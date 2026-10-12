@@ -1,56 +1,59 @@
-use jig_accounts_world::World;
-use jig_domain_accounts::{Event, Failure, Request};
+use jig_accounts_world::{ANALYST, World};
+use jig_domain_accounts::{Event, Failure, FromComponent, Place, Request, ToComponent, Unread};
 use skein_lib::{Duration, Rng};
-
 fn respond(world: &mut World, rng: &mut Rng, requests: Vec<Request>, trace: &mut Vec<Request>) {
     for request in &requests {
-        let terminal = match request {
-            Request::Refresh { account, generation } | Request::Keep { account, generation } => {
-                Some(if rng.chance(300) {
-                    Event::Failed { account: *account, generation: *generation, failure: Failure::Unavailable }
-                } else {
-                    Event::Refreshed { account: *account, generation: *generation, valid: Duration::from_secs(40) }
-                })
+        let response = match *request {
+            Request::Component(ToComponent::Want { account }) => Some(match rng.below(7) {
+                0 => FromComponent::Failed { account, failure: Failure::Later { after: None } },
+                1 => FromComponent::Failed { account, failure: Failure::SignInAgain },
+                2 => FromComponent::Failed { account, failure: Failure::Misconfigured },
+                3 => FromComponent::Failed {
+                    account,
+                    failure: Failure::Unloaded { at: Place::File, why: Unread::Stalled },
+                },
+                4 => FromComponent::Failed { account, failure: Failure::Cancelled },
+                _ => FromComponent::Granted { account, generation: 4, valid: Duration::from_secs(40) },
+            }),
+            Request::Component(ToComponent::Rejected { account, generation }) => {
+                Some(FromComponent::Expiring { account, generation })
             }
-            Request::Cancel { account, generation } => {
-                Some(Event::Failed { account: *account, generation: *generation, failure: Failure::Cancelled })
-            }
-            Request::Granted { .. }
-            | Request::Availability { .. }
-            | Request::Refused { .. }
-            | Request::Closed { .. } => None,
+            Request::Component(ToComponent::Close) => Some(FromComponent::Closed),
+            Request::Component(ToComponent::Release { .. }) | Request::Granted { .. } | Request::Closed => None,
         };
-        if let Some(event) = terminal {
-            trace.extend(world.step(event));
+        if let Some(event) = response {
+            trace.extend(world.step(Event::Component(event)));
         }
     }
     trace.extend(requests);
 }
-
 fn run(seed: u64) -> Vec<Request> {
     let mut world = World::default();
     let mut rng = Rng::new(seed);
-    let mut trace = world.step(Event::Add { account: 7, generation: 4, valid: Some(Duration::from_secs(40)) });
+    let mut trace = Vec::new();
+    let wanted = world.step(Event::Want);
+    respond(&mut world, &mut rng, wanted, &mut trace);
     for seconds in 1..160 {
         if rng.chance(40) {
-            let generation = world.domain.grant(7, world.now).map_or(4, |grant| grant.generation);
-            let requests = world.step(Event::Rejected { account: 7, generation });
+            let requests = world.step(Event::Rejected { account: ANALYST, generation: 4 });
             respond(&mut world, &mut rng, requests, &mut trace);
         }
         if rng.chance(30) {
-            trace.extend(world.step(Event::Exhausted { account: 7, retry_after: Duration::from_secs(5) }));
+            trace.extend(world.step(Event::Exhausted { account: ANALYST, retry_after: Duration::from_secs(5) }));
         }
         let due = world.fire_at(seconds);
         respond(&mut world, &mut rng, due, &mut trace);
-        assert!(world.domain.accounts() <= 2);
+        if world.domain.usable(ANALYST) {
+            assert!(world.domain.grant(ANALYST, world.now).is_some());
+        }
     }
-    let closing = world.step(Event::Close { account: 7 });
+    let closing = world.step(Event::Close);
     respond(&mut world, &mut rng, closing, &mut trace);
-    assert_eq!(world.domain.accounts(), 0, "every configured account closed");
-    assert!(world.domain.next_deadline().is_none(), "no timers after shutdown");
+    assert_eq!(world.domain.accounts(), 0);
+    assert_eq!(world.domain.next_deadline(), None);
+    assert!(world.step(Event::Want).is_empty());
     trace
 }
-
 #[test]
 fn seeded_account_timers_and_faults_replay() {
     for seed in 0..64 {

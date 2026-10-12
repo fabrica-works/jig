@@ -3,7 +3,7 @@
 //! client/domain/contract.md, 5 and 7.1;
 //! client/domain/pages.md, 7.
 use super::{AdmissionLimit, Chip, Funder, OwnerRequester, OwnerTaskLink, Proposer, Seen};
-use skein_lib::{Duration, List, Wall};
+use skein_lib::{Duration, List, Time, Wall};
 
 /// Whole supplied deployment facts with independent bounded loss counters.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -81,10 +81,10 @@ pub struct OwnerHostRun {
 #[expect(clippy::struct_excessive_bools, reason = "independent account flags and owner list loss")]
 pub struct OwnerAccount {
     pub number: u32,
-    pub generation: u64,
+    pub generation: Option<u64>,
     pub state: OwnerAccountState,
     pub usable: bool,
-    pub unsaved: bool,
+    pub expiring: bool,
     pub attention: bool,
     pub spent_until: Option<Wall>,
     pub runs: List<Chip>,
@@ -183,15 +183,13 @@ pub enum OwnerRunLocation {
 /// The supplied closed accountstate vocabulary.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum OwnerAccountState {
-    /// Fresh as supplied by its owner.
-    Fresh,
-    /// Refreshing as supplied by its owner.
-    Refreshing,
-    /// Retrying as supplied by its owner.
-    Retrying,
-    /// Revoked as supplied by its owner.
-    Revoked,
-    /// Closing as supplied by its owner.
+    Asking,
+    Granted,
+    Later { until: Time },
+    SignInAgain,
+    Misconfigured,
+    Unloaded { at: OwnerAccountPlace, why: OwnerAccountUnread },
+    Cancelled,
     Closing,
 }
 
@@ -330,4 +328,20 @@ pub enum OwnerTaskCapacityCause {
     Funders { limit: u32 },
     /// Writers as supplied by its owner.
     Writers { limit: u32 },
+}
+
+/// Where the account's record could not load.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum OwnerAccountPlace {
+    Directory,
+    File,
+}
+/// Why the account's record could not load.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum OwnerAccountUnread {
+    Unreadable,
+    Refused,
+    Failed,
+    Stalled,
+    TooLarge,
 }

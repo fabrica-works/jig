@@ -1354,6 +1354,7 @@ fn a_goal_with_a_deadline_is_held_past_it() {
     let goal = row.goal.number;
     let proposer = people::Proposer::Party(row.proposer);
     assert_eq!(row.goal.authority.budget.deadline, Some(deadline));
+    world.hold_accounts = true;
     world.restart_with(amendment_world_fixture(161).0);
     let Some(root::Record::Core(core::Record::Tasks(tasks::Stored::PersonProposal(row)))) =
         world.store.rows.get(&proposal_key)
@@ -1413,11 +1414,7 @@ fn a_goal_with_a_deadline_is_held_past_it() {
     );
     assert_eq!(live_row(&world, goal).authority.budget.deadline, Some(deadline));
     world.advance(skein_lib::Duration::from_secs(2));
-    world.send(root::Event::Core(core::Event::Account(jig_domain_accounts::Event::Add {
-        account: 1,
-        generation: 1,
-        valid: Some(skein_lib::Duration::from_secs(60)),
-    })));
+    world.grant_account(1);
     let chat = world.assignments[0];
     finish(&mut world, chat, b"chat finished");
     assert!(

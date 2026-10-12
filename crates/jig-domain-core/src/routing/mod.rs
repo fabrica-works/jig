@@ -281,6 +281,7 @@ fn route_room_checked(limits: &Limits) -> Option<u32> {
         .checked_add(limits.people.inbox_tasks)?
         .checked_add(fleet)?
         .checked_add(brief)?
+        .checked_add(limits.accounts.accounts.checked_add(2)?)?
         .checked_add(limits.people.pending.checked_mul(2)?)?
         .checked_add(
             limits.tasks.tasks.checked_mul(limits.tasks.tree_tasks.checked_add(limits.connectors)?.checked_add(4)?)?,
@@ -393,6 +394,11 @@ pub fn step(core: &mut Core, env: &Env<Limits>, event: Event) -> Requests {
     assert!(work.is_empty(), "finite sibling routes fit their bound");
     out.push(Request::Decided);
     Requests::Out(out)
+}
+
+/// Want every configured account once, at the restart's first step.
+pub fn want_accounts(core: &mut Core, env: &Env<Limits>) -> Requests {
+    route_account(core, env, accounts::Event::Want)
 }
 
 /// Resume the fleet's next held placement or relay through the core's sibling routes.
@@ -560,15 +566,13 @@ pub fn fire(core: &mut Core, env: &Env<Limits>, timer: Timer) -> Requests {
             tag_brief(core, env, out, brief::gather_max_out(&env.limits.brief))
         }
         Timer::Account => {
-            let mut out = Queue::with_capacity(accounts::MAX_OUT);
+            let mut out = Queue::with_capacity(accounts::max_out(&env.limits.accounts));
             accounts::fire(
                 &mut core.accounts,
                 &Env { now: env.now, wall: env.wall, limits: env.limits.accounts },
                 &mut out,
             );
-            if !out.is_empty() {
-                core.touch_deployment();
-            }
+            core.touch_deployment();
             tag_account(out)
         }
         Timer::View => {

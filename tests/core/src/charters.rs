@@ -49,11 +49,9 @@ pub fn two_charters(seed: u64) -> (root::Config, root::Limits) {
 impl World {
     /// Make this charter's account usable without changing another charter's grant.
     pub fn grant_account(&mut self, account: u32) {
-        self.send(root::Event::Core(core::Event::Account(accounts::Event::Add {
-            account,
-            generation: 1,
-            valid: Some(Duration::from_secs(60)),
-        })));
+        self.send(root::Event::Core(core::Event::Account(accounts::Event::Component(
+            accounts::FromComponent::Granted { account, generation: 1, valid: Duration::from_secs(60) },
+        ))));
     }
 
     /// Delegate one agent task from the currently assigned chat.

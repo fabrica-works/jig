@@ -516,6 +516,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event) {
                 core::RestartRequest::Step(step) => domain.restart_load = Some(step),
                 core::RestartRequest::Idle | core::RestartRequest::Refused { .. } => {}
             }
+            decide(domain, env, Work::Core(core::Event::Account(jig_domain_accounts::Event::Want)));
         }
         Event::RestartDone(step) => {
             let request = domain.core.restart_done(step);

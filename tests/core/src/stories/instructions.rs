@@ -43,11 +43,7 @@ pub fn task_document(w: &mut World, task: u64, request: u64) -> documents::Task 
     *doc.clone()
 }
 pub fn sign_in(w: &mut World) {
-    w.send(root::Event::Core(core::Event::Account(jig_domain_accounts::Event::Add {
-        account: 1,
-        generation: 1,
-        valid: Some(skein_lib::Duration::from_secs(60)),
-    })));
+    w.grant_account(1);
     w.send(root::Event::Core(core::Event::Fleet(jig_domain_fleet::Event::Hello {
         channel: Token::new(7),
         hello: jig_domain_fleet::Hello {

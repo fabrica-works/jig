@@ -107,7 +107,14 @@ impl Payload for OwnerRunLocation {
 impl Payload for OwnerAccountState {
     fn heap(&self, _bounds: &Bounds) -> Option<u64> {
         match self {
-            Self::Fresh | Self::Refreshing | Self::Retrying | Self::Revoked | Self::Closing => Some(0),
+            Self::Asking
+            | Self::Granted
+            | Self::Later { .. }
+            | Self::SignInAgain
+            | Self::Misconfigured
+            | Self::Unloaded { .. }
+            | Self::Cancelled
+            | Self::Closing => Some(0),
         }
     }
 }

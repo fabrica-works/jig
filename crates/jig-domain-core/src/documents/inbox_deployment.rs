@@ -112,10 +112,10 @@ pub struct Host {
 #[expect(clippy::struct_excessive_bools, reason = "independent child-owned flags plus document truncation")]
 pub struct Account {
     pub number: u32,
-    pub generation: u64,
+    pub generation: Option<u64>,
     pub state: accounts::State,
     pub usable: bool,
-    pub unsaved: bool,
+    pub expiring: bool,
     pub attention: bool,
     pub spent_until: Option<Wall>,
     pub runs: List<Chip>,
@@ -641,7 +641,7 @@ pub(super) fn deployment(
                 generation: value.generation,
                 state: value.state,
                 usable: value.usable,
-                unsaved: value.unsaved,
+                expiring: value.expiring,
                 attention: value.attention,
                 spent_until: match value.spent_until {
                     Some(at) => wall_deadline(clock, at),

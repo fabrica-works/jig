@@ -486,12 +486,17 @@ impl Application for Testing {
                     .into_iter()
                     .map(Input::Event)
                     .collect(),
-                Delivery::Now(core::Now::Account(accounts::Request::Refresh { account, generation })) => {
-                    vec![Input::Event(root::Event::Core(core::Event::Account(accounts::Event::Refreshed {
-                        account,
-                        generation,
-                        valid: Duration::from_secs(60),
-                    })))]
+                Delivery::Now(core::Now::Account(accounts::Request::Component(accounts::ToComponent::Want {
+                    account,
+                }))) => {
+                    vec![Input::Event(root::Event::Core(core::Event::Account(accounts::Event::Component(
+                        accounts::FromComponent::Granted { account, generation: 1, valid: Duration::from_secs(60) },
+                    ))))]
+                }
+                Delivery::Now(core::Now::Account(accounts::Request::Component(accounts::ToComponent::Close))) => {
+                    vec![Input::Event(root::Event::Core(core::Event::Account(accounts::Event::Component(
+                        accounts::FromComponent::Closed,
+                    ))))]
                 }
                 Delivery::Now(core::Now::StartPreparation { task, .. }) => {
                     let rows = store
@@ -662,11 +667,9 @@ impl Application for Testing {
         if ready {
             if !peers.account_ready {
                 peers.account_ready = true;
-                events.push(Input::Event(root::Event::Core(core::Event::Account(accounts::Event::Add {
-                    account: 1,
-                    generation: 1,
-                    valid: Some(Duration::from_secs(60)),
-                }))));
+                events.push(Input::Event(root::Event::Core(core::Event::Account(accounts::Event::Component(
+                    accounts::FromComponent::Granted { account: 1, generation: 1, valid: Duration::from_secs(60) },
+                )))));
             }
             events.extend(peers.peers.tick(store, Time::from_nanos(clock.now)).into_iter().map(Input::Event));
         }

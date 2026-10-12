@@ -1,6 +1,7 @@
 //! Entry-point checks for the reference journal and routes.
 use crate::{Config, Domain, Event, Limits, Output, Released, Store, release, step};
 use alloc::boxed::Box;
+use jig_domain_accounts as accounts;
 use jig_domain_core as core;
 use jig_domain_host as host;
 use jig_ops_domain_infrastructure as infrastructure;
@@ -216,6 +217,11 @@ fn cold_restart_loads_every_child_before_opening_decisions() {
     for _ in 0..16_u32 {
         for output in take(&mut domain, &env) {
             match output {
+                Output::Now(core::Now::Account(accounts::Request::Component(accounts::ToComponent::Want {
+                    account,
+                }))) => {
+                    assert_eq!(account, 1);
+                }
                 Output::Load { step: stage, .. } => {
                     loads.push(stage).unwrap();
                     if let Some(record) = header.take() {
@@ -319,7 +325,12 @@ fn started_chat() -> (Domain, Env<Limits>, Token) {
         core::Event::People(people::Event::Restored),
         core::Event::Tasks(tasks::Event::Restored),
         core::Event::Fleet(fleet::Event::Loaded),
-        core::Event::Account(accounts::Event::Add { account: 1, generation: 1, valid: Some(Duration::from_secs(60)) }),
+        core::Event::Account(accounts::Event::Want),
+        core::Event::Account(accounts::Event::Component(accounts::FromComponent::Granted {
+            account: 1,
+            generation: 1,
+            valid: Duration::from_secs(60),
+        })),
     ] {
         step(&mut domain, &env, Event::Core(event));
         settle(&mut domain, &env);

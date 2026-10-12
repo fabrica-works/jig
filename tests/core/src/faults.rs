@@ -74,11 +74,9 @@ pub fn worker_fault(world: &mut World, index: usize, fault: Fault) {
 pub fn restart(world: &mut World, seed: u64, engine: bool) {
     world.restart_with(crate::peers::fixture(seed, u32::from(engine)).0);
     // Account usability is an independently refreshed runtime capability.
-    world.send(jig_test_domain::Event::Core(jig_domain_core::Event::Account(jig_domain_accounts::Event::Add {
-        account: 1,
-        generation: 1,
-        valid: Some(Duration::from_secs(60)),
-    })));
+    world.send(jig_test_domain::Event::Core(jig_domain_core::Event::Account(jig_domain_accounts::Event::Component(
+        jig_domain_accounts::FromComponent::Granted { account: 1, generation: 1, valid: Duration::from_secs(60) },
+    ))));
 }
 
 /// The bounded two-level plan fixture used by resource and failure stories.

@@ -472,7 +472,7 @@ pub fn english(text: u32) -> Result<Words, Invalid> {
     let book = Phrasebook::load(
         shapes(jig_view::phrases::jig::shapes(text)),
         Box::new([english]),
-        &PhraseLimits { languages: 1, phrases: count, holes: 4, segments: 3000, text_bytes: 30000, hole_bytes: text },
+        &PhraseLimits { languages: 1, phrases: count, holes: 4, segments: 3000, text_bytes: 32000, hole_bytes: text },
     )?;
     Ok(Words { book, language: 0, offset_minutes: 0 })
 }

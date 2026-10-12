@@ -327,18 +327,10 @@ pub(super) fn tag_fleet(core: &mut Core, env: &Env<Limits>, mut child: Queue<fle
 }
 
 pub(super) fn tag_account(mut child: Queue<accounts::Request>) -> Requests {
-    let mut out = Queue::with_capacity(accounts::MAX_OUT.checked_add(1).expect("account output room"));
+    let mut out = Queue::with_capacity(child.capacity().checked_add(1).expect("account output room"));
     for _ in 0..child.len() {
-        let request = match child.pop().expect("account output count") {
-            request @ (accounts::Request::Refresh { .. }
-            | accounts::Request::Keep { .. }
-            | accounts::Request::Cancel { .. }
-            | accounts::Request::Granted { .. }
-            | accounts::Request::Availability { .. }
-            | accounts::Request::Refused { .. }
-            | accounts::Request::Closed { .. }) => Request::Now(Box::new(Now::Account(request))),
-        };
-        out.push(request);
+        let request = child.pop().expect("account output count");
+        out.push(Request::Now(Box::new(Now::Account(request))));
     }
     out.push(Request::Decided);
     Requests::Out(out)
@@ -354,7 +346,7 @@ pub(super) fn remember_due(core: &mut Core, context: Box<tasks::RunContext>) {
 }
 
 pub(super) fn route_account(core: &mut Core, env: &Env<Limits>, event: accounts::Event) -> Requests {
-    let mut out = Queue::with_capacity(accounts::MAX_OUT);
+    let mut out = Queue::with_capacity(accounts::max_out(&env.limits.accounts));
     accounts::step(
         &mut core.accounts,
         &Env { now: env.now, wall: env.wall, limits: env.limits.accounts },

@@ -97,7 +97,7 @@ fn account(value: &documents::Account, limits: &Limits) -> Result<client::OwnerA
         generation: value.generation,
         state: account_state(value.state),
         usable: value.usable,
-        unsaved: value.unsaved,
+        expiring: value.expiring,
         attention: value.attention,
         spent_until: value.spent_until,
         runs: owner::list(&value.runs, limits, |value| chips::chip(value, limits))?,
@@ -159,10 +159,25 @@ fn attempt(value: fleet::AttemptState) -> client::OwnerAttemptState {
 
 fn account_state(value: accounts::State) -> client::OwnerAccountState {
     match value {
-        accounts::State::Fresh => client::OwnerAccountState::Fresh,
-        accounts::State::Refreshing => client::OwnerAccountState::Refreshing,
-        accounts::State::Retrying => client::OwnerAccountState::Retrying,
-        accounts::State::Revoked => client::OwnerAccountState::Revoked,
+        accounts::State::Granted => client::OwnerAccountState::Granted,
+        accounts::State::Asking => client::OwnerAccountState::Asking,
+        accounts::State::SignInAgain => client::OwnerAccountState::SignInAgain,
+        accounts::State::Misconfigured => client::OwnerAccountState::Misconfigured,
+        accounts::State::Later { until } => client::OwnerAccountState::Later { until },
+        accounts::State::Unloaded { at, why } => client::OwnerAccountState::Unloaded {
+            at: match at {
+                accounts::Place::Directory => client::OwnerAccountPlace::Directory,
+                accounts::Place::File => client::OwnerAccountPlace::File,
+            },
+            why: match why {
+                accounts::Unread::Unreadable => client::OwnerAccountUnread::Unreadable,
+                accounts::Unread::Refused => client::OwnerAccountUnread::Refused,
+                accounts::Unread::Failed => client::OwnerAccountUnread::Failed,
+                accounts::Unread::Stalled => client::OwnerAccountUnread::Stalled,
+                accounts::Unread::TooLarge => client::OwnerAccountUnread::TooLarge,
+            },
+        },
+        accounts::State::Cancelled => client::OwnerAccountState::Cancelled,
         accounts::State::Closing => client::OwnerAccountState::Closing,
     }
 }

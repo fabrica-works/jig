@@ -8,71 +8,73 @@ pub struct Grant {
     pub valid: Duration,
 }
 
+/// Accounts on the component's terms (protocol/llm.md, 5.2).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Event {
-    /// Configured at startup. None means only a refresh token was kept.
-    Add {
-        account: u32,
-        generation: u64,
-        valid: Option<Duration>,
-    },
-    Refreshed {
-        account: u32,
-        generation: u64,
-        valid: Duration,
-    },
-    Failed {
-        account: u32,
-        generation: u64,
-        failure: Failure,
-    },
-    Rejected {
-        account: u32,
-        generation: u64,
-    },
-    Exhausted {
-        account: u32,
-        retry_after: Duration,
-    },
-    Close {
-        account: u32,
-    },
+    Want,
+    Component(FromComponent),
+    Rejected { account: u32, generation: u64 },
+    Exhausted { account: u32, retry_after: Duration },
+    Close,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum FromComponent {
+    Granted { account: u32, generation: u64, valid: Duration },
+    Expiring { account: u32, generation: u64 },
+    Failed { account: u32, failure: Failure },
+    Closed,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Failure {
-    Unavailable,
-    TimedOut,
-    RateLimited {
-        retry_after: Duration,
-    },
-    Refused,
-    /// The newly bought token is held by the protocol, but saving failed.
-    /// Retry its write, never spend the rotating refresh token again.
-    Unsaved {
-        valid: Duration,
-    },
+    Later { after: Option<Duration> },
+    SignInAgain,
+    Misconfigured,
+    Unloaded { at: Place, why: Unread },
     Cancelled,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub enum Request {
-    Refresh { account: u32, generation: u64 },
-    Keep { account: u32, generation: u64 },
-    Cancel { account: u32, generation: u64 },
-    Granted { grant: Grant },
-    Availability { account: u32, usable: bool },
-    Refused { account: u32 },
-    Closed { account: u32 },
+pub enum Place {
+    Directory,
+    File,
 }
 
-/// Account state for views. A spent overlay is carried separately by facts.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Unread {
+    Unreadable,
+    Refused,
+    Failed,
+    Stalled,
+    TooLarge,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum ToComponent {
+    Want { account: u32 },
+    Rejected { account: u32, generation: u64 },
+    Release { account: u32 },
+    Close,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Request {
+    Component(ToComponent),
+    Granted { grant: Grant },
+    Closed,
+}
+
+/// Secret-free account state (domain/engine.md, section 12).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum State {
-    Fresh,
-    Refreshing,
-    Retrying,
-    Revoked,
+    Asking,
+    Granted,
+    Later { until: Time },
+    SignInAgain,
+    Misconfigured,
+    Unloaded { at: Place, why: Unread },
+    Cancelled,
     Closing,
 }
 
@@ -80,10 +82,9 @@ pub enum State {
 pub struct Fact {
     pub account: u32,
     pub state: State,
-    pub generation: u64,
+    pub generation: Option<u64>,
     pub usable: bool,
-    pub unsaved: bool,
+    pub expiring: bool,
     pub spent_until: Option<Time>,
-    /// Revocation, an unsaved rotation, or a long account cooldown.
     pub attention: bool,
 }

@@ -1,16 +1,18 @@
 //! Deployment facts and bounded live diagnostics (pages.md, 7; view.md, 7).
 //! Supplied clocks, loss counters and identities stay independent.
 use crate::{
-    Builder, JigBindings, Key, Owner, Role, Run, owner_deployment_words::DeploymentPhrase as P, phrases::Hole,
+    Builder, JigBindings, Key, Owner, Role, Run,
+    owner_deployment_words::{AccountPhrase as A, DeploymentPhrase as P},
+    phrases::Hole,
     words::Words,
 };
 use jig_domain_client::{
     Domain, Limits,
     contract::{
-        AdmissionLimit, Chip, ChipPhase, Funder, OwnerAccountState, OwnerAttemptState, OwnerCapacity, OwnerChipPhase,
-        OwnerDeployment, OwnerHelloRefusal, OwnerHelloRefusalLine, OwnerHostKind, OwnerHostRun,
-        OwnerPersonCapacityAction, OwnerPersonCapacityCause, OwnerRunLocation, OwnerTaskCapacityAction,
-        OwnerTaskCapacityCause, OwnerTaskLink, Proposer, Seen,
+        AdmissionLimit, Chip, ChipPhase, Funder, OwnerAccountPlace, OwnerAccountState, OwnerAccountUnread,
+        OwnerAttemptState, OwnerCapacity, OwnerChipPhase, OwnerDeployment, OwnerHelloRefusal, OwnerHelloRefusalLine,
+        OwnerHostKind, OwnerHostRun, OwnerPersonCapacityAction, OwnerPersonCapacityCause, OwnerRunLocation,
+        OwnerTaskCapacityAction, OwnerTaskCapacityCause, OwnerTaskLink, Proposer, Seen,
     },
 };
 use skein_lib::{Duration, Wall};
@@ -82,10 +84,29 @@ fn attempt_state(b: &mut Builder, words: &Words, value: OwnerAttemptState) {
 }
 fn account_state(b: &mut Builder, words: &Words, value: OwnerAccountState) {
     let phrase = match value {
-        OwnerAccountState::Fresh => P::AccountStateFresh,
-        OwnerAccountState::Refreshing => P::AccountStateRefreshing,
-        OwnerAccountState::Retrying => P::AccountStateRetrying,
-        OwnerAccountState::Revoked => P::AccountStateRevoked,
+        OwnerAccountState::Granted => P::AccountStateGranted,
+        OwnerAccountState::Asking => P::AccountStateAsking,
+        OwnerAccountState::SignInAgain => P::AccountStateSignInAgain,
+        OwnerAccountState::Misconfigured => P::AccountStateMisconfigured,
+        OwnerAccountState::Later { .. } => P::AccountDetail(A::Later),
+        OwnerAccountState::Unloaded { at, why } => {
+            text(b, words, P::AccountDetail(A::Unloaded), &[]);
+            let place = match at {
+                OwnerAccountPlace::Directory => A::Directory,
+                OwnerAccountPlace::File => A::File,
+            };
+            text(b, words, P::AccountDetail(place), &[]);
+            let why = match why {
+                OwnerAccountUnread::Unreadable => A::Unreadable,
+                OwnerAccountUnread::Refused => A::Refused,
+                OwnerAccountUnread::Failed => A::Failed,
+                OwnerAccountUnread::Stalled => A::Stalled,
+                OwnerAccountUnread::TooLarge => A::TooLarge,
+            };
+            text(b, words, P::AccountDetail(why), &[]);
+            return;
+        }
+        OwnerAccountState::Cancelled => P::AccountDetail(A::Cancelled),
         OwnerAccountState::Closing => P::AccountStateClosing,
     };
     text(b, words, phrase, &[]);
@@ -511,13 +532,15 @@ fn render_accounts(
             words,
             P::Account,
             &[Hole::Number(u64::from(account.number))],
-            Some(Key { owner: Owner::Jig, kind: 95, a: u64::from(account.number), b: account.generation }),
+            Some(Key { owner: Owner::Jig, kind: 95, a: u64::from(account.number), b: account.generation.unwrap_or(0) }),
         );
         field_number(b, words, P::Account, u64::from(account.number));
-        field_number(b, words, P::Generation, account.generation);
+        if let Some(generation) = account.generation {
+            field_number(b, words, P::Generation, generation);
+        }
         account_state(b, words, account.state);
         text(b, words, if account.usable { P::Usable } else { P::Unusable }, &[]);
-        text(b, words, if account.unsaved { P::Unsaved } else { P::Saved }, &[]);
+        text(b, words, if account.expiring { P::Expiring } else { P::NotExpiring }, &[]);
         text(b, words, if account.attention { P::Attention } else { P::NoAttention }, &[]);
         wall(b, words, P::SpentUntil, P::UnknownClock, account.spent_until);
         region(b, words, P::Runs, &[], None);

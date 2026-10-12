@@ -56,7 +56,7 @@ mod sibling_routes;
 pub use numbers::{Counters, Deployment, Family, fresh};
 pub use routing::{
     Ask, CoreBriefBudgets, EscalationChoice, Event, Held, Limits, NamedAction, Now, PayloadRefusal, ProposalChoice,
-    Request, Requests, Timer, ToolKind, WatchRefusal, Write, fire, resume_fleet, room, room_max, step,
+    Request, Requests, Timer, ToolKind, WatchRefusal, Write, fire, resume_fleet, room, room_max, step, want_accounts,
 };
 pub use sibling_routes::{MadeRoute, PersonMessage, SentRoute};
 mod conversation;
@@ -498,6 +498,13 @@ impl Core {
                 "core prices configured permission roles"
             );
         }
+        let mut configured_accounts = List::with_capacity(limits.accounts.accounts);
+        for charter in &config.settings.charters {
+            let number = charter.account();
+            if !configured_accounts.as_slice().contains(&number) {
+                configured_accounts.push(number).expect("configured accounts fit their bound");
+            }
+        }
         Core {
             workers_in_process: config.workers_in_process,
             stopping: false,
@@ -577,7 +584,7 @@ impl Core {
             authority: config.authority,
             people: people::Domain::new(&limits.people, config.owners, config.settings.deployment_provider),
             fleet: fleet::Domain::new(&limits.fleet),
-            accounts: accounts::Domain::new(&limits.accounts),
+            accounts: accounts::Domain::new(&limits.accounts, configured_accounts.into_boxed()),
             brief: brief::GatherDomain::new(&limits.brief),
             notes: notes::Domain::new(&limits.notes),
             views: views::Domain::new(&limits.views),

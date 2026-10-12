@@ -21,11 +21,9 @@ fn hello(world: &mut World, hosting: Box<[fleet::Hosted]>) {
 }
 
 fn account(world: &mut World) {
-    world.send(root::Event::Core(core::Event::Account(jig_domain_accounts::Event::Add {
-        account: 1,
-        generation: 1,
-        valid: Some(Duration::from_secs(60)),
-    })));
+    world.send(root::Event::Core(core::Event::Account(jig_domain_accounts::Event::Component(
+        jig_domain_accounts::FromComponent::Granted { account: 1, generation: 1, valid: Duration::from_secs(60) },
+    ))));
 }
 
 fn applied_without_answer(world: &mut World) {

@@ -152,10 +152,14 @@ fn deployment_view_all_attempt_account_hello_states_clocks_keys_and_independent_
         assert!(tree.nodes().iter().any(|n| n.key.is_some_and(|k| k.kind == 96 && k.a == u64::MAX && k.b == u64::MAX)));
     }
     for (state, label) in [
-        (OwnerAccountState::Fresh, b"Account State Fresh".as_slice()),
-        (OwnerAccountState::Refreshing, b"Account State Refreshing"),
-        (OwnerAccountState::Retrying, b"Account State Retrying"),
-        (OwnerAccountState::Revoked, b"Account State Revoked"),
+        (OwnerAccountState::Granted, b"Account State Granted".as_slice()),
+        (OwnerAccountState::Asking, b"Account State Asking"),
+        (OwnerAccountState::SignInAgain, b"Account State Sign in again"),
+        (OwnerAccountState::Misconfigured, b"Account State Misconfigured"),
+        (
+            OwnerAccountState::Unloaded { at: OwnerAccountPlace::File, why: OwnerAccountUnread::Refused },
+            b"Account State Unloaded",
+        ),
         (OwnerAccountState::Closing, b"Account State Closing"),
     ] {
         let mut value = empty();
@@ -163,10 +167,10 @@ fn deployment_view_all_attempt_account_hello_states_clocks_keys_and_independent_
             .accounts
             .push(OwnerAccount {
                 number: u32::MAX,
-                generation: u64::MAX,
+                generation: Some(u64::MAX),
                 state,
                 usable: false,
-                unsaved: true,
+                expiring: true,
                 attention: true,
                 spent_until: Some(Wall::EPOCH),
                 runs: List::with_capacity(2),
@@ -176,6 +180,10 @@ fn deployment_view_all_attempt_account_hello_states_clocks_keys_and_independent_
             .unwrap();
         let tree = round_trip(value);
         assert!(contains(&tree, label));
+        if label == b"Account State Unloaded" {
+            assert!(contains(&tree, b"Record file"));
+            assert!(contains(&tree, b"Record refused"));
+        }
         assert!(contains(&tree, b"Spent until:"));
         assert!(
             tree.nodes()
@@ -274,7 +282,7 @@ fn deployment_view_normal_words_select_second_language_and_reject_missing_or_wro
     let tree = build(&client, &words, maximum);
     assert!(contains(&tree, b"selected "));
     assert!(!contains(&tree, b"Deployment diagnostics"));
-    assert_eq!(crate::owner_deployment_words::ALL.len(), 199);
+    assert_eq!(crate::owner_deployment_words::ALL.len(), 209);
     let mut wrong = crate::owner_deployment_words::language();
     let phrase = wrong.phrases.iter_mut().find(|p| p.id == P::Host.id()).unwrap();
     phrase.forms[0].segments = Box::new([Segment::Text(copy_of(b"host without number"))]);
@@ -326,10 +334,10 @@ fn deployment_view_all_outer_and_nested_lists_fill_together_with_exact_and_one_u
             .accounts
             .push(OwnerAccount {
                 number: if n == 0 { 0 } else { u32::MAX },
-                generation: n,
+                generation: Some(n),
                 state: OwnerAccountState::Closing,
                 usable: true,
-                unsaved: true,
+                expiring: true,
                 attention: true,
                 spent_until: Some(Wall::EPOCH),
                 runs: list(vec![genuine_owner_chip_fixture(n), genuine_owner_chip_fixture(n.wrapping_add(1))]),

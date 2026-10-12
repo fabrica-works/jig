@@ -141,10 +141,9 @@ pub fn limits() -> root::Limits {
             },
             accounts: accounts::Limits {
                 accounts: 1,
-                refresh_margin: Duration::from_secs(1),
-                backoff_base: Duration::from_millis(10),
-                backoff_max: Duration::from_secs(1),
-                rejected_interval: Duration::from_millis(10),
+                backoff_base: Duration::from_secs(2),
+                backoff_max: Duration::from_secs(8),
+                retry: Duration::from_secs(30),
                 spent_attention: Duration::from_secs(1),
                 facts: 2,
             },
@@ -424,11 +423,10 @@ impl World {
         events.push_back(root::Event::Core(core::Event::People(people::Event::Restored)));
         events.push_back(root::Event::Core(core::Event::Tasks(tasks::Event::Restored)));
         events.push_back(root::Event::Core(core::Event::Fleet(fleet::Event::Loaded)));
-        events.push_back(root::Event::Core(core::Event::Account(accounts::Event::Add {
-            account: 1,
-            generation: 1,
-            valid: Some(Duration::from_secs(60)),
-        })));
+        events.push_back(root::Event::Core(core::Event::Account(accounts::Event::Want)));
+        events.push_back(root::Event::Core(core::Event::Account(accounts::Event::Component(
+            accounts::FromComponent::Granted { account: 1, generation: 1, valid: Duration::from_secs(60) },
+        ))));
         events.push_back(root::Event::Core(core::Event::Fleet(fleet::Event::Hello {
             channel: Token::new(7),
             hello: fleet::Hello {
@@ -498,12 +496,17 @@ impl World {
                     self.events.push_front(root::Event::Committed { number: applied });
                 }
                 root::Request::Deliver(delivery) => self.delivered(delivery),
-                root::Request::Now(core::Now::Account(accounts::Request::Refresh { account, generation })) => {
-                    self.events.push_back(root::Event::Core(core::Event::Account(accounts::Event::Refreshed {
-                        account,
-                        generation,
-                        valid: Duration::from_secs(60),
-                    })));
+                root::Request::Now(core::Now::Account(accounts::Request::Component(accounts::ToComponent::Want {
+                    account,
+                }))) => {
+                    self.events.push_back(root::Event::Core(core::Event::Account(accounts::Event::Component(
+                        accounts::FromComponent::Granted { account, generation: 1, valid: Duration::from_secs(60) },
+                    ))));
+                }
+                root::Request::Now(core::Now::Account(accounts::Request::Component(accounts::ToComponent::Close))) => {
+                    self.events.push_back(root::Event::Core(core::Event::Account(accounts::Event::Component(
+                        accounts::FromComponent::Closed,
+                    ))));
                 }
                 root::Request::Now(core::Now::HistoricalPersonTask { request, person, project, task }) => {
                     let key = root::Key::Core(core::Key::Tasks(tasks::Key::Ended(task)));

@@ -1,4 +1,5 @@
 //! A scripted caller and two independent systems exercise the root boundary.
+mod account_preparation;
 use crate::Store;
 use jig_domain_accounts as accounts;
 use jig_domain_authority as authority;
@@ -35,6 +36,8 @@ pub struct World {
     pub answers: Vec<(Token, core::CallKey, core::CallPart)>,
     pub assigned: Option<root::Assignment>,
     last_read: Option<u64>,
+    pub fail_account_before_workspace: bool,
+    pub hold_accounts: bool,
     pub assignments: Vec<(u64, u64)>,
     pub cancellations: Vec<(u64, u64)>,
     pub busy_turns: Vec<(u64, u64, u32)>,
@@ -220,11 +223,11 @@ impl World {
             }
         }
         world.events.extend([
-            root::Event::Core(core::Event::Account(accounts::Event::Add {
+            root::Event::Core(core::Event::Account(accounts::Event::Component(accounts::FromComponent::Granted {
                 account: 1,
                 generation: 1,
-                valid: Some(Duration::from_secs(60)),
-            })),
+                valid: Duration::from_secs(60),
+            }))),
             root::Event::Core(core::Event::Fleet(fleet::Event::Hello {
                 channel: Token::new(7),
                 hello: fleet::Hello {
@@ -265,6 +268,8 @@ impl World {
             answers: Vec::new(),
             assigned: None,
             last_read: None,
+            fail_account_before_workspace: false,
+            hold_accounts: false,
             assignments: Vec::new(),
             cancellations: Vec::new(),
             busy_turns: Vec::new(),
@@ -363,11 +368,9 @@ impl World {
             root::Record::Core(core::Record::People(people::Stored::Roles { project: 1, holdings: Box::new([]) }));
         world.store.rows.insert(row.key(), row);
         world.events.push_back(root::Event::RestartBegin);
-        world.events.push_back(root::Event::Core(core::Event::Account(accounts::Event::Add {
-            account: 1,
-            generation: 1,
-            valid: Some(Duration::from_secs(60)),
-        })));
+        world.events.push_back(root::Event::Core(core::Event::Account(accounts::Event::Component(
+            accounts::FromComponent::Granted { account: 1, generation: 1, valid: Duration::from_secs(60) },
+        ))));
         world.drain();
         world
     }
@@ -534,27 +537,7 @@ impl World {
                     }
                     root::Request::Deliver(delivery) => self.delivered(delivery),
                     root::Request::Now(core::Now::StartPreparation { task, .. }) => {
-                        let rows: Vec<_> = self
-                            .store
-                            .rows
-                            .values()
-                            .filter_map(|record| match record {
-                                root::Record::Core(core::Record::Core(core::CoreRecord::Turn(turn)))
-                                    if turn.task == task =>
-                                {
-                                    Some(turn.clone())
-                                }
-                                root::Record::Core(_) | root::Record::Connector { .. } => None,
-                            })
-                            .collect();
-                        for row in rows {
-                            self.events.push_back(root::Event::TranscriptLoaded {
-                                task,
-                                rows: Box::new([row]),
-                                done: false,
-                            });
-                        }
-                        self.events.push_back(root::Event::TranscriptLoaded { task, rows: Box::new([]), done: true });
+                        self.transcript_loaded(task);
                     }
                     root::Request::Now(core::Now::Call { to, run, attempt, call }) => {
                         let token = to.into_token();
@@ -580,12 +563,8 @@ impl World {
                         }
                         self.answers.push((token, key, part));
                     }
-                    root::Request::Now(core::Now::Account(accounts::Request::Refresh { account, generation })) => {
-                        self.events.push_back(root::Event::Core(core::Event::Account(accounts::Event::Refreshed {
-                            account,
-                            generation,
-                            valid: Duration::from_secs(60),
-                        })));
+                    root::Request::Now(core::Now::Account(accounts::Request::Component(request))) => {
+                        self.account_request(request);
                     }
                     root::Request::Now(core::Now::LoadEndedChat { task }) => {
                         let key = root::Key::Core(core::Key::Tasks(tasks::Key::Ended(task)));

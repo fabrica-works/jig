@@ -13,7 +13,7 @@ use skein_lib::{Decision, Env, Queue};
 
 pub(crate) fn route(
     domain: &mut Domain,
-    _env: &Env<Limits>,
+    env: &Env<Limits>,
     decision: &mut Decision<Write, Output>,
     request: core::RestartRequest,
     work: &mut Queue<Work>,
@@ -21,7 +21,14 @@ pub(crate) fn route(
     match request {
         core::RestartRequest::Idle | core::RestartRequest::Refused { .. } => {}
         core::RestartRequest::Step(step) => match step {
-            core::RestartStep::LoadCore => held(decision, Output::Load { step, range: Range::Core }),
+            core::RestartStep::LoadCore => {
+                let requests = core::want_accounts(
+                    &mut domain.core,
+                    &Env { now: env.now, wall: env.wall, limits: env.limits.core },
+                );
+                crate::route::core_out(domain, env, decision, requests, work);
+                held(decision, Output::Load { step, range: Range::Core });
+            }
             core::RestartStep::LoadInbox => held(decision, Output::Load { step, range: Range::Inbox }),
             core::RestartStep::RestoreConnector { connector } => {
                 let range = match jig_ops_domain_connectors::connector(connector) {

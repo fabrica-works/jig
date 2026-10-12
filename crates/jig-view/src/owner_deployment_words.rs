@@ -1,4 +1,5 @@
 //! Deployment diagnostics sayings (client/domain/view.md, 7).
+mod accounts;
 use crate::{
     Owner,
     phrases::{
@@ -6,6 +7,7 @@ use crate::{
         WallFormat,
     },
 };
+pub use accounts::AccountPhrase;
 use alloc::boxed::Box;
 use skein_lib::{List, bytes::copy_of};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -38,8 +40,8 @@ pub enum DeploymentPhrase {
     NotDraining,
     Usable,
     Unusable,
-    Unsaved,
-    Saved,
+    Expiring,
+    NotExpiring,
     Attention,
     NoAttention,
     TaskProposer,
@@ -106,10 +108,11 @@ pub enum DeploymentPhrase {
     RunLocationNone,
     RunLocationConnected,
     RunLocationAdrift,
-    AccountStateFresh,
-    AccountStateRefreshing,
-    AccountStateRetrying,
-    AccountStateRevoked,
+    AccountStateGranted,
+    AccountStateAsking,
+    AccountStateSignInAgain,
+    AccountStateMisconfigured,
+    AccountDetail(AccountPhrase),
     AccountStateClosing,
     HelloRefusalReservedChannel,
     HelloRefusalWorkers,
@@ -210,7 +213,7 @@ pub enum DeploymentPhrase {
     ConnectorsCut,
     ConnectorsEmpty,
 }
-pub const ALL: [DeploymentPhrase; 199] = [
+pub const ALL: [DeploymentPhrase; 209] = [
     DeploymentPhrase::Deployment,
     DeploymentPhrase::Hosts,
     DeploymentPhrase::Attempts,
@@ -239,8 +242,8 @@ pub const ALL: [DeploymentPhrase; 199] = [
     DeploymentPhrase::NotDraining,
     DeploymentPhrase::Usable,
     DeploymentPhrase::Unusable,
-    DeploymentPhrase::Unsaved,
-    DeploymentPhrase::Saved,
+    DeploymentPhrase::Expiring,
+    DeploymentPhrase::NotExpiring,
     DeploymentPhrase::Attention,
     DeploymentPhrase::NoAttention,
     DeploymentPhrase::TaskProposer,
@@ -307,10 +310,20 @@ pub const ALL: [DeploymentPhrase; 199] = [
     DeploymentPhrase::RunLocationNone,
     DeploymentPhrase::RunLocationConnected,
     DeploymentPhrase::RunLocationAdrift,
-    DeploymentPhrase::AccountStateFresh,
-    DeploymentPhrase::AccountStateRefreshing,
-    DeploymentPhrase::AccountStateRetrying,
-    DeploymentPhrase::AccountStateRevoked,
+    DeploymentPhrase::AccountStateGranted,
+    DeploymentPhrase::AccountStateAsking,
+    DeploymentPhrase::AccountStateSignInAgain,
+    DeploymentPhrase::AccountStateMisconfigured,
+    DeploymentPhrase::AccountDetail(AccountPhrase::Later),
+    DeploymentPhrase::AccountDetail(AccountPhrase::Unloaded),
+    DeploymentPhrase::AccountDetail(AccountPhrase::Cancelled),
+    DeploymentPhrase::AccountDetail(AccountPhrase::Directory),
+    DeploymentPhrase::AccountDetail(AccountPhrase::File),
+    DeploymentPhrase::AccountDetail(AccountPhrase::Unreadable),
+    DeploymentPhrase::AccountDetail(AccountPhrase::Refused),
+    DeploymentPhrase::AccountDetail(AccountPhrase::Failed),
+    DeploymentPhrase::AccountDetail(AccountPhrase::Stalled),
+    DeploymentPhrase::AccountDetail(AccountPhrase::TooLarge),
     DeploymentPhrase::AccountStateClosing,
     DeploymentPhrase::HelloRefusalReservedChannel,
     DeploymentPhrase::HelloRefusalWorkers,
@@ -446,8 +459,8 @@ impl DeploymentPhrase {
                 Self::NotDraining => 9225,
                 Self::Usable => 9226,
                 Self::Unusable => 9227,
-                Self::Unsaved => 9228,
-                Self::Saved => 9229,
+                Self::Expiring => 9228,
+                Self::NotExpiring => 9229,
                 Self::Attention => 9230,
                 Self::NoAttention => 9231,
                 Self::TaskProposer => 9232,
@@ -514,10 +527,11 @@ impl DeploymentPhrase {
                 Self::RunLocationNone => 9293,
                 Self::RunLocationConnected => 9294,
                 Self::RunLocationAdrift => 9295,
-                Self::AccountStateFresh => 9296,
-                Self::AccountStateRefreshing => 9297,
-                Self::AccountStateRetrying => 9298,
-                Self::AccountStateRevoked => 9299,
+                Self::AccountStateGranted => 9296,
+                Self::AccountStateAsking => 9297,
+                Self::AccountStateSignInAgain => 9298,
+                Self::AccountStateMisconfigured => 9299,
+                Self::AccountDetail(phrase) => phrase.number(),
                 Self::AccountStateClosing => 9300,
                 Self::HelloRefusalReservedChannel => 9301,
                 Self::HelloRefusalWorkers => 9302,
@@ -623,7 +637,8 @@ impl DeploymentPhrase {
     #[expect(clippy::too_many_lines, reason = "the closed deployment vocabulary has one exhaustive mapping table")]
     fn hole(self) -> Option<HoleKind> {
         match self {
-            Self::Deployment
+            Self::AccountDetail(..)
+            | Self::Deployment
             | Self::Hosts
             | Self::Attempts
             | Self::Accounts
@@ -651,8 +666,8 @@ impl DeploymentPhrase {
             | Self::NotDraining
             | Self::Usable
             | Self::Unusable
-            | Self::Unsaved
-            | Self::Saved
+            | Self::Expiring
+            | Self::NotExpiring
             | Self::Attention
             | Self::NoAttention
             | Self::TasksCapacity
@@ -675,10 +690,10 @@ impl DeploymentPhrase {
             | Self::RunLocationNone
             | Self::RunLocationConnected
             | Self::RunLocationAdrift
-            | Self::AccountStateFresh
-            | Self::AccountStateRefreshing
-            | Self::AccountStateRetrying
-            | Self::AccountStateRevoked
+            | Self::AccountStateGranted
+            | Self::AccountStateAsking
+            | Self::AccountStateSignInAgain
+            | Self::AccountStateMisconfigured
             | Self::AccountStateClosing
             | Self::HelloRefusalReservedChannel
             | Self::HelloRefusalWorkers
@@ -851,8 +866,8 @@ impl DeploymentPhrase {
             Self::NotDraining => b"Not draining",
             Self::Usable => b"Usable",
             Self::Unusable => b"Unusable",
-            Self::Unsaved => b"Unsaved",
-            Self::Saved => b"Saved",
+            Self::Expiring => b"Expiring",
+            Self::NotExpiring => b"Not expiring",
             Self::Attention => b"Needs attention",
             Self::NoAttention => b"No attention flag",
             Self::TaskProposer => b"Task maker: ",
@@ -919,10 +934,11 @@ impl DeploymentPhrase {
             Self::RunLocationNone => b"Run Location None",
             Self::RunLocationConnected => b"Run Location Connected",
             Self::RunLocationAdrift => b"Run Location Adrift",
-            Self::AccountStateFresh => b"Account State Fresh",
-            Self::AccountStateRefreshing => b"Account State Refreshing",
-            Self::AccountStateRetrying => b"Account State Retrying",
-            Self::AccountStateRevoked => b"Account State Revoked",
+            Self::AccountStateGranted => b"Account State Granted",
+            Self::AccountStateAsking => b"Account State Asking",
+            Self::AccountStateSignInAgain => b"Account State Sign in again",
+            Self::AccountStateMisconfigured => b"Account State Misconfigured",
+            Self::AccountDetail(phrase) => phrase.label(),
             Self::AccountStateClosing => b"Account State Closing",
             Self::HelloRefusalReservedChannel => b"Hello Refusal Reserved Channel",
             Self::HelloRefusalWorkers => b"Hello Refusal Workers",

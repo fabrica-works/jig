@@ -52,10 +52,10 @@ pub(crate) fn source() -> documents::Deployment {
             3,
             [documents::Account {
                 number: u32::MAX,
-                generation: u64::MAX,
-                state: accounts::State::Retrying,
+                generation: Some(u64::MAX),
+                state: accounts::State::SignInAgain,
                 usable: false,
-                unsaved: true,
+                expiring: true,
                 attention: true,
                 spent_until: Some(Wall::EPOCH),
                 runs: rows(2, [chip.clone()]),
@@ -196,9 +196,9 @@ fn deployment_keeps_host_placement_and_secret_free_account_flags_without_derivin
     let account = value.accounts.get(0).expect("supplied fixture value");
     assert_eq!(
         (account.number, account.generation, account.state),
-        (u32::MAX, u64::MAX, client::OwnerAccountState::Retrying)
+        (u32::MAX, Some(u64::MAX), client::OwnerAccountState::SignInAgain)
     );
-    assert!(!account.usable && account.unsaved && account.attention && !account.cut);
+    assert!(!account.usable && account.expiring && account.attention && !account.cut);
     assert_eq!(account.spent_until, Some(Wall::EPOCH));
     assert_eq!((account.runs.capacity(), account.waiting.capacity()), (2, 3));
     let expected = chips::chip(&chips::tests::source_chip(), &limits()).expect("supplied fixture value");
@@ -354,10 +354,22 @@ fn deployment_attempt_and_account_lifecycles_preserve_every_supplied_state() {
 #[test]
 fn deployment_accounts_preserve_every_supplied_state() {
     for (source, expected) in [
-        (accounts::State::Fresh, client::OwnerAccountState::Fresh),
-        (accounts::State::Refreshing, client::OwnerAccountState::Refreshing),
-        (accounts::State::Retrying, client::OwnerAccountState::Retrying),
-        (accounts::State::Revoked, client::OwnerAccountState::Revoked),
+        (accounts::State::Granted, client::OwnerAccountState::Granted),
+        (accounts::State::Asking, client::OwnerAccountState::Asking),
+        (accounts::State::SignInAgain, client::OwnerAccountState::SignInAgain),
+        (accounts::State::Misconfigured, client::OwnerAccountState::Misconfigured),
+        (
+            accounts::State::Later { until: skein_lib::Time::ZERO },
+            client::OwnerAccountState::Later { until: skein_lib::Time::ZERO },
+        ),
+        (
+            accounts::State::Unloaded { at: accounts::Place::File, why: accounts::Unread::Refused },
+            client::OwnerAccountState::Unloaded {
+                at: client::OwnerAccountPlace::File,
+                why: client::OwnerAccountUnread::Refused,
+            },
+        ),
+        (accounts::State::Cancelled, client::OwnerAccountState::Cancelled),
         (accounts::State::Closing, client::OwnerAccountState::Closing),
     ] {
         assert_eq!(account_state(source), expected);

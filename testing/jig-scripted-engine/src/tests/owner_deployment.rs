@@ -130,25 +130,31 @@ fn deployment_hosts_ten_attempt_states_three_placements_task_links_and_absent_cl
         round_trip(value);
     }
 }
+fn account_states() -> [OwnerAccountState; 8] {
+    [
+        OwnerAccountState::Granted,
+        OwnerAccountState::Asking,
+        OwnerAccountState::SignInAgain,
+        OwnerAccountState::Misconfigured,
+        OwnerAccountState::Later { until: skein_lib::Time::ZERO },
+        OwnerAccountState::Unloaded { at: OwnerAccountPlace::File, why: OwnerAccountUnread::Refused },
+        OwnerAccountState::Cancelled,
+        OwnerAccountState::Closing,
+    ]
+}
 #[test]
 fn deployment_accounts_five_states_independent_flags_spend_overlay_and_generation_reach_both_carriers() {
-    for state in [
-        OwnerAccountState::Fresh,
-        OwnerAccountState::Refreshing,
-        OwnerAccountState::Retrying,
-        OwnerAccountState::Revoked,
-        OwnerAccountState::Closing,
-    ] {
+    for state in account_states() {
         for flags in 0_u8..8 {
             let mut value = empty();
             value
                 .accounts
                 .push(OwnerAccount {
                     number: u32::MAX,
-                    generation: u64::MAX,
+                    generation: Some(u64::MAX),
                     state,
                     usable: flags & 1 != 0,
-                    unsaved: flags & 2 != 0,
+                    expiring: flags & 2 != 0,
                     attention: flags & 4 != 0,
                     spent_until: if flags & 1 == 0 { None } else { Some(Wall::EPOCH) },
                     runs: list(vec![chip(0)]),
@@ -399,10 +405,10 @@ fn deployment_heap_counts_every_reserved_list_box_chip_text_and_exact_carrier_th
         .accounts
         .push(OwnerAccount {
             number: 1,
-            generation: 2,
-            state: OwnerAccountState::Fresh,
+            generation: Some(2),
+            state: OwnerAccountState::Granted,
             usable: true,
-            unsaved: false,
+            expiring: false,
             attention: false,
             spent_until: None,
             runs: list(vec![item.clone()]),

@@ -137,10 +137,9 @@ fn limits() -> Limits {
         brief_core_budgets: CoreBriefBudgets { task: 128, dependencies: 128, attempts: 128, plan: 128, notes: 64 },
         accounts: accounts::Limits {
             accounts: 1,
-            refresh_margin: Duration::from_secs(1),
-            backoff_base: Duration::from_millis(10),
-            backoff_max: Duration::from_secs(1),
-            rejected_interval: Duration::from_millis(10),
+            backoff_base: Duration::from_secs(2),
+            backoff_max: Duration::from_secs(8),
+            retry: Duration::from_secs(30),
             spent_attention: Duration::from_secs(1),
             facts: 2,
         },
@@ -1684,11 +1683,17 @@ fn documents_deployment_accounts_are_secret_free_and_show_unusable_state() {
     limits.people.projects = 2;
     restore_document_party(&mut core, &limits, &[0]);
     let env = Env { now: Time::from_nanos(100), wall: Wall::from_nanos(1000), limits: limits.accounts };
-    let mut out = Queue::with_capacity(accounts::MAX_OUT);
+    let mut out = Queue::with_capacity(accounts::max_out(&limits.accounts));
+    accounts::step(&mut core.accounts, &env, accounts::Event::Want, &mut out);
+    while out.pop().is_some() {}
     accounts::step(
         &mut core.accounts,
         &env,
-        accounts::Event::Add { account: 1, generation: 1, valid: Some(Duration::from_secs(60)) },
+        accounts::Event::Component(accounts::FromComponent::Granted {
+            account: 1,
+            generation: 1,
+            valid: Duration::from_secs(60),
+        }),
         &mut out,
     );
     while out.pop().is_some() {}
@@ -1712,7 +1717,7 @@ fn documents_deployment_accounts_are_secret_free_and_show_unusable_state() {
     let account = deployment.accounts.get(0).unwrap();
     assert!(!account.usable);
     assert_eq!(account.number, 1);
-    assert_eq!(account.state, accounts::State::Fresh);
+    assert_eq!(account.state, accounts::State::Granted);
     assert_eq!(account.spent_until, Some(Wall::from_nanos(1000 + Duration::from_secs(5).as_nanos())));
     assert!(!account.waiting.is_empty());
 }

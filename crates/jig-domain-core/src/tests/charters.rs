@@ -51,11 +51,22 @@ fn take_due_skips_a_task_whose_charters_account_is_unusable() {
     second.policy.model.account = 2;
     config.settings.charters = Box::new([config.settings.charters[0].clone(), second]);
     let mut core = Core::new(config, &limits);
-    let mut out = Queue::with_capacity(accounts::MAX_OUT);
+    let mut out = Queue::with_capacity(accounts::max_out(&limits.accounts));
     accounts::step(
         &mut core.accounts,
         &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.accounts },
-        accounts::Event::Add { account: 2, generation: 1, valid: Some(Duration::from_secs(60)) },
+        accounts::Event::Want,
+        &mut out,
+    );
+    while out.pop().is_some() {}
+    accounts::step(
+        &mut core.accounts,
+        &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.accounts },
+        accounts::Event::Component(accounts::FromComponent::Granted {
+            account: 2,
+            generation: 1,
+            valid: Duration::from_secs(60),
+        }),
         &mut out,
     );
     core.due.push(context(1, 1));

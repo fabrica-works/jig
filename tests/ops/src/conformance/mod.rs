@@ -530,12 +530,17 @@ impl Application for Ops {
                 peers.read_results.push(payload);
                 vec![Input::Event(root::Event::ResultRead { payload, end: crate::protocol::result(&outcome) })]
             }
-            root::Output::Now(core::Now::Account(accounts::Request::Refresh { account, generation })) => {
-                vec![Input::Event(root::Event::Core(core::Event::Account(accounts::Event::Refreshed {
-                    account,
-                    generation,
-                    valid: Duration::from_secs(7200),
-                })))]
+            root::Output::Now(core::Now::Account(accounts::Request::Component(accounts::ToComponent::Want {
+                account,
+            }))) => {
+                vec![Input::Event(root::Event::Core(core::Event::Account(accounts::Event::Component(
+                    accounts::FromComponent::Granted { account, generation: 1, valid: Duration::from_secs(7200) },
+                ))))]
+            }
+            root::Output::Now(core::Now::Account(accounts::Request::Component(accounts::ToComponent::Close))) => {
+                vec![Input::Event(root::Event::Core(core::Event::Account(accounts::Event::Component(
+                    accounts::FromComponent::Closed,
+                ))))]
             }
             root::Output::Core(core::Held::PeopleReply { reply, .. }) => {
                 peers.replies += 1;
@@ -620,11 +625,9 @@ impl Application for Ops {
         let mut events = Vec::new();
         if ready && !peers.account_ready {
             peers.account_ready = true;
-            events.push(Input::Event(root::Event::Core(core::Event::Account(accounts::Event::Add {
-                account: 1,
-                generation: 1,
-                valid: Some(Duration::from_secs(7200)),
-            }))));
+            events.push(Input::Event(root::Event::Core(core::Event::Account(accounts::Event::Component(
+                accounts::FromComponent::Granted { account: 1, generation: 1, valid: Duration::from_secs(7200) },
+            )))));
         }
         if ready && !peers.asked_sign_in {
             peers.asked_sign_in = true;

@@ -65,7 +65,7 @@ pub(super) fn workspace_prepared(
     };
     let why = match core.run_admission(&context, env.wall, writes) {
         crate::RunAdmission::Allow => None,
-        crate::RunAdmission::Account => Some(tasks::Hold::Effects),
+        crate::RunAdmission::Account => return wait_for_account(core, context),
         crate::RunAdmission::Hold(why) => Some(why),
     };
     if let Some(why) = why {
@@ -75,10 +75,7 @@ pub(super) fn workspace_prepared(
         return Requests::Out(out);
     }
     let Some(grant) = core.accounts.grant(core.charter_of(task).account(), env.now) else {
-        work.push(Event::Tasks(tasks::Event::PreparationFailed { task }));
-        out.push(Request::Now(Box::new(Now::RunPreparationFailed { task })));
-        out.push(Request::Decided);
-        return Requests::Out(out);
+        return wait_for_account(core, context);
     };
     if !core.proofs.contains_key(&task) && core.proofs.len() == core.proofs.capacity() {
         work.push(Event::Tasks(tasks::Event::PreparationFailed { task }));
@@ -162,6 +159,15 @@ fn start_proof(core: &Core, task: u64, attempt: u64, conversation: u64, messages
         offered = Some(word.number);
     }
     core.claim_proof(task, attempt, conversation, offered)
+}
+
+fn wait_for_account(core: &mut Core, context: Box<tasks::RunContext>) -> Requests {
+    let task = context.task;
+    remember_due(core, context);
+    let mut out = Queue::with_capacity(2);
+    out.push(Request::Now(Box::new(Now::RunPreparationFailed { task })));
+    out.push(Request::Decided);
+    Requests::Out(out)
 }
 
 pub(super) fn start_brief(core: &mut Core, env: &Env<Limits>, work: &mut Queue<Event>, task: u64) -> Requests {

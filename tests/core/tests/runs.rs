@@ -92,11 +92,7 @@ fn settled_delivery_evidence_survives_restart_and_resume_until_a_turn_carries_it
             hosting: Box::new([]),
         },
     })));
-    world.send(root::Event::Core(core::Event::Account(jig_domain_accounts::Event::Add {
-        account: 1,
-        generation: 1,
-        valid: Some(skein_lib::Duration::from_secs(60)),
-    })));
+    world.grant_account(1);
     let read = world.say(74);
     assert!(!world.assigned.as_ref().expect("resumed chat").answered.is_empty(), "{:?}", world.trace);
     assert_eq!(world.assigned.as_ref().expect("resumed chat").answered.as_ref(), [saved]);
@@ -368,4 +364,58 @@ fn a_fresh_start_after_a_transient_failure_names_its_own() {
     assert!(assignment.attempt > first);
     assert_eq!(assignment.conversation, assignment.attempt);
     assert!(assignment.transcript.is_empty());
+}
+
+fn account_failed(world: &mut World) {
+    world.send(root::Event::Core(core::Event::Account(jig_domain_accounts::Event::Component(
+        jig_domain_accounts::FromComponent::Failed { account: 1, failure: jig_domain_accounts::Failure::SignInAgain },
+    ))));
+}
+fn account_granted(world: &mut World) {
+    world.send(root::Event::Core(core::Event::Account(jig_domain_accounts::Event::Component(
+        jig_domain_accounts::FromComponent::Granted {
+            account: 1,
+            generation: 9,
+            valid: skein_lib::Duration::from_secs(60),
+        },
+    ))));
+}
+#[test]
+fn a_run_waits_while_its_account_must_sign_in_again() {
+    let mut world = World::new(141, false);
+    world.end(tasks::End::Parked, 0);
+    account_failed(&mut world);
+    let assigned = world.assignments.len();
+    world.say(83);
+    assert_eq!(world.assignments.len(), assigned);
+    assert!(world.store.rows.values().any(|row| matches!(row,
+        root::Record::Core(core::Record::Tasks(tasks::Stored::Live(task)))
+        if matches!(task.phase, tasks::Phase::Active(tasks::Active::Due)))));
+}
+#[test]
+fn a_run_waiting_for_its_account_starts_once_granted() {
+    let mut world = World::new(142, false);
+    world.end(tasks::End::Parked, 0);
+    account_failed(&mut world);
+    let assigned = world.assignments.len();
+    world.say(84);
+    assert_eq!(world.assignments.len(), assigned);
+    account_granted(&mut world);
+    assert_eq!(world.assignments.len(), assigned + 1);
+    assert_eq!(world.assigned.as_ref().expect("assigned after grant").grant.generation, 9);
+}
+#[test]
+fn an_account_unusable_at_the_second_check_waits_and_is_not_held() {
+    let mut world = World::new(143, false);
+    world.turn(1, 1, None, b"turn to resume");
+    world.end(tasks::End::Parked, 1);
+    world.fail_account_before_workspace = true;
+    let assigned = world.assignments.len();
+    world.say(85);
+    assert_eq!(world.assignments.len(), assigned);
+    assert!(world.store.rows.values().any(|row| matches!(row,
+        root::Record::Core(core::Record::Tasks(tasks::Stored::Live(task)))
+        if matches!(task.phase, tasks::Phase::Active(tasks::Active::Preparing)))));
+    account_granted(&mut world);
+    assert_eq!(world.assignments.len(), assigned + 1);
 }
