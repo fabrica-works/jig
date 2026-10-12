@@ -135,6 +135,13 @@ impl Domain {
         self.turns.len()
     }
 
+    /// The kind placement would choose now; None when no allowed slot is free.
+    #[must_use]
+    pub fn free_kind(&self, kinds: crate::Kinds, workstream: u64) -> Option<HostKind> {
+        let id = channel::choose(self, workstream, kinds)?;
+        Some(self.channels.get(id).expect("chosen channel is connected").kind)
+    }
+
     /// Copy bounded connected and retained lost host facts without changing placement.
     #[must_use]
     pub fn host_views(&self) -> List<crate::HostView> {

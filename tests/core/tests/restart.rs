@@ -525,3 +525,36 @@ fn a_restart_restores_unread_results_and_chat_totals() {
     chats.reverse();
     assert_eq!(census_unread_results(&mut world), chats);
 }
+
+fn both_kinds_engine_fixture(seed: u64) -> (root::Config, root::Limits) {
+    let (mut config, mut limits) = jig_core_world::effects::fixture(seed, false);
+    config.core.settings.charters[0].hosts = fleet::Kinds::Both;
+    limits.core.fleet.engine_slots = 2;
+    limits.core.fleet.slots = 1;
+    (config, limits)
+}
+
+#[test]
+fn a_restart_settles_an_engine_claim_of_a_both_kinds_charter_at_once() {
+    let (config, limits) = both_kinds_engine_fixture(125);
+    let mut world = World::configured(125, false, config, limits);
+    let assignment = world.assigned.as_ref().expect("engine claim");
+    let task = assignment.task;
+    let attempt = assignment.attempt;
+    world.send(root::Event::Turn {
+        channel: Token::new(0),
+        task,
+        attempt,
+        turn: 1,
+        cumulative: 2,
+        read: None,
+        opens_window: true,
+        refused: Box::new([]),
+        transcript: b"engine window".as_slice().into(),
+    });
+    world.restart_with(both_kinds_engine_fixture(125).0);
+    assert!(world.domain.ready(), "engine claim settles before any worker hello");
+    assert!(world.store.rows.values().any(|record| matches!(record,
+        root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row)))
+        if row.number == task && row.tries.lost == 1)));
+}

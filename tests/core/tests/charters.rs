@@ -187,3 +187,91 @@ fn a_restart_settles_an_engine_charters_claim_at_once() {
         root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row)))
         if row.number == task && row.tries.lost == 1)));
 }
+
+fn worker_with_affinity(world: &mut World, task: u64) {
+    use jig_domain_fleet as fleet;
+    world.send(root::Event::Core(core::Event::Fleet(fleet::Event::Hello {
+        channel: Token::new(8),
+        hello: fleet::Hello {
+            bounds: jig_core_world::fixtures::bounds(),
+            stop_bound: skein_lib::Duration::from_millis(100),
+            slots: 1,
+            workstreams: Box::new([task]),
+            hosting: Box::new([]),
+        },
+    })));
+}
+
+fn both_host_world(seed: u64) -> World {
+    let (mut config, mut limits) = world::two_charters(seed);
+    config.core.settings.charters[1].hosts = jig_domain_fleet::Kinds::Both;
+    limits.core.fleet.engine_slots = 1;
+    limits.core.fleet.slots = 1;
+    let mut world = World::configured(seed, false, config, limits);
+    world.grant_account(2);
+    world
+}
+
+fn delegate_task(world: &World) -> u64 {
+    world
+        .store
+        .rows
+        .values()
+        .find_map(|row| match row {
+            root::Record::Core(core::Record::Tasks(tasks::Stored::Live(task)))
+                if task.executor == tasks::Executor::Agent { charter: 2 } =>
+            {
+                Some(task.number)
+            }
+            root::Record::Core(_) | root::Record::Connector { .. } => None,
+        })
+        .expect("delegate in store")
+}
+
+fn first_claim_host(world: &World) -> jig_domain_fleet::HostKind {
+    let task = delegate_task(world);
+    world
+        .commits
+        .iter()
+        .flatten()
+        .find_map(|write| match write {
+            root::Write::Save(root::Record::Core(core::Record::Core(core::CoreRecord::RunProof(proof))))
+                if proof.task == task =>
+            {
+                Some(proof.host)
+            }
+            root::Write::Save(_) | root::Write::Erase(_) => None,
+        })
+        .expect("first claim submitted")
+}
+
+fn current_claim_host(world: &World) -> jig_domain_fleet::HostKind {
+    let task = delegate_task(world);
+    let key = root::Key::Core(core::Key::Core(core::CoreKey::RunProof(task)));
+    let root::Record::Core(core::Record::Core(core::CoreRecord::RunProof(proof))) = &world.store.rows[&key] else {
+        panic!("durable claim proof")
+    };
+    proof.host
+}
+
+#[test]
+fn a_charter_both_kinds_may_run_claims_the_engine_when_only_its_slot_is_free() {
+    let mut world = both_host_world(149);
+    world.delegate_agent(2, b"use the free engine slot");
+    assert_eq!(first_claim_host(&world), jig_domain_fleet::HostKind::Engine);
+}
+
+#[test]
+fn a_claim_for_the_engine_is_placed_only_on_the_engine() {
+    let mut world = both_host_world(150);
+    let assigned = world.assignments.len();
+    world.store.fault(jig_fake_store::Fault::Hold { commits: 2 });
+    world.delegate_agent(2, b"keep the claimed kind");
+    world.release_commits();
+    assert_eq!(world.assignments.len(), assigned, "claim waits for its completion");
+    let task = delegate_task(&world);
+    worker_with_affinity(&mut world, task);
+    world.release_commits();
+    assert_eq!(world.assigned.as_ref().expect("delegate assigned").task, task);
+    assert_eq!(current_claim_host(&world), jig_domain_fleet::HostKind::Engine);
+}

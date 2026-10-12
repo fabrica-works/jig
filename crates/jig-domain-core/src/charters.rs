@@ -65,27 +65,16 @@ pub(crate) fn numbers(settings: &Settings, limits: &Limits) -> Box<[u32]> {
 }
 
 impl Core {
-    pub(crate) fn claim_proof(
-        &self,
-        task: u64,
-        attempt: u64,
-        conversation: u64,
-        offered: Option<u64>,
-    ) -> crate::RunProof {
-        let host = match self.charter_of(task).hosts {
-            fleet::Kinds::Engine => fleet::HostKind::Engine,
-            fleet::Kinds::Workers | fleet::Kinds::Both => fleet::HostKind::Worker,
-        };
-        crate::RunProof::claimed(task, attempt, conversation, offered, host)
-    }
-
     pub(crate) fn claim_done(&mut self, task: u64, attempt: u64, out: &mut Queue<crate::Request>) {
         drop(self.replaced.remove(&task));
         let proof = self.proofs.get(&task).expect("claim proof pre-reserved");
         out.push(crate::Request::Write(crate::Write::Save(crate::Record::Core(crate::CoreRecord::RunProof(
             proof.clone(),
         )))));
-        let kinds = self.charter_of(task).hosts;
+        let kinds = match proof.host {
+            fleet::HostKind::Engine => fleet::Kinds::Engine,
+            fleet::HostKind::Worker => fleet::Kinds::Workers,
+        };
         for &connector in self.connectors.as_ref() {
             out.push(crate::Request::Ask { connector, ask: crate::Ask::ClaimDone { task, attempt, kinds } });
         }

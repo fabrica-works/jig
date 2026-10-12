@@ -102,22 +102,6 @@ pub(super) fn tag_brief(
     Requests::Out(out)
 }
 
-pub(super) fn record_host(
-    core: &mut Core,
-    out: &mut Queue<Request>,
-    run: Token,
-    attempt: Token,
-    kind: fleet::HostKind,
-) {
-    if let Some(proof) = core.proofs.get_mut(&run.raw())
-        && proof.attempt == attempt.raw()
-        && proof.host != kind
-    {
-        proof.host = kind;
-        out.push(Request::Write(Write::Save(Record::Core(CoreRecord::RunProof(proof.clone())))));
-    }
-}
-
 #[expect(clippy::too_many_lines, reason = "one exhaustive host vocabulary routes its bounded child decision")]
 pub(super) fn tag_fleet(core: &mut Core, env: &Env<Limits>, mut child: Queue<fleet::Request>, room: u32) -> Requests {
     let marked = room.checked_mul(4).expect("bounded fleet routes");
@@ -236,7 +220,8 @@ pub(super) fn tag_fleet(core: &mut Core, env: &Env<Limits>, mut child: Queue<fle
                 continue;
             }
             fleet::Request::Assign { channel, kind, run, attempt, activation, assignment } => {
-                record_host(core, &mut out, run, attempt, kind);
+                let proof = core.proofs.get(&run.raw()).expect("assigned run has a claim");
+                assert!(proof.attempt == attempt.raw() && proof.host == kind, "placement follows the claimed kind");
                 super::view_routes::touch_number(core, &env.limits, run.raw());
                 Request::Held(Box::new(Held::Assign { channel, run, attempt, activation, assignment }))
             }

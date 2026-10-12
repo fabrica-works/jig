@@ -159,7 +159,15 @@ fn start_proof(core: &Core, task: u64, attempt: u64, conversation: u64, messages
     for word in messages {
         offered = Some(word.number);
     }
-    core.claim_proof(task, attempt, conversation, offered)
+    let kinds = core.charter_of(task).hosts;
+    let host = match core.fleet.free_kind(kinds, task) {
+        Some(host) => host,
+        None => match kinds {
+            jig_domain_fleet::Kinds::Engine => jig_domain_fleet::HostKind::Engine,
+            jig_domain_fleet::Kinds::Workers | jig_domain_fleet::Kinds::Both => jig_domain_fleet::HostKind::Worker,
+        },
+    };
+    RunProof::claimed(task, attempt, conversation, offered, host)
 }
 
 fn wait_for_account(core: &mut Core, context: Box<tasks::RunContext>) -> Requests {
