@@ -4,6 +4,10 @@
 extern crate alloc;
 pub mod address;
 mod document;
+mod fits;
+pub mod profile;
+pub use fits::{Share, fits};
+pub use profile::{Limits, Link, Profile, profile};
 pub mod forms;
 mod problem;
 pub mod read;
