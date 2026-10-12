@@ -300,7 +300,7 @@ Scope: `Name`, `Holding`, `WakeRule`, `ResultsWake`, `WakePolicy`,
 `PersonProposal`, `Milestone`, `Grace`, `Revisions`, `RetryNotice`; the
 `History`, `Milestone`, `PersonProposal` and `DecidedProposal` rows.
 Needs: 14.2's tasks schema and `codec::tasks` module.
-Files: `crates/jig-protocol-store/{schema/tasks-v1.schema, src/generated/tasks_v1.rs, golden/tasks/v1/, src/codec/tasks/{phase.rs, proposals.rs}}`, `src/tests/{fixtures.rs, codec.rs}`.
+Files: `crates/jig-protocol-store/{schema/tasks-v1.schema, src/generated/tasks_v1.rs, golden/tasks/v1/, src/codec/tasks.rs, src/codec/tasks/{phase.rs, proposals.rs}}`, `src/tests/{fixtures.rs, codec.rs}`.
 Shape: as 14.2; a template's member that holds a template is refused as a
 `Problem` naming `recurring`.
 Test shape:
@@ -330,7 +330,7 @@ landed); the `Activity`, `Live`, `Ended` and `Stub` rows and jig 12's index
 rows that have landed (`Update`, `ResultRow`, `Conversation`, `GoalRow`,
 `Edge`); each `tasks::Stored` variant on `main` when the increment starts.
 Needs: 14.3's phase, proposal and history types in the tasks schema.
-Files: `crates/jig-protocol-store/{schema/tasks-v1.schema, src/generated/tasks_v1.rs, golden/tasks/v1/, src/codec/tasks/{activity.rs, record.rs, index.rs}}`, `src/tests/{fixtures.rs, codec.rs}`.
+Files: `crates/jig-protocol-store/{schema/tasks-v1.schema, src/generated/tasks_v1.rs, golden/tasks/v1/, src/codec/tasks.rs, src/codec/tasks/{activity.rs, record.rs, index.rs}}`, `src/tests/{fixtures.rs, codec.rs}`.
 Shape: as 14.2; `codec::tasks::encode` and `decode` have one arm per
 `tasks::Stored` variant and no fallback arm (clippy's
 `wildcard_enum_match_arm` denies one).

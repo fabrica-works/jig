@@ -579,6 +579,18 @@ the file.
      file. Past twice its Size it asks, as code-organization.md, section
      7 says. The 800-line file limit and the 40-line test function stay
      rules. jig 19.3 lands at its count. The README's Rules now say so.
+133. **A family's later codec increments name its facade** (2026-10-12,
+     the coordinator's block "jig 14.3: required tasks codec facade
+     omitted from Files", 2026-10-12T20:01:22Z). A plan defect: 14.3's
+     and 14.4's Shape is "as 14.2", whose facade
+     (`crates/jig-protocol-store/src/codec/tasks.rs`, 128 lines on jig
+     `3f0ce934`) maps the family's limits and dispatches encode and
+     decode by row, and 14.4's Shape says "`codec::tasks::encode` and
+     `decode` have one arm per" row; but only 14.2's Files named the
+     facade. 19.2 and 19.4 have the same gap for `src/codec/core.rs` and
+     `src/codec/people.rs`. Each now names its family's facade, for the
+     limits and the encode and decode arms of the rows and bounded fields
+     it adds, and nothing else of it, at the increment's Size.
 
 ## For the user
 

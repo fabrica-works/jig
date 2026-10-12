@@ -74,7 +74,7 @@ writes), `ProposalDecisionRecord`, `EscalationDecisionRecord`, and each
 other `core::CoreRecord` variant on `main` when the increment starts (jig 06's conversation, if
 it has landed).
 Needs: 19.1's core schema and `codec::core::Limits`.
-Files: `crates/jig-protocol-store/{schema/core-v1.schema, src/generated/core_v1.rs, golden/core/v1/, src/codec/core/{runs.rs, projections.rs}}`, `src/tests/{fixtures.rs, codec.rs}`.
+Files: `crates/jig-protocol-store/{schema/core-v1.schema, src/generated/core_v1.rs, golden/core/v1/, src/codec/core.rs, src/codec/core/{runs.rs, projections.rs}}`, `src/tests/{fixtures.rs, codec.rs}`.
 Shape: `codec::core::encode` and `decode` have one arm per `CoreRecord`
 variant and no fallback arm; `codec::core::turn(&core::TurnRecord, &Limits) -> Result<Box<[u8]>, core_v1::Problem>`
 and `codec::core::read_turn(&[u8], &Limits) -> Result<core::TurnRecord, core_v1::Problem>`
@@ -128,7 +128,7 @@ Scope: `Again`, `DisposalIssue`, `FailureClass`, `HoldReason`, `Moved`,
 `EscalationChoice`, `Outcome`; the `Answer` row; each `people::Stored`
 variant on `main` when the increment starts.
 Needs: 19.3's people schema and `codec::people` module.
-Files: `crates/jig-protocol-store/{schema/people-v1.schema, src/generated/people_v1.rs, golden/people/v1/, src/codec/people/outcomes.rs}`, `src/tests/{fixtures.rs, codec.rs}`.
+Files: `crates/jig-protocol-store/{schema/people-v1.schema, src/generated/people_v1.rs, golden/people/v1/, src/codec/people.rs, src/codec/people/outcomes.rs}`, `src/tests/{fixtures.rs, codec.rs}`.
 Shape: `codec::people::encode` and `decode` have one arm per
 `people::Stored` variant and no fallback arm.
 Test shape:
