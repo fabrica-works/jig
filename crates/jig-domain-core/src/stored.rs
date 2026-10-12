@@ -365,6 +365,8 @@ impl Core {
             tasks::Stored::Result(_)
             | tasks::Stored::ConversationNewest(_)
             | tasks::Stored::Goal(_)
+            | tasks::Stored::EndedDelegate(_)
+            | tasks::Stored::Delegate(_)
             | tasks::Stored::ConversationOldest(_)
             | tasks::Stored::Update(_)
             | tasks::Stored::Ended(_)

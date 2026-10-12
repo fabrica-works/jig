@@ -768,6 +768,8 @@ impl World {
                 | Stored::Result(_)
                 | Stored::ConversationNewest(_)
                 | Stored::Goal(_)
+                | Stored::EndedDelegate(_)
+                | Stored::Delegate(_)
                 | Stored::ConversationOldest(_)
                 | Stored::Update(_)
                 | Stored::PersonProposal(_) => {}
@@ -797,6 +799,8 @@ impl World {
             | Stored::Result(_)
             | Stored::ConversationNewest(_)
             | Stored::Goal(_)
+            | Stored::EndedDelegate(_)
+            | Stored::Delegate(_)
             | Stored::ConversationOldest(_)
             | Stored::Update(_)
             | Stored::Pool(_)
@@ -839,6 +843,8 @@ impl World {
                 | Key::Result { .. }
                 | Key::ConversationNewest { .. }
                 | Key::Goal { .. }
+                | Key::EndedDelegate { .. }
+                | Key::Delegate { .. }
                 | Key::ConversationOldest { .. }
                 | Key::Update { .. }
                 | Key::PersonProposal(_) => None,
@@ -903,6 +909,8 @@ impl World {
                 | Stored::Result(_)
                 | Stored::ConversationNewest(_)
                 | Stored::Goal(_)
+                | Stored::EndedDelegate(_)
+                | Stored::Delegate(_)
                 | Stored::ConversationOldest(_)
                 | Stored::Update(_)
                 | Stored::Pool(_)
@@ -1184,6 +1192,8 @@ fn live_row(record: &Stored) -> Option<&jig_domain_tasks::TaskRecord> {
         | Stored::Result(_)
         | Stored::ConversationNewest(_)
         | Stored::Goal(_)
+        | Stored::EndedDelegate(_)
+        | Stored::Delegate(_)
         | Stored::ConversationOldest(_)
         | Stored::Update(_)
         | Stored::ClosedLedger(_)

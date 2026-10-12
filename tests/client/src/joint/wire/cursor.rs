@@ -791,6 +791,8 @@ fn take_funder(r: &mut Reader<'_>) -> Option<tasks::Funder> {
 
 fn put_task_key(w: &mut Writer, value: &tasks::Key) -> Option<()> {
     match value {
+        tasks::Key::EndedDelegate { requester, task } => index::conversation(w, 17, *requester, *task)?,
+        tasks::Key::Delegate { requester, task } => index::conversation(w, 18, *requester, *task)?,
         tasks::Key::Goal { project, task } => {
             w.byte(16)?;
             w.u32(*project)?;
@@ -858,6 +860,8 @@ fn take_task_key(r: &mut Reader<'_>) -> Option<tasks::Key> {
     Some(match r.byte()? {
         13 => tasks::Key::Result { party: r.u64()?, position: r.u64()? },
         14 => tasks::Key::ConversationNewest { party: r.u64()?, task: tasks::Newest::from_raw(r.u64()?) },
+        17 => tasks::Key::EndedDelegate { requester: r.u64()?, task: r.u64()? },
+        18 => tasks::Key::Delegate { requester: r.u64()?, task: r.u64()? },
         16 => tasks::Key::Goal { project: r.u32()?, task: tasks::Newest::from_raw(r.u64()?) },
         15 => tasks::Key::ConversationOldest { party: r.u64()?, task: r.u64()? },
         12 => index::take(r)?,

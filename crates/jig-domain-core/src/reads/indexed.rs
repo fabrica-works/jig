@@ -123,6 +123,8 @@ pub(super) fn is_update(key: &Key) -> bool {
             | tasks::Key::Result { .. }
             | tasks::Key::ConversationNewest { .. }
             | tasks::Key::Goal { .. }
+            | tasks::Key::EndedDelegate { .. }
+            | tasks::Key::Delegate { .. }
             | tasks::Key::ConversationOldest { .. },
         )
         | Key::Core(_)
@@ -159,6 +161,8 @@ pub(super) fn conversation_row(
             tasks::Stored::Result(_)
             | tasks::Stored::ConversationNewest(_)
             | tasks::Stored::Goal(_)
+            | tasks::Stored::EndedDelegate(_)
+            | tasks::Stored::Delegate(_)
             | tasks::Stored::ConversationOldest(_)
             | tasks::Stored::ClosedLedger(_)
             | tasks::Stored::DecidedProposal(_)
@@ -205,7 +209,9 @@ pub(super) fn goal_row(
     let goal = match &row.value {
         crate::Record::Tasks(tasks::Stored::Goal(goal)) => goal,
         crate::Record::Tasks(
-            tasks::Stored::Update(_)
+            tasks::Stored::Delegate(_)
+            | tasks::Stored::EndedDelegate(_)
+            | tasks::Stored::Update(_)
             | tasks::Stored::Result(_)
             | tasks::Stored::ConversationNewest(_)
             | tasks::Stored::ConversationOldest(_)
@@ -248,4 +254,49 @@ pub(super) fn goal_row(
         budget: documents::budget_from_row(owner),
         held_below: 0,
     })))
+}
+
+/// An ended-delegate index row is joined to its ended owner by task number.
+pub(super) fn ended_delegate_row(
+    limits: &crate::Limits,
+    requester: u64,
+    row: &super::Row,
+) -> Result<Option<super::PageRow>, documents::Missing> {
+    let edge = match &row.value {
+        crate::Record::Tasks(tasks::Stored::EndedDelegate(edge)) => edge,
+        crate::Record::Tasks(
+            tasks::Stored::Delegate(_)
+            | tasks::Stored::Goal(_)
+            | tasks::Stored::Update(_)
+            | tasks::Stored::Result(_)
+            | tasks::Stored::ConversationNewest(_)
+            | tasks::Stored::ConversationOldest(_)
+            | tasks::Stored::Activity(_)
+            | tasks::Stored::Milestone(_)
+            | tasks::Stored::PersonProposal(_)
+            | tasks::Stored::DecidedProposal(_)
+            | tasks::Stored::ClosedLedger(_)
+            | tasks::Stored::History(_)
+            | tasks::Stored::Live(_)
+            | tasks::Stored::Ended(_)
+            | tasks::Stored::Stub(_)
+            | tasks::Stored::Ledger(_)
+            | tasks::Stored::Writer(_)
+            | tasks::Stored::Pool(_),
+        )
+        | crate::Record::Core(_)
+        | crate::Record::People(_)
+        | crate::Record::Notes(_) => return Ok(None),
+    };
+    let Some(owner) = &row.owner else { return Ok(None) };
+    if edge.requester != requester || edge.task != owner.number || owner.requester != tasks::Party::Task(requester) {
+        return Ok(None);
+    }
+    match owner.phase {
+        tasks::Phase::Ended(_) => {}
+        tasks::Phase::Waiting | tasks::Phase::Active(_) | tasks::Phase::Closing(_) | tasks::Phase::Held { .. } => {
+            return Ok(None);
+        }
+    }
+    Ok(Some(super::PageRow::EndedDelegate(documents::ended_delegate_from_row(limits, owner)?)))
 }

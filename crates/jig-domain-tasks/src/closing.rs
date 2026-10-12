@@ -376,6 +376,7 @@ fn end_task(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queue
     }
     match requester {
         Party::Task(parent) => {
+            out.push(Request::Save { record: Stored::EndedDelegate(crate::Edge { requester: parent, task: number }) });
             let mut remaining = List::with_capacity(env.limits.delegates);
             let task = task_mut(domain, parent).expect("requester remains live until all delegates end");
             for delegate in &task.record.delegates {

@@ -83,11 +83,11 @@ fn no_restart_interval_holds_a_turn_terminal_or_note() {
 fn each_fixed_scope_holds_the_keys_it_admits_and_no_others() {
     use jig_domain_core::reads;
     let mut rng = Rng::new(0x5701_e006);
-    let mut mappings = skein_lib::List::with_capacity(26);
+    let mut mappings = skein_lib::List::with_capacity(28);
     for scope in fixed_scopes() {
         for party in [1, 2] {
             let intervals = intervals::scope(party, &scope).expect("fixed scope");
-            mappings.push((party, scope.clone(), intervals)).expect("thirteen scopes and two parties");
+            mappings.push((party, scope.clone(), intervals)).expect("fourteen scopes and two parties");
         }
     }
     for _ in samples() {
@@ -103,13 +103,14 @@ fn each_fixed_scope_holds_the_keys_it_admits_and_no_others() {
     }
 }
 
-fn fixed_scopes() -> [jig_domain_core::reads::Scope; 13] {
+fn fixed_scopes() -> [jig_domain_core::reads::Scope; 14] {
     use jig_domain_core::reads::Scope;
     [
         Scope::Proposal { proposer: jig_domain_people::Proposer::Party(1), proposal: 1 },
         Scope::Proposal { proposer: jig_domain_people::Proposer::Party(2), proposal: 1 },
         Scope::Spend { project: 1 },
         Scope::Goals { project: 1 },
+        Scope::EndedDelegates { task: 1 },
         Scope::Task { task: 1 },
         Scope::PersonTask { task: 1 },
         Scope::Result { task: 1 },

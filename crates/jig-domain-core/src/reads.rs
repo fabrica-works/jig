@@ -52,6 +52,10 @@ pub fn admits(party: u64, scope: &Scope, key: &crate::Key) -> bool {
                 && (key == &Key::Tasks(TaskKey::PersonProposal(*proposal))
                     || key == &Key::Tasks(TaskKey::DecidedProposal(*proposal)))
         }
+        Scope::EndedDelegates { task } => match key {
+            Key::Tasks(TaskKey::EndedDelegate { requester, .. }) => requester == task,
+            Key::Tasks(_) | Key::Core(_) | Key::People(_) | Key::Notes(_) => false,
+        },
         Scope::Goals { project } => match key {
             Key::Tasks(TaskKey::Goal { project: owner, .. }) => owner == project,
             Key::Tasks(_) | Key::Core(_) | Key::People(_) | Key::Notes(_) => false,
@@ -80,7 +84,6 @@ pub fn admits(party: u64, scope: &Scope, key: &crate::Key) -> bool {
         | Scope::Escalation { .. }
         | Scope::Question { .. }
         | Scope::Turn { .. }
-        | Scope::EndedDelegates { .. }
         | Scope::History { subtree: true, .. }
         | Scope::Activity { .. }
         | Scope::Inbox { .. }

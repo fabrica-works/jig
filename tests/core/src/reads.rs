@@ -2,6 +2,7 @@
 //! Parties know the last submitted commit and the fake store's durable number.
 //! They never inspect the core or the journal. Their receipts survive a crash.
 use crate::{Store, effects::World};
+mod delegates;
 mod goals;
 use jig_domain_core::{self as core, documents, reads};
 use jig_domain_tasks as tasks;
@@ -35,6 +36,7 @@ impl Fence {
 #[derive(Debug)]
 pub struct Parties {
     made: u64,
+    tree_tasks: u32,
     awaiting: BTreeMap<u64, Fence>,
     admissions: VecDeque<u64>,
     queued: VecDeque<u64>,
@@ -51,6 +53,7 @@ impl Parties {
     pub fn new(made: u64) -> Self {
         Self {
             made,
+            tree_tasks: 0,
             awaiting: BTreeMap::new(),
             admissions: VecDeque::new(),
             queued: VecDeque::new(),
@@ -125,7 +128,7 @@ impl Parties {
         self.application_receipts.push((reply, fence.0, number, answer));
     }
 
-    pub fn load(&mut self, load: Token, range: reads::Range, store: &Store) -> Vec<root::Event> {
+    pub fn load(&mut self, load: Token, range: reads::Range, store: &Store, tree_tasks: u32) -> Vec<root::Event> {
         let reply = self.admissions.pop_front().expect("one owner load for an admitted read");
         self.awaiting
             .get(&reply)
@@ -133,6 +136,7 @@ impl Parties {
             .answered(store.applied)
             .expect("load follows the admission's durable fence");
         assert!(self.flights.insert(load.raw(), reply).is_none());
+        self.tree_tasks = tree_tasks;
         self.loads.push((load, range));
         if self.hold_loads { Vec::new() } else { self.complete(store) }
     }
@@ -140,7 +144,9 @@ impl Parties {
     pub fn complete(&mut self, store: &Store) -> Vec<root::Event> {
         std::mem::take(&mut self.loads)
             .into_iter()
-            .map(|(load, range)| root::Event::Core(core::Event::ReadLoaded { load, result: page(store, &range) }))
+            .map(|(load, range)| {
+                root::Event::Core(core::Event::ReadLoaded { load, result: page(store, &range, self.tree_tasks) })
+            })
             .collect()
     }
 
@@ -313,6 +319,7 @@ fn candidate(store: &Store, range: &reads::Range, value: &core::Record) -> Optio
                 inbox: None,
             })
         }
+        reads::Scope::EndedDelegates { task } => delegates::candidate(store, *task, value),
         reads::Scope::Goals { project } => goals::candidate(store, *project, value),
         reads::Scope::Conversations => conversation_row(store, range, value),
         reads::Scope::Turn { task, attempt, turn } => {
@@ -325,7 +332,6 @@ fn candidate(store: &Store, range: &reads::Range, value: &core::Record) -> Optio
         reads::Scope::Proposal { .. }
         | reads::Scope::Escalation { .. }
         | reads::Scope::Question { .. }
-        | reads::Scope::EndedDelegates { .. }
         | reads::Scope::History { .. }
         | reads::Scope::Inbox {
             group:
@@ -411,7 +417,7 @@ fn single_page(store: &Store, range: &reads::Range) -> reads::Loaded {
 
 /// The fake transport selects durable owner rows and echoes opaque continuations.
 #[must_use]
-pub fn page(store: &Store, range: &reads::Range) -> reads::Loaded {
+pub fn page(store: &Store, range: &reads::Range, tree_tasks: u32) -> reads::Loaded {
     if matches!(
         range.scope,
         reads::Scope::Question { .. }
@@ -419,6 +425,10 @@ pub fn page(store: &Store, range: &reads::Range) -> reads::Loaded {
             | reads::Scope::Proposal { proposer: documents::Proposer::Task(_), .. }
     ) {
         return single_page(store, range);
+    }
+    if let reads::Scope::History { task, subtree } = range.scope {
+        let Some(rows) = delegates::history(store, task, subtree, tree_tasks) else { return reads::Loaded::Busy };
+        return bounded_page(range, rows);
     }
     let mut ordered = BTreeMap::new();
     let bounds = index_bounds(range);
@@ -445,6 +455,11 @@ pub fn page(store: &Store, range: &reads::Range) -> reads::Loaded {
             ordered.insert(reads::row_key(&row).expect("owner-addressed row"), row);
         }
     }
+    bounded_page(range, ordered.into_values().collect())
+}
+
+fn bounded_page(range: &reads::Range, rows: Vec<reads::Row>) -> reads::Loaded {
+    let ordered: BTreeMap<_, _> = rows.into_iter().map(|row| (reads::row_key(&row).expect("row key"), row)).collect();
     let mut candidates: Vec<_> = ordered
         .into_iter()
         .filter(|(position, _)| match &range.after {
@@ -542,6 +557,7 @@ fn index_bounds(range: &reads::Range) -> Option<(root::Key, root::Key)> {
                 ),
             ))
         }
+        reads::Scope::EndedDelegates { task } => Some(delegates::bounds(task, true)),
         reads::Scope::Goals { project } => Some(goals::bounds(project)),
         reads::Scope::Conversations => {
             let key = |number| {
@@ -561,7 +577,6 @@ fn index_bounds(range: &reads::Range) -> Option<(root::Key, root::Key)> {
         | reads::Scope::Result { .. }
         | reads::Scope::Reply { .. }
         | reads::Scope::Turn { .. }
-        | reads::Scope::EndedDelegates { .. }
         | reads::Scope::History { .. }
         | reads::Scope::Activity { .. }
         | reads::Scope::Inbox {

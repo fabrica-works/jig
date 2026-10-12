@@ -131,6 +131,8 @@ pub fn encode(row: &domain::Stored, limits: &wire::Limits) -> Result<Box<[u8]>, 
         domain::Stored::DecidedProposal(row) => wire::Value::DecidedProposal(proposals::person_proposal(row, limits)?),
         domain::Stored::Update(_)
         | domain::Stored::Goal(_)
+        | domain::Stored::EndedDelegate(_)
+        | domain::Stored::Delegate(_)
         | domain::Stored::Result(_)
         | domain::Stored::ConversationNewest(_)
         | domain::Stored::ConversationOldest(_)

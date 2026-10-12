@@ -16,6 +16,8 @@ fn lines(world: &World, task: u64) -> Vec<ActivityLine> {
             | Stored::Result(_)
             | Stored::ConversationNewest(_)
             | Stored::Goal(_)
+            | Stored::EndedDelegate(_)
+            | Stored::Delegate(_)
             | Stored::ConversationOldest(_)
             | Stored::Update(_)
             | Stored::Pool(_)

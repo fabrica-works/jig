@@ -994,6 +994,8 @@ pub enum Stored {
     ConversationNewest(crate::Conversation),
     ConversationOldest(crate::Conversation),
     Goal(crate::GoalRow),
+    EndedDelegate(crate::Edge),
+    Delegate(crate::Edge),
     /// Historical activity loaded on demand, never restored as live state.
     Activity(crate::ActivityLine),
     /// One immutable lifecycle milestone, loaded on demand.
@@ -1038,6 +1040,8 @@ impl Stored {
     pub const fn key(&self) -> Key {
         match self {
             Stored::Update(row) => row.key(),
+            Stored::EndedDelegate(row) => Key::EndedDelegate { requester: row.requester, task: row.task },
+            Stored::Delegate(row) => Key::Delegate { requester: row.requester, task: row.task },
             Stored::Goal(row) => Key::Goal { project: row.project, task: crate::Newest::of(row.task) },
             Stored::Result(row) => Key::Result { party: row.party, position: row.position },
             Stored::ConversationNewest(row) => {

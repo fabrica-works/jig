@@ -628,3 +628,99 @@ fn goals_page_newest_first_with_counts_from_the_index() {
         ]
     );
 }
+
+fn ended_delegate_world(seed: u64) -> (jig_core_world::effects::World, u64, u64) {
+    let mut world = world(seed);
+    let chat = chat_task(&world);
+    finish_chat(&mut world, chat);
+    request(&mut world, 124, jig_core_world::stories::offers::goal(300));
+    let goal = chat_task(&world);
+    world.delegate();
+    world.observed(13);
+    let delegate = world.procedure.expect("ended delegate");
+    let message = live_task(&world, goal).inbox.last().expect("delegate result").number;
+    take_message(&mut world, goal, 1, message);
+    finish_chat(&mut world, goal);
+    (world, goal, delegate)
+}
+
+#[test]
+fn ended_delegates_page_from_the_index() {
+    let (mut world, goal, delegate) = ended_delegate_world(800);
+    world.restart(800, false);
+    ask(&mut world, 950, reads::Read::EndedDelegates { task: goal, from: None });
+    let reads::Answer::Page(page) = latest(&world) else { panic!("ended delegates") };
+    assert_eq!(page.rows.len(), 1);
+    let reads::PageRow::EndedDelegate(row) = page.rows.get(0).expect("one delegate") else { panic!("delegate") };
+    assert_eq!(row.chip.number, delegate);
+    assert!(matches!(row.ended, documents::Ending::Done(_)));
+    assert!(page.next.is_none());
+}
+
+fn seed_history(world: &mut jig_core_world::effects::World, task: u64) {
+    let row = tasks::History {
+        task,
+        revision: 1,
+        by: tasks::Party::Person(1),
+        change: tasks::Change::Amended,
+        reason: Box::new([]),
+        proposal: None,
+        at: skein_lib::Wall::EPOCH,
+        amendment: None,
+    };
+    world.store.rows.insert(
+        root::Key::Core(core::Key::Tasks(tasks::Key::History { task, revision: 1 })),
+        root::Record::Core(core::Record::Tasks(tasks::Stored::History(row))),
+    );
+}
+
+fn subtree_history(world: &mut jig_core_world::effects::World, task: u64) -> Vec<(u8, u64, u64)> {
+    let mut from = None;
+    let mut rows = Vec::new();
+    for number in 0..24 {
+        ask(world, 960 + number, reads::Read::History { task, subtree: true, from: from.take() });
+        let reads::Answer::Page(page) = latest(world) else { panic!("history") };
+        assert!(page.rows.len() <= 2);
+        for row in &page.rows {
+            match row {
+                reads::PageRow::History(line) => rows.push((0, line.task, line.revision)),
+                reads::PageRow::Milestone(line) => rows.push((1, line.task, line.position)),
+                reads::PageRow::EndedDelegate(_)
+                | reads::PageRow::Activity(_)
+                | reads::PageRow::Inbox(_)
+                | reads::PageRow::Conversation(_)
+                | reads::PageRow::Goal(_)
+                | reads::PageRow::Note(_)
+                | reads::PageRow::Spend(_) => panic!("history family"),
+            }
+        }
+        from.clone_from(&page.next);
+        if from.is_none() {
+            return rows;
+        }
+    }
+    panic!("bounded history exhausted");
+}
+
+#[test]
+fn a_subtree_history_reads_each_delegates_rows_found_by_index() {
+    let (mut world, goal, delegate) = ended_delegate_world(801);
+    world.restart(801, false);
+    seed_history(&mut world, goal);
+    seed_history(&mut world, delegate);
+    let rows = subtree_history(&mut world, goal);
+    assert!(rows.iter().any(|row| row.1 == goal));
+    assert!(rows.iter().any(|row| row.1 == delegate));
+    assert_eq!(&rows[..2], &[(0, goal, 1), (0, delegate, 1)]);
+    assert!(rows.windows(2).all(|pair| pair[0] < pair[1]));
+    assert!(
+        world
+            .store
+            .rows
+            .remove(&root::Key::Core(core::Key::Tasks(tasks::Key::Delegate { requester: goal, task: delegate })))
+            .is_some()
+    );
+    let without_edge = subtree_history(&mut world, goal);
+    assert!(!without_edge.is_empty());
+    assert!(without_edge.iter().all(|row| row.1 == goal));
+}

@@ -37,6 +37,7 @@ pub struct Peers {
     pub alert_news: Vec<(bool, jig_ops_domain_observability::Alert)>,
     replay_news: bool,
     applied: u64,
+    tree_tasks: u32,
     delayed_infrastructure: Vec<(u64, root::Output)>,
 }
 
@@ -71,10 +72,10 @@ fn task_row(store: &jig_core_world::Store, number: u64) -> Option<&jig_domain_ta
 
 /// The independent store supplies real withdrawn proposal history too. The
 /// core world's minimal read peer intentionally does not select this family.
-fn read_page(store: &Rows, range: &core::reads::Range) -> core::reads::Loaded {
+fn read_page(store: &Rows, range: &core::reads::Range, tree_tasks: u32) -> core::reads::Loaded {
     let store = core_store(store);
     let core::reads::Scope::Proposal { proposer: core::documents::Proposer::Task(task), proposal } = range.scope else {
-        return jig_core_world::reads::page(&store, range);
+        return jig_core_world::reads::page(&store, range, tree_tasks);
     };
     let mut ordered = std::collections::BTreeMap::new();
     for record in store.rows.values() {
@@ -175,6 +176,7 @@ impl Application for OpsApplication {
             alert_news: Vec::new(),
             replay_news: false,
             applied: 0,
+            tree_tasks: config.limits().core.tasks.tree_tasks,
             delayed_infrastructure: Vec::new(),
         }
     }
@@ -250,7 +252,7 @@ impl Application for OpsApplication {
             return vec![Input::Event(root::Event::Core(core::Event::SeenChatLoaded { request, row, busy: false }))];
         }
         if let root::Output::Core(core::Held::ReadLoad { load, range }) = delivery {
-            let loaded = read_page(store, &range);
+            let loaded = read_page(store, &range, peers.tree_tasks);
             return vec![Input::Event(root::Event::Core(core::Event::ReadLoaded { load, result: loaded }))];
         }
         match &delivery {

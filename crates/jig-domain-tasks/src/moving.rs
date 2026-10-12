@@ -353,6 +353,7 @@ pub(crate) fn make(domain: &mut Domain, env: &Env<Limits>, plan: Plan, reason: &
         crate::funders::save_funding(domain, destination, out);
     }
     if let Some(parent) = old_parent {
+        out.push(Request::Erase { key: crate::Key::Delegate { requester: parent, task: number } });
         let parent_row = task_mut(domain, parent).expect("old requester live");
         let mut delegates = List::with_capacity(env.limits.delegates);
         for delegate in &parent_row.record.delegates {

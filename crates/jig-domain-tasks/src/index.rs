@@ -117,6 +117,14 @@ pub enum Key {
         project: u32,
         task: Newest,
     },
+    EndedDelegate {
+        requester: u64,
+        task: u64,
+    },
+    Delegate {
+        requester: u64,
+        task: u64,
+    },
 }
 
 impl Key {
@@ -140,7 +148,9 @@ impl Key {
             | Self::Result { .. }
             | Self::ConversationNewest { .. }
             | Self::ConversationOldest { .. }
-            | Self::Goal { .. } => false,
+            | Self::Goal { .. }
+            | Self::EndedDelegate { .. }
+            | Self::Delegate { .. } => false,
         }
     }
 }
@@ -184,4 +194,11 @@ pub struct GoalRow {
     pub project: u32,
     pub task: u64,
     pub endings: Endings,
+}
+
+/// A requester-to-delegate edge retained until adoption (store.md 7.3).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Edge {
+    pub requester: u64,
+    pub task: u64,
 }

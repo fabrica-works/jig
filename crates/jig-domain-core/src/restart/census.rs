@@ -39,7 +39,9 @@ impl Census {
                 | tasks::Key::Activity { .. }
                 | tasks::Key::Update { .. }
                 | tasks::Key::ConversationNewest { .. }
-                | tasks::Key::Goal { .. },
+                | tasks::Key::Goal { .. }
+                | tasks::Key::EndedDelegate { .. }
+                | tasks::Key::Delegate { .. },
             )
             | Key::Core(_)
             | Key::People(_)

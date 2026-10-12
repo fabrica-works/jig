@@ -448,7 +448,7 @@ impl Domain {
 pub(crate) fn output_bound(limits: &Limits) -> Option<u32> {
     limits
         .tasks
-        .checked_mul(25)?
+        .checked_mul(26)?
         .checked_add(limits.batch.checked_mul(2)?)?
         .checked_add(limits.funders.checked_mul(3)?)?
         .checked_add(limits.tasks.checked_mul(limits.subscriptions)?.checked_mul(2)?)?
@@ -1249,6 +1249,9 @@ pub(crate) fn make_admitted(
             task_mut(domain, number).expect("handed child live").record.phase = Phase::Active(Active::Due);
         }
         publish(domain, env, number, out);
+        if let Some(requester) = parent {
+            out.push(Request::Save { record: Stored::Delegate(crate::Edge { requester, task: number }) });
+        }
         fact(domain, Fact::Made { task: number, requester: creator });
         if inherited {
             activate(domain, number, out);

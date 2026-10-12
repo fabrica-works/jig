@@ -633,6 +633,8 @@ fn object(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Optio
                 | tasks::Stored::Result(_)
                 | tasks::Stored::ConversationNewest(_)
                 | tasks::Stored::Goal(_)
+                | tasks::Stored::EndedDelegate(_)
+                | tasks::Stored::Delegate(_)
                 | tasks::Stored::ConversationOldest(_)
                 | tasks::Stored::Update(_)
                 | tasks::Stored::Pool(_)
@@ -805,15 +807,7 @@ fn object(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Optio
 #[expect(clippy::too_many_lines, reason = "exhaustive read construction keeps each owner conversion visible")]
 fn page_row(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Option<PageRow>, Missing> {
     match &range.scope {
-        Scope::EndedDelegates { task } => {
-            let Some(owner) = row_owner(&row) else {
-                return Ok(None);
-            };
-            if owner.requester != tasks::Party::Task(*task) || !ended(owner) {
-                return Ok(None);
-            }
-            Ok(Some(PageRow::EndedDelegate(documents::ended_delegate_from_row(limits, owner)?)))
-        }
+        Scope::EndedDelegates { task } => super::indexed::ended_delegate_row(limits, *task, &row),
         Scope::History { task, subtree } => {
             let Some(owner) = row_owner(&row) else {
                 return Ok(None);
@@ -841,6 +835,8 @@ fn page_row(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Opt
                     | tasks::Stored::Result(_)
                     | tasks::Stored::ConversationNewest(_)
                     | tasks::Stored::Goal(_)
+                    | tasks::Stored::EndedDelegate(_)
+                    | tasks::Stored::Delegate(_)
                     | tasks::Stored::ConversationOldest(_)
                     | tasks::Stored::Update(_)
                     | tasks::Stored::Pool(_)
@@ -962,6 +958,8 @@ fn inbox_selection_row(limits: &Limits, row: &Row) -> Result<Option<documents::I
             | tasks::Stored::Result(_)
             | tasks::Stored::ConversationNewest(_)
             | tasks::Stored::Goal(_)
+            | tasks::Stored::EndedDelegate(_)
+            | tasks::Stored::Delegate(_)
             | tasks::Stored::ConversationOldest(_)
             | tasks::Stored::Update(_)
             | tasks::Stored::Pool(_)
@@ -1010,6 +1008,8 @@ fn inbox_row(
             | tasks::Stored::Result(_)
             | tasks::Stored::ConversationNewest(_)
             | tasks::Stored::Goal(_)
+            | tasks::Stored::EndedDelegate(_)
+            | tasks::Stored::Delegate(_)
             | tasks::Stored::ConversationOldest(_)
             | tasks::Stored::Update(_)
             | tasks::Stored::Pool(_)
@@ -1253,6 +1253,8 @@ fn milestone_record(record: &Record) -> Option<&tasks::Milestone> {
             | tasks::Stored::Result(_)
             | tasks::Stored::ConversationNewest(_)
             | tasks::Stored::Goal(_)
+            | tasks::Stored::EndedDelegate(_)
+            | tasks::Stored::Delegate(_)
             | tasks::Stored::ConversationOldest(_)
             | tasks::Stored::Update(_)
             | tasks::Stored::Pool(_)
@@ -1280,6 +1282,8 @@ fn activity_record(record: &Record) -> Option<&tasks::ActivityLine> {
             | tasks::Stored::Result(_)
             | tasks::Stored::ConversationNewest(_)
             | tasks::Stored::Goal(_)
+            | tasks::Stored::EndedDelegate(_)
+            | tasks::Stored::Delegate(_)
             | tasks::Stored::ConversationOldest(_)
             | tasks::Stored::Update(_)
             | tasks::Stored::Pool(_)
@@ -1350,6 +1354,8 @@ fn ledger(record: &Record) -> Option<&tasks::FundingRecord> {
             | tasks::Stored::Result(_)
             | tasks::Stored::ConversationNewest(_)
             | tasks::Stored::Goal(_)
+            | tasks::Stored::EndedDelegate(_)
+            | tasks::Stored::Delegate(_)
             | tasks::Stored::ConversationOldest(_)
             | tasks::Stored::Update(_)
             | tasks::Stored::Pool(_)
@@ -1432,18 +1438,9 @@ pub(super) fn position_allowed(scope: &Scope, position: &Position) -> bool {
                     Key::Tasks(tasks::Key::Goal { project: owner, .. }) => owner == project,
                     Key::Tasks(_) | Key::Core(_) | Key::People(_) | Key::Notes(_) => false,
                 },
-                Scope::EndedDelegates { .. } => match kind {
-                    KeyKind::Ended(_) => true,
-                    KeyKind::Live(_)
-                    | KeyKind::History(_)
-                    | KeyKind::Milestone(_)
-                    | KeyKind::Activity(_)
-                    | KeyKind::PersonProposal(_)
-                    | KeyKind::Escalation(_)
-                    | KeyKind::Turn { .. }
-                    | KeyKind::Note
-                    | KeyKind::Ledger(_)
-                    | KeyKind::Unsupported => false,
+                Scope::EndedDelegates { task } => match key {
+                    Key::Tasks(tasks::Key::EndedDelegate { requester, .. }) => requester == task,
+                    Key::Tasks(_) | Key::Core(_) | Key::People(_) | Key::Notes(_) => false,
                 },
                 Scope::Notes { .. } | Scope::ScopedNotes { .. } => kind == KeyKind::Note,
                 Scope::Spend { project } => kind == KeyKind::Ledger(*project),
@@ -1492,6 +1489,8 @@ fn key_kind(key: &Key) -> KeyKind {
             | tasks::Key::Result { .. }
             | tasks::Key::ConversationNewest { .. }
             | tasks::Key::Goal { .. }
+            | tasks::Key::EndedDelegate { .. }
+            | tasks::Key::Delegate { .. }
             | tasks::Key::ConversationOldest { .. }
             | tasks::Key::Update { .. } => KeyKind::Unsupported,
         },

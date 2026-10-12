@@ -749,9 +749,9 @@ impl World {
             }
             root::Delivery::Core(core::Held::ReadLoad { load, range }) => {
                 if let Some(reads) = &mut self.reads {
-                    self.events.extend(reads.load(load, *range, &self.store));
+                    self.events.extend(reads.load(load, *range, &self.store, self.limits.core.tasks.tree_tasks));
                 } else if self.client_peer.is_some() {
-                    let result = crate::reads::page(&self.store, &range);
+                    let result = crate::reads::page(&self.store, &range, self.limits.core.tasks.tree_tasks);
                     self.events.push_back(root::Event::Core(core::Event::ReadLoaded { load, result }));
                 }
             }
