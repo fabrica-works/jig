@@ -15,7 +15,7 @@ use skein_lib::{Queue, ReplyTo, Token, Wall};
 #[expect(clippy::large_enum_variant, reason = "store pages own complete typed child events")]
 pub enum Store {
     /// This whole transaction is durable.
-    Committed { number: u64 },
+    Committed { number: u64, fill: u64 },
     /// This transaction failed and no later held output may leave.
     Failed { number: u64 },
     /// One row in the core's requested restoration order.

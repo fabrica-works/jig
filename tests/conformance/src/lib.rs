@@ -366,7 +366,7 @@ impl Application for Testing {
         let input = negative::input(domain, config, clock, input);
         match input {
             Input::Event(event) => root::step(domain, &env, event),
-            Input::Committed(number) => root::step(domain, &env, root::Event::Committed { number }),
+            Input::Committed(number) => root::step(domain, &env, root::Event::Committed { number, fill: 0 }),
             Input::Failed(number) => root::step(domain, &env, root::Event::Failed { number }),
             Input::Restore(row) => assert!(root::restore_record(domain, &env, row), "row accepted by cold script"),
         }

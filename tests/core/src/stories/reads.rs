@@ -290,7 +290,7 @@ pub fn conversation_owner_replay_keeps_every_retained_page_after_durability_and_
     assert!(world.watches.as_ref().expect("watcher").deliveries.is_empty());
     let committed = world.store.release_held().expect("actual durable completion");
     assert_eq!(committed, prerequisite);
-    world.send(root::Event::Committed { number: committed });
+    world.send(root::Event::Committed { number: committed, fill: 0 });
     let documents::Document::Conversations(value) = watches::latest(&world, 60) else {
         panic!("conversation document")
     };

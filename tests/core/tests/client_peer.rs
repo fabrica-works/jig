@@ -66,7 +66,7 @@ fn a_client_answer_and_read_wait_for_the_engines_commit_completion() {
     }));
     assert!(world.client_peer.as_ref().expect("client peer").delivered.is_empty(), "reads share the held barrier");
     let number = world.store.release_held().expect("the withheld commit completion");
-    world.send(root::Event::Committed { number });
+    world.send(root::Event::Committed { number, fill: 0 });
     let receipts = &world.client_peer.as_ref().expect("client peer").delivered;
     assert!(receipts.iter().any(|(durable, receipt)| matches!(receipt,
         root::Delivery::Core(core::Held::PeopleReply { reply: people::Reply::Outcome(people::Outcome::Started { .. }), .. })

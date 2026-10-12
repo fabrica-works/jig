@@ -133,7 +133,7 @@ fn drained_is_released_once_after_the_last_commit_is_durable() {
     assert!(!world.stop_deliveries.iter().any(|held| matches!(held, core::Held::Drained)));
     let number = world.store.release_held().expect("the pending commit");
     assert!(number > commits);
-    world.send(root::Event::Committed { number });
+    world.send(root::Event::Committed { number, fill: 0 });
     assert_eq!(world.stop_deliveries.iter().filter(|held| matches!(held, core::Held::Drained)).count(), 1);
     world.drain();
     assert_eq!(world.store.applied, number);

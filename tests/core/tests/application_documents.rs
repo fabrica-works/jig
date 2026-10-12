@@ -116,7 +116,7 @@ fn a_panel_read_waits_for_the_commit_it_reflects() {
     reads::application(&mut world, 1, ApplicationScope::Project(1), 1, ClientSubject::Panel { project: 1, task });
     assert!(world.reads.as_ref().expect("story fixture supplies this value").application_receipts.is_empty());
     let durable = world.store.release_held().expect("story fixture supplies this value");
-    world.send(root::Event::Committed { number: durable });
+    world.send(root::Event::Committed { number: durable, fill: 0 });
     let ClientDocument::Panel { resources: watched_resources, .. } = received(&world, 54)[0] else {
         panic!("watched connector panel")
     };

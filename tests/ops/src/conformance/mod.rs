@@ -244,7 +244,7 @@ impl Application for Ops {
     fn step(domain: &mut root::Domain, config: &Config, clock: Clock, input: Input<root::Event, root::Record>) {
         let event = match input {
             Input::Event(event) => event,
-            Input::Committed(number) => root::Event::Store(root::Store::Committed { number }),
+            Input::Committed(number) => root::Event::Store(root::Store::Committed { number, fill: 0 }),
             Input::Failed(number) => root::Event::Store(root::Store::Failed { number }),
             Input::Restore(row) => root::Event::Store(root::Store::Restore(row)),
         };

@@ -96,7 +96,7 @@ fn admission_precedes_a_connectors_change_and_its_outputs_wait_for_the_commit() 
         [Output::Busy] => {}
         other => panic!("busy: {other:?}"),
     }
-    step(&mut domain, &env, Event::Store(Store::Committed { number: 1 }));
+    step(&mut domain, &env, Event::Store(Store::Committed { number: 1, fill: 0 }));
     take(&mut domain, &env);
     step(&mut domain, &env, name(2));
     let retry = take(&mut domain, &env);
@@ -135,7 +135,7 @@ fn a_connector_read_answer_uses_the_door_and_makes_no_commit() {
     let (mut domain, env) = fixture();
     step(&mut domain, &env, name(1));
     take(&mut domain, &env);
-    step(&mut domain, &env, Event::Store(Store::Committed { number: 1 }));
+    step(&mut domain, &env, Event::Store(Store::Committed { number: 1, fill: 0 }));
     take(&mut domain, &env);
     step(&mut domain, &env, name(2));
     match take(&mut domain, &env).as_ref() {
@@ -236,7 +236,9 @@ fn cold_restart_loads_every_child_before_opening_decisions() {
                     step(&mut domain, &env, Event::Store(Store::Restored(stage)));
                 }
                 Output::ToChild(value) => step(&mut domain, &env, Event::Released(value)),
-                Output::Commit { number, .. } => step(&mut domain, &env, Event::Store(Store::Committed { number })),
+                Output::Commit { number, .. } => {
+                    step(&mut domain, &env, Event::Store(Store::Committed { number, fill: 0 }));
+                }
                 other @ (Output::ReadResult { .. }
                 | Output::CoreLoad(_)
                 | Output::Core(_)
@@ -287,7 +289,7 @@ fn settle(domain: &mut Domain, env: &Env<Limits>) -> Box<[Output]> {
         }
         for value in values {
             match value {
-                Output::Commit { number, .. } => step(domain, env, Event::Store(Store::Committed { number })),
+                Output::Commit { number, .. } => step(domain, env, Event::Store(Store::Committed { number, fill: 0 })),
                 Output::ToChild(value) => step(domain, env, Event::Released(value)),
                 Output::Core(core::Held::NotesLoad { owner, .. }) => step(
                     domain,
@@ -517,7 +519,7 @@ fn connector_documents_and_reads_share_the_last_connector_commit_barrier() {
         },
     );
     assert!(take(&mut domain, &env).is_empty(), "assembled read stays behind the same commit");
-    step(&mut domain, &env, Event::Store(Store::Committed { number }));
+    step(&mut domain, &env, Event::Store(Store::Committed { number, fill: 0 }));
     let released = take(&mut domain, &env);
     let mut documents = 0_u32;
     let mut answers = 0_u32;

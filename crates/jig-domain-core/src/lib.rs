@@ -220,6 +220,8 @@ pub(crate) struct WatchedSubject {
 #[derive(Debug)]
 #[expect(clippy::partial_pub_fields, reason = "the keyed escalation route remains private to the core")]
 pub struct Core {
+    /// Last reported store map bytes (protocol/store.md, 11.2).
+    pub fill: u64,
     pub(crate) workers_in_process: bool,
     pub(crate) stopping: bool,
     pub(crate) draining: Option<bool>,
@@ -506,6 +508,7 @@ impl Core {
             }
         }
         Core {
+            fill: 0,
             workers_in_process: config.workers_in_process,
             stopping: false,
             draining: None,

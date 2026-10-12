@@ -184,7 +184,7 @@ fn registered_and_scripted_sign_ins_wait_for_release_and_are_observed_once() {
         world.observer.referee.observe(0, observed).expect("original durability referee before release");
     }
     let number = world.store.release_held().expect("real held completion");
-    world.send(root::Event::Committed { number });
+    world.send(root::Event::Committed { number, fill: 0 });
     let receipts = replies(&mut world);
     assert_eq!(receipts.len(), 1);
     assert_eq!(receipts[0].0, world.store.applied);
@@ -193,7 +193,7 @@ fn registered_and_scripted_sign_ins_wait_for_release_and_are_observed_once() {
     assert!(world.peers.as_ref().expect("peers").parties[0].replies.is_empty(), "the second completion is still held");
     let scripted_commit = world.store.release_held().expect("scripted sign-in completion remains held");
     assert!(scripted_commit > number);
-    world.send(root::Event::Committed { number: scripted_commit });
+    world.send(root::Event::Committed { number: scripted_commit, fill: 0 });
     assert!(world.client_peer.as_ref().expect("client peer").delivered.is_empty());
     let party = &world.peers.as_ref().expect("peers").parties[0];
     assert_eq!(party.replies.len(), 1);

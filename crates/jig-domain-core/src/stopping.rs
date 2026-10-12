@@ -83,7 +83,8 @@ pub(crate) fn gate(core: &mut Core, event: Event) -> Result<Event, Requests> {
         | Event::ProcedureHoldings { .. }
         | Event::StartRecurring { .. }
         | Event::Period { .. } => Err(empty()),
-        event @ (Event::Marked { .. }
+        event @ (Event::Fill { .. }
+        | Event::Marked { .. }
         | Event::ReadLoaded { .. }
         | Event::Read { .. }
         | Event::ApplicationPart { .. }

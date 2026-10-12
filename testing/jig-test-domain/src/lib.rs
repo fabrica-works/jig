@@ -252,6 +252,7 @@ pub enum Event {
     /// Store acknowledgement of this exact commit number.
     Committed {
         number: u64,
+        fill: u64,
     },
     /// A store failure of this exact commit number.
     Failed {
@@ -544,7 +545,14 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event) {
                 decide(domain, env, Work::Core(event));
             }
         }
-        Event::Committed { number } => domain.journal.committed(number),
+        Event::Committed { number, fill } => {
+            domain.journal.committed(number);
+            let _filled = core::step(
+                &mut domain.core,
+                &Env { now: env.now, wall: env.wall, limits: env.limits.core },
+                core::Event::Fill { bytes: fill },
+            );
+        }
         Event::Failed { number } => domain.journal.failed(number),
         Event::ProjectionEffect { goal, number, effect } => {
             decide(domain, env, Work::ProjectionEffect { goal, number, effect });

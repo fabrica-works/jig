@@ -26,7 +26,7 @@ fn a_read_waits_for_the_commit_in_flight_before_it() {
     ask(&mut world, 1, reads::Read::Task { task });
     assert!(world.reads.as_ref().expect("party").receipts.is_empty());
     let acknowledged = world.store.release_held().expect("one held commit completion");
-    world.send(root::Event::Committed { number: acknowledged });
+    world.send(root::Event::Committed { number: acknowledged, fill: 0 });
     let receipt = &world.reads.as_ref().expect("party").receipts[0];
     assert_eq!(receipt.1, number);
     assert!(matches!(receipt.2, reads::Answer::Document(_)));

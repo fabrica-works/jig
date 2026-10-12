@@ -311,6 +311,7 @@ pub fn room_max(limits: &Limits) -> Option<JournalRoom> {
 pub fn room(limits: &Limits, event: &Event) -> Option<JournalRoom> {
     let room = room_max(limits)?;
     match event {
+        Event::Fill { .. } => Some(JournalRoom { writes: 0, held: 0 }),
         Event::Read { .. } | Event::ReadLoaded { .. } => Some(JournalRoom { writes: 0, held: room.held }),
         Event::Stopping
         | Event::Marked { .. }
@@ -421,6 +422,10 @@ fn step_one(core: &mut Core, env: &Env<Limits>, event: Event, work: &mut Queue<E
         Err(answer) => return answer,
     };
     match event {
+        Event::Fill { bytes } => {
+            core.fill = bytes;
+            crate::stopping::empty()
+        }
         Event::Stopping => crate::stopping::start(core),
         Event::Marked { connector, subjects } => view_routes::marked(core, connector, subjects),
         Event::Application { reply_to, sign_in, key, project, connector, digest, owner } => {
@@ -435,7 +440,7 @@ fn step_one(core: &mut Core, env: &Env<Limits>, event: Event, work: &mut Queue<E
         Event::EffectStart { owner, connector, origin } => crate::effects::start(core, env, owner, connector, origin),
         Event::EffectConnector(event) => crate::effects::connector(core, env, work, event),
         Event::EffectDeadline => crate::effects::deadline(core, env),
-        Event::SignIn { reply_to, identity } => sign_in(core, work, reply_to, identity),
+        Event::SignIn { reply_to, identity } => sign_in(core, env, work, reply_to, identity),
         Event::ReadLoaded { load, result } => crate::reads::loaded(core, env, load, result),
         Event::Read { reply, sign_in, read } => crate::reads::start(core, env, reply, sign_in, read),
         Event::Watch { watcher, sign_in, subject, window } => open(core, env, watcher, sign_in, subject, window),

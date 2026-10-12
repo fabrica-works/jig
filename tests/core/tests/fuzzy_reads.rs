@@ -29,7 +29,7 @@ fn seeded_reads_wait_for_prior_commits_and_keep_receipts_across_restart_cuts() {
             assert!(world.reads.as_ref().expect("party").receipts.is_empty());
             if rng.below(2) == 0 {
                 let number = world.store.release_held().expect("the deciding commit completion");
-                world.send(root::Event::Committed { number });
+                world.send(root::Event::Committed { number, fill: 0 });
                 assert_eq!(world.reads.as_ref().expect("party").receipts.len(), 1);
             }
             let observed = world.reads.as_ref().expect("party").receipts.len();

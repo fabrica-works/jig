@@ -110,6 +110,7 @@ pub fn limits() -> root::Limits {
         routes: 200,
         connector: jig_test_connector_world::LIMITS,
         core: core::Limits {
+            fill_mark: 1000,
             documents: core::documents::DocumentLimits {
                 rows: 32,
                 text_bytes: 256,
@@ -493,7 +494,7 @@ impl World {
                     self.store.submit(number, crate::store_writes(rows), 0);
                     let applied = self.store.tick(false).expect("store did not fail").expect("ready commit");
                     self.observer.durable(self.iteration * 1_000_000, &self.store);
-                    self.events.push_front(root::Event::Committed { number: applied });
+                    self.events.push_front(root::Event::Committed { number: applied, fill: 0 });
                 }
                 root::Request::Deliver(delivery) => self.delivered(delivery),
                 root::Request::Now(core::Now::Account(accounts::Request::Component(accounts::ToComponent::Want {

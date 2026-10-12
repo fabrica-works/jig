@@ -1469,7 +1469,7 @@ fn a_person_approves_the_exact_state_and_its_delegate_result_waits_for_commit() 
             .any(|message| matches!(message.kind, tasks::MessageKind::Result(tasks::ResultKind::Approved { .. })))
     );
     let number = world.store.release_held().expect("withheld approval completion");
-    world.send(root::Event::Committed { number });
+    world.send(root::Event::Committed { number, fill: 0 });
     assert_eq!(world.people_answers.last(), Some(&people::Reply::Outcome(people::Outcome::PersonAnswered { task })));
     let message = live_row(&world, parent)
         .inbox
@@ -1646,7 +1646,7 @@ fn an_approval_reaches_its_asking_procedure_connector_as_the_whole_durable_input
     );
     assert_eq!(world.procedure_inputs.len(), before, "connector cannot receive an unacknowledged commit");
     let number = world.store.release_held().expect("approval transaction held");
-    world.send(root::Event::Committed { number });
+    world.send(root::Event::Committed { number, fill: 0 });
     let (_, connector, _, context) = world.procedure_inputs.last().expect("procedure receives approval");
     assert_eq!(*connector, 1);
     assert_eq!(context.task, parent);
@@ -1742,7 +1742,7 @@ fn a_verdicts_machine_fields_reach_its_requester_whole_after_commit_and_restart(
     });
     assert_eq!(world.inbound.len(), before, "result waits for its commit completion");
     let number = world.store.release_held().expect("held verdict transaction");
-    world.send(root::Event::Committed { number });
+    world.send(root::Event::Committed { number, fill: 0 });
     let expected = tasks::MessageKind::Result(tasks::ResultKind::Verdict { code: 2, fields: fields.clone() });
     assert!(world.inbound.iter().any(|message| message.from == tasks::Party::Task(child)
         && message.kind == expected

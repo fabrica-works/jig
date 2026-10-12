@@ -206,3 +206,55 @@ fn a_runs_write_answer_waits_for_an_unrelated_commit_in_flight() {
     world.release_commits();
     assert_eq!(world.host_answers.len(), 1);
 }
+
+fn start_chat(world: &mut World, number: u8) {
+    jig_core_world::stories::reads::request(
+        world,
+        number,
+        jig_domain_people::Ask::StartChat { project: 1, words: b"new chat".as_slice().into() },
+    );
+}
+
+fn filled_chat(seed: u64) -> World {
+    let mut world = World::new(seed, false);
+    world.fill = jig_core_world::world::limits().core.fill_mark + 1;
+    world.turn(1, 1, None, b"fill reported with this commit");
+    world
+}
+
+#[test]
+fn a_running_chat_goes_on_above_the_fill_mark() {
+    let mut world = filled_chat(130);
+    let commits = world.store.applied;
+    start_chat(&mut world, 80);
+    assert_eq!(world.people_answers.last(), Some(&jig_domain_people::Reply::Again(jig_domain_people::Again::Busy)));
+    assert_eq!(world.store.applied, commits, "a fill refusal makes no commit");
+    world.turn(2, 2, None, b"the running chat continues");
+    assert!(world.store.rows.values().any(|row| matches!(row,
+        root::Record::Core(core::Record::Core(core::CoreRecord::Turn(turn)))
+            if turn.turn == 2 && turn.transcript.as_ref() == b"the running chat continues"
+    )));
+    assert!(world.busy_turns.is_empty());
+}
+
+#[test]
+fn a_fill_below_the_mark_admits_a_chat_again() {
+    let mut world = filled_chat(131);
+    world.fill = jig_core_world::world::limits().core.fill_mark - 1;
+    world.end(
+        tasks::End::Finished {
+            result: tasks::TaskResult::Report { words: b"finished chat".as_slice().into() },
+            cancel_delegates: false,
+        },
+        1,
+    );
+    start_chat(&mut world, 81);
+    assert!(
+        matches!(
+            world.people_answers.last(),
+            Some(jig_domain_people::Reply::Outcome(jig_domain_people::Outcome::Started { .. }))
+        ),
+        "{:?}",
+        world.people_answers.last()
+    );
+}

@@ -73,6 +73,8 @@ pub struct World {
     pub hold_restore_pages: bool,
     /// Delay before a submitted store transaction becomes durable.
     pub store_delay: u32,
+    /// Store map bytes supplied with subsequent commit answers.
+    pub fill: u64,
     /// Whether the root reported a failed commit and stopped.
     pub stopped: bool,
     /// Independent scripted hosts and clients, when this scenario uses them.
@@ -302,6 +304,7 @@ impl World {
             hold_restart_reads: false,
             hold_restore_pages: false,
             store_delay: 0,
+            fill: 0,
             stopped: false,
             peers: None,
             client_peer: None,
@@ -657,7 +660,7 @@ impl World {
             }
             if !self.stopped {
                 match self.store.tick(false) {
-                    Ok(Some(number)) => self.events.push_front(root::Event::Committed { number }),
+                    Ok(Some(number)) => self.events.push_front(root::Event::Committed { number, fill: self.fill }),
                     Ok(None) => {}
                     Err(number) => self.events.push_front(root::Event::Failed { number }),
                 }
@@ -1206,7 +1209,7 @@ impl World {
     /// Let every previously durable completion through its ordered barrier.
     pub fn release_commits(&mut self) {
         while let Some(number) = self.store.release_held() {
-            self.events.push_back(root::Event::Committed { number });
+            self.events.push_back(root::Event::Committed { number, fill: self.fill });
         }
         self.drain();
     }

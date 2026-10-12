@@ -280,6 +280,8 @@ pub enum Now {
 /// Limits of the core's child routes.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Limits {
+    /// Store map bytes at or above which new party work is refused (store.md, 11.2).
+    pub fill_mark: u64,
     /// Number of numbered connectors retained by the core.
     pub connectors: u32,
     /// Bytes retained for one task's resumable transcript tail.
@@ -336,6 +338,8 @@ pub struct CoreBriefBudgets {
 /// One event routed to a child of the core.
 #[derive(Debug)]
 pub enum Event {
+    /// Store map bytes from each commit answer; needs no commit (store.md, 11.2).
+    Fill { bytes: u64 },
     /// Refuse new decisions while the service drains (engine.md, 6.1).
     Stopping,
     /// A connector's state change names its opaque subjects in this decision.

@@ -152,7 +152,7 @@ pub(crate) fn released(
         match config.fault {
             Fault::EarlyOutput if signin => {
                 // Advance only the root's journal; its store remains unchanged.
-                root::step(domain, &env(config, clock), root::Event::Committed { number });
+                root::step(domain, &env(config, clock), root::Event::Committed { number, fill: 0 });
                 corrupt.extend(Testing::release(domain, &Config { fault: Fault::None, ..*config }, clock));
                 corrupt.push(Output::Commit { number, writes });
             }

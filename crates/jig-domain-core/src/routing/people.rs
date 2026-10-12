@@ -61,6 +61,7 @@ pub(super) fn route_people(
 
 pub(super) fn sign_in(
     core: &mut Core,
+    env: &Env<Limits>,
     work: &mut Queue<Event>,
     reply_to: ReplyTo,
     identity: people::Identity,
@@ -71,7 +72,10 @@ pub(super) fn sign_in(
             to: reply_to,
             reply: people::Reply::Again(people::Again::NotReady),
         })));
-    } else if core.counters.deployment().people == u64::MAX || core.counters.deployment().sign_ins == u64::MAX {
+    } else if core.fill >= env.limits.fill_mark
+        || core.counters.deployment().people == u64::MAX
+        || core.counters.deployment().sign_ins == u64::MAX
+    {
         out.push(Request::Now(Box::new(Now::SignInRefused { to: reply_to })));
     } else {
         let person = crate::fresh(&mut core.counters, crate::Family::Person).expect("person counter available");

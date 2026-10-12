@@ -1,0 +1,106 @@
+//! Store fill and admission at the high-water mark (protocol/store.md, 11.2).
+use super::*;
+
+fn filled_core(bytes: u64) -> (Core, Env<Limits>) {
+    let (mut core, limits) = core();
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
+    drop(step(&mut core, &env, Event::Fill { bytes }));
+    (core, env)
+}
+
+fn signed_in(core: &mut Core, env: &Env<Limits>) {
+    drop(step(
+        core,
+        env,
+        Event::People(people::Event::SignedIn {
+            reply_to: ReplyTo::new(Token::new(7200)),
+            person: 1,
+            sign_in: 10,
+            identity: people::Identity {
+                key: people::IdentityKey { provider: 0, subject: Box::new([1]) },
+                login: b"owner".as_slice().into(),
+                name: b"A Person".as_slice().into(),
+            },
+            kind: people::Kind::Person,
+        }),
+    ));
+    drop(step(core, env, Event::Tasks(tasks::Event::Restored)));
+}
+
+fn ask(core: &mut Core, env: &Env<Limits>, ask: people::Ask) -> Requests {
+    step(
+        core,
+        env,
+        Event::People(people::Event::Ask { reply_to: ReplyTo::new(Token::new(7202)), sign_in: 10, key: [72; 16], ask }),
+    )
+}
+
+fn goal() -> people::Ask {
+    people::Ask::SetGoal {
+        project: 1,
+        spec: b"new goal".as_slice().into(),
+        executor: people::GoalExecutor::Charter(1),
+        budget: 100,
+        priority: 1,
+        deadline: None,
+    }
+}
+
+fn busy(requests: Requests) {
+    let Requests::Out(mut out) = requests;
+    let Some(Request::Held(held)) = out.pop() else { panic!("one busy answer") };
+    let Held::PeopleReply { to, reply } = *held else { panic!("the party's answer") };
+    assert_eq!(to.into_token(), Token::new(7202));
+    assert_eq!(reply, people::Reply::Again(people::Again::Busy));
+    let Some(Request::Decided) = out.pop() else { panic!("the decision closes") };
+    assert!(out.is_empty(), "the refusal saves nothing");
+}
+
+#[test]
+fn a_sign_in_at_the_fill_mark_is_refused() {
+    let (mut core, env) = filled_core(limits().fill_mark);
+    let identity = people::Identity {
+        key: people::IdentityKey { provider: 0, subject: Box::new([2]) },
+        login: b"second".as_slice().into(),
+        name: b"B Person".as_slice().into(),
+    };
+    let Requests::Out(mut out) =
+        step(&mut core, &env, Event::SignIn { reply_to: ReplyTo::new(Token::new(7201)), identity });
+    let Some(Request::Now(now)) = out.pop() else { panic!("one refusal, first") };
+    let Now::SignInRefused { to } = *now else { panic!("the sign-in's refusal") };
+    assert_eq!(to.into_token(), Token::new(7201));
+    let Some(Request::Decided) = out.pop() else { panic!("the decision closes") };
+    assert!(out.is_empty(), "nothing is written");
+}
+
+#[test]
+fn a_chat_at_the_fill_mark_is_answered_busy() {
+    let (mut core, env) = filled_core(limits().fill_mark);
+    signed_in(&mut core, &env);
+    busy(ask(&mut core, &env, people::Ask::StartChat { project: 1, words: b"new chat".as_slice().into() }));
+}
+
+#[test]
+fn a_goal_below_the_fill_mark_is_made() {
+    let (mut core, env) = filled_core(limits().fill_mark - 1);
+    signed_in(&mut core, &env);
+    let Requests::Out(mut out) = ask(&mut core, &env, goal());
+    let mut request = None;
+    while let Some(next) = out.pop() {
+        if let Request::Ask { ask: Ask::TaskHoldings { request: token, .. }, .. } = next {
+            request = Some(token);
+        }
+    }
+    let request = request.expect("goal asks for connector holdings");
+    for connector in [1, 2] {
+        drop(step(&mut core, &env, Event::Holdings { request, connector, holdings: Some(Box::new([])) }));
+    }
+    assert!(core.tasks.task(1).is_some(), "the goal was made below the mark");
+}
+
+#[test]
+fn a_goal_at_the_fill_mark_is_answered_busy() {
+    let (mut core, env) = filled_core(limits().fill_mark);
+    signed_in(&mut core, &env);
+    busy(ask(&mut core, &env, goal()));
+}

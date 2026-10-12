@@ -146,6 +146,10 @@ pub(super) fn begin_goal_creation(
     priority: u32,
     deadline: Option<skein_lib::Wall>,
 ) {
+    if core.fill >= env.limits.fill_mark {
+        super::refusals::pool_again(work, request, people::Again::Busy);
+        return;
+    }
     if core.projections.len() >= env.limits.tasks.tasks {
         pool_refused(work, request, people::Refusal::Limit { which: people::LimitKind::LiveTasks });
         return;
@@ -199,6 +203,10 @@ pub(super) fn begin_chat_creation(
     role: people::Role,
     words: Box<[u8]>,
 ) {
+    if core.fill >= env.limits.fill_mark {
+        super::refusals::pool_again(work, request, people::Again::Busy);
+        return;
+    }
     if let Err(why) = core.chat_admit(project, person, role, env.limits.tasks.tree_tasks) {
         pool_refused(work, request, why);
         return;

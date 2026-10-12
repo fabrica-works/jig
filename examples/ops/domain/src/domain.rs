@@ -218,7 +218,14 @@ pub(crate) enum Work {
 /// Store terminals update the journal; every other input admits one decision.
 pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event) {
     match event {
-        Event::Store(Store::Committed { number }) => domain.journal.committed(number),
+        Event::Store(Store::Committed { number, fill }) => {
+            domain.journal.committed(number);
+            let _filled = core::step(
+                &mut domain.core,
+                &Env { now: env.now, wall: env.wall, limits: env.limits.core },
+                core::Event::Fill { bytes: fill },
+            );
+        }
         Event::Store(Store::Failed { number }) => domain.journal.failed(number),
         other @ (Event::WatchApplication { .. }
         | Event::ReadApplication { .. }

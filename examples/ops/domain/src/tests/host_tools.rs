@@ -101,6 +101,6 @@ fn a_tool_mutation_and_its_reply_part_share_one_commit() {
             panic!("the reply part waits for its commit");
         }
     }
-    step(&mut domain, &env, Event::Store(Store::Committed { number: commit.unwrap() }));
+    step(&mut domain, &env, Event::Store(Store::Committed { number: commit.unwrap(), fill: 0 }));
     subscription_answer(take(&mut domain, &env), key);
 }
