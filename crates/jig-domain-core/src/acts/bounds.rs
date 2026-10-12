@@ -40,25 +40,12 @@ pub(super) fn goal(core: &Core, limits: &Limits, party: u64, project: u32, held:
         .min(policy.ceiling.budget.spend)
         .min(core.authority.rules().ceiling.budget.spend);
     let maximum_deadline = earliest(policy.ceiling.budget.deadline, core.authority.rules().ceiling.budget.deadline);
-    let mut charters = List::with_capacity(1);
-    // A form varies only budget and deadline. Its fixed authority/executor
-    // must pass the same full judge before any charter is offered.
+    let mut charters = List::with_capacity(limits.documents.lines);
     let canonical_deadline = earliest(role.authority.budget.deadline, maximum_deadline);
-    let supported = match goal_start(
-        core,
-        project,
-        party,
-        held,
-        people::GoalExecutor::Charter(core.settings.chat),
-        0,
-        canonical_deadline,
-        limits.tasks.tree_tasks,
-    ) {
-        Ok(value) => value.direct,
-        Err(_) => false,
-    };
-    if supported && core.projections.len() < limits.tasks.tasks && core.tasks.charters().contains(&core.settings.chat) {
-        charters.push(core.settings.chat).expect("one offered charter");
+    for charter in &core.settings.charters {
+        if goal_charter(core, limits, party, project, held, charter.number) && charters.room() > 0 {
+            charters.push(charter.number).expect("bounded offered charters");
+        }
     }
     let mut procedures = List::with_capacity(limits.documents.lines);
     if core.projections.len() < limits.tasks.tasks {
@@ -196,6 +183,39 @@ fn earliest(left: Option<Wall>, right: Option<Wall>) -> Option<Wall> {
     }
 }
 
+/// Sample the same full goal judge for a configured charter's form fact.
+pub(crate) fn goal_charter(
+    core: &Core,
+    limits: &Limits,
+    party: u64,
+    project: u32,
+    held: people::Role,
+    charter: u32,
+) -> bool {
+    if core.projections.len() >= limits.tasks.tasks {
+        return false;
+    }
+    let Some(policy) = core.authority.policy(project) else { return false };
+    let Some(role) = core.authority.role(project, held.number()) else { return false };
+    let deadline = earliest(
+        role.authority.budget.deadline,
+        earliest(policy.ceiling.budget.deadline, core.authority.rules().ceiling.budget.deadline),
+    );
+    match goal_start(
+        core,
+        project,
+        party,
+        held,
+        people::GoalExecutor::Charter(charter),
+        0,
+        deadline,
+        limits.tasks.tree_tasks,
+    ) {
+        Ok(value) => value.direct,
+        Err(_) => false,
+    }
+}
+
 /// The goal's one full judge, also sampled for fixed supported form facts.
 #[expect(clippy::too_many_arguments, reason = "a goal carries its requested authority and deadline")]
 pub(crate) fn goal_start(
@@ -221,7 +241,7 @@ pub(crate) fn goal_start(
     given.budget.deadline = deadline;
     let executor = match executor {
         people::GoalExecutor::Charter(charter) => {
-            if charter != core.settings.chat {
+            if core.charter(charter).is_none() {
                 return Err(people::Refusal::NotOffered);
             }
             authority::Executor::Charter(charter)

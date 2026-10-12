@@ -11,6 +11,8 @@ fn frame(core: &Core, limits: &Limits) -> Frame {
 #[test]
 fn frame_projects_keep_unopened_pools_absent_and_use_actual_current_funding() {
     let (mut core, limits) = tree_core();
+    core.settings.chat_authority.delegation.tasks = 1;
+    core.settings.chat_authority.delegation.depth = 1;
     let initial = frame(&core, &limits);
     let project = initial.projects.get(0).expect("project role");
     assert_eq!(project.name, None);
@@ -125,4 +127,30 @@ fn frame_watch_receives_pool_ledger_changes_after_their_decision() {
         core.tasks.funding(tasks::Funder::Pool { project: 1, person: 1, period }).is_some(),
         "the prior pool remains an actual owner ledger"
     );
+}
+
+#[test]
+fn the_frame_offers_both_charters_for_goals() {
+    let (old, mut limits) = tree_core();
+    limits.tasks.charters = 2;
+    limits.tasks.executor_kinds = 3;
+    limits.authority.executors = 3;
+    let mut config = config(146);
+    let mut second = config.settings.charters[0].clone();
+    second.number = 2;
+    config.settings.charters = Box::new([config.settings.charters[0].clone(), second]);
+    let kinds: Box<[authority::Executor]> =
+        Box::new([authority::Executor::Charter(1), authority::Executor::Charter(2), authority::Executor::Procedure(1)]);
+    let mut rules = config.authority.rules().clone();
+    rules.ceiling.delegation.kinds.clone_from(&kinds);
+    let mut policy = config.authority.policy(1).expect("project policy").clone();
+    policy.ceiling.delegation.kinds.clone_from(&kinds);
+    policy.roles[0].authority.delegation.kinds = kinds;
+    config.authority = authority::Domain::new(rules, limits.authority).expect("charter policy");
+    let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
+    authority::step(&mut config.authority, authority::Event::Policy { project: 1, policy }, &mut out);
+    let mut core = Core::new(config, &limits);
+    core.people = old.people;
+    let frame = frame(&core, &limits);
+    assert_eq!(frame.charters.get(0).expect("project charters").goals.as_slice(), [1, 2]);
 }

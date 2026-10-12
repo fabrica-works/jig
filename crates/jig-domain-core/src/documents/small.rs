@@ -101,12 +101,16 @@ pub(super) fn frame(core: &Core, limits: &Limits, party: u64) -> Result<Frame, M
             })
             .expect("bounded project list");
         let mut goals = List::with_capacity(limits.documents.lines);
-        for charter in
-            core.tasks.charters().iter().take(usize::try_from(limits.documents.lines).expect("line count fits"))
-        {
-            goals.push(*charter).expect("bounded charter list");
+        let mut cut = false;
+        for charter in &core.settings.charters {
+            if crate::acts::bounds::goal_charter(core, limits, party, role.project, role.role, charter.number) {
+                if goals.room() > 0 {
+                    goals.push(charter.number).expect("bounded charter list");
+                } else {
+                    cut = true;
+                }
+            }
         }
-        let cut = usize::try_from(goals.len()).expect("charter count fits") < core.tasks.charters().len();
         charters
             .push(OfferedCharter { project: role.project, chat: core.settings.chat, goals, cut })
             .expect("one charter line per project");
