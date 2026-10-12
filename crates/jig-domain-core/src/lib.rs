@@ -59,6 +59,8 @@ pub use routing::{
 pub use sibling_routes::{MadeRoute, PersonMessage, SentRoute};
 mod conversation;
 pub use conversation::{DeliveryOutcome, SettledAnswer, SettledCall, conversation_worst_case};
+pub mod charters;
+pub use charters::Charter;
 mod stored;
 mod translate;
 pub use run::{
@@ -110,10 +112,10 @@ pub struct Settings {
     pub close_grace: skein_lib::Duration,
     /// Provider number for the application's services.
     pub deployment_provider: u16,
-    /// Agent charter selected for chats.
-    pub charter: u32,
-    /// Bounded run policy for the charter.
-    pub run: RunPolicy,
+    /// Numbered charters offered by this deployment.
+    pub charters: Box<[Charter]>,
+    /// Charter selected for chats.
+    pub chat: u32,
     /// Maximum committed conversation bytes resumed whole.
     pub resume_bytes: u32,
     /// Funding period identifier.
@@ -124,12 +126,6 @@ pub struct Settings {
     pub person_budget: u64,
     /// Authority of a directly requested chat.
     pub chat_authority: authority::Authority,
-    /// Account selected for the charter.
-    pub account: u32,
-    /// Initial account generation.
-    pub account_generation: u64,
-    /// Initial credential lifetime.
-    pub account_valid: Option<skein_lib::Duration>,
     /// Connector number for recurring procedures.
     pub recurring_connector: u16,
     /// Configured one-bit authority family for each engine tool.
@@ -478,14 +474,7 @@ impl Core {
             config.settings.resume_bytes > 0 && config.settings.resume_bytes <= limits.resume_bytes,
             "core prices its transcript retention"
         );
-        assert!(
-            match memory::policy_owned_bytes(&config.settings.run) {
-                Some(bytes) =>
-                    bytes <= u64::from(limits.run_bytes) && run::reserve_floor(&config.settings.run).is_some(),
-                None => false,
-            },
-            "core prices its configured run policy"
-        );
+        charters::assert_configured(&config.settings, limits);
         assert!(config.projects.capacity() <= limits.authority.projects, "core prices configured projects");
         assert!(config.permission_roles.len() <= limits.authority.projects, "core prices project permissions");
         for (_, roles) in &config.permission_roles {
@@ -573,7 +562,7 @@ impl Core {
             claiming: Map::with_capacity(limits.tasks.tasks),
             due: Queue::with_capacity(limits.tasks.tasks),
             adopted: Queue::with_capacity(limits.tasks.tasks.checked_mul(2).expect("adoption room representable")),
-            tasks: tasks::Domain::new(&limits.tasks, config.seed, Box::new([config.settings.charter])),
+            tasks: tasks::Domain::new(&limits.tasks, config.seed, charters::numbers(&config.settings, limits)),
             authority: config.authority,
             people: people::Domain::new(&limits.people, config.owners, config.settings.deployment_provider),
             fleet: fleet::Domain::new(&limits.fleet),

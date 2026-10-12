@@ -94,7 +94,7 @@ impl Core {
             pool: translate::authority_numbers(pool_numbers),
             tasks_left,
             request: authority::PersonRequest::Create(Box::new([authority::Delegate {
-                executor: authority::Executor::Charter(self.settings.charter),
+                executor: authority::Executor::Charter(self.settings.chat),
                 authority: self.settings.chat_authority.clone(),
                 symbolic: Box::new([]),
             }])),

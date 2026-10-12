@@ -106,7 +106,7 @@ impl Core {
             return None;
         }
         match row.executor {
-            tasks::Executor::Agent { charter } if charter == self.settings.charter => {}
+            tasks::Executor::Agent { charter } if charter == self.settings.chat => {}
             tasks::Executor::Agent { .. } | tasks::Executor::Person(_) | tasks::Executor::Procedure { .. } => {
                 return None;
             }

@@ -337,12 +337,15 @@ fn amendment(
             Some(_) | None => row.taken_by,
         },
         instructions: match row.executor {
-            tasks::Executor::Agent { .. } => {
+            tasks::Executor::Agent { charter } => {
                 let value = match change {
                     Some(change) => change.instructions.as_ref().or(row.instructions.as_ref()),
                     None => row.instructions.as_ref(),
                 };
-                Some(super::small::text(value.unwrap_or(&core.settings.run.instructions), limits.documents.text_bytes))
+                Some(super::small::text(
+                    value.unwrap_or(&core.charter(charter).expect("task charter configured").policy.instructions),
+                    limits.documents.text_bytes,
+                ))
             }
             tasks::Executor::Procedure { .. } | tasks::Executor::Person(_) => None,
         },

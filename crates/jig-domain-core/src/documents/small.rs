@@ -108,7 +108,7 @@ pub(super) fn frame(core: &Core, limits: &Limits, party: u64) -> Result<Frame, M
         }
         let cut = usize::try_from(goals.len()).expect("charter count fits") < core.tasks.charters().len();
         charters
-            .push(OfferedCharter { project: role.project, chat: core.settings.charter, goals, cut })
+            .push(OfferedCharter { project: role.project, chat: core.settings.chat, goals, cut })
             .expect("one charter line per project");
     }
     let counts = core.people.counts(&limits.people, party).ok_or(Missing::Unknown)?;

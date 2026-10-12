@@ -433,9 +433,7 @@ impl Domain {
     /// still wait for a host whose next hello supplies its capacity.
     #[must_use]
     pub fn quiescent(&self) -> bool {
-        self.journal.idle()
-            && self.now.is_empty()
-            && (!self.ready() || self.core.due.is_empty() || !self.core.accounts.usable(self.core.settings.account))
+        self.journal.idle() && self.now.is_empty() && (!self.ready() || !self.core.due_ready())
     }
 }
 
@@ -956,9 +954,7 @@ pub fn release(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>)
             decide(domain, env, Work::ConnectorResume { number });
             return;
         }
-        if domain.core.accounts.usable(domain.core.settings.account)
-            && let Some(context) = domain.core.due.pop()
-        {
+        if let Some(context) = domain.core.take_due() {
             decide(domain, env, Work::Core(core::Event::Activate { context, ready: true }));
             return;
         }

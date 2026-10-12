@@ -284,7 +284,7 @@ impl Core {
             }
             tasks::Stored::Stub(stub) => stub.task <= deployment.tasks,
             tasks::Stored::Live(task) => {
-                if !supported_task(task, self.settings.charter)
+                if !supported_task(task, self)
                     || !supported_proposal(task, &deployment)
                     || task.number > deployment.tasks
                     || !supported_requester(task.requester, deployment.people, deployment.tasks)
@@ -383,10 +383,10 @@ impl Core {
     }
 }
 
-fn supported_task(task: &jig_domain_tasks::TaskRecord, charter: u32) -> bool {
+fn supported_task(task: &jig_domain_tasks::TaskRecord, core: &Core) -> bool {
     use jig_domain_tasks as tasks;
     let executor = match task.executor {
-        tasks::Executor::Agent { charter: configured } => charter == configured,
+        tasks::Executor::Agent { charter } => core.charter(charter).is_some(),
         tasks::Executor::Procedure { code, .. } => code != 0,
         tasks::Executor::Person(tasks::PersonAddress::Person(person)) => person != 0,
         tasks::Executor::Person(tasks::PersonAddress::Role(role)) => role <= 3,

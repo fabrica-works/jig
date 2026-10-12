@@ -217,7 +217,7 @@ pub(super) fn begin_chat_creation(
     let new = tasks::New {
         number,
         project,
-        executor: tasks::Executor::Agent { charter: core.settings.charter },
+        executor: tasks::Executor::Agent { charter: core.settings.chat },
         spec: tasks::Spec { words, parameters: Box::new([]), inputs: Box::new([]) },
         contract: tasks::Contract::Report { words: env.limits.tasks.result_bytes },
         authority: crate::translate::task_authority(&core.settings.chat_authority),

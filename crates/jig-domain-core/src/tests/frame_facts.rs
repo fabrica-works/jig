@@ -31,7 +31,7 @@ fn frame_projects_keep_unopened_pools_absent_and_use_actual_current_funding() {
     assert_eq!(pool.numbers, actual.numbers);
     assert_eq!(pool.left, 177);
     assert_ne!(pool.numbers.budget, core.settings.person_budget);
-    assert_eq!(joined.charters.get(0).expect("charters").chat, core.settings.charter);
+    assert_eq!(joined.charters.get(0).expect("charters").chat, core.settings.chat);
     assert_eq!(joined.charters.get(0).expect("charters").goals.as_slice(), core.tasks.charters());
 }
 

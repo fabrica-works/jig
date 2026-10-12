@@ -446,7 +446,7 @@ pub(super) fn conversations(
         let row = core.tasks.task(row.number).expect("live task view");
         let chat = row.requester == tasks::Party::Person(party)
             && match row.executor {
-                tasks::Executor::Agent { charter } => charter == core.settings.charter,
+                tasks::Executor::Agent { charter } => charter == core.settings.chat,
                 tasks::Executor::Person(_) | tasks::Executor::Procedure { .. } => false,
             };
         if !chat || row.tracked.is_some() || row.recurring.is_some() || core.people.role(party, row.project).is_none() {
@@ -596,42 +596,42 @@ pub(super) fn deployment(
         let mut runs = List::with_capacity(limits.documents.lines);
         let mut waiting = List::with_capacity(limits.documents.lines);
         let mut account_cut = false;
-        if value.account == core.settings.account {
-            for row in &rows {
-                let row = core.tasks.task(row.number).expect("live view task");
-                let agent = match row.executor {
-                    tasks::Executor::Agent { .. } => true,
-                    tasks::Executor::Person(_) | tasks::Executor::Procedure { .. } => false,
-                };
-                if !agent {
-                    continue;
+        for row in &rows {
+            let row = core.tasks.task(row.number).expect("live view task");
+            let agent = match row.executor {
+                tasks::Executor::Agent { charter } => {
+                    core.charter(charter).expect("task charter").account() == value.account
                 }
-                let running = match core.proofs.get(&row.number) {
-                    Some(proof) => proof.terminal.is_none(),
-                    None => false,
+                tasks::Executor::Person(_) | tasks::Executor::Procedure { .. } => false,
+            };
+            if !agent {
+                continue;
+            }
+            let running = match core.proofs.get(&row.number) {
+                Some(proof) => proof.terminal.is_none(),
+                None => false,
+            };
+            let needs = !value.usable
+                && match row.phase {
+                    tasks::Phase::Active(tasks::Active::Due | tasks::Active::Preparing) => true,
+                    tasks::Phase::Waiting
+                    | tasks::Phase::Active(_)
+                    | tasks::Phase::Closing(_)
+                    | tasks::Phase::Held { .. }
+                    | tasks::Phase::Ended(_) => false,
                 };
-                let needs = !value.usable
-                    && match row.phase {
-                        tasks::Phase::Active(tasks::Active::Due | tasks::Active::Preparing) => true,
-                        tasks::Phase::Waiting
-                        | tasks::Phase::Active(_)
-                        | tasks::Phase::Closing(_)
-                        | tasks::Phase::Held { .. }
-                        | tasks::Phase::Ended(_) => false,
-                    };
-                if running {
-                    if runs.room() > 0 {
-                        runs.push(super::small::chip_with_core(core, limits, row)?).expect("bounded account runs");
-                    } else {
-                        account_cut = true;
-                    }
+            if running {
+                if runs.room() > 0 {
+                    runs.push(super::small::chip_with_core(core, limits, row)?).expect("bounded account runs");
+                } else {
+                    account_cut = true;
                 }
-                if needs {
-                    if waiting.room() > 0 {
-                        waiting.push(super::small::chip_with_core(core, limits, row)?).expect("bounded waiting agents");
-                    } else {
-                        account_cut = true;
-                    }
+            }
+            if needs {
+                if waiting.room() > 0 {
+                    waiting.push(super::small::chip_with_core(core, limits, row)?).expect("bounded waiting agents");
+                } else {
+                    account_cut = true;
                 }
             }
         }

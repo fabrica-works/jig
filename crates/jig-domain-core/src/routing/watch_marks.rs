@@ -202,7 +202,7 @@ pub(super) fn touch_task(core: &mut Core, limits: &Limits, row: &tasks::TaskReco
     let chat = root.tracked.is_none()
         && root.recurring.is_none()
         && match root.executor {
-            tasks::Executor::Agent { charter } => charter == core.settings.charter,
+            tasks::Executor::Agent { charter } => charter == core.settings.chat,
             tasks::Executor::Person(_) | tasks::Executor::Procedure { .. } => false,
         };
     let owner = if chat {

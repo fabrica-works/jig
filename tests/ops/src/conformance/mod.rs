@@ -185,7 +185,9 @@ impl Application for Ops {
             lead_commits: Vec::new(),
             pending_document_effects: Vec::new(),
             agents: {
-                let run = config::root_for(config.seed, config.story == Story::Environment).0.core.settings.run;
+                let run = config::root_for(config.seed, config.story == Story::Environment).0.core.settings.charters[0]
+                    .policy
+                    .clone();
                 scripts::Agents::new(
                     config.client_backed,
                     config.client_backed && config.story == Story::Environment,

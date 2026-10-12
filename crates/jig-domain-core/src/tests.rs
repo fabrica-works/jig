@@ -256,44 +256,46 @@ fn config(seed: u64) -> Config {
             close_grace: Duration::from_secs(5),
             deployment_provider: 3,
             recurring_connector: 1,
-            charter: 1,
-            run: RunPolicy {
-                instructions: b"Complete the task within its authority.".as_slice().into(),
-                waiting: Duration::from_secs(1),
-                resume: true,
-                turns: 8,
-                time: Duration::from_secs(60),
-                reserve_turns: 1,
-                reserve_time: Duration::from_secs(10),
-                model: Model {
-                    dialect: 1,
-                    account: 1,
-                    endpoint: 1,
-                    name: b"scripted".as_slice().into(),
-                    window: 8192,
-                    output: 1024,
-                    input_price: 1,
-                    cached_price: 1,
-                    cache_write_price: None,
-                    output_price: 1,
-                    price_unit: 1_000_000,
+            chat: 1,
+            charters: Box::new([Charter {
+                number: 1,
+                hosts: fleet::Kinds::Workers,
+                spend: 100,
+                policy: RunPolicy {
+                    instructions: b"Complete the task within its authority.".as_slice().into(),
+                    waiting: Duration::from_secs(1),
+                    resume: true,
+                    turns: 8,
+                    time: Duration::from_secs(60),
+                    reserve_turns: 1,
+                    reserve_time: Duration::from_secs(10),
+                    model: Model {
+                        dialect: 1,
+                        account: 1,
+                        endpoint: 1,
+                        name: b"scripted".as_slice().into(),
+                        window: 8192,
+                        output: 1024,
+                        input_price: 1,
+                        cached_price: 1,
+                        cache_write_price: None,
+                        output_price: 1,
+                        price_unit: 1_000_000,
+                    },
+                    alternatives: Box::new([]),
+                    inspect: true,
+                    modify: true,
+                    shell: true,
+                    agents: true,
+                    call_timeout: Duration::from_secs(10),
                 },
-                alternatives: Box::new([]),
-                inspect: true,
-                modify: true,
-                shell: true,
-                agents: true,
-                call_timeout: Duration::from_secs(10),
-            },
+            }]),
             resume_bytes: 256,
             period: 1,
             period_budget: 1000,
             person_budget: 500,
             chat_authority,
             tools: ToolFamilies::standard(),
-            account: 1,
-            account_generation: 1,
-            account_valid: Some(Duration::from_secs(60)),
         },
     }
 }
@@ -1001,7 +1003,10 @@ fn documents_proposal_actions_keep_effect_parts_and_amendment_before_and_after()
             }
             ProposalAction::Amend { before, after, release, .. } => {
                 assert_eq!(release, Some(1));
-                assert_eq!(before.instructions.as_ref().unwrap().bytes, core.settings.run.instructions);
+                assert_eq!(
+                    before.instructions.as_ref().unwrap().bytes,
+                    core.charter(core.settings.chat).expect("chat charter").policy.instructions
+                );
                 assert_eq!(after.instructions.as_ref().unwrap().bytes.as_ref(), b"Use the new evidence");
                 assert_eq!(before.spec.words.bytes.as_ref(), b"Work\nDetailed instructions");
                 assert_eq!(after.spec.words.bytes.as_ref(), b"New question");
@@ -2937,3 +2942,5 @@ mod restore_admission;
 mod project_period_watches;
 
 mod reserve;
+
+mod charters;

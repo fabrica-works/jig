@@ -49,7 +49,7 @@ pub(super) fn goal(core: &Core, limits: &Limits, party: u64, project: u32, held:
         project,
         party,
         held,
-        people::GoalExecutor::Charter(core.settings.charter),
+        people::GoalExecutor::Charter(core.settings.chat),
         0,
         canonical_deadline,
         limits.tasks.tree_tasks,
@@ -57,11 +57,8 @@ pub(super) fn goal(core: &Core, limits: &Limits, party: u64, project: u32, held:
         Ok(value) => value.direct,
         Err(_) => false,
     };
-    if supported
-        && core.projections.len() < limits.tasks.tasks
-        && core.tasks.charters().contains(&core.settings.charter)
-    {
-        charters.push(core.settings.charter).expect("one offered charter");
+    if supported && core.projections.len() < limits.tasks.tasks && core.tasks.charters().contains(&core.settings.chat) {
+        charters.push(core.settings.chat).expect("one offered charter");
     }
     let mut procedures = List::with_capacity(limits.documents.lines);
     if core.projections.len() < limits.tasks.tasks {
@@ -224,7 +221,7 @@ pub(crate) fn goal_start(
     given.budget.deadline = deadline;
     let executor = match executor {
         people::GoalExecutor::Charter(charter) => {
-            if charter != core.settings.charter {
+            if charter != core.settings.chat {
                 return Err(people::Refusal::NotOffered);
             }
             authority::Executor::Charter(charter)

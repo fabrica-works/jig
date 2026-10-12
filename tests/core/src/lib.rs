@@ -2,6 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+mod charters;
 pub mod world;
 
 mod application_observations;

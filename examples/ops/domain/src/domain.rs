@@ -159,10 +159,7 @@ impl Domain {
     /// The iterate adapter may park once the journal and immediate work settle.
     #[must_use]
     pub fn quiescent(&self) -> bool {
-        self.journal.idle()
-            && (!self.ready()
-                || (!self.host.is_ready()
-                    && (self.core.due.is_empty() || !self.core.accounts.usable(self.core.settings.account))))
+        self.journal.idle() && (!self.ready() || (!self.host.is_ready() && !self.core.due_ready()))
     }
 
     /// Reclaim child-retired slots after an iteration.
@@ -314,9 +311,7 @@ pub fn release(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Output>) 
         out.push(ready.pop().expect("journal release count"));
     }
     if domain.journal.idle() && domain.ready() {
-        if domain.core.accounts.usable(domain.core.settings.account)
-            && let Some(context) = domain.core.due.pop()
-        {
+        if let Some(context) = domain.core.take_due() {
             decide(domain, env, Work::Core(core::Event::Activate { context, ready: true }));
         } else {
             decide(domain, env, Work::ResumeFleet);

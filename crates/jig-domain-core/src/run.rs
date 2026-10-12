@@ -34,7 +34,7 @@ pub struct Transcript {
 impl Core {
     /// Current charter policy with this task's durable instruction replacement.
     pub(crate) fn run_policy(&self, task: u64, resume: bool) -> RunPolicy {
-        let mut policy = self.settings.run.clone();
+        let mut policy = self.charter_of(task).policy.clone();
         if let Some(instructions) = &self.tasks.task(task).expect("prepared task is live").instructions {
             policy.instructions.clone_from(instructions);
         }
@@ -64,9 +64,9 @@ impl Core {
                 authority: translate::authority_value(&task.authority),
                 numbers,
                 budget: authority::left(numbers).min(self.authority.rules().maximum_run_spend),
-                reserve: reserve_floor(&self.settings.run).expect("configured reserve floor"),
+                reserve: reserve_floor(&self.charter_of(task.task).policy).expect("configured reserve floor"),
                 wall,
-                accounts: Box::new([self.accounts.usable(self.settings.account)]),
+                accounts: Box::new([self.accounts.usable(self.charter_of(task.task).account())]),
                 writes,
             },
             &mut findings,

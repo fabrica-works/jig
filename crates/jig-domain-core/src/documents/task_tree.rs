@@ -780,10 +780,10 @@ pub fn task_from_row(core: &Core, limits: &Limits, party: u64, row: &tasks::Task
         words: super::small::text(&row.spec.words, limits.documents.text_bytes),
         parameters,
         instructions: match row.executor {
-            tasks::Executor::Agent { .. } => Some(super::small::text(
+            tasks::Executor::Agent { charter } => Some(super::small::text(
                 match &row.instructions {
                     Some(instructions) => instructions,
-                    None => &core.settings.run.instructions,
+                    None => &core.charter(charter).expect("task charter configured").policy.instructions,
                 },
                 limits.documents.text_bytes,
             )),

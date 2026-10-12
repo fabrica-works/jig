@@ -109,12 +109,13 @@ pub fn root_for(seed: u64, environment_chat: bool) -> (Config, Limits) {
             identity: jig_domain_people::IdentityKey { provider: 0, subject: 8_u64.to_be_bytes().into() },
         }]);
     }
+    config.core.settings.charters[0].hosts = jig_domain_fleet::Kinds::Engine;
     config.core.settings.period = 1;
-    config.core.settings.run.resume = true;
+    config.core.settings.charters[0].policy.resume = true;
     config.core.settings.resume_bytes = 32768;
-    config.core.settings.run.waiting = Duration::ZERO;
-    config.core.settings.run.turns = 32;
-    config.core.settings.run.time = Duration::from_secs(7200);
+    config.core.settings.charters[0].policy.waiting = Duration::ZERO;
+    config.core.settings.charters[0].policy.turns = 32;
+    config.core.settings.charters[0].policy.time = Duration::from_secs(7200);
     (config, limits)
 }
 

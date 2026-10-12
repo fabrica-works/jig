@@ -239,7 +239,10 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     )?)?;
     total = total.checked_add(bytes(limits.authority.projects, limits.policy_bytes)?)?;
     total = total.checked_add(limits.policy_bytes.checked_mul(2)?)?;
-    total = total.checked_add(u64::from(limits.run_bytes))?;
+    total = total.checked_add(bytes(
+        task.charters,
+        u64::from(limits.run_bytes).checked_add(sizeof(size_of::<crate::Charter>())?)?,
+    )?)?;
     total = total.checked_add(bytes(
         limits.call_records,
         bytes(task.batch, sizeof(size_of::<u64>())?)?

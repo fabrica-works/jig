@@ -74,7 +74,7 @@ pub(super) fn workspace_prepared(
         out.push(Request::Decided);
         return Requests::Out(out);
     }
-    let Some(grant) = core.accounts.grant(core.settings.account, env.now) else {
+    let Some(grant) = core.accounts.grant(core.charter_of(task).account(), env.now) else {
         work.push(Event::Tasks(tasks::Event::PreparationFailed { task }));
         out.push(Request::Now(Box::new(Now::RunPreparationFailed { task })));
         out.push(Request::Decided);
@@ -86,7 +86,7 @@ pub(super) fn workspace_prepared(
         out.push(Request::Decided);
         return Requests::Out(out);
     }
-    let resume = core.settings.run.resume
+    let resume = core.charter_of(task).policy.resume
         && context.tries.transient == 0
         && transcript.bytes <= u64::from(core.settings.resume_bytes);
     let conversation = if resume && transcript.last.is_some() { transcript.from } else { attempt };
@@ -134,7 +134,7 @@ pub(super) fn workspace_prepared(
     out.push(Request::Now(Box::new(Now::RunPrepared {
         task,
         attempt,
-        charter: core.settings.charter,
+        charter: core.charter_of(task).number,
         run: Box::new(run),
         inbox: context.inbox,
         saved: context.saved,
@@ -245,7 +245,7 @@ pub(super) fn plan_brief(
             })
             .expect("dependency result section room");
     }
-    if core.transcript_oversized(task) || context.tries.transient != 0 || !core.settings.run.resume {
+    if core.transcript_oversized(task) || context.tries.transient != 0 || !core.charter_of(task).policy.resume {
         let Some(text) = crate::read_brief_part(core, text_limits, task, crate::BriefPart::TranscriptTail) else {
             work.push(Event::Tasks(tasks::Event::PreparationFailed { task }));
             out.push(Request::Decided);
