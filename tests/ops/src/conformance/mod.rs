@@ -104,6 +104,7 @@ pub struct Peers {
     account_ready: bool,
     asked_sign_in: bool,
     pub results: Vec<u64>,
+    pub read_results: Vec<Token>,
     delivered_results: std::collections::BTreeSet<u64>,
     pending_results: Vec<(u64, u64, u64)>,
     pub assignments: Vec<(u64, u64)>,
@@ -169,6 +170,7 @@ impl Application for Ops {
             account_ready: false,
             asked_sign_in: config.client_backed,
             results: Vec::new(),
+            read_results: Vec::new(),
             delivered_results: std::collections::BTreeSet::new(),
             pending_results: Vec::new(),
             assignments: Vec::new(),
@@ -283,6 +285,7 @@ impl Application for Ops {
                 | root::Output::IncidentAssociationRefused { .. }
                 | root::Output::Application { .. }
                 | root::Output::Load { .. }
+                | root::Output::ReadResult { .. }
                 | root::Output::CoreLoad(_)
                 | root::Output::Core(_)
                 | root::Output::Now(_)
@@ -502,6 +505,10 @@ impl Application for Ops {
                 let event = systems.observability(call);
                 observations::fact(&mut peers.observed, &event);
                 vec![Input::Event(root::Event::Observability(obs::Event::System(event)))]
+            }
+            root::Output::ReadResult { payload, outcome } => {
+                peers.read_results.push(payload);
+                vec![Input::Event(root::Event::ResultRead { payload, end: crate::protocol::result(&outcome) })]
             }
             root::Output::Now(core::Now::Account(accounts::Request::Refresh { account, generation })) => {
                 vec![Input::Event(root::Event::Core(core::Event::Account(accounts::Event::Refreshed {
@@ -965,4 +972,15 @@ fn read_report(world: &mut jig_conformance::Harness<Ops>, cut: jig_conformance::
         matches!(&task.phase, tasks::Phase::Ended(tasks::Ending::Done(tasks::TaskResult::Report { words })) if words.as_ref() == b"checkout recovered after the accepted restart")
     );
     world.peers.results.push(task.number);
+}
+
+impl Peers {
+    #[must_use]
+    pub fn has_active_agent(&self) -> bool {
+        self.agents.active()
+    }
+    /// A scripted active agent finishes with exactly the supplied result bytes.
+    pub fn finish_result(&mut self, outcome: &[u8]) -> root::Event {
+        self.agents.finish_result(outcome)
+    }
 }

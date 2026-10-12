@@ -160,6 +160,7 @@ fn event_in(
                 }
             }
         },
+        Event::ResultRead { payload, end } => crate::assemble::result_read(domain, payload, end, work),
         Event::Effect { to, key, effect, deadline, proposal } => {
             let owner = domain.token();
             domain.effects.insert(owner, effect).expect("admitted decoded effect");
@@ -1284,22 +1285,7 @@ fn core_now(domain: &mut Domain, env: &Env<Limits>, value: core::Now, work: &mut
             work.push(Work::Core(core::Event::TurnPayload { run, attempt, turn, body, cumulative: spent, read }));
         }
         core::Now::AnswerPayload { run, attempt, payload } => {
-            let body = domain.payloads.get(&payload).expect("fleet retained the answer body");
-            let (spent, end) = match body {
-                Payload::Answer { spent, end, .. } => (*spent, end.clone()),
-                Payload::Word(_) | Payload::Settled(_) | Payload::Turn { .. } => {
-                    unreachable!("answer body family")
-                }
-            };
-            work.push(Work::Core(core::Event::AnswerPayload {
-                run,
-                attempt,
-                payload,
-                cumulative: spent,
-                end,
-                saved: None,
-                invalid_saved: false,
-            }));
+            crate::assemble::answer_payload(domain, run, attempt, payload, work);
         }
         core::Now::AcceptedTurn { payload, task, attempt, turn, accepted } => {
             let body = domain.payloads.remove(&payload).expect("accepted turn body");
@@ -1480,12 +1466,11 @@ fn host_out(
                     })));
                 }
                 host::Request::Up(host::LinkUp::Answer { run, attempt, answer, .. }) => {
-                    let end = crate::assemble::ending(answer.ending);
                     let payload = domain.payload(Payload::Answer {
                         task: run.raw(),
                         attempt: attempt.raw(),
                         spent: answer.spent,
-                        end,
+                        ending: answer.ending,
                     });
                     work.push(Work::Core(core::Event::Fleet(fleet::Event::Answer {
                         channel: Token::new(0),

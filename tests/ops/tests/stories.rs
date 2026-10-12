@@ -113,3 +113,66 @@ fn assert_alert(world: &jig_conformance::Harness<jig_ops_world::conformance::Ops
         world.trace.join("\n")
     );
 }
+
+fn result_world() -> jig_conformance::Harness<jig_ops_world::conformance::Ops> {
+    use jig_domain_core as core;
+    use jig_domain_people as people;
+    use jig_ops_domain as root;
+    use jig_ops_world::conformance::{Config, Ops, Story};
+    use skein_lib::{ReplyTo, Token};
+    let mut world = jig_conformance::Harness::<Ops>::new(Config::new(176, Story::Alert), 176);
+    world.drain().expect("cold root");
+    world.send(root::Event::Core(core::Event::People(people::Event::Ask {
+        reply_to: ReplyTo::new(Token::new(177)),
+        sign_in: world.peers.sign_in.expect("signed in"),
+        key: [177; 16],
+        ask: people::Ask::StartChat { project: 1, words: b"a result reading story".as_slice().into() },
+    })));
+    for _ in 0..128 {
+        world.iterate().expect("scripted chat starts");
+        if world.peers.has_active_agent() {
+            break;
+        }
+    }
+    assert!(world.peers.has_active_agent(), "assigned scripted chat");
+    world
+}
+
+#[test]
+fn a_run_whose_result_does_not_decode_fails_its_attempt_as_invalid() {
+    use jig_domain_core as core;
+    use jig_domain_tasks as tasks;
+    use jig_ops_domain as root;
+    let mut world = result_world();
+    let (task, attempt) = world.peers.assignments[0];
+    let event = world.peers.finish_result(b"not a smith result");
+    world.send(event);
+    world.drain().expect("invalid result is answered");
+    assert_eq!(world.peers.read_results.len(), 1, "the protocol routing read the fenced result");
+    let Some(root::Record::Core(core::Record::Core(core::CoreRecord::Terminal(terminal)))) =
+        world.store.rows.get(&root::Key::Core(core::Key::Core(core::CoreKey::Terminal { task, attempt })))
+    else {
+        panic!("durable failed attempt");
+    };
+    assert_eq!(terminal.end, tasks::End::Failed(tasks::Class::Invalid));
+}
+
+#[test]
+fn a_stale_attempts_answer_is_fenced_before_its_result_is_read() {
+    use jig_domain_core as core;
+    use jig_domain_fleet as fleet;
+    use jig_ops_domain as root;
+    use skein_lib::Token;
+    let mut world = jig_ops_world::conformance::alert(175, Cut::None);
+    let (task, attempt) = world.peers.assignments[0];
+    let read = world.peers.read_results.len();
+    world.send(root::Event::Core(core::Event::Fleet(fleet::Event::Answer {
+        channel: Token::new(0),
+        run: Token::new(task),
+        attempt: Token::new(attempt),
+        answer: fleet::Answer::Ended,
+        payload: Token::new(99_999),
+    })));
+    world.drain().expect("stale answer discarded at the fleet fence");
+    assert_eq!(world.peers.read_results.len(), read);
+}

@@ -96,6 +96,8 @@ pub enum Event {
     ObservabilityTimer,
     /// One infrastructure retry deadline.
     InfrastructureTimer,
+    /// A result read by the protocol layer after the fleet fenced its answer.
+    ResultRead { payload: Token, end: tasks::End },
     /// A decoded infrastructure effect with the core's caller envelope.
     Effect {
         to: ReplyTo,
@@ -152,6 +154,8 @@ pub enum Output {
     Observability(observability::SystemRequest),
     /// One request to the shared production's infrastructure API.
     Infrastructure(infrastructure::SystemRequest),
+    /// An ended answer whose result the protocol layer reads after the fence.
+    ReadResult { payload: Token, outcome: Box<[u8]> },
     /// A bounded read answer, with no state-changing effect.
     Read { owner: Token, bytes: Box<[u8]> },
     /// A request to the hub's agent capability, after its commit.
@@ -168,7 +172,7 @@ pub enum Output {
 #[derive(Debug)]
 pub(crate) enum Payload {
     Turn { task: u64, attempt: u64, turn: u32, spent: u64, read: Option<u64>, body: Box<[u8]> },
-    Answer { task: u64, attempt: u64, spent: u64, end: tasks::End },
+    Answer { task: u64, attempt: u64, spent: u64, ending: host::Ending },
     Word(tasks::Word),
     Settled(core::SettledCall),
 }

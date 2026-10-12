@@ -214,6 +214,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event) {
         | Event::Timer(_)
         | Event::ObservabilityTimer
         | Event::InfrastructureTimer
+        | Event::ResultRead { .. }
         | Event::Effect { .. }) => decide(domain, env, Work::Event(other)),
     }
 }

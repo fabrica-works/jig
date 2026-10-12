@@ -729,7 +729,12 @@ pub(super) fn route_answer_payload(
     saved: Option<Box<[tasks::SavedResource]>>,
     invalid_saved: bool,
 ) -> Requests {
-    assert!(core.current_proof(run.raw(), attempt.raw()), "current answer has reserved proof");
+    if !core.current_proof(run.raw(), attempt.raw()) {
+        let mut out = Queue::with_capacity(2);
+        out.push(Request::Now(Box::new(crate::Now::DropPayload { payload })));
+        out.push(Request::Decided);
+        return Requests::Out(out);
+    }
     let (cumulative, end, saved) = match core.committed_terminal(run.raw(), attempt.raw()) {
         Some(terminal) => (terminal.cumulative, terminal.end, None),
         None => {

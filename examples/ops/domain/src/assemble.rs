@@ -11,7 +11,7 @@ use jig_domain_host as host;
 use jig_domain_tasks as tasks;
 use jig_ops_domain_connectors::Connector;
 use jig_protocol_charter as charter;
-use skein_lib::{Decimal, Env, List, Queue, Reader, ReplyTo, Token, Writer};
+use skein_lib::{Decimal, Env, List, Queue, ReplyTo, Token, Writer};
 
 pub(crate) fn brief(order: Box<[brief::GatherPlaced]>) -> Box<[charter::Section]> {
     let mut sections = List::with_capacity(u32::try_from(order.len()).expect("bounded sections"));
@@ -247,38 +247,45 @@ pub(crate) fn ending(value: host::Ending) -> tasks::End {
             host::Failure::Run(_) => tasks::Class::Run,
             host::Failure::Agent(_) | host::Failure::Cancelled(_) => tasks::Class::Agent,
         }),
-        host::Ending::Ended { outcome, .. } => match decode_result(&outcome) {
-            Some(result) => tasks::End::Finished { result, cancel_delegates: false },
-            None => tasks::End::Failed(tasks::Class::Invalid),
-        },
+        host::Ending::Ended { .. } => unreachable!("ended results leave for protocol reading"),
     }
 }
-fn decode_result(bytes: &[u8]) -> Option<tasks::TaskResult> {
-    let mut reader = Reader::new(bytes);
-    let value = smith_charter::RunResult::decode(&smith_charter::v2::CEILINGS, &mut reader).ok()?;
-    match value.form() {
-        smith_charter::Form::Report => Some(tasks::TaskResult::Report { words: Box::from(value.text()) }),
-        smith_charter::Form::Failure => Some(tasks::TaskResult::Failure { reason: Box::from(value.text()) }),
-        smith_charter::Form::Verdict => {
-            if !value.items().is_empty() {
-                return None;
-            }
-            let code = crate::translate::decimal(value.label().as_deref()?)?;
-            let mut fields = List::with_capacity(value.fields().len());
-            for field in value.fields() {
-                fields
-                    .push(tasks::ResultField { name: Box::from(field.name()), value: Box::from(field.text()) })
-                    .ok()?;
-            }
-            Some(tasks::TaskResult::Verdict {
-                fields: fields.into_boxed(),
-                code: u32::try_from(code).ok()?,
-                words: Box::from(value.text()),
-            })
+
+pub(crate) fn answer_payload(domain: &mut Domain, run: Token, attempt: Token, payload: Token, work: &mut Queue<Work>) {
+    let ending = match domain.payloads.get(&payload).expect("fenced answer payload") {
+        crate::boundary::Payload::Answer { task, attempt: retained, ending, .. } => {
+            assert!(*task == run.raw() && *retained == attempt.raw(), "fenced answer identity");
+            ending.clone()
         }
-        smith_charter::Form::Change => None,
+        crate::boundary::Payload::Turn { .. }
+        | crate::boundary::Payload::Word(_)
+        | crate::boundary::Payload::Settled(_) => unreachable!("answer family"),
+    };
+    match ending {
+        host::Ending::Ended { outcome, .. } => {
+            crate::domain::now(domain, crate::Output::ReadResult { payload, outcome });
+        }
+        other @ (host::Ending::Refused(_) | host::Ending::Parked { .. } | host::Ending::Failed { .. }) => {
+            result_read(domain, payload, self::ending(other), work);
+        }
     }
 }
+
+pub(crate) fn result_read(domain: &Domain, payload: Token, end: tasks::End, work: &mut Queue<Work>) {
+    let Some(crate::boundary::Payload::Answer { task, attempt, spent, .. }) = domain.payloads.get(&payload) else {
+        return;
+    };
+    work.push(Work::Core(core::Event::AnswerPayload {
+        run: Token::new(*task),
+        attempt: Token::new(*attempt),
+        payload,
+        cumulative: *spent,
+        end,
+        saved: None,
+        invalid_saved: false,
+    }));
+}
+
 pub(crate) fn answer(domain: &Domain, key: core::CallKey, part: core::CallPart) -> core::SettledCall {
     let (name, tool) = domain.calls.get(&key).expect("attested call envelope");
     core::SettledCall {

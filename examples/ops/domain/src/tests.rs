@@ -191,6 +191,7 @@ fn cold_restart_loads_every_child_before_opening_decisions() {
                 }
             }
             Output::Load { .. }
+            | Output::ReadResult { .. }
             | Output::CoreLoad(_)
             | Output::Core(_)
             | Output::Now(_)
@@ -227,7 +228,8 @@ fn cold_restart_loads_every_child_before_opening_decisions() {
                 }
                 Output::ToChild(value) => step(&mut domain, &env, Event::Released(value)),
                 Output::Commit { number, .. } => step(&mut domain, &env, Event::Store(Store::Committed { number })),
-                other @ (Output::CoreLoad(_)
+                other @ (Output::ReadResult { .. }
+                | Output::CoreLoad(_)
                 | Output::Core(_)
                 | Output::Now(_)
                 | Output::Observability(_)
@@ -285,6 +287,7 @@ fn settle(domain: &mut Domain, env: &Env<Limits>) -> Box<[Output]> {
                     })),
                 ),
                 other @ (Output::Load { .. }
+                | Output::ReadResult { .. }
                 | Output::CoreLoad(_)
                 | Output::Core(_)
                 | Output::Now(_)
@@ -341,6 +344,7 @@ fn started_chat() -> (Domain, Env<Limits>, Token) {
             }) => sign_in = Some(session),
             Output::Commit { .. }
             | Output::Load { .. }
+            | Output::ReadResult { .. }
             | Output::CoreLoad(_)
             | Output::Core(_)
             | Output::Now(_)
@@ -376,6 +380,7 @@ fn started_chat() -> (Domain, Env<Limits>, Token) {
             Output::Agent(_)
             | Output::Commit { .. }
             | Output::Load { .. }
+            | Output::ReadResult { .. }
             | Output::CoreLoad(_)
             | Output::Core(_)
             | Output::Now(_)
@@ -455,6 +460,7 @@ fn a_tool_mutation_and_its_rendered_reply_share_one_commit() {
                 }
             }
             Output::Load { .. }
+            | Output::ReadResult { .. }
             | Output::CoreLoad(_)
             | Output::Core(_)
             | Output::Now(_)
@@ -487,6 +493,7 @@ fn a_tool_mutation_and_its_rendered_reply_share_one_commit() {
             }
             Output::Commit { .. }
             | Output::Load { .. }
+            | Output::ReadResult { .. }
             | Output::CoreLoad(_)
             | Output::Core(_)
             | Output::Now(_)
@@ -608,6 +615,7 @@ fn connector_documents_and_reads_share_the_last_connector_commit_barrier() {
             }
             Output::Commit { .. }
             | Output::Load { .. }
+            | Output::ReadResult { .. }
             | Output::CoreLoad(_)
             | Output::Core(_)
             | Output::Now(_)

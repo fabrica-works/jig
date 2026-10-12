@@ -254,6 +254,7 @@ impl Application for OpsApplication {
             | root::Output::Application { .. }
             | root::Output::Commit { .. }
             | root::Output::Load { .. }
+            | root::Output::ReadResult { .. }
             | root::Output::CoreLoad(_)
             | root::Output::Core(_)
             | root::Output::Now(_)
@@ -349,6 +350,7 @@ impl Application for OpsApplication {
             | root::Output::IncidentAssociationRefused { .. }
             | root::Output::Commit { .. }
             | root::Output::Load { .. }
+            | root::Output::ReadResult { .. }
             | root::Output::CoreLoad(_)
             | root::Output::Observability(_)
             | root::Output::Infrastructure(_)

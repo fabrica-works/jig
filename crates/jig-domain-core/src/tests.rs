@@ -2947,3 +2947,23 @@ mod fixtures;
 mod reserve;
 
 mod charters;
+
+#[test]
+fn an_answer_payload_for_a_replaced_attempt_is_dropped() {
+    let (mut core, limits) = watch_core();
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
+    let event = Event::AnswerPayload {
+        run: Token::new(1),
+        attempt: Token::new(6),
+        payload: Token::new(91),
+        cumulative: 0,
+        end: tasks::End::Parked,
+        saved: None,
+        invalid_saved: false,
+    };
+    let Requests::Out(mut out) = step(&mut core, &env, event);
+    let Request::Now(answer) = out.pop().unwrap() else { panic!("payload drop") };
+    let Now::DropPayload { payload } = *answer else { panic!("drop stale answer") };
+    assert_eq!(payload, Token::new(91));
+    assert!(core.current_proof(1, 7), "the replacement proof remains current");
+}

@@ -753,6 +753,7 @@ impl Joint {
             | root::Output::IncidentAssociationRefused { .. }
             | root::Output::Commit { .. }
             | root::Output::Load { .. }
+            | root::Output::ReadResult { .. }
             | root::Output::CoreLoad(_)
             | root::Output::Observability(_)
             | root::Output::Infrastructure(_)

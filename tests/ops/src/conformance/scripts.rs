@@ -83,6 +83,21 @@ impl Agents {
         Self { client_backed, environment_chat, waiting, call_timeout, live: BTreeMap::new() }
     }
 
+    pub fn active(&self) -> bool {
+        self.live.values().any(|agent| !agent.finished)
+    }
+
+    pub fn finish_result(&mut self, outcome: &[u8]) -> root::Event {
+        let (owner, agent) = self.live.iter_mut().find(|(_, agent)| !agent.finished).expect("active scripted agent");
+        agent.finished = true;
+        root::Event::Agent(host::FromAgent::Finished {
+            owner: *owner,
+            turns: agent.turns,
+            spent: agent.spent,
+            finish: host::Finish::Ended { outcome: outcome.into() },
+        })
+    }
+
     /// Every agent goes with the engine that hosted it.
     pub fn clear(&mut self) {
         self.live.clear();
