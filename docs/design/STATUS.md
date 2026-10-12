@@ -27,7 +27,7 @@ half, parent face, `smith-inline-agent` and agent shell (built). Section
 
 | Document | Built | Left |
 |---|---|---|
-| `README.md` | partly | 8: the store, beyond its fake; 9: agents on workers over the workers' channel, smith's payloads by hand-out, `smith-inline-agent` in the engine; 10: the client's wire and shells; 15: the crates' new names; 14: versioning, open: not planned |
+| `README.md` | partly | 8: the store (`protocol/store.md`); 9: agents on workers over the workers' channel, smith's payloads by hand-out, `smith-inline-agent` in the engine; 10: the client's wire and shells; 15: the crates' new names; 14: versioning, open: not planned |
 | `domain/README.md` | partly | 5: a task's proposal that nobody may accept, refused to its proposer (a party's is): not planned |
 | `domain/core.md` | yes | 12: open questions only |
 | `domain/tasks.md` | partly | 5.5: a budget held for its reserve and one most costly completion; 8.2, 8.3: the start carries the inbox, a message refused or left unread stays and wakes the task again; 9: a task's proposal that nobody may accept, refused rather than kept waiting: not planned |
@@ -52,6 +52,7 @@ half, parent face, `smith-inline-agent` and agent shell (built). Section
 | `protocol/configuration.md` | no | All: jig's part of a configuration, profiles, secrets from private files, first start, operators' formats: not planned |
 | `protocol/llm.md` | no | 5, 6: accounts on skein's driver, grants to workers: not planned; 1–4, 7–9: LLM calls in a host's own process, for `smith-inline-agent`: not planned |
 | `protocol/service.md` | no | All: the engine's and a worker's services, `iterate`, start and end, the reference service and binary (`jig-test-service`, `jig-test`), its world, one process with agents as child processes: not planned |
+| `protocol/store.md` | no | All: jig's store component on skein-kv, keys and intervals, codecs and the format row, commits, loads and parties' reads, transcripts' files, the secrets' store, growth, the real store in the worlds and the store's world; 15: what the domain owes it; skein's `OpenWrite` and `Cut`: not planned |
 | `examples.md` | partly | 4: `ops`'s agent, `smith-inline-agent` (its world scripts its runs' agents); 7.3: a queue for the pool, policy narrowed, a month of alerts (no world found, not confirmed); the conformance world crashes three stories, not all; 8: a terminal client; 9.1: `ops` standalone: not planned |
 
 ## 3. Not planned
@@ -67,11 +68,11 @@ half, parent face, `smith-inline-agent` and agent shell (built). Section
   carried with turns and the unread fence, the start's messages, windows,
   the reserve before a run is placed, smith's payloads and facts by
   hand-out, host tools outside the root, people's and tasks' refusals,
-  signing out (section 2's rows). Waits for jig-protocol.
-- **The store** (`protocol/README.md`, section 9; `domain/testing.md`,
-  section 7): jig's records on skein-kv, transcripts, the secrets' store,
-  the real store in the worlds. Waits for a design from `draft/store.md`.
-  The worlds use `jig-fake-store` until then.
+  signing out (section 2's rows); and the store's: live before history in
+  each child's keys, indexes for parties' reads, the inbox restored from
+  an index, turns kept by window and dropped whole, fill, retention, keys
+  for single reads (`protocol/store.md`, section 15). Waits for
+  jig-protocol.
 - **Agents in the engine** (`README.md`, section 9, the second shape;
   `domain/hosts.md`, 5.2; `protocol/llm.md`, sections 1 to 4 and 7 to
   9): `smith-inline-agent` composed by the engine's root, and smith's LLM
@@ -120,6 +121,4 @@ half, parent face, `smith-inline-agent` and agent shell (built). Section
 
 ## 4. Drafts
 
-| Draft | About | Next |
-|---|---|---|
-| `draft/store.md` | jig's store on skein-kv in the engine: its families, keys and codecs, transcripts, secrets, opening and restart, retention and fill; six questions, each with a leaning | A design pass of its own, whose content moves into `protocol/store.md`; then a plan (the drafted jig-protocol-implementation's jig 34) |
+None.

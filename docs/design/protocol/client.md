@@ -251,7 +251,9 @@ the platform's HTTP stack, TLS                  TLS server, or plaintext on loop
 - **The sign-in,** then: the core hears the identity and commits the
   sign-in, which gives it its number; the engine's side keeps the digest
   of a fresh secret under that number, in the store's secrets' records;
-  and only then hands the client the secret (`README.md`, section 8).
+  and only then hands the client the secret, which carries the sign-in's
+  number beside its random bytes, so the engine finds its digest by
+  number (`README.md`, section 8; `store.md`, section 9).
   Secrets come from a cryptographic generator of the component's, seeded
   from the kernel at start. The core says each sign-in that ends or
   expires, and the component erases its digest then.

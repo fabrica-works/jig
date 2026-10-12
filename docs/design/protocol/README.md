@@ -46,10 +46,10 @@ section 4. What is still open is listed in section 14.
   are decoded, and calls' answers rendered, in the engine's protocol
   layer, for runs on workers and in the engine alike (`channel.md`, 6.1
   and 6.3).
-- **The store is designed on its own,** as jig's subset of the store
-  design its first application already has, which applications extend
-  with their own families (section 9). The other components rely only on
-  the boundary section 9 states.
+- **jig ships the store,** `jig-protocol-store`: skein-kv in the
+  engine's process, jig's records and the application's in one commit,
+  transcripts as files, secrets in a second store (`store.md`). The
+  other components rely only on the boundary section 9 states.
 - **Secrets never reach a domain.** A domain names a secret by number and
   generation; components hold values in tables and in the store's
   secrets' records, skein's accounts driver in its private files, and
@@ -71,8 +71,8 @@ section 4. What is still open is listed in section 14.
 5. **configuration.md:** what an engine and a worker are told at start.
 6. **client.md:** the client's protocol: its wire, the connection, keyed
    requests, reads, watches, signing in, the small store, shells.
-
-The store is designed from `../draft/store.md` (section 14).
+7. **store.md:** the store: skein-kv in the engine, keys and records,
+   commits and loads, transcripts, secrets, growth.
 
 ## 3. Names
 
@@ -144,7 +144,7 @@ An application that mixes the last two has both.
 | `jig-protocol-tools` | translation | engine | the core's host tools: their schemas and descriptions, their calls decoded into the core's typed requests, their answers rendered as text (`channel.md`, 6.3) |
 | `jig-protocol-accounts` | translation, table | engine | the accounts child's vocabulary to skein's accounts driver's and back, and the access tokens lent (`llm.md`, section 5) |
 | `jig-protocol-config` | parsing | engine, worker | jig's part of a configuration, parsed and checked (`configuration.md`) |
-| `jig-protocol-store` | component, codecs | engine | the store's design (section 9) |
+| `jig-protocol-store` | component, codecs | engine | jig's records and the application's on skein-kv, transcripts' files, the secrets' store (`store.md`) |
 | `jig-protocol-client-wire` | codecs | engine, client | the client's records: requests, answers, reads, subjects, documents, the small store's (`client.md`, section 3) |
 | `jig-protocol-engine-clients` | component | engine | clients' connections: exchanges, streams, sign-ins, translation to and from the core's vocabulary (`client.md`) |
 | `jig-protocol-client-link` | component | client | the connection to the engine: attempts, the stream, envelopes, the small store's records (`client.md`) |
@@ -188,7 +188,7 @@ processes (smith's `protocol/hosts.md`, sections 2 and 3).
 | its parts' encodings: workspace items, left and saved work, delivery evidence, with its payload version | engine and worker | its own codecs (`channel.md`, 6.2) |
 | its periods' source | the engine | a child of its root (`configuration.md`, section 5) |
 | the worker's root, with its choice of agent capability, its workspace and its io | the worker | its own (`../domain/hosts.md`, section 7) |
-| its store's families' encodings | the engine | the store's design |
+| its store's families: keys' encoders, codecs, its store version, its indexes | the engine | its own, by `store.md`, section 12 |
 | its documents' and requests' wire, its sign-in providers' exchanges | engine and client | the client's protocol |
 
 It writes no codec of jig's records, none of the channel's rules, none of
@@ -212,7 +212,7 @@ and none of `smith-inline-agent`'s runs' LLM calls.
   version its release's smith writes, and its workers, of the same
   release, read them.
 - **What outlives a process** carries its version: the store's records,
-  per shape (the store's design), and the client's small store
+  per family (`store.md`, section 5), and the client's small store
   (`../client/domain/client.md`, section 11).
 - **The client's documents and requests are the exception:** they are
   versioned per owner, jig's by jig and the application's by the
@@ -261,11 +261,8 @@ and none of `smith-inline-agent`'s runs' LLM calls.
   encoding, versions, commits and loads, transcripts, secrets, opening,
   growth and retention), and leaves the application's families to the
   application, which adds them beside jig's, in the same commits.
-- **Designed on its own.** `../draft/store.md` collects what that design
-  takes as input: the records jig keeps, the questions it settles, and
-  what this design asks of it.
-- **What the rest of the protocol layer relies on,** whatever that design
-  settles:
+- **Its design is `store.md`.** What the rest of the protocol layer
+  relies on is this:
   - **commits** numbered as the journal numbers them, applied in order,
     each answered once durable, which makes every earlier one durable; a
     failed commit, or one the store refuses, answered failed, after which
@@ -325,7 +322,8 @@ Each is generic, and says nothing about jig.
   generator, the JSON reader and writer, the key-value store, the LLM
   client and connection component and their fake peer, OAuth's client and
   fake issuer, HTTP's server and client, server-sent events.
-- **The store's design** names what it needs of skein-kv.
+- **The store** needs skein-kv as it is, and io's `OpenWrite` and `Cut`
+  (skein's `io.md`, section 5; `store.md`, section 15).
 
 ## 11. What jig needs from smith
 
@@ -391,9 +389,9 @@ left is the code's:
 7. **An application's credentials,** kept beside LLM accounts and
    granted with the assignment (`../domain/engine.md`, 12.1).
 
-The store's domain questions (transcripts' vocabulary, retention and fill,
-indexes for paged reads) are the store's design's (`../draft/store.md`,
-section 6).
+What the store asks of the domain (live before history, indexes for
+parties' reads, turns kept by window, fill, retention, keys for single
+reads) is `store.md`, section 15.
 
 ## 13. Decisions this design takes
 
@@ -402,9 +400,9 @@ section 6).
   tools, configuration, the client's sides. What is generic is skein's,
   what is the application's is the application's; the hard parts of
   jig's own boundaries (authentication, liveness, keeping secrets before
-  use, decoding the LLM's calls) are written once. The store's design
-  settles its own component, and leans the same way (`../draft/store.md`,
-  5.1).
+  use, decoding the LLM's calls) are written once. The store too: jig's
+  component takes the application's records as bytes (`store.md`,
+  section 12).
 - **Records from schemas,** with skein's generator, for jig's channel and
   its other codecs, as smith's are.
 - **The channel on skein's channel,** one per worker, dialled by the
@@ -467,8 +465,10 @@ section 6).
 - **Configuration as strict JSON,** read once before the loop, composed
   per child, secrets in private files, limits by profile
   (`configuration.md`).
-- **The store designed separately,** as jig's subset of its first
-  application's store design (section 9).
+- **The store on skein-kv in the engine,** jig's subset of its first
+  application's store design: one transcript file per task, the current
+  window's start kept in the map, records from schemas, another version
+  refused (`store.md`).
 - **Workers are alike:** configured the same but for their name and
   secret, keeping nothing between runs that the engine does not hand them
   again. Every credential a run needs, an LLM account's or an
@@ -481,7 +481,6 @@ section 6).
 
 ## 14. Open questions
 
-- **The store,** from `../draft/store.md`.
 - **Signing an LLM account in through a client** (`llm.md`, section 10).
 - **One origin for clients and webhooks:** whether one listener, routed
   by path, may serve both, shared between components by the protocol

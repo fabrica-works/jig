@@ -122,9 +122,9 @@ systems   what the application's connectors drive
   skein. jig supplies the parts beneath its roots, and the pieces of its
   protocol layers that speak jig's vocabularies: both sides of the
   workers' channel, the LLM accounts', the host tools' translation, the
-  client's wire and connection, and the store's encoding of jig's records,
-  whose component the store's design settles (`protocol/README.md`,
-  sections 5 and 9).
+  client's wire and connection, and the store, which holds jig's records
+  and the application's (`protocol/README.md`, sections 5 and 9;
+  `protocol/store.md`).
 
 ## 4. The application owns the root
 
@@ -397,7 +397,7 @@ and the conformance world crashes the application at every commit.
 - **jig's part:**
   - the core's records and keys;
   - their encoding, ordered as the keys are and versioned;
-  - transcripts as files, per session;
+  - transcripts as files, one per task;
   - the secret records: sign-ins' digests (LLM accounts' records are
     skein's accounts driver's own files).
 - **The application's part:**
@@ -405,8 +405,8 @@ and the conformance world crashes the application at every commit.
     by key, and each connector's own state;
   - the root's keys, records and writes, which wrap both jig's records
     and its own;
-  - its families' encodings, composed with jig's as the store's design
-    settles (`protocol/README.md`, section 9).
+  - its families' keys and encodings, handed to jig's store as bytes
+    under the application's tag (`protocol/store.md`, section 12).
 - **One commit spans both,** through the journal. The live records of
   both are loaded by the core's restart script (6.4). skein-kv is
   underneath, inside the engine (`domain/engine.md`, section 5).
@@ -586,9 +586,9 @@ application as its first user.
   workers' channel, LLM accounts and LLM calls in a host's own process,
   configuration, and the client's protocol. Its `README.md` gives the
   reading order, the names, what jig needs from skein and smith, and what
-  the domain owes. The store's design joins it.
+  the domain owes, and `store.md` the store.
 - **`draft/`:** drafts, not contract: ideas and inputs gathered for a
-  design to come, such as the store's.
+  design to come.
 
 ## 13. Conventions
 

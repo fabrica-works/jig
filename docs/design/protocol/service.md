@@ -43,7 +43,7 @@ What is still open is listed in section 9.
 <application>-service                 iterate: io ↔ components ↔ root
 ├── <application>-domain              the root, with the journal (../domain/root.md)
 └── the protocol layer
-    ├── jig-protocol-store            commits, loads, transcripts, secrets (README.md, section 9)
+    ├── jig-protocol-store            commits, loads, transcripts, secrets (store.md)
     ├── jig-protocol-engine-workers   workers, if any (channel.md)
     ├── jig-protocol-accounts         LLM accounts, if it runs agents (llm.md)
     │   └── skein-oauth-accounts
@@ -286,7 +286,7 @@ Each within jig's suites' budgets (`../../development/workflow.md`).
 
 - **The domain worlds** run without any of this (`../domain/testing.md`).
 - **The components' worlds** test each component alone (`channel.md`,
-  section 12; `llm.md`, section 8; the store's design; `client.md`,
+  section 12; `llm.md`, section 8; `store.md`, section 14; `client.md`,
   section 14).
 - **The protocol world:** the reference service (section 7), every
   component in it, over skein's simulated io (testing-strategy.md, 2.7):

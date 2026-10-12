@@ -63,7 +63,7 @@ the application's main (its shell)
 
 | Member | What it gives | Used by |
 |---|---|---|
-| deployment | the store's directory; the seed's source, for tests | the store; the shell |
+| deployment | the deployment's directory, which holds the store, transcripts and the secrets' store; retention's horizons; the seed's source, for tests | the store (`store.md`); the domain's retention; the shell |
 | owners | the deployment's first owners, each a provider and a subject (`../domain/people.md`, section 3) | the people child, on a first start |
 | providers | each sign-in provider's number and kind; its settings are the application's | the people child; the client's protocol |
 | rules | the deployment's rules: the ceilings every project's policy is under (`../domain/authority.md`, section 6) | authority |

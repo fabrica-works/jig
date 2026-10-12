@@ -190,8 +190,10 @@ becomes observations:
 What jig ships for tests, as ordinary Rust or as step machines where
 more than one world needs them (testing-strategy.md, section 4):
 
-- **the store:** skein-kv's in-memory mode, behind a fake that holds
-  commits, fails one, and serves pages slowly;
+- **the store:** jig's store component over skein-kv's in-memory mode,
+  with an in-memory stand-in for transcripts' files, the world holding
+  commits, failing one, and serving pages slowly
+  (`../protocol/store.md`, section 14);
 - **scripted workers:** each a host that speaks the contract of
   hosts.md, section 2, playing a run's script, keeping turns and answers
   until acknowledged, refusing messages and leaving them unread, losing
