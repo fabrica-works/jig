@@ -1079,6 +1079,20 @@ the file.
      Files for the close trigger and a damaged record's usability (its
      `became_usable` assumes every story is granted), as ruling 166 did
      for 21.4.
+172. **An assignment's resumed turns: 480 of at most 8 MiB** (2026-10-12,
+     the coordinator's block "jig 22.3: assignment transcript ceiling
+     exceeds u32", 2026-10-12T22:46:19Z). 22.3's sketch had `turns: list
+     65536 bytes 8388608`, about 550 GB at the ceilings, which skein's
+     `codec.md`, 4 refuses ("must fit a `u32` at the ceilings"). The
+     profiles on `main` bound a resumed window far below: the core's
+     `resume_bytes` 65,536 (small) and 262,144 (standard), the hub's
+     `turn_bytes` 65,536 (`crates/jig-protocol-config/src/profile/`). By
+     jig 14's ceilings rule (ruling 154), the count's ceiling is 480 and a
+     turn's 8 MiB, about 3.9 GiB with the record's other fields; the sum
+     stays the domain's (`resume_bytes`). If the domain's limit on a
+     transcript's turns (decision 27) is above 480 in a `Limits` literal on
+     `main`, the count takes that value and a turn's ceiling the largest
+     power of two that keeps the record within a `u32`.
 
 ## For the user
 

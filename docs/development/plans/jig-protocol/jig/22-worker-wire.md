@@ -423,7 +423,7 @@ Shape:
       workspace: option Workspace
       save: bool
       charter: bytes 67108864
-      turns: list 65536 bytes 8388608
+      turns: list 480 bytes 8388608   # ruling 172
       answered: list 1024 AnsweredCall
       messages: list 1024 Message
       grants: list 64 Grant
