@@ -171,3 +171,43 @@ fn the_same_boundaries_accept_a_faithful_root_and_connector_across_restart() {
     world.drain().expect("faithful retry");
     assert_eq!(world.systems[0].observed().iter().filter(|effect| effect.applied).count(), 1);
 }
+
+#[test]
+fn a_commit_after_drained_is_a_violation() {
+    use jig_conformance::referee as r;
+    let mut referee = jig_core_world::observations::Observer::new(&jig_core_world::world::config(31)).referee;
+    referee
+        .observe(1, r::Observed::Durable { number: 1, snapshot: r::Snapshot::default() })
+        .expect("durable evidence accepted");
+    referee.observe(2, r::Observed::Drained { at: 1 }).expect("durable evidence accepted");
+    let failure = referee
+        .observe(3, r::Observed::Durable { number: 2, snapshot: r::Snapshot::default() })
+        .expect_err("drain invariant must reject this observation");
+    assert_eq!(failure.promise, Promise::Commit);
+    assert_eq!(failure.why, "CommitAfterDrained { number: 2 }");
+}
+
+#[test]
+fn a_drain_before_its_commit_is_durable_is_a_violation() {
+    use jig_conformance::referee as r;
+    let mut referee = jig_core_world::observations::Observer::new(&jig_core_world::world::config(31)).referee;
+    let failure =
+        referee.observe(1, r::Observed::Drained { at: 1 }).expect_err("drain invariant must reject this observation");
+    assert_eq!(failure.promise, Promise::Commit);
+}
+
+#[test]
+fn a_cold_store_that_loses_a_drained_party_answer_is_a_violation() {
+    use jig_conformance::referee as r;
+    let mut referee = jig_core_world::observations::Observer::new(&jig_core_world::world::config(31)).referee;
+    let mut snapshot = r::Snapshot::default();
+    snapshot.receipts.insert(r::Receipt::Party(7, [2; 16]));
+    referee.observe(1, r::Observed::Durable { number: 1, snapshot }).expect("durable evidence accepted");
+    referee.observe(2, r::Observed::Drained { at: 1 }).expect("durable evidence accepted");
+    referee.observe(3, r::Observed::Restart).expect("durable evidence accepted");
+    let failure = referee
+        .observe(4, r::Observed::ColdStore { receipts: std::collections::BTreeSet::new() })
+        .expect_err("drain invariant must reject this observation");
+    assert_eq!(failure.promise, Promise::Commit);
+    assert_eq!(failure.why, "cold store lost a drained receipt");
+}

@@ -265,6 +265,8 @@ pub enum Observed {
     ApplicationAnswered { reply: u64, connector: u16, outcome: Box<[u8]> },
     /// The fake store applied one whole commit.
     Durable { number: u64, snapshot: Snapshot },
+    /// The engine released its final commit barrier.
+    Drained { at: u64 },
     /// A durable retention transaction erased an ended owner and its read marker.
     Forgotten { task: u64 },
     /// A delivery reached a host, party, or system.
@@ -340,6 +342,8 @@ pub struct Referee {
     pub policy: Policy,
     last: Snapshot,
     commit: u64,
+    drained: Option<u64>,
+    drained_receipts: Option<BTreeSet<Receipt>>,
     first: BTreeMap<u64, u64>,
     made: BTreeMap<(u64, u64), u32>,
     decisions: BTreeMap<(u16, SystemKey), Decision>,
@@ -370,6 +374,8 @@ impl Referee {
             policy,
             last: Snapshot::default(),
             commit: 0,
+            drained: None,
+            drained_receipts: None,
             first: BTreeMap::new(),
             made: BTreeMap::new(),
             decisions: BTreeMap::new(),
@@ -853,8 +859,14 @@ impl Referee {
                 self.applications.answered(reply, connector, &outcome)?;
             }
             Observed::Durable { number, snapshot } => {
+                require(self.drained.is_none(), Promise::Commit, format!("CommitAfterDrained {{ number: {number} }}"))?;
                 self.durable(number, snapshot, now)?;
                 self.applications.durable(number, now)?;
+            }
+            Observed::Drained { at } => {
+                require(at == self.commit, Promise::Commit, "drain preceded its durable commit barrier")?;
+                self.drained = Some(at);
+                self.drained_receipts = Some(self.last.receipts.clone());
             }
             Observed::Forgotten { task } => {
                 require(!self.last.tasks.contains_key(&task), Promise::Commit, "forgotten owner remains durable")?;
@@ -971,6 +983,9 @@ impl Referee {
                 require(held <= maximum, Promise::Bounded, "engine heap exceeded worst_case")?;
             }
             Observed::ColdStore { receipts } => {
+                if let Some(drained) = self.drained_receipts.take() {
+                    require(drained.is_subset(&receipts), Promise::Commit, "cold store lost a drained receipt")?;
+                }
                 for receipt in &self.seen {
                     let must_keep = match receipt {
                         Receipt::Task(_) | Receipt::Turn(..) | Receipt::Terminal(..) | Receipt::Ended(_) => true,
@@ -991,6 +1006,7 @@ impl Referee {
                 self.restart_position += 1;
             }
             Observed::Restart => {
+                self.drained = None;
                 self.restart_position = 0;
                 self.applications.restart();
             }

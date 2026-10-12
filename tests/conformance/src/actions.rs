@@ -52,3 +52,8 @@ pub fn host_fault(world: &mut World, index: usize, fault: jig_fake_workers::Faul
         world.send(event);
     }
 }
+
+/// Tell the engine to drain before its components close.
+pub fn stop(world: &mut World) {
+    world.send(jig_test_domain::Event::Stop);
+}

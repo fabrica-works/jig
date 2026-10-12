@@ -38,3 +38,33 @@ fn cuts_around_the_party_answer_claim_and_effect_restart_from_durable_rows() {
         assert!(!world.outcome().stopped);
     }
 }
+
+#[test]
+fn a_drained_shutdown_ends_with_nothing_waiting_for_a_commit() {
+    let mut world = actions::world(32, false);
+    world.drain().expect("startup conforms");
+    let answers = world.peers.answers;
+    world.store.fault(jig_fake_store::Fault::Hold { commits: 1 });
+    actions::say(&mut world, 2);
+    world.drain().expect("party decision waits for its commit completion");
+    assert_eq!(world.peers.answers, answers);
+    actions::stop(&mut world);
+    world.drain().expect("stop waits for the outstanding commit");
+    assert!(world.peers.drained.is_empty());
+    world.release_commits();
+    world.drain().expect("held answers precede the drain barrier");
+    assert_eq!(world.peers.answers, answers + 1);
+    assert_eq!(world.peers.drained, [world.store.applied]);
+    assert!(world.store.pending.is_empty() && world.store.held.is_empty());
+    world.advance(1);
+    world.drain().expect("timers after the drain cannot make another commit");
+    assert_eq!(world.peers.drained, [world.store.applied]);
+    assert_eq!(world.peers.busy_events.len(), 2, "each connector retains its timer");
+    let rows = world.store.rows.clone();
+    world.crash().expect("every drained receipt survives the cold store");
+    assert_eq!(world.store.rows, rows);
+    world.drain().expect("work restarts from the drained durable rows");
+    actions::duplicate(&mut world);
+    world.drain().expect("the party's durable answer replays after restart");
+    assert_eq!(world.peers.answers, answers + 2);
+}

@@ -104,6 +104,8 @@ pub enum Delivery {
     Held(root::Delivery),
     /// A root observation that decides nothing.
     Now(core::Now),
+    /// A connector retains this event until a later engine can take it.
+    Busy(Box<root::Event>),
 }
 
 /// The outside correlation state of the application's scripted peers.
@@ -116,6 +118,8 @@ pub struct Neighbours {
     account_ready: bool,
     pub assignments: Vec<(u64, u64)>,
     pub answers: u64,
+    pub drained: Vec<u64>,
+    pub busy_events: Vec<std::rc::Rc<root::Event>>,
     pub restart_steps: Vec<core::RestartStep>,
     pub calls: Vec<core::CallPart>,
     pub hold_writes: bool,
@@ -144,6 +148,34 @@ fn env(config: &Config, clock: Clock) -> Env<root::Limits> {
 }
 
 impl Neighbours {
+    fn cold_receipts(store: &Store, receipts: &mut std::collections::BTreeSet<jig_conformance::referee::Receipt>) {
+        use jig_conformance::referee::Receipt;
+        for row in store.rows.values() {
+            match row {
+                root::Record::Core(core::Record::People(people::Stored::SignIn { number, .. })) => {
+                    receipts.insert(Receipt::SignIn(*number));
+                }
+                root::Record::Core(core::Record::People(people::Stored::Answer { key, .. })) => {
+                    receipts.insert(Receipt::Party(key.person, key.key));
+                }
+                root::Record::Core(core::Record::Tasks(tasks::Stored::Live(task) | tasks::Stored::Ended(task))) => {
+                    receipts.extend(task.inbox.iter().map(|word| Receipt::Word(task.number, word.number)));
+                    if let tasks::Escalation::Waiting { holder: tasks::EscalationHolder::Task(holder), entry, .. } =
+                        task.escalation
+                    {
+                        receipts.insert(Receipt::Word(holder, entry));
+                    }
+                }
+                root::Record::Connector { number, record: connector::Record::Outbox(row) } => {
+                    if let Some(attempt) = row.attempt {
+                        receipts.insert(Receipt::Outbox(*number, row.key.into(), attempt.number));
+                    }
+                }
+                root::Record::Core(_) | root::Record::Connector { .. } => {}
+            }
+        }
+    }
+
     fn restored(step: core::RestartStep, rows: &[root::Record]) -> Vec<Input<root::Event, root::Record>> {
         let mut inputs = Vec::new();
         if step == core::RestartStep::LoadInbox {
@@ -331,6 +363,8 @@ impl Application for Testing {
             account_ready: false,
             assignments: Vec::new(),
             answers: 0,
+            drained: Vec::new(),
+            busy_events: Vec::new(),
             restart_steps: Vec::new(),
             calls: Vec::new(),
             hold_writes: false,
@@ -420,7 +454,7 @@ impl Application for Testing {
                 root::Request::Restart(step) => Output::Deliver(Delivery::Held(root::Delivery::Restart(step))),
                 root::Request::Deliver(delivery) => Output::Deliver(Delivery::Held(delivery)),
                 root::Request::Now(now) => Output::Deliver(Delivery::Now(now)),
-                root::Request::Busy { .. } => panic!("this world does not stop"),
+                root::Request::Busy { event } => Output::Deliver(Delivery::Busy(event)),
                 root::Request::Stop => Output::Stop,
             });
         }
@@ -474,6 +508,10 @@ impl Application for Testing {
                         .collect();
                     vec![Input::Event(root::Event::TranscriptLoaded { task, rows, done: true })]
                 }
+                Delivery::Busy(event) => {
+                    peers.busy_events.push(std::rc::Rc::new(*event));
+                    Vec::new()
+                }
                 Delivery::Now(_) => Vec::new(),
                 Delivery::Held(_) => unreachable!("held handled above"),
             };
@@ -504,6 +542,11 @@ impl Application for Testing {
                     peers.routes.push(jig_conformance::referee::Observed::RestartStage { position });
                 }
                 peers.restart(store, step)
+            }
+            root::Delivery::Core(core::Held::Drained) => {
+                peers.drained.push(store.applied);
+                peers.routes.push(jig_conformance::referee::Observed::Drained { at: store.applied });
+                Vec::new()
             }
             root::Delivery::Assigned { assignment, .. } => {
                 peers.assignments.push((assignment.task, assignment.attempt));
@@ -644,6 +687,11 @@ impl Application for Testing {
         peers.observer.workers(clock.now, &peers.peers.workers);
         let mut observed = std::mem::take(&mut peers.routes);
         observed.extend(peers.observer.take());
+        for seen in &mut observed {
+            if let jig_conformance::referee::Observed::ColdStore { receipts } = seen {
+                Neighbours::cold_receipts(store, receipts);
+            }
+        }
         observed
     }
 
