@@ -365,12 +365,17 @@ Removes: nothing.
 ### 20.5 The engine's domain part and the whole check
 
 Scope: the `deployment` (its directory; the seed's source, for tests),
-`owners` (provider and subject), `providers` (number and kind), `rules`,
-`projects` (number, resources and their roles, homes, policy, parties'
-roles), `charters` (each numbered: its instructions' file, its models
-named from the `llm` member's, its tool families, the hosts that may run
-it, its waiting time, whether its runs resume, its default budget with
-its reserve), which charter chats run under, and `connectors` members;
+`owners` (provider and subject, each an owner of every seeded project),
+`providers` (number and kind, exactly one of kind `deployment`), `rules`,
+`projects` (number, policy with its spend per period and its roles'
+authority, allotment and proposal kinds, parties' roles; no resources
+or homes, which come by adoption), `charters` (each numbered: its
+instructions' file, its models named from the `llm` member's, its tool
+families, the hosts that may run it, its waiting time, whether its runs
+resume, its default budget with its reserve), which charter chats run
+under with a closed chat's grace, and `connectors` (none the core's
+reserved number) members (configuration.md, 3, as the designer's answer
+of 2026-10-12 amends it, jig `2f7b8800`);
 `core`, the core's `Config` from them and what the shell drew; the
 check: a chats' charter offered; one account per charter, shared by its
 models' endpoints; each charter's turns and time above its reserve's,
@@ -378,7 +383,14 @@ and its default budget holding its reserve and one of its main model's
 most costly completions, naming the charter; the deployment's message
 bound; the memory `fits` with the parts the caller names
 (configuration.md, 3, 6 and 8).
-Needs: nothing beyond 20.4.
+Needs: 20.4; and the core's step that takes a project's period and
+budget from the root, a pool from its role's allotment, a chat's
+authority from its person's role, and keeps the recurring procedure's
+number and the engine's tool families' bits as its own constants
+(the designer's answer of 2026-10-12, a step the supervisor names), so
+that `Settings` keeps no `period`, `period_budget`, `person_budget`,
+`chat_authority` or `recurring_connector` and `tools` is the core's
+constant.
 Files: `crates/jig-protocol-config/{src/domain.rs, src/charters.rs,
 src/projects.rs, src/core.rs, src/check.rs, src/lib.rs,
 src/tests/domain.rs, src/tests/charters.rs, src/tests/fixtures.rs}`.
@@ -387,7 +399,13 @@ Shape: as the interface sketch (`Engine`, `Deployment`, `engine`,
 `jig_domain_core::Config` takes them (owners as `people::InitialOwner`,
 rules and policies as the authority child's `Rules` and `Policy`, each
 charter as jig 07's `jig_domain_core::Charter { number, policy, hosts,
-spend }`, chats' charter as `Settings::chat`). The budget's check is
+spend }`, chats' charter as `Settings::chat`). `Settings`'
+`deployment_provider` is the provider of kind `deployment`;
+`close_grace` the chats' charter's grace; `resume_bytes` and
+`Config::hub_turns` the profile's limits; `owners` one
+`people::InitialOwner` per owner and seeded project. The check refuses
+a second provider of kind `deployment`, or none; a connector numbered
+as the core's reserved number. The budget's check is
 jig 07's: a charter's `spend` at least `jig_domain_core::reserve_floor(&policy)`,
 and its policy's turns and time above its reserve's. `core` sets jig
 09's `Config::workers_in_process` to whether the workers' listener is an
@@ -422,7 +440,11 @@ Test shape:
   `a_message_bound_below_a_partys_words_is_refused`,
   `the_cores_config_takes_the_charters_and_projects` (checks
   `core(..)`'s charter count and project list against literals),
-  `a_retention_member_is_refused_as_unknown`. Each under 20 ms.
+  `a_retention_member_is_refused_as_unknown`,
+  `a_projects_resources_member_is_refused_as_unknown`,
+  `two_deployment_providers_are_refused`,
+  `a_connector_numbered_as_the_cores_own_is_refused`,
+  `each_owner_owns_every_seeded_project`. Each under 20 ms.
 Proof: unit, `heavy cargo nextest run -p jig-protocol-config` once: a
 whole engine document parses into the core's configuration, and each
 charter whose budget cannot hold its reserve and one most costly
