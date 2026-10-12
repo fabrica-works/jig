@@ -112,7 +112,13 @@ Shape: as 14.2; this increment's `Row` holds the rows above; 19.4 adds
 (ruling 135): a field one kind of row carries takes that row's bound
 (`policy_bytes` and `authority` for the `Policy` row, `people`'s
 `amendment_bytes` for an ask); a field `Policy` and an ask share takes the
-larger. Sums stay the domain's to check, as in the tasks family.
+larger. Sums stay the domain's to check, as in the tasks family. The
+schema marks `Ask`'s `amend` variant `boxed`, and any other variant
+clippy's `large_enum_variant` reports, which the generated enum then
+holds in a `Box` (skein's `codec.md`, 3, "A variant marked `boxed`";
+skein `482691a7`); its translation boxes and unboxes it. It needs a
+`skein-codegen` that reads the word: the supervisor's skein step, and
+jig's `skein-codegen` pin moved to it.
 Test shape:
 - `src/tests/codec.rs`: `a_person_reads_back_with_its_identity`,
   `a_projects_policy_reads_back`, `each_kind_of_ask_reads_back`,
@@ -121,7 +127,8 @@ Test shape:
 Proof: unit. `heavy cargo nextest run -p jig-protocol-store -p
 jig-store-codecs-world` once: people's rows read back as saved. Bound: 1
 minute.
-Don't: share a type with the tasks family's schema (no imports).
+Don't: share a type with the tasks family's schema (no imports); add an
+allowance to a generated file, or box a variant clippy does not report.
 Size: at most 1,200 lines of production code (ruling 130).
 Removes: nothing.
 
