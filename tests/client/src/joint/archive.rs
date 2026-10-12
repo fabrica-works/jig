@@ -209,8 +209,8 @@ mod tests {
     }
     fn codec() -> jig_client_transcript::Limits {
         jig_client_transcript::Limits {
-            smith: smith_transcript::v2::CEILINGS,
-            bytes: 92,
+            smith: smith_transcript::v3::CEILINGS,
+            bytes: 127,
             turn: client::TurnLimits { messages: 1, blocks: 1, text: 3 },
         }
     }

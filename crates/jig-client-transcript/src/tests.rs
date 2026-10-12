@@ -42,11 +42,22 @@ fn source(messages: &[smith::Message]) -> smith::Turn {
     smith::Turn::new(
         &CEILINGS,
         TurnParts {
+            kind: smith::TurnKind::Ordinary,
+            affinity: None,
             endpoint: Box::from(&b"endpoint"[..]),
             dialect: Box::from(&b"dialect"[..]),
             place: 1,
-            usage: smith::Usage::new(&CEILINGS, UsageParts { input: 11, output: 12, cache_read: 13, cache_write: 14 })
-                .unwrap(),
+            usage: smith::Usage::new(
+                &CEILINGS,
+                UsageParts {
+                    input: Some(11),
+                    output: Some(12),
+                    cache_read: Some(13),
+                    cache_write: Some(14),
+                    reasoning: None,
+                },
+            )
+            .unwrap(),
             spent: 15,
             messages: list,
         },
@@ -86,10 +97,14 @@ fn whole_turn_preserves_blocks_and_joins_results_to_calls() {
                         &CEILINGS,
                         smith::ReadParts {
                             content: Box::from(&b"a\nb"[..]),
-                            skipped: 1,
+                            first: 2,
                             lines: 2,
                             total: 9,
-                            cut: true,
+                            next: smith::Next::Line(
+                                smith::LineNumber::new(&CEILINGS, smith::LineNumberParts { number: 4 }).unwrap(),
+                            ),
+                            cut: smith::ReadCut::Line,
+                            window: smith::BytesClamp::Within,
                         },
                     )
                     .unwrap(),
@@ -143,6 +158,7 @@ fn whole_turn_preserves_blocks_and_joins_results_to_calls() {
 }
 
 #[test]
+#[expect(clippy::too_many_lines, reason = "one table holds every tool outcome's summary")]
 fn outcomes_summarize_successes_command_endings_and_tool_refusals() {
     let cases: [(smith::Outcome, &[u8], bool); 32] = [
         (
@@ -197,31 +213,37 @@ fn outcomes_summarize_successes_command_endings_and_tool_refusals() {
         ),
         (exited(smith::Exit::TimedOut), b"Command ended: timed out; output bytes 2; dropped 9", true),
         (smith::Outcome::NotGranted, b"Tool refused: not granted", true),
-        (smith::Outcome::Outside, b"Tool refused: outside workspace", true),
-        (smith::Outcome::ReadOnly, b"Tool refused: read only", true),
+        (smith::Outcome::Outside(resolved()), b"Tool refused: outside workspace", true),
+        (smith::Outcome::ReadOnly(resolved()), b"Tool refused: read only", true),
         (smith::Outcome::TooLong, b"Tool refused: path too long", true),
-        (smith::Outcome::NotFound, b"Tool refused: not found", true),
+        (smith::Outcome::NotFound(resolved()), b"Tool refused: not found", true),
         (smith::Outcome::NotFile, b"Tool refused: not a file", true),
         (smith::Outcome::Linked, b"Tool refused: linked path", true),
         (smith::Outcome::Protected, b"Tool refused: protected path", true),
-        (smith::Outcome::NotDirectory, b"Tool refused: not a directory", true),
+        (smith::Outcome::NotDirectory(resolved()), b"Tool refused: not a directory", true),
         (
-            smith::Outcome::TooLarge(smith::TooLarge::new(&CEILINGS, smith::TooLargeParts { size: u64::MAX }).unwrap()),
+            smith::Outcome::TooLarge(
+                smith::TooLarge::new(
+                    &CEILINGS,
+                    smith::TooLargeParts { what: smith::SizePart::File, size: u64::MAX, bound: 1 },
+                )
+                .unwrap(),
+            ),
             b"Tool refused: too large, 18446744073709551615 bytes",
             true,
         ),
         (smith::Outcome::NotRead, b"Tool refused: not read", true),
         (smith::Outcome::Stale, b"Tool refused: stale read", true),
-        (smith::Outcome::NoMatch, b"Tool refused: no match", true),
+        (edit_failed(smith::Mismatch::NoMatch), b"Tool refused: edit 2, no match", true),
         (
-            smith::Outcome::Ambiguous(
+            edit_failed(smith::Mismatch::Ambiguous(
                 smith::Ambiguous::new(&CEILINGS, smith::AmbiguousParts { count: 2, lines: List::with_capacity(0) })
                     .unwrap(),
-            ),
-            b"Tool refused: ambiguous, 2 matches",
+            )),
+            b"Tool refused: edit 2, ambiguous, 2 matches",
             true,
         ),
-        (smith::Outcome::Unchanged, b"Unchanged", false),
+        (edit_failed(smith::Mismatch::Unchanged), b"Tool refused: edit 2, unchanged", true),
         (failed(smith::Fault::Denied), b"Tool failed: denied", true),
         (failed(smith::Fault::NoSpace), b"Tool failed: no space", true),
         (failed(smith::Fault::Other), b"Tool failed: other fault", true),
@@ -233,7 +255,15 @@ fn outcomes_summarize_successes_command_endings_and_tool_refusals() {
             smith::Outcome::Read(
                 smith::Read::new(
                     &CEILINGS,
-                    smith::ReadParts { content: Box::from(&b""[..]), skipped: 0, lines: 0, total: 0, cut: false },
+                    smith::ReadParts {
+                        content: Box::from(&b""[..]),
+                        first: 1,
+                        lines: 0,
+                        total: 0,
+                        next: smith::Next::End,
+                        cut: smith::ReadCut::Whole,
+                        window: smith::BytesClamp::Within,
+                    },
                 )
                 .unwrap(),
             ),
@@ -249,10 +279,25 @@ fn exited(exit: smith::Exit) -> smith::Outcome {
     smith::Outcome::Exited(
         smith::CommandEnd::new(
             &CEILINGS,
-            smith::CommandEndParts { exit, head: Box::from(&b"h"[..]), last: Box::from(&b"l"[..]), dropped: 9 },
+            smith::CommandEndParts {
+                exit,
+                head: Box::from(&b"h"[..]),
+                last: Box::from(&b"l"[..]),
+                dropped: 9,
+                timeout: smith::TimeoutClamp::Within,
+                output: smith::BytesClamp::Within,
+            },
         )
         .unwrap(),
     )
+}
+fn resolved() -> smith::ResolvedFailure {
+    let path = smith::WorkingPath::new(&CEILINGS, smith::WorkingPathParts { path: Box::from(&b"a"[..]) }).unwrap();
+    smith::ResolvedFailure::new(&CEILINGS, smith::ResolvedFailureParts { path: smith::Resolved::Working(path) })
+        .unwrap()
+}
+fn edit_failed(why: smith::Mismatch) -> smith::Outcome {
+    smith::Outcome::EditFailed(smith::EditFailed::new(&CEILINGS, smith::EditFailedParts { edit: 2, why }).unwrap())
 }
 fn failed(fault: smith::Fault) -> smith::Outcome {
     smith::Outcome::Failed(smith::Failed::new(&CEILINGS, smith::FailedParts { fault }).unwrap())
@@ -290,6 +335,19 @@ fn tool_text_and_invalid_calls_remain_distinct() {
         (smith::CallProblem::WrongType(field.clone()), b"Invalid call: wrong type for path"),
         (smith::CallProblem::BadValue(field), b"Invalid call: bad value for path"),
         (smith::CallProblem::TooLarge, b"Invalid call: input too large"),
+        (
+            smith::CallProblem::Oversize(
+                smith::OversizeProblem::new(&CEILINGS, smith::OversizeProblemParts { bytes: 9, bound: 8 }).unwrap(),
+            ),
+            b"Invalid call: input too large, 9 bytes over 8",
+        ),
+        (
+            smith::CallProblem::CutOff(
+                smith::CutProblem::new(&CEILINGS, smith::CutProblemParts { bytes: 17 }).unwrap(),
+            ),
+            b"Invalid call: input cut off after 17 bytes",
+        ),
+        (smith::CallProblem::Nesting, b"Invalid call: nested sub-agent"),
     ] {
         assert_result(
             smith::Returned::Invalid(smith::Invalid::new(&CEILINGS, smith::InvalidParts { problem }).unwrap()),
@@ -303,9 +361,9 @@ fn tool_text_and_invalid_calls_remain_distinct() {
 
 #[test]
 fn admission_errors_are_explicit_and_whole_records_are_required() {
-    assert_eq!(decode(&limits(), &[0, 3]), Err(Undecodable::Version { found: 3 }));
+    assert_eq!(decode(&limits(), &[0, 4]), Err(Undecodable::Version { found: 4 }));
     assert_eq!(decode(&limits(), &[0]), Err(Undecodable::Malformed));
-    assert_eq!(decode(&limits(), &[0, 2, 0, 0, 0, 65]), Err(Undecodable::TooLarge));
+    assert_eq!(decode(&limits(), &[0, 3, 0, 0, 0, 0, 0, 65]), Err(Undecodable::TooLarge));
     let source = source(&[message(smith::Role::Assistant, &[SBlock::Text(text(b"hello"))])]);
     let mut bytes = encode(&source);
     let mut small = limits();
@@ -370,7 +428,7 @@ fn receiving_limits_cut_without_growing_or_losing_call_outcomes() {
 #[expect(clippy::disallowed_macros, reason = "fixed wire fixtures belong to decoder unit tests")]
 fn smith_smallest_golden_decodes_at_its_whole_length() {
     let bytes = include_bytes!("../tests/data/record_turn_smallest.bin");
-    assert_eq!(bytes.len(), 58);
+    assert_eq!(bytes.len(), 33);
     let value = decode(&limits(), bytes).unwrap();
     assert_eq!(
         value,
@@ -388,7 +446,7 @@ fn smith_smallest_golden_decodes_at_its_whole_length() {
 #[expect(clippy::disallowed_macros, reason = "fixed wire fixtures belong to decoder unit tests")]
 fn smith_full_golden_preserves_maximum_usage_at_its_whole_length() {
     let bytes = include_bytes!("../tests/data/record_turn_full.bin");
-    assert_eq!(bytes.len(), 92);
+    assert_eq!(bytes.len(), 127);
     let mut blocks = List::with_capacity(1);
     blocks.push(Block::Text(Text::new(Box::from(&b"abc"[..]), 3).unwrap())).unwrap();
     let mut messages = List::with_capacity(1);

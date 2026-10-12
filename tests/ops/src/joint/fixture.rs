@@ -114,7 +114,7 @@ pub fn environment_world(seed: u64) -> World<Client, Joint> {
 }
 fn world_for(seed: u64, story: Story) -> World<Client, Joint> {
     let codec = jig_client_transcript::Limits {
-        smith: smith_transcript::v2::CEILINGS,
+        smith: smith_transcript::v3::CEILINGS,
         bytes: 32768,
         turn: jig_client::contract::TurnLimits { messages: 32, blocks: 32, text: 8192 },
     };

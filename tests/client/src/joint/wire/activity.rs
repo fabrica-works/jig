@@ -317,8 +317,8 @@ mod tests {
     fn fetched_archive_content_retains_the_exact_reference_and_rejects_another_reply_or_whole_overflow() {
         let limits = limits();
         let codec = jig_client_transcript::Limits {
-            smith: smith_transcript::v2::CEILINGS,
-            bytes: 92,
+            smith: smith_transcript::v3::CEILINGS,
+            bytes: 127,
             turn: client::TurnLimits { messages: 1, blocks: 1, text: 3 },
         };
         let original = line(

@@ -64,21 +64,12 @@ jig-client-transcript = { path = "crates/jig-client-transcript" }
 jig-client-view = { path = "crates/jig-client-view" }
 jig-fake-person = { path = "testing/jig-fake-person" }
 jig-scripted-engine = { path = "testing/jig-scripted-engine" }
-skein-lib = { git = "https://git.ekanayaka.io/ai/skein.git" }
-skein-json = { git = "https://git.ekanayaka.io/ai/skein.git" }
-skein-world = { git = "https://git.ekanayaka.io/ai/skein.git" }
-skein-fake-checkout = { git = "https://git.ekanayaka.io/ai/skein.git" }
-skein-fake-llm-domain = { git = "https://git.ekanayaka.io/ai/skein.git" }
-smith-agent-world = { git = "https://git.ekanayaka.io/ai/smith.git" }
-smith-domain = { git = "https://git.ekanayaka.io/ai/smith.git" }
-smith-domain-run = { git = "https://git.ekanayaka.io/ai/smith.git" }
-smith-domain-session = { git = "https://git.ekanayaka.io/ai/smith.git" }
-smith-domain-tools = { git = "https://git.ekanayaka.io/ai/smith.git" }
-smith-channel = { git = "https://git.ekanayaka.io/ai/smith.git" }
-smith-host-domain = { git = "https://git.ekanayaka.io/ai/smith.git" }
-smith-charter = { git = "https://git.ekanayaka.io/ai/smith.git" }
-smith-protocol-channel = { git = "https://git.ekanayaka.io/ai/smith.git" }
-smith-transcript = { git = "https://git.ekanayaka.io/ai/smith.git" }
+skein-lib = { git = "https://github.com/forgetic/skein.git" }
+skein-json = { git = "https://github.com/forgetic/skein.git" }
+skein-world = { git = "https://github.com/forgetic/skein.git" }
+smith-domain-run = { git = "https://github.com/forgetic/smith.git" }
+smith-charter = { git = "https://github.com/forgetic/smith.git" }
+smith-transcript = { git = "https://github.com/forgetic/smith.git" }
 sha2 = { version = "=0.10.9", default-features = false }
 jig-core-accounts = { path = "crates/jig-core-accounts" }
 jig-test-connector = { path = "testing/jig-test-connector" }

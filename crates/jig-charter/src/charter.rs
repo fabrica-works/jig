@@ -16,6 +16,7 @@ fn model(model: boundary::Model) -> run::charter::Llm {
         prices: run::Prices {
             input: model.prices.input,
             cached: model.prices.cached,
+            cache_write: model.prices.cache_write,
             output: model.prices.output,
             unit: model.prices.unit,
         },
@@ -23,7 +24,8 @@ fn model(model: boundary::Model) -> run::charter::Llm {
         account: model.account,
         endpoint: run::charter::Endpoint(model.endpoint),
         model: model.name,
-        max_tokens: model.max_tokens,
+        window: model.window,
+        output: model.output,
     }
 }
 
@@ -128,6 +130,7 @@ pub fn charter(charter: Charter, brief: Box<[Section]>, resumed: bool) -> Option
         },
         outcome,
         budget: run::Budget { turns: charter.budget.turns, spend: charter.budget.spend, time: charter.budget.time },
+        reserve: run::charter::Reserve { turns: charter.budget.reserve.turns, time: charter.budget.reserve.time },
         llm: model(charter.model),
         models: models.into_boxed(),
     })

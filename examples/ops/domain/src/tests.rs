@@ -37,7 +37,7 @@ fn fixture_with_commits(commits: u32) -> (Domain, Env<Limits>) {
             turns: 2,
             turn_queue_bytes: 2048,
         },
-        charter: smith_charter::v1::CEILINGS,
+        charter: smith_charter::v2::CEILINGS,
         endpoints: 1,
         journal: JournalLimits { commits, writes: 20000, held: 20000, now: 128, release: 128 },
         routes: 256,

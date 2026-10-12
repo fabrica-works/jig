@@ -74,7 +74,7 @@ pub fn root_for(seed: u64, environment_chat: bool) -> (Config, Limits) {
             turns: 32,
             turn_queue_bytes: 32768,
         },
-        charter: smith_charter::v1::CEILINGS,
+        charter: smith_charter::v2::CEILINGS,
         endpoints: 1,
         journal: JournalLimits { commits: 4, writes: 20000, held: 20000, now: 128, release: 128 },
         routes: 256,

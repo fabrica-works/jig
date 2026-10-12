@@ -13,8 +13,8 @@ mod encode;
 mod tests;
 
 pub use boundary::{
-    Budget, ChangeRule, Charter, Contract, Conventions, FieldRule, ItemRule, Items, Model, Prices, Section, TextRule,
-    Tool, ToolEffect, VerdictRule, WorkspaceTools,
+    Budget, ChangeRule, Charter, Contract, Conventions, FieldRule, ItemRule, Items, Model, Prices, Reserve, Section,
+    TextRule, Tool, ToolEffect, VerdictRule, WorkspaceTools,
 };
 pub use charter::charter;
 pub use encode::{EndpointName, encode};

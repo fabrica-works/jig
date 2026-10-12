@@ -3,7 +3,7 @@
 use alloc::boxed::Box;
 use skein_lib::stream::Read;
 use skein_lib::{Decimal, Intake};
-use smith_transcript::v2 as smith;
+use smith_transcript::v3 as smith;
 
 #[derive(Debug)]
 pub(super) struct Summary {
@@ -38,6 +38,18 @@ pub(super) fn summarize(returned: &smith::Returned) -> Summary {
                     builder.put(field.field());
                 }
                 smith::CallProblem::TooLarge => builder.put(b"input too large"),
+                smith::CallProblem::Oversize(oversize) => {
+                    builder.put(b"input too large, ");
+                    builder.number(oversize.bytes());
+                    builder.put(b" bytes over ");
+                    builder.number(u64::from(oversize.bound()));
+                }
+                smith::CallProblem::CutOff(cut) => {
+                    builder.put(b"input cut off after ");
+                    builder.number(cut.bytes());
+                    builder.put(b" bytes");
+                }
+                smith::CallProblem::Nesting => builder.put(b"nested sub-agent"),
             }
         }
         smith::Returned::NotRun => builder.put(b"Not run"),
@@ -71,9 +83,11 @@ impl Builder {
                 self.put(b" of ");
                 self.number(u64::from(read.total()));
                 self.put(b" lines; skipped ");
-                self.number(u64::from(read.skipped()));
-                if read.cut() {
-                    self.put(b"; content cut");
+                // Lines are numbered from one; a zero first line skipped none.
+                self.number(u64::from(read.first().saturating_sub(1)));
+                match read.cut() {
+                    smith::ReadCut::Whole => {}
+                    smith::ReadCut::Line => self.put(b"; content cut"),
                 }
             }
             smith::Outcome::Listed(listed) => {
@@ -109,14 +123,14 @@ impl Builder {
             }
             smith::Outcome::Exited(end) => self.command(end),
             smith::Outcome::NotGranted => self.put(b"Tool refused: not granted"),
-            smith::Outcome::Outside => self.put(b"Tool refused: outside workspace"),
-            smith::Outcome::ReadOnly => self.put(b"Tool refused: read only"),
+            smith::Outcome::Outside(_) => self.put(b"Tool refused: outside workspace"),
+            smith::Outcome::ReadOnly(_) => self.put(b"Tool refused: read only"),
             smith::Outcome::TooLong => self.put(b"Tool refused: path too long"),
-            smith::Outcome::NotFound => self.put(b"Tool refused: not found"),
+            smith::Outcome::NotFound(_) => self.put(b"Tool refused: not found"),
             smith::Outcome::NotFile => self.put(b"Tool refused: not a file"),
             smith::Outcome::Linked => self.put(b"Tool refused: linked path"),
             smith::Outcome::Protected => self.put(b"Tool refused: protected path"),
-            smith::Outcome::NotDirectory => self.put(b"Tool refused: not a directory"),
+            smith::Outcome::NotDirectory(_) => self.put(b"Tool refused: not a directory"),
             smith::Outcome::TooLarge(large) => {
                 self.put(b"Tool refused: too large, ");
                 self.number(large.size());
@@ -124,15 +138,18 @@ impl Builder {
             }
             smith::Outcome::NotRead => self.put(b"Tool refused: not read"),
             smith::Outcome::Stale => self.put(b"Tool refused: stale read"),
-            smith::Outcome::NoMatch => self.put(b"Tool refused: no match"),
-            smith::Outcome::Ambiguous(ambiguous) => {
-                self.put(b"Tool refused: ambiguous, ");
-                self.number(u64::from(ambiguous.count()));
-                self.put(b" matches");
-            }
-            smith::Outcome::Unchanged => {
-                self.failed = false;
-                self.put(b"Unchanged");
+            smith::Outcome::EditFailed(failed) => {
+                self.put(b"Tool refused: edit ");
+                self.number(u64::from(failed.edit()));
+                match failed.why() {
+                    smith::Mismatch::NoMatch => self.put(b", no match"),
+                    smith::Mismatch::Ambiguous(ambiguous) => {
+                        self.put(b", ambiguous, ");
+                        self.number(u64::from(ambiguous.count()));
+                        self.put(b" matches");
+                    }
+                    smith::Mismatch::Unchanged => self.put(b", unchanged"),
+                }
             }
             smith::Outcome::Failed(failed) => {
                 self.put(b"Tool failed: ");

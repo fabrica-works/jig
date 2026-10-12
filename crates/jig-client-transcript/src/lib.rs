@@ -14,7 +14,7 @@ extern crate alloc;
 use alloc::boxed::Box;
 use jig_client::contract::{Block, Call, Message, Speaker, Text, Turn, TurnLimits, Usage};
 use skein_lib::{List, Reader};
-use smith_transcript::v2 as smith;
+use smith_transcript::v3 as smith;
 
 mod summary;
 #[cfg(test)]
@@ -47,7 +47,7 @@ pub fn decode(limits: &Limits, bytes: &[u8]) -> Result<Turn, Undecodable> {
         return Err(Undecodable::TooLarge);
     }
     let version = Reader::new(bytes).u16().ok_or(Undecodable::Malformed)?;
-    if version != 2 {
+    if version != 3 {
         return Err(Undecodable::Version { found: version });
     }
     let source = match smith::Turn::decode(&limits.smith, &mut Reader::new(bytes)) {
@@ -99,11 +99,13 @@ fn translate(limits: TurnLimits, source: &smith::Turn) -> Turn {
     let usage = source.usage();
     Turn {
         messages,
+        // The contract's counts are plain: one the provider did not report shows
+        // as zero, as smith reported it before its counts became optional.
         used: Usage {
-            input: usage.input(),
-            output: usage.output(),
-            cached: usage.cache_read(),
-            cache_written: usage.cache_write(),
+            input: usage.input().unwrap_or(0),
+            output: usage.output().unwrap_or(0),
+            cached: usage.cache_read().unwrap_or(0),
+            cache_written: usage.cache_write().unwrap_or(0),
         },
         spent: source.spent(),
         read_through: None,

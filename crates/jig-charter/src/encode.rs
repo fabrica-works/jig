@@ -4,7 +4,7 @@
 
 use alloc::boxed::Box;
 use skein_lib::{List, Writer};
-use smith_charter::v1 as wire;
+use smith_charter::v2 as wire;
 use smith_domain_run as run;
 
 /// One configured endpoint name and its domain-visible identities.
@@ -36,13 +36,17 @@ fn llm(value: run::charter::Llm, names: &[EndpointName], limits: &wire::Limits) 
         wire::PricesParts {
             input: value.prices.input,
             cached: value.prices.cached,
+            cache_write: value.prices.cache_write,
             output: value.prices.output,
             unit: value.prices.unit,
         },
     )
     .ok()?;
-    wire::Llm::new(limits, wire::LlmParts { endpoint: name, model: value.model, max_tokens: value.max_tokens, prices })
-        .ok()
+    wire::Llm::new(
+        limits,
+        wire::LlmParts { endpoint: name, model: value.model, window: value.window, output: value.output, prices },
+    )
+    .ok()
 }
 
 fn fields(source: Box<[run::outcome::FieldRule]>, limits: &wire::Limits) -> Option<List<wire::FieldRule>> {
@@ -182,9 +186,12 @@ pub fn encode(source: run::Charter, names: &[EndpointName], limits: &wire::Limit
         ),
         None => None,
     };
+    let reserve =
+        wire::Reserve::new(limits, wire::ReserveParts { turns: source.reserve.turns, time: source.reserve.time })
+            .ok()?;
     let budget = wire::Budget::new(
         limits,
-        wire::BudgetParts { turns: source.budget.turns, spend: source.budget.spend, time: source.budget.time },
+        wire::BudgetParts { turns: source.budget.turns, spend: source.budget.spend, time: source.budget.time, reserve },
     )
     .ok()?;
     let charter = wire::Charter::new(

@@ -24,7 +24,7 @@ pub struct Limits {
     /// Engine-slot run hub.
     pub host: host::Limits,
     /// The charter codec's bounds.
-    pub charter: smith_charter::v1::Limits,
+    pub charter: smith_charter::v2::Limits,
     /// How many endpoint names the charter codec holds.
     pub endpoints: u32,
     /// The one commit barrier.

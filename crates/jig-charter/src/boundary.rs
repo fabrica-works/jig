@@ -12,7 +12,10 @@ pub struct Model {
     pub account: u32,
     pub endpoint: u32,
     pub name: Box<[u8]>,
-    pub max_tokens: u32,
+    /// The input tokens a conversation's window may hold on this model.
+    pub window: u32,
+    /// The most output tokens one completion may have, thinking included.
+    pub output: u32,
 }
 
 /// Prices per `unit` tokens, rounded once for each completion by Smith.
@@ -20,6 +23,8 @@ pub struct Model {
 pub struct Prices {
     pub input: u64,
     pub cached: u64,
+    /// Cache writes, when priced apart from fresh input.
+    pub cache_write: Option<u64>,
     pub output: u64,
     pub unit: u32,
 }
@@ -50,11 +55,22 @@ pub enum ToolEffect {
     Write,
 }
 
-/// Maximum use of the activation's turns, spend and time.
+/// Maximum use of the activation's turns, spend and time, and what of
+/// them it keeps for finishing.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Budget {
     pub turns: u32,
     pub spend: u64,
+    pub time: Duration,
+    pub reserve: Reserve,
+}
+
+/// The turns and time a run keeps to finish once the rest of its budget is
+/// spent; its spend is the main model's costliest completions for those turns
+/// (smith's `run.md`, section 9.1).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Reserve {
+    pub turns: u32,
     pub time: Duration,
 }
 

@@ -244,9 +244,14 @@ pub struct Model {
     pub account: u32,
     pub endpoint: u32,
     pub name: Box<[u8]>,
-    pub max_tokens: u32,
+    /// The input tokens a conversation's window may hold on this model.
+    pub window: u32,
+    /// The most output tokens one completion may have, thinking included.
+    pub output: u32,
     pub input_price: u64,
     pub cached_price: u64,
+    /// Cache writes, when priced apart from fresh input.
+    pub cache_write_price: Option<u64>,
     pub output_price: u64,
     pub price_unit: u32,
 }
@@ -260,6 +265,10 @@ pub struct RunPolicy {
     pub resume: bool,
     pub turns: u32,
     pub time: skein_lib::Duration,
+    /// The turns and time of each run kept for finishing once the rest of
+    /// its budget is spent.
+    pub reserve_turns: u32,
+    pub reserve_time: skein_lib::Duration,
     pub model: Model,
     pub alternatives: Box<[Model]>,
     pub inspect: bool,

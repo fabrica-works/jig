@@ -344,7 +344,13 @@ pub(crate) mod json {
                         }
                     };
                 }
-                Some(tokenizer::Event::Failed(_) | tokenizer::Event::Closed) => return Err(Problem::Malformed),
+                // Only `Next` is asked, so a capped text's or a skip's answer never comes.
+                Some(
+                    tokenizer::Event::Failed(_)
+                    | tokenizer::Event::Closed
+                    | tokenizer::Event::Long(_)
+                    | tokenizer::Event::Skipped(_),
+                ) => return Err(Problem::Malformed),
                 None => {}
             }
         }

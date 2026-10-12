@@ -13,18 +13,29 @@ pub(super) fn clock(now: Time) -> Wall {
 }
 
 pub(super) fn turn() -> Box<[u8]> {
-    use smith_transcript::v2 as source;
+    use smith_transcript::v3 as source;
     let limits = source::CEILINGS;
     let text = source::Text::new(&limits, source::TextParts { text: b"abc".as_slice().into(), replay: None })
         .expect("supplied worker text");
     let blocks = crate::test::list([source::Block::Text(text)]);
     let message = source::Message::new(&limits, source::MessageParts { role: source::Role::Assistant, blocks })
         .expect("supplied worker message");
-    let usage = source::Usage::new(&limits, source::UsageParts { input: 1, output: 1, cache_read: 0, cache_write: 0 })
-        .expect("supplied worker usage");
+    let usage = source::Usage::new(
+        &limits,
+        source::UsageParts {
+            input: Some(1),
+            output: Some(1),
+            cache_read: Some(0),
+            cache_write: Some(0),
+            reasoning: None,
+        },
+    )
+    .expect("supplied worker usage");
     let value = source::Turn::new(
         &limits,
         source::TurnParts {
+            kind: source::TurnKind::Ordinary,
+            affinity: None,
             endpoint: b"fixture".as_slice().into(),
             dialect: b"fixture".as_slice().into(),
             place: 1,
@@ -110,7 +121,7 @@ pub(super) fn seeded_world_with_receiving(
         clock(Time::ZERO),
     );
     let codec = jig_client_transcript::Limits {
-        smith: smith_transcript::v2::CEILINGS,
+        smith: smith_transcript::v3::CEILINGS,
         bytes: 1_048_576,
         turn: client::TurnLimits { messages: 2, blocks: 2, text: 32 },
     };

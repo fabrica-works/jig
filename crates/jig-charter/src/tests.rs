@@ -1,20 +1,22 @@
 use alloc::boxed::Box;
 use skein_lib::{Duration, Reader};
-use smith_charter::v1 as wire;
+use smith_charter::v2 as wire;
 
 use crate::{
-    Budget, Charter, Contract, EndpointName, Model, Prices, Section, TextRule, Tool, ToolEffect, charter, encode,
+    Budget, Charter, Contract, EndpointName, Model, Prices, Reserve, Section, TextRule, Tool, ToolEffect, charter,
+    encode,
 };
 
 #[test]
 fn core_charter_encodes_with_the_same_sections_tools_contract_and_model() {
     let model = Model {
-        prices: Prices { input: 2, cached: 1, output: 3, unit: 1000 },
+        prices: Prices { input: 2, cached: 1, cache_write: Some(4), output: 3, unit: 1000 },
         dialect: 4,
         account: 5,
         endpoint: 7,
         name: Box::from(&b"small"[..]),
-        max_tokens: 128,
+        window: 4096,
+        output: 128,
     };
     let source = Charter {
         instructions: Box::from(&b"help"[..]),
@@ -35,7 +37,12 @@ fn core_charter_encodes_with_the_same_sections_tools_contract_and_model() {
             verdicts: Box::new([]),
             change: None,
         },
-        budget: Budget { turns: 3, spend: 9000, time: Duration::ZERO },
+        budget: Budget {
+            turns: 3,
+            spend: 9000,
+            time: Duration::from_secs(60),
+            reserve: Reserve { turns: 1, time: Duration::from_secs(10) },
+        },
         model,
         models: Box::new([]),
         waiting: Duration::ZERO,
@@ -51,5 +58,10 @@ fn core_charter_encodes_with_the_same_sections_tools_contract_and_model() {
     assert_eq!(decoded.tools().host().get(0).expect("one tool").name(), b"read");
     assert_eq!(decoded.main().endpoint(), b"primary");
     assert_eq!(decoded.budget().spend(), 9000);
+    assert_eq!(decoded.budget().reserve().turns(), 1);
+    assert_eq!(decoded.budget().reserve().time(), Duration::from_secs(10));
+    assert_eq!(decoded.main().window(), 4096);
+    assert_eq!(decoded.main().output(), 128);
+    assert_eq!(*decoded.main().prices().cache_write(), Some(4));
     assert!(!decoded.resume(), "a resume requires a validated transcript");
 }

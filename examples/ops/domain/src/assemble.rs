@@ -69,7 +69,12 @@ pub(crate) fn assignment(
             workspace: charter::WorkspaceTools { inspect: false, modify: false, shell: false },
             conventions: None,
             contract: contract(run.contract)?,
-            budget: charter::Budget { turns: policy.turns, spend: run.budget, time: policy.time },
+            budget: charter::Budget {
+                turns: policy.turns,
+                spend: run.budget,
+                time: policy.time,
+                reserve: charter::Reserve { turns: policy.reserve_turns, time: policy.reserve_time },
+            },
             model: model(policy.model),
             models: models.into_boxed(),
             waiting: policy.waiting,
@@ -111,6 +116,7 @@ fn model(value: core::Model) -> charter::Model {
         prices: charter::Prices {
             input: value.input_price,
             cached: value.cached_price,
+            cache_write: value.cache_write_price,
             output: value.output_price,
             unit: value.price_unit,
         },
@@ -118,7 +124,8 @@ fn model(value: core::Model) -> charter::Model {
         account: value.account,
         endpoint: value.endpoint,
         name: value.name,
-        max_tokens: value.max_tokens,
+        window: value.window,
+        output: value.output,
     }
 }
 fn contract(value: tasks::Contract) -> Option<charter::Contract> {
@@ -252,7 +259,7 @@ pub(crate) fn ending(value: host::Ending) -> tasks::End {
 }
 fn decode_result(bytes: &[u8]) -> Option<tasks::TaskResult> {
     let mut reader = Reader::new(bytes);
-    let value = smith_charter::RunResult::decode(&smith_charter::v1::CEILINGS, &mut reader).ok()?;
+    let value = smith_charter::RunResult::decode(&smith_charter::v2::CEILINGS, &mut reader).ok()?;
     match value.form() {
         smith_charter::Form::Report => Some(tasks::TaskResult::Report { words: Box::from(value.text()) }),
         smith_charter::Form::Failure => Some(tasks::TaskResult::Failure { reason: Box::from(value.text()) }),

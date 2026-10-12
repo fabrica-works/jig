@@ -31,7 +31,7 @@ use jig_conformance::{Clock, Input};
 use jig_host as host;
 use jig_ops_domain as root;
 use skein_lib::{Duration, List, Token, Writer};
-use smith_transcript::v2 as transcript;
+use smith_transcript::v3 as transcript;
 use std::collections::BTreeMap;
 
 pub struct Agents {
@@ -441,12 +441,20 @@ fn turn(agent: &Agent, texts: &[Vec<u8>], step: &Step) -> Box<[u8]> {
     let value = transcript::Turn::new(
         &limits,
         transcript::TurnParts {
+            kind: transcript::TurnKind::Ordinary,
+            affinity: None,
             endpoint: b"fake".as_slice().into(),
             dialect: b"fake".as_slice().into(),
             place: agent.said,
             usage: transcript::Usage::new(
                 &limits,
-                transcript::UsageParts { input: 1, output: 1, cache_read: 0, cache_write: 0 },
+                transcript::UsageParts {
+                    input: Some(1),
+                    output: Some(1),
+                    cache_read: Some(0),
+                    cache_write: Some(0),
+                    reasoning: None,
+                },
             )
             .expect("usage"),
             spent: agent.spent,
@@ -484,7 +492,7 @@ fn verdict(code: &str, text: &str, fields: &[(&str, &str)]) -> Box<[u8]> {
 }
 /// The run's accepted result, in the record its outcome carries.
 fn result(form: smith_charter::Form, label: Option<&[u8]>, text: &[u8], fields: &[(&str, &str)]) -> Box<[u8]> {
-    let limits = smith_charter::v1::CEILINGS;
+    let limits = smith_charter::v2::CEILINGS;
     let mut list = List::with_capacity(u32::try_from(fields.len()).expect("few fields"));
     for (name, value) in fields {
         list.push(
