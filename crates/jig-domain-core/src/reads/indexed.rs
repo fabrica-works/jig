@@ -122,6 +122,7 @@ pub(super) fn is_update(key: &Key) -> bool {
             | tasks::Key::Activity { .. }
             | tasks::Key::Result { .. }
             | tasks::Key::ConversationNewest { .. }
+            | tasks::Key::Goal { .. }
             | tasks::Key::ConversationOldest { .. },
         )
         | Key::Core(_)
@@ -157,6 +158,7 @@ pub(super) fn conversation_row(
         crate::Record::Tasks(
             tasks::Stored::Result(_)
             | tasks::Stored::ConversationNewest(_)
+            | tasks::Stored::Goal(_)
             | tasks::Stored::ConversationOldest(_)
             | tasks::Stored::ClosedLedger(_)
             | tasks::Stored::DecidedProposal(_)
@@ -191,4 +193,59 @@ pub(super) fn conversation_row(
         return Ok(None);
     }
     Ok(Some(super::PageRow::Conversation(documents::conversation_from_row(core, limits, range.party, owner)?)))
+}
+
+/// The goal index carries its full ended census; its owner is a point join.
+pub(super) fn goal_row(
+    core: &crate::Core,
+    limits: &crate::Limits,
+    project: u32,
+    row: &super::Row,
+) -> Result<Option<super::PageRow>, documents::Missing> {
+    let goal = match &row.value {
+        crate::Record::Tasks(tasks::Stored::Goal(goal)) => goal,
+        crate::Record::Tasks(
+            tasks::Stored::Update(_)
+            | tasks::Stored::Result(_)
+            | tasks::Stored::ConversationNewest(_)
+            | tasks::Stored::ConversationOldest(_)
+            | tasks::Stored::Activity(_)
+            | tasks::Stored::Milestone(_)
+            | tasks::Stored::PersonProposal(_)
+            | tasks::Stored::DecidedProposal(_)
+            | tasks::Stored::ClosedLedger(_)
+            | tasks::Stored::History(_)
+            | tasks::Stored::Live(_)
+            | tasks::Stored::Ended(_)
+            | tasks::Stored::Stub(_)
+            | tasks::Stored::Ledger(_)
+            | tasks::Stored::Writer(_)
+            | tasks::Stored::Pool(_),
+        )
+        | crate::Record::Core(_)
+        | crate::Record::People(_)
+        | crate::Record::Notes(_) => return Ok(None),
+    };
+    let Some(owner) = &row.owner else { return Ok(None) };
+    if goal.project != project
+        || owner.project != project
+        || goal.task != owner.number
+        || owner.tracked.is_none()
+        || core.tasks.task(owner.number).is_some()
+    {
+        return Ok(None);
+    }
+    match owner.phase {
+        tasks::Phase::Ended(_) => {}
+        tasks::Phase::Waiting | tasks::Phase::Active(_) | tasks::Phase::Closing(_) | tasks::Phase::Held { .. } => {
+            return Ok(None);
+        }
+    }
+    Ok(Some(super::PageRow::Goal(documents::GoalLine {
+        chip: documents::chip_from_row_with_core(core, limits, owner)?,
+        priority: owner.tracked.expect("tracked goal"),
+        phases: documents::PhaseCounts::from_endings(goal.endings),
+        budget: documents::budget_from_row(owner),
+        held_below: 0,
+    })))
 }

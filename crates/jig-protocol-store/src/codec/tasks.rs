@@ -78,6 +78,7 @@ pub fn encode(row: &domain::Stored, limits: &wire::Limits) -> Result<Box<[u8]>, 
             wire::PoolSlotsParts { number: *number, pool: value::name(pool, limits)?, slots: *slots },
         )?),
         domain::Stored::Update(_)
+        | domain::Stored::Goal(_)
         | domain::Stored::Result(_)
         | domain::Stored::ConversationNewest(_)
         | domain::Stored::ConversationOldest(_)

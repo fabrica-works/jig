@@ -416,6 +416,7 @@ fn restore_refuses_task_funding_outside_its_requester_ancestry() {
             | Stored::Writer(_)
             | Stored::Result(_)
             | Stored::ConversationNewest(_)
+            | Stored::Goal(_)
             | Stored::ConversationOldest(_)
             | Stored::Update(_)
             | Stored::Pool(_)

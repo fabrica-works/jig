@@ -2,6 +2,7 @@
 //! Parties know the last submitted commit and the fake store's durable number.
 //! They never inspect the core or the journal. Their receipts survive a crash.
 use crate::{Store, effects::World};
+mod goals;
 use jig_domain_core::{self as core, documents, reads};
 use jig_domain_tasks as tasks;
 use jig_test_domain as root;
@@ -312,6 +313,7 @@ fn candidate(store: &Store, range: &reads::Range, value: &core::Record) -> Optio
                 inbox: None,
             })
         }
+        reads::Scope::Goals { project } => goals::candidate(store, *project, value),
         reads::Scope::Conversations => conversation_row(store, range, value),
         reads::Scope::Turn { task, attempt, turn } => {
             let core::Record::Core(core::CoreRecord::Turn(line)) = value else { return None };
@@ -334,7 +336,6 @@ fn candidate(store: &Store, range: &reads::Range, value: &core::Record) -> Optio
                 | reads::Group::PersonTasks,
             ..
         }
-        | reads::Scope::Goals { .. }
         | reads::Scope::Spend { .. } => None,
     }
 }
@@ -541,6 +542,7 @@ fn index_bounds(range: &reads::Range) -> Option<(root::Key, root::Key)> {
                 ),
             ))
         }
+        reads::Scope::Goals { project } => Some(goals::bounds(project)),
         reads::Scope::Conversations => {
             let key = |number| {
                 root::Key::Core(core::Key::Tasks(if range.backwards {
@@ -571,7 +573,6 @@ fn index_bounds(range: &reads::Range) -> Option<(root::Key, root::Key)> {
                 | reads::Group::PersonTasks,
             ..
         }
-        | reads::Scope::Goals { .. }
         | reads::Scope::Notes { .. }
         | reads::Scope::ScopedNotes { .. }
         | reads::Scope::Spend { .. } => None,

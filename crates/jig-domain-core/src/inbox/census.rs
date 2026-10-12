@@ -92,6 +92,7 @@ impl Core {
             | tasks::Stored::Update(_)
             | tasks::Stored::Result(_)
             | tasks::Stored::ConversationNewest(_)
+            | tasks::Stored::Goal(_)
             | tasks::Stored::ConversationOldest(_) => return false,
         };
         if !super::matches_ended(&row.phase) || !super::valid_header(self, limits, row) {

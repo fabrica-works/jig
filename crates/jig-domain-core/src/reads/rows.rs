@@ -632,6 +632,7 @@ fn object(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Optio
                 | tasks::Stored::Writer(_)
                 | tasks::Stored::Result(_)
                 | tasks::Stored::ConversationNewest(_)
+                | tasks::Stored::Goal(_)
                 | tasks::Stored::ConversationOldest(_)
                 | tasks::Stored::Update(_)
                 | tasks::Stored::Pool(_)
@@ -839,6 +840,7 @@ fn page_row(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Opt
                     | tasks::Stored::Writer(_)
                     | tasks::Stored::Result(_)
                     | tasks::Stored::ConversationNewest(_)
+                    | tasks::Stored::Goal(_)
                     | tasks::Stored::ConversationOldest(_)
                     | tasks::Stored::Update(_)
                     | tasks::Stored::Pool(_)
@@ -903,55 +905,7 @@ fn page_row(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Opt
                 | tasks::Funder::Recurring { .. } => Ok(None),
             }
         }
-        Scope::Goals { project } => {
-            let Some(owner) = row_owner(&row) else {
-                return Ok(None);
-            };
-            if owner.project != *project
-                || owner.tracked.is_none()
-                || !ended(owner)
-                || core.tasks.task(owner.number).is_some()
-            {
-                return Ok(None);
-            }
-            let mut phases = documents::PhaseCounts::ZERO;
-            for linked in &row.linked {
-                if !linked_below(&row, linked, owner.number, limits.tasks.depth) {
-                    continue;
-                }
-                match linked.phase {
-                    tasks::Phase::Ended(tasks::Ending::Done(_)) => phases.done = phases.done.saturating_add(1),
-                    tasks::Phase::Ended(tasks::Ending::Failed { .. }) => {
-                        phases.failed = phases.failed.saturating_add(1);
-                    }
-                    tasks::Phase::Ended(tasks::Ending::Cancelled { .. }) => {
-                        phases.cancelled = phases.cancelled.saturating_add(1);
-                    }
-                    tasks::Phase::Waiting
-                    | tasks::Phase::Active(_)
-                    | tasks::Phase::Closing(_)
-                    | tasks::Phase::Held { .. } => return Err(Missing::Unknown),
-                }
-            }
-            match owner.phase {
-                tasks::Phase::Ended(tasks::Ending::Done(_)) => phases.done = phases.done.saturating_add(1),
-                tasks::Phase::Ended(tasks::Ending::Failed { .. }) => phases.failed = phases.failed.saturating_add(1),
-                tasks::Phase::Ended(tasks::Ending::Cancelled { .. }) => {
-                    phases.cancelled = phases.cancelled.saturating_add(1);
-                }
-                tasks::Phase::Waiting
-                | tasks::Phase::Active(_)
-                | tasks::Phase::Closing(_)
-                | tasks::Phase::Held { .. } => unreachable!("ended goal"),
-            }
-            Ok(Some(PageRow::Goal(documents::GoalLine {
-                chip: documents::chip_from_row_with_core(core, limits, owner)?,
-                priority: owner.tracked.expect("tracked goal"),
-                phases,
-                budget: documents::budget_from_row(owner),
-                held_below: 0,
-            })))
-        }
+        Scope::Goals { project } => super::indexed::goal_row(core, limits, *project, &row),
         Scope::Conversations => super::indexed::conversation_row(core, limits, range, &row),
         Scope::Inbox { group, filter } => inbox_row(core, limits, range.party, *group, *filter, row),
         Scope::Task { .. }
@@ -1007,6 +961,7 @@ fn inbox_selection_row(limits: &Limits, row: &Row) -> Result<Option<documents::I
             | tasks::Stored::Writer(_)
             | tasks::Stored::Result(_)
             | tasks::Stored::ConversationNewest(_)
+            | tasks::Stored::Goal(_)
             | tasks::Stored::ConversationOldest(_)
             | tasks::Stored::Update(_)
             | tasks::Stored::Pool(_)
@@ -1054,6 +1009,7 @@ fn inbox_row(
             | tasks::Stored::Writer(_)
             | tasks::Stored::Result(_)
             | tasks::Stored::ConversationNewest(_)
+            | tasks::Stored::Goal(_)
             | tasks::Stored::ConversationOldest(_)
             | tasks::Stored::Update(_)
             | tasks::Stored::Pool(_)
@@ -1296,6 +1252,7 @@ fn milestone_record(record: &Record) -> Option<&tasks::Milestone> {
             | tasks::Stored::Writer(_)
             | tasks::Stored::Result(_)
             | tasks::Stored::ConversationNewest(_)
+            | tasks::Stored::Goal(_)
             | tasks::Stored::ConversationOldest(_)
             | tasks::Stored::Update(_)
             | tasks::Stored::Pool(_)
@@ -1322,6 +1279,7 @@ fn activity_record(record: &Record) -> Option<&tasks::ActivityLine> {
             | tasks::Stored::Writer(_)
             | tasks::Stored::Result(_)
             | tasks::Stored::ConversationNewest(_)
+            | tasks::Stored::Goal(_)
             | tasks::Stored::ConversationOldest(_)
             | tasks::Stored::Update(_)
             | tasks::Stored::Pool(_)
@@ -1391,6 +1349,7 @@ fn ledger(record: &Record) -> Option<&tasks::FundingRecord> {
             | tasks::Stored::Writer(_)
             | tasks::Stored::Result(_)
             | tasks::Stored::ConversationNewest(_)
+            | tasks::Stored::Goal(_)
             | tasks::Stored::ConversationOldest(_)
             | tasks::Stored::Update(_)
             | tasks::Stored::Pool(_)
@@ -1469,7 +1428,11 @@ pub(super) fn position_allowed(scope: &Scope, position: &Position) -> bool {
                     | KeyKind::Unsupported => false,
                 },
                 Scope::Conversations => super::indexed::conversation_position(position, true).is_some(),
-                Scope::EndedDelegates { .. } | Scope::Goals { .. } => match kind {
+                Scope::Goals { project } => match key {
+                    Key::Tasks(tasks::Key::Goal { project: owner, .. }) => owner == project,
+                    Key::Tasks(_) | Key::Core(_) | Key::People(_) | Key::Notes(_) => false,
+                },
+                Scope::EndedDelegates { .. } => match kind {
                     KeyKind::Ended(_) => true,
                     KeyKind::Live(_)
                     | KeyKind::History(_)
@@ -1528,6 +1491,7 @@ fn key_kind(key: &Key) -> KeyKind {
             | tasks::Key::Pool(_)
             | tasks::Key::Result { .. }
             | tasks::Key::ConversationNewest { .. }
+            | tasks::Key::Goal { .. }
             | tasks::Key::ConversationOldest { .. }
             | tasks::Key::Update { .. } => KeyKind::Unsupported,
         },
@@ -1557,25 +1521,6 @@ fn linked_row(row: &Row, number: u64) -> Option<&tasks::TaskRecord> {
         }
     }
     None
-}
-
-fn linked_below(row: &Row, candidate: &tasks::TaskRecord, root: u64, depth: u32) -> bool {
-    let mut parent = candidate.requester;
-    for _ in 0..depth {
-        match parent {
-            tasks::Party::Task(number) => {
-                if number == root {
-                    return true;
-                }
-                let Some(owner) = linked_row(row, number) else {
-                    return false;
-                };
-                parent = owner.requester;
-            }
-            tasks::Party::Person(_) | tasks::Party::Deployment { .. } => return false,
-        }
-    }
-    false
 }
 
 fn hydrate_task(

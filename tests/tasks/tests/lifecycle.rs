@@ -770,3 +770,6 @@ fn lifecycle_history_has_independent_positions_and_restore_does_not_repeat_a_pha
         matches!(world.records.get(&Key::Milestone { task: 1, position: held + 1 }), Some(jig_domain_tasks::Stored::Milestone(row)) if row.phase == world.record(1).phase)
     );
 }
+
+#[path = "lifecycle/goals.rs"]
+mod goals;

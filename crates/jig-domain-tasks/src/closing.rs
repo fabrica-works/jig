@@ -309,6 +309,7 @@ fn end_task(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queue
     let ending = ending.clone();
     let requester = task.requester;
     let status = status(&ending);
+    let endings = task.ended_below.ended(status);
     let subscriptions = task.subscriptions.clone();
     let mut ended = task.clone();
     for subscription in &subscriptions {
@@ -332,6 +333,11 @@ fn end_task(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queue
     domain.alarms.cancel(number);
     domain.chat_alarms.cancel(number);
     out.push(Request::Erase { key: Key::Live(number) });
+    if ended.tracked.is_some() {
+        out.push(Request::Save {
+            record: Stored::Goal(crate::GoalRow { project: ended.project, task: number, endings }),
+        });
+    }
     out.push(Request::Save { record: Stored::Ended(Box::new(ended)) });
     let dependents = snapshot(domain, env.limits.tasks);
     for dependent in dependents.into_boxed() {
@@ -378,6 +384,7 @@ fn end_task(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queue
                 }
             }
             task.record.delegates = remaining.into_boxed();
+            task.record.ended_below.add(endings);
             publish(domain, env, parent, out);
         }
         Party::Person(_) | Party::Deployment { .. } => {}

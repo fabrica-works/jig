@@ -113,6 +113,10 @@ pub enum Key {
         party: u64,
         task: u64,
     },
+    Goal {
+        project: u32,
+        task: Newest,
+    },
 }
 
 impl Key {
@@ -135,7 +139,8 @@ impl Key {
             | Self::Update { .. }
             | Self::Result { .. }
             | Self::ConversationNewest { .. }
-            | Self::ConversationOldest { .. } => false,
+            | Self::ConversationOldest { .. }
+            | Self::Goal { .. } => false,
         }
     }
 }
@@ -146,4 +151,37 @@ pub struct ResultRow {
     pub party: u64,
     pub position: u64,
     pub task: u64,
+}
+
+/// Lifetime ended descendants' outcomes, saturating (decisions.md 9, ruling 131).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Endings {
+    pub done: u32,
+    pub failed: u32,
+    pub cancelled: u32,
+}
+impl Endings {
+    pub const ZERO: Self = Self { done: 0, failed: 0, cancelled: 0 };
+    pub(crate) fn add(&mut self, other: Self) {
+        self.done = self.done.saturating_add(other.done);
+        self.failed = self.failed.saturating_add(other.failed);
+        self.cancelled = self.cancelled.saturating_add(other.cancelled);
+    }
+    pub(crate) fn ended(mut self, status: crate::Status) -> Self {
+        let count = match status {
+            crate::Status::Done => &mut self.done,
+            crate::Status::Failed => &mut self.failed,
+            crate::Status::Cancelled => &mut self.cancelled,
+        };
+        *count = count.saturating_add(1);
+        self
+    }
+}
+
+/// An ended tracked goal, with its own and its descendants' outcomes.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct GoalRow {
+    pub project: u32,
+    pub task: u64,
+    pub endings: Endings,
 }

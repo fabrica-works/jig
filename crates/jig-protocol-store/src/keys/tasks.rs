@@ -64,6 +64,11 @@ pub(super) fn write(writer: &mut KeyWriter, key: &Key) {
             writer.u64(*party);
             writer.u64(task.raw());
         }
+        Key::Goal { project, task } => {
+            writer.tag(16);
+            writer.u64(u64::from(*project));
+            writer.u64(task.raw());
+        }
         Key::ConversationOldest { party, task } => {
             writer.tag(15);
             writer.u64(*party);
@@ -116,6 +121,7 @@ pub(super) fn read(reader: &mut KeyReader<'_>) -> Option<Key> {
         },
         13 => Key::Result { party: reader.u64()?, position: reader.u64()? },
         14 => Key::ConversationNewest { party: reader.u64()?, task: Newest::from_raw(reader.u64()?) },
+        16 => Key::Goal { project: u32::try_from(reader.u64()?).ok()?, task: Newest::from_raw(reader.u64()?) },
         15 => Key::ConversationOldest { party: reader.u64()?, task: reader.u64()? },
         _ => return None,
     })

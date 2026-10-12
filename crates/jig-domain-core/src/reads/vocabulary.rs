@@ -325,6 +325,7 @@ pub(crate) fn row_owner(row: &Row) -> Option<&tasks::TaskRecord> {
             | tasks::Stored::Writer(_)
             | tasks::Stored::Result(_)
             | tasks::Stored::ConversationNewest(_)
+            | tasks::Stored::Goal(_)
             | tasks::Stored::ConversationOldest(_)
             | tasks::Stored::Update(_)
             | tasks::Stored::Pool(_)
@@ -366,6 +367,7 @@ pub(crate) fn row_visible(core: &Core, party: u64, row: &Row) -> bool {
             | tasks::Stored::Writer(_)
             | tasks::Stored::Result(_)
             | tasks::Stored::ConversationNewest(_)
+            | tasks::Stored::Goal(_)
             | tasks::Stored::ConversationOldest(_)
             | tasks::Stored::Update(_)
             | tasks::Stored::Pool(_),

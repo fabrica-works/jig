@@ -21,6 +21,7 @@
 //! host grace and account cooldowns from monotonic deadlines.
 
 mod chip_phase;
+mod endings;
 pub use chip_phase::{ChipDetails, ChipObservation, ChipWork};
 mod inbox_deployment;
 pub use inbox_deployment::{ConversationLine, Conversations, Inbox, InboxEntry, InboxObject, conversation_from_row};

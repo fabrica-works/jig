@@ -38,7 +38,8 @@ impl Census {
                 | tasks::Key::Milestone { .. }
                 | tasks::Key::Activity { .. }
                 | tasks::Key::Update { .. }
-                | tasks::Key::ConversationNewest { .. },
+                | tasks::Key::ConversationNewest { .. }
+                | tasks::Key::Goal { .. },
             )
             | Key::Core(_)
             | Key::People(_)

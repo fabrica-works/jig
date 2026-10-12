@@ -52,6 +52,10 @@ pub fn admits(party: u64, scope: &Scope, key: &crate::Key) -> bool {
                 && (key == &Key::Tasks(TaskKey::PersonProposal(*proposal))
                     || key == &Key::Tasks(TaskKey::DecidedProposal(*proposal)))
         }
+        Scope::Goals { project } => match key {
+            Key::Tasks(TaskKey::Goal { project: owner, .. }) => owner == project,
+            Key::Tasks(_) | Key::Core(_) | Key::People(_) | Key::Notes(_) => false,
+        },
         Scope::Spend { project } => match key {
             Key::Tasks(
                 TaskKey::Ledger(Funder::Period { project: owner, .. })
@@ -80,8 +84,7 @@ pub fn admits(party: u64, scope: &Scope, key: &crate::Key) -> bool {
         | Scope::History { subtree: true, .. }
         | Scope::Activity { .. }
         | Scope::Inbox { .. }
-        | Scope::Conversations
-        | Scope::Goals { .. } => false,
+        | Scope::Conversations => false,
     }
 }
 

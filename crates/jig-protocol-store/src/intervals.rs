@@ -94,6 +94,7 @@ pub fn scope(party: u64, scope: &core::reads::Scope) -> Option<Box<[Range]>> {
                 Box::new([])
             }
         }
+        Scope::Goals { project } => Box::new([numbered_prefix(&[keys::JIG, 1, 16], u64::from(*project))]),
         Scope::Spend { project } => Box::new([
             numbered_prefix(&[keys::JIG, 1, 2, 3], u64::from(*project)),
             numbered_prefix(&[keys::JIG, 1, 7, 3], u64::from(*project)),
@@ -117,8 +118,7 @@ pub fn scope(party: u64, scope: &core::reads::Scope) -> Option<Box<[Range]>> {
         | Scope::History { subtree: true, .. }
         | Scope::Activity { .. }
         | Scope::Inbox { .. }
-        | Scope::Conversations
-        | Scope::Goals { .. } => return None,
+        | Scope::Conversations => return None,
     })
 }
 fn numbered_prefix(prefix: &[u8], number: u64) -> Range {

@@ -448,7 +448,7 @@ impl Domain {
 pub(crate) fn output_bound(limits: &Limits) -> Option<u32> {
     limits
         .tasks
-        .checked_mul(24)?
+        .checked_mul(25)?
         .checked_add(limits.batch.checked_mul(2)?)?
         .checked_add(limits.funders.checked_mul(3)?)?
         .checked_add(limits.tasks.checked_mul(limits.subscriptions)?.checked_mul(2)?)?
@@ -1154,6 +1154,7 @@ pub(crate) fn make_admitted(
             published: None,
             procedure_offered: None,
             record: TaskRecord {
+                ended_below: crate::Endings::ZERO,
                 question_lines: Box::new([]),
                 hold: 0,
                 proposal_rows: Box::new([]),

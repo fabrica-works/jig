@@ -60,6 +60,7 @@ pub(crate) fn save(core: &Core, record: &tasks::Stored, out: &mut Queue<Request>
         }
         tasks::Stored::Result(_)
         | tasks::Stored::ConversationNewest(_)
+        | tasks::Stored::Goal(_)
         | tasks::Stored::ConversationOldest(_)
         | tasks::Stored::Update(_)
         | tasks::Stored::Live(_)

@@ -570,3 +570,61 @@ fn a_question_answered_by_its_task_reads_the_line_in_the_delegates_activity() {
         if *number == sent && *question == message && words.as_ref() == b"answer")
     );
 }
+
+fn live_task(world: &jig_core_world::effects::World, task: u64) -> &tasks::TaskRecord {
+    let root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row))) =
+        &world.store.rows[&root::Key::Core(core::Key::Tasks(tasks::Key::Live(task)))]
+    else {
+        panic!("live task")
+    };
+    row
+}
+
+fn finish_goal(world: &mut jig_core_world::effects::World, key: u8, delegate: bool) -> u64 {
+    request(world, key, jig_core_world::stories::offers::goal(300));
+    let goal = chat_task(world);
+    if delegate {
+        world.delegate();
+        world.observed(13);
+        let child = world.procedure.expect("goal delegate");
+        assert!(world.store.rows.remove(&root::Key::Core(core::Key::Tasks(tasks::Key::Ended(child)))).is_some());
+        let message = live_task(world, goal).inbox.last().expect("delegate result").number;
+        take_message(world, goal, 1, message);
+    }
+    finish_chat(world, goal);
+    goal
+}
+fn ended_goals(world: &mut jig_core_world::effects::World) -> Vec<(u64, documents::PhaseCounts)> {
+    let mut from = None;
+    let mut goals = Vec::new();
+    for page in 0..5 {
+        ask(world, 920 + page, reads::Read::Goals { project: 1, from: from.take() });
+        let reads::Answer::Page(rows) = latest(world) else { panic!("goals page: {:?}", latest(world)) };
+        for row in &rows.rows {
+            let reads::PageRow::Goal(goal) = row else { panic!("goal") };
+            goals.push((goal.chip.number, goal.phases));
+        }
+        from.clone_from(&rows.next);
+        if from.is_none() {
+            break;
+        }
+    }
+    goals
+}
+#[test]
+fn goals_page_newest_first_with_counts_from_the_index() {
+    let mut world = world(799);
+    let chat = chat_task(&world);
+    finish_chat(&mut world, chat);
+    let oldest = finish_goal(&mut world, 121, true);
+    let middle = finish_goal(&mut world, 122, false);
+    let newest = finish_goal(&mut world, 123, false);
+    assert_eq!(
+        ended_goals(&mut world),
+        [
+            (newest, documents::PhaseCounts { done: 1, ..documents::PhaseCounts::ZERO }),
+            (middle, documents::PhaseCounts { done: 1, ..documents::PhaseCounts::ZERO }),
+            (oldest, documents::PhaseCounts { done: 2, ..documents::PhaseCounts::ZERO }),
+        ]
+    );
+}

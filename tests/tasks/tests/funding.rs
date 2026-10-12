@@ -48,6 +48,7 @@ fn ledger(world: &World, funder: Funder) -> tasks::FundingRecord {
         | Stored::Writer(_)
         | Stored::Result(_)
         | Stored::ConversationNewest(_)
+        | Stored::Goal(_)
         | Stored::ConversationOldest(_)
         | Stored::Update(_)
         | Stored::Pool(_)

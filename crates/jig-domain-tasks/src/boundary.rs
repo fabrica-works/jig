@@ -842,6 +842,8 @@ pub struct ReplyHint {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 #[expect(clippy::struct_excessive_bools, reason = "independent durable lifecycle facts are explicit")]
 pub struct TaskRecord {
+    /// Lifetime ended descendants, summed as each delegate ends; counts saturate.
+    pub ended_below: crate::Endings,
     /// Newest question and answer activity positions, at most `inbox_messages`.
     pub question_lines: Box<[crate::QuestionLine]>,
     /// Latest hold milestone; zero before the first hold.
@@ -991,6 +993,7 @@ pub enum Stored {
     Result(crate::ResultRow),
     ConversationNewest(crate::Conversation),
     ConversationOldest(crate::Conversation),
+    Goal(crate::GoalRow),
     /// Historical activity loaded on demand, never restored as live state.
     Activity(crate::ActivityLine),
     /// One immutable lifecycle milestone, loaded on demand.
@@ -1035,6 +1038,7 @@ impl Stored {
     pub const fn key(&self) -> Key {
         match self {
             Stored::Update(row) => row.key(),
+            Stored::Goal(row) => Key::Goal { project: row.project, task: crate::Newest::of(row.task) },
             Stored::Result(row) => Key::Result { party: row.party, position: row.position },
             Stored::ConversationNewest(row) => {
                 Key::ConversationNewest { party: row.party, task: crate::Newest::of(row.task) }
