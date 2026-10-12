@@ -1065,6 +1065,20 @@ the file.
      07.s1 (`jig/07-charters-and-budgets.md`), moves them before jig 20.5
      lands; resources and homes come by adoption after the first start,
      and homes wait (`later.md`).
+171. **A close drains an exchange in flight, as skein's design says**
+     (2026-10-12, the coordinator's block "jig 21.5: close drains versus
+     cancellation", 2026-10-12T22:44:15Z). A plan defect: 21.5 had "a
+     close during an exchange cancelling it", but skein's `oauth.md`, 6.6:
+     "**Close drains.** ... An exchange in flight with the issuer
+     finishes, its record is kept, and then its connection closes", and
+     llm.md, 5.2 maps close to close. 21.5's test is now
+     `a_close_during_an_exchange_drains_it`, closing once the fake issuer
+     has seen the refresh and expecting `Closed` only after it finishes;
+     no cancel is added to production routing. The accounts world's
+     referee (`tests/protocol-accounts/src/referee.rs`) is in 21.5's
+     Files for the close trigger and a damaged record's usability (its
+     `became_usable` assumes every story is granted), as ruling 166 did
+     for 21.4.
 
 ## For the user
 

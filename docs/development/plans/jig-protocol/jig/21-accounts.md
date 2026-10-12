@@ -368,7 +368,7 @@ limit failing later with the issuer's delay; an issuer rejecting the
 refresh token (`invalid_grant`) failing as sign in again; the
 deployment's client rejected failing as misconfigured; an account's
 record file damaged failing as unloaded, with where and why; a close
-during an exchange cancelling it (llm.md, 5.2 and 5.4).
+during an exchange draining it (ruling 171) (llm.md, 5.2 and 5.4).
 Needs: nothing beyond 21.4.
 Files: `tests/protocol-accounts/{src/fixtures.rs, src/world.rs,
 tests/failures.rs}`.
@@ -380,7 +380,7 @@ Test shape: `tests/protocol-accounts/tests/failures.rs` (new):
 `a_refused_refresh_token_fails_as_sign_in_again`,
 `a_rejected_client_fails_as_misconfigured`,
 `a_damaged_record_file_fails_as_unloaded_naming_the_file`,
-`a_close_during_an_exchange_cancels_it`; each written as 21.3's
+`a_close_during_an_exchange_drains_it`; each written as 21.3's
 reference test, its `Heard` list a literal. Each under 0.5 s.
 Proof: world, `heavy cargo nextest run -p jig-protocol-accounts-world -E
 'test(failures)'` once: each failure the fake issuer or the disk makes
