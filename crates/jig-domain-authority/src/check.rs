@@ -505,6 +505,9 @@ pub fn check_run(domain: &Domain, ask: &RunAsk, why: &mut Queue<Finding>) -> Ans
     if ask.budget <= domain.rules().minimum_run_spend || ask.budget > left(ask.numbers) {
         find(&mut answer, why, Answer::Wait, Finding::RunBudget);
     }
+    if ask.budget < ask.reserve {
+        find(&mut answer, why, Answer::Wait, Finding::RunBudget);
+    }
     if ask.budget > domain.rules().maximum_run_spend || ask.budget > ask.authority.budget.spend {
         find(&mut answer, why, Answer::Refuse, Finding::RunCap);
     }

@@ -480,7 +480,8 @@ impl Core {
         );
         assert!(
             match memory::policy_owned_bytes(&config.settings.run) {
-                Some(bytes) => bytes <= u64::from(limits.run_bytes),
+                Some(bytes) =>
+                    bytes <= u64::from(limits.run_bytes) && run::reserve_floor(&config.settings.run).is_some(),
                 None => false,
             },
             "core prices its configured run policy"

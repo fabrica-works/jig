@@ -173,6 +173,19 @@ impl World {
     /// A story may configure its programs, policy and worker capacity.
     #[must_use]
     pub fn configured(seed: u64, requirement: bool, configuration: root::Config, limits: root::Limits) -> World {
+        let world = Self::configured_unassigned(seed, requirement, configuration, limits);
+        assert!(world.assigned.is_some(), "the task hub and fleet assigned the caller: {:?}", world.trace);
+        world
+    }
+
+    /// Build a story whose initial chat may wait or be held before assignment.
+    #[must_use]
+    pub fn configured_unassigned(
+        seed: u64,
+        requirement: bool,
+        configuration: root::Config,
+        limits: root::Limits,
+    ) -> World {
         // This domain only journals roles before the exact effect configuration
         // is installed and restored below; its bootstrap needs no effect grants.
         let mut bootstrap = crate::world::config(seed);
@@ -223,7 +236,6 @@ impl World {
             }),
         ]);
         world.drain();
-        assert!(world.assigned.is_some(), "the task hub and fleet assigned the caller: {:?}", world.trace);
         if requirement {
             world.waiting_judge();
         }

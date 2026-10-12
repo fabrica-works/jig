@@ -276,7 +276,7 @@ fn config(seed: u64) -> Config {
                     cached_price: 1,
                     cache_write_price: None,
                     output_price: 1,
-                    price_unit: 1000,
+                    price_unit: 1_000_000,
                 },
                 alternatives: Box::new([]),
                 inspect: true,
@@ -2934,3 +2934,5 @@ mod inbox_selection;
 mod restore_admission;
 
 mod project_period_watches;
+
+mod reserve;

@@ -518,7 +518,7 @@ fn batch_cells_count_direct_creation_and_reserve_only_after_every_check_allows()
     assert_eq!(allowed.answer, Answer::Allow);
     assert_eq!(allowed.numbers.unwrap().reserved, 30, "budgets are summed once and carved together");
     assert!(why.is_empty(), "allow has no deficits");
-    for cause in 0_u8..6 {
+    for cause in 0_u8..7 {
         let mut ask = base.clone();
         match cause {
             0 => ask.tasks_left = 1,
@@ -640,6 +640,7 @@ fn run_cells_hold_for_readiness_propose_grants_and_refuse_hard_caps() {
         authority: authority(),
         numbers: numbers(100),
         budget: 20,
+        reserve: 0,
         wall: Wall::from_nanos(10),
         accounts: Box::new([true]),
         writes: Box::new([Write { effect: effect(), held: Writer::Task }]),
@@ -668,6 +669,10 @@ fn run_cells_hold_for_readiness_propose_grants_and_refuse_hard_caps() {
             4 => {
                 ask.writes[0].held = Writer::Pending;
                 Finding::Writer
+            }
+            5 => {
+                ask.reserve = 21;
+                Finding::RunBudget
             }
             _ => {
                 ask.writes[0].held = Writer::Other;
@@ -727,6 +732,7 @@ fn run_checks_the_resources_it_writes_after_policy_narrows() {
         authority: task,
         numbers: numbers(100),
         budget: 20,
+        reserve: 0,
         wall: Wall::EPOCH,
         accounts: Box::new([true]),
         writes: Box::new([Write { effect: effect(), held: Writer::Task }]),

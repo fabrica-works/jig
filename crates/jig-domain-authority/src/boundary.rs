@@ -262,6 +262,8 @@ pub struct RunAsk {
     pub numbers: Numbers,
     /// Offered run budget in the deployment unit; must exceed the minimum and fit all caps.
     pub budget: u64,
+    /// Spend needed for the reserve and one most costly completion.
+    pub reserve: u64,
     /// Root-supplied current wall time for the deadline check.
     pub wall: Wall,
     /// One status for each model account its charter will use. One usability status per model

@@ -314,7 +314,7 @@ pub fn config(seed: u64) -> root::Config {
                         cached_price: 1,
                         cache_write_price: None,
                         output_price: 1,
-                        price_unit: 1000,
+                        price_unit: 1_000_000,
                     },
                     alternatives: Box::new([]),
                     inspect: true,

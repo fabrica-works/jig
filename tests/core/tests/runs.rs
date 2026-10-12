@@ -272,3 +272,36 @@ fn a_conversations_attempts_name_one_first_attempt() {
         assert!(proof.attempt > first);
     }
 }
+
+fn reserve_fixture(seed: u64, spend: u64) -> (root::Config, root::Limits) {
+    let (mut config, limits) = jig_core_world::effects::fixture(seed, false);
+    config.core.settings.run.model.price_unit = 1_000;
+    let mut rules = config.core.authority.rules().clone();
+    rules.maximum_run_spend = spend;
+    let policy = config.core.authority.policy(1).expect("project policy").clone();
+    config.core.authority = jig_domain_authority::Domain::new(rules, limits.core.authority).expect("authority bounds");
+    let mut out = skein_lib::Queue::with_capacity(jig_domain_authority::POLICY_MAX_OUT);
+    jig_domain_authority::step(
+        &mut config.core.authority,
+        jig_domain_authority::Event::Policy { project: 1, policy },
+        &mut out,
+    );
+    (config, limits)
+}
+
+#[test]
+fn a_chat_whose_spend_is_below_its_reserve_is_held_for_budget() {
+    let (config, limits) = reserve_fixture(139, 19);
+    let world = World::configured_unassigned(139, false, config, limits);
+    assert!(world.assigned.is_none());
+    assert!(world.store.rows.values().any(|row| matches!(row,
+        root::Record::Core(core::Record::Tasks(tasks::Stored::Live(task)))
+        if matches!(task.phase, tasks::Phase::Held { why: tasks::Hold::Budget, .. }))));
+}
+
+#[test]
+fn a_chat_whose_spend_holds_its_reserve_is_assigned() {
+    let (config, limits) = reserve_fixture(140, 20);
+    let world = World::configured(140, false, config, limits);
+    assert_eq!(world.assigned.as_ref().expect("chat assigned at floor").run.budget, 20);
+}

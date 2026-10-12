@@ -64,6 +64,7 @@ impl Core {
                 authority: translate::authority_value(&task.authority),
                 numbers,
                 budget: authority::left(numbers).min(self.authority.rules().maximum_run_spend),
+                reserve: reserve_floor(&self.settings.run).expect("configured reserve floor"),
                 wall,
                 accounts: Box::new([self.accounts.usable(self.settings.account)]),
                 writes,
@@ -348,4 +349,22 @@ pub enum GoalRoute {
     Proposing { proposal: u64 },
     Accepting { proposer: u64, proposal: u64, by: u64, task: u64 },
     Deciding { proposer: u64, proposal: u64, by: u64 },
+}
+
+/// A completion's maximum price, rounded up once (domain/authority.md, 7).
+#[must_use]
+pub fn most_costly(model: &Model) -> Option<u64> {
+    let rate = model.input_price.max(model.cached_price).max(model.cache_write_price.unwrap_or(model.input_price));
+    let input = u128::from(model.window).checked_mul(u128::from(rate))?;
+    let output = u128::from(model.output).checked_mul(u128::from(model.output_price))?;
+    let sum = input.checked_add(output)?;
+    let unit = u128::from(model.price_unit);
+    let rounded = sum.checked_div(unit)?.checked_add(u128::from(sum.checked_rem(unit)? != 0))?;
+    u64::try_from(rounded).ok()
+}
+
+/// Reserve turns and one completion more (domain/authority.md, 7).
+#[must_use]
+pub fn reserve_floor(policy: &RunPolicy) -> Option<u64> {
+    most_costly(&policy.model)?.checked_mul(u64::from(policy.reserve_turns).checked_add(1)?)
 }
