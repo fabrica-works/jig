@@ -193,6 +193,17 @@ ones before it in its session. Dependencies are by capability: "skein
   in any session's crate: written as its neighbours are, at most 5 lines
   per match, named in its commit body. It is no question. Tests for those
   arms only where the increment's Test shape names them.
+- **A small fix outside Files that the build or the gate needs is no
+  question** (decisions.md, ruling 114). An edit outside the increment's
+  Files is an implementation choice, named in its commit body, when the
+  increment's change, its Proof or the gate needs it, it is at most 20
+  lines, and it keeps every test's name and every assertion's expected
+  value; a fixture's or a test's inputs may change so that the test
+  checks the same behaviour under the new code. It may be in any
+  session's files, shared test files and the test roots included. This
+  replaces development.md, 8.2's "it is in your session's own files" for
+  this plan; expected values change only as ruling 108 says. Anything
+  else outside Files stays a question.
 
 ## Live services
 

@@ -355,6 +355,23 @@ the file.
      says ("The core's notes paging is not changed"). 13.4 also needs jig
      11.2's split families for its spend and party-proposal scopes; its
      Needs line now says so.
+114. **A small fix outside Files that the gate needs is no question**
+     (2026-10-12, the coordinator's block "jig 11.2: funding saturation
+     fixture outside Files", 2026-10-12T17:11:44Z). jig 11.2 frees a
+     funding slot, so `tests/tasks/tests/memory.rs`'s saturation fixture
+     needs a third live source before its refusal: three input lines, no
+     assertion changed. The sixth block in three hours on an edit outside
+     an increment's Files (rulings 104, 106, 107, 108, 112): the README's
+     Rules now make such a fix, at most 20 lines, keeping every test's
+     name and expected values, an implementation choice in any session's
+     files.
+115. **jig 12.1 proves forgetting through `Event::ForgetChat`**
+     (2026-10-12, the coordinator's block "jig 12.1: test-root SeenChat
+     route outside Files", 2026-10-12T17:11:44Z). The implementer's own
+     proposal: marking replies seen while the chat is live, then
+     forgetting it through the root's existing `ForgetChat`, proves the
+     index without `Now::SeenChat`, which the test root routes from jig
+     18.3 (its session file says so).
 
 ## For the user
 
