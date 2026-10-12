@@ -226,6 +226,22 @@ the file.
      code-organization.md, section 7 says so. skein 01.1 lands at up to
      360 lines. The 800-line file limit and the 40-line test function
      stay rules, which `plan pulse` checks.
+104. **`jig-protocol-charter` may link `smith-channel`** (2026-10-12, the
+     coordinator's block "jig 10.1: required smith-channel dependency
+     fails boundary rule", 2026-10-12T15:47:06Z). A plan defect: 10.1's
+     Files add `smith-channel` to the crate's `Cargo.toml`, and its Shape
+     decodes with `smith_channel::CallName::decode`; code-organization.md,
+     section 3 says "Only `jig-protocol-charter` and
+     `jig-protocol-transcript` link smith" and "later sessions add their
+     crates to them"; but jig 01.4's `smith_breaches`
+     (`tests/boundary/src/tests/graph.rs:408`) lists only
+     `smith-domain-run` and `smith-charter` for the crate. 10.1 adds
+     `smith-channel` to that list. Its "Don't" ("`tests/boundary`'s rule
+     for the crate stays as jig 01 leaves it") binds the rule on
+     `jig-domain-*` crates it names, not smith's list. From now to the
+     run's end, a dependency section 3 allows that `tests/boundary`'s
+     lists lack is added by the increment that adds it, as section 3 now
+     says.
 
 ## For the user
 

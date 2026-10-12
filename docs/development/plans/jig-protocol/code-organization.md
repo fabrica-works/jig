@@ -70,7 +70,10 @@ interface, the plan's "Don't" list and its size limits.
 ## 3. Who links what
 
 The rules `tests/boundary` checks (jig 01 writes them; later sessions add
-their crates to them):
+their crates to them). A dependency this section allows that
+`tests/boundary`'s lists lack is added to them by the increment that adds
+the dependency, at most 2 lines, named in its commit body; it is no
+question (decisions.md, ruling 104).
 
 - **The core and its children** (`jig-domain-*` but `jig-domain-host` and
   `jig-domain-client`) depend on no `jig-protocol-*` crate, no smith crate
