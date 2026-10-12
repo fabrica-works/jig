@@ -200,8 +200,7 @@ pub(crate) fn check(
             return Err(crate::Problem::new(Some(number), Refusal::Funding));
         }
         let mut after = match domain.funding.get(&destination) {
-            Some(pool) if !pool.closed => pool.numbers,
-            Some(_) => return Err(crate::Problem::new(Some(number), Refusal::Funding)),
+            Some(pool) => pool.numbers,
             None => Numbers { budget: pool_budget, spent: 0, spent_below: 0, reserved: 0 },
         };
         after.reserved = match after.reserved.checked_add(left) {
@@ -218,13 +217,15 @@ pub(crate) fn check(
     }
     let create_pool = domain.funding.get(&destination).is_none();
     let create_period = domain.funding.get(&period_source).is_none();
+    if create_pool && crate::funders::newer_period(domain, project, period) {
+        return Err(crate::Problem::new(Some(number), Refusal::Funding));
+    }
     if create_period && !create_pool {
         return Err(crate::Problem::new(Some(number), Refusal::Funding));
     }
     if create_pool {
         let period_numbers = match domain.funding.get(&period_source) {
-            Some(ledger) if !ledger.closed => ledger.numbers,
-            Some(_) => return Err(crate::Problem::new(Some(number), Refusal::Funding)),
+            Some(ledger) => ledger.numbers,
             None => {
                 for (funder, _) in &domain.funding {
                     match *funder {

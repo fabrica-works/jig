@@ -7,7 +7,7 @@ pub(super) fn put(
     task: tasks::Newest,
     object: tasks::UpdateObject,
 ) -> Option<()> {
-    w.byte(10)?;
+    w.byte(12)?;
     w.u64(party)?;
     w.u64(at.raw())?;
     w.u64(task.raw())?;

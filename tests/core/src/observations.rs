@@ -642,7 +642,9 @@ impl Observer {
                 root::Record::Core(core::Record::Tasks(tasks::Stored::Pool(value))) => {
                     snapshot.pools.insert(name(&value.pool), value.slots);
                 }
-                root::Record::Core(core::Record::Tasks(tasks::Stored::Ledger(value))) => {
+                root::Record::Core(core::Record::Tasks(
+                    tasks::Stored::Ledger(value) | tasks::Stored::ClosedLedger(value),
+                )) => {
                     snapshot.balances.push((
                         value.numbers.budget,
                         value.numbers.spent,

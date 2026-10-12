@@ -322,7 +322,9 @@ pub(crate) fn row_owner(row: &Row) -> Option<&tasks::TaskRecord> {
             | tasks::Stored::Ledger(_)
             | tasks::Stored::Writer(_)
             | tasks::Stored::Update(_)
-            | tasks::Stored::Pool(_),
+            | tasks::Stored::Pool(_)
+            | tasks::Stored::ClosedLedger(_)
+            | tasks::Stored::DecidedProposal(_),
         )
         | Record::Core(_)
         | Record::People(_)
@@ -332,8 +334,10 @@ pub(crate) fn row_owner(row: &Row) -> Option<&tasks::TaskRecord> {
 
 pub(crate) fn row_visible(core: &Core, party: u64, row: &Row) -> bool {
     match &row.value {
-        Record::Tasks(tasks::Stored::PersonProposal(proposal)) => core.people.role(party, proposal.project).is_some(),
-        Record::Tasks(tasks::Stored::Ledger(ledger)) => match ledger.funder {
+        Record::Tasks(tasks::Stored::PersonProposal(proposal) | tasks::Stored::DecidedProposal(proposal)) => {
+            core.people.role(party, proposal.project).is_some()
+        }
+        Record::Tasks(tasks::Stored::Ledger(ledger) | tasks::Stored::ClosedLedger(ledger)) => match ledger.funder {
             tasks::Funder::Period { project, .. } => core.people.role(party, project).is_some(),
             tasks::Funder::Pool { project, person, .. } => {
                 person == party && core.people.role(party, project).is_some()

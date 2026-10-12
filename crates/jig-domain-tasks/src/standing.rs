@@ -48,19 +48,20 @@ pub(crate) fn renew(domain: &mut Domain, env: &Env<Limits>, number: u64, period:
     {
         return;
     }
-    let Some(old_row) = domain.funding.get(&old) else { return };
+    if !domain.funding.contains_key(&old) {
+        return;
+    }
     let Some(new_row) = domain.funding.get(&fresh) else { return };
     let mut new_numbers = new_row.numbers;
     let Some(next_reserved) = new_numbers.reserved.checked_add(budget) else { return };
     new_numbers.reserved = next_reserved;
-    if old_row.closed || new_row.closed || crate::funders::available(new_numbers).is_none() {
+    if crate::funders::available(new_numbers).is_none() {
         return;
     }
     match source {
         Funder::Pool { .. } => {
             let Some(pool) = domain.funding.get(&source) else { return };
-            if pool.closed
-                || pool.parent != Some(old)
+            if pool.parent != Some(old)
                 || pool.numbers.budget.checked_sub(budget).is_none()
                 || pool.numbers.reserved.checked_sub(budget).is_none()
             {

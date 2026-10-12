@@ -976,12 +976,13 @@ impl World {
     /// Expense debited to the accepting person's finite pool.
     #[must_use]
     pub fn holder_spent(&self) -> u64 {
-        match self.store.rows.get(&root::Key::Core(core::Key::Tasks(tasks::Key::Ledger(tasks::Funder::Pool {
-            project: 1,
-            person: 1,
-            period: 1,
-        })))) {
-            Some(root::Record::Core(core::Record::Tasks(tasks::Stored::Ledger(row)))) => row.numbers.spent,
+        let funder = tasks::Funder::Pool { project: 1, person: 1, period: 1 };
+        let live = root::Key::Core(core::Key::Tasks(tasks::Key::Ledger(funder)));
+        let past = root::Key::Core(core::Key::Tasks(tasks::Key::ClosedLedger(funder)));
+        match self.store.rows.get(&live).or_else(|| self.store.rows.get(&past)) {
+            Some(root::Record::Core(core::Record::Tasks(
+                tasks::Stored::Ledger(row) | tasks::Stored::ClosedLedger(row),
+            ))) => row.numbers.spent,
             row => panic!("holder's stored balance: {row:?}"),
         }
     }

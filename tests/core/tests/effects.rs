@@ -207,6 +207,8 @@ fn retained_effect_core(seed: u64) -> (core::Core, core::Limits, core::CallKey) 
             | tasks::Stored::Ledger(_)
             | tasks::Stored::Update(_)
             | tasks::Stored::Pool(_)
+            | tasks::Stored::ClosedLedger(_)
+            | tasks::Stored::DecidedProposal(_)
             | tasks::Stored::Writer(_)),
         )) = row
         {

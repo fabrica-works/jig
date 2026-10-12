@@ -322,7 +322,7 @@ impl Core {
 /// Extract one immutable person-facing final decision from the child's durable row.
 pub(crate) fn decision_record(row: &tasks::Stored, at: skein_lib::Wall) -> Option<ProposalDecisionRecord> {
     match row {
-        tasks::Stored::PersonProposal(row) => {
+        tasks::Stored::PersonProposal(row) | tasks::Stored::DecidedProposal(row) => {
             let (by, choice) = match &row.state {
                 tasks::PersonProposalState::Accepted { by: tasks::Party::Person(by) } => {
                     (*by, people::ProposalChoice::Accepted)
@@ -383,6 +383,7 @@ pub(crate) fn decision_record(row: &tasks::Stored, at: skein_lib::Wall) -> Optio
         | tasks::Stored::Writer(_)
         | tasks::Stored::Update(_)
         | tasks::Stored::Pool(_)
+        | tasks::Stored::ClosedLedger(_)
         | tasks::Stored::Stub(_)
         | tasks::Stored::Activity(_)
         | tasks::Stored::Milestone(_) => None,

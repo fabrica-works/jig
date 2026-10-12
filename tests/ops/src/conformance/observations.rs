@@ -150,7 +150,7 @@ pub fn snapshot(store: &Store) -> r::Snapshot {
                     attempt,
                 ));
             }
-            root::Record::Core(core::Record::Tasks(tasks::Stored::Ledger(row))) => {
+            root::Record::Core(core::Record::Tasks(tasks::Stored::Ledger(row) | tasks::Stored::ClosedLedger(row))) => {
                 snapshot.balances.push((
                     row.numbers.budget,
                     row.numbers.spent,

@@ -15,6 +15,8 @@ fn lines(world: &World, task: u64) -> Vec<ActivityLine> {
             | Stored::Writer(_)
             | Stored::Update(_)
             | Stored::Pool(_)
+            | Stored::ClosedLedger(_)
+            | Stored::DecidedProposal(_)
             | Stored::Stub(_)
             | Stored::Milestone(_)
             | Stored::History(_)

@@ -326,7 +326,8 @@ pub(crate) fn decide_person(
         },
         ProposalDecision::Pass { .. } => unreachable!("person proposal has final policy holder"),
     };
-    out.push(Request::Save { record: Stored::PersonProposal(Box::new(proposal)) });
+    out.push(Request::Erase { key: crate::Key::PersonProposal(number) });
+    out.push(Request::Save { record: Stored::DecidedProposal(Box::new(proposal)) });
     out.push(Request::PersonProposalDecided { reply_to: to, proposer, number, outcome });
 }
 

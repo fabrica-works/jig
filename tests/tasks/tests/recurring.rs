@@ -45,7 +45,11 @@ fn a_recurring_task_continues_across_a_period_reset() {
     world.open_period(2, 100_000);
     batch(&mut world, 9, 2, 11);
     assert_eq!(world.record(9).recurring.as_ref().expect("template").last_period, 2);
-    assert!(world.records.contains_key(&tasks::Key::Ledger(Funder::Recurring { project: 1, task: 9, period: 1 })));
+    assert!(world.records.contains_key(&tasks::Key::ClosedLedger(Funder::Recurring {
+        project: 1,
+        task: 9,
+        period: 1
+    })));
     world.restart();
     assert_eq!(world.record(11).funder, Funder::Recurring { project: 1, task: 9, period: 2 });
     assert_eq!(world.record(9).recurring.as_ref().expect("template").last_batch.as_ref(), [11]);
@@ -121,8 +125,9 @@ fn a_standing_task_makes_delegates_across_many_periods_its_allotment_renewed_eac
     }
     for period in 1..5 {
         let old = Funder::Period { project: 1, period };
-        assert!(matches!(world.records.get(&Key::Ledger(old)),
-            Some(Stored::Ledger(row)) if row.closed && row.numbers.spent_below == 10));
+        assert!(
+            matches!(world.records.get(&Key::ClosedLedger(old)), Some(Stored::ClosedLedger(row)) if row.closed && row.numbers.spent_below == 10)
+        );
     }
     assert_eq!(world.record(9).recurring.as_ref().expect("standing template").last_period, 5);
 }
@@ -177,8 +182,9 @@ fn a_subscribed_procedure_renews_while_its_old_delegate_remains_live() {
         Cause::Priced { cumulative: 10 },
     );
     world.settle(21);
-    assert!(matches!(world.records.get(&Key::Ledger(Funder::Period { project: 1, period: 0 })),
-        Some(Stored::Ledger(row)) if row.closed && row.numbers.spent_below == 10));
+    assert!(
+        matches!(world.records.get(&Key::ClosedLedger(Funder::Period { project: 1, period: 0 })), Some(Stored::ClosedLedger(row)) if row.closed && row.numbers.spent_below == 10)
+    );
     world.open_period(2, 30);
     world.send(Event::RenewStanding { task: 20, period: 2 });
     assert_eq!(world.record(22).funder, Funder::Recurring { project: 1, task: 20, period: 1 });
@@ -206,8 +212,8 @@ fn a_persons_standing_procedure_renews_from_the_project_after_its_first_period()
     world.open_period(1, 30);
     world.send(Event::RenewStanding { task: 30, period: 1 });
     assert_eq!(world.record(30).funder, Funder::Period { project: 1, period: 1 });
-    assert!(matches!(world.records.get(&Key::Ledger(Funder::Pool { project: 1, person: 9, period: 0 })),
-        Some(Stored::Ledger(row)) if row.numbers.budget == 0 && row.numbers.reserved == 0));
+    assert!(matches!(world.records.get(&Key::ClosedLedger(Funder::Pool { project: 1, person: 9, period: 0 })),
+        Some(Stored::ClosedLedger(row)) if row.numbers.budget == 0 && row.numbers.reserved == 0));
     world.restart();
     assert_eq!(world.record(30).funder, Funder::Period { project: 1, period: 1 });
 }

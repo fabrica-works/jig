@@ -13,6 +13,8 @@ fn every_live_tasks_key_sorts_before_every_history_key() {
     ];
     let history = [
         Key::Ended(0),
+        Key::ClosedLedger(Funder::Task(0)),
+        Key::DecidedProposal(0),
         Key::History { task: 0, revision: 0 },
         Key::Milestone { task: 0, position: 0 },
         Key::Activity { task: 0, position: 0 },

@@ -27,6 +27,13 @@ fn current(rows: &BTreeMap<Key, Stored>, task: u64) -> Option<&TaskRecord> {
     })
 }
 
+fn funding(rows: &BTreeMap<Key, Stored>, funder: Funder) -> Option<&jig_domain_tasks::FundingRecord> {
+    match rows.get(&Key::Ledger(funder)).or_else(|| rows.get(&Key::ClosedLedger(funder))) {
+        Some(Stored::Ledger(row) | Stored::ClosedLedger(row)) => Some(row),
+        _ => None,
+    }
+}
+
 fn standing_reset(before: &TaskRecord, after: &TaskRecord, rows: &BTreeMap<Key, Stored>) -> Option<Funder> {
     let old_period = match before.funder {
         Funder::Period { project, period } | Funder::Pool { project, period, .. } => Funder::Period { project, period },
@@ -51,7 +58,7 @@ fn standing_reset(before: &TaskRecord, after: &TaskRecord, rows: &BTreeMap<Key, 
         return None;
     }
     let archived = Funder::Recurring { project, task: before.number, period };
-    let Some(Stored::Ledger(ledger)) = rows.get(&Key::Ledger(archived)) else { return None };
+    let ledger = funding(rows, archived)?;
     if ledger.parent != Some(old_period)
         || ledger.numbers.budget != before.numbers.budget
         || ledger.numbers.spent_below != before.numbers.spent + before.numbers.spent_below
@@ -156,14 +163,12 @@ impl Accounting {
     fn newly_retired_pools(&self, rows: &BTreeMap<Key, Stored>, period: Funder) -> u64 {
         rows.values()
             .filter_map(|row| {
-                let Stored::Ledger(new) = row else { return None };
+                let Stored::ClosedLedger(new) = row else { return None };
                 if new.parent != Some(period) || !new.closed {
                     return None;
                 }
-                match self.before.get(&Key::Ledger(new.funder)) {
-                    Some(Stored::Ledger(old)) if old.closed => return None,
-                    Some(Stored::Ledger(_)) | None => {}
-                    Some(_) => return None,
+                if self.before.contains_key(&Key::ClosedLedger(new.funder)) {
+                    return None;
                 }
                 new.numbers.spent.checked_add(new.numbers.spent_below)
             })
@@ -207,12 +212,21 @@ impl Accounting {
     pub fn committed(&mut self, rows: &BTreeMap<Key, Stored>, requests: &[Request]) -> Result<(), &'static str> {
         self.messages_and_holders(rows, requests)?;
         for (key, old) in &self.before {
-            if matches!(old, Stored::Ended(_) | Stored::Activity(_) | Stored::History(_) | Stored::Milestone(_))
-                && rows.get(key) != Some(old)
+            if matches!(
+                old,
+                Stored::Ended(_)
+                    | Stored::Activity(_)
+                    | Stored::History(_)
+                    | Stored::Milestone(_)
+                    | Stored::ClosedLedger(_)
+                    | Stored::DecidedProposal(_)
+            ) && rows.get(key) != Some(old)
             {
                 return Err("immutable accounting row changed");
             }
-            if matches!(old, Stored::Ledger(_)) && !rows.contains_key(key) {
+            if let Stored::Ledger(ledger) = old
+                && funding(rows, ledger.funder).is_none()
+            {
                 return Err("funding source vanished");
             }
         }
@@ -269,6 +283,8 @@ impl Accounting {
                             | Stored::Writer(_)
                             | Stored::Update(_)
                             | Stored::Pool(_)
+                            | Stored::ClosedLedger(_)
+                            | Stored::DecidedProposal(_)
                             | Stored::Ended(_)
                             | Stored::Stub(_)
                             | Stored::Ledger(_)
@@ -296,7 +312,13 @@ impl Accounting {
                         return Err("new allocation carries invented expense");
                     }
                 }
-                Stored::Ledger(ledger) => {
+                Stored::Ledger(ledger) | Stored::ClosedLedger(ledger) => {
+                    if ledger.closed != matches!(row, Stored::ClosedLedger(_))
+                        || (rows.contains_key(&Key::Ledger(ledger.funder))
+                            && rows.contains_key(&Key::ClosedLedger(ledger.funder)))
+                    {
+                        return Err("funding source is in the wrong history family");
+                    }
                     let reserved: u64 = rows
                         .values()
                         .filter_map(|row| match row {
@@ -308,6 +330,8 @@ impl Accounting {
                             | Stored::Writer(_)
                             | Stored::Update(_)
                             | Stored::Pool(_)
+                            | Stored::ClosedLedger(_)
+                            | Stored::DecidedProposal(_)
                             | Stored::Ended(_)
                             | Stored::Stub(_)
                             | Stored::Ledger(_)
@@ -318,13 +342,13 @@ impl Accounting {
                         })
                         .sum();
                     let posted = self.newly_settled(rows, ledger.funder);
-                    let before_posted = match self.before.get(key) {
-                        Some(Stored::Ledger(old)) => old.numbers.spent_below,
+                    let before_posted = match funding(&self.before, ledger.funder) {
+                        Some(old) => old.numbers.spent_below,
                         _ => 0,
                     };
                     let retired = self.newly_retired_pools(rows, ledger.funder);
                     let transferred = match ledger.funder {
-                        Funder::Recurring { task, .. } if !self.before.contains_key(key) => {
+                        Funder::Recurring { task, .. } if funding(&self.before, ledger.funder).is_none() => {
                             match (live(&self.before, task), live(rows, task)) {
                                 (Some(before), Some(after))
                                     if standing_reset(before, after, rows) == Some(ledger.funder) =>
@@ -342,7 +366,7 @@ impl Accounting {
                     {
                         return Err("external reservation or settlement posting differs");
                     }
-                    if let Some(Stored::Ledger(old)) = self.before.get(key)
+                    if let Some(old) = funding(&self.before, ledger.funder)
                         && (ledger.funder != old.funder
                             || ledger.parent != old.parent
                             || {
@@ -373,6 +397,7 @@ impl Accounting {
                 | Stored::Writer(_)
                 | Stored::Update(_)
                 | Stored::Pool(_)
+                | Stored::DecidedProposal(_)
                 | Stored::Stub(_)
                 | Stored::Activity(_)
                 | Stored::Milestone(_)

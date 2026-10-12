@@ -341,9 +341,7 @@ pub(super) fn project(core: &Core, limits: &Limits, party: u64, number: u32) -> 
     let mut current_number = 0;
     for (source, value) in core.tasks.funding_records() {
         match source {
-            tasks::Funder::Period { project, period }
-                if *project == number && *period > current_number && !value.closed =>
-            {
+            tasks::Funder::Period { project, period } if *project == number && *period > current_number => {
                 current_number = *period;
                 current_period = Some(ledger(value));
             }

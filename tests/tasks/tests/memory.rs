@@ -320,12 +320,14 @@ fn saturated_finite_sources_and_oversized_refusals_fit_without_input_copies() {
     let mut m = Measured::new(&l);
     m.bootstrap();
     let reply_to = m.to();
-    m.event(Event::OpenPeriod { reply_to, project: 1, period: 8, budget: 100 });
-    assert!(m.refused);
-    let reply_to = m.to();
     let mut new = task(1, &[]);
     new.funder = Funder::Pool { project: 1, person: 9, period: 7 };
     m.event(Event::Make { reply_to, creator: Party::Person(1), batch: Box::new([new]) });
+    let reply_to = m.to();
+    m.event(Event::OpenPeriod { reply_to, project: 1, period: 8, budget: 100 });
+    let reply_to = m.to();
+    m.event(Event::OpenPeriod { reply_to, project: 1, period: 9, budget: 100 });
+    assert!(m.refused);
     m.claim(1);
     let reply_to = m.to();
     m.event(Event::Activation {

@@ -46,7 +46,7 @@ pub(crate) fn charge_effect(
         Funder::Pool { .. } | Funder::Period { .. } | Funder::Recurring { .. } => {
             let ledger = domain.funding.get_mut(&funder).expect("effect source opened in this decision");
             assert!(
-                !ledger.closed && available(ledger.numbers).expect("valid effect source") >= maximum,
+                available(ledger.numbers).expect("valid effect source") >= maximum,
                 "root admitted the holder's effect price"
             );
             ledger.numbers.spent = ledger.numbers.spent.checked_add(maximum).expect("effect maximum fits source");
@@ -65,7 +65,7 @@ pub(crate) fn funded_live(domain: &Domain, funder: u64) -> bool {
     false
 }
 
-fn source_live(domain: &Domain, funder: Funder) -> bool {
+pub(crate) fn source_live(domain: &Domain, funder: Funder) -> bool {
     for (number, _) in &domain.names {
         let task = record(domain, *number).expect("live name");
         if task.funder == funder && task.recurring.is_some() {
@@ -140,7 +140,7 @@ pub(crate) fn can_reserve(
                 let Some(ledger) = domain.funding.get(&new.funder) else {
                     return false;
                 };
-                if project != new.project || ledger.closed {
+                if project != new.project {
                     return false;
                 }
                 let mut after = ledger.numbers;
@@ -197,8 +197,8 @@ pub(crate) fn can_resize(domain: &Domain, number: u64, budget: u64) -> bool {
         },
         Funder::Pool { .. } | Funder::Period { .. } | Funder::Recurring { .. } => {
             match domain.funding.get(&task.funder) {
-                Some(ledger) if !ledger.closed => ledger.numbers,
-                Some(_) | None => return false,
+                Some(ledger) => ledger.numbers,
+                None => return false,
             }
         }
     };
@@ -277,7 +277,7 @@ pub(crate) fn links(domain: &Domain, bound: u32) -> bool {
     for (funder, ledger) in &domain.funding {
         let mut reserved = 0_u64;
         for (_, other) in &domain.funding {
-            if other.parent == Some(*funder) && !other.closed {
+            if other.parent == Some(*funder) {
                 let Some(sum) = reserved.checked_add(other.numbers.budget) else {
                     return false;
                 };
@@ -287,9 +287,6 @@ pub(crate) fn links(domain: &Domain, bound: u32) -> bool {
         for (number, _) in &domain.names {
             let task = record(domain, *number).expect("live name");
             if task.funder == *funder {
-                if ledger.closed {
-                    return false;
-                }
                 let Some(sum) = reserved.checked_add(task.numbers.budget) else {
                     return false;
                 };
@@ -297,9 +294,6 @@ pub(crate) fn links(domain: &Domain, bound: u32) -> bool {
             }
         }
         if reserved != ledger.numbers.reserved {
-            return false;
-        }
-        if ledger.closed && ledger.numbers.reserved != 0 {
             return false;
         }
         if let Some(parent) = ledger.parent
@@ -475,7 +469,7 @@ pub(crate) fn carve(
         return refused(to, None, Refusal::Funding, out);
     };
     after.reserved = reserved;
-    if old.closed || newer_period(domain, project, period) || available(after).is_none() {
+    if newer_period(domain, project, period) || available(after).is_none() {
         return refused(to, None, Refusal::Funding, out);
     }
     if domain.funding.len() == domain.funding.capacity() {
@@ -529,7 +523,7 @@ pub(crate) fn resize_pool(
     let Some(period_record) = domain.funding.get(&parent).copied() else {
         return refused(to, None, Refusal::Funding, out);
     };
-    if pool.closed || period_record.closed || pool.parent != Some(parent) || newer_period(domain, project, period) {
+    if pool.parent != Some(parent) || newer_period(domain, project, period) {
         return refused(to, None, Refusal::Funding, out);
     }
     let mut next_pool = pool.numbers;
@@ -573,7 +567,7 @@ pub(crate) fn carve_recurring(
     let mut after = old.numbers;
     let Some(reserved) = after.reserved.checked_add(budget) else { return false };
     after.reserved = reserved;
-    if old.closed || newer_period(domain, project, period) || available(after).is_none() {
+    if newer_period(domain, project, period) || available(after).is_none() {
         return false;
     }
     let record = FundingRecord {
@@ -596,7 +590,7 @@ pub(crate) fn restore_funding(domain: &mut Domain, ledger: FundingRecord) -> boo
         || domain.funding.len() == domain.funding.capacity()
         || total(ledger.numbers).is_none()
         || available(ledger.numbers).is_none()
-        || (ledger.closed && ledger.numbers.reserved != 0)
+        || ledger.closed
         || ledger.numbers.spent != 0
         || ledger.made > domain.names.capacity()
     {
@@ -604,9 +598,7 @@ pub(crate) fn restore_funding(domain: &mut Domain, ledger: FundingRecord) -> boo
     }
     let valid = match ledger.funder {
         Funder::Task(_) => false,
-        Funder::Period { .. } => {
-            ledger.period.is_some() && ledger.parent.is_none() && (!ledger.closed || ledger.numbers.reserved == 0)
-        }
+        Funder::Period { .. } => ledger.period.is_some() && ledger.parent.is_none(),
         Funder::Pool { project, period, .. } | Funder::Recurring { project, period, .. } => {
             ledger.period.is_none() && ledger.parent == Some(Funder::Period { project, period })
         }
@@ -618,7 +610,7 @@ pub(crate) fn restore_funding(domain: &mut Domain, ledger: FundingRecord) -> boo
     true
 }
 
-fn newer_period(domain: &Domain, project: u32, period: u64) -> bool {
+pub(crate) fn newer_period(domain: &Domain, project: u32, period: u64) -> bool {
     for (funder, _) in &domain.funding {
         match *funder {
             Funder::Period { project: other, period: next } if other == project && next > period => return true,
@@ -628,62 +620,7 @@ fn newer_period(domain: &Domain, project: u32, period: u64) -> bool {
     false
 }
 
-// The closed rows remain durable history. Their counters do not move again.
-// The pool posts its expense once and returns its original allotment to its period.
-pub(crate) fn retire(domain: &mut Domain, out: &mut Queue<Request>) {
-    let count = domain.funding.len();
-    for _ in 0..count {
-        let mut ready = None;
-        for (funder, row) in &domain.funding {
-            let period = match *funder {
-                Funder::Pool { project, period, .. } | Funder::Recurring { project, period, .. } => {
-                    Some((project, period))
-                }
-                Funder::Task(_) | Funder::Period { .. } => None,
-            };
-            if let Some((project, period)) = period
-                && !row.closed
-                && row.numbers.reserved == 0
-                && newer_period(domain, project, period)
-            {
-                ready = Some((*funder, row.parent.expect("allotment's period"), row.numbers));
-                break;
-            }
-        }
-        let Some((pool, parent, numbers)) = ready else { break };
-        let period = domain.funding.get_mut(&parent).expect("original period kept");
-        period.numbers.reserved = period.numbers.reserved.checked_sub(numbers.budget).expect("pool reserved");
-        period.numbers.spent_below = period
-            .numbers
-            .spent_below
-            .checked_add(total(numbers).expect("valid pool"))
-            .expect("pool spend representable");
-        domain.funding.get_mut(&pool).expect("pool kept").closed = true;
-        save_funding(domain, pool, out);
-        save_funding(domain, parent, out);
-    }
-    let count = domain.funding.len();
-    for _ in 0..count {
-        let mut ready = None;
-        for (funder, row) in &domain.funding {
-            match *funder {
-                Funder::Period { project, period }
-                    if !row.closed
-                        && row.numbers.reserved == 0
-                        && newer_period(domain, project, period)
-                        && !source_live(domain, *funder) =>
-                {
-                    ready = Some(*funder);
-                    break;
-                }
-                Funder::Period { .. } | Funder::Task(_) | Funder::Pool { .. } | Funder::Recurring { .. } => {}
-            }
-        }
-        let Some(period) = ready else { break };
-        domain.funding.get_mut(&period).expect("period kept").closed = true;
-        save_funding(domain, period, out);
-    }
-}
+pub(crate) use crate::retire::retire;
 
 // The final period will eventually receive every still-open aggregate under
 // it. Counting each live node's own/closed spend once bounds every intermediate
@@ -728,7 +665,7 @@ pub(crate) fn representable(domain: &Domain, number: u64, delta: u64) -> bool {
         return false;
     };
     for (_, pool) in &domain.funding {
-        if pool.parent == Some(period) && !pool.closed {
+        if pool.parent == Some(period) {
             let Some(spent) = total(pool.numbers) else {
                 return false;
             };

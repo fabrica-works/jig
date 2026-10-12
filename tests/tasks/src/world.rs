@@ -758,6 +758,8 @@ impl World {
                 Stored::Ended(_)
                 | Stored::Stub(_)
                 | Stored::Ledger(_)
+                | Stored::ClosedLedger(_)
+                | Stored::DecidedProposal(_)
                 | Stored::Activity(_)
                 | Stored::Milestone(_)
                 | Stored::History(_)
@@ -788,6 +790,8 @@ impl World {
             | Stored::Writer(_)
             | Stored::Update(_)
             | Stored::Pool(_)
+            | Stored::ClosedLedger(_)
+            | Stored::DecidedProposal(_)
             | Stored::Stub(_)
             | Stored::Ledger(_)
             | Stored::Activity(_)
@@ -814,6 +818,8 @@ impl World {
                 Key::Live(_)
                 | Key::Writer(_)
                 | Key::Pool(_)
+                | Key::ClosedLedger(_)
+                | Key::DecidedProposal(_)
                 | Key::Ended(_)
                 | Key::Stub(_)
                 | Key::Ledger(_)
@@ -882,6 +888,8 @@ impl World {
                 | Stored::Writer(_)
                 | Stored::Update(_)
                 | Stored::Pool(_)
+                | Stored::ClosedLedger(_)
+                | Stored::DecidedProposal(_)
                 | Stored::Stub(_)
                 | Stored::Activity(_)
                 | Stored::Milestone(_)
@@ -1146,6 +1154,8 @@ fn live_row(record: &Stored) -> Option<&jig_domain_tasks::TaskRecord> {
         | Stored::History(_)
         | Stored::Milestone(_)
         | Stored::Activity(_)
-        | Stored::Update(_) => None,
+        | Stored::Update(_)
+        | Stored::ClosedLedger(_)
+        | Stored::DecidedProposal(_) => None,
     }
 }

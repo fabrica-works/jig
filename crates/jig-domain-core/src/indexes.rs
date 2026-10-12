@@ -51,7 +51,9 @@ pub(crate) fn save(core: &Core, record: &tasks::Stored, out: &mut Queue<Request>
         | tasks::Stored::Stub(_)
         | tasks::Stored::Ledger(_)
         | tasks::Stored::Writer(_)
-        | tasks::Stored::Pool(_) => None,
+        | tasks::Stored::Pool(_)
+        | tasks::Stored::ClosedLedger(_)
+        | tasks::Stored::DecidedProposal(_) => None,
     };
     if let Some(update) = update {
         out.push(Request::Write(Write::Save(Record::Tasks(tasks::Stored::Update(update)))));

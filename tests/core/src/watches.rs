@@ -215,7 +215,9 @@ impl Parties {
                 ))) => {
                     self.task_projects.insert(row.number, row.project);
                 }
-                root::Write::Save(root::Record::Core(core::Record::Tasks(tasks::Stored::PersonProposal(row)))) => {
+                root::Write::Save(root::Record::Core(core::Record::Tasks(
+                    tasks::Stored::PersonProposal(row) | tasks::Stored::DecidedProposal(row),
+                ))) => {
                     self.proposal_projects.insert(row.number, row.project);
                 }
                 root::Write::Save(_) | root::Write::Erase(_) => {}
@@ -239,7 +241,7 @@ impl Parties {
                             tasks::Party::Task(_) | tasks::Party::Deployment { .. } => false,
                         }
                 }
-                root::Write::Save(root::Record::Core(core::Record::Tasks(tasks::Stored::PersonProposal(row)))) => {
+                root::Write::Save(root::Record::Core(core::Record::Tasks(tasks::Stored::PersonProposal(row) | tasks::Stored::DecidedProposal(row)))) => {
                     project_subject(&consumer.subject, row.project, &self.task_projects, &self.proposal_projects)
                         || party_subject(&consumer.subject, row.proposer)
                         || self.projects.iter().any(|(party, projects)| {
@@ -263,7 +265,7 @@ impl Parties {
                 }
                 root::Write::Save(root::Record::Core(core::Record::People(people::Stored::Policy { project, .. }))) =>
                     project_subject(&consumer.subject, *project, &self.task_projects, &self.proposal_projects),
-                root::Write::Save(root::Record::Core(core::Record::Tasks(tasks::Stored::Ledger(row)))) => match row.funder {
+                root::Write::Save(root::Record::Core(core::Record::Tasks(tasks::Stored::Ledger(row) | tasks::Stored::ClosedLedger(row)))) => match row.funder {
                     tasks::Funder::Pool { project, .. } | tasks::Funder::Period { project, .. } | tasks::Funder::Recurring { project, .. } =>
                         project_subject(&consumer.subject, project, &self.task_projects, &self.proposal_projects),
                     tasks::Funder::Task(_) => false,

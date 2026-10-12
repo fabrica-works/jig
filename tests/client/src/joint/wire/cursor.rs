@@ -793,7 +793,7 @@ fn put_task_key(w: &mut Writer, value: &tasks::Key) -> Option<()> {
     match value {
         tasks::Key::Update { party, at, task, object } => index::put(w, *party, *at, *task, *object)?,
         tasks::Key::Activity { task, position } => {
-            w.byte(9)?;
+            w.byte(11)?;
             w.u64(*task)?;
             w.u64(*position)?;
         }
@@ -802,17 +802,25 @@ fn put_task_key(w: &mut Writer, value: &tasks::Key) -> Option<()> {
             w.u64(*value)?;
         }
         tasks::Key::History { task, revision } => {
-            w.byte(7)?;
+            w.byte(9)?;
             w.u64(*task)?;
             w.u64(*revision)?;
         }
         tasks::Key::Milestone { task, position } => {
-            w.byte(8)?;
+            w.byte(10)?;
             w.u64(*task)?;
             w.u64(*position)?;
         }
         tasks::Key::Live(value) => {
             w.byte(0)?;
+            w.u64(*value)?;
+        }
+        tasks::Key::ClosedLedger(value) => {
+            w.byte(7)?;
+            put_funder(w, value)?;
+        }
+        tasks::Key::DecidedProposal(value) => {
+            w.byte(8)?;
             w.u64(*value)?;
         }
         tasks::Key::Ended(value) => {
@@ -840,13 +848,15 @@ fn put_task_key(w: &mut Writer, value: &tasks::Key) -> Option<()> {
 }
 fn take_task_key(r: &mut Reader<'_>) -> Option<tasks::Key> {
     Some(match r.byte()? {
-        10 => index::take(r)?,
-        9 => tasks::Key::Activity { task: r.u64()?, position: r.u64()? },
+        12 => index::take(r)?,
+        11 => tasks::Key::Activity { task: r.u64()?, position: r.u64()? },
         5 => tasks::Key::PersonProposal(r.u64()?),
-        7 => tasks::Key::History { task: r.u64()?, revision: r.u64()? },
-        8 => tasks::Key::Milestone { task: r.u64()?, position: r.u64()? },
+        9 => tasks::Key::History { task: r.u64()?, revision: r.u64()? },
+        10 => tasks::Key::Milestone { task: r.u64()?, position: r.u64()? },
         0 => tasks::Key::Live(r.u64()?),
         6 => tasks::Key::Ended(r.u64()?),
+        7 => tasks::Key::ClosedLedger(take_funder(r)?),
+        8 => tasks::Key::DecidedProposal(r.u64()?),
         1 => tasks::Key::Stub(r.u64()?),
         2 => tasks::Key::Ledger(take_funder(r)?),
         3 => tasks::Key::Writer(r.u64()?),

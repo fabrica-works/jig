@@ -64,3 +64,55 @@ fn cold_restore_refuses_a_period_without_its_actual_opening_fact() {
         assert!(refused);
     }
 }
+
+#[test]
+fn a_closed_period_leaves_memory_and_saves_under_closed_ledger() {
+    let mut test = Harness::new();
+    let old = Funder::Period { project: 1, period: 0 };
+    let out = test.send(Event::OpenPeriod { reply_to: to(), project: 1, period: 1, budget: 100 });
+    assert!(test.domain.funding(old).is_none());
+    assert!(!test.stored.contains_key(&crate::Key::Ledger(old)));
+    let mut erased = false;
+    for request in out {
+        if let Request::Erase { key: crate::Key::Ledger(source) } = request {
+            erased |= source == old;
+        }
+    }
+    assert!(erased);
+    let Some(Stored::ClosedLedger(row)) = test.stored.get(&crate::Key::ClosedLedger(old)) else {
+        panic!("the closed period is history")
+    };
+    assert!(row.closed);
+    assert_eq!(row.funder, old);
+}
+
+#[test]
+fn a_restored_closed_ledger_refuses_the_start() {
+    let test = Harness::new();
+    let mut row = *test.domain.funding(Funder::Period { project: 1, period: 0 }).unwrap();
+    row.closed = true;
+    let mut domain = Domain::new(&LIMITS, 91, Box::new([1]));
+    let mut out = Queue::with_capacity(max_out(&LIMITS));
+    step(&mut domain, &test.env, Event::Restore { record: Stored::ClosedLedger(row) }, &mut out);
+    let mut refused = false;
+    while let Some(request) = out.pop() {
+        if let Request::RestoreRefused { .. } = request {
+            refused = true;
+        }
+    }
+    assert!(refused);
+    assert!(!domain.ready());
+}
+
+#[test]
+fn the_newest_period_stays_live_after_its_pools_close() {
+    let mut test = Harness::new();
+    let pool = Funder::Pool { project: 1, person: 9, period: 0 };
+    test.send(Event::CarvePool { reply_to: to(), project: 1, person: 9, period: 0, budget: 40 });
+    test.send(Event::OpenPeriod { reply_to: to(), project: 1, period: 1, budget: 100 });
+    assert!(test.domain.funding(pool).is_none());
+    assert!(test.stored.contains_key(&crate::Key::ClosedLedger(pool)));
+    let newest = test.domain.funding(Funder::Period { project: 1, period: 1 }).unwrap();
+    assert!(!newest.closed);
+    assert_eq!(newest.numbers.reserved, 0);
+}

@@ -27,13 +27,19 @@ fn end(world: &mut World, task: u64, attempt: u64, end: End, cumulative: u64) ->
 }
 
 fn ledger(world: &World, funder: Funder) -> tasks::FundingRecord {
-    match world.records[&Key::Ledger(funder)] {
-        Stored::Ledger(record) => record,
+    match *world
+        .records
+        .get(&Key::Ledger(funder))
+        .or_else(|| world.records.get(&Key::ClosedLedger(funder)))
+        .expect("durable source")
+    {
+        Stored::Ledger(record) | Stored::ClosedLedger(record) => record,
         Stored::Live(_)
         | Stored::Ended(_)
         | Stored::Writer(_)
         | Stored::Update(_)
         | Stored::Pool(_)
+        | Stored::DecidedProposal(_)
         | Stored::Stub(_)
         | Stored::Activity(_)
         | Stored::Milestone(_)

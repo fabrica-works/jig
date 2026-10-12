@@ -89,6 +89,7 @@ mod procedure;
 mod proposals;
 mod recurring;
 mod refs;
+mod retire;
 mod run;
 mod runtime;
 mod standing;

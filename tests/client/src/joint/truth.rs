@@ -104,7 +104,7 @@ fn facts(rows: &BTreeMap<root::Key, root::Record>) -> (BTreeSet<CardKey>, WordIm
                 tasks::Stored::Ended(task) => {
                     ended.insert(task.number);
                 }
-                tasks::Stored::PersonProposal(proposal) => {
+                tasks::Stored::PersonProposal(proposal) | tasks::Stored::DecidedProposal(proposal) => {
                     if matches!(proposal.state, tasks::PersonProposalState::Pending { .. }) {
                         waiting.insert(crate::observe::key(ObjectKey::Proposal(ProposalKey {
                             proposer: Proposer::Party(proposal.proposer),
@@ -128,7 +128,8 @@ fn facts(rows: &BTreeMap<root::Key, root::Record>) -> (BTreeSet<CardKey>, WordIm
                 | tasks::Stored::Ledger(_)
                 | tasks::Stored::Writer(_)
                 | tasks::Stored::Update(_)
-                | tasks::Stored::Pool(_) => {}
+                | tasks::Stored::Pool(_)
+                | tasks::Stored::ClosedLedger(_) => {}
             }
         }
     }

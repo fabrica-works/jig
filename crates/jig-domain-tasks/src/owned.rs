@@ -26,7 +26,7 @@ pub fn stored_bytes(record: &Stored) -> Option<u64> {
             | crate::Line::Turn { .. } => Some(0),
         },
         Stored::Milestone(row) => phase_bytes(&row.phase),
-        Stored::PersonProposal(row) => {
+        Stored::PersonProposal(row) | Stored::DecidedProposal(row) => {
             let mut total = bytes(size_of::<crate::PersonProposal>())?
                 .checked_add(spec_bytes(&row.goal.spec)?)?
                 .checked_add(authority_bytes(&row.goal.authority)?)?
@@ -54,7 +54,7 @@ pub fn stored_bytes(record: &Stored) -> Option<u64> {
             Some(total)
         }
         Stored::Live(task) | Stored::Ended(task) => task_bytes(task),
-        Stored::Update(_) | Stored::Stub(_) | Stored::Ledger(_) => Some(0),
+        Stored::Update(_) | Stored::Stub(_) | Stored::Ledger(_) | Stored::ClosedLedger(_) => Some(0),
         Stored::Writer(slot) => {
             let mut total = bytes(size_of_val(&*slot.resource.path))?;
             for segment in &slot.resource.path {

@@ -432,8 +432,8 @@ fn funding(core: &Core, source: tasks::Funder, needed: u64) -> FundingOffer {
         },
         tasks::Funder::Pool { .. } | tasks::Funder::Period { .. } | tasks::Funder::Recurring { .. } => {
             match core.tasks.funding(source) {
-                Some(row) if !row.closed => Some(row.numbers),
-                Some(_) | None => None,
+                Some(row) => Some(row.numbers),
+                None => None,
             }
         }
     };

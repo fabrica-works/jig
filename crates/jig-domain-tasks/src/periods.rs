@@ -28,7 +28,7 @@ pub(crate) fn observe(domain: &mut Domain, project: u32, period: u64, next: Opti
     let Some(times) = &mut row.period else {
         return;
     };
-    if row.closed || times.next == next {
+    if times.next == next {
         return;
     }
     times.next = next;

@@ -42,6 +42,9 @@ fn restored_core(configured: u64, rows: &[tasks::FundingRecord]) -> (Core, Limit
     let mut out = Queue::with_capacity(tasks::max_out(&limits.tasks));
     let env = Env { now: Time::ZERO, wall: Wall::from_nanos(9999), limits: limits.tasks };
     for row in rows {
+        if row.closed {
+            continue;
+        }
         tasks::step(&mut core.tasks, &env, tasks::Event::Restore { record: tasks::Stored::Ledger(*row) }, &mut out);
         assert_eq!(out.pop(), None, "each source ledger is admitted at restore");
     }
@@ -61,14 +64,7 @@ fn project_pool_target_keeps_configured_zero_distinct_from_the_observed_period_a
     assert_eq!(value.current_period.unwrap().began, Some(Wall::EPOCH));
     assert_eq!(value.current_period.unwrap().next, Some(Wall::EPOCH));
     assert_eq!(value.pools.get(0).unwrap().source, observed.funder);
-    let target = value.configured_pools.get(0).unwrap();
-    assert_eq!(target.source, closed.funder);
-    assert_eq!(target.parent, closed.parent);
-    assert_eq!(target.numbers, closed.numbers);
-    assert_eq!(target.left, 170);
-    assert!(target.closed);
-    assert_eq!(target.began, None);
-    assert_eq!(target.next, None);
+    assert_eq!(value.configured_pools.len(), 0);
     assert!(!value.configured_pools_cut);
 }
 
@@ -94,13 +90,14 @@ fn project_configured_target_absence_and_full_width_period_do_not_borrow_an_obse
 #[test]
 fn project_configured_pools_keep_source_order_and_report_their_loss_independently() {
     let rows = [
-        period(1, 0, 40, false),
+        period(1, 0, 53, false),
         pool(1, u64::MAX, 0, 23, false),
         pool(1, 1, 0, 19, true),
         pool(1, 7, 0, 17, false),
         period(1, 9, 0, false),
         period(2, 0, 31, false),
         pool(2, 1, 0, 31, false),
+        pool(1, 5, 0, 13, false),
     ];
     let (mut core, mut limits) = restored_core(0, &rows);
     core.permission_roles.insert(1, Box::new([])).unwrap();
@@ -109,7 +106,10 @@ fn project_configured_pools_keep_source_order_and_report_their_loss_independentl
     assert_eq!(complete.configured_pools.len(), 3);
     assert_eq!(complete.configured_pools.capacity(), 3);
     assert!(!complete.configured_pools_cut);
-    let expected = [rows[2], rows[3], rows[1]];
+    for row in &complete.configured_pools {
+        assert_ne!(row.source, rows[2].funder);
+    }
+    let expected = [rows[7], rows[3], rows[1]];
     for (actual, expected) in complete.configured_pools.iter().zip(expected) {
         assert_eq!(actual.source, expected.funder);
         assert_eq!(actual.numbers, expected.numbers);

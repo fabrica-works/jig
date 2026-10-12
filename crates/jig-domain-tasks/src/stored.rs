@@ -721,7 +721,9 @@ pub(crate) fn restore(domain: &mut Domain, env: &Env<Limits>, stored: Stored, ou
                     let inserted = domain.person_proposals.insert(row.number, *row);
                     assert!(inserted == Ok(None), "restored person proposal admitted");
                 }
-                crate::PersonProposalState::Accepted { .. } | crate::PersonProposalState::Rejected { .. } => {}
+                crate::PersonProposalState::Accepted { .. } | crate::PersonProposalState::Rejected { .. } => {
+                    failed(domain, None, Refusal::Restore, out);
+                }
             }
         }
         Stored::Live(task) => {
@@ -772,6 +774,7 @@ pub(crate) fn restore(domain: &mut Domain, env: &Env<Limits>, stored: Stored, ou
         // Historical ended rows stay outside the live arena;
         // they cannot accidentally return an ended task to the live arena.
         Stored::Update(row) => failed(domain, Some(row.task), Refusal::Restore, out),
+        Stored::DecidedProposal(_) | Stored::ClosedLedger(_) => failed(domain, None, Refusal::Restore, out),
         Stored::Ended(task) => failed(domain, Some(task.number), Refusal::Restore, out),
         Stored::Milestone(row) => failed(domain, Some(row.task), Refusal::Restore, out),
         Stored::History(row) => failed(domain, Some(row.task), Refusal::Restore, out),

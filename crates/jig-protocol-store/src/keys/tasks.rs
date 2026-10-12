@@ -31,23 +31,31 @@ pub(super) fn write(writer: &mut KeyWriter, key: &Key) {
             writer.tag(6);
             writer.u64(*task);
         }
-        Key::History { task, revision } => {
+        Key::ClosedLedger(value) => {
             writer.tag(7);
+            funder(writer, value);
+        }
+        Key::DecidedProposal(proposal) => {
+            writer.tag(8);
+            writer.u64(*proposal);
+        }
+        Key::History { task, revision } => {
+            writer.tag(9);
             writer.u64(*task);
             writer.u64(*revision);
         }
         Key::Milestone { task, position } => {
-            writer.tag(8);
+            writer.tag(10);
             writer.u64(*task);
             writer.u64(*position);
         }
         Key::Activity { task, position } => {
-            writer.tag(9);
+            writer.tag(11);
             writer.u64(*task);
             writer.u64(*position);
         }
         Key::Update { party, at, task, object } => {
-            writer.tag(10);
+            writer.tag(12);
             writer.u64(*party);
             writer.u64(at.raw());
             writer.u64(task.raw());
@@ -73,10 +81,12 @@ pub(super) fn read(reader: &mut KeyReader<'_>) -> Option<Key> {
         4 => Key::Pool(reader.u64()?),
         5 => Key::PersonProposal(reader.u64()?),
         6 => Key::Ended(reader.u64()?),
-        7 => Key::History { task: reader.u64()?, revision: reader.u64()? },
-        8 => Key::Milestone { task: reader.u64()?, position: reader.u64()? },
-        9 => Key::Activity { task: reader.u64()?, position: reader.u64()? },
-        10 => Key::Update {
+        7 => Key::ClosedLedger(read_funder(reader)?),
+        8 => Key::DecidedProposal(reader.u64()?),
+        9 => Key::History { task: reader.u64()?, revision: reader.u64()? },
+        10 => Key::Milestone { task: reader.u64()?, position: reader.u64()? },
+        11 => Key::Activity { task: reader.u64()?, position: reader.u64()? },
+        12 => Key::Update {
             party: reader.u64()?,
             at: Newest::from_raw(reader.u64()?),
             task: Newest::from_raw(reader.u64()?),

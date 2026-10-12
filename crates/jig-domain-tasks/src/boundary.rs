@@ -990,6 +990,10 @@ pub enum Key {
     PersonProposal(u64),
     /// Logical historical ended-task row.
     Ended(u64),
+    /// A closed funding source retained for spend pages.
+    ClosedLedger(Funder),
+    /// A decided person-origin proposal.
+    DecidedProposal(u64),
     /// Immutable plan change outside the live arena.
     History { task: u64, revision: u64 },
     /// One immutable lifecycle milestone in a task's history.
@@ -1012,6 +1016,8 @@ impl Key {
             | Self::Pool(_)
             | Self::PersonProposal(_) => true,
             Self::Ended(_)
+            | Self::ClosedLedger(_)
+            | Self::DecidedProposal(_)
             | Self::History { .. }
             | Self::Milestone { .. }
             | Self::Activity { .. }
@@ -1030,8 +1036,12 @@ pub enum Stored {
     Activity(crate::ActivityLine),
     /// One immutable lifecycle milestone, loaded on demand.
     Milestone(crate::Milestone),
-    /// Pending or decided person-origin goal proposal.
+    /// Pending person-origin goal proposal.
     PersonProposal(Box<crate::PersonProposal>),
+    /// A decided person-origin goal proposal, loaded on demand.
+    DecidedProposal(Box<crate::PersonProposal>),
+    /// A closed funding source, loaded on demand.
+    ClosedLedger(crate::FundingRecord),
     /// Committed change read on demand, never restored as live state.
     History(crate::History),
     /// Current bounded live task state, emitted on mutation and admitted once at startup.
@@ -1067,6 +1077,8 @@ impl Stored {
         match self {
             Stored::Update(row) => row.key(),
             Stored::PersonProposal(row) => Key::PersonProposal(row.number),
+            Stored::DecidedProposal(row) => Key::DecidedProposal(row.number),
+            Stored::ClosedLedger(row) => Key::ClosedLedger(row.funder),
             Stored::History(row) => Key::History { task: row.task, revision: row.revision },
             Stored::Activity(row) => Key::Activity { task: row.task, position: row.position },
             Stored::Milestone(row) => Key::Milestone { task: row.task, position: row.position },

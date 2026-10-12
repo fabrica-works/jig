@@ -413,7 +413,9 @@ pub fn restore_key(key: &crate::Key) -> bool {
             | tasks::Key::Ledger(_)
             | tasks::Key::Writer(_)
             | tasks::Key::Update { .. }
-            | tasks::Key::Pool(_),
+            | tasks::Key::Pool(_)
+            | tasks::Key::ClosedLedger(_)
+            | tasks::Key::DecidedProposal(_),
         )
         | crate::Key::Core(_)
         | crate::Key::People(_)
@@ -487,7 +489,9 @@ impl Core {
             | tasks::Stored::Ledger(_)
             | tasks::Stored::Writer(_)
             | tasks::Stored::Update(_)
-            | tasks::Stored::Pool(_) => return true,
+            | tasks::Stored::Pool(_)
+            | tasks::Stored::ClosedLedger(_)
+            | tasks::Stored::DecidedProposal(_) => return true,
         };
         people::step(&mut self.people, &env, people::Event::Waiting { task, entries }, &mut out);
         out.is_empty()

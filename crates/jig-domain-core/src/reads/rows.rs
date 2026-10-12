@@ -582,7 +582,7 @@ fn object(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Optio
                     None => None,
                 })
             }
-            Record::Tasks(tasks::Stored::PersonProposal(value)) => {
+            Record::Tasks(tasks::Stored::PersonProposal(value) | tasks::Stored::DecidedProposal(value)) => {
                 if *proposer != Proposer::Party(value.proposer) || value.number != *proposal {
                     return Ok(None);
                 }
@@ -629,7 +629,8 @@ fn object(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Optio
                 | tasks::Stored::Ledger(_)
                 | tasks::Stored::Writer(_)
                 | tasks::Stored::Update(_)
-                | tasks::Stored::Pool(_),
+                | tasks::Stored::Pool(_)
+                | tasks::Stored::ClosedLedger(_),
             )
             | Record::Core(_)
             | Record::People(_)
@@ -832,7 +833,9 @@ fn page_row(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Opt
                     | tasks::Stored::Ledger(_)
                     | tasks::Stored::Writer(_)
                     | tasks::Stored::Update(_)
-                    | tasks::Stored::Pool(_),
+                    | tasks::Stored::Pool(_)
+                    | tasks::Stored::ClosedLedger(_)
+                    | tasks::Stored::DecidedProposal(_),
                 )
                 | Record::Core(_)
                 | Record::People(_)
@@ -998,7 +1001,7 @@ fn inbox_selection_row(limits: &Limits, row: &Row) -> Result<Option<documents::I
         return Ok(None);
     };
     let task = match &row.value {
-        Record::Tasks(tasks::Stored::PersonProposal(proposal)) => {
+        Record::Tasks(tasks::Stored::PersonProposal(proposal) | tasks::Stored::DecidedProposal(proposal)) => {
             let context = documents::inbox_selection_from_ancestry(limits, proposal.goal.number, cursor, &[])?;
             return Ok(Some(context));
         }
@@ -1012,7 +1015,8 @@ fn inbox_selection_row(limits: &Limits, row: &Row) -> Result<Option<documents::I
             | tasks::Stored::Ledger(_)
             | tasks::Stored::Writer(_)
             | tasks::Stored::Update(_)
-            | tasks::Stored::Pool(_),
+            | tasks::Stored::Pool(_)
+            | tasks::Stored::ClosedLedger(_),
         )
         | Record::Core(_)
         | Record::People(_)
@@ -1042,7 +1046,7 @@ fn inbox_row(
         Some(documents::Cursor::Inbox { .. } | documents::Cursor::Number { .. }) | None => {}
     }
     match &row.value {
-        Record::Tasks(tasks::Stored::PersonProposal(proposal)) => {
+        Record::Tasks(tasks::Stored::PersonProposal(proposal) | tasks::Stored::DecidedProposal(proposal)) => {
             return person_proposal_need(core, limits, party, group, filter, &row, proposal);
         }
         Record::Tasks(
@@ -1055,7 +1059,8 @@ fn inbox_row(
             | tasks::Stored::Ledger(_)
             | tasks::Stored::Writer(_)
             | tasks::Stored::Update(_)
-            | tasks::Stored::Pool(_),
+            | tasks::Stored::Pool(_)
+            | tasks::Stored::ClosedLedger(_),
         )
         | Record::Core(_)
         | Record::People(_)
@@ -1293,7 +1298,9 @@ fn milestone_record(record: &Record) -> Option<&tasks::Milestone> {
             | tasks::Stored::Ledger(_)
             | tasks::Stored::Writer(_)
             | tasks::Stored::Update(_)
-            | tasks::Stored::Pool(_),
+            | tasks::Stored::Pool(_)
+            | tasks::Stored::ClosedLedger(_)
+            | tasks::Stored::DecidedProposal(_),
         )
         | Record::Core(_)
         | Record::People(_)
@@ -1314,7 +1321,9 @@ fn activity_record(record: &Record) -> Option<&tasks::ActivityLine> {
             | tasks::Stored::Ledger(_)
             | tasks::Stored::Writer(_)
             | tasks::Stored::Update(_)
-            | tasks::Stored::Pool(_),
+            | tasks::Stored::Pool(_)
+            | tasks::Stored::ClosedLedger(_)
+            | tasks::Stored::DecidedProposal(_),
         )
         | Record::Core(_)
         | Record::Notes(_)
@@ -1367,7 +1376,7 @@ fn note(record: &Record) -> Option<&notes::Entry> {
 
 fn ledger(record: &Record) -> Option<&tasks::FundingRecord> {
     match record {
-        Record::Tasks(tasks::Stored::Ledger(value)) => Some(value),
+        Record::Tasks(tasks::Stored::Ledger(value) | tasks::Stored::ClosedLedger(value)) => Some(value),
         Record::Tasks(
             tasks::Stored::Activity(_)
             | tasks::Stored::PersonProposal(_)
@@ -1378,7 +1387,8 @@ fn ledger(record: &Record) -> Option<&tasks::FundingRecord> {
             | tasks::Stored::Stub(_)
             | tasks::Stored::Writer(_)
             | tasks::Stored::Update(_)
-            | tasks::Stored::Pool(_),
+            | tasks::Stored::Pool(_)
+            | tasks::Stored::DecidedProposal(_),
         )
         | Record::Core(_)
         | Record::Notes(_)
@@ -1495,9 +1505,15 @@ fn key_kind(key: &Key) -> KeyKind {
             tasks::Key::History { task, .. } => KeyKind::History(*task),
             tasks::Key::Milestone { task, .. } => KeyKind::Milestone(*task),
             tasks::Key::Activity { task, .. } => KeyKind::Activity(*task),
-            tasks::Key::PersonProposal(proposal) => KeyKind::PersonProposal(*proposal),
-            tasks::Key::Ledger(tasks::Funder::Period { project, .. }) => KeyKind::Ledger(*project),
+            tasks::Key::PersonProposal(proposal) | tasks::Key::DecidedProposal(proposal) => {
+                KeyKind::PersonProposal(*proposal)
+            }
+            tasks::Key::Ledger(tasks::Funder::Period { project, .. })
+            | tasks::Key::ClosedLedger(tasks::Funder::Period { project, .. }) => KeyKind::Ledger(*project),
             tasks::Key::Ledger(
+                tasks::Funder::Task(_) | tasks::Funder::Pool { .. } | tasks::Funder::Recurring { .. },
+            )
+            | tasks::Key::ClosedLedger(
                 tasks::Funder::Task(_) | tasks::Funder::Pool { .. } | tasks::Funder::Recurring { .. },
             )
             | tasks::Key::Stub(_)

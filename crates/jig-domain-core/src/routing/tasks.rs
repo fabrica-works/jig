@@ -734,6 +734,8 @@ pub(super) fn tag_tasks(
                     | tasks::Stored::Writer(_)
                     | tasks::Stored::Update(_)
                     | tasks::Stored::Pool(_)
+                    | tasks::Stored::ClosedLedger(_)
+                    | tasks::Stored::DecidedProposal(_)
                     | tasks::Stored::Ledger(_)
                     | tasks::Stored::Stub(_)
                     | tasks::Stored::PersonProposal(_) => record,
@@ -752,7 +754,9 @@ pub(super) fn tag_tasks(
                             | tasks::Stored::Ledger(_)
                             | tasks::Stored::Writer(_)
                             | tasks::Stored::Update(_)
-                            | tasks::Stored::Pool(_) => unreachable!("matched task header"),
+                            | tasks::Stored::Pool(_)
+                            | tasks::Stored::ClosedLedger(_)
+                            | tasks::Stored::DecidedProposal(_) => unreachable!("matched task header"),
                         };
                         append_people(
                             core,
@@ -821,11 +825,11 @@ pub(super) fn tag_tasks(
                 }
                 match &record {
                     tasks::Stored::Ended(task) => touch_task(core, &env.limits, task),
-                    tasks::Stored::PersonProposal(row) => {
+                    tasks::Stored::PersonProposal(row) | tasks::Stored::DecidedProposal(row) => {
                         core.touch_deployment();
                         core.touch_project_objects(row.project);
                     }
-                    tasks::Stored::Ledger(row) => match row.funder {
+                    tasks::Stored::Ledger(row) | tasks::Stored::ClosedLedger(row) => match row.funder {
                         tasks::Funder::Pool { project, person, .. } => {
                             core.touch_project_objects(project);
                             core.touch_party(person);
@@ -847,11 +851,14 @@ pub(super) fn tag_tasks(
                     tasks::Stored::Live(task) | tasks::Stored::Ended(task) => {
                         Some((task.number, core.waiting_entries(&env.limits, task)))
                     }
-                    tasks::Stored::PersonProposal(row) => Some((row.goal.number, core.person_proposal_entries(row))),
+                    tasks::Stored::PersonProposal(row) | tasks::Stored::DecidedProposal(row) => {
+                        Some((row.goal.number, core.person_proposal_entries(row)))
+                    }
                     tasks::Stored::Ledger(_)
                     | tasks::Stored::Writer(_)
                     | tasks::Stored::Update(_)
                     | tasks::Stored::Pool(_)
+                    | tasks::Stored::ClosedLedger(_)
                     | tasks::Stored::History(_)
                     | tasks::Stored::Milestone(_)
                     | tasks::Stored::Activity(_)
@@ -890,6 +897,8 @@ pub(super) fn tag_tasks(
                     | tasks::Stored::Writer(_)
                     | tasks::Stored::Update(_)
                     | tasks::Stored::Pool(_)
+                    | tasks::Stored::ClosedLedger(_)
+                    | tasks::Stored::DecidedProposal(_)
                     | tasks::Stored::Stub(_) => {}
                 }
                 out.push(Request::Write(Write::Save(Record::Tasks(record))));

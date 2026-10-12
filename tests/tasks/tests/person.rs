@@ -25,7 +25,9 @@ fn notified(world: &World, task: u64) -> &tasks::ActivityLine {
             | tasks::Stored::Ledger(_)
             | tasks::Stored::Writer(_)
             | tasks::Stored::Update(_)
-            | tasks::Stored::Pool(_) => None,
+            | tasks::Stored::Pool(_)
+            | tasks::Stored::ClosedLedger(_)
+            | tasks::Stored::DecidedProposal(_) => None,
         })
         .expect("immutable outward notification")
 }
@@ -273,4 +275,63 @@ fn an_approval_exceeding_the_tasks_result_bound_leaves_it_answerable() {
     );
     world.settle(1);
     assert_eq!(world.results[&1], tasks::Ending::Done(TaskResult::Approved { state, words: None }));
+}
+
+fn goal_proposal(number: u64) -> tasks::PersonProposal {
+    let mut goal = task(number, &[]);
+    goal.tracked = Some(1);
+    goal.funder = tasks::Funder::Pool { project: 1, person: 9, period: 0 };
+    tasks::PersonProposal {
+        number,
+        proposer: 9,
+        project: 1,
+        goal,
+        state: tasks::PersonProposalState::Pending { since: skein_lib::Wall::EPOCH },
+    }
+}
+
+fn reject_goal_proposal(world: &mut World, number: u64) {
+    assert_eq!(
+        response(world, |reply_to| Event::DecidePersonProposal {
+            reply_to,
+            proposer: 9,
+            proposal: number,
+            by: Party::Person(10),
+            message: Some(number + 10),
+            decision: tasks::ProposalDecision::Reject { reason: Box::new([1]) },
+        }),
+        Reply::Done
+    );
+}
+
+#[test]
+fn a_decided_person_proposal_is_erased_and_saved_as_decided() {
+    let mut world = World::new(250, LIMITS);
+    assert_eq!(
+        response(&mut world, |reply_to| Event::ProposePerson { reply_to, proposal: goal_proposal(1) }),
+        Reply::Done
+    );
+    reject_goal_proposal(&mut world, 1);
+    assert!(!world.records.contains_key(&tasks::Key::PersonProposal(1)));
+    let Some(tasks::Stored::DecidedProposal(row)) = world.records.get(&tasks::Key::DecidedProposal(1)) else {
+        panic!("the decided proposal is history")
+    };
+    assert!(matches!(row.state, tasks::PersonProposalState::Rejected { by: Party::Person(10), .. }));
+}
+
+#[test]
+fn a_restart_restores_no_decided_person_proposal() {
+    let mut world = World::new(251, LIMITS);
+    assert_eq!(
+        response(&mut world, |reply_to| Event::ProposePerson { reply_to, proposal: goal_proposal(1) }),
+        Reply::Done
+    );
+    reject_goal_proposal(&mut world, 1);
+    world.restart();
+    assert_eq!(
+        response(&mut world, |reply_to| Event::ProposePerson { reply_to, proposal: goal_proposal(2) }),
+        Reply::Done
+    );
+    assert!(world.records.contains_key(&tasks::Key::PersonProposal(2)), "startup completed without historical rows");
+    assert!(world.records.contains_key(&tasks::Key::DecidedProposal(1)), "history remains durable");
 }

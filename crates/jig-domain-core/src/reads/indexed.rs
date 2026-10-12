@@ -104,6 +104,8 @@ pub(super) fn is_update(key: &Key) -> bool {
             | tasks::Key::Ended(_)
             | tasks::Key::Stub(_)
             | tasks::Key::Ledger(_)
+            | tasks::Key::ClosedLedger(_)
+            | tasks::Key::DecidedProposal(_)
             | tasks::Key::Writer(_)
             | tasks::Key::Pool(_)
             | tasks::Key::PersonProposal(_)
