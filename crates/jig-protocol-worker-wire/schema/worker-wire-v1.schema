@@ -1,0 +1,27 @@
+family jig-worker-wire 1
+
+# The worker's credential (protocol/channel.md, 4.1).
+record Credential { name: text 256 secret: secret 1024 payload: u32 }
+
+# The worker's hello and agent bounds (protocol/channel.md, 5.1).
+record ModelBound { name: text 128 window: u32 output: u32 }
+record Bounds {
+    models: list 64 ModelBound
+    turns: u32
+    spend: u64
+    time: duration
+    waiting: duration
+    checks: duration
+    message_bytes: u32
+    inbox: u32
+    unacknowledged: u32
+}
+enum Phase { answered, preparing, starting, active, waiting, ending }
+record Hosting { task: u64 attempt: u64 phase: Phase }
+record Hello {
+    slots: u32
+    stop_bound: duration
+    workstreams: list 65536 u64
+    hosting: list 65536 Hosting
+    bounds: Bounds
+}

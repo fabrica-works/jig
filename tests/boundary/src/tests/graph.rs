@@ -471,6 +471,18 @@ fn protocol_crates_link_no_application_crate_even_when_empty() {
 }
 
 #[test]
+fn worker_wire_links_only_skeins_codec_and_channel_vocabulary() {
+    let roots: Vec<_> = manifests()
+        .into_iter()
+        .filter(|manifest| manifest.name.as_deref() == Some("jig-protocol-worker-wire"))
+        .collect();
+    assert_eq!(roots.len(), 1, "one worker wire codec crate");
+    let mut dependencies = roots[0].dependencies.clone();
+    dependencies.sort();
+    assert_eq!(dependencies, ["skein-channel", "skein-codec", "skein-lib"]);
+}
+
+#[test]
 fn a_protocol_crate_naming_an_ops_crate_is_reported() {
     let manifest = parse_manifest(
         PathBuf::from("fixture/tools/Cargo.toml"),

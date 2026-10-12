@@ -578,6 +578,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "jig-protocol-worker-wire"
+version = "0.0.0"
+dependencies = [
+ "skein-channel",
+ "skein-codec",
+ "skein-lib",
+]
+
+[[package]]
 name = "jig-scripted-engine"
 version = "0.0.0"
 dependencies = [
@@ -688,6 +697,15 @@ dependencies = [
  "jig-domain-views",
  "skein-lib",
  "skein-world",
+]
+
+[[package]]
+name = "jig-worker-wire-world"
+version = "0.0.0"
+dependencies = [
+ "jig-protocol-worker-wire",
+ "skein-codegen",
+ "skein-lib",
 ]
 
 [[package]]

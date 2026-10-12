@@ -56,6 +56,8 @@ members = [
     "tests/host",
     "tests/boundary",
     "tests/store-codecs",
+    "crates/jig-protocol-worker-wire",
+    "tests/worker-wire",
 ]
 
 [workspace.package]
@@ -75,6 +77,8 @@ skein-tls = { git = "https://github.com/forgetic/skein.git" }
 jig-protocol-accounts = { path = "crates/jig-protocol-accounts" }
 skein-oauth = { git = "https://github.com/forgetic/skein.git" }
 skein-oauth-accounts = { git = "https://github.com/forgetic/skein.git" }
+jig-protocol-worker-wire = { path = "crates/jig-protocol-worker-wire" }
+skein-channel = { git = "https://github.com/forgetic/skein.git" }
 jig-protocol-config = { path = "crates/jig-protocol-config" }
 jig-protocol-store = { path = "crates/jig-protocol-store" }
 jig-protocol-tools = { path = "crates/jig-protocol-tools" }

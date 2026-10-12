@@ -1,0 +1,15 @@
+[package]
+name = "jig-protocol-worker-wire"
+description = "Worker channel records and bounded kind table"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+skein-lib.workspace = true
+skein-codec.workspace = true
+skein-channel.workspace = true
+
+[lints]
+workspace = true
