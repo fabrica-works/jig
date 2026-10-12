@@ -1,0 +1,242 @@
+# Session 19: the store's codecs, part 2: the core's and people's families, the format row
+
+The second half of jig 14 (split for size): the core's and the people
+child's families' schemas, generated codecs and translations, then the
+format row, the dispatch and the sizes check, which need every family.
+19.1 to 19.4 need only jig 14's pattern (14.1), so this session runs
+beside jig 14's tasks family; 19.5 needs jig 14 whole.
+
+## Read first
+
+jig 14's "Read first", "What the design asks", "Choices this plan makes"
+and "Interface sketches" (`jig/14-store-codecs.md`): they bind this
+session as they bind jig 14.
+
+## Rules that bind it
+
+- **"Line counts exclude generated code under `src/generated/` and its
+  golden files"** (README, "Rules"), and "Generated codecs are committed
+  under each codec crate's `src/generated/`, made by skein's generator from
+  the crate's `schema/*.schema`, with skein's drift test, as
+  `smith-transcript` does" (`code-organization.md`, section 2).
+- **"A durable record's codec follows its record. Once jig 14 or jig 19 has landed a
+  family's codec, an increment of any session that changes a durable
+  record of that family changes its schema, its generated codec and its
+  translation in the same increment, and the record's family's version
+  moves at the first such change in this plan"** (README, "Rules"). In
+  this session: each increment translates the family's types as they are
+  on `main` when it starts, and a record another session changes later is
+  that session's to follow.
+- **"No increment … decodes or encodes bytes in a domain crate"**
+  (`code-organization.md`, section 6): the translations are in
+  `jig-protocol-store`; the domain crates gain no codec dependency.
+
+## Increments
+
+### 19.1 The core family, part 1: the values it carries, calls
+
+Scope: the tasks schema's records the core carries as bytes (`End` with
+`ResultFollowups`, `Problem` with `Refusal`, `Capacity`, `CapacityAction`,
+`CapacityCause`, and `Phase` and `Change` as top-level records) with their
+encoders; the notes schema's `Entry` likewise; the core schema's small
+enumerations (`Proposer`, `ProposalChoice`, `EscalationDecision`,
+`ProposalKind`, `EscalationOutcome`, `ProposalOutcome`, `Answer`, `Finding`,
+`Source`, `Lacks`, `Judge`, `HostKind`), `OutboxOutcome`, `SettledCall`,
+`SettledAnswer`, `DeliveryOutcome`, `CallPart`, `CallKey`, `CallRecord`;
+the `Call` row.
+Needs: 14.3's `Phase`, `Change`, `New` and `Proposal` in the tasks schema
+(`End`'s follow-ups carry them).
+Files: `crates/jig-protocol-store/{schema/core-v1.schema, schema/tasks-v1.schema, schema/notes-v1.schema, src/generated/{core_v1.rs, tasks_v1.rs, notes_v1.rs}, golden/{core,tasks,notes}/v1/, src/codec/core.rs, src/codec/core/calls.rs, src/codec/tasks/carried.rs}`, `src/tests/{fixtures.rs, codec.rs}`, `tests/store-codecs/tests/{drift.rs, fuzzy_decode.rs}`.
+Shape:
+- `codec::core::Limits { core: core_v1::Limits, tasks: tasks_v1::Limits, notes: notes_v1::Limits }`;
+  `codec::core::limits(&core::Limits) -> Option<Limits>`; `encode` and
+  `decode` over `core::CoreRecord`; this increment's `Row` holds `call`;
+  19.2 adds the others (as 14.2 did).
+Test shape:
+- `src/tests/codec.rs`: `a_call_record_of_each_part_reads_back`,
+  `a_refused_delegation_reads_back_with_its_problem`,
+  `a_recalled_notes_page_reads_back`, `a_settled_call_reads_back`.
+- Ceilings: unit 20 ms.
+Proof: unit. `heavy cargo nextest run -p jig-protocol-store -p
+jig-store-codecs-world` once: each kind of call answer reads back as saved,
+its tasks and notes values decoded by their own families' code. Bound: 1
+minute.
+Don't: declare `End`, `Phase`, `Change` or `Problem` in the core's schema.
+Size: at most 600 lines of production code.
+Removes: nothing.
+
+### 19.2 The core family, part 2: the deployment, projections, runs, turns, decisions
+
+Scope: `Deployment`, `ProjectionRecord`, `ProjectionKey`, `ProjectionGoal`,
+`ProjectionTask`, `ProjectionMilestone`, `MilestoneId`, `RunProof`,
+`TurnProof`, `TerminalRecord`, `TurnRecord` (the frame's body jig 17
+writes), `ProposalDecisionRecord`, `EscalationDecisionRecord`, and each
+other `core::CoreRecord` variant on `main` when the increment starts (jig 06's conversation, if
+it has landed).
+Needs: 19.1's core schema and `codec::core::Limits`.
+Files: `crates/jig-protocol-store/{schema/core-v1.schema, src/generated/core_v1.rs, golden/core/v1/, src/codec/core/{runs.rs, projections.rs}}`, `src/tests/{fixtures.rs, codec.rs}`.
+Shape: `codec::core::encode` and `decode` have one arm per `CoreRecord`
+variant and no fallback arm; `codec::core::turn(&core::TurnRecord, &Limits) -> Result<Box<[u8]>, core_v1::Problem>`
+and `codec::core::read_turn(&[u8], &Limits) -> Result<core::TurnRecord, core_v1::Problem>`
+for jig 17's frames.
+Test shape:
+- `src/tests/codec.rs`: `the_deployment_header_reads_back_with_its_id`,
+  `a_run_proof_with_its_terminal_reads_back`,
+  `a_goal_projection_reads_back_with_its_phase`,
+  `a_turn_reads_back_with_its_bytes`, `both_decision_records_read_back`.
+- Ceilings: unit 20 ms.
+Proof: unit. `heavy cargo nextest run -p jig-protocol-store -p
+jig-store-codecs-world` once: each core row kind of the fixtures reads back
+as saved. Bound: 1
+minute.
+Don't: leave a `CoreRecord` variant without its arm.
+Size: at most 450 lines of production code.
+Removes: 19.1's `Problem` arm for rows not yet translated.
+
+### 19.3 The people family, part 1: identities, roles, policy, asks
+
+Scope: `Role`, `Holding`, `IdentityKey`, `Identity`, `RequestKey`, `Last`,
+`Pattern`, `Grant`, `ResourceScope`, `Executor`, `Delegation`, `Authority`,
+`Judge`, `Guard`, `Requirement`, `PermissionRole`, `PolicyRole`,
+`PolicyValue`, `PolicyChange`, `Seen`, `NoteScope`, `NoteChange`,
+`ResourceRole`, `ResourceName`, `Adoption`, `Disposal`, `Keep`,
+`GoalExecutor`, `PersonResult`, `Proposer`, `ProposalDecision`,
+`EscalationDecision`, `PersonAddress`, `AddressChange`, `Parameter`, `Spec`,
+`WakeRule`, `ResultsWake`, `WakePolicy`, `Amendment`, `Ask`
+(`crates/jig-domain-people/src/{boundary.rs, amendment.rs, policy_value.rs}`);
+the `Person`, `SignIn`, `Roles`, `Policy`, `ReadResults` and `ReadChat` rows.
+Needs: 14.1's pattern (not the tasks or core families).
+Files: `crates/jig-protocol-store/{schema/people-v1.schema, src/generated/people_v1.rs, golden/people/v1/, src/codec/people.rs, src/codec/people/{policy.rs, asks.rs}}`, `src/tests/{fixtures.rs, codec.rs}`, `tests/store-codecs/tests/{drift.rs, fuzzy_decode.rs}`.
+Shape: as 14.2; this increment's `Row` holds the rows above; 19.4 adds
+`Answer`.
+Test shape:
+- `src/tests/codec.rs`: `a_person_reads_back_with_its_identity`,
+  `a_projects_policy_reads_back`, `each_kind_of_ask_reads_back`,
+  `a_read_chat_position_reads_back`.
+- Ceilings: unit 20 ms.
+Proof: unit. `heavy cargo nextest run -p jig-protocol-store -p
+jig-store-codecs-world` once: people's rows read back as saved. Bound: 1
+minute.
+Don't: share a type with the tasks family's schema (no imports).
+Size: at most 600 lines of production code.
+Removes: nothing.
+
+### 19.4 The people family, part 2: refusals, outcomes, answered keys
+
+Scope: `Again`, `DisposalIssue`, `FailureClass`, `HoldReason`, `Moved`,
+`Party`, `Ending`, `Lack`, `LimitKind`, `Refusal`, `ProposalChoice`,
+`EscalationChoice`, `Outcome`; the `Answer` row; each `people::Stored`
+variant on `main` when the increment starts.
+Needs: 19.3's people schema and `codec::people` module.
+Files: `crates/jig-protocol-store/{schema/people-v1.schema, src/generated/people_v1.rs, golden/people/v1/, src/codec/people/outcomes.rs}`, `src/tests/{fixtures.rs, codec.rs}`.
+Shape: `codec::people::encode` and `decode` have one arm per
+`people::Stored` variant and no fallback arm.
+Test shape:
+- `src/tests/codec.rs`: `an_answered_key_reads_back_with_its_ask_and_outcome`,
+  `each_limit_kind_reads_back`, `a_refusal_lacking_a_budget_reads_back`.
+- Ceilings: unit 20 ms.
+Proof: unit. `heavy cargo nextest run -p jig-protocol-store -p
+jig-store-codecs-world` once: each people row kind of the fixtures reads
+back as saved. Bound:
+1 minute.
+Don't: leave a `people::Stored` variant without its arm.
+Size: at most 550 lines of production code.
+Removes: 19.3's `Problem` arm for rows not yet translated.
+
+### 19.5 The format row, the dispatch, sizes
+
+Scope: `codec::encode` and `codec::decode` over `core::Record` by its key's
+child; `format::current` and `format::check` (store.md 5.3); `sizes::check`:
+the largest key, value and commit from the domain's limits and the
+application's, against skein-kv's limits, and the page that must hold one
+row (store.md 5.4; `findings/store.md` 5: "A first row larger than
+`max.bytes` is `Refused TooLarge`"); the memory test of each family's row
+at its worst case.
+Needs: the five families' `Row` translations (19.2's core, 19.4's people).
+Files: `crates/jig-protocol-store/src/{codec.rs, format.rs, sizes.rs, lib.rs}`, `src/tests/{fixtures.rs, format.rs}` (`format.rs` new), `tests/store-codecs/tests/memory.rs` (new), `tests/store-codecs/Cargo.toml` (`skein-heap`).
+Shape:
+- `codec::Limits { core: core_v1::Limits, tasks: tasks_v1::Limits, people: people_v1::Limits, notes: notes_v1::Limits }`;
+  `codec::limits(&core::Limits) -> Option<codec::Limits>`;
+  `codec::encode(&core::Record, &codec::Limits) -> Option<Box<[u8]>>`;
+  `codec::decode(&core::Key, &[u8], &codec::Limits) -> Option<core::Record>`
+  (the key names the family).
+- `format::current(application: u32, deployment: [u8; 16]) -> component::Format`;
+  `format::check(found: &component::Format, wanted: &component::Format) -> Result<(), OpenRefusal>`,
+  naming the first family whose version differs, or the deployment.
+- `sizes::check(domain: &core::Limits, application: &Application, journal: &skein_lib::JournalLimits, store: &skein_kv::Limits) -> Result<Sizes, SizeRefusal>`
+  as sketched.
+- `src/tests/fixtures.rs` gains `APPLICATION: sizes::Application` and
+  `DEPLOYMENT: [u8; 16]`.
+Test shape:
+- New `src/tests/format.rs` (format and sizes). Reference test, written
+  out in full:
+
+  ```rust
+  //! The format row and the sizes at start (store.md 5.3, 5.4).
+  use super::fixtures;
+  use crate::boundary::{Family, OpenRefusal};
+  use crate::format;
+
+  #[test]
+  fn a_format_row_of_another_tasks_version_is_refused_naming_tasks() {
+      let wanted = format::current(fixtures::APPLICATION.version, fixtures::DEPLOYMENT);
+      let mut found = wanted;
+      found.tasks = 2;
+      assert_eq!(
+          format::check(&found, &wanted),
+          Err(OpenRefusal::Format { family: Family::Tasks, found: 2, wanted: 1 })
+      );
+  }
+  ```
+- Also there: `a_format_row_of_another_deployment_is_refused`,
+  `the_current_format_row_is_accepted`,
+  `a_key_limit_below_the_largest_note_line_is_refused`,
+  `a_value_limit_below_the_largest_task_record_is_refused`,
+  `a_page_smaller_than_one_row_is_refused`,
+  `fixture_limits_fit_their_store` (the expected sizes as literals).
+- New `tests/store-codecs/tests/memory.rs` (smith's
+  `tests/codecs/tests/memory.rs`). Reference test, written out in full:
+
+  ```rust
+  //! A family's full golden row decodes within its heap worst case (skein's codec.md, 6).
+  use jig_protocol_store::notes_v1;
+  use skein_heap::{Counting, Meter};
+  use skein_lib::Reader;
+
+  #[global_allocator]
+  static HEAP: Counting = Counting;
+
+  #[test]
+  fn a_full_notes_row_decodes_within_its_heap_worst_case() {
+      let golden = std::fs::read(
+          std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+              .join("../../crates/jig-protocol-store/golden/notes/v1/record_row_full.bin"),
+      )
+      .expect("full notes row");
+      let bound = notes_v1::Row::worst_case_heap(&notes_v1::CEILINGS).expect("notes heap bound");
+      let meter = Meter::new();
+      meter.start();
+      let decoded = notes_v1::Row::decode(&notes_v1::CEILINGS, &mut Reader::new(&golden)).expect("full row");
+      let measured = meter.end();
+      assert!(measured.peak() <= bound, "decoding peaks within the generated bound");
+      drop(decoded);
+      assert_eq!(meter.held(), 0, "the decoded row's heap is released");
+  }
+  ```
+  Also the same test for the tasks, core and people families' `Row`.
+- Ceilings: unit 20 ms; memory 0.5 s.
+Proof: unit. `heavy cargo nextest run -p jig-protocol-store -p
+jig-store-codecs-world` once: a store of another version or deployment is
+refused saying which, and limits a commit could break are refused at start.
+Bound: 1 minute.
+Don't: compute a size from fixtures' values; take it from the generated
+`worst_case_bytes`.
+Size: at most 250 lines of production code.
+Removes: nothing.
+
+## Done when
+
+- Each increment's tests pass in `heavy cargo nextest run -p jig-protocol-store -p jig-store-codecs-world`.
+- The format row and the sizes are checked at start: `heavy cargo nextest
+  run -p jig-protocol-store -E 'test(/format::/)'` passes, running at
+  least 7 tests (19.5's `src/tests/format.rs`).

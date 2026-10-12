@@ -8,71 +8,56 @@ development.md, section 3.3).
 
 | Plan | State | Takes the design to | Where |
 |---|---|---|---|
-| jig-protocol | drafting | `README.md` 15 (the crates' new names); `protocol/` but `llm.md`'s calls in a host's own process; the `domain/` and `client/domain/` sections that section 2 names as owed to the protocol layer | `docs/development/plans/jig-protocol/` (not written; `~/src/rust/plans/jig-protocol-implementation/`, unversioned, drafted before this design's revision of 2026-10-12, is an input) |
+| jig-protocol | ready | `README.md` 15 (the crates' new names); `protocol/` but `llm.md`'s calls in a host's own process and `client.md` 12's browser; the `domain/` and `client/domain/` sections that section 2 names as owed to the protocol layer, but retention (`protocol/store.md`, 11.1) | `docs/development/plans/jig-protocol/` |
 | jig-client-implementation | done 2026-10-11 | `client/domain/` above the protocol line; `client/domain/contract.md` 9 (the engine's changes); `examples.md` 8 (`ops`'s client) | `~/src/rust/plans/jig-client-implementation/` (not versioned) |
 | jig-protocol-design | done 2026-10-10 | a design pass, with no code: `protocol/`, `draft/store.md` | `~/src/rust/plans/jig-protocol-design/` (not versioned) |
 | jig-move | done 2026-10-09 | no section: jig in a repository of its own, with its workspace, lints and gate | `~/src/rust/plans/jig-move/` (not versioned) |
 | jig-extraction | done 2026-10-09 | `domain/`: the core and its children, the hub, the conformance world; `README.md` 6.2 (the journal, in skein-lib); `examples.md` 2–6, 9, 10 and two stories of 7 (`ops`) | `~/src/rust/plans/jig-extraction/` (not versioned) |
 
-jig-protocol is to be planned from this design, as skein's
-development.md, section 5 says. Its upstream needs are on skein's and
-smith's `main`: skein's designs of joined sockets, in-process addresses,
-private startup reads, `base64`, `Secret`, `CryptoRng` and the
-cryptographic seed, and `OpenWrite` and `Cut` (designed, not built);
-smith's charter v2, transcript v3, channel v2, host domain and host
-half, parent face, `smith-inline-agent` and agent shell (built). Section
-2 says "not planned" for what it would build.
+jig-protocol builds skein's designed pieces it needs (in-process
+addresses and joined sockets, private startup reads and the seed,
+`Secret`, `base64`, `CryptoRng`, `OpenWrite` and `Cut`), takes them into
+smith, and builds what section 2's rows name it for.
 
 ## 2. The design
 
 | Document | Built | Left |
 |---|---|---|
-| `README.md` | partly | 8: the store (`protocol/store.md`); 9: agents on workers over the workers' channel, smith's payloads by hand-out, `smith-inline-agent` in the engine; 10: the client's wire and shells; 15: the crates' new names; 14: versioning, open: not planned |
-| `domain/README.md` | partly | 5: a task's proposal that nobody may accept, refused to its proposer (a party's is): not planned |
+| `README.md` | partly | 8: the store; 9: agents on workers over the workers' channel, smith's payloads by hand-out; 10: the client's wire and the native shell; 15: the crates' new names (jig-protocol); 9: `smith-inline-agent` in the engine; 10: the browser's shell; 14: versioning, open: not planned |
+| `domain/README.md` | partly | 5: a task's proposal that nobody may accept, refused to its proposer (jig-protocol) |
 | `domain/core.md` | yes | 12: open questions only |
-| `domain/tasks.md` | partly | 5.5: a budget held for its reserve and one most costly completion; 8.2, 8.3: the start carries the inbox, a message refused or left unread stays and wakes the task again; 9: a task's proposal that nobody may accept, refused rather than kept waiting: not planned |
-| `domain/authority.md` | partly | 7, 8.3: a run placed only when its budget holds its reserve and one most costly completion (the reserve's fields are built): not planned |
-| `domain/connectors.md` | partly | 10: the application's credentials a workspace needs, named with its items; 13: a system's request budget (fresh reads first, reserved shares, a stop until the reset): not planned |
-| `domain/engine.md` | partly | 6.1: stopping; 7.1: several charters, the start's messages, the conversation's first attempt for the run's identity; 7.2: windows, a resume from the current window; 8: grants pushed, and resent at a hello and an adoption; a hello's agent bounds checked; a run's text from hosts through the fleet; 9: no inbox section in the brief; 11: text by retry, a gap marked cut; 12: accounts on skein's driver; 12.1: an application's credentials: not planned. Models' windows and outputs and budgets' reserves are built |
-| `domain/hosts.md` | partly | 2, 6.1: the hub's hello (with its agent's bounds) and notices; 2, 6.2, 6.4: refusals carried with turns, the unread fence, windows; 5.2: `smith-inline-agent` as the engine's agent; 6.5: activity from smith's facts; 6.8: smith's payloads by hand-out; 8: host tools decoded outside the root, the reserve: not planned |
-| `domain/people.md` | partly | 3: a reply naming its own sign-in; 5.1: a decision on an escalation no longer waiting, refused as not waiting; 6: a chat forgotten once ended and read: not planned |
-| `domain/root.md` | partly | 5, 6: smith's payloads handed out to the protocol layer; 11, 12: the reference root decodes host tools' calls, a call's key and a run's result itself: not planned |
-| `domain/testing.md` | partly | 7: the real store on skein-kv's in-memory mode in the worlds (`jig-fake-store` stands in): not planned |
-| `client/domain/README.md` | partly | 2: the client's wire, link and shells (`protocol/client.md`): not planned |
-| `client/domain/client.md` | partly | 12: signing out from the frame; 16: the protocol layer below the domain, but turns' decoding: not planned |
-| `client/domain/contract.md` | partly | 5.1: a turn's bytes in its activity line; 6: reads refused as signed out; 8: a range of versions served; 10: the wire, one connection per client, the browser's client served by the engine: not planned |
+| `domain/tasks.md` | partly | 5.5: a budget held for its reserve and one most costly completion; 8.2, 8.3: the start carries the inbox, a message refused or left unread stays and wakes the task again; 9: a task's proposal that nobody may accept, refused (jig-protocol) |
+| `domain/authority.md` | partly | 7, 8.3: a run placed only when its budget holds its reserve and one most costly completion; the reserve's fields are built (jig-protocol) |
+| `domain/connectors.md` | partly | 10: the application's credentials a workspace needs (jig-protocol); 13: a system's request budget (fresh reads first, reserved shares, a stop until the reset): not planned |
+| `domain/engine.md` | partly | 6.1: stopping; 7.1: several charters, the start's messages, the conversation's first attempt; 7.2: windows; 8: grants pushed and resent, a hello's agent bounds checked; 9: no inbox section in the brief; 11: text by retry, a gap marked cut; 12: accounts on skein's driver; 12.1: an application's credentials (jig-protocol); 8: a run's text from workers' hosts, waiting for smith's channel: not planned. Models' windows and outputs and budgets' reserves are built |
+| `domain/hosts.md` | partly | 2, 6.1: the hub's hello with its agent's bounds, notices; 2, 6.2, 6.4: refusals carried with turns, the unread fence, windows; 6.5: activity from smith's facts; 6.8: smith's payloads by hand-out; 8: host tools decoded outside the root, the reserve (jig-protocol); 5.2: `smith-inline-agent` as the engine's agent; 6.5: text and named calls from agent processes: not planned |
+| `domain/people.md` | partly | 3: a reply naming its own sign-in; 5.1: a decision on an escalation no longer waiting, refused as not waiting; words within the run's bound (jig-protocol); 6: a chat forgotten once ended and read: not planned (retention) |
+| `domain/root.md` | partly | 5, 6: smith's payloads handed out to the protocol layer; 11, 12: host tools' calls, a call's key and a run's result decoded outside the root (jig-protocol) |
+| `domain/testing.md` | partly | 7: the real store on skein-kv's in-memory mode in jig's worlds (jig-protocol); in `ops`'s worlds: not planned |
+| `client/domain/README.md` | partly | 2: the client's wire, link and native shell (jig-protocol); the browser's shell: not planned |
+| `client/domain/client.md` | partly | 12: signing out from the frame; 16: the protocol layer below the domain (jig-protocol) |
+| `client/domain/contract.md` | partly | 5.1: a turn's bytes in its activity line; 6: reads refused as signed out; 8: a range of versions served; 10: the wire, one connection per client (jig-protocol); 10: the browser's client served by the engine: not planned |
 | `client/domain/objects.md` | yes | 13: open questions only |
 | `client/domain/pages.md` | partly | 7: a connector's request budget, and what its system last said: not planned |
 | `client/domain/root.md` | partly | 11: a service's root, its small store in a file, its world: not planned |
-| `client/domain/testing.md` | partly | 2: the protocol world, the real loop, the browser tier; 3: the fake person's browser face: not planned |
-| `client/domain/view.md` | partly | 11: the browser's and the native shells, drawings in a shell; 12: roles mapped by the browser's shell; 13: the browser's stylesheet: not planned |
-| `protocol/README.md` | partly | 5: every component but the charter's translation and turns' decoding (`jig-charter`, `jig-client-transcript`); 7: versions; 8: the secrets' tables; 9: the store; 12: what the domain owes, as the `domain/` rows say: not planned |
-| `protocol/channel.md` | no | All: the workers' wire, the engine's and the worker's sides, grants, its world. The hub and the fleet meet without bytes: not planned |
-| `protocol/client.md` | no | All: the client's wire, the engine's and the client's sides, sign-ins, the shells, wasm32 builds, its world, the browser tier: not planned |
-| `protocol/configuration.md` | no | All: jig's part of a configuration, profiles, secrets from private files, first start, operators' formats: not planned |
-| `protocol/llm.md` | no | 5, 6: accounts on skein's driver, grants to workers: not planned; 1–4, 7–9: LLM calls in a host's own process, for `smith-inline-agent`: not planned |
-| `protocol/service.md` | no | All: the engine's and a worker's services, `iterate`, start and end, the reference service and binary (`jig-test-service`, `jig-test`), its world, one process with agents as child processes: not planned |
-| `protocol/store.md` | no | All: jig's store component on skein-kv, keys and intervals, codecs and the format row, commits, loads and parties' reads, transcripts' files, the secrets' store, growth, the real store in the worlds and the store's world; 15: what the domain owes it; skein's `OpenWrite` and `Cut`: not planned |
+| `client/domain/testing.md` | partly | 2: the protocol world, the real loop (jig-protocol); 2, 3: the browser tier, the fake person's browser face: not planned |
+| `client/domain/view.md` | partly | 11: the native shell (jig-protocol); 11–13: the browser's shell, drawings in a shell, roles mapped by the browser, its stylesheet: not planned |
+| `protocol/README.md` | partly | 5: the components but the charter's translation and turns' decoding; 7: versions; 8: the secrets' tables; 9: the store; 12: what the domain owes (jig-protocol) |
+| `protocol/channel.md` | no | All: the workers' wire, the engine's and the worker's sides, grants, its world (jig-protocol); 6.4: text from agent processes: not planned |
+| `protocol/client.md` | no | All but section 12's browser: the client's wire, the engine's and the client's sides, sign-ins, the native shell, its world (jig-protocol); 12: the browser's shell, wasm32 builds, the browser tier: not planned |
+| `protocol/configuration.md` | no | All: jig's part of a configuration, profiles, secrets from private files, first start, operators' formats (jig-protocol) |
+| `protocol/llm.md` | no | 5, 6: accounts on skein's driver, handed-in accounts, grants to workers (jig-protocol); 1–4, 7–9: LLM calls in a host's own process, for `smith-inline-agent`: not planned |
+| `protocol/service.md` | no | All: the engine's and a worker's services, `iterate`, start and end, the reference service and binary (`jig-test-service`, `jig-test`), its world, one process with agents as child processes (jig-protocol) |
+| `protocol/store.md` | no | All but retention: jig's store component on skein-kv, keys and intervals, codecs and the format row, commits, loads and parties' reads, transcripts' files, the secrets' store, fill, the real store in jig's worlds and the store's world; 15: what the domain owes it (jig-protocol); 11.1: retention: not planned |
 | `examples.md` | partly | 4: `ops`'s agent, `smith-inline-agent` (its world scripts its runs' agents); 7.3: a queue for the pool, policy narrowed, a month of alerts (no world found, not confirmed); the conformance world crashes three stories, not all; 8: a terminal client; 9.1: `ops` standalone: not planned |
 
 ## 3. Not planned
 
-- **jig's protocol layer** (`protocol/README.md`, section 5; `README.md`,
-  section 15): the components, the reference service and binary, the
-  protocol worlds, and the crates' new names. Waits for its plan,
-  jig-protocol (section 1).
-- **What the domain owes the protocol layer** (`protocol/README.md`,
-  section 12): the engine stopping, several charters, grants pushed and
-  resent, an application's credentials, text by retry, accounts on
-  skein's driver, the hub's hello with its agent's bounds, refusals
-  carried with turns and the unread fence, the start's messages, windows,
-  the reserve before a run is placed, smith's payloads and facts by
-  hand-out, host tools outside the root, people's and tasks' refusals,
-  signing out (section 2's rows); and the store's: live before history in
-  each child's keys, indexes for parties' reads, the inbox restored from
-  an index, turns kept by window and dropped whole, fill, retention, keys
-  for single reads (`protocol/store.md`, section 15). Waits for
-  jig-protocol.
+- **Retention** (`protocol/store.md`, 11.1; `domain/people.md`, section
+  6): summaries of ended tasks, transcripts dropped past a horizon,
+  answered keys expired, chats forgotten. The store's mechanisms are
+  jig-protocol's; the domain's timers wait for a deployment whose store
+  nears its budget.
 - **Agents in the engine** (`README.md`, section 9, the second shape;
   `domain/hosts.md`, 5.2; `protocol/llm.md`, sections 1 to 4 and 7 to
   9): `smith-inline-agent` composed by the engine's root, and smith's LLM

@@ -1,0 +1,242 @@
+# jig-protocol: jig's protocol layer, for its first application
+
+2026-10-12. Start commits: skein `917ea21`, smith `2a800ea2`, jig
+`1cdfeb62` (each repository's `origin/main` when the plan was written;
+each session starts from its repository's `origin/main`).
+
+A plan to make jig's protocol layer real, so that an application whose
+agents run on workers can run as one process on one person's machine:
+the engine and a worker joined in memory, the worker's agents as child
+processes, a store on disk, and a native client on loopback. It builds
+skein's designed pieces this needs, takes them into smith, pays what
+jig's domain owes the protocol layer, and builds jig's components, its
+store, its reference service and binary, and their worlds. No browser
+and no wasm32 (the user's choice, 2026-10-12).
+
+## Inputs
+
+- **jig's design** on jig's `main` (`docs/design/`): `protocol/README.md`
+  first, then `service.md`, `channel.md`, `store.md`, `configuration.md`,
+  `llm.md` (sections 5 and 6), `client.md` (but section 12's browser);
+  `domain/hosts.md`, `engine.md`, `tasks.md`, `authority.md`,
+  `people.md`, `connectors.md`, `root.md`, where `STATUS.md`'s rows name
+  them; `README.md`, section 15 (names).
+- **skein's design** on skein's `main`: `io.md`, 3.5, section 4 and
+  section 5 (`OpenWrite`, `Cut`); `kernel.md`, 6.1; `simulator.md`, 3;
+  `shell.md`, 5 and 6.1; `lib.md`, 6, 6.1 and 8; `codec.md`, 3;
+  `oauth.md`, 6.2 to 6.4.
+- **skein's foundation:** `development.md` (this plan follows it),
+  `programming-model.md`, `testing-strategy.md`.
+- **`decisions.md`:** what this plan settled.
+- **`findings/`:** the code audit: `skein.md` (skein's pieces and smith's
+  repin), `domain.md` (what jig's domain owes), `store.md` (the store),
+  `protocol.md` (jig's kits, client, worlds, and the old draft).
+
+## The sessions
+
+A session waits for what "Needs at start" names; an increment that needs
+more says so in its row and its file. Each increment also builds on the
+ones before it in its session. Dependencies are by capability: "skein
+01's `Addr`" means the increment of skein 01 that lands io's `Addr`.
+
+### skein
+
+| File | Session | Needs at start | Increments that need more |
+|---|---|---|---|
+| `skein/01-addresses.md` | io's `Addr` with in-process names, `Limits::names`, in-process listeners and joined sockets, their world | nothing | none |
+| `skein/02-startup-and-secrets.md` | `read_private_file` and the cryptographic seed; `lib::Secret` and `secret N`; `lib::base64`, skein's copies moved onto it; `CryptoRng` by stream, OAuth's states and verifiers from it; the accounts driver dropping a record failed as sign in again | nothing | none |
+| `skein/03-files.md` | the kernel's `Write` open and `Truncate`, io's `OpenWrite` and `Cut`, the simulator's disk keeping a file's length until synced | nothing | none |
+
+### smith
+
+| File | Session | Needs at start | Increments that need more |
+|---|---|---|---|
+| `smith/01-skein.md` | smith on skein with skein 01 to 03: addresses, `io::Limits::names`, the kernel's opens | skein 01, 02 and 03, landed whole | none |
+
+### jig: the start
+
+| File | Session | Needs at start | Increments that need more |
+|---|---|---|---|
+| `jig/01-renames.md` | crates renamed by layer; `tests/boundary`'s rules | nothing; **alone** (Rules) | none |
+| `jig/02-skein.md` | jig on skein's and smith's new revisions | jig 01; smith 01 | none |
+
+### jig: what the domain owes
+
+| File | Session | Needs at start | Increments that need more |
+|---|---|---|---|
+| `jig/03-people-and-tasks.md` | people's and tasks' refusals and timers, a reply's own sign-in, chats forgotten, signing out, reads answered signed out, the message bound | jig 01 | none |
+| `jig/05-hub-link.md` | the hub's link vocabulary: the hello with its agent's bounds and the fleet's check; turns opening a window and carrying refusals; the unread fence; facts as typed activity; notices (rejected, exhausted, told) routed where the core has `unreachable!` today; text by retry, a gap cut | jig 01 | the fleet's check of the hello's agent bounds (05.6) needs jig 07's charters and reserve, and jig 04's run inbox count |
+| `jig/04-messages.md` | the start carries the inbox, the brief has no inbox section; refusals committed with turns; a refused or unread message stays and wakes its task | jig 05's assignment (05.2) | 04.3 (refusals committed) needs jig 05's turns with refusals and the answer's fence (05.3) |
+| `jig/06-windows.md` | the assignment names the conversation's first attempt (recorded at every claim, a resuming charter's first one included) and the run's identity (`run_identity`, in `jig-protocol-charter`); the core keeps each task's current window; a resume reads the window; the claim records its host kind | jig 01 | 06.2 (the assignment) needs jig 05's assignment (05.2); 06.3 (the window) needs jig 05's turns opening a window (05.3); 06.5 (the claim's host kind) needs jig 07.4 |
+| `jig/07-charters-and-budgets.md` | several charters, the chats' charter, a default budget, one account per charter; no run placed whose budget cannot hold its reserve and one most costly completion | jig 01 | none |
+| `jig/08-accounts-and-credentials.md` | the accounts child on skein's driver's terms (wanted, expiring, five failures); grants pushed and resent, replacing the core's `unreachable!` for the fleet's grants; an application's credentials | jig 05's assignment; jig 07's one account per charter | none |
+| `jig/09-stopping.md` | the engine stopping; in-process workers' claims settled at once | jig 01 | none |
+| `jig/10-host-tools.md` | `jig-protocol-tools`; host tools' calls decoded and answers rendered outside the root; a run's result and a call's key read by `jig-protocol-charter` | jig 01 | none |
+
+### jig: the store
+
+| File | Session | Needs at start | Increments that need more |
+|---|---|---|---|
+| `jig/11-store-domain.md` | live before history in the children's keys; keys for single reads; fill and the high-water mark | jig 01 | none |
+| `jig/12-store-indexes.md` | the inbox's index and its restore; conversations', goals', ended delegates' and subtrees' indexes | jig 11's keys | none |
+| `jig/13-store-keys.md` | `jig-protocol-store`: the crate, its boundary, keys' encoders, tags, ranges to intervals | jig 11's keys | the intervals of indexed scopes need jig 12 |
+| `jig/14-store-codecs.md` | the codecs' pattern, the component's own rows, the notes' and the tasks' families, generated, with their translations | jig 13's keys | none |
+| `jig/19-store-codecs-core-people.md` | the core's and people's families' codecs; the format row, the dispatch, sizes | jig 14's pattern (14.1) | 19.1 (the core family) needs jig 14.3's tasks types; 19.5 needs jig 14 whole |
+| `jig/15-store-commits-loads.md` | commits, restart loads (the census's ended rows joined), pages and gets, over skein-kv's memory mode | jig 14; jig 19 | 15.3 (restart loads) needs jig 13's census intervals (13.5, after jig 12) |
+| `jig/16-store-reads.md` | parties' reads: point scopes with their joins, paged scopes | jig 15; jig 12 | none |
+| `jig/17-store-files.md` | transcripts' files and the secrets' store | jig 15; jig 02 (skein's `OpenWrite` and `Cut`); jig 06 (windows) | 17.5 (turns in parties' reads) needs jig 16 |
+| `jig/18-store-worlds.md` | the test application's keys and codecs; the files' stand-in; jig's worlds on the real store, `jig-fake-store` kept for `ops` only; the store's world on the crashing disk | jig 16; jig 17 | none |
+
+### jig: the workers' channel and the reference service
+
+| File | Session | Needs at start | Increments that need more |
+|---|---|---|---|
+| `jig/20-config.md` | `jig-protocol-config` | jig 02 (`read_private_file`); jig 07 | none |
+| `jig/21-accounts.md` | `jig-protocol-accounts`, handed-in accounts | jig 08; jig 02 (`Secret`) | none |
+| `jig/22-worker-wire.md` | `jig-protocol-worker-wire` | jig 05; jig 02 (`secret N`) | none |
+| `jig/23-engine-workers.md` | `jig-protocol-engine-workers` | jig 22 | none |
+| `jig/24-worker-link.md` | `jig-protocol-worker-link` | jig 22 | 24.5 (the two sides joined) needs jig 23.3 |
+| `jig/25-test-service.md` | `jig-test-worker`, `jig-test-service`'s spine, the channel's protocol world and its first story | jig 23; jig 24; jig 10; jig 20; jig 21; jig 05 | none |
+| `jig/27-channel-stories-and-store.md` | the channel world's stories and referee; stopping and draining the service; the service on the real store | jig 25; jig 04; jig 06; jig 09 | 27.3 (the store) needs jig 18 |
+| `jig/26-one-process.md` | the one-process world; the reference binary `jig-test`; the process and live proofs | jig 27; jig 33 | none |
+
+### jig: the client's protocol
+
+| File | Session | Needs at start | Increments that need more |
+|---|---|---|---|
+| `jig/30-client-wire.md` | `jig-protocol-client-wire` | jig 03 | none |
+| `jig/31-engine-clients.md` | `jig-protocol-engine-clients`: exchanges, the stream, sign-ins (the printed link, a native bearer), an application's providers routed | jig 30; jig 02 (`CryptoRng`, `Secret`, `base64`); jig 17 (the secrets' store) | 31.4 (reads and cursors) needs jig 34's pages and single reads (34.3, 34.4) |
+| `jig/32-client-link.md` | `jig-protocol-client-link`, for the host: attempts and envelopes, reads, the stream, the small store | jig 30 | 32.2 (reads) needs jig 35's documents (35.2); 32.3 (the stream) needs jig 02 (`base64`) |
+| `jig/34-engine-clients-documents.md` | the engine's clients' side: jig's documents encoded | jig 31.1 | none |
+| `jig/35-client-link-documents.md` | the client's link: jig's documents decoded | jig 32.1 | none |
+| `jig/33-native-shell.md` | `jig-shell-native`; the test application's wire; the reference service's clients' side; the client's protocol world | jig 31; jig 32; jig 34; jig 35; jig 25 | none |
+
+### Repins (development.md, 5.7)
+
+- **`smith-repin`:** after the last skein increment, if skein's `main`
+  moved past what smith 01 pinned; otherwise it lands nothing.
+- **`jig-repin`:** after `smith-repin`.
+- **`temper-repin`:** after `jig-repin`. See "Repin" below.
+
+### How many at once, and in what order
+
+- **At the start:** skein 01, 02 and 03, and jig 01 (alone among jig's
+  sessions): four sessions.
+- **After jig 01:** jig 03, 05, 06, 07, 09, 10 and 11 at once; jig 02 once
+  smith 01 has landed. The machine's slots bound it (development.md, 7.2
+  and 11.4).
+- **When slots are short, start first** the sessions others wait on, in
+  this order:
+  1. jig 01, skein 01, skein 03, skein 02; then smith 01;
+  2. jig 05, jig 11, jig 02;
+  3. jig 13, jig 06, jig 04, jig 08, jig 10, jig 07, jig 03, jig 09;
+  4. jig 14, jig 19, jig 12, jig 22, jig 30;
+  5. jig 15, jig 20, jig 21, jig 23, jig 24, jig 31, jig 32, jig 34, jig 35;
+  6. jig 16, jig 17, jig 25, jig 27;
+  7. jig 18, jig 33;
+  8. jig 26; then the repins.
+- **The longest chains:** jig 01 → 11 → 13 → 14 → 19 → 15 → 16 → 18 →
+  27 → 26; skein 01 → smith 01 → jig 02 → 17 → 18; jig 05 → 22 → 23 → 25
+  → 33 → 26.
+
+## Rules of this plan
+
+- **jig 01 runs alone.** No other jig session starts before it has
+  landed whole: it renames the crates every jig session touches.
+- **Every session reads,** besides its "Read first": its repository's
+  `AGENTS.md` and workflow, this README and `code-organization.md`.
+- **A durable record's codec follows its record.** Once jig 14 or jig 19 has
+  landed a family's codec, an increment of any session that changes a
+  durable record of that family changes its schema, its generated codec
+  and its translation in the same increment; the translation's build
+  breaks otherwise, which is the check. Aim to move the family's version
+  at the first such change in this plan (development.md, 5.1: formats
+  are pre-release); nothing checks it, and the supervisor's hourly check
+  looks at schema diffs for it.
+- **No browser, no wasm32, no web shell,** in any session: no
+  session adds one, builds for wasm32 or starts a browser itself. Editing
+  skein's existing browser kit and tests where an increment's Files name
+  them (skein 01.1, 02.1) adds none; skein's gate runs its browser suite
+  as it does today. Checked by "Done when" item 7.
+- **Line counts** exclude generated code under `src/generated/` and its
+  golden files.
+- **Shared hotspots with smith's reliability plan,** if it runs at the
+  same time on another machine: skein's `crates/skein-io/src/kernel.rs`,
+  `crates/skein-io/src/file*.rs` and `crates/skein-shell/` (its terminal
+  modes, skein 02.6 of that plan). `land` rebases each landing on the
+  other's; no session waits for it.
+- **The design's crate names follow jig 01.** Once jig 01 has landed
+  whole, the supervisor wakes the designer (`plan wake designer`) to
+  rename the crates in jig's design documents (`docs/design/README.md`,
+  section 15's table), a Markdown-only landing; no session waits for it.
+- **A component's limits join the profiles.** Once `jig-protocol-config`'s
+  profiles exist (jig 20.2), the increment that makes or changes a
+  component's limits adds them to the profiles in the same increment, so
+  the reference service's startup finds them. A component that landed
+  before jig 20.2 has its limits added by the increment of jig 25 or 27
+  that takes it (jig 25's Choices, 25.4, 27.3).
+- **The process proof's script** is written once, by jig 26, as
+  `scripts/proof-one-process.sh` in jig, and later increments that prove
+  at the process layer run it.
+
+## Live services
+
+- **An LLM provider, for the live proofs only:** the user's ChatGPT login
+  at `~/.codex/auth.json`, borrowed read only and access token only. A
+  live proof's script copies the access token and its expiry into a
+  private file in the run's `logs/` directory, which `jig-test`'s
+  configuration names as a handed-in account (jig's `protocol/llm.md`,
+  5.4). No agent signs in, and nothing writes to `~/.codex`.
+- **Its budget:** at most 5 completions and 5 minutes per live proof, at
+  most 40 completions in the whole run. Only jig 26's increments have
+  live proofs.
+- **smith's `smoke-tools`,** for smith 01 and `smith-repin` only, as
+  smith's `docs/development/workflow.md`, section 5 requires of every
+  smith landing that changes code: the cheapest model and effort, once
+  before `land`, once more only if it fails; about 10,000 tokens a run,
+  borrowing the same login as smith's benchmarks do.
+- **Nothing else is live:** skein's fake LLM peer serves every other
+  proof.
+
+## Repin
+
+Every repository downstream of what the plan changes is repinned
+(development.md, 5.7): smith by smith 01 and `smith-repin`, jig by jig 02
+and `jig-repin`, temper by `temper-repin`. temper pins jig `2860e63`, far
+behind; its repin is expected to need more than a repin may change (at
+most about 200 lines, no change of design). If it does, the step lands
+nothing, and the gap goes to temper's `docs/design/STATUS.md`, under
+"Not planned", and to this plan's `later.md`, as section 5.7 says.
+
+## Pulse
+
+```
+words: legacy|compat|hack|workaround
+types: ^(Legacy|Old|Compat)[A-Z]
+file-lines: 800
+budgets: 15 60
+```
+
+## Done when
+
+1. Every step is landed or dropped: `plan status` lists none waiting,
+   ready, running or blocked.
+2. jig's gate passes on `main`: `git -C ~/src/rust/jig log -1
+   --format='%(trailers:key=Gate-Result,valueonly)' origin/main -- . ':!docs'`
+   (the last landed commit outside `docs/`) names `scripts/check.sh passed`.
+3. The crates carry their new names: `git -C ~/src/rust/jig grep -n -E
+   '"(jig-core|jig-host|jig-charter|jig-client|jig-client-view|jig-client-transcript)"'
+   -- '*.toml'` prints nothing.
+4. jig's own worlds run on the real store: `git -C ~/src/rust/jig grep -n
+   jig-fake-store -- tests/core tests/conformance` prints nothing.
+5. The process proof passes once: `cd ~/src/rust/jig && heavy --gate
+   scripts/proof-one-process.sh` exits 0 (jig 26 records its output in the
+   run's logs).
+6. The live proof ran once within its budget: `ls
+   ~/src/rust/tmp/jig/jig-protocol/logs/jig-26/proof-live.log` lists the
+   log, and `grep -n -i completions
+   ~/src/rust/tmp/jig/jig-protocol/sessions/jig-26.md` prints the line of
+   jig 26's checkpoint that names the completions spent, at most 5.
+7. No browser or wasm32 entered jig: `git -C ~/src/rust/jig grep -n -i -E
+   'wasm32|wasm-bindgen|jig-shell-web' -- . ':!docs'` prints nothing.
+8. The aims stated above are these items; none other is checked.
