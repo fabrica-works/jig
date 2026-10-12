@@ -195,6 +195,23 @@ the file.
      ahead", N above 0), or a merge that fails, is still a block, as
      development.md, 9.6 says. Proposed for the retrospective: `plan check
      --fix` fast-forwards a primary checkout that is only behind.
+102. **`Unsafe::Mode` carries the group and other bits alone** (2026-10-12,
+     the coordinator's block "skein 02.3: unsafe mode bits disagree",
+     2026-10-12T15:10:21Z). A plan defect, not a design gap: 02.3's Shape
+     says "startup and io name one file alike", and its reference test
+     expects `Unsafe::Mode(0o040)` for a `0o640` file, but io's
+     `crates/skein-io/src/file_layer/private.rs:83,99` pass the whole
+     mode. The design names the bits found unsafe: io.md, 5.3, "saying
+     what it found unsafe (a link, a non-directory, group or other bits,
+     another owner)"; shell.md, 6.1, "as io's `Unsafe` names it (a link,
+     the kind, the bits, the link count, the owner)"; and `Unsafe::Mode`'s
+     comment, "The opened node has these group or other permission bits."
+     So io and startup both pass `stat.mode & 0o077`. skein 02.3 makes
+     io's change in the same increment, beyond its Files: those two
+     production lines, and the expected values at
+     `crates/skein-io/src/tests/private.rs:87,104` and
+     `tests/io/src/private.rs:136,142`. No other repository names
+     `Unsafe::Mode` (`git grep` on smith's, jig's and temper's mains).
 
 ## For the user
 
