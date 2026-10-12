@@ -295,6 +295,17 @@ holds, and neither of its components reads them.
   in order, within the resume limit, decoded on the worker as the agent
   starts; earlier windows' turns are never sent (`../domain/engine.md`,
   7.2).
+- **A window crosses as one piece,** in smith's form: each turn's bytes
+  after their length, a `u32`, as smith's channel carries a start's
+  transcript (smith's `protocol/channel.md`, section 3). The resume
+  limit bounds the piece, each turn counted with its length, so one
+  field's bound holds any window the domain may resume, many small turns
+  or a few large; the domain bounds a window's bytes, not its turns, and
+  smith's resume limit holds any window one of its sessions makes.
+  `jig-protocol-engine-workers` joins the core's turns into the piece as
+  it encodes an assignment; the worker's link splits it back into the
+  hub's turns as it decodes, and a piece whose lengths do not end
+  exactly at its end is a transcript that does not decode (below).
 - **A run's result** is encoded on the worker as smith's result, in its
   charter's version, before the hub keeps the answer.
   `jig-protocol-charter`'s reader decodes it in the engine's protocol

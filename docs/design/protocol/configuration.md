@@ -97,8 +97,12 @@ the application's main (its shell)
     bounds its budget;
   - *a party's pool* for a period: the allotment their role gives, from
     the project's policy;
-  - *a chat's authority and budget:* its person's role's, from the
-    project's policy (`../domain/people.md`, sections 4 and 7);
+  - *a chat's authority and budget,* from the project's policy: its
+    authority the most that fits under its person's role, as any task a
+    person makes fits (the role's, one level shallower, within the tasks
+    and spend left: `../domain/authority.md`, sections 5 and 6), and its
+    budget the role's default for chats (`../domain/people.md`,
+    sections 4, 5.1 and 7);
   - *the core's recurring procedure* (`../domain/tasks.md`, section 10):
     the core's own, under a number the core keeps for its procedures,
     which no connector takes;

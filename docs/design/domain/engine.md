@@ -490,7 +490,9 @@ When an agent task is due (tasks.md, 5.2), the core:
   whether it opens a window, which the turn carries beside its bytes.
 - **Resuming.** A run that resumes is given its current window only,
   within the resume limit (the deployment's bound on the current
-  window's bytes, across the attempts it spans), and, as a note after
+  window's bytes, across the attempts it spans, each turn counted with
+  the four bytes of its length, as the window crosses to a host:
+  `../protocol/channel.md`, 6.1), and, as a note after
   it, the calls committed after its last turn, with their answers. One
   past the limit starts fresh from a brief that carries the transcript's
   tail. Earlier windows' turns stay readable by parties
