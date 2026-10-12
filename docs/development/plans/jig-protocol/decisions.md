@@ -1002,6 +1002,15 @@ the file.
      retrospective: generated bound tests at small test limits, since
      the focused suite grew 30 % in this run's last 80 minutes, much of
      it generated.
+166. **jig 21.4's Files gain the accounts world's referee** (2026-10-12,
+     the coordinator's block "jig 21.4: referee scope exceeds outside-Files
+     allowance", 2026-10-12T22:18:32Z). 21.4's handed-in accounts expire,
+     are rejected and close, and the referee
+     (`tests/protocol-accounts/src/referee.rs`) must wait through expiry
+     and stop checking an expired grant: 10 lines added and 18 removed,
+     past ruling 114's 20, every expected literal kept, moved into a
+     fixture helper. The referee is in 21.4's Files for those three
+     predicates.
 
 ## For the user
 
