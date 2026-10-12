@@ -279,3 +279,163 @@ pub fn assignment_resumed() -> crate::Assignment {
     )
     .expect("resumed assignment")
 }
+
+pub const SIZES_ONE_SLOT: crate::sizes::Sizes = crate::sizes::Sizes {
+    charter: 16,
+    transcript: 16,
+    turn: 16,
+    message: 16,
+    sender: 16,
+    call_name: 16,
+    tool_name: 16,
+    call_input: 16,
+    answer: 16,
+    result: 16,
+    detail: 16,
+    grant: 16,
+    account_id: 16,
+    name: 16,
+    secret: 16,
+    model_name: 16,
+    items: 16,
+    left: 16,
+    saved: 16,
+    evidence: 16,
+    resource: 16,
+    slots: 1,
+    calls: 1,
+    turns: 1,
+    inbox: 1,
+    answered: 1,
+    models: 1,
+    workstreams: 1,
+    accounts: 1,
+    credentials: 1,
+    facts: 16,
+};
+
+pub const SIZES_LARGE: crate::sizes::Sizes = crate::sizes::Sizes {
+    charter: 67_108_864,
+    transcript: 8_388_608,
+    turn: 8_388_608,
+    message: 1_048_576,
+    sender: 1024,
+    call_name: 64,
+    tool_name: 64,
+    call_input: 1_048_576,
+    answer: 1_048_576,
+    result: 67_108_864,
+    detail: 4096,
+    grant: 8192,
+    account_id: 256,
+    name: 256,
+    secret: 1024,
+    model_name: 128,
+    items: 1_048_576,
+    left: 65_536,
+    saved: 65_536,
+    evidence: 1_048_576,
+    resource: 1024,
+    slots: 65_536,
+    calls: 1024,
+    turns: 1024,
+    inbox: 1024,
+    answered: 1024,
+    models: 64,
+    workstreams: 65_536,
+    accounts: 32,
+    credentials: 32,
+    facts: 4096,
+};
+
+fn one_slot_limits() -> v1::Limits {
+    crate::sizes::limits(&SIZES_ONE_SLOT).expect("small size bounds")
+}
+
+fn full_bytes() -> Box<[u8]> {
+    b"xxxxxxxxxxxxxxxx".as_slice().into()
+}
+
+pub fn fullest_turn() -> crate::Turn {
+    let limits = one_slot_limits();
+    let mut refused = List::with_capacity(1);
+    refused.push(refusal(MESSAGE_FIRST, crate::MessageRefusal::Ending)).expect("one refusal slot");
+    crate::Turn::new(
+        &limits,
+        crate::TurnParts {
+            task: 3,
+            attempt: 4,
+            number: 7,
+            spent: 100,
+            read: Some(MESSAGE_FIRST),
+            opens_window: true,
+            refused,
+            body: full_bytes(),
+        },
+    )
+    .expect("full turn")
+}
+
+fn fullest_call(limits: &v1::Limits) -> crate::AnsweredCall {
+    let answer = crate::HostAnswer::new(limits, crate::HostAnswerParts { error: true, body: full_bytes() })
+        .expect("full host answer");
+    crate::AnsweredCall::new(
+        limits,
+        crate::AnsweredCallParts { name: full_bytes(), tool: full_bytes(), answer: crate::SettledAnswer::Host(answer) },
+    )
+    .expect("full answered call")
+}
+
+fn fullest_grants(limits: &v1::Limits) -> List<crate::Grant> {
+    let mut grants = List::with_capacity(2);
+    for account in [5, 6] {
+        let grant = crate::Grant::new(
+            limits,
+            crate::GrantParts {
+                table: crate::GrantTable::Accounts,
+                account,
+                generation: 9,
+                valid: Duration::from_secs(60),
+                value: Secret::new(full_bytes()),
+                account_id: Secret::new(full_bytes()),
+            },
+        )
+        .expect("full grant");
+        grants.push(grant).expect("two grant slots");
+    }
+    grants
+}
+
+pub fn fullest_assignment() -> crate::Assignment {
+    let limits = one_slot_limits();
+    let mut answered = List::with_capacity(1);
+    answered.push(fullest_call(&limits)).expect("one answered call slot");
+    let mut messages = List::with_capacity(1);
+    messages
+        .push(
+            crate::Message::new(
+                &limits,
+                crate::MessageParts { name: MESSAGE_FIRST, sender: full_bytes(), words: full_bytes() },
+            )
+            .expect("full message"),
+        )
+        .expect("one message slot");
+    let workspace = crate::Workspace::new(&limits, crate::WorkspaceParts { workstream: 7, items: full_bytes() })
+        .expect("full workspace");
+    crate::Assignment::new(
+        &limits,
+        crate::AssignmentParts {
+            task: 3,
+            attempt: 4,
+            identity: IDENTITY_FIRST,
+            workspace: Some(workspace),
+            save: true,
+            charter: full_bytes(),
+            transcript: full_bytes(),
+            answered,
+            messages,
+            grants: fullest_grants(&limits),
+        },
+    )
+    .expect("full assignment")
+}

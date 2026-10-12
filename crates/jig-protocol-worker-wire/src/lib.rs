@@ -10,6 +10,7 @@ use skein_lib::Token;
 #[path = "generated/v1.rs"]
 pub mod v1;
 mod kinds;
+pub mod sizes;
 #[cfg(test)]
 mod tests;
 
