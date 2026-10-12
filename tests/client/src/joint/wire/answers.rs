@@ -10,6 +10,7 @@ use skein_lib::{RequestEnvelope, Token, Wall};
 pub enum Reply {
     SignedIn {
         person: u64,
+        sign_in: u64,
         expires: Wall,
     },
     Final(client::Answer),
@@ -25,7 +26,7 @@ pub enum Reply {
 #[must_use]
 pub fn reply(value: people::Reply) -> Reply {
     match value {
-        people::Reply::SignedIn { person, expires } => Reply::SignedIn { person, expires },
+        people::Reply::SignedIn { person, sign_in, expires } => Reply::SignedIn { person, sign_in, expires },
         people::Reply::SignedOut => Reply::SignedOut,
         people::Reply::Again(why) => Reply::Again(why),
         people::Reply::Refused(why) => Reply::Final(client::Answer::Refused(refusals::refusal(why))),
@@ -92,8 +93,8 @@ mod tests {
 
     #[test]
     fn actual_sign_in_and_connector_reference_require_their_owner_routes_and_keep_full_width_values() {
-        let authenticated = reply(people::Reply::SignedIn { person: u64::MAX, expires: Wall::EPOCH });
-        assert_eq!(authenticated, Reply::SignedIn { person: u64::MAX, expires: Wall::EPOCH });
+        let authenticated = reply(people::Reply::SignedIn { person: u64::MAX, sign_in: 0, expires: Wall::EPOCH });
+        assert_eq!(authenticated, Reply::SignedIn { person: u64::MAX, sign_in: 0, expires: Wall::EPOCH });
         assert_eq!(keyed(authenticated.clone()), Err(authenticated));
         let applied = reply(people::Reply::Outcome(people::Outcome::Applied {
             connector: u16::MAX,

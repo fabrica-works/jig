@@ -10,9 +10,14 @@
 use super::*;
 use skein_lib::{Journal, JournalLimits, JournalRoom, Released};
 
-fn timer_core(answers: bool) -> (Core, Env<Limits>) {
-    let limits = limits();
+pub(super) fn timer_core(answers: bool) -> (Core, Env<Limits>) {
+    let mut limits = limits();
+    limits.people.sign_ins = 3;
     let mut core = Core::new(config(41), &limits);
+    let mut deployment = core.counters.deployment();
+    deployment.people = 1;
+    deployment.sign_ins = 11;
+    core.counters = Counters::new(deployment);
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
     let identity = people::Identity {
         key: people::IdentityKey { provider: 0, subject: Box::new([1]) },

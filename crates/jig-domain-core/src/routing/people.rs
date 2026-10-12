@@ -69,7 +69,6 @@ pub(super) fn sign_in(
     if !core.people.ready() {
         out.push(Request::Held(Box::new(Held::PeopleReply {
             to: reply_to,
-            sign_in: None,
             reply: people::Reply::Again(people::Again::NotReady),
         })));
     } else if core.counters.deployment().people == u64::MAX || core.counters.deployment().sign_ins == u64::MAX {
@@ -77,7 +76,6 @@ pub(super) fn sign_in(
     } else {
         let person = crate::fresh(&mut core.counters, crate::Family::Person).expect("person counter available");
         let sign_in = crate::fresh(&mut core.counters, crate::Family::SignIn).expect("sign-in counter available");
-        core.signing_in = Some(sign_in);
         let kind = if identity.key.provider == core.settings.deployment_provider {
             people::Kind::Service
         } else {
@@ -128,7 +126,7 @@ pub(super) fn tag_people(
                 reply @ (people::Reply::Again(people::Again::Busy)
                 | people::Reply::Outcome(people::Outcome::Again(people::Again::Busy))) => {
                     core.touch_deployment();
-                    Request::Held(Box::new(Held::PeopleReply { to, sign_in: core.signing_in, reply }))
+                    Request::Held(Box::new(Held::PeopleReply { to, reply }))
                 }
                 people::Reply::Outcome(people::Outcome::Applied { connector, token }) => {
                     Request::Held(Box::new(Held::Applied { to, connector, token }))
@@ -166,7 +164,7 @@ pub(super) fn tag_people(
                     | people::Outcome::EscalationDecided { .. }
                     | people::Outcome::Started { .. }
                     | people::Outcome::Refused(..),
-                )) => Request::Held(Box::new(Held::PeopleReply { to, sign_in: core.signing_in, reply })),
+                )) => Request::Held(Box::new(Held::PeopleReply { to, reply })),
             },
             people::Request::RolesApplied { .. } => continue,
             people::Request::RolesRefused { .. } | people::Request::RestoreRefused { .. } => {

@@ -182,14 +182,12 @@ mod tests {
         for packet in driver.poll(now, wall) {
             let Packet::Held { commit, delivery } = packet else { panic!("sign-in must be durable") };
             assert!(commit > 0);
-            let root::Delivery::Core(core::Held::PeopleReply { to, sign_in, reply }) = *delivery else {
-                panic!("owner reply")
-            };
+            let root::Delivery::Core(core::Held::PeopleReply { to, reply }) = *delivery else { panic!("owner reply") };
             assert_eq!(driver.transport.take_reply(to.into_token()), Some(Reply::SignIn { client: ClientId(0) }));
-            let people::Reply::SignedIn { person, expires } = reply else { panic!("actual signed-in answer") };
+            let people::Reply::SignedIn { person, sign_in, expires } = reply else { panic!("actual signed-in answer") };
             assert_eq!(person, 1);
             assert_eq!(expires.as_nanos(), wall.as_nanos() + limits.core.people.sign_in_lifetime.as_nanos());
-            let session = sign_in.expect("actual core session");
+            let session = sign_in;
             driver.transport.signed_in(ClientId(0), person, session);
             signed_in = Some(session);
         }
@@ -270,15 +268,15 @@ mod tests {
         let mut packets = driver.poll(now, wall);
         assert_eq!(packets.len(), 1);
         let Packet::Held { commit, delivery } = packets.remove(0) else { panic!("durable sign-in") };
-        let root::Delivery::Core(core::Held::PeopleReply { to, sign_in, reply }) = *delivery else {
+        let root::Delivery::Core(core::Held::PeopleReply { to, reply }) = *delivery else {
             panic!("whole sign-in envelope")
         };
         assert!(commit <= driver.world.store.applied);
         let destination = to.into_token();
         assert_eq!(destination, Token::new(1));
         assert_eq!(driver.transport.take_reply(destination), Some(Reply::SignIn { client: ClientId(0) }));
-        let people::Reply::SignedIn { person, .. } = reply else { panic!("actual person") };
-        let session = sign_in.expect("actual sign-in session");
+        let people::Reply::SignedIn { person, sign_in, .. } = reply else { panic!("actual person") };
+        let session = sign_in;
         driver.transport.signed_in(ClientId(0), person, session);
         assert!(driver.transport.reply_tokens().is_empty());
 

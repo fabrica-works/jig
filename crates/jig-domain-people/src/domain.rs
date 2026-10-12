@@ -812,7 +812,8 @@ fn signin(
         if old.expires <= env.wall || old.due <= env.now {
             return signed_out(to, out);
         }
-        return out.push(Request::Reply { to, reply: Reply::SignedIn { person, expires: old.expires } });
+        return out
+            .push(Request::Reply { to, reply: Reply::SignedIn { person, sign_in: number, expires: old.expires } });
     }
     if domain.sign_ins.len() >= env.limits.sign_ins {
         return again(to, Again::Busy, out);
@@ -876,7 +877,7 @@ fn signin(
     assert!(saved == Ok(None), "sign-in admitted before mutation");
     arm(domain, env, number, expires);
     out.push(Request::Save { record: Stored::SignIn { number, person, expires } });
-    out.push(Request::Reply { to, reply: Reply::SignedIn { person, expires } });
+    out.push(Request::Reply { to, reply: Reply::SignedIn { person, sign_in: number, expires } });
     fact(domain, Fact::SignedIn { person, sign_in: number });
 }
 

@@ -504,6 +504,8 @@ pub enum Reply {
     SignedIn {
         /** Stable deployment party number for the authenticated identity. */
         person: u64,
+        /** Stable number of this saved sign-in. */
+        sign_in: u64,
         /** Saved wall-time expiry for this sign-in; its monotonic deadline is retained internally. */
         expires: Wall,
     },

@@ -591,9 +591,7 @@ impl World {
                 })));
             }
             root::Delivery::Core(core::Held::PeopleReply {
-                sign_in: Some(sign_in),
-                reply: people::Reply::SignedIn { .. },
-                ..
+                reply: people::Reply::SignedIn { sign_in, .. }, ..
             }) => {
                 self.sign_in = Some(sign_in);
                 let ask = match self.scenario {

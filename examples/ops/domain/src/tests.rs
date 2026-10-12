@@ -335,7 +335,9 @@ fn started_chat() -> (Domain, Env<Limits>, Token) {
     let mut sign_in = None;
     for output in signed {
         match output {
-            Output::Core(core::Held::PeopleReply { sign_in: session, .. }) => sign_in = session,
+            Output::Core(core::Held::PeopleReply {
+                reply: people::Reply::SignedIn { sign_in: session, .. }, ..
+            }) => sign_in = Some(session),
             Output::Commit { .. }
             | Output::Load { .. }
             | Output::CoreLoad(_)

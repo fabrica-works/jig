@@ -263,8 +263,6 @@ pub struct Core {
     pub(crate) creating_procedures: Map<(u64, u64), routing::ProcedureCreation>,
     /// One committed word awaiting host delivery.
     pub relaying: Option<PendingRelay>,
-    /// Candidate sign-in in flight.
-    pub signing_in: Option<u64>,
     /// Configured project identifiers for bootstrap.
     pub projects: List<u32>,
     /// Mutable connector permission mappings approved by policy edits.
@@ -537,7 +535,6 @@ impl Core {
             creating_delegates: Map::with_capacity(limits.call_records),
             creating_procedures: Map::with_capacity(limits.tasks.tasks),
             relaying: None,
-            signing_in: None,
             projects: config.projects,
             permission_roles: config.permission_roles,
             connectors: config.connectors,
@@ -637,7 +634,6 @@ impl Core {
             && self.moving.is_empty()
             && self.person_tasks.is_empty()
             && self.relaying.is_none()
-            && self.signing_in.is_none()
             && self.adopted.is_empty()
             && self.due.is_empty()
             && self.claiming.is_empty()

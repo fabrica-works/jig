@@ -530,7 +530,7 @@ impl Joint {
     #[expect(clippy::too_many_lines, reason = "held Ops packets keep their original exhaustive client routes")]
     fn packet(&mut self, packet: root::Output) {
         match packet {
-            root::Output::Core(core::Held::PeopleReply { to, sign_in, reply }) => {
+            root::Output::Core(core::Held::PeopleReply { to, reply }) => {
                 let to = to.into_token();
                 if self.engine.peers.transport.reply(to).is_some() {
                     if let Reply::Keyed { client, attempt, owner: KeyedOwner::Application { connector: 2 }, .. } =
@@ -562,14 +562,9 @@ impl Joint {
                         self.engine.peers.transport.take_reply(to).expect("consume original reply");
                         self.callbacks.push((client, client::Event::Answer { attempt, envelope, answer }));
                     } else {
-                        let packet = packets::people_reply(
-                            &mut self.engine.peers.transport,
-                            to,
-                            sign_in,
-                            reply,
-                            &self.limits.jig,
-                        )
-                        .expect("whole people reply uses 45 wire");
+                        let packet =
+                            packets::people_reply(&mut self.engine.peers.transport, to, reply, &self.limits.jig)
+                                .expect("whole people reply uses 45 wire");
                         self.incoming(packet);
                     }
                 }

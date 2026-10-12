@@ -304,10 +304,10 @@ impl Peers {
         }
     }
 
-    pub fn reply(&mut self, to: ReplyTo, sign_in: Option<u64>, reply: people::Reply) {
+    pub fn reply(&mut self, to: ReplyTo, reply: people::Reply) {
         let number = to.into_token().raw();
         if let Some(index) = self.party_flights.remove(&number) {
-            self.parties[index].reply(number, party_reply(reply, sign_in));
+            self.parties[index].reply(number, party_reply(reply));
         }
     }
 
@@ -364,11 +364,9 @@ fn task_number(task: parties::Task) -> u64 {
     }
 }
 
-fn party_reply(reply: people::Reply, sign_in: Option<u64>) -> parties::Reply {
+fn party_reply(reply: people::Reply) -> parties::Reply {
     match reply {
-        people::Reply::SignedIn { person, .. } => {
-            parties::Reply::SignedIn { person, sign_in: sign_in.expect("new sign-in number") }
-        }
+        people::Reply::SignedIn { person, sign_in, .. } => parties::Reply::SignedIn { person, sign_in },
         people::Reply::Outcome(people::Outcome::Started { task } | people::Outcome::GoalStarted { task }) => {
             parties::Reply::Started { task }
         }

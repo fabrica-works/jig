@@ -54,10 +54,9 @@ impl ClientPeer {
     )]
     pub fn capture(&mut self, commit: u64, delivery: root::Delivery) -> Result<(), root::Delivery> {
         let delivery = if let Some(replies) = &self.replies {
-            if let root::Delivery::Core(core::Held::PeopleReply { to, sign_in, reply }) = delivery {
+            if let root::Delivery::Core(core::Held::PeopleReply { to, reply }) = delivery {
                 let token = to.into_token();
-                let delivery =
-                    root::Delivery::Core(core::Held::PeopleReply { to: ReplyTo::new(token), sign_in, reply });
+                let delivery = root::Delivery::Core(core::Held::PeopleReply { to: ReplyTo::new(token), reply });
                 if !replies.contains(&token) {
                     return Err(delivery);
                 }

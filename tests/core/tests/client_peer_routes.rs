@@ -49,14 +49,14 @@ fn scripted_sign_in(world: &mut World) {
         .extend(Box::new([Act::SignIn { provider: 0, subject: SUBJECT.into() }]));
 }
 
-fn replies(world: &mut World) -> Vec<(u64, Token, Option<u64>, people::Reply)> {
+fn replies(world: &mut World) -> Vec<(u64, Token, people::Reply)> {
     std::mem::take(&mut world.client_peer.as_mut().expect("client peer").delivered)
         .into_iter()
         .map(|(commit, delivery)| {
-            let root::Delivery::Core(core::Held::PeopleReply { to, sign_in, reply }) = delivery else {
+            let root::Delivery::Core(core::Held::PeopleReply { to, reply }) = delivery else {
                 panic!("whole people reply expected: {delivery:?}");
             };
-            (commit, to.into_token(), sign_in, reply)
+            (commit, to.into_token(), reply)
         })
         .collect()
 }
@@ -66,11 +66,10 @@ fn signed_in(world: &mut World, token: Token) -> (u64, u64) {
     world.send(sign_in(token));
     let receipts = replies(world);
     assert_eq!(receipts.len(), 1);
-    let (commit, destination, sign_in, reply) = receipts[0];
+    let (commit, destination, reply) = receipts[0];
     assert_eq!(destination, token);
     assert!(commit > 0 && commit <= world.store.applied);
-    let people::Reply::SignedIn { person, .. } = reply else { panic!("successful sign-in") };
-    let sign_in = sign_in.expect("session accompanies its reply");
+    let people::Reply::SignedIn { person, sign_in, .. } = reply else { panic!("successful sign-in") };
     assert!(world.store.rows.values().any(|row| matches!(row,
         root::Record::Core(core::Record::People(people::Stored::SignIn { number, person: owner, .. }))
             if *number == sign_in && *owner == person)));
@@ -145,10 +144,8 @@ fn interleaved_destinations_route_by_registration_even_for_the_same_person() {
     let receipts = replies(&mut world);
     assert_eq!(receipts.len(), 2);
     assert_eq!(receipts[0].1, CLIENT);
-    assert_eq!(receipts[0].2, Some(second_session));
     assert_eq!(receipts[1].1, OTHER_CLIENT);
-    assert_eq!(receipts[1].2, Some(second_session));
-    for (commit, _, _, reply) in receipts {
+    for (commit, _, reply) in receipts {
         assert!(commit > 0 && commit <= world.store.applied);
         assert_eq!(
             reply,
@@ -201,7 +198,8 @@ fn registered_and_scripted_sign_ins_wait_for_release_and_are_observed_once() {
     let party = &world.peers.as_ref().expect("peers").parties[0];
     assert_eq!(party.replies.len(), 1);
     assert_eq!(party.replies[0].0, SCRIPTED);
-    let sessions = [receipts[0].2.expect("client session"), party.sign_in.expect("scripted session")];
+    let people::Reply::SignedIn { sign_in, .. } = receipts[0].2 else { panic!("client session") };
+    let sessions = [sign_in, party.sign_in.expect("scripted session")];
     let after_release = world.observer.take();
     for session in sessions {
         assert_eq!(
@@ -237,11 +235,11 @@ fn keyed_client_work_replays_after_explicit_registration_reset_and_cold_restart(
     world.send(chat());
     let first = replies(&mut world);
     assert_eq!(first.len(), 1);
-    let people::Reply::Outcome(people::Outcome::Started { task }) = first[0].3 else { panic!("chat started") };
+    let people::Reply::Outcome(people::Outcome::Started { task }) = first[0].2 else { panic!("chat started") };
     world.send(chat());
     let duplicate = replies(&mut world);
     assert_eq!(duplicate.len(), 1);
-    assert_eq!((duplicate[0].1, duplicate[0].2, duplicate[0].3), (CLIENT, Some(session), first[0].3));
+    assert_eq!((duplicate[0].1, duplicate[0].2), (CLIENT, first[0].2));
     assert_eq!(world.peers.as_ref().expect("peers").workers[0].seen.len(), 1);
     world.client_peer.as_mut().expect("client peer").clear_replies();
     assert!(!world.client_peer.as_mut().expect("client peer").unregister_reply(CLIENT));
@@ -250,7 +248,7 @@ fn keyed_client_work_replays_after_explicit_registration_reset_and_cold_restart(
     world.send(chat());
     let replay = replies(&mut world);
     assert_eq!(replay.len(), 1);
-    assert_eq!((replay[0].1, replay[0].2, replay[0].3), (CLIENT, None, first[0].3));
+    assert_eq!((replay[0].1, replay[0].2), (CLIENT, first[0].2));
     assert!(replay[0].0 <= world.store.applied);
     assert_eq!(
         world
@@ -299,8 +297,7 @@ fn default_capture_and_independent_worker_delivery_keep_their_original_paths() {
     let received = replies(&mut world);
     assert_eq!(received.len(), 1);
     assert_eq!(received[0].1, CLIENT);
-    let people::Reply::SignedIn { person, .. } = received[0].3 else { panic!("sign-in succeeded") };
-    let session = received[0].2.expect("client session");
+    let people::Reply::SignedIn { person, sign_in: session, .. } = received[0].2 else { panic!("sign-in succeeded") };
     world.send(root::Event::Core(core::Event::People(people::Event::Roles {
         project: 1,
         holdings: Box::new([people::Holding { person, role: people::Role::Owner }]),
@@ -314,7 +311,7 @@ fn default_capture_and_independent_worker_delivery_keep_their_original_paths() {
     let received = replies(&mut world);
     assert_eq!(received.len(), 1);
     assert_eq!(received[0].1, OTHER_CLIENT);
-    let people::Reply::Outcome(people::Outcome::Started { task }) = received[0].3 else { panic!("chat started") };
+    let people::Reply::Outcome(people::Outcome::Started { task }) = received[0].2 else { panic!("chat started") };
     assert_eq!(world.peers.as_ref().expect("peers").workers[0].seen[0].task, task);
     assert_eq!(world.assignments.len(), 1);
 }

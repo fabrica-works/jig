@@ -223,6 +223,7 @@ impl Application for Ops {
     fn timers(_: &Config) -> Vec<root::Event> {
         vec![
             root::Event::Timer(core::Timer::Tasks),
+            root::Event::Timer(core::Timer::People),
             root::Event::Timer(core::Timer::Fleet),
             root::Event::Timer(core::Timer::Account),
             root::Event::Timer(core::Timer::Brief),
@@ -516,17 +517,16 @@ impl Application for Ops {
                     valid: Duration::from_secs(7200),
                 })))]
             }
-            root::Output::Core(core::Held::PeopleReply { sign_in, reply, .. }) => {
+            root::Output::Core(core::Held::PeopleReply { reply, .. }) => {
                 peers.replies += 1;
                 match reply {
-                    people::Reply::SignedIn { .. } => {
-                        let number = sign_in.expect("saved session");
+                    people::Reply::SignedIn { sign_in: number, .. } => {
                         peers.sign_in = Some(number);
                         peers.observed.push(r::Observed::Released { requires: vec![r::Receipt::SignIn(number)] });
                     }
                     people::Reply::Outcome(_) => {}
                     other @ (people::Reply::SignedOut | people::Reply::Refused(_) | people::Reply::Again(_)) => {
-                        panic!("unexpected party reply: {other:?}, {sign_in:?}")
+                        panic!("unexpected party reply: {other:?}")
                     }
                 }
                 Vec::new()

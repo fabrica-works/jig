@@ -391,6 +391,7 @@ impl Application for Testing {
         vec![
             root::Event::Timer(core::Timer::Fleet),
             root::Event::Timer(core::Timer::Tasks),
+            root::Event::Timer(core::Timer::People),
             root::Event::ConnectorTimer { number: 1 },
             root::Event::ConnectorTimer { number: 2 },
         ]
@@ -508,9 +509,9 @@ impl Application for Testing {
                 peers.assignments.push((assignment.task, assignment.attempt));
                 Vec::new()
             }
-            root::Delivery::Core(core::Held::PeopleReply { to, sign_in, reply }) => {
+            root::Delivery::Core(core::Held::PeopleReply { to, reply }) => {
                 peers.answers += 1;
-                peers.peers.reply(to, sign_in, reply);
+                peers.peers.reply(to, reply);
                 Vec::new()
             }
             root::Delivery::System { connector: number, call } => {

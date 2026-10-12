@@ -243,12 +243,12 @@ mod tests {
         driver.send(now, wall, root::Event::Core(event));
         for packet in driver.poll(now, wall) {
             let Packet::Held { delivery, .. } = packet else { panic!("sign-in is committed") };
-            let root::Delivery::Core(core::Held::PeopleReply { to, sign_in, reply }) = *delivery else {
+            let root::Delivery::Core(core::Held::PeopleReply { to, reply }) = *delivery else {
                 panic!("actual sign-in answer")
             };
             assert_eq!(driver.transport.take_reply(to.into_token()), Some(Reply::SignIn { client: ClientId(0) }));
-            let people::Reply::SignedIn { person, .. } = reply else { panic!("actual authenticated person") };
-            driver.transport.signed_in(ClientId(0), person, sign_in.expect("supplied independent session"));
+            let people::Reply::SignedIn { person, sign_in, .. } = reply else { panic!("actual authenticated person") };
+            driver.transport.signed_in(ClientId(0), person, sign_in);
         }
         assert!(driver.transport.sign_in(ClientId(0)).is_some());
         let attempt = Token::new(u64::MAX);

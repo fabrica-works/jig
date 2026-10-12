@@ -426,13 +426,12 @@ mod tests {
         assert!(captured.iter().any(|(_, value)| matches!(
             value,
             jig_test_domain::Delivery::Core(jig_domain_core::Held::PeopleReply {
-                sign_in: None,
                 reply: people::Reply::Again(people::Again::NotReady),
                 ..
             })
         )));
         assert!(Front::<Test>::poll(&mut front, Time::ZERO, clock(Time::ZERO)).is_empty());
-        assert_eq!(front.session.sign_in_again(ClientId(0)), Some((None, people::Again::NotReady)));
+        assert_eq!(front.session.sign_in_again(ClientId(0)), Some(people::Again::NotReady));
         assert_eq!(front.session.driver.transport.sign_in(ClientId(0)), None);
         assert_eq!(front.session.driver.world.store.rows, rows);
         assert_eq!(front.session.driver.world.store.applied, applied);
@@ -442,7 +441,7 @@ mod tests {
         assert!(Front::<Test>::poll(&mut front, later, clock(later)).is_empty());
         assert!(!front.session.driver.world.store.loading());
         assert_eq!(front.session.driver.transport.sign_in(ClientId(0)), None);
-        assert_eq!(front.session.sign_in_again(ClientId(0)), Some((None, people::Again::NotReady)));
+        assert_eq!(front.session.sign_in_again(ClientId(0)), Some(people::Again::NotReady));
         assert_eq!(front.session.driver.world.store.rows, rows);
         assert_eq!(front.session.driver.world.store.applied, applied);
         assert_eq!(front.session.driver.world.commits.len(), commits);

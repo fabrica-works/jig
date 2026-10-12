@@ -29,7 +29,7 @@ fn supplied_joint_clocks_survive_internal_commits_and_drive_the_actual_sign_in_e
         world
             .people_answers
             .iter()
-            .any(|reply| matches!(reply, people::Reply::SignedIn { person: 1, expires } if *expires == expiry))
+            .any(|reply| matches!(reply, people::Reply::SignedIn { person: 1, expires, .. } if *expires == expiry))
     );
     assert!(world.store.rows.values().any(|row| matches!(row, root::Record::Core(core::Record::People(people::Stored::SignIn { person: 1, expires, .. })) if *expires == expiry)));
     assert!(world.store.applied > 0, "the sign-in was actually committed");
@@ -62,7 +62,7 @@ fn corrected_joint_wall_is_independent_of_elapsed_time_and_is_persisted_for_a_ne
         world
             .people_answers
             .iter()
-            .any(|reply| matches!(reply, people::Reply::SignedIn { person: 2, expires } if *expires == expiry))
+            .any(|reply| matches!(reply, people::Reply::SignedIn { person: 2, expires, .. } if *expires == expiry))
     );
     assert!(world.store.rows.values().any(|row| matches!(row, root::Record::Core(core::Record::People(people::Stored::SignIn { person: 2, expires, .. })) if *expires == expiry)));
     assert!(world.store.rows.values().any(|row| matches!(row, root::Record::Core(core::Record::People(people::Stored::SignIn { person: 1, expires, .. })) if *expires == prior_expiry)), "the correction does not rewrite an existing durable expiry");

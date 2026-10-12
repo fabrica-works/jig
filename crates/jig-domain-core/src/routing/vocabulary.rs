@@ -137,7 +137,7 @@ pub enum Held {
     /// A saved word relayed to its fenced live attempt after commit.
     Relay { task: u64, attempt: u64, previous: Option<u64>, word: tasks::Word },
     /// A party's keyed terminal, released after its decision is durable.
-    PeopleReply { to: ReplyTo, sign_in: Option<u64>, reply: people::Reply },
+    PeopleReply { to: ReplyTo, reply: people::Reply },
     /// A named core call answer, assembled and delivered after its decision commits.
     CallAnswer { to: ReplyTo, key: CallKey, part: CallPart },
     /// An ended task's result is delivered to its person requester.

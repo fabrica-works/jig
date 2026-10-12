@@ -207,7 +207,7 @@ fn owner_makes_a_service_which_can_request_work_but_cannot_start_a_chat() {
         identity: identity(2, 2),
         kind: Kind::Service,
     });
-    assert_eq!(reply(&service), Reply::SignedIn { person: 2, expires: Wall::from_nanos(60_000_000_000) });
+    assert_eq!(reply(&service), Reply::SignedIn { person: 2, sign_in: 21, expires: Wall::from_nanos(60_000_000_000) });
     assert_eq!(
         reply(&test.request(21, 2, Ask::StartChat { project: 1, words: Box::new([]) })),
         Reply::Outcome(Outcome::Refused(Refusal::Role { held: Some(Role::Member) }))

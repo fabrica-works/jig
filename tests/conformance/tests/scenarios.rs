@@ -61,3 +61,17 @@ fn standing_task_chosen_effect_admission_and_completion_cut_ends_the_story() {
 fn run_budget_chosen_effect_admission_and_completion_cut_ends_the_story() {
     chosen_cut(Scenario::RunBudget);
 }
+
+#[test]
+fn a_sign_in_past_its_lifetime_is_answered_signed_out() {
+    use jig_fake_parties::{Act, Ask, Reply};
+    let config = jig_conformance_world::Config::new(39, false, 1, None);
+    let lifetime = jig_core_world::world::limits().core.people.sign_in_lifetime.as_nanos();
+    let mut world = jig_conformance::Harness::<Testing>::new(config, 39);
+    world.drain().expect("signed in and assigned");
+    world.advance(lifetime + 1);
+    world.drain().expect("expiration committed");
+    world.peers.peers.parties[0].extend(Box::new([Act::Request { key: [2; 16], ask: Ask::SeeResults { through: 0 } }]));
+    world.drain().expect("expired sign-in answered");
+    assert_eq!(world.peers.peers.parties[0].replies.last().map(|(_, reply)| reply), Some(&Reply::SignedOut));
+}

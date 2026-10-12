@@ -33,8 +33,8 @@ pub enum SignInFailure {
 #[derive(Debug)]
 pub enum Incoming {
     Authenticated { client: ClientId, person: u64, expires: Wall },
-    SignInAgain { client: ClientId, reported_sign_in: Option<u64>, why: people::Again },
-    SignInFailed { client: ClientId, reported_sign_in: Option<u64>, failure: SignInFailure },
+    SignInAgain { client: ClientId, why: people::Again },
+    SignInFailed { client: ClientId, failure: SignInFailure },
     Callback { client: ClientId, event: Event },
 }
 fn bounds(limits: &Limits) -> admission::Bounds {
@@ -291,12 +291,11 @@ pub fn application_read(
 
 /// Translate the actual people owner reply, preserving its native route on failure.
 /// # Errors
-/// Refuses a missing/wrong child route, a sign-in without its independently supplied
-/// session, or a complete keyed body above its receiving bound.
+/// Refuses a missing/wrong child route, a sign-in for another party,
+/// or a complete keyed body above its receiving bound.
 pub fn people_reply(
     transport: &mut Transport,
     to: Token,
-    sign_in: Option<u64>,
     reply: people::Reply,
     limits: &Limits,
 ) -> Result<Incoming, Invalid> {
@@ -304,22 +303,19 @@ pub fn people_reply(
     let translated = wire::answers::reply(reply);
     let incoming = match route {
         Reply::SignIn { client } => match translated {
-            wire::answers::Reply::SignedIn { person, expires } => {
-                let sign_in = sign_in.ok_or(Invalid::Session)?;
+            wire::answers::Reply::SignedIn { person, sign_in, expires } => {
                 if transport.party(client) != person {
                     return Err(Invalid::Session);
                 }
                 transport.signed_in(client, person, sign_in);
                 Incoming::Authenticated { client, person, expires }
             }
-            wire::answers::Reply::Again(why) => Incoming::SignInAgain { client, reported_sign_in: sign_in, why },
-            wire::answers::Reply::SignedOut => {
-                Incoming::SignInFailed { client, reported_sign_in: sign_in, failure: SignInFailure::SignedOut }
-            }
+            wire::answers::Reply::Again(why) => Incoming::SignInAgain { client, why },
+            wire::answers::Reply::SignedOut => Incoming::SignInFailed { client, failure: SignInFailure::SignedOut },
             wire::answers::Reply::Final(client::Answer::Refused(why)) => {
                 admission::admit_answer(&client::Answer::Refused(why.clone()), &bounds(limits))
                     .map_err(|_| Invalid::Payload)?;
-                Incoming::SignInFailed { client, reported_sign_in: sign_in, failure: SignInFailure::Refused(why) }
+                Incoming::SignInFailed { client, failure: SignInFailure::Refused(why) }
             }
             wire::answers::Reply::Final(client::Answer::Done(_)) | wire::answers::Reply::Applied { .. } => {
                 return Err(Invalid::OwnerRoute);
@@ -424,81 +420,64 @@ mod tests {
         })
     }
     #[test]
-    fn provider_again_keeps_exact_source_reason_and_optional_session_without_a_keyed_callback_or_authentication() {
+    fn provider_again_keeps_its_source_reason_without_a_keyed_callback_or_authentication() {
         for why in [people::Again::Busy, people::Again::NotReady] {
-            for reported_sign_in in [None, Some(0), Some(u64::MAX)] {
-                let mut transport = transport();
-                let to = transport.reply_to(Reply::SignIn { client: ClientId(1) }).into_token();
-                let Incoming::SignInAgain { client, reported_sign_in: actual, why: actual_why } = people_reply(
-                    &mut transport,
-                    to,
-                    reported_sign_in,
-                    people::Reply::Again(why),
-                    &crate::test::limits().jig,
-                )
-                .expect("actual provider terminal") else {
-                    panic!("provider exchange cannot manufacture a keyed final")
-                };
-                assert_eq!(client, ClientId(1));
-                assert_eq!(actual, reported_sign_in);
-                assert_eq!(actual_why, why);
-                assert_eq!(transport.sign_in(ClientId(1)), None);
-                assert!(transport.reply(to).is_none());
-                assert_eq!(
-                    people_reply(
-                        &mut transport,
-                        to,
-                        reported_sign_in,
-                        people::Reply::Again(why),
-                        &crate::test::limits().jig
-                    )
-                    .err(),
-                    Some(Invalid::MissingRoute)
-                );
-            }
+            let mut transport = transport();
+            let to = transport.reply_to(Reply::SignIn { client: ClientId(1) }).into_token();
+            let Incoming::SignInAgain { client, why: actual_why } =
+                people_reply(&mut transport, to, people::Reply::Again(why), &crate::test::limits().jig)
+                    .expect("actual provider terminal")
+            else {
+                panic!("provider exchange cannot manufacture a keyed final")
+            };
+            assert_eq!(client, ClientId(1));
+            assert_eq!(actual_why, why);
+            assert_eq!(transport.sign_in(ClientId(1)), None);
+            assert!(transport.reply(to).is_none());
+            assert_eq!(
+                people_reply(&mut transport, to, people::Reply::Again(why), &crate::test::limits().jig).err(),
+                Some(Invalid::MissingRoute)
+            );
         }
     }
 
     #[test]
     fn provider_failures_keep_whole_refusal_or_signed_out_and_never_authenticate_or_become_keyed_answers() {
-        for reported in [None, Some(0), Some(u64::MAX)] {
-            for failure in [
-                SignInFailure::Refused(client::Refusal::Limit {
-                    which: client::Limit::Admission { which: client::AdmissionLimit::Identity },
-                }),
-                SignInFailure::SignedOut,
-            ] {
-                let mut transport = transport();
-                let to = transport.reply_to(Reply::SignIn { client: ClientId(1) }).into_token();
-                let source = match failure {
-                    SignInFailure::Refused(_) => {
-                        people::Reply::Refused(people::Refusal::Limit { which: people::LimitKind::Identity })
-                    }
-                    SignInFailure::SignedOut => people::Reply::SignedOut,
-                    SignInFailure::Capacity => unreachable!("immediate source terminal"),
-                };
-                let Incoming::SignInFailed { client, reported_sign_in, failure: actual } =
-                    people_reply(&mut transport, to, reported, source, &crate::test::limits().jig)
-                        .expect("whole original provider terminal")
-                else {
-                    panic!("provider terminal is not a keyed callback")
-                };
-                assert_eq!(client, ClientId(1));
-                assert_eq!(reported_sign_in, reported);
-                assert_eq!(actual, failure);
-                assert_eq!(transport.sign_in(ClientId(1)), None);
-                assert!(transport.reply(to).is_none());
-            }
+        for failure in [
+            SignInFailure::Refused(client::Refusal::Limit {
+                which: client::Limit::Admission { which: client::AdmissionLimit::Identity },
+            }),
+            SignInFailure::SignedOut,
+        ] {
+            let mut transport = transport();
+            let to = transport.reply_to(Reply::SignIn { client: ClientId(1) }).into_token();
+            let source = match failure {
+                SignInFailure::Refused(_) => {
+                    people::Reply::Refused(people::Refusal::Limit { which: people::LimitKind::Identity })
+                }
+                SignInFailure::SignedOut => people::Reply::SignedOut,
+                SignInFailure::Capacity => unreachable!("immediate source terminal"),
+            };
+            let Incoming::SignInFailed { client, failure: actual } =
+                people_reply(&mut transport, to, source, &crate::test::limits().jig)
+                    .expect("whole original provider terminal")
+            else {
+                panic!("provider terminal is not a keyed callback")
+            };
+            assert_eq!(client, ClientId(1));
+            assert_eq!(actual, failure);
+            assert_eq!(transport.sign_in(ClientId(1)), None);
+            assert!(transport.reply(to).is_none());
         }
         let mut transport = transport();
         transport.signed_in(ClientId(1), u64::MAX, u64::MAX);
         let to = transport.reply_to(Reply::SignIn { client: ClientId(1) }).into_token();
         let limits = jig_domain_client::Limits { document_bytes: 0, ..crate::test::limits().jig };
         let source = people::Reply::Refused(people::Refusal::Limit { which: people::LimitKind::Arithmetic });
-        assert!(matches!(people_reply(&mut transport, to, None, source, &limits), Err(Invalid::Payload)));
+        assert!(matches!(people_reply(&mut transport, to, source, &limits), Err(Invalid::Payload)));
         assert!(transport.reply(to).is_some(), "failed whole admission leaves the original exchange intact");
         let Incoming::SignInFailed { failure, .. } =
-            people_reply(&mut transport, to, None, source, &crate::test::limits().jig).expect("whole refusal")
+            people_reply(&mut transport, to, source, &crate::test::limits().jig).expect("whole refusal")
         else {
             panic!("provider refusal")
         };
@@ -869,17 +848,22 @@ mod tests {
         }
     }
     #[test]
-    fn actual_independent_sign_in_session_is_required_and_a_wrong_owner_does_not_consume_the_route() {
+    fn a_sign_in_names_its_session_and_a_wrong_party_does_not_consume_the_route() {
         let mut transport = transport();
         let token = transport.reply_to(Reply::SignIn { client: ClientId(1) }).into_token();
-        let reply = people::Reply::SignedIn { person: u64::MAX, expires: Wall::EPOCH };
+        let reply = people::Reply::SignedIn { person: u64::MAX, sign_in: 0, expires: Wall::EPOCH };
         assert!(matches!(
-            people_reply(&mut transport, token, None, reply, &crate::test::limits().jig),
+            people_reply(
+                &mut transport,
+                token,
+                people::Reply::SignedIn { person: 1, sign_in: 0, expires: Wall::EPOCH },
+                &crate::test::limits().jig
+            ),
             Err(Invalid::Session)
         ));
         assert!(transport.reply(token).is_some());
         assert!(matches!(
-            people_reply(&mut transport, token, Some(0), reply, &crate::test::limits().jig),
+            people_reply(&mut transport, token, reply, &crate::test::limits().jig),
             Ok(Incoming::Authenticated { client: ClientId(1), person: u64::MAX, expires: Wall::EPOCH })
         ));
         assert_eq!(transport.sign_in(ClientId(1)), Some(0));
@@ -903,7 +887,7 @@ mod tests {
             client,
             event:
                 Event::Answer { attempt: actual, envelope, answer: Some(Answered::First(family::Answer::Refused(answer))) },
-        } = people_reply(&mut transport, token, None, people::Reply::Refused(why), &crate::test::limits().jig)
+        } = people_reply(&mut transport, token, people::Reply::Refused(why), &crate::test::limits().jig)
             .expect("original child")
         else {
             panic!("original application refusal");

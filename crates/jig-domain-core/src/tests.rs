@@ -2928,6 +2928,7 @@ fn verdict_documents_preserve_machine_field_rules_and_values_whole() {
 }
 
 mod engine_timers;
+mod sign_ins;
 
 mod conversation_cursor;
 mod inbox_selection;

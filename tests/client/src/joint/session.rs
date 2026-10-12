@@ -46,8 +46,8 @@ pub struct Session {
     truth: Truth,
     parked: BTreeMap<ClientId, Vec<Request>>,
     unsigned: BTreeSet<ClientId>,
-    sign_in_again: BTreeMap<ClientId, (Option<u64>, people::Again)>,
-    sign_in_failures: BTreeMap<ClientId, (Option<u64>, packets::SignInFailure)>,
+    sign_in_again: BTreeMap<ClientId, people::Again>,
+    sign_in_failures: BTreeMap<ClientId, packets::SignInFailure>,
     callbacks: Vec<(ClientId, Event)>,
     delayed: Vec<(ClientId, Event)>,
     delay_until: Option<Time>,
@@ -198,14 +198,14 @@ impl Session {
     /// The source terminal of the latest provider exchange. It establishes no
     /// session and schedules no keyed or automatic sign-in retry (protocol/client.md, 8).
     #[must_use]
-    pub fn sign_in_again(&self, client: ClientId) -> Option<(Option<u64>, people::Again)> {
+    pub fn sign_in_again(&self, client: ClientId) -> Option<people::Again> {
         self.sign_in_again.get(&client).copied()
     }
 
     /// The exact failure of the latest provider exchange. It neither creates a
     /// session nor retires an independently authenticated older session.
     #[must_use]
-    pub fn sign_in_failure(&self, client: ClientId) -> Option<&(Option<u64>, packets::SignInFailure)> {
+    pub fn sign_in_failure(&self, client: ClientId) -> Option<&packets::SignInFailure> {
         self.sign_in_failures.get(&client)
     }
 
@@ -459,14 +459,14 @@ impl Session {
                     self.callbacks.push((client, event));
                 }
             }
-            Incoming::SignInAgain { client, reported_sign_in, why } => {
-                self.sign_in_again.insert(client, (reported_sign_in, why));
+            Incoming::SignInAgain { client, why } => {
+                self.sign_in_again.insert(client, why);
                 if self.driver.transport.sign_in(client).is_none() {
                     self.unsigned.insert(client);
                 }
             }
-            Incoming::SignInFailed { client, reported_sign_in, failure } => {
-                self.sign_in_failures.insert(client, (reported_sign_in, failure));
+            Incoming::SignInFailed { client, failure } => {
+                self.sign_in_failures.insert(client, failure);
                 if self.driver.transport.sign_in(client).is_none() {
                     self.unsigned.insert(client);
                 }
@@ -625,12 +625,12 @@ impl Session {
 
     fn held(&mut self, delivery: root::Delivery, now: Time, wall: Wall) -> Result<(), Invalid> {
         match delivery {
-            root::Delivery::Core(core::Held::PeopleReply { to, sign_in, reply }) => {
+            root::Delivery::Core(core::Held::PeopleReply { to, reply }) => {
                 let to = to.into_token();
                 if self.driver.transport.reply(to).is_none() {
                     return Ok(());
                 }
-                let value = packets::people_reply(&mut self.driver.transport, to, sign_in, reply, &self.limits.jig)
+                let value = packets::people_reply(&mut self.driver.transport, to, reply, &self.limits.jig)
                     .map_err(Invalid::Packet)?;
                 self.incoming(value, now, wall)?;
             }
@@ -757,11 +757,7 @@ impl Session {
                     let Reply::SignIn { client } = *route else { return Err(Invalid::InternalPacket) };
                     self.driver.transport.take_reply(to).expect("original provider route");
                     self.incoming(
-                        Incoming::SignInFailed {
-                            client,
-                            reported_sign_in: None,
-                            failure: packets::SignInFailure::Capacity,
-                        },
+                        Incoming::SignInFailed { client, failure: packets::SignInFailure::Capacity },
                         now,
                         wall,
                     )?;
@@ -1096,12 +1092,9 @@ mod tests {
         assert!(session.poll(now, wall).expect("provider refusal is a normal exchange terminal").is_empty());
         assert!(matches!(
             session.sign_in_failure(ClientId(0)),
-            Some((
-                Some(_),
-                packets::SignInFailure::Refused(client::Refusal::Limit {
-                    which: client::Limit::Admission { which: client::AdmissionLimit::Identity }
-                })
-            ))
+            Some(packets::SignInFailure::Refused(client::Refusal::Limit {
+                which: client::Limit::Admission { which: client::AdmissionLimit::Identity }
+            }))
         ));
         assert_eq!(session.driver.transport.sign_in(ClientId(0)), None);
         let applied = session.driver.world.store.applied;
@@ -1132,7 +1125,7 @@ mod tests {
         session
             .immediate(core::Now::SignInRefused { to: skein_lib::ReplyTo::new(to) }, now, wall)
             .expect("actual capacity terminal");
-        assert_eq!(session.sign_in_failure(ClientId(0)), Some(&(None, packets::SignInFailure::Capacity)));
+        assert_eq!(session.sign_in_failure(ClientId(0)), Some(&packets::SignInFailure::Capacity));
         assert!(session.driver.transport.reply(to).is_none());
         assert_eq!(session.driver.transport.sign_in(ClientId(0)), None);
         assert!(session.poll(now, wall).expect("no callback or retry").is_empty());

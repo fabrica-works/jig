@@ -427,6 +427,7 @@ impl World {
             .map(|wall| Wall::from_nanos(wall.as_nanos().checked_add(by.as_nanos()).expect("supplied wall fits")));
         self.events.push_back(root::Event::Timer(core::Timer::Fleet));
         self.events.push_back(root::Event::Timer(core::Timer::Tasks));
+        self.events.push_back(root::Event::Timer(core::Timer::People));
         self.events.push_back(root::Event::ConnectorTimer { number: 1 });
         self.events.push_back(root::Event::ConnectorTimer { number: 2 });
         self.drain();
@@ -474,7 +475,7 @@ impl World {
             if let Some(mut event) = self.events.pop_front() {
                 self.observer.inbound(&self.store, self.wall, &mut event);
                 if let Some(offers) = &mut self.offers {
-                    offers.inbound(&event);
+                    offers.inbound(&mut event);
                 }
                 if let Some(watches) = &mut self.watches {
                     watches.inbound(&event);
@@ -668,7 +669,7 @@ impl World {
     fn delivered(&mut self, mut delivery: root::Delivery) {
         self.observer.delivered(self.wall, &mut delivery);
         if let Some(offers) = &mut self.offers {
-            offers.delivered(&delivery);
+            offers.delivered(&mut delivery);
         }
         if let Some(watches) = &mut self.watches {
             watches.released(&delivery, self.store.applied);
@@ -681,8 +682,8 @@ impl World {
         }
         if let Some(peers) = &mut self.peers {
             peers.delivered(&delivery);
-            if let root::Delivery::Core(core::Held::PeopleReply { to, sign_in, reply }) = delivery {
-                peers.reply(to, sign_in, reply);
+            if let root::Delivery::Core(core::Held::PeopleReply { to, reply }) = delivery {
+                peers.reply(to, reply);
                 self.people_answers.push(reply);
                 return;
             }
@@ -788,8 +789,7 @@ impl World {
                 self.events.push_back(root::Event::Connector { number, event: connector::Event::System(event) });
             }
             root::Delivery::Core(core::Held::PeopleReply {
-                sign_in: Some(sign_in),
-                reply: reply @ people::Reply::SignedIn { .. },
+                reply: reply @ people::Reply::SignedIn { sign_in, .. },
                 ..
             }) => {
                 let initial = self.sign_in.is_none();

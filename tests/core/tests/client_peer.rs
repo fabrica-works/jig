@@ -29,9 +29,7 @@ fn client_world() -> (World, u64) {
     let (
         _,
         root::Delivery::Core(core::Held::PeopleReply {
-            sign_in: Some(sign_in),
-            reply: people::Reply::SignedIn { person, .. },
-            ..
+            reply: people::Reply::SignedIn { sign_in, person, .. }, ..
         }),
     ) = world.client_peer.as_mut().expect("client peer").delivered.pop().expect("sign-in terminal")
     else {

@@ -861,11 +861,9 @@ impl Observer {
                     "answer preceded its durable named-call record"
                 );
             }
-            root::Delivery::Core(core::Held::PeopleReply { to, sign_in, reply }) => match reply {
-                people::Reply::SignedIn { .. } => {
-                    if let Some(sign_in) = sign_in {
-                        requires.push(r::Receipt::SignIn(*sign_in));
-                    }
+            root::Delivery::Core(core::Held::PeopleReply { to, reply }) => match reply {
+                people::Reply::SignedIn { sign_in, .. } => {
+                    requires.push(r::Receipt::SignIn(*sign_in));
                 }
                 people::Reply::Again(_) | people::Reply::SignedOut | people::Reply::Refused(_) => {}
                 people::Reply::Outcome(_) => {

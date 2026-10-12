@@ -35,11 +35,20 @@ fn reply(world: &mut World, token: u64) -> (Option<u64>, people::Reply) {
     assert_eq!(peer.delivered.len(), 1, "one externally released answer");
     let (applied, delivery) = peer.delivered.pop().expect("actual release");
     assert!(applied <= world.store.applied, "the answer followed an actually applied boundary");
-    let root::Delivery::Core(core::Held::PeopleReply { to, sign_in, reply }) = delivery else {
+    let root::Delivery::Core(core::Held::PeopleReply { to, reply }) = delivery else {
         panic!("actual people reply");
     };
     assert_eq!(to.into_token(), Token::new(token), "the original caller's one-answer capability");
-    (sign_in, reply)
+    (
+        match reply {
+            people::Reply::SignedIn { sign_in, .. } => Some(sign_in),
+            people::Reply::SignedOut
+            | people::Reply::Outcome(_)
+            | people::Reply::Again(_)
+            | people::Reply::Refused(_) => None,
+        },
+        reply,
+    )
 }
 
 fn world() -> (World, u64) {

@@ -39,7 +39,7 @@ impl Referee {
     pub fn committed(&mut self, made: u64) {
         self.made = made;
     }
-    pub fn inbound(&mut self, event: &root::Event) {
+    pub fn inbound(&mut self, event: &mut root::Event) {
         if let root::Event::Core(core::Event::Watch { watcher, sign_in, subject, .. }) = event
             && let Some(party) = self.people.get(sign_in)
         {
@@ -50,7 +50,7 @@ impl Referee {
         {
             self.reading.push_back((*party, read_subject(read)));
         }
-        if let root::Event::Core(core::Event::People(people::Event::Ask { sign_in, ask, .. })) = event {
+        if let root::Event::Core(core::Event::People(people::Event::Ask { reply_to, sign_in, ask, .. })) = event {
             let Some(party) = self.people.get(sign_in) else {
                 return;
             };
@@ -64,7 +64,7 @@ impl Referee {
                 if let Some(offer) = received.offers.iter().find(|value| value.act == act)
                     && let Some(expected) = facts::predict(&offer.admission, ask, received.task.as_ref())
                 {
-                    self.pending.insert(*sign_in, expected);
+                    self.pending.insert(crate::observations::destination(reply_to), expected);
                 }
             }
         }
@@ -94,7 +94,7 @@ impl Referee {
         };
         self.documents.insert(number, Received { party, subject, at: self.made, offers: offers.clone(), task });
     }
-    pub fn delivered(&mut self, value: &root::Delivery) {
+    pub fn delivered(&mut self, value: &mut root::Delivery) {
         match value {
             root::Delivery::Core(core::Held::Delivery { watcher, document }) => {
                 if let Some((party, subject)) = self.watches.get(&watcher.raw()).cloned() {
@@ -109,8 +109,8 @@ impl Referee {
                     self.remember(u64::MAX - self.next_read, party, subject, document);
                 }
             }
-            root::Delivery::Core(core::Held::PeopleReply { sign_in: Some(sign_in), reply, .. }) => {
-                if let Some(expected) = self.pending.remove(sign_in) {
+            root::Delivery::Core(core::Held::PeopleReply { to, reply }) => {
+                if let Some(expected) = self.pending.remove(&crate::observations::destination(to)) {
                     check(&expected, reply).expect("delivered offer matches admission");
                     self.checked += 1;
                 }

@@ -19,9 +19,8 @@ fn signin(core: &mut Core, env: &Env<Limits>, token: u64) {
         step(core, env, Event::SignIn { reply_to: ReplyTo::new(Token::new(token)), identity: identity() });
     assert_eq!(out.len(), 2, "one answer and the completed decision, with no write");
     let Some(Request::Held(reply)) = out.pop() else { panic!("held sign-in answer") };
-    let Held::PeopleReply { to, sign_in, reply } = *reply else { panic!("original people reply") };
+    let Held::PeopleReply { to, reply } = *reply else { panic!("original people reply") };
     assert_eq!(to.into_token(), Token::new(token));
-    assert_eq!(sign_in, None, "refusal has no allocated sign-in candidate");
     assert_eq!(reply, people::Reply::Again(people::Again::NotReady));
     let Some(Request::Decided) = out.pop() else { panic!("completed sign-in decision") };
     assert!(out.is_empty());
