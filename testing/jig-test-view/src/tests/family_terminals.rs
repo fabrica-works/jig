@@ -71,7 +71,7 @@ fn every_family_departure_fits_the_public_view_and_checked_selected_words() {
     let family = family_words();
     let jig = words();
     let client = limits();
-    let bounds = Limits::for_world(&client, &jig, &family, 1024, 256).unwrap();
+    let bounds = Limits::for_world(&client, jig, family, 1024, 256).unwrap();
     for (end, caption) in endings {
         let mut root = ready();
         let rows = drive(
@@ -102,7 +102,7 @@ fn every_family_departure_fits_the_public_view_and_checked_selected_words() {
         }
         assert!(view.tree().len() <= view.limits().tree.nodes);
 
-        assert!(crate::worst_case(&bounds, &client, &jig, &family).unwrap() > 0);
+        assert!(crate::worst_case(&bounds, &client, jig, family).unwrap() > 0);
         assert_eq!(family.book.limits().phrases, 29);
         assert!(patches(&mut view, &root).is_empty());
     }
@@ -253,8 +253,8 @@ fn family_terminal_captions_come_from_the_selected_checked_language_without_engl
         drive(&mut root, Event::First(first::Event::Ended { watch, end }));
         let jig = words();
         let family = selected_words();
-        let bounds = Limits::for_world(&limits(), &jig, &family, 1024, 256).unwrap();
-        let mut view = View::new(&bounds, &limits(), jig, family, first::Address { project: 3, item: 5 });
+        let bounds = Limits::for_world(&limits(), jig, &family, 1024, 256).unwrap();
+        let mut view = View::new(&bounds, &limits(), jig, &family, first::Address { project: 3, item: 5 });
         patches(&mut view, &root);
         assert!(contains(&view, caption));
         assert!(!contains(&view, b"Other language"));

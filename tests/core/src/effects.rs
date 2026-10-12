@@ -70,6 +70,7 @@ pub struct World {
     pub pending_writes: Vec<(u16, connector::SystemRequest)>,
     pub lose_answer: bool,
     pub trace: Vec<String>,
+    tracing: bool,
     pub restart_steps: Vec<core::RestartStep>,
     pub restore_ranges: Vec<core::RestoreRange>,
     pub census_ended: u32,
@@ -306,6 +307,7 @@ impl World {
             pending_writes: Vec::new(),
             lose_answer: false,
             trace: Vec::new(),
+            tracing: std::env::var_os("JIG_WORLD_TRACE").is_some(),
             restart_steps: Vec::new(),
             restore_ranges: Vec::new(),
             census_ended: 0,
@@ -490,6 +492,11 @@ impl World {
         self.drain();
     }
 
+    /// Retain diagnostics for a focused story that asserts on trace text.
+    pub fn enable_tracing(&mut self) {
+        self.tracing = true;
+    }
+
     #[expect(
         clippy::too_many_lines,
         reason = "one iteration keeps commit application, peer observations and root outputs in order"
@@ -516,7 +523,9 @@ impl World {
                 if let Some(reads) = &mut self.reads {
                     reads.inbound(&event);
                 }
-                self.trace.push(format!("input {event:?}"));
+                if self.tracing {
+                    self.trace.push(format!("input {event:?}"));
+                }
                 root::step(&mut self.domain, &env, event);
             }
             let mut out = Queue::with_capacity(128);
@@ -524,7 +533,9 @@ impl World {
             let empty = out.is_empty();
             for _ in 0..out.len() {
                 let request = out.pop().expect("root output count");
-                self.trace.push(format!("output {request:?}"));
+                if self.tracing {
+                    self.trace.push(format!("output {request:?}"));
+                }
                 match request {
                     root::Request::Restart(step) => self.restart_step(step),
                     root::Request::Commit { number, mut writes } => {
@@ -1168,7 +1179,7 @@ impl World {
                 let mut restore = self.restoring.take().expect("requested restart page");
                 let live = restore.step == core::RestartStep::LoadCore;
                 let rows = page.rows.len() + if live { restore.rows.len() % 2 } else { 0 };
-                if !live || rows == 2 || (page.next.is_none() && restore.remaining.is_empty()) {
+                if self.tracing && (!live || rows == 2 || (page.next.is_none() && restore.remaining.is_empty())) {
                     self.trace.push(format!("store page {:?} {rows} rows", restore.step));
                 }
                 census::append(self, restore.step, page.rows, &mut restore.rows);

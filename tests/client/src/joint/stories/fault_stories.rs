@@ -1,6 +1,10 @@
 //! Client faults cross the real protocol loop (testing.md, sections 5–7).
 use super::*;
 
+fn enable_tracing(world: &mut World<Test, Joint>) {
+    world.front().session.driver.world.enable_tracing();
+}
+
 fn start() -> Vec<Step<jig_test_domain_client::Address>> {
     let within = Duration::from_secs(1);
     vec![
@@ -186,6 +190,7 @@ fn a_reload_with_a_stop_pending_recovers_its_lost_committed_answer_by_the_origin
             limits.core.views.watchers = 12;
         },
     ));
+    enable_tracing(&mut world);
     let submitted = world.front().session.driver.world.store.applied.checked_add(1).expect("next transaction");
     world.front().session.driver.world.cut = Some(jig_core_world::effects::Cut::Submitted(submitted));
     world.person(
@@ -286,6 +291,7 @@ fn a_crash_after_the_stop_commit_cold_restarts_offline_and_answers_the_same_key_
         |front| front.restart_configuration(configuration),
         |limits| limits.core.views.watchers = 12,
     ));
+    enable_tracing(&mut world);
     let submitted = world.front().session.driver.world.store.applied.checked_add(1).expect("next transaction");
     world.front().session.driver.world.cut = Some(jig_core_world::effects::Cut::Submitted(submitted));
     world.person(

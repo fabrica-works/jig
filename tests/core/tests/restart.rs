@@ -97,6 +97,7 @@ fn an_out_of_order_restart_completion_refuses_the_start_naming_its_step() {
 #[test]
 fn an_uncertain_effect_across_restarts_is_made_before_its_retry_deadline_and_once() {
     let mut world = World::new(113, false);
+    world.enable_tracing();
     applied_without_answer(&mut world);
     let (key, deadline) = world
         .store

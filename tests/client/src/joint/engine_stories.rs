@@ -288,7 +288,7 @@ fn drift_limits() -> jig_test_domain_client::Limits {
     limits
 }
 
-fn drift_client(seed: u64) -> (jig_test_domain_client::Domain, jig_test_view::View) {
+fn drift_client(seed: u64) -> (jig_test_domain_client::Domain, jig_test_view::View<'static>) {
     crate::test::new(&drift_limits(), seed)
 }
 

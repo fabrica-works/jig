@@ -8,7 +8,7 @@ fn family_limits() -> jig_test_domain_client::Limits {
     limits.first.connector.segment_bytes = 16;
     limits
 }
-fn family_client(seed: u64) -> (jig_test_domain_client::Domain, jig_test_view::View) {
+fn family_client(seed: u64) -> (jig_test_domain_client::Domain, jig_test_view::View<'static>) {
     crate::test::new(&family_limits(), seed)
 }
 

@@ -81,7 +81,7 @@ fn receiving() -> jig_test_domain_client::Limits {
     limits.first.text = 128;
     limits
 }
-fn client(seed: u64) -> (jig_test_domain_client::Domain, jig_test_view::View) {
+fn client(seed: u64) -> (jig_test_domain_client::Domain, jig_test_view::View<'static>) {
     crate::test::new(&receiving(), seed)
 }
 fn ready(seed: u64) -> (World<Test, Joint>, crate::ClientId) {

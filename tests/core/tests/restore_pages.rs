@@ -111,6 +111,7 @@ fn a_paused_restore_answers_sign_in_not_ready_without_changing_durable_rows() {
 #[test]
 fn paused_polls_preserve_multiple_whole_pages_and_repeated_release_is_safe() {
     let (mut world, _) = world();
+    world.enable_tracing();
     let rows = world.store.rows.clone();
     let core_count = rows.keys().filter(|key| matches!(key, root::Key::Core(_))).count();
     assert!(core_count > 2, "multiple original core store pages");

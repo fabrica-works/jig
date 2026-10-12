@@ -8,25 +8,25 @@ use jig_test_domain_client::{Connector, Domain, first};
 use jig_view::{Act, Builder, JigBindings, NodeId, Owner, Patch, Role, Tree};
 use skein_lib::Queue;
 #[derive(Debug)]
-pub struct View {
+pub struct View<'a> {
     render: jig_view::View,
-    words: jig_view::words::Words,
-    first_words: words::Words,
+    words: &'a jig_view::words::Words,
+    first_words: &'a words::Words,
     jig: JigBindings,
     first: Bindings,
     limits: Limits,
     navigation: first::Address,
 }
-impl View {
+impl<'a> View<'a> {
     #[must_use]
     pub fn new(
         limits: &Limits,
         domain: &jig_test_domain_client::Limits,
-        words: jig_view::words::Words,
-        first_words: words::Words,
+        words: &'a jig_view::words::Words,
+        first_words: &'a words::Words,
         navigation: first::Address,
     ) -> Self {
-        assert!(crate::worst_case(limits, domain, &words, &first_words).is_some(), "view capacities are checked");
+        assert!(crate::worst_case(limits, domain, words, first_words).is_some(), "view capacities are checked");
         Self {
             render: jig_view::View::new(&limits.tree),
             jig: JigBindings::new(limits.tree.bindings, domain.jig.text),
@@ -46,7 +46,7 @@ impl View {
         &self.limits
     }
 }
-pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
+pub fn build(view: &mut View<'_>, root: &Domain, out: &mut Queue<Patch>) {
     let shown = jig_test_domain_client::shown(root);
     if !view.render.stale(shown) {
         return;
@@ -55,9 +55,9 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
     view.first.begin();
     let mut b = view.render.builder();
     b.open(Role::Page);
-    if !jig_view::jig(&mut b, root.jig(), family::NAV, &view.words, &mut view.jig) {
-        family::page(&mut b, root.first(), &view.first_words, &view.words, &mut view.first);
-        jig_view::after_page(&mut b, root.jig(), &view.words, &mut view.jig);
+    if !jig_view::jig(&mut b, root.jig(), family::NAV, view.words, &mut view.jig) {
+        family::page(&mut b, root.first(), view.first_words, view.words, &mut view.first);
+        jig_view::after_page(&mut b, root.jig(), view.words, &mut view.jig);
     }
     b.close();
     for pass in 0..2 {
@@ -71,7 +71,7 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
                             root.jig(),
                             id,
                             &jig_view::cards::Place::Elsewhere,
-                            &view.words,
+                            view.words,
                             &mut view.jig,
                         ),
                         None => false,
@@ -81,7 +81,7 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
                 Owner::Side { connector } => match Connector::of(connector) {
                     Some(Connector::First) => {
                         if slot.reference == family::NAV {
-                            family::navigation(&mut fragment, view.navigation, &view.first_words, &mut view.first);
+                            family::navigation(&mut fragment, view.navigation, view.first_words, &mut view.first);
                             true
                         } else {
                             match view.jig.part(slot.reference.token) {
@@ -91,8 +91,8 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
                                         root.first(),
                                         part,
                                         root.jig().generation(),
-                                        &view.first_words,
-                                        &view.words,
+                                        view.first_words,
+                                        view.words,
                                         &mut view.first,
                                     );
                                     true
@@ -110,8 +110,8 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
                                                     root.first(),
                                                     &part,
                                                     root.jig().generation(),
-                                                    &view.first_words,
-                                                    &view.words,
+                                                    view.first_words,
+                                                    view.words,
                                                     &mut view.first,
                                                 );
                                                 true
@@ -126,7 +126,7 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
                     }
                     Some(Connector::Second) => match view.jig.part(slot.reference.token) {
                         Some(part) => {
-                            second(&mut fragment, root, part, &view.first_words, &view.words);
+                            second(&mut fragment, root, part, view.first_words, view.words);
                             true
                         }
                         None => false,
@@ -178,7 +178,7 @@ fn second(
 }
 #[must_use]
 #[expect(clippy::manual_map, reason = "step code matches optional owner actions explicitly")]
-pub fn decode(view: &mut View, node: NodeId, act: Act) -> Option<Action> {
+pub fn decode(view: &mut View<'_>, node: NodeId, act: Act) -> Option<Action> {
     let bound = view.render.act(node, act)?;
     match bound.binding.owner {
         Owner::Jig => match jig_view::decode(&mut view.jig, bound.binding.token, bound.act) {

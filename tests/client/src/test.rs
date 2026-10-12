@@ -88,27 +88,43 @@ pub fn list<T>(rows: impl IntoIterator<Item = T>) -> List<T> {
     out
 }
 
-// The world varies roots, not English. Load each configured book once;
-// each view still owns a clone of the immutable checked data.
+// Checked immutable books and envelopes are shared by every equal fixture.
 type Books = (jig_view::words::Words, view::words::Words);
-fn phrasebooks(limits: &domain::Limits) -> Books {
-    static BOOKS: OnceLock<Mutex<BTreeMap<(u32, u32), Books>>> = OnceLock::new();
+fn phrasebooks(limits: &domain::Limits) -> &'static Books {
+    static BOOKS: OnceLock<Mutex<BTreeMap<(u32, u32), &'static Books>>> = OnceLock::new();
     let mut books = BOOKS.get_or_init(|| Mutex::new(BTreeMap::new())).lock().expect("fixture books lock");
-    books
-        .entry((limits.jig.text, limits.first.text))
-        .or_insert_with(|| {
-            (
-                view::connector_values_words::english(limits.jig.text).expect("composed application English fits"),
-                view::words::Words::english(limits.first.text).expect("family English fits"),
-            )
-        })
-        .clone()
+    books.entry((limits.jig.text, limits.first.text)).or_insert_with(|| {
+        Box::leak(Box::new((
+            view::connector_values_words::english(limits.jig.text).expect("composed application English fits"),
+            view::words::Words::english(limits.first.text).expect("family English fits"),
+        )))
+    })
+}
+struct Fixture {
+    books: &'static Books,
+    bounds: view::Limits,
+    worst_case: u64,
+}
+fn fixture(limits: &domain::Limits) -> &'static Fixture {
+    static FIXTURES: OnceLock<Mutex<Vec<(domain::Limits, &'static Fixture)>>> = OnceLock::new();
+    let mut fixtures = FIXTURES.get_or_init(|| Mutex::new(Vec::new())).lock().expect("fixture envelopes lock");
+    if let Some((_, fixture)) = fixtures.iter().find(|(key, _)| key == limits) {
+        return fixture;
+    }
+    let books = phrasebooks(limits);
+    let bounds = view::Limits::for_world(limits, &books.0, &books.1, 1024, 256).expect("view bounds fit");
+    let worst_case = domain::worst_case(limits).expect("root worst case")
+        // The shell model is bounded by another renderer envelope.
+        + 2 * view::worst_case(&bounds, limits, &books.0, &books.1).expect("view worst case");
+    let fixture = Box::leak(Box::new(Fixture { books, bounds, worst_case }));
+    fixtures.push((*limits, fixture));
+    fixture
 }
 /// Constructs the test application's root and view with one declared bound.
 #[must_use]
-pub fn new(limits: &domain::Limits, seed: u64) -> (domain::Domain, view::View) {
-    let (words, family) = phrasebooks(limits);
-    let bounds = view::Limits::for_world(limits, &words, &family, 1024, 256).expect("view bounds fit");
+pub fn new(limits: &domain::Limits, seed: u64) -> (domain::Domain, view::View<'static>) {
+    let fixture = fixture(limits);
+    let (words, family) = fixture.books;
     let mut root = domain::new(limits, seed);
     domain::provider(&mut root, jig_domain_client::signin::Provider { number: 1, name: crate::stories::text(b"Test") })
         .expect("provider fits");
@@ -117,11 +133,11 @@ pub fn new(limits: &domain::Limits, seed: u64) -> (domain::Domain, view::View) {
         jig_domain_client::signin::Provider { number: 2, name: crate::stories::text(b"Other") },
     )
     .expect("second provider fits");
-    (root, view::View::new(&bounds, limits, words, family, first::Address { project: 1, item: 1 }))
+    (root, view::View::new(&fixture.bounds, limits, words, family, first::Address { project: 1, item: 1 }))
 }
 impl App for Test {
     type Root = domain::Domain;
-    type View = view::View;
+    type View = view::View<'static>;
     type Limits = domain::Limits;
     type Event = Event;
     type Request = Request;
@@ -221,11 +237,7 @@ impl App for Test {
         view.limits().tree.patches
     }
     fn worst_case(limits: &Self::Limits) -> u64 {
-        let (words, family) = phrasebooks(limits);
-        let bounds = view::Limits::for_world(limits, &words, &family, 1024, 256).expect("view fits");
-        domain::worst_case(limits).expect("root worst case")
-            // The shell model is bounded by another renderer envelope.
-            + 2 * view::worst_case(&bounds, limits, &words, &family).expect("view worst case")
+        fixture(limits).worst_case
     }
     fn window_changed(event: &Self::Event) -> bool {
         crate::observe::window_changed(event)

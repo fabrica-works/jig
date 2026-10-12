@@ -140,21 +140,21 @@ fn ready() -> Domain {
     );
     root
 }
-fn words() -> jig_view::words::Words {
+fn words() -> &'static jig_view::words::Words {
     static WORDS: std::sync::OnceLock<jig_view::words::Words> = std::sync::OnceLock::new();
-    WORDS.get_or_init(|| crate::connector_values_words::english(limits().jig.text).unwrap()).clone()
+    WORDS.get_or_init(|| crate::connector_values_words::english(limits().jig.text).unwrap())
 }
-fn family_words() -> words::Words {
+fn family_words() -> &'static words::Words {
     static WORDS: std::sync::OnceLock<words::Words> = std::sync::OnceLock::new();
-    WORDS.get_or_init(|| words::Words::english(limits().first.text).unwrap()).clone()
+    WORDS.get_or_init(|| words::Words::english(limits().first.text).unwrap())
 }
-fn view() -> View {
+fn view() -> View<'static> {
     let jig = words();
     let first = family_words();
-    let bounds = Limits::for_world(&limits(), &jig, &first, 1024, 256).unwrap();
+    let bounds = Limits::for_world(&limits(), jig, first, 1024, 256).unwrap();
     View::new(&bounds, &limits(), jig, first, first::Address { project: 3, item: 5 })
 }
-fn patches(view: &mut View, root: &Domain) -> Vec<Patch> {
+fn patches(view: &mut View<'_>, root: &Domain) -> Vec<Patch> {
     let mut out = Queue::with_capacity(view.limits().tree.patches);
     build(view, root, &mut out);
     let mut rows = Vec::new();
@@ -364,10 +364,10 @@ fn load_cards(root: &mut Domain, rows: Vec<Request>) {
         }
     }
 }
-fn named(view: &View, role: Role, name: &[u8]) -> NodeId {
+fn named(view: &View<'_>, role: Role, name: &[u8]) -> NodeId {
     view.tree().nodes().iter().find(|node| node.role == role && node.name.as_deref() == Some(name)).unwrap().id
 }
-fn contains(view: &View, text: &[u8]) -> bool {
+fn contains(view: &View<'_>, text: &[u8]) -> bool {
     view.tree()
         .nodes()
         .iter()
@@ -413,7 +413,7 @@ fn the_drawing_has_a_named_readable_fallback_and_bounded_owner_bytes() {
     let first = family_words();
     let mut bounds = limits();
     bounds.first.rows = u32::MAX;
-    assert!(Limits::of(&bounds, &jig, &first).is_none());
+    assert!(Limits::of(&bounds, jig, first).is_none());
 }
 #[test]
 fn buttons_and_parameter_fields_decode_to_their_owner_and_departed_nodes_are_stale() {
@@ -808,11 +808,11 @@ fn unsupported_individual_deployment_parts_say_cannot_show_without_a_project_or_
     assert_eq!(root.first().object(root.first().find(subject).unwrap()).unwrap().value, first::Value::Unsupported);
     let jig = words();
     let family_words = words::Words::english(limits().first.text).unwrap();
-    let bounds = Limits::for_world(&limits(), &jig, &family_words, 1024, 256).unwrap();
+    let bounds = Limits::for_world(&limits(), jig, &family_words, 1024, 256).unwrap();
     let mut builder = jig_view::Builder::new(&bounds.tree);
     let mut bindings = crate::bindings::Bindings::new(bounds.tree.bindings, limits().first.text);
     builder.open(Role::Page);
-    crate::family::part(&mut builder, root.first(), &part, 1, &family_words, &jig, &mut bindings);
+    crate::family::part(&mut builder, root.first(), &part, 1, &family_words, jig, &mut bindings);
     builder.close();
     let tree = builder.finish();
     assert!(

@@ -321,6 +321,9 @@ impl Application for Testing {
     fn policy(peers: &Neighbours) -> &jig_conformance::referee::Policy {
         &peers.observer.referee.policy
     }
+    fn policy_generation(peers: &Neighbours) -> u64 {
+        peers.observer.policy_generation()
+    }
 
     fn recovery(config: &Config, number: u16, kind: u16) -> jig_conformance::referee::Recovery {
         let configuration = config.root().0;

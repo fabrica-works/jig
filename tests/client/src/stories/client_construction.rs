@@ -16,7 +16,7 @@ pub fn limits() -> jig_test_domain_client::Limits {
 }
 /// Constructs both sides of the client with the fixture's declared bounds.
 #[must_use]
-pub fn client(seed: u64) -> (jig_test_domain_client::Domain, jig_test_view::View) {
+pub fn client(seed: u64) -> (jig_test_domain_client::Domain, jig_test_view::View<'static>) {
     test::new(&limits(), seed)
 }
 /// Supplies one wide frame and one ordinary frame to independent clients.

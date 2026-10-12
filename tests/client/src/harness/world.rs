@@ -128,17 +128,16 @@ pub struct World<A: App, F: Front<A>> {
     quota_failure: bool,
     meter: Option<skein_world::domain::heap::Meter>,
     heap_peak: u64,
-    default_heap_bound: u64,
+    default_heap_bound: Option<u64>,
 }
 impl<A: App, F: Front<A>> World<A, F> {
     /// Creates one seeded loop in front of the supplied engine boundary.
     #[must_use]
     pub fn new(settings: Settings, front: F) -> Self {
-        let heap_bound = A::worst_case(&A::limits()).min(settings.heap_bytes_per_client);
         let meter = if settings.memory { Some(skein_world::domain::heap::Meter::new()) } else { None };
         Self {
             meter,
-            default_heap_bound: heap_bound,
+            default_heap_bound: None,
             heap_peak: 0,
             rng: Rng::new(settings.seed),
             referee: Referee::new(super::referee::Rules::new(
@@ -176,7 +175,10 @@ impl<A: App, F: Front<A>> World<A, F> {
     }
     /// Starts a device with an empty small store.
     pub fn client(&mut self, party: u64, address: A::Address) -> ClientId {
-        self.make_client(party, address, Vec::new(), A::limits(), A::new, self.default_heap_bound)
+        let bound = *self
+            .default_heap_bound
+            .get_or_insert_with(|| A::worst_case(&A::limits()).min(self.settings.heap_bytes_per_client));
+        self.make_client(party, address, Vec::new(), A::limits(), A::new, bound)
     }
     /// Starts a device with supplied receiving bounds and a root/view fixture.
     /// The constructor must use the same bounds; tabs and reloads retain both.

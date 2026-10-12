@@ -22,11 +22,11 @@ fn choice_limits() -> jig_test_domain_client::Limits {
     limits.first.text = 128;
     limits
 }
-fn choice_client(seed: u64) -> (jig_test_domain_client::Domain, jig_test_view::View) {
+fn choice_client(seed: u64) -> (jig_test_domain_client::Domain, jig_test_view::View<'static>) {
     crate::test::new(&choice_limits(), seed)
 }
 
-fn client(seed: u64) -> (jig_test_domain_client::Domain, jig_test_view::View) {
+fn client(seed: u64) -> (jig_test_domain_client::Domain, jig_test_view::View<'static>) {
     crate::test::new(&receiving_limits(), seed)
 }
 

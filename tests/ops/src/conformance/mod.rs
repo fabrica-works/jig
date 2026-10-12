@@ -209,6 +209,9 @@ impl Application for Ops {
     fn policy(peers: &Peers) -> &r::Policy {
         &peers.policy
     }
+    fn policy_generation(_: &Peers) -> u64 {
+        0
+    }
     fn recovery(_: &Config, connector: u16, kind: u16) -> r::Recovery {
         match (connector, kind) {
             (2, 1 | 4) => r::Recovery::Keyed,

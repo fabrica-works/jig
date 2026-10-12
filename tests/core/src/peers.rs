@@ -22,6 +22,7 @@ pub struct Peers {
     pub upstream: Vec<workers::Up>,
     pub requests: Vec<parties::Up>,
     party_flights: BTreeMap<u64, usize>,
+    party_marks: BTreeMap<usize, (u64, Option<u64>, parties::Role)>,
     call_hosts: BTreeMap<core::CallKey, (u64, u32)>,
     pub protocol: crate::protocol::Stand,
     opaque: BTreeMap<OpaqueName, (u64, u32)>,
@@ -36,6 +37,7 @@ impl Peers {
             upstream: Vec::new(),
             requests: Vec::new(),
             party_flights: BTreeMap::new(),
+            party_marks: BTreeMap::new(),
             call_hosts: BTreeMap::new(),
             protocol: crate::protocol::Stand::new(crate::world::limits().core),
             opaque: BTreeMap::new(),
@@ -45,6 +47,7 @@ impl Peers {
     /// Reconnect the independently retained peers to a cold engine.
     pub fn restart(&mut self) {
         self.party_flights.clear();
+        self.party_marks.clear();
         for worker in &mut self.workers {
             worker.restart_engine();
         }
@@ -162,8 +165,13 @@ impl Peers {
         let reports: Vec<_> = self.workers.iter_mut().flat_map(|worker| worker.tick(now)).collect();
         let mut events: Vec<_> = reports.into_iter().map(|up| self.worker_event(up)).collect();
         for index in 0..self.parties.len() {
-            let entry = waiting(store, &self.parties[index]);
-            self.parties[index].waiting(entry);
+            let party = &self.parties[index];
+            let mark = (store.applied, party.person, party.role);
+            if self.party_marks.get(&index) != Some(&mark) {
+                let entry = waiting(store, party);
+                self.parties[index].waiting(entry);
+                self.party_marks.insert(index, mark);
+            }
             if let Some(up) = self.parties[index].tick(now) {
                 events.push(self.party_event(index, up));
             }

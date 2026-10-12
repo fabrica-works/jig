@@ -41,6 +41,7 @@ fn a_failed_commit_stops_the_root_before_its_effect_or_answer_leaves() {
 #[test]
 fn slow_pages_delay_a_cold_start_without_skipping_the_live_rows() {
     let mut world = World::new(123, false);
+    world.enable_tracing();
     world.turn(1, 3, None, b"kept before slow restart");
     world.call(1, 802);
     let durable = world.store.applied;

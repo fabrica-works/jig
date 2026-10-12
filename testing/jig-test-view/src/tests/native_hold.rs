@@ -136,11 +136,11 @@ fn load(root: &mut Domain, task: Task) -> Vec<Request> {
         }),
     )
 }
-pub(super) fn view() -> View {
+pub(super) fn view() -> View<'static> {
     let jig = words();
     let first = family_words();
     let limits = limits();
-    let bounds = Limits::for_world(&limits, &jig, &first, 1024, 256).unwrap();
+    let bounds = Limits::for_world(&limits, jig, first, 1024, 256).unwrap();
     View::new(&bounds, &limits, jig, first, first::Address { project: 3, item: 5 })
 }
 

@@ -117,6 +117,7 @@ fn a_request_sent_twice_is_made_once_across_an_engine_restart() {
     let mut world = super::configured_world(super::turn(), |front| front.restart_configuration(configuration));
     let client = world.client(1, crate::stories::conversation());
     let within = Duration::from_secs(1);
+    world.front().session.driver.world.enable_tracing();
     world.person(
         client,
         vec![
