@@ -1,0 +1,140 @@
+use crate::{Decoded, Limits, Problem, Why, json, nested, notes};
+use alloc::boxed::Box;
+use jig_domain_core as core;
+use jig_domain_tasks as tasks;
+use skein_lib::Wall;
+
+#[must_use]
+pub fn decode(tool: &[u8], input: &[u8], limits: &Limits) -> Decoded {
+    let mut known = false;
+    for item in crate::declarations() {
+        if item.name == tool {
+            known = true;
+        }
+    }
+    if !known {
+        return Decoded::NotMine;
+    }
+    match read(tool, input, limits) {
+        Ok(decoded) => decoded,
+        Err(problem) => Decoded::Problem(problem),
+    }
+}
+
+fn read(tool: &[u8], input: &[u8], limits: &Limits) -> Result<Decoded, Problem> {
+    let value = json::parse(input, limits)?;
+    let action = match tool {
+        b"delegate" => return Ok(Decoded::Delegate(delegates(value.required(b"batch")?, limits)?)),
+        b"message" => message(&value)?,
+        b"cancel" => core::NamedAction::Control {
+            target: value.required(b"target")?.number()?,
+            control: tasks::Control::Cancel { reason: value.required(b"reason")?.text()? },
+        },
+        b"release" => core::NamedAction::Control {
+            target: value.required(b"target")?.number()?,
+            control: tasks::Control::Release { again: None, message: None },
+        },
+        b"introduce" => core::NamedAction::Introduce {
+            left: value.required(b"left")?.number()?,
+            right: value.required(b"right")?.number()?,
+        },
+        b"withdraw" => core::NamedAction::WithdrawProposal { proposal: value.required(b"proposal")?.number()? },
+        b"unsubscribe" => core::NamedAction::Unsubscribe { subscription: value.required(b"subscription")?.number()? },
+        b"amend" => core::NamedAction::Amend {
+            target: value.required(b"target")?.number()?,
+            amendment: nested::amendment(value.required(b"amendment")?)?,
+        },
+        b"decide" => {
+            let choice = match value.required(b"decision")?.text()?.as_ref() {
+                b"accept" => core::ProposalChoice::Accept,
+                b"reject" => core::ProposalChoice::Reject { reason: value.required(b"reason")?.text()? },
+                b"pass" => core::ProposalChoice::Pass,
+                _ => return Err(Problem { field: b"decision", why: Why::Range }),
+            };
+            core::NamedAction::DecideProposal {
+                proposer: value.required(b"proposer")?.number()?,
+                proposal: value.required(b"proposal")?.number()?,
+                choice,
+            }
+        }
+        b"decide_escalation" => {
+            let choice = match value.required(b"decision")?.text()?.as_ref() {
+                b"release" => core::EscalationChoice::Release,
+                b"reject" => core::EscalationChoice::Reject { reason: value.required(b"reason")?.text()? },
+                b"pass" => core::EscalationChoice::Pass,
+                _ => return Err(Problem { field: b"decision", why: Why::Range }),
+            };
+            core::NamedAction::DecideEscalation {
+                task: value.required(b"task")?.number()?,
+                revision: value.required(b"revision")?.number()?,
+                choice,
+            }
+        }
+        b"subscribe" => {
+            let kind = match value.required(b"kind")?.text()?.as_ref() {
+                b"task" => tasks::SubscriptionKind::Task {
+                    target: value.required(b"target")?.number()?,
+                    held: false,
+                    result: true,
+                },
+                b"timer" => tasks::SubscriptionKind::Timer {
+                    at: Wall::from_nanos(value.required(b"at")?.number()?),
+                    period: match value.field(b"period")? {
+                        Some(value) => Some(skein_lib::Duration::from_nanos(value.number()?)),
+                        None => None,
+                    },
+                },
+                _ => return Err(Problem { field: b"kind", why: Why::Range }),
+            };
+            core::NamedAction::Subscribe { kind }
+        }
+        b"propose" => {
+            let reason = value.required(b"reason")?.text()?;
+            let kind = value.required(b"action")?.text()?;
+            match kind.as_ref() {
+                b"batch" => core::NamedAction::ProposeBatch {
+                    batch: delegates(value.required(b"batch")?, limits)?,
+                    reason,
+                    as_holder: false,
+                },
+                _ => return Err(Problem { field: b"action", why: Why::Range }),
+            }
+        }
+        b"note" => {
+            let (entry, recalled) = notes::new(&value)?;
+            core::NamedAction::Note { entry, recalled }
+        }
+        b"recall" => {
+            let (by, page) = notes::recall(&value)?;
+            core::NamedAction::Recall { by, page }
+        }
+        _ => return Err(Problem { field: b"", why: Why::Malformed }),
+    };
+    Ok(Decoded::Action(action))
+}
+
+pub fn batch(input: &[u8], limits: &Limits) -> Result<Box<[core::Delegate]>, Problem> {
+    let value = json::parse(input, limits)?;
+    delegates(value.required(b"batch")?, limits)
+}
+
+fn delegates(value: &json::Value, limits: &Limits) -> Result<Box<[core::Delegate]>, Problem> {
+    if value.array()?.len() > usize::try_from(limits.batch).expect("u32 fits usize") {
+        return Err(Problem { field: b"batch", why: Why::TooLarge });
+    }
+    nested::delegates(value)
+}
+
+fn message(value: &json::Value) -> Result<core::NamedAction, Problem> {
+    let kind = match value.required(b"form")?.text()?.as_ref() {
+        b"words" => tasks::MessageKind::Words,
+        b"question" => tasks::MessageKind::Question,
+        b"answer" => tasks::MessageKind::Answer { question: value.required(b"question")?.number()? },
+        _ => return Err(Problem { field: b"form", why: Why::Range }),
+    };
+    Ok(core::NamedAction::Message {
+        target: value.required(b"target")?.number()?,
+        kind,
+        words: value.required(b"words")?.text()?,
+    })
+}

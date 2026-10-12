@@ -41,6 +41,7 @@ members = [
     "crates/jig-domain-views",
     "crates/jig-domain-host",
     "crates/jig-protocol-charter",
+    "crates/jig-protocol-tools",
     "tests/accounts",
     "tests/brief",
     "tests/fleet",
@@ -59,6 +60,7 @@ rust-version = "1.95"
 publish = false
 
 [workspace.dependencies]
+jig-protocol-tools = { path = "crates/jig-protocol-tools" }
 jig-client-world = { path = "tests/client" }
 jig-domain-client = { path = "crates/jig-domain-client" }
 jig-protocol-transcript = { path = "crates/jig-protocol-transcript" }

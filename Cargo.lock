@@ -455,6 +455,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "jig-protocol-tools"
+version = "0.0.0"
+dependencies = [
+ "jig-domain-authority",
+ "jig-domain-core",
+ "jig-domain-notes",
+ "jig-domain-tasks",
+ "skein-json",
+ "skein-lib",
+]
+
+[[package]]
 name = "jig-protocol-transcript"
 version = "0.0.0"
 dependencies = [
