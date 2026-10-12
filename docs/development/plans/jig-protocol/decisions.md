@@ -180,7 +180,21 @@ the file.
 
 ## The supervisor's rulings
 
-(none yet)
+101. **A primary checkout behind `origin/main` is no block** (2026-10-12,
+     the coordinator's block "smith 01.1: primary checkout behind
+     origin/main", 2026-10-12T15:00:00Z). Other machines land in skein and
+     smith while this plan runs (smith's reliability plan), so a primary
+     checkout's `main` falls behind `origin/main` between this run's own
+     landings there; `land` fast-forwards it at the next one
+     (development.md, 9.1, step 5). From now until the run's end, when
+     `plan check` prints `FAIL <repository>: main is 0 ahead and <N>
+     behind origin/main`, the coordinator runs `git -C
+     /srv/data/git/runner/src/<repository> merge --ff-only origin/main`,
+     then `plan check` once more, and goes on; it writes nothing to
+     `blocked.md` for it. A `main` with commits `origin` lacks ("<N>
+     ahead", N above 0), or a merge that fails, is still a block, as
+     development.md, 9.6 says. Proposed for the retrospective: `plan check
+     --fix` fast-forwards a primary checkout that is only behind.
 
 ## For the user
 
