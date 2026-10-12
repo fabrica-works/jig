@@ -350,6 +350,15 @@ Shape:
   that ignored `from` is a root's bug, failing the preparation as a bad
   page does) and counts only the window in `Transcript.bytes`;
   `transcript_oversized` and `resumed_turns` judge the window.
+- The unread answer (ruling 127): `core::Event::TranscriptUnread { task:
+  u64 }`, which a root sends when the store answers the task's transcript
+  as unread, routed to `tasks::Event::PreparationUnread { task: u64 }`:
+  a preparing task's attempt fails as transient, under the existing retry
+  policy, and its next run starts fresh, as the fresh-start rule at
+  `run_preparation.rs:245` starts one. The roots and worlds that load
+  transcripts send it where their loader finds a transcript unread; the
+  matches the new variants need are added as ruling 112 says. Production
+  lines for this count toward 06.4's Size, now at most 120.
 Test shape:
 - `tests/core/tests/runs.rs`: new scenarios
   `a_chat_resumed_after_a_compaction_is_sent_only_its_window` (engine.md,
@@ -362,12 +371,14 @@ Test shape:
   gains a turn before the window's start, refused. Each under 0.5 s.
 - `tests/core/tests/restart.rs`: `a_restart_between_a_window_turn_and_its_resume_sends_the_window`.
   Under 0.5 s.
+- `tests/core/tests/runs.rs`: `a_transcript_read_as_unread_fails_the_run_and_the_next_starts_fresh`
+  (ruling 127). Under 0.5 s.
 Proof: world, `heavy cargo nextest run -p jig-core-world --test runs -E 'test(runs_scenarios)'`,
 once: a chat that compacted resumes with its window turn first and none
 of the turns before it; under 0.5 s.
 Don't: send a run an earlier window's turns; drop the calls committed
 since the last turn from a resume (they stay its note, engine.md, 7.2).
-Size: at most 60 lines of production code.
+Size: at most 120 lines of production code (ruling 127).
 Removes: the resume's count of the conversation's turns before its window in
 `append_transcript`.
 

@@ -506,6 +506,17 @@ the file.
      `TaskRecord.refused` names only messages still in the inbox, and the
      newer hint is delivered as any message is (option A). No type
      changes.
+127. **jig 06.4 lands the unread transcript's events** (2026-10-12, the
+     coordinator's block "jig 06.4: unread transcript has no
+     preparation-transient event", 2026-10-12T19:08:39Z). A plan defect:
+     06.4's Scope says a transcript the store answers as unread "fails the
+     run as transient, and the next run of its task starts fresh ... the
+     core's transcript load gains that answer here", and jig 17's file
+     expects "the core event jig 06 lands for it", but 06.4's Shape names
+     none. 06.4 adds `core::Event::TranscriptUnread { task }` and
+     `tasks::Event::PreparationUnread { task }`, as its implementer
+     proposed (store.md, 8.3: "the run fails as transient and the next
+     starts fresh"); its Shape, Test shape and Size (120) now say so.
 
 ## For the user
 
