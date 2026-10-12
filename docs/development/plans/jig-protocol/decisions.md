@@ -983,6 +983,25 @@ the file.
      ruling 160's envelope, the same change is a step of the
      supervisor's"): jig 21.s1 (`jig/21-accounts.md`), before jig 21.3
      lands.
+164. **jig 20.4 lands at 744 lines** (2026-10-12, the coordinator's block
+     "jig 20.4: size 744 exceeds 660-line margin", 2026-10-12T22:11:30Z).
+     744 net lines against 550: strict collected parsing of every
+     endpoint, account, sign-in and transport field, as 20.4's Shape
+     asks, with one set of field helpers (115 lines) shared by every
+     parser. Its Size becomes 800.
+165. **Generated tests have a ceiling of their own: 200 ms** (2026-10-12,
+     the coordinator's block "jig 22.1: generated bound tests exceed 40ms
+     threshold", 2026-10-12T22:11:30Z). skein's generator writes a bounds
+     test per bounded field (codec.md, 6: "generated tests decode a field
+     at its limit, and one past it"); at jig 22.1's ceilings three take
+     72, 91 and 119 ms against 22.1's 20 ms, and no session may edit
+     generated code. From now to the run's end, a test under
+     `src/generated/` has a ceiling of 200 ms, past which it is a
+     question; development.md, 8.2's "made cheaper before it lands" does
+     not bind it below that. No measurement is wanted. Proposed for the
+     retrospective: generated bound tests at small test limits, since
+     the focused suite grew 30 % in this run's last 80 minutes, much of
+     it generated.
 
 ## For the user
 

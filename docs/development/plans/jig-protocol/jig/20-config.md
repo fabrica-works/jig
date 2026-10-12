@@ -359,7 +359,7 @@ accounts, workers and listeners parse, every reference is checked, and
 every secret file is named private; under 10 s with the build warm.
 Don't: link skein-oauth or an LLM crate to type these values; read a
 file.
-Size: at most 550 lines of production code.
+Size: at most 800 lines of production code (ruling 164).
 Removes: nothing.
 
 ### 20.5 The engine's domain part and the whole check

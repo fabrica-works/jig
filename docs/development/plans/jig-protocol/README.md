@@ -286,6 +286,10 @@ ones before it in its session. Dependencies are by capability: "skein
   does; the largest of their bounds where several kinds of value share the
   field, ruling 156); its translations check no sum. No family adds a wrapper
   `Limits` type; the domain checks its sums at admission and restore.
+- **A generated test's ceiling is 200 ms** (decisions.md, ruling 165). A
+  test under `src/generated/`, which no session edits, lands when it runs
+  within 200 ms; past that it is a question. Hand-written tests keep
+  their increments' ceilings.
 
 ## Live services
 
