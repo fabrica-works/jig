@@ -44,3 +44,8 @@ fn the_component_familys_code_and_goldens_have_no_drift() {
 fn the_tasks_familys_code_and_goldens_have_no_drift() {
     check("tasks");
 }
+
+#[test]
+fn the_people_familys_code_and_goldens_have_no_drift() {
+    check("people");
+}

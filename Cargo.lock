@@ -484,10 +484,15 @@ dependencies = [
 name = "jig-protocol-store"
 version = "0.0.0"
 dependencies = [
+ "jig-domain-accounts",
+ "jig-domain-authority",
+ "jig-domain-brief",
  "jig-domain-core",
+ "jig-domain-fleet",
  "jig-domain-notes",
  "jig-domain-people",
  "jig-domain-tasks",
+ "jig-domain-views",
  "skein-codec",
  "skein-io",
  "skein-kv",

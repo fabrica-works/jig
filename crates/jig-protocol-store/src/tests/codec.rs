@@ -488,3 +488,127 @@ fn decoded_verdict_rules_past_their_aggregate_byte_bound_are_refused() {
 }
 
 mod phase;
+
+fn core_limits() -> jig_domain_core::Limits {
+    fixtures::CORE_LIMITS
+}
+
+fn people_limits() -> crate::people_v1::Limits {
+    crate::codec::people::limits(&core_limits()).expect("within people's ceilings")
+}
+
+fn people_round_trip(row: jig_domain_people::Stored) {
+    let limits = people_limits();
+    let bytes = crate::codec::people::encode(&row, &limits).expect("within people's bounds");
+    assert_eq!(crate::codec::people::decode(&bytes, &limits), Ok(row));
+}
+
+fn ask_round_trip(ask: jig_domain_people::Ask) {
+    let limits = people_limits();
+    let value = crate::codec::people::encode_ask(&ask, &limits).expect("bounded ask");
+    let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("bounded length"));
+    value.encode(&mut writer).expect("measured room");
+    let bytes = writer.finish();
+    let read = crate::people_v1::Ask::decode(&limits, &mut skein_lib::Reader::new(&bytes)).expect("saved ask");
+    assert_eq!(crate::codec::people::decode_ask(read), ask);
+}
+
+#[test]
+fn a_person_reads_back_with_its_identity() {
+    people_round_trip(jig_domain_people::Stored::Person { number: u64::MAX, identity: fixtures::identity() });
+}
+
+#[test]
+fn a_projects_policy_reads_back() {
+    people_round_trip(jig_domain_people::Stored::Policy { project: 3, value: fixtures::people_policy() });
+}
+
+#[test]
+fn a_policy_larger_than_one_amendment_reads_back() {
+    let mut value = fixtures::people_policy();
+    let first = value.roles[0].clone();
+    let mut second = first.clone();
+    second.number = 5;
+    value.roles = Box::new([first, second]);
+    people_round_trip(jig_domain_people::Stored::Policy { project: 3, value });
+}
+
+#[test]
+fn shared_people_fields_take_the_larger_policy_bound() {
+    let mut domain = core_limits();
+    domain.people.amendment_bytes = 16;
+    domain.authority.segment_bytes = 32;
+    domain.authority.segments = 3;
+    let limits = crate::codec::people::limits(&domain).expect("within ceilings");
+    assert_eq!(limits.segment_bytes, 32);
+    assert_eq!(limits.pattern_segments, 3);
+}
+
+#[test]
+fn each_kind_of_ask_reads_back() {
+    for ask in fixtures::people_asks() {
+        ask_round_trip(ask);
+    }
+}
+
+#[test]
+fn a_read_chat_position_reads_back() {
+    people_round_trip(jig_domain_people::Stored::ReadChat { party: 3, task: 4, through: u64::MAX });
+}
+
+#[test]
+fn a_sign_in_reads_back_with_its_wall_expiry() {
+    people_round_trip(jig_domain_people::Stored::SignIn {
+        number: 2,
+        person: 3,
+        expires: skein_lib::Wall::from_nanos(u64::MAX),
+    });
+}
+
+#[test]
+fn every_role_reads_back_in_a_roster() {
+    use jig_domain_people::{Holding, Role, Stored};
+    for role in [Role::Owner, Role::Maintainer, Role::Member, Role::Observer, Role::Policy { role: u32::MAX }] {
+        people_round_trip(Stored::Roles { project: 3, holdings: Box::new([Holding { person: 4, role }]) });
+    }
+}
+
+#[test]
+fn a_read_results_position_reads_back() {
+    people_round_trip(jig_domain_people::Stored::ReadResults { party: 3, through: u64::MAX });
+}
+
+#[test]
+fn people_limits_past_their_ceilings_are_refused() {
+    let mut limits = core_limits();
+    limits.people.amendment_bytes = u32::MAX;
+    assert_eq!(crate::codec::people::limits(&limits), None);
+}
+
+#[test]
+fn a_person_identity_field_past_its_limit_is_refused() {
+    let mut identity = fixtures::identity();
+    identity.key.subject = Box::new([0; 33]);
+    assert_eq!(
+        crate::codec::people::encode(&jig_domain_people::Stored::Person { number: 1, identity }, &people_limits()),
+        Err(crate::people_v1::Problem {
+            path: crate::people_v1::Path::IdentityKeySubject,
+            reason: skein_codec::Reason::Bound
+        })
+    );
+}
+
+#[test]
+fn a_people_row_of_another_version_does_not_decode() {
+    let limits = people_limits();
+    let row = jig_domain_people::Stored::ReadResults { party: 1, through: 2 };
+    let mut bytes = crate::codec::people::encode(&row, &limits).expect("fixed row");
+    *bytes.get_mut(1).expect("version prefix") = 2;
+    assert_eq!(
+        crate::codec::people::decode(&bytes, &limits),
+        Err(crate::people_v1::Problem {
+            path: crate::people_v1::Path::RowVersion,
+            reason: skein_codec::Reason::Version
+        })
+    );
+}

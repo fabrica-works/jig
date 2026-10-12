@@ -1,5 +1,5 @@
 //! Arbitrary and mutated family bytes (protocol/store.md, sections 5.1 and 14).
-use jig_protocol_store::{component_v1, notes_v1};
+use jig_protocol_store::{component_v1, notes_v1, people_v1};
 use skein_lib::{Reader, Rng, Writer};
 use std::{fs, path::Path};
 
@@ -94,4 +94,21 @@ fn arbitrary_tasks_rows_never_panic_and_round_trip_when_they_decode() {
 #[test]
 fn mutated_tasks_goldens_never_panic() {
     mutated("tasks", 0x5706_e014, tasks);
+}
+
+fn people(bytes: &[u8]) {
+    if let Ok(row) = people_v1::Row::decode(&people_v1::CEILINGS, &mut Reader::new(bytes)) {
+        let mut writer = Writer::new(usize::try_from(row.measure()).expect("measured length"));
+        row.encode(&mut writer).expect("measured room");
+        assert_eq!(writer.finish().as_ref(), bytes);
+    }
+}
+
+#[test]
+fn arbitrary_people_rows_never_panic_and_round_trip_when_they_decode() {
+    arbitrary(0x5701_e019, people);
+}
+#[test]
+fn mutated_people_goldens_never_panic() {
+    mutated("people", 0x5702_e019, people);
 }

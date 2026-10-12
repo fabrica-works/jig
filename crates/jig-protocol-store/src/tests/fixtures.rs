@@ -508,3 +508,267 @@ pub fn task_wake() -> jig_domain_tasks::WakePolicy {
         timers: true,
     }
 }
+
+pub const PEOPLE_LIMITS: people::Limits = people::Limits {
+    people: 2,
+    inbox_entries: 2,
+    inbox_tasks: 2,
+    inbox_recipients: 2,
+    sign_ins: 2,
+    projects: 2,
+    holdings: 2,
+    goals: 2,
+    initial_owners: 2,
+    requests: 2,
+    room_refusals: 2,
+    pending: 2,
+    waiters: 2,
+    identity_bytes: 32,
+    words: 32,
+    amendment_bytes: 512,
+    sign_in_lifetime: skein_lib::Duration::from_nanos(1_000),
+    request_retention: skein_lib::Duration::from_nanos(1_000),
+    facts: 2,
+};
+
+pub fn identity() -> people::Identity {
+    people::Identity {
+        key: people::IdentityKey { provider: 3, subject: Box::from(b"subject".as_slice()) },
+        login: Box::from(b"login".as_slice()),
+        name: Box::from(b"name".as_slice()),
+    }
+}
+
+pub fn people_pattern() -> people::Pattern {
+    people::Pattern { segments: Box::new([Box::from(b"a".as_slice())]), last: people::Last::Open(Box::new([0, 255])) }
+}
+
+pub fn people_authority() -> people::Authority {
+    people::Authority {
+        tools: 9,
+        grants: Box::new([people::Grant { connector: 1, kind: 2, pattern: people_pattern() }]),
+        delegation: people::Delegation {
+            kinds: Box::new([people::Executor::Charter(3), people::Executor::Procedure(4), people::Executor::Role(5)]),
+            tasks: 2,
+            depth: 3,
+        },
+        spend: 17,
+        deadline: Some(skein_lib::Wall::from_nanos(u64::MAX)),
+        notes: 3,
+        note_resources: Box::new([people::ResourceScope { connector: 1, pattern: people_pattern() }]),
+    }
+}
+
+pub fn people_policy() -> people::PolicyValue {
+    people::PolicyValue {
+        period_spend: 99,
+        projections: Box::new([]),
+        roles: Box::new([people::PolicyRole {
+            number: 4,
+            authority: people_authority(),
+            period_spend: 33,
+            requests: 2,
+            decides: 3,
+        }]),
+        requirements: Box::new([people::Requirement {
+            connector: 1,
+            kind: 2,
+            pattern: people_pattern(),
+            judge: people::Judge { connector: 2, requirement: 3, parameters: 4 },
+            guard: people::Guard::Observed { freshness: skein_lib::Duration::from_nanos(91) },
+            must_be_guarded: true,
+        }]),
+        permissions: Box::new([people::PermissionRole { connector: 1, permission: 2, role: 4 }]),
+    }
+}
+
+pub fn people_amendment() -> people::Amendment {
+    people::Amendment {
+        addressed: Some(people::AddressChange { revision: 7, address: people::PersonAddress::Role(4) }),
+        instructions: Some(Box::new([0, 255])),
+        spec: Some(people::Spec {
+            words: Box::new([1]),
+            parameters: Box::new([
+                people::Parameter::Number { name: 3, value: 8 },
+                people::Parameter::Bytes { name: 4, value: Box::new([0]) },
+                people::Parameter::Resource { name: 5, connector: 1, resource: 6 },
+            ]),
+            inputs: Box::new([8]),
+        }),
+        wake: Some(people::WakePolicy {
+            words: people::WakeRule::Never,
+            notices: people::WakeRule::Immediate,
+            news: people::WakeRule::Batch { count: 2, age: skein_lib::Duration::from_nanos(99) },
+            results: people::ResultsWake::LastOrFailure,
+            questions: true,
+            answers: false,
+            timers: true,
+        }),
+        dependencies: Some(Box::new([9])),
+        authority: Some(people_authority()),
+        reason: Box::new([2]),
+    }
+}
+
+pub fn people_asks() -> Box<[people::Ask]> {
+    use people::{Ask, Proposer};
+    let mut disposals = skein_lib::List::with_capacity(1);
+    disposals.push(people::Disposal { task: 2, keep: people::Keep::MakeMine }).expect("one disposal");
+    Box::new([
+        Ask::Close { project: 1, chat: 2, disposals },
+        Ask::MarkSeen { seen: people::Seen::Chat { task: 2, through: 3 } },
+        Ask::Application { project: 1, connector: 2, digest: [3; 32] },
+        Ask::EditNote {
+            project: 1,
+            name: 2,
+            scope: Box::new(people::NoteScope::Resources { connector: 1, pattern: people_pattern() }),
+            change: Box::new(people::NoteChange::Correct {
+                description: Box::new([2]),
+                body: Box::new([0, 255]),
+                references: Box::new([3]),
+                recalled: 4,
+            }),
+        },
+        Ask::MakeService { project: 1, name: Box::new([2]), role: people::Role::Maintainer },
+        Ask::Adopt {
+            project: 1,
+            adoption: people::Adoption {
+                resource: people::ResourceName { connector: 1, path: Box::new([Box::new([2])]) },
+                role: people::ResourceRole::Owned,
+                options: Box::new([Box::new([3])]),
+            },
+        },
+        Ask::SetGoal {
+            project: 1,
+            spec: Box::new([2]),
+            executor: people::GoalExecutor::Procedure { connector: 1, code: 2 },
+            budget: 3,
+            priority: 4,
+            deadline: Some(skein_lib::Wall::from_nanos(5)),
+        },
+        Ask::Stop { project: 1, task: 2 },
+        Ask::Cancel { project: 1, task: 2, reason: Box::new([3]) },
+        Ask::Release { project: 1, task: 2, revision: 3, again: Some(true) },
+        Ask::TakePerson { project: 1, task: 2 },
+        Ask::HandBackPerson { project: 1, task: 2 },
+        Ask::AnswerPerson {
+            project: 1,
+            task: 2,
+            revision: 3,
+            result: people::PersonResult::Approved { state: Box::new([2]), words: Some(Box::new([3])) },
+        },
+        Ask::Move { project: 1, task: 2, reason: Box::new([3]) },
+        Ask::DecideProposal {
+            project: 1,
+            proposer: Proposer::Party(2),
+            proposal: 3,
+            decision: people::ProposalDecision::Reject { reason: Box::new([4]) },
+        },
+        Ask::Say { project: 1, task: 2, words: Box::new([3]), release: true },
+        Ask::AnswerQuestion { project: 1, task: 2, question: 3, words: Box::new([4]) },
+        Ask::Prioritise { project: 1, goals: Box::new([(2, 3)]) },
+        Ask::Amend { project: 1, task: 2, revision: 3, amendment: people_amendment(), release: Some(4) },
+        Ask::SetRoles {
+            project: 1,
+            holdings: Box::new([people::Holding { person: 2, role: people::Role::Policy { role: 4 } }]),
+        },
+        Ask::ChangePolicy {
+            project: 1,
+            change: people::PolicyChange::Role(people::PolicyRole {
+                number: 4,
+                authority: people_authority(),
+                period_spend: 5,
+                requests: 2,
+                decides: 3,
+            }),
+        },
+        Ask::SetPool { project: 1, person: 2, budget: 3 },
+        Ask::DecideEscalation {
+            project: 1,
+            task: 2,
+            revision: 3,
+            decision: people::EscalationDecision::Reject { reason: Box::new([4]) },
+        },
+        Ask::StartChat { project: 1, words: Box::new([2]) },
+    ])
+}
+
+pub const CORE_LIMITS: core::Limits = core::Limits {
+    fill_mark: 1000,
+    documents: core::documents::DocumentLimits {
+        rows: 32,
+        text_bytes: 256,
+        chips: 32,
+        lines: 32,
+        versions: core::documents::Versions { minimum: 1, maximum: 1 },
+    },
+    connectors: 2,
+    resume_bytes: 256,
+    run_bytes: 256,
+    policy_bytes: 8192,
+    escalation_reason_bytes: 128,
+    load_slots: 2,
+    load_bytes: 65_536,
+    call_records: 2,
+    call_answer_bytes: 256,
+    tasks: TASKS_LIMITS,
+    authority: core_authority_limits(),
+    people: PEOPLE_LIMITS,
+    fleet: core_fleet_limits(),
+    brief: jig_domain_brief::Limits { briefs: 2, sections: 3, read_bytes: 256, brief_bytes: 384 },
+    brief_parts: 2,
+    brief_core_budgets: core::CoreBriefBudgets { task: 128, dependencies: 128, attempts: 128, plan: 128, notes: 64 },
+    accounts: jig_domain_accounts::Limits {
+        accounts: 1,
+        credentials: 2,
+        backoff_base: skein_lib::Duration::from_nanos(2_000_000_000),
+        backoff_max: skein_lib::Duration::from_nanos(8_000_000_000),
+        retry: skein_lib::Duration::from_nanos(30_000_000_000),
+        spent_attention: skein_lib::Duration::from_nanos(1_000_000_000),
+        facts: 2,
+    },
+    views: jig_domain_views::Limits {
+        runs: 2,
+        watchers: 4,
+        watchers_per_party: 8,
+        subjects_per_change: 64,
+        text_bytes: 64,
+        facts: 8,
+    },
+    notes: NOTES_LIMITS,
+};
+const fn core_authority_limits() -> jig_domain_authority::Limits {
+    jig_domain_authority::Limits {
+        projects: 1,
+        roles: 2,
+        requirements: 1,
+        facts: 2,
+        grants: 1,
+        executors: 2,
+        segments: 1,
+        segment_bytes: 32,
+        implications: 0,
+        batch: 1,
+        accounts: 1,
+        writes: 1,
+    }
+}
+
+const fn core_fleet_limits() -> jig_domain_fleet::Limits {
+    jig_domain_fleet::Limits {
+        workers: 1,
+        needs_bytes: 4096,
+        engine_slots: 0,
+        slots: 1,
+        workstreams: 1,
+        attempts: 2,
+        grants: 8,
+        calls: 1,
+        call_name_bytes: 64,
+        progress_bytes: 64,
+        turns: 2,
+        grace: skein_lib::Duration::from_nanos(5_000_000_000),
+        facts: 2,
+        history: 2,
+    }
+}

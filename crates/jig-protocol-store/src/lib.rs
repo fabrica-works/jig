@@ -13,6 +13,9 @@ pub mod component_v1;
 #[path = "generated/notes_v1.rs"]
 pub mod notes_v1;
 #[rustfmt::skip]
+#[path = "generated/people_v1.rs"]
+pub mod people_v1;
+#[rustfmt::skip]
 #[path = "generated/tasks_v1.rs"]
 pub mod tasks_v1;
 pub mod keys;
