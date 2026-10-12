@@ -18,6 +18,7 @@ const LIMITS: Limits = Limits {
     slots: 3,
     workstreams: 3,
     attempts: 12,
+    grants: 4,
     calls: 4,
     call_name_bytes: 64,
     progress_bytes: 64,

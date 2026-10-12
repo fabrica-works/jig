@@ -93,6 +93,7 @@ fn has_watch_end(out: &[Request]) -> bool {
                 | Held::MakeEffect { .. }
                 | Held::SettledCall { .. }
                 | Held::Assign { .. }
+                | Held::Grant { .. }
                 | Held::Relayed { .. }
                 | Held::Inbound { .. }
                 | Held::Relay { .. }

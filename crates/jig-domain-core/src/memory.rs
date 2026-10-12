@@ -214,6 +214,9 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         total.checked_add(Map::<(u64, u16), ()>::worst_case(limits.tasks.tasks.checked_mul(limits.connectors)?)?)?;
     total = total.checked_add(Queue::<Box<tasks::RunContext>>::worst_case(limits.tasks.tasks)?)?;
     total = total.checked_add(Queue::<fleet::Event>::worst_case(limits.tasks.tasks.checked_mul(2)?)?)?;
+    let grants = bytes(limits.fleet.grants, sizeof(size_of::<fleet::Grant>())?)?
+        .checked_add(bytes(limits.fleet.grants, sizeof(size_of::<fleet::GrantName>())?)?)?;
+    total = total.checked_add(bytes(limits.tasks.tasks.checked_mul(2)?, grants)?)?;
 
     let task = &limits.tasks;
     let new_task = task_carrier(limits)?;

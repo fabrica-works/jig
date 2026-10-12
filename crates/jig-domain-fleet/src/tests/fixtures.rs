@@ -25,3 +25,12 @@ pub fn adopt(run: skein_lib::Token, attempt: skein_lib::Token, kept: u32) -> cra
         grants: Box::new([]),
     }
 }
+
+pub const ANALYST_FIRST: crate::Grant = crate::Grant {
+    table: crate::GrantTable::Accounts,
+    account: 1,
+    generation: 1,
+    valid: skein_lib::Duration::from_secs(60),
+};
+pub const ANALYST_SECOND: crate::Grant = crate::Grant { generation: 2, ..ANALYST_FIRST };
+pub const OTHER_ACCOUNT: crate::Grant = crate::Grant { account: 2, ..ANALYST_FIRST };

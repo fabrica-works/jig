@@ -103,6 +103,7 @@ fn limits() -> Limits {
         slots: 1,
         workstreams: 1,
         attempts: 2,
+        grants: 8,
         calls: 1,
         call_name_bytes: 64,
         progress_bytes: 64,

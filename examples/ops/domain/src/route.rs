@@ -274,6 +274,17 @@ fn core_held(domain: &mut Domain, decision: &mut Decision<Write, Output>, value:
             let answer = domain.payload(Payload::Settled(call));
             work.push(Work::Core(core::Event::Fleet(fleet::Event::Relayed { to, answer })));
         }
+        core::Held::Grant { channel, run, attempt, grant } => {
+            assert!(channel == Token::new(0), "ops engine's permanent link");
+            child(
+                decision,
+                Released::Host(host::Event::Down(host::LinkDown::Grant {
+                    run,
+                    attempt,
+                    grant: crate::assemble::host_grant(grant),
+                })),
+            );
+        }
         core::Held::Relayed { run, attempt, call, answer, .. } => {
             if let Some(released) = crate::assemble::relayed(domain, run, attempt, call, answer) {
                 child(decision, released);
@@ -523,7 +534,9 @@ fn core_ask(
                 child(
                     decision,
                     Released::Fleet(fleet::Event::Start {
-                        grants: Box::new([]),
+                        grants: crate::assemble::fleet_grants(
+                            &domain.assignments.get(&task).expect("prepared assignment").value.assignment.grants,
+                        ),
                         reply_to: ReplyTo::new(Token::new(task)),
                         run: Token::new(task),
                         attempt: Token::new(attempt),
@@ -1231,7 +1244,7 @@ fn core_now(domain: &mut Domain, env: &Env<Limits>, value: core::Now, work: &mut
         core::Now::WorkspaceRequest { task, attempt, .. } => {
             work.push(Work::Core(core::Event::WorkspacePrepared { task, attempt, writes: Some(Box::new([])) }));
         }
-        core::Now::RunPrepared { task, attempt, conversation, run, messages, transcript, grant, .. } => {
+        core::Now::RunPrepared { task, attempt, conversation, run, messages, transcript, grants, .. } => {
             let budget = run.budget;
             let sections = domain.briefs.remove(&task).expect("completed brief parts");
             match crate::assemble::assignment(
@@ -1244,7 +1257,7 @@ fn core_now(domain: &mut Domain, env: &Env<Limits>, value: core::Now, work: &mut
                 sections,
                 transcript,
                 messages,
-                grant,
+                grants,
             ) {
                 Some(value) => {
                     domain

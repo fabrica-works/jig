@@ -100,7 +100,7 @@
 
 use core::mem;
 
-use skein_lib::{Env, Id, Queue, ReplyTo, Slab, Time, Token};
+use skein_lib::{Env, Id, List, Queue, ReplyTo, Slab, Time, Token};
 
 use crate::boundary::{Answer, Assignment, HostKind, Kinds, Refusal, Request, Withdrawal};
 use crate::channel::{self, Channel};
@@ -124,6 +124,7 @@ pub(crate) struct Attempt {
     pub(crate) progress: Option<crate::Observation>,
     /// The parent's conversation state references for an assignment.
     pub(crate) assignment: Assignment,
+    pub(crate) grants: List<crate::grants::Kept>,
     pub(crate) state: State,
 }
 
@@ -276,7 +277,7 @@ pub(crate) fn start(
     kinds: Kinds,
     assignment: Assignment,
     out: &mut Queue<Request>,
-) {
+) -> bool {
     let refusal = if workstream == 0 {
         Some(Refusal::Workstream)
     } else if domain.names.contains_key(&(run, attempt)) {
@@ -288,11 +289,12 @@ pub(crate) fn start(
     };
     if let Some(refusal) = refusal {
         refuse(domain, to, Names { run, attempt }, refusal, out);
-        return;
+        return false;
     }
     replace(domain, run, out);
     let serial = next_serial(&mut domain.serial);
     insert(domain, run, attempt, false, assignment, State::Waiting { to, workstream, kinds, serial });
+    true
 }
 
 /// Adopt: a stray claimed, a kept answer handed over, or a claim adrift
@@ -306,12 +308,12 @@ pub(crate) fn adopt(
     attempt: Token,
     kept: u32,
     out: &mut Queue<Request>,
-) {
+) -> bool {
     let names = Names { run, attempt };
     let Some(&id) = domain.names.get(&(run, attempt)) else {
         if !has_room(domain, env) {
             refuse(domain, to, names, Refusal::Busy, out);
-            return;
+            return false;
         }
         replace(domain, run, out);
         let until = env.now.saturating_add(env.limits.grace);
@@ -325,7 +327,7 @@ pub(crate) fn adopt(
         );
         let id = *domain.names.get(&(run, attempt)).expect("inserted above");
         domain.attempts.get_mut(id).expect("inserted above").kept = kept;
-        return;
+        return true;
     };
     let entry = domain.attempts.get(id).expect("a named attempt is tracked");
     match &entry.state {
@@ -337,13 +339,13 @@ pub(crate) fn adopt(
         | State::Handed { .. }
         | State::Acknowledged { .. } => {
             refuse(domain, to, names, Refusal::Duplicate, out);
-            return;
+            return false;
         }
         // Cancelled for good: as far as the parent can tell, lost.
         State::Fenced { .. } => {
             domain.facts.push(Fact::PresumedLost);
             out.push(Request::Lost { to, run, attempt });
-            return;
+            return false;
         }
         State::Closed => unreachable!("a closed attempt is no longer named"),
     }
@@ -365,6 +367,7 @@ pub(crate) fn adopt(
         | State::Closed => unreachable!("only a stray or a kept answer is adopted, as matched above"),
     };
     follow(domain, id, before);
+    true
 }
 
 /// Cancel, from the parent. An attempt the fleet no longer tracks, or whose
@@ -461,6 +464,7 @@ pub(crate) fn place(
         | State::Closed => unreachable!("only a waiting attempt is queued for a slot"),
     };
     follow(domain, id, before);
+    crate::grants::resend(domain.attempts.get(id).expect("placed attempt"), &domain.channels, env.now, out);
 }
 
 /// Listed by the hello of the worker of `channel`: what it hosts is kept,
@@ -504,6 +508,7 @@ pub(crate) fn listed(
         State::Closed => unreachable!("a closed attempt is no longer named"),
     };
     follow(domain, id, before);
+    crate::grants::resend(domain.attempts.get(id).expect("listed attempt"), &domain.channels, env.now, out);
 }
 
 /// An answer, on the channel `channel`. Dropped unacknowledged if the channel
@@ -1020,6 +1025,7 @@ fn insert(domain: &mut Domain, run: Token, attempt: Token, listed: bool, assignm
         kept: 0,
         lost_host: None,
         progress: None,
+        grants: List::with_capacity(0),
         assignment,
         state,
     }) else {

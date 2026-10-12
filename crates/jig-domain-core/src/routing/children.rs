@@ -282,7 +282,9 @@ pub(super) fn tag_fleet(core: &mut Core, env: &Env<Limits>, mut child: Queue<fle
                 append_account(core, env, accounts::Event::Exhausted { account, retry_after }, &mut out);
                 continue;
             }
-            fleet::Request::Grant { .. } => unreachable!("account host grants are handled separately"),
+            fleet::Request::Grant { channel, run, attempt, grant } => {
+                Request::Held(Box::new(Held::Grant { channel, run, attempt, grant }))
+            }
             fleet::Request::Turned { run, attempt, turn, body } if core.stopping => {
                 let mut follow = Queue::with_capacity(fleet::max_out(&env.limits.fleet));
                 fleet::step(
@@ -328,11 +330,30 @@ fn append_account(core: &mut Core, env: &Env<Limits>, event: accounts::Event, ou
     }
 }
 
-pub(super) fn tag_account(mut child: Queue<accounts::Request>) -> Requests {
-    let mut out = Queue::with_capacity(child.capacity().checked_add(1).expect("account output room"));
+pub(super) fn tag_account(core: &mut Core, env: &Env<Limits>, mut child: Queue<accounts::Request>) -> Requests {
+    let room = child
+        .capacity()
+        .checked_mul(fleet::max_out(&env.limits.fleet).checked_add(1).expect("grant routes"))
+        .expect("account output room");
+    let mut out = Queue::with_capacity(room.checked_add(1).expect("account decision"));
     for _ in 0..child.len() {
-        let request = child.pop().expect("account output count");
-        out.push(Request::Now(Box::new(Now::Account(request))));
+        match child.pop().expect("account output count") {
+            accounts::Request::Granted { grant } => {
+                let Requests::Out(mut routed) =
+                    route_fleet(core, env, fleet::Event::Grant { grant: crate::sibling_routes::fleet_grant(grant) });
+                for _ in 0..routed.len() {
+                    match routed.pop().expect("grant output count") {
+                        Request::Decided => {}
+                        request @ (Request::Write(_) | Request::Ask { .. } | Request::Held(_) | Request::Now(_)) => {
+                            out.push(request);
+                        }
+                    }
+                }
+            }
+            request @ (accounts::Request::Component(_) | accounts::Request::Closed) => {
+                out.push(Request::Now(Box::new(Now::Account(request))));
+            }
+        }
     }
     out.push(Request::Decided);
     Requests::Out(out)
@@ -356,7 +377,7 @@ pub(super) fn route_account(core: &mut Core, env: &Env<Limits>, event: accounts:
         &mut out,
     );
     core.touch_deployment();
-    tag_account(out)
+    tag_account(core, env, out)
 }
 
 pub(super) fn route_brief(core: &mut Core, env: &Env<Limits>, event: brief::GatherEvent) -> Requests {
@@ -370,7 +391,19 @@ pub(super) fn route_brief(core: &mut Core, env: &Env<Limits>, event: brief::Gath
     tag_brief(core, env, out, brief::gather_max_out(&env.limits.brief))
 }
 
-pub(super) fn route_fleet(core: &mut Core, env: &Env<Limits>, event: fleet::Event) -> Requests {
+pub(super) fn route_fleet(core: &mut Core, env: &Env<Limits>, mut event: fleet::Event) -> Requests {
+    if let fleet::Event::Start { grants, .. } = &mut event {
+        for grant in &mut **grants {
+            match grant.table {
+                fleet::GrantTable::Accounts => {
+                    if let Some(current) = core.accounts.grant(grant.account, env.now) {
+                        *grant = crate::sibling_routes::fleet_grant(current);
+                    }
+                }
+                fleet::GrantTable::Application => {}
+            }
+        }
+    }
     let touched = match &event {
         fleet::Event::Start { .. }
         | fleet::Event::Adopt { .. }

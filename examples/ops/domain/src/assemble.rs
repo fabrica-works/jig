@@ -7,6 +7,7 @@ use alloc::boxed::Box;
 use jig_domain_accounts as accounts;
 use jig_domain_brief as brief;
 use jig_domain_core as core;
+use jig_domain_fleet as fleet;
 use jig_domain_host as host;
 use jig_domain_tasks as tasks;
 use jig_ops_domain_connectors::Connector;
@@ -54,7 +55,7 @@ pub(crate) fn assignment(
     sections: Box<[charter::Section]>,
     transcript: Box<[Box<[u8]>]>,
     messages: Box<[tasks::Word]>,
-    grant: accounts::Grant,
+    grants: Box<[accounts::Grant]>,
 ) -> Option<host::Assignment> {
     let policy = run.policy;
     let mut models = List::with_capacity(u32::try_from(policy.alternatives.len()).ok()?);
@@ -105,6 +106,19 @@ pub(crate) fn assignment(
             })
             .ok()?;
     }
+    let mut held = List::with_capacity(u32::try_from(grants.len()).ok()?);
+    for grant in grants {
+        held.push(host::Grant {
+            table: match grant.table {
+                accounts::GrantTable::Accounts => host::GrantTable::Accounts,
+                accounts::GrantTable::Application => host::GrantTable::Application,
+            },
+            account: grant.account,
+            generation: grant.generation,
+            valid: grant.valid,
+        })
+        .ok()?;
+    }
     Some(host::Assignment {
         messages: start_messages.into_boxed(),
         assignment: host::RunAssignment {
@@ -114,15 +128,7 @@ pub(crate) fn assignment(
             workspace: None,
             save: false,
             charter: encoded,
-            grants: Box::new([host::Grant {
-                table: match grant.table {
-                    accounts::GrantTable::Accounts => host::GrantTable::Accounts,
-                    accounts::GrantTable::Application => host::GrantTable::Application,
-                },
-                account: grant.account,
-                generation: grant.generation,
-                valid: grant.valid,
-            }]),
+            grants: held.into_boxed(),
         },
         turns: transcript,
         answered: answered.into_boxed(),
@@ -370,5 +376,35 @@ pub(crate) fn connector_read(
         let token = domain.token();
         domain.read_calls.insert(token, binding).expect("admitted read continuation");
         work.push(Work::Observability(jig_ops_domain_observability::Event::Read { token, read }));
+    }
+}
+
+pub(crate) fn fleet_grants(grants: &[host::Grant]) -> Box<[fleet::Grant]> {
+    let mut translated = List::with_capacity(u32::try_from(grants.len()).expect("bounded grants"));
+    for grant in grants {
+        translated
+            .push(fleet::Grant {
+                table: match grant.table {
+                    host::GrantTable::Accounts => fleet::GrantTable::Accounts,
+                    host::GrantTable::Application => fleet::GrantTable::Application,
+                },
+                account: grant.account,
+                generation: grant.generation,
+                valid: grant.valid,
+            })
+            .expect("grant room");
+    }
+    translated.into_boxed()
+}
+
+pub(crate) fn host_grant(grant: fleet::Grant) -> host::Grant {
+    host::Grant {
+        table: match grant.table {
+            fleet::GrantTable::Accounts => host::GrantTable::Accounts,
+            fleet::GrantTable::Application => host::GrantTable::Application,
+        },
+        account: grant.account,
+        generation: grant.generation,
+        valid: grant.valid,
     }
 }

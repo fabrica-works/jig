@@ -132,6 +132,8 @@ pub enum Held {
     SettledCall { to: ReplyTo, key: CallKey, call: crate::SettledCall },
     /// A claimed host receives the parent's conversation references.
     Assign { channel: Token, run: Token, attempt: Token, activation: u64, assignment: fleet::Assignment },
+    /// A grant follows every prior commit and its attempt's assignment (engine.md, 5.2).
+    Grant { channel: Token, run: Token, attempt: Token, grant: fleet::Grant },
     /// The host receives an answer under its original opaque call name.
     Relayed { channel: Token, run: Token, attempt: Token, call: Box<[u8]>, answer: Token },
     /// The host receives the same named label and words the root supplied.
@@ -267,7 +269,7 @@ pub enum Now {
         saved: Box<[tasks::SavedResource]>,
         transcript: Box<[Box<[u8]>]>,
         answered: Box<[CallKey]>,
-        grant: accounts::Grant,
+        grants: Box<[accounts::Grant]>,
     },
     /// Load one held-chat decision that has left live task memory.
     HistoricalEscalation { request: Token, person: u64, project: u32, task: u64, revision: u64 },

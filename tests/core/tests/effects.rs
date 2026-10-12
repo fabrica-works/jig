@@ -517,7 +517,7 @@ fn a_rejected_grant_reaches_the_accounts_child() {
     use skein_lib::Token;
     let (config, limits) = jig_core_world::world::two_charters(151);
     let mut world = World::configured(151, false, config, limits);
-    let before = assignment(&world).grant;
+    let before = assignment(&world).grants[0];
     assert_eq!(before.generation, 1);
     let current = assignment(&world);
     world.send(root::Event::Core(core::Event::Fleet(fleet::Event::Rejected {
@@ -529,7 +529,7 @@ fn a_rejected_grant_reaches_the_accounts_child() {
     })));
     world.delegate_agent(1, b"use the refreshed account");
     assert_eq!(world.assignments.len(), 2, "the notice is observed through a fresh assignment");
-    let grant = assignment(&world).grant;
+    let grant = assignment(&world).grants[0];
     assert_eq!((grant.account, grant.generation), (before.account, 2));
 }
 

@@ -20,8 +20,11 @@ use crate::turn::{self, Pending};
 /// per resume, within the same bound.
 #[must_use]
 pub const fn max_out(limits: &Limits) -> u32 {
-    let listed = limits.slots.saturating_mul(2);
-    if listed > 3 { listed } else { 3 }
+    let listed = limits.slots.saturating_mul(limits.grants.saturating_add(2));
+    let tracked = limits.attempts.saturating_add(limits.workers.saturating_mul(limits.slots));
+    let adopting = limits.grants.saturating_add(3);
+    let other = if tracked > adopting { tracked } else { adopting };
+    if listed > other { listed } else { other }
 }
 
 /// The fleet's state.
@@ -305,14 +308,16 @@ impl Domain {
 /// Handles one event, emitting at most [`max_out`] requests.
 pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     match event {
-        Event::Start { reply_to, run, attempt, workstream, kinds, assignment, grants: _ } => {
-            attempt::start(domain, env, reply_to, run, attempt, workstream, kinds, assignment, out);
+        Event::Start { reply_to, run, attempt, workstream, kinds, assignment, grants } => {
+            if attempt::start(domain, env, reply_to, run, attempt, workstream, kinds, assignment, out) {
+                crate::grants::keep(domain, env, run, attempt, &[], &grants, out);
+            }
         }
         Event::Inbound { run, attempt, message } => call::inbound(domain, run, attempt, message, out),
         Event::Relay { channel, run, attempt, call } => {
             call::relay(domain, env, channel, run, attempt, call, out);
         }
-        Event::Adopt { reply_to, run, attempt, kept, kind, worked, holds: _, grants: _ } => match kind {
+        Event::Adopt { reply_to, run, attempt, kept, kind, worked, holds, grants } => match kind {
             HostKind::Engine => {
                 if worked {
                     out.push(Request::Lost { to: reply_to, run, attempt });
@@ -320,12 +325,16 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
                     out.push(Request::NotStarted { to: reply_to, run, attempt });
                 }
             }
-            HostKind::Worker => attempt::adopt(domain, env, reply_to, run, attempt, kept, out),
+            HostKind::Worker => {
+                if attempt::adopt(domain, env, reply_to, run, attempt, kept, out) {
+                    crate::grants::keep(domain, env, run, attempt, &holds, &grants, out);
+                }
+            }
         },
         Event::Cancel { run, attempt } => attempt::cancel(domain, run, attempt, out),
         Event::Relayed { to, answer } => call::relayed(domain, to, answer, out),
         Event::Acknowledge { run, attempt } => attempt::acknowledge(domain, run, attempt, out),
-        Event::Grant { grant: _ } => {}
+        Event::Grant { grant } => crate::grants::renew(domain, env, grant, out),
         Event::Rejected { channel, run, attempt, account, generation } => {
             call::credential_notice(
                 domain,

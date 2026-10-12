@@ -15,6 +15,7 @@ const LIMITS: Limits = Limits {
     slots: 2,
     workstreams: 2,
     attempts: 6,
+    grants: 2,
     calls: 2,
     call_name_bytes: 64,
     progress_bytes: 64,
@@ -1093,9 +1094,9 @@ fn the_worst_case_is_bounded_or_refused() {
     assert!(worst_case(&LIMITS).is_some());
     let huge = Limits { workers: u32::MAX, slots: u32::MAX, ..LIMITS };
     assert_eq!(worst_case(&huge), None);
-    assert_eq!(max_out(&LIMITS), 4);
-    assert_eq!(max_out(&Limits { slots: 1, ..LIMITS }), 3);
-    assert_eq!(max_out(&Limits { slots: 8, ..LIMITS }), 16);
+    assert_eq!(max_out(&LIMITS), 12);
+    assert_eq!(max_out(&Limits { slots: 1, ..LIMITS }), 9);
+    assert_eq!(max_out(&Limits { slots: 8, ..LIMITS }), 32);
 }
 
 fn turns() -> Harness {
@@ -1280,3 +1281,4 @@ fn free_kind_follows_the_placement_rule() {
     assert_eq!(h.domain.free_kind(Kinds::Workers, 7), None);
     assert_eq!(h.domain.free_kind(Kinds::Both, 7), Some(HostKind::Engine));
 }
+mod grants;

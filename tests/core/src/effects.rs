@@ -1,6 +1,7 @@
 //! A scripted caller and two independent systems exercise the root boundary.
 mod account_preparation;
 mod census;
+mod grants;
 use crate::Store;
 use jig_domain_accounts as accounts;
 use jig_domain_authority as authority;
@@ -37,6 +38,9 @@ pub struct World {
     pub answers: Vec<(Token, core::CallKey, core::CallPart)>,
     pub assigned: Option<root::Assignment>,
     last_read: Option<u64>,
+    received_grant: Option<(Token, Token, Token, fleet::Grant)>,
+    grant_follows_assignment: bool,
+    renew_on_running: Option<accounts::FromComponent>,
     pub fail_account_before_workspace: bool,
     pub hold_accounts: bool,
     pub assignments: Vec<(u64, u64)>,
@@ -272,6 +276,9 @@ impl World {
             answers: Vec::new(),
             assigned: None,
             last_read: None,
+            received_grant: None,
+            grant_follows_assignment: false,
+            renew_on_running: None,
             fail_account_before_workspace: false,
             hold_accounts: false,
             assignments: Vec::new(),
@@ -533,6 +540,7 @@ impl World {
                         if let Some(reads) = &mut self.reads {
                             reads.commit(number);
                         }
+                        self.inject_assignment_renewal(&rows);
                         self.commits.push(rows.clone());
                         self.store.submit(number, crate::store_writes(rows), self.store_delay);
                         self.observer.submitted(self.wall, &self.store);
@@ -782,6 +790,9 @@ impl World {
                 self.last_read = None;
                 self.assignments.push((assignment.task, assignment.attempt));
                 self.assigned = Some(assignment);
+            }
+            root::Delivery::Core(core::Held::Grant { channel, run, attempt, grant }) => {
+                self.grant_delivered(channel, run, attempt, grant);
             }
             root::Delivery::Core(core::Held::Cancel { run, attempt, .. }) => {
                 self.cancellations.push((run.raw(), attempt.raw()));

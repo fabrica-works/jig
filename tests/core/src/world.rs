@@ -90,6 +90,7 @@ pub fn limits() -> root::Limits {
         slots: 1,
         workstreams: 1,
         attempts: 2,
+        grants: 8,
         calls: 1,
         call_name_bytes: 64,
         progress_bytes: 64,
@@ -778,7 +779,9 @@ impl World {
             }
             root::Delivery::ApplicationDocument { .. }
             | root::Delivery::ApplicationRead { .. }
-            | root::Delivery::Core(core::Held::Delivery { .. } | core::Held::WatchEnded { .. }) => {}
+            | root::Delivery::Core(
+                core::Held::Delivery { .. } | core::Held::WatchEnded { .. } | core::Held::Grant { .. },
+            ) => {}
             other @ (root::Delivery::CallBusy { .. }
             | root::Delivery::CallAnswer { .. }
             | root::Delivery::Core(_)

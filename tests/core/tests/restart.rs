@@ -21,9 +21,26 @@ fn hello(world: &mut World, hosting: Box<[fleet::Hosted]>) {
 }
 
 fn account(world: &mut World) {
+    grant_account(world, 1, 1);
+}
+
+fn grant_account(world: &mut World, account: u32, generation: u64) {
     world.send(root::Event::Core(core::Event::Account(jig_domain_accounts::Event::Component(
-        jig_domain_accounts::FromComponent::Granted { account: 1, generation: 1, valid: Duration::from_secs(60) },
+        jig_domain_accounts::FromComponent::Granted { account, generation, valid: Duration::from_secs(60) },
     ))));
+}
+
+fn hosting(world: &World) -> Box<[fleet::Hosted]> {
+    let assigned = world.assigned.as_ref().expect("a live chat");
+    Box::new([fleet::Hosted {
+        run: Token::new(assigned.task),
+        attempt: Token::new(assigned.attempt),
+        phase: fleet::Phase::Active,
+    }])
+}
+
+fn received(world: &World) -> fleet::Grant {
+    world.received_grant().expect("host received a grant").3
 }
 
 fn applied_without_answer(world: &mut World) {
@@ -557,4 +574,57 @@ fn a_restart_settles_an_engine_claim_of_a_both_kinds_charter_at_once() {
     assert!(world.store.rows.values().any(|record| matches!(record,
         root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row)))
         if row.number == task && row.tries.lost == 1)));
+}
+
+#[test]
+fn a_new_generation_reaches_the_live_chat() {
+    let mut world = World::new(161, false);
+    grant_account(&mut world, 1, 2);
+    let grant = received(&world);
+    assert_eq!((grant.table, grant.account, grant.generation), (fleet::GrantTable::Accounts, 1, 2));
+}
+
+#[test]
+fn a_restart_sends_an_adopted_chat_its_current_grant() {
+    let mut world = World::new(162, false);
+    let live = hosting(&world);
+    world.restart(162, false);
+    grant_account(&mut world, 1, 7);
+    hello(&mut world, live);
+    let grant = received(&world);
+    assert_eq!((grant.table, grant.account, grant.generation), (fleet::GrantTable::Accounts, 1, 7));
+    assert!(world.grant_follows_assignment());
+}
+
+#[test]
+fn a_generation_renewed_while_the_assignment_is_held_reaches_the_attempt_after_it() {
+    const SECOND_ANALYST: u32 = 2;
+    let (mut config, limits) = jig_core_world::effects::fixture(163, false);
+    for charter in &mut config.core.settings.charters {
+        charter.policy.model.account = SECOND_ANALYST;
+        for model in &mut charter.policy.alternatives {
+            model.account = SECOND_ANALYST;
+        }
+    }
+    let mut world = World::configured_unassigned(163, false, config, limits);
+    assert!(world.assigned.is_none());
+    world.renew_on_assignment(SECOND_ANALYST, 2);
+    grant_account(&mut world, SECOND_ANALYST, 1);
+    assert_eq!(world.assigned.as_ref().expect("assigned after commit").grants[0].generation, 1);
+    let grant = received(&world);
+    assert_eq!((grant.account, grant.generation), (SECOND_ANALYST, 2));
+    assert!(world.grant_follows_assignment());
+}
+
+#[test]
+fn a_generation_renewed_before_a_waiting_chat_is_placed_reaches_its_host() {
+    let mut world = World::new(165, false);
+    world.end(tasks::End::Parked, 0);
+    world.send(root::Event::Core(core::Event::Fleet(fleet::Event::Lost { channel: Token::new(7) })));
+    world.say(99);
+    grant_account(&mut world, 1, 2);
+    hello(&mut world, Box::new([]));
+    assert_eq!(world.assigned.as_ref().expect("resumed assignment").grants[0].generation, 1);
+    assert_eq!(received(&world).generation, 2);
+    assert!(world.grant_follows_assignment());
 }

@@ -26,3 +26,11 @@ pub fn hosting_pair(
     use jig_domain_fleet::{Hosted, Phase};
     vec![Hosted { run: r1, attempt: a1, phase: Phase::Active }, Hosted { run: r2, attempt: a2, phase: Phase::Answered }]
 }
+
+/// The account granted to the fleet world's scripted attempts.
+pub const ANALYST: jig_domain_fleet::Grant = jig_domain_fleet::Grant {
+    table: jig_domain_fleet::GrantTable::Accounts,
+    account: 1,
+    generation: 1,
+    valid: skein_lib::Duration::from_secs(60),
+};

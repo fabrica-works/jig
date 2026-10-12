@@ -24,6 +24,7 @@ pub const LIMITS: Limits = Limits {
     slots: 3,
     workstreams: 3,
     attempts: 16,
+    grants: 4,
     calls: 8,
     call_name_bytes: 64,
     progress_bytes: 64,
@@ -499,6 +500,8 @@ pub struct World {
     pub(crate) referee: Referee<Fleet>,
     pub(crate) stats: Stats,
     trace: Trace,
+    last_grant: Option<(Token, Token, Token, fleet::Grant)>,
+    grants_sent: u64,
 }
 
 impl World {
@@ -533,6 +536,8 @@ impl World {
             referee: Referee::new(Fleet::new(settings.bound())),
             stats: Stats::default(),
             trace: Trace::default(),
+            last_grant: None,
+            grants_sent: 0,
             settings,
         };
         for worker in 0..settings.workers {
@@ -937,12 +942,9 @@ impl World {
             Request::DropCall { call } => {
                 self.payloads.end(skein_lib::Reader::new(&call.input).u64().expect("body token"));
             }
-            Request::Grant { .. } | Request::Rejected { .. } | Request::Exhausted { .. } => {}
-            Request::Assign { channel, run, attempt, .. } => {
-                self.stats.assigned += 1;
-                self.sent(run, attempt, Down::Assign);
-                self.down(channel, Message::Assign { run: run.raw(), attempt: attempt.raw() });
-            }
+            Request::Grant { channel, run, attempt, grant } => self.record_grant(channel, run, attempt, grant),
+            Request::Rejected { .. } | Request::Exhausted { .. } => {}
+            Request::Assign { channel, run, attempt, .. } => self.assignment_sent(channel, run, attempt),
             Request::Inbound { channel, run, attempt, message } => {
                 assert_eq!(
                     self.payloads.end(message.words.raw()),
@@ -1086,7 +1088,7 @@ impl World {
         self.calls.open(attempt, ());
         self.observe(Seen::Started { run, attempt });
         self.stage.push(Event::Start {
-            grants: Box::new([]),
+            grants: Box::new([crate::fixtures::ANALYST]),
             reply_to: ReplyTo::new(Token::new(attempt)),
             run: Token::new(run),
             attempt: Token::new(attempt),
@@ -1314,3 +1316,5 @@ fn describe(event: &Event) -> String {
         | Event::Loaded => format!("{event:?}"),
     }
 }
+
+mod grants;

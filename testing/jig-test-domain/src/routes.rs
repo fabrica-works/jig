@@ -76,6 +76,7 @@ pub(super) fn route_core(
                 | core::Held::TaskTurnKept { .. }
                 | core::Held::AcknowledgeTurn { .. }
                 | core::Held::Drained
+                | core::Held::Grant { .. }
                 | core::Held::Cancel { .. }
                 | core::Held::Refuse { .. }
                 | core::Held::TurnBusy { .. }
@@ -195,7 +196,7 @@ fn route_ask(
                 hold(
                     decision,
                     Delivery::Fleet(fleet::Event::Start {
-                        grants: Box::new([]),
+                        grants: grants::fleet(&domain.assignments.get(&task).expect("prepared assignment").grants),
                         reply_to: ReplyTo::new(Token::new(task)),
                         run: Token::new(task),
                         attempt: Token::new(attempt),
@@ -394,7 +395,7 @@ fn route_now(
             assert!(domain.workspace_writes.insert(task, names.into_boxed()).is_ok(), "workspace per task");
             work.push(Work::Core(core::Event::WorkspacePrepared { task, attempt, writes: Some(checks.into_boxed()) }));
         }
-        core::Now::RunPrepared { task, attempt, conversation, charter, run, messages, transcript, grant, .. } => {
+        core::Now::RunPrepared { task, attempt, conversation, charter, run, messages, transcript, grants, .. } => {
             let budget = run.budget;
             assert!(
                 domain
@@ -410,7 +411,7 @@ fn route_now(
                             messages,
                             transcript,
                             answered: domain.core.settled_calls(task, attempt),
-                            grant
+                            grants
                         }
                     )
                     .is_ok(),
@@ -996,3 +997,5 @@ fn application_answer(outcome: people::Outcome) -> connector::ApplicationCoreAns
         | people::Outcome::Started { .. } => unreachable!("release core part returns a release terminal"),
     }
 }
+
+mod grants;

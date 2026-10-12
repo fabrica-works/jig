@@ -118,8 +118,8 @@ pub struct Assignment {
     pub messages: Box<[tasks::Word]>,
     pub transcript: Box<[Box<[u8]>]>,
     pub answered: Box<[core::SettledCall]>,
-    /// The selected account grant.
-    pub grant: jig_domain_accounts::Grant,
+    /// The selected account and application credential grants.
+    pub grants: Box<[jig_domain_accounts::Grant]>,
 }
 
 /// What the root asks its surrounding world to do.

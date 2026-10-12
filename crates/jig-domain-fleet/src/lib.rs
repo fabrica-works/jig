@@ -57,6 +57,7 @@ mod call;
 mod channel;
 mod domain;
 mod facts;
+mod grants;
 mod history;
 mod limits;
 mod progress;

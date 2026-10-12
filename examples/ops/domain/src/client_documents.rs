@@ -121,6 +121,7 @@ pub(crate) fn document(
                 | core::Held::MakeEffect { .. }
                 | core::Held::SettledCall { .. }
                 | core::Held::Assign { .. }
+                | core::Held::Grant { .. }
                 | core::Held::Relayed { .. }
                 | core::Held::Inbound { .. }
                 | core::Held::Relay { .. }

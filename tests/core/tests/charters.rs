@@ -15,7 +15,7 @@ fn a_delegate_on_another_charter_runs_its_instructions_and_account() {
     let assignment = world.assigned.as_ref().expect("delegate assigned");
     assert_eq!(assignment.charter, 2);
     assert_eq!(assignment.run.policy.instructions.as_ref(), b"Research the question.");
-    assert_eq!(assignment.grant.account, 2);
+    assert_eq!(assignment.grants[0].account, 2);
 }
 
 #[test]
@@ -57,7 +57,7 @@ fn a_restart_restores_a_task_on_the_second_charter() {
     assert_eq!(assignment.task, task);
     assert_eq!(assignment.charter, 2);
     assert_eq!(assignment.run.policy.instructions.as_ref(), b"Research the question.");
-    assert_eq!(assignment.grant.account, 2);
+    assert_eq!(assignment.grants[0].account, 2);
 }
 
 fn rejoin(world: &mut World) {
@@ -104,7 +104,7 @@ fn a_goal_on_the_second_charter_is_admitted_and_runs_it() {
     let assignment = world.assigned.as_ref().expect("goal assigned");
     assert_eq!(assignment.charter, 2);
     assert_eq!(assignment.run.policy.instructions.as_ref(), b"Research the question.");
-    assert_eq!(assignment.grant.account, 2);
+    assert_eq!(assignment.grants[0].account, 2);
 }
 
 #[test]

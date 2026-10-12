@@ -593,7 +593,7 @@ pub fn fire(core: &mut Core, env: &Env<Limits>, timer: Timer) -> Requests {
                 &mut out,
             );
             core.touch_deployment();
-            tag_account(out)
+            tag_account(core, env, out)
         }
         Timer::View => {
             let mut out = Queue::with_capacity(views::max_out(&env.limits.views));

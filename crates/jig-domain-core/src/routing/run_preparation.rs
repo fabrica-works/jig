@@ -137,7 +137,7 @@ pub(super) fn workspace_prepared(
         saved: context.saved,
         transcript: turns,
         answered: answered.into_boxed(),
-        grant,
+        grants: Box::new([grant]),
     })));
     out.push(Request::Decided);
     Requests::Out(out)

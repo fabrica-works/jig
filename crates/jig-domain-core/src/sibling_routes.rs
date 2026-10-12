@@ -3,6 +3,7 @@
 //! carries their events and handles the resulting store and host requests.
 
 use alloc::boxed::Box;
+use jig_domain_accounts as accounts;
 use jig_domain_authority as authority;
 use jig_domain_fleet as fleet;
 use jig_domain_people as people;
@@ -10,6 +11,18 @@ use jig_domain_tasks as tasks;
 use skein_lib::{Env, List, Queue, Token, Wall};
 
 use crate::{CallKey, Core, Family, GoalRoute, Limits, PersonProposalRoute, RoutedCall, fresh};
+
+pub(crate) fn fleet_grant(grant: accounts::Grant) -> fleet::Grant {
+    fleet::Grant {
+        table: match grant.table {
+            accounts::GrantTable::Accounts => fleet::GrantTable::Accounts,
+            accounts::GrantTable::Application => fleet::GrantTable::Application,
+        },
+        account: grant.account,
+        generation: grant.generation,
+        valid: grant.valid,
+    }
+}
 
 /// Destination of an accepted message after the task child saved it.
 #[derive(Debug)]
@@ -158,7 +171,7 @@ impl Core {
 
     /// Route a restored task's current claim to views and the fleet, holding
     /// host adoption until the application's live-range load finishes.
-    pub fn adopt(&mut self, _env: &Env<Limits>, task: u64, attempt: u64, kept: u32) {
+    pub fn adopt(&mut self, env: &Env<Limits>, task: u64, attempt: u64, kept: u32) {
         assert!(self.unreported_restored.insert(task, attempt) == Ok(None), "one restored claim per task");
         let mut worked = kept > 0;
         for (key, _) in &self.call_parts {
@@ -166,9 +179,14 @@ impl Core {
                 worked = true;
             }
         }
+        let account = self.charter_of(task).account();
+        let mut grants = List::with_capacity(env.limits.fleet.grants);
+        if let Some(grant) = self.accounts.grant(account, env.now) {
+            grants.push(fleet_grant(grant)).expect("account grant room");
+        }
         self.adopted.push(fleet::Event::Adopt {
-            holds: Box::new([]),
-            grants: Box::new([]),
+            holds: Box::new([fleet::GrantName { table: fleet::GrantTable::Accounts, account }]),
+            grants: grants.into_boxed(),
             kind: if self.workers_in_process {
                 fleet::HostKind::Engine
             } else {

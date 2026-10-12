@@ -125,3 +125,23 @@ fn a_tight_fleet_refuses_at_the_entrance_and_settles() {
     let stats = run(&settings).stats();
     assert!(ending(&stats, "refused") > 0, "starts beyond the room are refused: {stats:?}");
 }
+
+#[test]
+fn a_worker_back_within_its_grace_receives_its_attempts_grants() {
+    let settings = Settings {
+        workers: 1,
+        slots: 1,
+        items: 2,
+        starts: 1,
+        run: Span::millis(5_000, 5_000),
+        drops: 6,
+        horizon: Duration::from_secs(8),
+        away: Span::millis(100, 100),
+        ..Settings::calm(164)
+    };
+    let world = run(&settings);
+    assert!(world.stats().drops > 0);
+    assert!(world.grants_sent() > u64::from(world.stats().assigned), "a later listing resends grants");
+    let (_, _, _, grant) = world.received_grant().expect("a returning worker is sent its grant");
+    assert_eq!((grant.table, grant.account, grant.generation), (jig_domain_fleet::GrantTable::Accounts, 1, 1));
+}

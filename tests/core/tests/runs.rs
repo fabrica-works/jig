@@ -575,7 +575,7 @@ fn a_run_waiting_for_its_account_starts_once_granted() {
     assert_eq!(world.assignments.len(), assigned);
     account_granted(&mut world);
     assert_eq!(world.assignments.len(), assigned + 1);
-    assert_eq!(world.assigned.as_ref().expect("assigned after grant").grant.generation, 9);
+    assert_eq!(world.assigned.as_ref().expect("assigned after grant").grants[0].generation, 9);
 }
 #[test]
 fn an_account_unusable_at_the_second_check_waits_and_is_not_held() {

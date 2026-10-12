@@ -27,6 +27,8 @@ pub struct Limits {
     /// that the parent has not claimed, a worker's slots for each worker; a
     /// listing beyond that room is cancelled.
     pub attempts: u32,
+    /// Credential names held by each attempt, across both protocol tables.
+    pub grants: u32,
     /// Relayed calls the parent serves at once. A call beyond them is
     /// dropped, and its run withdraws it past its own deadline.
     pub calls: u32,
@@ -83,6 +85,9 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Map::<Token, Run>::worst_case(tracked)?)?
         .checked_add(Map::<u64, Id<Attempt>>::worst_case(tracked)?)?
         .checked_add(Deadlines::<Id<Attempt>>::worst_case(tracked)?)?
+        .checked_add(
+            u64::from(tracked).checked_mul(skein_lib::List::<crate::grants::Kept>::worst_case(limits.grants)?)?,
+        )?
         .checked_add(u64::from(tracked).checked_mul(limits.call_name_bytes.checked_add(limits.progress_bytes)?)?)?;
     let calls = Slab::<PendingCall>::worst_case(limits.calls)?
         .checked_add(u64::from(limits.calls).checked_mul(limits.call_name_bytes)?)?;
