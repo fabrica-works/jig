@@ -359,9 +359,17 @@ pub(super) fn route_prepared_agent(
     } else {
         let number = context.task;
         let previous_attempt = context.previous_attempt;
+        let fresh = context.tries.transient != 0;
         assert!(core.contexts.insert(number, context).is_ok(), "bounded activation context");
         core.begin_transcript(number, previous_attempt);
-        out.push(Request::Now(Box::new(Now::StartPreparation { task: number, transcript_waiter })));
+        if fresh {
+            core.transcripts.get_mut(&number).expect("begun transcript").window = None;
+        }
+        out.push(Request::Now(Box::new(Now::StartPreparation {
+            task: number,
+            transcript_waiter,
+            from: core.transcripts.get(&number).expect("begun transcript").window,
+        })));
     }
     out.push(Request::Decided);
     Requests::Out(out)
@@ -448,6 +456,17 @@ pub(super) fn route_claim_prepared(
             budget,
             writes,
         }));
+    }
+    let mut out = Queue::with_capacity(1);
+    out.push(Request::Decided);
+    Requests::Out(out)
+}
+
+pub(super) fn transcript_unread(core: &mut Core, work: &mut Queue<Event>, task: u64) -> Requests {
+    if core.transcripts.remove(&task).is_some() {
+        drop(core.contexts.remove(&task));
+        drop(core.dependency_results.remove(&task));
+        work.push(Event::Tasks(tasks::Event::PreparationUnread { task }));
     }
     let mut out = Queue::with_capacity(1);
     out.push(Request::Decided);

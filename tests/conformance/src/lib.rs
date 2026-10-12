@@ -498,20 +498,30 @@ impl Application for Testing {
                         accounts::FromComponent::Closed,
                     ))))]
                 }
-                Delivery::Now(core::Now::StartPreparation { task, .. }) => {
-                    let rows = store
+                Delivery::Now(core::Now::StartPreparation { task, from, .. }) => {
+                    let rows: Vec<core::TurnRecord> = store
                         .rows
                         .values()
                         .filter_map(|record| match record {
                             root::Record::Core(core::Record::Core(core::CoreRecord::Turn(turn)))
-                                if turn.task == task =>
+                                if turn.task == task
+                                    && from.is_some_and(|start| (turn.attempt, turn.turn) >= start) =>
                             {
                                 Some(turn.clone())
                             }
                             root::Record::Core(_) | root::Record::Connector { .. } => None,
                         })
                         .collect();
-                    vec![Input::Event(root::Event::TranscriptLoaded { task, rows, done: true })]
+                    if let Some(start) = from
+                        && !rows.first().is_some_and(|row| (row.attempt, row.turn) == start && row.opens_window)
+                    {
+                        return vec![Input::Event(root::Event::Core(core::Event::TranscriptUnread { task }))];
+                    }
+                    vec![Input::Event(root::Event::TranscriptLoaded {
+                        task,
+                        rows: rows.into_boxed_slice(),
+                        done: true,
+                    })]
                 }
                 Delivery::Busy(event) => {
                     peers.busy_events.push(std::rc::Rc::new(*event));

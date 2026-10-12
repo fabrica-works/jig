@@ -339,6 +339,7 @@ pub fn room(limits: &Limits, event: &Event) -> Option<JournalRoom> {
         | Event::ConnectorRepair { .. }
         | Event::Period { .. }
         | Event::PreparationFailed { .. }
+        | Event::TranscriptUnread { .. }
         | Event::PersonProposal(_)
         | Event::PersonEscalation(_)
         | Event::TaskEscalation(_)
@@ -467,6 +468,7 @@ fn step_one(core: &mut Core, env: &Env<Limits>, event: Event, work: &mut Queue<E
         }
         Event::Period { project, period, budget, next } => route_period(core, work, project, period, budget, next),
         Event::PreparationFailed { task } => route_preparation_failed(core, work, task),
+        Event::TranscriptUnread { task } => run_preparation::transcript_unread(core, work, task),
         Event::PersonProposal(event) => route_person_proposal(core, env, event),
         Event::TaskEscalation(event) => route_task_escalation(core, env, event),
         Event::PersonEscalation(event) => route_person_escalation(core, env, event),

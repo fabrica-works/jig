@@ -536,8 +536,8 @@ impl World {
                         }
                     }
                     root::Request::Deliver(delivery) => self.delivered(delivery),
-                    root::Request::Now(core::Now::StartPreparation { task, .. }) => {
-                        self.transcript_loaded(task);
+                    root::Request::Now(core::Now::StartPreparation { task, from, .. }) => {
+                        self.transcript_loaded(task, from);
                     }
                     root::Request::Now(core::Now::Call { to, run, attempt, call }) => {
                         let token = to.into_token();

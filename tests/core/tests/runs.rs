@@ -112,37 +112,75 @@ fn a_chat_past_the_resume_limit_starts_fresh() {
     assert!(world.assigned.as_ref().expect("fresh chat").transcript.is_empty());
 }
 
-fn loaded_transcript_pages_reject_repeated_and_reversed_turns() {
+fn transcript_core(window: (u64, u32)) -> core::Core {
     let limits = jig_core_world::world::limits().core;
     let config = jig_core_world::world::config(105).core;
     let mut core = core::Core::new(config, &limits);
     core.begin_transcript(1, 3);
-    let turn = core::TurnRecord {
-        opens_window: false,
+    core.transcripts.get_mut(&1).expect("begun transcript").window = Some(window);
+    core
+}
+
+fn stored_turn(attempt: u64, turn: u32, body: &[u8]) -> core::TurnRecord {
+    core::TurnRecord {
+        opens_window: true,
         task: 1,
-        attempt: 2,
-        turn: 1,
+        attempt,
+        turn,
         spent: 0,
         read: None,
         at: skein_lib::Wall::EPOCH,
-        transcript: b"turn".as_slice().into(),
-    };
-    assert!(core.append_transcript(1, turn.clone()));
-    assert!(!core.append_transcript(1, turn));
-    assert!(!core.append_transcript(
-        1,
-        core::TurnRecord {
-            opens_window: false,
-            task: 1,
-            attempt: 1,
-            turn: 2,
-            spent: 0,
-            read: None,
-            at: skein_lib::Wall::EPOCH,
-            transcript: b"old".as_slice().into()
-        }
-    ));
+        transcript: body.into(),
+    }
+}
+
+fn loaded_transcript_pages_reject_repeated_and_reversed_turns() {
+    let mut core = transcript_core((2, 2));
+    assert!(!core.append_transcript(1, stored_turn(2, 1, b"before window")));
+    assert!(core.append_transcript(1, stored_turn(2, 2, b"turn")));
+    assert!(!core.append_transcript(1, stored_turn(2, 2, b"turn")));
+    assert!(!core.append_transcript(1, stored_turn(1, 2, b"old")));
     assert_eq!(core.transcripts.get(&1).expect("loaded transcript").bytes, 4);
+}
+
+fn a_chat_resumed_after_a_compaction_is_sent_only_its_window() {
+    let mut world = World::new(115, false);
+    world.turn(1, 1, None, &[b'a'; 200]);
+    park_chat(&mut world, 1);
+    world.say(86);
+    world.window_turn(1, 1, None, b"compacted window");
+    world.turn(2, 2, None, b"window continuation");
+    park_chat(&mut world, 2);
+    world.say(87);
+    assert_eq!(
+        world.assigned.as_ref().expect("resumed compacted chat").transcript.as_ref(),
+        [Box::<[u8]>::from(&b"compacted window"[..]), Box::<[u8]>::from(&b"window continuation"[..])]
+    );
+}
+
+fn a_window_past_the_resume_limit_starts_fresh_with_its_tail() {
+    let mut world = World::new(116, false);
+    world.turn(1, 1, None, b"earlier window");
+    world.window_turn(2, 2, None, &[b'b'; 200]);
+    park_chat(&mut world, 2);
+    world.say(88);
+    world.turn(1, 1, None, &[b'c'; 100]);
+    park_chat(&mut world, 1);
+    world.say(90);
+    let fresh = world.assigned.as_ref().expect("fresh chat");
+    assert!(!fresh.run.policy.resume);
+    assert!(fresh.transcript.is_empty());
+    let mut core = transcript_core((2, 2));
+    assert!(core.append_transcript(1, stored_turn(2, 2, &[b'b'; 200])));
+    assert!(core.append_transcript(1, stored_turn(3, 1, &[b'c'; 100])));
+    let tail = core::read_brief_part(
+        &core,
+        core::BriefTextLimits { parts: 2, read_bytes: 128, brief_bytes: 256 },
+        1,
+        core::BriefPart::TranscriptTail,
+    )
+    .expect("window tail");
+    assert_eq!(tail.as_ref(), [b"[200 bytes cut]\n".as_slice(), &[b'c'; 100]].concat());
 }
 
 fn an_unusable_transcript_fails_transient_and_the_next_conversation_starts_fresh() {
@@ -274,6 +312,8 @@ fn runs_scenarios() {
     a_turn_admits_its_read_fence_and_spend_together_and_duplicates_change_nothing();
     settled_delivery_evidence_survives_restart_and_resume_until_a_turn_carries_it();
     a_chat_past_the_resume_limit_starts_fresh();
+    a_chat_resumed_after_a_compaction_is_sent_only_its_window();
+    a_window_past_the_resume_limit_starts_fresh_with_its_tail();
     loaded_transcript_pages_reject_repeated_and_reversed_turns();
     an_unusable_transcript_fails_transient_and_the_next_conversation_starts_fresh();
     settled_answers_resume_in_commit_order_and_a_replay_preserves_exact_bytes();
@@ -460,4 +500,27 @@ fn a_fresh_start_clears_the_window_until_its_first_turn() {
     assert_eq!(current_window_proof(&world).window, None);
     world.turn(1, 1, None, b"fresh first turn");
     assert_eq!(current_window_proof(&world).window, Some((attempt, 1)));
+}
+
+#[test]
+fn a_transcript_read_as_unread_fails_the_run_and_the_next_starts_fresh() {
+    let mut world = World::new(117, false);
+    world.turn(1, 1, None, b"unread window");
+    park_chat(&mut world, 1);
+    let proof = current_window_proof(&world);
+    let key =
+        root::Key::Core(core::Key::Core(core::CoreKey::Turn { task: proof.task, attempt: proof.attempt, turn: 1 }));
+    world.store.rows.remove(&key);
+    let assigned = world.assignments.len();
+    world.say(89);
+    assert_eq!(world.assignments.len(), assigned);
+    world.retry_due();
+    let fresh = world.assigned.as_ref().expect("fresh retry after unread transcript");
+    assert_eq!(world.assignments.len(), assigned + 1);
+    assert!(!fresh.run.policy.resume);
+    assert!(fresh.transcript.is_empty());
+}
+
+fn park_chat(world: &mut World, spent: u64) {
+    world.end(tasks::End::Parked, spent);
 }

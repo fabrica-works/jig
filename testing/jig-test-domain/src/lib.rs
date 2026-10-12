@@ -536,7 +536,12 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event) {
                 }
             }
             if done {
-                decide(domain, env, Work::Core(core::Event::StartBrief { task }));
+                let event = if domain.core.transcript_readable(task) {
+                    core::Event::StartBrief { task }
+                } else {
+                    core::Event::TranscriptUnread { task }
+                };
+                decide(domain, env, Work::Core(event));
             }
         }
         Event::Committed { number } => domain.journal.committed(number),

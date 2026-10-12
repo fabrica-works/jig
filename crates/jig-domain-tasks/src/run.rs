@@ -494,6 +494,17 @@ pub(crate) fn preparation_failed(domain: &mut Domain, env: &Env<Limits>, number:
     }
 }
 
+pub(crate) fn preparation_unread(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queue<Request>) {
+    if domain.ready()
+        && let Some(task) = record(domain, number)
+        && task.phase == Phase::Active(Active::Preparing)
+    {
+        let phase = failure(domain, env, number, Class::Transient);
+        task_mut(domain, number).expect("prepared task exists").record.phase = phase;
+        publish(domain, env, number, out);
+    }
+}
+
 pub(crate) fn hold(domain: &mut Domain, env: &Env<Limits>, number: u64, why: Hold, out: &mut Queue<Request>) {
     hold_from(domain, env, number, why, None, out);
 }

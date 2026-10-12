@@ -238,8 +238,8 @@ pub enum Now {
     Activate { context: Box<tasks::RunContext> },
     /// Reserve the root's transcript read slot for an admitted agent run.
     PrepareAgent { context: Box<tasks::RunContext> },
-    /// Start task preparation and assemble its first store load.
-    StartPreparation { task: u64, transcript_waiter: Option<Token> },
+    /// Load the current window in key order from its first turn; None loads nothing.
+    StartPreparation { task: u64, transcript_waiter: Option<Token>, from: Option<(u64, u32)> },
     /// Load one proposal decision that has left live task memory.
     SeenChat { request: Token, task: u64 },
     /// Load an ended chat; answer `ForgetChat` if its row still exists.
@@ -420,6 +420,8 @@ pub enum Event {
     Period { project: u32, period: u64, budget: u64, next: Option<Wall> },
     /// A required preparation read or connector section could not be assembled.
     PreparationFailed { task: u64 },
+    /// The store could not read the current transcript window.
+    TranscriptUnread { task: u64 },
     /// A task continuation for a person's pending proposal.
     PersonProposal(tasks::Event),
     /// A task continuation for a person's pending escalation choice.

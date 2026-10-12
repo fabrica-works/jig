@@ -106,7 +106,12 @@ pub(crate) fn store(
                 }
             }
             if done {
-                work.push(Work::Core(core::Event::StartBrief { task }));
+                let event = if domain.core.transcript_readable(task) {
+                    core::Event::StartBrief { task }
+                } else {
+                    core::Event::TranscriptUnread { task }
+                };
+                work.push(Work::Core(event));
             }
         }
         Store::Restore(record) => {

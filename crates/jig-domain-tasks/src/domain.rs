@@ -635,6 +635,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             },
         },
         Event::PreparationFailed { task } => crate::run::preparation_failed(domain, env, task, out),
+        Event::PreparationUnread { task } => crate::run::preparation_unread(domain, env, task, out),
         Event::Hold { task, why } => crate::run::hold(domain, env, task, why, out),
         Event::HoldFrom { task, why, source } => crate::run::hold_from(domain, env, task, why, Some(source), out),
         Event::EffectsSettled { task } => crate::closing::effects_settled(domain, env, task, out),

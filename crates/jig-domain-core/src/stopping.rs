@@ -78,6 +78,7 @@ pub(crate) fn gate(core: &mut Core, event: Event) -> Result<Event, Requests> {
         | Event::ClaimPrepared { .. }
         | Event::ClaimRefused { .. }
         | Event::PreparationFailed { .. }
+        | Event::TranscriptUnread { .. }
         | Event::ProcedureStep { .. }
         | Event::ProcedureHoldings { .. }
         | Event::StartRecurring { .. }

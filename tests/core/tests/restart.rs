@@ -378,3 +378,25 @@ fn a_restart_keeps_the_window_a_turn_opened() {
     };
     assert_eq!(proof.window, Some((attempt, 2)));
 }
+
+#[test]
+fn a_restart_between_a_window_turn_and_its_resume_sends_the_window() {
+    let mut world = World::new(124, false);
+    world.turn(1, 1, None, b"earlier window");
+    world.window_turn(2, 2, None, b"window to resume");
+    let assignment = world.assigned.as_ref().expect("live worker");
+    let hosted = fleet::Hosted {
+        run: Token::new(assignment.task),
+        attempt: Token::new(assignment.attempt),
+        phase: fleet::Phase::Active,
+    };
+    world.restart(124, false);
+    hello(&mut world, Box::new([hosted]));
+    world.end(tasks::End::Parked, 2);
+    account(&mut world);
+    world.say(91);
+    assert_eq!(
+        world.assigned.as_ref().expect("resumed window").transcript.as_ref(),
+        [Box::<[u8]>::from(&b"window to resume"[..])]
+    );
+}

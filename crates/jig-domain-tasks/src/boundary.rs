@@ -1467,6 +1467,8 @@ pub enum Event {
         /// phase tasks are ignored.
         task: u64,
     },
+    /// An unread transcript fails only a preparing task as transient, under its retry policy.
+    PreparationUnread { task: u64 },
     /// Authorized notification preserving prior state and issuing `Stop` for any live run;
     /// absent tasks and unchanged reasons have no output.
     Hold {

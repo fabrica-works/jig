@@ -588,12 +588,14 @@ impl Application for Ops {
                     more: false,
                 })))]
             }
-            root::Output::CoreLoad(core::Now::StartPreparation { task, .. }) => {
+            root::Output::CoreLoad(core::Now::StartPreparation { task, from, .. }) => {
                 let mut rows: Vec<_> = store
                     .rows
                     .values()
                     .filter_map(|record| match record {
-                        root::Record::Core(core::Record::Core(core::CoreRecord::Turn(row))) if row.task == task => {
+                        root::Record::Core(core::Record::Core(core::CoreRecord::Turn(row)))
+                            if row.task == task && from.is_some_and(|start| (row.attempt, row.turn) >= start) =>
+                        {
                             Some(row.clone())
                         }
                         root::Record::Core(_) | root::Record::Infrastructure(_) | root::Record::Observability(_) => {
@@ -602,6 +604,11 @@ impl Application for Ops {
                     })
                     .collect();
                 rows.sort_by_key(|row| (row.attempt, row.turn));
+                if let Some(start) = from
+                    && !rows.first().is_some_and(|row| (row.attempt, row.turn) == start && row.opens_window)
+                {
+                    return vec![Input::Event(root::Event::Core(core::Event::TranscriptUnread { task }))];
+                }
                 vec![Input::Event(root::Event::Store(root::Store::Transcript {
                     task,
                     rows: rows.into_boxed_slice(),

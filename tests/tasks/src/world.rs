@@ -424,6 +424,7 @@ impl World {
             | Event::Started { .. }
             | Event::Activation { cause: Cause::Unpriced, .. }
             | Event::PreparationFailed { .. }
+            | Event::PreparationUnread { .. }
             | Event::Hold { .. }
             | Event::HoldFrom { .. }
             | Event::EffectsSettled { .. }
@@ -494,6 +495,7 @@ impl World {
             | Event::Started { .. }
             | Event::Activation { .. }
             | Event::PreparationFailed { .. }
+            | Event::PreparationUnread { .. }
             | Event::Hold { .. }
             | Event::HoldFrom { .. }
             | Event::EffectsSettled { .. }

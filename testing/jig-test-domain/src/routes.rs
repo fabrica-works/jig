@@ -341,14 +341,14 @@ fn route_now(
             let transcript_waiter = if context.ever_turned { Some(Token::new(context.task)) } else { None };
             work.push(Work::Core(core::Event::PreparedAgent { context, transcript_waiter, busy: false }));
         }
-        core::Now::StartPreparation { task, transcript_waiter: None } => {
+        core::Now::StartPreparation { task, from: None, .. } => {
             work.push(Work::Core(core::Event::Tasks(tasks::Event::Prepare {
                 reply_to: ReplyTo::new(Token::new(task)),
                 task,
             })));
             work.push(Work::Core(core::Event::StartBrief { task }));
         }
-        value @ core::Now::StartPreparation { task, transcript_waiter: Some(_) } => {
+        value @ core::Now::StartPreparation { task, from: Some(_), .. } => {
             work.push(Work::Core(core::Event::Tasks(tasks::Event::Prepare {
                 reply_to: ReplyTo::new(Token::new(task)),
                 task,

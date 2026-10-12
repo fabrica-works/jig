@@ -173,7 +173,7 @@ impl Core {
     }
 
     /// Admit one restored turn in store order, retaining only the bounded
-    /// tail while still counting the full conversation for resume policy.
+    /// tail while still counting the full current window for resume policy.
     #[must_use]
     pub fn append_transcript(&mut self, task: u64, turn: TurnRecord) -> bool {
         let transcript = self.transcripts.get_mut(&task).expect("load belongs to prepared task");
@@ -185,9 +185,11 @@ impl Core {
         {
             return false;
         }
-        if turn.attempt < transcript.from {
-            transcript.last = Some((turn.attempt, turn.turn));
-            return true;
+        let Some(start) = transcript.window else { return false };
+        if (turn.attempt, turn.turn) < start
+            || (transcript.last.is_none() && ((turn.attempt, turn.turn) != start || !turn.opens_window))
+        {
+            return false;
         }
         let length = u64::try_from(turn.transcript.len()).expect("stored turn size fits u64");
         let Some(total) = transcript.bytes.checked_add(length) else { return false };
@@ -223,14 +225,21 @@ impl Core {
         true
     }
 
-    /// Whether the full prior conversation exceeded this charter's resume bound.
+    /// A completed load includes the window the core asked the store to read.
+    #[must_use]
+    pub fn transcript_readable(&self, task: u64) -> bool {
+        let transcript = self.transcripts.get(&task).expect("prepared transcript state");
+        transcript.window.is_none() || transcript.last.is_some()
+    }
+
+    /// Whether the current window exceeded the deployment's resume bound.
     #[must_use]
     pub fn transcript_oversized(&self, task: u64) -> bool {
         self.transcripts.get(&task).expect("prepared transcript state").bytes > u64::from(self.settings.resume_bytes)
     }
 
     /// Select whole prior turns only while their cumulative bytes fit the
-    /// charter's resume bound. A longer conversation starts fresh.
+    /// deployment's resume bound. A longer window starts fresh.
     #[must_use]
     pub fn resumed_turns(&self, transcript: Transcript) -> Box<[Box<[u8]>]> {
         let mut turns = List::with_capacity(transcript.turns.len());
