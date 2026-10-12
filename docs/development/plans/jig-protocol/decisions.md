@@ -242,6 +242,19 @@ the file.
      run's end, a dependency section 3 allows that `tests/boundary`'s
      lists lack is added by the increment that adds it, as section 3 now
      says.
+105. **jig-10.1 landed with its Step outside the trailers** (2026-10-12,
+     the coordinator's block "jig 10.1: landed commit Step line is
+     outside parsed trailers", 2026-10-12T15:56:22Z). jig `75bd3ec6` has
+     `Proof:`, `Plan: jig-protocol` and `Step: jig-10.1` in its body, with a
+     paragraph after them, so git parses only `Gate-Tree` and
+     `Gate-Result` as its trailers. A landed commit is never rewritten
+     (development.md, 8.4): the ledger records jig-10.1 landed at
+     `75bd3ec6`, `plan status`'s line "jig-10.1: landed in the ledger, no
+     commit on origin/main says so" stays and is this, and `plan pulse`'s
+     and `plan metrics`' counts read one step and one proof fewer, which
+     the retrospective adds back from this ruling. From now to the run's
+     end, every session checks its tip before `land`: `git log -1
+     --format='%(trailers:key=Step,valueonly)'` prints its step.
 
 ## For the user
 
