@@ -409,10 +409,19 @@ the file.
      marks the ended chat's replies and its result seen. jig 12.1 had
      landed (`4a86719c`) before this ruling, with that test at
      `tests/core/tests/reads.rs:217`: jig 03.4 converts it as it converts
-     `activity.rs:207`, keeping its name and assertions (ruling 114). jig 03's check now greps `core::Event::ForgetChat`, since the
-     people child's worlds send the child's own `Event::ForgetChat`
+     `activity.rs:207`, keeping its name and assertions (ruling 114).
+     jig 03's check now greps `core::Event::ForgetChat`, since the people
+     child's worlds send the child's own `Event::ForgetChat`
      (`tests/people/src/world.rs:347`, `tests/people/tests/memory.rs:257`),
      which stays.
+119. **jig 03's check reads the scenarios only** (2026-10-12, the
+     coordinator's block "jig 03.4: Done-when grep also matches prescribed
+     loader replies", 2026-10-12T18:01:14Z). Ruling 118's check still
+     matched the worlds' loaders, which answer `Now::LoadEndedChat` with
+     `core::Event::ForgetChat` as 03.4's Shape says. It now greps
+     `tests/*/tests`, the scenarios (jig `b8eb5aef`): on jig 03.4's branch
+     (`14f4a908`), `git grep -n 'core::Event::ForgetChat' --
+     'tests/*/tests'` printed nothing, 2026-10-12T18:02Z.
 
 ## For the user
 
