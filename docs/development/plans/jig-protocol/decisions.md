@@ -372,6 +372,14 @@ the file.
      forgetting it through the root's existing `ForgetChat`, proves the
      index without `Now::SeenChat`, which the test root routes from jig
      18.3 (its session file says so).
+116. **A new module that section 7 calls for is inside Files**
+     (2026-10-12, the coordinator's block "jig 12.1: cursor helper module
+     outside Files", 2026-10-12T17:14:31Z). jig 12.1 must add the `Update`
+     key to `tests/client/src/joint/wire/cursor.rs`, a file past 800
+     lines that grows by at most 20 (code-organization.md, section 7:
+     "new code goes in new modules"); it puts 44 lines in a new
+     `cursor/index.rs` and 3 wiring lines in the file. The README's Rules
+     now count such a module inside the increment's Files.
 
 ## For the user
 

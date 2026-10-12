@@ -204,6 +204,12 @@ ones before it in its session. Dependencies are by capability: "skein
   replaces development.md, 8.2's "it is in your session's own files" for
   this plan; expected values change only as ruling 108 says. Anything
   else outside Files stays a question.
+- **A new module beside a file past 800 lines is inside Files**
+  (decisions.md, ruling 116). Where an increment's Files name a file past
+  800 lines, the new module that code-organization.md, section 7 sends its
+  new code to ("new code goes in new modules"), beside that file or under
+  it, is part of the increment's Files, at the increment's Size. It is no
+  question.
 
 ## Live services
 
