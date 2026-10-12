@@ -255,6 +255,22 @@ the file.
      the retrospective adds back from this ruling. From now to the run's
      end, every session checks its tip before `land`: `git log -1
      --format='%(trailers:key=Step,valueonly)'` prints its step.
+106. **A world's restore pages fill across the live ranges** (2026-10-12,
+     the coordinator's block "jig 11.1: restore page expectations outside
+     increment Files", 2026-10-12T16:02:42Z). jig 11.1's worlds load
+     `RestoreRange::LIVE[0]` to `LIVE[3]` in turn; paged one range at a
+     time, the core world's pages come out as 1, 2 and 1 rows, and
+     `tests/core/tests/restore_pages.rs`'s
+     `paused_polls_preserve_multiple_whole_pages_and_repeated_release_is_safe`
+     fails. `protocol/store.md`, 4.3 says "a page that exhausts one
+     interval with room left goes on into the next in the same step",
+     and section 7 calls the core's live ranges "a fixed list of
+     intervals, in that order, paged and handed up typed"; 11.1's Test
+     shape says "The existing restart, store and conformance stories run
+     unchanged." So the world's `LoadCore` pages the four ranges' rows,
+     in order, as one sequence, with today's page size, in
+     `tests/core/src/effects.rs` (11.1's Files), and `restore_pages.rs`
+     stays as it is.
 
 ## For the user
 
