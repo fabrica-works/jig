@@ -29,6 +29,7 @@ fn list<T>(values: Vec<T>) -> List<T> {
 }
 fn empty() -> OwnerDeployment {
     OwnerDeployment {
+        store: StoreFill { bytes: 0, mark: 0 },
         hosts: List::with_capacity(2),
         attempts: List::with_capacity(2),
         accounts: List::with_capacity(2),
@@ -282,7 +283,7 @@ fn deployment_view_normal_words_select_second_language_and_reject_missing_or_wro
     let tree = build(&client, &words, maximum);
     assert!(contains(&tree, b"selected "));
     assert!(!contains(&tree, b"Deployment diagnostics"));
-    assert_eq!(crate::owner_deployment_words::ALL.len(), 209);
+    assert_eq!(crate::owner_deployment_words::ALL.len(), 211);
     let mut wrong = crate::owner_deployment_words::language();
     let phrase = wrong.phrases.iter_mut().find(|p| p.id == P::Host.id()).unwrap();
     phrase.forms[0].segments = Box::new([Segment::Text(copy_of(b"host without number"))]);
@@ -670,4 +671,35 @@ fn deployment_view_configured_empty_and_clipped_catalogues_are_distinct_and_slot
         vec![crate::Owner::Side { connector: u16::MAX }, crate::Owner::Side { connector: 0 }]
     );
     assert!(!contains(&tree, b"No configured connectors"));
+}
+
+fn store_words() -> Words {
+    let limits = PhraseLimits {
+        languages: 1,
+        phrases: 220,
+        holes: 1,
+        segments: 512,
+        text_bytes: 16_384,
+        hole_bytes: CLIENT.text,
+    };
+    Words {
+        book: Phrasebook::load(
+            crate::owner_deployment_words::shapes(),
+            Box::new([crate::owner_deployment_words::language()]),
+            &limits,
+        )
+        .unwrap(),
+        language: 0,
+        offset_minutes: 0,
+    }
+}
+
+#[test]
+fn the_deployment_page_shows_the_store_fill_against_its_mark() {
+    let mut value = empty();
+    value.store = StoreFill { bytes: 6789, mark: 9012 };
+    let client = domain(value);
+    let tree = build(&client, &store_words(), super::cards::limits());
+    assert!(contains(&tree, b"Store map bytes: 6789"));
+    assert!(contains(&tree, b"Store high-water mark in bytes: 9012"));
 }

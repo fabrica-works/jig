@@ -212,8 +212,10 @@ pub enum DeploymentPhrase {
     Connectors,
     ConnectorsCut,
     ConnectorsEmpty,
+    StoreBytes,
+    StoreMark,
 }
-pub const ALL: [DeploymentPhrase; 209] = [
+pub const ALL: [DeploymentPhrase; 211] = [
     DeploymentPhrase::Deployment,
     DeploymentPhrase::Hosts,
     DeploymentPhrase::Attempts,
@@ -423,6 +425,8 @@ pub const ALL: [DeploymentPhrase; 209] = [
     DeploymentPhrase::Connectors,
     DeploymentPhrase::ConnectorsCut,
     DeploymentPhrase::ConnectorsEmpty,
+    DeploymentPhrase::StoreBytes,
+    DeploymentPhrase::StoreMark,
 ];
 impl DeploymentPhrase {
     #[must_use]
@@ -631,6 +635,8 @@ impl DeploymentPhrase {
                 Self::Connectors => 9396,
                 Self::ConnectorsCut => 9397,
                 Self::ConnectorsEmpty => 9398,
+                Self::StoreBytes => 9399,
+                Self::StoreMark => 9420,
             },
         }
     }
@@ -828,7 +834,9 @@ impl DeploymentPhrase {
             | Self::Through
             | Self::Chat
             | Self::Messages
-            | Self::Bytes => Some(HoleKind::Number),
+            | Self::Bytes
+            | Self::StoreBytes
+            | Self::StoreMark => Some(HoleKind::Number),
             Self::At | Self::GraceUntil | Self::SpentUntil => Some(HoleKind::Wall),
             Self::GraceRemaining | Self::GraceBound | Self::StopBound | Self::AllowedGrace | Self::Retention => {
                 Some(HoleKind::Span)
@@ -1038,6 +1046,8 @@ impl DeploymentPhrase {
             Self::Connectors => b"Configured connectors",
             Self::ConnectorsCut => b"Some configured connectors omitted",
             Self::ConnectorsEmpty => b"No configured connectors",
+            Self::StoreBytes => b"Store map bytes: ",
+            Self::StoreMark => b"Store high-water mark in bytes: ",
         }
     }
 }

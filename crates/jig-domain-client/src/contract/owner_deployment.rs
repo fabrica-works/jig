@@ -8,6 +8,7 @@ use skein_lib::{Duration, List, Time, Wall};
 /// Whole supplied deployment facts with independent bounded loss counters.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct OwnerDeployment {
+    pub store: StoreFill,
     pub hosts: List<OwnerHost>,
     pub attempts: List<OwnerHostRun>,
     pub accounts: List<OwnerAccount>,
@@ -31,6 +32,13 @@ pub struct OwnerDeployment {
     pub connectors: List<u16>,
     /// Independently supplied configured catalogue loss.
     pub connectors_cut: bool,
+}
+
+/// Store map bytes at the last commit answer and its admission mark (store.md, 11.2).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct StoreFill {
+    pub bytes: u64,
+    pub mark: u64,
 }
 
 /// One independently counted resource capacity.

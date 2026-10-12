@@ -563,6 +563,8 @@ fn render_accounts(
 /// Render every supplied deployment scalar and ordered row without decoding keys or deriving authority.
 pub fn render(b: &mut Builder, client: &Domain, value: &OwnerDeployment, words: &Words, bindings: &mut JigBindings) {
     region(b, words, P::Deployment, &[], None);
+    field_number(b, words, P::StoreBytes, value.store.bytes);
+    field_number(b, words, P::StoreMark, value.store.mark);
     render_hosts(b, client, value, words, bindings);
     list(b, words, P::Attempts);
     for value in &value.attempts {
@@ -665,7 +667,7 @@ pub fn max_nodes(l: &Limits) -> Option<u32> {
         .checked_add(accounts)?
         .checked_add(l.rows.checked_mul(80)?)?
         .checked_add(l.rows)?
-        .checked_add(42)
+        .checked_add(44)
 }
 /// Finite selected-language storage, including opaque fixed-width request keys.
 #[must_use]

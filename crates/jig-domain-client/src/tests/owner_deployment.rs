@@ -17,6 +17,7 @@ use skein_lib::{Duration, List, Time, Token};
 
 fn document() -> OwnerDeployment {
     OwnerDeployment {
+        store: StoreFill { bytes: 0, mark: 0 },
         hosts: List::with_capacity(2),
         attempts: List::with_capacity(2),
         accounts: List::with_capacity(2),

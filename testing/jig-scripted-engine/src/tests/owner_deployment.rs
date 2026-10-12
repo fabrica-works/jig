@@ -5,6 +5,7 @@ use core::mem::size_of;
 
 fn empty() -> OwnerDeployment {
     OwnerDeployment {
+        store: StoreFill { bytes: 0, mark: 0 },
         hosts: List::with_capacity(2),
         attempts: List::with_capacity(2),
         accounts: List::with_capacity(2),

@@ -23,9 +23,11 @@
 mod chip_phase;
 pub use chip_phase::{ChipDetails, ChipObservation, ChipWork};
 mod inbox_deployment;
-pub use inbox_deployment::{
-    Account, Capacity, ConversationLine, Conversations, Deployment, DocumentClock, HelloRefusalLine, Host, HostRun,
-    Inbox, InboxEntry, InboxObject, ProjectCapacity, RunLocation, conversation_from_row, make_with_clock,
+pub use inbox_deployment::{ConversationLine, Conversations, Inbox, InboxEntry, InboxObject, conversation_from_row};
+mod deployment;
+pub use deployment::{
+    Account, Capacity, Deployment, DocumentClock, HelloRefusalLine, Host, HostRun, ProjectCapacity, RunLocation,
+    StoreFill, make_with_clock,
 };
 mod inbox_selection;
 pub(crate) use inbox_selection::retained as inbox_selection_from_ancestry;
@@ -373,9 +375,7 @@ pub fn make(core: &Core, limits: &Limits, party: u64, subject: &Subject, window:
             }
             Ok(Document::Conversations(inbox_deployment::conversations(core, limits, party, window)?))
         }
-        Subject::Deployment => {
-            Ok(Document::Deployment(Box::new(inbox_deployment::deployment(core, limits, party, None)?)))
-        }
+        Subject::Deployment => Ok(Document::Deployment(Box::new(deployment::deployment(core, limits, party, None)?))),
         Subject::Proposal { proposer, number } => {
             Ok(Document::Proposal(Box::new(objects::proposal(core, limits, party, *proposer, *number)?)))
         }
@@ -424,7 +424,7 @@ pub fn document_worst_case(limits: &DocumentLimits) -> Option<u64> {
             .max(project_tasks::worst_case(limits)?)
             .max(objects::worst_case(limits)?)
             .max(project_note::worst_case(limits)?)
-            .max(inbox_deployment::worst_case(limits)?),
+            .max(deployment::worst_case(limits)?),
     )
 }
 
@@ -438,7 +438,7 @@ pub fn document_with_context_worst_case(limits: &Limits) -> Option<u64> {
 /// Peak scratch allocated while constructing party/deployment pages. Child
 /// accessors copy bounded shallow facts only; documents themselves are separate.
 pub(crate) fn document_scratch_worst_case(limits: &Limits) -> Option<u64> {
-    Some(inbox_deployment::scratch_worst_case(limits)?.max(project_tasks::scratch_worst_case(limits)?))
+    Some(deployment::scratch_worst_case(limits)?.max(project_tasks::scratch_worst_case(limits)?))
 }
 
 /// Join volatile live observations to a loaded owner row. The reader checks

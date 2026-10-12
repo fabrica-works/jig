@@ -170,3 +170,11 @@ fn deployment_complete_connector_registry_does_not_hide_original_refusal_history
         assert_eq!(row.why, fleet::HelloRefusal::StopBound { grace: limits.fleet.grace });
     }
 }
+
+#[test]
+fn the_deployment_document_shows_the_last_fill_and_the_mark() {
+    let (mut core, mut limits) = source(&[1], 2);
+    limits.fill_mark = 9012;
+    core.fill = 6789;
+    assert_eq!(deployment(&core, &limits).store, StoreFill { bytes: 6789, mark: 9012 });
+}

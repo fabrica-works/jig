@@ -31,6 +31,7 @@ pub(crate) fn source() -> documents::Deployment {
     run.state = fleet::AttemptState::Kept;
     let chip = chips::tests::source_chip();
     documents::Deployment {
+        store: documents::StoreFill { bytes: u64::MAX, mark: 0 },
         hosts: rows(
             2,
             [documents::Host {
@@ -658,4 +659,10 @@ fn deployment_frame_role_is_independent_of_another_project_owner_or_clipped_proj
         assert_eq!(value.deployment_role, expected);
         assert!(value.cut && value.projects.is_empty());
     }
+}
+
+#[test]
+fn deployment_keeps_the_store_fill_and_the_mark() {
+    let value = document(&source(), &limits()).expect("whole deployment");
+    assert_eq!(value.store, client::StoreFill { bytes: u64::MAX, mark: 0 });
 }
