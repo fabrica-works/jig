@@ -137,7 +137,7 @@ answered once durable (engine.md, 5.2):
 | make themselves a task's requester | they may amend it | tasks.md, section 7 |
 | stop a run | the task in their tree, or maintainer | its run cancelled and its task held for a party's stop |
 | prioritise goals | maintainer | the goals' priorities amended |
-| adopt a resource; change the policy, roles or services | owner | the project changed (5.2) |
+| adopt a resource, as a home or not; change the policy, roles or services | owner | the project changed (5.2) |
 | edit or delete a note | the note's scope within their role | the note revised (engine.md, section 10) |
 | take or hand back a person task | addressed to a role they hold | held by them, so no other answers it; or back to the role (section 8) |
 | set a party's pool | owner | the pool opened or resized in the current period, what was spent and reserved kept |

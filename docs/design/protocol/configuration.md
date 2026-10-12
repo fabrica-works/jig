@@ -33,8 +33,9 @@ when configuration is read. What is still open is listed in section 9.
   or the start is refused.
 - **What lives in the store is not configuration.** Projects, their
   policies and roles, parties and their pools are the store's, changed by
-  parties' requests. Configuration seeds them on a deployment's first
-  start only.
+  parties' requests. Configuration seeds projects, their policies and
+  their parties' roles on a deployment's first start only; resources and
+  homes come by adoption after it (section 3).
 
 ## 2. Where it sits
 
@@ -64,15 +65,15 @@ the application's main (its shell)
 | Member | What it gives | Used by |
 |---|---|---|
 | deployment | the deployment's directory, which holds the store, transcripts and the secrets' store; retention's horizons; the seed's source, for tests | the store (`store.md`); the domain's retention; the shell |
-| owners | the deployment's first owners, each a provider and a subject (`../domain/people.md`, section 3) | the people child, on a first start |
-| providers | each sign-in provider's number and kind; its settings are the application's | the people child; the client's protocol |
+| owners | the deployment's first owners, each a provider and a subject (`../domain/people.md`, section 3), each an owner of every project seeded with it | the people child, on a first start |
+| providers | each sign-in provider's number and kind; its settings are the application's. One, of kind deployment, is the deployment's own, for services' credentials (`../domain/people.md`, section 3) | the people child; the client's protocol |
 | rules | the deployment's rules: the ceilings every project's policy is under (`../domain/authority.md`, section 6) | authority |
-| projects | each project seeded on a first start: its number, its resources and their roles, its homes, its policy, its parties' roles | the core, on a first start |
-| charters | each charter the deployment offers, numbered: its instructions (a file it names), its models, named from the llm member's (its main model, and those its sub-agents may use), its tool families, the hosts that may run it, its waiting time, whether its runs resume, its default budget (turns, spend and time, and a reserve of turns and time), which applies to a task whose batch gives none (`../domain/hosts.md`, section 8); its models' endpoints name one account, until a run needs several; and which charter chats run under | the core; `jig-protocol-charter` |
+| projects | each project seeded on a first start: its number; its policy, with its spend per period and its roles (each one's authority, the spend a party in it may allot per period, the kinds of proposal it decides; `../domain/authority.md`, section 6); its parties' roles. Its resources and homes come by adoption (below) | the core, on a first start |
+| charters | each charter the deployment offers, numbered: its instructions (a file it names), its models, named from the llm member's (its main model, and those its sub-agents may use), its tool families, the hosts that may run it, its waiting time, whether its runs resume, its default budget (turns, spend and time, and a reserve of turns and time), which applies to a task whose batch gives none (`../domain/hosts.md`, section 8); its models' endpoints name one account, until a run needs several; and which charter chats run under, with the grace a closed chat has to finish (`../domain/people.md`, section 7) | the core; `jig-protocol-charter` |
 | hosts | the engine's own slots, if it runs agents in the engine (shape 2), and their `smith-inline-agent`'s limits; the workers' names, each with the file of its secret's digest; the workers' listener: its addresses, socket addresses or an in-process name (skein's `io.md`, section 4), and its certificate and key files, but for an in-process name (`channel.md`, section 10); a listener on an in-process name tells the core its workers are in its process, and that no worker outlives it (`../domain/engine.md`, section 6) | the fleet; `jig-protocol-engine-workers`; `smith-inline-agent`, through the application's startup |
 | llm | endpoints, each with the models it serves; each model's window, output and the rest of what smith's agent configuration declares of it (smith's `protocol/agent.md`, section 4), and its prices: input, cached input, output, and cache writes when priced apart; accounts, each signed in, with its registration and its token endpoint, or handed in, with the private file of its access token (`llm.md`, 5.4), and the private directory of their records (`llm.md`, sections 4 and 5) | the core; smith's and skein's components and skein's accounts driver, through the application's startup; `jig-protocol-accounts` |
 | clients | the clients' listener (a TCP address, or loopback on one person's machine) and its certificate and key files, but on loopback; the heartbeat; whether the engine prints a local sign-in link at start (`client.md`, sections 4 and 8). It serves the client's routes and files only: a connector's webhooks are on a listener of its own | `jig-protocol-engine-clients` |
-| connectors | the application's connectors' numbers, as the core knows them (`../domain/core.md`, 3.5) | the core |
+| connectors | the application's connectors' numbers, as the core knows them (`../domain/core.md`, 3.5); none takes the number the core keeps for its own procedures (below) | the core |
 | limits | a profile, and any limit overridden by name (section 6) | every child and component of jig's |
 
 - **Each connector's own configuration** (its system's address, its
@@ -87,6 +88,30 @@ the application's main (its shell)
   section 8).
 - **The application's own children** take their configuration from the
   application's members, as its root gives them.
+- **What the core takes that no member names:**
+  - *a project's current period and its budget,* from the application's
+    root as each period begins (section 5), at every start before the
+    core admits a party's request; the policy's spend per period bounds
+    it;
+  - *a party's pool* for a period: the allotment their role gives, from
+    the project's policy;
+  - *a chat's authority and budget:* its person's role's, from the
+    project's policy (`../domain/people.md`, sections 4 and 7);
+  - *the core's recurring procedure* (`../domain/tasks.md`, section 10):
+    the core's own, under a number the core keeps for its procedures,
+    which no connector takes;
+  - *the engine's tool families' bits* in an authority: jig's own
+    numbering, the same in every deployment; a charter names the
+    families it allows;
+  - *a resumed conversation's bytes and the hub's turns:* limits, from
+    the profile (section 6).
+- **Resources and homes come by adoption,** after the first start, by an
+  owner's request (`../domain/people.md`, 5.1): a resource is a
+  project's once its connector has read what the application may do
+  there (`../domain/connectors.md`, section 12), which configuration
+  cannot say. A home is a resource its adoption names as the project's
+  home for that connector. A project seeded with none has none until
+  then.
 
 ## 4. jig's part for a worker
 

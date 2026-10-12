@@ -601,7 +601,11 @@ procedure, but a mechanism of the connector's, keyed to the goal.
   the application may do there and keeps it with the project, and the
   project's ceiling follows from it (authority.md, section 6). It may
   also say which parties it knows there, with their permission, from
-  which the project's policy may seed roles (people.md, section 4).
+  which the project's policy may seed roles (people.md, section 4). For
+  a connector that projects goals, an adoption may name the resource
+  the project's home there (core.md, 6.1). Configuration adopts
+  nothing: a deployment's first start seeds projects without resources
+  (`../protocol/configuration.md`, section 3).
 - **Nothing is required** of the system beyond the access the
   application is given. What is missing narrows what may be done there
   or slows it down, and the client says so: a system without hints is
