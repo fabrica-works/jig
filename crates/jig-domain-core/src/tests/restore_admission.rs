@@ -182,3 +182,82 @@ fn restore_ranges_admit_each_live_family_once() {
         assert_eq!(count, 1, "{key:?}");
     }
 }
+
+fn record_key_rows() -> [(CoreRecord, CoreKey); 8] {
+    [
+        (CoreRecord::Deployment(Core::new(config(50), &limits()).counters.deployment()), CoreKey::Deployment),
+        (
+            CoreRecord::Projection(ProjectionRecord::Goal {
+                goal: ProjectionGoal {
+                    number: 7,
+                    project: 1,
+                    priority: 1,
+                    words: Box::new([]),
+                    phase: tasks::Phase::Waiting,
+                },
+                pending: Box::new([]),
+                changed: false,
+                fed_at: None,
+            }),
+            CoreKey::Projection(ProjectionKey::Goal(7)),
+        ),
+        (
+            CoreRecord::Call(CallRecord {
+                key: CallKey { task: 11, attempt: 13, completion: 17, position: 19 },
+                part: CallPart::Controlled,
+                settled: None,
+            }),
+            CoreKey::Call(CallKey { task: 11, attempt: 13, completion: 17, position: 19 }),
+        ),
+        (CoreRecord::RunProof(RunProof::claimed(23, 29, 29, None)), CoreKey::RunProof(23)),
+        (
+            CoreRecord::Turn(TurnRecord {
+                task: 31,
+                attempt: 37,
+                turn: 41,
+                spent: 0,
+                read: None,
+                at: Wall::EPOCH,
+                transcript: Box::new([]),
+            }),
+            CoreKey::Turn { task: 31, attempt: 37, turn: 41 },
+        ),
+        (
+            CoreRecord::Terminal(TerminalRecord { task: 43, attempt: 47, cumulative: 0, end: tasks::End::Parked }),
+            CoreKey::Terminal { task: 43, attempt: 47 },
+        ),
+        (
+            CoreRecord::ProposalDecision(ProposalDecisionRecord {
+                project: 1,
+                proposer: Proposer::Task(53),
+                proposal: 59,
+                kind: tasks::ProposalKind::Batch,
+                by: 1,
+                at: Wall::EPOCH,
+                choice: people::ProposalChoice::Accepted,
+                created: None,
+            }),
+            CoreKey::ProposalDecision { proposer: Proposer::Task(53), proposal: 59 },
+        ),
+        (
+            CoreRecord::EscalationDecision(EscalationDecisionRecord {
+                project: 1,
+                requester: 1,
+                task: 61,
+                revision: 67,
+                by: 1,
+                at: Wall::EPOCH,
+                decision: people::EscalationDecision::Release,
+            }),
+            CoreKey::EscalationDecision { task: 61, revision: 67 },
+        ),
+    ]
+}
+
+#[test]
+fn a_records_key_is_the_key_its_row_is_saved_under() {
+    for (row, key) in record_key_rows() {
+        assert_eq!(row.key(), key, "the row owns its address");
+        assert_eq!(Record::Core(row).key(), Key::Core(key), "the child tag wraps the same address");
+    }
+}

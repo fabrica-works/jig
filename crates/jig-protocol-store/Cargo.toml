@@ -1,0 +1,19 @@
+[package]
+name = "jig-protocol-store"
+description = "Engine store boundary, keys and intervals"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+skein-lib.workspace = true
+skein-kv.workspace = true
+skein-io.workspace = true
+jig-domain-core.workspace = true
+jig-domain-tasks.workspace = true
+jig-domain-people.workspace = true
+jig-domain-notes.workspace = true
+
+[lints]
+workspace = true

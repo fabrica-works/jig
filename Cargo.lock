@@ -458,6 +458,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "jig-protocol-store"
+version = "0.0.0"
+dependencies = [
+ "jig-domain-core",
+ "jig-domain-notes",
+ "jig-domain-people",
+ "jig-domain-tasks",
+ "skein-io",
+ "skein-kv",
+ "skein-lib",
+]
+
+[[package]]
 name = "jig-protocol-tools"
 version = "0.0.0"
 dependencies = [
@@ -632,6 +645,15 @@ name = "skein-json"
 version = "0.0.0"
 source = "git+https://github.com/forgetic/skein.git#30dc6f7ddc7bb82659f2f58898edae8a19ffc856"
 dependencies = [
+ "skein-lib",
+]
+
+[[package]]
+name = "skein-kv"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/skein.git#30dc6f7ddc7bb82659f2f58898edae8a19ffc856"
+dependencies = [
+ "skein-io",
  "skein-lib",
 ]
 

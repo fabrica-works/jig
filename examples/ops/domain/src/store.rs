@@ -43,7 +43,7 @@ impl Record {
     #[must_use]
     pub fn key(&self) -> Key {
         match self {
-            Self::Core(row) => Key::Core(core_key(row)),
+            Self::Core(row) => Key::Core(row.key()),
             Self::Observability(row) => Key::Observability(row.key()),
             Self::Infrastructure(row) => Key::Infrastructure(row.key()),
         }
@@ -56,30 +56,4 @@ pub enum Write {
     Save(Record),
     /// Erase the owner's address.
     Erase(Key),
-}
-fn core_key(row: &core::Record) -> core::Key {
-    match row {
-        core::Record::Core(row) => core::Key::Core(match row {
-            core::CoreRecord::Deployment(_) => core::CoreKey::Deployment,
-            core::CoreRecord::Projection(row) => core::CoreKey::Projection(row.key()),
-            core::CoreRecord::Call(row) => core::CoreKey::Call(row.key),
-            core::CoreRecord::RunProof(row) => core::CoreKey::RunProof(row.task),
-            core::CoreRecord::Turn(row) => core::CoreKey::Turn { task: row.task, attempt: row.attempt, turn: row.turn },
-            core::CoreRecord::Terminal(row) => core::CoreKey::Terminal { task: row.task, attempt: row.attempt },
-            core::CoreRecord::ProposalDecision(row) => {
-                core::CoreKey::ProposalDecision { proposer: row.proposer, proposal: row.proposal }
-            }
-            core::CoreRecord::EscalationDecision(row) => {
-                core::CoreKey::EscalationDecision { task: row.task, revision: row.revision }
-            }
-        }),
-        core::Record::Tasks(row) => core::Key::Tasks(row.key()),
-        core::Record::People(row) => core::Key::People(row.key()),
-        core::Record::Notes(row) => core::Key::Notes(match row {
-            jig_domain_notes::Record::Entry(entry) => jig_domain_notes::Key::Entry { name: entry.name },
-            jig_domain_notes::Record::Line(line) => {
-                jig_domain_notes::Key::Line { scope: line.scope.clone(), name: line.name }
-            }
-        }),
-    }
 }

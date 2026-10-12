@@ -93,6 +93,17 @@ pub enum Record {
     Line(Line),
 }
 
+impl Record {
+    /// The durable address of this entry or scope line (domain/engine.md, 5.6).
+    #[must_use]
+    pub fn key(&self) -> Key {
+        match self {
+            Self::Entry(row) => Key::Entry { name: row.name },
+            Self::Line(row) => Key::Line { scope: row.scope.clone(), name: row.name },
+        }
+    }
+}
+
 /// Which records to load, starting after a previous page's last name.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Range {

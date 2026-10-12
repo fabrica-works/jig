@@ -178,6 +178,23 @@ pub enum CoreRecord {
     EscalationDecision(EscalationDecisionRecord),
 }
 
+impl CoreRecord {
+    /// The durable address of this core-owned row (domain/engine.md, 5.4).
+    #[must_use]
+    pub fn key(&self) -> CoreKey {
+        match self {
+            Self::Deployment(_) => CoreKey::Deployment,
+            Self::Projection(row) => CoreKey::Projection(row.key()),
+            Self::Call(row) => CoreKey::Call(row.key),
+            Self::RunProof(row) => CoreKey::RunProof(row.task),
+            Self::Turn(row) => CoreKey::Turn { task: row.task, attempt: row.attempt, turn: row.turn },
+            Self::Terminal(row) => CoreKey::Terminal { task: row.task, attempt: row.attempt },
+            Self::ProposalDecision(row) => CoreKey::ProposalDecision { proposer: row.proposer, proposal: row.proposal },
+            Self::EscalationDecision(row) => CoreKey::EscalationDecision { task: row.task, revision: row.revision },
+        }
+    }
+}
+
 /// Core-owned fixed-size addresses, ordered within the core's own family.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum CoreKey {
@@ -226,6 +243,19 @@ pub enum Record {
     People(jig_domain_people::Stored),
     /// Scoped note entries and index lines.
     Notes(jig_domain_notes::Record),
+}
+
+impl Record {
+    /// The durable address owned by the core or its child (domain/engine.md, 5.4).
+    #[must_use]
+    pub fn key(&self) -> Key {
+        match self {
+            Self::Core(row) => Key::Core(row.key()),
+            Self::Tasks(row) => Key::Tasks(row.key()),
+            Self::People(row) => Key::People(row.key()),
+            Self::Notes(row) => Key::Notes(row.key()),
+        }
+    }
 }
 
 /// The core's child-first store-key order.

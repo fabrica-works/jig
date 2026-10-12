@@ -1,0 +1,221 @@
+//! Store requests and terminals (protocol/store.md, sections 3, 7 to 10).
+use alloc::boxed::Box;
+use jig_domain_core::{self as core, RestoreRange, reads};
+use jig_domain_notes as notes;
+use skein_io::kernel::Fd;
+use skein_lib::Token;
+
+/// What the engine's protocol layer asks of the component. Each request but
+/// `Commit` names its asker's token; each has one terminal event.
+#[derive(Debug)]
+pub enum Request {
+    /// Open both stores in the deployment's directory (store.md 10); the
+    /// component's own rows and the core's header are checked before
+    /// `Opened`. In skein-kv's memory mode, the worlds' component needs none.
+    Open { owner: Token, root: Fd },
+    /// Commit `number` (store.md 6): its writes, in order, one skein-kv
+    /// commit with the same number. Terminal: `Committed` or `Failed`.
+    Commit { number: u64, writes: Box<[Write]> },
+    /// A page of one restart step's ranges (store.md 7.2), from `after`.
+    Restore { owner: Token, range: Restore, after: Option<Cursor>, rows: u32, bytes: u64 },
+    /// A page of a child's range (store.md 7.1), from `after`.
+    Load { owner: Token, range: Load, after: Option<Cursor>, rows: u32, bytes: u64 },
+    /// A party's read (store.md 7.3): its scope, position, direction and bounds.
+    Read { owner: Token, range: reads::Range },
+    /// One record by key.
+    Get { owner: Token, key: Get },
+    /// A transcript's turns (store.md 8.3).
+    Transcript { owner: Token, read: TranscriptRead, rows: u32, bytes: u64 },
+    /// The secrets' store (store.md 9).
+    Secrets { owner: Token, request: Secrets },
+}
+
+/// One write of a commit (store.md 6).
+#[derive(Debug)]
+pub enum Write {
+    /// jig's save: a put of its encoded key and record; a turn's save
+    /// becomes a frame in its task's transcript and puts of its places.
+    Save(core::Record),
+    /// jig's erase.
+    Erase(core::Key),
+    /// A task's transcript dropped whole (store.md 8.5): its places erased,
+    /// its file removed before the commit is submitted.
+    DropTranscript { task: u64 },
+    /// The application's put: its key's bytes (without the tag) and its value's.
+    Put { key: Box<[u8]>, value: Box<[u8]> },
+    /// The application's erase.
+    Remove { key: Box<[u8]> },
+}
+
+/// What a restart step restores.
+#[derive(Debug)]
+pub enum Restore {
+    /// jig's ranges, in order: `RestoreRange::LIVE` for `LoadCore`, the
+    /// census for `LoadInbox`. Rows are handed up typed; the census's are
+    /// the ended tasks its index rows name.
+    Jig(Box<[RestoreRange]>),
+    /// A connector's live intervals, relative to the application's tag.
+    Application(Box<[skein_kv::Range]>),
+}
+
+/// A child's range to load.
+#[derive(Debug)]
+pub enum Load {
+    /// The notes child's entry or a scope's lines.
+    Notes(notes::Range),
+    /// The application's intervals, relative to its tag.
+    Application(Box<[skein_kv::Range]>),
+}
+
+/// A record to get.
+#[derive(Debug)]
+pub enum Get {
+    Jig(core::Key),
+    /// The application's key, relative to its tag.
+    Application(Box<[u8]>),
+}
+
+/// A transcript read (store.md 8.3). Offsets are the component's, given
+/// and taken back; none reads past what is committed.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum TranscriptRead {
+    /// A resuming run's current window, from the turn the core names as its
+    /// start; a window that starts at another turn is `Unread`.
+    Window { task: u64, attempt: u64, turn: u32, after: Option<u64> },
+    /// One turn, walked to from its attempt's first turn.
+    Turn { task: u64, attempt: u64, turn: u32 },
+    /// A page of a task's turns from either end; a fresh run's tail is
+    /// `backwards: true, after: None`.
+    Page { task: u64, backwards: bool, after: Option<u64> },
+}
+
+/// Whose secret (store.md 9).
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub enum SecretOwner {
+    /// A sign-in's digest, by the sign-in's number.
+    SignIn,
+    /// A service's credential's digest, by the service's number.
+    Service,
+    /// The application's own record, under its tag, by its number.
+    Application,
+}
+
+/// A request to the secrets' store. jig 17 makes `value` a `skein_lib::Secret`.
+#[derive(Debug)]
+pub enum Secrets {
+    Keep { owner: SecretOwner, number: u64, value: Box<[u8]> },
+    Erase { owner: SecretOwner, number: u64 },
+    Get { owner: SecretOwner, number: u64 },
+}
+
+/// Where a page stopped: the interval of the request's list, and the last
+/// key it returned (store.md 7.1: the next page starts just past it).
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Cursor {
+    pub interval: u32,
+    pub after: Box<[u8]>,
+}
+
+/// One restored or loaded row.
+#[derive(Debug)]
+pub enum Row {
+    /// jig's record, decoded.
+    Jig(core::Record),
+    /// The application's row, its key relative to its tag.
+    Application { key: Box<[u8]>, value: Box<[u8]> },
+}
+
+/// Whose format the format row disagrees on (store.md 5.3).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Family {
+    Component,
+    Core,
+    Tasks,
+    People,
+    Notes,
+    Application,
+}
+
+/// Why a store refuses to open, saying which (store.md 5.3, 6, 10).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum OpenRefusal {
+    /// The format row names another version of `family`.
+    Format { family: Family, found: u32, wanted: u32 },
+    /// The format row names another deployment than the header.
+    Deployment,
+    /// skein-kv's recovered last commit is not the header's.
+    Numbers { store: u64, header: u64 },
+    /// A file failed, or a store did not recover.
+    Failed,
+}
+
+/// What the component answers.
+#[derive(Debug)]
+pub enum Event {
+    /// Both stores are open and checked; `last` is the last durable commit.
+    Opened {
+        owner: Token,
+        last: u64,
+    },
+    OpenRefused {
+        owner: Token,
+        why: OpenRefusal,
+    },
+    /// Commit `number` is durable, and every earlier one; `fill` is the
+    /// map's bytes (skein-kv's `used`), for the core's high-water mark.
+    Committed {
+        number: u64,
+        fill: u64,
+    },
+    /// Commit `number` failed or was refused; the engine stops (store.md 6).
+    Failed {
+        number: u64,
+    },
+    /// A restore's page; `next` is none once the step's ranges are done.
+    Restored {
+        owner: Token,
+        rows: Box<[Row]>,
+        next: Option<Cursor>,
+    },
+    /// A load's page; `next` is none once the range is done.
+    Loaded {
+        owner: Token,
+        rows: Box<[Row]>,
+        next: Option<Cursor>,
+    },
+    /// A read's page, busy, or gone.
+    Read {
+        owner: Token,
+        result: reads::Loaded,
+    },
+    Got {
+        owner: Token,
+        row: Option<Row>,
+    },
+    /// A transcript's turns; `next` is the offset to continue from.
+    Turns {
+        owner: Token,
+        turns: Box<[core::TurnRecord]>,
+        next: Option<u64>,
+    },
+    /// A transcript read failed: a frame's checksum, a window at another
+    /// turn, a dropped transcript (store.md 8.3, 8.5).
+    Unread {
+        owner: Token,
+    },
+    Kept {
+        owner: Token,
+    },
+    Erased {
+        owner: Token,
+    },
+    Secret {
+        owner: Token,
+        value: Option<Box<[u8]>>,
+    },
+    /// A stored row did not decode: the request's terminal; the engine
+    /// stops (store.md 7.1).
+    Corrupt {
+        owner: Token,
+    },
+}

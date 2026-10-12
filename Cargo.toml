@@ -42,6 +42,7 @@ members = [
     "crates/jig-domain-host",
     "crates/jig-protocol-charter",
     "crates/jig-protocol-tools",
+    "crates/jig-protocol-store",
     "tests/accounts",
     "tests/brief",
     "tests/fleet",
@@ -60,6 +61,7 @@ rust-version = "1.95"
 publish = false
 
 [workspace.dependencies]
+jig-protocol-store = { path = "crates/jig-protocol-store" }
 jig-protocol-tools = { path = "crates/jig-protocol-tools" }
 jig-client-world = { path = "tests/client" }
 jig-domain-client = { path = "crates/jig-domain-client" }
@@ -68,6 +70,8 @@ jig-view = { path = "crates/jig-view" }
 jig-fake-person = { path = "testing/jig-fake-person" }
 jig-scripted-engine = { path = "testing/jig-scripted-engine" }
 skein-lib = { git = "https://github.com/forgetic/skein.git" }
+skein-kv = { git = "https://github.com/forgetic/skein.git" }
+skein-io = { git = "https://github.com/forgetic/skein.git" }
 skein-json = { git = "https://github.com/forgetic/skein.git" }
 skein-world = { git = "https://github.com/forgetic/skein.git" }
 smith-domain-run = { git = "https://github.com/forgetic/smith.git" }
