@@ -371,7 +371,7 @@ pub(super) fn project(core: &Core, limits: &Limits, party: u64, number: u32) -> 
     let mut configured_pools_cut = false;
     for (source, value) in core.tasks.funding_records() {
         match source {
-            tasks::Funder::Pool { project, period, .. } if *project == number && *period == core.settings.period => {
+            tasks::Funder::Pool { project, period, .. } if *project == number && *period == core.period(number) => {
                 if configured_pools.room() > 0 {
                     configured_pools.push(ledger(value)).expect("bounded configured pools");
                 } else {
@@ -472,7 +472,7 @@ pub(super) fn project(core: &Core, limits: &Limits, party: u64, number: u32) -> 
         members,
         current_period,
         pools,
-        configured_period: core.settings.period,
+        configured_period: core.period(number),
         configured_pools,
         configured_pools_cut,
         spend,

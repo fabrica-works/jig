@@ -212,10 +212,15 @@ fn config(seed: u64) -> Config {
         period_spend: 1000,
         roles: Box::new([authority::Role {
             number: 0,
-            authority: authority_value(
-                500,
-                Box::new([authority::Executor::Charter(1), authority::Executor::Procedure(1)]),
-            ),
+            authority: {
+                let mut given = authority_value(
+                    500,
+                    Box::new([authority::Executor::Charter(1), authority::Executor::Procedure(1)]),
+                );
+                given.delegation.tasks = 2;
+                given.delegation.depth = 2;
+                given
+            },
             period_spend: 500,
             requests: authority::Requests::ALL,
             decides: authority::Proposals::ALL,
@@ -225,9 +230,6 @@ fn config(seed: u64) -> Config {
     let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
     authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }), "policy admitted");
-    let mut chat_authority = authority_value(100, Box::new([authority::Executor::Procedure(1)]));
-    chat_authority.delegation.tasks = 1;
-    chat_authority.delegation.depth = 1;
     Config {
         deployment: [31; 16],
         seed,
@@ -261,7 +263,7 @@ fn config(seed: u64) -> Config {
         settings: Settings {
             close_grace: Duration::from_secs(5),
             deployment_provider: 3,
-            recurring_connector: 1,
+
             chat: 1,
             charters: Box::new([Charter {
                 number: 1,
@@ -297,11 +299,8 @@ fn config(seed: u64) -> Config {
                 },
             }]),
             resume_bytes: 256,
-            period: 1,
-            period_budget: 1000,
-            person_budget: 500,
-            chat_authority,
-            tools: ToolFamilies::standard(),
+
+            tools: ToolFamilies::JIG,
         },
     }
 }
@@ -353,6 +352,8 @@ fn make_task(core: &mut Core, limits: &Limits, number: u64) {
         &mut out,
     );
     while out.pop().is_some() {}
+    let mut given = core.chat_authority(1, 1, people::Role::Owner, u32::MAX);
+    given.budget.spend = 100;
     let row = tasks::New {
         number,
         project: 1,
@@ -363,7 +364,7 @@ fn make_task(core: &mut Core, limits: &Limits, number: u64) {
             inputs: Box::new([]),
         },
         contract: tasks::Contract::Report { words: 64 },
-        authority: task_authority(&core.settings.chat_authority),
+        authority: task_authority(&given),
         numbers: tasks::Numbers { budget: 100, spent: 0, spent_below: 0, reserved: 0 },
         funder: tasks::Funder::Period { project: 1, period: 1 },
         dependencies: Box::new([]),
@@ -404,7 +405,7 @@ fn documents_frame_carries_roles_retention_and_configured_charters() {
             role: people::Role::Owner,
             name: None,
             pool: None,
-            chat_budget: core.settings.chat_authority.budget.spend
+            chat_budget: core.authority.role(1, 0).unwrap().authority.budget.spend
         }]
     );
     assert_eq!(frame.retention, limits.people.request_retention);
@@ -511,8 +512,10 @@ fn tree_core() -> (Core, Limits) {
     limits.tasks.inbox_messages = 16;
     limits.tasks.inbox_bytes = 2048;
     let mut config = config(17);
-    config.settings.chat_authority.delegation.tasks = 16;
-    config.settings.chat_authority.delegation.depth = 4;
+    let mut given = config.authority.role(1, 0).unwrap().authority.clone();
+    given.delegation.tasks = 17;
+    given.delegation.depth = 5;
+    set_role_authority(&mut config.authority, given);
     let mut core = Core::new(config, &limits);
     core.people = old.people;
     send_task(&mut core, &limits, tasks::Event::Restored);
@@ -536,7 +539,7 @@ fn send_task(core: &mut Core, limits: &Limits, event: tasks::Event) {
 }
 
 fn new_row(core: &Core, number: u64, funder: tasks::Funder, tracked: Option<u32>) -> tasks::New {
-    let mut authority = task_authority(&core.settings.chat_authority);
+    let mut authority = task_authority(&core.chat_authority(1, 1, people::Role::Owner, u32::MAX));
     let budget = match funder {
         tasks::Funder::Task(_) => 10,
         tasks::Funder::Pool { .. } | tasks::Funder::Recurring { .. } | tasks::Funder::Period { .. } => 100,
@@ -2997,4 +3000,6 @@ fn an_answer_payload_for_a_replaced_attempt_is_dropped() {
 
 mod credentials;
 
+mod funding_fixtures;
 mod windows;
+use funding_fixtures::set_role_authority;

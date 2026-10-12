@@ -66,32 +66,32 @@ pub(super) fn pool_route(
         pool_refused(work, request, people::Refusal::Unknown);
         return;
     };
-    if core.settings.period_budget > policy.period_spend {
+    if core.period_budget(project) > policy.period_spend {
         pool_refused(
             work,
             request,
             people::Refusal::Authority {
                 proposable: None,
-                lacking: people::Lack::Budget { needs: core.settings.period_budget, left: policy.period_spend },
+                lacking: people::Lack::Budget { needs: core.period_budget(project), left: policy.period_spend },
             },
         );
         return;
     }
-    let period = tasks::Funder::Period { project, period: core.settings.period };
-    let funder = tasks::Funder::Pool { project, person, period: core.settings.period };
+    let period = tasks::Funder::Period { project, period: core.period(project) };
+    let funder = tasks::Funder::Pool { project, person, period: core.period(project) };
     let needed =
         u32::from(core.tasks.funding(period).is_none()).saturating_add(u32::from(core.tasks.funding(funder).is_none()));
     if core.tasks.funding_room() < needed {
         super::refusals::pool_again(work, request, people::Again::Busy);
         return;
     }
-    if core.tasks.funding(period).is_none() && budget > core.settings.period_budget {
+    if core.tasks.funding(period).is_none() && budget > core.period_budget(project) {
         pool_refused(
             work,
             request,
             people::Refusal::Authority {
                 proposable: None,
-                lacking: people::Lack::Budget { needs: budget, left: core.settings.period_budget },
+                lacking: people::Lack::Budget { needs: budget, left: core.period_budget(project) },
             },
         );
         return;
@@ -100,8 +100,8 @@ pub(super) fn pool_route(
         work.push(Event::Tasks(tasks::Event::OpenPeriod {
             reply_to: ReplyTo::new(Token::new(0)),
             project,
-            period: core.settings.period,
-            budget: core.settings.period_budget,
+            period: core.period(project),
+            budget: core.period_budget(project),
         }));
     }
     assert!(
@@ -113,7 +113,7 @@ pub(super) fn pool_route(
             reply_to: ReplyTo::new(request),
             project,
             person,
-            period: core.settings.period,
+            period: core.period(project),
             budget,
         }));
     } else {
@@ -121,7 +121,7 @@ pub(super) fn pool_route(
             reply_to: ReplyTo::new(request),
             project,
             person,
-            period: core.settings.period,
+            period: core.period(project),
             budget,
         }));
     }
@@ -222,20 +222,16 @@ pub(super) fn begin_chat_creation(
         pool_refused(work, request, people::Refusal::Limit { which: people::LimitKind::Arithmetic });
         return;
     };
+    let given = core.chat_authority(project, person, role, env.limits.tasks.tree_tasks);
     let new = tasks::New {
         number,
         project,
         executor: tasks::Executor::Agent { charter: core.settings.chat },
         spec: tasks::Spec { words, parameters: Box::new([]), inputs: Box::new([]) },
         contract: tasks::Contract::Report { words: env.limits.tasks.result_bytes },
-        authority: crate::translate::task_authority(&core.settings.chat_authority),
-        numbers: tasks::Numbers {
-            budget: core.settings.chat_authority.budget.spend,
-            spent: 0,
-            spent_below: 0,
-            reserved: 0,
-        },
-        funder: tasks::Funder::Pool { project, person, period: core.settings.period },
+        authority: crate::translate::task_authority(&given),
+        numbers: tasks::Numbers { budget: given.budget.spend, spent: 0, spent_below: 0, reserved: 0 },
+        funder: tasks::Funder::Pool { project, person, period: core.period(project) },
         dependencies: Box::new([]),
         holdings: Box::new([]),
         wake: tasks::WakePolicy::DEFAULT,

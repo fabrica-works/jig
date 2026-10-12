@@ -74,9 +74,9 @@ fn assert_original_facts(before: &Deployment, after: &Deployment) {
 
 #[test]
 fn deployment_connector_references_keep_full_width_identifiers_and_configured_order_without_activity() {
-    let (core, limits) = source(&[u16::MAX, 9, 0, 1], 5);
+    let (core, limits) = source(&[u16::MAX - 1, 9, 0, 1], 5);
     let value = deployment(&core, &limits);
-    assert_eq!(value.connectors.as_slice(), &[u16::MAX, 9, 0, 1]);
+    assert_eq!(value.connectors.as_slice(), &[u16::MAX - 1, 9, 0, 1]);
     assert_eq!(value.connectors.capacity(), 5);
     assert!(!value.connectors_cut);
     assert!(!value.cut);
@@ -115,7 +115,7 @@ fn deployment_supplied_empty_connector_registry_is_complete_and_reserves_whole_d
 
 #[test]
 fn deployment_connector_reference_loss_is_independent_and_included_in_the_aggregate_cut() {
-    let (core, limits) = source(&[9, u16::MAX, 1], 1);
+    let (core, limits) = source(&[9, u16::MAX - 1, 1], 1);
     let value = deployment(&core, &limits);
     assert_eq!(value.connectors.as_slice(), &[9]);
     assert_eq!(value.connectors.capacity(), 1);
@@ -129,7 +129,7 @@ fn deployment_connector_reference_loss_is_independent_and_included_in_the_aggreg
 
 #[test]
 fn deployment_complete_connector_registry_does_not_hide_original_refusal_history_loss_or_epoch() {
-    let (mut core, limits) = source(&[u16::MAX], 2);
+    let (mut core, limits) = source(&[u16::MAX - 1], 2);
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.fleet };
     let mut out = Queue::with_capacity(fleet::max_out(&limits.fleet));
     for channel in [9, 10, 11] {
@@ -155,7 +155,7 @@ fn deployment_complete_connector_registry_does_not_hide_original_refusal_history
         assert_eq!(out.pop(), None);
     }
     let value = deployment(&core, &limits);
-    assert_eq!(value.connectors.as_slice(), &[u16::MAX]);
+    assert_eq!(value.connectors.as_slice(), &[u16::MAX - 1]);
     assert_eq!(value.connectors.capacity(), 2);
     assert!(!value.connectors_cut);
     assert!(value.cut);

@@ -842,7 +842,7 @@ fn charge(core: &mut Core, work: &mut Queue<Event>, origin: &EffectOrigin, price
                     if let Some(event) = pool {
                         work.push(Event::Tasks(event));
                     }
-                    tasks::Funder::Pool { project: proposal.project, person, period: core.settings.period }
+                    tasks::Funder::Pool { project: proposal.project, person, period: core.period(proposal.project) }
                 }
                 tasks::Party::Deployment { .. } => unreachable!("authenticated effect accepter"),
             },
@@ -1073,11 +1073,11 @@ fn check(
                     let pool = match core.tasks.funding(tasks::Funder::Pool {
                         project: proposal.project,
                         person,
-                        period: core.settings.period,
+                        period: core.period(proposal.project),
                     }) {
                         Some(pool) => pool.numbers,
                         None => tasks::Numbers {
-                            budget: core.settings.person_budget,
+                            budget: core.pool_budget(proposal.project, person),
                             spent: 0,
                             spent_below: 0,
                             reserved: 0,

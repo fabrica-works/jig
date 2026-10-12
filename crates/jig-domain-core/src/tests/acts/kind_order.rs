@@ -27,7 +27,9 @@ fn configured(pairs: Box<[authority::Implication]>, rows: u32) -> (Core, Limits)
     let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
     authority::step(&mut cfg.authority, authority::Event::Policy { project: 1, policy: value }, &mut out);
     assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
-    cfg.settings.chat_authority.grants = Box::new([grant(1, authority::Last::Exact(b"alpha".as_slice().into()))]);
+    let mut given = cfg.authority.role(1, 0).unwrap().authority.clone();
+    given.grants = Box::new([grant(1, authority::Last::Exact(b"alpha".as_slice().into()))]);
+    set_role_authority(&mut cfg.authority, given);
     let (prepared, _) = core();
     let mut core = Core::new(cfg, &limits);
     core.people = prepared.people;

@@ -38,20 +38,20 @@ impl Core {
         }
         let Some(policy) = self.authority.policy(project) else { return false };
         authority::at_most(&translate::authority_value(given), &policy.ceiling, &self.authority.rules().implies)
-            && self.settings.period_budget <= policy.period_spend
+            && self.period_budget(project) <= policy.period_spend
     }
 
     /// Ask the task child to open a missing period or person pool before a
     /// goal starts; both requests join the same decision as the goal.
     #[must_use]
     pub fn goal_open_pool(&self, project: u32, person: u64) -> (Option<tasks::Event>, Option<tasks::Event>) {
-        let period = tasks::Funder::Period { project, period: self.settings.period };
+        let period = tasks::Funder::Period { project, period: self.period(project) };
         let open_period = if self.tasks.funding(period).is_none() {
             Some(tasks::Event::OpenPeriod {
                 reply_to: ReplyTo::new(Token::new(0)),
                 project,
-                period: self.settings.period,
-                budget: self.settings.period_budget,
+                period: self.period(project),
+                budget: self.period_budget(project),
             })
         } else {
             None
@@ -62,8 +62,8 @@ impl Core {
                 reply_to: ReplyTo::new(Token::new(0)),
                 project,
                 person,
-                period: self.settings.period,
-                budget: self.settings.person_budget,
+                period: self.period(project),
+                budget: self.pool_budget(project, person),
             })
         } else {
             None
@@ -126,13 +126,13 @@ impl Core {
         }
     }
 
-    /// Read the person's current pool, including its configured unopened size.
+    /// Read the person's current pool, including their role's unopened allotment.
     #[must_use]
     pub fn goal_pool(&self, project: u32, person: u64) -> (tasks::Funder, tasks::Numbers) {
-        let source = tasks::Funder::Pool { project, person, period: self.settings.period };
+        let source = tasks::Funder::Pool { project, person, period: self.period(project) };
         let numbers = match self.tasks.funding(source) {
             Some(row) => row.numbers,
-            None => tasks::Numbers { budget: self.settings.person_budget, spent: 0, spent_below: 0, reserved: 0 },
+            None => tasks::Numbers { budget: self.pool_budget(project, person), spent: 0, spent_below: 0, reserved: 0 },
         };
         (source, numbers)
     }

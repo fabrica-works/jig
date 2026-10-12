@@ -1,4 +1,4 @@
-//! Frame watches signal global period changes; projects are reread through held answers.
+//! Frame watches signal project period changes; rereads keep each project's own period.
 //! `client/domain/contract.md`, 6, 7.1–7.2; `domain/engine.md`, 11.
 
 use super::*;
@@ -11,7 +11,6 @@ fn period_core(configured: u64) -> (Core, Limits) {
     limits.views.watchers_per_party = 4;
     limits.documents.lines = 4;
     let mut config = config(61);
-    config.settings.period = configured;
     let policy = config.authority.policy(1).unwrap().clone();
     config.authority = authority::Domain::new(
         config.authority.rules().clone(),
@@ -56,6 +55,9 @@ fn period_core(configured: u64) -> (Core, Limits) {
         }),
     );
     assert!(has_write(&carved));
+    if configured > 0 {
+        watch_outputs(&mut core, &limits, Event::Period { project: 2, period: configured, budget: 1000, next: None });
+    }
     assert_eq!(finish_watch_outputs(&mut core, &limits).len(), 1);
     (core, limits)
 }
@@ -172,7 +174,12 @@ fn a_cross_project_period_holds_the_frame_signal_and_project_reread_until_durabi
     let mut funding_writes = 0_u32;
     for request in &out {
         if let Request::Write(Write::Save(Record::Tasks(record))) = request {
-            let tasks::Stored::Ledger(row) = record else { panic!("no task in the period fixture") };
+            let tasks::Stored::Ledger(row) = record else {
+                let tasks::Stored::ClosedLedger(row) = record else { panic!("no task in the period fixture") };
+                assert_eq!(row.funder, tasks::Funder::Period { project: 2, period: 1 });
+                assert!(row.closed);
+                continue;
+            };
             let tasks::Funder::Period { project, period } = row.funder else { panic!("no local pool mutation") };
             assert_eq!(project, 2, "the reread project emitted no funding write");
             assert_eq!(period, 2);
@@ -181,7 +188,7 @@ fn a_cross_project_period_holds_the_frame_signal_and_project_reread_until_durabi
     }
     assert!(funding_writes > 0);
     let frame = frame_delivery(&out, watcher).expect("cross-project frame signal is held");
-    assert_frame_project_pool(&frame, None);
+    assert_frame_project_pool(&frame, before.pools.get(0));
     let room = room_max(&limits).unwrap();
     let mut journal = skein_lib::Journal::<Write, Box<Held>>::new(&skein_lib::JournalLimits {
         commits: 1,
@@ -207,8 +214,8 @@ fn a_cross_project_period_holds_the_frame_signal_and_project_reread_until_durabi
     journal.accept(decision);
     let commit = journal.commit().expect("the period's own commit").number;
     let (after, held_read) = held_project_read(&mut core, &limits);
-    assert_eq!(after.configured_period, 2);
-    assert!(after.configured_pools.is_empty());
+    assert_eq!(after.configured_period, 1);
+    assert_eq!(after.configured_pools, before.pools);
     assert_observed_pool(&after, &before);
     let mut read = journal.decision(&skein_lib::JournalRoom { writes: 0, held: 1 }).unwrap();
     read.hold(held_read).unwrap();
@@ -257,10 +264,10 @@ fn inflight_frame_signals_coalesce_before_rereading_the_latest_project_target() 
     assert_eq!(before.configured_period, 1, "the already made project read stays whole");
     let out = watch_outputs(&mut core, &limits, Event::Delivered { watcher });
     let current_frame = frame_delivery(&out, watcher).expect("one coalesced frame delivery");
-    assert_frame_project_pool(&current_frame, None);
+    assert_frame_project_pool(&current_frame, before.pools.get(0));
     let (current, _) = held_project_read(&mut core, &limits);
-    assert_eq!(current.configured_period, 4);
-    assert!(current.configured_pools.is_empty());
+    assert_eq!(current.configured_period, 1);
+    assert_eq!(current.configured_pools, before.pools);
     assert_observed_pool(&current, &before);
     assert!(frame_delivery(&watch_outputs(&mut core, &limits, Event::Delivered { watcher }), watcher).is_none());
     assert!(frame_delivery(&finish_watch_outputs(&mut core, &limits), watcher).is_none());
@@ -286,30 +293,10 @@ fn zero_older_over_budget_and_unknown_periods_change_neither_frame_signal_nor_pr
         let watcher = Token::new(30);
         open_frame(&mut core, &limits, watcher);
         let (before, _) = held_project_read(&mut core, &limits);
-        assert_eq!(before.configured_period, 2);
+        assert_eq!(before.configured_period, 1);
         watch_outputs(&mut core, &limits, Event::Delivered { watcher });
         assert!(frame_delivery(&period_outputs(&mut core, &limits, project, period, budget), watcher).is_none());
         let (after, _) = held_project_read(&mut core, &limits);
         assert_eq!(after, before);
     }
-}
-
-#[test]
-fn the_first_positive_period_signals_frame_before_rereading_the_project_target() {
-    let (mut core, limits) = period_core(0);
-    let watcher = Token::new(30);
-    let initial_frame = open_frame(&mut core, &limits, watcher);
-    let (before, _) = held_project_read(&mut core, &limits);
-    assert_frame_project_pool(&initial_frame, None);
-    assert_eq!(before.configured_period, 0);
-    assert!(before.configured_pools.is_empty());
-    assert_eq!(before.current_period.as_ref().unwrap().source, tasks::Funder::Period { project: 1, period: 1 });
-    watch_outputs(&mut core, &limits, Event::Delivered { watcher });
-    let out = period_outputs(&mut core, &limits, 2, 1, 1000);
-    let frame = frame_delivery(&out, watcher).expect("zero target changes the frame signal");
-    assert_frame_project_pool(&frame, before.pools.get(0));
-    let (after, _) = held_project_read(&mut core, &limits);
-    assert_eq!(after.configured_period, 1);
-    assert_eq!(after.configured_pools, before.pools);
-    assert_observed_pool(&after, &before);
 }

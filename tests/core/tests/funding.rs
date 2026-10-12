@@ -1,0 +1,144 @@
+use jig_core_world::{effects::World, world};
+use jig_domain_authority as authority;
+use jig_domain_core as core;
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
+use jig_test_domain as root;
+use skein_lib::{Queue, ReplyTo, Token};
+
+fn ask(world: &mut World, key: u8, ask: people::Ask) {
+    world.send(root::Event::Core(core::Event::People(people::Event::Ask {
+        reply_to: ReplyTo::new(Token::new(8000 + u64::from(key))),
+        sign_in: world.sign_in.expect("signed in owner"),
+        key: [key; 16],
+        ask,
+    })));
+}
+
+fn ledger(world: &World, funder: tasks::Funder) -> &tasks::FundingRecord {
+    let root::Record::Core(core::Record::Tasks(tasks::Stored::Ledger(row))) =
+        &world.store.rows[&root::Key::Core(core::Key::Tasks(tasks::Key::Ledger(funder)))]
+    else {
+        panic!("funding ledger")
+    };
+    row
+}
+
+fn two_projects(seed: u64) -> (root::Config, root::Limits) {
+    let mut config = world::config(seed);
+    let mut limits = world::limits();
+    limits.core.authority.projects = 2;
+    limits.core.tasks.funders = 8;
+    limits.core.people.projects = 2;
+    limits.core.people.initial_owners = 2;
+    limits.journal.writes = 10000;
+    limits.journal.held = 10000;
+    let policy = config.core.authority.policy(1).expect("first policy").clone();
+    config.core.authority =
+        authority::Domain::new(config.core.authority.rules().clone(), limits.core.authority).expect("two projects");
+    let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
+    for project in [1, 2] {
+        let mut policy = policy.clone();
+        policy.period_spend = if project == 1 { 1000 } else { 700 };
+        authority::step(&mut config.core.authority, authority::Event::Policy { project, policy }, &mut facts);
+        assert_eq!(facts.pop(), Some(authority::PolicyFact::Added { project }));
+    }
+    config.core.projects = skein_lib::List::with_capacity(2);
+    config.core.projects.push(1).expect("first project");
+    config.core.projects.push(2).expect("second project");
+    config.core.owners = Box::new([
+        config.core.owners[0].clone(),
+        people::InitialOwner { project: 2, identity: config.core.owners[0].identity.clone() },
+    ]);
+    (config, limits)
+}
+
+#[test]
+fn two_projects_with_different_spends_fund_their_own_periods() {
+    let (config, limits) = two_projects(601);
+    let mut world = World::configured(601, false, config, limits);
+    world.send(root::Event::Core(core::Event::Period { project: 1, period: 2, budget: 800, next: None }));
+    world.send(root::Event::Core(core::Event::Period { project: 2, period: 9, budget: 600, next: None }));
+    world.restart_with(two_projects(601).0);
+    ask(&mut world, 1, people::Ask::SetPool { project: 1, person: 1, budget: 100 });
+    ask(&mut world, 2, people::Ask::SetPool { project: 2, person: 1, budget: 200 });
+    let first = tasks::Funder::Period { project: 1, period: 2 };
+    let second = tasks::Funder::Period { project: 2, period: 9 };
+    assert_eq!(ledger(&world, first).numbers.budget, 800);
+    assert_eq!(ledger(&world, second).numbers.budget, 600);
+    assert_eq!(ledger(&world, tasks::Funder::Pool { project: 1, person: 1, period: 2 }).parent, Some(first));
+    assert_eq!(ledger(&world, tasks::Funder::Pool { project: 2, person: 1, period: 9 }).parent, Some(second));
+}
+
+#[test]
+fn a_chat_takes_the_most_that_fits_under_its_persons_role() {
+    let mut config = world::config(602);
+    world::edit_role(&mut config.core, |role| {
+        role.authority.tools = authority::Tools(513);
+        role.authority.budget.spend = 80;
+        role.period_spend = 90;
+        role.authority.delegation.tasks = 3;
+    });
+    let mut limits = world::limits();
+    limits.core.tasks.tree_tasks = 4;
+    limits.journal.writes = 10000;
+    limits.journal.held = 10000;
+    let mut world = World::configured(602, false, config, limits);
+    ask(&mut world, 6, people::Ask::StartChat { project: 1, words: b"use the remainder".as_slice().into() });
+    let task = 2;
+    let root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row))) =
+        &world.store.rows[&root::Key::Core(core::Key::Tasks(tasks::Key::Live(task)))]
+    else {
+        panic!("live chat")
+    };
+    assert_eq!(row.authority.tools, tasks::Tools(513));
+    assert_eq!(row.authority.budget.spend, 10);
+    assert_eq!(row.authority.delegation.depth, 1);
+    assert_eq!(row.authority.delegation.tasks, 2);
+    assert_eq!(row.numbers.budget, 10);
+}
+
+#[test]
+fn a_policy_change_reaches_the_next_pool_budget() {
+    let mut world = World::configured(603, false, world::config(603), world::limits());
+    let initial = tasks::Funder::Pool { project: 1, person: 1, period: 1 };
+    assert_eq!(ledger(&world, initial).numbers.budget, 500);
+    ask(&mut world, 3, people::Ask::ChangePolicy { project: 1, change: people::PolicyChange::Role(changed_role()) });
+    world.send(root::Event::Core(core::Event::Period { project: 1, period: 2, budget: 1000, next: None }));
+    ask(
+        &mut world,
+        4,
+        people::Ask::SetGoal {
+            project: 1,
+            spec: b"next period".as_slice().into(),
+            executor: people::GoalExecutor::Charter(1),
+            budget: 20,
+            priority: 1,
+            deadline: None,
+        },
+    );
+    assert_eq!(ledger(&world, tasks::Funder::Pool { project: 1, person: 1, period: 2 }).numbers.budget, 175);
+    assert_eq!(ledger(&world, initial).numbers.budget, 500);
+}
+
+fn changed_role() -> people::PolicyRole {
+    people::PolicyRole {
+        number: 0,
+        authority: people::Authority {
+            tools: 1023,
+            grants: Box::new([]),
+            delegation: people::Delegation {
+                kinds: Box::new([people::Executor::Charter(1), people::Executor::Procedure(1)]),
+                tasks: 2,
+                depth: 2,
+            },
+            spend: 100,
+            deadline: None,
+            notes: 0,
+            note_resources: Box::new([]),
+        },
+        period_spend: 175,
+        requests: authority::Requests::ALL.0,
+        decides: authority::Proposals::ALL.0,
+    }
+}

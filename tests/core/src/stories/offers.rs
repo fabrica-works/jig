@@ -10,10 +10,10 @@ use skein_lib::{Queue, ReplyTo, Token};
 #[must_use]
 pub fn world_configuration(seed: u64) -> root::Config {
     let (mut configuration, _) = fixture(seed, false);
-    configuration.core.settings.chat_authority.delegation.kinds =
-        Box::new([authority::Executor::Charter(1), authority::Executor::Procedure(1)]);
-    configuration.core.settings.chat_authority.delegation.tasks = 1;
-    configuration.core.settings.chat_authority.delegation.depth = 1;
+    crate::world::edit_role(&mut configuration.core, |role| {
+        role.authority.delegation.tasks = 2;
+        role.authority.delegation.depth = 2;
+    });
     configuration
 }
 
@@ -36,10 +36,10 @@ pub fn world(seed: u64, role: Option<people::Role>) -> World {
         assert_eq!(facts.pop(), Some(authority::PolicyFact::Added { project: 1 }));
         configuration.core.authority = domain;
     }
-    configuration.core.settings.chat_authority.delegation.kinds =
-        Box::new([authority::Executor::Charter(1), authority::Executor::Procedure(1)]);
-    configuration.core.settings.chat_authority.delegation.tasks = 1;
-    configuration.core.settings.chat_authority.delegation.depth = 1;
+    crate::world::edit_role(&mut configuration.core, |role| {
+        role.authority.delegation.tasks = 2;
+        role.authority.delegation.depth = 2;
+    });
     let mut world = World::configured(seed, false, configuration, limits);
     let person = world
         .people_answers

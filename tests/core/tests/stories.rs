@@ -355,7 +355,7 @@ fn a_note_written_corrected_by_a_person_and_recalled_keeps_the_corrected_body() 
     authority::step(&mut checked, authority::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
     configuration.core.authority = checked;
-    configuration.core.settings.chat_authority.notes = authority::Scopes::PROJECT;
+
     let mut world = World::configured(121, false, configuration, limits);
     let key = world.call_key(1);
     action(
@@ -1032,26 +1032,6 @@ fn an_amendment_and_a_release_are_one_decision() {
 }
 
 #[test]
-fn a_party_short_of_budget_hears_what_the_request_needs_and_what_is_left() {
-    let mut world = World::new(153, false);
-    ask(&mut world, 57, people::Ask::StartChat { project: 1, words: b"next".as_slice().into() });
-    let expected = people::Reply::Outcome(people::Outcome::Refused(people::Refusal::Authority {
-        proposable: None,
-        lacking: people::Lack::Budget { needs: 300, left: 200 },
-    }));
-    assert_eq!(world.people_answers.last(), Some(&expected));
-    world.end(
-        tasks::End::Finished {
-            result: tasks::TaskResult::Report { words: b"done".as_slice().into() },
-            cancel_delegates: false,
-        },
-        1,
-    );
-    ask(&mut world, 57, people::Ask::StartChat { project: 1, words: b"next".as_slice().into() });
-    assert_eq!(world.people_answers.last(), Some(&expected), "the freed budget does not change a saved refusal");
-}
-
-#[test]
 fn a_party_deciding_a_cancelled_task_hears_who_cancelled_it_and_when() {
     let mut world = World::new(154, false);
     let task = world.call_key(1).task;
@@ -1080,7 +1060,7 @@ fn person_world_fixture(seed: u64) -> (root::Config, root::Limits) {
     let (mut configuration, mut limits) = jig_core_world::faults::plan_fixture(seed);
     limits.core.tasks.person_stall = skein_lib::Duration::from_secs(1);
     let kinds: Box<[authority::Executor]> = Box::new([authority::Executor::Charter(1), authority::Executor::Role(0)]);
-    configuration.core.settings.chat_authority.delegation.kinds.clone_from(&kinds);
+
     let mut rules = configuration.core.authority.rules().clone();
     rules.ceiling.delegation.kinds.clone_from(&kinds);
     let mut policy = configuration.core.authority.policy(1).expect("plan policy").clone();
@@ -1227,7 +1207,7 @@ fn amendment_world_fixture(seed: u64) -> (root::Config, root::Limits) {
     let rules = configuration.core.authority.rules().clone();
     let mut policy = configuration.core.authority.policy(1).expect("amendment policy").clone();
     policy.roles[0].period_spend = 1000;
-    configuration.core.settings.person_budget = 1000;
+
     let mut authority_domain = authority::Domain::new(rules, limits.core.authority).expect("bounded amendment policy");
     let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
     authority::step(&mut authority_domain, authority::Event::Policy { project: 1, policy }, &mut out);
@@ -1850,7 +1830,7 @@ fn procedure_configuration(seed: u64) -> (root::Config, root::Limits) {
     limits.core.tasks.executor_kinds = 3;
     let kinds: Box<[authority::Executor]> =
         Box::new([authority::Executor::Charter(1), authority::Executor::Role(0), authority::Executor::Procedure(1)]);
-    configuration.core.settings.chat_authority.delegation.kinds.clone_from(&kinds);
+
     let mut rules = configuration.core.authority.rules().clone();
     rules.ceiling.delegation.kinds.clone_from(&kinds);
     let mut policy = configuration.core.authority.policy(1).expect("project policy").clone();

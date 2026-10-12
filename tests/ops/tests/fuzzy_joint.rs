@@ -6,6 +6,7 @@ use jig_client_world::{
 use jig_conformance::Cut;
 use jig_domain_client::address::{Address as JigAddress, TaskSection};
 use jig_fake_person::{Find, Step};
+use jig_ops_domain as root;
 use jig_ops_domain_client::{Address, observability as obs};
 use jig_ops_world::joint::engine::Milestone;
 use jig_ops_world::joint::fixture;
@@ -26,12 +27,43 @@ fn p_accepts_the_restart_from_the_incidents_page() {
     p_story(511, Cut::None, false);
 }
 
+type OpsEngine = jig_conformance::Harness<jig_ops_world::joint::engine::OpsApplication>;
+
 type StoryWorld = jig_client_world::World<fixture::Client, jig_ops_world::joint::front::Joint>;
+
+fn incident_lead(engine: &OpsEngine) -> u64 {
+    let mut rows = engine.store.rows.values();
+    rows.find_map(|row| match row {
+        jig_ops_domain::Record::Observability(jig_ops_domain_observability::Record::Incident(incident))
+            if incident.project == 1 && incident.number == 12 =>
+        {
+            incident.lead
+        }
+        root::Record::Core(_) | root::Record::Observability(_) | root::Record::Infrastructure(_) => None,
+    })
+    .expect("incident 12 has its retained lead")
+}
+
+fn remediation(engine: &OpsEngine, lead: u64) -> u64 {
+    let mut rows = engine.store.rows.values();
+    rows.find_map(|row| match row {
+        jig_ops_domain::Record::Core(jig_domain_core::Record::Tasks(
+            jig_domain_tasks::Stored::Live(task) | jig_domain_tasks::Stored::Ended(task),
+        )) if task.requester == jig_domain_tasks::Party::Task(lead) => Some(task.number),
+        root::Record::Core(_) | root::Record::Observability(_) | root::Record::Infrastructure(_) => None,
+    })
+    .expect("the lead has its remediation delegate")
+}
 
 fn p_story(seed: u64, cut: Cut, noise: bool) -> StoryWorld {
     let (mut world, p) = monitor(seed);
     world.front().engine.cut(cut);
     fixture::alert(world.front());
+    let service =
+        jig_ops_domain_infrastructure::Service::new(b"production".as_slice().into(), b"checkout".as_slice().into());
+    let fact =
+        world.front().engine.systems.infrastructure(jig_ops_domain_infrastructure::SystemRequest::Service { service });
+    world.front().source(jig_ops_domain::Event::Infrastructure(jig_ops_domain_infrastructure::Event::System(fact)));
     world.person(
         p,
         vec![
@@ -39,7 +71,14 @@ fn p_story(seed: u64, cut: Cut, noise: bool) -> StoryWorld {
             Step::See { find: Find::named(Role::Link, b"Incident 12"), within: WITHIN },
             press(Role::Link, b"Incident 12"),
             see(b"Lead"),
-            Step::Go { address: Address::Jig(JigAddress::Task { task: 5, section: TaskSection::Activity }) },
+        ],
+    );
+    passed(&mut world);
+    let lead = incident_lead(&world.front().engine);
+    world.person(
+        p,
+        vec![
+            Step::Go { address: Address::Jig(JigAddress::Task { task: lead, section: TaskSection::Activity }) },
             see(b"read_series"),
             see(b"delegate"),
             Step::Go { address: Address::Jig(JigAddress::Inbox { project: None }) },
@@ -49,13 +88,14 @@ fn p_story(seed: u64, cut: Cut, noise: bool) -> StoryWorld {
         ],
     );
     passed(&mut world);
+    let remedy = remediation(&world.front().engine, lead);
     if noise {
         wander(&mut world, p, seed);
     }
     world.person(
         p,
         vec![
-            Step::Go { address: Address::Jig(JigAddress::Task { task: 5, section: TaskSection::Plan }) },
+            Step::Go { address: Address::Jig(JigAddress::Task { task: lead, section: TaskSection::Plan }) },
             see(b"restart checkout"),
             see(b"Restart service"),
             see(b"checkout"),
@@ -67,7 +107,7 @@ fn p_story(seed: u64, cut: Cut, noise: bool) -> StoryWorld {
             Step::Go { address: Address::Jig(JigAddress::Inbox { project: None }) },
             Step::Gone { find: Find::text(b"Restart service"), within: Duration::from_secs(8) },
             see(b"0 need you"),
-            Step::Go { address: Address::Jig(JigAddress::Task { task: 6, section: TaskSection::Panels }) },
+            Step::Go { address: Address::Jig(JigAddress::Task { task: remedy, section: TaskSection::Panels }) },
             see(b"Restart service"),
             see(b"Restarting"),
             see(b"Waiting for healthy"),
@@ -88,7 +128,7 @@ fn p_story(seed: u64, cut: Cut, noise: bool) -> StoryWorld {
     );
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, Verdict::Passed, "{}", outcome.trace.join("\n"));
-    assert_durable_restart(&world.front().engine);
+    assert_durable_restart(&world.front().engine, lead, remedy);
     assert_acceptance_key(&mut world, false);
     world
 }
@@ -219,7 +259,7 @@ fn assert_durable_withdrawal(engine: &jig_conformance::Harness<jig_ops_world::jo
     );
 }
 
-fn assert_durable_restart(engine: &jig_conformance::Harness<jig_ops_world::joint::engine::OpsApplication>) {
+fn assert_durable_restart(engine: &OpsEngine, lead: u64, remedy: u64) {
     let restart = jig_ops_fake_production::ObservedEffect::Restart {
         service: jig_ops_fake_production::ServiceName::new("production", "checkout"),
         operation: 77,
@@ -233,7 +273,7 @@ fn assert_durable_restart(engine: &jig_conformance::Harness<jig_ops_world::joint
         .filter_map(|row| match row {
             jig_ops_domain::Record::Core(jig_domain_core::Record::Core(
                 jig_domain_core::CoreRecord::ProposalDecision(decision),
-            )) if decision.proposer == jig_domain_people::Proposer::Task(6) => Some(decision),
+            )) if decision.proposer == jig_domain_people::Proposer::Task(remedy) => Some(decision),
             jig_ops_domain::Record::Core(_)
             | jig_ops_domain::Record::Observability(_)
             | jig_ops_domain::Record::Infrastructure(_) => None,
@@ -252,12 +292,12 @@ fn assert_durable_restart(engine: &jig_conformance::Harness<jig_ops_world::joint
     ] {
         assert!(native.iter().any(|(_, document)| matches!(document,
             jig_ops_domain::ClientDocument::Infrastructure(value)
-            if matches!(value.as_ref(), jig_ops_domain_infrastructure::ClientDocument::Panel { task: 6, state, .. } if state.phase == phase))));
+            if matches!(value.as_ref(), jig_ops_domain_infrastructure::ClientDocument::Panel { task, state, .. } if *task == remedy && state.phase == phase))));
     }
     assert!(native.iter().any(|(_, document)| matches!(document,
         jig_ops_domain::ClientDocument::Observability(value)
         if matches!(value.as_ref(), jig_ops_domain_observability::ClientDocument::Incident { incident, .. }
-            if incident.number == 12 && incident.lead == Some(5) && incident.state == jig_ops_domain_observability::IncidentState::Resolved))));
+            if incident.number == 12 && incident.lead == Some(lead) && incident.state == jig_ops_domain_observability::IncidentState::Resolved))));
 }
 
 #[test]
@@ -617,6 +657,7 @@ fn assert_recovered(world: &mut StoryWorld, commit: u64) {
 fn assert_acceptance_key(world: &mut StoryWorld, replayed: bool) {
     use jig_domain_people as people;
     let front = world.front();
+    let remedy = remediation(&front.engine, incident_lead(&front.engine));
     let requests: Vec<_> = front
         .engine
         .peers
@@ -626,10 +667,10 @@ fn assert_acceptance_key(world: &mut StoryWorld, replayed: bool) {
             matches!(
                 ask,
                 people::Ask::DecideProposal {
-                    proposer: people::Proposer::Task(6),
+                    proposer: people::Proposer::Task(task),
                     decision: people::ProposalDecision::Accept,
                     ..
-                }
+                } if *task == remedy
             )
         })
         .collect();
@@ -662,11 +703,11 @@ fn assert_acceptance_key(world: &mut StoryWorld, replayed: bool) {
     assert!(matches!(
         answers[0].2,
         people::Outcome::ProposalDecided {
-            proposer: people::Proposer::Task(6),
+            proposer: people::Proposer::Task(task),
             by: 1,
             choice: people::ProposalChoice::Accepted,
             ..
-        }
+        } if *task == remedy
     ));
 }
 

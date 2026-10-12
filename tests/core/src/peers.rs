@@ -566,18 +566,18 @@ pub fn fixture(seed: u64, engine_slots: u32) -> (root::Config, root::Limits) {
     limits.journal.held = 10_000;
     configuration.core.settings.charters[0].hosts = fleet::Kinds::Both;
     let kinds = Box::new([policy::Executor::Charter(1), policy::Executor::Procedure(1), policy::Executor::Role(1)]);
-    configuration.core.settings.chat_authority.delegation =
-        policy::Delegation { kinds: kinds.clone(), tasks: 3, depth: 2 };
-    configuration.core.settings.chat_authority.budget.spend = 40;
     let mut rules = configuration.core.authority.rules().clone();
     rules.ceiling.delegation = policy::Delegation { kinds, tasks: 6, depth: 3 };
     rules.maximum_run_spend = 20;
     let mut project = configuration.core.authority.policy(1).expect("peer policy").clone();
     project.ceiling = rules.ceiling.clone();
     let mut owner = project.roles[0].clone();
-    owner.authority.delegation = rules.ceiling.delegation.clone();
+    owner.authority.delegation =
+        policy::Delegation { kinds: rules.ceiling.delegation.kinds.clone(), tasks: 4, depth: 3 };
+    owner.authority.budget.spend = 40;
     let mut maintainer = owner.clone();
     maintainer.number = 1;
+    maintainer.authority.budget.spend = 500;
     let mut member = owner.clone();
     member.number = 2;
     member.authority.budget.spend = 50;

@@ -8,7 +8,7 @@ fn project_reads_the_whole_last_created_batch_after_ending_and_refuses_a_partial
     core.people = authenticated.people;
     limits.people = auth_limits.people;
     let mut parent = new_row(&core, 100, tasks::Funder::Period { project: 1, period: 1 }, None);
-    parent.executor = tasks::Executor::Procedure { connector: core.settings.recurring_connector, code: 1 };
+    parent.executor = tasks::Executor::Procedure { connector: RECURRING, code: 1 };
     parent.numbers = tasks::Numbers { budget: 0, spent: 0, spent_below: 0, reserved: 0 };
     parent.authority.delegation.kinds = Box::new([tasks::AuthorityExecutor::Charter(1)]);
     let mut first = new_row(&core, 1, tasks::Funder::Task(100), None);

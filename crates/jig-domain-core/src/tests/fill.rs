@@ -25,6 +25,7 @@ fn signed_in(core: &mut Core, env: &Env<Limits>) {
         }),
     ));
     drop(step(core, env, Event::Tasks(tasks::Event::Restored)));
+    drop(step(core, env, Event::Period { project: 1, period: 1, budget: 1000, next: None }));
 }
 
 fn ask(core: &mut Core, env: &Env<Limits>, ask: people::Ask) -> Requests {

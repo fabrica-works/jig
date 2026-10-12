@@ -24,6 +24,7 @@ mod effects;
 mod escalation;
 pub use effects::{EffectKey, EffectOrigin, EffectPurpose, effect_worst_case};
 mod chats;
+mod funding;
 mod goals;
 mod historical;
 mod inbox;
@@ -102,7 +103,7 @@ pub struct Config {
     pub owners: Box<[people::InitialOwner]>,
     /// Configured authority and policy.
     pub authority: authority::Domain,
-    /// Policy and run settings retained by the core.
+    /// Deployment and run settings retained by the core.
     pub settings: Settings,
     /// Configured project identifiers for bootstrap.
     pub projects: List<u32>,
@@ -112,7 +113,7 @@ pub struct Config {
     pub connectors: Box<[u16]>,
 }
 
-/// Immutable policy and run settings used by core decisions.
+/// Immutable deployment and run settings used by core decisions.
 #[derive(Debug)]
 pub struct Settings {
     /// Time a chat has to finish after its whole close decision.
@@ -125,21 +126,11 @@ pub struct Settings {
     pub chat: u32,
     /// Maximum committed conversation bytes resumed whole.
     pub resume_bytes: u32,
-    /// Funding period identifier.
-    pub period: u64,
-    /// Initial project period budget.
-    pub period_budget: u64,
-    /// Initial person pool budget.
-    pub person_budget: u64,
-    /// Authority of a directly requested chat.
-    pub chat_authority: authority::Authority,
-    /// Connector number for recurring procedures.
-    pub recurring_connector: u16,
-    /// Configured one-bit authority family for each engine tool.
+    /// Jig's one-bit authority family for each engine tool.
     pub tools: ToolFamilies,
 }
 
-/// Authority bits assigned to the engine's tool families by the charter.
+/// Jig's authority bits for the engine's tool families.
 #[derive(Clone, Copy, Debug)]
 pub struct ToolFamilies {
     pub delegate: authority::Tools,
@@ -153,6 +144,9 @@ pub struct ToolFamilies {
     pub recall: authority::Tools,
     pub read: authority::Tools,
 }
+
+/// Connector number reserved for the core's recurring procedure (tasks.md, 10).
+pub const RECURRING: u16 = u16::MAX;
 
 impl ToolFamilies {
     /// Every offered family has one distinct authority bit.
@@ -179,22 +173,19 @@ impl ToolFamilies {
         true
     }
 
-    /// A ten-family assignment available to a charter that offers every engine tool.
-    #[must_use]
-    pub const fn standard() -> Self {
-        Self {
-            delegate: authority::Tools(1),
-            message: authority::Tools(2),
-            control: authority::Tools(4),
-            decide: authority::Tools(8),
-            propose: authority::Tools(16),
-            subscribe: authority::Tools(32),
-            effect: authority::Tools(64),
-            note: authority::Tools(128),
-            recall: authority::Tools(256),
-            read: authority::Tools(512),
-        }
-    }
+    /// The ten engine tool families, numbered alike in every deployment.
+    pub const JIG: Self = Self {
+        delegate: authority::Tools(1),
+        message: authority::Tools(2),
+        control: authority::Tools(4),
+        decide: authority::Tools(8),
+        propose: authority::Tools(16),
+        subscribe: authority::Tools(32),
+        effect: authority::Tools(64),
+        note: authority::Tools(128),
+        recall: authority::Tools(256),
+        read: authority::Tools(512),
+    };
 }
 
 /// A watch's authenticated owner and concrete construction inputs.
@@ -346,6 +337,7 @@ pub struct Core {
 }
 
 fn assert_connector_registry(connectors: &[u16]) {
+    assert!(!connectors.contains(&RECURRING), "the core reserves its recurring connector number");
     for connector in connectors {
         let mut count = 0_u32;
         for other in connectors {

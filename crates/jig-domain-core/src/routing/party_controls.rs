@@ -384,9 +384,9 @@ pub(super) fn move_request(
                 reply_to: ReplyTo::new(request),
                 task,
                 person,
-                period: core.settings.period,
-                pool_budget: core.settings.person_budget,
-                period_budget: core.settings.period_budget,
+                period: core.period(project),
+                pool_budget: core.pool_budget(project, person),
+                period_budget: core.period_budget(project),
                 reason,
             }));
         }

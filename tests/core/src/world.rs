@@ -234,10 +234,15 @@ pub fn config(seed: u64) -> root::Config {
         period_spend: 1000,
         roles: Box::new([authority::Role {
             number: 0,
-            authority: authority_value(
-                500,
-                Box::new([authority::Executor::Charter(1), authority::Executor::Procedure(1)]),
-            ),
+            authority: {
+                let mut given = authority_value(
+                    100,
+                    Box::new([authority::Executor::Charter(1), authority::Executor::Procedure(1)]),
+                );
+                given.delegation.tasks = 2;
+                given.delegation.depth = 2;
+                given
+            },
             period_spend: 500,
             requests: authority::Requests::ALL,
             decides: authority::Proposals::ALL,
@@ -247,9 +252,6 @@ pub fn config(seed: u64) -> root::Config {
     let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
     authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }), "policy admitted");
-    let mut chat_authority = authority_value(100, Box::new([authority::Executor::Procedure(1)]));
-    chat_authority.delegation.tasks = 1;
-    chat_authority.delegation.depth = 1;
     let mut first = jig_test_connector_world::config(1);
     first.deployment = [31; 16];
     let mut second = jig_test_connector_world::config(2);
@@ -298,7 +300,7 @@ pub fn config(seed: u64) -> root::Config {
             settings: core::Settings {
                 close_grace: Duration::from_secs(5),
                 deployment_provider: 3,
-                recurring_connector: 1,
+
                 chat: 1,
                 charters: Box::new([core::Charter {
                     number: 1,
@@ -334,11 +336,8 @@ pub fn config(seed: u64) -> root::Config {
                     },
                 }]),
                 resume_bytes: 256,
-                period: 1,
-                period_budget: 1000,
-                person_budget: 500,
-                chat_authority,
-                tools: core::ToolFamilies::standard(),
+
+                tools: core::ToolFamilies::JIG,
             },
         },
     }
@@ -442,6 +441,7 @@ impl World {
                 hosting: Box::new([]),
             },
         })));
+        events.push_back(root::Event::Core(core::Event::Period { project: 1, period: 1, budget: 1000, next: None }));
         events.push_back(root::Event::Core(core::Event::SignIn {
             reply_to: ReplyTo::new(Token::new(101)),
             identity: people::Identity {
@@ -834,3 +834,6 @@ impl World {
 pub use crate::charters::{research_charter, two_charters};
 mod credentials;
 pub use credentials::with_workspace_credential;
+
+mod funding;
+pub use funding::edit_role;

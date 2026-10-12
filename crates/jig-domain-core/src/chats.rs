@@ -107,8 +107,8 @@ pub(crate) fn route(
         message,
         until: Wall::from_nanos(until),
         disposals: children,
-        period: core.settings.period,
-        pool_budget: core.settings.person_budget,
-        period_budget: core.settings.period_budget,
+        period: core.period(project),
+        pool_budget: core.pool_budget(project, person),
+        period_budget: core.period_budget(project),
     }));
 }

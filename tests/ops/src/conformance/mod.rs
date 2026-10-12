@@ -105,6 +105,7 @@ pub struct Peers {
     pub sign_in: Option<u64>,
     account_ready: bool,
     asked_sign_in: bool,
+    role_widened: bool,
     pub results: Vec<u64>,
     pub read_results: Vec<Token>,
     delivered_results: std::collections::BTreeSet<u64>,
@@ -173,6 +174,7 @@ impl Application for Ops {
             sign_in: None,
             account_ready: false,
             asked_sign_in: config.client_backed,
+            role_widened: false,
             results: Vec::new(),
             read_results: Vec::new(),
             delivered_results: std::collections::BTreeSet::new(),
@@ -231,6 +233,7 @@ impl Application for Ops {
         peers.observed.push(r::Observed::ColdStore { receipts: observations::snapshot(store).receipts });
         peers.account_ready = false;
         peers.asked_accept.clear();
+        peers.role_widened = false;
         peers.agents.clear();
         peers.protocol.clear();
     }
@@ -660,6 +663,17 @@ impl Application for Ops {
         let mut events = Vec::new();
         if ready && !peers.account_ready {
             peers.account_ready = true;
+            if !store.rows.contains_key(&root::Key::Core(core::Key::Tasks(tasks::Key::Ledger(tasks::Funder::Period {
+                project: 1,
+                period: 1,
+            })))) {
+                events.push(Input::Event(root::Event::Core(core::Event::Period {
+                    project: 1,
+                    period: 1,
+                    budget: 1000,
+                    next: None,
+                })));
+            }
             events.push(Input::Event(root::Event::Core(core::Event::Account(accounts::Event::Component(
                 accounts::FromComponent::Granted { account: 1, generation: 1, valid: Duration::from_secs(7200) },
             )))));
@@ -674,6 +688,9 @@ impl Application for Ops {
                     name: Box::new([]),
                 },
             })));
+        }
+        if ready {
+            events.extend(funding::poll(peers, store));
         }
         if ready && let Some(sign_in) = peers.sign_in {
             for record in store.rows.values() {
@@ -1051,3 +1068,5 @@ fn census_owner(store: &Store, row: &root::Record) -> Option<root::Record> {
     };
     store.rows.get(&root::Key::Core(core::Key::Tasks(tasks::Key::Ended(task)))).cloned()
 }
+
+mod funding;

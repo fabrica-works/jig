@@ -17,6 +17,7 @@ use skein_lib::Duration;
 pub fn limits() -> client::Limits {
     let mut limits = crate::client::limits();
     limits.jig.text = 4096;
+    limits.jig.document_bytes = 262_144;
     limits.jig.rows = 32;
     limits.jig.roles = 8;
     limits.jig.charters = 32;

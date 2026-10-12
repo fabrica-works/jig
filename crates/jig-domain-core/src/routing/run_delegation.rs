@@ -593,14 +593,14 @@ pub(super) fn start_recurring(
     if !core.recurring_admit(project, &authority, &template) {
         return;
     }
-    let period = core.settings.period;
+    let period = core.period(project);
     let to = ReplyTo::new(Token::new(u64::MAX - 2));
     if core.tasks.funding(tasks::Funder::Period { project, period }).is_none() {
         work.push(Event::Tasks(tasks::Event::OpenPeriod {
             reply_to: ReplyTo::new(Token::new(u64::MAX - 2)),
             project,
             period,
-            budget: core.settings.period_budget,
+            budget: core.period_budget(project),
         }));
     }
     let Some(number) = crate::fresh(&mut core.counters, crate::Family::Task) else { return };
@@ -610,7 +610,7 @@ pub(super) fn start_recurring(
         batch: Box::new([tasks::New {
             number,
             project,
-            executor: tasks::Executor::Procedure { connector: core.settings.recurring_connector, code: 1 },
+            executor: tasks::Executor::Procedure { connector: crate::RECURRING, code: 1 },
             spec: tasks::Spec { words: b"recurring".as_slice().into(), parameters: Box::new([]), inputs: Box::new([]) },
             contract: tasks::Contract::Report { words: 0 },
             numbers: tasks::Numbers { budget: 0, spent: 0, spent_below: 0, reserved: 0 },
@@ -638,12 +638,10 @@ pub(super) fn route_period(
         Some(policy) => budget <= policy.period_spend,
         None => false,
     };
-    if period > 0 && period >= core.settings.period && allowed {
-        if period != core.settings.period {
+    if period > 0 && period >= core.period(project) && allowed {
+        if period != core.period(project) {
             core.touch_frames();
         }
-        core.settings.period = period;
-        core.settings.period_budget = budget;
         if core.tasks.funding(tasks::Funder::Period { project, period }).is_none() {
             work.push(Event::Tasks(tasks::Event::OpenPeriod {
                 reply_to: ReplyTo::new(Token::new(u64::MAX - 2)),

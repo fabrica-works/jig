@@ -454,9 +454,9 @@ fn funding(core: &Core, source: tasks::Funder, needed: u64) -> FundingOffer {
 fn holder_source(core: &Core, party: u64, project: u32, holder: tasks::ProposalHolder) -> tasks::Funder {
     match holder {
         tasks::ProposalHolder::Task(number) => tasks::Funder::Task(number),
-        tasks::ProposalHolder::Person(person) => tasks::Funder::Pool { project, person, period: core.settings.period },
+        tasks::ProposalHolder::Person(person) => tasks::Funder::Pool { project, person, period: core.period(project) },
         tasks::ProposalHolder::Policy { .. } => {
-            tasks::Funder::Pool { project, person: party, period: core.settings.period }
+            tasks::Funder::Pool { project, person: party, period: core.period(project) }
         }
     }
 }

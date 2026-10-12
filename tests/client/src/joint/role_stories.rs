@@ -70,7 +70,7 @@ fn configured_with_bounds(
     owner.core.documents.text_bytes = receiving.jig.text;
     // This scenario offers its agent and human executor, not a procedure.
     let kinds = Box::new([jig_domain_authority::Executor::Charter(1), jig_domain_authority::Executor::Role(1)]);
-    configuration.core.settings.chat_authority.delegation.kinds = kinds.clone();
+
     let mut authority_rules = configuration.core.authority.rules().clone();
     authority_rules.ceiling.delegation.kinds = kinds.clone();
     let mut policy = configuration.core.authority.policy(1).expect("role policy").clone();
@@ -78,6 +78,7 @@ fn configured_with_bounds(
     for role in &mut policy.roles {
         role.authority.delegation.kinds = kinds.clone();
     }
+    policy.roles[0].authority.budget.spend = 500;
     configuration.core.authority =
         jig_domain_authority::Domain::new(authority_rules, owner.core.authority).expect("role scenario bounds");
     let mut out = skein_lib::Queue::with_capacity(jig_domain_authority::POLICY_MAX_OUT);

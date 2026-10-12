@@ -34,6 +34,7 @@ pub fn root_for(seed: u64, environment_chat: bool) -> (Config, Limits) {
     core_limits.tasks.message_bytes = 512;
     core_limits.tasks.proposal_stall = Duration::from_secs(60);
     core_limits.people.words = 512;
+    core_limits.people.amendment_bytes = 2048;
     core_limits.people.requests = 16;
     core_limits.people.inbox_entries = 16;
     core_limits.people.sign_in_lifetime = Duration::from_secs(7200);
@@ -103,16 +104,13 @@ pub fn root_for(seed: u64, environment_chat: bool) -> (Config, Limits) {
     limits.infrastructure.tasks = 8;
     limits.infrastructure.procedures = 8;
     config.core.authority = policy_domain(&limits.core.authority, environment_chat);
-    config.core.settings.chat_authority = authority(100, false);
     if environment_chat {
-        config.core.settings.chat_authority = environment_authority(20, false);
         config.core.owners = Box::new([jig_domain_people::InitialOwner {
             project: 1,
             identity: jig_domain_people::IdentityKey { provider: 0, subject: 8_u64.to_be_bytes().into() },
         }]);
     }
     config.core.settings.charters[0].hosts = jig_domain_fleet::Kinds::Engine;
-    config.core.settings.period = 1;
     config.core.settings.charters[0].policy.resume = true;
     config.core.settings.resume_bytes = 32768;
     config.core.settings.charters[0].policy.waiting = Duration::ZERO;
@@ -259,7 +257,17 @@ fn policy_domain(limits: &authority::Limits, environment_chat: bool) -> authorit
                 period_spend: 1000,
                 roles: Box::new([authority::Role {
                     number: 0,
-                    authority: if environment_chat { environment_authority(500, true) } else { authority(500, true) },
+                    authority: if environment_chat {
+                        let mut value = environment_authority(20, false);
+                        value.delegation.tasks += 1;
+                        value.delegation.depth += 1;
+                        value
+                    } else {
+                        let mut value = authority(100, false);
+                        value.delegation.tasks += 1;
+                        value.delegation.depth += 1;
+                        value
+                    },
                     period_spend: 500,
                     requests: authority::Requests::ALL,
                     decides: authority::Proposals::ALL,

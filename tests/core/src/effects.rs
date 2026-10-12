@@ -83,6 +83,7 @@ pub struct World {
     pub fill: u64,
     /// Whether the root reported a failed commit and stopped.
     pub stopped: bool,
+    period_started: bool,
     /// Independent scripted hosts and clients, when this scenario uses them.
     pub peers: Option<crate::peers::Peers>,
     /// Client-facing outputs; their protocol adapter runs in the joint world.
@@ -141,6 +142,7 @@ pub fn fixture(seed: u64, requirement: bool) -> (root::Config, root::Limits) {
     let mut policy = configuration.core.authority.policy(1).expect("configured policy").clone();
     policy.ceiling.grants = Box::new([grant()]);
     policy.roles[0].authority.grants = Box::new([grant()]);
+    policy.roles[0].authority.budget.spend = 300;
     if requirement {
         policy.requirements = Box::new([authority::Requirement {
             connector: 1,
@@ -155,8 +157,6 @@ pub fn fixture(seed: u64, requirement: bool) -> (root::Config, root::Limits) {
     let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
     authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
-    configuration.core.settings.chat_authority.grants = Box::new([grant()]);
-    configuration.core.settings.chat_authority.budget.spend = 300;
     configuration.core.authority = domain;
     configuration.first.procedures = Box::new([connector::ProcedureSpec {
         number: 1,
@@ -219,12 +219,20 @@ impl World {
         }
         let mut world = Self::empty(bootstrap, &limits);
         world.send(root::Event::Core(core::Event::People(people::Event::Roles { project: 1, holdings: Box::new([]) })));
-        let projects: Vec<_> = configuration.core.projects.iter().copied().collect();
+        let projects: Vec<_> = configuration
+            .core
+            .projects
+            .iter()
+            .map(|project| {
+                (*project, configuration.core.authority.policy(*project).expect("project policy").period_spend)
+            })
+            .collect();
         world.observer = crate::observations::Observer::new(&configuration);
         world.observer.durable(world.wall, &world.store);
         world.domain = root::Domain::new(configuration, &limits);
         world.send(root::Event::RestartBegin);
-        for project in projects {
+        for (project, budget) in projects {
+            world.send(root::Event::Core(core::Event::Period { project, period: 1, budget, next: None }));
             if project != 1 {
                 world.send(root::Event::Core(core::Event::People(people::Event::Roles {
                     project,
@@ -316,6 +324,7 @@ impl World {
             store_delay: 0,
             fill: 0,
             stopped: false,
+            period_started: false,
             peers: None,
             client_peer: None,
             store_peer: None,
@@ -700,7 +709,17 @@ impl World {
                 if self.domain.ready()
                     && let Some(peers) = &mut self.peers
                 {
-                    self.events.extend(peers.tick(&self.store, env.now));
+                    if self.period_started {
+                        self.events.extend(peers.tick(&self.store, env.now));
+                    } else {
+                        self.period_started = true;
+                        self.events.push_front(root::Event::Core(core::Event::Period {
+                            project: 1,
+                            period: 1,
+                            budget: 1000,
+                            next: None,
+                        }));
+                    }
                 }
             }
             if let Some(peers) = &self.peers {
@@ -1272,6 +1291,7 @@ impl World {
         }
         self.observer.cold(self.wall, &self.store);
         self.stopped = false;
+        self.period_started = false;
         self.restoring = None;
         self.domain = root::Domain::new(config, &self.limits);
         for (connector, kinds) in self.hold_kinds.clone() {

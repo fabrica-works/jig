@@ -100,10 +100,10 @@ fn covers_person(
     kind: authority::ProposalKind,
 ) -> bool {
     let Some(role) = core.people.role(person, project) else { return false };
-    let funder = tasks::Funder::Pool { project, person, period: core.settings.period };
+    let funder = tasks::Funder::Pool { project, person, period: core.period(project) };
     let numbers = match core.tasks.funding(funder) {
         Some(pool) => pool.numbers,
-        None => tasks::Numbers { budget: core.settings.person_budget, spent: 0, spent_below: 0, reserved: 0 },
+        None => tasks::Numbers { budget: core.pool_budget(project, person), spent: 0, spent_below: 0, reserved: 0 },
     };
     authority::covers(
         &core.authority,

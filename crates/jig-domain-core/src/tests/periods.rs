@@ -8,7 +8,7 @@ fn recurring_lines_join_the_supplied_period_and_its_durable_opening_fact() {
     core.people = authenticated.people;
     limits.people = auth_limits.people;
     let mut recurring = new_row(&core, 10, tasks::Funder::Period { project: 1, period: 1 }, None);
-    recurring.executor = tasks::Executor::Procedure { connector: core.settings.recurring_connector, code: 1 };
+    recurring.executor = tasks::Executor::Procedure { connector: RECURRING, code: 1 };
     recurring.numbers = tasks::Numbers { budget: 0, spent: 0, spent_below: 0, reserved: 0 };
     recurring.recurring = Some(Box::new(tasks::RecurringTemplate {
         key: 1,

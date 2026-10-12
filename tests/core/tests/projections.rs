@@ -11,7 +11,6 @@ fn projections_use_project_grants_require_verdicts_and_observe_a_policy_narrowin
     let mut policy = configuration.core.authority.policy(1).expect("fixture policy").clone();
     policy.projections.clone_from(&policy.ceiling.grants);
     policy.roles[0].authority.grants = Box::new([]);
-    configuration.core.settings.chat_authority.grants = Box::new([]);
     let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
     authority::step(&mut configuration.core.authority, authority::Event::Policy { project: 1, policy }, &mut facts);
     assert_eq!(facts.pop(), Some(authority::PolicyFact::Changed { project: 1 }));
@@ -183,8 +182,10 @@ fn tree_world() -> (World, root::Config) {
     configuration.core.authority = authority::Domain::new(rules, limits.core.authority).expect("tree policy");
     let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
     authority::step(&mut configuration.core.authority, authority::Event::Policy { project: 1, policy }, &mut facts);
-    configuration.core.settings.chat_authority.delegation =
-        authority::Delegation { kinds: Box::new([authority::Executor::Charter(1)]), tasks: 2, depth: 2 };
+    jig_core_world::world::edit_role(&mut configuration.core, |role| {
+        role.authority.delegation =
+            authority::Delegation { kinds: Box::new([authority::Executor::Charter(1)]), tasks: 3, depth: 3 };
+    });
     let mut restart_configuration = fixture(171, false).0;
     restart_configuration.core.authority =
         authority::Domain::new(configuration.core.authority.rules().clone(), limits.core.authority)
@@ -197,8 +198,6 @@ fn tree_world() -> (World, root::Config) {
         },
         &mut Queue::with_capacity(authority::POLICY_MAX_OUT),
     );
-    restart_configuration.core.settings.chat_authority.delegation =
-        configuration.core.settings.chat_authority.delegation.clone();
     (World::configured(171, false, configuration, limits), restart_configuration)
 }
 

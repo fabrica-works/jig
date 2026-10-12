@@ -129,7 +129,7 @@ fn deciding_an_escalation_of_an_unseen_project_is_unknown() {
 fn policy_without_effect_approvers() -> (root::Config, root::Limits) {
     use jig_domain_authority as authority;
     let (mut config, limits) = jig_core_world::effects::fixture(155, false);
-    config.core.settings.chat_authority.grants = Box::new([]);
+
     let rules = config.core.authority.rules().clone();
     let mut policy = config.core.authority.policy(1).expect("policy").clone();
     for role in &mut policy.roles {

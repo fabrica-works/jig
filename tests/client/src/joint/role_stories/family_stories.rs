@@ -15,7 +15,7 @@ fn family_client(seed: u64) -> (jig_test_domain_client::Domain, jig_test_view::V
 fn procedure_configuration(configuration: &mut jig_test_domain::Config, owner: &jig_test_domain::Limits) {
     let kinds: Box<[jig_domain_authority::Executor]> =
         Box::new([jig_domain_authority::Executor::Charter(1), jig_domain_authority::Executor::Procedure(1)]);
-    configuration.core.settings.chat_authority.delegation.kinds.clone_from(&kinds);
+
     let mut rules = configuration.core.authority.rules().clone();
     rules.ceiling.delegation.kinds.clone_from(&kinds);
     let mut policy = configuration.core.authority.policy(1).expect("actual procedure policy").clone();
@@ -23,6 +23,7 @@ fn procedure_configuration(configuration: &mut jig_test_domain::Config, owner: &
     for role in &mut policy.roles {
         role.authority.delegation.kinds.clone_from(&kinds);
     }
+    policy.roles[0].authority.budget.spend = 500;
     let mut checked = jig_domain_authority::Domain::new(rules, owner.core.authority).expect("declared executor bounds");
     let mut out = skein_lib::Queue::with_capacity(jig_domain_authority::POLICY_MAX_OUT);
     jig_domain_authority::step(&mut checked, jig_domain_authority::Event::Policy { project: 1, policy }, &mut out);
@@ -129,7 +130,7 @@ fn effect_configuration(configuration: &mut jig_test_domain::Config, owner: &jig
             last: jig_domain_authority::Last::Open(Box::new([])),
         },
     };
-    configuration.core.settings.chat_authority.grants = Box::new([grant.clone()]);
+
     let mut rules = configuration.core.authority.rules().clone();
     rules.ceiling.grants = Box::new([grant.clone()]);
     let mut policy = configuration.core.authority.policy(1).expect("actual effect policy").clone();

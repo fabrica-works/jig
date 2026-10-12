@@ -221,7 +221,8 @@ pub(super) fn person_proposal_accept(
                 work.push(Event::Tasks(event));
             }
             for member in &mut batch {
-                member.funder = tasks::Funder::Pool { project: proposal.project, person, period: core.settings.period };
+                member.funder =
+                    tasks::Funder::Pool { project: proposal.project, person, period: core.period(proposal.project) };
             }
             if result_followups {
                 tasks::Event::MakeResultFollowups {

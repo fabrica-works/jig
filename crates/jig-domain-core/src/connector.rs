@@ -361,7 +361,7 @@ impl Core {
     pub fn connector_repair_authority(&self, project: u32) -> Option<authority::Authority> {
         let policy = self.authority.policy(project)?;
         let mut given = policy.ceiling.clone();
-        let period = self.settings.period;
+        let period = self.period(project);
         let available = match self.tasks.funding(tasks::Funder::Period { project, period }) {
             Some(funding) => funding
                 .numbers
@@ -369,7 +369,7 @@ impl Core {
                 .saturating_sub(funding.numbers.spent)
                 .saturating_sub(funding.numbers.spent_below)
                 .saturating_sub(funding.numbers.reserved),
-            None => self.settings.period_budget,
+            None => self.period_budget(project),
         };
         given.budget.spend = given.budget.spend.min(available).min(self.authority.rules().maximum_run_spend);
         if given.budget.spend == 0 { None } else { Some(given) }
@@ -379,12 +379,12 @@ impl Core {
     pub fn repair_seed(&mut self, project: u32) -> Option<RepairSeed> {
         let authority = self.connector_repair_authority(project)?;
         let number = fresh(&mut self.counters, Family::Task)?;
-        let period = self.settings.period;
+        let period = self.period(project);
         Some(RepairSeed {
             number,
             project,
             period,
-            period_budget: self.settings.period_budget,
+            period_budget: self.period_budget(project),
             open_period: self.tasks.funding(tasks::Funder::Period { project, period }).is_none(),
             budget: authority.budget.spend,
             authority: translate::task_authority(&authority),

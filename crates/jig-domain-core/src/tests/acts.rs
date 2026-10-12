@@ -458,6 +458,10 @@ fn a_named_person_can_answer_without_project_membership() {
 #[test]
 fn task_controls_owner_changes_priorities_and_note_scopes_share_their_judges() {
     let (mut core, limits) = make_tree();
+    let mut given = core.authority.role(1, 0).unwrap().authority.clone();
+    given.delegation.tasks = 3;
+    given.delegation.depth = 2;
+    set_role_authority(&mut core.authority, given);
     for (act, ask, number) in [
         (Act::Stop, people::Ask::Stop { project: 1, task: 2 }, 2),
         (Act::Cancel, people::Ask::Cancel { project: 1, task: 2, reason: b"done".as_slice().into() }, 2),
@@ -723,8 +727,11 @@ fn procedure_goal_bounds_and_admission_keep_exact_executor_and_authority_facts()
     let admitted = core.goal_start(1, 1, people::Role::Owner, executor, 100, None, limits.tasks.tree_tasks).unwrap();
     assert!(admitted.direct);
     assert_eq!(admitted.authority.tools, authority::Tools(0));
-    assert_eq!(admitted.authority.grants, core.settings.chat_authority.grants);
-    assert_eq!(admitted.authority.delegation, core.settings.chat_authority.delegation);
+    assert_eq!(admitted.authority.grants, core.authority.role(1, 0).unwrap().authority.grants);
+    assert_eq!(
+        admitted.authority.delegation,
+        core.chat_authority(1, 1, people::Role::Owner, limits.tasks.tree_tasks).delegation
+    );
     assert!(!core.goal_start(1, 1, people::Role::Owner, executor, 501, None, limits.tasks.tree_tasks).unwrap().direct);
     assert_eq!(
         core.goal_start(

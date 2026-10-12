@@ -123,7 +123,7 @@ pub(super) fn amend(core: &Core, limits: &Limits, party: u64, task: u64, held: O
     let role = core.authority.role(row.project, held.number()).expect("amend admission found role policy");
     // Amendment admission uses an already-opened pool; a configured future
     // pool is not available until a goal opens it.
-    let source = tasks::Funder::Pool { project: row.project, person: party, period: core.settings.period };
+    let source = tasks::Funder::Pool { project: row.project, person: party, period: core.period(row.project) };
     let pool = match core.tasks.funding(source) {
         Some(row) => row.numbers,
         None => tasks::Numbers { budget: 0, spent: 0, spent_below: 0, reserved: 0 },
@@ -236,7 +236,7 @@ pub(crate) fn goal_start(
     if !role_policy.requests.allows(authority::RequestKind::Create) {
         return Err(people::Refusal::Role { held: Some(role) });
     }
-    let mut given = core.settings.chat_authority.clone();
+    let mut given = core.chat_authority(project, person, role, tasks_left);
     given.budget.spend = budget;
     given.budget.deadline = deadline;
     let executor = match executor {
@@ -356,7 +356,7 @@ pub(crate) fn amendment_admit(
     if authority::at_most(&after, &before, implies) {
         return Ok((stop_run, false));
     }
-    let pool = tasks::Funder::Pool { project, person, period: core.settings.period };
+    let pool = tasks::Funder::Pool { project, person, period: core.period(project) };
     let numbers = match core.tasks.funding(pool) {
         Some(row) => row.numbers,
         None => tasks::Numbers { budget: 0, spent: 0, spent_below: 0, reserved: 0 },

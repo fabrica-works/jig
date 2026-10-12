@@ -22,7 +22,7 @@ fn covers(
     role: Option<people::Role>,
 ) -> bool {
     let Some(role) = role else { return false };
-    let pool = tasks::Funder::Pool { project: context.project, person, period: core.settings.period };
+    let pool = tasks::Funder::Pool { project: context.project, person, period: core.period(context.project) };
     let numbers = match core.tasks.funding(pool) {
         Some(record) => record.numbers,
         None => tasks::Numbers { budget: 0, spent: 0, spent_below: 0, reserved: 0 },
@@ -181,7 +181,7 @@ impl Core {
         tasks_left: u32,
     ) -> Result<(), people::Refusal> {
         let Some(role) = role else { return Err(people::Refusal::Role { held: None }) };
-        let pool = tasks::Funder::Pool { project: context.project, person, period: self.settings.period };
+        let pool = tasks::Funder::Pool { project: context.project, person, period: self.period(context.project) };
         let numbers = match self.tasks.funding(pool) {
             Some(record) => record.numbers,
             None => tasks::Numbers { budget: 0, spent: 0, spent_below: 0, reserved: 0 },

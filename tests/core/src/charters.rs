@@ -33,7 +33,7 @@ pub fn two_charters(seed: u64) -> (root::Config, root::Limits) {
     let mut policy = config.core.authority.policy(1).expect("project policy").clone();
     policy.ceiling.delegation.kinds.clone_from(&kinds);
     policy.roles[0].authority.delegation.kinds.clone_from(&kinds);
-    config.core.settings.chat_authority.delegation.kinds = kinds;
+
     config.core.authority = authority::Domain::new(rules, limits.core.authority).expect("charter policy");
     let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
     authority::step(&mut config.core.authority, authority::Event::Policy { project: 1, policy }, &mut out);

@@ -60,7 +60,7 @@ impl Config {
             limits.core.fleet.slots = 3;
             limits.core.tasks.inbox_bytes = 512;
             limits.core.tasks.inbox_messages = 8;
-            config.core.settings.chat_authority.budget.spend = 80;
+            jig_core_world::world::edit_role(&mut config.core, |role| role.authority.budget.spend = 80);
         }
         if self.scenario == Some(Scenario::StandingTask) {
             limits.core.tasks.tasks = 8;
@@ -627,6 +627,12 @@ impl Application for Testing {
         if ready {
             if !peers.account_ready {
                 peers.account_ready = true;
+                events.push(Input::Event(root::Event::Core(core::Event::Period {
+                    project: 1,
+                    period: 1,
+                    budget: 1000,
+                    next: None,
+                })));
                 events.push(Input::Event(root::Event::Core(core::Event::Account(accounts::Event::Component(
                     accounts::FromComponent::Granted { account: 1, generation: 1, valid: Duration::from_secs(60) },
                 )))));

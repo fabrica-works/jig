@@ -86,7 +86,7 @@ pub(super) fn frame(core: &Core, limits: &Limits, party: u64) -> Result<Frame, M
         let pool = match core.tasks.funding(tasks::Funder::Pool {
             project: role.project,
             person: party,
-            period: core.settings.period,
+            period: core.period(role.project),
         }) {
             Some(record) => Some(super::project_note::ledger(record)),
             None => None,
@@ -97,7 +97,12 @@ pub(super) fn frame(core: &Core, limits: &Limits, party: u64) -> Result<Frame, M
                 role: role.role,
                 name: None,
                 pool,
-                chat_budget: core.settings.chat_authority.budget.spend,
+                chat_budget: match core.authority.role(role.project, role.role.number()) {
+                    Some(_) => {
+                        core.chat_authority(role.project, party, role.role, limits.tasks.tree_tasks).budget.spend
+                    }
+                    None => 0,
+                },
             })
             .expect("bounded project list");
         let mut goals = List::with_capacity(limits.documents.lines);

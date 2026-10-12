@@ -11,14 +11,16 @@ fn frame(core: &Core, limits: &Limits) -> Frame {
 #[test]
 fn frame_projects_keep_unopened_pools_absent_and_use_actual_current_funding() {
     let (mut core, limits) = tree_core();
-    core.settings.chat_authority.delegation.tasks = 1;
-    core.settings.chat_authority.delegation.depth = 1;
+    let mut given = core.authority.role(1, 0).unwrap().authority.clone();
+    given.delegation.tasks = 1;
+    given.delegation.depth = 1;
+    set_role_authority(&mut core.authority, given);
     let initial = frame(&core, &limits);
     let project = initial.projects.get(0).expect("project role");
     assert_eq!(project.name, None);
     assert_eq!(project.pool, None);
-    assert_eq!(project.chat_budget, core.settings.chat_authority.budget.spend);
-    let period = core.settings.period;
+    assert_eq!(project.chat_budget, core.authority.role(1, 0).unwrap().authority.budget.spend);
+    let period = core.period(1);
     let source = tasks::Funder::Pool { project: 1, person: 1, period };
     send_task(
         &mut core,
@@ -32,7 +34,7 @@ fn frame_projects_keep_unopened_pools_absent_and_use_actual_current_funding() {
     assert_eq!(pool.parent, actual.parent);
     assert_eq!(pool.numbers, actual.numbers);
     assert_eq!(pool.left, 177);
-    assert_ne!(pool.numbers.budget, core.settings.person_budget);
+    assert_ne!(pool.numbers.budget, core.pool_budget(1, 1));
     assert_eq!(joined.charters.get(0).expect("charters").chat, core.settings.chat);
     assert_eq!(joined.charters.get(0).expect("charters").goals.as_slice(), core.tasks.charters());
 }
@@ -90,7 +92,7 @@ fn frame_watch_receives_pool_ledger_changes_after_their_decision() {
         assert_eq!(facts.pop(), Some(authority::PolicyFact::Added { project }));
     }
     let watcher = Token::new(30);
-    let period = core.settings.period;
+    let period = core.period(1);
     watch_outputs(
         &mut core,
         &limits,
@@ -108,6 +110,16 @@ fn frame_watch_receives_pool_ledger_changes_after_their_decision() {
             budget: 177,
         }),
     );
+    let row = new_row(&core, 1, tasks::Funder::Pool { project: 1, person: 1, period }, None);
+    send_task(
+        &mut core,
+        &limits,
+        tasks::Event::Make {
+            reply_to: ReplyTo::new(Token::new(91)),
+            creator: tasks::Party::Person(1),
+            batch: Box::new([row]),
+        },
+    );
     let changed = finish_watch_outputs(&mut core, &limits);
     let Request::Held(value) = &changed[0] else { panic!("held frame") };
     let Held::Delivery { document, .. } = value.as_ref() else { panic!("frame delivery") };
@@ -117,7 +129,7 @@ fn frame_watch_receives_pool_ledger_changes_after_their_decision() {
         177
     );
     watch_outputs(&mut core, &limits, Event::Delivered { watcher });
-    watch_outputs(&mut core, &limits, Event::Period { project: 2, period: 2, budget: 1000, next: None });
+    watch_outputs(&mut core, &limits, Event::Period { project: 1, period: 2, budget: 1000, next: None });
     let next = finish_watch_outputs(&mut core, &limits);
     let Request::Held(value) = &next[0] else { panic!("changed frame") };
     let Held::Delivery { document, .. } = value.as_ref() else { panic!("frame delivery") };

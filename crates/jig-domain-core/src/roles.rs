@@ -36,16 +36,10 @@ impl Core {
             return Err(people::Refusal::Role { held: Some(holding) });
         }
         let Some(policy) = self.authority.policy(project) else { unreachable!("configured policy") };
-        if self.settings.period_budget > policy.period_spend {
+        if self.period_budget(project) > policy.period_spend {
             return Err(people::Refusal::Authority {
                 proposable: None,
-                lacking: people::Lack::Budget { needs: self.settings.period_budget, left: policy.period_spend },
-            });
-        }
-        if self.settings.person_budget > role_policy.period_spend {
-            return Err(people::Refusal::Authority {
-                proposable: None,
-                lacking: people::Lack::Budget { needs: self.settings.person_budget, left: role_policy.period_spend },
+                lacking: people::Lack::Budget { needs: self.period_budget(project), left: policy.period_spend },
             });
         }
         let Some(left) = self.tasks.takeover_budget(task) else {
@@ -95,7 +89,7 @@ impl Core {
             tasks_left,
             request: authority::PersonRequest::Create(Box::new([authority::Delegate {
                 executor: authority::Executor::Charter(self.settings.chat),
-                authority: self.settings.chat_authority.clone(),
+                authority: self.chat_authority(project, person, role, tasks_left),
                 symbolic: Box::new([]),
             }])),
         };
@@ -104,25 +98,16 @@ impl Core {
             return Err(self.request_refusal(&ask, &mut findings));
         }
         let Some(policy) = self.authority.policy(project) else { unreachable!("checked project policy") };
-        let Some(role_policy) = self.authority.role(project, role.number()) else {
-            unreachable!("checked role policy")
-        };
         if match policy.escalation_role {
             Some(role) => role > 3,
             None => true,
         } {
             return Err(people::Refusal::NotOffered);
         }
-        if self.settings.period_budget > policy.period_spend {
+        if self.period_budget(project) > policy.period_spend {
             return Err(people::Refusal::Authority {
                 proposable: None,
-                lacking: people::Lack::Budget { needs: self.settings.period_budget, left: policy.period_spend },
-            });
-        }
-        if self.settings.person_budget > role_policy.period_spend {
-            return Err(people::Refusal::Authority {
-                proposable: None,
-                lacking: people::Lack::Budget { needs: self.settings.person_budget, left: role_policy.period_spend },
+                lacking: people::Lack::Budget { needs: self.period_budget(project), left: policy.period_spend },
             });
         }
         Ok(())
@@ -178,7 +163,7 @@ impl Core {
         if context.project != project || !any_task && !standing {
             return Err(people::Refusal::Unknown);
         }
-        let pool = tasks::Funder::Pool { project, person, period: self.settings.period };
+        let pool = tasks::Funder::Pool { project, person, period: self.period(project) };
         let numbers = match self.tasks.funding(pool) {
             Some(record) => record.numbers,
             None => tasks::Numbers { budget: 0, spent: 0, spent_below: 0, reserved: 0 },
@@ -346,7 +331,7 @@ impl Core {
         if self.authority.policy(project).is_none() {
             return Err(people::Refusal::Unknown);
         }
-        let pool = tasks::Funder::Pool { project, person, period: self.settings.period };
+        let pool = tasks::Funder::Pool { project, person, period: self.period(project) };
         let numbers = match self.tasks.funding(pool) {
             Some(record) => record.numbers,
             None => tasks::Numbers { budget: 0, spent: 0, spent_below: 0, reserved: 0 },
