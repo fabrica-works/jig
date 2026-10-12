@@ -713,6 +713,15 @@ the file.
      u64`, checked at `Domain::new` and priced in `fleet::worst_case`.
      Each `Config` or `fleet::Limits` literal outside 05.6's Files gains
      its one line, named in the commit body, whatever their number.
+142. **skein 02.s1's proof reads existing goldens only** (2026-10-12, the
+     coordinator's block "skein 02.s1: lint fixture goldens contradict
+     unchanged-goldens proof", 2026-10-12T20:24:29Z). The supervisor's
+     defect: 02.s1's Test shape grows `lints-v1.schema`, whose drift test
+     then needs new goldens under `tests/codec/golden/v1/`, while its
+     Proof asked `git diff --stat origin/main -- ... tests/codec/golden`
+     to print nothing. The Proof now runs with `--diff-filter=MD`: no
+     existing generated file or golden changes or goes; the new lint
+     goldens are added and listed in the commit body.
 
 ## For the user
 
@@ -728,6 +737,10 @@ the file.
   timeouts get a margin over their budgets (say 1.5×), reporting SLOW
   instead of failing: 15 s equals the fast suites' budget, and load
   outside the queue failed about 2 gates an hour on it.
+  One source of that load (2026-10-12, 20:15Z): the code-graph
+  indexer of the Claude sessions' codebase-memory server, at 565 % CPU
+  when jig 12.4's gate began, re-indexing after landings outside the
+  queue. Ruling 140 retries such gates meanwhile.
 - **smith's focused suite on carbon-forge** (ruling 121): it runs past
   its 15 s budget here on `main` itself (16.2 s measured, 2,515 tests),
   against 6.3 to 7.4 s on smith's reliability machine. Is carbon-forge a

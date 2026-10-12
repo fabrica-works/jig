@@ -486,10 +486,12 @@ Test shape: `lints-v1.schema` gains an enumeration with one `boxed`
   unit test in `testing/skein-codegen` generates a family of 120 records
   and finds no function past 100 lines. Each under 20 ms.
 Proof: unit, run once with `heavy cargo nextest run -p skein-codegen -p
-  skein-codec-tests`; and `git diff --stat origin/main --
-  tests/codec/src/generated tests/codec/src/scalars
-  tests/codec/src/secrets tests/codec/golden` prints nothing. The gate's
-  clippy checks the lint fixture.
+  skein-codec-tests`; and `git diff --stat --diff-filter=MD origin/main
+  -- tests/codec/src/generated tests/codec/src/scalars
+  tests/codec/src/secrets tests/codec/golden` prints nothing: no existing
+  generated file or golden is changed or removed. The lint fixture's new
+  goldens are added, and the commit body lists them (ruling 142). The
+  gate's clippy checks the lint fixture.
 Don't: guess a type's size; box a variant not marked; add an allowance
   to generated code; move golden bytes; change `sample-v1.schema`.
 Size: at most 250 lines of production code; generated files and goldens
