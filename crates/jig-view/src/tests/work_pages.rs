@@ -562,13 +562,13 @@ fn deployment(words: &Words) {
 #[test]
 fn work_pages_show_executor_sections_folds_project_settings_and_deployment_capacity() {
     let words = words();
-    task_sections(&words);
-    plan_folds(&words);
-    history(&words);
-    project_sections(&words);
-    recurring_times_use_supplied_boundaries_without_inferred_cadence(&words);
-    goal_form(&words);
-    deployment(&words);
+    task_sections(words);
+    plan_folds(words);
+    history(words);
+    project_sections(words);
+    recurring_times_use_supplied_boundaries_without_inferred_cadence(words);
+    goal_form(words);
+    deployment(words);
 }
 
 fn recurring_times_use_supplied_boundaries_without_inferred_cadence(words: &Words) {
@@ -639,7 +639,7 @@ fn procedure_goal_choices_render_whole_numeric_pairs_without_frame_charters() {
         },
     }]);
     drive(&mut d, Event::Read { read, result: ReadResult::Value(ReadValue::Project(Box::new(doc))) });
-    let (tree, mut bindings) = build(&d, 3, &words);
+    let (tree, mut bindings) = build(&d, 3, words);
     for (label, executor) in [
         (b"Charter 99".as_slice(), GoalExecutor::Charter(99)),
         (b"Connector 7, procedure 4294967295".as_slice(), GoalExecutor::Procedure { connector: 7, code: u32::MAX }),
@@ -659,7 +659,7 @@ fn procedure_goal_choices_render_whole_numeric_pairs_without_frame_charters() {
         crate::decode(&mut bindings, named_binding(&tree, b"Connector 65535, procedure 4294967295"), crate::Act::Press)
             .unwrap();
     drive(&mut d, Event::Act { act: choice });
-    let (tree, mut bindings) = build(&d, 3, &words);
+    let (tree, mut bindings) = build(&d, 3, words);
     let edit = crate::decode(
         &mut bindings,
         named_binding(&tree, b"Goal budget"),
@@ -678,13 +678,13 @@ fn procedure_goal_choices_render_whole_numeric_pairs_without_frame_charters() {
             act: Act::Edit { field: jig_domain_client::fields::Purpose::NewGoal, text: text(b"procedure words") },
         },
     );
-    let (tree, _) = build(&d, 3, &words);
+    let (tree, _) = build(&d, 3, words);
     assert!(contains(&tree, b"proposed"));
     drive(&mut d, Event::Act { act: Act::Submit { field: jig_domain_client::fields::Purpose::NewGoal } });
     let mut b = crate::Builder::new(&super::cards::limits());
     let mut bindings = JigBindings::new(32, super::cards::CLIENT.text);
     b.open(Role::Page);
-    crate::confirmation::confirmation(&mut b, &d, &words, &mut bindings);
+    crate::confirmation::confirmation(&mut b, &d, words, &mut bindings);
     b.close();
     let tree = b.finish();
     assert!(contains(&tree, b"Connector 65535, procedure 4294967295"));

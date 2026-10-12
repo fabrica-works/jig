@@ -168,7 +168,7 @@ fn every_native_page_retains_source_loss_and_displays_it_independently_of_contin
             drive(&mut domain, Event::Read { read: token, result: ReadResult::Value(source) });
             assert_eq!(held(&domain, kind), cut, "native page kind {kind}");
             assert_eq!(continuation(&domain, kind), after, "opaque continuation for page kind {kind}");
-            let tree = build(&domain, 3, &words).0;
+            let tree = build(&domain, 3, words).0;
             assert_eq!(contains(&tree, b"This page is incomplete"), cut, "public page kind {kind}");
             assert_eq!(
                 tree.nodes()
@@ -179,7 +179,7 @@ fn every_native_page_retains_source_loss_and_displays_it_independently_of_contin
             );
             assert!(tree.len() <= crate::page_nodes(&super::cards::CLIENT, 0).unwrap());
             drive(&mut domain, Event::Went { place: Place::Jig(Address::Conversations { project: None }) });
-            assert!(!contains(&build(&domain, 3, &words).0, b"This page is incomplete"));
+            assert!(!contains(&build(&domain, 3, words).0, b"This page is incomplete"));
         }
     }
 }
@@ -221,7 +221,7 @@ fn a_complete_conversation_page_preserves_independent_row_text_loss_and_opaque_c
     assert!(!domain.conversation_rows().cut);
     assert_eq!(domain.conversation_rows().rows.get(0), Some(&row));
     assert_eq!(domain.conversation_rows().edges.after, jig_domain_client::windows::Edge::More(cursor()));
-    let tree = build(&domain, 3, &words()).0;
+    let tree = build(&domain, 3, words()).0;
     assert!(!contains(&tree, b"This page is incomplete"));
     assert!(contains(&tree, b"Read later"));
     assert!(contains(&tree, b"Title is incomplete"));
@@ -242,7 +242,7 @@ fn sliding_a_read_window_keeps_supplied_page_loss_until_that_source_is_reset() {
         let token = read(&out, kind);
         drive(&mut domain, Event::Read { read: token, result: ReadResult::Value(value(kind, false, None)) });
         assert!(held(&domain, kind), "a later page says nothing about the previous page's missing content");
-        assert!(contains(&build(&domain, 3, &words()).0, b"This page is incomplete"));
+        assert!(contains(&build(&domain, 3, words()).0, b"This page is incomplete"));
         if kind == 1 {
             drive(&mut domain, Event::Act { act: Act::HistoryScope { subtree: true } });
             assert!(!held(&domain, kind));

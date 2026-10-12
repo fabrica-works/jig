@@ -62,7 +62,7 @@ fn task_instruction_updates_distinguish_supplied_effective_empty_unknown_and_par
         row.chip.executor = Executor::Agent { charter: 2 };
         row.instructions = source.clone();
         super::super::pages::deliver(&mut domain, watch, Delivery::Task(Box::new(row)));
-        let tree = super::super::pages::build(&domain, 3, &words()).0;
+        let tree = super::super::pages::build(&domain, 3, words()).0;
         facts(&tree, source.as_ref());
         if source.is_none() {
             assert!(!contains(&tree, b"supplied local effective text"));
@@ -85,7 +85,7 @@ fn task_instruction_amendment_uses_only_complete_source_without_selecting_it() {
         drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::Amend } });
         drive(&mut domain, Event::Act { act: Action::Edit { field: Purpose::Reason, text: text(b"") } });
         let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
-        let tree = dialog(&domain, &words(), &mut bindings);
+        let tree = dialog(&domain, words(), &mut bindings);
         facts(&tree, source.as_ref());
         baseline(&tree, source.as_ref());
         assert!(domain.confirmation().unwrap().choices.change.is_none());
@@ -100,7 +100,7 @@ fn task_instruction_amendment_uses_only_complete_source_without_selecting_it() {
         };
         expected.authority.as_mut().unwrap().spend = 25;
         assert_eq!(domain.confirmation().unwrap().choices.change.as_ref(), Some(&expected));
-        let tree = dialog(&domain, &words(), &mut bindings);
+        let tree = dialog(&domain, words(), &mut bindings);
         baseline(&tree, source.as_ref());
         drive(&mut domain, Event::Act { act: input(&tree, b"New instructions", b"", &mut bindings) });
         expected.instructions = Some(text(b""));
@@ -122,7 +122,7 @@ fn steering_instruction_unknown_context_and_loss_preserve_explicit_clear_and_rev
         drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::AmendRelease } });
         drive(&mut domain, Event::Act { act: Action::Edit { field: Purpose::Reason, text: text(b"") } });
         let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
-        let tree = dialog(&domain, &words(), &mut bindings);
+        let tree = dialog(&domain, words(), &mut bindings);
         facts(&tree, source.as_ref());
         baseline(&tree, source.as_ref());
         assert!(domain.confirmation().unwrap().choices.change.is_none());
@@ -138,7 +138,7 @@ fn steering_instruction_unknown_context_and_loss_preserve_explicit_clear_and_rev
             authority: Some(authority),
         };
         assert_eq!(domain.confirmation().unwrap().choices.change.as_ref(), Some(&expected));
-        let tree = dialog(&domain, &words(), &mut bindings);
+        let tree = dialog(&domain, words(), &mut bindings);
         drive(&mut domain, Event::Act { act: input(&tree, b"New instructions", b"", &mut bindings) });
         expected.instructions = Some(text(b""));
         let out = drive(&mut domain, Event::Act { act: Action::Confirm });

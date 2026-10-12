@@ -37,7 +37,7 @@ pub fn spend_nodes(l: &Limits) -> Option<u32> {
     l.rows.checked_mul(18)?.checked_add(2)
 }
 fn envelope(nodes: u32, l: &Limits, words: &Words) -> Option<HistoricalFragment> {
-    let phrase = crate::owner_words::phrase_bytes(&words.book)?.max(words.book.jig_capacity()?);
+    let phrase = words.book.jig_capacity()?;
     let text_per_node = phrase.max(crate::literal_segment::max_bytes(l.text)?).checked_mul(2)?;
     Some(HistoricalFragment {
         nodes,

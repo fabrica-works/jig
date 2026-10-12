@@ -36,7 +36,7 @@ fn task_pages_keep_owner_requesters_and_live_retained_stored_links_without_filli
             row.cut = true;
             super::super::pages::deliver(&mut domain, watch, Delivery::Task(Box::new(row)));
             let words = words();
-            let (tree, mut bindings) = super::super::pages::build(&domain, 3, &words);
+            let (tree, mut bindings) = super::super::pages::build(&domain, 3, words);
             super::super::cards_access::check(&tree);
             assert!(contains(&tree, caption));
             assert!(contains(&tree, b"Some task lists are incomplete"));
@@ -82,7 +82,7 @@ fn aggregate_task_loss_prevents_partial_dependency_replacement_and_complete_link
         drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::Amend } });
         let words = words();
         let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
-        let tree = dialog(&domain, &words, &mut bindings);
+        let tree = dialog(&domain, words, &mut bindings);
         assert_eq!(contains(&tree, b"Some task lists are incomplete"), cut);
         let mut selected = Vec::new();
         for node in tree.nodes() {

@@ -72,7 +72,7 @@ fn amendment_single_field_inputs_select_only_whole_property_and_explicit_empty_i
     ] {
         let (mut domain, _) = open(row.clone());
         let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
-        let tree = dialog(&domain, &words(), &mut bindings);
+        let tree = dialog(&domain, words(), &mut bindings);
         assert!(contains(&tree, b"whole task instructions"));
         assert!(!contains(&tree, b"Address to task number"), "only actual person and role destinations are offered");
         assert!(domain.confirmation().unwrap().choices.change.is_none());
@@ -101,7 +101,7 @@ fn amendment_dependency_and_wake_controls_preserve_only_prior_selected_changes()
     let (mut domain, _) = open(row);
     let words = words();
     let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
-    let tree = dialog(&domain, &words, &mut bindings);
+    let tree = dialog(&domain, words, &mut bindings);
     drive(&mut domain, Event::Act { act: press(&tree, b"Drop dependency 8", &mut bindings) });
     let mut expected = Amendment { dependencies: Some(list([])), ..empty() };
     assert_eq!(
@@ -109,17 +109,17 @@ fn amendment_dependency_and_wake_controls_preserve_only_prior_selected_changes()
         1
     );
     assert_eq!(domain.confirmation().unwrap().choices.change.as_ref(), Some(&expected));
-    let tree = dialog(&domain, &words, &mut bindings);
+    let tree = dialog(&domain, words, &mut bindings);
     drive(&mut domain, Event::Act { act: press(&tree, b"Wakes on inbox messages", &mut bindings) });
     let mut wake = initial_wake;
     wake.words = WakeRule::Never;
     expected.wake = Some(wake);
     assert_eq!(domain.confirmation().unwrap().choices.change.as_ref(), Some(&expected));
-    let tree = dialog(&domain, &words, &mut bindings);
+    let tree = dialog(&domain, words, &mut bindings);
     drive(&mut domain, Event::Act { act: press(&tree, b"Wakes on a delegate result", &mut bindings) });
     wake.results = ResultsWake::Never;
     expected.wake = Some(wake);
-    let tree = dialog(&domain, &words, &mut bindings);
+    let tree = dialog(&domain, words, &mut bindings);
     assert!(!tree.nodes().iter().any(|node| node.name.as_deref() == Some(b"Drop dependency 8")));
     drive(&mut domain, Event::Act { act: input(&tree, b"New instructions", b"", &mut bindings) });
     expected.instructions = Some(text(b""));
@@ -139,7 +139,7 @@ fn amendment_loss_in_specification_does_not_select_or_block_independent_fields()
         row.spec.cut = mask & 4 != 0;
         let (mut domain, _) = open(row);
         let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
-        let tree = dialog(&domain, &words(), &mut bindings);
+        let tree = dialog(&domain, words(), &mut bindings);
         assert!(!tree.nodes().iter().any(|node| node.name.as_deref() == Some(b"New specification")));
         assert!(contains(&tree, b"The specification is incomplete"));
         assert!(contains(&tree, b"whole task specification"));
@@ -164,7 +164,7 @@ fn amendment_rebuild_keeps_selected_authority_and_distinct_person_spec_and_hold_
         (b"New deadline (UTC, YYYY-MM-DD HH:MM)", b"2000-02-29 12:34"),
         (b"New instructions", b""),
     ] {
-        let tree = dialog(&domain, &words, &mut bindings);
+        let tree = dialog(&domain, words, &mut bindings);
         drive(&mut domain, Event::Act { act: input(&tree, label, value, &mut bindings) });
     }
     let mut authority = row.steering.authority.whole().unwrap();
@@ -208,12 +208,12 @@ fn person_address_inputs_preserve_full_width_targets_and_the_named_person_revisi
         drive(&mut domain, Event::Act { act: Action::Edit { field: Purpose::Reason, text: text(b"") } });
         let words = words();
         let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
-        let tree = dialog(&domain, &words, &mut bindings);
+        let tree = dialog(&domain, words, &mut bindings);
         drive(
             &mut domain,
             Event::Act { act: input(&tree, b"New specification", b"selected whole words", &mut bindings) },
         );
-        let tree = dialog(&domain, &words, &mut bindings);
+        let tree = dialog(&domain, words, &mut bindings);
         assert!(contains(&tree, b"Person-task revision 12"));
         if address == PersonAddress::Role(u32::MAX) {
             let token =
@@ -262,7 +262,7 @@ fn address_controls_require_actual_person_revision_and_keep_task_recipients_outs
         let (mut domain, id) = loaded(ObjectKey::Escalation(8), ReadValue::Escalation(Box::new(row)));
         drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::AmendRelease } });
         drive(&mut domain, Event::Act { act: Action::Edit { field: Purpose::Reason, text: text(b"") } });
-        let tree = dialog(&domain, &words(), &mut JigBindings::new(limits().bindings, CLIENT.text));
+        let tree = dialog(&domain, words(), &mut JigBindings::new(limits().bindings, CLIENT.text));
         assert!(!tree.nodes().iter().any(|node| node.name.as_deref() == Some(b"Address to party number")));
         assert!(
             !tree.nodes().iter().any(|node| node.name.as_deref() == Some(b"Address to role number in this project"))
@@ -276,7 +276,7 @@ fn address_controls_require_actual_person_revision_and_keep_task_recipients_outs
     let mut row = task_doc(&[ActKind::Amend]);
     row.person_revision = None;
     let (domain, _) = open(row);
-    let tree = dialog(&domain, &words(), &mut JigBindings::new(limits().bindings, CLIENT.text));
+    let tree = dialog(&domain, words(), &mut JigBindings::new(limits().bindings, CLIENT.text));
     assert!(!tree.nodes().iter().any(|node| node.name.as_deref() == Some(b"Address to party number")));
     assert!(tree.nodes().iter().any(|node| node.name.as_deref() == Some(b"New budget")));
 }

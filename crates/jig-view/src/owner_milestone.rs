@@ -70,10 +70,7 @@ pub fn required(value: &OwnerMilestoneLine, limits: &Limits, words: &Words) -> O
 #[must_use]
 pub fn worst_case(limits: &Limits, words: &Words) -> Option<MilestoneFragment> {
     let nodes = max_nodes(limits)?;
-    let mut phrase = crate::owner_words::phrase_bytes(&words.book)?;
-    for p in crate::phrases::jig::ALL {
-        phrase = phrase.max(words.book.capacity(p.id())?);
-    }
+    let phrase = words.book.jig_capacity()?;
     let text_per_node = crate::literal_segment::max_bytes(limits.text)?.max(phrase).checked_mul(2)?;
     Some(MilestoneFragment {
         nodes,

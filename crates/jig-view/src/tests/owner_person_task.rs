@@ -91,7 +91,10 @@ fn client_limits() -> jig_domain_client::Limits {
     jig_domain_client::Limits { rows: 8, ..CLIENT }
 }
 fn limits(words: &Words) -> Limits {
-    let f = view::worst_case(&client_limits(), words).unwrap();
+    limits_for(&client_limits(), words)
+}
+fn limits_for(client: &jig_domain_client::Limits, words: &Words) -> Limits {
+    let f = view::worst_case(client, words).unwrap();
     Limits {
         nodes: f.nodes,
         depth: f.depth,
@@ -133,7 +136,7 @@ fn person_owner_view_retains_ordered_missing_links_full_results_and_independent_
     ]);
     let unchanged = value.clone();
     let w = words();
-    let tree = build(&value, &w, limits(&w));
+    let tree = build(&value, w, limits(w));
     for text in [
         b"Result not supplied".as_slice(),
         b"Ended time unavailable",
@@ -162,7 +165,7 @@ fn person_owner_view_retains_ordered_missing_links_full_results_and_independent_
         });
     assert!(positions.windows(2).all(|pair| pair[0] < pair[1]));
     assert_eq!(value, unchanged);
-    assert!(view::required(&value, &client_limits(), &w).is_some());
+    assert!(view::required(&value, &client_limits(), w).is_some());
 }
 #[test]
 fn person_owner_card_and_confirmation_show_numeric_rules_and_disable_field_bearing_choices() {
@@ -183,15 +186,15 @@ fn person_owner_card_and_confirmation_show_numeric_rules_and_disable_field_beari
         super::cards_objects::loaded(ObjectKey::PersonTask(8), ReadValue::OwnerPersonTask(Box::new(value)));
     drive(&mut d, Event::Act { act: Act::Intend { object: id.token(), act: ActKind::Answer } });
     let w = words();
-    let mut cap = limits(&w);
+    let mut cap = limits(w);
     cap.nodes = cap.nodes.checked_add(view::form_nodes(&client_limits()).unwrap()).unwrap();
     cap.text_bytes = cap.nodes.checked_mul(cap.text_per_node).unwrap();
     cap.bindings = cap.nodes;
     cap.slots = cap.nodes;
     let mut b = Builder::new(&cap);
     let mut bindings = JigBindings::new(cap.bindings, CLIENT.text);
-    crate::cards::card(&mut b, &d, id, &crate::cards::Place::Elsewhere, &w, &mut bindings);
-    crate::confirmation::confirmation(&mut b, &d, &w, &mut bindings);
+    crate::cards::card(&mut b, &d, id, &crate::cards::Place::Elsewhere, w, &mut bindings);
+    crate::confirmation::confirmation(&mut b, &d, w, &mut bindings);
     let tree = b.finish();
     for text in [
         b"Choice code: 4294967295".as_slice(),
@@ -221,7 +224,7 @@ fn person_owner_card_and_confirmation_show_numeric_rules_and_disable_field_beari
         },
     );
     let mut b = Builder::new(&cap);
-    crate::confirmation::confirmation(&mut b, &d, &w, &mut bindings);
+    crate::confirmation::confirmation(&mut b, &d, w, &mut bindings);
     let confirmation = b.finish();
     assert!(contains(&confirmation, b"Choice code: 7"));
     assert!(contains(&confirmation, b"field/a"));
@@ -240,11 +243,11 @@ fn person_owner_approval_renders_opaque_parts_without_inventing_application_scop
         },
     };
     let w = words();
-    let cap = limits(&w);
+    let cap = limits(w);
     let client = Domain::new(&client_limits(), 1);
     let mut b = Builder::new(&cap);
     let mut bindings = JigBindings::new(cap.bindings, CLIENT.text);
-    view::render(&mut b, &client, &value, &w, &mut bindings);
+    view::render(&mut b, &client, &value, w, &mut bindings);
     let tree = b.finish();
     for text in [
         b"Person destination: 18446744073709551615".as_slice(),
@@ -377,7 +380,7 @@ fn person_storage_dimension(selected_dimension: Option<usize>) {
         language: 1,
         offset_minutes: 0,
     };
-    let l = client_limits();
+    let l = jig_domain_client::Limits { rows: 3, ..client_limits() };
     let value = full_value(&l);
     let untouched = value.clone();
     if selected_dimension == Some(5) {
@@ -397,7 +400,7 @@ fn person_storage_dimension(selected_dimension: Option<usize>) {
     if selected_dimension.is_none() {
         assert!(view::required(&value, &l, &w).is_some());
     }
-    let maximum = limits(&w);
+    let maximum = limits_for(&l, &w);
     let tree = build(&value, &w, maximum);
     if selected_dimension.is_none() {
         assert!(contains(&tree, b"selected 4294967295"));
@@ -478,11 +481,11 @@ fn person_owner_view_admits_closed_offer_capacity_without_expanding_shown_result
     }
     value.results.get_mut(0).unwrap().result.as_mut().unwrap().acts = List::with_capacity(MAX_OFFERED_ACTS);
     let original = value.clone();
-    assert!(view::required(&value, &l, &w).is_some());
+    assert!(view::required(&value, &l, w).is_some());
     let (domain, id) =
         super::cards_objects::loaded(ObjectKey::PersonTask(8), ReadValue::OwnerPersonTask(Box::new(value.clone())));
     // Price this single enclosing card with the shared card bound.
-    let mut cap = limits(&w);
+    let mut cap = limits(w);
     cap.nodes = crate::card_nodes(&l).unwrap().checked_add(1).unwrap();
     cap.depth = l.rows.checked_add(32).unwrap();
     cap.text_bytes = cap.nodes.checked_mul(cap.text_per_node).unwrap();
@@ -491,7 +494,7 @@ fn person_owner_view_admits_closed_offer_capacity_without_expanding_shown_result
     let mut builder = Builder::new(&cap);
     let mut bindings = JigBindings::new(cap.bindings, l.text);
     builder.open(Role::Page);
-    assert!(crate::cards::card(&mut builder, &domain, id, &crate::cards::Place::Elsewhere, &w, &mut bindings));
+    assert!(crate::cards::card(&mut builder, &domain, id, &crate::cards::Place::Elsewhere, w, &mut bindings));
     builder.close();
     let tree = builder.finish();
     assert!(tree.len() <= crate::card_nodes(&l).unwrap() + 1);
@@ -505,11 +508,11 @@ fn person_owner_view_admits_closed_offer_capacity_without_expanding_shown_result
             oversized.results.get_mut(0).unwrap().result.as_mut().unwrap().acts = List::with_capacity(cap);
         }
         let unchanged = oversized.clone();
-        assert!(view::required(&oversized, &l, &w).is_none());
+        assert!(view::required(&oversized, &l, w).is_none());
         assert_eq!(oversized, unchanged);
     }
     value.results = List::with_capacity(l.rows + 1);
-    assert!(view::required(&value, &l, &w).is_none());
+    assert!(view::required(&value, &l, w).is_none());
     assert_eq!(original.acts.capacity(), MAX_OFFERED_ACTS);
     assert!(MAX_OFFERED_ACTS > l.rows);
 }

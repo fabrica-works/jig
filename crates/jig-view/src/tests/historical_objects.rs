@@ -138,7 +138,7 @@ fn historical_task_renders_whole_task_and_independent_result_without_current_tas
         ObjectKey::Task(8),
         OwnerHistoricalValue::Task { document: Box::new(row), result: Box::new(result()) },
     );
-    let (tree, _) = build(&value, &words());
+    let (tree, _) = build(&value, words());
     assert!(contains(&tree, b"independent result"));
     assert!(contains(&tree, b"Historical task"));
     assert!(contains(&tree, b"Historical record time not supplied"));
@@ -148,7 +148,7 @@ fn historical_task_renders_whole_task_and_independent_result_without_current_tas
 #[test]
 fn historical_raw_person_goal_displays_all_four_numbers_and_distinct_unjoined_opaque_holdings() {
     let value = person();
-    let (tree, _) = build(&value, &words());
+    let (tree, _) = build(&value, words());
     for caption in [
         b"Budget: 1".as_slice(),
         b"Spent: 7",
@@ -185,7 +185,7 @@ fn historical_raw_person_goal_displays_all_four_numbers_and_distinct_unjoined_op
             choice,
             created: None,
         });
-        let (tree, _) = build(&decided, &selected);
+        let (tree, _) = build(&decided, selected);
         assert!(contains(&tree, caption));
         assert!(contains(&tree, b"Created task pair not supplied"));
         assert!(tree.nodes().iter().all(|node| node.role != Role::Button));
@@ -199,7 +199,7 @@ fn historical_retained_proposal_uses_bare_whole_fragment_and_keeps_pending_state
         OwnerHistoricalValue::Proposal(p),
     );
     assert!(!value.is_terminal());
-    let (tree, _) = build(&value, &words());
+    let (tree, _) = build(&value, words());
     assert!(contains(&tree, b"Historical task proposal"));
     assert!(!contains(&tree, b"History revision"));
     assert!(crate::owner_history::proposal_max_nodes(&CLIENT).unwrap() <= view::max_nodes(&CLIENT).unwrap());
@@ -222,7 +222,7 @@ fn historical_escalation_keeps_rejection_revision_sender_and_optional_retained_h
             hold: None,
         },
     );
-    let (tree, _) = build(&value, &words());
+    let (tree, _) = build(&value, words());
     assert!(contains(&tree, b"Revision: 18446744073709551615"));
     assert!(contains(&tree, b"Decision person: 17"));
     assert!(contains(&tree, b"Retained hold not supplied"));
@@ -233,14 +233,14 @@ fn historical_question_keeps_answer_full_result_and_outer_absence_as_three_indep
     let mut value = question(true, true);
     value.at = Some(Wall::from_nanos(23));
     value.by = Some(OwnerRequester::Person(19));
-    let (tree, _) = build(&value, &words());
+    let (tree, _) = build(&value, words());
     assert!(contains(&tree, b"independent result"));
     assert!(contains(&tree, b"Historical record sender"));
     assert!(!contains(&tree, b"Answer not supplied"));
     assert!(!contains(&tree, b"Ending not supplied"));
     let pending = question(false, false);
     assert!(!pending.is_terminal());
-    let (tree, _) = build(&pending, &words());
+    let (tree, _) = build(&pending, words());
     assert!(contains(&tree, b"Answer not supplied"));
     assert!(contains(&tree, b"Ending not supplied"));
 }
@@ -266,7 +266,7 @@ fn historical_person_task_keeps_whole_address_contract_loss_and_independent_resu
         ObjectKey::PersonTask(8),
         OwnerHistoricalValue::PersonTask { document: Box::new(document), result: Box::new(result()) },
     );
-    let (tree, _) = build(&value, &words());
+    let (tree, _) = build(&value, words());
     assert!(contains(&tree, b"independent result"));
     assert!(contains(&tree, b"Historical person task"));
     assert!(tree.nodes().iter().all(|node| node.role != Role::TextField && node.role != Role::TextArea));
@@ -275,12 +275,12 @@ fn historical_person_task_keeps_whole_address_contract_loss_and_independent_resu
 fn historical_whole_receiving_refuses_reserved_paths_and_nested_text_excess_without_clipping_sources() {
     let value = person();
     let original = value.clone();
-    assert!(view::required(&value, &CLIENT, &words()).is_some());
-    assert!(view::required(&value, &jig_domain_client::Limits { rows: 1, ..CLIENT }, &words()).is_none());
+    assert!(view::required(&value, &CLIENT, words()).is_some());
+    assert!(view::required(&value, &jig_domain_client::Limits { rows: 1, ..CLIENT }, words()).is_none());
     let mut large = value.clone();
     let OwnerHistoricalValue::PersonProposal { proposal, .. } = &mut large.value else { panic!("raw proposal") };
     proposal.goal.spec.words = Text::new(Box::new([255; 129]), 129).unwrap();
-    assert!(view::required(&large, &CLIENT, &words()).is_none());
+    assert!(view::required(&large, &CLIENT, words()).is_none());
     assert_eq!(value, original);
     assert!(view::max_nodes(&jig_domain_client::Limits { rows: u32::MAX, ..CLIENT }).is_none());
 }
@@ -288,13 +288,13 @@ fn historical_whole_receiving_refuses_reserved_paths_and_nested_text_excess_with
 fn historical_passive_card_retains_named_whole_departure_and_does_not_bind_current_question_actions() {
     let value = question(true, false);
     let (d, id) = super::cards_objects::loaded(value.key, ReadValue::Historical(Box::new(value.clone())));
-    let f = view::required(&value, &CLIENT, &words()).unwrap();
+    let f = view::required(&value, &CLIENT, words()).unwrap();
     let mut l = limits(f);
     l.nodes = l.nodes.checked_add(64).unwrap();
     l.text_bytes = l.text_bytes.checked_add(64_u32.checked_mul(l.text_per_node).unwrap()).unwrap();
     let mut b = Builder::new(&l);
     let mut bindings = JigBindings::new(l.bindings, CLIENT.text);
-    assert!(crate::cards::card(&mut b, &d, id, &crate::cards::Place::Elsewhere, &words(), &mut bindings));
+    assert!(crate::cards::card(&mut b, &d, id, &crate::cards::Place::Elsewhere, words(), &mut bindings));
     let tree = b.finish();
     super::cards_access::check(&tree);
     assert!(contains(&tree, b"Historical question"));
@@ -443,13 +443,13 @@ fn presence_finish(domain: &mut Domain, l: &jig_domain_client::Limits, task_read
     );
     let id = domain.objects().find(supplied.key).unwrap();
     let words = words();
-    let f = view::required(&supplied, l, &words).unwrap();
+    let f = view::required(&supplied, l, words).unwrap();
     let mut cap = limits(f);
     cap.nodes = cap.nodes.checked_add(64).unwrap();
     cap.text_bytes = cap.text_bytes.checked_add(64_u32.checked_mul(cap.text_per_node).unwrap()).unwrap();
     let mut b = Builder::new(&cap);
     let mut bindings = JigBindings::new(cap.bindings, l.text);
-    assert!(crate::cards::card(&mut b, domain, id, &crate::cards::Place::Elsewhere, &words, &mut bindings));
+    assert!(crate::cards::card(&mut b, domain, id, &crate::cards::Place::Elsewhere, words, &mut bindings));
     let tree = b.finish();
     super::cards_access::check(&tree);
     assert!(tree.len() <= f.nodes.checked_add(64).unwrap());

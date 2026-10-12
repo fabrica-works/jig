@@ -104,7 +104,7 @@ fn exact_part_slots_keep_separate_literal_segments_all_owner_kinds_and_numeric_k
             let reference = OwnerPart { connector: u16::MAX, kind, key };
             let mut b = builder();
             let mut bindings = JigBindings::new(16, CLIENT.text);
-            proposed_task::part(&mut b, &reference, &words, &mut bindings);
+            proposed_task::part(&mut b, &reference, words, &mut bindings);
             let tree = finish(b);
             let slot = tree.nodes().iter().find_map(|node| node.slot).unwrap();
             assert_eq!(slot.owner, crate::Owner::Side { connector: u16::MAX });
@@ -144,7 +144,7 @@ fn proposed_executor_and_funder_keep_full_width_codes_and_original_period_identi
         OwnerExecutor::Person(PersonAddress::Party(u64::MAX)),
         OwnerExecutor::Person(PersonAddress::Role(u32::MAX)),
     ] {
-        proposed_task::executor(&mut b, executor, &words);
+        proposed_task::executor(&mut b, executor, words);
     }
     for funder in [
         Funder::Task(u64::MAX),
@@ -152,12 +152,12 @@ fn proposed_executor_and_funder_keep_full_width_codes_and_original_period_identi
         Funder::Recurring { project: u32::MAX, task: u64::MAX, period: 71 },
         Funder::Period { project: u32::MAX, period: 59 },
     ] {
-        proposed_task::funder(&mut b, funder, &words);
+        proposed_task::funder(&mut b, funder, words);
     }
     let tree = finish(b);
     assert_eq!(tree.len(), 5 + proposed_task::funder_nodes() * 4);
     let actual = tree.nodes().iter().skip(5).flat_map(|node| &node.text).map(|run| run.text.len()).max().unwrap();
-    assert!(usize::try_from(proposed_task::funder_phrase_bytes(&words).unwrap()).unwrap() >= actual);
+    assert!(usize::try_from(proposed_task::funder_phrase_bytes(words).unwrap()).unwrap() >= actual);
     assert!(contains(&tree, b"Agent charter 4294967295"));
     assert!(contains(&tree, b"Procedure connector 65535, code 4294967295"));
     assert!(contains(&tree, b"Person 18446744073709551615"));
@@ -198,7 +198,7 @@ fn exact_contracts_keep_approval_state_verdict_fields_and_each_result_bound() {
         },
         TaskContractDocument::Change { connector: u16::MAX, kind: u16::MAX, words: u32::MAX },
     ] {
-        proposed_task::contract(&mut b, &contract, &words, &mut bindings);
+        proposed_task::contract(&mut b, &contract, words, &mut bindings);
     }
     let tree = finish(b);
     assert!(contains(&tree, b"Approval of exact state"));
@@ -216,7 +216,7 @@ fn exact_contracts_keep_approval_state_verdict_fields_and_each_result_bound() {
 
 #[test]
 fn normal_words_adjust_extreme_public_offsets_by_saturating_the_wall_instant() {
-    let mut words = words();
+    let mut words = words().clone();
     for offset in [i32::MAX, i32::MIN] {
         words.offset_minutes = offset;
         for instant in [skein_lib::Wall::EPOCH, skein_lib::Wall::from_nanos(u64::MAX)] {

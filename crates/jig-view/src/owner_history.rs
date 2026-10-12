@@ -168,10 +168,7 @@ pub fn max_nodes(limits: &Limits) -> Option<u32> {
 #[must_use]
 pub fn worst_case(limits: &Limits, words: &Words) -> Option<HistoryFragment> {
     let nodes = max_nodes(limits)?;
-    let mut phrase = crate::owner_words::phrase_bytes(&words.book)?;
-    for saying in crate::phrases::jig::ALL {
-        phrase = phrase.max(words.book.capacity(saying.id())?);
-    }
+    let phrase = words.book.jig_capacity()?;
     let text_per_node = crate::literal_segment::max_bytes(limits.text)?.max(phrase).checked_mul(2)?;
     let bindings = limits.rows.checked_mul(limits.rows.checked_add(1)?)?.max(1);
     Some(HistoryFragment {

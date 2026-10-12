@@ -47,7 +47,7 @@ fn ready(runtime: Runtime, details: ChipPhase, phase: Phase) -> Domain {
 }
 fn shown(value: ActiveRun) -> Tree {
     let d = ready(Runtime::Active(value.clone()), ChipPhase::Active(value), Phase::Running);
-    build(&d, 3, &words()).0
+    build(&d, 3, words()).0
 }
 #[test]
 fn unobserved_activation_preserves_phase_attempt_and_placement_without_inventing_work_or_start() {
@@ -158,7 +158,7 @@ fn held_prior_lifecycle_and_optional_closing_facts_keep_their_owner_meaning() {
                 },
                 Phase::Held,
             );
-            let tree = build(&d, 3, &words()).0;
+            let tree = build(&d, 3, words()).0;
             assert!(contains(&tree, b"Prior lifecycle before the hold"));
             assert!(contains(&tree, b"Pending ending"));
             assert!(contains(&tree, b"17"));
@@ -229,7 +229,7 @@ fn full_runtime_tools_and_held_closing_fit_the_declared_tree_envelope() {
         let mut b = Builder::new(&limits());
         let mut bindings = JigBindings::new(64, CLIENT.text);
         b.open(Role::Page);
-        crate::cards::chip::chip(&mut b, &d, &chip, &words(), &mut bindings);
+        crate::cards::chip::chip(&mut b, &d, &chip, words(), &mut bindings);
         b.close();
         let tree = b.finish();
         assert!(tree.len() <= crate::chip_nodes(&CLIENT).unwrap() + 1);

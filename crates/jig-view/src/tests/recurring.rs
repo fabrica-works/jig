@@ -46,7 +46,7 @@ fn recurring_keeps_every_template_member_overlap_period_fact_and_last_batch_link
         final_task.funder = Funder::Period { project: u32::MAX, period: 71 };
         final_task.cut = true;
         drive(&mut domain, Event::Read { read, result: ReadResult::Value(ReadValue::Project(Box::new(document))) });
-        let (tree, mut bindings) = build(&domain, 3, &words);
+        let (tree, mut bindings) = build(&domain, 3, words);
         assert!(contains(&tree, b"Daily work"));
         assert!(contains(&tree, b"Then follow up"));
         assert!(contains(&tree, b"Proposed task 18446744073709551615"));
@@ -92,7 +92,7 @@ fn recurring_with_no_template_members_or_retained_batch_invents_no_task_or_pendi
     row.next = None;
     row.cut = false;
     drive(&mut domain, Event::Read { read, result: ReadResult::Value(ReadValue::Project(Box::new(document))) });
-    let (tree, _) = build(&domain, 3, &words);
+    let (tree, _) = build(&domain, 3, words);
     assert!(!contains(&tree, b"Daily work"));
     assert!(!contains(&tree, b"Then follow up"));
     assert!(!contains(&tree, b"Pending batch period"));

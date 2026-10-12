@@ -66,7 +66,7 @@ fn maximum_card_envelope() {
     let mut builder = Builder::new(&allocation);
     let mut bindings = JigBindings::new(bound, CLIENT.text);
     builder.open(Role::Page);
-    assert!(cards::card(&mut builder, &domain, id, &cards::Place::Elsewhere, &words(), &mut bindings));
+    assert!(cards::card(&mut builder, &domain, id, &cards::Place::Elsewhere, words(), &mut bindings));
     builder.close();
     let tree = builder.finish();
     super::super::cards_access::check(&tree);
@@ -84,7 +84,7 @@ fn owner_escalation_named_card_keeps_current_holder_prior_stage_and_whole_task_w
     let row = escalation();
     let (domain, id) = loaded(ObjectKey::Escalation(8), ReadValue::OwnerEscalation(Box::new(row.clone())));
     let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
-    let tree = render(&domain, id, &words(), &mut bindings);
+    let tree = render(&domain, id, words(), &mut bindings);
     assert!(contains(&tree, b"whole task specification"));
     assert!(contains(&tree, b"whole task instructions"));
     assert!(contains(&tree, b"Prior closing effects"));
@@ -118,7 +118,7 @@ fn owner_escalation_amendment_inputs_keep_whole_source_baselines_and_selected_de
         let (mut domain, id) = loaded(ObjectKey::Escalation(8), ReadValue::OwnerEscalation(Box::new(row)));
         drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::AmendRelease } });
         let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
-        let tree = dialog(&domain, &words(), &mut bindings);
+        let tree = dialog(&domain, words(), &mut bindings);
         assert!(contains(&tree, b"whole task specification"));
         assert!(contains(&tree, b"whole task instructions"));
         assert!(contains(&tree, b"Hold revision: 18446744073709551615"));
@@ -382,7 +382,7 @@ fn check_presence_case(present: [bool; 3], loaded: bool, owner: bool) {
     let mut builder = Builder::new(&allocation);
     let mut bindings = JigBindings::new(allocation.bindings, l.text);
     builder.open(Role::Page);
-    assert!(cards::card(&mut builder, &domain, id, &cards::Place::Elsewhere, &words(), &mut bindings));
+    assert!(cards::card(&mut builder, &domain, id, &cards::Place::Elsewhere, words(), &mut bindings));
     builder.close();
     let tree = builder.finish();
     super::super::cards_access::check(&tree);
@@ -508,13 +508,13 @@ fn owner_escalation_closed_outer_controls_and_whole_refusals_fit_finite_view_and
         assert_eq!(row.acts.len(), MAX_OFFERED_ACTS);
         assert_eq!(row.task.context, None);
         let (domain, id) = loaded(ObjectKey::Escalation(8), ReadValue::OwnerEscalation(Box::new(row.clone())));
-        let mut allocation = crate::Limits::of_words(&CLIENT, &w).unwrap();
+        let mut allocation = crate::Limits::of_words(&CLIENT, w).unwrap();
         allocation.nodes = crate::sizes::owner_escalation_nodes(&CLIENT).unwrap() + 1;
         allocation.text_bytes = allocation.nodes * allocation.text_per_node;
         let mut builder = Builder::new(&allocation);
         let mut bindings = JigBindings::new(allocation.bindings, CLIENT.text);
         builder.open(Role::Page);
-        assert!(cards::card(&mut builder, &domain, id, &cards::Place::Elsewhere, &w, &mut bindings));
+        assert!(cards::card(&mut builder, &domain, id, &cards::Place::Elsewhere, w, &mut bindings));
         builder.close();
         let tree = builder.finish();
         super::super::cards_access::check(&tree);
@@ -556,7 +556,7 @@ fn owner_escalation_closed_outer_controls_and_whole_refusals_fit_finite_view_and
         assert!(contains(&tree, b"whole task specification"));
         assert!(contains(&tree, b"supplied prior task failure"));
         assert_eq!(domain.objects().get(id).unwrap().body.as_ref().unwrap().ending(), None);
-        check_exact_storage(&row, allocation, &tree, &w);
+        check_exact_storage(&row, allocation, &tree, w);
         assert_eq!(row, original);
         assert_eq!(
             domain.objects().get(id).unwrap().body,
@@ -567,11 +567,11 @@ fn owner_escalation_closed_outer_controls_and_whole_refusals_fit_finite_view_and
     oversized.acts = List::with_capacity(MAX_OFFERED_ACTS + 1);
     let original = oversized.clone();
     let (domain, id) = loaded(ObjectKey::Escalation(8), ReadValue::OwnerEscalation(Box::new(oversized)));
-    let allocation = crate::Limits::of_words(&CLIENT, &w).unwrap();
+    let allocation = crate::Limits::of_words(&CLIENT, w).unwrap();
     let mut builder = Builder::new(&allocation);
     let mut bindings = JigBindings::new(allocation.bindings, CLIENT.text);
     builder.open(Role::Page);
-    assert!(!cards::card(&mut builder, &domain, id, &cards::Place::Elsewhere, &w, &mut bindings));
+    assert!(!cards::card(&mut builder, &domain, id, &cards::Place::Elsewhere, w, &mut bindings));
     builder.close();
     assert_eq!(builder.finish().len(), 1);
     assert_eq!(

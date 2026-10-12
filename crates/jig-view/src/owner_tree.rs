@@ -51,10 +51,7 @@ pub fn max_nodes(l: &Limits) -> Option<u32> {
 #[must_use]
 pub fn worst_case(l: &Limits, words: &Words) -> Option<TreeFragment> {
     let nodes = max_nodes(l)?;
-    let mut phrase = crate::owner_words::phrase_bytes(&words.book)?;
-    for p in crate::phrases::jig::ALL {
-        phrase = phrase.max(words.book.capacity(p.id())?);
-    }
+    let phrase = words.book.jig_capacity()?;
     let text_per_node = phrase.max(crate::literal_segment::max_bytes(l.text)?).checked_mul(2)?;
     Some(TreeFragment {
         nodes,

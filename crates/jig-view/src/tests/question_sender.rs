@@ -87,7 +87,7 @@ fn question_sender_cards_render_exact_closed_kinds_full_widths_and_no_claim_for_
         (Some(OwnerRequester::Deployment { project: u32::MAX }), b"Question from deployment project 4294967295"),
     ] {
         let (d, id, value) = fixture(from);
-        let shown = tree(&d, id, &words());
+        let shown = tree(&d, id, words());
         if from.is_some() {
             assert!(contains(&shown, expected));
         }

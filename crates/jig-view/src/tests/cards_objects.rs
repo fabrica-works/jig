@@ -1300,15 +1300,15 @@ mod sizes;
 #[test]
 fn jig_object_cards_hold_actions_confirmations_and_notices() {
     let words = words();
-    whole_object_cards_keep_facts_while_confirmation_request_refusal_and_leaving_change(&words);
-    person_contracts_and_result_values_keep_choices_slots_and_full_payloads(&words);
-    proposal_kinds_chip_phases_and_live_replies_keep_facts_and_slots(&words);
-    escalation_reasons_confirmation_choices_changed_revisions_and_notices_keep_semantic_facts(&words);
-    sizes::scenario(&words);
-    closing_connectors_use_their_owners_words(&words);
-    person_chip_preserves_absent_readiness(&words);
-    authority_refusal_uses_only_supplied_proposal_eligibility(&words);
-    collective_recipients_name_every_supplied_role_in_order(&words);
+    whole_object_cards_keep_facts_while_confirmation_request_refusal_and_leaving_change(words);
+    person_contracts_and_result_values_keep_choices_slots_and_full_payloads(words);
+    proposal_kinds_chip_phases_and_live_replies_keep_facts_and_slots(words);
+    escalation_reasons_confirmation_choices_changed_revisions_and_notices_keep_semantic_facts(words);
+    sizes::scenario(words);
+    closing_connectors_use_their_owners_words(words);
+    person_chip_preserves_absent_readiness(words);
+    authority_refusal_uses_only_supplied_proposal_eligibility(words);
+    collective_recipients_name_every_supplied_role_in_order(words);
 }
 
 fn closing_connectors_use_their_owners_words(words: &crate::words::Words) {
@@ -1395,7 +1395,7 @@ fn approved_and_failed_results_show_only_their_supplied_owner_payloads() {
         let mut builder = Builder::new(&limits());
         builder.open(Role::Page);
         let mut bindings = JigBindings::new(64, CLIENT.text);
-        cards::result::value_nodes(&mut builder, &domain, &value, &words, &mut bindings);
+        cards::result::value_nodes(&mut builder, &domain, &value, words, &mut bindings);
         builder.close();
         let tree = builder.finish();
         assert!(contains(&tree, &[0, 255, 1]));
@@ -1413,7 +1413,7 @@ fn approved_and_failed_results_show_only_their_supplied_owner_payloads() {
         &mut builder,
         &domain,
         &ResultValue::Failure(DocumentText::complete(text(b"cannot complete"))),
-        &words,
+        words,
         &mut bindings,
     );
     builder.close();
@@ -1445,7 +1445,7 @@ fn whole_specification_words_edit_preserves_parameters_and_input_identities() {
     drive(&mut domain, Event::Act { act: Action::Edit { field: Purpose::Reason, text: text(b"") } });
     let words = words();
     let mut bindings = JigBindings::new(256, CLIENT.text);
-    let tree = dialog(&domain, &words, &mut bindings);
+    let tree = dialog(&domain, words, &mut bindings);
     assert!(contains(&tree, &[0, 255, 1]));
     assert!(contains(&tree, b"Parameter 4294967295 has value 18446744073709551615"));
     assert!(contains(&tree, b"Parameter 9 names connector 65535 resource 18446744073709551615"));
@@ -1485,14 +1485,14 @@ fn cut_specification_is_shown_and_cannot_be_reconstructed_by_the_words_editor() 
             document.cut = true;
             document
         },
-        &words,
+        words,
     );
     builder.close();
     assert!(contains(&builder.finish(), b"The specification is incomplete"));
     drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::Amend } });
     drive(&mut domain, Event::Act { act: Action::Edit { field: Purpose::Reason, text: text(b"") } });
     let mut bindings = JigBindings::new(256, CLIENT.text);
-    let tree = dialog(&domain, &words, &mut bindings);
+    let tree = dialog(&domain, words, &mut bindings);
     assert!(!tree.nodes().iter().any(|node| node.name.as_deref() == Some(b"New specification")));
     assert!(drive(&mut domain, Event::Act { act: Action::Confirm }).is_empty());
 }
@@ -1508,7 +1508,7 @@ fn person_task_cards_preserve_numeric_takers_without_inventing_names() {
         value.taken = Some(TakenBy { number: u64::MAX, name: supplied_name.clone() });
         let (domain, object, _) = loaded_with_watch(ObjectKey::PersonTask(8), ReadValue::PersonTask(Box::new(value)));
         let mut bindings = JigBindings::new(16, CLIENT.text);
-        let tree = render(&domain, object, &words, &mut bindings);
+        let tree = render(&domain, object, words, &mut bindings);
         assert!(contains(&tree, b"Waiting for project 4, role 4294967295"));
         assert_eq!(contains(&tree, b"Taken by party 18446744073709551615"), supplied_name.is_none());
         assert_eq!(contains(&tree, b"Taken by actual taker"), supplied_name.is_some());
@@ -1554,7 +1554,7 @@ fn specification_documents_keep_independent_text_and_list_loss_and_block_whole_e
         assert_eq!(row.spec.whole().is_some(), mask == 0);
         let words = words();
         let mut builder = Builder::new(&limits());
-        crate::specification::document(&mut builder, &row.spec, &words);
+        crate::specification::document(&mut builder, &row.spec, words);
         let tree = builder.finish();
         assert!(contains(&tree, &[0, 255, 1]));
         assert_eq!(contains(&tree, b"Only part of this text was supplied"), mask & 3 != 0);
@@ -1562,7 +1562,7 @@ fn specification_documents_keep_independent_text_and_list_loss_and_block_whole_e
         drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::Amend } });
         drive(&mut domain, Event::Act { act: Action::Edit { field: Purpose::Reason, text: text(b"") } });
         let mut bindings = JigBindings::new(256, CLIENT.text);
-        let tree = dialog(&domain, &words, &mut bindings);
+        let tree = dialog(&domain, words, &mut bindings);
         if mask != 0 {
             assert!(!tree.nodes().iter().any(|node| node.name.as_deref() == Some(b"New specification")));
             assert!(drive(&mut domain, Event::Act { act: Action::Confirm }).is_empty());
@@ -1604,12 +1604,12 @@ fn note_documents_keep_each_text_loss_and_reference_loss_without_reconstructing_
             let words = words();
             let mut bindings = JigBindings::new(256, CLIENT.text);
             let mut builder = Builder::new(&limits());
-            cards::card(&mut builder, &domain, id, &cards::Place::Elsewhere, &words, &mut bindings);
+            cards::card(&mut builder, &domain, id, &cards::Place::Elsewhere, words, &mut bindings);
             let tree = builder.finish();
             assert_eq!(contains(&tree, b"Only part of this text was supplied"), mask & 3 != 0);
             assert_eq!(contains(&tree, b"This note has more references"), mask & 4 != 0);
             drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act } });
-            let tree = dialog(&domain, &words, &mut bindings);
+            let tree = dialog(&domain, words, &mut bindings);
             let out = drive(&mut domain, Event::Act { act: Action::Confirm });
             if act == ActKind::EditNote && mask != 0 {
                 assert!(tree.nodes().iter().all(|node| node.value.is_none()));
@@ -1643,7 +1643,7 @@ fn equal_number_proposal_makers_keep_distinct_card_keys_words_and_decoding() {
         let key = ObjectKey::Proposal(row.key);
         let (mut d, id) = loaded(key, ReadValue::Proposal(Box::new(row)));
         let mut bindings = JigBindings::new(64, CLIENT.text);
-        let tree = render(&d, id, &words, &mut bindings);
+        let tree = render(&d, id, words, &mut bindings);
         assert!(contains(&tree, label));
         let expected = crate::Key { owner: crate::Owner::Jig, kind, a: u64::MAX, b: u64::MAX };
         assert!(tree.nodes().iter().any(|node| node.role == Role::Item && node.key == Some(expected)));
@@ -1651,7 +1651,7 @@ fn equal_number_proposal_makers_keep_distinct_card_keys_words_and_decoding() {
         shown.push(expected);
         let action = press(&tree, b"Accept", &mut bindings);
         drive(&mut d, Event::Act { act: action });
-        let tree = dialog(&d, &words, &mut bindings);
+        let tree = dialog(&d, words, &mut bindings);
         assert!(contains(&tree, label));
         let action = press(&tree, b"Confirm", &mut bindings);
         let sent = drive(&mut d, Event::Act { act: action });
@@ -1732,7 +1732,7 @@ fn a_cut_note_shows_its_reference_loss_and_blocks_correction_but_keeps_exact_del
         };
         let (mut domain, id) = note_loaded(note);
         drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act } });
-        let tree = dialog(&domain, &words, &mut bindings);
+        let tree = dialog(&domain, words, &mut bindings);
         let outgoing = drive(&mut domain, Event::Act { act: Action::Confirm });
         if act == ActKind::EditNote {
             assert!(contains(&tree, b"This note has more references"));
@@ -1790,10 +1790,10 @@ fn result_documents_keep_each_words_loss_fact_and_the_exact_change_kind_and_owne
             ResultValue::Change { kind: u16::MAX, part: raw.clone(), words: explanation },
         ];
         for value in values {
-            let mut builder = Builder::new(&crate::Limits::of_words(&CLIENT, &words).unwrap());
+            let mut builder = Builder::new(&crate::Limits::of_words(&CLIENT, words).unwrap());
             builder.open(Role::Page);
             let mut bindings = JigBindings::new(64, CLIENT.text);
-            cards::result::value_nodes(&mut builder, &domain, &value, &words, &mut bindings);
+            cards::result::value_nodes(&mut builder, &domain, &value, words, &mut bindings);
             builder.close();
             let tree = builder.finish();
             assert!(contains(&tree, b"supplied words"));
@@ -1830,11 +1830,11 @@ fn result_cards_distinguish_an_absent_completion_wall_from_epoch_and_render_supp
             proposal: None,
             cut: false,
         }));
-        let envelope = crate::Limits::of_words(&CLIENT, &words).unwrap();
+        let envelope = crate::Limits::of_words(&CLIENT, words).unwrap();
         let mut builder = Builder::new(&envelope);
         builder.open(Role::Page);
         let mut bindings = JigBindings::new(envelope.bindings, CLIENT.text);
-        cards::result::facts(&mut builder, &domain, &value, &words, &mut bindings);
+        cards::result::facts(&mut builder, &domain, &value, words, &mut bindings);
         builder.close();
         let tree = builder.finish();
         assert_eq!(contains(&tree, b"Completion time not supplied"), at.is_none());
@@ -1866,11 +1866,11 @@ fn exact_owner_verdict_renders_payload_and_stored_followups_without_inventing_ch
             cut: true,
         }));
         let before = value.clone();
-        let envelope = crate::Limits::of_words(&CLIENT, &words).unwrap();
+        let envelope = crate::Limits::of_words(&CLIENT, words).unwrap();
         let mut builder = Builder::new(&envelope);
         builder.open(Role::Page);
         let mut bindings = JigBindings::new(envelope.bindings, CLIENT.text);
-        cards::result::facts(&mut builder, &domain, &value, &words, &mut bindings);
+        cards::result::facts(&mut builder, &domain, &value, words, &mut bindings);
         builder.close();
         let tree = builder.finish();
         assert!(contains(&tree, b"Verdict 4294967295"));
@@ -1927,7 +1927,7 @@ fn connector_effect_slots_keep_raw_numbers_separate_from_jig_proposal_makers() {
         let mut bindings = JigBindings::new(8, CLIENT.text);
         let mut builder = Builder::new(&limits());
         builder.open(Role::Page);
-        cards::common::part(&mut builder, &native, &words, &mut bindings);
+        cards::common::part(&mut builder, &native, words, &mut bindings);
         builder.close();
         let tree = builder.finish();
         let slot = tree.nodes().iter().find_map(|node| node.slot).unwrap();
@@ -1937,7 +1937,7 @@ fn connector_effect_slots_keep_raw_numbers_separate_from_jig_proposal_makers() {
             let maker_effect = Part::Effect { connector, proposal: ProposalKey { proposer, number: proposal } };
             let mut builder = Builder::new(&limits());
             builder.open(Role::Page);
-            cards::common::part(&mut builder, &maker_effect, &words, &mut bindings);
+            cards::common::part(&mut builder, &maker_effect, words, &mut bindings);
             builder.close();
             let tree = builder.finish();
             let old = tree.nodes().iter().find_map(|node| node.slot).unwrap();

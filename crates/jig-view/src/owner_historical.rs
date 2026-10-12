@@ -319,10 +319,7 @@ pub fn max_nodes(l: &Limits) -> Option<u32> {
 #[must_use]
 pub fn worst_case(l: &Limits, words: &Words) -> Option<HistoricalFragment> {
     let nodes = max_nodes(l)?;
-    let text_per_node = crate::owner_words::phrase_bytes(&words.book)?
-        .max(words.book.jig_capacity()?)
-        .max(crate::literal_segment::max_bytes(l.text)?)
-        .checked_mul(2)?;
+    let text_per_node = words.book.jig_capacity()?.max(crate::literal_segment::max_bytes(l.text)?).checked_mul(2)?;
     Some(HistoricalFragment {
         nodes,
         text_bytes: nodes.checked_mul(text_per_node)?,

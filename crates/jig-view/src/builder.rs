@@ -77,10 +77,15 @@ impl Builder {
 
     /// Begin a node; calls between this and `close` build its children.
     pub fn open(&mut self, role: Role) {
+        let runs = if role == Role::Text { self.limits.text_per_node } else { 0 };
+        self.open_with_runs(role, runs);
+    }
+
+    fn open_with_runs(&mut self, role: Role, runs: u32) {
         assert!(self.tree.nodes.room() > 0, "tree fits its node capacity");
         assert!(self.open.len() < self.limits.depth, "tree fits its depth capacity");
         let index = self.tree.len();
-        let node = Node::new(role, &self.limits);
+        let node = Node::new(role, &self.limits, runs);
         self.tree.nodes.push(node).expect("tree fits its node capacity");
         self.open.push(index).expect("tree fits its depth capacity");
     }
@@ -120,7 +125,7 @@ impl Builder {
 
     /// Build a text leaf with one run.
     pub fn text(&mut self, run: Run, bytes: &[u8]) {
-        self.open(Role::Text);
+        self.open_with_runs(Role::Text, 1);
         self.run(run, bytes);
         self.close();
     }

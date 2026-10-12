@@ -225,8 +225,7 @@ impl Node {
         }
     }
 
-    pub(crate) fn new(role: Role, limits: &crate::Limits) -> Node {
-        let runs = if role == Role::Text { limits.text_per_node } else { 0 };
+    pub(crate) fn new(role: Role, limits: &crate::Limits, runs: u32) -> Node {
         Node {
             id: NodeId(0),
             role,

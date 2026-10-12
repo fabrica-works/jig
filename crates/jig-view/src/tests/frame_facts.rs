@@ -4,7 +4,7 @@ use crate::{Builder, JigBindings, Owner, Role, SlotRef, Tree, phrases::jig::JigP
 use jig_domain_client::{Domain, Event, contract::*};
 use skein_lib::{List, Token, Wall};
 fn tree(domain: &Domain) -> Tree {
-    frame_tree(domain, &words())
+    frame_tree(domain, words())
 }
 fn frame_tree(domain: &Domain, words: &crate::words::Words) -> Tree {
     let mut sized = limits();
@@ -124,7 +124,7 @@ fn chat_forms_join_membership_only_by_supplied_project_and_preserve_optional_cha
             }),
         },
     );
-    let shown = super::pages::build(&domain, 1, &words()).0;
+    let shown = super::pages::build(&domain, 1, words()).0;
     for bytes in
         [b"Charter 4294967295".as_slice(), b"actual-charter", b"Budget 123", b"Only part of this text was supplied"]
     {
@@ -140,7 +140,7 @@ fn chat_forms_join_membership_only_by_supplied_project_and_preserve_optional_cha
             }),
         },
     );
-    let shown = super::pages::build(&mismatched, 1, &words()).0;
+    let shown = super::pages::build(&mismatched, 1, words()).0;
     assert!(!contains(&shown, b"Budget 123"));
     assert!(!contains(&shown, b"actual-charter"));
 }

@@ -167,3 +167,12 @@ fn runs_and_link_addresses_keep_their_owner_tokens() {
     assert_eq!(tree.get(0).expect("link").link, Some(link));
     assert_eq!(tree.get(1).expect("text").text.len(), 2);
 }
+
+#[test]
+fn a_built_text_leaf_reserves_one_run() {
+    let mut builder = Builder::new(&LIMITS);
+    builder.text(Run::Plain, b"one");
+    let tree = builder.finish();
+    let node = tree.get(0).expect("text node exists");
+    assert_eq!(node.text.capacity(), 1);
+}

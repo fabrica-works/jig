@@ -101,10 +101,7 @@ pub fn nodes(limits: &jig_domain_client::Limits) -> Option<u32> {
 #[must_use]
 pub fn limits(client: &jig_domain_client::Limits, words: &Words) -> Option<crate::Limits> {
     let nodes = nodes(client)?;
-    let mut phrase = crate::owner_words::phrase_bytes(&words.book)?;
-    for id in crate::phrases::jig::ALL {
-        phrase = phrase.max(words.book.capacity(id.id())?);
-    }
+    let phrase = words.book.jig_capacity()?;
     let text_per_node = phrase.checked_mul(2)?.checked_add(crate::literal_segment::max_bytes(client.text)?)?;
     Some(crate::Limits {
         nodes,

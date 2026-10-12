@@ -44,7 +44,7 @@ fn owner_hold_confirmation_keeps_exact_prior_counts_loss_clock_presence_and_repe
                 drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::Release } });
                 let envelope = limits();
                 let mut bindings = JigBindings::new(envelope.bindings, CLIENT.text);
-                let tree = dialog(&domain, &words(), &mut bindings);
+                let tree = dialog(&domain, words(), &mut bindings);
                 assert!(contains(&tree, b"Release continues from the shown lifecycle; failure counts reset"));
                 assert!(contains(&tree, b"Hold revision: 18446744073709551615"));
                 assert!(contains(&tree, b"Left held by: 18446744073709551615"));

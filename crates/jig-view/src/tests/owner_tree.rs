@@ -117,7 +117,7 @@ fn owner_tree_view_names_root_parent_depth_spend_loss_proposal_and_all_ten_count
     let value = source();
     let d = domain(&value);
     let w = words();
-    let tree = build(&value, &d, &w, None);
+    let tree = build(&value, &d, w, None);
     for expected in [
         b"Root task: 8".as_slice(),
         b"Parent task: 8",
@@ -161,7 +161,7 @@ fn owner_tree_view_preserves_all_link_metadata_without_fabricated_stored_chip_or
         value.rows.get_mut(0).unwrap().dependencies.clear();
         value.rows.get_mut(0).unwrap().dependencies.push(link).unwrap();
         let d = domain(&value);
-        let tree = build(&value, &d, &w, None);
+        let tree = build(&value, &d, w, None);
         assert!(contains(&tree, expected), "missing {}", core::str::from_utf8(expected).unwrap());
         assert_eq!(d.task_page().plan.owner.as_deref(), Some(&value));
     }
@@ -260,14 +260,14 @@ fn owner_tree_local_filters_folds_cycles_and_empty_loss_continuations_remain_bou
     let w = words();
     value.rows.get_mut(0).unwrap().parent = 9;
     let d = domain(&value);
-    let tree = build(&value, &d, &w, None);
+    let tree = build(&value, &d, w, None);
     assert_eq!(tree.nodes().iter().filter(|n| n.role == Role::TreeItem).count(), 2);
     for next in [None, Some(Cursor { value: Text::new(copy_of(b""), 128).unwrap() })] {
         value.rows = List::with_capacity(2);
         value.folded = List::with_capacity(2);
         value.next = next.clone();
         let d = domain(&value);
-        let tree = build(&value, &d, &w, None);
+        let tree = build(&value, &d, w, None);
         assert!(contains(&tree, if next.is_some() { b"More descendants remain" } else { b"no continuation" }));
         assert!(!contains(&tree, b"Some dependencies are outside this row"));
         assert!(contains(&tree, b"Held below: 19"));
@@ -321,7 +321,7 @@ fn owner_tree_departure_keeps_a_separately_named_deciding_card_until_its_answer_
         .unwrap();
     let w = words();
     let build_page = |domain: &Domain| {
-        let mut cap = crate::Limits::of_words(&CLIENT, &w).unwrap();
+        let mut cap = crate::Limits::of_words(&CLIENT, w).unwrap();
         cap.nodes = cap.nodes.max(4096);
         cap.text_bytes = cap.nodes.checked_mul(cap.text_per_node).unwrap();
         let mut b = Builder::new(&cap);
@@ -332,10 +332,10 @@ fn owner_tree_departure_keeps_a_separately_named_deciding_card_until_its_answer_
             domain.task_page().plan.owner.as_ref().unwrap(),
             &domain.task_page().plan,
             domain,
-            &w,
+            w,
             &mut bindings,
         );
-        crate::pages::after_page(&mut b, domain, &w, &mut bindings);
+        crate::pages::after_page(&mut b, domain, w, &mut bindings);
         b.close();
         b.finish()
     };

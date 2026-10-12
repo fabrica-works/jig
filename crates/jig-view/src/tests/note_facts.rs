@@ -19,7 +19,7 @@ fn note_cards_name_the_whole_stored_attempt_and_only_render_supplied_times() {
             let words = words();
             let mut bindings = JigBindings::new(256, CLIENT.text);
             let mut builder = Builder::new(&limits());
-            cards::card(&mut builder, &domain, id, &cards::Place::Elsewhere, &words, &mut bindings);
+            cards::card(&mut builder, &domain, id, &cards::Place::Elsewhere, words, &mut bindings);
             let tree = builder.finish();
             assert!(contains(&tree, b"note body"));
             assert!(contains(&tree, b"Only part of this text was supplied"));
@@ -63,7 +63,7 @@ fn settled_note_answer(act: ActKind, cut: bool) {
     let (mut domain, id) = note_loaded(note);
     let words = words();
     let mut bindings = JigBindings::new(256, CLIENT.text);
-    let tree = render(&domain, id, &words, &mut bindings);
+    let tree = render(&domain, id, words, &mut bindings);
     assert!(!contains(&tree, b"Note edited"));
     assert!(contains(&tree, b"Edit note"));
     assert!(contains(&tree, b"Delete note"));
@@ -78,7 +78,7 @@ fn settled_note_answer(act: ActKind, cut: bool) {
             _ => None,
         })
         .unwrap();
-    assert!(!contains(&render(&domain, id, &words, &mut bindings), b"Note edited"));
+    assert!(!contains(&render(&domain, id, words, &mut bindings), b"Note edited"));
     let answer = Answer::Done(Outcome::Owner(OwnerOutcome::NoteEdited { name: 77 }));
     drive(&mut domain, Event::Answered { request, answer: answer.clone() });
     let facts = domain.objects().get(id).unwrap();
@@ -87,11 +87,11 @@ fn settled_note_answer(act: ActKind, cut: bool) {
         Some(jig_domain_client::objects::Body::Note { document, .. }) => assert_eq!(document.as_ref(), &expected_note),
         other => panic!("the answer must preserve the supplied note: {other:?}"),
     }
-    let mut envelope = crate::Limits::of_words(&CLIENT, &words).unwrap();
+    let mut envelope = crate::Limits::of_words(&CLIENT, words).unwrap();
     envelope.nodes = crate::card_nodes(&CLIENT).unwrap();
     let mut builder = Builder::new(&envelope);
     bindings.begin();
-    assert!(cards::card(&mut builder, &domain, id, &cards::Place::Elsewhere, &words, &mut bindings));
+    assert!(cards::card(&mut builder, &domain, id, &cards::Place::Elsewhere, words, &mut bindings));
     let tree = builder.finish();
     assert!(
         tree.nodes().iter().any(|node| node.role == Role::Region && node.name.as_deref() == Some(b"stored note title"))

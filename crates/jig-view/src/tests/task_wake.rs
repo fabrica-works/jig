@@ -27,7 +27,7 @@ fn whole_wake_channel_edits_preserve_batched_rules_flags_and_separate_subscripti
             drive(&mut domain, Event::Act { act: Action::Edit { field: Purpose::Reason, text: text(b"") } });
             let words = words();
             let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
-            let tree = dialog(&domain, &words, &mut bindings);
+            let tree = dialog(&domain, words, &mut bindings);
             assert!(contains(&tree, b"4294967295 messages or 18446744073709551615 ns"));
             assert!(contains(&tree, b"Questions wake"));
             let action = press(&tree, b"Wakes on inbox messages", &mut bindings);
@@ -42,7 +42,7 @@ fn whole_wake_channel_edits_preserve_batched_rules_flags_and_separate_subscripti
             assert!(selected.dependencies.is_none());
             assert!(selected.instructions.is_none());
             assert!(selected.authority.is_none());
-            let tree = dialog(&domain, &words, &mut bindings);
+            let tree = dialog(&domain, words, &mut bindings);
             drive(&mut domain, Event::Act { act: press(&tree, b"Wakes on a delegate result", &mut bindings) });
             expected.results = match results {
                 ResultsWake::Never => ResultsWake::Each,
@@ -101,7 +101,7 @@ fn task_overview_renders_numbered_standing_interests_independently_of_activation
         row.subscriptions.entries.push(Subscription { number: u64::MAX, kind }).unwrap();
         row.cut = true;
         super::super::pages::deliver(&mut domain, watch, Delivery::Task(Box::new(row.clone())));
-        let (tree, _) = super::super::pages::build(&domain, 3, &words());
+        let (tree, _) = super::super::pages::build(&domain, 3, words());
         super::super::cards_access::check(&tree);
         assert!(tree.nodes().iter().any(|node| node.name.as_deref() == Some(b"Wake policy")));
         assert!(tree.nodes().iter().any(|node| node.name.as_deref() == Some(b"Subscriptions")));

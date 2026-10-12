@@ -498,9 +498,9 @@ fn not_the_work(words: &Words) {
 #[test]
 fn every_page_with_full_windows_nested_lists_and_maximum_text_fits_its_composed_capacity() {
     let words = words();
-    task_pages(&words);
-    project_pages(&words);
-    other_pages(&words);
+    task_pages(words);
+    project_pages(words);
+    other_pages(words);
 }
 #[test]
 #[expect(
@@ -510,7 +510,7 @@ fn every_page_with_full_windows_nested_lists_and_maximum_text_fits_its_composed_
 )]
 fn capacity_composes_siblings_fragments_and_application_pages_with_checked_overflow() {
     let words = words();
-    let limits = crate::Limits::of_words(&CLIENT, &words).unwrap();
+    let limits = crate::Limits::of_words(&CLIENT, words).unwrap();
     let largest = crate::page_nodes(&CLIENT, 0).unwrap();
     assert_eq!(
         limits.nodes,
@@ -524,11 +524,11 @@ fn capacity_composes_siblings_fragments_and_application_pages_with_checked_overf
             .checked_add(1)
             .unwrap()
     );
-    let extra = crate::Limits::compose(&CLIENT, &words, largest.checked_add(7).unwrap(), 9, 2).unwrap();
+    let extra = crate::Limits::compose(&CLIENT, words, largest.checked_add(7).unwrap(), 9, 2).unwrap();
     assert_eq!(extra.nodes, limits.nodes.checked_add(16).unwrap());
     assert_eq!(extra.depth, limits.depth.checked_add(2).unwrap());
     assert_eq!(crate::page_nodes(&CLIENT, 9), largest.checked_add(9));
-    assert!(crate::Limits::compose(&CLIENT, &words, u32::MAX, 0, 0).is_none());
+    assert!(crate::Limits::compose(&CLIENT, words, u32::MAX, 0, 0).is_none());
     assert!(crate::page_nodes(&CLIENT, u32::MAX).is_none());
     let mut huge = CLIENT;
     huge.rows = u32::MAX;
@@ -544,13 +544,13 @@ fn capacity_composes_siblings_fragments_and_application_pages_with_checked_overf
         &mut b,
         &d,
         SlotRef { owner: Owner::Other { child: 1 }, token: Token::new(1) },
-        &words,
+        words,
         &mut bindings
     ));
     b.open(Role::Heading { level: 1 });
     b.text(crate::Run::Plain, b"Application page");
     b.close();
-    crate::after_page(&mut b, &d, &words, &mut bindings);
+    crate::after_page(&mut b, &d, words, &mut bindings);
     b.close();
     let slots = b.slots(0);
     assert_eq!(slots.len(), 1);

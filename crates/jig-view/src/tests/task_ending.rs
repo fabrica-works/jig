@@ -70,7 +70,7 @@ fn task_overview_shows_only_supplied_ending_facts_with_opaque_state_loss_and_raw
         let mut builder = Builder::new(&envelope);
         builder.open(Role::Page);
         let mut bindings = JigBindings::new(envelope.bindings, CLIENT.text);
-        crate::task_result::render(&mut builder, &domain, row.result.as_ref().unwrap(), &words(), &mut bindings);
+        crate::task_result::render(&mut builder, &domain, row.result.as_ref().unwrap(), words(), &mut bindings);
         builder.close();
         let tree = builder.finish();
         assert!(tree.len() <= crate::task_result::nodes(&CLIENT).unwrap());

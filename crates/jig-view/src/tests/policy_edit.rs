@@ -11,7 +11,7 @@ fn pattern(last: OwnerPatternEnd) -> OwnerPattern {
 }
 fn shown(value: &PolicyEdit) -> crate::Tree {
     let words = words();
-    let required = policy_edit::required(value, &words).unwrap();
+    let required = policy_edit::required(value, words).unwrap();
     let mut b = Builder::new(&crate::Limits {
         nodes: required.nodes.checked_add(1).unwrap(),
         depth: required.depth.checked_add(1).unwrap(),
@@ -25,7 +25,7 @@ fn shown(value: &PolicyEdit) -> crate::Tree {
         markdown_depth: 0,
     });
     b.open(Role::Page);
-    policy_edit::render(&mut b, value, &words);
+    policy_edit::render(&mut b, value, words);
     b.close();
     let tree = b.finish();
     assert_eq!(tree.len(), required.nodes.checked_add(1).unwrap());

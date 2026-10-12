@@ -40,7 +40,7 @@ fn task_authority_forms_preserve_all_permissions_and_selected_delta_without_reco
         drive(&mut domain, Event::Act { act: Action::Edit { field: Purpose::Reason, text: text(b"") } });
         let words = words();
         let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
-        let tree = dialog(&domain, &words, &mut bindings);
+        let tree = dialog(&domain, words, &mut bindings);
         assert!(contains(&tree, b"Tool bits: 18446744073709551615"));
         assert!(contains(&tree, b"Note scope bits: 255"));
         assert!(contains(&tree, b"Role: 4294967295"));
@@ -54,7 +54,7 @@ fn task_authority_forms_preserve_all_permissions_and_selected_delta_without_reco
         );
         let action = input(&tree, b"New instructions", b"", &mut bindings);
         drive(&mut domain, Event::Act { act: action });
-        let tree = dialog(&domain, &words, &mut bindings);
+        let tree = dialog(&domain, words, &mut bindings);
         if !cut {
             let action = input(&tree, b"New budget", b"25", &mut bindings);
             drive(&mut domain, Event::Act { act: action });
@@ -118,7 +118,7 @@ fn task_budget_section_renders_exact_bitmap_delegation_and_literal_authority_los
             row.authority.cut = cut;
             *row.authority.authority.delegation.kinds.get_mut(0).unwrap() = kind;
             super::super::pages::deliver(&mut domain, watch, Delivery::Task(Box::new(row.clone())));
-            let (tree, _) = super::super::pages::build(&domain, 3, &words());
+            let (tree, _) = super::super::pages::build(&domain, 3, words());
             super::super::cards_access::check(&tree);
             assert!(contains(&tree, b"Tool bits: 18446744073709551615"));
             assert!(contains(&tree, b"Note scope bits: 255"));

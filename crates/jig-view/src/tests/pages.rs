@@ -402,11 +402,11 @@ fn conversation_states(words: &crate::words::Words) {
 #[test]
 fn pages_show_non_work_states_inbox_edges_and_the_offered_conversation_form() {
     let words = words();
-    special_pages(&words);
-    inbox_edges(&words);
-    inbox_committed_read_position(&words);
-    conversations_form(&words);
-    conversation_states(&words);
+    special_pages(words);
+    inbox_edges(words);
+    inbox_committed_read_position(words);
+    conversations_form(words);
+    conversation_states(words);
 }
 
 #[test]
@@ -432,7 +432,7 @@ fn inbox_group_controls_decode_independent_windows() {
             );
         }
     }
-    let (tree, mut bindings) = build(&d, 0, &words);
+    let (tree, mut bindings) = build(&d, 0, words);
     let mut acts = Vec::new();
     for node in tree.nodes() {
         if node.name.as_deref() == Some(b"Read later".as_slice()) {

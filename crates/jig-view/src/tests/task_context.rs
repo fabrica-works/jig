@@ -31,7 +31,7 @@ fn task_context_view_preserves_supplied_runtime_spend_slots_and_impact_without_c
             }
             let watch = task_watch.unwrap();
             super::super::pages::deliver(&mut domain, watch, Delivery::Task(Box::new(row.clone())));
-            let (tree, bindings) = super::super::pages::build(&domain, 3, &words());
+            let (tree, bindings) = super::super::pages::build(&domain, 3, words());
             super::super::cards_access::check(&tree);
             assert!(tree.len() <= crate::task_nodes(&CLIENT, 0).unwrap());
             if section == TaskSection::Activity {
@@ -59,7 +59,7 @@ fn task_context_view_preserves_supplied_runtime_spend_slots_and_impact_without_c
         let (mut domain, id, _) = loaded_with_watch(ObjectKey::Task(8), ReadValue::Task(Box::new(row.clone())));
         drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::Cancel } });
         let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
-        let tree = dialog(&domain, &words(), &mut bindings);
+        let tree = dialog(&domain, words(), &mut bindings);
         let caption = words().say(JigPhrase::TasksRunning, &[Hole::Number(u64::from(u32::MAX))]);
         assert_eq!(contains(&tree, &caption), present);
         let Some(jig_domain_client::objects::Body::Task(retained)) = &domain.objects().get(id).unwrap().body else {

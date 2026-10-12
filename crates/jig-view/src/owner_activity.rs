@@ -92,10 +92,7 @@ pub fn required(value: &OwnerActivityLine, limits: &Limits, words: &Words) -> Op
 #[must_use]
 pub fn worst_case(limits: &Limits, words: &Words) -> Option<ActivityFragment> {
     let nodes = 100_u32.checked_add(limits.rows.checked_mul(4)?)?;
-    let mut saying = crate::owner_words::phrase_bytes(&words.book)?;
-    for phrase in crate::phrases::jig::ALL {
-        saying = saying.max(words.book.capacity(phrase.id())?);
-    }
+    let saying = words.book.jig_capacity()?;
     let text_per_node = crate::literal_segment::max_bytes(limits.text)?.max(saying);
     Some(ActivityFragment {
         nodes,

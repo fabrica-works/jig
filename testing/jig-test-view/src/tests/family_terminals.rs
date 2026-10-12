@@ -68,6 +68,10 @@ fn every_family_departure_fits_the_public_view_and_checked_selected_words() {
         (first::WatchEnd::Stopping, Some(b"Engine stopping; retrying family watch".as_slice())),
         (first::WatchEnd::Busy, Some(b"Family watch busy; retrying".as_slice())),
     ];
+    let family = family_words();
+    let jig = words();
+    let client = limits();
+    let bounds = Limits::for_world(&client, &jig, &family, 1024, 256).unwrap();
     for (end, caption) in endings {
         let mut root = ready();
         let rows = drive(
@@ -97,14 +101,12 @@ fn every_family_departure_fits_the_public_view_and_checked_selected_words() {
             assert!(contains(&view, caption), "{end:?}");
         }
         assert!(view.tree().len() <= view.limits().tree.nodes);
-        let family = family_words();
-        let jig = words();
-        let bounds = Limits::for_world(&limits(), &jig, &family, 1024, 256).unwrap();
-        assert!(crate::worst_case(&bounds, &limits(), &jig, &family).unwrap() > 0);
+
+        assert!(crate::worst_case(&bounds, &client, &jig, &family).unwrap() > 0);
         assert_eq!(family.book.limits().phrases, 29);
         assert!(patches(&mut view, &root).is_empty());
     }
-    let checked = family_words();
+    let checked = &family;
     for (word, number) in [
         (words::Word::NotAllowed, 7800),
         (words::Word::SubjectEnded, 7801),

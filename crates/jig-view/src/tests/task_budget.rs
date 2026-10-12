@@ -11,7 +11,7 @@ fn budget_page(row: Task) -> Tree {
         })
         .unwrap();
     super::super::pages::deliver(&mut domain, watch, Delivery::Task(Box::new(row)));
-    let tree = super::super::pages::build(&domain, 3, &words()).0;
+    let tree = super::super::pages::build(&domain, 3, words()).0;
     super::super::cards_access::check(&tree);
     assert!(tree.len() <= crate::task_nodes(&CLIENT, 0).unwrap());
     tree

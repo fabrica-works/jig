@@ -72,8 +72,8 @@ pub(super) fn shared_words() -> &'static Words {
     static WORDS: std::sync::OnceLock<Words> = std::sync::OnceLock::new();
     WORDS.get_or_init(|| Words { book: english::english(CLIENT.text).unwrap(), language: 0, offset_minutes: 60 })
 }
-pub(super) fn words() -> Words {
-    shared_words().clone()
+pub(super) fn words() -> &'static Words {
+    shared_words()
 }
 pub(super) fn text(bytes: &[u8]) -> Text {
     Text::new(bytes.into(), CLIENT.text).unwrap()
@@ -206,7 +206,7 @@ fn frame_builds_statuses_counts_navigation_and_number_submission_in_every_link_s
             &mut b,
             &d,
             SlotRef { owner: Owner::Other { child: 1 }, token: Token::new(1) },
-            &words,
+            words,
             &mut bindings,
         );
         b.close();
@@ -267,7 +267,7 @@ fn shared_card_frame_says_each_progress_refusal_and_departure_with_context_only_
     for state in states {
         let mut b = Builder::new(&limits());
         b.open(Role::Page);
-        crate::cards::state(&mut b, &state, id, &words, &mut bindings);
+        crate::cards::state(&mut b, &state, id, words, &mut bindings);
         b.close();
         let tree = b.finish();
         super::cards_access::check(&tree);
@@ -283,7 +283,7 @@ fn shared_card_frame_says_each_progress_refusal_and_departure_with_context_only_
             );
         }
     }
-    card_context(&mut d, frame_watch, &words, &mut bindings);
+    card_context(&mut d, frame_watch, words, &mut bindings);
     // Refused by the domain after its handle has left; a retained tree token still decodes the handle.
     let binding = bindings.insert(JigMeaning::Action(Action::LookAgain { object: id.token() }));
     let action = decode(&mut bindings, binding.token, Act::Press).unwrap();

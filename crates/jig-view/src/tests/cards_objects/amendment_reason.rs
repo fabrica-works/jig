@@ -8,7 +8,7 @@ fn rendered_amendment_reason_preserves_empty_opaque_bytes_and_only_selected_inst
         drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::Amend } });
         let words = words();
         let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
-        let tree = dialog(&domain, &words, &mut bindings);
+        let tree = dialog(&domain, words, &mut bindings);
         let reason = tree.nodes().iter().find(|node| node.name.as_deref() == Some(b"Your reason")).unwrap();
         assert_eq!(reason.role, Role::TextArea);
         assert!(reason.binding.is_some());
@@ -32,7 +32,7 @@ fn rendered_amendment_reason_preserves_empty_opaque_bytes_and_only_selected_inst
                 authority: None
             }
         );
-        let tree = dialog(&domain, &words, &mut bindings);
+        let tree = dialog(&domain, words, &mut bindings);
         let reason = tree.nodes().iter().find(|node| node.name.as_deref() == Some(b"Your reason")).unwrap();
         assert_eq!(reason.value.as_ref().unwrap().text.as_ref(), bytes);
         let text_bytes: u32 = tree.nodes().iter().map(crate::tree::Node::text_bytes).sum();
@@ -68,7 +68,7 @@ fn reason_checked_binding_rejects_over_limit_without_establishing_presence() {
     let (mut domain, id) = loaded(ObjectKey::Task(8), ReadValue::Task(Box::new(task_doc(&[ActKind::Amend]))));
     drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::Amend } });
     let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
-    let tree = dialog(&domain, &words(), &mut bindings);
+    let tree = dialog(&domain, words(), &mut bindings);
     let token =
         tree.nodes().iter().find(|node| node.name.as_deref() == Some(b"Your reason")).unwrap().binding.unwrap().token;
     assert_eq!(decode(&mut bindings, token, Act::Input { value: Box::from([0xff; 129]) }), None);

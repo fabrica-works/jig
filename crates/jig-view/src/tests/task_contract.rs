@@ -11,7 +11,7 @@ pub(super) fn page(row: Task) -> (Tree, JigBindings) {
         })
         .unwrap();
     super::super::pages::deliver(&mut domain, watch, Delivery::Task(Box::new(row)));
-    let built = super::super::pages::build(&domain, 3, &words());
+    let built = super::super::pages::build(&domain, 3, words());
     super::super::cards_access::check(&built.0);
     assert!(built.0.len() <= crate::task_nodes(&CLIENT, 0).unwrap());
     built

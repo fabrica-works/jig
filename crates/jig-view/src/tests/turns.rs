@@ -320,9 +320,9 @@ fn activities(words: &Words) {
 #[test]
 fn conversation_keeps_word_states_activity_call_folds_and_provisional_turn_identity() {
     let words = words();
-    replacement(&words);
-    words_states(&words);
-    activities(&words);
+    replacement(words);
+    words_states(words);
+    activities(words);
 }
 
 #[test]
@@ -345,7 +345,7 @@ fn full_width_attempt_turn_keys_survive_commit_under_the_actual_task_log_scope()
             })),
         );
     }
-    let before = build(&d, 3, &words).0;
+    let before = build(&d, 3, words).0;
     let prior = keys(&before);
     assert_eq!(prior.len(), 2);
     assert_ne!(prior[0], prior[1]);
@@ -380,10 +380,10 @@ fn full_width_attempt_turn_keys_survive_commit_under_the_actual_task_log_scope()
             }))),
         },
     );
-    assert_eq!(keys(&build(&d, 3, &words).0), prior);
+    assert_eq!(keys(&build(&d, 3, words).0), prior);
     assert!(d.conversation().live.is_empty());
     let (other, _, _, _) = ready_task(u64::MAX - 1);
-    let other = build(&other, 3, &words).0;
+    let other = build(&other, 3, words).0;
     let log = |tree: &Tree| tree.nodes().iter().find_map(|n| n.key.filter(|key| key.kind == 28));
     assert_ne!(log(&before), log(&other));
 }
@@ -486,7 +486,7 @@ fn raw_live_call_rendering_omits_unsupplied_wall_and_preserves_escaped_literals_
     deliver(&mut d, run, Delivery::Run(Box::new(value.clone())));
     assert_eq!(d.conversation().live.get(0).unwrap().began, None);
     assert_eq!(d.conversation().live.get(0).unwrap().call, value.call);
-    let (folded, bindings) = build(&d, 3, &words);
+    let (folded, bindings) = build(&d, 3, words);
     access(&folded);
     assert!(contains(&folded, b"\\x72\\x61\\x77\\x2F\\x74\\x6F\\x6F\\x6C\\xFF"));
     assert!(!contains(&folded, b"\\x61\\x2F\\x62\\x00\\xFE"));
@@ -495,11 +495,11 @@ fn raw_live_call_rendering_omits_unsupplied_wall_and_preserves_escaped_literals_
     drop(bindings);
     value.began = Some(Wall::EPOCH);
     deliver(&mut d, run, Delivery::Run(Box::new(value.clone())));
-    let supplied = build(&d, 3, &words).0;
+    let supplied = build(&d, 3, words).0;
     assert_eq!(supplied.nodes().len(), missing_nodes + 2, "an actual epoch gets its own time and text nodes");
     assert_eq!(d.conversation().live.get(0).unwrap().began, Some(Wall::EPOCH));
     drive(&mut d, Event::Act { act: Act::FoldCurrentCall { identity: raw.identity.clone(), open: true } });
-    let expanded = build(&d, 3, &words).0;
+    let expanded = build(&d, 3, words).0;
     access(&expanded);
     assert!(contains(&expanded, b"\\x61\\x2F\\x62\\x00\\xFE"));
     assert!(expanded.nodes().iter().any(|node| node.states.as_slice().contains(&crate::State::Expanded)));
@@ -510,7 +510,7 @@ fn raw_live_call_rendering_omits_unsupplied_wall_and_preserves_escaped_literals_
     }
     value.began = None;
     deliver(&mut d, run, Delivery::Run(Box::new(value)));
-    let uncut = build(&d, 3, &words).0;
+    let uncut = build(&d, 3, words).0;
     assert_eq!(uncut.nodes().len() + 4, expanded.nodes().len(), "wall and raw-call loss are independent leaves");
     assert!(contains(&uncut, b"\\x61\\x2F\\x62\\x00\\xFE"));
     let mut first_seen = RunText {
@@ -524,14 +524,14 @@ fn raw_live_call_rendering_omits_unsupplied_wall_and_preserves_escaped_literals_
         call: Some(LiveCall::Raw(CurrentCall { began: Some(Wall::EPOCH), cut: false, ..raw })),
     };
     deliver(&mut d, run, Delivery::Run(Box::new(first_seen.clone())));
-    let observed = build(&d, 3, &words).0;
+    let observed = build(&d, 3, words).0;
     assert_eq!(observed.nodes().len(), uncut.nodes().len() + 2);
     assert_eq!(d.conversation().live.get(0).unwrap().began, None);
     if let Some(LiveCall::Raw(call)) = &mut first_seen.call {
         call.began = None;
     }
     deliver(&mut d, run, Delivery::Run(Box::new(first_seen)));
-    assert_eq!(build(&d, 3, &words).0.nodes().len(), uncut.nodes().len());
+    assert_eq!(build(&d, 3, words).0.nodes().len(), uncut.nodes().len());
 }
 
 #[test]
@@ -568,7 +568,7 @@ fn maximum_raw_live_calls_fit_whole_page_and_escaped_phrase_capacities() {
     }
     assert_eq!(d.conversation().live.len(), CLIENT.rows);
     assert_eq!(d.conversation().current_opened.len(), CLIENT.rows);
-    let limits = crate::Limits::of_words(&CLIENT, &words).unwrap();
+    let limits = crate::Limits::of_words(&CLIENT, words).unwrap();
     let mut b = crate::Builder::new(&limits);
     let mut bindings = crate::JigBindings::new(limits.bindings, CLIENT.text);
     b.open(Role::Page);
@@ -576,7 +576,7 @@ fn maximum_raw_live_calls_fit_whole_page_and_escaped_phrase_capacities() {
         &mut b,
         &d,
         crate::SlotRef { owner: crate::Owner::Other { child: 1 }, token: Token::new(1) },
-        &words,
+        words,
         &mut bindings
     ));
     b.close();
@@ -727,7 +727,7 @@ fn whole_run_call_only_is_visible_once_without_a_turn_and_uses_normal_document_a
     assert_eq!(d.conversation().current, None);
     assert_eq!(d.conversation().offset(), 0);
     assert_eq!(d.conversation().current_run, Some(state.clone()));
-    let folded = build(&d, 3, &words).0;
+    let folded = build(&d, 3, words).0;
     access(&folded);
     assert!(keys(&folded).is_empty(), "call-only has no invented provisional turn key");
     assert!(contains(&folded, b"call-only-tool"));
@@ -735,12 +735,12 @@ fn whole_run_call_only_is_visible_once_without_a_turn_and_uses_normal_document_a
     let label: &[u8] = b"Observed current tool call";
     assert_eq!(folded.nodes().iter().filter(|node| node.name.as_deref() == Some(label)).count(), 1);
     drive(&mut d, Event::Act { act: Act::FoldCurrentCall { identity: raw.identity.clone(), open: true } });
-    let opened = build(&d, 3, &words).0;
+    let opened = build(&d, 3, words).0;
     assert!(contains(&opened, b"call-only-input"));
     let without_wall = opened.nodes().len();
     state.call.as_mut().unwrap().began = Some(Wall::EPOCH);
     deliver(&mut d, run, Delivery::RunState(Box::new(state.clone())));
-    assert_eq!(build(&d, 3, &words).0.nodes().len(), without_wall + 2);
+    assert_eq!(build(&d, 3, words).0.nodes().len(), without_wall + 2);
     state.writing = Some(RunText {
         attempt: 2,
         began: None,
@@ -752,7 +752,7 @@ fn whole_run_call_only_is_visible_once_without_a_turn_and_uses_normal_document_a
         call: Some(LiveCall::Raw(raw)),
     });
     deliver(&mut d, run, Delivery::RunState(Box::new(state.clone())));
-    let writing = build(&d, 3, &words).0;
+    let writing = build(&d, 3, words).0;
     assert_eq!(keys(&writing).len(), 1);
     assert_eq!(
         writing.nodes().iter().filter(|node| node.name.as_deref() == Some(label)).count(),
@@ -763,10 +763,10 @@ fn whole_run_call_only_is_visible_once_without_a_turn_and_uses_normal_document_a
     state.committed_turn = 1;
     deliver(&mut d, run, Delivery::RunState(Box::new(state.clone())));
     assert_eq!(d.conversation().current_run, Some(state.clone()));
-    assert_eq!(build(&d, 3, &words).0.nodes().iter().filter(|node| node.name.as_deref() == Some(label)).count(), 1);
+    assert_eq!(build(&d, 3, words).0.nodes().iter().filter(|node| node.name.as_deref() == Some(label)).count(), 1);
     state.call = None;
     deliver(&mut d, run, Delivery::RunState(Box::new(state)));
-    let cleared = build(&d, 3, &words).0;
+    let cleared = build(&d, 3, words).0;
     assert!(!contains(&cleared, b"call-only-tool"), "absent whole-document call clears the retained current call");
 }
 
@@ -797,7 +797,7 @@ fn maximum_independent_current_call_fits_page_with_all_existing_provisional_rows
         })),
     );
     drive(&mut d, Event::Act { act: Act::FoldCurrentCall { identity: call.identity, open: true } });
-    let limits = crate::Limits::of_words(&CLIENT, &words).unwrap();
+    let limits = crate::Limits::of_words(&CLIENT, words).unwrap();
     let mut b = crate::Builder::new(&limits);
     let mut bindings = crate::JigBindings::new(limits.bindings, CLIENT.text);
     b.open(Role::Page);
@@ -805,7 +805,7 @@ fn maximum_independent_current_call_fits_page_with_all_existing_provisional_rows
         &mut b,
         &d,
         crate::SlotRef { owner: crate::Owner::Other { child: 1 }, token: Token::new(1) },
-        &words,
+        words,
         &mut bindings
     ));
     b.close();
@@ -834,7 +834,7 @@ fn displayed_retry_replaces_empty_then_resumes_with_exact_actual_watch_position(
             },
         },
     );
-    assert!(contains(&build(&d, 3, &words).0, b"whole private input"), "existing rich call detail is still available");
+    assert!(contains(&build(&d, 3, words).0, b"whole private input"), "existing rich call detail is still available");
     let name = ProvisionalTurnName { attempt: 2, number: 1, retry: u32::MAX };
     let mut value =
         RunText { attempt: 2, began: None, turn: name, from: 0, through: 0, text: text(b""), cut: false, call: None };
@@ -845,7 +845,7 @@ fn displayed_retry_replaces_empty_then_resumes_with_exact_actual_watch_position(
     assert_eq!(d.conversation().live.len(), 1);
     assert_eq!(d.conversation().live.get(0).unwrap().name, name);
     assert_eq!(d.conversation().live.get(0).unwrap().text.bytes(), b"");
-    let empty = build(&d, 3, &words).0;
+    let empty = build(&d, 3, words).0;
     access(&empty);
     assert!(!contains(&empty, b"provisional first"));
     assert!(!contains(&empty, b"whole private input"), "a removed retry's rich detail cannot remain visible");
@@ -858,7 +858,7 @@ fn displayed_retry_replaces_empty_then_resumes_with_exact_actual_watch_position(
             subject: Subject::Run { task: 8, turn: Some(name), offset: 15 }
         })
     );
-    assert!(contains(&build(&d, 3, &words).0, b"new retry bytes"));
+    assert!(contains(&build(&d, 3, words).0, b"new retry bytes"));
     deliver(&mut d, run, Delivery::Run(Box::new(value)));
     assert_eq!(d.conversation().live.get(0).unwrap().text.bytes(), b"new retry bytes");
     assert_eq!(d.conversation().offset(), 15);
@@ -916,7 +916,7 @@ fn whole_owner_activity_and_fetched_archive_keep_numeric_senders_references_and_
             }))),
         },
     );
-    let (tree, _) = build(&domain, 3, &words);
+    let (tree, _) = build(&domain, 3, words);
     for label in [
         b"raw owner words".as_slice(),
         b"Task: ",
@@ -930,6 +930,6 @@ fn whole_owner_activity_and_fetched_archive_keep_numeric_senders_references_and_
     ] {
         assert!(contains(&tree, label), "missing {label:?}");
     }
-    let limits = crate::Limits::of_words(&super::cards::CLIENT, &words).unwrap();
+    let limits = crate::Limits::of_words(&super::cards::CLIENT, words).unwrap();
     assert!(tree.nodes.len() <= limits.nodes);
 }
