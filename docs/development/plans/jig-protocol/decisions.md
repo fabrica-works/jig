@@ -863,6 +863,17 @@ the file.
      allowances". Two steps not in the plan, as for ruling 138: skein
      02.s2 (`skein/02-startup-and-secrets.md`), then jig-repin.s2 (README,
      "Repin"). jig 22.1 commits on its branch and lands after them.
+153. **jig 30's drift test may take 4 s, then 6 s** (2026-10-12, the
+     coordinator's block "jig 30.1: enlarged family exceeds drift
+     ceiling", 2026-10-12T21:24:53Z). Ruling 151 grew 30.1's family to
+     359 declarations and 85,702 generated lines (7.87 MB); its drift
+     test takes 3.755 s, generating alone 3.346 s, against a 0.3 s
+     ceiling. The focused suite runs tests in parallel (2,808 tests in
+     10.8 s on jig `86d24f62`), so one 4 s test costs it little wall time.
+     30.1's drift ceiling is 4 s; 30.2 to 30.5's, 6 s; past that, a
+     question. The focused suite's 15 s budget is unchanged. Proposed for
+     the retrospective: skein-codegen's speed (about 9 ms a declaration)
+     and the size of a family that mirrors the client's contract.
 
 ## For the user
 

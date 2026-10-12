@@ -170,7 +170,7 @@ smith's `tests/codecs/tests/drift.rs:7-19`. Fuzzy
 (`tests/client-wire/tests/fuzzy_client_wire.rs`):
 `client_wire_decoders_never_panic_and_reencode_the_same`, 2000 drawn
 inputs per decoder. Ceilings: each step test under 20 ms; the drift test
-under 0.3 s; the fuzzy test under 3 s. Reference test, in full:
+under 4 s (ruling 153); the fuzzy test under 3 s. Reference test, in full:
 
 ```rust
 #[test]
@@ -235,7 +235,7 @@ Proof: unit and world, `heavy cargo nextest run -p
 jig-protocol-client-wire -p jig-client-wire-world`, run once: a page or
 a cursor past its bound is refused and each read's answer round-trips
 unchanged (the four tests above, under 0.1 s), and the drift test passes
-with the new goldens (under 0.3 s).
+with the new goldens (under 6 s, ruling 153).
 Don't: carry `ReadNone::Unreachable`; decode a cursor.
 Size: at most 500 lines.
 Removes: nothing.
@@ -267,7 +267,7 @@ Proof: unit and world, `heavy cargo nextest run -p
 jig-protocol-client-wire -p jig-client-wire-world`, run once: a frame, a
 run state and a chip in each phase round-trip unchanged and a task one
 byte past its bound is refused (the four tests, under 0.1 s), and the
-drift test passes (under 0.3 s).
+drift test passes (under 6 s, ruling 153).
 Don't: add a field the contract's type lacks; carry a `Time`.
 Size: at most 600 lines.
 Removes: nothing.
