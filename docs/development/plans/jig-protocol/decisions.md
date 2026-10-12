@@ -918,6 +918,15 @@ the file.
      under its Step would make one step two commits. The record split
      becomes skein 02.s3 (`skein/02-startup-and-secrets.md`), and
      jig-repin.s2 pins skein 02.s3's commit, which carries both fixes.
+158. **skein 02.s3 lands at 119 lines, with a fixture that splits**
+     (2026-10-12, the coordinator's block "skein 02.s3: size 119 exceeds
+     96-line margin", 2026-10-12T21:43:45Z). 119 net lines against
+     "Size: at most 80" (ruling 103's margin, 96): the split covers four
+     kinds of function, and the plan priced it low. Its Size becomes 120.
+     Its implementer found the prescribed 30-field fixture leaves every
+     function within 100 lines, so skein's gate would not exercise a
+     split: the fixture record grows until each of its four functions
+     would pass 100 lines unsplit, at most 100 fields.
 
 ## For the user
 

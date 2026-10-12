@@ -539,11 +539,13 @@ Shape: a record's generated functions (constructor check, measure,
   `OwnerChipDetailsFields::encode` (107) does, are split into helpers of
   at most 100 lines. Output for a schema whose functions are all within
   100 lines is unchanged, byte for byte.
-Test shape: `lints-v1.schema` gains a record of 30 `bytes 4` fields; the
-  gate's clippy over the fixture is the check.
+Test shape: `lints-v1.schema` gains a record with enough `bytes 4`
+  fields that each of its four functions would pass 100 lines unsplit
+  (at most 100 fields; ruling 158); the gate's clippy over the fixture
+  is the check.
 Proof: as 02.s2's.
 Don't: change the bytes of any encoding; add an allowance.
-Size: at most 80 lines of production code.
+Size: at most 120 lines of production code (ruling 158).
 
 ## Interface sketches
 
