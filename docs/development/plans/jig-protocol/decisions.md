@@ -627,6 +627,34 @@ the file.
      No facade `Limits` type is added, and 19.5's `codec::Limits { people:
      people_v1::Limits, .. }` and `codec::limits(&core::Limits)` are
      unchanged. 19.3's Shape says so.
+136. **jig-protocol-store's tests build a `core::Limits`** (2026-10-12,
+     the coordinator's block "jig 19.3: dev dependencies for core Limits
+     fixture", 2026-10-12T20:07:13Z). Ruling 135 has the people codec
+     take `&core::Limits`, whose `authority`, `fleet`, `brief`,
+     `accounts` and `views` fields name types of crates that
+     `crates/jig-protocol-store/Cargo.toml` does not depend on (on jig
+     `9ca1be6a` it names `jig-domain-core`, `-tasks`, `-people` and `-notes`).
+     jig 19.3's Files gain that `Cargo.toml`, for five
+     `[dev-dependencies]` only: `jig-domain-authority`, `jig-domain-fleet`,
+     `jig-domain-brief`, `jig-domain-accounts`, `jig-domain-views`, each
+     `.workspace = true`; `[dependencies]` stay as they are. The fixture
+     is one `core::Limits` constant in `src/tests/fixtures.rs`, which 19.5
+     reuses for `codec::limits` and `sizes::check`. Where
+     `tests/boundary` refuses a dev dependency, its list gains it in the
+     same increment (ruling 104).
+137. **jig 03.6 owns the fuzzy case its change reaches** (2026-10-12, the
+     coordinator's block "jig 03.6: fuzzy gate failure outside increment
+     Files", 2026-10-12T20:09:12Z). `fuzzy_joint`'s seeds are fixed
+     (`tests/client/tests/fuzzy_joint.rs:5-10`: `FIRST_SEED` 4500, 64
+     seeds and the pinned ones), and `main`'s gate passes
+     `random_people_with_failed_commits_and_drop_watch`, so 03.6's change
+     is what reaches the failure at `tests/client/src/model.rs:101`
+     (node 351, written 89: platform text `**h`, view text `100`). 03.6
+     replays it and fixes where the fault is: in its own code, as its
+     work; outside its Files, under ruling 114 (at most 20 lines, every
+     test's name and expected value kept), named in its commit body.
+     A fix past 20 lines outside Files, or one that changes an expected
+     value, is reported with what the replay found, and nothing lands.
 
 ## For the user
 

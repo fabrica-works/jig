@@ -106,7 +106,7 @@ Scope: `Role`, `Holding`, `IdentityKey`, `Identity`, `RequestKey`, `Last`,
 (`crates/jig-domain-people/src/{boundary.rs, amendment.rs, policy_value.rs}`);
 the `Person`, `SignIn`, `Roles`, `Policy`, `ReadResults` and `ReadChat` rows.
 Needs: 14.1's pattern (not the tasks or core families).
-Files: `crates/jig-protocol-store/{schema/people-v1.schema, src/generated/people_v1.rs, golden/people/v1/, src/codec/people.rs, src/codec/people/{policy.rs, asks.rs}}`, `src/tests/{fixtures.rs, codec.rs}`, `tests/store-codecs/tests/{drift.rs, fuzzy_decode.rs}`.
+Files: `crates/jig-protocol-store/{schema/people-v1.schema, src/generated/people_v1.rs, golden/people/v1/, src/codec/people.rs, src/codec/people/{policy.rs, asks.rs}, Cargo.toml}` (five `[dev-dependencies]`, ruling 136), `src/tests/{fixtures.rs, codec.rs}`, `tests/store-codecs/tests/{drift.rs, fuzzy_decode.rs}`.
 Shape: as 14.2; this increment's `Row` holds the rows above; 19.4 adds
 `Answer`. `codec::people::limits(&core::Limits) -> Option<people_v1::Limits>`
 (ruling 135): a field one kind of row carries takes that row's bound
