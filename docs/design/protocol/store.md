@@ -326,7 +326,7 @@ relates to.
 | a task, a person task, a result | the task's record, by key, with its last attempt's terminal |
 | a proposal | a party's: its record, by key, with its decision; a task's: the row of its proposer's history that keeps it |
 | an escalation | its decision, by the revision its task's record names, with the hold's milestone |
-| a question, a reply | the task's activity line, by its position, with the line that answers a question, or the turn a reply was (from the transcript, 8.3) |
+| a question, a reply | the task's activity line, by its position, with the line that answers a question, where its answer was heard (below), or the turn a reply was (from the transcript, 8.3) |
 | a turn | the task's transcript (8.3) |
 | a task's activity, newest first | the activity family, read backwards (7.4) |
 | a task's history, or a subtree's | the history and milestone families; a subtree's by the index of its delegates |
@@ -344,6 +344,16 @@ relates to.
   key a single read needs (a question's line and its answer's, an
   escalation's hold, a task's proposal in its proposer's history), the
   domain names it there, or keeps an index (section 15).
+- **An answer is read where it was heard.** A message is a line in the
+  activity of the task that hears it (`../domain/engine.md`, 7.2;
+  `../domain/tasks.md`, 8.1). A party's answer to a question a task heard
+  is that task's own line; the task's answer to the delegate that asked
+  is the delegate's line, not repeated in the answering task's activity,
+  whose turn holds the call that sent it. The question's record names the
+  answer by its task and position, and the read joins it by a point read,
+  as the record it relates to. A party who may read the question reads
+  its answer: a delegate is in its requester's project, and the answer's
+  words are those of the task the question was put to.
 - **A read past its bounds** is cut and says so, as every load is
   (`../domain/engine.md`, 5.3).
 
@@ -628,7 +638,8 @@ Each within jig's suites' budgets (`../../development/workflow.md`).
   7. **keys for single reads:** a question's line and its answer's, an
      escalation's hold, and a task's proposal's row in its proposer's
      history, each named by its position in its task's record, as a
-     reply's is, so a read finds it by key, never by a scan (7.3).
+     reply's is, an answer's with the task whose activity holds it, so a
+     read finds it by key, never by a scan (7.3).
 - **skein owes:** io's `OpenWrite` and `Cut` (skein's `io.md`, section
   5), for 8.2 and 8.4. skein-kv serves as it is: its in-memory
   mode, its key writer, its fill.
