@@ -347,7 +347,7 @@ dependencies = [
  "jig-ops-domain-observability",
  "jig-ops-world",
  "jig-protocol-charter",
- "skein-json",
+ "jig-protocol-tools",
  "skein-lib",
  "smith-charter",
 ]
@@ -424,6 +424,7 @@ dependencies = [
  "jig-ops-fake-production",
  "jig-ops-view",
  "jig-protocol-charter",
+ "jig-protocol-tools",
  "jig-protocol-transcript",
  "jig-scripted-engine",
  "jig-test-domain",
@@ -431,8 +432,10 @@ dependencies = [
  "jig-test-system",
  "jig-view",
  "sha2",
+ "skein-json",
  "skein-lib",
  "skein-world",
+ "smith-channel",
  "smith-charter",
  "smith-transcript",
 ]

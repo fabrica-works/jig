@@ -81,6 +81,7 @@ pub fn root_for(seed: u64, environment_chat: bool) -> (Config, Limits) {
         routes: 256,
     };
     let mut config = Config {
+        tools: crate::protocol::tools(Duration::from_secs(30)),
         core: jig_core_world::world::config(seed).core,
         triage_templates: Box::new([jig_ops_domain_observability::TriageTemplate {
             number: 1,

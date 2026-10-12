@@ -161,6 +161,13 @@ fn event_in(
             }
         },
         Event::ResultRead { payload, end } => crate::assemble::result_read(domain, payload, end, work),
+        Event::CallAnswered { to, call } => {
+            let answer = domain.payload(Payload::Settled(call));
+            work.push(Work::Core(core::Event::Fleet(fleet::Event::Relayed { to, answer })));
+        }
+        Event::ConnectorRead { to, task, name, tool, read } => {
+            crate::assemble::connector_read(domain, env, to, task, name, tool, read, work);
+        }
         Event::Effect { to, key, effect, deadline, proposal } => {
             let owner = domain.token();
             domain.effects.insert(owner, effect).expect("admitted decoded effect");
@@ -263,8 +270,7 @@ fn core_held(domain: &mut Domain, decision: &mut Decision<Write, Output>, value:
                 })),
             );
         }
-        core::Held::SettledCall { to, key, call } => {
-            domain.calls.remove(&key);
+        core::Held::SettledCall { to, key: _, call } => {
             let answer = domain.payload(Payload::Settled(call));
             work.push(Work::Core(core::Event::Fleet(fleet::Event::Relayed { to, answer })));
         }
@@ -327,12 +333,8 @@ fn core_held(domain: &mut Domain, decision: &mut Decision<Write, Output>, value:
             decision,
             Released::Fleet(fleet::Event::Acknowledge { run: Token::new(task), attempt: Token::new(attempt) }),
         ),
-        core::Held::CallAnswer { to, key, part } => work.push(Work::Core(core::Event::SettledCall {
-            to,
-            key,
-            call: crate::assemble::answer(domain, key, part),
-        })),
-        other @ (core::Held::ReadLoad { .. }
+        other @ (core::Held::CallAnswer { .. }
+        | core::Held::ReadLoad { .. }
         | core::Held::Read { .. }
         | core::Held::Delivery { .. }
         | core::Held::WatchEnded { .. }
@@ -1188,12 +1190,6 @@ fn core_now(domain: &mut Domain, env: &Env<Limits>, value: core::Now, work: &mut
                 now(domain, Output::ToChild(released));
             }
         }
-        core::Now::EffectAnswer { to, key, part } => {
-            let call = crate::assemble::answer(domain, key, part);
-            domain.calls.remove(&key);
-            let answer = domain.payload(Payload::Settled(call));
-            work.push(Work::Core(core::Event::Fleet(fleet::Event::Relayed { to, answer })));
-        }
         core::Now::Undelivered { message, .. } => {
             drop(domain.payloads.remove(&message.words));
         }
@@ -1360,19 +1356,6 @@ fn core_now(domain: &mut Domain, env: &Env<Limits>, value: core::Now, work: &mut
         core::Now::RestoreRefused => {
             let _request = domain.core.restart_refuse();
         }
-        core::Now::Call { to, run, attempt, call } => {
-            crate::assemble::call(domain, env, to, run, attempt, call, work);
-        }
-        core::Now::SettledCallRefused { to, key, name, tool } => {
-            domain.calls.remove(&key);
-            crate::assemble::read_answer(
-                domain,
-                crate::domain::ReadCall { to: to.into_token(), name, tool },
-                true,
-                Box::from(&b"unavailable"[..]),
-                work,
-            );
-        }
         core::Now::DropCall { call } => {
             if let Some(binding) = domain.host_calls.remove(&call.name) {
                 now(
@@ -1389,17 +1372,11 @@ fn core_now(domain: &mut Domain, env: &Env<Limits>, value: core::Now, work: &mut
                 );
             }
         }
-        core::Now::NoteBusy { to, key } => {
-            let (name, tool) = domain.calls.remove(&key).expect("named note call envelope");
-            crate::assemble::read_answer(
-                domain,
-                crate::domain::ReadCall { to: to.into_token(), name, tool },
-                true,
-                Box::from(&b"busy"[..]),
-                work,
-            );
-        }
-        other @ (core::Now::CallBusy { .. }
+        other @ (core::Now::Call { .. }
+        | core::Now::EffectAnswer { .. }
+        | core::Now::NoteBusy { .. }
+        | core::Now::SettledCallRefused { .. }
+        | core::Now::CallBusy { .. }
         | core::Now::SignInRefused { .. }
         | core::Now::WatchRefused { .. }
         | core::Now::Account(_)

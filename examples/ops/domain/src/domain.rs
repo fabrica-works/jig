@@ -46,11 +46,11 @@ pub struct Config {
     pub lead_templates: Box<[observability::LeadTemplate]>,
     /// The infrastructure backend's available recovery promise.
     pub backend: infrastructure::Backend,
+    /// Host tools supplied by the protocol configuration.
+    pub tools: Box<[jig_protocol_charter::Tool]>,
     /// Charter codec endpoint names for the configured endpoint identities.
     pub charter_endpoints: Box<[jig_protocol_charter::EndpointName]>,
 }
-
-pub(crate) type CallEnvelope = (Box<[u8]>, Box<[u8]>);
 
 /// Children, one journal, and opaque child-requested continuation bindings.
 /// No root-owned record or policy is stored (domain/root.md, 2).
@@ -65,7 +65,7 @@ pub struct Domain {
     pub(crate) charter_endpoints: Box<[jig_protocol_charter::EndpointName]>,
     pub(crate) assignments: Map<u64, Assignment>,
     pub(crate) briefs: Map<u64, Box<[jig_protocol_charter::Section]>>,
-    pub(crate) calls: Map<core::CallKey, CallEnvelope>,
+    pub(crate) tools: Box<[jig_protocol_charter::Tool]>,
     pub(crate) read_calls: Map<Token, ReadCall>,
     pub(crate) payloads: Map<Token, Payload>,
     pub(crate) effects: Map<Token, infrastructure::Effect>,
@@ -100,6 +100,25 @@ impl Domain {
                 "endpoint name bound"
             );
         }
+        let mut tool_bytes = 0_u64;
+        for tool in &config.tools {
+            tool_bytes = tool_bytes
+                .checked_add(u64::try_from(::core::mem::size_of::<jig_protocol_charter::Tool>()).expect("tool size"))
+                .expect("tool structs")
+                .checked_add(
+                    u64::try_from(
+                        tool.name
+                            .len()
+                            .checked_add(tool.description.len())
+                            .expect("tool description")
+                            .checked_add(tool.schema.len())
+                            .expect("tool schema"),
+                    )
+                    .expect("tool bytes"),
+                )
+                .expect("tool room");
+        }
+        assert!(tool_bytes <= limits.host.charter_bytes, "configured tools fit the charter byte bound");
         let host_calls = limits.host.slots.checked_mul(limits.host.run_calls).expect("hub relays");
         let deployment = config.core.deployment;
         let mut core = core::Core::new(config.core, &limits.core);
@@ -132,7 +151,7 @@ impl Domain {
             charter_endpoints: config.charter_endpoints,
             assignments: Map::with_capacity(limits.core.tasks.tasks),
             briefs: Map::with_capacity(limits.core.tasks.tasks),
-            calls: Map::with_capacity(limits.core.call_records),
+            tools: config.tools,
             read_calls: Map::with_capacity(limits.observability.reads),
             payloads: Map::with_capacity(
                 limits.core.fleet.turns.checked_add(limits.core.fleet.attempts).expect("payloads"),
@@ -204,6 +223,8 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event) {
         other @ (Event::WatchApplication { .. }
         | Event::ReadApplication { .. }
         | Event::Application { .. }
+        | Event::ConnectorRead { .. }
+        | Event::CallAnswered { .. }
         | Event::Core(_)
         | Event::Infrastructure(_)
         | Event::Observability(_)
@@ -226,7 +247,8 @@ fn decide(domain: &mut Domain, env: &Env<Limits>, first: Work) {
         // A read only keeps or consumes a volatile callback. It needs no
         // durable slot, including while a commit is in flight.
         Work::Event(
-            Event::Core(core::Event::Fleet(fleet::Event::Relay { call: fleet::Call { writes: false, .. }, .. }))
+            Event::ConnectorRead { .. }
+            | Event::Core(core::Event::Fleet(fleet::Event::Relay { call: fleet::Call { writes: false, .. }, .. }))
             | Event::Host(host::Event::Called { ask: host::Ask::Relay { writes: false, .. }, .. })
             | Event::Observability(
                 observability::Event::Read { .. }

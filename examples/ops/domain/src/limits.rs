@@ -59,7 +59,6 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(host::worst_case(&limits.host)?)?;
     let tables = Map::<u64, Assignment>::worst_case(limits.core.tasks.tasks)?
         .checked_add(Map::<u64, Box<[charter::Section]>>::worst_case(limits.core.tasks.tasks)?)?
-        .checked_add(Map::<core::CallKey, (Box<[u8]>, Box<[u8]>)>::worst_case(limits.core.call_records)?)?
         .checked_add(Map::<Token, ReadCall>::worst_case(limits.observability.reads)?)?
         .checked_add(Map::<Token, Payload>::worst_case(payloads)?)?
         .checked_add(Map::<Token, infrastructure::Effect>::worst_case(effects)?)?
@@ -92,12 +91,13 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
             .max(infrastructure::document_worst_case(&limits.infrastructure)?)
             .max(observability::document_worst_case(&limits.observability)?)
             .max(u64::from(limits.core.views.text_bytes).checked_mul(2)?);
-    let envelopes = u64::from(limits.core.call_records.checked_add(limits.observability.reads)?.checked_add(calls)?)
+    let envelopes = u64::from(limits.observability.reads.checked_add(calls)?)
         .checked_mul(limits.core.fleet.call_name_bytes.checked_add(32)?)?;
     let owned = u64::from(limits.core.tasks.tasks)
         .checked_mul(assignment)?
         .checked_add(u64::from(limits.core.tasks.tasks).checked_mul(u64::from(limits.core.brief.brief_bytes))?)?
         .checked_add(envelopes)?
+        .checked_add(limits.host.charter_bytes)?
         .checked_add(u64::from(payloads).checked_mul(value)?)?
         .checked_add(u64::from(effects).checked_mul(u64::from(limits.infrastructure.name_bytes).checked_mul(8)?)?)?
         .checked_add(u64::from(limits.endpoints).checked_mul(limits.host.charter_bytes.checked_add(64)?)?)?;

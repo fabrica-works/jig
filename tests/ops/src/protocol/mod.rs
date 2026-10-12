@@ -42,3 +42,25 @@ fn decimal(bytes: &[u8]) -> Option<u64> {
     }
     Some(number)
 }
+
+mod calls;
+mod json;
+mod tools;
+pub use calls::Stand;
+use skein_lib::Duration;
+
+/// Both owners' declarations in the charter's vocabulary.
+#[must_use]
+pub fn tools(timeout: Duration) -> Box<[charter::Tool]> {
+    jig_protocol_tools::declarations()
+        .iter()
+        .map(|tool| charter::Tool {
+            name: tool.name.into(),
+            description: tool.description.into(),
+            schema: tool.schema.into(),
+            effect: if tool.writes { charter::ToolEffect::Write } else { charter::ToolEffect::Read },
+            timeout,
+        })
+        .chain(tools::declarations(timeout))
+        .collect()
+}

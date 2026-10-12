@@ -3,6 +3,7 @@ mod application;
 mod config;
 mod documents;
 mod observations;
+mod protocol;
 mod scripts;
 mod systems;
 
@@ -121,6 +122,8 @@ pub struct Peers {
     document_rows: Vec<(u64, root::Record)>,
     pending_document_effects: Vec<infra::SystemRequest>,
     agents: scripts::Agents,
+    protocol: crate::protocol::Stand,
+    pub call_answers: Vec<(bool, Box<[u8]>)>,
     asked_accept: std::collections::BTreeSet<(u64, u64)>,
 }
 
@@ -197,6 +200,8 @@ impl Application for Ops {
                     run.call_timeout,
                 )
             },
+            protocol: crate::protocol::Stand::new(config.limits.core),
+            call_answers: Vec::new(),
             asked_accept: std::collections::BTreeSet::new(),
         }
     }
@@ -223,6 +228,7 @@ impl Application for Ops {
         peers.account_ready = false;
         peers.asked_accept.clear();
         peers.agents.clear();
+        peers.protocol.clear();
     }
     fn timers(_: &Config) -> Vec<root::Event> {
         vec![
@@ -526,6 +532,19 @@ impl Application for Ops {
                 observations::fact(&mut peers.observed, &event);
                 vec![Input::Event(root::Event::Observability(obs::Event::System(event)))]
             }
+            root::Output::Now(core::Now::Call { to, run, attempt, call }) => {
+                vec![Input::Event(peers.protocol.decode(to, run, attempt, &call, Wall::from_nanos(clock.now)))]
+            }
+            root::Output::Core(core::Held::CallAnswer { to, key, part }) => {
+                vec![Input::Event(peers.protocol.answer(to, key, &part, true))]
+            }
+            root::Output::Now(core::Now::EffectAnswer { to, key, part }) => {
+                vec![Input::Event(peers.protocol.answer(to, key, &part, false))]
+            }
+            root::Output::Now(core::Now::NoteBusy { to, key }) => vec![Input::Event(peers.protocol.busy(to, key))],
+            root::Output::Now(core::Now::SettledCallRefused { to, key, name, tool }) => {
+                vec![Input::Event(peers.protocol.refused(to, key, name, tool))]
+            }
             root::Output::ReadResult { payload, outcome } => {
                 peers.read_results.push(payload);
                 vec![Input::Event(root::Event::ResultRead { payload, end: crate::protocol::result(&outcome) })]
@@ -606,7 +625,7 @@ impl Application for Ops {
             | root::Output::Now(_)
             | root::Output::CoreLoad(_)
             | root::Output::Busy => Vec::new(),
-            root::Output::Agent(request) => peers.agents.answer(request),
+            root::Output::Agent(request) => protocol::agent(peers, request),
             root::Output::Commit { .. } | root::Output::Stop => unreachable!("harness consumed commit/stop"),
         }
     }

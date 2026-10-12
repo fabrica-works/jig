@@ -98,6 +98,10 @@ pub enum Event {
     InfrastructureTimer,
     /// A result read by the protocol layer after the fleet fenced its answer.
     ResultRead { payload: Token, end: tasks::End },
+    /// A connector read decoded outside the root, with its authenticated task.
+    ConnectorRead { to: ReplyTo, task: u64, name: Box<[u8]>, tool: Box<[u8]>, read: observability::Read },
+    /// A rendered no-record answer, for a read or an undecodable call.
+    CallAnswered { to: ReplyTo, call: core::SettledCall },
     /// A decoded infrastructure effect with the core's caller envelope.
     Effect {
         to: ReplyTo,

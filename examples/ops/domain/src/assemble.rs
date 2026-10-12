@@ -64,7 +64,7 @@ pub(crate) fn assignment(
     let value = charter::charter(
         charter::Charter {
             instructions: policy.instructions,
-            tools: crate::translate::tools(policy.call_timeout),
+            tools: domain.tools.clone(),
             wait: true,
             agents: policy.agents,
             workspace: charter::WorkspaceTools { inspect: false, modify: false, shell: false },
@@ -301,211 +301,6 @@ pub(crate) fn result_read(domain: &Domain, payload: Token, end: tasks::End, work
     }));
 }
 
-pub(crate) fn answer(domain: &Domain, key: core::CallKey, part: core::CallPart) -> core::SettledCall {
-    let (name, tool) = domain.calls.get(&key).expect("attested call envelope");
-    core::SettledCall {
-        serial: 0,
-        name: name.clone(),
-        tool: tool.clone(),
-        answer: core::SettledAnswer::Host { error: false, body: render(part) },
-    }
-}
-fn render(part: core::CallPart) -> Box<[u8]> {
-    let (status, number) = match part {
-        core::CallPart::Effect { entry, .. } => (b"effect".as_slice(), Some(entry)),
-        core::CallPart::Connector { .. } => (b"connector".as_slice(), None),
-        core::CallPart::Proposed { proposal } => (b"proposed".as_slice(), Some(proposal)),
-        core::CallPart::ProposalDecided { proposal, .. } => (b"decided".as_slice(), Some(proposal)),
-        core::CallPart::Sent { message } => (b"sent".as_slice(), Some(message)),
-        core::CallPart::Subscribed { subscription } => (b"subscribed".as_slice(), Some(subscription)),
-        core::CallPart::Delegated(numbers) => return delegated(&numbers),
-        core::CallPart::NoteWritten { name, .. } => (b"noted".as_slice(), Some(name)),
-        core::CallPart::Controlled
-        | core::CallPart::Introduced
-        | core::CallPart::Unsubscribed
-        | core::CallPart::EscalationDecided { .. } => (b"done".as_slice(), None),
-        core::CallPart::EffectDenied { .. }
-        | core::CallPart::ToolDenied { .. }
-        | core::CallPart::EscalationRefused(_)
-        | core::CallPart::ProposalRefused(_)
-        | core::CallPart::ControlRefused(_)
-        | core::CallPart::ControlDenied { .. }
-        | core::CallPart::MessageRefused(_)
-        | core::CallPart::SubscriptionRefused(_)
-        | core::CallPart::DelegationDenied { .. }
-        | core::CallPart::DelegationRefused(_)
-        | core::CallPart::NoteRefused(_) => (b"refused".as_slice(), None),
-        core::CallPart::NoteRecalled { entries, more } => return notes(&entries, more),
-        core::CallPart::Unavailable => (b"unavailable".as_slice(), None),
-    };
-    let suffix = match number {
-        Some(number) => b",\"number\":".len().checked_add(Decimal::of(number).as_bytes().len()).expect("number field"),
-        None => 0,
-    };
-    let bytes = b"{\"status\":\""
-        .len()
-        .checked_add(status.len())
-        .expect("status bytes")
-        .checked_add(2)
-        .expect("closing quote and brace")
-        .checked_add(suffix)
-        .expect("answer bytes");
-    let mut writer = Writer::new(bytes);
-    writer.put(b"{\"status\":\"").expect("status prefix");
-    writer.put(status).expect("bounded status");
-    writer.put(b"\"").expect("quote");
-    if let Some(number) = number {
-        writer.put(b",\"number\":").expect("number field");
-        writer.put(Decimal::of(number).as_bytes()).expect("decimal");
-    }
-    writer.put(b"}").expect("object end");
-    writer.finish()
-}
-
-fn delegated(numbers: &[u64]) -> Box<[u8]> {
-    let prefix = b"{\"status\":\"delegated\",\"numbers\":[";
-    let mut bytes = prefix.len().checked_add(2).expect("array and object closing");
-    for (index, number) in numbers.iter().enumerate() {
-        bytes = bytes.checked_add(Decimal::of(*number).as_bytes().len()).expect("delegate identity");
-        if index > 0 {
-            bytes = bytes.checked_add(1).expect("comma");
-        }
-    }
-    let mut writer = Writer::new(bytes);
-    writer.put(prefix).expect("delegated prefix");
-    for (index, number) in numbers.iter().enumerate() {
-        if index > 0 {
-            writer.put(b",").expect("comma");
-        }
-        writer.put(Decimal::of(*number).as_bytes()).expect("delegate identity");
-    }
-    writer.put(b"]}").expect("array and object closing");
-    writer.finish()
-}
-
-fn notes(entries: &[jig_domain_notes::Entry], more: bool) -> Box<[u8]> {
-    let tail = if more { b"\nMore notes remain.".as_slice() } else { b"\nEnd of notes.".as_slice() };
-    let mut bytes = b"Notes".len().checked_add(tail.len()).expect("page framing");
-    for entry in entries {
-        bytes = bytes
-            .checked_add(b"\nNote ".len())
-            .expect("note heading")
-            .checked_add(Decimal::of(entry.name).as_bytes().len())
-            .expect("note identity")
-            .checked_add(b" revision ".len())
-            .expect("revision heading")
-            .checked_add(Decimal::of(u64::from(entry.revision)).as_bytes().len())
-            .expect("revision")
-            .checked_add(2)
-            .expect("line breaks")
-            .checked_add(entry.description.len())
-            .expect("description")
-            .checked_add(entry.body.len())
-            .expect("body")
-            .checked_add(b"\nReferences:".len())
-            .expect("references heading");
-        for reference in &entry.references {
-            bytes = bytes
-                .checked_add(1)
-                .expect("reference separator")
-                .checked_add(Decimal::of(*reference).as_bytes().len())
-                .expect("reference");
-        }
-    }
-    let mut writer = Writer::new(bytes);
-    writer.put(b"Notes").expect("page heading");
-    for entry in entries {
-        writer.put(b"\nNote ").expect("note heading");
-        writer.put(Decimal::of(entry.name).as_bytes()).expect("note identity");
-        writer.put(b" revision ").expect("revision heading");
-        writer.put(Decimal::of(u64::from(entry.revision)).as_bytes()).expect("revision");
-        writer.put(b"\n").expect("line break");
-        writer.put(&entry.description).expect("description");
-        writer.put(b"\n").expect("line break");
-        writer.put(&entry.body).expect("body");
-        writer.put(b"\nReferences:").expect("references heading");
-        for reference in &entry.references {
-            writer.put(b" ").expect("reference separator");
-            writer.put(Decimal::of(*reference).as_bytes()).expect("reference");
-        }
-    }
-    writer.put(tail).expect("page tail");
-    writer.finish()
-}
-pub(crate) fn call(
-    domain: &mut Domain,
-    env: &Env<Limits>,
-    to: ReplyTo,
-    run: Token,
-    attempt: Token,
-    call: jig_domain_fleet::Call,
-    work: &mut Queue<Work>,
-) {
-    let Some(name) = crate::translate::call_name(&call.name) else {
-        read_answer(
-            domain,
-            crate::domain::ReadCall { to: to.into_token(), name: call.name, tool: call.tool },
-            true,
-            Box::from(&b"unavailable"[..]),
-            work,
-        );
-        return;
-    };
-    let key =
-        core::CallKey { task: run.raw(), attempt: attempt.raw(), completion: name.completion, position: name.position };
-    if !call.writes {
-        let binding = crate::domain::ReadCall { to: to.into_token(), name: call.name, tool: call.tool.clone() };
-        match crate::translate::decode(&call.tool, &call.input) {
-            Ok(crate::translate::Decoded::Read(read)) => {
-                let description = crate::translate::read_description(
-                    jig_ops_domain_connectors::number(Connector::Observability),
-                    &read,
-                );
-                let mut findings = Queue::with_capacity(
-                    jig_domain_authority::max_out(&env.limits.core.authority).expect("authority findings"),
-                );
-                if domain.core.connector_read_admit(run.raw(), description, &mut findings)
-                    != jig_domain_authority::Answer::Allow
-                    || domain.read_calls.len() == domain.read_calls.capacity()
-                {
-                    read_answer(domain, binding, true, Box::from(&b"refused"[..]), work);
-                } else {
-                    let token = domain.token();
-                    domain.read_calls.insert(token, binding).expect("read continuation admitted");
-                    work.push(Work::Observability(jig_ops_domain_observability::Event::Read { token, read }));
-                }
-            }
-            Ok(
-                crate::translate::Decoded::Action(_)
-                | crate::translate::Decoded::Delegate(_)
-                | crate::translate::Decoded::Effect { .. },
-            )
-            | Err(_) => read_answer(domain, binding, true, Box::from(&b"unavailable"[..]), work),
-        }
-        return;
-    }
-    domain.calls.insert(key, (call.name, call.tool.clone())).expect("core admitted this named call");
-    match crate::translate::decode(&call.tool, &call.input) {
-        Ok(crate::translate::Decoded::Read(_)) => {
-            work.push(Work::Core(core::Event::NamedAnswer { to, key, part: core::CallPart::Unavailable }));
-        }
-        Ok(crate::translate::Decoded::Action(action)) => {
-            work.push(Work::Core(core::Event::NamedAction { to, key, action }));
-        }
-        Ok(crate::translate::Decoded::Delegate(batch)) => {
-            work.push(Work::Core(core::Event::DelegateValidated { to, key, batch, stubs: Box::new([]) }));
-        }
-        Ok(crate::translate::Decoded::Effect { effect, reason }) => work.push(Work::Event(crate::Event::Effect {
-            to,
-            key,
-            effect,
-            deadline: skein_lib::Wall::from_nanos(env.wall.as_nanos().saturating_add(call.deadline.as_nanos())),
-            proposal: reason,
-        })),
-        Err(_) => work.push(Work::Core(core::Event::NamedAnswer { to, key, part: core::CallPart::Unavailable })),
-    }
-}
-
 /// Take the owner's answer once, preserving the core's held or now mark.
 pub(crate) fn relayed(
     domain: &mut Domain,
@@ -547,3 +342,30 @@ pub(crate) fn read_answer(
 }
 
 pub(crate) use crate::message_refusals::{message_read, refusal_names, refusals};
+
+#[expect(clippy::too_many_arguments, reason = "route the owners read and authenticated caller envelope")]
+pub(crate) fn connector_read(
+    domain: &mut Domain,
+    env: &Env<Limits>,
+    to: ReplyTo,
+    task: u64,
+    name: Box<[u8]>,
+    tool: Box<[u8]>,
+    read: jig_ops_domain_observability::Read,
+    work: &mut Queue<Work>,
+) {
+    let binding = crate::domain::ReadCall { to: to.into_token(), name, tool };
+    let number = jig_ops_domain_connectors::number(Connector::Observability);
+    let description = crate::translate::read_description(number, &read);
+    let mut findings =
+        Queue::with_capacity(jig_domain_authority::max_out(&env.limits.core.authority).expect("findings"));
+    if domain.core.connector_read_admit(task, description, &mut findings) != jig_domain_authority::Answer::Allow
+        || domain.read_calls.len() == domain.read_calls.capacity()
+    {
+        read_answer(domain, binding, true, Box::from(&b"refused"[..]), work);
+    } else {
+        let token = domain.token();
+        domain.read_calls.insert(token, binding).expect("admitted read continuation");
+        work.push(Work::Observability(jig_ops_domain_observability::Event::Read { token, read }));
+    }
+}

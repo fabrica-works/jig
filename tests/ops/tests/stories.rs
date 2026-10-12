@@ -176,3 +176,41 @@ fn a_stale_attempts_answer_is_fenced_before_its_result_is_read() {
     world.drain().expect("stale answer discarded at the fleet fence");
     assert_eq!(world.peers.read_results.len(), read);
 }
+
+#[test]
+fn an_ops_call_that_does_not_decode_is_answered_naming_the_field() {
+    let mut world = result_world();
+    let answers = world.peers.call_answers.len();
+    let commits = world.outcome().commits;
+    let event = world.peers.tool_call(b"effect_restart", br#"{"environment":"production","operation":77}"#, true);
+    world.send(event);
+    for _ in 0..128 {
+        world.iterate().expect("undecodable effect answered");
+        if world.peers.call_answers.len() > answers {
+            break;
+        }
+    }
+    assert_eq!(world.outcome().commits, commits, "an undecodable call decides nothing");
+    assert_eq!(
+        world.peers.call_answers[answers],
+        (true, b"effect_restart: the field service is missing".as_slice().into())
+    );
+    world.drain().expect("scripted run settles after the answer");
+    assert!(world.peers.entries.is_empty(), "an undecodable effect admits no outbox entry");
+}
+
+#[test]
+fn an_ops_read_is_decoded_outside_the_root_and_answered() {
+    let mut world = result_world();
+    let answers = world.peers.call_answers.len();
+    let event = world.peers.tool_call(
+        b"read_logs",
+        br#"{"environment":"production","service":"checkout","from":0,"through":0,"max_bytes":256,"filter":""}"#,
+        false,
+    );
+    world.send(event);
+    world.drain().expect("decoded read answered");
+    let (error, text) = &world.peers.call_answers[answers];
+    assert!(!error, "the authenticated task admits its connector read");
+    assert_eq!(text.as_ref(), b"baseline", "the production log read is answered unchanged");
+}

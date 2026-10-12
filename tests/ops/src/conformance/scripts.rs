@@ -89,6 +89,19 @@ impl Agents {
         self.live.values().any(|agent| !agent.finished)
     }
 
+    pub fn tool_call(&mut self, tool: &[u8], input: &[u8], writes: bool) -> root::Event {
+        let (owner, agent) = self.live.iter_mut().find(|(_, agent)| !agent.finished).expect("active scripted agent");
+        agent.said += 1;
+        let call = name(agent.activation, agent.said);
+        agent.pending = Some(call.clone());
+        agent.ready = false;
+        root::Event::Agent(host::FromAgent::Called {
+            owner: *owner,
+            call,
+            ask: host::Ask::Relay { tool: tool.into(), input: input.into(), writes, deadline: self.call_timeout },
+        })
+    }
+
     pub fn finish_result(&mut self, outcome: &[u8]) -> root::Event {
         let (owner, agent) = self.live.iter_mut().find(|(_, agent)| !agent.finished).expect("active scripted agent");
         agent.finished = true;
@@ -392,13 +405,16 @@ impl Agent {
     }
 }
 
-/// A relayed call's name, as an agent's host renders it: activation,
-/// completion and position, sixteen bytes, little-endian.
+/// A relayed call's name in smith's channel record.
 fn name(activation: u64, completion: u32) -> Box<[u8]> {
-    let mut bytes = activation.to_le_bytes().to_vec();
-    bytes.extend_from_slice(&completion.to_le_bytes());
-    bytes.extend_from_slice(&0_u32.to_le_bytes());
-    bytes.into()
+    let name = smith_channel::v2::CallName::new(
+        &smith_channel::v2::CEILINGS,
+        smith_channel::v2::CallNameParts { activation, completion, position: 0 },
+    )
+    .expect("script call name");
+    let mut encoded = skein_lib::Writer::new(usize::try_from(name.measure()).expect("call name size"));
+    name.encode(&mut encoded).expect("measured call name");
+    encoded.finish()
 }
 
 /// What a completion streams: its start, then its text or its call.

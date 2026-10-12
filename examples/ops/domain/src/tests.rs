@@ -1,4 +1,5 @@
 //! Entry-point checks for the reference journal and routes.
+mod host_tools;
 use crate::{Config, Domain, Event, Limits, Output, Released, Store, release, step};
 use alloc::boxed::Box;
 use jig_domain_accounts as accounts;
@@ -45,6 +46,7 @@ fn fixture_with_commits(commits: u32) -> (Domain, Env<Limits>) {
         routes: 256,
     };
     let mut config = Config {
+        tools: jig_ops_world::protocol::tools(Duration::from_secs(30)),
         core: jig_core_world::world::config(17).core,
         triage_templates: Box::new([]),
         lead_templates: Box::new([]),
@@ -280,6 +282,9 @@ fn settle(domain: &mut Domain, env: &Env<Limits>) -> Box<[Output]> {
     let mut seen = List::with_capacity(4096);
     for _ in 0..64_u32 {
         let values = take(domain, env);
+        if values.is_empty() && domain.quiescent() {
+            break;
+        }
         for value in values {
             match value {
                 Output::Commit { number, .. } => step(domain, env, Event::Store(Store::Committed { number })),
@@ -414,10 +419,10 @@ fn started_chat() -> (Domain, Env<Limits>, Token) {
     (domain, env, owner)
 }
 
-/// A relayed call's name as an agent's host renders it (`translate::CallName`).
+/// A relayed call name in smith's big-endian channel record.
 fn call_name(activation: u64, completion: u32, position: u32) -> Box<[u8]> {
     let mut bytes = List::with_capacity(16);
-    for byte in activation.to_le_bytes().into_iter().chain(completion.to_le_bytes()).chain(position.to_le_bytes()) {
+    for byte in activation.to_be_bytes().into_iter().chain(completion.to_be_bytes()).chain(position.to_be_bytes()) {
         bytes.push(byte).unwrap();
     }
     bytes.into_boxed()
@@ -426,103 +431,6 @@ fn call_name(activation: u64, completion: u32, position: u32) -> Box<[u8]> {
 #[test]
 fn a_committed_chat_assignment_starts_its_agent_through_the_engine_hub() {
     started_chat();
-}
-
-#[test]
-fn a_tool_mutation_and_its_rendered_reply_share_one_commit() {
-    let (mut domain, env, client) = started_chat();
-    step(
-        &mut domain,
-        &env,
-        Event::Agent(host::FromAgent::Called {
-            owner: client,
-            call: call_name(1, 1, 0),
-            ask: host::Ask::Relay {
-                tool: Box::from(&b"subscribe"[..]),
-                writes: true,
-                input: Box::from(&br#"{"kind":"timer","at":10000000000}"#[..]),
-                deadline: Duration::from_secs(10),
-            },
-        }),
-    );
-    let outputs = take(&mut domain, &env);
-    let mut commit = None;
-    let mut call = false;
-    let mut task = false;
-    for output in outputs {
-        match output {
-            Output::Commit { number, mut writes } => {
-                assert!(commit.replace(number).is_none(), "one decision makes one commit");
-                for _ in 0..writes.len() {
-                    match writes.pop().unwrap() {
-                        crate::Write::Save(crate::Record::Core(core::Record::Core(core::CoreRecord::Call(row)))) => {
-                            let Some(settled) = row.settled else { continue };
-                            match settled.answer {
-                                core::SettledAnswer::Host { error, body } => {
-                                    assert!(!error);
-                                    assert_eq!(body.as_ref(), br#"{"status":"subscribed","number":1}"#);
-                                }
-                                core::SettledAnswer::Delivery { .. } => panic!("host reply"),
-                            }
-                            call = true;
-                        }
-                        crate::Write::Save(crate::Record::Core(core::Record::Tasks(_))) => task = true,
-                        crate::Write::Save(_) | crate::Write::Erase(_) => {}
-                    }
-                }
-            }
-            Output::Load { .. }
-            | Output::ReadResult { .. }
-            | Output::CoreLoad(_)
-            | Output::Core(_)
-            | Output::Now(_)
-            | Output::Observability(_)
-            | Output::Infrastructure(_)
-            | Output::ApplicationDocument { .. }
-            | Output::ApplicationRead { .. }
-            | Output::Application { .. }
-            | Output::IncidentAssociationRefused { .. }
-            | Output::Read { .. }
-            | Output::Agent(_)
-            | Output::ToChild(_)
-            | Output::Busy
-            | Output::Stop => panic!("the reply waits for its commit"),
-        }
-    }
-    assert!(call && task, "the same transaction owns the mutation and settled reply");
-    step(&mut domain, &env, Event::Store(Store::Committed { number: commit.unwrap() }));
-    let outputs = take(&mut domain, &env);
-    let mut answered = false;
-    for output in outputs {
-        match output {
-            Output::ToChild(Released::Host(host::Event::Down(host::LinkDown::Relayed {
-                answer: host::Relayed::Answer { error, text },
-                ..
-            }))) => {
-                assert!(!error);
-                assert_eq!(text.as_ref(), br#"{"status":"subscribed","number":1}"#);
-                answered = true;
-            }
-            Output::Commit { .. }
-            | Output::Load { .. }
-            | Output::ReadResult { .. }
-            | Output::CoreLoad(_)
-            | Output::Core(_)
-            | Output::Now(_)
-            | Output::Observability(_)
-            | Output::Infrastructure(_)
-            | Output::ApplicationDocument { .. }
-            | Output::ApplicationRead { .. }
-            | Output::Application { .. }
-            | Output::IncidentAssociationRefused { .. }
-            | Output::Read { .. }
-            | Output::Agent(_)
-            | Output::ToChild(_)
-            | Output::Busy
-            | Output::Stop => {}
-        }
-    }
-    assert!(answered, "the hub receives the reply after this transaction commits");
 }
 
 #[test]
