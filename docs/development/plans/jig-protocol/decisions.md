@@ -956,6 +956,14 @@ the file.
      `jig-protocol-accounts`) + the token's; no typed `Value`. The
      question goes to the designer (question.md); a different answer
      changes 21.2 and the routing that fills the table.
+161. **jig 20.3 lands at 556 lines** (2026-10-12, the coordinator's block
+     "jig 20.3: size 556 exceeds 420-line margin", 2026-10-12T21:52:01Z).
+     556 net lines against 350: the exhaustive destructuring 20.3's
+     Shape asks for ("no wildcard over a field: a field added to a
+     child's `Limits` breaks the build until it has a name here"), over
+     170 scalar members, ruling 159's dotted compound members among
+     them. No macro or generic helper is wanted to shrink it. Its Size
+     becomes 600.
 
 ## For the user
 
