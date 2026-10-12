@@ -422,6 +422,17 @@ the file.
      `tests/*/tests`, the scenarios (jig `b8eb5aef`): on jig 03.4's branch
      (`14f4a908`), `git grep -n 'core::Event::ForgetChat' --
      'tests/*/tests'` printed nothing, 2026-10-12T18:02Z.
+120. **smith 01.1's gate timeouts are measured once before anything
+     else** (2026-10-12, the coordinator's block "smith 01.1: focused
+     gate timeout and retry exhausted", 2026-10-12T18:03:40Z). Both gates
+     reached smith's 15 s global timeout with 1,823 of 2,436 and 2,157 of
+     2,515 tests run; on `main` the same suite runs in 6.3 to 7.4 s
+     (`Gate-Result` of smith `bd273f58`, `78222b68`, `1307cb56`), and
+     jig's gates in the same hour ran at their usual times. smith 01.1
+     runs the suite once under the `measure` profile, which has no
+     global timeout, alone in the gate lane: under 12 s, the machine was
+     the cause, and it lands again; 12 s or more, it compares its ten
+     slowest tests with `main`'s and reports, changing nothing yet.
 
 ## For the user
 
