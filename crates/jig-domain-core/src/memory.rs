@@ -17,7 +17,8 @@ use skein_lib::{Id, List, Map, Queue, Set, Slab};
 
 use crate::{CallKey, Event, HistoricalResult, Limits, Request};
 
-pub(crate) fn policy_owned_bytes(policy: &crate::RunPolicy) -> Option<u64> {
+#[must_use]
+pub fn policy_owned_bytes(policy: &crate::RunPolicy) -> Option<u64> {
     let mut bytes = sizeof(size_of::<crate::RunPolicy>())?
         .checked_add(u64::try_from(policy.instructions.len()).ok()?)?
         .checked_add(u64::try_from(policy.model.name.len()).ok()?)?

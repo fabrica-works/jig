@@ -29,5 +29,5 @@ fn most_costly_takes_the_highest_input_rate() {
 fn reserve_floor_counts_the_reserve_and_one_completion_more() {
     let mut policy = config(1).settings.charters[0].policy.clone();
     policy.reserve_turns = 2;
-    assert_eq!(run::reserve_floor(&policy), Some(3));
+    assert_eq!(reserve_floor(&policy), Some(3));
 }

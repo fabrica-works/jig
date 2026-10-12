@@ -2,6 +2,15 @@
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 extern crate alloc;
+use alloc::boxed::Box;
+mod charters;
+pub use charters::Chats;
+mod core;
+pub use core::core;
+mod domain;
+mod projects;
+pub use domain::{Deployment, Provider, ProviderKind};
+pub use projects::Project;
 mod check;
 pub mod clients;
 mod files;
@@ -28,6 +37,15 @@ pub use problem::{PROBLEMS, Path, Problem, Problems, Segment, What};
 /// The engine's protocol configuration (configuration.md, 3).
 #[derive(Debug)]
 pub struct Engine {
+    pub deployment: Deployment,
+    pub owners: Box<[jig_domain_people::InitialOwner]>,
+    pub providers: Box<[Provider]>,
+    pub rules: jig_domain_authority::Rules,
+    pub projects: Box<[Project]>,
+    pub connectors: Box<[u16]>,
+    pub memory: u64,
+    pub charters: Box<[jig_domain_core::Charter]>,
+    pub chats: Chats,
     pub llm: Llm,
     pub hosts: Hosts,
     pub clients: Clients,
@@ -64,16 +82,72 @@ pub fn engine(document: &skein_json::Document, at: u32) -> Result<Engine, Proble
     if let Some(at) = object.required(document, b"clients", &path, &mut problems) {
         clients = clients::parse(document, at, &path.member(b"clients"), &mut problems);
     }
+    let mut charters = None;
+    if let Some(at) = object.required(document, b"charters", &path, &mut problems)
+        && let Some(llm) = &llm
+    {
+        charters = charters::parse(document, at, &path.member(b"charters"), llm, &limits, &mut problems);
+    }
+    let at = object.required(document, b"chats", &path, &mut problems);
+    let mut chats = None;
+    if let Some(at) = at {
+        chats =
+            charters::chats(document, at, &path.member(b"chats"), charters.as_deref().unwrap_or(&[]), &mut problems);
+    }
+    let mut deployment = None;
+    if let Some(at) = object.required(document, b"deployment", &path, &mut problems) {
+        deployment = domain::deployment(document, at, &path.member(b"deployment"), &mut problems);
+    }
+    let mut providers = None;
+    if let Some(at) = object.required(document, b"providers", &path, &mut problems) {
+        providers = domain::providers(document, at, &path.member(b"providers"), &mut problems);
+    }
+    let mut rules = None;
+    if let Some(at) = object.required(document, b"rules", &path, &mut problems) {
+        rules = projects::rules(document, at, &path.member(b"rules"), &limits.core.authority, &mut problems);
+    }
+    let mut projects = None;
+    if let Some(at) = object.required(document, b"projects", &path, &mut problems) {
+        projects = projects::projects(document, at, &path.member(b"projects"), &limits, &mut problems);
+    }
+    let mut connectors = None;
+    if let Some(at) = object.required(document, b"connectors", &path, &mut problems) {
+        connectors =
+            domain::connectors(document, at, &path.member(b"connectors"), limits.core.connectors, &mut problems);
+    }
+    let memory = check::integer(&mut object, document, b"memory_bytes", &path, &mut problems);
+    let owners = object.required(document, b"owners", &path, &mut problems);
     object.finish(document, &path, &mut problems);
     if !problems.is_empty() {
         return Err(problems);
     }
-    Ok(Engine {
+    let mut engine = Engine {
+        deployment: deployment.expect("required member checked"),
+        providers: providers.expect("required member checked"),
+        rules: rules.expect("required member checked"),
+        projects: projects.expect("required member checked"),
+        connectors: connectors.expect("required member checked"),
+        owners: Box::default(),
+        memory: memory.expect("required member checked"),
+        charters: charters.expect("required member checked"),
+        chats: chats.expect("required member checked"),
         llm: llm.expect("required member checked"),
         hosts: hosts.expect("required member checked"),
         clients: clients.expect("required member checked"),
         limits,
-    })
+    };
+    engine.owners = domain::owners(
+        document,
+        owners.expect("required member checked"),
+        &path.member(b"owners"),
+        &engine,
+        &mut problems,
+    );
+    domain::whole(&engine, &mut problems);
+    if !problems.is_empty() {
+        return Err(problems);
+    }
+    Ok(engine)
 }
 #[cfg(test)]
 mod tests;

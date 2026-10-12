@@ -15,48 +15,77 @@ pub fn path(segments: &[&[u8]]) -> Path {
 }
 
 pub const ENGINE_SMALL: &[u8] = br#"{
-  "limits": {"profile": "small"},
-  "llm": {
-    "endpoints": [{
-      "name": "fake",
-      "number": 1,
-      "dialect": 0,
-      "account": 1,
-      "provider": "fake-provider",
-      "address": {"socket": "127.0.0.1:7101"},
-      "transport": "plaintext",
-      "headers": [],
-      "connect_ms": 10000,
-      "handshake_ms": 10000
-    }],
-    "models": [{
-      "name": "small",
-      "endpoint": "fake",
-      "window": 1024,
-      "output": 128,
-      "prices": {"input": 1, "cached": 1, "output": 2, "unit": 1000}
-    }],
-    "accounts": [{
-      "number": 1,
-      "source": {"handed_in": {"file": "accounts/chat.json"}}
-    }],
-    "records": "accounts/records"
-  },
-  "hosts": {
-    "workers": [
-      {"name": "worker-a", "digest": "secrets/worker-a.digest"},
-      {"name": "worker-b", "digest": "secrets/worker-b.digest"}
-    ],
-    "listener": [{"in_process": "workers"}]
-  },
-  "clients": {
-    "listener": {"socket": "127.0.0.1:7100"},
-    "heartbeat_ms": 10000,
-    "link": true
-  }
+"limits": {"profile": "small"},
+"llm": {
+"endpoints": [{
+"name": "fake",
+"number": 1,
+"dialect": 0,
+"account": 1,
+"provider": "fake-provider",
+"address": {"socket": "127.0.0.1:7101"},
+"transport": "plaintext",
+"headers": [],
+"connect_ms": 10000,
+"handshake_ms": 10000
+}],
+"models": [{
+"name": "small",
+"endpoint": "fake",
+"window": 8192,
+"output": 1024,
+"prices": {"input": 1, "cached": 1, "output": 1, "unit": 1000}
+}],
+"accounts": [{
+"number": 1,
+"source": {"handed_in": {"file": "accounts/chat.json"}}
+}],
+"records": "accounts/records"
+},
+"hosts": {
+"workers": [
+{"name": "worker-a", "digest": "secrets/worker-a.digest"},
+{"name": "worker-b", "digest": "secrets/worker-b.digest"}
+],
+"listener": [{"in_process": "workers"}]
+},
+"charters": [{
+"number": 1, "instructions": "charters/chat.txt", "model": "small", "alternatives": [],
+"hosts": "workers", "waiting_ms": 10000, "resume": true,
+"turns": 4, "time_ms": 30000, "reserve_turns": 1, "reserve_time_ms": 5000, "spend": 20,
+"inspect": true, "modify": false, "shell": false, "agents": false, "call_timeout_ms": 10000
+}],
+"chats": {"charter": 1, "close_grace_ms": 5000},
+"clients": {
+"listener": {"socket": "127.0.0.1:7100"},
+"heartbeat_ms": 10000,
+"link": true
+},
+"deployment": {"directory": "state", "seed": 7},
+"owners": [{"provider": 1, "subject": "owner-a"}],
+"providers": [{"number": 1, "kind": "link"}, {"number": 2, "kind": "deployment"}],
+"connectors": [1],
+"memory_bytes": 17179869184,
+"rules": {
+"ceiling": {"tools": 1023, "grants": [],
+"delegation": {"kinds": [{"kind": "charter", "number": 1}], "tasks": 8, "depth": 8},
+"budget": {"spend": 100, "deadline_unix_seconds": null}, "notes": 7, "note_resources": []},
+"period_spend": 100, "minimum_run_spend": 1, "maximum_run_spend": 100,
+"implies": [], "requirements": []
+},
+"projects": [{"number": 1, "roles": [{"connector": 1, "permission": 1, "role": 1}],
+"policy": {"escalation_role": 1, "period_spend": 100, "projections": [], "requirements": [],
+"ceiling": {"tools": 1023, "grants": [],
+"delegation": {"kinds": [{"kind": "charter", "number": 1}], "tasks": 8, "depth": 8},
+"budget": {"spend": 100, "deadline_unix_seconds": null}, "notes": 7, "note_resources": []},
+"roles": [{"number": 1, "period_spend": 100, "requests": 511, "decides": 31,
+"authority": {"tools": 1023, "grants": [],
+"delegation": {"kinds": [{"kind": "charter", "number": 1}], "tasks": 8, "depth": 8},
+"budget": {"spend": 100, "deadline_unix_seconds": null}, "notes": 7, "note_resources": []}}]
+}}]
 }"#;
 pub fn engine(bytes: &[u8]) -> Result<crate::Engine, crate::Problems> {
-    let limits = DocumentLimits { bytes: 8192, tokens: 1024, depth: 16 };
+    let limits = DocumentLimits { bytes: 4096, tokens: 768, depth: 16 };
     let document = match crate::document(bytes, &limits) {
         Ok(document) => document,
         Err(problem) => {

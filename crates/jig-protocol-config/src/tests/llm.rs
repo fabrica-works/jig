@@ -69,6 +69,7 @@ fn a_cache_write_price_may_be_left_out() {
 #[test]
 fn a_cache_write_price_is_kept_when_named() {
     let bytes = fixtures::with(fixtures::ENGINE_SMALL, br#""unit": 1000"#, br#""unit": 1000, "cache_write": 3"#);
+    let bytes = fixtures::with(&bytes, br#""spend": 20"#, br#""spend": 60"#);
     assert_eq!(model(&bytes).cache_write_price, Some(3));
 }
 #[test]

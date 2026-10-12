@@ -61,6 +61,44 @@ pub(crate) fn count(
         }
     }
 }
+pub(crate) fn short(
+    object: &mut read::Object,
+    document: &Document,
+    name: &[u8],
+    path: &Path,
+    problems: &mut Problems,
+) -> Option<u16> {
+    let value = integer(object, document, name, path, problems)?;
+    match u16::try_from(value) {
+        Ok(value) => Some(value),
+        Err(_) => {
+            problems.push(path.member(name), What::Bound);
+            None
+        }
+    }
+}
+pub(crate) fn optional(
+    object: &mut read::Object,
+    document: &Document,
+    name: &[u8],
+    path: &Path,
+    problems: &mut Problems,
+) -> Result<Option<u64>, What> {
+    let at = object.required(document, name, path, problems).ok_or(What::Missing)?;
+    if document.token(at).ok_or(What::Kind)?.kind == skein_json::document::Kind::Null {
+        return Ok(None);
+    }
+    match read::integer(document, at, u64::MAX) {
+        Ok(value) => Ok(Some(value)),
+        Err(what) => {
+            problems.push(path.member(name), what);
+            Err(what)
+        }
+    }
+}
+pub(crate) fn index(path: &Path, index: usize) -> Path {
+    path.child(crate::Segment::Index(u32::try_from(index).expect("document count fits u32")))
+}
 pub(crate) fn duration(
     object: &mut read::Object,
     document: &Document,
@@ -70,6 +108,22 @@ pub(crate) fn duration(
 ) -> Option<Duration> {
     let at = object.required(document, name, path, problems)?;
     match read::duration(document, at) {
+        Ok(value) => Some(value),
+        Err(what) => {
+            problems.push(path.member(name), what);
+            None
+        }
+    }
+}
+pub(crate) fn boolean(
+    object: &mut read::Object,
+    document: &Document,
+    name: &[u8],
+    path: &Path,
+    problems: &mut Problems,
+) -> Option<bool> {
+    let at = object.required(document, name, path, problems)?;
+    match read::boolean(document, at) {
         Ok(value) => Some(value),
         Err(what) => {
             problems.push(path.member(name), what);

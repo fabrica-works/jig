@@ -55,17 +55,14 @@ impl Object {
     /// Read every occurrence of this name, retaining the first for value decoding.
     pub fn member(&mut self, document: &Document, name: &[u8]) -> Option<u32> {
         let mut first = None;
-        for member in self.members.as_slice() {
-            let key = document.token(member.key)?;
-            if document.text(key)? == name && first.is_none() {
-                first = Some(member.value);
-            }
-        }
         for index in 0..self.members.len() {
             let member = self.members.get_mut(index)?;
             let key = document.token(member.key)?;
             if document.text(key)? == name {
                 member.read = true;
+                if first.is_none() {
+                    first = Some(member.value);
+                }
             }
         }
         first

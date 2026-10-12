@@ -23,8 +23,11 @@ pub fn files(engine: &Engine) -> Box<[File]> {
         .checked_add(engine.llm.endpoints.len())
         .expect("bounded endpoints")
         .checked_add(engine.hosts.workers.len())
-        .expect("bounded workers");
+        .expect("bounded workers")
+        .checked_add(engine.charters.len())
+        .expect("bounded charters");
     let mut files = List::with_capacity(u32::try_from(max).expect("document count fits u32"));
+    crate::charters::files(engine, &mut files);
     for (index, worker) in engine.hosts.workers.iter().enumerate() {
         let at = Path::root()
             .member(b"hosts")
@@ -69,7 +72,7 @@ fn trust(files: &mut List<File>, transport: &Transport, at: &Path) {
         }
     }
 }
-fn push(files: &mut List<File>, at: Path, path: &[u8], max: u32, private: bool) {
+pub(crate) fn push(files: &mut List<File>, at: Path, path: &[u8], max: u32, private: bool) {
     let file = File { at, path: bytes::copy_of(path), max, private };
     files.push(file).expect("capacity includes every configured file");
 }

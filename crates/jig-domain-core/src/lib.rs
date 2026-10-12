@@ -31,7 +31,7 @@ mod inbox;
 mod indexes;
 mod memory;
 pub use goals::GoalStart;
-pub use memory::worst_case;
+pub use memory::{policy_owned_bytes, worst_case};
 mod numbers;
 mod person_task;
 mod policy;
@@ -68,7 +68,7 @@ mod stored;
 mod translate;
 pub use run::{
     GoalRoute, HistoricalResult, Model, PendingRelay, PersonProposalRoute, PersonTaskRoute, RestoringProof, RoutedCall,
-    RunAdmission, RunCharter, RunPolicy, Transcript,
+    RunAdmission, RunCharter, RunPolicy, Transcript, reserve_floor,
 };
 pub use stored::{
     CallKey, CallPart, CallRecord, CallReplay, CoreKey, CoreRecord, EscalationDecisionRecord, Key,

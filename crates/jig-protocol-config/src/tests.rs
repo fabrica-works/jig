@@ -1,3 +1,5 @@
+mod charters;
+mod domain;
 mod fixtures;
 mod forms;
 mod hosts;
