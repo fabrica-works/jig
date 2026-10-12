@@ -13,6 +13,8 @@ pub struct Limits {
     /// Workers in contact at once. A worker beyond them is turned away at
     /// its hello.
     pub workers: u32,
+    /// Owned charter/model requirements retained for hello admission.
+    pub needs_bytes: u64,
     /// Slots hosted inside the engine; zero in applications using only workers.
     pub engine_slots: u32,
     /// The most runs a worker hosts at once: slots a hello says beyond them
@@ -104,5 +106,6 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(turns)?
         .checked_add(facts)?
         .checked_add(crate::history::worst_case(limits.history)?)?
+        .checked_add(limits.needs_bytes)?
         .checked_add(views)
 }

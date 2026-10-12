@@ -98,6 +98,7 @@ fn limits() -> Limits {
         facts: 2,
     };
     let fleet = fleet::Limits {
+        needs_bytes: 4096,
         workers: 1,
         engine_slots: 0,
         slots: 1,
@@ -230,6 +231,7 @@ fn config(seed: u64) -> Config {
         deployment: [31; 16],
         seed,
         workers_in_process: false,
+        hub_turns: 2,
         owners: Box::new([people::InitialOwner {
             project: 1,
             identity: people::IdentityKey { provider: 0, subject: 7_u64.to_be_bytes().into() },

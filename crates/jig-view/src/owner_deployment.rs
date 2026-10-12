@@ -1,11 +1,13 @@
 //! Deployment facts and bounded live diagnostics (pages.md, 7; view.md, 7).
 //! Supplied clocks, loss counters and identities stay independent.
+mod hello;
 use crate::{
     Builder, JigBindings, Key, Owner, Role, Run,
     owner_deployment_words::{AccountPhrase as A, DeploymentPhrase as P},
     phrases::Hole,
     words::Words,
 };
+use hello::hello;
 use jig_domain_client::{
     Domain, Limits,
     contract::{
@@ -151,31 +153,6 @@ fn capacity(b: &mut Builder, words: &Words, phrase: P, value: &OwnerCapacity) {
     region(b, words, phrase, &[], None);
     field_number(b, words, P::Used, u64::from(value.used));
     field_number(b, words, P::Limit, u64::from(value.limit));
-    b.close();
-}
-fn hello(b: &mut Builder, words: &Words, value: &OwnerHelloRefusalLine, position: u64) {
-    region(
-        b,
-        words,
-        P::Host,
-        &[Hole::Number(value.channel)],
-        Some(Key { owner: Owner::Jig, kind: 97, a: position, b: value.channel }),
-    );
-    field_number(b, words, P::Host, value.channel);
-    field_number(b, words, P::Slots, u64::from(value.slots));
-    text(b, words, P::At, &[Hole::Wall(words.adjusted_wall(value.at))]);
-    duration(b, words, P::StopBound, value.stop_bound);
-    match value.why {
-        OwnerHelloRefusal::ReservedChannel => text(b, words, P::HelloRefusalReservedChannel, &[]),
-        OwnerHelloRefusal::Workers { limit } => {
-            text(b, words, P::HelloRefusalWorkers, &[]);
-            field_number(b, words, P::Limit, u64::from(limit));
-        }
-        OwnerHelloRefusal::StopBound { grace } => {
-            text(b, words, P::HelloRefusalStopBound, &[]);
-            duration(b, words, P::AllowedGrace, grace);
-        }
-    }
     b.close();
 }
 fn show_proposer(b: &mut Builder, words: &Words, value: Proposer) {

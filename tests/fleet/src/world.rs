@@ -19,6 +19,7 @@ const MAX_WIRE: usize = 20_000;
 
 /// The fleet's limits in the calm world.
 pub const LIMITS: Limits = Limits {
+    needs_bytes: 4096,
     workers: 4,
     engine_slots: 0,
     slots: 3,
@@ -519,7 +520,7 @@ impl World {
         let mut world = World {
             now: Time::ZERO,
             rng: Rng::new(settings.seed),
-            domain: Domain::new(&settings.limits),
+            domain: Domain::new(&settings.limits, crate::fixtures::needs()),
             stage: Stage::new(settings.limits, max_out, max_out + SLACK),
             epoch: 0,
             loaded: true,
@@ -781,7 +782,7 @@ impl World {
         self.stats.restarts += 1;
         self.epoch += 1;
         self.loaded = false;
-        self.domain = Domain::new(&self.settings.limits);
+        self.domain = Domain::new(&self.settings.limits, crate::fixtures::needs());
         self.stage.inbox.clear();
         self.calls = Ledger::new("start or adoption");
         self.relays = Ledger::new("relayed call");

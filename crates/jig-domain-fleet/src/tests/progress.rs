@@ -44,7 +44,7 @@ fn progress_is_fenced_and_preserves_receipt_times_without_placement_claims() {
     h.step(Event::Cancel { run: R1, attempt: A1 });
     assert!(h.domain.observation(R1, A1).is_none());
     assert!(h.step(Event::Observe { channel: C3, run: R1, attempt: A1, report: Report::Started }).is_empty());
-    let fresh = Domain::new(&LIMITS);
+    let fresh = Domain::new(&LIMITS, fixtures::needs());
     assert!(fresh.observation(R1, A1).is_none(), "best-effort observations are volatile");
 }
 

@@ -40,6 +40,8 @@ pub(crate) struct HostCall {
 pub struct Config {
     /// Core rules and its children.
     pub core: core::Config,
+    /// Agent capability supplied by its configuration, checked by the fleet.
+    pub agent_bounds: host::Bounds,
     /// Observability owns the standing watches' delegate templates.
     pub triage_templates: Box<[observability::TriageTemplate]>,
     /// Observability owns the matching incident lead templates.
@@ -121,7 +123,10 @@ impl Domain {
         assert!(tool_bytes <= limits.host.charter_bytes, "configured tools fit the charter byte bound");
         let host_calls = limits.host.slots.checked_mul(limits.host.run_calls).expect("hub relays");
         let deployment = config.core.deployment;
-        let mut core = core::Core::new(config.core, &limits.core);
+        let mut core_config = config.core;
+        core_config.hub_turns = limits.host.turns;
+        let mut core = core::Core::new(core_config, &limits.core);
+        check_engine_hello(&mut core.fleet, &limits.core.fleet, config.agent_bounds, limits.host.slots);
         // Connector hold rules are configuration, so a cold root installs
         // the same translated vocabulary before restoring live task rows.
         let mut configured = Queue::with_capacity(jig_domain_tasks::max_out(&limits.core.tasks));
@@ -363,4 +368,43 @@ pub(crate) fn child(decision: &mut Decision<Write, Output>, value: Released) {
 }
 pub(crate) fn now(domain: &mut Domain, value: Output) {
     domain.journal.now(value).expect("bounded door drained by each domain iteration");
+}
+
+fn check_engine_hello(domain: &mut fleet::Domain, limits: &fleet::Limits, agent_bounds: host::Bounds, slots: u32) {
+    let mut out = Queue::with_capacity(fleet::max_out(limits));
+    fleet::step(
+        domain,
+        &Env { now: skein_lib::Time::ZERO, wall: skein_lib::Wall::EPOCH, limits: *limits },
+        fleet::Event::Hello {
+            channel: Token::new(0),
+            hello: fleet::Hello {
+                slots,
+                stop_bound: skein_lib::Duration::ZERO,
+                workstreams: Box::new([]),
+                hosting: Box::new([]),
+                bounds: bounds(agent_bounds),
+            },
+        },
+        &mut out,
+    );
+    assert!(out.is_empty(), "engine agent bounds must hold its configured charters");
+}
+fn bounds(value: host::Bounds) -> fleet::Bounds {
+    let mut models = skein_lib::List::with_capacity(u32::try_from(value.models.len()).expect("configured model count"));
+    for model in value.models {
+        models
+            .push(fleet::ModelBound { name: model.name, window: model.window, output: model.output })
+            .expect("configured model count");
+    }
+    fleet::Bounds {
+        models: models.into_boxed(),
+        turns: value.turns,
+        spend: value.spend,
+        time: value.time,
+        waiting: value.waiting,
+        checks: value.checks,
+        message_bytes: value.message_bytes,
+        inbox: value.inbox,
+        unacknowledged: value.unacknowledged,
+    }
 }

@@ -15,3 +15,5 @@ pub mod client;
 
 /// Ops clients in front of the actual conformance engine.
 pub mod joint;
+
+pub use conformance::agent_bounds;

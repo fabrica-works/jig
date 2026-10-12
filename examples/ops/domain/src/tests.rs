@@ -45,6 +45,7 @@ fn fixture_with_commits(commits: u32) -> (Domain, Env<Limits>) {
         routes: 256,
     };
     let mut config = Config {
+        agent_bounds: jig_ops_world::agent_bounds(),
         tools: jig_ops_world::protocol::tools(Duration::from_secs(30)),
         core: jig_core_world::world::config(17).core,
         triage_templates: Box::new([]),

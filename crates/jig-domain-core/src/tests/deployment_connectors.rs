@@ -178,3 +178,33 @@ fn the_deployment_document_shows_the_last_fill_and_the_mark() {
     core.fill = 6789;
     assert_eq!(deployment(&core, &limits).store, StoreFill { bytes: 6789, mark: 9012 });
 }
+
+#[test]
+fn a_refused_hello_shows_its_agent_shortfall() {
+    let (mut core, limits) = source(&[1], 2);
+    let mut bounds = fixtures::bounds();
+    bounds.models = Box::new([]);
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.fleet };
+    let mut out = Queue::with_capacity(fleet::max_out(&limits.fleet));
+    fleet::step(
+        &mut core.fleet,
+        &env,
+        fleet::Event::Hello {
+            channel: Token::new(9),
+            hello: fleet::Hello {
+                bounds,
+                slots: 1,
+                stop_bound: Duration::ZERO,
+                workstreams: Box::new([]),
+                hosting: Box::new([]),
+            },
+        },
+        &mut out,
+    );
+    assert_eq!(out.pop(), Some(fleet::Request::Refuse { channel: Token::new(9) }));
+    let value = deployment(&core, &limits);
+    assert_eq!(
+        value.hello_refusals.get(0).unwrap().why,
+        fleet::HelloRefusal::Agent { why: fleet::AgentShortfall::Model { charter: 1, model: 0 } }
+    );
+}

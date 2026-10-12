@@ -185,6 +185,7 @@ fn account_state(value: accounts::State) -> client::OwnerAccountState {
 
 fn hello(value: fleet::HelloRefusal) -> client::OwnerHelloRefusal {
     match value {
+        fleet::HelloRefusal::Agent { why } => client::OwnerHelloRefusal::Agent { why: shortfall(why) },
         fleet::HelloRefusal::ReservedChannel => client::OwnerHelloRefusal::ReservedChannel,
         fleet::HelloRefusal::Workers { limit } => client::OwnerHelloRefusal::Workers { limit },
         fleet::HelloRefusal::StopBound { grace } => client::OwnerHelloRefusal::StopBound { grace },
@@ -276,3 +277,19 @@ fn task_cause(value: tasks::CapacityCause) -> client::OwnerTaskCapacityCause {
 
 #[cfg(test)]
 pub(crate) mod tests;
+
+fn shortfall(value: fleet::AgentShortfall) -> client::OwnerAgentShortfall {
+    match value {
+        fleet::AgentShortfall::Model { charter, model } => client::OwnerAgentShortfall::Model { charter, model },
+        fleet::AgentShortfall::Window { charter, model } => client::OwnerAgentShortfall::Window { charter, model },
+        fleet::AgentShortfall::Output { charter, model } => client::OwnerAgentShortfall::Output { charter, model },
+        fleet::AgentShortfall::Turns => client::OwnerAgentShortfall::Turns,
+        fleet::AgentShortfall::Spend => client::OwnerAgentShortfall::Spend,
+        fleet::AgentShortfall::Time => client::OwnerAgentShortfall::Time,
+        fleet::AgentShortfall::Waiting => client::OwnerAgentShortfall::Waiting,
+        fleet::AgentShortfall::Checks => client::OwnerAgentShortfall::Checks,
+        fleet::AgentShortfall::Message => client::OwnerAgentShortfall::Message,
+        fleet::AgentShortfall::Inbox => client::OwnerAgentShortfall::Inbox,
+        fleet::AgentShortfall::Unacknowledged => client::OwnerAgentShortfall::Unacknowledged,
+    }
+}

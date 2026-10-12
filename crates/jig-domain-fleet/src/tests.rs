@@ -10,6 +10,7 @@ use crate::{
 };
 
 const LIMITS: Limits = Limits {
+    needs_bytes: 4096,
     workers: 3,
     engine_slots: 0,
     slots: 2,
@@ -56,8 +57,12 @@ struct Harness {
 
 impl Harness {
     fn new(limits: Limits) -> Harness {
+        Self::with_needs(limits, fixtures::needs())
+    }
+
+    fn with_needs(limits: Limits, needs: crate::Needs) -> Harness {
         let out = Queue::with_capacity(max_out(&limits));
-        Harness { domain: Domain::new(&limits), env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits }, out }
+        Harness { domain: Domain::new(&limits, needs), env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits }, out }
     }
 
     /// Steps `event`, returning what it emitted, oldest first.
@@ -1282,3 +1287,5 @@ fn free_kind_follows_the_placement_rule() {
     assert_eq!(h.domain.free_kind(Kinds::Both, 7), Some(HostKind::Engine));
 }
 mod grants;
+
+mod needs;

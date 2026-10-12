@@ -27,11 +27,20 @@ pub const fn max_out(limits: &Limits) -> u32 {
     if listed > other { listed } else { other }
 }
 
+/// Whether the engine's construction hello has been heard.
+#[derive(Debug)]
+pub(crate) enum EngineHello {
+    Expected,
+    Heard,
+}
+
 /// The fleet's state.
 #[derive(Debug)]
 pub struct Domain {
     /// The workers in contact, and their channels' names.
     pub(crate) channels: Slab<Channel>,
+    pub(crate) needs: crate::Needs,
+    pub(crate) engine_hello: EngineHello,
     pub(crate) tokens: Map<Token, Id<Channel>>,
     /// The attempts tracked, by their run's and their own names.
     pub(crate) attempts: Slab<Attempt>,
@@ -65,7 +74,14 @@ pub struct Domain {
 impl Domain {
     /// A domain with room for `limits`.
     #[must_use]
-    pub fn new(limits: &Limits) -> Domain {
+    pub fn new(limits: &Limits, needs: crate::Needs) -> Domain {
+        assert!(
+            match crate::needs::owned_bytes(&needs) {
+                Some(bytes) => bytes <= limits.needs_bytes,
+                None => false,
+            },
+            "configured agent needs fit their byte bound"
+        );
         let tracked = limits::tracked(limits).expect("worst_case accepted the limits");
         let channels_count =
             limits.workers.checked_add(u32::from(limits.engine_slots > 0)).expect("worst_case accepted the limits");
@@ -85,6 +101,8 @@ impl Domain {
             tokens.insert(Token::new(0), id).expect("engine token reserved");
         }
         Domain {
+            needs,
+            engine_hello: EngineHello::Expected,
             channels,
             tokens,
             attempts: Slab::with_capacity(tracked),

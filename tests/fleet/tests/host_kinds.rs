@@ -30,7 +30,7 @@ fn place(domain: &mut Domain, limits: Limits) -> Vec<Request> {
 #[test]
 fn a_run_placed_on_the_engine_slots_is_settled_as_not_started_by_a_restart_before_its_first_turn() {
     let limits = Limits { workers: 0, engine_slots: 1, ..jig_fleet_world::LIMITS };
-    let mut domain = Domain::new(&limits);
+    let mut domain = Domain::new(&limits, jig_fleet_world::fixtures::needs());
     let task = Token::new(1);
     let attempt = Token::new(2);
     assert!(
@@ -65,7 +65,7 @@ fn a_run_placed_on_the_engine_slots_is_settled_as_not_started_by_a_restart_befor
     );
     assert!(step(&mut domain, limits, Event::Lost { channel: Token::new(0) }).is_empty());
     assert_eq!(domain.attempts(), 1, "the local host stays until restart");
-    let mut restarted = Domain::new(&limits);
+    let mut restarted = Domain::new(&limits, jig_fleet_world::fixtures::needs());
     assert_eq!(
         step(
             &mut restarted,
@@ -83,7 +83,7 @@ fn a_run_placed_on_the_engine_slots_is_settled_as_not_started_by_a_restart_befor
         ),
         vec![Request::NotStarted { to: ReplyTo::new(attempt), run: task, attempt }]
     );
-    let mut restarted_with_work = Domain::new(&limits);
+    let mut restarted_with_work = Domain::new(&limits, jig_fleet_world::fixtures::needs());
     assert_eq!(
         step(
             &mut restarted_with_work,
@@ -106,7 +106,7 @@ fn a_run_placed_on_the_engine_slots_is_settled_as_not_started_by_a_restart_befor
 #[test]
 fn a_charter_for_workers_only_waits_while_only_engine_slots_are_free() {
     let limits = Limits { workers: 1, engine_slots: 1, ..jig_fleet_world::LIMITS };
-    let mut domain = Domain::new(&limits);
+    let mut domain = Domain::new(&limits, jig_fleet_world::fixtures::needs());
     let task = Token::new(3);
     let attempt = Token::new(4);
     assert!(
@@ -163,7 +163,7 @@ fn a_charter_for_workers_only_waits_while_only_engine_slots_are_free() {
 #[test]
 fn a_worker_holding_the_workstream_is_preferred_over_a_free_engine_slot() {
     let limits = Limits { workers: 1, engine_slots: 1, ..jig_fleet_world::LIMITS };
-    let mut domain = Domain::new(&limits);
+    let mut domain = Domain::new(&limits, jig_fleet_world::fixtures::needs());
     let task = Token::new(9);
     let attempt = Token::new(10);
     assert!(
@@ -245,4 +245,70 @@ fn a_worker_holding_the_workstream_is_preferred_over_a_free_engine_slot() {
 
 fn refs() -> jig_domain_fleet::Assignment {
     jig_domain_fleet::Assignment { turns: Token::new(0), answered: Token::new(0) }
+}
+
+#[test]
+fn a_worker_refused_for_its_agent_hosts_nothing() {
+    let limits = jig_fleet_world::LIMITS;
+    let mut domain = waiting_worker(limits);
+    assert_eq!(
+        step(
+            &mut domain,
+            limits,
+            Event::Hello {
+                channel: Token::new(5),
+                hello: Hello {
+                    bounds: jig_fleet_world::fixtures::bounds(),
+                    slots: 1,
+                    stop_bound: Duration::ZERO,
+                    workstreams: Box::new([]),
+                    hosting: Box::new([]),
+                },
+            }
+        ),
+        vec![Request::Refuse { channel: Token::new(5) }]
+    );
+    assert!(place(&mut domain, limits).is_empty());
+    assert_eq!(domain.workers(), 0);
+    assert_eq!(domain.waiting(), 1);
+}
+
+fn worker_needs() -> fleet::Needs {
+    use fleet::{CharterNeeds, ModelNeed, Needs};
+    Needs {
+        charters: Box::new([CharterNeeds {
+            charter: 1,
+            kinds: Kinds::Workers,
+            models: Box::new([ModelNeed { name: b"model".as_slice().into(), window: 8192, output: 1024 }]),
+            turns: 8,
+            time: Duration::from_secs(60),
+            waiting: Duration::from_secs(10),
+            change_reserve: None,
+        }]),
+        spend: 100,
+        message_bytes: 64,
+        start_messages: 4,
+        unacknowledged: 2,
+    }
+}
+
+fn waiting_worker(limits: Limits) -> Domain {
+    let mut domain = Domain::new(&limits, worker_needs());
+    assert!(
+        step(
+            &mut domain,
+            limits,
+            Event::Start {
+                grants: Box::new([]),
+                reply_to: ReplyTo::new(Token::new(2)),
+                run: Token::new(1),
+                attempt: Token::new(2),
+                workstream: 1,
+                kinds: Kinds::Workers,
+                assignment: refs(),
+            }
+        )
+        .is_empty()
+    );
+    domain
 }

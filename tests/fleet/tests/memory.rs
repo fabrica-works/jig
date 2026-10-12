@@ -13,6 +13,7 @@ use skein_world::domain::heap::{self, Meter};
 static HEAP: heap::Counting = heap::Counting;
 
 const LIMITS: Limits = Limits {
+    needs_bytes: 0,
     workers: 3,
     engine_slots: 0,
     slots: 3,
@@ -44,7 +45,7 @@ impl Measured {
     fn new(limits: Limits) -> Measured {
         let bound = worst_case(&limits).expect("the test limits fit");
         let meter = Meter::new();
-        let domain = Domain::new(&limits);
+        let domain = Domain::new(&limits, jig_fleet_world::fixtures::needs());
         let out = Queue::with_capacity(max_out(&limits));
         Measured { domain, env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits }, out, meter, bound, names: 0 }
     }
@@ -338,6 +339,7 @@ fn every_entry_point_stays_within_the_worst_case() {
     fleet.at(30);
     fleet.settle();
     assert_eq!((fleet.domain.attempts(), fleet.domain.calls()), (0, 0));
+    fleet.hello(Token::new(0), Vec::new());
     for number in 10..=10 + LIMITS.history {
         fleet.hello(channel(number), Vec::new());
         fleet.step(Event::Lost { channel: channel(number) });

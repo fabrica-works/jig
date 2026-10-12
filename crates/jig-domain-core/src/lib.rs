@@ -61,6 +61,7 @@ pub use sibling_routes::{MadeRoute, PersonMessage, SentRoute};
 mod conversation;
 pub use conversation::{DeliveryOutcome, SettledAnswer, SettledCall, conversation_worst_case};
 pub mod charters;
+mod fleet_needs;
 pub use charters::Charter;
 mod stored;
 mod translate;
@@ -95,6 +96,8 @@ pub struct Config {
     pub seed: u64,
     /// Workers share this engine's process and cannot outlive it.
     pub workers_in_process: bool,
+    /// Normal retained turns per attempt in the deployment's hub.
+    pub hub_turns: u32,
     /// Initial authenticated owners.
     pub owners: Box<[people::InitialOwner]>,
     /// Configured authority and policy.
@@ -507,6 +510,7 @@ impl Core {
                 configured_accounts.push(number).expect("configured accounts fit their bound");
             }
         }
+        let fleet_needs = fleet_needs::configured(&config, limits);
         Core {
             fill: 0,
             workers_in_process: config.workers_in_process,
@@ -587,7 +591,7 @@ impl Core {
             tasks: tasks::Domain::new(&limits.tasks, config.seed, charters::numbers(&config.settings, limits)),
             authority: config.authority,
             people: people::Domain::new(&limits.people, config.owners, config.settings.deployment_provider),
-            fleet: fleet::Domain::new(&limits.fleet),
+            fleet: fleet::Domain::new(&limits.fleet, fleet_needs),
             accounts: accounts::Domain::new(&limits.accounts, configured_accounts.into_boxed()),
             brief: brief::GatherDomain::new(&limits.brief),
             notes: notes::Domain::new(&limits.notes),

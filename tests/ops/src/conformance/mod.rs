@@ -5,6 +5,7 @@ mod documents;
 mod observations;
 mod protocol;
 mod scripts;
+pub use scripts::agent_bounds;
 mod systems;
 
 use jig_conformance::referee as r;

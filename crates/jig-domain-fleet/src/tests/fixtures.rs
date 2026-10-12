@@ -34,3 +34,8 @@ pub const ANALYST_FIRST: crate::Grant = crate::Grant {
 };
 pub const ANALYST_SECOND: crate::Grant = crate::Grant { generation: 2, ..ANALYST_FIRST };
 pub const OTHER_ACCOUNT: crate::Grant = crate::Grant { account: 2, ..ANALYST_FIRST };
+
+#[must_use]
+pub fn needs() -> crate::Needs {
+    crate::Needs { charters: Box::new([]), spend: 0, message_bytes: 0, start_messages: 0, unacknowledged: 0 }
+}

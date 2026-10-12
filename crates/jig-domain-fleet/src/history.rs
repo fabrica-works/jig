@@ -8,6 +8,8 @@ use skein_lib::{Duration, Map, Queue, Time, Token, Wall};
 pub enum HelloRefusal {
     /// Channel zero belongs to the engine's configured host.
     ReservedChannel,
+    /// The agent cannot hold a configured charter for this host kind.
+    Agent { why: crate::AgentShortfall },
     /// The connected worker set has no admission room.
     Workers { limit: u32 },
     /// A worker must stop strictly before the engine's grace expires.

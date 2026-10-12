@@ -204,12 +204,19 @@ pub enum OwnerAccountState {
 /// The supplied closed hellorefusal vocabulary.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum OwnerHelloRefusal {
+    Agent {
+        why: OwnerAgentShortfall,
+    },
     /// `ReservedChannel` as supplied by its owner.
     ReservedChannel,
     /// Workers as supplied by its owner.
-    Workers { limit: u32 },
+    Workers {
+        limit: u32,
+    },
     /// `StopBound` as supplied by its owner.
-    StopBound { grace: Duration },
+    StopBound {
+        grace: Duration,
+    },
 }
 
 /// The supplied closed personcapacityaction vocabulary.
@@ -352,4 +359,20 @@ pub enum OwnerAccountUnread {
     Failed,
     Stalled,
     TooLarge,
+}
+
+/// Which advertised agent capability falls short of the deployment.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum OwnerAgentShortfall {
+    Model { charter: u32, model: u32 },
+    Window { charter: u32, model: u32 },
+    Output { charter: u32, model: u32 },
+    Turns,
+    Spend,
+    Time,
+    Waiting,
+    Checks,
+    Message,
+    Inbox,
+    Unacknowledged,
 }

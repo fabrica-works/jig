@@ -651,3 +651,23 @@ fn completion_activity(owner: Token, turns: u32) -> Vec<root::Event> {
     }
     reports
 }
+
+/// Capabilities of the scripted agent, whose script applies no smaller limits.
+#[must_use]
+pub fn agent_bounds() -> host::Bounds {
+    host::Bounds {
+        models: Box::new([host::ModelBound {
+            name: b"scripted".as_slice().into(),
+            window: u32::MAX,
+            output: u32::MAX,
+        }]),
+        turns: u32::MAX,
+        spend: u64::MAX,
+        time: Duration::from_nanos(u64::MAX),
+        waiting: Duration::from_nanos(u64::MAX),
+        checks: Duration::from_nanos(1),
+        message_bytes: u32::MAX,
+        inbox: u32::MAX,
+        unacknowledged: u32::MAX,
+    }
+}

@@ -34,3 +34,8 @@ pub const ANALYST: jig_domain_fleet::Grant = jig_domain_fleet::Grant {
     generation: 1,
     valid: skein_lib::Duration::from_secs(60),
 };
+
+#[must_use]
+pub fn needs() -> jig_domain_fleet::Needs {
+    jig_domain_fleet::Needs { charters: Box::new([]), spend: 0, message_bytes: 0, start_messages: 0, unacknowledged: 0 }
+}

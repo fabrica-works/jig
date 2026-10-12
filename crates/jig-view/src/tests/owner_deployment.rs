@@ -283,7 +283,7 @@ fn deployment_view_normal_words_select_second_language_and_reject_missing_or_wro
     let tree = build(&client, &words, maximum);
     assert!(contains(&tree, b"selected "));
     assert!(!contains(&tree, b"Deployment diagnostics"));
-    assert_eq!(crate::owner_deployment_words::ALL.len(), 211);
+    assert_eq!(crate::owner_deployment_words::ALL.len(), 223);
     let mut wrong = crate::owner_deployment_words::language();
     let phrase = wrong.phrases.iter_mut().find(|p| p.id == P::Host.id()).unwrap();
     phrase.forms[0].segments = Box::new([Segment::Text(copy_of(b"host without number"))]);
@@ -676,7 +676,7 @@ fn deployment_view_configured_empty_and_clipped_catalogues_are_distinct_and_slot
 fn store_words() -> Words {
     let limits = PhraseLimits {
         languages: 1,
-        phrases: 220,
+        phrases: 223,
         holes: 1,
         segments: 512,
         text_bytes: 16_384,
@@ -702,4 +702,22 @@ fn the_deployment_page_shows_the_store_fill_against_its_mark() {
     let tree = build(&client, &store_words(), super::cards::limits());
     assert!(contains(&tree, b"Store map bytes: 6789"));
     assert!(contains(&tree, b"Store high-water mark in bytes: 9012"));
+}
+
+#[test]
+fn an_agent_shortfall_refusal_is_worded() {
+    let mut value = empty();
+    value
+        .hello_refusals
+        .push(OwnerHelloRefusalLine {
+            channel: 9,
+            at: Wall::EPOCH,
+            slots: 1,
+            stop_bound: Duration::ZERO,
+            why: OwnerHelloRefusal::Agent { why: OwnerAgentShortfall::Window { charter: 42, model: 3 } },
+        })
+        .unwrap();
+    let tree = round_trip(value);
+    assert!(contains(&tree, b"Agent window too small for charter 42"));
+    assert!(contains(&tree, b"Model position 3"));
 }

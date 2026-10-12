@@ -165,7 +165,7 @@ impl World {
         };
         Self {
             rng: Rng::new(settings.seed),
-            domain: Domain::new(&limits),
+            domain: Domain::new(&limits, crate::fixtures::needs()),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
             out: Queue::with_capacity(fleet::max_out(&limits)),
             worker: BTreeMap::new(),
@@ -348,7 +348,7 @@ impl World {
                 self.report.replays += 1;
             }
             if self.settings.restart && tick == 10 {
-                self.domain = Domain::new(&self.env.limits);
+                self.domain = Domain::new(&self.env.limits, crate::fixtures::needs());
                 self.channel = None;
                 self.loaded = false;
                 self.parent.clear();

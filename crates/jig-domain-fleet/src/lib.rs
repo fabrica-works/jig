@@ -60,6 +60,8 @@ mod facts;
 mod grants;
 mod history;
 mod limits;
+mod needs;
+pub use needs::{AgentShortfall, CharterNeeds, ModelNeed, Needs};
 mod progress;
 #[cfg(test)]
 mod tests;

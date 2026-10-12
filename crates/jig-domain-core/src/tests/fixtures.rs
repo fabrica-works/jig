@@ -16,3 +16,8 @@ pub fn bounds() -> jig_domain_fleet::Bounds {
         unacknowledged: u32::MAX,
     }
 }
+
+#[must_use]
+pub fn needs() -> jig_domain_fleet::Needs {
+    jig_domain_fleet::Needs { charters: Box::new([]), spend: 0, message_bytes: 0, start_messages: 0, unacknowledged: 0 }
+}

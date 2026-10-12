@@ -98,19 +98,24 @@ pub(crate) fn cache(channel: &mut Channel, limits: &Limits, workstream: u64) {
 /// Hello, on a new channel: the worker is in contact, or turned away.
 pub(crate) fn hello(domain: &mut Domain, env: &Env<Limits>, channel: Token, hello: Hello, out: &mut Queue<Request>) {
     let limits = &env.limits;
-    if channel == Token::new(0) {
-        crate::history::refused(
-            domain,
-            crate::HelloRefusalRecord {
-                channel,
-                at: env.wall,
-                slots: hello.slots,
-                stop_bound: hello.stop_bound,
-                why: crate::HelloRefusal::ReservedChannel,
-            },
-        );
-        domain.facts.push(Fact::TurnedAway);
-        out.push(Request::Refuse { channel });
+    let engine = channel == Token::new(0);
+    let reserved = match domain.engine_hello {
+        crate::domain::EngineHello::Expected => false,
+        crate::domain::EngineHello::Heard => true,
+    };
+    if engine && reserved {
+        refuse(domain, env, channel, &hello, crate::HelloRefusal::ReservedChannel, out);
+        return;
+    }
+    if engine {
+        domain.engine_hello = crate::domain::EngineHello::Heard;
+    }
+    let kind = if engine { HostKind::Engine } else { HostKind::Worker };
+    if let Some(why) = crate::needs::shortfall(&domain.needs, &hello.bounds, kind) {
+        refuse(domain, env, channel, &hello, crate::HelloRefusal::Agent { why }, out);
+        return;
+    }
+    if engine {
         return;
     }
     if domain.tokens.contains_key(&channel) {
@@ -179,6 +184,22 @@ pub(crate) fn hello(domain: &mut Domain, env: &Env<Limits>, channel: Token, hell
     }
     domain.facts.push(Fact::Hello { listed });
     domain.placing = true;
+}
+
+fn refuse(
+    domain: &mut Domain,
+    env: &Env<Limits>,
+    channel: Token,
+    hello: &Hello,
+    why: crate::HelloRefusal,
+    out: &mut Queue<Request>,
+) {
+    crate::history::refused(
+        domain,
+        crate::HelloRefusalRecord { channel, at: env.wall, slots: hello.slots, stop_bound: hello.stop_bound, why },
+    );
+    domain.facts.push(Fact::TurnedAway);
+    out.push(Request::Refuse { channel });
 }
 
 /// Lost: the worker's attempts are kept for the grace, adrift. A channel

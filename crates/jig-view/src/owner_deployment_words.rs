@@ -1,5 +1,6 @@
 //! Deployment diagnostics sayings (client/domain/view.md, 7).
 mod accounts;
+mod agents;
 use crate::{
     Owner,
     phrases::{
@@ -8,10 +9,12 @@ use crate::{
     },
 };
 pub use accounts::AccountPhrase;
+pub use agents::AgentPhrase;
 use alloc::boxed::Box;
 use skein_lib::{List, bytes::copy_of};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DeploymentPhrase {
+    Agent(AgentPhrase),
     Deployment,
     Hosts,
     Attempts,
@@ -215,7 +218,19 @@ pub enum DeploymentPhrase {
     StoreBytes,
     StoreMark,
 }
-pub const ALL: [DeploymentPhrase; 211] = [
+pub const ALL: [DeploymentPhrase; 223] = [
+    DeploymentPhrase::Agent(AgentPhrase::Model),
+    DeploymentPhrase::Agent(AgentPhrase::Window),
+    DeploymentPhrase::Agent(AgentPhrase::Output),
+    DeploymentPhrase::Agent(AgentPhrase::Turns),
+    DeploymentPhrase::Agent(AgentPhrase::Spend),
+    DeploymentPhrase::Agent(AgentPhrase::Time),
+    DeploymentPhrase::Agent(AgentPhrase::Waiting),
+    DeploymentPhrase::Agent(AgentPhrase::Checks),
+    DeploymentPhrase::Agent(AgentPhrase::Message),
+    DeploymentPhrase::Agent(AgentPhrase::Inbox),
+    DeploymentPhrase::Agent(AgentPhrase::Unacknowledged),
+    DeploymentPhrase::Agent(AgentPhrase::ModelPosition),
     DeploymentPhrase::Deployment,
     DeploymentPhrase::Hosts,
     DeploymentPhrase::Attempts,
@@ -536,6 +551,7 @@ impl DeploymentPhrase {
                 Self::AccountStateSignInAgain => 9298,
                 Self::AccountStateMisconfigured => 9299,
                 Self::AccountDetail(phrase) => phrase.number(),
+                Self::Agent(phrase) => phrase.number(),
                 Self::AccountStateClosing => 9300,
                 Self::HelloRefusalReservedChannel => 9301,
                 Self::HelloRefusalWorkers => 9302,
@@ -643,6 +659,7 @@ impl DeploymentPhrase {
     #[expect(clippy::too_many_lines, reason = "the closed deployment vocabulary has one exhaustive mapping table")]
     fn hole(self) -> Option<HoleKind> {
         match self {
+            Self::Agent(phrase) => phrase.hole(),
             Self::AccountDetail(..)
             | Self::Deployment
             | Self::Hosts
@@ -947,6 +964,7 @@ impl DeploymentPhrase {
             Self::AccountStateSignInAgain => b"Account State Sign in again",
             Self::AccountStateMisconfigured => b"Account State Misconfigured",
             Self::AccountDetail(phrase) => phrase.label(),
+            Self::Agent(phrase) => phrase.label(),
             Self::AccountStateClosing => b"Account State Closing",
             Self::HelloRefusalReservedChannel => b"Hello Refusal Reserved Channel",
             Self::HelloRefusalWorkers => b"Hello Refusal Workers",
