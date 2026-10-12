@@ -740,9 +740,10 @@ exchange; the client domain owns only the act and what it shows.
 - The conformance and `ops` worlds fire the people child's timer:
   `git -C ~/src/rust/jig grep -n 'Timer::People' -- tests/conformance/src/lib.rs tests/ops/src/conformance/mod.rs`
   prints two lines.
-- No chat is forgotten by a test's own event: `git -C ~/src/rust/jig grep -n 'core::Event::ForgetChat' -- tests`
-  prints nothing (the people child's own worlds send its `Event::ForgetChat`
-  to the child, which stays; ruling 118).
+- No chat is forgotten by a test's own event: `git -C ~/src/rust/jig grep -n 'core::Event::ForgetChat' -- 'tests/*/tests'`
+  prints nothing. The worlds' loaders answering `Now::LoadEndedChat` with
+  it (`tests/core/src/effects.rs`, `tests/ops/src/joint/engine.rs`) and the
+  people child's own worlds' `Event::ForgetChat` stay (rulings 118, 119).
 - The tasks' refusal for a proposal nobody may accept exists and is
   mapped: `git -C ~/src/rust/jig grep -n 'Refusal::Unproposable' -- crates/jig-domain-core/src/routing`
   prints at least two lines.
