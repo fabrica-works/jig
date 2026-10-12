@@ -279,6 +279,12 @@ ones before it in its session. Dependencies are by capability: "skein
   replaces development.md, 8.5's "stop on a question" for that case
   only; a failure the Shape does not explain, or a fix past ruling
   114's limits, is still a question.
+- **A codec checks fields and counts; sums are the domain's**
+  (decisions.md, rulings 135 and 154). In jig 14, 19 and 30, a codec's
+  `limits` maps the domain's limits to the generated `Limits`, each
+  field's ceiling the domain limit that bounds it (a sum where only a sum
+  does); its translations check no sum. No family adds a wrapper
+  `Limits` type; the domain checks its sums at admission and restore.
 
 ## Live services
 

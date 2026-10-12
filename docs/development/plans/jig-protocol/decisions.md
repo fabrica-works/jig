@@ -874,6 +874,21 @@ the file.
      question. The focused suite's 15 s budget is unchanged. Proposed for
      the retrospective: skein-codegen's speed (about 9 ms a declaration)
      and the size of a family that mirrors the client's contract.
+154. **A codec checks fields and counts; sums are the domain's**
+     (2026-10-12, the coordinator's block "jig 14.4: aggregate inbox
+     bytes codec boundary", 2026-10-12T21:25:54Z; the second such block,
+     after jig 19.3's, ruling 135). `TaskRecord.inbox` is bounded by
+     `inbox_messages` (its count), `message_bytes` (each message) and
+     `inbox_bytes` (their sum). jig 14's Choice gives a field the domain
+     bounds only by a sum that sum as its ceiling ("an aggregate where
+     the domain bounds only a sum: ..., `inbox_bytes`, ..."), and ruling
+     135 has "The translations check each field against its ceiling and
+     no sum, as the tasks family's do". So no wrapper `Limits` type:
+     `codec::tasks::{limits, encode, decode}` keep `tasks_v1::Limits`, and
+     `inbox_bytes` is checked by the domain at admission and restore.
+     `a_task_record_at_its_inbox_bound_reads_back` holds `inbox_messages`
+     messages, their bytes within `inbox_bytes`, and reads back. The
+     README's Rules now say so for every codec family.
 
 ## For the user
 
