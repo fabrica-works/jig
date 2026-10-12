@@ -433,9 +433,37 @@ the file.
      global timeout, alone in the gate lane: under 12 s, the machine was
      the cause, and it lands again; 12 s or more, it compares its ten
      slowest tests with `main`'s and reports, changing nothing yet.
+121. **smith's landings here gate without the fast suite's 15 s timeout**
+     (2026-10-12, the coordinator's block "smith 01.1: measured focused
+     suite exceeds budget on tip and main", 2026-10-12T18:19:26Z). Under
+     ruling 120's measure, smith's focused suite took 16.199 s on `main`
+     and 20.953 s on 01.1's tip, on carbon-forge. The only smith gate this
+     machine passed (`tmp/gates/smith/a0b07e80…`, 09:01 today) took
+     13.593 s for 2,123 tests; `main` has 2,515. smith's `Gate-Result`
+     times (6.3 to 7.4 s) are smith's reliability machine's. So smith's
+     gate fails on `main` here (development.md, 6: "a gate that fails on
+     `main` goes to the user"). So that smith 01, which heads the chain
+     through jig 02 to jig 17 and 18, need not wait: on this machine, for
+     this run, smith's landings (smith 01.1, smith-repin) run `land
+     --gate 'cargo fmt --all --check && cargo clippy --workspace
+     --all-targets -- -D warnings && cargo nextest run --workspace
+     --profile measure && cargo nextest run --workspace --profile
+     fuzzy'`: every test of both suites runs and must pass; only the
+     focused suite's 15 s global timeout is dropped. Restored by `land`
+     with smith's `scripts/check.sh`, once smith's focused suite fits 15
+     s here, or by landing smith from smith's reliability machine.
+     Reported to the user at once (development.md, 10.4). Before landing,
+     smith 01.1 accounts for the two `smith-bench` tests about six times
+     slower on its tip than on `main`.
 
 ## For the user
 
+- **smith's focused suite on carbon-forge** (ruling 121): it runs past
+  its 15 s budget here on `main` itself (16.2 s measured, 2,515 tests),
+  against 6.3 to 7.4 s on smith's reliability machine. Is carbon-forge a
+  reference machine for smith's budgets, and if so, is the suite made
+  cheaper, or its budget raised? Until then, smith lands here without
+  the focused suite's timeout.
 - **Retention** (decision 13): when a deployment's store must start
   shrinking ended work.
 - **The browser's shell and wasm32** (decision 2): when, and whether jig
