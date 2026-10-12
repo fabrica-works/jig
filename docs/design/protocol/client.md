@@ -289,7 +289,10 @@ the platform's HTTP stack, TLS                  TLS server, or plaintext on loop
   and the client goes to sign in (`../client/domain/client.md`,
   section 12). A person signing out is an exchange that ends their
   sign-in, its digest erased, the cookie cleared: the shell's exchange,
-  as signing in is (`../client/domain/client.md`, section 12).
+  as signing in is (`../client/domain/client.md`, section 12). Sent with
+  a secret the engine no longer knows, it is answered signed out like
+  any exchange, so a shell may send it again after it ended lost; a lost
+  one clears nothing on the client's side.
 
 ## 9. Versions
 

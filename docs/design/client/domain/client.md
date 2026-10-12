@@ -463,6 +463,15 @@ What a chat's page leads with, and every agent task's activity
 - **Signing out,** from the frame, is the shell's exchange too: it ends
   the sign-in on the engine (`../../domain/people.md`, section 3), and the
   client then shows the sign-in page, as when signed out.
+- **A sign-out that does not reach the engine** (lost,
+  `../../protocol/client.md`, section 4) leaves the person signed in, as
+  they still are: the sign-in's secret still works wherever its shell
+  keeps it, and a browser's cookie only the engine clears. The frame says
+  the sign-out did not reach the engine and offers it again; nothing is
+  shown done before it is (testing.md, section 6). Asking again is safe:
+  a sign-out whose sign-in has already ended is answered signed out, the
+  end the person asked for, and a lost one that did reach the engine
+  shows at the client's next exchange, answered signed out.
 - **Keys are the party's across sign-ins,** so the parked requests are
   sent again once the same party is confirmed (`../../domain/people.md`,
   5.1), within the engine's retention.
@@ -567,3 +576,8 @@ the one the person saw; nothing beyond the client's limits is held.
 - **A window's turn:** how a conversation shows a turn that opens a
   window (a compaction's summary of what came before it), beside the
   earlier window's turns it summarises.
+- **Signing out of a shared machine with the engine out of reach:**
+  whether a native shell should also forget its token there, leaving the
+  sign-in live on the engine until it expires, or a client keep the
+  sign-out and send it once the engine is reached. A browser's cookie
+  only the engine clears (section 12).
