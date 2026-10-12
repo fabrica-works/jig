@@ -1164,7 +1164,7 @@ fn accept_refused(
 /// The core owns the Propose answer and chooses its nearest covering holder.
 /// No Call identity is substituted for the procedure's genuine step/purpose.
 #[expect(clippy::too_many_arguments, reason = "one original procedure effect admission")]
-fn procedure_propose(
+pub(crate) fn procedure_propose(
     core: &mut Core,
     env: &Env<Limits>,
     work: &mut Queue<Event>,
@@ -1202,6 +1202,11 @@ fn procedure_propose(
         procedure_wait(core, work, task, step);
         return;
     };
+    if !crate::acts::bounds::proposal_has_recipient(core, holder) {
+        drop_effect(out, connector, owner, authority::Answer::Refuse);
+        procedure_wait(core, work, task, step);
+        return;
+    }
     let Some(proposal) = fresh(&mut core.counters, Family::Message) else {
         drop_effect(out, connector, owner, authority::Answer::Refuse);
         procedure_wait(core, work, task, step);
@@ -1424,8 +1429,7 @@ pub fn effect_worst_case(limits: &Limits) -> Option<u64> {
 
 fn projection_refused(core: &mut Core, env: &Env<Limits>, work: &mut Queue<Event>, goal: u64) {
     let message = b"Projection write refused";
-    let most = message.len().min(usize::try_from(env.limits.tasks.message_bytes).expect("u32 fits usize"));
-    let words = message.get(..most).expect("bounded refusal news");
+    let words: &[u8] = message;
     if let Some(row) = core.tasks.task(goal) {
         for word in &row.inbox {
             if word.kind == (tasks::MessageKind::News { subscription: 0, class: tasks::NewsClass::Kept })

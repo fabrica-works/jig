@@ -8,7 +8,7 @@ use jig_domain_people as people;
 use jig_domain_tasks as tasks;
 use skein_lib::{List, Queue, Wall};
 
-fn recipient(core: &Core, project: u32, kind: authority::ProposalKind) -> Option<Recipient> {
+pub(crate) fn recipient(core: &Core, project: u32, kind: authority::ProposalKind) -> Option<Recipient> {
     let policy = core.authority.policy(project)?;
     let mut roles = List::with_capacity(core.authority.limits().roles);
     for role in &policy.roles {
@@ -400,4 +400,20 @@ pub(crate) fn amendment_admit(
 /// is sent and when its admission would otherwise make a party proposal.
 fn unproposable() -> people::Refusal {
     people::Refusal::Authority { lacking: people::Lack::Approver, proposable: Some(false) }
+}
+
+/// Only a newly admitted proposal needs an accepting policy role (tasks.md, 9).
+pub(crate) fn proposal_has_recipient(core: &Core, holder: tasks::ProposalHolder) -> bool {
+    let (project, kind) = match holder {
+        tasks::ProposalHolder::Policy { project, kind } => (project, kind),
+        tasks::ProposalHolder::Task(_) | tasks::ProposalHolder::Person(_) => return true,
+    };
+    let kind = match kind {
+        tasks::ProposalKind::Batch => authority::ProposalKind::Batch,
+        tasks::ProposalKind::Effect => authority::ProposalKind::Effect,
+        tasks::ProposalKind::Amend => authority::ProposalKind::Amend,
+        tasks::ProposalKind::Widen => authority::ProposalKind::Widen,
+        tasks::ProposalKind::Release => authority::ProposalKind::Escalation,
+    };
+    recipient(core, project, kind).is_some()
 }

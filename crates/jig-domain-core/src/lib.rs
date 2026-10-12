@@ -464,6 +464,8 @@ impl Core {
     #[must_use]
     #[expect(clippy::too_many_lines, reason = "construct all bounded children, bindings and subject marks together")]
     pub fn new(config: Config, limits: &Limits) -> Core {
+        assert!(limits.people.words <= limits.tasks.message_bytes, "party words fit one run message");
+        assert!(limits.tasks.message_bytes >= 24, "projection refusal news fits one run message");
         assert!(config.settings.tools.valid(), "each engine tool has one configured authority bit");
         assert!(*config.authority.limits() == limits.authority, "core prices its authority's configured bounds");
         assert!(

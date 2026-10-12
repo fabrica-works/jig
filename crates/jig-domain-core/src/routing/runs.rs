@@ -270,6 +270,9 @@ pub(crate) fn named_propose(
     let Some(holder) = core.proposal_holder(&env.limits, key.task, &action, None) else {
         return proposal_refused(core, to, key, tasks::Refusal::Reference);
     };
+    if !crate::acts::bounds::proposal_has_recipient(core, holder) {
+        return proposal_refused(core, to, key, tasks::Refusal::Unproposable);
+    }
     let Some(number) = crate::fresh(&mut core.counters, crate::Family::Message) else {
         return proposal_refused(core, to, key, tasks::Refusal::Busy);
     };

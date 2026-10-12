@@ -230,6 +230,19 @@ fn a_denied_part_renders_as_an_error_naming_what_it_lacked() {
     );
 }
 #[test]
+fn an_unproposable_part_renders_as_an_error_saying_no_proposal_could_be_accepted() {
+    let part = core::CallPart::ProposalRefused(jig_domain_tasks::Problem {
+        task: Some(1),
+        why: jig_domain_tasks::Refusal::Unproposable,
+        blocked_by: None,
+        capacity: None,
+    });
+    assert_eq!(
+        crate::render(&part),
+        crate::Rendered { error: true, text: b"Refused: no proposal could be accepted".as_slice().into() }
+    );
+}
+#[test]
 fn a_problem_renders_the_tools_name_and_missing_field() {
     assert_eq!(
         crate::problem(b"message", &Problem { field: b"target", why: Why::Missing }),
