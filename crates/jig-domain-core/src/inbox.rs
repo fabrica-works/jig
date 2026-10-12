@@ -1,6 +1,9 @@
 //! Volatile party inbox projections from the task child's durable rows.
 //! The core routes these sibling facts on save and restore (domain/engine.md, 4.4).
 
+mod census;
+pub(crate) use census::{Progress, worst_case as census_worst_case};
+
 use alloc::boxed::Box;
 use jig_domain_authority as authority;
 use jig_domain_people as people;
@@ -400,108 +403,6 @@ fn matches_ended(phase: &tasks::Phase) -> bool {
     }
 }
 
-/// Owner-defined startup census range, loaded after people's positions restore.
-#[must_use]
-pub fn restore_key(key: &crate::Key) -> bool {
-    match key {
-        crate::Key::Tasks(tasks::Key::Live(_) | tasks::Key::Ended(_) | tasks::Key::PersonProposal(_)) => true,
-        crate::Key::Tasks(
-            tasks::Key::Activity { .. }
-            | tasks::Key::History { .. }
-            | tasks::Key::Milestone { .. }
-            | tasks::Key::Stub(_)
-            | tasks::Key::Ledger(_)
-            | tasks::Key::Writer(_)
-            | tasks::Key::ConversationNewest { .. }
-            | tasks::Key::ConversationOldest { .. }
-            | tasks::Key::Update { .. }
-            | tasks::Key::Pool(_)
-            | tasks::Key::ClosedLedger(_)
-            | tasks::Key::DecidedProposal(_),
-        )
-        | crate::Key::Core(_)
-        | crate::Key::People(_)
-        | crate::Key::Notes(_) => false,
-    }
-}
-impl Core {
-    /// Rebuild bounded inbox references and exact chat totals from their owner rows.
-    /// This census is a separate startup range so all read positions already exist.
-    #[must_use]
-    pub fn restore_inbox_row(&mut self, limits: &Limits, row: &tasks::Stored) -> bool {
-        if self.restart_step() != Some(crate::RestartStep::LoadInbox) || !self.people.ready() {
-            return false;
-        }
-        let mut out = skein_lib::Queue::with_capacity(people::max_out(&limits.people));
-        let env = skein_lib::Env { now: skein_lib::Time::ZERO, wall: skein_lib::Wall::EPOCH, limits: limits.people };
-        let (task, entries) = match row {
-            tasks::Stored::Live(row) | tasks::Stored::Ended(row) => {
-                if !valid_header(self, limits, row) {
-                    return false;
-                }
-                let live = !matches_ended(&row.phase);
-                if let tasks::Party::Person(party) = row.requester {
-                    if self.people.identity(party).is_none() {
-                        return false;
-                    }
-                    if !live {
-                        let Some(at) = row.ended_at else {
-                            return false;
-                        };
-                        if row.result_position == 0 || row.result_position > self.counters.deployment().messages {
-                            return false;
-                        }
-                        self.people.remember_result(
-                            &limits.people,
-                            party,
-                            people::ResultRef {
-                                task: row.number,
-                                project: row.project,
-                                at,
-                                position: row.result_position,
-                            },
-                        );
-                    }
-                    if self.chat_requester(row).is_some() {
-                        people::step(
-                            &mut self.people,
-                            &env,
-                            people::Event::ChatState {
-                                party,
-                                project: row.project,
-                                task: row.number,
-                                last_reply: row.last_reply,
-                                live,
-                                replies: reply_refs(limits, row, party),
-                            },
-                            &mut out,
-                        );
-                    }
-                }
-                if !live {
-                    self.cache_archived_chat(limits, row);
-                }
-                (row.number, self.waiting_entries(limits, row))
-            }
-            tasks::Stored::PersonProposal(row) => (row.goal.number, self.person_proposal_entries(row)),
-            tasks::Stored::Activity(_)
-            | tasks::Stored::History(_)
-            | tasks::Stored::Milestone(_)
-            | tasks::Stored::Stub(_)
-            | tasks::Stored::Ledger(_)
-            | tasks::Stored::Writer(_)
-            | tasks::Stored::ConversationNewest(_)
-            | tasks::Stored::ConversationOldest(_)
-            | tasks::Stored::Update(_)
-            | tasks::Stored::Pool(_)
-            | tasks::Stored::ClosedLedger(_)
-            | tasks::Stored::DecidedProposal(_) => return true,
-        };
-        people::step(&mut self.people, &env, people::Event::Waiting { task, entries }, &mut out);
-        out.is_empty()
-    }
-}
-
 /// Forget the ended owner only after every update has been read. The marker erase
 /// and owner erase share the root's journal decision; linked archives without an
 /// owner become unreadable and can be collected by the store's retention pass.
@@ -511,7 +412,7 @@ pub(crate) fn forget_chat(
     work: &mut skein_lib::Queue<crate::Event>,
     row: &tasks::TaskRecord,
 ) -> crate::Requests {
-    let mut out = skein_lib::Queue::with_capacity(5);
+    let mut out = skein_lib::Queue::with_capacity(6);
     if matches_ended(&row.phase)
         && core.people.ready()
         && valid_header(core, &env.limits, row)
@@ -537,6 +438,7 @@ pub(crate) fn forget_chat(
         };
         out.push(crate::Request::Write(crate::Write::Erase(crate::Key::Tasks(update.key()))));
         for key in [
+            tasks::Key::Result { party, position: row.result_position },
             tasks::Key::ConversationNewest { party, task: tasks::Newest::of(row.number) },
             tasks::Key::ConversationOldest { party, task: row.number },
         ] {

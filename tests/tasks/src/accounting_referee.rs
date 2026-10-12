@@ -281,6 +281,7 @@ impl Accounting {
                             }
                             Stored::Live(_)
                             | Stored::Writer(_)
+                            | Stored::Result(_)
                             | Stored::ConversationNewest(_)
                             | Stored::ConversationOldest(_)
                             | Stored::Update(_)
@@ -330,6 +331,7 @@ impl Accounting {
                             }
                             Stored::Live(_)
                             | Stored::Writer(_)
+                            | Stored::Result(_)
                             | Stored::ConversationNewest(_)
                             | Stored::ConversationOldest(_)
                             | Stored::Update(_)
@@ -399,6 +401,7 @@ impl Accounting {
                 }
                 Stored::Ended(_)
                 | Stored::Writer(_)
+                | Stored::Result(_)
                 | Stored::ConversationNewest(_)
                 | Stored::ConversationOldest(_)
                 | Stored::Update(_)

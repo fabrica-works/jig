@@ -400,3 +400,128 @@ fn a_restart_between_a_window_turn_and_its_resume_sends_the_window() {
         [Box::<[u8]>::from(&b"window to resume"[..])]
     );
 }
+
+fn census_world(seed: u64) -> World {
+    let (configuration, mut limits) = jig_core_world::effects::fixture(seed, false);
+    limits.core.people.inbox_entries = 8;
+    limits.core.tasks.inbox_messages = 8;
+    limits.core.tasks.run_inbox = 8;
+    limits.core.documents.rows = 2;
+    let room = core::room_max(&limits.core).expect("census world room");
+    let connectors = connector::MAX_OUT * 2;
+    limits.journal.commits = 2;
+    limits.journal.writes = room.writes + connectors;
+    limits.journal.held = (room.held + connectors) * 2;
+    let mut world = World::configured(seed, false, configuration, limits);
+    world.reads = Some(jig_core_world::reads::Parties::new(world.store.applied));
+    world
+}
+fn finish_census_task(world: &mut World, cumulative: u64) {
+    world.end(
+        tasks::End::Finished {
+            result: tasks::TaskResult::Report { words: b"census result".as_slice().into() },
+            cancel_delegates: false,
+        },
+        cumulative,
+    );
+}
+fn census_ended_key(task: u64) -> root::Key {
+    root::Key::Core(core::Key::Tasks(tasks::Key::Ended(task)))
+}
+fn census_result(world: &World, task: u64) -> &tasks::TaskRecord {
+    let root::Record::Core(core::Record::Tasks(tasks::Stored::Ended(row))) = &world.store.rows[&census_ended_key(task)]
+    else {
+        panic!("ended census result")
+    };
+    row
+}
+fn census_goal(world: &mut World, key: u8) -> u64 {
+    jig_core_world::stories::reads::request(world, key, jig_core_world::stories::offers::goal(100));
+    let task = world.assigned.as_ref().expect("goal assigned").task;
+    finish_census_task(world, 0);
+    assert!(census_result(world, task).tracked.is_some());
+    task
+}
+fn census_mark_results(world: &mut World, through: u64, key: u8) {
+    jig_core_world::stories::reads::request(
+        world,
+        key,
+        jig_domain_people::Ask::MarkSeen { seen: jig_domain_people::Seen::Results { through } },
+    );
+}
+#[test]
+fn a_restart_reads_no_ended_task_whose_result_was_read() {
+    let mut world = census_world(790);
+    let chat = world.assigned.as_ref().expect("initial chat").task;
+    world.turn(1, 1, None, b"initial reply");
+    finish_census_task(&mut world, 1);
+    jig_core_world::stories::reads::request(
+        &mut world,
+        99,
+        jig_domain_people::Ask::MarkSeen { seen: jig_domain_people::Seen::Chat { task: chat, through: 1 } },
+    );
+    let through = census_result(&world, chat).result_position;
+    census_mark_results(&mut world, through, 100);
+    let first = census_goal(&mut world, 101);
+    let _second = census_goal(&mut world, 102);
+    let _third = census_goal(&mut world, 103);
+    let through = census_result(&world, first).result_position;
+    census_mark_results(&mut world, through, 104);
+    world.restart(790, false);
+    assert_eq!(world.census_ended, 2);
+    assert!(world.store.rows.contains_key(&census_ended_key(first)));
+}
+fn census_updates(world: &mut World, reply: u64) -> core::documents::Count {
+    jig_core_world::reads::ask(world, reply, core::reads::Read::Frame);
+    let core::reads::Answer::Document(document) = jig_core_world::reads::latest(world) else { panic!("frame") };
+    let core::documents::Document::Frame(frame) = &**document else { panic!("frame document") };
+    frame.updates
+}
+fn census_unread_results(world: &mut World) -> Vec<u64> {
+    let mut from = None;
+    let mut tasks = Vec::new();
+    for page in 0..4 {
+        jig_core_world::reads::ask(
+            world,
+            810 + page,
+            core::reads::Read::Inbox {
+                group: core::reads::Group::Results,
+                filter: core::reads::Filter { project: Some(1), goal: None },
+                from: from.take(),
+            },
+        );
+        let core::reads::Answer::Page(rows) = jig_core_world::reads::latest(world) else { panic!("results page") };
+        for row in &rows.rows {
+            let core::reads::PageRow::Inbox(entry) = row else { panic!("result row") };
+            let core::documents::TaskLink::Retained { chip, .. } = &entry.task else { panic!("retained task") };
+            tasks.push(chip.number);
+        }
+        from.clone_from(&rows.next);
+        if from.is_none() {
+            break;
+        }
+    }
+    tasks
+}
+#[test]
+fn a_restart_restores_unread_results_and_chat_totals() {
+    let mut world = census_world(791);
+    let mut chats = Vec::new();
+    for number in 0..3 {
+        if number != 0 {
+            jig_core_world::stories::reads::request(
+                &mut world,
+                110 + number,
+                jig_domain_people::Ask::StartChat { project: 1, words: b"next census chat".as_slice().into() },
+            );
+        }
+        chats.push(world.assigned.as_ref().expect("chat").task);
+        world.turn(1, 1, None, b"unread reply");
+        finish_census_task(&mut world, 1);
+    }
+    assert_eq!(census_updates(&mut world, 800), core::documents::Count::Known(6));
+    world.restart(791, false);
+    assert_eq!(census_updates(&mut world, 801), core::documents::Count::Known(6));
+    chats.reverse();
+    assert_eq!(census_unread_results(&mut world), chats);
+}

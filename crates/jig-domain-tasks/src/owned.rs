@@ -54,7 +54,8 @@ pub fn stored_bytes(record: &Stored) -> Option<u64> {
             Some(total)
         }
         Stored::Live(task) | Stored::Ended(task) => task_bytes(task),
-        Stored::ConversationNewest(_)
+        Stored::Result(_)
+        | Stored::ConversationNewest(_)
         | Stored::ConversationOldest(_)
         | Stored::Update(_)
         | Stored::Stub(_)

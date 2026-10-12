@@ -37,6 +37,7 @@ fn ledger(world: &World, funder: Funder) -> tasks::FundingRecord {
         Stored::Live(_)
         | Stored::Ended(_)
         | Stored::Writer(_)
+        | Stored::Result(_)
         | Stored::ConversationNewest(_)
         | Stored::ConversationOldest(_)
         | Stored::Update(_)

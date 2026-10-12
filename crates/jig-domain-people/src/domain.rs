@@ -7,6 +7,7 @@
 
 #[path = "inbox.rs"]
 mod inbox;
+mod parties;
 use inbox::{chat_seen_decision, mark_seen, prune_unheld_roles, replace_waiting};
 
 use crate::{

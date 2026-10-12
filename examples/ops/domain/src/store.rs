@@ -5,12 +5,12 @@ use jig_ops_domain_infrastructure as infrastructure;
 use jig_ops_domain_observability as observability;
 
 /// A contiguous family of rows belonging to one child.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Range {
     /// The core's live rows, in its restoration order.
     Core,
     /// Task owner rows used to rebuild the core's derived inbox after positions restore.
-    Inbox,
+    Census(core::Census),
     /// Observability's live rows.
     Observability,
     /// Infrastructure's live rows.

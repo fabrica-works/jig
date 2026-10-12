@@ -2,7 +2,9 @@
 //! The application performs each requested step and reports that exact step
 //! done. Only the core chooses the next step or opens decisions.
 
+mod census;
 use crate::{Core, fleet};
+pub use census::{Census, ReadResults};
 
 /// Ordered live ranges of the cold start (protocol/store.md, 4.3 and 7.2).
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -15,6 +17,8 @@ pub enum RestoreRange {
     Tasks,
     /// The core's remaining live families.
     Core,
+    /// Inbox owners named by durable indexes after read positions are restored.
+    Census(Census),
 }
 
 impl RestoreRange {
@@ -24,6 +28,10 @@ impl RestoreRange {
     /// Predicate checked against the store's intervals (protocol/store.md, 4.3).
     #[must_use]
     pub fn admits(&self, key: &crate::Key) -> bool {
+        match self {
+            Self::Census(census) => return census.admits(key),
+            Self::Deployment | Self::People | Self::Tasks | Self::Core => {}
+        }
         match key {
             crate::Key::Core(crate::CoreKey::Deployment) => *self == Self::Deployment,
             crate::Key::Core(key) => *self == Self::Core && key.live(),
@@ -113,6 +121,7 @@ impl Core {
             Restart::Open => RestartStep::Open,
         };
         self.restart = Restart::Failed(step);
+        self.census_progress = skein_lib::Map::with_capacity(self.census_progress.capacity());
         RestartRequest::Refused { step }
     }
 
@@ -157,10 +166,13 @@ impl Core {
                 self.counters.finish_restore();
                 RestartStep::LoadInbox
             }
-            RestartStep::LoadInbox => match self.connectors.first() {
-                Some(&connector) => RestartStep::RestoreConnector { connector },
-                None => RestartStep::AdoptRuns,
-            },
+            RestartStep::LoadInbox => {
+                self.census_progress = skein_lib::Map::with_capacity(self.census_progress.capacity());
+                match self.connectors.first() {
+                    Some(&connector) => RestartStep::RestoreConnector { connector },
+                    None => RestartStep::AdoptRuns,
+                }
+            }
             RestartStep::RestoreConnector { connector } => match self.restart_next_connector(connector) {
                 Some(connector) => RestartStep::RestoreConnector { connector },
                 None => RestartStep::AdoptRuns,

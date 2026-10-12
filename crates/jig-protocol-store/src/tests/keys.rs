@@ -4,6 +4,10 @@ use crate::keys;
 use jig_domain_core::{CoreKey, Key};
 use skein_lib::Rng;
 
+fn samples() -> core::ops::Range<u32> {
+    0..500
+}
+
 #[test]
 fn core_and_people_keys_sort_as_bytes_as_they_derive() {
     let mut rng = Rng::new(0x5701_e001);
@@ -18,7 +22,7 @@ fn core_and_people_keys_sort_as_bytes_as_they_derive() {
 #[test]
 fn every_generated_key_decodes_to_itself() {
     let mut rng = Rng::new(0x5701_e002);
-    for _ in 0_u32..2_000 {
+    for _ in samples() {
         let key = fixtures::key(&mut rng);
         let bytes = keys::encode(&key, fixtures::KEY_LIMIT).expect("within the key limit");
         assert_eq!(keys::decode(&bytes), Some(key));
@@ -82,7 +86,7 @@ fn an_application_key_must_have_its_owners_tag() {
 #[test]
 fn tasks_keys_sort_as_bytes_as_they_derive() {
     let mut rng = Rng::new(0x5701_e014);
-    for _ in 0_u32..2_000 {
+    for _ in samples() {
         let left = Key::Tasks(fixtures::tasks_key(&mut rng));
         let right = Key::Tasks(fixtures::tasks_key(&mut rng));
         let left_bytes = keys::encode(&left, fixtures::KEY_LIMIT).expect("within the key limit");

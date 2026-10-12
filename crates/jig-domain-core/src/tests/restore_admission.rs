@@ -265,3 +265,90 @@ fn a_records_key_is_the_key_its_row_is_saved_under() {
         assert_eq!(Record::Core(row).key(), Key::Core(key), "the child tag wraps the same address");
     }
 }
+
+fn census_fixture() -> (Core, Env<Limits>) {
+    let mut env = env();
+    env.limits.people.inbox_entries = 8;
+    let mut configuration = config(79);
+    configuration.owners = Box::new([]);
+    let mut core = Core::new(configuration, &env.limits);
+    assert_eq!(core.restart_begin(), RestartRequest::Step(RestartStep::LoadCore));
+    let mut header = core.counters.deployment();
+    header.tasks = 20;
+    header.people = 7;
+    header.messages = 5;
+    header.runs = 1;
+    core.counters = Counters::new(header);
+    restore_census_people(&mut core, &env);
+    assert_eq!(core.restart_done(RestartStep::LoadCore), RestartRequest::Step(RestartStep::LoadInbox));
+    (core, env)
+}
+#[test]
+fn the_census_lists_each_party_after_its_read_position() {
+    let (mut core, env) = census_fixture();
+    assert_eq!(
+        core.census(&env.limits).results.as_ref(),
+        [ReadResults { party: 1, after: 3 }, ReadResults { party: 7, after: 0 }]
+    );
+}
+fn ended_census_chat() -> tasks::Stored {
+    let (live, _) = watch_core();
+    let mut row = live.tasks.task(1).expect("fixture chat").clone();
+    row.number = 2;
+    row.root = 2;
+    row.depth = 0;
+    row.result_position = 5;
+    row.last_reply = 1;
+    row.activity = 1;
+    row.attempt = 1;
+    row.turn = 1;
+    row.replies =
+        Box::new([tasks::ReplyHint { number: 1, activity: 1, attempt: 1, turn: 1, at: Wall::from_nanos(50) }]);
+    row.ended_at = Some(Wall::from_nanos(100));
+    row.phase = tasks::Phase::Ended(tasks::Ending::Cancelled {
+        by: tasks::Party::Person(1),
+        at: Wall::from_nanos(100),
+        reason: Box::new([1]),
+        result: None,
+    });
+    tasks::Stored::Ended(Box::new(row))
+}
+#[test]
+fn an_ended_chat_handed_twice_to_the_census_changes_nothing() {
+    let (mut core, env) = census_fixture();
+    let _census = core.census(&env.limits);
+    let chat = ended_census_chat();
+    assert!(core.restore_inbox_row(&env.limits, &chat));
+    let before = core.people.counts(&env.limits.people, 1).expect("party counts");
+    assert!(core.restore_inbox_row(&env.limits, &chat));
+    assert_eq!(core.people.counts(&env.limits.people, 1), Some(before));
+    assert_eq!(core.people.cached_results(1).expect("party results").len(), 1);
+    let _next = core.restart_done(RestartStep::LoadInbox);
+    assert!(core.census_progress.is_empty());
+}
+
+fn restore_census_people(core: &mut Core, env: &Env<Limits>) {
+    let people_env = Env { now: env.now, wall: env.wall, limits: env.limits.people };
+    let mut out = Queue::with_capacity(people::max_out(&env.limits.people));
+    for party in [1, 7] {
+        let mut who = identity();
+        who.key.subject = Box::new([u8::try_from(party).expect("fixture party")]);
+        people::step(
+            &mut core.people,
+            &people_env,
+            people::Event::Restore { record: people::Stored::Person { number: party, identity: who } },
+            &mut out,
+        );
+    }
+    for record in [
+        people::Stored::ReadResults { party: 1, through: 3 },
+        people::Stored::Roles {
+            project: 1,
+            holdings: Box::new([people::Holding { person: 1, role: people::Role::Owner }]),
+        },
+    ] {
+        people::step(&mut core.people, &people_env, people::Event::Restore { record }, &mut out);
+    }
+    people::step(&mut core.people, &people_env, people::Event::Restored, &mut out);
+    assert!(out.is_empty());
+}

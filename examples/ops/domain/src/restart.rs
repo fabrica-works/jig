@@ -29,7 +29,10 @@ pub(crate) fn route(
                 crate::route::core_out(domain, env, decision, requests, work);
                 held(decision, Output::Load { step, range: Range::Core });
             }
-            core::RestartStep::LoadInbox => held(decision, Output::Load { step, range: Range::Inbox }),
+            core::RestartStep::LoadInbox => {
+                let census = domain.core.census(&env.limits.core);
+                held(decision, Output::Load { step, range: Range::Census(census) });
+            }
             core::RestartStep::RestoreConnector { connector } => {
                 let range = match jig_ops_domain_connectors::connector(connector) {
                     Some(Connector::Infrastructure) => Range::Infrastructure,

@@ -16,6 +16,7 @@ use jig_test_domain as root;
 use jig_test_system::System;
 use skein_lib::{Duration, Env, List, Queue, Time, Wall};
 use std::collections::BTreeMap;
+mod census;
 
 /// Tiny limits and seeded vocabulary, reconstructed on every cold start.
 #[derive(Clone, Copy, Debug)]
@@ -106,6 +107,8 @@ pub enum Delivery {
     Now(core::Now),
     /// A connector retains this event until a later engine can take it.
     Busy(Box<root::Event>),
+    /// The root-selected inbox index range.
+    Census(core::Census),
 }
 
 /// The outside correlation state of the application's scripted peers.
@@ -189,71 +192,6 @@ impl Neighbours {
         }
         inputs.push(Input::Event(root::Event::RestartDone(step)));
         inputs
-    }
-
-    fn restart(&mut self, store: &mut Store, step: core::RestartStep) -> Vec<Input<root::Event, root::Record>> {
-        self.restart_steps.push(step);
-        match step {
-            core::RestartStep::LoadCore | core::RestartStep::LoadInbox | core::RestartStep::RestoreConnector { .. } => {
-                let mut intervals = std::collections::VecDeque::new();
-                if step == core::RestartStep::LoadCore {
-                    for range in core::RestoreRange::LIVE {
-                        let mut keys = store.rows.keys().filter(|key| match key {
-                            root::Key::Core(key) => range.admits(key),
-                            root::Key::Connector { .. } => false,
-                        });
-                        if let Some(first) = keys.next() {
-                            let last = keys.next_back().unwrap_or(first);
-                            intervals.push_back((first.clone(), last.clone()));
-                        }
-                    }
-                } else {
-                    let mut interval = None;
-                    for key in store.rows.keys() {
-                        let admitted = match (step, key) {
-                            (core::RestartStep::LoadInbox, root::Key::Core(key)) => core::inbox_restore_key(key),
-                            (
-                                core::RestartStep::RestoreConnector { connector },
-                                root::Key::Connector { number, .. },
-                            ) => connector == *number,
-                            _ => false,
-                        };
-                        if admitted {
-                            match &mut interval {
-                                Some((_, last)) => *last = key.clone(),
-                                None => interval = Some((key.clone(), key.clone())),
-                            }
-                        } else if let Some(bounds) = interval.take() {
-                            intervals.push_back(bounds);
-                        }
-                    }
-                    if let Some(bounds) = interval {
-                        intervals.push_back(bounds);
-                    }
-                }
-                if let Some((first, last)) = intervals.pop_front() {
-                    store.load(1, &first, &last, None, 2);
-                    self.restoring = Some(Restore { step, first, last, rows: Vec::new(), remaining: intervals });
-                    Vec::new()
-                } else {
-                    Self::restored(step, &[])
-                }
-            }
-            core::RestartStep::ReadAfresh { connector: number } => {
-                self.restart_reads.insert(number, step);
-                vec![Input::Event(root::Event::Connector {
-                    number,
-                    event: connector::Event::Restart(connector::RestartStep::FreshRead {
-                        resource: jig_test_connector_world::path(1, 1),
-                    }),
-                })]
-            }
-            core::RestartStep::SettleOutbox { connector: number } => vec![Input::Event(root::Event::Connector {
-                number,
-                event: connector::Event::Restart(connector::RestartStep::SettleOutbox),
-            })],
-            core::RestartStep::AdoptRuns | core::RestartStep::Open => panic!("root performs synchronous restart step"),
-        }
     }
 }
 
@@ -451,6 +389,10 @@ impl Application for Testing {
                     }
                     Output::Commit { number, writes: jig_core_world::store_writes(rows) }
                 }
+                root::Request::Restart(core::RestartStep::LoadInbox)
+                | root::Request::Deliver(root::Delivery::Restart(core::RestartStep::LoadInbox)) => {
+                    Output::Deliver(Delivery::Census(root::inbox_census(domain, &config.limits)))
+                }
                 root::Request::Restart(step) => Output::Deliver(Delivery::Held(root::Delivery::Restart(step))),
                 root::Request::Deliver(delivery) => Output::Deliver(Delivery::Held(delivery)),
                 root::Request::Now(now) => Output::Deliver(Delivery::Now(now)),
@@ -523,6 +465,7 @@ impl Application for Testing {
                         done: true,
                     })]
                 }
+                Delivery::Census(census) => peers.restart(store, core::RestartStep::LoadInbox, Some(&census)),
                 Delivery::Busy(event) => {
                     peers.busy_events.push(std::rc::Rc::new(*event));
                     Vec::new()
@@ -556,7 +499,7 @@ impl Application for Testing {
                 if step != core::RestartStep::LoadInbox {
                     peers.routes.push(jig_conformance::referee::Observed::RestartStage { position });
                 }
-                peers.restart(store, step)
+                peers.restart(store, step, None)
             }
             root::Delivery::Core(core::Held::Drained) => {
                 peers.drained.push(store.applied);
@@ -661,7 +604,11 @@ impl Application for Testing {
         for (owner, page) in store.tick_pages() {
             assert_eq!(owner, 1);
             let mut restore = peers.restoring.take().expect("cold page requested");
-            restore.rows.extend(page.rows);
+            if restore.step == core::RestartStep::LoadInbox {
+                restore.rows.extend(page.rows.into_iter().filter_map(|row| census::owner(store, &row)));
+            } else {
+                restore.rows.extend(page.rows);
+            }
             if let Some(after) = page.next {
                 store.load(1, &restore.first, &restore.last, Some(&after), 2);
                 peers.restoring = Some(restore);

@@ -4,6 +4,7 @@ use alloc::boxed::Box;
 use jig_domain_core::{self as core, RestoreRange};
 use jig_domain_notes as notes;
 use skein_kv::{KeyWriter, Range};
+use skein_lib::List;
 
 /// The restart hands each live family up in the core's declared order.
 #[must_use]
@@ -13,7 +14,24 @@ pub fn restore(range: &RestoreRange) -> Box<[Range]> {
         RestoreRange::People => Range::prefix(&[keys::JIG, 2]),
         RestoreRange::Tasks => Range { start: Box::new([keys::JIG, 1, 0]), end: Some(Box::new([keys::JIG, 1, 6])) },
         RestoreRange::Core => Range { start: Box::new([keys::JIG, 0, 1]), end: Some(Box::new([keys::JIG, 0, 4])) },
+        RestoreRange::Census(census) => return census_ranges(census),
     }])
+}
+
+fn census_ranges(census: &core::Census) -> Box<[Range]> {
+    let capacity = u32::try_from(census.results.len())
+        .expect("bounded census parties")
+        .checked_add(1)
+        .expect("census parties and conversation family");
+    let mut ranges = List::with_capacity(capacity);
+    for read in &census.results {
+        let mut range = numbered_prefix(&[keys::JIG, 1, 13], read.party);
+        let key = core::Key::Tasks(jig_domain_tasks::Key::Result { party: read.party, position: read.after });
+        range.start = after(&encoded(&key));
+        ranges.push(range).expect("one result interval per census party");
+    }
+    ranges.push(Range::prefix(&[keys::JIG, 1, 15])).expect("one conversation family");
+    ranges.into_boxed()
 }
 
 /// One globally named entry or the ordered lines of one exact scope.

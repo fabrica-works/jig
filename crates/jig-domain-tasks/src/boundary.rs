@@ -986,6 +986,7 @@ pub use crate::index::Key;
 pub enum Stored {
     /// One party's durable update index.
     Update(crate::Update),
+    Result(crate::ResultRow),
     ConversationNewest(crate::Conversation),
     ConversationOldest(crate::Conversation),
     /// Historical activity loaded on demand, never restored as live state.
@@ -1032,6 +1033,7 @@ impl Stored {
     pub const fn key(&self) -> Key {
         match self {
             Stored::Update(row) => row.key(),
+            Stored::Result(row) => Key::Result { party: row.party, position: row.position },
             Stored::ConversationNewest(row) => {
                 Key::ConversationNewest { party: row.party, task: crate::Newest::of(row.task) }
             }

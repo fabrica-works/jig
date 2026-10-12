@@ -101,6 +101,10 @@ pub enum Key {
         task: Newest,
         object: UpdateObject,
     },
+    Result {
+        party: u64,
+        position: u64,
+    },
     ConversationNewest {
         party: u64,
         task: Newest,
@@ -129,8 +133,17 @@ impl Key {
             | Self::Milestone { .. }
             | Self::Activity { .. }
             | Self::Update { .. }
+            | Self::Result { .. }
             | Self::ConversationNewest { .. }
             | Self::ConversationOldest { .. } => false,
         }
     }
+}
+
+/// A person's result ordered by its root-issued commit position.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct ResultRow {
+    pub party: u64,
+    pub position: u64,
+    pub task: u64,
 }

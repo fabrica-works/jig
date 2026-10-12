@@ -28,7 +28,6 @@ mod goals;
 mod historical;
 mod inbox;
 mod indexes;
-pub use inbox::restore_key as inbox_restore_key;
 mod memory;
 pub use goals::GoalStart;
 pub use memory::worst_case;
@@ -47,7 +46,7 @@ mod relays;
 mod resources;
 mod restart;
 mod stopping;
-pub use restart::{RestartRequest, RestartStep, RestoreRange};
+pub use restart::{Census, ReadResults, RestartRequest, RestartStep, RestoreRange};
 mod revisions;
 mod roles;
 mod routing;
@@ -224,6 +223,7 @@ pub struct Core {
     pub(crate) workers_in_process: bool,
     pub(crate) stopping: bool,
     pub(crate) draining: Option<bool>,
+    pub(crate) census_progress: Map<u64, inbox::Progress>,
     pub(crate) archived_chats: Map<u64, inbox::ArchivedChat>,
     pub(crate) application_input: Option<(u16, Token)>,
     pub(crate) task_capacity_mark: u64,
@@ -509,6 +509,7 @@ impl Core {
             workers_in_process: config.workers_in_process,
             stopping: false,
             draining: None,
+            census_progress: Map::with_capacity(limits.people.people),
             archived_chats: Map::with_capacity(
                 limits
                     .people

@@ -13,6 +13,7 @@ fn lines(world: &World, task: u64) -> Vec<ActivityLine> {
             | Stored::Ended(_)
             | Stored::Ledger(_)
             | Stored::Writer(_)
+            | Stored::Result(_)
             | Stored::ConversationNewest(_)
             | Stored::ConversationOldest(_)
             | Stored::Update(_)

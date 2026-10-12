@@ -120,6 +120,7 @@ pub(super) fn is_update(key: &Key) -> bool {
             | tasks::Key::History { .. }
             | tasks::Key::Milestone { .. }
             | tasks::Key::Activity { .. }
+            | tasks::Key::Result { .. }
             | tasks::Key::ConversationNewest { .. }
             | tasks::Key::ConversationOldest { .. },
         )
@@ -154,7 +155,8 @@ pub(super) fn conversation_row(
         crate::Record::Tasks(tasks::Stored::ConversationNewest(row)) if range.backwards => row,
         crate::Record::Tasks(tasks::Stored::ConversationOldest(row)) if !range.backwards => row,
         crate::Record::Tasks(
-            tasks::Stored::ConversationNewest(_)
+            tasks::Stored::Result(_)
+            | tasks::Stored::ConversationNewest(_)
             | tasks::Stored::ConversationOldest(_)
             | tasks::Stored::ClosedLedger(_)
             | tasks::Stored::DecidedProposal(_)

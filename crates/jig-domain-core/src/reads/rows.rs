@@ -630,6 +630,7 @@ fn object(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Optio
                 | tasks::Stored::Stub(_)
                 | tasks::Stored::Ledger(_)
                 | tasks::Stored::Writer(_)
+                | tasks::Stored::Result(_)
                 | tasks::Stored::ConversationNewest(_)
                 | tasks::Stored::ConversationOldest(_)
                 | tasks::Stored::Update(_)
@@ -836,6 +837,7 @@ fn page_row(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Opt
                     | tasks::Stored::Stub(_)
                     | tasks::Stored::Ledger(_)
                     | tasks::Stored::Writer(_)
+                    | tasks::Stored::Result(_)
                     | tasks::Stored::ConversationNewest(_)
                     | tasks::Stored::ConversationOldest(_)
                     | tasks::Stored::Update(_)
@@ -1003,6 +1005,7 @@ fn inbox_selection_row(limits: &Limits, row: &Row) -> Result<Option<documents::I
             | tasks::Stored::Stub(_)
             | tasks::Stored::Ledger(_)
             | tasks::Stored::Writer(_)
+            | tasks::Stored::Result(_)
             | tasks::Stored::ConversationNewest(_)
             | tasks::Stored::ConversationOldest(_)
             | tasks::Stored::Update(_)
@@ -1049,6 +1052,7 @@ fn inbox_row(
             | tasks::Stored::Stub(_)
             | tasks::Stored::Ledger(_)
             | tasks::Stored::Writer(_)
+            | tasks::Stored::Result(_)
             | tasks::Stored::ConversationNewest(_)
             | tasks::Stored::ConversationOldest(_)
             | tasks::Stored::Update(_)
@@ -1290,6 +1294,7 @@ fn milestone_record(record: &Record) -> Option<&tasks::Milestone> {
             | tasks::Stored::Stub(_)
             | tasks::Stored::Ledger(_)
             | tasks::Stored::Writer(_)
+            | tasks::Stored::Result(_)
             | tasks::Stored::ConversationNewest(_)
             | tasks::Stored::ConversationOldest(_)
             | tasks::Stored::Update(_)
@@ -1315,6 +1320,7 @@ fn activity_record(record: &Record) -> Option<&tasks::ActivityLine> {
             | tasks::Stored::Stub(_)
             | tasks::Stored::Ledger(_)
             | tasks::Stored::Writer(_)
+            | tasks::Stored::Result(_)
             | tasks::Stored::ConversationNewest(_)
             | tasks::Stored::ConversationOldest(_)
             | tasks::Stored::Update(_)
@@ -1383,6 +1389,7 @@ fn ledger(record: &Record) -> Option<&tasks::FundingRecord> {
             | tasks::Stored::Ended(_)
             | tasks::Stored::Stub(_)
             | tasks::Stored::Writer(_)
+            | tasks::Stored::Result(_)
             | tasks::Stored::ConversationNewest(_)
             | tasks::Stored::ConversationOldest(_)
             | tasks::Stored::Update(_)
@@ -1519,6 +1526,7 @@ fn key_kind(key: &Key) -> KeyKind {
             | tasks::Key::Stub(_)
             | tasks::Key::Writer(_)
             | tasks::Key::Pool(_)
+            | tasks::Key::Result { .. }
             | tasks::Key::ConversationNewest { .. }
             | tasks::Key::ConversationOldest { .. }
             | tasks::Key::Update { .. } => KeyKind::Unsupported,

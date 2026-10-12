@@ -6,6 +6,13 @@ use skein_lib::Queue;
 pub(crate) fn save(core: &Core, record: &tasks::Stored, out: &mut Queue<Request>) {
     let update = match record {
         tasks::Stored::Ended(task) => {
+            match task.requester {
+                tasks::Party::Person(party) => {
+                    let row = tasks::ResultRow { party, position: task.result_position, task: task.number };
+                    out.push(Request::Write(Write::Save(Record::Tasks(tasks::Stored::Result(row)))));
+                }
+                tasks::Party::Task(_) | tasks::Party::Deployment { .. } => {}
+            }
             if let Some(party) = core.chat_requester(task) {
                 let row = tasks::Conversation { party, task: task.number };
                 for record in [tasks::Stored::ConversationNewest(row), tasks::Stored::ConversationOldest(row)] {
@@ -51,7 +58,8 @@ pub(crate) fn save(core: &Core, record: &tasks::Stored, out: &mut Queue<Request>
                 },
             })
         }
-        tasks::Stored::ConversationNewest(_)
+        tasks::Stored::Result(_)
+        | tasks::Stored::ConversationNewest(_)
         | tasks::Stored::ConversationOldest(_)
         | tasks::Stored::Update(_)
         | tasks::Stored::Live(_)

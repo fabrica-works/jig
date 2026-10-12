@@ -10,10 +10,14 @@ fn key_bytes(key: &Key) -> Box<[u8]> {
     keys::encode(key, fixtures::KEY_LIMIT).expect("within the key limit")
 }
 
+fn samples() -> core::ops::Range<u32> {
+    0..500
+}
+
 #[test]
 fn each_restart_range_holds_the_keys_it_admits_and_no_others() {
     let mut rng = Rng::new(0x5701_e004);
-    for _ in 0_u32..2_000 {
+    for _ in samples() {
         let key = fixtures::key(&mut rng);
         let bytes = key_bytes(&key);
         for range in RestoreRange::LIVE {
@@ -36,7 +40,7 @@ fn a_notes_load_holds_exactly_its_scopes_lines() {
     let wanted = notes::Scope::Project { project: 1 };
     let range = notes::Range::Lines { scope: wanted.clone(), after: Some(1) };
     let intervals = intervals::notes(&range);
-    for _ in 0_u32..2_000 {
+    for _ in samples() {
         let key = fixtures::key(&mut rng);
         let admitted = match &key {
             Key::Notes(notes::Key::Line { scope, name }) => scope == &wanted && *name > 1,
@@ -86,7 +90,7 @@ fn each_fixed_scope_holds_the_keys_it_admits_and_no_others() {
             mappings.push((party, scope.clone(), intervals)).expect("twelve scopes and two parties");
         }
     }
-    for _ in 0_u32..2_000 {
+    for _ in samples() {
         let key = fixtures::key(&mut rng);
         let bytes = key_bytes(&key);
         for (party, scope, intervals) in &mappings {

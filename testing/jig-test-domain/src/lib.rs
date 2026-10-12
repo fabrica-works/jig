@@ -983,6 +983,9 @@ use messages::Payload;
 mod stopping;
 use routes::{route_connector, route_core};
 
+mod census;
+pub use census::inbox_census;
+
 /// Translate one durable row during the requested restart load. The root
 /// supplies header, children, proofs, then calls; the core validates their links.
 #[must_use]

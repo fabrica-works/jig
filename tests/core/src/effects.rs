@@ -1,5 +1,6 @@
 //! A scripted caller and two independent systems exercise the root boundary.
 mod account_preparation;
+mod census;
 use crate::Store;
 use jig_domain_accounts as accounts;
 use jig_domain_authority as authority;
@@ -66,6 +67,7 @@ pub struct World {
     pub trace: Vec<String>,
     pub restart_steps: Vec<core::RestartStep>,
     pub restore_ranges: Vec<core::RestoreRange>,
+    pub census_ended: u32,
     pub hold_restart_reads: bool,
     /// Withhold requested whole store pages during a real cold restore.
     pub hold_restore_pages: bool,
@@ -296,6 +298,7 @@ impl World {
             trace: Vec::new(),
             restart_steps: Vec::new(),
             restore_ranges: Vec::new(),
+            census_ended: 0,
             hold_restart_reads: false,
             hold_restore_pages: false,
             store_delay: 0,
@@ -1089,6 +1092,7 @@ impl World {
     }
 
     fn load_restart(&mut self, step: core::RestartStep) {
+        let census = census::range(self, step);
         let mut intervals = std::collections::VecDeque::new();
         if step == core::RestartStep::LoadCore {
             self.restore_ranges.extend(core::RestoreRange::LIVE);
@@ -1106,7 +1110,9 @@ impl World {
             let mut interval = None;
             for key in self.store.rows.keys() {
                 let admitted = match (step, key) {
-                    (core::RestartStep::LoadInbox, root::Key::Core(key)) => core::inbox_restore_key(key),
+                    (core::RestartStep::LoadInbox, root::Key::Core(key)) => {
+                        census.as_ref().expect("inbox census selected").admits(key)
+                    }
                     (core::RestartStep::RestoreConnector { connector }, root::Key::Connector { number, .. }) => {
                         connector == *number
                     }
@@ -1150,7 +1156,7 @@ impl World {
                 if !live || rows == 2 || (page.next.is_none() && restore.remaining.is_empty()) {
                     self.trace.push(format!("store page {:?} {rows} rows", restore.step));
                 }
-                restore.rows.extend(page.rows);
+                census::append(self, restore.step, page.rows, &mut restore.rows);
                 if let Some(after) = page.next {
                     self.store.load(1, &restore.first, &restore.last, Some(&after), 2);
                     self.restoring = Some(restore);
@@ -1252,6 +1258,7 @@ impl World {
         self.restart_reads.clear();
         self.restart_steps.clear();
         self.restore_ranges.clear();
+        self.census_ended = 0;
         if let Some(peers) = &mut self.peers {
             peers.restart();
         }

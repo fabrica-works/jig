@@ -127,6 +127,7 @@ fn facts(rows: &BTreeMap<root::Key, root::Record>) -> (BTreeSet<CardKey>, WordIm
                 | tasks::Stored::Stub(_)
                 | tasks::Stored::Ledger(_)
                 | tasks::Stored::Writer(_)
+                | tasks::Stored::Result(_)
                 | tasks::Stored::ConversationNewest(_)
                 | tasks::Stored::ConversationOldest(_)
                 | tasks::Stored::Update(_)

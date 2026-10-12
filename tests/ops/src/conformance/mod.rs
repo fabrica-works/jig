@@ -401,8 +401,8 @@ impl Application for Ops {
                         .rows
                         .iter()
                         .filter_map(|(key, row)| {
-                            let admitted = match (range, key) {
-                                (root::Range::Inbox, root::Key::Core(key)) => core::inbox_restore_key(key),
+                            let admitted = match (&range, key) {
+                                (root::Range::Census(census), root::Key::Core(key)) => census.admits(key),
                                 (root::Range::Observability, root::Key::Observability(_))
                                 | (root::Range::Infrastructure, root::Key::Infrastructure(_)) => true,
                                 _ => false,
@@ -410,6 +410,11 @@ impl Application for Ops {
                             admitted.then(|| row.clone())
                         })
                         .collect()
+                };
+                let rows = if matches!(range, root::Range::Census(_)) {
+                    rows.into_iter().filter_map(|row| census_owner(store, &row)).collect()
+                } else {
+                    rows
                 };
                 let mut events: Vec<_> = rows.into_iter().map(Input::Restore).collect();
                 events.push(Input::Event(root::Event::Store(root::Store::Restored(step))));
@@ -1032,4 +1037,13 @@ impl Peers {
     pub fn finish_result(&mut self, outcome: &[u8]) -> root::Event {
         self.agents.finish_result(outcome)
     }
+}
+
+fn census_owner(store: &Store, row: &root::Record) -> Option<root::Record> {
+    let task = match row {
+        root::Record::Core(core::Record::Tasks(tasks::Stored::Result(row))) => row.task,
+        root::Record::Core(core::Record::Tasks(tasks::Stored::ConversationOldest(row))) => row.task,
+        root::Record::Core(_) | root::Record::Observability(_) | root::Record::Infrastructure(_) => return None,
+    };
+    store.rows.get(&root::Key::Core(core::Key::Tasks(tasks::Key::Ended(task)))).cloned()
 }

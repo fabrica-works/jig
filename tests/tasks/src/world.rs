@@ -765,6 +765,7 @@ impl World {
                 | Stored::Activity(_)
                 | Stored::Milestone(_)
                 | Stored::History(_)
+                | Stored::Result(_)
                 | Stored::ConversationNewest(_)
                 | Stored::ConversationOldest(_)
                 | Stored::Update(_)
@@ -792,6 +793,7 @@ impl World {
             Stored::Live(record) => record,
             Stored::Ended(_)
             | Stored::Writer(_)
+            | Stored::Result(_)
             | Stored::ConversationNewest(_)
             | Stored::ConversationOldest(_)
             | Stored::Update(_)
@@ -832,6 +834,7 @@ impl World {
                 | Key::Milestone { .. }
                 | Key::Activity { .. }
                 | Key::History { .. }
+                | Key::Result { .. }
                 | Key::ConversationNewest { .. }
                 | Key::ConversationOldest { .. }
                 | Key::Update { .. }
@@ -894,6 +897,7 @@ impl World {
                 Stored::Live(record) | Stored::Ended(record) => Some(record.attempt),
                 Stored::Ledger(_)
                 | Stored::Writer(_)
+                | Stored::Result(_)
                 | Stored::ConversationNewest(_)
                 | Stored::ConversationOldest(_)
                 | Stored::Update(_)
@@ -1164,6 +1168,7 @@ fn live_row(record: &Stored) -> Option<&jig_domain_tasks::TaskRecord> {
         | Stored::History(_)
         | Stored::Milestone(_)
         | Stored::Activity(_)
+        | Stored::Result(_)
         | Stored::ConversationNewest(_)
         | Stored::ConversationOldest(_)
         | Stored::Update(_)
