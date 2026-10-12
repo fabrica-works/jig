@@ -11,7 +11,7 @@ struct CrateManifest {
     dependencies: Vec<String>,
 }
 
-fn kit_root() -> PathBuf {
+pub(super) fn kit_root() -> PathBuf {
     // Cargo and nextest run tests from the current package directory. A cached
     // binary may have been compiled in a worktree that has since been removed.
     std::env::current_dir().expect("package directory exists").join("../..").canonicalize().expect("kit root exists")
@@ -205,4 +205,25 @@ fn walk_fixture_skips_build_and_hidden_directories() {
     assert!(!walk_directory(".config", false));
     assert!(walk_directory("tests", true));
     assert!(walk_directory("target", false));
+}
+
+#[test]
+fn the_store_codecs_world_is_among_the_workspace_worlds() {
+    let worlds: Vec<_> =
+        manifests().into_iter().filter(|m| m.name.as_deref() == Some("jig-store-codecs-world")).collect();
+    assert_eq!(worlds.len(), 1, "one store codecs world");
+    let manifest = &worlds[0];
+    assert!(
+        manifest
+            .dependencies
+            .iter()
+            .all(|name| ["jig-protocol-store", "skein-codegen", "skein-lib", "skein-heap"].contains(&name.as_str()))
+    );
+}
+
+#[test]
+fn store_schema_module_names_pass_the_source_guard() {
+    let source = "use crate::component_v1 as wire; use crate::notes_v1 as wire;";
+    let failures = super::names::breaches(Path::new("fixture/codec.rs"), source, &source.to_ascii_lowercase());
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
 }

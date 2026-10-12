@@ -469,6 +469,7 @@ dependencies = [
  "jig-domain-notes",
  "jig-domain-people",
  "jig-domain-tasks",
+ "skein-codec",
  "skein-io",
  "skein-kv",
  "skein-lib",
@@ -500,6 +501,16 @@ name = "jig-scripted-engine"
 version = "0.0.0"
 dependencies = [
  "jig-domain-client",
+ "skein-lib",
+]
+
+[[package]]
+name = "jig-store-codecs-world"
+version = "0.0.0"
+dependencies = [
+ "jig-protocol-store",
+ "skein-codegen",
+ "skein-heap",
  "skein-lib",
 ]
 
@@ -630,6 +641,11 @@ source = "git+https://github.com/forgetic/skein.git#90326012cca7ec8546e0f3a22c7c
 dependencies = [
  "skein-lib",
 ]
+
+[[package]]
+name = "skein-codegen"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/skein.git#30dc6f7ddc7bb82659f2f58898edae8a19ffc856"
 
 [[package]]
 name = "skein-heap"

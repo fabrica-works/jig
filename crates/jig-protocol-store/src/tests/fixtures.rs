@@ -197,3 +197,47 @@ pub fn within(intervals: &[skein_kv::Range], key: &[u8]) -> bool {
     }
     false
 }
+
+/// Small notes bounds shared by codec round trips.
+pub const NOTES_LIMITS: jig_domain_notes::Limits = jig_domain_notes::Limits {
+    scopes: 2,
+    entries_per_scope: 2,
+    pattern_bytes: 16,
+    description_bytes: 32,
+    body_bytes: 64,
+    references: 2,
+    load_rows: 2,
+    lines: 2,
+    recalled: 2,
+};
+pub fn note_entry() -> jig_domain_notes::Entry {
+    let mut references = skein_lib::List::with_capacity(NOTES_LIMITS.references);
+    references.push(21).expect("two references fit");
+    references.push(34).expect("two references fit");
+    jig_domain_notes::Entry {
+        name: 17,
+        scope: jig_domain_notes::Scope::Goal { project: 3, goal: 21 },
+        description: Box::from(b"an entry".as_slice()),
+        body: Box::from(b"its body".as_slice()),
+        references,
+        author: jig_domain_notes::Author::Task { task: 21, attempt: 2 },
+        revision: 4,
+        changed: skein_lib::Wall::from_nanos(u64::MAX),
+    }
+}
+pub fn note_line() -> jig_domain_notes::Line {
+    use jig_domain_notes::{Last, Pattern, Scope};
+    jig_domain_notes::Line {
+        scope: Scope::Resources {
+            project: 3,
+            connector: 2,
+            pattern: Pattern {
+                segments: Box::new([Box::from(b"a".as_slice()), Box::from(b"\0b".as_slice())]),
+                last: Last::Open(Box::from(b"c".as_slice())),
+            },
+        },
+        name: 17,
+        description: Box::from(b"a resource".as_slice()),
+        revision: 4,
+    }
+}

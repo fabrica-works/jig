@@ -6,9 +6,19 @@ fn identifier_byte(byte: u8) -> bool {
     byte.is_ascii_alphanumeric() || byte == b'_' || byte >= 128
 }
 
-fn forbidden_name(name: &str) -> bool {
+fn codec_module(name: &str) -> bool {
+    let Some((family, version)) = name.rsplit_once("_v") else {
+        return false;
+    };
+    super::tests::kit_root()
+        .join("crates/jig-protocol-store/schema")
+        .join(format!("{family}-v{version}.schema"))
+        .is_file()
+}
+
+fn forbidden_name(name: &str, codec: bool) -> bool {
     let stem = name.trim_end_matches(|ch: char| ch.is_ascii_digit());
-    if stem.len() < name.len() && (stem.ends_with('V') || stem.ends_with("_v")) {
+    if !codec && stem.len() < name.len() && (stem.ends_with('V') || stem.ends_with("_v")) {
         return true;
     }
     let bytes = name.as_bytes();
@@ -179,7 +189,7 @@ pub(super) fn scan(path: &Path, source: &str, words: &[String], names: bool) -> 
                 index += 1;
             }
             let name = &source[start..index];
-            if candidate && forbidden_name(name) {
+            if candidate && forbidden_name(name, codec_module(name)) {
                 failures.push(format!("{}:{line}: identifier {name}", path.display()));
             }
         } else {

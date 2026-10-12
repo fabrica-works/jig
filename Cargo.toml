@@ -52,6 +52,7 @@ members = [
     "tests/views",
     "tests/host",
     "tests/boundary",
+    "tests/store-codecs",
 ]
 
 [workspace.package]
@@ -69,6 +70,9 @@ jig-protocol-transcript = { path = "crates/jig-protocol-transcript" }
 jig-view = { path = "crates/jig-view" }
 jig-fake-person = { path = "testing/jig-fake-person" }
 jig-scripted-engine = { path = "testing/jig-scripted-engine" }
+skein-codec = { git = "https://github.com/forgetic/skein.git" }
+skein-codegen = { git = "https://github.com/forgetic/skein.git" }
+skein-heap = { git = "https://github.com/forgetic/skein.git" }
 skein-lib = { git = "https://github.com/forgetic/skein.git" }
 skein-kv = { git = "https://github.com/forgetic/skein.git" }
 skein-io = { git = "https://github.com/forgetic/skein.git" }

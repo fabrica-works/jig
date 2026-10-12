@@ -1,0 +1,80 @@
+//! Arbitrary and mutated family bytes (protocol/store.md, sections 5.1 and 14).
+use jig_protocol_store::{component_v1, notes_v1};
+use skein_lib::{Reader, Rng, Writer};
+use std::{fs, path::Path};
+
+fn notes(bytes: &[u8]) {
+    if let Ok(row) = notes_v1::Row::decode(&notes_v1::CEILINGS, &mut Reader::new(bytes)) {
+        let mut writer = Writer::new(usize::try_from(row.measure()).expect("measured length"));
+        row.encode(&mut writer).expect("measured room");
+        assert_eq!(writer.finish().as_ref(), bytes);
+    }
+}
+fn component(bytes: &[u8]) {
+    if let Ok(row) = component_v1::Format::decode(&component_v1::CEILINGS, &mut Reader::new(bytes)) {
+        let mut writer = Writer::new(usize::try_from(row.measure()).expect("measured length"));
+        row.encode(&mut writer).expect("measured room");
+        assert_eq!(writer.finish().as_ref(), bytes);
+    }
+    if let Ok(row) = component_v1::Transcript::decode(&component_v1::CEILINGS, &mut Reader::new(bytes)) {
+        let mut writer = Writer::new(usize::try_from(row.measure()).expect("measured length"));
+        row.encode(&mut writer).expect("measured room");
+        assert_eq!(writer.finish().as_ref(), bytes);
+    }
+    if let Ok(row) = component_v1::Attempt::decode(&component_v1::CEILINGS, &mut Reader::new(bytes)) {
+        let mut writer = Writer::new(usize::try_from(row.measure()).expect("measured length"));
+        row.encode(&mut writer).expect("measured room");
+        assert_eq!(writer.finish().as_ref(), bytes);
+    }
+}
+fn arbitrary(seed: u64, check: fn(&[u8])) {
+    let mut rng = Rng::new(seed);
+    let mut buffer = [0_u8; 128];
+    for _ in 0_u32..10_000 {
+        let length = usize::try_from(rng.below(129)).expect("bounded length");
+        for byte in buffer.get_mut(..length).expect("within buffer") {
+            *byte = u8::try_from(rng.next_u64() & 0xff).expect("low byte");
+        }
+        check(buffer.get(..length).expect("within buffer"));
+    }
+}
+fn mutated(family: &str, seed: u64, check: fn(&[u8])) {
+    let root =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../crates/jig-protocol-store/golden").join(family).join("v1");
+    let mut rng = Rng::new(seed);
+    let mut paths: Vec<_> =
+        fs::read_dir(root).expect("golden directory").map(|entry| entry.expect("golden entry").path()).collect();
+    paths.sort();
+    for path in paths {
+        if !path.file_name().expect("file name").to_string_lossy().ends_with("_full.bin") {
+            continue;
+        }
+        let golden = fs::read(path).expect("golden readable");
+        check(&golden);
+        for _ in 0_u32..100 {
+            let mut bytes = golden.clone();
+            if !bytes.is_empty() {
+                let index =
+                    usize::try_from(rng.below(u64::try_from(bytes.len()).expect("length fits"))).expect("index fits");
+                *bytes.get_mut(index).expect("chosen byte") = u8::try_from(rng.next_u64() & 0xff).expect("low byte");
+            }
+            check(&bytes);
+        }
+    }
+}
+#[test]
+fn arbitrary_notes_rows_never_panic_and_round_trip_when_they_decode() {
+    arbitrary(0x5701_e014, notes);
+}
+#[test]
+fn mutated_notes_goldens_never_panic() {
+    mutated("notes", 0x5702_e014, notes);
+}
+#[test]
+fn arbitrary_component_rows_never_panic_and_round_trip_when_they_decode() {
+    arbitrary(0x5703_e014, component);
+}
+#[test]
+fn mutated_component_goldens_never_panic() {
+    mutated("component", 0x5704_e014, component);
+}
