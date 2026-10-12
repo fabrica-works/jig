@@ -121,44 +121,34 @@ fn comment_end(source: &[u8], start: usize) -> usize {
     end
 }
 
-fn vocabulary_at(
-    path: &Path,
-    source: &str,
-    at: usize,
-    words: &[String],
-    starts: &[bool; 256],
-    failures: &mut Vec<String>,
-) {
+fn vocabulary_matches(path: &Path, source: &str, words: &[String]) -> Vec<String> {
+    let lower = source.to_ascii_lowercase();
     let bytes = source.as_bytes();
-    if !starts[usize::from(bytes[at].to_ascii_lowercase())] {
-        return;
-    }
-    if at.checked_sub(1).and_then(|before| bytes.get(before)).is_some_and(u8::is_ascii_alphanumeric) {
-        return;
-    }
-    for word in words {
-        if !bytes[at].eq_ignore_ascii_case(&word.as_bytes()[0]) {
-            continue;
-        }
-        let end = at + word.len();
-        if bytes.get(at..end).is_some_and(|candidate| candidate.eq_ignore_ascii_case(word.as_bytes()))
-            && !bytes.get(end).is_some_and(|after| after.is_ascii_alphanumeric() && !after.is_ascii_uppercase())
-        {
-            failures.push(format!("{}: {word}", path.display()));
+    let mut matches = Vec::new();
+    for (word_index, word) in words.iter().enumerate() {
+        for (at, _) in lower.match_indices(word.as_str()) {
+            if !at.checked_sub(1).and_then(|before| bytes.get(before)).is_some_and(u8::is_ascii_alphanumeric)
+                && !bytes
+                    .get(at + word.len())
+                    .is_some_and(|after| after.is_ascii_alphanumeric() && !after.is_ascii_uppercase())
+            {
+                matches.push((at, word_index));
+            }
         }
     }
+    matches.sort_unstable();
+    matches.into_iter().map(|(_, word)| format!("{}: {}", path.display(), words[word])).collect()
 }
 
-pub(super) fn breaches(path: &Path, source: &str, _lower: &str) -> Vec<String> {
+pub(super) fn breaches(path: &Path, source: &str) -> Vec<String> {
     scan(path, source, &[], true)
 }
 
-// One source walk checks every vocabulary pattern and each lexeme's name rule.
+// Standard string searches check vocabulary; the source walk checks lexeme names.
 pub(super) fn scan(path: &Path, source: &str, words: &[String], names: bool) -> Vec<String> {
-    let mut failures = Vec::new();
-    let mut starts = [false; 256];
-    for word in words {
-        starts[usize::from(word.as_bytes()[0].to_ascii_lowercase())] = true;
+    let mut failures = vocabulary_matches(path, source, words);
+    if !names {
+        return failures;
     }
     let bytes = source.as_bytes();
     let mut index = 0;
@@ -177,19 +167,11 @@ pub(super) fn scan(path: &Path, source: &str, words: &[String], names: bool) -> 
             index = comment_end(bytes, index);
             comment = true;
         } else if names && identifier_byte(bytes[index]) && !bytes[index].is_ascii_digit() {
-            let mut candidate = false;
             while bytes.get(index).is_some_and(|byte| identifier_byte(*byte)) {
-                candidate |= matches!(bytes[index], b't' | b'T')
-                    && bytes.get(index..index + 5).is_some_and(|word| word.eq_ignore_ascii_case(b"typed"));
-                candidate |= matches!(bytes[index], b'l' | b'L')
-                    && bytes.get(index..index + 6).is_some_and(|word| word.eq_ignore_ascii_case(b"legacy"));
-                candidate |= bytes[index] == b'V' && bytes.get(index + 1).is_some_and(u8::is_ascii_digit);
-                candidate |=
-                    bytes.get(index..index + 2) == Some(b"_v") && bytes.get(index + 2).is_some_and(u8::is_ascii_digit);
                 index += 1;
             }
             let name = &source[start..index];
-            if candidate && forbidden_name(name, codec_module(name)) {
+            if forbidden_name(name, false) && (!codec_module(name) || forbidden_name(name, true)) {
                 failures.push(format!("{}:{line}: identifier {name}", path.display()));
             }
         } else {
@@ -198,24 +180,19 @@ pub(super) fn scan(path: &Path, source: &str, words: &[String], names: bool) -> 
                 index += 1;
             }
         }
-        for (offset, ch) in source[start..index].char_indices() {
-            let at = start + offset;
-            if !words.is_empty() {
-                vocabulary_at(path, source, at, words, &starts, &mut failures);
-            }
-            if comment
-                && matches!(ch, 'l' | 'L')
-                && bytes.get(at..at + 6).is_some_and(|word| word.eq_ignore_ascii_case(b"legacy"))
-                && !at.checked_sub(1).and_then(|before| bytes.get(before)).is_some_and(|byte| identifier_byte(*byte))
-                && !bytes.get(at + 6).is_some_and(|byte| identifier_byte(*byte))
-            {
-                let word = &source[at..at + 6];
-                failures.push(format!("{}:{line}: comment {word}", path.display()));
-            }
-            if ch == '\n' {
-                line += 1;
+        if comment {
+            for (offset, _) in source[start..index].to_ascii_lowercase().match_indices("legacy") {
+                let at = start + offset;
+                if !at.checked_sub(1).and_then(|before| bytes.get(before)).is_some_and(|byte| identifier_byte(*byte))
+                    && !bytes.get(at + 6).is_some_and(|byte| identifier_byte(*byte))
+                {
+                    let comment_line = line + source[start..at].matches('\n').count();
+                    let word = &source[at..at + 6];
+                    failures.push(format!("{}:{comment_line}: comment {word}", path.display()));
+                }
             }
         }
+        line += source[start..index].matches('\n').count();
     }
     failures
 }

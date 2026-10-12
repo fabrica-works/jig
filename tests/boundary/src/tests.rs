@@ -224,6 +224,6 @@ fn the_store_codecs_world_is_among_the_workspace_worlds() {
 #[test]
 fn store_schema_module_names_pass_the_source_guard() {
     let source = "use crate::component_v1 as wire; use crate::notes_v1 as wire;";
-    let failures = super::names::breaches(Path::new("fixture/codec.rs"), source, &source.to_ascii_lowercase());
+    let failures = super::names::breaches(Path::new("fixture/codec.rs"), source);
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
