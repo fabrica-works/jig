@@ -405,7 +405,9 @@ fn smith_breaches(manifests: &[CrateManifest]) -> Vec<String> {
         }
         for dependency in &manifest.dependencies {
             let allowed = match name {
-                "jig-protocol-charter" => ["smith-domain-run", "smith-charter"].contains(&dependency.as_str()),
+                "jig-protocol-charter" => {
+                    ["smith-domain-run", "smith-charter", "smith-channel"].contains(&dependency.as_str())
+                }
                 "jig-protocol-transcript" => dependency == "smith-transcript",
                 _ => false,
             };

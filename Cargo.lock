@@ -449,6 +449,7 @@ name = "jig-protocol-charter"
 version = "0.0.0"
 dependencies = [
  "skein-lib",
+ "smith-channel",
  "smith-charter",
  "smith-domain-run",
 ]
@@ -583,6 +584,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "skein-channel"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/skein.git#30dc6f7ddc7bb82659f2f58898edae8a19ffc856"
+dependencies = [
+ "skein-lib",
+]
+
+[[package]]
 name = "skein-codec"
 version = "0.0.0"
 source = "git+https://github.com/forgetic/skein.git#30dc6f7ddc7bb82659f2f58898edae8a19ffc856"
@@ -646,6 +655,16 @@ dependencies = [
  "skein-lib",
  "skein-shell",
  "skein-sim",
+]
+
+[[package]]
+name = "smith-channel"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/smith.git#2a800ea239acb93a8dc071432a25b2723369dc47"
+dependencies = [
+ "skein-channel",
+ "skein-codec",
+ "skein-lib",
 ]
 
 [[package]]

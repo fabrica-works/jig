@@ -70,6 +70,7 @@ skein-json = { git = "https://github.com/forgetic/skein.git" }
 skein-world = { git = "https://github.com/forgetic/skein.git" }
 smith-domain-run = { git = "https://github.com/forgetic/smith.git" }
 smith-charter = { git = "https://github.com/forgetic/smith.git" }
+smith-channel = { git = "https://github.com/forgetic/smith.git" }
 smith-transcript = { git = "https://github.com/forgetic/smith.git" }
 sha2 = { version = "=0.10.9", default-features = false }
 jig-domain-accounts = { path = "crates/jig-domain-accounts" }
