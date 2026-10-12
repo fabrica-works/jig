@@ -548,6 +548,18 @@ the file.
 
 ## For the user
 
+- **The gate lane bounds the run** (supervision.md, checks of 17:22 and
+  18:22): gates ran 81 to 91 % of each hour, pausing the build lane, so a
+  build command waited about 4 minutes and landings fell to 8 to 14 an
+  hour. Three changes to skein's kit, which smith's reliability run on
+  another machine also uses, so none was made: (a) `land` fetches and
+  rebases inside its gate task, just before the gate starts, so a gate
+  that waited in the queue does not find `main` moved (about half the
+  gates were such regates); (b) the gate's crates compile in the build
+  lane first, so only its tests run alone; (c) the suites' global
+  timeouts get a margin over their budgets (say 1.5×), reporting SLOW
+  instead of failing: 15 s equals the fast suites' budget, and load
+  outside the queue failed about 2 gates an hour on it.
 - **smith's focused suite on carbon-forge** (ruling 121): it runs past
   its 15 s budget here on `main` itself (16.2 s measured, 2,515 tests),
   against 6.3 to 7.4 s on smith's reliability machine. Is carbon-forge a
