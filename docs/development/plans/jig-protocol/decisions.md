@@ -1036,6 +1036,23 @@ the file.
      extends to them: jig 19.1 keeps its commit and lands once the
      analysis's fixes have made room; jig 19.2, 19.4, 19.5 and 30.2 to
      30.5 do not start before; every other session goes on.
+169. **Six steps make the focused suite cheaper** (2026-10-12, the
+     designer's answer to the supervisor's question "The focused suite's
+     cost", asked at the user's request; skein `778ce715`). The suite
+     spends 104.7 s of test time: about 35 s starting a process per test,
+     17.4 s on generated codec tests one per process (0.79 s in one), 4.1
+     s on an O(N²) generator's drift, 9.2 s on the boundary's byte loop
+     over generated files, 16.5 s of real work in jig-view, about 20 s in
+     the worlds. Six steps not in the plan, in `tests-cost.md`:
+     jig-tests.s1 (the boundary's scan), skein-02.s4 (the generator: table
+     tests, small-limit bounds, linear), jig-repin.s3 (skein-codegen alone,
+     families regenerated), jig-tests.s2 (the view), jig-tests.s3 (the
+     worlds), skein-tests.s1 (skein-heap). About 35 s less, with room for
+     jig 30.1's family. jig 19.1 and 30.1 regenerate and land after
+     jig-repin.s3, and the codec increments start again (rulings 167,
+     168). Ruling 165's 200 ms ceiling ends at jig-repin.s3: a generated
+     table test then has 100 ms; ruling 153's drift ceilings go back to
+     the world's.
 
 ## For the user
 
