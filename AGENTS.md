@@ -1,8 +1,11 @@
 # Agent guidance for jig
 
-- Before merging anything to main, run the checks in
-  `docs/development/workflow.md`; main moves only when they all pass. A
-  change to Markdown files only skips them (same document).
+- **main moves only through skein's `land`,** which runs the gate,
+  `scripts/check.sh`, and pushes (`docs/development/workflow.md`, section
+  1). Do not run the gate yourself before `land`. A change to Markdown
+  files only lands with `land --docs`. Run what compiles and the tests of
+  the crates you touch through `heavy` (skein's development.md, section
+  8.3).
 - The default test suite (unit tests and the worlds' focused tests under
   `tests/`) takes at most 15 seconds; the fuzzy suite (the worlds'
   `tests/fuzzy_*.rs`, randomized tests) at most 1 minute. Keep new tests
@@ -36,5 +39,5 @@
   smith (`README.md`, section 9).
 - **No system is named in jig's code:** no forge, repository, branch, pull
   request, issue or git. Systems are an application's connectors.
-- **Work locally,** on isolated branches merged with `--ff-only`. Do not
-  push or publish unless the session explicitly authorises it.
+- **Work on a branch in a worktree of your own,** never in the primary
+  checkout. `land` is the only push; do not push or publish otherwise.

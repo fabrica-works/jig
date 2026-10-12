@@ -6,8 +6,8 @@ documentation.
 
 ## 1. Before merging to main
 
-On the branch's tip, rebased on main, so that what is checked is what main
-becomes:
+The gate is `scripts/check.sh`, run on the branch's tip rebased on main, so
+that what is checked is what main becomes:
 
 ```sh
 cargo fmt --check
@@ -16,16 +16,15 @@ cargo nextest run --workspace
 cargo nextest run --workspace --profile fuzzy
 ```
 
-Then, once all four pass:
-
-```sh
-git checkout main
-git merge --ff-only <branch>
-```
+skein's `land` (skein's `docs/foundation/development.md`, section 9) does
+it all from a clean worktree on the branch: it rebases on `origin/main`,
+runs the gate through the machine's queue, records its result in the tip
+commit's trailers, and pushes the tip to `origin`'s `main`, which only
+fast-forwards. The local `main` follows.
 
 A branch that changes only Markdown files (the documents under `docs/`,
-`AGENTS.md`) skips the four checks, since nothing it touches is built or
-tested, and is merged the same way. Doc comments in `.rs` files are not
+`AGENTS.md`) skips the gate, since nothing it touches is built or tested,
+and lands with `land --docs`. Doc comments in `.rs` files are not
 documentation in this sense: they are code, and clippy checks them.
 
 ## 2. The two test suites
