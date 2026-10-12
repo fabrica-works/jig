@@ -6,3 +6,6 @@ mod names;
 mod tests;
 #[cfg(test)]
 mod tools;
+
+#[cfg(test)]
+mod accounts;

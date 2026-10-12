@@ -1,0 +1,16 @@
+[package]
+name = "jig-protocol-accounts"
+description = "The accounts vocabulary over skein's OAuth driver"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+skein-lib.workspace = true
+skein-oauth.workspace = true
+skein-oauth-accounts.workspace = true
+jig-domain-accounts.workspace = true
+
+[lints]
+workspace = true
