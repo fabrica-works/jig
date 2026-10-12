@@ -223,6 +223,12 @@ ones before it in its session. Dependencies are by capability: "skein
   ruling 124): those it adds, and those whose inputs or setup it changes.
   A test changed only in an expected value (rulings 108, 122, 123) is not
   made cheaper by that increment, whatever one run times it at.
+- **A private field is an implementation choice** (decisions.md, ruling
+  125). A field an increment adds to a type other sessions use, private to
+  its crate and reached by no other session's code, does not change the
+  fields others see (development.md, 8.2): it is no question. It is
+  bounded by a limit, priced in its owner's `worst_case`, and named in the
+  commit body.
 - **A new module beside a file past 800 lines is inside Files**
   (decisions.md, ruling 116). Where an increment's Files name a file past
   800 lines, the new module that code-organization.md, section 7 sends its

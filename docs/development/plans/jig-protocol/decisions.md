@@ -484,6 +484,17 @@ the file.
      made cheaper before it lands" binds the tests an increment adds, or
      whose inputs or setup it changes; 03.5 lands as it is. The README's
      Rules now say so.
+125. **jig 12.3's census keeps its progress in a private, bounded map**
+     (2026-10-12, the coordinator's block "jig 12.3: bounded census
+     progress field for duplicate rows", 2026-10-12T18:59:33Z). 12.3's
+     Shape: "a row it is handed twice (a chat with an unread result)
+     changes nothing the second time"; today a second ended-chat row adds
+     its unread replies again (`people/src/inbox.rs:412-437`). 12.3 adds a
+     private `Core` field, a census-progress map bounded by
+     `limits.people.people`, two high-water marks per party, initialised
+     by `Core::census`, updated by `restore_inbox_row`, priced in `Core`'s
+     `worst_case` and emptied when the census ends; every public signature
+     stays. The README's Rules now say a private field is no question.
 
 ## For the user
 
