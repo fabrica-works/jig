@@ -226,7 +226,7 @@ pub(super) fn tag_tasks(
             }
             tasks::Request::WriterWaiting { task: Some(task), .. } => {
                 if core.claiming.remove(&task).is_some() {
-                    drop(core.proofs.remove(&task));
+                    core.restore_replaced_proof(task);
                     out.push(Request::Now(Box::new(Now::DropAssignment { task })));
                     let mut follow = Queue::with_capacity(room);
                     tasks::step(
@@ -659,6 +659,7 @@ pub(super) fn tag_tasks(
                     continue;
                 }
                 if let Some(attempt) = core.claiming.remove(&token.raw()) {
+                    drop(core.replaced.remove(&token.raw()));
                     let proof = core.proofs.get(&token.raw()).expect("claim proof pre-reserved");
                     out.push(Request::Write(Write::Save(Record::Core(CoreRecord::RunProof(proof.clone())))));
                     for &connector in core.connectors.as_ref() {
@@ -1117,7 +1118,7 @@ pub(super) fn tag_tasks(
                     continue;
                 }
                 if core.claiming.remove(&token.raw()).is_some() {
-                    drop(core.proofs.remove(&token.raw()));
+                    core.restore_replaced_proof(token.raw());
                     out.push(Request::Now(Box::new(Now::DropAssignment { task: token.raw() })));
                     let mut follow = Queue::with_capacity(room);
                     tasks::step(

@@ -243,3 +243,32 @@ fn runs_scenarios() {
     settled_answers_resume_in_commit_order_and_a_replay_preserves_exact_bytes();
     a_bounced_message_stays_unread_for_a_later_read();
 }
+
+#[test]
+fn a_resuming_charters_first_claim_records_its_own_attempt() {
+    let world = World::new(108, false);
+    let assigned = world.assigned.as_ref().expect("first chat assignment");
+    let key = root::Key::Core(core::Key::Core(core::CoreKey::RunProof(assigned.task)));
+    let root::Record::Core(core::Record::Core(core::CoreRecord::RunProof(proof))) = &world.store.rows[&key] else {
+        panic!("durable claim proof")
+    };
+    assert_eq!(proof.conversation, assigned.attempt);
+}
+
+#[test]
+fn a_conversations_attempts_name_one_first_attempt() {
+    let mut world = World::new(109, false);
+    let first = world.assigned.as_ref().expect("first assignment").attempt;
+    for key in [81, 82] {
+        world.turn(1, 1, None, b"conversation turn");
+        world.end(tasks::End::Parked, 1);
+        world.say(key);
+        let assigned = world.assigned.as_ref().expect("resumed chat");
+        let key = root::Key::Core(core::Key::Core(core::CoreKey::RunProof(assigned.task)));
+        let root::Record::Core(core::Record::Core(core::CoreRecord::RunProof(proof))) = &world.store.rows[&key] else {
+            panic!("durable resumed claim")
+        };
+        assert_eq!(proof.conversation, first);
+        assert!(proof.attempt > first);
+    }
+}

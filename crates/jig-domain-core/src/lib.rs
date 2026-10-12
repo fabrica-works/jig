@@ -306,6 +306,8 @@ pub struct Core {
     pub transcripts: Map<u64, Transcript>,
     /// Current durable claim evidence.
     pub proofs: Map<u64, RunProof>,
+    /// Durable proof kept aside until a replacement claim commits.
+    pub replaced: Map<u64, RunProof>,
     /// Correlation while current proofs are restored.
     pub restoring_proofs: Map<u64, RestoringProof>,
     /// Restored claims not yet reported by a host.
@@ -564,6 +566,7 @@ impl Core {
             workspace_pending: Map::with_capacity(limits.tasks.tasks),
             transcripts: Map::with_capacity(limits.tasks.tasks),
             proofs: Map::with_capacity(limits.tasks.tasks),
+            replaced: Map::with_capacity(limits.tasks.tasks),
             restoring_proofs: Map::with_capacity(limits.tasks.tasks),
             unreported_restored: Map::with_capacity(limits.tasks.tasks),
             claiming: Map::with_capacity(limits.tasks.tasks),
@@ -637,6 +640,7 @@ impl Core {
             && self.adopted.is_empty()
             && self.due.is_empty()
             && self.claiming.is_empty()
+            && self.replaced.is_empty()
             && self.contexts.is_empty()
             && self.transcripts.is_empty()
             && self.restoring_proofs.is_empty()
@@ -669,7 +673,7 @@ impl Core {
 }
 
 fn valid_proof(proof: &RunProof, expected: &RestoringProof, result_bytes: u32) -> bool {
-    if proof.task == 0 || proof.attempt == 0 || proof.transcript_from > proof.attempt {
+    if proof.task == 0 || proof.attempt == 0 || proof.conversation == 0 || proof.conversation > proof.attempt {
         return false;
     }
     let spent = match proof.turn {

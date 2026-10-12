@@ -251,3 +251,30 @@ fn an_uncertain_effect_released_without_making_it_again_tells_its_executor() {
     ));
     assert!(world.store.rows.values().any(|row| matches!(row, root::Record::Core(core::Record::Core(core::CoreRecord::Call(row))) if row.key.task == task && matches!(row.part, core::CallPart::Effect { outcome: Some(core::connector::OutboxOutcome::NotMade), .. }))));
 }
+
+#[test]
+fn a_refused_claim_keeps_the_conversation_for_the_next_resume() {
+    let mut world = World::new(120, false);
+    world.turn(1, 1, None, b"durable conversation");
+    world.end(tasks::End::Parked, 1);
+    let assignment = world.assigned.as_ref().expect("first assignment");
+    let task = assignment.task;
+    let key = root::Key::Core(core::Key::Core(core::CoreKey::RunProof(task)));
+    let root::Record::Core(core::Record::Core(core::CoreRecord::RunProof(saved))) = &world.store.rows[&key] else {
+        panic!("durable proof")
+    };
+    let limits = jig_core_world::world::limits().core;
+    let mut core = core::Core::new(jig_core_world::world::config(120).core, &limits);
+    core.replaced.insert(task, saved.clone()).expect("one durable replacement");
+    let mut pending = saved.clone();
+    pending.attempt += 1;
+    pending.conversation = pending.attempt;
+    core.proofs.insert(task, pending.clone()).expect("one pending proof");
+    core.claiming.insert(task, pending.attempt).expect("one pending claim");
+    let env = skein_lib::Env { now: skein_lib::Time::ZERO, wall: skein_lib::Wall::EPOCH, limits };
+    let _decision = core::step(&mut core, &env, core::Event::ClaimRefused { task });
+    assert_eq!(core.proofs.get(&task), Some(saved));
+    assert!(core.replaced.is_empty());
+    core.begin_transcript(task, saved.attempt);
+    assert_eq!(core.transcripts.get(&task).expect("next resume").from, saved.conversation);
+}

@@ -133,11 +133,19 @@ impl Core {
         }
     }
 
+    /// Put back the durable evidence when a pending claim cannot commit.
+    pub(crate) fn restore_replaced_proof(&mut self, task: u64) {
+        drop(self.proofs.remove(&task));
+        if let Some(proof) = self.replaced.remove(&task) {
+            self.proofs.insert(task, proof).expect("replacement releases proof room");
+        }
+    }
+
     /// Begin a bounded transcript load for a due task's previous attempt.
     pub fn begin_transcript(&mut self, task: u64, previous_attempt: u64) {
         let from = match self.proofs.get(&task) {
-            Some(proof) => proof.transcript_from,
-            None => 0,
+            Some(proof) => proof.conversation,
+            None => 1,
         };
         assert!(
             self.transcripts

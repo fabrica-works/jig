@@ -455,7 +455,7 @@ fn documents_run_has_only_the_live_proofs_committed_progress() {
             RunProof {
                 task: 1,
                 attempt: 7,
-                transcript_from: 0,
+                conversation: 1,
                 host: fleet::HostKind::Engine,
                 offered: None,
                 turn: Some(TurnProof { turn: 3, cumulative: 0, read: None }),
@@ -1719,7 +1719,7 @@ fn watch_core() -> (Core, Limits) {
             RunProof {
                 task: 1,
                 attempt: 7,
-                transcript_from: 0,
+                conversation: 1,
                 host: fleet::HostKind::Engine,
                 offered: None,
                 turn: None,

@@ -89,12 +89,15 @@ pub(super) fn workspace_prepared(
     let resume = core.settings.run.resume
         && context.tries.transient == 0
         && transcript.bytes <= u64::from(core.settings.resume_bytes);
-    let transcript_from = if resume { transcript.from } else { attempt };
+    let conversation = if resume && transcript.last.is_some() { transcript.from } else { attempt };
     let offered = if context.last_message == 0 { None } else { Some(context.last_message) };
-    assert!(
-        core.proofs.insert(task, RunProof::claimed(task, attempt, transcript_from, offered)).is_ok(),
-        "claim proof reserved before child mutation"
-    );
+    let previous = core
+        .proofs
+        .insert(task, RunProof::claimed(task, attempt, conversation, offered))
+        .expect("claim proof reserved before child mutation");
+    if let Some(previous) = previous {
+        assert!(core.replaced.insert(task, previous) == Ok(None), "one pending replacement per task");
+    }
     let turns = if resume { core.resumed_turns(transcript) } else { Box::new([]) };
     let mut answered = List::with_capacity(env.limits.call_records);
     let mut after = None;
@@ -386,7 +389,7 @@ pub(super) fn route_preparation_failed(core: &mut Core, work: &mut Queue<Event>,
 pub(super) fn route_claim_refused(core: &mut Core, work: &mut Queue<Event>, task: u64) -> Requests {
     let mut out = Queue::with_capacity(2);
     if core.claiming.remove(&task).is_some() {
-        drop(core.proofs.remove(&task));
+        core.restore_replaced_proof(task);
         out.push(Request::Now(Box::new(Now::DropAssignment { task })));
         work.push(Event::Tasks(tasks::Event::PreparationFailed { task }));
     }
@@ -404,7 +407,7 @@ pub(super) fn route_claim_prepared(
 ) -> Requests {
     if core.claiming.get(&task) == Some(&attempt) {
         let earlier_transcript = match core.proofs.get(&task) {
-            Some(proof) => proof.transcript_from != attempt,
+            Some(proof) => proof.conversation != attempt,
             None => false,
         };
         let turned = match core.tasks.task(task) {
