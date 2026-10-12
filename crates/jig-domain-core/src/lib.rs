@@ -310,6 +310,7 @@ pub struct Core {
     pub contexts: Map<u64, Box<tasks::RunContext>>,
     /// Briefs waiting for their application connector's workspace translation.
     pub(crate) workspace_pending: Map<u64, u64>,
+    pub(crate) workspace_credentials: Map<u64, Box<[u32]>>,
     /// Recent transcript windows for runs being prepared.
     pub transcripts: Map<u64, Transcript>,
     /// Current durable claim evidence.
@@ -580,6 +581,7 @@ impl Core {
             next_note_owner: 1,
             contexts: Map::with_capacity(limits.tasks.tasks),
             workspace_pending: Map::with_capacity(limits.tasks.tasks),
+            workspace_credentials: Map::with_capacity(limits.tasks.tasks),
             transcripts: Map::with_capacity(limits.tasks.tasks),
             proofs: Map::with_capacity(limits.tasks.tasks),
             replaced: Map::with_capacity(limits.tasks.tasks),
@@ -657,6 +659,7 @@ impl Core {
             && self.claiming.is_empty()
             && self.replaced.is_empty()
             && self.contexts.is_empty()
+            && self.workspace_credentials.is_empty()
             && self.transcripts.is_empty()
             && self.restoring_proofs.is_empty()
             && self.unreported_restored.is_empty()
@@ -680,7 +683,12 @@ impl Core {
             Some(turn) => turn.turn,
             None => 0,
         };
-        if proof.attempt != expected.attempt || turn != expected.turn || !valid_proof(&proof, &expected, result_bytes) {
+        if proof.credentials.len()
+            > usize::try_from(self.accounts.credential_limit()).expect("u32 credential limit fits usize")
+            || proof.attempt != expected.attempt
+            || turn != expected.turn
+            || !valid_proof(&proof, &expected, result_bytes)
+        {
             return false;
         }
         self.proofs.insert(proof.task, proof).is_ok()

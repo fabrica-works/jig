@@ -97,6 +97,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         || limits.tasks.inbox_messages < limits.people.inbox_entries
         || limits.people.inbox_tasks < limits.tasks.tasks.checked_mul(2)?
         || limits.people.inbox_recipients < crate::inbox::waiting_capacity(limits)?
+        || limits.fleet.grants < limits.accounts.credentials.checked_add(1)?
+        || limits.authority.accounts < limits.accounts.credentials.checked_add(1)?
         || limits.notes.scopes < 3_u32.checked_add(limits.authority.grants)?
     {
         return None;
@@ -214,6 +216,11 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         total.checked_add(Map::<(u64, u16), ()>::worst_case(limits.tasks.tasks.checked_mul(limits.connectors)?)?)?;
     total = total.checked_add(Queue::<Box<tasks::RunContext>>::worst_case(limits.tasks.tasks)?)?;
     total = total.checked_add(Queue::<fleet::Event>::worst_case(limits.tasks.tasks.checked_mul(2)?)?)?;
+    total = total.checked_add(Map::<u64, Box<[u32]>>::worst_case(limits.tasks.tasks)?)?;
+    total = total.checked_add(bytes(
+        limits.tasks.tasks.checked_mul(3)?,
+        bytes(limits.accounts.credentials, sizeof(size_of::<u32>())?)?,
+    )?)?;
     let grants = bytes(limits.fleet.grants, sizeof(size_of::<fleet::Grant>())?)?
         .checked_add(bytes(limits.fleet.grants, sizeof(size_of::<fleet::GrantName>())?)?)?;
     total = total.checked_add(bytes(limits.tasks.tasks.checked_mul(2)?, grants)?)?;

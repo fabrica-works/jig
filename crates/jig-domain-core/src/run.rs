@@ -33,6 +33,32 @@ pub struct Transcript {
 }
 
 impl Core {
+    pub(crate) fn run_credentials(&self, task: u64) -> &[u32] {
+        if let Some(credentials) = self.workspace_credentials.get(&task) {
+            return credentials;
+        }
+        match self.proofs.get(&task) {
+            Some(proof) => &proof.credentials,
+            None => &[],
+        }
+    }
+    pub(crate) fn credentials_ready(&self, task: u64) -> bool {
+        for number in self.run_credentials(task) {
+            if !self.accounts.credential_usable(*number) {
+                return false;
+            }
+        }
+        true
+    }
+    pub(crate) fn run_accounts(&self, task: u64) -> Box<[bool]> {
+        let credentials = self.run_credentials(task);
+        let mut usable = List::with_capacity(self.accounts.credential_limit().checked_add(1).expect("grant bound"));
+        usable.push(self.accounts.usable(self.charter_of(task).account())).expect("account room");
+        for number in credentials {
+            usable.push(self.accounts.credential_usable(*number)).expect("credential room");
+        }
+        usable.into_boxed()
+    }
     /// Current charter policy with this task's durable instruction replacement.
     pub(crate) fn run_policy(&self, task: u64, resume: bool) -> RunPolicy {
         let mut policy = self.charter_of(task).policy.clone();
@@ -67,7 +93,7 @@ impl Core {
                 budget: authority::left(numbers).min(self.authority.rules().maximum_run_spend),
                 reserve: reserve_floor(&self.charter_of(task.task).policy).expect("configured reserve floor"),
                 wall,
-                accounts: Box::new([self.accounts.usable(self.charter_of(task.task).account())]),
+                accounts: self.run_accounts(task.task),
                 writes,
             },
             &mut findings,

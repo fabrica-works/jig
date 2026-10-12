@@ -576,6 +576,8 @@ pub struct RunProof {
     /// The conversation's first attempt: this claim's attempt when its run starts
     /// fresh, the previous proof's when it resumes; never zero.
     pub conversation: u64,
+    /// Application credential numbers lent with this claim.
+    pub credentials: Box<[u32]>,
     /// The current window's first turn: the last committed turn of this
     /// conversation that opened a window, by attempt and turn.
     pub window: Option<(u64, u32)>,
@@ -638,6 +640,16 @@ impl RunProof {
         offered: Option<u64>,
         host: jig_domain_fleet::HostKind,
     ) -> Self {
-        Self { task, attempt, conversation, window: None, host, offered, turn: None, terminal: None }
+        Self {
+            task,
+            attempt,
+            conversation,
+            credentials: Box::new([]),
+            window: None,
+            host,
+            offered,
+            turn: None,
+            terminal: None,
+        }
     }
 }

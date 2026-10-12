@@ -140,6 +140,7 @@ fn limits() -> Limits {
         brief_core_budgets: CoreBriefBudgets { task: 128, dependencies: 128, attempts: 128, plan: 128, notes: 64 },
         accounts: accounts::Limits {
             accounts: 1,
+            credentials: 2,
             backoff_base: Duration::from_secs(2),
             backoff_max: Duration::from_secs(8),
             retry: Duration::from_secs(30),
@@ -179,7 +180,7 @@ fn authority_limits() -> authority::Limits {
         segment_bytes: 32,
         implications: 0,
         batch: 1,
-        accounts: 1,
+        accounts: 3,
         writes: 1,
     }
 }
@@ -463,6 +464,7 @@ fn documents_run_has_only_the_live_proofs_committed_progress() {
                 task: 1,
                 attempt: 7,
                 conversation: 1,
+                credentials: Box::new([]),
                 window: None,
                 host: fleet::HostKind::Engine,
                 offered: None,
@@ -1739,6 +1741,7 @@ fn watch_core() -> (Core, Limits) {
                 task: 1,
                 attempt: 7,
                 conversation: 1,
+                credentials: Box::new([]),
                 window: None,
                 host: fleet::HostKind::Engine,
                 offered: None,
@@ -2991,3 +2994,5 @@ fn an_answer_payload_for_a_replaced_attempt_is_dropped() {
     assert_eq!(payload, Token::new(91));
     assert!(core.current_proof(1, 7), "the replacement proof remains current");
 }
+
+mod credentials;

@@ -783,6 +783,15 @@ pub(super) fn tag_tasks(
                     if let tasks::Stored::Ended(_) = &record {
                         core.cache_archived_chat(&env.limits, task);
                     }
+                    match task.phase {
+                        tasks::Phase::Ended(_) => {
+                            drop(core.workspace_credentials.remove(&task.number));
+                        }
+                        tasks::Phase::Waiting
+                        | tasks::Phase::Active(_)
+                        | tasks::Phase::Closing(_)
+                        | tasks::Phase::Held { .. } => {}
+                    }
                     let stale = match core.contexts.get(&task.number) {
                         Some(context) => {
                             task.phase != tasks::Phase::Active(tasks::Active::Preparing)

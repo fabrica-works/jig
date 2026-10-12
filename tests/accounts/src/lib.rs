@@ -4,6 +4,7 @@ use skein_lib::{Duration, Env, Queue, Time, Wall};
 pub const ANALYST: u32 = 7;
 pub const LIMITS: Limits = Limits {
     accounts: 2,
+    credentials: 2,
     backoff_base: Duration::from_secs(2),
     backoff_max: Duration::from_secs(8),
     retry: Duration::from_secs(30),

@@ -43,6 +43,7 @@ pub(super) fn workspace_prepared(
     task: u64,
     attempt: u64,
     writes: Option<Box<[authority::Write]>>,
+    credentials: Box<[u32]>,
 ) -> Requests {
     let mut out = Queue::with_capacity(2);
     if core.workspace_pending.remove(&task) != Some(attempt) {
@@ -63,6 +64,13 @@ pub(super) fn workspace_prepared(
         out.push(Request::Decided);
         return Requests::Out(out);
     };
+    if credentials.len() > usize::try_from(env.limits.accounts.credentials).expect("u32 credential limit fits usize") {
+        work.push(Event::Tasks(tasks::Event::Hold { task, why: tasks::Hold::Effects }));
+        out.push(Request::Now(Box::new(Now::RunPreparationFailed { task })));
+        out.push(Request::Decided);
+        return Requests::Out(out);
+    }
+    drop(core.workspace_credentials.insert(task, credentials).expect("live task credential room"));
     let why = match core.run_admission(&context, env.wall, writes) {
         crate::RunAdmission::Allow => None,
         crate::RunAdmission::Account => return wait_for_account(core, context),
@@ -77,6 +85,14 @@ pub(super) fn workspace_prepared(
     let Some(grant) = core.accounts.grant(core.charter_of(task).account(), env.now) else {
         return wait_for_account(core, context);
     };
+    let mut grants = List::with_capacity(env.limits.fleet.grants);
+    grants.push(grant).expect("account grant room");
+    for number in core.run_credentials(task) {
+        let Some(grant) = core.accounts.credential_grant(*number, env.now) else {
+            return wait_for_account(core, context);
+        };
+        grants.push(grant).expect("credential grant room");
+    }
     if !core.proofs.contains_key(&task) && core.proofs.len() == core.proofs.capacity() {
         work.push(Event::Tasks(tasks::Event::PreparationFailed { task }));
         out.push(Request::Now(Box::new(Now::RunPreparationFailed { task })));
@@ -90,12 +106,40 @@ pub(super) fn workspace_prepared(
     let messages = start_messages(context.inbox, env.limits.tasks.run_inbox);
     let mut proof = start_proof(core, task, attempt, conversation, &messages);
     proof.window = if resume { transcript.window } else { None };
+    proof.credentials = core.workspace_credentials.remove(&task).expect("prepared credentials");
     let previous = core.proofs.insert(task, proof).expect("claim proof reserved before child mutation");
     if let Some(previous) = previous {
         assert!(core.replaced.insert(task, previous) == Ok(None), "one pending replacement per task");
     }
     let turns = if resume { core.resumed_turns(transcript) } else { Box::new([]) };
-    let mut answered = List::with_capacity(env.limits.call_records);
+    let answered = answered_calls(core, task, attempt, env.limits.call_records);
+    let policy = core.run_policy(task, resume);
+    let run = RunCharter {
+        policy,
+        contract: context.contract,
+        authority: context.authority,
+        budget: authority::left(crate::translate::authority_numbers(context.numbers))
+            .min(core.authority.rules().maximum_run_spend),
+    };
+    assert!(core.claiming.insert(task, attempt) == Ok(None), "one pending claim per task");
+    out.push(Request::Now(Box::new(Now::RunPrepared {
+        task,
+        attempt,
+        conversation,
+        charter: core.charter_of(task).number,
+        run: Box::new(run),
+        messages,
+        saved: context.saved,
+        transcript: turns,
+        answered,
+        grants: grants.into_boxed(),
+    })));
+    out.push(Request::Decided);
+    Requests::Out(out)
+}
+
+fn answered_calls(core: &Core, task: u64, attempt: u64, limit: u32) -> Box<[crate::CallKey]> {
+    let mut answered = List::with_capacity(limit);
     let mut after = None;
     for _ in 0..core.call_parts.len() {
         let mut next = None;
@@ -118,29 +162,7 @@ pub(super) fn workspace_prepared(
         answered.push(key).expect("retained call bound");
         after = Some(key);
     }
-    let policy = core.run_policy(task, resume);
-    let run = RunCharter {
-        policy,
-        contract: context.contract,
-        authority: context.authority,
-        budget: authority::left(crate::translate::authority_numbers(context.numbers))
-            .min(core.authority.rules().maximum_run_spend),
-    };
-    assert!(core.claiming.insert(task, attempt) == Ok(None), "one pending claim per task");
-    out.push(Request::Now(Box::new(Now::RunPrepared {
-        task,
-        attempt,
-        conversation,
-        charter: core.charter_of(task).number,
-        run: Box::new(run),
-        messages,
-        saved: context.saved,
-        transcript: turns,
-        answered: answered.into_boxed(),
-        grants: Box::new([grant]),
-    })));
-    out.push(Request::Decided);
-    Requests::Out(out)
+    answered.into_boxed()
 }
 
 fn start_messages(inbox: Box<[tasks::Word]>, most: u32) -> Box<[tasks::Word]> {

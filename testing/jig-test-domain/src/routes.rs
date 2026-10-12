@@ -365,7 +365,12 @@ fn route_now(
             for number in [1, 2] {
                 let Some(holdings) = specification_holdings(domain, env, number, context.project, &context.spec, work)
                 else {
-                    work.push(Work::Core(core::Event::WorkspacePrepared { task, attempt, writes: None }));
+                    work.push(Work::Core(core::Event::WorkspacePrepared {
+                        task,
+                        attempt,
+                        credentials: Box::new([]),
+                        writes: None,
+                    }));
                     return;
                 };
                 for holding in holdings {
@@ -393,7 +398,12 @@ fn route_now(
                 }
             }
             assert!(domain.workspace_writes.insert(task, names.into_boxed()).is_ok(), "workspace per task");
-            work.push(Work::Core(core::Event::WorkspacePrepared { task, attempt, writes: Some(checks.into_boxed()) }));
+            work.push(Work::Core(core::Event::WorkspacePrepared {
+                task,
+                attempt,
+                credentials: Box::new([]),
+                writes: Some(checks.into_boxed()),
+            }));
         }
         core::Now::RunPrepared { task, attempt, conversation, charter, run, messages, transcript, grants, .. } => {
             let budget = run.budget;

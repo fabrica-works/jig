@@ -106,6 +106,7 @@ impl Core {
         match context.executor {
             tasks::Executor::Agent { charter } => {
                 self.accounts.usable(self.charter(charter).expect("task charter").account())
+                    && self.credentials_ready(context.task)
             }
             tasks::Executor::Procedure { .. } => true,
             tasks::Executor::Person(_) => false,

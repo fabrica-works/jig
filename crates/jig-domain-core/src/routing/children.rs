@@ -400,7 +400,11 @@ pub(super) fn route_fleet(core: &mut Core, env: &Env<Limits>, mut event: fleet::
                         *grant = crate::sibling_routes::fleet_grant(current);
                     }
                 }
-                fleet::GrantTable::Application => {}
+                fleet::GrantTable::Application => {
+                    if let Some(current) = core.accounts.credential_grant(grant.account, env.now) {
+                        *grant = crate::sibling_routes::fleet_grant(current);
+                    }
+                }
             }
         }
     }

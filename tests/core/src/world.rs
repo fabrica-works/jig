@@ -144,6 +144,7 @@ pub fn limits() -> root::Limits {
             },
             accounts: accounts::Limits {
                 accounts: 1,
+                credentials: 2,
                 backoff_base: Duration::from_secs(2),
                 backoff_max: Duration::from_secs(8),
                 retry: Duration::from_secs(30),
@@ -196,7 +197,7 @@ fn authority_limits() -> authority::Limits {
         segment_bytes: 32,
         implications: 0,
         batch: 1,
-        accounts: 1,
+        accounts: 3,
         writes: 1,
     }
 }

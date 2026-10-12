@@ -184,8 +184,18 @@ impl Core {
         if let Some(grant) = self.accounts.grant(account, env.now) {
             grants.push(fleet_grant(grant)).expect("account grant room");
         }
+        let mut holds = List::with_capacity(env.limits.fleet.grants);
+        holds.push(fleet::GrantName { table: fleet::GrantTable::Accounts, account }).expect("account name room");
+        for number in &self.proofs.get(&task).expect("restored claim proof").credentials {
+            holds
+                .push(fleet::GrantName { table: fleet::GrantTable::Application, account: *number })
+                .expect("credential name room");
+            if let Some(grant) = self.accounts.credential_grant(*number, env.now) {
+                grants.push(fleet_grant(grant)).expect("credential grant room");
+            }
+        }
         self.adopted.push(fleet::Event::Adopt {
-            holds: Box::new([fleet::GrantName { table: fleet::GrantTable::Accounts, account }]),
+            holds: holds.into_boxed(),
             grants: grants.into_boxed(),
             kind: if self.workers_in_process {
                 fleet::HostKind::Engine

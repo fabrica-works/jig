@@ -463,8 +463,8 @@ fn step_one(core: &mut Core, env: &Env<Limits>, event: Event, work: &mut Queue<E
         Event::StartBrief { task } => start_brief(core, env, work, task),
         Event::BriefNotes { task, lines, more } => plan_brief(core, env, work, task, lines, more),
         Event::BriefAssembled { task, ready } => brief_assembled(core, work, task, ready),
-        Event::WorkspacePrepared { task, attempt, writes } => {
-            workspace_prepared(core, env, work, task, attempt, writes)
+        Event::WorkspacePrepared { task, attempt, writes, credentials } => {
+            workspace_prepared(core, env, work, task, attempt, writes, credentials)
         }
         Event::ClaimPrepared { task, attempt, budget, writes } => {
             route_claim_prepared(core, work, task, attempt, budget, writes)

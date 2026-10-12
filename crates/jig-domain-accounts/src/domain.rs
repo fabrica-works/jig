@@ -20,7 +20,7 @@ pub(crate) struct Account {
     spent_attention: bool,
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-struct Granted {
+pub(crate) struct Granted {
     generation: u64,
     expires: Time,
 }
@@ -34,9 +34,12 @@ enum Phase {
 #[derive(Debug)]
 pub struct Domain {
     accounts: Map<u32, Account>,
+    credentials: Map<u32, Granted>,
+    credential_alarms: Deadlines<u32>,
     alarms: Deadlines<u32>,
     facts: Queue<Fact>,
     lost: u64,
+    now: Time,
     phase: Phase,
 }
 impl Domain {
@@ -45,9 +48,12 @@ impl Domain {
         assert!(crate::worst_case(limits).is_some(), "account limits are valid");
         let mut domain = Domain {
             accounts: Map::with_capacity(limits.accounts),
+            credentials: Map::with_capacity(limits.credentials),
+            credential_alarms: Deadlines::with_capacity(limits.credentials),
             alarms: Deadlines::with_capacity(limits.accounts),
             facts: Queue::with_capacity(limits.facts),
             lost: 0,
+            now: Time::ZERO,
             phase: Phase::New,
         };
         for number in &accounts {
@@ -87,12 +93,42 @@ impl Domain {
         })
     }
     #[must_use]
+    pub fn credential_usable(&self, number: u32) -> bool {
+        match self.credentials.get(&number) {
+            Some(grant) => grant.expires > self.now,
+            None => false,
+        }
+    }
+    #[must_use]
+    pub fn credential_limit(&self) -> u32 {
+        self.credentials.capacity()
+    }
+    #[must_use]
+    pub fn credential_grant(&self, number: u32, now: Time) -> Option<Grant> {
+        let grant = self.credentials.get(&number)?;
+        if grant.expires <= now {
+            return None;
+        }
+        Some(Grant {
+            table: GrantTable::Application,
+            account: number,
+            generation: grant.generation,
+            valid: grant.expires.saturating_since(now),
+        })
+    }
+    #[must_use]
     pub fn next_deadline(&self) -> Option<Time> {
-        self.alarms.next()
+        match self.alarms.next() {
+            Some(a) => match self.credential_alarms.next() {
+                Some(b) => Some(a.min(b)),
+                None => Some(a),
+            },
+            None => self.credential_alarms.next(),
+        }
     }
     #[must_use]
     pub fn is_due(&self, now: Time) -> bool {
-        match self.alarms.next() {
+        match self.next_deadline() {
             Some(at) => at <= now,
             None => false,
         }
@@ -123,6 +159,7 @@ impl Domain {
 }
 
 pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
+    domain.now = env.now;
     match event {
         Event::Want => {
             if domain.phase != Phase::New {
@@ -132,6 +169,20 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             for (account, _) in &domain.accounts {
                 out.push(Request::Component(ToComponent::Want { account: *account }));
             }
+        }
+        Event::Credential { number, generation, valid } => {
+            match domain.phase {
+                Phase::Closing | Phase::Closed => return,
+                Phase::New | Phase::Wanted => {}
+            }
+            let expires = env.now.saturating_add(valid);
+            if domain.credentials.insert(number, Granted { generation, expires }).is_err() {
+                return;
+            }
+            domain.credential_alarms.arm(number, expires).expect("credential alarm room");
+            out.push(Request::Granted {
+                grant: Grant { table: GrantTable::Application, account: number, generation, valid },
+            });
         }
         Event::Close => close(domain, env, out),
         Event::Component(FromComponent::Closed) => {
@@ -173,6 +224,8 @@ fn close(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
         Phase::Closing | Phase::Closed => return,
         Phase::New | Phase::Wanted => domain.phase = Phase::Closing,
     }
+    domain.credentials = Map::with_capacity(env.limits.credentials);
+    domain.credential_alarms = Deadlines::with_capacity(env.limits.credentials);
     let mut numbers = List::with_capacity(env.limits.accounts);
     for (number, _) in &domain.accounts {
         numbers.push(*number).expect("configured account count");
@@ -263,6 +316,11 @@ fn failed(entry: &mut Account, env: &Env<Limits>, failure: Failure) {
 }
 /// One expired account, after component inputs so a grant arriving now wins.
 pub fn fire(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
+    domain.now = env.now;
+    if let Some(number) = domain.credential_alarms.expire(env.now) {
+        domain.credentials.remove(&number).expect("credential alarm names a grant");
+        return;
+    }
     let Some(account) = domain.alarms.expire(env.now) else { return };
     let entry = domain.accounts.get_mut(&account).expect("alarm names a configured account");
     if match entry.spent {

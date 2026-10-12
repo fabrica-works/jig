@@ -18,7 +18,7 @@ fn a_charter_whose_default_spend_misses_its_floor_is_refused() {
     let _core = Core::new(config, &limits());
 }
 
-fn context(task: u64, charter: u32) -> Box<tasks::RunContext> {
+pub(super) fn context(task: u64, charter: u32) -> Box<tasks::RunContext> {
     Box::new(tasks::RunContext {
         task,
         last_message: 0,

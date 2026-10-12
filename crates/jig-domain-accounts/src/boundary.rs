@@ -23,6 +23,7 @@ pub enum Event {
     Component(FromComponent),
     Rejected { account: u32, generation: u64 },
     Exhausted { account: u32, retry_after: Duration },
+    Credential { number: u32, generation: u64, valid: Duration },
     Close,
 }
 

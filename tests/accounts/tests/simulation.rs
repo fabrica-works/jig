@@ -137,3 +137,30 @@ fn close_releases_every_account_and_ends_on_closed() {
     assert_eq!(world.domain.accounts(), 0);
     assert_eq!(world.fire_at(100), vec![]);
 }
+
+fn credential(generation: u64) -> Event {
+    Event::Credential { number: 7, generation, valid: Duration::from_secs(100) }
+}
+fn credential_world() -> World {
+    let mut world = World::default();
+    world.step(credential(1));
+    world
+}
+#[test]
+fn a_credential_is_usable_while_its_generation_is_valid() {
+    let mut world = credential_world();
+    world.fire_at(99);
+    assert!(world.domain.credential_usable(7));
+    world.fire_at(100);
+    assert!(!world.domain.credential_usable(7));
+}
+#[test]
+fn a_credentials_new_generation_is_granted_on() {
+    let mut world = credential_world();
+    assert_eq!(
+        world.step(credential(2)),
+        vec![Request::Granted {
+            grant: Grant { table: GrantTable::Application, account: 7, generation: 2, valid: Duration::from_secs(100) }
+        }]
+    );
+}

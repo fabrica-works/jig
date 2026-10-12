@@ -409,7 +409,7 @@ pub enum Event {
     /// The root assembled all selected connector sections, or found a missing owner.
     BriefAssembled { task: u64, ready: bool },
     /// The root translated the selected connector's workspace writes.
-    WorkspacePrepared { task: u64, attempt: u64, writes: Option<Box<[authority::Write]>> },
+    WorkspacePrepared { task: u64, attempt: u64, writes: Option<Box<[authority::Write]>>, credentials: Box<[u32]> },
     /// The root returned translated workspace names after assembling the run assignment.
     ClaimPrepared { task: u64, attempt: u64, budget: u64, writes: Box<[tasks::Name]> },
     /// A connector refused the held names of a pending task claim.

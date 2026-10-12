@@ -1242,7 +1242,12 @@ fn core_now(domain: &mut Domain, env: &Env<Limits>, value: core::Now, work: &mut
             work.push(Work::Core(core::Event::BriefAssembled { task: brief.raw(), ready: true }));
         }
         core::Now::WorkspaceRequest { task, attempt, .. } => {
-            work.push(Work::Core(core::Event::WorkspacePrepared { task, attempt, writes: Some(Box::new([])) }));
+            work.push(Work::Core(core::Event::WorkspacePrepared {
+                task,
+                attempt,
+                credentials: Box::new([]),
+                writes: Some(Box::new([])),
+            }));
         }
         core::Now::RunPrepared { task, attempt, conversation, run, messages, transcript, grants, .. } => {
             let budget = run.budget;

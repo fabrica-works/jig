@@ -1,11 +1,12 @@
 use skein_lib::{Deadlines, Duration, List, Map, Queue};
 
 use crate::Fact;
-use crate::domain::Account;
+use crate::domain::{Account, Granted};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Limits {
     pub accounts: u32,
+    pub credentials: u32,
     pub backoff_base: Duration,
     pub backoff_max: Duration,
     pub retry: Duration,
@@ -25,6 +26,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         return None;
     }
     Map::<u32, Account>::worst_case(limits.accounts)?
+        .checked_add(Map::<u32, Granted>::worst_case(limits.credentials)?)?
+        .checked_add(Deadlines::<u32>::worst_case(limits.credentials)?)?
         .checked_add(List::<u32>::worst_case(limits.accounts)?)?
         .checked_add(Deadlines::<u32>::worst_case(limits.accounts)?)?
         .checked_add(Queue::<Fact>::worst_case(limits.facts)?)

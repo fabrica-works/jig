@@ -591,7 +591,7 @@ impl Core {
                 reserve: crate::run::reserve_floor(&self.charter_of(context.task).policy)
                     .expect("configured reserve floor"),
                 wall: now,
-                accounts: Box::new([self.accounts.usable(self.charter_of(context.task).account())]),
+                accounts: self.run_accounts(context.task),
                 writes: Box::new([authority::Write {
                     effect: crate::resources::effect(self, context.project, effect),
                     held: authority::Writer::Task,
