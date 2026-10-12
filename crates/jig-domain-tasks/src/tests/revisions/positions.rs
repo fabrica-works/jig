@@ -58,6 +58,7 @@ fn question_cycles(h: &mut Harness) {
             "{out:?}"
         );
         h.send(Event::Turn {
+            refused: Box::new([]),
             reply_to: to(),
             task: 2,
             attempt: 1,

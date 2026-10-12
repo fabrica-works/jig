@@ -59,6 +59,8 @@ pub enum Script {
     Text { turn: u32, offset: u32, text: Box<[u8]> },
     /// Take a whole turn, within the independently supplied allowance.
     Turn { body: Box<[u8]>, cost: u64, read: Option<u64> },
+    /// Keep this refusal for the next turn or answer.
+    Refuse { name: u64 },
     /// Ask one call and wait for its answer before advancing.
     Call(Call),
     /// Hold the slot until a new message arrives.
@@ -116,11 +118,12 @@ pub enum Up {
         read: Option<u64>,
         body: Box<[u8]>,
         opens_window: bool,
+        refused: Box<[u64]>,
     },
     /// A call waiting for one answer.
     Call { channel: u64, task: u64, attempt: u64, number: u32, call: Call },
     /// A retained activation answer.
-    Answer { channel: u64, task: u64, attempt: u64, spent: u64, end: End, read: Option<u64> },
+    Answer { channel: u64, task: u64, attempt: u64, spent: u64, end: End, read: Option<u64>, refused: Box<[u64]> },
 }
 
 #[derive(Clone, Debug)]
@@ -131,6 +134,7 @@ struct Run {
     kept_spent: u64,
     next_turn: u32,
     read: Option<u64>,
+    refused: Vec<u64>,
     next_call: u32,
     turns: Vec<Up>,
     answer: Option<Up>,
@@ -222,6 +226,7 @@ impl Worker {
                         kept_spent: 0,
                         next_turn: 1,
                         read: None,
+                        refused: Vec::new(),
                         next_call: 1,
                         turns: Vec::new(),
                         answer: None,
@@ -406,6 +411,10 @@ impl Worker {
                     offset,
                     text,
                 }),
+                Script::Refuse { name } => {
+                    run.refused.push(name);
+                    None
+                }
                 Script::Turn { body, cost, read } => {
                     run.spent = run.spent.checked_add(cost).expect("spend fits");
                     assert!(run.spent <= run.assignment.budget, "scripted completion stays in its allowance");
@@ -422,6 +431,7 @@ impl Worker {
                         turn: run.next_turn,
                         spent: run.spent,
                         read,
+                        refused: std::mem::take(&mut run.refused).into_boxed_slice(),
                         opens_window: run.next_turn == 1 && run.assignment.transcript.is_empty(),
                         body,
                     };
@@ -494,7 +504,7 @@ impl Worker {
     }
 }
 
-fn answer(channel: u64, run: &Run, end: End) -> Up {
+fn answer(channel: u64, run: &mut Run, end: End) -> Up {
     Up::Answer {
         channel,
         task: run.assignment.task,
@@ -502,5 +512,6 @@ fn answer(channel: u64, run: &Run, end: End) -> Up {
         spent: run.spent,
         end,
         read: run.read,
+        refused: std::mem::take(&mut run.refused).into_boxed_slice(),
     }
 }

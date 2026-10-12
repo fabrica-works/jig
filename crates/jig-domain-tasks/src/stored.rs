@@ -367,11 +367,21 @@ fn valid_record(domain: &Domain, limits: &Limits, task: &TaskRecord) -> bool {
         || !valid_chat_close(task)
         || !valid_person_answer(task)
         || !crate::positions::valid(task, limits.inbox_messages)
+        || !crate::inbox::valid_refusals(task, Some(task.last_message), &task.refused)
     {
         return false;
     }
-    if (task.turn != 0 && task.attempt == 0) || (task.narrowing && crate::run::run_attempt(&task.phase).is_none()) {
+    if ((task.turn != 0 || !task.refused.is_empty()) && task.attempt == 0)
+        || (task.narrowing && crate::run::run_attempt(&task.phase).is_none())
+    {
         return false;
+    }
+    let mut previous = 0;
+    for &number in &task.refused {
+        if number <= previous {
+            return false;
+        }
+        previous = number;
     }
     let Some((subscription_count, subscription_bytes)) = crate::subscriptions::credit(task, limits) else {
         return false;

@@ -324,6 +324,7 @@ fn priority_spend_delegate_phase_and_run_turn_do_not_move_decision_revisions() {
     );
     test.send(Event::Started { task: 1, attempt: 1 });
     let out = test.send(Event::Turn {
+        refused: Box::new([]),
         reply_to: to(),
         task: 1,
         attempt: 1,
@@ -454,6 +455,7 @@ fn activity_keeps_whole_words_after_a_committed_turn_takes_them() {
     test.send(Event::Claim { reply_to: to(), task: 1, attempt: 1, resumed: false, budget: 10, writes: Box::new([]) });
     test.send(Event::Started { task: 1, attempt: 1 });
     test.send(Event::Turn {
+        refused: Box::new([]),
         reply_to: to(),
         task: 1,
         attempt: 1,

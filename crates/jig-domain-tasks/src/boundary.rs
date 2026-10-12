@@ -850,6 +850,8 @@ pub struct TaskRecord {
     pub proposal_rows: Box<[crate::ProposalRow]>,
     /// Agent instruction replacement; absent uses the configured charter default.
     pub instructions: Option<Box<[u8]>>,
+    /// Messages the current attempt's run refused; untaken by later fences of that attempt.
+    pub refused: Box<[u64]>,
     /// A person requested this chat to finish by this durable deadline.
     pub chat_close: Option<crate::chat::Grace>,
     /// Independent revisions retained in live and ended records.
@@ -1382,6 +1384,8 @@ pub enum Event {
         turn: u32,
         /// Highest committed inbox message read by this turn; taking is atomic with the charge.
         read: Option<u64>,
+        /// Offered messages still in the inbox that this turn refuses.
+        refused: Box<[u64]>,
         /// Highest message this exact run was offered by its assignment or committed relay.
         offered: Option<u64>,
         /// Whole priced attempt expense; tasks posts only the checked delta above `run_spent`

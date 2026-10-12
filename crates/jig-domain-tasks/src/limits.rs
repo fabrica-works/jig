@@ -147,7 +147,9 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     let approval_contract = u64::from(limits.result_bytes)
         .checked_add(u64::from(limits.hold_bytes))?
         .checked_add(List::<Box<[u8]>>::worst_case(limits.hold_segments)?)?;
-    let payload = u64::from(limits.spec_bytes)
+    let payload = u64::from(limits.inbox_messages)
+        .checked_mul(u64::try_from(size_of::<u64>()).ok()?)?
+        .checked_add(u64::from(limits.spec_bytes))?
         .checked_add(u64::from(limits.message_bytes))?
         .checked_add(u64::from(limits.inbox_bytes))?
         .checked_add(u64::from(limits.inbox_bytes).checked_mul(field_size)?)?

@@ -12,7 +12,16 @@ fn send(world: &mut World, build: impl FnOnce(ReplyTo) -> Event) -> Reply {
 }
 
 fn turn(world: &mut World, task: u64, attempt: u64, turn: u32, read: Option<u64>, cumulative: u64) -> Reply {
-    send(world, |reply_to| Event::Turn { reply_to, task, attempt, turn, read, offered: None, cumulative })
+    send(world, |reply_to| Event::Turn {
+        refused: Box::new([]),
+        reply_to,
+        task,
+        attempt,
+        turn,
+        read,
+        offered: None,
+        cumulative,
+    })
 }
 
 fn end(world: &mut World, task: u64, attempt: u64, end: End, cumulative: u64) -> Reply {

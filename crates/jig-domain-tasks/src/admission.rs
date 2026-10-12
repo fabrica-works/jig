@@ -47,6 +47,7 @@ pub(crate) fn turn(
     attempt: u64,
     turn: u32,
     read: Option<u64>,
+    refusals: &[u64],
     offered: Option<u64>,
     cumulative: u64,
     out: &mut Queue<Request>,
@@ -72,7 +73,10 @@ pub(crate) fn turn(
         },
         None => false,
     };
-    if beyond_offer || !crate::inbox::readable(domain, number, read) {
+    if beyond_offer
+        || !crate::inbox::readable(domain, number, read)
+        || !crate::inbox::valid_refusals(old, offered, refusals)
+    {
         return refused(to, Some(number), Refusal::Read, out);
     }
     let spent = match check_charge(domain, number, cumulative) {
@@ -84,7 +88,7 @@ pub(crate) fn turn(
     }
     let task = &mut task_mut(domain, number).expect("turn admitted").record;
     task.turn = turn;
-    crate::inbox::take(task, read);
+    crate::inbox::take(task, read, refusals);
     task.ever_turned = true;
     task.last_reply = task.last_reply.checked_add(1).expect("reply ordinal admitted");
     crate::activity::append(

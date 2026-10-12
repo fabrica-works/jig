@@ -25,12 +25,13 @@ use run_delegation::{
     delegate_holdings, delegate_input_failed, delegate_validated, procedure_holdings, procedure_step, route_period,
     route_start_recurring,
 };
+use run_payloads::{route_answer_payload, route_turn_payload};
 use run_preparation::{
     brief_assembled, plan_brief, route_activate, route_claim_prepared, route_claim_refused, route_preparation_failed,
     route_prepared_agent, start_brief, workspace_prepared,
 };
 pub(crate) use runs::named_propose;
-use runs::{named_action, route_answer_payload, route_named_answer, route_refused_payload, route_turn_payload};
+use runs::{named_action, route_named_answer, route_refused_payload};
 use skein_lib::{Env, JournalRoom, List, Queue, ReplyTo, Token};
 use task_routes::{
     route_connector_repair, route_person_escalation, route_person_proposal, route_task_escalation, route_tasks,
@@ -54,6 +55,7 @@ mod party_decisions;
 mod people_routes;
 pub(crate) mod refusals;
 mod run_delegation;
+mod run_payloads;
 mod run_preparation;
 mod runs;
 mod turns;
@@ -482,11 +484,23 @@ fn step_one(core: &mut Core, env: &Env<Limits>, event: Event, work: &mut Queue<E
             route_holdings(core, env, work, request, connector, holdings)
         }
         Event::Fleet(event) => route_fleet(core, env, event),
-        Event::TurnPayload { run, attempt, turn, body, read, cumulative, refused: _ } => {
-            route_turn_payload(core, work, run, attempt, turn, body, read, cumulative)
+        Event::TurnPayload { run, attempt, turn, body, read, cumulative, refused } => {
+            route_turn_payload(core, work, run, attempt, turn, body, read, refused, cumulative)
         }
-        Event::AnswerPayload { run, attempt, payload, cumulative, end, saved, invalid_saved, read: _, refused: _ } => {
-            route_answer_payload(core, work, run, attempt, payload, cumulative, end, saved, invalid_saved)
+        Event::AnswerPayload { run, attempt, payload, cumulative, end, saved, invalid_saved, read, refused } => {
+            route_answer_payload(
+                core,
+                work,
+                run,
+                attempt,
+                payload,
+                cumulative,
+                end,
+                saved,
+                invalid_saved,
+                read,
+                &refused,
+            )
         }
         Event::AcceptedTurn { task, attempt, turn, accepted, cumulative, read, transcript, opens_window } => {
             route_accepted_turn(core, env, task, attempt, turn, accepted, cumulative, read, transcript, opens_window)

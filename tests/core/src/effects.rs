@@ -1295,19 +1295,31 @@ impl World {
     }
 
     pub fn turn(&mut self, number: u32, spent: u64, read: Option<u64>, body: &[u8]) {
-        self.send_turn(number, spent, read, body, None);
+        self.send_turn(number, spent, read, body, None, &[]);
     }
 
     pub fn window_turn(&mut self, number: u32, spent: u64, read: Option<u64>, body: &[u8]) {
-        self.send_turn(number, spent, read, body, Some(true));
+        self.send_turn(number, spent, read, body, Some(true), &[]);
     }
 
-    fn send_turn(&mut self, number: u32, spent: u64, read: Option<u64>, body: &[u8], opens: Option<bool>) {
+    pub fn turn_refusing(&mut self, number: u32, spent: u64, read: Option<u64>, refused: &[u64], body: &[u8]) {
+        self.send_turn(number, spent, read, body, None, refused);
+    }
+
+    fn send_turn(
+        &mut self,
+        number: u32,
+        spent: u64,
+        read: Option<u64>,
+        body: &[u8],
+        opens: Option<bool>,
+        refused: &[u64],
+    ) {
         self.last_read = read;
         let assignment = self.assigned.as_ref().expect("assigned chat");
         self.send(root::Event::Turn {
             opens_window: opens.unwrap_or(number == 1 && assignment.transcript.is_empty()),
-            refused: Box::new([]),
+            refused: refused.into(),
             channel: Token::new(7),
             task: assignment.task,
             attempt: assignment.attempt,

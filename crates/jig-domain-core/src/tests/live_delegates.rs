@@ -33,6 +33,7 @@ fn live_delegate_documents_keep_every_identity_and_the_owner_takeover_reservatio
         &mut core,
         &limits,
         tasks::Event::Turn {
+            refused: Box::new([]),
             reply_to: ReplyTo::new(Token::new(1)),
             task: 2,
             attempt: 1,

@@ -6,7 +6,9 @@ pub(crate) fn next(domain: &Domain, task: u64, after: Option<u64>) -> Option<Wor
     let task_record = record(domain, task)?;
     let mut next = None;
     for word in &task_record.inbox {
-        consider(&mut next, word, after);
+        if !task_record.refused.contains(&word.number) {
+            consider(&mut next, word, after);
+        }
     }
     for word in crate::proposals::waiting_for(domain, task) {
         consider(&mut next, &word, after);

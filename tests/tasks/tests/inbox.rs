@@ -34,6 +34,7 @@ fn a_read_fence_takes_only_offered_words() {
     let before = world.record(1).clone();
     let call = 1001;
     world.send(Event::Turn {
+        refused: Box::new([]),
         reply_to: ReplyTo::new(Token::new(call)),
         task: 1,
         attempt: 1,
@@ -46,6 +47,7 @@ fn a_read_fence_takes_only_offered_words() {
     assert_eq!(world.record(1), &before);
     let call = 1002;
     world.send(Event::Turn {
+        refused: Box::new([]),
         reply_to: ReplyTo::new(Token::new(call)),
         task: 1,
         attempt: 1,
@@ -540,4 +542,83 @@ fn only_introduced_peers_can_message_each_other() {
     assert_eq!(task_words(&mut world, 2, 3, 2, MessageKind::Words), Reply::Done);
     assert!(matches!(task_words(&mut world, 2, 4, 3, MessageKind::Words), Reply::Refused(_)));
     world.restart();
+}
+
+fn refusal_world(seed: u64) -> World {
+    let mut world = World::new(seed, LIMITS);
+    world.make(Party::Person(9), vec![task(1, &[])]);
+    world.claim(1, 1);
+    say(&mut world, 1);
+    say(&mut world, 2);
+    world
+}
+
+fn refusal_snapshot(world: &World) -> jig_domain_tasks::TaskRecord {
+    world.record(1).clone()
+}
+
+fn refusal_turn(world: &mut World, turn: u32, read: u64, offered: u64, refused: &[u64]) -> Reply {
+    let reply_to = world.to();
+    let call = reply_to.into_token().raw();
+    world.send(Event::Turn {
+        reply_to: ReplyTo::new(Token::new(call)),
+        task: 1,
+        attempt: 1,
+        turn,
+        read: Some(read),
+        refused: refused.into(),
+        offered: Some(offered),
+        cumulative: u64::from(turn),
+    });
+    world.replies[&call].clone()
+}
+
+fn refused_world(seed: u64) -> World {
+    let mut world = refusal_world(seed);
+    assert_eq!(refusal_turn(&mut world, 1, 2, 2, &[1]), Reply::Turn(Accepted::New));
+    world
+}
+
+fn advance_fence(world: &mut World) {
+    say(world, 3);
+    assert_eq!(refusal_turn(world, 2, 3, 3, &[]), Reply::Turn(Accepted::New));
+}
+
+fn inbox_numbers(world: &World) -> Vec<u64> {
+    world.record(1).inbox.iter().map(|word| word.number).collect()
+}
+
+#[test]
+fn a_refused_word_survives_a_later_fence() {
+    let mut world = refused_world(91);
+    advance_fence(&mut world);
+    assert_eq!(inbox_numbers(&world), [1]);
+    assert_eq!(world.record(1).refused.as_ref(), [1]);
+}
+
+#[test]
+fn a_refusal_naming_an_unoffered_word_is_refused_as_read() {
+    let mut world = refusal_world(92);
+    let before = refusal_snapshot(&world);
+    assert!(matches!(refusal_turn(&mut world, 1, 1, 1, &[2]),
+        Reply::Refused(problem) if problem.why == Refusal::Read));
+    assert_eq!(world.record(1), &before);
+}
+
+#[test]
+fn a_refusal_naming_a_word_outside_the_inbox_is_refused_as_read() {
+    let mut world = refusal_world(93);
+    let before = refusal_snapshot(&world);
+    assert!(matches!(refusal_turn(&mut world, 1, 2, 3, &[3]),
+        Reply::Refused(problem) if problem.why == Refusal::Read));
+    assert_eq!(world.record(1), &before);
+}
+
+#[test]
+fn a_refused_word_survives_a_restart_and_a_later_fence() {
+    let mut world = refused_world(94);
+    world.restart();
+    advance_fence(&mut world);
+    assert_eq!(inbox_numbers(&world), [1]);
+    assert_eq!(world.record(1).refused.as_ref(), [1]);
 }

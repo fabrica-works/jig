@@ -166,6 +166,7 @@ fn saturated_payloads_graph_backoff_held_closing_retirement_and_restore_fit() {
             });
             let reply_to = m.to();
             m.event(Event::Turn {
+                refused: Box::new([]),
                 reply_to,
                 task: number,
                 attempt: number + 10,
@@ -177,6 +178,7 @@ fn saturated_payloads_graph_backoff_held_closing_retirement_and_restore_fit() {
             for turn in 2..=l.inbox_messages {
                 let reply_to = m.to();
                 m.event(Event::Turn {
+                    refused: Box::new([]),
                     reply_to,
                     task: number,
                     attempt: number + 10,
@@ -343,7 +345,16 @@ fn saturated_finite_sources_and_oversized_refusals_fit_without_input_copies() {
     });
     assert!(m.refused);
     let reply_to = m.to();
-    m.event(Event::Turn { reply_to, task: 1, attempt: 1, turn: 1, read: Some(1), offered: None, cumulative: 5 });
+    m.event(Event::Turn {
+        refused: Box::new([]),
+        reply_to,
+        task: 1,
+        attempt: 1,
+        turn: 1,
+        read: Some(1),
+        offered: None,
+        cumulative: 5,
+    });
     assert!(m.refused);
 }
 
@@ -353,6 +364,7 @@ fn borrowed_stored_bytes_matches_allocator_for_every_retained_row() {
     world.make(Party::Person(1), vec![task(1, &[])]);
     let mut record = world.record(1).clone();
     let new = filled(&LIMITS, 1);
+    record.refused = Box::new([1, 2]);
     record.spec = new.spec;
     record.spec.parameters = Box::new([
         Parameter::Bytes { name: 1, value: vec![1; 4096].into_boxed_slice() },

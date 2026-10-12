@@ -617,8 +617,10 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             crate::writers::effect_in_flight(domain, env, reply_to, task, resource, entry, out);
         }
         Event::EffectSettled { resource, entry } => crate::writers::effect_settled(domain, env, &resource, entry, out),
-        Event::Turn { reply_to, task, attempt, turn, read, offered, cumulative } => {
-            crate::admission::turn(domain, env, reply_to, task, attempt, turn, read, offered, cumulative, out);
+        Event::Turn { reply_to, task, attempt, turn, read, refused, offered, cumulative } => {
+            crate::admission::turn(
+                domain, env, reply_to, task, attempt, turn, read, &refused, offered, cumulative, out,
+            );
         }
         Event::Started { task, attempt } => crate::run::started(domain, env, task, attempt, out),
         Event::Activation { reply_to, task, attempt, end, saved, cause } => match cause {
@@ -892,6 +894,7 @@ fn milestone(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queu
 pub(crate) fn publish(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queue<Request>) {
     crate::proposals::withdraw_on_close(domain, env, number, out);
     let task = task_mut(domain, number).expect("published task is live");
+    crate::inbox::keep_refusals(&mut task.record, &[]);
     let source_changed = match &task.record.phase {
         Phase::Held { source, .. } => match &task.observed_phase {
             Some(Phase::Held { source: previous, .. }) => source != previous,
@@ -1155,6 +1158,7 @@ pub(crate) fn make_admitted(
                 hold: 0,
                 proposal_rows: Box::new([]),
                 instructions: None,
+                refused: Box::new([]),
                 chat_close: None,
                 created_at: env.wall,
                 changed: env.wall,

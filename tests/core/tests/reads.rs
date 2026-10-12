@@ -399,9 +399,8 @@ fn question(world: &mut jig_core_world::effects::World, target: u64, completion:
 
 fn finish_chat(world: &mut jig_core_world::effects::World, task: u64) {
     let key = run_key(world, task, 0);
-    let read = live_task(world, task).inbox.last().map(|word| word.number);
     world.send(root::Event::Answer {
-        read,
+        read: None,
         refused: Box::new([]),
         channel: skein_lib::Token::new(7),
         task,
@@ -570,13 +569,4 @@ fn a_question_answered_by_its_task_reads_the_line_in_the_delegates_activity() {
         matches!(&answer.line, tasks::Line::Words { message: number, kind: tasks::MessageKind::Answer { question }, words, .. }
         if *number == sent && *question == message && words.as_ref() == b"answer")
     );
-}
-
-fn live_task(world: &jig_core_world::effects::World, task: u64) -> &tasks::TaskRecord {
-    let root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row))) =
-        &world.store.rows[&root::Key::Core(core::Key::Tasks(tasks::Key::Live(task)))]
-    else {
-        panic!("live task")
-    };
-    row
 }

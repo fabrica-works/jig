@@ -1,0 +1,89 @@
+//! Turn and answer admission fences (domain/engine.md, 7.2 and 7.4).
+use crate::{Core, Event, Request, Requests};
+use alloc::boxed::Box;
+use jig_domain_tasks as tasks;
+use skein_lib::{Queue, ReplyTo, Token};
+
+#[expect(clippy::too_many_arguments, reason = "the route retains its event fields")]
+pub(super) fn route_answer_payload(
+    core: &mut Core,
+    work: &mut Queue<Event>,
+    run: Token,
+    attempt: Token,
+    payload: Token,
+    cumulative: u64,
+    end: tasks::End,
+    saved: Option<Box<[tasks::SavedResource]>>,
+    invalid_saved: bool,
+    read: Option<u64>,
+    refused: &[u64],
+) -> Requests {
+    if !core.current_proof(run.raw(), attempt.raw()) {
+        let mut out = Queue::with_capacity(2);
+        out.push(Request::Now(Box::new(crate::Now::DropPayload { payload })));
+        out.push(Request::Decided);
+        return Requests::Out(out);
+    }
+    let (cumulative, end, saved) = match core.committed_terminal(run.raw(), attempt.raw()) {
+        Some(terminal) => (terminal.cumulative, terminal.end, None),
+        None => {
+            let proof = core.proofs.get(&run.raw()).expect("current proof");
+            let last_read = match proof.turn {
+                Some(turn) => turn.read,
+                None => None,
+            };
+            let mut invalid = read > last_read;
+            for number in refused {
+                invalid |= *number == 0 || Some(*number) > proof.offered;
+            }
+            if invalid_saved || invalid {
+                (cumulative, tasks::End::Failed(tasks::Class::Invalid), None)
+            } else {
+                (cumulative, end, saved)
+            }
+        }
+    };
+    let proof = core.proofs.get_mut(&run.raw()).expect("terminal proof pre-reserved");
+    proof.terminal =
+        Some(crate::TerminalRecord { task: run.raw(), attempt: attempt.raw(), cumulative, end: end.clone() });
+    work.push(Event::Tasks(tasks::Event::Activation {
+        reply_to: ReplyTo::new(payload),
+        task: run.raw(),
+        attempt: attempt.raw(),
+        cause: tasks::Cause::Priced { cumulative },
+        end,
+        saved,
+    }));
+    let mut out = Queue::with_capacity(1);
+    out.push(Request::Decided);
+    Requests::Out(out)
+}
+
+#[expect(clippy::too_many_arguments, reason = "the route retains its event fields")]
+pub(super) fn route_turn_payload(
+    core: &mut Core,
+    work: &mut Queue<Event>,
+    run: Token,
+    attempt: Token,
+    turn: u32,
+    body: Token,
+    read: Option<u64>,
+    refused: Box<[u64]>,
+    cumulative: u64,
+) -> Requests {
+    assert!(core.current_proof(run.raw(), attempt.raw()), "current turn has reserved proof");
+    let offered = core.proofs.get(&run.raw()).expect("current proof").offered;
+    work.push(Event::Tasks(tasks::Event::Turn {
+        reply_to: ReplyTo::new(body),
+        task: run.raw(),
+        attempt: attempt.raw(),
+        turn,
+        read,
+        refused,
+        offered,
+        cumulative,
+    }));
+    let mut out = Queue::with_capacity(1);
+    out.push(Request::Decided);
+    Requests::Out(out)
+}

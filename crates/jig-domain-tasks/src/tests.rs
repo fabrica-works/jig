@@ -20,6 +20,7 @@ fn exponential_equal_jitter_saturates_without_overflow_and_replays() {
 
 mod hold_origin;
 mod keys;
+mod refusals;
 mod revisions;
 mod waiting;
 

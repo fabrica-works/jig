@@ -383,6 +383,11 @@ fn within(task: &TaskRecord, limits: &Limits) -> bool {
 }
 
 fn stored(live: &[TaskRecord], limits: &Limits, judge: &mut Judge<Name, Stimulus>) {
+    for task in live {
+        if task.refused.iter().any(|number| !task.inbox.iter().any(|word| word.number == *number)) {
+            judge.fail("committed message taken while refused");
+        }
+    }
     if !live.iter().all(|task| within(task, limits))
         || live.iter().any(|task| {
             live.iter().filter(|other| other.project == task.project).count()

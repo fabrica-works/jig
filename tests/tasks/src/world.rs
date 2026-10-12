@@ -1094,7 +1094,16 @@ fn story_run(seed: u64, w: &mut World, choices: Option<Story>) {
     w.make(Party::Task(1), vec![task(2, &[]), task(3, &[2])]);
     w.claim_fresh(2);
     let reply_to = w.to();
-    w.stage(Event::Turn { reply_to, task: 1, attempt: 1, turn: 1, read: None, offered: None, cumulative: 5 });
+    w.stage(Event::Turn {
+        refused: Box::new([]),
+        reply_to,
+        task: 1,
+        attempt: 1,
+        turn: 1,
+        read: None,
+        offered: None,
+        cumulative: 5,
+    });
     // Defaults remain eager draws at their original positions: an ordinary
     // seeded replay's random stream and every action stay unchanged.
     if choices.map_or(rng.chance(500), |story| story.turn == TurnState::Committed) {

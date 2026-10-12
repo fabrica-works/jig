@@ -455,11 +455,41 @@ pub(crate) fn readable(domain: &Domain, task: u64, read: Option<u64>) -> bool {
     }
 }
 
-pub(crate) fn take(task: &mut crate::TaskRecord, read: Option<u64>) {
+pub(crate) fn valid_refusals(task: &crate::TaskRecord, offered: Option<u64>, refusals: &[u64]) -> bool {
+    for number in refusals {
+        if offered.is_none() || Some(*number) > offered {
+            return false;
+        }
+        let mut found = false;
+        for word in &task.inbox {
+            found |= word.number == *number;
+        }
+        if !found {
+            return false;
+        }
+    }
+    true
+}
+
+pub(crate) fn keep_refusals(task: &mut crate::TaskRecord, refused: &[u64]) {
+    if task.refused.is_empty() && refused.is_empty() {
+        return;
+    }
+    let mut names = List::with_capacity(u32::try_from(task.inbox.len()).expect("bounded inbox"));
+    for word in &task.inbox {
+        if task.refused.contains(&word.number) || refused.contains(&word.number) {
+            names.push(word.number).expect("refused subset fits");
+        }
+    }
+    task.refused = names.into_boxed();
+}
+
+pub(crate) fn take(task: &mut crate::TaskRecord, read: Option<u64>, refused: &[u64]) {
+    keep_refusals(task, refused);
     if let Some(number) = read {
         let mut kept = List::with_capacity(u32::try_from(task.inbox.len()).expect("bounded inbox count"));
         for word in &task.inbox {
-            if word.number > number {
+            if word.number > number || task.refused.contains(&word.number) {
                 kept.push(word.clone()).expect("retained subset fits");
             }
         }

@@ -51,6 +51,7 @@ fn take(world: &mut World, turn: u32, read: u64, cumulative: u64) {
     let reply_to = world.to();
     let request = reply_to.into_token();
     world.send(Event::Turn {
+        refused: Box::new([]),
         reply_to: skein_lib::ReplyTo::new(request),
         task: 1,
         attempt: 7,

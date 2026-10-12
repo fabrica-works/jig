@@ -133,3 +133,16 @@ fn scripted_text_names_its_turn_and_is_not_replayed_after_reconnection() {
     let replay = worker.tick(Time::from_nanos(1_000_000));
     assert!(matches!(replay.as_slice(), [Up::Hello { .. }]));
 }
+
+#[test]
+fn a_scripted_refusal_rides_with_the_next_turn() {
+    let mut worker = Worker::new(
+        0,
+        1,
+        vec![Box::new([Script::Refuse { name: 3 }, Script::Turn { body: Box::new([]), cost: 1, read: None }])],
+    );
+    worker.assign(assigned());
+    assert!(worker.tick(Time::ZERO).is_empty());
+    assert!(matches!(worker.tick(Time::ZERO).as_slice(),
+        [Up::Turn { refused, .. }] if refused.as_ref() == [3]));
+}

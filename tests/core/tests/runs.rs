@@ -300,10 +300,61 @@ fn a_run_reading_nothing_is_relayed_nothing_more() {
     assert_eq!(world.inbound.iter().map(|word| word.number).collect::<Vec<_>>(), [first]);
 }
 
+fn answer_with_messages(world: &mut World, read: Option<u64>, refused: &[u64]) {
+    let assignment = world.assigned.as_ref().expect("assigned chat");
+    world.send(root::Event::Answer {
+        channel: Token::new(7),
+        task: assignment.task,
+        attempt: assignment.attempt,
+        cumulative: 1,
+        end: tasks::End::Parked,
+        read,
+        refused: refused.into(),
+    });
+}
+
+fn invalid_answer_recorded(world: &World) -> bool {
+    world.store.rows.values().any(|row| {
+        matches!(row,
+        root::Record::Core(core::Record::Core(core::CoreRecord::RunProof(proof)))
+        if matches!(&proof.terminal, Some(terminal)
+            if terminal.end == tasks::End::Failed(tasks::Class::Invalid)))
+    })
+}
+
+fn an_answer_whose_fence_passes_its_last_turn_fails_invalid() {
+    let mut world = World::new(145, false);
+    let first = world.say(92);
+    world.turn(1, 1, Some(first), b"reads the first words");
+    let second = world.say(93);
+    answer_with_messages(&mut world, Some(second), &[]);
+    assert!(invalid_answer_recorded(&world), "{:?}", world.trace);
+}
+
+fn an_answer_refusing_an_unoffered_word_fails_invalid() {
+    let mut world = World::new(146, false);
+    world.turn(1, 1, None, b"reads no words");
+    answer_with_messages(&mut world, None, &[999]);
+    assert!(invalid_answer_recorded(&world), "{:?}", world.trace);
+}
+
+fn a_refusal_frees_the_runs_inbox_for_its_next_waiting_word() {
+    let (config, mut limits) = jig_core_world::effects::fixture(147, false);
+    limits.core.tasks.run_inbox = 1;
+    let mut world = World::configured(147, false, config, limits);
+    let first = world.say(94);
+    let second = world.say(95);
+    world.turn_refusing(1, 1, None, &[first], b"refuses the first words");
+    assert_eq!(world.inbound.iter().map(|word| word.number).collect::<Vec<_>>(), [first, second]);
+}
+
 // Each scenario keeps its own fresh world and all original assertions.
 // A shared entrypoint avoids one process startup per short scenario.
 #[test]
 fn runs_scenarios() {
+    an_answer_whose_fence_passes_its_last_turn_fails_invalid();
+    an_answer_refusing_an_unoffered_word_fails_invalid();
+    a_refusal_frees_the_runs_inbox_for_its_next_waiting_word();
     relays_wait_while_the_runs_inbox_is_full();
     a_run_reading_nothing_is_relayed_nothing_more();
     a_woken_chats_start_carries_its_waiting_words_oldest_first();

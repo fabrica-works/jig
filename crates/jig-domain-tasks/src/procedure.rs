@@ -57,7 +57,7 @@ pub(crate) fn stepped(
     }
     let live = task_mut(domain, number).expect("procedure step preflighted");
     live.record.attempt = step;
-    crate::inbox::take(&mut live.record, read);
+    crate::inbox::take(&mut live.record, read, &[]);
     live.procedure_offered = None;
     match decision {
         ProcedureDecision::Delegate(batch) => {

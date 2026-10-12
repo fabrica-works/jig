@@ -104,6 +104,7 @@ pub(crate) fn claim(
     task.record.run_spent = 0;
     task.record.invalid_result = None;
     task.record.turn = 0;
+    task.record.refused = Box::new([]);
     task.record.phase = Phase::Active(Active::Claimed { attempt });
     let why = task.record.due_reason;
     crate::activity::append(&mut task.record, env.wall, crate::Line::RunBegan { attempt, why, resumed }, out);
