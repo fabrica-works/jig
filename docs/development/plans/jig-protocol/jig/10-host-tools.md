@@ -355,8 +355,10 @@ tests/ops/src/conformance/mod.rs, tests/ops/src/joint/engine.rs,
 tests/ops/src/joint/front.rs). Shared hotspots:
 `examples/ops/domain/src/{route.rs, assemble.rs, translate.rs}`,
 `tests/ops`.
-Shape: `jig_ops_domain::Event::ConnectorRead { to: ReplyTo, name:
-Box<[u8]>, tool: Box<[u8]>, read: observability::Read }`;
+Shape: `jig_ops_domain::Event::ConnectorRead { to: ReplyTo, task: u64,
+name: Box<[u8]>, tool: Box<[u8]>, read: observability::Read }`, its `task`
+copied by the world from the `Now::Call`'s authenticated run, for
+`connector_read_admit` (ruling 111);
 `jig_ops_domain::Event::CallAnswered { to: ReplyTo, call:
 core::SettledCall }`; `Config { tools: Box<[jig_protocol_charter::Tool]>,
 .. }`.

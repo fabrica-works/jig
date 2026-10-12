@@ -320,6 +320,17 @@ the file.
      Files-named `Cargo.toml` change generates belong to that change, as
      long as they move no existing package. code-organization.md,
      section 7 says both. jig 13.1 lands as it is.
+111. **`ops`'s `ConnectorRead` carries its task** (2026-10-12, the
+     coordinator's block "jig 10.4: ConnectorRead lacks authenticated
+     task", 2026-10-12T16:51:02Z). A plan defect: 10.4's sketch of
+     `Event::ConnectorRead` has no task, but the root admits a read with
+     `core.connector_read_admit(run.raw(), ..)`
+     (`examples/ops/domain/src/assemble.rs:442`), and the root reads no
+     value carried between children (root.md, 11), so it cannot take the
+     task from the call's name. The event gains `task: u64`, which `ops`'s
+     world, standing in for the protocol layer, copies from the
+     `Now::Call`'s authenticated run. No core or fleet lookup is added.
+     The design names no such event: it is `ops`'s root's own.
 
 ## For the user
 
