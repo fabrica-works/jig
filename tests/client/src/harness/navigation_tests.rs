@@ -38,6 +38,7 @@ impl Front<Test> for Receipts {
         }
     }
     fn sign_in(&mut self, _client: ClientId, _now: Time, _wall: Wall) {}
+    fn sign_out(&mut self, _: ClientId, _: Time, _: Wall) {}
 }
 fn world() -> (World<Test, Receipts>, ClientId) {
     let mut world = World::new(Settings { latency: Span::millis(2, 2), ..Settings::default() }, Receipts::default());

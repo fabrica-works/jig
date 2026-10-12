@@ -197,6 +197,7 @@ impl App for Ops {
             Request::Erase { key } => Duty::Store(StoreWrite::Erase(key)),
             Request::Show { address, replace } => Duty::Show { address, replace },
             Request::SignIn { provider, back } => Duty::SignIn { provider, back },
+            Request::SignOut => Duty::SignOut,
             Request::Send { .. }
             | Request::Jig(
                 JigOut::Read { .. } | JigOut::Open { .. } | JigOut::Continue { .. } | JigOut::Close { .. },
@@ -249,6 +250,7 @@ impl App for Ops {
             Request::Save { .. }
             | Request::Erase { .. }
             | Request::Show { .. }
+            | Request::SignOut
             | Request::SignIn { .. }
             | Request::Fact { .. }
             | Request::Jig(JigOut::Answered { .. } | JigOut::Unknown { .. })

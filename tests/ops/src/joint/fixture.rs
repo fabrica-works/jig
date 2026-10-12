@@ -235,6 +235,7 @@ impl jig_client_world::harness::App for Client {
             Duty::Wire(value) => Duty::Wire(value),
             Duty::Show { address, replace } => Duty::Show { address, replace },
             Duty::SignIn { provider, back } => Duty::SignIn { provider, back },
+            Duty::SignOut => Duty::SignOut,
             Duty::Fact => Duty::Fact,
         }
     }

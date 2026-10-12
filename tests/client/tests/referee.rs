@@ -222,6 +222,7 @@ impl<const BAD: u8> Front<Broken<BAD>> for FrontOf<BAD> {
         }
     }
     fn sign_in(&mut self, _: ClientId, _: Time, _: Wall) {}
+    fn sign_out(&mut self, _: ClientId, _: Time, _: Wall) {}
 }
 fn run<const BAD: u8>() {
     let settings = Settings {

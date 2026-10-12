@@ -95,7 +95,7 @@ struct Client<A: App> {
 }
 enum PersonKind<A: App> {
     Script(Person<A::Address>),
-    Random { person: RandomPerson, left: u32 },
+    Random { person: RandomPerson, left: u32, except: Option<&'static [u8]> },
 }
 struct Walker<A: App> {
     client: ClientId,
@@ -259,10 +259,19 @@ impl<A: App, F: Front<A>> World<A, F> {
             person: PersonKind::Random {
                 person: RandomPerson::new(self.rng.next_u64(), self.settings.word_bytes),
                 left: self.settings.random_steps,
+                except: None,
             },
             done: false,
             wake: None,
         });
+        id
+    }
+    /// Add random exploration that skips pressing one named button in this story.
+    pub fn random_person_without_button(&mut self, client: ClientId, name: &'static [u8]) -> PersonId {
+        let id = self.random_person(client);
+        if let PersonKind::Random { except, .. } = &mut self.people[id.0].person {
+            *except = Some(name);
+        }
         id
     }
     /// Restarts this tab from its kept records and advances its delivery epoch.
@@ -519,6 +528,7 @@ impl<A: App, F: Front<A>> World<A, F> {
         let mut wires = Vec::new();
         let mut shows = Vec::new();
         let mut signs = Vec::new();
+        let mut sign_outs = 0;
         let mut failed = self.quota_failure;
         self.quota_failure = false;
         while let Some(request) = out.pop() {
@@ -527,6 +537,7 @@ impl<A: App, F: Front<A>> World<A, F> {
                 Duty::Wire(request) => wires.push(request),
                 Duty::Show { address, replace } => shows.push((address, replace)),
                 Duty::SignIn { provider: _, back } => signs.push(back),
+                Duty::SignOut => sign_outs += 1,
                 Duty::Fact => {}
             }
         }
@@ -571,6 +582,9 @@ impl<A: App, F: Front<A>> World<A, F> {
         }
         for (address, replace) in shows {
             self.platform_show(id, address, replace);
+        }
+        for _ in 0..sign_outs {
+            self.front.sign_out(id, self.now, env.wall);
         }
         for back in signs {
             self.front.sign_in(id, self.now, env.wall);
@@ -640,13 +654,21 @@ impl<A: App, F: Front<A>> World<A, F> {
                     progress |= before != person.at();
                     next
                 }
-                PersonKind::Random { person, left } => {
+                PersonKind::Random { person, left, except } => {
                     if *left == 0 {
                         Next::Done
                     } else {
                         *left -= 1;
                         progress = true;
                         match person.next(A::tree(&self.clients[id.0].view)) {
+                            Some(RandomDoing::Act { node, act: Act::Press })
+                                if except.is_some()
+                                    && A::tree(&self.clients[id.0].view).find(node).is_some_and(|node| {
+                                        node.role == jig_view::Role::Button && node.name.as_deref() == *except
+                                    }) =>
+                            {
+                                Next::Wait { until: None }
+                            }
                             Some(RandomDoing::Act { node, act }) => Next::Do(Doing::Act { node, act }),
                             Some(RandomDoing::Reload) => Next::Do(Doing::Reload),
                             Some(RandomDoing::Back) => {

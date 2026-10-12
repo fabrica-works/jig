@@ -50,7 +50,10 @@ pub enum Event {
     ShowObjects { objects: List<crate::contract::ObjectKey> },
     /// The application page stopped naming jig objects.
     ObjectsLeft,
-    /// A keyed request envelope ended the sign in.
+    /// The sign-out exchange ended lost (protocol/client.md, 4):
+    /// the person is still signed in.
+    SignOutLost,
+    /// The shell or an answered exchange ended the sign-in.
     SignedOut,
     /// A sibling requests the current frame within this step.
     Frame { asked: Token },
@@ -75,6 +78,10 @@ pub enum Request {
     Save { record: Record },
     /// Erase this domain record.
     Erase { key: StoreKey },
+    /// Ask the shell to end the sign-in on the engine. Its successful end is
+    /// `Event::SignedOut`, after which the sign-in page shows. A lost exchange
+    /// is `Event::SignOutLost`, leaving the person signed in.
+    SignOut,
     /// Sign in and come back to an address.
     SignIn { provider: u16, back: Address },
     /// Have the part owner show its value.

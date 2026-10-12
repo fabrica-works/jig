@@ -60,6 +60,7 @@ pub enum Duty<A: App> {
     Wire(A::Request),
     Show { address: A::Address, replace: bool },
     SignIn { provider: u16, back: A::Address },
+    SignOut,
     Fact,
 }
 /// Engine boundary; token routing and transport epochs belong to the front.
@@ -73,6 +74,7 @@ pub trait Front<A: App> {
     fn reload(&mut self, client: ClientId, now: Time);
     fn received(&mut self, client: ClientId, event: &A::Event);
     fn sign_in(&mut self, client: ClientId, now: Time, wall: Wall);
+    fn sign_out(&mut self, client: ClientId, now: Time, wall: Wall);
 }
 /// A fault the engine boundary can inject.
 #[derive(Clone, Debug)]

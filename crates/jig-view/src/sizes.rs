@@ -196,7 +196,7 @@ pub fn frame_nodes(limits: &Limits) -> Option<u32> {
         .max(limits.rows)
         .checked_mul(19)?
         .checked_add(limits.navigation_entries.checked_mul(2)?)?
-        .checked_add(23)
+        .checked_add(24)
 }
 /// One object or goal dialog, with every delegate and amendment field.
 #[must_use]

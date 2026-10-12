@@ -130,6 +130,8 @@ pub struct Scripted {
     ledger: Ledger<Token, ()>,
     parties: BTreeMap<ClientId, u64>,
     hellos: std::collections::BTreeSet<ClientId>,
+    shell: Vec<(ClientId, Event)>,
+    lose_sign_out: bool,
     routes: BTreeMap<Token, Route>,
     serial: u64,
     committed: usize,
@@ -143,6 +145,10 @@ pub struct Scripted {
     pending_faults: Vec<FrontFault>,
 }
 impl Scripted {
+    /// Lose the next shell sign-out before it reaches the engine.
+    pub fn lose_next_sign_out(&mut self) {
+        self.lose_sign_out = true;
+    }
     fn hello_events(&mut self) -> Vec<(ClientId, Event)> {
         std::mem::take(&mut self.hellos)
             .into_iter()
@@ -161,6 +167,8 @@ impl Scripted {
             engine: engine::Engine::with_application(script, seed, family).expect("script keeps contract"),
             parties: BTreeMap::new(),
             hellos: std::collections::BTreeSet::new(),
+            shell: Vec::new(),
+            lose_sign_out: false,
             routes: BTreeMap::new(),
             serial: 0,
             committed: 0,
@@ -249,6 +257,7 @@ impl Scripted {
             Request::Save { .. }
             | Request::Erase { .. }
             | Request::Show { .. }
+            | Request::SignOut
             | Request::SignIn { .. }
             | Request::Fact { .. }
             | Request::Jig(JigOut::Answered { .. } | JigOut::Unknown { .. })
@@ -351,6 +360,7 @@ impl Front<Test> for Scripted {
             Request::Save { .. }
             | Request::Erase { .. }
             | Request::Show { .. }
+            | Request::SignOut
             | Request::SignIn { .. }
             | Request::Fact { .. } => unreachable!("shell classified a wire request"),
         }
@@ -358,6 +368,7 @@ impl Front<Test> for Scripted {
     fn poll(&mut self, now: Time, wall: Wall) -> Vec<(ClientId, Event)> {
         self.recover(now, wall);
         let mut events = self.hello_events();
+        events.append(&mut self.shell);
         events.extend(
             self.engine
                 .poll(now)
@@ -457,7 +468,11 @@ impl Front<Test> for Scripted {
         events
     }
     fn next_due(&self) -> Option<Time> {
-        if self.hellos.is_empty() { self.recovery.or_else(|| self.engine.next_due()) } else { Some(Time::ZERO) }
+        if self.hellos.is_empty() && self.shell.is_empty() {
+            self.recovery.or_else(|| self.engine.next_due())
+        } else {
+            Some(Time::ZERO)
+        }
     }
     fn observed(&mut self) -> Vec<Observed> {
         let mut seen = std::mem::take(&mut self.link);
@@ -566,6 +581,15 @@ impl Front<Test> for Scripted {
             let token = self.transport(client, local, first, false);
             self.engine.taken(token);
         }
+    }
+    fn sign_out(&mut self, client: ClientId, now: Time, wall: Wall) {
+        if std::mem::take(&mut self.lose_sign_out) || self.recovery.is_some_and(|at| now < at) {
+            self.shell.push((client, Event::Jig(jig_domain_client::Event::SignOutLost)));
+            return;
+        }
+        let sign_in = self.parties[&client];
+        self.engine.act(now, wall, engine::Change::SignedOut { sign_in }).expect("sign out fits");
+        self.shell.push((client, Event::SignedOut));
     }
     fn sign_in(&mut self, client: ClientId, now: Time, wall: Wall) {
         let party = self.parties[&client];

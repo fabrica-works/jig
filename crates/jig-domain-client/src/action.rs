@@ -74,6 +74,8 @@ pub enum Act {
     HistoryScope { subtree: bool },
     /// Read an ended subtree of the shown plan.
     OpenEnded { task: u64 },
+    /// End this sign-in from the frame; never offered to a service.
+    SignOut,
     /// Choose a sign in provider.
     SignIn { provider: u16 },
 }

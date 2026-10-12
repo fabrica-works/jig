@@ -59,5 +59,6 @@ pub enum Request {
     First(first::Out),
     Show { address: Address, replace: bool },
     SignIn { provider: u16, back: Address },
+    SignOut,
     Fact { fact: Fact },
 }

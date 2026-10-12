@@ -179,6 +179,7 @@ impl Front<Test> for Joint {
             | Request::Save { .. }
             | Request::Erase { .. }
             | Request::Show { .. }
+            | Request::SignOut
             | Request::SignIn { .. }
             | Request::Fact { .. } => {}
         }
@@ -216,6 +217,12 @@ impl Front<Test> for Joint {
     }
     fn received(&mut self, client: ClientId, event: &Event) {
         self.session.received(client, self.now, self.wall, event);
+    }
+    fn sign_out(&mut self, client: ClientId, now: Time, wall: Wall) {
+        self.now = now;
+        self.wall = wall;
+        self.last_client = Some(client);
+        self.session.sign_out(client, now, wall);
     }
     fn sign_in(&mut self, client: ClientId, now: Time, wall: Wall) {
         self.now = now;

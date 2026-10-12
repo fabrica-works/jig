@@ -213,6 +213,10 @@ impl Session {
     /// An already absent session needs no fabricated owner reply.
     pub fn sign_out(&mut self, client: ClientId, now: Time, wall: Wall) {
         self.stopping().expect("whole original stopped routes");
+        if self.offline() {
+            self.callbacks.push((client, Event::Jig(jig_domain_client::Event::SignOutLost)));
+            return;
+        }
         let Some(sign_in) = self.driver.transport.sign_in(client) else { return };
         let reply_to = self.driver.transport.reply_to(Reply::SignOut { client });
         self.source(now, wall, root::Event::Core(core::Event::People(people::Event::SignOut { reply_to, sign_in })));
@@ -422,6 +426,7 @@ impl Session {
                         | Request::Save { .. }
                         | Request::Erase { .. }
                         | Request::Show { .. }
+                        | Request::SignOut
                         | Request::SignIn { .. }
                         | Request::Fact { .. } => None,
                     };

@@ -202,6 +202,7 @@ impl JigBindings {
                         | jig_domain_client::action::Act::FilterPlan { .. }
                         | jig_domain_client::action::Act::HistoryScope { .. }
                         | jig_domain_client::action::Act::OpenEnded { .. }
+                        | jig_domain_client::action::Act::SignOut
                         | jig_domain_client::action::Act::SignIn { .. } => return None,
                     },
                     JigMeaning::Field(_)

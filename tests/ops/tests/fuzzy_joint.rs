@@ -566,7 +566,7 @@ fn wander(world: &mut StoryWorld, person: ClientId, seed: u64) {
         vec![Step::Go { address: Address::Observability(obs::Address::Incidents { project: 1, open: true }) }],
     );
     passed(world);
-    world.random_person(person);
+    world.random_person_without_button(person, b"Sign out");
     passed(world);
     let mut random = skein_lib::Rng::new(seed);
     for _ in 0..3 {

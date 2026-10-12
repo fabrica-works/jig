@@ -31,6 +31,7 @@ pub fn facts(b: &mut Builder, kind: &Kind, words: &Words) {
     b.open(Role::Status);
     b.name(&words.say(JigPhrase::Notice, &[]));
     match kind {
+        Kind::SignOutLost => words.text(b, JigPhrase::SignOutLost, &[]),
         Kind::Link(link) => words.link(b, *link),
         Kind::Answer { object, answer: outcome } => {
             object_words(b, *object, words);

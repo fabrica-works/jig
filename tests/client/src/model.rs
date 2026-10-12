@@ -4,6 +4,7 @@ use jig_view::{Made, NodeId, Patch, Tree};
 struct Entry {
     node: Made,
     parent: NodeId,
+    edited: bool,
 }
 
 fn entries(nodes: &[Made], parent: NodeId) -> Vec<Entry> {
@@ -15,7 +16,7 @@ fn entries(nodes: &[Made], parent: NodeId) -> Vec<Entry> {
             stack.pop();
         }
         let parent = stack.last().map_or(parent, |(id, _)| *id);
-        rows.push(Entry { node: node.clone(), parent });
+        rows.push(Entry { node: node.clone(), parent, edited: false });
         stack.push((node.id, index.checked_add(node.size).expect("small subtree")));
     }
     rows
@@ -89,7 +90,13 @@ fn apply(rows: &mut Vec<Entry>, patch: Patch) {
         }
         Patch::Value { node, value } => {
             let at = position(rows, node);
+            assert_ne!(
+                rows[at].node.value.as_ref().map(|field| field.written),
+                value.as_ref().map(|field| field.written),
+                "a value patch changes the write count"
+            );
             rows[at].node.value = value;
+            rows[at].edited = false;
         }
     }
 }
@@ -98,7 +105,14 @@ fn equal(rows: &[Entry], tree: &Tree) {
     assert_eq!(rows.len(), usize::try_from(tree.len()).expect("small tree"), "platform-visible node count");
     for (row, node) in rows.iter().zip(tree.nodes().iter()) {
         let made = &row.node;
-        assert_eq!((made.id, made.size, &made.value), (node.id, node.size, &node.value), "platform-visible node");
+        assert_eq!(
+            (made.id, made.size, made.value.as_ref().map(|field| field.written)),
+            (node.id, node.size, node.value.as_ref().map(|field| field.written)),
+            "platform-visible node"
+        );
+        if !row.edited {
+            assert_eq!(made.value, node.value, "platform-visible field text");
+        }
         let attribute = &made.attribute;
         assert_eq!(
             (
@@ -136,6 +150,7 @@ impl Model {
         let at = position(&self.rows, node);
         if let Some(value) = self.rows[at].node.value.as_mut() {
             value.text = Box::from(text);
+            self.rows[at].edited = true;
         }
     }
     /// Applies one platform patch without rebuilding from the view.
@@ -155,4 +170,38 @@ impl Model {
     pub fn nodes(&self) -> Vec<Made> {
         self.rows.iter().map(|row| row.node.clone()).collect()
     }
+}
+
+#[test]
+fn local_typing_survives_unchanged_writes_and_same_count_value_patches_are_rejected() {
+    let limits = jig_view::Limits {
+        nodes: 1,
+        depth: 1,
+        text_per_node: 8,
+        text_bytes: 8,
+        drawing_bytes: 0,
+        styles_per_node: 0,
+        patches: 8,
+        bindings: 0,
+        slots: 0,
+        markdown_depth: 0,
+    };
+    let mut view = jig_view::View::new(&limits);
+    let mut patches = skein_lib::Queue::with_capacity(limits.patches);
+    let mut builder = view.builder();
+    builder.open(jig_view::Role::TextField);
+    builder.value(b"100", 89);
+    builder.close();
+    view.finish(builder, 1, &mut patches);
+    let mut model = Model::default();
+    while let Some(patch) = patches.pop() {
+        model.apply(patch);
+    }
+    let node = view.tree().get(0).expect("field").id;
+    model.input(node, b"**h");
+    model.apply(Patch::Text { node, text: Box::default() });
+    model.check(view.tree());
+    assert_eq!(model.rows[0].node.value.as_ref().expect("field").text.as_ref(), b"**h");
+    let same_count = Patch::Value { node, value: Some(jig_view::Value { text: Box::from(*b"100"), written: 89 }) };
+    assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| model.apply(same_count))).is_err());
 }

@@ -43,11 +43,24 @@ pub(crate) fn choose(domain: &Domain, provider: u16, out: &mut Queue<Request>) {
         Page::Starting | Page::Work { .. } | Page::Elsewhere | Page::Missing | Page::OutOfDate | Page::SomeoneElse => {}
     }
 }
+/// The shell owns the exchange; retain the frame until it answers signed out.
+pub(crate) fn sign_out(domain: &Domain, out: &mut Queue<Request>) {
+    if domain.confirmed.is_some() && !domain.signin.service {
+        out.push(Request::SignOut);
+    }
+}
+/// A lost exchange only adds the frame notice; the sign-in still works.
+pub(crate) fn sign_out_lost(domain: &mut Domain) {
+    if domain.confirmed.is_some() && !domain.signin.service {
+        crate::notices::show(domain, crate::notices::Kind::SignOutLost);
+    }
+}
 /// Ends the confirmed sign-in, preserving pending intents and kept records.
 pub(crate) fn signed_out(domain: &mut Domain, out: &mut Queue<Request>) {
     if domain.blocked {
         return;
     }
+    crate::notices::clear_sign_out_lost(domain);
     let service = domain.signin.service;
     domain.close_all(out);
     domain.reads.abandon(domain.generation);

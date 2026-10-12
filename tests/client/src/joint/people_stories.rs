@@ -332,3 +332,64 @@ fn a_hold_moved_in_the_engine_is_refused_as_moved_and_shown_current() {
         now: people::Moved::Hold { revision: 2, reason: people::HoldReason::Budget },
     })))));
 }
+
+fn signed_in_at_the_frame() -> (World<Test, Joint>, crate::harness::ClientId) {
+    let mut world = super::world(super::turn());
+    let client = world.client(1, crate::stories::inbox());
+    world.person(
+        client,
+        vec![
+            Step::See { find: sign_in_button(), within: Duration::from_secs(1) },
+            Step::Press { find: sign_in_button() },
+            Step::See { find: sign_out_button(), within: Duration::from_secs(1) },
+        ],
+    );
+    assert_eq!(world.run(Until::Done).verdict, skein_world::domain::Verdict::Passed);
+    (world, client)
+}
+fn sign_out_button() -> Find {
+    Find::named(Role::Button, b"Sign out")
+}
+#[test]
+fn a_person_signs_out_and_a_later_request_is_answered_signed_out() {
+    use crate::joint::transport::{KeyedOwner, Reply};
+    let (mut world, client) = signed_in_at_the_frame();
+    let sign_in = session_sign_in(&world.front().session, client).expect("real sign-in");
+    world.person(
+        client,
+        vec![
+            Step::Press { find: sign_out_button() },
+            Step::See { find: sign_in_button(), within: Duration::from_secs(1) },
+        ],
+    );
+    assert_eq!(world.run(Until::Done).verdict, skein_world::domain::Verdict::Passed);
+    let now = world.now();
+    let attempt = Token::new(999);
+    let key = [99; 16];
+    let session = &mut world.front().session;
+    assert_eq!(session_sign_in(session, client), None);
+    let reply_to = session.driver.transport.reply_to(Reply::Keyed { client, attempt, key, owner: KeyedOwner::Jig });
+    session.driver.send(
+        now,
+        super::clock(now),
+        jig_test_domain::Event::Core(jig_domain_core::Event::People(people::Event::Ask {
+            reply_to,
+            sign_in,
+            key,
+            ask: people::Ask::Stop { project: 1, task: u64::MAX },
+        })),
+    );
+    let callbacks = session.poll(now, super::clock(now)).expect("actual engine terminal");
+    assert!(callbacks.iter().any(|(owner, event)| *owner == client && matches!(event,
+        jig_test_domain_client::Event::Answer { attempt: actual, envelope: skein_lib::RequestEnvelope::SignedOut, answer: None } if *actual == attempt)));
+    assert!(session.driver.world.store.rows.values().all(|row| !matches!(row,
+        jig_test_domain::Record::Core(jig_domain_core::Record::People(people::Stored::SignIn { number, .. })) if *number == sign_in)));
+}
+
+fn sign_in_button() -> Find {
+    Find::named(Role::Button, b"Sign in with Test")
+}
+
+fn session_sign_in(session: &Session, client: crate::harness::ClientId) -> Option<u64> {
+    session.driver.transport.sign_in(client)
+}

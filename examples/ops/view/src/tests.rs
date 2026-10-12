@@ -349,6 +349,7 @@ fn public_effect_fragments_keep_equal_task_and_party_makers_separate() {
                     | Request::Jig(_)
                     | Request::Observability(_)
                     | Request::Show { .. }
+                    | Request::SignOut
                     | Request::SignIn { .. }
                     | Request::Fact { .. } => false,
                 })

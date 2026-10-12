@@ -29,6 +29,7 @@ pub struct Scripted {
     routes: BTreeMap<Token, Route>,
     parties: BTreeMap<ClientId, u64>,
     hellos: BTreeSet<ClientId>,
+    shell: Vec<(ClientId, Event)>,
     ledger: Ledger<Token, ()>,
     serial: u64,
     committed: usize,
@@ -53,6 +54,7 @@ impl Scripted {
             routes: BTreeMap::new(),
             parties: BTreeMap::new(),
             hellos: BTreeSet::new(),
+            shell: Vec::new(),
             ledger: Ledger::new("Ops shell operation"),
             serial: 0,
             committed: 0,
@@ -347,6 +349,7 @@ impl Front<Ops> for Scripted {
             Request::Save { .. }
             | Request::Erase { .. }
             | Request::Show { .. }
+            | Request::SignOut
             | Request::SignIn { .. }
             | Request::Fact { .. }
             | Request::Jig(JigOut::Answered { .. } | JigOut::Unknown { .. }) => {
@@ -360,6 +363,7 @@ impl Front<Ops> for Scripted {
             .into_iter()
             .map(|client| (client, Event::Jig(client::Event::Hello { versions: self.engine.versions() })))
             .collect();
+        delivered.append(&mut self.shell);
         for up in self.engine.poll(now) {
             let token = match &up {
                 Up::Answer { attempt, .. } | Up::ApplicationAnswer { attempt, .. } => *attempt,
@@ -456,7 +460,7 @@ impl Front<Ops> for Scripted {
         delivered
     }
     fn next_due(&self) -> Option<Time> {
-        if !self.hellos.is_empty() {
+        if !self.hellos.is_empty() || !self.shell.is_empty() {
             return Some(Time::ZERO);
         }
         match (self.recovery, self.engine.next_due()) {
@@ -553,6 +557,15 @@ impl Front<Ops> for Scripted {
         {
             self.engine.taken(token);
         }
+    }
+    fn sign_out(&mut self, client: ClientId, now: Time, wall: Wall) {
+        if self.recovery.is_some_and(|at| now < at) {
+            self.shell.push((client, Event::Jig(jig_domain_client::Event::SignOutLost)));
+            return;
+        }
+        let sign_in = self.parties[&client];
+        self.engine.act(now, wall, engine::Change::SignedOut { sign_in }).expect("sign out fits");
+        self.shell.push((client, Event::SignedOut));
     }
     fn sign_in(&mut self, client: ClientId, now: Time, wall: Wall) {
         let party = self.parties[&client];

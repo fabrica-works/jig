@@ -214,7 +214,8 @@ pub fn jig_received(event: &jig_domain_client::Event) -> Vec<Receipt> {
         jig_domain_client::Event::SignedOut
         | jig_domain_client::Event::Read { result: ReadResult::None(ReadNone::SignedOut), .. }
         | jig_domain_client::Event::Ended { end: WatchEnd::SignedOut, .. } => vec![Receipt::Parked],
-        jig_domain_client::Event::Kept { .. }
+        jig_domain_client::Event::SignOutLost
+        | jig_domain_client::Event::Kept { .. }
         | jig_domain_client::Event::KeptGone { .. }
         | jig_domain_client::Event::Went { .. }
         | jig_domain_client::Event::Act { .. }

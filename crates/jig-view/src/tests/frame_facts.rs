@@ -1,9 +1,12 @@
 #![expect(clippy::disallowed_methods, reason = "ordinary tests inspect public trees and exact supplied source values")]
 use super::cards::{CLIENT, contains, document, drive, limits, start, text, words};
-use crate::{Builder, JigBindings, Owner, Role, SlotRef, Tree};
+use crate::{Builder, JigBindings, Owner, Role, SlotRef, Tree, phrases::jig::JigPhrase};
 use jig_domain_client::{Domain, Event, contract::*};
 use skein_lib::{List, Token, Wall};
 fn tree(domain: &Domain) -> Tree {
+    frame_tree(domain, &words())
+}
+fn frame_tree(domain: &Domain, words: &crate::words::Words) -> Tree {
     let mut sized = limits();
     sized.nodes = crate::frame_nodes(&CLIENT).unwrap().checked_add(1).unwrap();
     let mut builder = Builder::new(&sized);
@@ -13,7 +16,7 @@ fn tree(domain: &Domain) -> Tree {
         &mut builder,
         domain,
         SlotRef { owner: Owner::Other { child: 1 }, token: Token::new(1) },
-        &words(),
+        words,
         &mut bindings,
     );
     builder.close();
@@ -140,4 +143,92 @@ fn chat_forms_join_membership_only_by_supplied_project_and_preserve_optional_cha
     let shown = super::pages::build(&mismatched, 1, &words()).0;
     assert!(!contains(&shown, b"Budget 123"));
     assert!(!contains(&shown, b"actual-charter"));
+}
+
+#[test]
+fn a_service_frame_offers_no_sign_out() {
+    let mut domain = ready(sign_out_frame(PartyKind::Service));
+    let shown = sign_out_tree(&domain);
+    assert!(!offers_sign_out(&shown));
+    let out = choose_sign_out(&mut domain);
+    assert!(out.is_empty());
+}
+
+#[test]
+fn choosing_sign_out_keeps_the_frame_until_the_shell_answers() {
+    let source = sign_out_frame(PartyKind::Person);
+    let mut domain = ready(source.clone());
+    let out = choose_sign_out(&mut domain);
+    assert_eq!(out.as_ref(), &[jig_domain_client::Request::SignOut]);
+    assert_eq!(domain.frame().document.as_ref(), Some(&source));
+    assert!(offers_sign_out(&sign_out_tree(&domain)));
+    drive(&mut domain, Event::SignedOut);
+    assert!(domain.frame().document.is_none());
+    assert_eq!(domain.page(), &jig_domain_client::pages::Page::SigningIn);
+}
+
+fn offers_sign_out(shown: &Tree) -> bool {
+    shown.nodes().iter().any(|node| node.role == Role::Button && node.name.as_deref() == Some(b"Sign out"))
+}
+fn choose_sign_out(domain: &mut Domain) -> Box<[jig_domain_client::Request]> {
+    drive(domain, Event::Act { act: jig_domain_client::action::Act::SignOut }).into_boxed_slice()
+}
+
+fn sign_out_frame(kind: PartyKind) -> Frame {
+    let mut source = document();
+    source.party.kind = kind;
+    source.projects = List::with_capacity(0);
+    source.charters = List::with_capacity(0);
+    source.updates = Count { value: 0, limited: false };
+    source
+}
+const SIGN_OUT_PHRASES: [JigPhrase; 14] = [
+    JigPhrase::Frame,
+    JigPhrase::Live,
+    JigPhrase::SignedIn,
+    JigPhrase::FramePerson,
+    JigPhrase::FrameService,
+    JigPhrase::FrameLogin,
+    JigPhrase::FrameNeedsKinds,
+    JigPhrase::FrameResultsSeen,
+    JigPhrase::SignOut,
+    JigPhrase::Updates,
+    JigPhrase::Needs,
+    JigPhrase::TaskNumber,
+    JigPhrase::Navigation,
+    JigPhrase::LoadingNavigation,
+];
+
+fn sign_out_tree(domain: &Domain) -> Tree {
+    frame_tree(domain, &sign_out_words())
+}
+fn sign_out_words() -> crate::words::Words {
+    use crate::phrases::{PhraseLimits, Phrasebook};
+    let count = u32::try_from(SIGN_OUT_PHRASES.len()).unwrap();
+    let mut shapes = List::with_capacity(count);
+    for phrase in SIGN_OUT_PHRASES {
+        shapes.push(phrase.shape(CLIENT.text)).unwrap();
+    }
+    let mut language = crate::phrases::english::language();
+    let mut phrases = List::with_capacity(count);
+    for phrase in language.phrases {
+        if SIGN_OUT_PHRASES.iter().any(|wanted| wanted.id() == phrase.id) {
+            phrases.push(phrase).unwrap();
+        }
+    }
+    language.phrases = phrases.into_boxed();
+    let book = Phrasebook::load(
+        shapes.into_boxed(),
+        Box::new([language]),
+        &PhraseLimits {
+            languages: 1,
+            phrases: count,
+            holes: 4,
+            segments: 128,
+            text_bytes: 2048,
+            hole_bytes: CLIENT.text,
+        },
+    )
+    .unwrap();
+    crate::words::Words { book, language: 0, offset_minutes: 60 }
 }

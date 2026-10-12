@@ -578,6 +578,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             | Event::Read { .. }
             | Event::Watch { .. }
             | Event::Ended { .. }
+            | Event::SignOutLost
             | Event::SignedOut
             | Event::ShowObjects { .. }
             | Event::ObjectsLeft
@@ -622,6 +623,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::Ask { ask } => crate::intents::by_value(domain, ask, out),
         Event::Progress { request, progress } => crate::intents::progress(domain, request, progress, out),
         Event::Answered { request, answer } => crate::intents::answered(domain, env, request, answer, out),
+        Event::SignOutLost => crate::signin::sign_out_lost(domain),
         Event::SignedOut => signed_out(domain, out),
         Event::ShowObjects { objects } => crate::application::show(domain, env, objects, out),
         Event::ObjectsLeft => crate::application::left(domain, out),
@@ -665,6 +667,7 @@ fn act_event(domain: &mut Domain, env: &Env<Limits>, act: Act, out: &mut Queue<R
             }
         },
         Act::Dismiss => dismiss_act(domain),
+        Act::SignOut => crate::signin::sign_out(domain, out),
         Act::SignIn { provider } => crate::signin::choose(domain, provider, out),
         Act::StartChat { project } => crate::pages::conversations::start(domain, env, project, out),
         Act::OpenChat { task } => crate::pages::conversations::open_chat(domain, env, task, out),

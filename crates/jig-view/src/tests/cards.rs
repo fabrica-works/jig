@@ -95,6 +95,7 @@ pub(super) fn drive(d: &mut Domain, event: Event) -> Vec<Request> {
         | Event::Ended { .. }
         | Event::ShowObjects { .. }
         | Event::ObjectsLeft
+        | Event::SignOutLost
         | Event::SignedOut
         | Event::Frame { .. } => false,
     };

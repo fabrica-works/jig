@@ -70,5 +70,6 @@ pub enum Request {
     Observability(crate::observability::Out),
     Show { address: Address, replace: bool },
     SignIn { provider: u16, back: Address },
+    SignOut,
     Fact { fact: Fact },
 }

@@ -174,6 +174,7 @@ impl App for Test {
             }
             Request::Show { address, replace } => Duty::Show { address, replace },
             Request::SignIn { provider, back } => Duty::SignIn { provider, back },
+            Request::SignOut => Duty::SignOut,
             Request::Jig(JigOut::Answered { .. } | JigOut::Unknown { .. })
             | Request::First(first::Out::Fact { .. })
             | Request::Fact { .. } => Duty::Fact,
@@ -206,6 +207,7 @@ impl App for Test {
             Request::Save { .. }
             | Request::Erase { .. }
             | Request::Show { .. }
+            | Request::SignOut
             | Request::SignIn { .. }
             | Request::Fact { .. }
             | Request::Jig(JigOut::Answered { .. } | JigOut::Unknown { .. })

@@ -22,6 +22,9 @@ pub fn frame(b: &mut Builder, client: &Domain, nav: SlotRef, words: &Words, bind
         Some(frame) => {
             crate::frame_facts::identity(b, words, &frame.party);
             crate::frame_facts::counts(b, words, frame);
+            if frame.party.kind == jig_domain_client::contract::PartyKind::Person {
+                control(b, words, bindings, Role::Button, JigPhrase::SignOut, &[], Act::SignOut);
+            }
             let phrase = if summary.updates.limited { JigPhrase::MoreUpdates } else { JigPhrase::Updates };
             control(
                 b,

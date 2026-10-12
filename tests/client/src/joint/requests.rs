@@ -120,6 +120,7 @@ pub fn send(
         Request::Save { .. }
         | Request::Erase { .. }
         | Request::Show { .. }
+        | Request::SignOut
         | Request::SignIn { .. }
         | Request::Fact { .. } => return Err(Invalid::Shell),
     };

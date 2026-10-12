@@ -11,6 +11,8 @@ use skein_lib::{Duration, Id, Map, Slab, Time, Token};
 /// Facts the view phrases as a short-lived notice.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Kind {
+    /// A sign-out exchange did not reach the engine.
+    SignOutLost,
     /// The frame's link went away or came back.
     Link(Link),
     /// A durable answer for a card no longer shown.
@@ -115,6 +117,20 @@ pub fn dismiss(domain: &mut Domain, token: Token) {
     if domain.notices.remove(id) {
         domain.timers.cancel(Timer::Notice(id));
         domain.changed();
+    }
+}
+pub(crate) fn clear_sign_out_lost(domain: &mut Domain) {
+    for _ in 0..domain.notices.ids.len() {
+        let mut lost = None;
+        for (id, ()) in domain.notices.ids() {
+            if domain.notices.get(*id).expect("visible notice exists").kind == Kind::SignOutLost {
+                lost = Some(id.token());
+                break;
+            }
+        }
+        if let Some(token) = lost {
+            dismiss(domain, token);
+        }
     }
 }
 pub(crate) fn dismiss_first(domain: &mut Domain) {

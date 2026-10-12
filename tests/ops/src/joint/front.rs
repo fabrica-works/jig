@@ -167,6 +167,10 @@ impl Joint {
             self.incoming(packet);
         }
     }
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one exhaustive match keeps every client wire route and shell duty explicit"
+    )]
     fn request(&mut self, client: ClientId, value: client::Request) {
         if self.offline_until.is_some() {
             self.parked.entry(client).or_default().push(value);
@@ -265,6 +269,7 @@ impl Joint {
             client::Request::Save { .. }
             | client::Request::Erase { .. }
             | client::Request::Show { .. }
+            | client::Request::SignOut
             | client::Request::SignIn { .. }
             | client::Request::Fact { .. } => panic!("shell duty never goes on wire"),
         }
@@ -978,6 +983,16 @@ impl Front<super::fixture::Client> for Joint {
             | client::Event::Observability(_)
             | client::Event::SignedOut => {}
         }
+    }
+    fn sign_out(&mut self, client: ClientId, now: Time, _wall: Wall) {
+        self.advance(now);
+        if self.offline_until.is_some() {
+            self.callbacks.push((client, client::Event::Jig(jig_domain_client::Event::SignOutLost)));
+            return;
+        }
+        let Some(sign_in) = self.engine.peers.transport.sign_in(client) else { return };
+        let reply_to = self.engine.peers.transport.reply_to(Reply::SignOut { client });
+        self.send_event(root::Event::Core(core::Event::People(people::Event::SignOut { reply_to, sign_in })));
     }
     fn sign_in(&mut self, client: ClientId, now: Time, _wall: Wall) {
         self.advance(now);

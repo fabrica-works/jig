@@ -32,6 +32,7 @@ fn drive(domain: &mut Domain, limits: &Limits, now: Time, event: Event) -> Box<[
         | Event::Ended { .. }
         | Event::ShowObjects { .. }
         | Event::ObjectsLeft
+        | Event::SignOutLost
         | Event::SignedOut
         | Event::Frame { .. } => false,
     };

@@ -69,6 +69,7 @@ pub(super) fn drive(domain: &mut Domain, now: Time, event: Event) -> Box<[Reques
         | Event::Ended { .. }
         | Event::ShowObjects { .. }
         | Event::ObjectsLeft
+        | Event::SignOutLost
         | Event::SignedOut
         | Event::Frame { .. } => false,
     };

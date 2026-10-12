@@ -749,6 +749,8 @@ pub fn language() -> Language {
             JigPhrase::SignedIn => {
                 Box::new([Segment::Text(copy_of(b"Signed in as ")), Segment::Hole { index: 0, kind: HoleKind::Name }])
             }
+            JigPhrase::SignOutLost => Box::new([Segment::Text(copy_of(b"Not signed out: the engine was not reached"))]),
+            JigPhrase::SignOut => Box::new([Segment::Text(copy_of(b"Sign out"))]),
             JigPhrase::SignedOut => Box::new([Segment::Text(copy_of(b"Signed out"))]),
             JigPhrase::Frame => Box::new([Segment::Text(copy_of(b"Work"))]),
             JigPhrase::Navigation => Box::new([Segment::Text(copy_of(b"Navigation"))]),

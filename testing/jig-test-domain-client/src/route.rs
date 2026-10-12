@@ -125,6 +125,7 @@ pub(crate) fn route_jig(
             }
             jig_domain_client::Request::Save { record } => out.push(Request::Save { record: Record::Jig(record) }),
             jig_domain_client::Request::Erase { key } => out.push(Request::Erase { key: Key::Jig(key) }),
+            jig_domain_client::Request::SignOut => out.push(Request::SignOut),
             jig_domain_client::Request::SignIn { provider, back } => {
                 out.push(Request::SignIn { provider, back: Address::Jig(back) });
             }

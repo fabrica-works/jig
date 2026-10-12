@@ -128,6 +128,10 @@ pub enum JigPhrase {
     MoreUpdates,
     /// Signed in as (0).
     SignedIn,
+    /// Sign out.
+    SignOut,
+    /// Not signed out: the engine was not reached.
+    SignOutLost,
     /// Signed out.
     SignedOut,
     /// Work.
@@ -1186,6 +1190,8 @@ impl JigPhrase {
             Self::Updates => 10,
             Self::MoreUpdates => 11,
             Self::SignedIn => 12,
+            Self::SignOut => 563,
+            Self::SignOutLost => 564,
             Self::SignedOut => 13,
             Self::Frame => 14,
             Self::Navigation => 15,
@@ -1917,6 +1923,8 @@ impl JigPhrase {
             | Self::Offline
             | Self::Starting
             | Self::Behind
+            | Self::SignOut
+            | Self::SignOutLost
             | Self::SignedOut
             | Self::Frame
             | Self::Navigation
@@ -2366,7 +2374,7 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 615] = [
+pub const ALL: [JigPhrase; 617] = [
     JigPhrase::OwnerHoldRelease,
     JigPhrase::QuestionFromTask,
     JigPhrase::QuestionFromPerson,
@@ -2467,6 +2475,8 @@ pub const ALL: [JigPhrase; 615] = [
     JigPhrase::Updates,
     JigPhrase::MoreUpdates,
     JigPhrase::SignedIn,
+    JigPhrase::SignOut,
+    JigPhrase::SignOutLost,
     JigPhrase::SignedOut,
     JigPhrase::Frame,
     JigPhrase::Navigation,
