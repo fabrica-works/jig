@@ -18,6 +18,7 @@ mod vocabulary;
 pub use vocabulary::{
     Answer, Cursor, Filter, Group, Historical, Loaded, Page, PageRow, Past, Position, Range, Read, Row, Scope, Why,
 };
+pub mod indexed;
 mod rows;
 pub use rows::row_key;
 mod cursors;
@@ -123,11 +124,7 @@ fn subject(read: &Read, party: u64) -> Option<Subject> {
 
 fn backwards(scope: &Scope) -> bool {
     match scope {
-        Scope::Activity { .. }
-        | Scope::Conversations
-        | Scope::Escalation { .. }
-        | Scope::Proposal { .. }
-        | Scope::Inbox { group: Group::Updates | Group::Results | Group::Replies, .. } => true,
+        Scope::Activity { .. } | Scope::Conversations | Scope::Escalation { .. } | Scope::Proposal { .. } => true,
         Scope::Task { .. }
         | Scope::Question { .. }
         | Scope::PersonTask { .. }
@@ -140,6 +137,7 @@ fn backwards(scope: &Scope) -> bool {
             group: Group::Needs | Group::Proposals | Group::Escalations | Group::Questions | Group::PersonTasks,
             ..
         }
+        | Scope::Inbox { group: Group::Updates | Group::Results | Group::Replies, .. }
         | Scope::Goals { .. }
         | Scope::Notes { .. }
         | Scope::ScopedNotes { .. }

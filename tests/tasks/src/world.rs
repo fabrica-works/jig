@@ -659,23 +659,13 @@ impl World {
         let made = self
             .records
             .values()
-            .filter_map(|record| match record {
-                Stored::Live(record) if !self.referee.expectations().has_task(record.number) => Some(Seen::Made {
-                    task: record.number,
-                    parent: record.requester,
-                    dependencies: record.dependencies.to_vec(),
-                    depth: record.depth,
-                }),
-                Stored::Live(_)
-                | Stored::Writer(_)
-                | Stored::Pool(_)
-                | Stored::Ended(_)
-                | Stored::Stub(_)
-                | Stored::Ledger(_)
-                | Stored::Activity(_)
-                | Stored::Milestone(_)
-                | Stored::History(_)
-                | Stored::PersonProposal(_) => None,
+            .filter_map(live_row)
+            .filter(|record| !self.referee.expectations().has_task(record.number))
+            .map(|record| Seen::Made {
+                task: record.number,
+                parent: record.requester,
+                dependencies: record.dependencies.to_vec(),
+                depth: record.depth,
             })
             .collect::<Vec<_>>();
         for seen in made {
@@ -754,22 +744,7 @@ impl World {
             }
         }
         self.observe(Seen::Limit { live: self.live(), cap: self.env.limits.tasks });
-        let live = self
-            .records
-            .values()
-            .filter_map(|row| match row {
-                Stored::Live(record) => Some(*record.clone()),
-                Stored::Ended(_)
-                | Stored::Writer(_)
-                | Stored::Pool(_)
-                | Stored::Stub(_)
-                | Stored::Ledger(_)
-                | Stored::Activity(_)
-                | Stored::Milestone(_)
-                | Stored::History(_)
-                | Stored::PersonProposal(_) => None,
-            })
-            .collect();
+        let live = self.records.values().filter_map(live_row).cloned().collect();
         self.observe(Seen::Stored { live, limits: Box::new(self.env.limits) });
         let mut live = Vec::new();
         let mut pools = Vec::new();
@@ -785,6 +760,7 @@ impl World {
                 | Stored::Activity(_)
                 | Stored::Milestone(_)
                 | Stored::History(_)
+                | Stored::Update(_)
                 | Stored::PersonProposal(_) => {}
             }
         }
@@ -809,6 +785,7 @@ impl World {
             Stored::Live(record) => record,
             Stored::Ended(_)
             | Stored::Writer(_)
+            | Stored::Update(_)
             | Stored::Pool(_)
             | Stored::Stub(_)
             | Stored::Ledger(_)
@@ -842,6 +819,7 @@ impl World {
                 | Key::Milestone { .. }
                 | Key::Activity { .. }
                 | Key::History { .. }
+                | Key::Update { .. }
                 | Key::PersonProposal(_) => None,
             })
             .collect();
@@ -901,6 +879,7 @@ impl World {
                 Stored::Live(record) | Stored::Ended(record) => Some(record.attempt),
                 Stored::Ledger(_)
                 | Stored::Writer(_)
+                | Stored::Update(_)
                 | Stored::Pool(_)
                 | Stored::Stub(_)
                 | Stored::Activity(_)
@@ -1152,4 +1131,20 @@ fn story_run(seed: u64, w: &mut World, choices: Option<Story>) {
     w.complete_cancel();
     assert_eq!(w.results.len(), 5);
     assert_eq!(w.live(), 0);
+}
+
+fn live_row(record: &Stored) -> Option<&jig_domain_tasks::TaskRecord> {
+    match record {
+        Stored::Live(record) => Some(record),
+        Stored::Ended(_)
+        | Stored::Stub(_)
+        | Stored::Ledger(_)
+        | Stored::Writer(_)
+        | Stored::Pool(_)
+        | Stored::PersonProposal(_)
+        | Stored::History(_)
+        | Stored::Milestone(_)
+        | Stored::Activity(_)
+        | Stored::Update(_) => None,
+    }
 }

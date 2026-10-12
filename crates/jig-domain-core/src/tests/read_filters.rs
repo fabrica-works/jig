@@ -274,7 +274,8 @@ fn stored_inbox_kind_filter_keeps_an_empty_page_cursor_and_refuses_a_different_k
     owner.result_position = 1;
     owner.ended_at = Some(Wall::from_nanos(10));
     let object = InboxObject::Result { position: 1 };
-    let mut row = stored_row(Record::Tasks(tasks::Stored::Ended(Box::new(owner.clone()))), Some(owner));
+    let update = tasks::Update { party: 1, at: Wall::from_nanos(10), task: 100, object: tasks::UpdateObject::Result };
+    let mut row = stored_row(Record::Tasks(tasks::Stored::Update(update)), Some(owner));
     row.inbox = Some(Cursor::Inbox { task: 100, object, at: Some(Wall::from_nanos(10)) });
     let position = reads::row_key(&row).unwrap();
     let filter = reads::Filter { project: Some(1), goal: None };

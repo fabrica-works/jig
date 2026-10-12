@@ -142,42 +142,9 @@ pub(super) fn needs_store(read: &Read, document: &Document) -> bool {
     }
 }
 
-fn inbox_position(group: Group, cursor: documents::Cursor, activity: Option<u64>) -> Option<Position> {
-    match cursor {
-        documents::Cursor::Inbox { task, object, at } => {
-            let key = match group {
-                Group::Updates | Group::Results | Group::Replies => match object {
-                    documents::InboxObject::Result { .. } => Key::Tasks(tasks::Key::Ended(task)),
-                    documents::InboxObject::Reply { .. } => {
-                        Key::Tasks(tasks::Key::Activity { task, position: activity? })
-                    }
-                    documents::InboxObject::Question { .. }
-                    | documents::InboxObject::Proposal { .. }
-                    | documents::InboxObject::Escalation { .. }
-                    | documents::InboxObject::PersonTask => return None,
-                },
-                Group::Needs | Group::Proposals | Group::Escalations | Group::Questions | Group::PersonTasks => {
-                    match object {
-                        documents::InboxObject::Proposal { proposer: Proposer::Party(_), number } => {
-                            Key::Tasks(tasks::Key::PersonProposal(number))
-                        }
-                        documents::InboxObject::Question { .. }
-                        | documents::InboxObject::Proposal { proposer: Proposer::Task(_), .. }
-                        | documents::InboxObject::Escalation { .. }
-                        | documents::InboxObject::PersonTask => Key::Tasks(tasks::Key::Live(task)),
-                        documents::InboxObject::Result { .. } | documents::InboxObject::Reply { .. } => return None,
-                    }
-                }
-            };
-            Some(Position::Inbox { at, task, object, key })
-        }
-        documents::Cursor::Number { .. } => None,
-    }
-}
-
 #[expect(clippy::manual_map, reason = "the strict subset uses an exhaustive match rather than a closure")]
 #[expect(clippy::too_many_lines, reason = "the exhaustive live-to-store seam keeps each document family visible")]
-pub(super) fn live_page(core: &Core, limits: &Limits, _party: u64, read: &Read, document: Document) -> Answer {
+pub(super) fn live_page(core: &Core, limits: &Limits, party: u64, read: &Read, document: Document) -> Answer {
     let mut rows = List::with_capacity(limits.documents.rows);
     let (page_scope, next) = match document {
         Document::Inbox(value) => {
@@ -231,7 +198,7 @@ pub(super) fn live_page(core: &Core, limits: &Limits, _party: u64, read: &Read, 
                 Some(after) if group.updates() || !needs_done => Some(Cursor::Live {
                     scope,
                     store_after: match last {
-                        Some((cursor, activity)) => inbox_position(*group, cursor, activity),
+                        Some((cursor, activity)) => super::indexed::inbox_position(party, *group, cursor, activity),
                         None => match super::cursor(read) {
                             Some(Cursor::Live { store_after, .. }) => store_after.clone(),
                             Some(
@@ -250,7 +217,7 @@ pub(super) fn live_page(core: &Core, limits: &Limits, _party: u64, read: &Read, 
                 }),
                 Some(_) | None => {
                     let after = match last {
-                        Some((cursor, activity)) => inbox_position(*group, cursor, activity),
+                        Some((cursor, activity)) => super::indexed::inbox_position(party, *group, cursor, activity),
                         None => match super::cursor(read) {
                             Some(Cursor::Live { store_after, .. }) => store_after.clone(),
                             Some(
@@ -359,6 +326,9 @@ pub fn row_key(row: &Row) -> Option<Position> {
         | Record::People(_)
         | Record::Notes(notes::Record::Line(_)) => None,
     }?;
+    if let Record::Tasks(tasks::Stored::Update(_)) = &row.value {
+        return Some(Position::Owner(key));
+    }
     match row.inbox {
         Some(documents::Cursor::Inbox { task, object, at }) => Some(Position::Inbox { at, task, object, key }),
         Some(documents::Cursor::Number { .. }) => None,
@@ -658,6 +628,7 @@ fn object(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Optio
                 | tasks::Stored::Stub(_)
                 | tasks::Stored::Ledger(_)
                 | tasks::Stored::Writer(_)
+                | tasks::Stored::Update(_)
                 | tasks::Stored::Pool(_),
             )
             | Record::Core(_)
@@ -860,6 +831,7 @@ fn page_row(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Opt
                     | tasks::Stored::Stub(_)
                     | tasks::Stored::Ledger(_)
                     | tasks::Stored::Writer(_)
+                    | tasks::Stored::Update(_)
                     | tasks::Stored::Pool(_),
                 )
                 | Record::Core(_)
@@ -1039,6 +1011,7 @@ fn inbox_selection_row(limits: &Limits, row: &Row) -> Result<Option<documents::I
             | tasks::Stored::Stub(_)
             | tasks::Stored::Ledger(_)
             | tasks::Stored::Writer(_)
+            | tasks::Stored::Update(_)
             | tasks::Stored::Pool(_),
         )
         | Record::Core(_)
@@ -1061,6 +1034,9 @@ fn inbox_row(
     filter: Filter,
     row: Row,
 ) -> Result<Option<PageRow>, Missing> {
+    if group.updates() && !super::indexed::valid_update(party, &row) {
+        return Err(Missing::Unknown);
+    }
     match row.inbox {
         Some(documents::Cursor::Inbox { object, .. }) if !group.includes(object) => return Ok(None),
         Some(documents::Cursor::Inbox { .. } | documents::Cursor::Number { .. }) | None => {}
@@ -1078,6 +1054,7 @@ fn inbox_row(
             | tasks::Stored::Stub(_)
             | tasks::Stored::Ledger(_)
             | tasks::Stored::Writer(_)
+            | tasks::Stored::Update(_)
             | tasks::Stored::Pool(_),
         )
         | Record::Core(_)
@@ -1098,7 +1075,10 @@ fn inbox_row(
     }
     match group {
         Group::Updates | Group::Results | Group::Replies => {
-            if let Some(line) = activity_record(&row.value) {
+            if let Some(line) = match &row.related {
+                Some(record) => activity_record(record),
+                None => None,
+            } {
                 return reply_update(core, limits, party, &row, owner, line);
             }
             if !ended(owner)
@@ -1312,6 +1292,7 @@ fn milestone_record(record: &Record) -> Option<&tasks::Milestone> {
             | tasks::Stored::Stub(_)
             | tasks::Stored::Ledger(_)
             | tasks::Stored::Writer(_)
+            | tasks::Stored::Update(_)
             | tasks::Stored::Pool(_),
         )
         | Record::Core(_)
@@ -1332,6 +1313,7 @@ fn activity_record(record: &Record) -> Option<&tasks::ActivityLine> {
             | tasks::Stored::Stub(_)
             | tasks::Stored::Ledger(_)
             | tasks::Stored::Writer(_)
+            | tasks::Stored::Update(_)
             | tasks::Stored::Pool(_),
         )
         | Record::Core(_)
@@ -1395,6 +1377,7 @@ fn ledger(record: &Record) -> Option<&tasks::FundingRecord> {
             | tasks::Stored::Ended(_)
             | tasks::Stored::Stub(_)
             | tasks::Stored::Writer(_)
+            | tasks::Stored::Update(_)
             | tasks::Stored::Pool(_),
         )
         | Record::Core(_)
@@ -1405,14 +1388,7 @@ fn ledger(record: &Record) -> Option<&tasks::FundingRecord> {
 
 fn inbox_key_allowed(group: Group, task: u64, object: documents::InboxObject, key: &Key) -> bool {
     match group {
-        Group::Updates | Group::Results | Group::Replies => match object {
-            documents::InboxObject::Result { .. } => key_kind(key) == KeyKind::Ended(task),
-            documents::InboxObject::Reply { .. } => key_kind(key) == KeyKind::Activity(task),
-            documents::InboxObject::Question { .. }
-            | documents::InboxObject::Proposal { .. }
-            | documents::InboxObject::Escalation { .. }
-            | documents::InboxObject::PersonTask => false,
-        },
+        Group::Updates | Group::Results | Group::Replies => false,
         Group::Needs | Group::Proposals | Group::Escalations | Group::Questions | Group::PersonTasks => match object {
             documents::InboxObject::Proposal { proposer: Proposer::Party(_), number } => {
                 key_kind(key) == KeyKind::PersonProposal(number)
@@ -1491,7 +1467,7 @@ pub(super) fn position_allowed(scope: &Scope, position: &Position) -> bool {
                 },
                 Scope::Notes { .. } | Scope::ScopedNotes { .. } => kind == KeyKind::Note,
                 Scope::Spend { project } => kind == KeyKind::Ledger(*project),
-                Scope::Inbox { .. } => false,
+                Scope::Inbox { group, .. } => group.updates() && super::indexed::is_update(key),
             }
         }
     }
@@ -1526,7 +1502,8 @@ fn key_kind(key: &Key) -> KeyKind {
             )
             | tasks::Key::Stub(_)
             | tasks::Key::Writer(_)
-            | tasks::Key::Pool(_) => KeyKind::Unsupported,
+            | tasks::Key::Pool(_)
+            | tasks::Key::Update { .. } => KeyKind::Unsupported,
         },
         Key::Core(value) => match value {
             CoreKey::EscalationDecision { task, .. } => KeyKind::Escalation(*task),

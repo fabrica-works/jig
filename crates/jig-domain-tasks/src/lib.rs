@@ -77,6 +77,8 @@ mod funders;
 mod hold_origin;
 mod holds;
 mod inbox;
+mod index;
+pub use index::{Newest, Update, UpdateObject};
 mod limits;
 mod moving;
 mod owned;

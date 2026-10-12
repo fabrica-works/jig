@@ -996,6 +996,8 @@ pub enum Key {
     Milestone { task: u64, position: u64 },
     /// One immutable line in the ordered task activity range.
     Activity { task: u64, position: u64 },
+    /// One party's update in newest-first order.
+    Update { party: u64, at: crate::Newest, task: crate::Newest, object: crate::UpdateObject },
 }
 
 impl Key {
@@ -1009,7 +1011,11 @@ impl Key {
             | Self::Writer(_)
             | Self::Pool(_)
             | Self::PersonProposal(_) => true,
-            Self::Ended(_) | Self::History { .. } | Self::Milestone { .. } | Self::Activity { .. } => false,
+            Self::Ended(_)
+            | Self::History { .. }
+            | Self::Milestone { .. }
+            | Self::Activity { .. }
+            | Self::Update { .. } => false,
         }
     }
 }
@@ -1018,6 +1024,8 @@ impl Key {
 /// funding, writer slots and pool counts are restored before admission.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Stored {
+    /// One party's durable update index.
+    Update(crate::Update),
     /// Historical activity loaded on demand, never restored as live state.
     Activity(crate::ActivityLine),
     /// One immutable lifecycle milestone, loaded on demand.
@@ -1057,6 +1065,7 @@ impl Stored {
     #[must_use]
     pub const fn key(&self) -> Key {
         match self {
+            Stored::Update(row) => row.key(),
             Stored::PersonProposal(row) => Key::PersonProposal(row.number),
             Stored::History(row) => Key::History { task: row.task, revision: row.revision },
             Stored::Activity(row) => Key::Activity { task: row.task, position: row.position },

@@ -3,7 +3,7 @@ use jig_core_world::{
     reads::{Fence, ask, complete, latest},
     stories::reads::{conversation, request, world},
 };
-use jig_domain_core::{documents, reads};
+use jig_domain_core::{self as core, documents, reads};
 use jig_domain_people as people;
 use jig_domain_tasks as tasks;
 use jig_test_domain as root;
@@ -160,4 +160,97 @@ fn five_independent_read_stories_fit_the_shared_process_budget() {
 #[test]
 fn conversation_owner_replay_keeps_every_retained_page_after_durability_and_restart() {
     jig_core_world::stories::reads::conversation_owner_replay_keeps_every_retained_page_after_durability_and_restart();
+}
+
+#[test]
+fn updates_page_from_the_index_newest_first_after_restart() {
+    let mut world = world(780);
+    let task = world.assigned.as_ref().expect("chat").task;
+    world.turn(1, 1, None, b"first reply");
+    world.advance(skein_lib::Duration::from_secs(1));
+    world.turn(2, 2, None, b"second reply");
+    world.restart(780, false);
+    let group = reads::Group::Updates;
+    let filter = reads::Filter { project: Some(1), goal: None };
+    let mut from = Some(reads::Cursor::Store { scope: reads::Scope::Inbox { group, filter }, after: None });
+    let mut found = Vec::new();
+    for page in 0..4 {
+        ask(&mut world, 700 + page, reads::Read::Inbox { group, filter, from: from.take() });
+        let reads::Answer::Page(value) = latest(&world) else { panic!("updates page") };
+        for row in &value.rows {
+            let reads::PageRow::Inbox(entry) = row else { panic!("update") };
+            assert!(matches!(entry.task, documents::TaskLink::Retained { ref chip, .. } if chip.number == task));
+            let documents::InboxObject::Reply { message } = entry.object else { panic!("reply") };
+            found.push(message);
+        }
+        from.clone_from(&value.next);
+        if from.is_none() {
+            break;
+        }
+    }
+    assert_eq!(found, [2, 1]);
+}
+
+#[test]
+fn a_forgotten_chats_result_leaves_the_updates_index() {
+    let mut world = world(781);
+    let task = world.assigned.as_ref().expect("chat").task;
+    world.turn(1, 1, None, b"reply");
+    request(&mut world, 71, people::Ask::MarkSeen { seen: people::Seen::Chat { task, through: 1 } });
+    world.end(
+        tasks::End::Finished {
+            result: tasks::TaskResult::Report { words: b"done".as_slice().into() },
+            cancel_delegates: false,
+        },
+        1,
+    );
+    let key = world.store.rows.keys().find(|key| matches!(key, root::Key::Core(core::Key::Tasks(tasks::Key::Update { task: number, object: tasks::UpdateObject::Result, .. })) if number.value() == task)).expect("result index").clone();
+    let root::Record::Core(core::Record::Tasks(tasks::Stored::Ended(ended))) =
+        &world.store.rows[&root::Key::Core(core::Key::Tasks(tasks::Key::Ended(task)))]
+    else {
+        panic!("ended chat")
+    };
+    let through = ended.result_position;
+    let row = ended.clone();
+    let reply = world.store.rows.keys().find(|key| matches!(key, root::Key::Core(core::Key::Tasks(tasks::Key::Update { task: number, object: tasks::UpdateObject::Reply { .. }, .. })) if number.value() == task)).expect("reply index").clone();
+    request(&mut world, 70, people::Ask::MarkSeen { seen: people::Seen::Results { through } });
+    world.send(root::Event::Core(core::Event::ForgetChat { row }));
+    assert!(!world.store.rows.contains_key(&key));
+    assert!(world.store.rows.contains_key(&reply));
+    let group = reads::Group::Updates;
+    let filter = reads::Filter { project: Some(1), goal: None };
+    let scope = reads::Scope::Inbox { group, filter };
+    ask(&mut world, 730, reads::Read::Inbox { group, filter, from: Some(reads::Cursor::Store { scope, after: None }) });
+    let reads::Answer::Page(page) = latest(&world) else { panic!("forgotten updates page") };
+    assert_eq!(page.rows.len(), 0);
+    assert_eq!(page.next, None);
+}
+
+#[test]
+fn the_results_group_pages_results_only_from_the_index() {
+    let mut world = world(782);
+    world.turn(1, 1, None, b"reply");
+    world.end(
+        tasks::End::Finished {
+            result: tasks::TaskResult::Report { words: b"done".as_slice().into() },
+            cancel_delegates: false,
+        },
+        1,
+    );
+    world.restart(782, false);
+    let scope =
+        reads::Scope::Inbox { group: reads::Group::Results, filter: reads::Filter { project: Some(1), goal: None } };
+    ask(
+        &mut world,
+        720,
+        reads::Read::Inbox {
+            group: reads::Group::Results,
+            filter: reads::Filter { project: Some(1), goal: None },
+            from: Some(reads::Cursor::Store { scope, after: None }),
+        },
+    );
+    let reads::Answer::Page(value) = latest(&world) else { panic!("results page") };
+    assert_eq!(value.rows.len(), 1);
+    let reads::PageRow::Inbox(entry) = value.rows.get(0).expect("result") else { panic!("inbox result") };
+    assert!(matches!(entry.object, documents::InboxObject::Result { .. }));
 }

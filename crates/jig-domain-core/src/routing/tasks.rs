@@ -745,11 +745,13 @@ pub(super) fn tag_tasks(
                     | tasks::Stored::Milestone(_)
                     | tasks::Stored::Activity(_)
                     | tasks::Stored::Writer(_)
+                    | tasks::Stored::Update(_)
                     | tasks::Stored::Pool(_)
                     | tasks::Stored::Ledger(_)
                     | tasks::Stored::Stub(_)
                     | tasks::Stored::PersonProposal(_) => record,
                 };
+                crate::indexes::save(core, &record, &mut out);
                 if let tasks::Stored::Live(task) | tasks::Stored::Ended(task) = &record {
                     if let Some(party) = core.chat_requester(task) {
                         let live = match &record {
@@ -762,6 +764,7 @@ pub(super) fn tag_tasks(
                             | tasks::Stored::Stub(_)
                             | tasks::Stored::Ledger(_)
                             | tasks::Stored::Writer(_)
+                            | tasks::Stored::Update(_)
                             | tasks::Stored::Pool(_) => unreachable!("matched task header"),
                         };
                         append_people(
@@ -846,6 +849,7 @@ pub(super) fn tag_tasks(
                     },
                     tasks::Stored::Live(_)
                     | tasks::Stored::Writer(_)
+                    | tasks::Stored::Update(_)
                     | tasks::Stored::Pool(_)
                     | tasks::Stored::History(_)
                     | tasks::Stored::Milestone(_)
@@ -859,6 +863,7 @@ pub(super) fn tag_tasks(
                     tasks::Stored::PersonProposal(row) => Some((row.goal.number, core.person_proposal_entries(row))),
                     tasks::Stored::Ledger(_)
                     | tasks::Stored::Writer(_)
+                    | tasks::Stored::Update(_)
                     | tasks::Stored::Pool(_)
                     | tasks::Stored::History(_)
                     | tasks::Stored::Milestone(_)
@@ -896,6 +901,7 @@ pub(super) fn tag_tasks(
                     | tasks::Stored::PersonProposal(_)
                     | tasks::Stored::Ledger(_)
                     | tasks::Stored::Writer(_)
+                    | tasks::Stored::Update(_)
                     | tasks::Stored::Pool(_)
                     | tasks::Stored::Stub(_) => {}
                 }

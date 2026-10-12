@@ -24,6 +24,7 @@ fn notified(world: &World, task: u64) -> &tasks::ActivityLine {
             | tasks::Stored::Stub(_)
             | tasks::Stored::Ledger(_)
             | tasks::Stored::Writer(_)
+            | tasks::Stored::Update(_)
             | tasks::Stored::Pool(_) => None,
         })
         .expect("immutable outward notification")

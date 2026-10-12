@@ -27,6 +27,7 @@ mod chats;
 mod goals;
 mod historical;
 mod inbox;
+mod indexes;
 pub use inbox::restore_key as inbox_restore_key;
 mod memory;
 pub use goals::GoalStart;

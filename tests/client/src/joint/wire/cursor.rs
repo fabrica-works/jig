@@ -1,6 +1,7 @@
 //! Opaque continuations cross reload as bytes, carrying the whole owner cursor.
 //! The protocol layer interprets the bytes; the client only echoes them
 //! (client/domain/contract.md, 6). No live cursor table owns continuation state.
+mod index;
 use jig_domain_client::contract::{Cursor, Text};
 use jig_domain_core::{CallKey, CoreKey, Key, ProjectionKey, documents, reads};
 use jig_domain_notes as notes;
@@ -790,6 +791,7 @@ fn take_funder(r: &mut Reader<'_>) -> Option<tasks::Funder> {
 
 fn put_task_key(w: &mut Writer, value: &tasks::Key) -> Option<()> {
     match value {
+        tasks::Key::Update { party, at, task, object } => index::put(w, *party, *at, *task, *object)?,
         tasks::Key::Activity { task, position } => {
             w.byte(9)?;
             w.u64(*task)?;
@@ -838,6 +840,7 @@ fn put_task_key(w: &mut Writer, value: &tasks::Key) -> Option<()> {
 }
 fn take_task_key(r: &mut Reader<'_>) -> Option<tasks::Key> {
     Some(match r.byte()? {
+        10 => index::take(r)?,
         9 => tasks::Key::Activity { task: r.u64()?, position: r.u64()? },
         5 => tasks::Key::PersonProposal(r.u64()?),
         7 => tasks::Key::History { task: r.u64()?, revision: r.u64()? },

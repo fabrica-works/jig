@@ -381,6 +381,7 @@ pub(crate) fn decision_record(row: &tasks::Stored, at: skein_lib::Wall) -> Optio
         | tasks::Stored::Ended(_)
         | tasks::Stored::Ledger(_)
         | tasks::Stored::Writer(_)
+        | tasks::Stored::Update(_)
         | tasks::Stored::Pool(_)
         | tasks::Stored::Stub(_)
         | tasks::Stored::Activity(_)

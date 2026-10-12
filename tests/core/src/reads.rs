@@ -252,43 +252,37 @@ fn candidate(store: &Store, range: &reads::Range, value: &core::Record) -> Optio
         reads::Scope::Inbox {
             group: reads::Group::Updates | reads::Group::Results | reads::Group::Replies, ..
         } => {
-            let (task, object, at) = match value {
-                core::Record::Tasks(tasks::Stored::Ended(task)) => {
-                    if task.requester != tasks::Party::Person(range.party) || task.result_position == 0 {
-                        return None;
-                    }
-                    (task.as_ref(), documents::InboxObject::Result { position: task.result_position }, task.ended_at)
-                }
-                core::Record::Tasks(tasks::Stored::Activity(line)) => {
-                    let task = owner(store, line.task)?;
-                    let message = match &line.line {
-                        tasks::Line::Turn { reply, .. } if task.requester == tasks::Party::Person(range.party) => {
-                            *reply
-                        }
-                        tasks::Line::Notified { recipient: tasks::Party::Person(party), word }
-                            if *party == range.party =>
-                        {
-                            word.number
-                        }
-                        tasks::Line::Words { .. }
-                        | tasks::Line::Heard(_)
-                        | tasks::Line::Notified { .. }
-                        | tasks::Line::RunBegan { .. }
-                        | tasks::Line::RunEnded { .. }
-                        | tasks::Line::Turn { .. }
-                        | tasks::Line::Decided { .. }
-                        | tasks::Line::Milestone { .. } => return None,
-                    };
-                    (task, documents::InboxObject::Reply { message }, Some(line.at))
-                }
-                core::Record::Core(_) | core::Record::Tasks(_) | core::Record::People(_) | core::Record::Notes(_) => {
-                    return None;
-                }
+            let core::Record::Tasks(tasks::Stored::Update(update)) = value else { return None };
+            if update.party != range.party {
+                return None;
+            }
+            let Some(task) = owner(store, update.task) else {
+                return Some(reads::Row {
+                    value: value.clone(),
+                    owner: None,
+                    ancestors: Box::new([]),
+                    related: None,
+                    linked: Box::new([]),
+                    inbox: None,
+                });
             };
             let mut value = row(store, value, task);
-            value.inbox = Some(documents::Cursor::Inbox { task: task.number, object, at });
+            let object = match update.object {
+                tasks::UpdateObject::Result => documents::InboxObject::Result { position: task.result_position },
+                tasks::UpdateObject::Reply { message, activity } => {
+                    let record = store.rows.get(&root::Key::Core(core::Key::Tasks(tasks::Key::Activity {
+                        task: update.task,
+                        position: activity.value(),
+                    })))?;
+                    let root::Record::Core(line) = record else { return None };
+                    value.related = Some(line.clone());
+                    documents::InboxObject::Reply { message: message.value() }
+                }
+            };
+            value.inbox = Some(documents::Cursor::Inbox { task: task.number, object, at: Some(update.at) });
             Some(value)
         }
+
         reads::Scope::Notes { .. } | reads::Scope::ScopedNotes { .. } => {
             let core::Record::Notes(jig_domain_notes::Record::Entry(_)) = value else { return None };
             Some(reads::Row {
@@ -331,7 +325,25 @@ fn candidate(store: &Store, range: &reads::Range, value: &core::Record) -> Optio
 #[must_use]
 pub fn page(store: &Store, range: &reads::Range) -> reads::Loaded {
     let mut ordered = BTreeMap::new();
-    for record in store.rows.values() {
+    let bounds = update_bounds(range);
+    let bounds = match bounds {
+        Some((first, last)) => {
+            let first = match &range.after {
+                Some(reads::Position::Owner(core::Key::Tasks(key @ tasks::Key::Update { party, .. })))
+                    if *party == range.party =>
+                {
+                    std::ops::Bound::Excluded(root::Key::Core(core::Key::Tasks(*key)))
+                }
+                Some(reads::Position::Owner(_) | reads::Position::Inbox { .. }) | None => {
+                    std::ops::Bound::Included(first)
+                }
+            };
+            (first, std::ops::Bound::Included(last))
+        }
+        None => (std::ops::Bound::Unbounded, std::ops::Bound::Unbounded),
+    };
+    let records = store.rows.range(bounds).map(|(_, value)| value);
+    for record in records {
         let root::Record::Core(value) = record else { continue };
         if let Some(row) = candidate(store, range, value) {
             ordered.insert(reads::row_key(&row).expect("owner-addressed row"), row);
@@ -407,4 +419,57 @@ pub fn latest(world: &World) -> &reads::Answer {
 pub fn complete(world: &mut World) {
     let events = world.reads.as_mut().expect("read parties").complete(&world.store);
     world.send_all(events);
+}
+
+fn update_bounds(range: &reads::Range) -> Option<(root::Key, root::Key)> {
+    match range.scope {
+        reads::Scope::Inbox {
+            group: reads::Group::Updates | reads::Group::Results | reads::Group::Replies, ..
+        } => {
+            let key = |at, task, object| {
+                root::Key::Core(core::Key::Tasks(tasks::Key::Update {
+                    party: range.party,
+                    at: tasks::Newest::from_raw(at),
+                    task: tasks::Newest::from_raw(task),
+                    object,
+                }))
+            };
+            Some((
+                key(0, 0, tasks::UpdateObject::Result),
+                key(
+                    u64::MAX,
+                    u64::MAX,
+                    tasks::UpdateObject::Reply {
+                        message: tasks::Newest::from_raw(u64::MAX),
+                        activity: tasks::Newest::from_raw(u64::MAX),
+                    },
+                ),
+            ))
+        }
+        reads::Scope::Task { .. }
+        | reads::Scope::Proposal { .. }
+        | reads::Scope::Escalation { .. }
+        | reads::Scope::Question { .. }
+        | reads::Scope::PersonTask { .. }
+        | reads::Scope::Result { .. }
+        | reads::Scope::Reply { .. }
+        | reads::Scope::Turn { .. }
+        | reads::Scope::EndedDelegates { .. }
+        | reads::Scope::History { .. }
+        | reads::Scope::Activity { .. }
+        | reads::Scope::Inbox {
+            group:
+                reads::Group::Needs
+                | reads::Group::Proposals
+                | reads::Group::Escalations
+                | reads::Group::Questions
+                | reads::Group::PersonTasks,
+            ..
+        }
+        | reads::Scope::Conversations
+        | reads::Scope::Goals { .. }
+        | reads::Scope::Notes { .. }
+        | reads::Scope::ScopedNotes { .. }
+        | reads::Scope::Spend { .. } => None,
+    }
 }

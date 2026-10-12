@@ -1,5 +1,5 @@
 //! Task and funding addresses (protocol/store.md, section 4.1).
-use jig_domain_tasks::{Funder, Key};
+use jig_domain_tasks::{Funder, Key, Newest, UpdateObject};
 use skein_kv::{KeyReader, KeyWriter};
 pub(super) fn write(writer: &mut KeyWriter, key: &Key) {
     match key {
@@ -46,6 +46,22 @@ pub(super) fn write(writer: &mut KeyWriter, key: &Key) {
             writer.u64(*task);
             writer.u64(*position);
         }
+        Key::Update { party, at, task, object } => {
+            writer.tag(10);
+            writer.u64(*party);
+            writer.u64(at.raw());
+            writer.u64(task.raw());
+            match object {
+                UpdateObject::Result => {
+                    writer.tag(0);
+                }
+                UpdateObject::Reply { message, activity } => {
+                    writer.tag(1);
+                    writer.u64(message.raw());
+                    writer.u64(activity.raw());
+                }
+            }
+        }
     }
 }
 pub(super) fn read(reader: &mut KeyReader<'_>) -> Option<Key> {
@@ -60,6 +76,19 @@ pub(super) fn read(reader: &mut KeyReader<'_>) -> Option<Key> {
         7 => Key::History { task: reader.u64()?, revision: reader.u64()? },
         8 => Key::Milestone { task: reader.u64()?, position: reader.u64()? },
         9 => Key::Activity { task: reader.u64()?, position: reader.u64()? },
+        10 => Key::Update {
+            party: reader.u64()?,
+            at: Newest::from_raw(reader.u64()?),
+            task: Newest::from_raw(reader.u64()?),
+            object: match reader.tag()? {
+                0 => UpdateObject::Result,
+                1 => UpdateObject::Reply {
+                    message: Newest::from_raw(reader.u64()?),
+                    activity: Newest::from_raw(reader.u64()?),
+                },
+                _ => return None,
+            },
+        },
         _ => return None,
     })
 }

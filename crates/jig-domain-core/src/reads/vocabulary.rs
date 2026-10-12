@@ -321,6 +321,7 @@ pub(crate) fn row_owner(row: &Row) -> Option<&tasks::TaskRecord> {
             | tasks::Stored::Stub(_)
             | tasks::Stored::Ledger(_)
             | tasks::Stored::Writer(_)
+            | tasks::Stored::Update(_)
             | tasks::Stored::Pool(_),
         )
         | Record::Core(_)
@@ -354,6 +355,7 @@ pub(crate) fn row_visible(core: &Core, party: u64, row: &Row) -> bool {
             | tasks::Stored::Milestone(_)
             | tasks::Stored::Stub(_)
             | tasks::Stored::Writer(_)
+            | tasks::Stored::Update(_)
             | tasks::Stored::Pool(_),
         ) => match row_owner(row) {
             Some(owner) => core.people.role(party, owner.project).is_some(),

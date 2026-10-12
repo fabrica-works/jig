@@ -267,6 +267,7 @@ impl Accounting {
                             }
                             Stored::Live(_)
                             | Stored::Writer(_)
+                            | Stored::Update(_)
                             | Stored::Pool(_)
                             | Stored::Ended(_)
                             | Stored::Stub(_)
@@ -305,6 +306,7 @@ impl Accounting {
                             }
                             Stored::Live(_)
                             | Stored::Writer(_)
+                            | Stored::Update(_)
                             | Stored::Pool(_)
                             | Stored::Ended(_)
                             | Stored::Stub(_)
@@ -369,6 +371,7 @@ impl Accounting {
                 }
                 Stored::Ended(_)
                 | Stored::Writer(_)
+                | Stored::Update(_)
                 | Stored::Pool(_)
                 | Stored::Stub(_)
                 | Stored::Activity(_)

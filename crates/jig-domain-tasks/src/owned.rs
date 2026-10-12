@@ -54,7 +54,7 @@ pub fn stored_bytes(record: &Stored) -> Option<u64> {
             Some(total)
         }
         Stored::Live(task) | Stored::Ended(task) => task_bytes(task),
-        Stored::Stub(_) | Stored::Ledger(_) => Some(0),
+        Stored::Update(_) | Stored::Stub(_) | Stored::Ledger(_) => Some(0),
         Stored::Writer(slot) => {
             let mut total = bytes(size_of_val(&*slot.resource.path))?;
             for segment in &slot.resource.path {

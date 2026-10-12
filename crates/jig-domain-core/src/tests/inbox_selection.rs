@@ -1,5 +1,6 @@
 //! Inbox selection contexts preserve the source's membership and original rows.
 use super::*;
+use tasks::{Newest, Update, UpdateObject};
 
 fn fixture() -> (Core, Limits) {
     let (mut core, mut limits) = watch_core();
@@ -112,7 +113,8 @@ fn ended_row(core: &Core, number: u64, ancestors: &[u64]) -> reads::Row {
     owner.result_position = u64::MAX;
     owner.ended_at = None;
     let object = InboxObject::Result { position: u64::MAX };
-    let mut row = stored_row(Record::Tasks(tasks::Stored::Ended(Box::new(owner))), None);
+    let update = Update { party: 1, at: Wall::EPOCH, task: number, object: UpdateObject::Result };
+    let mut row = stored_row(Record::Tasks(tasks::Stored::Update(update)), Some(owner));
     row.ancestors = ancestors.into();
     row.inbox = Some(Cursor::Inbox { task: number, object, at: None });
     row
@@ -306,7 +308,10 @@ fn stored_waiting_and_reply_entries_keep_separate_original_contexts_and_activity
         at: word.at,
         line: tasks::Line::Notified { recipient: tasks::Party::Person(1), word: word.clone() },
     };
-    let mut row = stored_row(Record::Tasks(tasks::Stored::Activity(line)), Some(owner));
+    let object = UpdateObject::Reply { message: Newest::of(word.number), activity: Newest::of(line.position) };
+    let update = Update { party: 1, at: word.at, task: 1, object };
+    let mut row = stored_row(Record::Tasks(tasks::Stored::Update(update)), Some(owner));
+    row.related = Some(Record::Tasks(tasks::Stored::Activity(line)));
     row.inbox = Some(Cursor::Inbox { task: 1, object: InboxObject::Reply { message: word.number }, at: Some(word.at) });
     row.ancestors = Box::new([99]);
     let reads::Answer::Page(updates) =

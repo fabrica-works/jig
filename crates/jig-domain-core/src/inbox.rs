@@ -404,6 +404,7 @@ pub fn restore_key(key: &crate::Key) -> bool {
             | tasks::Key::Stub(_)
             | tasks::Key::Ledger(_)
             | tasks::Key::Writer(_)
+            | tasks::Key::Update { .. }
             | tasks::Key::Pool(_),
         )
         | crate::Key::Core(_)
@@ -477,6 +478,7 @@ impl Core {
             | tasks::Stored::Stub(_)
             | tasks::Stored::Ledger(_)
             | tasks::Stored::Writer(_)
+            | tasks::Stored::Update(_)
             | tasks::Stored::Pool(_) => return true,
         };
         people::step(&mut self.people, &env, people::Event::Waiting { task, entries }, &mut out);
@@ -493,7 +495,7 @@ pub(crate) fn forget_chat(
     work: &mut skein_lib::Queue<crate::Event>,
     row: &tasks::TaskRecord,
 ) -> crate::Requests {
-    let mut out = skein_lib::Queue::with_capacity(2);
+    let mut out = skein_lib::Queue::with_capacity(3);
     if matches_ended(&row.phase)
         && core.people.ready()
         && valid_header(core, &env.limits, row)
@@ -511,6 +513,13 @@ pub(crate) fn forget_chat(
             last_reply: row.last_reply,
         }));
         out.push(crate::Request::Write(crate::Write::Erase(crate::Key::Tasks(tasks::Key::Ended(row.number)))));
+        let update = tasks::Update {
+            party,
+            at: row.ended_at.expect("validated end time"),
+            task: row.number,
+            object: tasks::UpdateObject::Result,
+        };
+        out.push(crate::Request::Write(crate::Write::Erase(crate::Key::Tasks(update.key()))));
     }
     out.push(crate::Request::Decided);
     crate::Requests::Out(out)
