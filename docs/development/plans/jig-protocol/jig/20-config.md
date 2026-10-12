@@ -276,7 +276,13 @@ Proof: unit, `heavy cargo nextest run -p jig-protocol-config -E
 'test(overrides)'` once: any limit can be overridden by its name, and an
 override that breaks a worst case is refused naming it; under 10 s with
 the build warm.
-Don't: accept an override by position, or of a limit's part.
+Compound limits (ruling 159): a limit whose value is a record
+(`tasks.retries`, `documents.versions`, `core.brief_core_budgets`) is
+overridden member by member, each scalar member named by its dotted path
+(`tasks.retries.transient.base_ms`, `documents.versions.minimum`), and
+the test's list names each.
+Don't: accept an override by position, or of a whole compound limit at
+once.
 Size: at most 350 lines of production code.
 Removes: nothing.
 

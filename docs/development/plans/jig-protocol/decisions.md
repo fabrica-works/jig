@@ -927,6 +927,18 @@ the file.
      function within 100 lines, so skein's gate would not exercise a
      split: the fixture record grows until each of its four functions
      would pass 100 lines unsplit, at most 100 fields.
+159. **A compound limit's members are overridden by dotted names**
+     (2026-10-12, the coordinator's block "jig 20.3: compound limits
+     cannot take integer overrides", 2026-10-12T21:47:28Z; asked for the
+     designer, ruled by the supervisor as the plan's syntax). configuration.md,
+     6: "A deployment names a profile and overrides any limit by its
+     name", so keeping `tasks.retries` (six retry policies),
+     `documents.versions` and `core.brief_core_budgets` preset-only would
+     contradict it. Each of their scalar members is named by its dotted
+     path (`tasks.retries.transient.base_ms`) and overridden alone, and
+     `every_limit_of_the_small_profile_has_a_name` lists each. 20.3's
+     Don't "or of a limit's part" now reads "or of a whole compound limit
+     at once".
 
 ## For the user
 
