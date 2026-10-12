@@ -1,8 +1,16 @@
 use skein_lib::{Duration, Time};
 
+/// The protocol layer's table that holds a grant (protocol/channel.md, section 8).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum GrantTable {
+    Accounts,
+    Application,
+}
+
 /// A name and the time its token has left; never the token itself.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Grant {
+    pub table: GrantTable,
     pub account: u32,
     pub generation: u64,
     pub valid: Duration,

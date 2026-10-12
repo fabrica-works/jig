@@ -3,6 +3,9 @@
 use jig_domain_host::LinkDown;
 use jig_domain_host::{Ask, Assignment, Event, Finish, RunAssignment};
 use skein_lib::{Duration, Reader, ReplyTo, Token};
+/// The account named by the grant renewal story.
+pub const ANALYST: u32 = 3;
+
 #[must_use]
 pub fn assign(reply_to: ReplyTo, assignment: RunAssignment) -> Event {
     assign_with(reply_to, assignment, Box::new([]))

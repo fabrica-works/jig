@@ -400,6 +400,19 @@ mod fixtures {
     // as opaque names; names are opaque bytes.
     use crate::{Ask, Assignment, Event, Finish, LinkDown, RunAssignment};
     use skein_lib::{Reader, ReplyTo, Token};
+    const ANALYST: u32 = 3;
+    pub fn account_grant(generation: u64) -> crate::Grant {
+        crate::Grant {
+            table: crate::GrantTable::Accounts,
+            account: ANALYST,
+            generation,
+            valid: skein_lib::Duration::from_secs(30),
+        }
+    }
+
+    pub fn application_grant(generation: u64) -> crate::Grant {
+        crate::Grant { table: crate::GrantTable::Application, ..account_grant(generation) }
+    }
     pub fn assign(reply_to: ReplyTo, assignment: RunAssignment) -> Event {
         Event::Down(LinkDown::Assign {
             reply_to,
@@ -427,29 +440,83 @@ mod fixtures {
 
 mod progress;
 
+fn assigned_grants(h: &mut Harness, grants: Box<[crate::Grant]>) -> (Token, Box<crate::Start>) {
+    let mut assignment = assignment(1);
+    assignment.workspace = None;
+    assignment.grants = grants;
+    let requests = h.step(fixtures::assign(ReplyTo::new(assignment.run), assignment));
+    assert_eq!(requests.len(), 1);
+    let mut requests = requests.into_iter();
+    let Some(Request::Start { owner, start }) = requests.next() else { panic!("expected start") };
+    (owner, start)
+}
+
+fn renewal(h: &mut Harness, grant: crate::Grant) -> Box<[Request]> {
+    h.step(Event::Down(LinkDown::Grant { run: Token::new(1), attempt: Token::new(1001), grant }))
+}
+
+fn kept_grants(h: &Harness, owner: Token) -> &[crate::Grant] {
+    h.domain.hosted.get(skein_lib::Id::from_token(owner)).expect("hosted run").grants()
+}
+
 #[test]
 fn a_grant_keeps_its_table_through_the_start() {
     let mut h = Harness::new();
-    let mut assignment = assignment(1);
-    assignment.workspace = None;
-    assignment.grants = Box::new([
-        crate::Grant {
-            table: crate::GrantTable::Accounts,
-            account: 3,
-            generation: 1,
-            valid: skein_lib::Duration::from_secs(30),
-        },
-        crate::Grant {
-            table: crate::GrantTable::Application,
-            account: 3,
-            generation: 2,
-            valid: skein_lib::Duration::from_secs(60),
-        },
-    ]);
-    let requests = h.step(fixtures::assign(ReplyTo::new(assignment.run), assignment));
-    let [Request::Start { start, .. }] = &*requests else { panic!("expected start: {requests:?}") };
-    assert_eq!(start.grants[0].table, crate::GrantTable::Accounts);
-    assert_eq!(start.grants[1].table, crate::GrantTable::Application);
+    let (_, start) = assigned_grants(&mut h, Box::new([fixtures::account_grant(1)]));
+    assert_eq!(&*start.grants, &[fixtures::account_grant(1)]);
+}
+
+#[test]
+fn two_grants_of_one_number_in_different_tables_are_admitted() {
+    let mut h = Harness::new();
+    let (owner, _) = assigned_grants(&mut h, Box::new([fixtures::account_grant(1), fixtures::application_grant(1)]));
+    assert_eq!(kept_grants(&h, owner), &[fixtures::account_grant(1), fixtures::application_grant(1)]);
+}
+
+#[test]
+fn an_applications_grant_is_kept_and_never_handed_to_the_agent() {
+    let mut h = Harness::new();
+    let (owner, start) = assigned_grants(&mut h, Box::new([fixtures::application_grant(1)]));
+    assert!(start.grants.is_empty());
+    assert!(renewal(&mut h, fixtures::application_grant(2)).is_empty());
+    assert!(h.step(Event::Started { owner, agent: Token::new(301) }).is_empty());
+    assert!(renewal(&mut h, fixtures::application_grant(3)).is_empty());
+    assert_eq!(kept_grants(&h, owner), &[fixtures::application_grant(3)]);
+}
+
+#[test]
+fn an_accounts_grant_renews_the_agents_grant() {
+    let mut h = Harness::new();
+    let (owner, _) = assigned_grants(&mut h, Box::new([fixtures::account_grant(1), fixtures::application_grant(1)]));
+    let agent = Token::new(301);
+    h.step(Event::Started { owner, agent });
+    assert_eq!(
+        &*renewal(&mut h, fixtures::account_grant(2)),
+        &[Request::Grant { agent, grant: fixtures::account_grant(2) }]
+    );
+    assert_eq!(kept_grants(&h, owner), &[fixtures::account_grant(2), fixtures::application_grant(1)]);
+}
+
+#[test]
+fn a_renewal_while_starting_sends_the_agent_accounts_grants_only() {
+    let mut h = Harness::new();
+    let (owner, _) = assigned_grants(&mut h, Box::new([fixtures::account_grant(1), fixtures::application_grant(1)]));
+    assert!(renewal(&mut h, fixtures::account_grant(2)).is_empty());
+    assert!(renewal(&mut h, fixtures::application_grant(2)).is_empty());
+    let agent = Token::new(301);
+    assert_eq!(
+        &*h.step(Event::Started { owner, agent }),
+        &[Request::Grant { agent, grant: fixtures::account_grant(2) }]
+    );
+}
+
+#[test]
+fn an_equal_or_older_generation_does_not_renew_an_agent() {
+    let mut h = Harness::new();
+    let (owner, _) = assigned_grants(&mut h, Box::new([fixtures::account_grant(2)]));
+    h.step(Event::Started { owner, agent: Token::new(301) });
+    assert!(renewal(&mut h, fixtures::account_grant(2)).is_empty());
+    assert!(renewal(&mut h, fixtures::account_grant(1)).is_empty());
 }
 
 #[test]

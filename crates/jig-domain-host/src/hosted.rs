@@ -12,8 +12,9 @@ use skein_lib::{Env, Id, List, Map, Queue, ReplyTo, Set, Slab, Token};
 
 use crate::assignment::{self, len};
 use crate::boundary::{
-    AgentFailure, AnsweredCall, Ask, Assignment, Delivery, Ending, Failure, Finish, Grant, Hosting, MessageRefusal,
-    Phase, Preparation, Reason, Refusal, Refused, Reply, Request, RunAssignment, RunFailure, SettledAnswer, Work,
+    AgentFailure, AnsweredCall, Ask, Assignment, Delivery, Ending, Failure, Finish, Grant, GrantTable, Hosting,
+    MessageRefusal, Phase, Preparation, Reason, Refusal, Refused, Reply, Request, RunAssignment, RunFailure,
+    SettledAnswer, Work,
 };
 use crate::call::{self, Call};
 use crate::domain::Domain;
@@ -439,7 +440,9 @@ fn start_prepared(domain: &mut Domain, owner: Token, workspace: Option<Token>, o
         State::Preparing { reply_to, charter, held } => {
             let mut grants = List::with_capacity(u32::try_from(entry.grants.len()).expect("validated grants"));
             for grant in &entry.grants {
-                grants.push(*grant).expect("room for every grant");
+                if grant.table == GrantTable::Accounts {
+                    grants.push(*grant).expect("room for every account grant");
+                }
             }
             let conversation = entry.runtime.start.take().expect("an agent is started once");
             out.push(Request::Start {
@@ -520,7 +523,9 @@ pub(crate) fn started(domain: &mut Domain, env: &Env<Limits>, owner: Token, agen
         State::Starting { reply_to, workspace, mut held } => {
             if entry.refreshed {
                 for grant in &entry.grants {
-                    out.push(Request::Grant { agent, grant: *grant });
+                    if grant.table == GrantTable::Accounts {
+                        out.push(Request::Grant { agent, grant: *grant });
+                    }
                 }
                 entry.refreshed = false;
             }
@@ -1229,12 +1234,12 @@ pub(crate) fn grant(domain: &mut Domain, run: Token, attempt: Token, grant: Gran
     let entry = domain.hosted.get_mut(id).expect("a named run is hosted");
     let mut accepted = false;
     for current in &mut entry.grants {
-        if current.table == grant.table && current.account == grant.account && current.generation <= grant.generation {
+        if current.table == grant.table && current.account == grant.account && current.generation < grant.generation {
             *current = grant;
             accepted = true;
         }
     }
-    if !accepted {
+    if !accepted || grant.table != GrantTable::Accounts {
         return;
     }
     entry.refreshed = true;
@@ -1372,4 +1377,11 @@ pub(crate) fn finished(
         return;
     }
     finish_run(domain, env, owner, finish, out);
+}
+
+#[cfg(test)]
+impl Hosted {
+    pub(crate) fn grants(&self) -> &[Grant] {
+        &self.grants
+    }
 }

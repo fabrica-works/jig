@@ -88,6 +88,7 @@ pub struct World {
     hello: Option<host::Hello>,
     reply: Option<host::Reply>,
     next_relay: Option<host::Relayed>,
+    received_grant: Option<host::Grant>,
     prepare_waits: bool,
     last_read: Option<Token>,
     refusals: crate::refusals::Referee,
@@ -135,6 +136,7 @@ impl World {
             hello: None,
             reply: None,
             next_relay: None,
+            received_grant: None,
             link_words: Vec::new(),
             prepare_waits: false,
             last_read: None,
@@ -209,6 +211,26 @@ impl World {
     /// Assigns one attempt. Its workspace prepares and its agent starts
     /// through the parent's immediate scripted terminals.
     pub fn assign(&mut self, workspace: bool) {
+        self.assign_with_grants(workspace, Box::new([]));
+    }
+
+    /// Assign an itemless run holding the engine's bounded grants.
+    pub fn assign_granted(&mut self, grants: Box<[host::Grant]>) {
+        self.assign_with_grants(false, grants);
+    }
+
+    /// A renewed name received from the engine's grant table.
+    pub fn grant(&mut self, grant: host::Grant) {
+        self.send(Event::Down(LinkDown::Grant { run: RUN, attempt: ATTEMPT, grant }));
+    }
+
+    /// The last grant handed to the scripted agent.
+    #[must_use]
+    pub fn received_grant(&self) -> Option<host::Grant> {
+        self.received_grant
+    }
+
+    fn assign_with_grants(&mut self, workspace: bool, grants: Box<[host::Grant]>) {
         self.has_workspace = workspace;
 
         let workspace = if workspace { Some(Workspace { workstream: 3, items: Token::new(4) }) } else { None };
@@ -219,7 +241,7 @@ impl World {
             workspace,
             save: true,
             charter: Box::from(&b"charter"[..]),
-            grants: Box::new([]),
+            grants,
         };
         self.send(Event::Down(LinkDown::Assign {
             reply_to: ReplyTo::new(RUN),
@@ -612,17 +634,27 @@ impl World {
                 );
                 self.hello = Some(hello);
             }
-            Request::CancelRelay { .. } | Request::Grant { .. } | Request::Abort { .. } => {
+            Request::Grant { agent, grant } => self.receive_grant(agent, grant),
+            Request::CancelRelay { .. } | Request::Abort { .. } => {
                 panic!("unscripted request: {request:?}")
             }
         }
+    }
+
+    fn receive_grant(&mut self, agent: Token, grant: host::Grant) {
+        assert_eq!(agent, AGENT);
+        assert!(self.agent_live);
+        assert_eq!(grant.table, host::GrantTable::Accounts);
+        self.received_grant = Some(grant);
     }
 
     fn start(&mut self, owner: Token, start: host::Start) {
         let host::Start { workspace, charter, activation, identity, turns, answered, messages, grants } = start;
         assert_eq!(workspace, if self.space_live { Some(SPACE) } else { None });
         assert_eq!(&*charter, b"charter");
-        assert!(grants.is_empty());
+        for grant in &grants {
+            assert_eq!(grant.table, host::GrantTable::Accounts);
+        }
         self.owner = Some(owner);
         self.agent_live = true;
         self.reading = true;

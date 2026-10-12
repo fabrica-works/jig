@@ -115,7 +115,10 @@ pub(crate) fn assignment(
             save: false,
             charter: encoded,
             grants: Box::new([host::Grant {
-                table: jig_domain_host::GrantTable::Accounts,
+                table: match grant.table {
+                    accounts::GrantTable::Accounts => host::GrantTable::Accounts,
+                    accounts::GrantTable::Application => host::GrantTable::Application,
+                },
                 account: grant.account,
                 generation: grant.generation,
                 valid: grant.valid,

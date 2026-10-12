@@ -1,4 +1,4 @@
-use crate::{Event, Fact, Failure, FromComponent, Grant, Limits, Request, State, ToComponent};
+use crate::{Event, Fact, Failure, FromComponent, Grant, GrantTable, Limits, Request, State, ToComponent};
 use alloc::boxed::Box;
 use skein_lib::{Deadlines, Duration, Env, List, Map, Queue, Time};
 
@@ -79,7 +79,12 @@ impl Domain {
         if !entry.usable || grant.expires <= now {
             return None;
         }
-        Some(Grant { account, generation: grant.generation, valid: grant.expires.saturating_since(now) })
+        Some(Grant {
+            table: GrantTable::Accounts,
+            account,
+            generation: grant.generation,
+            valid: grant.expires.saturating_since(now),
+        })
     }
     #[must_use]
     pub fn next_deadline(&self) -> Option<Time> {
@@ -196,7 +201,7 @@ fn component(domain: &mut Domain, env: &Env<Limits>, event: FromComponent, out: 
             entry.retry = None;
             entry.expiring = false;
             entry.backoff = env.limits.backoff_base;
-            out.push(Request::Granted { grant: Grant { account, generation, valid } });
+            out.push(Request::Granted { grant: Grant { table: GrantTable::Accounts, account, generation, valid } });
             account
         }
         FromComponent::Expiring { account, generation } => {

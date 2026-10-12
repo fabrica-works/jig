@@ -1,5 +1,7 @@
 use jig_accounts_world::{ANALYST, World};
-use jig_domain_accounts::{Event, Failure, FromComponent, Grant, Place, Request, State, ToComponent, Unread};
+use jig_domain_accounts::{
+    Event, Failure, FromComponent, Grant, GrantTable, Place, Request, State, ToComponent, Unread,
+};
 use skein_lib::{Duration, Time};
 fn granted() -> World {
     let mut world = World::wanting(&[ANALYST]);
@@ -9,7 +11,14 @@ fn granted() -> World {
             generation: 4,
             valid: Duration::from_secs(100)
         })),
-        vec![Request::Granted { grant: Grant { account: ANALYST, generation: 4, valid: Duration::from_secs(100) } }]
+        vec![Request::Granted {
+            grant: Grant {
+                table: GrantTable::Accounts,
+                account: ANALYST,
+                generation: 4,
+                valid: Duration::from_secs(100)
+            }
+        }]
     );
     world
 }
