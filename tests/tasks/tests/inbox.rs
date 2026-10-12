@@ -72,6 +72,36 @@ fn a_parked_chat_wakes_on_its_persons_words() {
     assert_eq!(world.contexts[&1].inbox[0].number, 1);
 }
 
+#[test]
+fn a_persons_words_left_unread_wake_the_task_as_its_run_ends() {
+    let mut world = refusal_world(94);
+    assert_eq!(world.terminal(1, End::Parked), Reply::Acknowledged(Accepted::New));
+    assert!(world.activations.contains(&1));
+    assert_eq!(world.contexts[&1].inbox.iter().map(|word| word.number).collect::<Vec<_>>(), [1, 2]);
+}
+
+#[test]
+fn a_runs_refusals_end_with_its_attempt() {
+    for end in [End::Parked, End::Failed(jig_domain_tasks::Class::Transient), End::Refused] {
+        let mut world = refused_world(95);
+        assert_eq!(world.record(1).refused.as_ref(), [1]);
+        assert_eq!(world.terminal(1, end), Reply::Acknowledged(Accepted::New));
+        assert!(world.record(1).refused.is_empty());
+        assert_eq!(world.record(1).inbox[0].number, 1);
+        world.restart();
+        assert!(world.record(1).refused.is_empty());
+    }
+}
+
+#[test]
+fn unread_words_do_not_wake_a_task_its_run_closes() {
+    let mut world = refusal_world(96);
+    world.finish(1);
+    world.settle(1);
+    assert!(!world.activations.contains(&1));
+    assert!(world.records.contains_key(&jig_domain_tasks::Key::Ended(1)));
+}
+
 fn task_words(world: &mut World, source: u64, target: u64, number: u64, kind: MessageKind) -> Reply {
     let reply_to = world.to();
     let key = reply_to.into_token().raw();

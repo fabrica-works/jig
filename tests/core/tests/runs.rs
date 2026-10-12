@@ -252,8 +252,8 @@ fn settled_answers_resume_in_commit_order_and_a_replay_preserves_exact_bytes() {
 fn a_woken_chats_start_carries_its_waiting_words_oldest_first() {
     let mut world = World::new(141, false);
     let first = world.say(84);
-    world.end(tasks::End::Parked, 0);
     let second = world.say(85);
+    park_chat(&mut world, 0);
     let messages = &world.assigned.as_ref().expect("woken chat").messages;
     assert_eq!(messages.iter().map(|word| word.number).collect::<Vec<_>>(), [first, second]);
     assert_eq!(messages[0].words.as_ref(), [84]);
@@ -265,8 +265,8 @@ fn a_start_carries_at_most_the_runs_inbox() {
     limits.core.tasks.run_inbox = 1;
     let mut world = World::configured(142, false, config, limits);
     let first = world.say(86);
-    world.end(tasks::End::Parked, 0);
     let second = world.say(87);
+    park_chat(&mut world, 0);
     let assigned = world.assigned.as_ref().expect("woken chat");
     assert_eq!(assigned.messages.iter().map(|word| word.number).collect::<Vec<_>>(), [first]);
     let key = root::Key::Core(core::Key::Core(core::CoreKey::RunProof(assigned.task)));
@@ -348,10 +348,90 @@ fn a_refusal_frees_the_runs_inbox_for_its_next_waiting_word() {
     assert_eq!(world.inbound.iter().map(|word| word.number).collect::<Vec<_>>(), [first, second]);
 }
 
+fn a_refused_message_survives_a_later_fence_and_wakes_its_task_as_the_run_parks() {
+    let mut world = World::new(148, false);
+    let first = world.say(80);
+    let second = world.say(81);
+    let attempt = assigned_chat(&world).attempt;
+    world.turn_refusing(1, 1, Some(second), &[first], b"reads the second words only");
+    park_chat(&mut world, 1);
+    let woken = assigned_chat(&world);
+    assert!(woken.attempt > attempt, "{:?}", world.trace);
+    assert_eq!(woken.messages.first().map(|word| word.number), Some(first));
+}
+
+fn a_message_left_unread_wakes_its_task_as_the_run_parks() {
+    let mut world = World::new(149, false);
+    let first = world.say(82);
+    world.turn(1, 1, Some(first), b"reads the first words");
+    let unread = world.say(83);
+    let attempt = assigned_chat(&world).attempt;
+    park_chat(&mut world, 1);
+    let woken = assigned_chat(&world);
+    assert!(woken.attempt > attempt, "{:?}", world.trace);
+    assert_eq!(woken.messages.first().map(|word| word.number), Some(unread));
+}
+
+fn quiet_news_left_unread_waits_for_the_next_activation() {
+    let (config, mut limits) = jig_core_world::effects::fixture(150, false);
+    limits.core.tasks.inbox_bytes = 256;
+    let mut world = World::configured(150, false, config, limits);
+    let task = assigned_chat(&world).task;
+    subscribe_topic(&mut world, task, 10);
+    subscribe_topic(&mut world, task, 11);
+    world.send(root::Event::Core(core::Event::Tasks(tasks::Event::Notice {
+        task,
+        word: inbox_notice(9001, tasks::MessageKind::News { subscription: 10, class: tasks::NewsClass::Kept }),
+    })));
+    let assigned = world.assignments.len();
+    park_chat(&mut world, 0);
+    assert_eq!(world.assignments.len(), assigned, "quiet news does not wake a parked chat");
+    world.send(root::Event::Core(core::Event::Tasks(tasks::Event::Notice {
+        task,
+        word: inbox_notice(9002, tasks::MessageKind::News { subscription: 11, class: tasks::NewsClass::Wakes }),
+    })));
+    assert_eq!(world.assignments.len(), assigned + 1);
+    assert!(world.assigned.as_ref().expect("next activation").messages.iter().any(|word| word.number == 9001));
+}
+
+fn inbox_notice(number: u64, kind: tasks::MessageKind) -> tasks::Word {
+    tasks::Word {
+        number,
+        from: tasks::Party::Deployment { project: 1 },
+        kind,
+        words: b"inbox notice".as_slice().into(),
+        at: skein_lib::Wall::EPOCH,
+        hits: 1,
+        eligible: false,
+    }
+}
+
+fn subscribe_topic(world: &mut World, task: u64, number: u64) {
+    world.send(root::Event::Core(core::Event::Tasks(tasks::Event::SubscribeTopic {
+        reply_to: ReplyTo::new(Token::new(9000 + number)),
+        task,
+        subscription: tasks::Subscription {
+            number,
+            kind: tasks::SubscriptionKind::Topic { connector: 0, topic: number },
+        },
+    })));
+    let key = root::Key::Core(core::Key::Tasks(tasks::Key::Live(task)));
+    assert!(matches!(&world.store.rows[&key],
+        root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row)))
+        if row.subscriptions.iter().any(|subscription| subscription.number == number)));
+}
+
+fn assigned_chat(world: &World) -> &root::Assignment {
+    world.assigned.as_ref().expect("assigned chat")
+}
+
 // Each scenario keeps its own fresh world and all original assertions.
 // A shared entrypoint avoids one process startup per short scenario.
 #[test]
 fn runs_scenarios() {
+    a_refused_message_survives_a_later_fence_and_wakes_its_task_as_the_run_parks();
+    a_message_left_unread_wakes_its_task_as_the_run_parks();
+    quiet_news_left_unread_waits_for_the_next_activation();
     an_answer_whose_fence_passes_its_last_turn_fails_invalid();
     an_answer_refusing_an_unoffered_word_fails_invalid();
     a_refusal_frees_the_runs_inbox_for_its_next_waiting_word();

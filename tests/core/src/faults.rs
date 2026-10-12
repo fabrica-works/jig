@@ -18,17 +18,17 @@ pub fn workers(seed: u64, count: u32, engine: bool) -> World {
 pub fn workers_at(seed: u64, count: u32, engine: bool, cut: Option<crate::effects::Cut>) -> World {
     assert!((1..=3).contains(&count));
     let (config, limits) = crate::peers::fixture(seed, u32::from(engine));
-    let script = || {
+    let script = |read| {
         Box::new([
             Script::Wait,
-            Script::Turn { body: b"kept whole turn".as_slice().into(), cost: 2, read: None },
+            Script::Turn { body: b"kept whole turn".as_slice().into(), cost: 2, read: Some(read) },
             Script::Park,
         ]) as Box<[Script]>
     };
     let mut hosts: Vec<_> =
-        (0..count).map(|index| Worker::new(7 + u64::from(index), 1, vec![script(), script()])).collect();
+        (0..count).map(|index| Worker::new(7 + u64::from(index), 1, vec![script(1), script(2)])).collect();
     if engine {
-        hosts.insert(0, Worker::new(0, 1, vec![script(), script()]));
+        hosts.insert(0, Worker::new(0, 1, vec![script(1), script(2)]));
     }
     World::scripted_at(
         config,

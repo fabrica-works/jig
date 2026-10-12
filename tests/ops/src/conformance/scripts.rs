@@ -26,7 +26,8 @@
 //! parks once the charter's waiting time passes without a message. A stop
 //! ends a run that has not finished as cancelled, and the agent goes.
 //! Messages that come once its run has finished, before the stop, are not
-//! read: smith's inline agent heard the stop in the same step.
+//! read: smith's inline agent heard the stop in the same step. If its task
+//! stays live, the unread messages wake it again according to their policy.
 use jig_conformance::{Clock, Input};
 use jig_domain_host as host;
 use jig_ops_domain as root;
@@ -149,7 +150,7 @@ impl Agents {
             }
             host::ToAgent::Message { agent: owner, name, words, .. } => {
                 // A run that has said how it finishes reads nothing more; the
-                // core keeps what it did not read for the next activation.
+                // core keeps and re-judges what it did not read as the run ends.
                 if let Some(agent) = self.live.get_mut(&owner)
                     && !agent.finished
                 {

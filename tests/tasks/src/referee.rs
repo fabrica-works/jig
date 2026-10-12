@@ -387,6 +387,9 @@ fn stored(live: &[TaskRecord], limits: &Limits, judge: &mut Judge<Name, Stimulus
         if task.refused.iter().any(|number| !task.inbox.iter().any(|word| word.number == *number)) {
             judge.fail("committed message taken while refused");
         }
+        if task.last_answer == Some(task.attempt) && !task.refused.is_empty() {
+            judge.fail("message refusals kept past their attempt");
+        }
     }
     if !live.iter().all(|task| within(task, limits))
         || live.iter().any(|task| {

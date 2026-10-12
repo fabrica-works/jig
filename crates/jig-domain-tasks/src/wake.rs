@@ -4,6 +4,7 @@
 //! batch news by their policy and step immediately on other messages.
 use crate::domain::{Domain, activate, publish, record, task_mut};
 use crate::{Active, Limits, MessageKind, NewsClass, Party, Phase, Request, ResultsWake, WakePolicy, WakeRule, Word};
+use alloc::boxed::Box;
 use skein_lib::{Duration, Env, Queue, Wall};
 
 pub(crate) fn valid(policy: &WakePolicy) -> bool {
@@ -192,6 +193,15 @@ pub(crate) fn after_step(domain: &mut Domain, env: &Env<Limits>, number: u64, ou
             return;
         }
         after_message(domain, env, number, None, word, out);
+    }
+}
+
+/// An attempt's refusals end with it; unread messages keep their wake policy.
+pub(crate) fn after_run(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queue<Request>) {
+    let task = task_mut(domain, number).expect("answered task live");
+    task.record.refused = Box::new([]);
+    if task.record.phase == Phase::Active(Active::Idle) {
+        after_step(domain, env, number, out);
     }
 }
 
