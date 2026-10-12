@@ -89,8 +89,9 @@ assignment, and pushed and resent as an account's are.
   start or its adoption and from each new generation; it sends them
   when a hello lists the attempt and when it adopts it. A grant past its
   lapse is not sent. The value stays the protocol layer's.
-- **A grant to a host is `Now`:** it follows no commit (engine.md, 5.2
-  lists no grant).
+- **A grant to a host is `Held`:** it waits for the last commit made
+  before it, so it never overtakes its attempt's assignment (engine.md,
+  5.2, "grants"; the designer's answer of 2026-10-12, jig `ee995fc6`).
 - **Grants name their table** in the three copies of the grant: jig
   05 gives `host::Grant` and `fleet::Grant` their `table: GrantTable`
   (its 05.1); 08.2 gives the accounts child's `Grant` the same, keeps
@@ -311,15 +312,18 @@ which sends it to each live attempt that holds its account, on any
 host, the engine's own included; the fleet keeps each attempt's grants
 from its start and its adoption and sends them when a hello lists the
 attempt and when it adopts it; the core routes the fleet's grant as
-`Now::Grant`, in place of the `unreachable!` at children.rs:287; the
-assignment carries its grants as a list (`Now::RunPrepared::grants`);
-both roots route `Now::Grant` to their host (the test root out to its
-world; `ops`'s root to its hub on channel 0, `host::Event::Grant`).
+`Held::Grant`, in place of the `unreachable!` at children.rs:287, so it
+leaves after the last commit made before it and never ahead of its
+attempt's assignment (engine.md, 5.2, "grants"); the assignment carries
+its grants as a list (`Now::RunPrepared::grants`); both roots route
+`Held::Grant`, as the journal releases it, to their host (the test root
+out to its world; `ops`'s root to its hub on channel 0,
+`host::Event::Grant`).
 Needs: 08.2's tables; jig 05.2's fleet grant vocabulary (`Grant`, its
 name, `Event::{Start, Adopt, Grant}`, `Request::Grant`) and the hub's
 `RunAssignment`, used as jig 05.2 leaves them: this increment fills
 them, and changes none of their variants or fields. In the core it
-changes `Now::RunPrepared`'s `grant` to `grants` and adds `Now::Grant`
+changes `Now::RunPrepared`'s `grant` to `grants` and adds `Held::Grant`
 (jig 05's Choices: jig 04, 06 and 08 add their own fields to
 `Now::RunPrepared`).
 Files: `crates/jig-domain-fleet/src/boundary.rs` (`Event::{Start, Adopt,
@@ -328,7 +332,7 @@ Grant}`, `Grant`), `grants.rs` (new: the kept grants, `keep`, `renew`,
 `moved` and `located` are called), `call.rs` (`grant`, line 199, goes),
 `domain.rs` (line 321), `limits.rs` (`grants`), `tests.rs` (helpers 120-150);
 `crates/jig-domain-core/src/routing/children.rs` (lines 287-290, 371,
-`tag_account`), `routing/vocabulary.rs` (`Now::Grant`; `Now::RunPrepared::grants`),
+`tag_account`), `routing/vocabulary.rs` (`Held::Grant`; `Now::RunPrepared::grants`),
 `routing/run_preparation.rs` (line 139), `sibling_routes.rs` (line 169,
 the adoption's grants); `testing/jig-test-domain/src/{lib.rs (Assignment,
 line 145), routes.rs (lines 208, 421, 537)}`; `examples/ops/domain/src/{route.rs
@@ -354,8 +358,10 @@ holds the grant's name and sends `Request::Grant` to each on a channel;
 `fleet::max_out` grows by `tracked(limits)` for a grant and by
 `slots * grants` for a hello. In the core, `tag_account`'s
 `Request::Granted` steps the fleet with `fleet::Event::Grant` in the same
-decision; `fleet::Request::Grant` becomes `Now::Grant { channel, run,
-attempt, grant }`.
+decision; `fleet::Request::Grant` becomes `Held::Grant { channel, run,
+attempt, grant }`, which the journal tags with the last commit made
+before it and releases in order, after the assignment of the same
+attempt.
 Test shape:
 - `crates/jig-domain-fleet/src/tests.rs`, unit, under 20 ms each:
   `a_new_generation_reaches_each_live_attempt_of_its_account`,
@@ -386,13 +392,18 @@ Test shape:
   fleet world's parent (world.rs:935-990) records `Request::Grant`.
 - `tests/core/tests/restart.rs`, world, under 0.5 s each:
   `a_new_generation_reaches_the_live_chat`,
-  `a_restart_sends_an_adopted_chat_its_current_grant`.
+  `a_restart_sends_an_adopted_chat_its_current_grant`,
+  `a_generation_renewed_while_the_assignment_is_held_reaches_the_attempt_after_it`:
+  a chat is placed, a new generation is granted before the assignment's
+  commit is durable, and the host hears the assignment, then the grant
+  of the new generation.
 Proof: world: `heavy cargo nextest run -p jig-core-world --test restart
 a_restart_sends_an_adopted_chat_its_current_grant` shows a chat adopted
 after a restart sent its account's current generation once its worker
 lists it; once, under 1 s.
-Don't: hold a value in the fleet or the core; make a grant `Held`; send
-a grant to an attempt the fleet fenced off.
+Don't: hold a value in the fleet or the core; send a grant as `Now`, or
+ahead of its attempt's assignment; rewrite an assignment the journal
+holds; send a grant to an attempt the fleet fenced off.
 Size: at most 300 lines of production code.
 Removes: the `Grant` arm of the `unreachable!` at children.rs:287 (the
 other three arms are jig 05's). The per-attempt `fleet::Event::Grant`
@@ -702,10 +713,15 @@ pub enum FleetEvent {
 // jig_domain_core::routing::vocabulary (08.3, 08.4)
 use jig_domain_fleet as fleet;
 
-pub enum Now {
-    /// A grant for the host on `channel` (0, the engine's own): its value is
-    /// filled in by the protocol layer from the table it names.
+pub enum Held {
+    /// A grant for the host on `channel` (0, the engine's own), released
+    /// after the last commit made before it, so never ahead of its
+    /// attempt's assignment (engine.md, 5.2): its value is filled in by
+    /// the protocol layer from the table it names.
     Grant { channel: Token, run: Token, attempt: Token, grant: fleet::Grant },
+}
+
+pub enum Now {
     // RunPrepared { .., grants: Box<[accounts::Grant]> } in place of `grant`.
 }
 ```
@@ -733,8 +749,10 @@ with `Closed`.
   -n -E 'refresh_margin|rejected_interval|Unsaved|Refreshing' --
   crates/jig-domain-accounts crates/jig-domain-core` prints nothing.
 - The fleet's grants are routed: `git -C ~/src/rust/jig grep -n
-  'Now::Grant' -- crates/jig-domain-core/src/routing/children.rs`
-  prints one line (none on 2026-10-12, when the arm is `unreachable!`).
+  'Held::Grant' -- crates/jig-domain-core/src/routing/children.rs`
+  prints one line (none on 2026-10-12, when the arm is `unreachable!`),
+  and `git -C ~/src/rust/jig grep -n 'Now::Grant' -- crates` prints
+  nothing.
 - The worlds pass: `heavy cargo nextest run -p jig-accounts-world`
   passes, and `heavy cargo nextest run -p jig-core-world --test runs
   --test restart --test credentials` passes.
