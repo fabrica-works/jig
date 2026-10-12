@@ -12,11 +12,6 @@ fn fixture() -> (Domain, Env<Limits>) {
 }
 
 fn fixture_with_commits(commits: u32) -> (Domain, Env<Limits>) {
-    let mut smith = smith_agent_world::Settings::calm(17).limits;
-    smith.run.budget.spend = 100;
-    smith.session.spend = 100;
-    smith.run.host_tools = 32;
-    smith.run.brief_sections = 32;
     let mut core_limits = jig_core_world::world::limits().core;
     core_limits.fleet.engine_slots = 1;
     core_limits.tasks.hold_kinds = 3;
@@ -42,38 +37,22 @@ fn fixture_with_commits(commits: u32) -> (Domain, Env<Limits>) {
             turns: 2,
             turn_queue_bytes: 2048,
         },
-        agent: jig_inline_agent::Limits {
-            slots: 1,
-            smith,
-            window: smith_domain::Window {
-                turns: 2,
-                bytes: smith_domain::max_turn_bytes(&smith).unwrap().checked_mul(2).unwrap(),
-            },
-            charter: smith_charter::v1::CEILINGS,
-            transcript: smith_transcript::v2::CEILINGS,
-            cancel_grace: Duration::from_secs(2),
-        },
+        charter: smith_charter::v1::CEILINGS,
+        endpoints: 1,
         journal: JournalLimits { commits, writes: 20000, held: 20000, now: 128, release: 128 },
         routes: 256,
     };
-    let mut endpoints = List::with_capacity(1);
-    endpoints
-        .push(smith_protocol_channel::Endpoint { name: Box::from(&b"fake"[..]), number: 1, dialect: 1, account: 1 })
-        .unwrap();
     let config = Config {
         core: jig_core_world::world::config(17).core,
         triage_templates: Box::new([]),
         lead_templates: Box::new([]),
         backend: infrastructure::Backend::OperationIds,
-        endpoints: Box::new([smith_domain_run::charter::Endpoint(1)]),
-        endpoint_names: smith_protocol_channel::Endpoints::new(endpoints),
         charter_endpoints: Box::new([jig_charter::EndpointName {
             number: 1,
             dialect: 1,
             account: 1,
             name: Box::from(&b"fake"[..]),
         }]),
-        seed: 17,
     };
     (Domain::new(config, &limits), Env { now: Time::ZERO, wall: Wall::EPOCH, limits })
 }
@@ -221,7 +200,7 @@ fn cold_restart_loads_every_child_before_opening_decisions() {
             | Output::Application { .. }
             | Output::IncidentAssociationRefused { .. }
             | Output::Read { .. }
-            | Output::Llm { .. }
+            | Output::Agent(_)
             | Output::ToChild(_)
             | Output::Busy
             | Output::Stop => panic!("one initial commit"),
@@ -257,7 +236,7 @@ fn cold_restart_loads_every_child_before_opening_decisions() {
                 | Output::Application { .. }
                 | Output::IncidentAssociationRefused { .. }
                 | Output::Read { .. }
-                | Output::Llm { .. }
+                | Output::Agent(_)
                 | Output::Busy
                 | Output::Stop) => panic!("empty restart has no other work: {other:?}"),
             }
@@ -315,7 +294,7 @@ fn settle(domain: &mut Domain, env: &Env<Limits>) -> Box<[Output]> {
                 | Output::Application { .. }
                 | Output::IncidentAssociationRefused { .. }
                 | Output::Read { .. }
-                | Output::Llm { .. }
+                | Output::Agent(_)
                 | Output::Busy
                 | Output::Stop) => seen.push(other).unwrap(),
             }
@@ -369,7 +348,7 @@ fn started_chat() -> (Domain, Env<Limits>, Token) {
             | Output::Application { .. }
             | Output::IncidentAssociationRefused { .. }
             | Output::Read { .. }
-            | Output::Llm { .. }
+            | Output::Agent(_)
             | Output::ToChild(_)
             | Output::Busy
             | Output::Stop => {}
@@ -387,11 +366,12 @@ fn started_chat() -> (Domain, Env<Limits>, Token) {
         })),
     );
     let outputs = settle(&mut domain, &env);
-    let mut completed = None;
+    let mut started = None;
     for output in &outputs {
         match output {
-            Output::Llm { client, .. } => completed = Some(*client),
-            Output::Commit { .. }
+            Output::Agent(host::ToAgent::Start { owner, .. }) => started = Some(*owner),
+            Output::Agent(_)
+            | Output::Commit { .. }
             | Output::Load { .. }
             | Output::CoreLoad(_)
             | Output::Core(_)
@@ -408,12 +388,23 @@ fn started_chat() -> (Domain, Env<Limits>, Token) {
             | Output::Stop => {}
         }
     }
-    let client = completed.expect("the assigned hub run reached its LLM");
-    (domain, env, client)
+    let owner = started.expect("the assigned hub run asked its agent to start");
+    step(&mut domain, &env, Event::Agent(host::FromAgent::Started { owner, agent: owner }));
+    settle(&mut domain, &env);
+    (domain, env, owner)
+}
+
+/// A relayed call's name as an agent's host renders it (`translate::CallName`).
+fn call_name(activation: u64, completion: u32, position: u32) -> Box<[u8]> {
+    let mut bytes = List::with_capacity(16);
+    for byte in activation.to_le_bytes().into_iter().chain(completion.to_le_bytes()).chain(position.to_le_bytes()) {
+        bytes.push(byte).unwrap();
+    }
+    bytes.into_boxed()
 }
 
 #[test]
-fn a_committed_chat_assignment_starts_smith_through_the_engine_hub() {
+fn a_committed_chat_assignment_starts_its_agent_through_the_engine_hub() {
     started_chat();
 }
 
@@ -423,13 +414,9 @@ fn a_tool_mutation_and_its_rendered_reply_share_one_commit() {
     step(
         &mut domain,
         &env,
-        Event::Host(host::Event::Called {
+        Event::Agent(host::FromAgent::Called {
             owner: client,
-            call: Box::from(crate::translate::name(smith_host_domain::CallName {
-                activation: 1,
-                completion: 1,
-                position: 0,
-            })),
+            call: call_name(1, 1, 0),
             ask: host::Ask::Relay {
                 tool: Box::from(&b"subscribe"[..]),
                 writes: true,
@@ -475,7 +462,7 @@ fn a_tool_mutation_and_its_rendered_reply_share_one_commit() {
             | Output::Application { .. }
             | Output::IncidentAssociationRefused { .. }
             | Output::Read { .. }
-            | Output::Llm { .. }
+            | Output::Agent(_)
             | Output::ToChild(_)
             | Output::Busy
             | Output::Stop => panic!("the reply waits for its commit"),
@@ -504,7 +491,7 @@ fn a_tool_mutation_and_its_rendered_reply_share_one_commit() {
             | Output::Application { .. }
             | Output::IncidentAssociationRefused { .. }
             | Output::Read { .. }
-            | Output::Llm { .. }
+            | Output::Agent(_)
             | Output::ToChild(_)
             | Output::Busy
             | Output::Stop => {}
@@ -623,7 +610,7 @@ fn connector_documents_and_reads_share_the_last_connector_commit_barrier() {
             | Output::Application { .. }
             | Output::IncidentAssociationRefused { .. }
             | Output::Read { .. }
-            | Output::Llm { .. }
+            | Output::Agent(_)
             | Output::ToChild(_)
             | Output::Busy
             | Output::Stop => {}

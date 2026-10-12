@@ -260,7 +260,7 @@ impl Application for OpsApplication {
             | root::Output::Observability(_)
             | root::Output::Infrastructure(_)
             | root::Output::Read { .. }
-            | root::Output::Llm { .. }
+            | root::Output::Agent(_)
             | root::Output::ToChild(_)
             | root::Output::Busy
             | root::Output::Stop => {}
@@ -351,7 +351,7 @@ impl Application for OpsApplication {
             | root::Output::Observability(_)
             | root::Output::Infrastructure(_)
             | root::Output::Read { .. }
-            | root::Output::Llm { .. }
+            | root::Output::Agent(_)
             | root::Output::ToChild(_)
             | root::Output::Busy
             | root::Output::Stop => false,

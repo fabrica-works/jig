@@ -78,7 +78,7 @@ pub(crate) fn assignment(
         sections,
         !transcript.is_empty(),
     )?;
-    let encoded = charter::encode(value, &domain.charter_endpoints, &env.limits.agent.charter)?;
+    let encoded = charter::encode(value, &domain.charter_endpoints, &env.limits.charter)?;
     let mut answered = List::with_capacity(env.limits.core.call_records);
     for value in domain.core.settled_calls(task, attempt) {
         let answer = match value.answer {
@@ -234,14 +234,6 @@ pub(crate) fn host_answer(value: core::SettledAnswer) -> Box<[u8]> {
     }
 }
 
-pub(crate) fn agent_reply(bytes: &[u8]) -> smith_host_domain::Reply {
-    let error = match bytes.first() {
-        Some(0) => false,
-        Some(1) => true,
-        Some(_) | None => return smith_host_domain::Reply::Unavailable,
-    };
-    smith_host_domain::Reply::Host { error, body: Box::from(bytes.get(1..).expect("reply envelope")) }
-}
 pub(crate) fn ending(value: host::Ending) -> tasks::End {
     match value {
         host::Ending::Refused(_) => tasks::End::Refused,
@@ -282,37 +274,6 @@ fn decode_result(bytes: &[u8]) -> Option<tasks::TaskResult> {
             })
         }
         smith_charter::Form::Change => None,
-    }
-}
-pub(crate) fn finish(value: smith_host_domain::RunResult) -> host::Finish {
-    use smith_host_domain as smith;
-    match value {
-        smith::RunResult::Accepted { outcome } => host::Finish::Ended { outcome },
-        smith::RunResult::Parked => host::Finish::Parked,
-        smith::RunResult::Failed { failure } => host::Finish::Failed {
-            failure: match failure {
-                smith::RunFailure::Transcript(_)
-                | smith::RunFailure::Model(
-                    smith::ModelFault::Completion { .. }
-                    | smith::ModelFault::Provider
-                    | smith::ModelFault::ContextFull
-                    | smith::ModelFault::Refused
-                    | smith::ModelFault::Truncated
-                    | smith::ModelFault::Malformed,
-                ) => host::RunFailure::Model,
-                smith::RunFailure::Model(smith::ModelFault::Exhausted) => host::RunFailure::Exhausted,
-                smith::RunFailure::Budget(_) => host::RunFailure::Budget,
-                smith::RunFailure::Policy(_) => host::RunFailure::Policy,
-                smith::RunFailure::Cancelled => host::RunFailure::Cancelled,
-                smith::RunFailure::Stale => host::RunFailure::Stale,
-            },
-        },
-        smith::RunResult::Refused { refusal } => host::Finish::Failed {
-            failure: match refusal {
-                smith::Refusal::Busy => host::RunFailure::Model,
-                smith::Refusal::Invalid(_) => host::RunFailure::Policy,
-            },
-        },
     }
 }
 pub(crate) fn answer(domain: &Domain, key: core::CallKey, part: core::CallPart) -> core::SettledCall {
@@ -455,7 +416,7 @@ pub(crate) fn call(
     call: jig_core_fleet::Call,
     work: &mut Queue<Work>,
 ) {
-    let Some(name) = crate::translate::named(&call.name) else {
+    let Some(name) = crate::translate::call_name(&call.name) else {
         read_answer(
             domain,
             crate::domain::ReadCall { to: to.into_token(), name: call.name, tool: call.tool },

@@ -8,7 +8,6 @@ use jig_charter as charter;
 use jig_core as core;
 use jig_core_authority as authority;
 use jig_host as host;
-use jig_inline_agent as agent;
 use jig_ops_domain_infrastructure as infrastructure;
 use jig_ops_domain_observability as observability;
 use skein_lib::{Journal, JournalLimits, JournalRoom, Map, Queue, Token};
@@ -24,8 +23,10 @@ pub struct Limits {
     pub infrastructure: infrastructure::Limits,
     /// Engine-slot run hub.
     pub host: host::Limits,
-    /// Smith domains in the engine.
-    pub agent: agent::Limits,
+    /// The charter codec's bounds.
+    pub charter: smith_charter::v1::Limits,
+    /// How many endpoint names the charter codec holds.
+    pub endpoints: u32,
     /// The one commit barrier.
     pub journal: JournalLimits,
     /// Maximum synchronous continuations for one admitted event.
@@ -36,10 +37,8 @@ pub struct Limits {
 #[must_use]
 pub fn room(limits: &Limits) -> Option<JournalRoom> {
     let core = core::room_max(&limits.core)?;
-    let children = infrastructure::MAX_OUT
-        .checked_add(observability::MAX_OUT)?
-        .checked_add(host::max_out(&limits.host))?
-        .checked_add(agent::max_out(&limits.agent))?;
+    let children =
+        infrastructure::MAX_OUT.checked_add(observability::MAX_OUT)?.checked_add(host::max_out(&limits.host))?;
     Some(JournalRoom {
         writes: core.writes.checked_add(children)?.checked_add(1)?,
         held: core.held.checked_add(children)?,
@@ -52,14 +51,12 @@ pub fn room(limits: &Limits) -> Option<JournalRoom> {
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
     let calls = limits.host.slots.checked_mul(limits.host.run_calls)?;
-    let callbacks = limits.host.slots.checked_mul(limits.agent.smith.run.calls)?;
     let effects = limits.core.call_records.checked_add(limits.core.tasks.tasks)?;
     let payloads = limits.core.fleet.turns.checked_add(limits.core.fleet.attempts)?;
     let children = core::worst_case(&limits.core)?
         .checked_add(observability::worst_case(&limits.observability)?)?
         .checked_add(infrastructure::worst_case(&limits.infrastructure)?)?
-        .checked_add(host::worst_case(&limits.host)?)?
-        .checked_add(agent::worst_case(&limits.agent)?)?;
+        .checked_add(host::worst_case(&limits.host)?)?;
     let tables = Map::<u64, Assignment>::worst_case(limits.core.tasks.tasks)?
         .checked_add(Map::<u64, Box<[charter::Section]>>::worst_case(limits.core.tasks.tasks)?)?
         .checked_add(Map::<core::CallKey, (Box<[u8]>, Box<[u8]>)>::worst_case(limits.core.call_records)?)?
@@ -69,8 +66,6 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Map::<Token, (Token, authority::Judge, [u8; 32])>::worst_case(limits.core.authority.facts)?)?
         .checked_add(Map::<u64, (u64, u16, u32)>::worst_case(limits.core.tasks.tasks)?)?
         .checked_add(Map::<Token, u64>::worst_case(limits.core.tasks.tasks)?)?
-        .checked_add(Map::<Token, Token>::worst_case(limits.host.slots)?)?
-        .checked_add(Map::<(Token, Token), [u8; 16]>::worst_case(callbacks)?)?
         .checked_add(Map::<Box<[u8]>, HostCall>::worst_case(calls)?)?;
     // A complete assignment includes its charter, transcript, grants and
     // settled call tail. Held documents and provisional suffixes have their
@@ -105,9 +100,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(envelopes)?
         .checked_add(u64::from(payloads).checked_mul(value)?)?
         .checked_add(u64::from(effects).checked_mul(u64::from(limits.infrastructure.name_bytes).checked_mul(8)?)?)?
-        .checked_add(
-            u64::from(limits.agent.smith.endpoints).checked_mul(limits.host.charter_bytes.checked_add(64)?)?,
-        )?;
+        .checked_add(u64::from(limits.endpoints).checked_mul(limits.host.charter_bytes.checked_add(64)?)?)?;
     let queued = limits
         .journal
         .writes

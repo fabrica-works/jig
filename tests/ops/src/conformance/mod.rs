@@ -119,7 +119,7 @@ pub struct Peers {
     watched_documents: std::collections::BTreeSet<u64>,
     document_rows: Vec<(u64, root::Record)>,
     pending_document_effects: Vec<infra::SystemRequest>,
-    llm: scripts::Llm,
+    agents: scripts::Agents,
     asked_accept: std::collections::BTreeSet<(u64, u64)>,
 }
 
@@ -184,10 +184,14 @@ impl Application for Ops {
             document_rows: Vec::new(),
             lead_commits: Vec::new(),
             pending_document_effects: Vec::new(),
-            llm: if config.client_backed {
-                scripts::Llm::with_client(config.seed, true, config.story == Story::Environment)
-            } else {
-                scripts::Llm::new(config.seed)
+            agents: {
+                let run = config::root_for(config.seed, config.story == Story::Environment).0.core.settings.run;
+                scripts::Agents::new(
+                    config.client_backed,
+                    config.client_backed && config.story == Story::Environment,
+                    run.waiting,
+                    run.call_timeout,
+                )
             },
             asked_accept: std::collections::BTreeSet::new(),
         }
@@ -214,6 +218,7 @@ impl Application for Ops {
         peers.observed.push(r::Observed::ColdStore { receipts: observations::snapshot(store).receipts });
         peers.account_ready = false;
         peers.asked_accept.clear();
+        peers.agents.clear();
     }
     fn timers(_: &Config) -> Vec<root::Event> {
         vec![
@@ -223,7 +228,6 @@ impl Application for Ops {
             root::Event::Timer(core::Timer::Brief),
             root::Event::ObservabilityTimer,
             root::Event::InfrastructureTimer,
-            root::Event::HostTimer,
         ]
     }
     fn step(domain: &mut root::Domain, config: &Config, clock: Clock, input: Input<root::Event, root::Record>) {
@@ -282,7 +286,7 @@ impl Application for Ops {
                 | root::Output::Observability(_)
                 | root::Output::Infrastructure(_)
                 | root::Output::Read { .. }
-                | root::Output::Llm { .. }
+                | root::Output::Agent(_)
                 | root::Output::ToChild(_)
                 | root::Output::Busy) => outputs.push(Output::Deliver(Delivery::Root(Box::new(other)))),
             }
@@ -290,6 +294,7 @@ impl Application for Ops {
         outputs
     }
     fn inbound(peers: &mut Peers, store: &Store, _: Clock, event: &mut root::Event) {
+        peers.agents.stepped(event);
         if let Some(observed) = application::requested(store, event) {
             peers.application_requests = true;
             peers.application_observed.push(observed);
@@ -576,7 +581,7 @@ impl Application for Ops {
             | root::Output::Now(_)
             | root::Output::CoreLoad(_)
             | root::Output::Busy => Vec::new(),
-            root::Output::Llm { client, request } => peers.llm.answer(clock, client, request),
+            root::Output::Agent(request) => peers.agents.answer(request),
             root::Output::Commit { .. } | root::Output::Stop => unreachable!("harness consumed commit/stop"),
         }
     }
@@ -654,6 +659,7 @@ impl Application for Ops {
                 ));
             }
         }
+        events.extend(peers.agents.poll(clock));
         events
     }
     fn submitted(peers: &mut Peers, store: &Store, _: Clock) {

@@ -2,20 +2,11 @@
 use jig_host as host;
 use jig_ops_domain::{Config, Limits};
 use jig_ops_domain_infrastructure as infrastructure;
-use skein_lib::{Duration, JournalLimits, List};
+use skein_lib::{Duration, JournalLimits};
 
 #[must_use]
 #[expect(clippy::too_many_lines, reason = "the fixture lists every child bound")]
 pub fn root_for(seed: u64, environment_chat: bool) -> (Config, Limits) {
-    let mut smith = smith_agent_world::Settings::calm(seed).limits;
-    smith.run.budget.spend = 100;
-    smith.run.budget.turns = 32;
-    smith.run.budget.time = Duration::from_secs(7200);
-    smith.session.spend = 100;
-    smith.session.budget.turns = 32;
-    smith.session.budget.time = Duration::from_secs(7200);
-    smith.run.host_tools = 32;
-    smith.run.brief_sections = 32;
     let mut core_limits = jig_core_world::world::limits().core;
     core_limits.fleet.engine_slots = 1;
     core_limits.tasks.tasks = 8;
@@ -83,27 +74,11 @@ pub fn root_for(seed: u64, environment_chat: bool) -> (Config, Limits) {
             turns: 32,
             turn_queue_bytes: 32768,
         },
-        agent: jig_inline_agent::Limits {
-            slots: 1,
-            smith,
-            window: smith_domain::Window {
-                turns: 32,
-                bytes: smith_domain::max_turn_bytes(&smith)
-                    .expect("bounded Smith turn")
-                    .checked_mul(32)
-                    .expect("bounded transcript window"),
-            },
-            charter: smith_charter::v1::CEILINGS,
-            transcript: smith_transcript::v2::CEILINGS,
-            cancel_grace: Duration::from_secs(2),
-        },
+        charter: smith_charter::v1::CEILINGS,
+        endpoints: 1,
         journal: JournalLimits { commits: 4, writes: 20000, held: 20000, now: 128, release: 128 },
         routes: 256,
     };
-    let mut endpoints = List::with_capacity(1);
-    endpoints
-        .push(smith_protocol_channel::Endpoint { name: Box::from(&b"fake"[..]), number: 1, dialect: 1, account: 1 })
-        .expect("one endpoint fits");
     let mut config = Config {
         core: jig_core_world::world::config(seed).core,
         triage_templates: Box::new([jig_ops_domain_observability::TriageTemplate {
@@ -115,15 +90,12 @@ pub fn root_for(seed: u64, environment_chat: bool) -> (Config, Limits) {
             delegate: super::scripts::lead(),
         }]),
         backend: infrastructure::Backend::OperationIds,
-        endpoints: Box::new([smith_domain_run::charter::Endpoint(1)]),
-        endpoint_names: smith_protocol_channel::Endpoints::new(endpoints),
         charter_endpoints: Box::new([jig_charter::EndpointName {
             number: 1,
             dialect: 1,
             account: 1,
             name: Box::from(&b"fake"[..]),
         }]),
-        seed,
     };
     limits.observability.answer_bytes = 2048;
     limits.infrastructure.tasks = 8;

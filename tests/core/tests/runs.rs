@@ -212,6 +212,24 @@ fn settled_answers_resume_in_commit_order_and_a_replay_preserves_exact_bytes() {
     assert!(answers[0].serial < answers[1].serial);
 }
 
+fn a_bounced_message_stays_unread_for_a_later_read() {
+    let mut world = World::new(104, false);
+    let message = world.say(76);
+    let assignment = world.assigned.as_ref().expect("assigned chat");
+    let (task, attempt) = (assignment.task, assignment.attempt);
+    let rows = world.store.rows.clone();
+    world.send(root::Event::Core(core::Event::Fleet(jig_core_fleet::Event::Bounced {
+        channel: Token::new(7),
+        run: Token::new(task),
+        attempt: Token::new(attempt),
+        name: Token::new(message),
+        bounce: jig_core_fleet::Bounce::Ending,
+    })));
+    assert_eq!(world.store.rows, rows, "a bounce changes nothing durable");
+    world.turn(1, 1, Some(message), b"reads the bounced words");
+    assert_eq!(world.spent(), 1, "{:?}", world.trace);
+}
+
 // Each scenario keeps its own fresh world and all original assertions.
 // A shared entrypoint avoids one process startup per short scenario.
 #[test]
@@ -223,4 +241,5 @@ fn runs_scenarios() {
     loaded_transcript_pages_reject_repeated_and_reversed_turns();
     an_unusable_transcript_fails_transient_and_the_next_conversation_starts_fresh();
     settled_answers_resume_in_commit_order_and_a_replay_preserves_exact_bytes();
+    a_bounced_message_stays_unread_for_a_later_read();
 }

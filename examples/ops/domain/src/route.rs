@@ -10,7 +10,6 @@ use jig_core_authority as authority;
 use jig_core_fleet as fleet;
 use jig_core_tasks as tasks;
 use jig_host as host;
-use jig_inline_agent as agent;
 use jig_ops_connectors::Connector;
 use jig_ops_domain_infrastructure as infrastructure;
 use jig_ops_domain_observability as observability;
@@ -41,15 +40,6 @@ pub(crate) fn work(
                 &mut hub_out,
             );
             host_out(domain, env, decision, &mut hub_out, work);
-            // Smith exposes bounded ready work just like the fleet. A copied
-            // root resumes both children in its ordinary domain iteration.
-            let mut out = Queue::with_capacity(agent::max_out(&env.limits.agent));
-            agent::resume(
-                &mut domain.agents,
-                &Env { now: env.now, wall: env.wall, limits: env.limits.agent },
-                &mut out,
-            );
-            agent_out(domain, env, decision, &mut out, work);
         }
         Work::Infrastructure(event) => {
             let mut out = Queue::with_capacity(infrastructure::MAX_OUT);
@@ -80,16 +70,6 @@ pub(crate) fn work(
                 &mut out,
             );
             host_out(domain, env, decision, &mut out, work);
-        }
-        Work::Agent(event) => {
-            let mut out = Queue::with_capacity(agent::max_out(&env.limits.agent));
-            agent::step(
-                &mut domain.agents,
-                &Env { now: env.now, wall: env.wall, limits: env.limits.agent },
-                event,
-                &mut out,
-            );
-            agent_out(domain, env, decision, &mut out, work);
         }
         Work::Restart(request) => crate::restart::route(domain, env, decision, request, work),
         Work::AdoptClaims => {
@@ -165,7 +145,6 @@ fn event_in(
             Released::Core(event) => work.push(Work::Core(event)),
             Released::Fleet(event) => work.push(Work::Core(core::Event::Fleet(event))),
             Released::Host(event) => work.push(Work::Host(event)),
-            Released::Agent(event) => work.push(Work::Agent(event)),
             Released::Infrastructure(event) => work.push(Work::Infrastructure(event)),
             Released::Observability(event) => work.push(Work::Observability(event)),
             Released::Restart(step) => work.push(Work::Restart(core::RestartRequest::Step(step))),
@@ -217,22 +196,8 @@ fn event_in(
             );
             observability_out(domain, env, decision, &mut out, work);
         }
-        Event::HostTimer => {
-            let mut out = Queue::with_capacity(agent::max_out(&env.limits.agent));
-            agent::fire(&mut domain.agents, &Env { now: env.now, wall: env.wall, limits: env.limits.agent }, &mut out);
-            agent_out(domain, env, decision, &mut out, work);
-        }
-        Event::Llm { client, completion } => {
-            let mut out = Queue::with_capacity(agent::max_out(&env.limits.agent));
-            agent::terminal(
-                &mut domain.agents,
-                &Env { now: env.now, wall: env.wall, limits: env.limits.agent },
-                client,
-                completion,
-                &mut out,
-            );
-            agent_out(domain, env, decision, &mut out, work);
-        }
+        Event::Agent(report) => work.push(Work::Host(host::Event::from_agent(report))),
+        Event::AgentContent { owner, content } => agent_content(domain, env, decision, work, owner, content),
     }
 }
 
@@ -1448,14 +1413,14 @@ fn core_now(domain: &mut Domain, env: &Env<Limits>, value: core::Now, work: &mut
 fn host_out(
     domain: &mut Domain,
     _env: &Env<Limits>,
-    _decision: &mut Decision<Write, Output>,
+    decision: &mut Decision<Write, Output>,
     out: &mut Queue<host::Request>,
     work: &mut Queue<Work>,
 ) {
     for _ in 0..out.len() {
         let request = out.pop().expect("host requests");
         match request.to_agent() {
-            Ok(request) => to_agent(domain, request, work),
+            Ok(request) => held(decision, Output::Agent(request)),
             Err(request) => match request {
                 host::Request::Relay { run, attempt, call, delivery, tool, writes, input, deadline } => {
                     domain
@@ -1556,284 +1521,65 @@ fn host_out(
         }
     }
 }
-fn to_agent(domain: &mut Domain, request: host::ToAgent, work: &mut Queue<Work>) {
-    use smith_host_domain as smith;
-    let event = match request {
-        host::ToAgent::Start { owner, workspace, charter, activation, turns, answered, grants } => {
-            assert!(workspace.is_none(), "engine hub has no workspace");
-            let logical_run = domain.host.hosting(owner).expect("hosted agent start").run;
-            let mut calls = List::with_capacity(u32::try_from(answered.len()).expect("settled calls"));
-            for call in answered {
-                let reply = match call.answer {
-                    host::SettledAnswer::Host { error, body } => smith::SavedReply::Host { error, body },
-                    host::SettledAnswer::Delivery { .. } => unreachable!("engine's charter has no workspace delivery"),
-                };
-                calls
-                    .push(smith::AnsweredCall {
-                        name: translate::named(&call.name).expect("activation-qualified name"),
-                        tool: call.tool,
-                        reply,
-                    })
-                    .expect("settled call room");
-            }
-            let mut translated = List::with_capacity(u32::try_from(grants.len()).expect("account grants"));
-            for grant in grants {
-                translated.push(translate::grant(grant)).expect("one grant per account");
-            }
-            smith::Event::Spawn {
-                client: owner,
-                start: smith::Start {
-                    logical_run,
-                    activation,
-                    workspace: None,
-                    charter,
-                    transcript: if turns.is_empty() { None } else { Some(turns) },
-                    answered: calls.into_boxed(),
-                    directories: Box::new([]),
-                    grants: translated.into_boxed(),
-                },
-            }
-        }
-        host::ToAgent::Message { agent, name, sender, words } => {
-            smith::Event::Message { agent, name, label: sender, text: words }
-        }
-        host::ToAgent::Answer { agent, call, reply } => {
-            let mut found = None;
-            for (callback, name) in &domain.agent_calls {
-                if callback.0 == agent && name.as_slice() == call.as_ref() {
-                    found = Some(*callback);
-                    break;
-                }
-            }
-            let callback = found.expect("retained Smith callback");
-            domain.agent_calls.remove(&callback);
-            let reply = match reply {
-                host::Reply::Relayed { answer } => crate::assemble::agent_reply(&answer),
-                host::Reply::Busy => smith::Reply::Busy,
-                host::Reply::Unavailable => smith::Reply::Unavailable,
-                host::Reply::Withdrawn => smith::Reply::Withdrawn,
-                host::Reply::Delivered(_) => unreachable!("engine's charter has no workspace delivery"),
-            };
-            smith::Event::Answer { agent, call: callback.1, reply }
-        }
-        host::ToAgent::Grant { agent, grant } => smith::Event::Grant { agent, grant: translate::grant(grant) },
-        host::ToAgent::Cancel { agent } => smith::Event::Stop { agent },
-        host::ToAgent::Acknowledge { agent, turn } => smith::Event::Acknowledge { agent, turn },
-    };
-    work.push(Work::Agent(event));
-}
-#[expect(clippy::too_many_lines, reason = "one exhaustive dispatcher translates this child boundary")]
-fn agent_out(
-    domain: &mut Domain,
-    env: &Env<Limits>,
-    decision: &mut Decision<Write, Output>,
-    out: &mut Queue<agent::Request>,
-    work: &mut Queue<Work>,
-) {
-    use smith_host_domain as smith;
-    for _ in 0..out.len() {
-        let event = match out.pop().expect("inline agent requests") {
-            agent::Request::CompletionStarted { client, turn, retry } => {
-                if let Some(hosting) = domain.host.hosting(client) {
-                    inline_report(
-                        domain,
-                        env,
-                        decision,
-                        work,
-                        hosting,
-                        agent::Provisional { turn, retry, offset: 0 },
-                        Box::new([]),
-                        None,
-                    );
-                }
-                continue;
-            }
-            agent::Request::Content { client, provisional, content } => {
-                inline_content(domain, env, decision, work, client, provisional, content);
-                continue;
-            }
-            agent::Request::Lower { client, request } => {
-                held(decision, Output::Llm { client, request });
-                continue;
-            }
-            agent::Request::Host(request) => match request {
-                smith::Request::Started { client, agent } => {
-                    domain.agent_owners.insert(client, agent).expect("one agent per hub start");
-                    host::FromAgent::Started { owner: client, agent }
-                }
-                smith::Request::Admitted { .. } => continue,
-                smith::Request::Called { client, call, name, deadline, ask, .. } => {
-                    let agent = *domain.agent_owners.get(&client).expect("a started agent calls");
-                    let name = translate::name(name);
-                    domain.agent_calls.insert((agent, call), name).expect("Smith bounded its callbacks");
-                    let ask = match ask {
-                        smith::Ask::Host { tool, effect, body } => host::Ask::Relay {
-                            tool,
-                            writes: match effect {
-                                smith::Effect::Read => false,
-                                smith::Effect::Write => true,
-                            },
-                            input: body,
-                            deadline: deadline.saturating_since(env.now),
-                        },
-                        smith::Ask::Deliver { .. } => unreachable!("engine's charter has no workspace delivery"),
-                    };
-                    host::FromAgent::Called { owner: client, call: Box::from(name), ask }
-                }
-                smith::Request::Withdrawn { client, call } => {
-                    let agent = *domain.agent_owners.get(&client).expect("a started agent withdraws");
-                    let name = *domain.agent_calls.get(&(agent, call)).expect("outstanding callback");
-                    host::FromAgent::Withdrawn { owner: client, call: Box::from(name) }
-                }
-                smith::Request::Turn { client, turn } => host::FromAgent::Turn {
-                    owner: client,
-                    turn: host::Turn { turn: turn.number, spent: turn.spent, read: turn.read, body: turn.body },
-                },
-                smith::Request::Waiting { client, .. } => host::FromAgent::Yielded { owner: client },
-                smith::Request::Told { client, body } => host::FromAgent::Facts { owner: client, fact: body },
-                smith::Request::Answered { client, answer } => host::FromAgent::Finished {
-                    owner: client,
-                    turns: answer.turns,
-                    spent: answer.spent,
-                    finish: crate::assemble::finish(answer.result),
-                },
-                smith::Request::Faulted { client, fault } => host::FromAgent::Faulted {
-                    owner: client,
-                    fault: match fault {
-                        smith::Fault::Exited => host::AgentFailure::Exited,
-                        smith::Fault::Rules | smith::Fault::TooLarge => host::AgentFailure::Rules,
-                        smith::Fault::NoProgress => host::AgentFailure::NoProgress,
-                        smith::Fault::WallTime => host::AgentFailure::WallTime,
-                    },
-                },
-                smith::Request::Bounced { client, name, bounce } => host::FromAgent::Bounced {
-                    owner: client,
-                    name,
-                    bounce: match bounce {
-                        smith::Bounce::TooLarge => host::Bounce::TooLarge,
-                        smith::Bounce::Full => host::Bounce::Full,
-                        smith::Bounce::ReusedName | smith::Bounce::Ending => host::Bounce::Ending,
-                    },
-                },
-                smith::Request::Gone { client, detail, .. } => {
-                    domain.agent_owners.remove(&client);
-                    host::FromAgent::Gone { owner: client, detail }
-                }
-                smith::Request::Rejected { client, account, generation } => {
-                    if let Some(hosting) = domain.host.hosting(client) {
-                        work.push(Work::Core(core::Event::Fleet(fleet::Event::Rejected {
-                            channel: Token::new(0),
-                            run: hosting.run,
-                            attempt: hosting.attempt,
-                            account,
-                            generation,
-                        })));
-                    }
-                    continue;
-                }
-                smith::Request::Exhausted { client, account, retry_after } => {
-                    if let Some(hosting) = domain.host.hosting(client) {
-                        work.push(Work::Core(core::Event::Fleet(fleet::Event::Exhausted {
-                            channel: Token::new(0),
-                            run: hosting.run,
-                            attempt: hosting.attempt,
-                            account,
-                            retry_after,
-                        })));
-                    }
-                    continue;
-                }
-                smith::Request::Spawn { .. }
-                | smith::Request::Send { .. }
-                | smith::Request::Read { .. }
-                | smith::Request::Signal { .. }
-                | smith::Request::Wait { .. }
-                | smith::Request::Reap { .. } => unreachable!("inline agent has no process boundary"),
-            },
-        };
-        work.push(Work::Host(host::Event::from_agent(event)));
-    }
-}
 
-/// Text uses the inline child's supplied main completion position. Every call
-/// carries its opaque source identity independently, including nested calls.
-/// `client/domain/contract.md`, 7.3.
-fn inline_content(
+/// A run's live content goes to the core under its hub's hosting; text is
+/// carried in pieces the views' bound allows (client/domain/contract.md, 7.3).
+fn agent_content(
     domain: &mut Domain,
     env: &Env<Limits>,
     decision: &mut Decision<Write, Output>,
     work: &mut Queue<Work>,
-    client: Token,
-    provisional: Option<agent::Provisional>,
-    content: smith_domain::Content,
+    owner: Token,
+    content: crate::AgentContent,
 ) {
-    let Some(hosting) = domain.host.hosting(client) else { return };
+    let Some(hosting) = domain.host.hosting(owner) else { return };
+    let core_env = Env { now: env.now, wall: env.wall, limits: env.limits.core };
     match content {
-        smith_domain::Content::Text { text, .. } => {
-            let Some(mut provisional) = provisional else { return };
-            let bound = usize::try_from(env.limits.core.views.text_bytes).expect("stream byte limit");
-            for chunk in text.chunks(bound) {
-                inline_report(
-                    domain,
-                    env,
-                    decision,
-                    work,
-                    hosting,
-                    provisional,
-                    skein_lib::bytes::copy_of(chunk),
-                    None,
+        crate::AgentContent::Text { turn, retry, mut offset, text } => {
+            if text.is_empty() {
+                let requests = core::step(
+                    &mut domain.core,
+                    &core_env,
+                    core::Event::RunText {
+                        run: hosting.run,
+                        attempt: hosting.attempt,
+                        turn,
+                        retry,
+                        offset,
+                        text,
+                        call: None,
+                    },
                 );
-                let length = u32::try_from(chunk.len()).expect("stream chunk byte limit");
-                provisional.offset = provisional.offset.checked_add(length).expect("inline supplied text position");
+                core_out(domain, env, decision, requests, work);
+                return;
+            }
+            let bound = usize::try_from(env.limits.core.views.text_bytes).expect("stream byte limit");
+            for piece in text.chunks(bound) {
+                let requests = core::step(
+                    &mut domain.core,
+                    &core_env,
+                    core::Event::RunText {
+                        run: hosting.run,
+                        attempt: hosting.attempt,
+                        turn,
+                        retry,
+                        offset,
+                        text: skein_lib::bytes::copy_of(piece),
+                        call: None,
+                    },
+                );
+                core_out(domain, env, decision, requests, work);
+                let length = u32::try_from(piece.len()).expect("stream piece byte limit");
+                offset = offset.checked_add(length).expect("supplied text position");
             }
         }
-        smith_domain::Content::Call { owner, completion, id, name, input } => {
-            let call = jig_core_views::Call {
-                identity: jig_core_views::CallIdentity {
-                    owner,
-                    sequence: completion.sequence,
-                    retry: completion.retry,
-                    id,
-                },
-                tool: name,
-                input,
-                cut: false,
-                began: None,
-            };
+        crate::AgentContent::Call(call) => {
             let requests = core::step(
                 &mut domain.core,
-                &Env { now: env.now, wall: env.wall, limits: env.limits.core },
+                &core_env,
                 core::Event::RunCall { run: hosting.run, attempt: hosting.attempt, call },
             );
             core_out(domain, env, decision, requests, work);
         }
-        smith_domain::Content::Tool { .. } | smith_domain::Content::Usage { .. } => {}
     }
-}
-
-#[expect(clippy::too_many_arguments, reason = "the supplied provisional position accompanies this routed report")]
-fn inline_report(
-    domain: &mut Domain,
-    env: &Env<Limits>,
-    decision: &mut Decision<Write, Output>,
-    work: &mut Queue<Work>,
-    hosting: host::Hosting,
-    provisional: agent::Provisional,
-    text: Box<[u8]>,
-    call: Option<jig_core_views::Call>,
-) {
-    let requests = core::step(
-        &mut domain.core,
-        &Env { now: env.now, wall: env.wall, limits: env.limits.core },
-        core::Event::RunText {
-            run: hosting.run,
-            attempt: hosting.attempt,
-            turn: provisional.turn,
-            retry: provisional.retry,
-            offset: provisional.offset,
-            text,
-            call,
-        },
-    );
-    core_out(domain, env, decision, requests, work);
 }

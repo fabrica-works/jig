@@ -40,7 +40,6 @@ members = [
     "crates/jig-core-views",
     "crates/jig-host",
     "crates/jig-charter",
-    "crates/jig-inline-agent",
     "tests/accounts",
     "tests/brief",
     "tests/fleet",
@@ -109,7 +108,6 @@ jig-core-fleet = { path = "crates/jig-core-fleet" }
 jig-core-views = { path = "crates/jig-core-views" }
 jig-host = { path = "crates/jig-host" }
 jig-charter = { path = "crates/jig-charter" }
-jig-inline-agent = { path = "crates/jig-inline-agent" }
 
 # Panics are fail-stop and overflow traps, in every profile. (The test harness
 # needs unwinding, so cargo ignores `panic` for test targets.)

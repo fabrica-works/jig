@@ -760,7 +760,7 @@ impl Joint {
             | root::Output::Observability(_)
             | root::Output::Infrastructure(_)
             | root::Output::Read { .. }
-            | root::Output::Llm { .. }
+            | root::Output::Agent(_)
             | root::Output::ToChild(_)
             | root::Output::Busy
             | root::Output::Stop => panic!("non-client output escaped Ops peers"),

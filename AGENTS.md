@@ -32,9 +32,9 @@
   routes and translates (`README.md`, section 6). A change that would
   make an application's root decide or order something is a change to
   jig's design first.
-- **The core never depends on smith.** Only the inline agent, the
-  charter's translation into smith's terms and the client's decoding of
-  turns, below its domain, do; the hub, `jig-host`, and the client's
+- **The core never depends on smith.** Only the charter's translation
+  into smith's terms and the client's decoding of turns, below its
+  domain, do; the hub, `jig-host`, and the client's
   domain and view do not. An application without agents never links
   smith (`README.md`, section 9).
 - **No system is named in jig's code:** no forge, repository, branch, pull

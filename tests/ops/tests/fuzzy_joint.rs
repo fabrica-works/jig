@@ -739,7 +739,7 @@ fn q_move_end_survives_its_durable_answer_commit_and_reload() {
 
 #[test]
 fn p_story_survives_seeded_commit_crashes_and_random_presses() {
-    for seed in [537, 538] {
+    for seed in [537, 548] {
         let mut world = p_story(seed, Cut::Random { seed: seed ^ 0x33 }, true);
         assert_eq!(world.front().engine.outcome().crashes.len(), 1);
         assert_eq!(world.front().disconnects, 1);

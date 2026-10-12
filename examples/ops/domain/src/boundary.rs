@@ -6,7 +6,6 @@ use jig_core as core;
 use jig_core_fleet as fleet;
 use jig_core_tasks as tasks;
 use jig_host as host;
-use jig_inline_agent as agent;
 use jig_ops_domain_infrastructure as infrastructure;
 use jig_ops_domain_observability as observability;
 use skein_lib::{Queue, ReplyTo, Token, Wall};
@@ -31,6 +30,7 @@ pub enum Store {
 
 /// A released output addressed to a child; iterate feeds it back as one event.
 #[derive(Debug)]
+#[expect(clippy::large_enum_variant, reason = "a released continuation moves once, whole, through the journal")]
 pub enum Released {
     /// A core continuation.
     Core(core::Event),
@@ -42,8 +42,6 @@ pub enum Released {
     Observability(observability::Event),
     /// The engine's own run hub, over its permanent link.
     Host(host::Event),
-    /// The hub's agent capability, in the same process.
-    Agent(smith_host_domain::Event),
     /// A procedure may choose its next step after the preceding decision.
     Procedure { task: u64, step: u64, connector: u16, code: u32 },
     /// One core-selected stage of cold restart.
@@ -80,8 +78,12 @@ pub enum Event {
     Infrastructure(infrastructure::Event),
     /// The host's agent or engine-side input.
     Host(host::Event),
-    /// An LLM terminal for the named inline agent slot.
-    Llm { client: Token, completion: agent::Completion },
+    /// What the hub's agent capability reports. Ops runs no agent in its
+    /// engine; whoever hosts its runs' agents answers the hub's requests.
+    Agent(host::FromAgent),
+    /// What a run's agent streams while a completion is in flight, for the
+    /// run's followers (client/domain/contract.md, 7.3).
+    AgentContent { owner: Token, content: AgentContent },
     /// A typed store terminal or page.
     Store(Store),
     /// A child-addressed output released by the journal.
@@ -94,8 +96,6 @@ pub enum Event {
     ObservabilityTimer,
     /// One infrastructure retry deadline.
     InfrastructureTimer,
-    /// The inline agent's next deadline; the hub arms no timers.
-    HostTimer,
     /// A decoded infrastructure effect with the core's caller envelope.
     Effect {
         to: ReplyTo,
@@ -104,6 +104,15 @@ pub enum Event {
         deadline: Wall,
         proposal: Option<Box<[u8]>>,
     },
+}
+
+/// A run's live content, named by the hub's owner of its agent.
+#[derive(Debug)]
+pub enum AgentContent {
+    /// Text at `offset` of the completion `turn`'s `retry`; empty as it begins.
+    Text { turn: u32, retry: u32, offset: u32, text: Box<[u8]> },
+    /// A call the completion makes.
+    Call(jig_core_views::Call),
 }
 
 /// A timer retains its owner's identity through the root's admission.
@@ -115,8 +124,6 @@ pub enum Timer {
     Observability,
     /// Infrastructure's retry deadline.
     Infrastructure,
-    /// The inline agent's deadline.
-    Agent,
 }
 
 /// The journal is the only source of root outputs.
@@ -147,8 +154,8 @@ pub enum Output {
     Infrastructure(infrastructure::SystemRequest),
     /// A bounded read answer, with no state-changing effect.
     Read { owner: Token, bytes: Box<[u8]> },
-    /// The inline agent's lower LLM request.
-    Llm { client: Token, request: smith_domain::Request },
+    /// A request to the hub's agent capability, after its commit.
+    Agent(host::ToAgent),
     /// Feed this released continuation back as an event.
     ToChild(Released),
     /// Admission failed before a child changed; the sender retains its input.

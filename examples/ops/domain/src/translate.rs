@@ -4,7 +4,6 @@ use alloc::boxed::Box;
 use jig_core as core;
 use jig_core_authority as authority;
 use jig_core_tasks as tasks;
-use jig_host as host;
 use jig_ops_domain_infrastructure as infrastructure;
 use jig_ops_domain_observability as observability;
 use skein_lib::{List, Wall};
@@ -252,31 +251,21 @@ pub(crate) fn holdings(number: u16, executor: tasks::Executor, spec: &tasks::Spe
         }
     }
 }
-pub(crate) fn name(name: smith_host_domain::CallName) -> [u8; 16] {
-    let mut bytes = [0; 16];
-    for (slot, byte) in bytes.iter_mut().zip(
-        name.activation
-            .to_le_bytes()
-            .into_iter()
-            .chain(name.completion.to_le_bytes())
-            .chain(name.position.to_le_bytes()),
-    ) {
-        *slot = byte;
-    }
-    bytes
+/// A relayed call's name in the hub: its activation, completion and
+/// position, sixteen bytes, little-endian, as the agent's host renders them.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) struct CallName {
+    pub(crate) completion: u32,
+    pub(crate) position: u32,
 }
-pub(crate) fn named(bytes: &[u8]) -> Option<smith_host_domain::CallName> {
+pub(crate) fn call_name(bytes: &[u8]) -> Option<CallName> {
     if bytes.len() != 16 {
         return None;
     }
-    Some(smith_host_domain::CallName {
-        activation: u64::from_le_bytes(bytes.get(..8)?.try_into().ok()?),
+    Some(CallName {
         completion: u32::from_le_bytes(bytes.get(8..12)?.try_into().ok()?),
         position: u32::from_le_bytes(bytes.get(12..16)?.try_into().ok()?),
     })
-}
-pub(crate) const fn grant(grant: host::Grant) -> smith_host_domain::Grant {
-    smith_host_domain::Grant { account: grant.account, generation: grant.generation, valid: grant.valid }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

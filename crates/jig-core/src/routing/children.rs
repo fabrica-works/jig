@@ -281,10 +281,12 @@ pub(super) fn tag_fleet(core: &mut Core, env: &Env<Limits>, mut child: Queue<fle
                 let _pending = core.relaying.take();
                 Request::Now(Box::new(Now::Undelivered { run, attempt, message }))
             }
+            // A message its host did not pass on stays in the task's inbox,
+            // unread, for the run's next activation (hosts.md, section 2).
+            fleet::Request::Bounced { .. } => continue,
             fleet::Request::Grant { .. }
             | fleet::Request::Rejected { .. }
             | fleet::Request::Exhausted { .. }
-            | fleet::Request::Bounced { .. }
             | fleet::Request::Told { .. } => unreachable!("account and diagnostic host routes are handled separately"),
             fleet::Request::Turned { run, attempt, turn, body } => {
                 assert!(core.current_proof(run.raw(), attempt.raw()), "current turn has reserved proof");

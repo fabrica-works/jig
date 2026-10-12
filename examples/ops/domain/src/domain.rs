@@ -7,7 +7,6 @@ use jig_core as core;
 use jig_core_authority as authority;
 use jig_core_fleet as fleet;
 use jig_host as host;
-use jig_inline_agent as agent;
 use jig_ops_connectors::Connector;
 use jig_ops_domain_infrastructure as infrastructure;
 use jig_ops_domain_observability as observability;
@@ -48,14 +47,8 @@ pub struct Config {
     pub lead_templates: Box<[observability::LeadTemplate]>,
     /// The infrastructure backend's available recovery promise.
     pub backend: infrastructure::Backend,
-    /// Endpoint identities for the inline agent.
-    pub endpoints: Box<[smith_domain_run::charter::Endpoint]>,
-    /// The protocol layer's names for the same endpoint identities.
-    pub endpoint_names: smith_protocol_channel::Endpoints,
-    /// Charter codec endpoint names for the same identities.
+    /// Charter codec endpoint names for the configured endpoint identities.
     pub charter_endpoints: Box<[jig_charter::EndpointName]>,
-    /// Injected agent seed.
-    pub seed: u64,
 }
 
 pub(crate) type CallEnvelope = (Box<[u8]>, Box<[u8]>);
@@ -68,7 +61,6 @@ pub struct Domain {
     pub(crate) observability: observability::Domain,
     pub(crate) infrastructure: infrastructure::Domain,
     pub(crate) host: host::Domain,
-    pub(crate) agents: agent::Agent,
     pub(crate) journal: Journal<Write, Output>,
     pub(crate) charter_endpoints: Box<[jig_charter::EndpointName]>,
     pub(crate) assignments: Map<u64, Assignment>,
@@ -80,8 +72,6 @@ pub struct Domain {
     pub(crate) judges: Map<Token, (Token, authority::Judge, [u8; 32])>,
     pub(crate) procedures: Map<u64, (u64, u16, u32)>,
     pub(crate) effect_procedures: Map<Token, u64>,
-    pub(crate) agent_owners: Map<Token, Token>,
-    pub(crate) agent_calls: Map<(Token, Token), [u8; 16]>,
     pub(crate) host_calls: Map<Box<[u8]>, HostCall>,
     pub(crate) next_token: u64,
     pub(crate) wrote: bool,
@@ -99,12 +89,9 @@ impl Domain {
         let room = crate::limits::room(limits).expect("finite root route");
         assert!(room.writes <= limits.journal.writes && room.held <= limits.journal.held, "admit the complete route");
         assert!(limits.routes > 0 && limits.journal.now > 0, "nonempty route and door");
+        assert!(limits.host.slots == limits.core.fleet.engine_slots, "engine slot agreement");
         assert!(
-            limits.host.slots == limits.agent.slots && limits.host.slots == limits.core.fleet.engine_slots,
-            "engine slot agreement"
-        );
-        assert!(
-            config.charter_endpoints.len() <= usize::try_from(limits.agent.smith.endpoints).expect("endpoint count"),
+            config.charter_endpoints.len() <= usize::try_from(limits.endpoints).expect("endpoint count"),
             "bounded codec endpoints"
         );
         for endpoint in &config.charter_endpoints {
@@ -113,7 +100,6 @@ impl Domain {
                 "endpoint name bound"
             );
         }
-        let agent_calls = limits.host.slots.checked_mul(limits.agent.smith.run.calls).expect("agent callbacks");
         let host_calls = limits.host.slots.checked_mul(limits.host.run_calls).expect("hub relays");
         let mut core = core::Core::new(config.core, &limits.core);
         // Connector hold rules are configuration, so a cold root installs
@@ -140,7 +126,6 @@ impl Domain {
                 .with_leads(&limits.observability, config.lead_templates),
             infrastructure: infrastructure::Domain::new(config.backend, &limits.infrastructure),
             host: host::Domain::new(&limits.host),
-            agents: agent::Agent::new(&limits.agent, config.endpoints, config.endpoint_names, config.seed),
             journal: Journal::new(&limits.journal),
             charter_endpoints: config.charter_endpoints,
             assignments: Map::with_capacity(limits.core.tasks.tasks),
@@ -156,8 +141,6 @@ impl Domain {
             judges: Map::with_capacity(limits.core.authority.facts),
             procedures: Map::with_capacity(limits.core.tasks.tasks),
             effect_procedures: Map::with_capacity(limits.core.tasks.tasks),
-            agent_owners: Map::with_capacity(limits.host.slots),
-            agent_calls: Map::with_capacity(agent_calls),
             host_calls: Map::with_capacity(host_calls),
             next_token: 1,
             wrote: false,
@@ -179,7 +162,6 @@ impl Domain {
         self.journal.idle()
             && (!self.ready()
                 || (!self.host.is_ready()
-                    && !self.agents.is_ready()
                     && (self.core.due.is_empty() || !self.core.accounts.usable(self.core.settings.account))))
     }
 
@@ -187,7 +169,6 @@ impl Domain {
     pub fn reclaim(&mut self) {
         self.core.reclaim();
         self.host.reclaim();
-        agent::reclaim(&mut self.agents);
     }
 
     pub(crate) fn token(&mut self) -> Token {
@@ -211,7 +192,6 @@ pub(crate) enum Work {
     Infrastructure(infrastructure::Event),
     Observability(observability::Event),
     Host(host::Event),
-    Agent(smith_host_domain::Event),
     Restart(core::RestartRequest),
     AdoptClaims,
     AdoptDone,
@@ -229,14 +209,14 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event) {
         | Event::Infrastructure(_)
         | Event::Observability(_)
         | Event::Host(_)
-        | Event::Llm { .. }
+        | Event::Agent(_)
+        | Event::AgentContent { .. }
         | Event::Store(Store::Restore(_) | Store::Restored(_) | Store::Transcript { .. } | Store::Loaded(_))
         | Event::Released(_)
         | Event::Restart
         | Event::Timer(_)
         | Event::ObservabilityTimer
         | Event::InfrastructureTimer
-        | Event::HostTimer
         | Event::Effect { .. }) => decide(domain, env, Work::Event(other)),
     }
 }
@@ -259,7 +239,6 @@ fn decide(domain: &mut Domain, env: &Env<Limits>, first: Work) {
         | Work::Infrastructure(_)
         | Work::Observability(_)
         | Work::Host(_)
-        | Work::Agent(_)
         | Work::Restart(_)
         | Work::AdoptClaims
         | Work::AdoptDone => crate::limits::room(&env.limits).expect("validated route room"),
@@ -313,7 +292,6 @@ pub fn fire(domain: &mut Domain, env: &Env<Limits>, timer: crate::Timer) {
         crate::Timer::Core(timer) => Event::Timer(timer),
         crate::Timer::Observability => Event::ObservabilityTimer,
         crate::Timer::Infrastructure => Event::InfrastructureTimer,
-        crate::Timer::Agent => Event::HostTimer,
     };
     step(domain, env, event);
 }
