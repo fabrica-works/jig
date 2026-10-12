@@ -911,6 +911,13 @@ the file.
      larger"), its ceiling is `max(message_bytes, result_bytes)`; a field
      one kind owns keeps its own bound (`ActivityWords.words`,
      `message_bytes`). The README's rule now says so.
+157. **The record split is skein 02.s3** (2026-10-12, the coordinator's
+     block "skein 02.s2: scope extension arrived during successful
+     landing", 2026-10-12T21:30:36Z). skein 02.s2 landed its list fix
+     (skein `be47b1b5`) before ruling 155 reached it; a second landing
+     under its Step would make one step two commits. The record split
+     becomes skein 02.s3 (`skein/02-startup-and-secrets.md`), and
+     jig-repin.s2 pins skein 02.s3's commit, which carries both fixes.
 
 ## For the user
 

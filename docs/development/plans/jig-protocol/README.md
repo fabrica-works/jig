@@ -338,7 +338,8 @@ Size: nothing besides `Cargo.lock` and generated files.
 
 ### jig-repin.s2: the skein source again, after skein 02.s2
 
-As jig-repin.s1, with skein 02.s2's commit (ruling 152).
+As jig-repin.s1, with skein 02.s3's commit, which follows 02.s2's
+(rulings 152, 157).
 
 ## Pulse
 

@@ -525,6 +525,26 @@ Proof: unit, `heavy cargo nextest run -p skein-codegen -p
 Don't: change the bytes of any encoding; add an allowance.
 Size: at most 120 lines of production code.
 
+### 02.s3 A long record's generated functions are split
+
+A step not in the plan (decisions.md, rulings 155 and 157): 02.s2 landed
+(skein `be47b1b5`) before ruling 155 added this to it.
+Scope: codec.md, 6: "the generator writes what the lints accept
+  (functions short enough ...)".
+Needs: 02.s2.
+Files: `testing/skein-codegen/src/*.rs`; `tests/codec/schema/lints-v1.schema`,
+  its generated `tests/codec/src/lints/v1.rs` and goldens.
+Shape: a record's generated functions (constructor check, measure,
+  encode, decode) that would pass 100 lines, as jig 30.1's 23-field
+  `OwnerChipDetailsFields::encode` (107) does, are split into helpers of
+  at most 100 lines. Output for a schema whose functions are all within
+  100 lines is unchanged, byte for byte.
+Test shape: `lints-v1.schema` gains a record of 30 `bytes 4` fields; the
+  gate's clippy over the fixture is the check.
+Proof: as 02.s2's.
+Don't: change the bytes of any encoding; add an allowance.
+Size: at most 80 lines of production code.
+
 ## Interface sketches
 
 ```rust
