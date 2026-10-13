@@ -15,6 +15,11 @@ pub(crate) struct Walked {
     pub next: Option<Cursor>,
 }
 
+pub(crate) struct Decoded {
+    pub rows: Box<[Row]>,
+    pub next: Option<Cursor>,
+}
+
 pub(crate) fn walk(store: &mut Store, intervals: &[Range], after: Option<&Cursor>, rows: u32) -> Option<Walked> {
     // Every encoded row costs at least one byte. The encoded page therefore
     // bounds the carrier list even when the asker supplies a larger row count.

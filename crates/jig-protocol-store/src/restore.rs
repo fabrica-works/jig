@@ -1,4 +1,5 @@
 //! Restart pages, including the inbox census joins (protocol/store.md, 7.2).
+use crate::pages::Decoded as Restored;
 use crate::{Cursor, Event, Phase, Restore, Row, Store, codec, intervals, keys, pages};
 use alloc::boxed::Box;
 use jig_domain_core::{Key, Record};
@@ -20,11 +21,6 @@ pub(crate) fn restore(
         return;
     };
     above.push(Event::Restored { owner, rows: walked.rows, next: walked.next });
-}
-
-struct Restored {
-    rows: Box<[Row]>,
-    next: Option<Cursor>,
 }
 
 fn restore_page(store: &mut Store, range: Restore, after: Option<&Cursor>, rows: u32, bytes: u64) -> Option<Restored> {

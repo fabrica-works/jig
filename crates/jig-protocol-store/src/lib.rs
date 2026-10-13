@@ -6,7 +6,10 @@ pub mod boundary;
 pub mod codec;
 mod commits;
 pub mod format;
+mod gets;
+pub mod historical;
 pub mod intervals;
+mod loads;
 mod open;
 mod pages;
 mod restore;
@@ -105,12 +108,12 @@ pub fn down(store: &mut Store, request: Request, above: &mut Queue<Event>) {
         Request::Restore { owner, range, after, rows, bytes } => {
             restore::restore(store, owner, range, after, rows, bytes, above);
         }
+        Request::Load { owner, range, after, rows, bytes } => {
+            loads::load(store, owner, range, after, rows, bytes, above);
+        }
+        Request::Get { owner, key } => gets::get(store, owner, key, above),
         // Each remaining handler joins in its owning increment, before routing uses it.
-        Request::Load { .. }
-        | Request::Read { .. }
-        | Request::Get { .. }
-        | Request::Transcript { .. }
-        | Request::Secrets { .. } => {}
+        Request::Read { .. } | Request::Transcript { .. } | Request::Secrets { .. } => {}
     }
 }
 

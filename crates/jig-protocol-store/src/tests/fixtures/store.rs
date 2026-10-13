@@ -1,6 +1,7 @@
 //! Memory component fixtures (protocol/store.md, section 14).
 use super::{
-    APPLICATION, CORE_LIMITS, DEPLOYMENT, KEY_LIMIT, calls, core_rows, identity, note_entry, task_history, task_record,
+    APPLICATION, CORE_LIMITS, DEPLOYMENT, KEY_LIMIT, calls, core_rows, identity, note_entry, note_line, task_history,
+    task_record,
 };
 use crate::{Event, Limits, Request, Store, Stores, Write, codec, format, keys};
 use alloc::boxed::Box;
@@ -148,6 +149,7 @@ pub fn get_kv(store: &mut Store, key: &[u8]) -> Option<Box<[u8]>> {
 pub const ALICE: u64 = 11;
 pub const LIVE: u64 = 21;
 pub const ENDED: u64 = 22;
+pub const PROJECT: u32 = 3;
 
 pub fn committed(store: &mut Store, writes: Box<[Write]>) {
     let number = store.stores.store.last().checked_add(1).expect("fixture next commit");
@@ -215,4 +217,11 @@ pub fn result_index(party: u64, position: u64, task: u64) -> Record {
 
 pub fn conversation_index(party: u64, task: u64) -> Record {
     Record::Tasks(jig_domain_tasks::Stored::ConversationOldest(jig_domain_tasks::Conversation { party, task }))
+}
+
+pub fn notes_line(scope: &jig_domain_notes::Scope, name: u64) -> Record {
+    let mut row = note_line();
+    row.scope = scope.clone();
+    row.name = name;
+    Record::Notes(jig_domain_notes::Record::Line(row))
 }

@@ -83,7 +83,7 @@ pub(crate) fn open(store: &mut Store, owner: Token, above: &mut Queue<Event>) {
     }
 }
 
-fn get(store: &mut Store, owner: Token, key: Box<[u8]>) -> Result<Option<Box<[u8]>>, OpenRefusal> {
+pub(crate) fn get(store: &mut Store, owner: Token, key: Box<[u8]>) -> Result<Option<Box<[u8]>>, OpenRefusal> {
     let mut above = Queue::with_capacity(skein_kv::MAX_OUT.above);
     let mut below = Queue::with_capacity(skein_kv::MAX_OUT.below);
     skein_kv::down(
