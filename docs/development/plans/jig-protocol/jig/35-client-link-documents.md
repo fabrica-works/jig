@@ -77,8 +77,15 @@ variants) and single reads' documents (`Proposal`, `OwnerProposal`,
 `OwnerPersonTask`, `Result`, `Project`, `OwnerHistorical`) to the
 contract's types, checked as 35.1; an activity line's turn bytes decoded
 with `jig_protocol_transcript::decode`, one that does not decode carried
-up as the contract's undecodable turn.
-Needs: nothing beyond 35.1.
+up as the contract's undecodable turn: `contract::TurnRead { Decoded(Turn),
+Undecodable { why: TurnProblem } }`, `TurnProblem` one of another version
+(with the one found), malformed, or past the client's bounds, which
+`Activity::Turn` and `ArchivedTurn` carry in place of `Turn`
+(client/domain/client.md, 10, "A turn that does not decode"; the
+designer, 2026-10-13, jig `13153661`). The contract and the view's card
+for it change first, a step of the supervisor's; until it lands, 35.2
+lands its other pages and documents.
+Needs: nothing beyond 35.1, and that step for the undecodable turn.
 Files: `src/{translate/pages.rs, translate/objects.rs}`;
 `src/tests/{pages.rs, fixtures.rs}`; the crate's `Cargo.toml`
 (`jig-protocol-transcript`).
