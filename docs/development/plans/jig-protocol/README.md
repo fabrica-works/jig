@@ -458,6 +458,13 @@ now, so it brings 03.s2 and whatever skein lands meanwhile. Where that
 needs a change in jig's code, it is made here, within what
 development.md, 5.7 lets a repin change.
 
+### jig-repin.s6: skein's main, before jig 26.3 lands
+
+As jig-repin.s5, with skein's `main` once skein 03.s3 has landed (the
+designer's answer on jig 26.3's power loss): 26.3's power loss with
+smith's agent running as a hosted child needs it. jig-repin.s5 has
+landed, so this one moves the skein source again.
+
 ## Pulse
 
 ```

@@ -232,7 +232,8 @@ shutdown ends with nothing waiting for a commit. Kills (`World::cut`,
 `Cut::Kill`) and power losses (`Cut::PowerLoss`) at drawn moments; the
 service started again from its store. Fuzzy: people, runs, kills and a
 final drain over seeds.
-Needs: nothing beyond 26.2.
+Needs: 26.2; jig-repin.s6 before it lands, for a power loss with a
+hosted child (skein 03.s3).
 Files: `tests/one-process/{src/{referee.rs, world.rs, fixtures.rs},
 tests/{one_process.rs, fuzzy_one_process.rs}}`.
 Shape: `referee::Referee` implementing `skein_world::Referee<Proc>` over

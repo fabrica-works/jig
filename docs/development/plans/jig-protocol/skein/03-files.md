@@ -382,6 +382,38 @@ Don't: count a closed pipe as read; loosen the check for a child that
   exited with a code.
 Size: at most 20 lines of production code.
 
+### 03.s3 A power loss restarts the world's own processes, not hosted children
+
+A step not in the plan, from the designer's answer on jig 26.3's power
+loss (skein `2f89cf78`: `simulator.md`, 3.3). On `Cut::PowerLoss`,
+`World::cut` and `perform_cut`
+(`testing/skein-world/src/world.rs:279-287`, `:630-679`) ask a restart factory of every admitted process and restart
+all of them; `World::host` registers a hosted child's launch factory
+and no restart slot (`:239-255`; `admit` pushes `None`, `:338`), so no
+world with a live hosted child can be cut by power loss.
+Needs: nothing.
+Files: `testing/skein-world/src/world.rs`; `tests/world/tests/hosted.rs`
+  (`skein-world-tests`).
+Shape: on `Cut::PowerLoss`, every process is dropped at the cut as now
+  (`sim.cut_with`, its held handles given to the machine's cut); each
+  with a restart factory restarts as now; each hosted child (its
+  `hosted` slot `Some`) leaves the world's tables, as a killed one does
+  (`drop_killed`, `:585`), and is not started again. `cut` and
+  `perform_cut` ask a factory of every process but hosted children. A
+  kill is unchanged.
+Test shape: `a_power_loss_drops_hosted_children_and_restarts_the_roots`
+  (a restartable root spawns a hosted child; power is cut while the
+  child runs; the root restarts, the child does not, the root spawns it
+  again, and the world settles);
+  `a_power_loss_needs_every_roots_factory` (a process the world started
+  without a factory is still refused).
+  Under 20 ms each.
+Proof: unit, `heavy cargo nextest run -p skein-world-tests --test
+  hosted` once; `-p skein-io-world --test cuts` unchanged.
+Don't: restart a hosted child from the world; drop a hosted child on a
+  kill of another process.
+Size: at most 60 lines of production code.
+
 ## Interface sketches
 
 ```rust
