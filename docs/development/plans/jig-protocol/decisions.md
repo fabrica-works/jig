@@ -1243,6 +1243,16 @@ the file.
      inside `Owned.record: bytes 16777216` (30.1's sketch), so no piece of
      it can be larger: D, the ceiling of every piece ruling 182 makes, is
      16,777,216, within a `u32`, and jig 20's profiles must fit it.
+185. **jig 05.s1 also drops `reply_to` from the link vocabulary**
+     (2026-10-13, the designer's answer to question.md's "jig 23.2: an
+     answer's `reply_to` on the engine side"; jig `e49ace7c`, `8fceddd1`).
+     channel.md, 3: "**The link vocabulary names only what crosses** ... A
+     handle one side mints for itself (a delivery's token, a request's
+     reply handle) is not in it". jig 05.s1, still running when the answer
+     came, takes it: `LinkDown::Assign` and `LinkUp::Answer` lose
+     `reply_to`, the hub answers and refuses an assignment by its run and
+     attempt; its Size is now 250. jig 23.2 translates `Answer` and
+     `Assign` once 05.s1 lands; jig 24's link makes no `ReplyTo`.
 
 ## For the user
 
