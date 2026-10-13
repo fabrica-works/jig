@@ -778,3 +778,5 @@ pub use record::{task_record, task_word};
 pub mod calls;
 
 pub mod core_rows;
+
+pub mod people_outcomes;

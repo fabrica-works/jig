@@ -711,3 +711,5 @@ fn end_round_trip(end: jig_domain_tasks::End) {
 }
 
 mod core_rows;
+
+mod people_outcomes;

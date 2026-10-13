@@ -5,6 +5,7 @@ use jig_domain_core as core;
 use jig_domain_people as domain;
 use skein_lib::{Duration, List, Reader, Wall, Writer};
 mod asks;
+mod outcomes;
 mod policy;
 pub use asks::{decode_ask, encode_ask};
 use policy::{
@@ -98,7 +99,15 @@ pub fn encode(row: &domain::Stored, limits: &wire::Limits) -> Result<Box<[u8]>, 
             limits,
             wire::StoredPolicyParts { project: *project, value: encode_policy_value(value, limits)? },
         )?),
-        domain::Stored::Answer { key: _, ask: _, outcome: _, at: _ } => return Err(problem()),
+        domain::Stored::Answer { key, ask, outcome, at } => wire::Value::Answer(wire::StoredAnswer::new(
+            limits,
+            wire::StoredAnswerParts {
+                key: encode_request_key(key, limits)?,
+                ask: encode_ask(ask, limits)?,
+                outcome: outcomes::encode_outcome(outcome, limits)?,
+                at: at.as_nanos(),
+            },
+        )?),
     };
     let row = wire::Row::new(limits, wire::RowParts { value })?;
     let mut writer = Writer::new(usize::try_from(row.measure()).expect("row length fits usize"));
@@ -131,6 +140,15 @@ pub fn decode(bytes: &[u8], limits: &wire::Limits) -> Result<domain::Stored, wir
         wire::Value::Policy(value) => {
             let wire::StoredPolicyParts { project, value } = value.into_parts();
             domain::Stored::Policy { project, value: decode_policy_value(value) }
+        }
+        wire::Value::Answer(value) => {
+            let wire::StoredAnswerParts { key, ask, outcome, at } = value.into_parts();
+            domain::Stored::Answer {
+                key: decode_request_key(key),
+                ask: Box::new(decode_ask(ask)),
+                outcome: outcomes::decode_outcome(outcome),
+                at: Wall::from_nanos(at),
+            }
         }
     };
     Ok(row)

@@ -1,0 +1,132 @@
+//! Permanent people answers preserve their request and refusal facts (protocol/store.md, 5.1).
+use super::{fixtures, people_round_trip};
+use fixtures::people_outcomes as values;
+use jig_domain_people as domain;
+use skein_lib::Wall;
+#[test]
+fn each_again_reads_back() {
+    for value in values::again_values() {
+        people_round_trip(values::answered(domain::Outcome::Again(value)));
+    }
+}
+#[test]
+fn each_disposal_issue_reads_back() {
+    for value in values::disposal_issue_values() {
+        people_round_trip(values::answered(domain::Outcome::Refused(domain::Refusal::Disposal {
+            task: 3,
+            issue: value,
+        })));
+    }
+}
+#[test]
+fn each_failure_class_reads_back() {
+    for value in values::failure_class_values() {
+        people_round_trip(values::answered(domain::Outcome::Refused(domain::Refusal::Moved {
+            now: domain::Moved::Hold { revision: 3, reason: domain::HoldReason::Failures { class: value } },
+        })));
+    }
+}
+#[test]
+fn each_hold_reason_reads_back() {
+    for value in values::hold_reason_values() {
+        people_round_trip(values::answered(domain::Outcome::Refused(domain::Refusal::Moved {
+            now: domain::Moved::Hold { revision: 3, reason: value },
+        })));
+    }
+}
+#[test]
+fn each_moved_reads_back() {
+    for value in values::moved_values() {
+        people_round_trip(values::answered(domain::Outcome::Refused(domain::Refusal::Moved { now: value })));
+    }
+}
+#[test]
+fn each_party_reads_back() {
+    for value in values::party_values() {
+        people_round_trip(values::answered(domain::Outcome::Refused(domain::Refusal::Ended {
+            how: domain::Ending::Cancelled { by: value, at: Wall::from_nanos(19) },
+        })));
+    }
+}
+#[test]
+fn each_ending_reads_back() {
+    for value in values::ending_values() {
+        people_round_trip(values::answered(domain::Outcome::Refused(domain::Refusal::Ended { how: value })));
+    }
+}
+#[test]
+fn each_lack_reads_back() {
+    for value in values::lack_values() {
+        people_round_trip(values::answered(domain::Outcome::Refused(domain::Refusal::Authority {
+            lacking: value,
+            proposable: Some(true),
+        })));
+    }
+}
+#[test]
+fn each_limit_kind_reads_back() {
+    for value in values::limit_kind_values() {
+        people_round_trip(values::answered(domain::Outcome::Refused(domain::Refusal::Limit { which: value })));
+    }
+}
+#[test]
+fn each_refusal_reads_back() {
+    for value in values::refusal_values() {
+        people_round_trip(values::answered(domain::Outcome::Refused(value)));
+    }
+}
+#[test]
+fn each_proposal_choice_reads_back() {
+    for value in values::proposal_choice_values() {
+        people_round_trip(values::answered(domain::Outcome::ProposalDecided {
+            proposer: domain::Proposer::Task(2),
+            proposal: 3,
+            by: 5,
+            at: Wall::from_nanos(19),
+            choice: value,
+        }));
+    }
+}
+#[test]
+fn each_escalation_choice_reads_back() {
+    for value in values::escalation_choice_values() {
+        people_round_trip(values::answered(domain::Outcome::EscalationDecided {
+            task: 2,
+            revision: 3,
+            by: 5,
+            at: Wall::from_nanos(19),
+            choice: value,
+        }));
+    }
+}
+#[test]
+fn an_answered_key_reads_back_with_its_ask_and_outcome() {
+    for value in values::outcome_values() {
+        people_round_trip(values::answered(value));
+    }
+}
+#[test]
+fn a_refusal_lacking_a_budget_reads_back() {
+    people_round_trip(values::answered(domain::Outcome::Refused(domain::Refusal::Authority {
+        lacking: domain::Lack::Budget { needs: 17, left: 11 },
+        proposable: Some(true),
+    })));
+}
+#[test]
+fn a_role_refusal_without_a_role_reads_back() {
+    people_round_trip(values::answered(domain::Outcome::Refused(domain::Refusal::Role { held: None })));
+}
+#[test]
+fn an_authority_refusal_without_proposability_reads_back() {
+    people_round_trip(values::answered(domain::Outcome::Refused(domain::Refusal::Authority {
+        lacking: domain::Lack::Funding,
+        proposable: None,
+    })));
+}
+#[test]
+fn an_authority_refusal_prevents_a_proposal_reads_back() {
+    people_round_trip(values::answered(domain::Outcome::Refused(domain::Refusal::Authority {
+        lacking: domain::Lack::Funding,
+        proposable: Some(false),
+    })));
+}
