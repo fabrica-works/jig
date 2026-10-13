@@ -234,5 +234,6 @@ fn client_link_depends_only_on_client_vocabulary_and_foundation() {
         manifests().into_iter().find(|m| m.name.as_deref() == Some("jig-protocol-client-link")).expect("link manifest");
     assert!(link.dependencies.iter().all(|name| {
         ["skein-lib", "skein-codec", "jig-domain-client", "jig-protocol-client-wire"].contains(&name.as_str())
+            || name == "jig-protocol-transcript"
     }));
 }

@@ -6,3 +6,4 @@ use skein_lib::{Queue, Reader, RequestEnvelope, Time, Token};
 mod attempts;
 mod documents;
 mod fixtures;
+mod pages;

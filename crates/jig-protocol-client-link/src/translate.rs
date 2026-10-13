@@ -21,3 +21,5 @@ pub(crate) fn text_problem(_: Box<[u8]>) -> w::Problem {
 pub(crate) fn piece_problem(reason: skein_codec::Reason) -> w::Problem {
     w::Problem { path: w::Path::OwnedRecord, reason }
 }
+pub mod objects;
+pub mod pages;

@@ -10,5 +10,6 @@ skein-lib.workspace = true
 skein-codec.workspace = true
 jig-domain-client = { path = "../jig-domain-client" }
 jig-protocol-client-wire = { path = "../jig-protocol-client-wire" }
+jig-protocol-transcript.workspace = true
 [lints]
 workspace = true

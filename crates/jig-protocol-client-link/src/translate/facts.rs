@@ -325,3 +325,6 @@ pub(crate) fn decode(bytes: &[u8], limits: &Limits) -> Result<Node, w::Problem> 
 fn size_problem(_: core::num::TryFromIntError) -> w::Problem {
     too_large()
 }
+
+pub(crate) use part1::{owner_failure_tries, owner_prior_phase};
+pub(crate) use part2::result_field;

@@ -28,6 +28,13 @@ pub struct Limits {
     pub turn: TurnLimits,
 }
 
+impl Limits {
+    #[must_use]
+    pub const fn new(bytes: u32, turn: TurnLimits) -> Self {
+        Self { smith: smith::CEILINGS, bytes, turn }
+    }
+}
+
 /// Why one activity turn cannot be shown; its activity line remains in place.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Undecodable {
