@@ -141,6 +141,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Queue::<skein_kv::Event>::worst_case(skein_kv::MAX_OUT.above)?)?
         .checked_add(Queue::<skein_io::file::Request>::worst_case(skein_kv::MAX_OUT.below)?)?
         .checked_add(Queue::<Event>::worst_case(MAX_OUT_DOWN)?)?
+        .checked_add(commits::worst_case(limits)?)?
         .checked_add(secrets::worst_case(limits)?)?
         .checked_add(transcripts::worst_case(limits)?)?
         .checked_add(Queue::<skein_io::file::Request>::worst_case(skein_kv::MAX_OUT.below.checked_mul(2)?)?)

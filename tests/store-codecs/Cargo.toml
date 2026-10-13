@@ -13,6 +13,7 @@ jig-protocol-store.workspace = true
 jig-test-store.workspace = true
 skein-codegen.workspace = true
 skein-lib.workspace = true
+skein-kv.workspace = true
 skein-heap.workspace = true
 
 # Ordinary Rust (programming-model.md, 10.2), so not the step crates' lints.

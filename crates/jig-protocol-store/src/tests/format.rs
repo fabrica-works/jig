@@ -17,7 +17,7 @@ fn store() -> skein_kv::Limits {
         commit: 134_217_728,
         queued: 2,
         queued_bytes: 268_435_456,
-        budget: 1_073_741_824,
+        budget: 16_384,
         segment: 268_435_456,
         snapshot_after: 134_217_728,
         chunk: 16_778_260,
@@ -91,7 +91,7 @@ fn a_page_smaller_than_one_row_is_refused() {
 }
 #[test]
 fn fixture_limits_fit_their_store() {
-    assert_eq!(check(&store()), Ok(sizes::Sizes { key: 112, value: 80_949, ops: 9, commit: 729_656 }));
+    assert_eq!(check(&store()), Ok(sizes::Sizes { key: 112, value: 80_949, ops: 9, commit: 17_499 }));
 }
 #[test]
 fn too_few_operations_are_refused() {
@@ -102,8 +102,8 @@ fn too_few_operations_are_refused() {
 #[test]
 fn too_few_commit_bytes_are_refused() {
     let mut limits = store();
-    limits.commit = 729_655;
-    assert_eq!(check(&limits), Err(sizes::SizeRefusal::Commit { needs: 729_656, has: 729_655 }));
+    limits.commit = 17_498;
+    assert_eq!(check(&limits), Err(sizes::SizeRefusal::Commit { needs: 17_499, has: 17_498 }));
 }
 #[test]
 fn too_few_in_flight_slots_are_refused() {
@@ -122,8 +122,8 @@ fn a_journal_bound_past_the_queue_is_refused_at_start() {
 #[test]
 fn too_few_queued_bytes_are_refused() {
     let mut limits = store();
-    limits.queued_bytes = 1_459_311;
-    assert_eq!(check(&limits), Err(sizes::SizeRefusal::QueuedBytes { needs: 1_459_312, has: 1_459_311 }));
+    limits.queued_bytes = 34_997;
+    assert_eq!(check(&limits), Err(sizes::SizeRefusal::QueuedBytes { needs: 34_998, has: 34_997 }));
 }
 #[test]
 fn a_domain_limit_past_its_family_ceiling_is_refused_at_start() {
@@ -192,7 +192,7 @@ fn larger_application_encodings_are_included_in_the_bounds() {
     let application = sizes::Application { version: 1, key: 256, value: 9_000_000 };
     assert_eq!(
         sizes::check(&fixtures::CORE_LIMITS, &application, &JOURNAL, &store(), 0),
-        Ok(sizes::Sizes { key: 257, value: 9_000_000, ops: 9, commit: 81_002_420 }),
+        Ok(sizes::Sizes { key: 257, value: 9_000_000, ops: 9, commit: 18_804 }),
     );
 }
 #[test]
@@ -202,4 +202,16 @@ fn a_journal_whose_operation_count_overflows_is_refused() {
         sizes::check(&fixtures::CORE_LIMITS, &fixtures::APPLICATION, &journal, &store(), 0),
         Err(sizes::SizeRefusal::Ceiling),
     );
+}
+
+#[test]
+fn a_map_budget_past_the_commit_envelope_is_refused() {
+    for (label, budget, expected) in [
+        ("exact_u32_commit", 4_294_966_180, Ok(sizes::Sizes { key: 112, value: 80_949, ops: 9, commit: u32::MAX })),
+        ("one_byte_past_u32", 4_294_966_181, Err(sizes::SizeRefusal::Ceiling)),
+        ("u64_sum_overflows", u64::MAX, Err(sizes::SizeRefusal::Ceiling)),
+    ] {
+        let limits = skein_kv::Limits { budget, commit: u32::MAX, queued_bytes: u64::MAX, ..store() };
+        assert_eq!(check(&limits), expected, "{label}");
+    }
 }

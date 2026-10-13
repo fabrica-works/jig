@@ -808,6 +808,7 @@ dependencies = [
  "jig-test-store",
  "skein-codegen",
  "skein-heap",
+ "skein-kv",
  "skein-lib",
 ]
 

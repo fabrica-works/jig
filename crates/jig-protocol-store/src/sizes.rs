@@ -37,7 +37,7 @@ pub fn check(
     store: &skein_kv::Limits,
     orphan_erases: u32,
 ) -> Result<Sizes, SizeRefusal> {
-    let sizes = largest(domain, application, journal, orphan_erases).ok_or(SizeRefusal::Ceiling)?;
+    let sizes = largest(domain, application, journal, orphan_erases, store.budget).ok_or(SizeRefusal::Ceiling)?;
     if sizes.key > store.key {
         return Err(SizeRefusal::Key { needs: sizes.key, has: store.key });
     }
@@ -70,6 +70,7 @@ fn largest(
     application: &Application,
     journal: &skein_lib::JournalLimits,
     orphan_erases: u32,
+    budget: u64,
 ) -> Option<Sizes> {
     let limits = codec::limits(domain)?;
     // A resources line has 32 fixed bytes, three per empty segment, and at
@@ -92,6 +93,9 @@ fn largest(
     // inserts the format row. Each put costs a tag and two u32 lengths; a
     // skein-kv frame costs 22 header bytes and four checksum bytes.
     let ops = journal.writes.checked_mul(2)?.checked_add(1)?.checked_add(orphan_erases)?;
-    let commit = key.checked_add(value)?.checked_add(9)?.checked_mul(ops)?.checked_add(26)?;
+    let commit = u32::try_from(
+        budget.checked_add(u64::from(key).checked_add(9)?.checked_mul(u64::from(ops))?)?.checked_add(26)?,
+    )
+    .ok()?;
     Some(Sizes { key, value, ops, commit })
 }

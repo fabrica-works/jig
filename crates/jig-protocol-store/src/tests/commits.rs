@@ -215,3 +215,54 @@ fn a_committed_store_reopens_at_its_last_number() {
     assert_eq!(*owner, Token::new(1));
     assert_eq!(*last, 1);
 }
+
+fn pending_operations(writes: Box<[Write]>) -> Box<[skein_kv::Op]> {
+    let mut store = fixtures::opened();
+    store.limits.store.commit = 64;
+    crate::commits::operations(&mut store, 1, writes, false).expect("final operations fit the commit").ops
+}
+
+struct PutCase {
+    label: &'static str,
+    writes: Box<[Write]>,
+    expected: Box<[skein_kv::Op]>,
+}
+
+fn put_cases() -> [PutCase; 2] {
+    use skein_kv::Op;
+    [
+        PutCase {
+            label: "last_put_keeps_first_key_order",
+            writes: Box::new([
+                application_put(),
+                Write::Put { key: Box::new([42]), value: Box::new([2]) },
+                Write::Put { key: Box::new([41]), value: Box::new([3]) },
+            ]),
+            expected: Box::new([
+                Op::Put { key: Box::new([2, 41]), value: Box::new([3]) },
+                Op::Put { key: Box::new([2, 42]), value: Box::new([2]) },
+            ]),
+        },
+        PutCase {
+            label: "only_final_put_is_priced",
+            writes: Box::new([
+                Write::Put { key: Box::new([41]), value: Box::new([0; 128]) },
+                Write::Put { key: Box::new([41]), value: Box::new([3]) },
+            ]),
+            expected: Box::new([Op::Put { key: Box::new([2, 41]), value: Box::new([3]) }]),
+        },
+    ]
+}
+
+#[test]
+fn a_key_written_twice_in_a_commit_is_one_put_the_last() {
+    for case in put_cases() {
+        assert_eq!(pending_operations(case.writes), case.expected, "{}", case.label);
+    }
+}
+
+#[test]
+fn a_put_then_an_erase_of_one_key_is_one_erase() {
+    let ops = pending_operations(Box::new([application_put(), Write::Remove { key: Box::new([41]) }]));
+    assert_eq!(ops.as_ref(), &[skein_kv::Op::Erase { key: Box::new([2, 41]) }]);
+}

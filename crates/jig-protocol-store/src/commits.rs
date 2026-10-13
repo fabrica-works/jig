@@ -2,7 +2,7 @@
 use crate::{Event, Store, Write, codec, format, keys};
 use alloc::boxed::Box;
 use jig_domain_core::{CoreRecord, Record};
-use skein_lib::{List, Queue, Token};
+use skein_lib::{List, Map, Queue, Token};
 
 pub(crate) fn submit(
     store: &mut Store,
@@ -32,9 +32,9 @@ pub(crate) fn operations(
     if writes.len() > usize::try_from(store.limits.journal.writes).ok()? {
         return None;
     }
-    let mut ops = List::with_capacity(
-        store.limits.journal.writes.checked_mul(2)?.checked_add(1)?.checked_add(store.limits.orphan_erases)?,
-    );
+    let capacity =
+        store.limits.journal.writes.checked_mul(2)?.checked_add(1)?.checked_add(store.limits.orphan_erases)?;
+    let mut ops = List::with_capacity(capacity);
     let mut frames = Queue::with_capacity(store.limits.journal.writes);
     let mut drops = Queue::with_capacity(store.limits.journal.writes);
     let mut bytes = 26;
@@ -85,10 +85,8 @@ pub(crate) fn operations(
         .ok()?;
     }
     crate::transcripts::drop::erases(store, &mut ops)?;
-    let mut bounded = List::with_capacity(
-        store.limits.journal.writes.checked_mul(2)?.checked_add(1)?.checked_add(store.limits.orphan_erases)?,
-    );
-    for op in ops.into_boxed() {
+    let mut bounded = List::with_capacity(capacity);
+    for op in unique(ops.into_boxed(), capacity)? {
         append(&mut bounded, op, &mut bytes, store.limits.store.commit)?;
     }
     Some(crate::transcripts::Pending { number, frames, ops: bounded.into_boxed(), drops })
@@ -146,4 +144,25 @@ fn append(ops: &mut List<skein_kv::Op>, op: skein_kv::Op, bytes: &mut u64, limit
     ops.push(op).ok()?;
     *bytes = total;
     Some(())
+}
+
+/// Last writes replace their first slot; encoded keys are the map's identity.
+fn unique(ops: Box<[skein_kv::Op]>, capacity: u32) -> Option<Box<[skein_kv::Op]>> {
+    let mut positions = Map::with_capacity(capacity);
+    let mut kept = List::with_capacity(capacity);
+    for op in ops {
+        if let Some(position) = positions.get(op.key()).copied() {
+            *kept.get_mut(position).expect("each indexed operation has its first slot") = op;
+        } else {
+            positions.insert(skein_lib::bytes::copy_of(op.key()), kept.len()).ok()?;
+            kept.push(op).ok()?;
+        }
+    }
+    Some(kept.into_boxed())
+}
+
+pub(crate) fn worst_case(limits: &crate::Limits) -> Option<u64> {
+    let capacity = limits.journal.writes.checked_mul(2)?.checked_add(1)?.checked_add(limits.orphan_erases)?;
+    Map::<Box<[u8]>, u32>::worst_case(capacity)?
+        .checked_add(u64::from(limits.store.key).checked_mul(u64::from(capacity))?)
 }
