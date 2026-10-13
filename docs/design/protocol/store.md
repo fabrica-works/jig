@@ -208,6 +208,14 @@ run said and did.
 - **Each record carries its family's version,** as every generated record
   does (skein's `codec.md`, section 5), which is what an upgrade will
   need.
+- **A collection the domain bounds by its bytes in all is one piece**
+  (skein's `codec.md`, 3), its limit the domain's sum: a verdict's
+  fields by the result's bytes, an amendment's lists, an authority's and
+  a policy's by the amendment's and the policy's bytes. Only a
+  collection the domain bounds by a count of its own is a counted list.
+  So a family's limits, made from the domain's (5.4), are never past
+  its ceilings for a count the domain does not have, and a record's
+  worst case is the sum, not a count times its largest item.
 - **Golden bytes** per family and version; a fuzz target per family's
   decoder; bounds at their limit and one past it.
 
