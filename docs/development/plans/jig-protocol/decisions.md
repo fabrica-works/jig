@@ -1369,6 +1369,17 @@ the file.
      shared fixture module or a child of it (a new child where the root
      would pass 800, ruling 116), with the root's re-exports; it is no
      question. The README's Rules say so.
+196. **An increment lands up to 1.5 times its Size without asking**
+     (2026-10-13, the coordinator's block "jig 17.1: production size 747
+     versus 660 margin", 2026-10-13T02:51:23Z; the fourth plain size block
+     since 01:20Z, after jig 20.5, 24.2 and 32.1, each landed as it was).
+     jig 17.1 lands at 747 against 550. From now to the run's end, ruling
+     103's margin is 1.5: an increment within N × 1.5 of its "Size: at most
+     N lines" lands and gives its count by file; past that it asks. The
+     codec and configuration rule (up to 2 ×, rulings 132, 151, 188) and the
+     client translations' (at their count, ruling 194) stay. The 800-line
+     file limit and the 40-line test function stay rules. code-organization.md,
+     section 7 says so.
 
 ## For the user
 

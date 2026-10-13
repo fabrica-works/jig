@@ -164,9 +164,9 @@ No increment of this plan:
 - **A test function:** at most 40 lines.
 - **An increment:** at most about 600 lines of production code; its
   session file gives its own limit, "Size: at most N lines". That limit
-  is a guide (decisions.md, ruling 103): an increment within N × 1.2,
+  is a guide (decisions.md, ruling 103): an increment within N × 1.5 (ruling 196; 1.2 before),
   rounded down, lands, and its report's Evidence line gives its count
-  and how it counted; past N × 1.2, it asks before landing, as a
+  and how it counted; past N × 1.5 (ruling 196; 1.2 before), it asks before landing, as a
   question. Nobody restructures code only to meet it. The file and
   test-function limits above stay rules.
 - **What a Size counts** (ruling 110): lines of production code added,
