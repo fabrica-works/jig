@@ -2389,6 +2389,19 @@ the file.
      `docs/design/STATUS.md` gap, this plan's `later.md` gains the row, and
      temper's reconciliation is a plan of its own. temper's Cargo URLs
      move with that plan.
+283. **jig 26.6 runs live until its proof passes, its request captured**
+     (2026-10-13, the user: "please perform the live run, or more if
+     needed, so we can close the plan"). Ruling 280 took the third failure
+     to the user; the model answered "No brief provided." and an offline
+     capture showed the brief in smith's request. The live proof runs
+     again with smith's provider request recorded (its instructions or
+     system part and its input, never headers or credentials), so a
+     failure says whether the brief left the engine. Each failure is
+     diagnosed from that capture and fixed before the next run; at most
+     four more live runs (within the run's 40), each recorded in the
+     commit body. A brief absent from the live request is a defect to fix;
+     a brief present that the model ignores is the prompt's to sharpen
+     (the charter's words), not the engine's.
 
 ## For the user
 
