@@ -12,7 +12,10 @@ pub(crate) fn answer(reply: &p::Reply, limits: &w::Limits) -> Result<w::Answer, 
             w::Final::Refused(w::Refused::new(limits, w::RefusedParts { refusal: refusals::refusal(*why, limits)? })?)
         }
         p::Reply::Outcome(p::Outcome::ServiceMade { person }) => {
-            let what = w::Made::Service(w::MadeService::new(limits, w::MadeServiceParts { party: *person })?);
+            let what = w::Made::Service(w::MadeService::new(
+                limits,
+                w::MadeServiceParts { party: *person, credential: skein_lib::Secret::new(Box::new([])) },
+            )?);
             let outcome = w::Outcome::Made(w::OutcomeMade::new(limits, w::OutcomeMadeParts { what })?);
             w::Final::Done(w::Done::new(limits, w::DoneParts { outcome })?)
         }
@@ -25,6 +28,14 @@ pub(crate) fn answer(reply: &p::Reply, limits: &w::Limits) -> Result<w::Answer, 
     };
     let mut out = Writer::new(usize::try_from(final_answer.measure()).expect("wire size fits"));
     final_answer.encode(&mut out).expect("measured final answer");
+    owned(w::Owner::Jig, jig_protocol_client_wire::VERSION, out.finish(), limits)
+}
+pub(crate) fn service(party: u64, credential: skein_lib::Secret, limits: &w::Limits) -> Result<w::Answer, w::Problem> {
+    let what = w::Made::Service(w::MadeService::new(limits, w::MadeServiceParts { party, credential })?);
+    let outcome = w::Outcome::Made(w::OutcomeMade::new(limits, w::OutcomeMadeParts { what })?);
+    let answer = w::Final::Done(w::Done::new(limits, w::DoneParts { outcome })?);
+    let mut out = Writer::new(usize::try_from(answer.measure()).expect("wire size fits"));
+    answer.encode(&mut out).expect("measured final answer");
     owned(w::Owner::Jig, jig_protocol_client_wire::VERSION, out.finish(), limits)
 }
 pub(crate) fn owned(

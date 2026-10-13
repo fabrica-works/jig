@@ -110,6 +110,7 @@ impl Harness {
                 | Request::Remove { .. }
                 | Request::Kept { .. }
                 | Request::Dropped { .. }
+                | Request::ServiceCredential { .. }
                 | Request::Fact { .. } => {}
             }
         }
@@ -133,6 +134,7 @@ impl Harness {
                 | Request::Remove { .. }
                 | Request::Kept { .. }
                 | Request::Dropped { .. }
+                | Request::ServiceCredential { .. }
                 | Request::Fact { .. } => {}
             }
         }
@@ -156,6 +158,7 @@ impl Harness {
                 | Request::Remove { .. }
                 | Request::Kept { .. }
                 | Request::Dropped { .. }
+                | Request::ServiceCredential { .. }
                 | Request::Fact { .. } => {}
             }
         }
@@ -179,6 +182,7 @@ impl Harness {
             | Request::Remove { .. }
             | Request::Kept { .. }
             | Request::Dropped { .. }
+            | Request::ServiceCredential { .. }
             | Request::Fact { .. }) => panic!("no close: {other:?}"),
         }
     }
@@ -207,6 +211,7 @@ impl Harness {
                 | Request::Remove { .. }
                 | Request::Kept { .. }
                 | Request::Dropped { .. }
+                | Request::ServiceCredential { .. }
                 | Request::Fact { .. } => {}
             }
         }
@@ -247,6 +252,7 @@ impl Harness {
                 | Request::Remove { .. }
                 | Request::Kept { .. }
                 | Request::Dropped { .. }
+                | Request::ServiceCredential { .. }
                 | Request::Fact { .. } => {}
             }
         }

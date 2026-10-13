@@ -197,6 +197,7 @@ impl Harness {
                 | Request::FamilyDelivery { .. }
                 | Request::Ended { .. }
                 | Request::Hello { .. }
+                | Request::ServiceCredential { .. }
                 | Request::Fact { .. } => {}
             }
         }
@@ -220,6 +221,7 @@ impl Harness {
                 | Request::FamilyDelivery { .. }
                 | Request::Ended { .. }
                 | Request::Hello { .. }
+                | Request::ServiceCredential { .. }
                 | Request::Fact { .. } => {}
             }
         }

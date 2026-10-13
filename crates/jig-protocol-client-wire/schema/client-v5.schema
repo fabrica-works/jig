@@ -312,7 +312,7 @@ record MadeChat { task: u64 }
 record MadeWords { task: u64 message: u64 }
 record MadeGoal { task: u64 }
 record MadeTasks { tasks: list 32 u64 }
-record MadeService { party: u64 }
+record MadeService { party: u64 credential: secret 40 }
 record MadePersonResult { task: u64 }
 record MadeNote { note: u64 scope: NoteScope }
 enum Made { chat: MadeChat, words: MadeWords, goal: MadeGoal, tasks: MadeTasks, service: MadeService, person_result: MadePersonResult, note: MadeNote }

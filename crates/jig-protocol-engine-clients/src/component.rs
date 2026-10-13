@@ -1,6 +1,6 @@
 //! Listener, exchanges, and durable sign-in sequencing (protocol/client.md, 8).
 use crate::{
-    Event, Kept, Limits, Request, SecretsAnswer, SecretsRequest, Settings,
+    Event, Kept, Limits, Request, SecretOwner, SecretsAnswer, SecretsRequest, Settings,
     connection::Connection,
     routes::{self, Route},
     sign_in::{self, Link, Pending, Waiting},
@@ -14,6 +14,8 @@ use skein_lib::{
     CryptoRng, Env, Map, Queue, ReplyTo, Time, Token,
     stream::{Read, Up},
 };
+#[path = "services.rs"]
+mod services;
 const LISTENER: Token = Token::new(0);
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Unusable {
@@ -204,13 +206,21 @@ impl Component {
                     ready = Some(*exchange);
                     break;
                 }
-                Waiting::Core | Waiting::Get { .. } | Waiting::Keep { .. } | Waiting::Ask { .. } => {}
+                Waiting::Core
+                | Waiting::Get { .. }
+                | Waiting::Keep { .. }
+                | Waiting::Made { .. }
+                | Waiting::Ask { .. } => {}
             }
         }
         if let Some(exchange) = ready {
             match self.pending.exchanges.remove(&exchange).expect("ready exchange") {
                 Waiting::Checked { sign_in, body } => self.request(env, exchange, sign_in, &body, out),
-                Waiting::Core | Waiting::Get { .. } | Waiting::Keep { .. } | Waiting::Ask { .. } => {}
+                Waiting::Core
+                | Waiting::Get { .. }
+                | Waiting::Keep { .. }
+                | Waiting::Made { .. }
+                | Waiting::Ask { .. } => {}
             }
             return true;
         }
@@ -243,7 +253,7 @@ impl Component {
                 connection.call = Some(call);
                 match connection.route {
                     Route::Missing => connection.respond(404, Box::new([]), &env.limits),
-                    Route::Link | Route::Request => connection.read(&env.limits),
+                    Route::Link | Route::Service | Route::Request => connection.read(&env.limits),
                 }
             }
             http::Event::Body(Up::Bytes(bytes)) => {
@@ -314,17 +324,27 @@ impl Component {
                     identity: self.settings.link.as_ref().expect("link enabled").clone(),
                 })));
             }
-            Route::Request => {
+            Route::Service | Route::Request => {
                 let call = connection.call.as_ref().expect("call retained");
                 let Some((sign_in, digest)) = sign_in::bearer(call.header(b"authorization")) else {
-                    connection.respond(200, routes::signed_out(&env.limits.wire), &env.limits);
+                    let answer = if connection.route == Route::Service {
+                        routes::refused(&env.limits.wire)
+                    } else {
+                        routes::signed_out(&env.limits.wire)
+                    };
+                    connection.respond(200, answer, &env.limits);
                     return;
+                };
+                let owner = if connection.route == Route::Service {
+                    SecretOwner::Service(sign_in)
+                } else {
+                    SecretOwner::SignIn(sign_in)
                 };
                 self.pending
                     .exchanges
-                    .insert(exchange, Waiting::Get { sign_in, digest, body })
+                    .insert(exchange, Waiting::Get { owner, digest, body })
                     .expect("admitted exchange");
-                out.push(Request::Secrets(SecretsRequest::Get { sign_in }));
+                out.push(Request::Secrets(SecretsRequest::Get { owner }));
             }
             Route::Missing => {}
         }
@@ -343,8 +363,21 @@ impl Component {
                         w::SignedInParts { token, party: person, expires: expires.as_nanos() },
                     )
                     .expect("40-byte token admitted");
-                    self.pending.exchanges.insert(exchange, Waiting::Keep { sign_in, answer }).expect("same slot");
-                    out.push(Request::Secrets(SecretsRequest::Keep { sign_in, value: Kept { digest, expires } }));
+                    self.pending
+                        .exchanges
+                        .insert(
+                            exchange,
+                            Waiting::Keep {
+                                sign_in,
+                                owner: SecretOwner::SignIn(sign_in),
+                                answer: sign_in::Answer::SignedIn(answer),
+                            },
+                        )
+                        .expect("same slot");
+                    out.push(Request::Secrets(SecretsRequest::Keep {
+                        owner: SecretOwner::SignIn(sign_in),
+                        value: Kept { digest, expires },
+                    }));
                 }
                 people::Reply::SignedOut
                 | people::Reply::Outcome(_)
@@ -353,7 +386,14 @@ impl Component {
                     self.respond(env, exchange, routes::refused(&env.limits.wire));
                 }
             },
-            Waiting::Ask { .. } => match reply {
+            Waiting::Ask { sign_in, .. } => match reply {
+                people::Reply::Outcome(people::Outcome::ServiceMade { person }) => {
+                    self.pending
+                        .exchanges
+                        .insert(exchange, Waiting::Made { sign_in, party: person })
+                        .expect("same slot");
+                    out.push(Request::Secrets(SecretsRequest::Get { owner: SecretOwner::Service(person) }));
+                }
                 people::Reply::Outcome(people::Outcome::Applied { .. }) => {
                     self.pending.exchanges.insert(exchange, waiting).expect("same slot");
                 }
@@ -366,7 +406,7 @@ impl Component {
                     self.answer(env, exchange, answer, out);
                 }
             },
-            Waiting::Keep { .. } | Waiting::Get { .. } | Waiting::Checked { .. } => {
+            Waiting::Keep { .. } | Waiting::Get { .. } | Waiting::Made { .. } | Waiting::Checked { .. } => {
                 self.pending.exchanges.insert(exchange, waiting).expect("same slot");
             }
         }
@@ -415,6 +455,7 @@ impl Component {
             Waiting::Core
             | Waiting::Keep { .. }
             | Waiting::Get { .. }
+            | Waiting::Made { .. }
             | Waiting::Checked { .. }
             | Waiting::Ask { .. } => {
                 self.pending.exchanges.insert(exchange, waiting).expect("same slot");
@@ -422,13 +463,14 @@ impl Component {
         }
     }
     fn ended(&mut self, env: &Env<Limits>, sign_in: u64, out: &mut Queue<Request>) {
-        out.push(Request::Secrets(SecretsRequest::Erase { sign_in }));
+        out.push(Request::Secrets(SecretsRequest::Erase { owner: SecretOwner::SignIn(sign_in) }));
         for _ in 0..self.pending.exchanges.capacity() {
             let mut found = None;
             for (exchange, waiting) in &self.pending.exchanges {
                 match waiting {
                     Waiting::Keep { sign_in: number, .. }
-                    | Waiting::Get { sign_in: number, .. }
+                    | Waiting::Get { owner: SecretOwner::SignIn(number), .. }
+                    | Waiting::Made { sign_in: number, .. }
                     | Waiting::Checked { sign_in: number, .. }
                     | Waiting::Ask { sign_in: number, .. }
                         if *number == sign_in =>
@@ -439,6 +481,7 @@ impl Component {
                     Waiting::Core
                     | Waiting::Keep { .. }
                     | Waiting::Get { .. }
+                    | Waiting::Made { .. }
                     | Waiting::Checked { .. }
                     | Waiting::Ask { .. } => {}
                 }
@@ -447,7 +490,9 @@ impl Component {
                 break;
             };
             match self.pending.exchanges.remove(&exchange).expect("ended exchange") {
-                Waiting::Keep { .. } => self.respond(env, exchange, routes::refused(&env.limits.wire)),
+                Waiting::Keep { .. } | Waiting::Made { .. } => {
+                    self.respond(env, exchange, routes::refused(&env.limits.wire));
+                }
                 Waiting::Get { .. } | Waiting::Checked { .. } | Waiting::Ask { .. } => {
                     self.respond(env, exchange, routes::signed_out(&env.limits.wire));
                 }
@@ -473,76 +518,13 @@ impl Component {
             self.connections.get_mut(&owner).expect("exchange owner").respond(200, body, &env.limits);
         }
     }
-    fn secrets(&mut self, env: &Env<Limits>, answer: SecretsAnswer, out: &mut Queue<Request>) {
-        match answer {
-            SecretsAnswer::Kept { sign_in } => {
-                let mut found = None;
-                for (exchange, waiting) in &self.pending.exchanges {
-                    match waiting {
-                        Waiting::Keep { sign_in: number, .. } if *number == sign_in => {
-                            found = Some(*exchange);
-                            break;
-                        }
-                        Waiting::Core
-                        | Waiting::Keep { .. }
-                        | Waiting::Get { .. }
-                        | Waiting::Ask { .. }
-                        | Waiting::Checked { .. } => {}
-                    }
-                }
-                if let Some(exchange) = found {
-                    match self.pending.exchanges.remove(&exchange).expect("found keep") {
-                        Waiting::Keep { answer, .. } => {
-                            self.respond(env, exchange, routes::signed_in(&env.limits.wire, answer));
-                        }
-                        Waiting::Core | Waiting::Get { .. } | Waiting::Ask { .. } | Waiting::Checked { .. } => {}
-                    }
-                }
-            }
-            SecretsAnswer::Got { sign_in, value } => {
-                // Gets answer in the same iterate; all waiting gets of that number can use it.
-                for _ in 0..env.limits.connections {
-                    let mut found = None;
-                    for (exchange, waiting) in &self.pending.exchanges {
-                        match waiting {
-                            Waiting::Get { sign_in: number, .. } if *number == sign_in => {
-                                found = Some(*exchange);
-                                break;
-                            }
-                            Waiting::Core
-                            | Waiting::Keep { .. }
-                            | Waiting::Get { .. }
-                            | Waiting::Ask { .. }
-                            | Waiting::Checked { .. } => {}
-                        }
-                    }
-                    let Some(exchange) = found else {
-                        break;
-                    };
-                    match self.pending.exchanges.remove(&exchange).expect("found get") {
-                        Waiting::Get { digest, body, .. } => {
-                            if sign_in::accepted(value.as_ref(), &digest, env.wall) {
-                                self.pending
-                                    .exchanges
-                                    .insert(exchange, Waiting::Checked { sign_in, body })
-                                    .expect("same get slot");
-                            } else {
-                                self.respond(env, exchange, routes::signed_out(&env.limits.wire));
-                            }
-                        }
-                        Waiting::Core | Waiting::Keep { .. } | Waiting::Ask { .. } | Waiting::Checked { .. } => {}
-                    }
-                }
-            }
-            SecretsAnswer::Failed => self.abort(out),
-            SecretsAnswer::Erased { .. } => {}
-        }
-    }
     fn admitted(&self) -> u32 {
         let mut count = 0_u32;
         for (_, waiting) in &self.pending.exchanges {
             match waiting {
-                Waiting::Core | Waiting::Keep { .. } | Waiting::Ask { .. } => count = count.saturating_add(1),
+                Waiting::Core | Waiting::Keep { .. } | Waiting::Made { .. } | Waiting::Ask { .. } => {
+                    count = count.saturating_add(1);
+                }
                 Waiting::Get { .. } | Waiting::Checked { .. } => {}
             }
         }
@@ -560,6 +542,7 @@ impl Component {
                 | Waiting::Keep { .. }
                 | Waiting::Get { .. }
                 | Waiting::Ask { .. }
+                | Waiting::Made { .. }
                 | Waiting::Checked { .. } => {}
             }
         }

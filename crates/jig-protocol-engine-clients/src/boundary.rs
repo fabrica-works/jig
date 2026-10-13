@@ -100,15 +100,20 @@ pub enum FromApplication {
 }
 #[derive(Debug)]
 pub enum SecretsRequest {
-    Keep { sign_in: u64, value: Kept },
-    Erase { sign_in: u64 },
-    Get { sign_in: u64 },
+    Keep { owner: SecretOwner, value: Kept },
+    Erase { owner: SecretOwner },
+    Get { owner: SecretOwner },
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum SecretOwner {
+    SignIn(u64),
+    Service(u64),
 }
 #[derive(Debug)]
 pub enum SecretsAnswer {
-    Kept { sign_in: u64 },
-    Erased { sign_in: u64 },
-    Got { sign_in: u64, value: Option<Kept> },
+    Kept { owner: SecretOwner },
+    Erased { owner: SecretOwner },
+    Got { owner: SecretOwner, value: Option<Kept> },
     Failed,
 }
 #[derive(Clone, Debug)]
@@ -130,6 +135,7 @@ pub enum Verdict {
 pub struct Settings {
     pub listener: skein_io::Addr,
     pub link: Option<people::Identity>,
+    pub deployment_provider: u16,
     pub heartbeat: Duration,
     pub served: List<Served>,
     pub providers: List<u16>,

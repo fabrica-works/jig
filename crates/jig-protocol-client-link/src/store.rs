@@ -206,6 +206,7 @@ impl Link {
                 | Request::Ended { .. }
                 | Request::Hello { .. }
                 | Request::Read { .. }
+                | Request::ServiceCredential { .. }
                 | Request::Fact { .. }) => out.push(value),
             }
         }

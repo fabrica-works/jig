@@ -202,6 +202,7 @@ impl Link {
             w::Answer::Busy | w::Answer::NotReady => RequestEnvelope::Again,
             w::Answer::SignedOut => RequestEnvelope::SignedOut,
             w::Answer::FinalAnswer(record) => {
+                let credential = translate::answers::credential(&record, &self.limits);
                 let answer = if record.owner() != &attempt.owner || record.version() != attempt.version {
                     Err(translate::Undecodable::Version)
                 } else {
@@ -220,6 +221,9 @@ impl Link {
                 };
                 match answer {
                     Ok(answer) => {
+                        if let Some((party, credential)) = credential {
+                            out.push(Request::ServiceCredential { party, credential });
+                        }
                         out.push(Request::Answer {
                             attempt: attempt.token,
                             envelope: RequestEnvelope::Final,

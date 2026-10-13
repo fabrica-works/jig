@@ -46,10 +46,10 @@ fn an_ended_sign_in_is_answered_signed_out() {
     let (owner, to) = exchange.ask();
     exchange.component.down(&exchange.env, Event::SignInEnded { sign_in: f::NUMBER }, &mut exchange.out);
     assert_eq!(exchange.answer(owner), w::Answer::SignedOut);
-    let Some(Request::Secrets(SecretsRequest::Erase { sign_in })) = exchange.out.pop() else {
+    let Some(Request::Secrets(SecretsRequest::Erase { owner: secret_owner })) = exchange.out.pop() else {
         panic!("erase digest");
     };
-    assert_eq!(sign_in, 41);
+    assert_eq!(secret_owner, crate::SecretOwner::SignIn(41));
     assert!(exchange.component.pending.exchanges.is_empty());
     exchange.reply(to, p::Reply::Outcome(p::Outcome::Started { task: 8 }));
     assert_eq!(exchange.answer(owner), w::Answer::SignedOut);
@@ -108,8 +108,8 @@ fn a_service_result_contains_its_party_and_no_credential() {
     let answer =
         crate::translate::answers::answer(&p::Reply::Outcome(p::Outcome::ServiceMade { person: 7 }), &f::wire())
             .expect("service answer");
-    let mut out = skein_lib::Writer::new(21);
-    answer.encode(&mut out).expect("21-byte party-only answer");
+    let mut out = skein_lib::Writer::new(25);
+    answer.encode(&mut out).expect("25-byte party-only answer");
     assert_eq!(out.finish().as_ref(), &f::SERVICE_ANSWER);
 }
 fn unanswered(exchange: &Exchange, owner: Token) -> bool {

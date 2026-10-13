@@ -1,5 +1,5 @@
 //! One live link, fresh bearer tokens, and durable digest admission (client.md, 8).
-use crate::{Kept, Settings};
+use crate::{Kept, SecretOwner, Settings};
 use alloc::boxed::Box;
 use jig_protocol_client_wire::v5 as w;
 use skein_lib::{
@@ -14,10 +14,16 @@ pub(crate) struct Link {
 #[derive(Debug)]
 pub(crate) enum Waiting {
     Core,
-    Keep { sign_in: u64, answer: w::SignedIn },
-    Get { sign_in: u64, digest: Secret, body: Box<[u8]> },
+    Keep { sign_in: u64, owner: SecretOwner, answer: Answer },
+    Get { owner: SecretOwner, digest: Secret, body: Box<[u8]> },
+    Made { sign_in: u64, party: u64 },
     Ask { sign_in: u64, family: Option<u16>, version: u32 },
     Checked { sign_in: u64, body: Box<[u8]> },
+}
+#[derive(Debug)]
+pub(crate) enum Answer {
+    SignedIn(w::SignedIn),
+    Service(w::Answer),
 }
 #[derive(Debug)]
 pub(crate) struct Pending {

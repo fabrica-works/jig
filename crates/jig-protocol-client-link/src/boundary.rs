@@ -1,7 +1,7 @@
 //! Owner routing and shell exchanges (protocol/client.md, 2 and 5).
 use alloc::boxed::Box;
 use jig_domain_client::contract;
-use skein_lib::{List, RequestEnvelope, RequestKey, RequestRecord, Token};
+use skein_lib::{List, RequestEnvelope, RequestKey, RequestRecord, Secret, Token};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Family {
     pub family: u16,
@@ -145,6 +145,11 @@ pub enum Request {
         attempt: Token,
         envelope: RequestEnvelope,
         answer: Option<Answered>,
+    },
+    /// The shell shows this once; it never enters the client's domain.
+    ServiceCredential {
+        party: u64,
+        credential: Secret,
     },
     OpenStream,
     CloseStream,

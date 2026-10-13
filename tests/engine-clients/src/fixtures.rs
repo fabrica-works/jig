@@ -17,6 +17,7 @@ pub fn settings() -> Settings {
     let mut served = List::with_capacity(1);
     served.push(Served { family: None, first: 5, last: 5 }).expect("one range");
     Settings {
+        deployment_provider: 2,
         listener: skein_io::Addr::Ip("127.0.0.1:8080".parse().expect("loopback")),
         link: Some(first_owner()),
         heartbeat: Duration::from_secs(5),

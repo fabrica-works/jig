@@ -20,7 +20,9 @@ pub const MAX_OUT_FIRE: u32 = 1;
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
     if limits.wire.signed_in_token < 40
+        || limits.wire.made_service_credential < 40
         || limits.wire.link_sign_in_secret < 32
+        || limits.identity_bytes < 8
         || limits.connections == 0
         || limits.exchanges == 0
         || limits.exchanges_per_client == 0

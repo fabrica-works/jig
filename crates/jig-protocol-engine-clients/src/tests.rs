@@ -5,3 +5,6 @@ mod fixtures;
 
 #[path = "tests/answers.rs"]
 mod answers;
+
+#[path = "tests/services.rs"]
+mod services;

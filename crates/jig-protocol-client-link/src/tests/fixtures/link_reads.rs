@@ -37,6 +37,7 @@ impl Harness {
             | Request::Remove { .. }
             | Request::Kept { .. }
             | Request::Dropped { .. }
+            | Request::ServiceCredential { .. }
             | Request::Fact { .. }) => {
                 panic!("expected read exchange: {other:?}")
             }
@@ -70,6 +71,7 @@ impl Harness {
                 | Request::Remove { .. }
                 | Request::Kept { .. }
                 | Request::Dropped { .. }
+                | Request::ServiceCredential { .. }
                 | Request::Fact { .. } => {}
             }
         }
@@ -94,6 +96,7 @@ impl Harness {
                 | Request::Remove { .. }
                 | Request::Kept { .. }
                 | Request::Dropped { .. }
+                | Request::ServiceCredential { .. }
                 | Request::Fact { .. } => {}
             }
         }

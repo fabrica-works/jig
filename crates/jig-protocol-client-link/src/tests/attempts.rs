@@ -23,6 +23,35 @@ fn done_is_handed_up_final_with_its_outcome() {
     );
 }
 #[test]
+fn the_client_domain_never_holds_a_service_credential() {
+    let cases = [
+        (fixtures::answer_done_service(&fixtures::SERVICE_CREDENTIAL), true),
+        (fixtures::answer_done_service(&[]), false),
+    ];
+    for (body, shown) in cases {
+        let (mut h, exchange) = fixtures::Harness::sending();
+        h.answer(exchange, 200, &body);
+        assert_eq!(
+            h.answered(fixtures::ATTEMPT),
+            Some((
+                RequestEnvelope::Final,
+                Some(&Answered::Jig(c::Answer::Done(c::Outcome::Made { what: c::Made::Service { party: 7 } })))
+            ))
+        );
+        assert_eq!(
+            h.has(&Request::ServiceCredential {
+                party: 7,
+                credential: skein_lib::Secret::new(Box::new(fixtures::SERVICE_CREDENTIAL))
+            }),
+            shown
+        );
+        let count = if shown { 3 } else { 2 };
+        assert_eq!(h.out.len(), count);
+        h.answer(exchange, 200, &body);
+        assert_eq!(h.out.len(), count);
+    }
+}
+#[test]
 fn busy_is_handed_up_as_again_with_no_answer() {
     let (mut h, exchange) = fixtures::Harness::sending();
     h.answer(exchange, 200, &fixtures::answer_busy());

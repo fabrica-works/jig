@@ -152,6 +152,7 @@ impl Harness {
                 | Request::Remove { .. }
                 | Request::Kept { .. }
                 | Request::Dropped { .. }
+                | Request::ServiceCredential { .. }
                 | Request::Fact { .. } => {}
             }
         }

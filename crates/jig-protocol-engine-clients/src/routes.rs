@@ -4,6 +4,7 @@ use jig_protocol_client_wire::v5 as w;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Route {
     Link,
+    Service,
     Request,
     Missing,
 }
@@ -13,6 +14,7 @@ pub(crate) fn route(call: &skein_http::server::Call) -> Route {
     }
     match call.target.as_ref() {
         b"/jig/v1/sign-in/link" => Route::Link,
+        b"/jig/v1/sign-in/deployment" => Route::Service,
         b"/jig/v1/request" => Route::Request,
         _ => Route::Missing,
     }

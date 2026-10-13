@@ -3,7 +3,9 @@ use crate::fixtures;
 use jig_domain_core as core;
 use jig_domain_people as people;
 use jig_protocol_client_wire::v5 as w;
-use jig_protocol_engine_clients::{Component, Event, Kept, Limits, Request, SecretsAnswer, SecretsRequest, Settings};
+use jig_protocol_engine_clients::{
+    Component, Event, Kept, Limits, Request, SecretOwner, SecretsAnswer, SecretsRequest, Settings,
+};
 use skein_http::client as http;
 use skein_lib::{
     Env, Queue, ReplyTo, Time, Token, Wall, Writer,
@@ -119,8 +121,8 @@ pub struct Peer {
     next_socket: u64,
     links: Vec<Box<[u8]>>,
     core: VecDeque<core::Event>,
-    keep: Option<(u64, Kept)>,
-    digests: BTreeMap<u64, Kept>,
+    keep: Option<(SecretOwner, Kept)>,
+    digests: BTreeMap<SecretOwner, Kept>,
 
     last_core: Option<String>,
 }
@@ -161,16 +163,16 @@ impl Peer {
                         self.last_core = Some(format!("{event:?}"));
                         self.core.push_back(*event);
                     }
-                    Request::Secrets(SecretsRequest::Keep { sign_in, value }) => self.keep = Some((sign_in, value)),
-                    Request::Secrets(SecretsRequest::Get { sign_in }) => {
+                    Request::Secrets(SecretsRequest::Keep { owner, value }) => self.keep = Some((owner, value)),
+                    Request::Secrets(SecretsRequest::Get { owner }) => {
                         self.component.down(
                             &self.env,
-                            Event::Secrets(SecretsAnswer::Got { sign_in, value: self.digests.get(&sign_in).cloned() }),
+                            Event::Secrets(SecretsAnswer::Got { owner, value: self.digests.get(&owner).cloned() }),
                             &mut self.out,
                         );
                     }
-                    Request::Secrets(SecretsRequest::Erase { sign_in }) => {
-                        self.digests.remove(&sign_in);
+                    Request::Secrets(SecretsRequest::Erase { owner }) => {
+                        self.digests.remove(&owner);
                     }
                     Request::Link { link } => self.links.push(link),
                     Request::Application(_) | Request::Provider { .. } | Request::Closed => {}
@@ -272,9 +274,9 @@ impl Peer {
     }
     pub fn answer_kept(&mut self, sign_in: u64) {
         let (number, value) = self.keep.take().expect("digest keep requested");
-        assert_eq!(number, sign_in);
+        assert_eq!(number, SecretOwner::SignIn(sign_in));
         self.digests.insert(number, value);
-        self.event(Event::Secrets(SecretsAnswer::Kept { sign_in }));
+        self.event(Event::Secrets(SecretsAnswer::Kept { owner: SecretOwner::SignIn(sign_in) }));
     }
     pub fn fail_keep(&mut self) {
         self.keep = None;
@@ -282,7 +284,9 @@ impl Peer {
     }
     #[must_use]
     pub fn digest_kept(&self) -> Option<u64> {
-        self.keep.as_ref().map(|(number, _)| *number)
+        self.keep.as_ref().map(|(owner, _)| match owner {
+            SecretOwner::SignIn(number) | SecretOwner::Service(number) => *number,
+        })
     }
     #[must_use]
     pub fn answered(&self, exchange: Token) -> Option<&[u8]> {

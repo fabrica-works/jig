@@ -451,6 +451,22 @@ pub(crate) fn refusal(value: &w::Refusal, limits: &Limits) -> Result<c::Refusal,
         w::Refusal::KeyConflict => c::Refusal::KeyConflict,
     })
 }
+/// Takes the shell-only value beside a made service's domain answer.
+pub(crate) fn credential(record: &w::Owned, limits: &Limits) -> Option<(u64, skein_lib::Secret)> {
+    if record.owner() != &w::Owner::Jig || record.version() != jig_protocol_client_wire::VERSION {
+        return None;
+    }
+    let w::Final::Done(value) = w::Final::decode(&limits.wire, &mut Reader::new(record.record())).ok()? else {
+        return None;
+    };
+    let w::Outcome::Made(value) = value.into_parts().outcome else { return None };
+    let w::Made::Service(value) = value.into_parts().what else { return None };
+    let parts = value.into_parts();
+    if parts.credential.expose().is_empty() {
+        return None;
+    }
+    Some((parts.party, parts.credential))
+}
 /// Decodes one final jig answer in its owner's vocabulary.
 pub fn answer(record: w::Answer, limits: &Limits) -> Result<c::Answer, super::Undecodable> {
     let value = match record {

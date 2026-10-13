@@ -3,6 +3,7 @@ use jig_domain_client::limits::Backoff;
 use skein_lib::{Duration, RequestKey, Writer};
 pub const ATTEMPT: Token = Token::new(17);
 pub const KEY: RequestKey = [9; 16];
+pub const SERVICE_CREDENTIAL: [u8; 40] = [7; 40];
 const CLIENT: jig_domain_client::Limits = jig_domain_client::Limits {
     watches: 4,
     notices: 2,
@@ -58,6 +59,16 @@ pub fn answer_done_chat(task: u64) -> Box<[u8]> {
     let made = w::OutcomeMade::new(&lim, w::OutcomeMadeParts { what: w::Made::Chat(chat) }).unwrap();
     final_answer(w::Final::Done(w::Done::new(&lim, w::DoneParts { outcome: w::Outcome::Made(made) }).unwrap()))
 }
+pub fn answer_done_service(credential: &[u8]) -> Box<[u8]> {
+    let lim = limits().wire;
+    let row = w::MadeService::new(
+        &lim,
+        w::MadeServiceParts { party: 7, credential: skein_lib::Secret::new(Box::from(credential)) },
+    )
+    .unwrap();
+    let made = w::OutcomeMade::new(&lim, w::OutcomeMadeParts { what: w::Made::Service(row) }).unwrap();
+    final_answer(w::Final::Done(w::Done::new(&lim, w::DoneParts { outcome: w::Outcome::Made(made) }).unwrap()))
+}
 pub fn answer_busy() -> Box<[u8]> {
     encoded_answer(&w::Answer::Busy)
 }
@@ -95,6 +106,7 @@ impl Harness {
             | Request::Remove { .. }
             | Request::Kept { .. }
             | Request::Dropped { .. }
+            | Request::ServiceCredential { .. }
             | Request::Fact { .. }) => {
                 panic!("expected exchange: {other:?}")
             }
@@ -128,6 +140,7 @@ impl Harness {
                 | Request::Remove { .. }
                 | Request::Kept { .. }
                 | Request::Dropped { .. }
+                | Request::ServiceCredential { .. }
                 | Request::Fact { .. } => {}
             }
         }
@@ -159,6 +172,7 @@ impl Harness {
                 | Request::Remove { .. }
                 | Request::Kept { .. }
                 | Request::Dropped { .. }
+                | Request::ServiceCredential { .. }
                 | Request::Fact { .. } => {}
             }
         }

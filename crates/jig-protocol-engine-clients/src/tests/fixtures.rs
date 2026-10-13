@@ -16,6 +16,7 @@ pub fn settings() -> Settings {
     served.push(crate::Served { family: None, first: 5, last: 5 }).expect("one jig range");
     served.push(crate::Served { family: Some(9), first: 2, last: 2 }).expect("one family range");
     Settings {
+        deployment_provider: 2,
         listener: skein_io::Addr::Ip(::core::net::SocketAddr::new(::core::net::IpAddr::from([127, 0, 0, 1]), 8080)),
         link: None,
         heartbeat: Duration::from_secs(5),
@@ -108,6 +109,9 @@ impl Exchange {
         Self { component, env, out, token: token.finish() }
     }
     pub fn post(&mut self, body: Box<[u8]>) -> Token {
+        self.post_to(b"/jig/v1/request", body)
+    }
+    pub fn post_to(&mut self, target: &[u8], body: Box<[u8]>) -> Token {
         let owner = self.component.name();
         let mut connection = Connection::new(owner, &self.env.limits, self.env.now);
         connection.requests.pop();
@@ -117,7 +121,7 @@ impl Exchange {
         bearer.put(&encoded).expect("token");
         let call = http::Call {
             method: skein_http::Method::Post,
-            target: Box::from(b"/jig/v1/request".as_slice()),
+            target: Box::from(target),
             headers: Box::new([skein_http::Header {
                 name: Box::from(b"authorization".as_slice()),
                 value: bearer.finish(),
@@ -132,14 +136,14 @@ impl Exchange {
         owner
     }
     pub fn authenticate(&mut self) {
-        let Some(Request::Secrets(SecretsRequest::Get { sign_in })) = self.out.pop() else {
+        let Some(Request::Secrets(SecretsRequest::Get { owner })) = self.out.pop() else {
             panic!("digest get");
         };
-        assert_eq!(sign_in, NUMBER);
+        assert_eq!(owner, SecretOwner::SignIn(NUMBER));
         self.component.down(
             &self.env,
             Event::Secrets(SecretsAnswer::Got {
-                sign_in: NUMBER,
+                owner: SecretOwner::SignIn(NUMBER),
                 value: Some(Kept {
                     digest: sign_in::digest(&self.token),
                     expires: Wall::from_nanos(86_400_000_000_000),
@@ -756,3 +760,6 @@ pub fn client_limits() -> jig_protocol_client_link::Limits {
     };
     jig_protocol_client_link::Limits::new(client, 4, Duration::from_secs(10)).expect("valid receiving limits")
 }
+#[path = "fixtures/services.rs"]
+mod services;
+pub use services::*;
