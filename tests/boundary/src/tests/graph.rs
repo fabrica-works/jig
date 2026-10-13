@@ -581,3 +581,15 @@ fn engine_worker_channels_link_only_their_boundary_and_foundation() {
     dependencies.sort();
     assert_eq!(dependencies, ["jig-domain-host", "jig-protocol-worker-wire", "skein-channel", "skein-io", "skein-lib"]);
 }
+
+#[test]
+fn worker_link_links_only_its_wire_host_and_channel_vocabulary() {
+    let roots: Vec<_> = manifests()
+        .into_iter()
+        .filter(|manifest| manifest.name.as_deref() == Some("jig-protocol-worker-link"))
+        .collect();
+    assert_eq!(roots.len(), 1, "one worker link component");
+    let mut dependencies = roots[0].dependencies.clone();
+    dependencies.sort();
+    assert_eq!(dependencies, ["jig-domain-host", "jig-protocol-worker-wire", "skein-channel", "skein-lib"]);
+}

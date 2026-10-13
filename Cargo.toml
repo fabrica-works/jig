@@ -62,6 +62,8 @@ members = [
     "tests/worker-wire",
     "crates/jig-protocol-engine-workers",
     "tests/engine-workers",
+    "crates/jig-protocol-worker-link",
+    "tests/worker-link",
 ]
 
 [workspace.package]
@@ -72,7 +74,6 @@ publish = false
 
 [workspace.dependencies]
 jig-protocol-engine-workers = { path = "crates/jig-protocol-engine-workers" }
-skein-fake-channel = { git = "https://github.com/forgetic/skein.git" }
 skein-sim = { git = "https://github.com/forgetic/skein.git" }
 skein-fake-oauth = { git = "https://github.com/forgetic/skein.git" }
 skein-fake-peers = { git = "https://github.com/forgetic/skein.git" }
@@ -83,6 +84,8 @@ skein-tls = { git = "https://github.com/forgetic/skein.git" }
 jig-protocol-accounts = { path = "crates/jig-protocol-accounts" }
 skein-oauth = { git = "https://github.com/forgetic/skein.git" }
 skein-oauth-accounts = { git = "https://github.com/forgetic/skein.git" }
+jig-protocol-worker-link = { path = "crates/jig-protocol-worker-link" }
+skein-fake-channel = { git = "https://github.com/forgetic/skein.git" }
 jig-protocol-worker-wire = { path = "crates/jig-protocol-worker-wire" }
 skein-channel = { git = "https://github.com/forgetic/skein.git" }
 jig-protocol-client-wire = { path = "crates/jig-protocol-client-wire" }

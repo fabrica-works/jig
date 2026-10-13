@@ -622,6 +622,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "jig-protocol-worker-link"
+version = "0.0.0"
+dependencies = [
+ "jig-domain-host",
+ "jig-protocol-worker-wire",
+ "skein-channel",
+ "skein-lib",
+]
+
+[[package]]
 name = "jig-protocol-worker-wire"
 version = "0.0.0"
 dependencies = [
@@ -739,6 +749,18 @@ name = "jig-views-world"
 version = "0.0.0"
 dependencies = [
  "jig-domain-views",
+ "skein-lib",
+ "skein-world",
+]
+
+[[package]]
+name = "jig-worker-link-world"
+version = "0.0.0"
+dependencies = [
+ "jig-protocol-worker-link",
+ "jig-protocol-worker-wire",
+ "skein-channel",
+ "skein-fake-channel",
  "skein-lib",
  "skein-world",
 ]

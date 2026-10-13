@@ -1,0 +1,16 @@
+[package]
+name = "jig-protocol-worker-link"
+description = "The worker channel and its redial policy"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+skein-lib.workspace = true
+skein-channel.workspace = true
+jig-protocol-worker-wire.workspace = true
+jig-domain-host.workspace = true
+
+[lints]
+workspace = true
