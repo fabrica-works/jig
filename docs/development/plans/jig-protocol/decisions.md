@@ -2080,6 +2080,17 @@ the file.
      as they stand, and moving jig's Cargo git URLs to GitHub as the
      workspace's AGENTS.md says. 25.6 keeps its work and resumes on it.
      No partial pin move.
+255. **The reference service shows its roots' state to a referee, and
+     nothing else** (2026-10-13, the coordinator's block "jig 27.1:
+     service root-only formatting for the grant-value referee",
+     2026-10-13T10:16:00Z). 27.1's referee searches each root's formatted
+     state for every grant's bytes (channel.md, 12), and `jig-test-service`
+     exposes no root. As proposed: one read-only method on `Service`
+     formats each root's domain state (the engine's and each worker's),
+     never a component, a value table or a credential, with the service,
+     engine and worker files it needs in 27.1's Files. Editing `worker.rs`
+     brings ruling 252's split of `Worker::process` into the same
+     increment, counted for nothing (ruling 209).
 
 ## For the user
 
