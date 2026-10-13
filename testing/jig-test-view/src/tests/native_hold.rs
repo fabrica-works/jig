@@ -37,7 +37,7 @@ pub(super) fn ready() -> Domain {
             _ => None,
         })
         .unwrap();
-    drive(&mut root, Event::Jig(jig_domain_client::Event::Hello { versions: VersionRange { first: 5, last: 5 } }));
+    drive(&mut root, Event::Jig(jig_domain_client::Event::Hello { versions: VersionRange { first: 6, last: 6 } }));
     drive(
         &mut root,
         Event::Jig(jig_domain_client::Event::Watch {

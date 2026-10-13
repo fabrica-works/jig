@@ -929,7 +929,7 @@ pub struct ActivityLine {
 /// A task activity event, turns decoded below this domain.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Activity {
-    /// Whole owner activity; decoded content is supplied only by an archive fetch.
+    /// Whole owner activity; its page carries the turn without a separate fetch.
     Owner { source: Box<super::OwnerActivityLine>, decoded: Option<ArchivedTurn> },
     /// Words as the party wrote them.
     Words { by: Party, message: u64, words: Text },
@@ -946,7 +946,7 @@ pub enum Activity {
     /// A recorded decision.
     Decision { object: ObjectKey, by: Actor, how: Decision },
 }
-/// Metadata from the fetched immutable archive, distinct from per-turn codec facts.
+/// Archived metadata and turn carried by its activity page, never fetched separately.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ArchivedTurn {
     pub task: u64,

@@ -191,7 +191,10 @@ pub(crate) fn archived_turn_fields(value: &w::ArchivedTurn, limits: &Limits) -> 
         cumulative: value.cumulative(),
         read: opt0,
         at: Wall::from_nanos(value.at()),
-        turn: turn_fields(value.turn(), limits),
+        turn: match value.turn() {
+            w::TurnBytes::Carried(row) => turn_fields(row.bytes(), limits),
+            w::TurnBytes::TooLarge(_) => c::TurnRead::Undecodable { why: c::TurnProblem::TooLarge },
+        },
     }
 }
 

@@ -318,3 +318,25 @@ fn each_delivery_value_variant_round_trips_unchanged() {
         assert_eq!(DeliveryValue::decode(&limits, &mut Reader::new(&bytes)), Ok(value.clone()), "{name}");
     }
 }
+
+#[test]
+fn each_turn_bytes_variant_round_trips_with_the_carried_ceiling() {
+    let limits = fixtures::limits();
+    let rows = [
+        (
+            "carried at 8 MiB",
+            TurnBytes::Carried(
+                TurnCarried::new(&limits, TurnCarriedParts { bytes: fixtures::bytes(8_388_608) })
+                    .expect("store and worker turn ceiling"),
+            ),
+        ),
+        (
+            "too large",
+            TurnBytes::TooLarge(TurnTooLarge::new(&limits, TurnTooLargeParts { bytes: u64::MAX }).expect("turn size")),
+        ),
+    ];
+    for (name, value) in rows {
+        let bytes = fixtures::encoded(&value, TurnBytes::measure, TurnBytes::encode);
+        assert_eq!(TurnBytes::decode(&limits, &mut Reader::new(&bytes)), Ok(value), "{name}");
+    }
+}

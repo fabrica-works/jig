@@ -95,9 +95,9 @@ pub fn expected_one_activity_line(row: c::ActivityLine) -> c::ActivityPage {
     rows.push(row).unwrap();
     expected_activity_rows(rows)
 }
-pub fn archived_activity_record() -> w::ActivityPage {
+fn owner_turn_source() -> w::OwnerActivityLine {
     let lim = w::CEILINGS;
-    let source = w::OwnerActivityLine::new(
+    w::OwnerActivityLine::new(
         &lim,
         w::OwnerActivityLineParts {
             task: 7,
@@ -112,26 +112,41 @@ pub fn archived_activity_record() -> w::ActivityPage {
             ),
         },
     )
-    .unwrap();
-    let decoded = w::ArchivedTurn::new(
-        &lim,
-        w::ArchivedTurnParts {
-            task: 7,
-            name: w::TurnName::new(&lim, w::TurnNameParts { attempt: 44, number: 3 }).unwrap(),
-            cumulative: 123,
-            read: Some(78),
-            at: 99,
-            turn: Box::from([0, 4]),
-        },
-    )
-    .unwrap();
-    let event = w::Activity::Owner(
-        w::ActivityOwner::new(&lim, w::ActivityOwnerParts { source, decoded: Some(decoded) }).unwrap(),
-    );
+    .unwrap()
+}
+pub fn archived_activity_record() -> w::ActivityPage {
+    let lim = w::CEILINGS;
+    let turn = w::TurnCarried::new(&lim, w::TurnCarriedParts { bytes: Box::from([0, 4]) }).unwrap();
+    owner_turn_activity_record(Some(w::TurnBytes::Carried(turn)))
+}
+pub fn owner_turn_activity_record(turn: Option<w::TurnBytes>) -> w::ActivityPage {
+    let lim = w::CEILINGS;
+    let source = owner_turn_source();
+    let mut decoded = None;
+    if let Some(turn) = turn {
+        decoded = Some(
+            w::ArchivedTurn::new(
+                &lim,
+                w::ArchivedTurnParts {
+                    task: 7,
+                    name: w::TurnName::new(&lim, w::TurnNameParts { attempt: 44, number: 3 }).unwrap(),
+                    cumulative: 123,
+                    read: Some(78),
+                    at: 99,
+                    turn,
+                },
+            )
+            .unwrap(),
+        );
+    }
+    let event = w::Activity::Owner(w::ActivityOwner::new(&lim, w::ActivityOwnerParts { source, decoded }).unwrap());
     let row = w::ActivityLine::new(&lim, w::ActivityLineParts { position: 50, at: 51, event }).unwrap();
     activity_rows(&[row])
 }
 pub fn archived_activity_page() -> c::ActivityPage {
+    archived_activity_page_with_problem(c::TurnProblem::Version { found: 4 })
+}
+fn archived_activity_page_with_problem(why: c::TurnProblem) -> c::ActivityPage {
     let source = c::OwnerActivityLine {
         task: 7,
         position: 88,
@@ -144,7 +159,7 @@ pub fn archived_activity_page() -> c::ActivityPage {
         cumulative: 123,
         read: Some(78),
         at: Wall::from_nanos(99),
-        turn: c::TurnRead::Undecodable { why: c::TurnProblem::Version { found: 4 } },
+        turn: c::TurnRead::Undecodable { why },
     };
     expected_one_activity_line(c::ActivityLine {
         position: 50,
@@ -162,3 +177,26 @@ pub fn turn_limits(text: u32, document_bytes: u64) -> Limits {
 }
 
 const UTF8_TEXTS: [&[u8]; 1] = [b"~\0\x01"];
+
+pub fn owner_turn_pages() -> [(&'static str, w::ActivityPage, c::ActivityPage); 2] {
+    let large = w::TurnTooLarge::new(&w::CEILINGS, w::TurnTooLargeParts { bytes: 8_388_609 }).unwrap();
+    [
+        (
+            "too large",
+            owner_turn_activity_record(Some(w::TurnBytes::TooLarge(large))),
+            archived_activity_page_with_problem(c::TurnProblem::TooLarge),
+        ),
+        (
+            "malformed unread",
+            owner_turn_activity_record(None),
+            expected_one_activity_line(c::ActivityLine {
+                position: 50,
+                at: Wall::from_nanos(51),
+                event: c::Activity::Turn {
+                    name: c::TurnName { attempt: 44, number: 3 },
+                    turn: c::TurnRead::Undecodable { why: c::TurnProblem::Malformed },
+                },
+            }),
+        ),
+    ]
+}

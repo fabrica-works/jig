@@ -1,6 +1,6 @@
 //! Incremental SSE and canonical base64 framing (protocol/client.md, 4 and 7).
 use crate::{Limits, Undecodable, translate};
-use jig_protocol_client_wire::v5 as w;
+use jig_protocol_client_wire::v6 as w;
 use skein_http::sse;
 use skein_lib::base64::{Alphabet, Decoder};
 use skein_lib::stream::{Down, Read, Up};

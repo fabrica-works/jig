@@ -2,7 +2,7 @@
 use super::refusals;
 use alloc::boxed::Box;
 use jig_domain_people as p;
-use jig_protocol_client_wire::v5 as w;
+use jig_protocol_client_wire::v6 as w;
 use skein_lib::Writer;
 pub(crate) fn answer(reply: &p::Reply, limits: &w::Limits) -> Result<w::Answer, w::Problem> {
     let final_answer = match reply {

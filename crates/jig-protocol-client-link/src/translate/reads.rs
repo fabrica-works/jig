@@ -5,7 +5,7 @@ use crate::{Limits, Readable};
 use alloc::boxed::Box;
 use jig_domain_client::contract as c;
 use jig_protocol_client_wire::VERSION;
-use jig_protocol_client_wire::v5 as w;
+use jig_protocol_client_wire::v6 as w;
 use skein_lib::{Reader, Writer, bytes};
 
 #[expect(clippy::manual_map, reason = "step code matches optional fields without closures")]

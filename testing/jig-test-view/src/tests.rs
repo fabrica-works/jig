@@ -113,7 +113,7 @@ fn ready() -> Domain {
             _ => None,
         })
         .unwrap();
-    drive(&mut root, Event::Jig(jig_domain_client::Event::Hello { versions: VersionRange { first: 5, last: 5 } }));
+    drive(&mut root, Event::Jig(jig_domain_client::Event::Hello { versions: VersionRange { first: 6, last: 6 } }));
     drive(
         &mut root,
         Event::Jig(jig_domain_client::Event::Watch {
@@ -574,7 +574,7 @@ fn check_outbox_family_keys_keep_scope_entry_and_effect_proposal_distinct() {
     for scope in [PartScope::Project(3), PartScope::Project(4), PartScope::Deployment] {
         parts.push(Part::Outbox { connector: jig_test_domain_client::FIRST, scope, entry }).unwrap();
     }
-    drive(&mut root, Event::Jig(jig_domain_client::Event::Hello { versions: VersionRange { first: 5, last: 5 } }));
+    drive(&mut root, Event::Jig(jig_domain_client::Event::Hello { versions: VersionRange { first: 6, last: 6 } }));
     drive(
         &mut root,
         Event::Jig(jig_domain_client::Event::Watch {

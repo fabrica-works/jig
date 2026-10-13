@@ -15,7 +15,7 @@ pub fn first_owner() -> Identity {
 #[must_use]
 pub fn settings() -> Settings {
     let mut served = List::with_capacity(1);
-    served.push(Served { family: None, first: 5, last: 5 }).expect("one range");
+    served.push(Served { family: None, first: 6, last: 6 }).expect("one range");
     Settings {
         deployment_provider: 2,
         listener: skein_io::Addr::Ip("127.0.0.1:8080".parse().expect("loopback")),
@@ -37,7 +37,7 @@ pub fn limits() -> Limits {
         exchanges: 4,
         exchanges_per_client: 2,
         http: skein_http::server::Limits { head: 4096, headers: 32, body: 1024, read: 256, response: 1024, send: 256 },
-        wire: jig_protocol_client_wire::v5::CEILINGS,
+        wire: jig_protocol_client_wire::v6::CEILINGS,
         link_span: Duration::from_secs(300),
         stall: Duration::from_secs(30),
     }

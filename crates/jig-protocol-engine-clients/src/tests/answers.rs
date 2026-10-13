@@ -1,7 +1,7 @@
 use super::fixtures::{self as f, Exchange};
 use crate::{Event, Request, SecretsRequest};
 use jig_domain_people as p;
-use jig_protocol_client_wire::v5 as w;
+use jig_protocol_client_wire::v6 as w;
 use skein_lib::{Reader, ReplyTo, Token};
 #[test]
 fn a_made_chat_is_answered_done_with_its_task() {
@@ -95,7 +95,7 @@ fn translated(reply: &p::Reply, limits: &w::Limits) -> w::Final {
     match record {
         w::Answer::FinalAnswer(value) => {
             assert_eq!(value.owner(), &w::Owner::Jig);
-            assert_eq!(value.version(), 5);
+            assert_eq!(value.version(), 6);
             w::Final::decode(limits, &mut Reader::new(value.record())).expect("jig answer")
         }
         other @ (w::Answer::Busy | w::Answer::NotReady | w::Answer::SignedOut) => {

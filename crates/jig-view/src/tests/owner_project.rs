@@ -505,7 +505,7 @@ fn check_owner_project_real_page_decodes_whole_role_edits_preserves_prior_channe
             offset: jig_domain_client::boundary::Offset { minutes: 0 },
         },
     );
-    native_drive(&mut d, Event::Hello { versions: VersionRange { first: 5, last: 5 } });
+    native_drive(&mut d, Event::Hello { versions: VersionRange { first: 6, last: 6 } });
     let f = opened
         .iter()
         .find_map(|r| match r {
@@ -685,7 +685,7 @@ fn native_owner_at(value: OwnerProject, section: jig_domain_client::address::Pro
             offset: jig_domain_client::boundary::Offset { minutes: 0 },
         },
     );
-    native_drive(&mut domain, Event::Hello { versions: VersionRange { first: 5, last: 5 } });
+    native_drive(&mut domain, Event::Hello { versions: VersionRange { first: 6, last: 6 } });
     let watch = out
         .iter()
         .find_map(|request| match request {
@@ -1061,7 +1061,7 @@ fn native_historical_project() -> (Domain, OwnerSpendPage) {
             offset: jig_domain_client::boundary::Offset { minutes: 0 },
         },
     );
-    native_drive(&mut domain, Event::Hello { versions: VersionRange { first: 5, last: 5 } });
+    native_drive(&mut domain, Event::Hello { versions: VersionRange { first: 6, last: 6 } });
     let watch = start
         .iter()
         .find_map(|request| match request {

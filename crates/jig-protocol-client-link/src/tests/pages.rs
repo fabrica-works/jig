@@ -254,3 +254,11 @@ fn a_turn_past_its_admission_bound_is_carried_as_too_large() {
         c::TurnRead::Undecodable { why: c::TurnProblem::TooLarge }
     );
 }
+
+#[test]
+fn an_owner_turn_without_carried_bytes_crosses_up_with_its_problem() {
+    let limits = fixtures::limits();
+    for (name, record, expected) in fixtures::owner_turn_pages() {
+        assert_eq!(translate::pages::activity_page(record, &limits), Ok(expected), "{name}");
+    }
+}

@@ -1,7 +1,7 @@
 //! Fresh wire names and one terminal per watch (protocol/client.md, 7).
 use crate::{Family, Limits, Request};
 use jig_domain_client::contract::{WatchEnd, WatchEvent};
-use jig_protocol_client_wire::v5 as w;
+use jig_protocol_client_wire::v6 as w;
 use skein_lib::{Map, Queue, Token};
 #[derive(Debug)]
 pub(crate) struct Opening {

@@ -2,7 +2,7 @@
 use crate::{Erased, Fact, Keeper, Limits, Link, Request, Saved, StoreRead, StoreVersion, translate};
 use alloc::boxed::Box;
 use jig_domain_client::store::StoreKey;
-use jig_protocol_client_wire::v5 as w;
+use jig_protocol_client_wire::v6 as w;
 use skein_lib::{List, Queue, Reader, Token, Writer, bytes};
 #[derive(Debug)]
 struct Held {

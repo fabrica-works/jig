@@ -23,7 +23,7 @@ pub fn moved_hold() -> w::Final {
     );
     w::Final::Refused(w::Refused::new(&wire(), w::RefusedParts { refusal: hold_refusal(reason) }).expect("refused"))
 }
-pub const SERVICE_ANSWER: [u8; 25] = [0, 0, 0, 0, 0, 5, 0, 0, 0, 15, 0, 1, 4, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0];
+pub const SERVICE_ANSWER: [u8; 25] = [0, 0, 0, 0, 0, 6, 0, 0, 0, 15, 0, 1, 4, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0];
 pub fn application_answer() -> w::Answer {
     let owner = w::Owner::Family(w::Family::new(&wire(), w::FamilyParts { number: 9 }).expect("family"));
     w::Answer::FinalAnswer(

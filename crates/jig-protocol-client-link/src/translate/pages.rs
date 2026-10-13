@@ -10,7 +10,7 @@ use super::{Undecodable, piece_problem, too_large};
 use crate::Limits;
 use alloc::boxed::Box;
 use jig_domain_client::contract as c;
-use jig_protocol_client_wire::v5 as w;
+use jig_protocol_client_wire::v6 as w;
 use skein_lib::{List, Reader, Wall, bytes};
 fn opaque(value: &[u8], limits: &Limits) -> Result<c::Bytes, w::Problem> {
     match c::Bytes::new(bytes::copy_of(value), limits.client.text) {

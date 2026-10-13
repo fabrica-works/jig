@@ -1,7 +1,7 @@
 //! One live link, fresh bearer tokens, and durable digest admission (client.md, 8).
 use crate::{Kept, SecretOwner, Settings};
 use alloc::boxed::Box;
-use jig_protocol_client_wire::v5 as w;
+use jig_protocol_client_wire::v6 as w;
 use skein_lib::{
     CryptoRng, Map, Secret, Time, Token, Writer,
     base64::{self, Alphabet},

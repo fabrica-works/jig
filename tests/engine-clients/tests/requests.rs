@@ -1,7 +1,7 @@
 use jig_domain_core as core;
 use jig_domain_people as people;
 use jig_engine_clients_world::fixtures::{self, Peer};
-use jig_protocol_client_wire::v5 as w;
+use jig_protocol_client_wire::v6 as w;
 use skein_lib::{
     Writer,
     base64::{self, Alphabet},
@@ -26,7 +26,7 @@ fn request() -> Box<[u8]> {
     let mut out = Writer::new(usize::try_from(ask.measure()).expect("ask size"));
     ask.encode(&mut out).expect("ask bytes");
     let record =
-        w::Keyed::new(&limits, w::KeyedParts { key: [5; 16], owner: w::Owner::Jig, version: 5, request: out.finish() })
+        w::Keyed::new(&limits, w::KeyedParts { key: [5; 16], owner: w::Owner::Jig, version: 6, request: out.finish() })
             .expect("keyed request");
     let mut out = Writer::new(usize::try_from(record.measure()).expect("record size"));
     record.encode(&mut out).expect("request bytes");
@@ -62,7 +62,7 @@ fn a_native_request_waits_for_the_released_reply_and_takes_its_task() {
         panic!("final answer");
     };
     assert_eq!(answer.owner(), &w::Owner::Jig);
-    assert_eq!(answer.version(), 5);
+    assert_eq!(answer.version(), 6);
     let outcome = w::Outcome::Owner(
         w::OutcomeOwner::new(
             &limits,

@@ -8,7 +8,7 @@ use crate::{
 use alloc::boxed::Box;
 use jig_domain_core as core;
 use jig_domain_people as people;
-use jig_protocol_client_wire::v5 as w;
+use jig_protocol_client_wire::v6 as w;
 use skein_http::server as http;
 use skein_lib::{
     CryptoRng, Env, Map, Queue, ReplyTo, Time, Token,

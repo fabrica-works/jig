@@ -205,6 +205,14 @@ pub(crate) fn activity_line_fields(value: &w::ActivityLine, limits: &Limits) -> 
 pub(crate) fn activity_fields(value: &w::Activity, limits: &Limits) -> Result<c::Activity, w::Problem> {
     Ok(match value {
         w::Activity::Owner(row) => {
+            if row.decoded().is_none()
+                && let w::OwnerActivity::Turn(turn) = row.source().line()
+            {
+                return Ok(c::Activity::Turn {
+                    name: c::TurnName { attempt: turn.attempt(), number: turn.turn() },
+                    turn: c::TurnRead::Undecodable { why: c::TurnProblem::Malformed },
+                });
+            }
             let opt0 = match row.decoded() {
                 Some(item) => Some(archived_turn_fields(item, limits)),
                 None => None,

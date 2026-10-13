@@ -1690,7 +1690,7 @@ fn check_inbox_group_pages_keep_orders_cursors_and_live_precedence() {
             offset: crate::boundary::Offset { minutes: 0 },
         },
     ));
-    send(&mut domain, Event::Hello { versions: VersionRange { first: 5, last: 5 } });
+    send(&mut domain, Event::Hello { versions: VersionRange { first: 6, last: 6 } });
     let entered =
         send(&mut domain, Event::Watch { watch: f, event: WatchEvent::Delivered(Delivery::Frame(Box::new(frame(7)))) });
     let watch = open_token(&entered);

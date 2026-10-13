@@ -117,7 +117,7 @@ fn start(root: &mut Domain, kept: List<crate::store::Record>) -> Token {
         .unwrap()
 }
 fn confirm(root: &mut Domain, watch: Token, party: u64) {
-    drive(root, Event::Jig(jig_domain_client::Event::Hello { versions: VersionRange { first: 5, last: 5 } }));
+    drive(root, Event::Jig(jig_domain_client::Event::Hello { versions: VersionRange { first: 6, last: 6 } }));
     // Explicit synthetic identity and empty offers, supplied independently of the party's display name.
     let frame = Frame {
         party: FrameParty {
