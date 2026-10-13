@@ -5,12 +5,12 @@ use std::{fs, path::Path};
 #[test]
 fn client_wire_schema_matches_generated_code_and_goldens() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../crates/jig-protocol-client-wire");
-    let mut source = fs::read_to_string(root.join("schema/client-v4.schema")).expect("client schema");
+    let mut source = fs::read_to_string(root.join("schema/client-v5.schema")).expect("client schema");
     source
-        .push_str(&fs::read_to_string(root.join("schema/client-v4-part1.schema")).expect("client schema continuation"));
+        .push_str(&fs::read_to_string(root.join("schema/client-v5-part1.schema")).expect("client schema continuation"));
     let output = generate(&parse(&source).expect("schema valid"));
-    let code = root.join("src/generated/v4.rs");
-    let goldens = root.join("golden/v4");
+    let code = root.join("src/generated/v5.rs");
+    let goldens = root.join("golden/v5");
     let write = std::env::var_os("SKEIN_CODEGEN_WRITE").is_some_and(|value| value == "1");
     let again = "run SKEIN_CODEGEN_WRITE=1 heavy cargo nextest run -p jig-client-wire-world --test drift";
     if write {

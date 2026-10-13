@@ -33,6 +33,10 @@ impl Harness {
             | Request::FamilyDelivery { .. }
             | Request::Ended { .. }
             | Request::Hello { .. }
+            | Request::Write { .. }
+            | Request::Remove { .. }
+            | Request::Kept { .. }
+            | Request::Dropped { .. }
             | Request::Fact { .. }) => {
                 panic!("expected read exchange: {other:?}")
             }
@@ -62,6 +66,10 @@ impl Harness {
                 | Request::FamilyDelivery { .. }
                 | Request::Ended { .. }
                 | Request::Hello { .. }
+                | Request::Write { .. }
+                | Request::Remove { .. }
+                | Request::Kept { .. }
+                | Request::Dropped { .. }
                 | Request::Fact { .. } => {}
             }
         }
@@ -82,6 +90,10 @@ impl Harness {
                 | Request::FamilyDelivery { .. }
                 | Request::Ended { .. }
                 | Request::Hello { .. }
+                | Request::Write { .. }
+                | Request::Remove { .. }
+                | Request::Kept { .. }
+                | Request::Dropped { .. }
                 | Request::Fact { .. } => {}
             }
         }

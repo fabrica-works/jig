@@ -36,7 +36,7 @@ pub fn limits() -> Limits {
         exchanges: 4,
         exchanges_per_client: 2,
         http: skein_http::server::Limits { head: 4096, headers: 32, body: 1024, read: 256, response: 1024, send: 256 },
-        wire: jig_protocol_client_wire::v4::CEILINGS,
+        wire: jig_protocol_client_wire::v5::CEILINGS,
         link_span: Duration::from_secs(300),
         stall: Duration::from_secs(30),
     }

@@ -1,7 +1,7 @@
 use crate::*;
 use alloc::boxed::Box;
 use jig_domain_client::contract as c;
-use jig_protocol_client_wire::v4 as w;
+use jig_protocol_client_wire::v5 as w;
 use skein_lib::{Queue, Reader, RequestEnvelope, Time, Token};
 mod attempts;
 mod documents;
@@ -16,3 +16,5 @@ mod stream;
 fn the_client_version_matches_its_wire_version() {
     assert_eq!(c::CLIENT_VERSION, jig_protocol_client_wire::VERSION);
 }
+
+mod store;

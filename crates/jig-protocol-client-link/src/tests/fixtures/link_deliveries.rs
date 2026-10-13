@@ -148,6 +148,10 @@ impl Harness {
                 | Request::FamilyDelivery { .. }
                 | Request::Ended { .. }
                 | Request::Hello { .. }
+                | Request::Write { .. }
+                | Request::Remove { .. }
+                | Request::Kept { .. }
+                | Request::Dropped { .. }
                 | Request::Fact { .. } => {}
             }
         }

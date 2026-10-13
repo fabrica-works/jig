@@ -106,6 +106,10 @@ impl Harness {
                 | Request::FamilyDelivery { .. }
                 | Request::Ended { .. }
                 | Request::Hello { .. }
+                | Request::Write { .. }
+                | Request::Remove { .. }
+                | Request::Kept { .. }
+                | Request::Dropped { .. }
                 | Request::Fact { .. } => {}
             }
         }
@@ -125,6 +129,10 @@ impl Harness {
                 | Request::FamilyDelivery { .. }
                 | Request::Ended { .. }
                 | Request::Hello { .. }
+                | Request::Write { .. }
+                | Request::Remove { .. }
+                | Request::Kept { .. }
+                | Request::Dropped { .. }
                 | Request::Fact { .. } => {}
             }
         }
@@ -144,6 +152,10 @@ impl Harness {
                 | Request::Watch { .. }
                 | Request::FamilyDelivery { .. }
                 | Request::Hello { .. }
+                | Request::Write { .. }
+                | Request::Remove { .. }
+                | Request::Kept { .. }
+                | Request::Dropped { .. }
                 | Request::Fact { .. } => {}
             }
         }
@@ -163,6 +175,10 @@ impl Harness {
             | Request::FamilyDelivery { .. }
             | Request::Ended { .. }
             | Request::Hello { .. }
+            | Request::Write { .. }
+            | Request::Remove { .. }
+            | Request::Kept { .. }
+            | Request::Dropped { .. }
             | Request::Fact { .. }) => panic!("no close: {other:?}"),
         }
     }
@@ -187,6 +203,10 @@ impl Harness {
                 | Request::FamilyDelivery { .. }
                 | Request::Ended { .. }
                 | Request::Hello { .. }
+                | Request::Write { .. }
+                | Request::Remove { .. }
+                | Request::Kept { .. }
+                | Request::Dropped { .. }
                 | Request::Fact { .. } => {}
             }
         }
@@ -223,6 +243,10 @@ impl Harness {
                 | Request::FamilyDelivery { .. }
                 | Request::Ended { .. }
                 | Request::Hello { .. }
+                | Request::Write { .. }
+                | Request::Remove { .. }
+                | Request::Kept { .. }
+                | Request::Dropped { .. }
                 | Request::Fact { .. } => {}
             }
         }

@@ -6,7 +6,7 @@ use super::pages::{
 use super::{Undecodable, documents::classify};
 use crate::Limits;
 use jig_domain_client::contract as c;
-use jig_protocol_client_wire::v4 as w;
+use jig_protocol_client_wire::v5 as w;
 pub fn proposal(record: w::Proposal, limits: &Limits) -> Result<c::Proposal, Undecodable> {
     if crate::limits::worst_case(limits).is_none() || u64::from(record.measure()) > limits.client.document_bytes {
         return Err(Undecodable::TooLarge);

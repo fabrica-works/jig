@@ -48,7 +48,7 @@ pub fn final_answer(value: w::Final) -> Box<[u8]> {
     let mut bytes = Writer::new(usize::try_from(value.measure()).unwrap());
     value.encode(&mut bytes).unwrap();
     let owned =
-        w::Owned::new(&limits().wire, w::OwnedParts { owner: w::Owner::Jig, version: 4, record: bytes.finish() })
+        w::Owned::new(&limits().wire, w::OwnedParts { owner: w::Owner::Jig, version: 5, record: bytes.finish() })
             .unwrap();
     encoded_answer(&w::Answer::FinalAnswer(owned))
 }
@@ -66,7 +66,7 @@ pub fn answer_signed_out() -> Box<[u8]> {
 }
 pub fn malformed_final() -> Box<[u8]> {
     let owned =
-        w::Owned::new(&limits().wire, w::OwnedParts { owner: w::Owner::Jig, version: 4, record: Box::from([255]) })
+        w::Owned::new(&limits().wire, w::OwnedParts { owner: w::Owner::Jig, version: 5, record: Box::from([255]) })
             .unwrap();
     encoded_answer(&w::Answer::FinalAnswer(owned))
 }
@@ -91,6 +91,10 @@ impl Harness {
             | Request::FamilyDelivery { .. }
             | Request::Ended { .. }
             | Request::Hello { .. }
+            | Request::Write { .. }
+            | Request::Remove { .. }
+            | Request::Kept { .. }
+            | Request::Dropped { .. }
             | Request::Fact { .. }) => {
                 panic!("expected exchange: {other:?}")
             }
@@ -120,6 +124,10 @@ impl Harness {
                 | Request::FamilyDelivery { .. }
                 | Request::Ended { .. }
                 | Request::Hello { .. }
+                | Request::Write { .. }
+                | Request::Remove { .. }
+                | Request::Kept { .. }
+                | Request::Dropped { .. }
                 | Request::Fact { .. } => {}
             }
         }
@@ -147,6 +155,10 @@ impl Harness {
                 | Request::FamilyDelivery { .. }
                 | Request::Ended { .. }
                 | Request::Hello { .. }
+                | Request::Write { .. }
+                | Request::Remove { .. }
+                | Request::Kept { .. }
+                | Request::Dropped { .. }
                 | Request::Fact { .. } => {}
             }
         }
@@ -205,3 +217,6 @@ pub use link_stream::*;
 
 mod link_deliveries;
 pub use link_deliveries::*;
+
+mod link_store;
+pub use link_store::*;

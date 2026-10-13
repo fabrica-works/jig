@@ -10,7 +10,7 @@ pub struct Limits {
     pub exchanges: u32,
     pub exchanges_per_client: u32,
     pub http: skein_http::server::Limits,
-    pub wire: jig_protocol_client_wire::v4::Limits,
+    pub wire: jig_protocol_client_wire::v5::Limits,
     pub link_span: Duration,
     pub stall: Duration,
 }
@@ -29,7 +29,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     {
         return None;
     }
-    jig_protocol_client_wire::v4::check_limits(&limits.wire).ok()?;
+    jig_protocol_client_wire::v5::check_limits(&limits.wire).ok()?;
     let body = u32::try_from(limits.http.body).ok()?;
     let each = skein_http::server::worst_case(&limits.http)?
         .checked_add(skein_lib::Intake::worst_case(body)?)?

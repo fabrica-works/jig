@@ -5,6 +5,7 @@ extern crate alloc;
 pub mod boundary;
 mod component;
 pub mod limits;
+mod store;
 mod stream;
 pub mod translate;
 mod watches;

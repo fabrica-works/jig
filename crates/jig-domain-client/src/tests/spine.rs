@@ -75,7 +75,7 @@ pub(super) fn drive(domain: &mut Domain, now: Time, event: Event) -> Box<[Reques
     };
     step(domain, &env(now), event, &mut out);
     if starting {
-        step(domain, &env(now), Event::Hello { versions: VersionRange { first: 4, last: 4 } }, &mut out);
+        step(domain, &env(now), Event::Hello { versions: VersionRange { first: 5, last: 5 } }, &mut out);
     }
     drain(out)
 }

@@ -1167,7 +1167,7 @@ mod tests {
         let callbacks = session.poll(now, wall).expect("Hello is protocol-owned");
         assert_eq!(callbacks.len(), 1, "actual callbacks: {callbacks:?}");
         assert!(
-            matches!(&callbacks[0], (ClientId(0), Event::Jig(jig_domain_client::Event::Hello { versions })) if *versions == client::VersionRange { first: 4, last: 4 })
+            matches!(&callbacks[0], (ClientId(0), Event::Jig(jig_domain_client::Event::Hello { versions })) if *versions == client::VersionRange { first: 5, last: 5 })
         );
         assert!(session.driver.withhold_completion().expect("actual authentication becomes durable").is_none());
         assert!(session.poll(now, wall).expect("completion withheld").is_empty());

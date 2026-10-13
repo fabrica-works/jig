@@ -1,5 +1,5 @@
 use jig_engine_clients_world::fixtures::{self, Peer};
-use jig_protocol_client_wire::v4 as w;
+use jig_protocol_client_wire::v5 as w;
 use jig_protocol_engine_clients::{Component, Unusable};
 use skein_lib::{Env, Queue, Time, Wall};
 fn peer() -> Peer {

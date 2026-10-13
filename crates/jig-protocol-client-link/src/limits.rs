@@ -1,6 +1,6 @@
 //! Fixed attempt admission and receiving bounds (protocol/client.md, 13).
 use crate::component::Attempt;
-use jig_protocol_client_wire::v4 as w;
+use jig_protocol_client_wire::v5 as w;
 use skein_lib::{Duration, Map};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
@@ -174,6 +174,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         return None;
     }
     max_out(limits)?;
+    crate::store::records(limits)?.checked_add(2)?;
     if limits.client.watches == 0 || limits.client.heartbeat == Duration::ZERO {
         return None;
     }
@@ -181,11 +182,16 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     map.checked_add(skein_lib::List::<skein_lib::Token>::worst_case(limits.exchanges)?)?
         .checked_add(crate::watches::worst_case(limits)?)?
         .checked_add(skein_lib::List::<skein_lib::Token>::worst_case(limits.client.watches)?)?
-        .checked_add(crate::stream::worst_case(limits)?)
+        .checked_add(crate::stream::worst_case(limits)?)?
+        .checked_add(crate::store::worst_case(limits)?)
 }
 
 pub(crate) fn max_out(limits: &Limits) -> Option<u32> {
     crate::stream::bounds(limits)?;
     let per_event = limits.client.watches.checked_mul(3)?.checked_add(limits.exchanges)?.checked_add(20)?;
-    limits.stream_chunk().checked_mul(per_event)?.checked_add(limits.exchanges.checked_mul(2)?)
+    limits
+        .stream_chunk()
+        .checked_mul(per_event)?
+        .checked_add(limits.exchanges.checked_mul(2)?)?
+        .checked_add(crate::store::records(limits)?.checked_mul(2)?)
 }

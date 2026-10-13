@@ -66,3 +66,5 @@ record OwnerInbox { party: u64 needs: bytes 16777216 updates: bytes 16777216 nex
 
 # A delivery preserves its contract variant and the whole document (ruling 211).
 enum DeliveryValue { owner_project: OwnerProject, frame: Frame, task: boxed Task, owner_proposal: OwnerProposal, tree: Tree, owner_tree: OwnerTree, chips: Chips, inbox: Inbox, owner_inbox: OwnerInbox, goals: Goals, tasks: Tasks, conversations: Conversations, run: RunText, run_state: RunState, deployment: Deployment, owner_deployment: OwnerDeployment }
+
+enum JigRecord { place: Place, draft: Draft }

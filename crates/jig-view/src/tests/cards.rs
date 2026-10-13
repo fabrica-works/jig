@@ -104,7 +104,7 @@ pub(super) fn drive(d: &mut Domain, event: Event) -> Vec<Request> {
         jig_domain_client::step(
             d,
             &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: CLIENT },
-            Event::Hello { versions: VersionRange { first: 4, last: 4 } },
+            Event::Hello { versions: VersionRange { first: 5, last: 5 } },
             &mut q,
         );
     }
