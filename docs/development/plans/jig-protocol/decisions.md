@@ -1846,6 +1846,17 @@ the file.
      expected value kept. Default and production limits
      (`world::limits`, the profiles) are not changed, and the adapter
      caps nothing. The README's Rules now say so.
+236. **jig 18.3 takes what its gate needs of 18.4** (2026-10-13, the
+     coordinator's block "jig 18.3: gate needs conformance transition
+     currently assigned to 18.4", 2026-10-13T07:18:05Z). A plan defect:
+     `tests/conformance` imports the core world's `Store` and
+     `store_writes`, which 18.3 replaces and removes, and its
+     `Application` harness still takes the fake store, so 18.3's gate
+     fails to compile; 18.4 moves conformance, and "Needs: nothing beyond
+     18.3". 18.3 makes 18.4's `Durable` and `Application` changes and the
+     conformance routing its gate needs, as 18.4 specifies them; 18.4
+     keeps its new snapshot test, its joint proof and the measure. No
+     temporary bridge API, no fake store restored to the core world.
 
 ## For the user
 

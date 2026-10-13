@@ -445,6 +445,17 @@ Removes: `tests/core/src/historical.rs`; the fake scan in
 world's restart rank sort (`effects.rs:1075-1120`); `jig-fake-store` from
 `tests/core/Cargo.toml`.
 
+
+**18.3 takes what its gate needs of 18.4** (decisions.md, ruling 236).
+`tests/conformance` imports the core world's `Store` and `store_writes`,
+which 18.3 replaces and removes, and drives `Application` methods that
+still take the fake store, so 18.3's gate cannot build. 18.3 also makes
+18.4's `Durable` trait and `Application` changes, and the conformance
+world's routing to the adapter, as 18.4's Scope, Shape and Files say,
+named in its commit body. 18.4 keeps its new test
+(`a_forked_snapshot_replays_to_the_durable_rows`), its joint proof and
+the measure, and whatever of its Scope 18.3 did not need.
+
 ### 18.4 The conformance world on the real store; the budgets (W3)
 
 Scope: decisions 8 and 9. `testing/jig-conformance`'s harness drives a
