@@ -1403,6 +1403,21 @@ the file.
      its Shape changes the behaviour, named in its commit body. Another
      session's files stay under rulings 114 and 145. The README's Rules
      say so.
+199. **smith's `Directory.git` field is allowed where jig builds one**
+     (2026-10-13, the coordinator's block "jig 25.1: foreign Smith
+     Directory git field rejected by vocabulary guard",
+     2026-10-13T03:05:17Z). jig's vocabulary guard
+     (`tests/boundary/src/tests/vocabulary.rs`, `names.rs`'
+     `vocabulary_matches`) refuses the word `git` in jig's sources; smith's
+     `smith::Directory` has a field `git: bool`, and smith's `valid_start`
+     wants a `Directory` whenever a start has a workspace, so jig 25.1's
+     workspace fixture (and later the test service's construction) must
+     write `git: false`. The guard keeps jig's own vocabulary, not the
+     field names of smith's types. 25.1 adds to the guard an allowance for
+     exactly the field `git` of a `smith::Directory` literal, in the files
+     that build one, each named; every other check of the word stays.
+     Not a dropped check: a foreign name excepted, as jig's own names are
+     not.
 
 ## For the user
 
