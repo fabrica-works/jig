@@ -1434,6 +1434,18 @@ the file.
      test `an_assignment_for_a_channel_leaves_as_the_hub_s_record` checks
      the typed hand-off and the kept `RunCharter`. No payload encoding in
      the root.
+201. **`jig-protocol-transcript` gains `Limits::new` for the client link**
+     (2026-10-13, the coordinator's block "jig 35.2: client transcript
+     Limits construction without Smith dependency", 2026-10-13T03:27:33Z).
+     35.2 decodes an activity's turn bytes with
+     `jig_protocol_transcript::decode`, whose `Limits { smith, bytes, turn
+     }` the client link cannot build: only the transcript crate links
+     smith (`tests/boundary`'s `client_transcript_is_the_client_only_smith_link`).
+     35.2 adds `pub fn Limits::new(bytes: u32, turn: contract::TurnLimits)
+     -> Limits` to the transcript crate, its smith part smith's
+     `CEILINGS` (a client decodes whatever smith may have written), at
+     most 8 lines, no field, behaviour or landed test changed, named in
+     its commit body. The client link builds it from its own limits.
 
 ## For the user
 
