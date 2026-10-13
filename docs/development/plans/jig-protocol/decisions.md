@@ -1358,6 +1358,17 @@ the file.
      its report; each file stays under 800 lines and each test function
      under 40; anything else in it keeps its Size. jig 32.1 lands at 2,961.
      The README's Rules say so.
+195. **The fixtures a Test shape names are inside Files** (2026-10-13, the
+     coordinator's block "jig 16.2: required fixtures omitted from Files",
+     2026-10-13T02:48:57Z). 16.2's Test shape names eleven fixtures
+     (`person_proposal`, `proposal_decision`, ..., `with_proposal_rows`)
+     but its Files list only `reads/point.rs` and `src/tests/reads.rs`;
+     code-organization.md, 5 keeps one shared fixture module per crate,
+     whose root is 794 lines. From now to the run's end, the fixtures an
+     increment's Test shape names belong in its Files, in the crate's
+     shared fixture module or a child of it (a new child where the root
+     would pass 800, ruling 116), with the root's re-exports; it is no
+     question. The README's Rules say so.
 
 ## For the user
 

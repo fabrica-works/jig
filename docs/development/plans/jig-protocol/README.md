@@ -301,6 +301,10 @@ ones before it in its session. Dependencies are by capability: "skein
   wire's lands without asking whatever its Size, its report giving the
   count by file; each file under 800 lines, each test function under 40.
   Code that is not such a translation keeps the increment's Size.
+- **The fixtures a Test shape names are inside Files** (decisions.md,
+  ruling 195): in the crate's shared fixture module or a child of it (a
+  new child where the root would pass 800 lines), with the root's
+  re-exports; no question, and no landed test changed by it.
 
 ## Live services
 
