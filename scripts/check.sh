@@ -8,5 +8,7 @@ cd "$(dirname "$0")/.."
 
 cargo fmt --check
 cargo clippy --workspace --all-targets -- -D warnings
+# skein's testing-strategy.md, section 8: a test is a process.
+export NEXTEST_DOUBLE_SPAWN=0
 cargo nextest run --workspace
 cargo nextest run --workspace --profile fuzzy

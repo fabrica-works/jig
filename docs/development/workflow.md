@@ -12,8 +12,8 @@ that what is checked is what main becomes:
 ```sh
 cargo fmt --check
 cargo clippy --workspace --all-targets -- -D warnings
-cargo nextest run --workspace
-cargo nextest run --workspace --profile fuzzy
+NEXTEST_DOUBLE_SPAWN=0 cargo nextest run --workspace
+NEXTEST_DOUBLE_SPAWN=0 cargo nextest run --workspace --profile fuzzy
 ```
 
 skein's `land` (skein's `docs/foundation/development.md`, section 9) does
@@ -37,7 +37,7 @@ hold in jig.
   focused tests (`tests/<name>/tests/*.rs`): focused tests of
   expected behaviour (scenarios, referee tests, replay, facts changing
   nothing, memory against the worst case), and a cheap random world as a
-  smoke test where one helps. It is what `cargo nextest run --workspace`
+  smoke test where one helps. It is what `NEXTEST_DOUBLE_SPAWN=0 cargo nextest run --workspace`
   runs, and it takes at most **15 seconds**.
 - **The fuzzy suite** is the worlds' `tests/fuzzy_*.rs`: randomized tests,
   such as sweeps of random worlds and domains driven at random, over many
@@ -80,7 +80,7 @@ additional merge gates. To see what each test costs on its own, the
 `measure` profile has no suite budget:
 
 ```sh
-cargo nextest run --workspace --profile measure -j 1
+NEXTEST_DOUBLE_SPAWN=0 cargo nextest run --workspace --profile measure -j 1
 ```
 
 The budgets are wall time on the development machine (4 cores, 8 threads,
