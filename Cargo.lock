@@ -761,11 +761,13 @@ name = "jig-worker-link-world"
 version = "0.0.0"
 dependencies = [
  "jig-domain-host",
+ "jig-protocol-engine-workers",
  "jig-protocol-worker-link",
  "jig-protocol-worker-wire",
  "skein-channel",
  "skein-codec",
  "skein-fake-channel",
+ "skein-io",
  "skein-lib",
  "skein-world",
 ]

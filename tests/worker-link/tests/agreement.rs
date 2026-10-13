@@ -1,0 +1,201 @@
+#[path = "../src/joined.rs"]
+pub mod joined;
+mod agreement {
+    use super::joined::{Joined, grant_value, values};
+    use jig_domain_host as host;
+    use jig_protocol_engine_workers as engine;
+    use jig_protocol_worker_link::Request;
+    use jig_protocol_worker_wire::Part;
+    use jig_worker_link_world::fixtures::{self, ATTEMPT_TWO, RUN_SEVEN};
+    use skein_lib::{Duration, Token};
+    fn world() -> Joined {
+        let mut world = Joined::new(&fixtures::joined_limits(), 3);
+        world.run();
+        world.acknowledge(false);
+        world
+    }
+    fn up(world: &Joined) -> (&host::LinkUp, &[Part]) {
+        let engine::Request::Up { up, parts, .. } = world.engine_root.last().expect("record") else { panic!("up") };
+        (up, parts)
+    }
+    fn down(world: &Joined) -> (&host::LinkDown, &[Part]) {
+        let Request::Down { down, parts } = world.worker_root.last().expect("record") else { panic!("down") };
+        (down, parts)
+    }
+    fn cross_up(record: host::LinkUp, expected: &host::LinkUp) {
+        let mut world = world();
+        world.worker_up(record, Box::new([]));
+        world.run();
+        assert_eq!(up(&world).0, expected);
+        assert!(up(&world).1.is_empty());
+        world.finish();
+    }
+    fn cross_down(record: host::LinkDown, expected: &host::LinkDown) {
+        let mut world = world();
+        world.engine_down(record, Box::new([]), Box::new([]));
+        world.run();
+        assert_eq!(down(&world).0, expected);
+        assert!(down(&world).1.is_empty());
+        world.finish();
+    }
+    #[test]
+    fn a_hello_crosses_unchanged() {
+        let mut world = world();
+        let engine::Request::Hello { hello, .. } = &world.engine_root[0] else { panic!("hello") };
+        assert_eq!(hello, &fixtures::hello());
+        world.finish();
+    }
+    #[test]
+    fn a_turn_crosses_unchanged() {
+        cross_up(fixtures::turn(), &fixtures::turn());
+    }
+    #[test]
+    fn a_call_crosses_unchanged() {
+        cross_up(fixtures::call(&[0, 2, 7]), &fixtures::call(&[0, 2, 7]));
+    }
+    #[test]
+    fn an_answer_crosses_unchanged() {
+        let mut world = world();
+        world.worker_up(fixtures::answer(), fixtures::work_parts());
+        world.run();
+        let (received, parts) = up(&world);
+        let mut expected = fixtures::answer();
+        let host::LinkUp::Answer { answer: host::Answer { ending: host::Ending::Ended { work, .. }, .. }, .. } =
+            &mut expected
+        else {
+            panic!("ended")
+        };
+        work.left = Some(Token::new(1));
+        work.saved = Some(Token::new(2));
+        assert_eq!(received, &expected);
+        assert_eq!(
+            parts,
+            [
+                Part { token: Token::new(1), bytes: b"left".as_slice().into() },
+                Part { token: Token::new(2), bytes: b"saved".as_slice().into() }
+            ]
+        );
+        world.finish();
+    }
+    fn fact() -> host::LinkUp {
+        host::LinkUp::Activity {
+            run: RUN_SEVEN,
+            attempt: ATTEMPT_TWO,
+            activity: host::Activity::Long { operation: host::Operation::Command, span: Duration::from_secs(2) },
+        }
+    }
+    #[test]
+    fn a_fact_crosses_unchanged() {
+        cross_up(fact(), &fact());
+    }
+    fn rejected() -> host::LinkUp {
+        host::LinkUp::Rejected { run: RUN_SEVEN, attempt: ATTEMPT_TWO, account: 1, generation: 3 }
+    }
+    #[test]
+    fn a_rejected_notice_crosses_unchanged() {
+        cross_up(rejected(), &rejected());
+    }
+    fn exhausted() -> host::LinkUp {
+        host::LinkUp::Exhausted {
+            run: RUN_SEVEN,
+            attempt: ATTEMPT_TWO,
+            account: 1,
+            retry_after: Duration::from_secs(60),
+        }
+    }
+    #[test]
+    fn an_exhausted_notice_crosses_unchanged() {
+        cross_up(exhausted(), &exhausted());
+    }
+    #[test]
+    fn an_assignment_crosses_unchanged() {
+        let mut world = world();
+        world.engine_down(
+            host::LinkDown::Assign { assignment: fixtures::assignment() },
+            fixtures::assignment_parts(),
+            values(),
+        );
+        world.run();
+        let mut expected = fixtures::assignment();
+        expected.assignment.workspace.as_mut().expect("workspace").items = Token::new(1);
+        assert_eq!(down(&world).0, &host::LinkDown::Assign { assignment: expected });
+        assert_eq!(down(&world).1, [Part { token: Token::new(1), bytes: b"items".as_slice().into() }]);
+        world.finish();
+    }
+    #[test]
+    fn a_grant_crosses_as_a_name_and_a_value() {
+        for table in [host::GrantTable::Accounts, host::GrantTable::Application] {
+            let mut world = world();
+            world.engine_down(
+                host::LinkDown::Grant { run: RUN_SEVEN, attempt: ATTEMPT_TWO, grant: fixtures::grant(table) },
+                Box::new([]),
+                Box::new([Some(grant_value(table))]),
+            );
+            world.run();
+            assert_eq!(
+                down(&world).0,
+                &host::LinkDown::Grant { run: RUN_SEVEN, attempt: ATTEMPT_TWO, grant: fixtures::grant(table) }
+            );
+            let Request::Value { table: owner, account, generation, expires, value, account_id } = &world.values[0]
+            else {
+                panic!("value")
+            };
+            assert_eq!(
+                (*owner, *account, *generation, *expires),
+                (table, 1, 3, skein_lib::Time::ZERO.saturating_add(Duration::from_secs(60)))
+            );
+            let (token, id) = match table {
+                host::GrantTable::Accounts => (fixtures::TOKEN_ONE, fixtures::ACCOUNT_ONE),
+                host::GrantTable::Application => (fixtures::TOKEN_TWO, b"".as_slice()),
+            };
+            assert_eq!(value.expose(), token);
+            assert_eq!(account_id.expose(), id);
+            assert_eq!(world.worker_order, ["value", "down"]);
+            world.finish();
+        }
+    }
+    fn message() -> host::LinkDown {
+        host::LinkDown::Message {
+            run: RUN_SEVEN,
+            attempt: ATTEMPT_TWO,
+            name: Token::new(6),
+            sender: b"sender".as_slice().into(),
+            words: b"later".as_slice().into(),
+        }
+    }
+    #[test]
+    fn a_message_crosses_unchanged() {
+        cross_down(message(), &message());
+    }
+    #[test]
+    fn a_relayed_answer_crosses_unchanged() {
+        let mut world = world();
+        world.worker_up(fixtures::call(b"call"), Box::new([]));
+        world.run();
+        world.engine_down(fixtures::relay_answer(b"call"), Box::new([]), Box::new([]));
+        world.run();
+        assert_eq!(down(&world).0, &fixtures::relay_answer(b"call"));
+        world.finish();
+    }
+    fn kept() -> host::LinkDown {
+        host::LinkDown::TurnKept { run: RUN_SEVEN, attempt: ATTEMPT_TWO, turn: 1 }
+    }
+    #[test]
+    fn a_turn_kept_crosses_unchanged() {
+        cross_down(kept(), &kept());
+    }
+    fn acknowledged() -> host::LinkDown {
+        host::LinkDown::Acknowledge { run: RUN_SEVEN, attempt: ATTEMPT_TWO }
+    }
+    #[test]
+    fn an_acknowledgement_crosses_unchanged() {
+        cross_down(acknowledged(), &acknowledged());
+    }
+    fn cancel() -> host::LinkDown {
+        host::LinkDown::Cancel { run: RUN_SEVEN, attempt: ATTEMPT_TWO }
+    }
+    #[test]
+    fn a_cancel_crosses_unchanged() {
+        cross_down(cancel(), &cancel());
+    }
+}

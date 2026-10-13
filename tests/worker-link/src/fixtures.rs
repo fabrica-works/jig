@@ -105,6 +105,7 @@ use jig_domain_host as host;
 use jig_protocol_worker_wire::{self as wire, Part};
 use skein_lib::{List, Token, Writer};
 pub const TOKEN_ONE: &[u8] = b"access";
+pub const TOKEN_TWO: &[u8] = b"app-access";
 pub const ACCOUNT_ONE: &[u8] = b"account";
 pub const RUN_SEVEN: Token = Token::new(7);
 pub const ATTEMPT_TWO: Token = Token::new(2);
@@ -387,4 +388,51 @@ pub fn engine_accepting_with(limits: &Limits) -> skein_fake_channel::ScriptedPee
     let channel = jig_protocol_worker_link::channel_limits(limits).expect("channel limits");
     skein_fake_channel::ScriptedPeer::new(schema, skein_channel::Role::Responder, channel, 1, Box::new([]))
         .expect("engine")
+}
+
+#[must_use]
+pub fn joined_limits() -> Limits {
+    limits()
+}
+#[must_use]
+pub fn grant(table: host::GrantTable) -> host::Grant {
+    host::Grant { table, account: 1, generation: 3, valid: Duration::from_secs(60) }
+}
+#[must_use]
+pub fn assignment() -> host::Assignment {
+    host::Assignment {
+        assignment: host::RunAssignment {
+            run: RUN_SEVEN,
+            attempt: ATTEMPT_TWO,
+            identity: [9; 16],
+            workspace: Some(host::Workspace { workstream: 3, items: Token::new(10) }),
+            save: true,
+            charter: b"charter".as_slice().into(),
+            grants: Box::new([grant(host::GrantTable::Accounts), grant(host::GrantTable::Application)]),
+        },
+        turns: Box::new([Box::from(b"one!".as_slice()), Box::from(b"two!".as_slice())]),
+        answered: Box::new([host::AnsweredCall {
+            name: b"call".as_slice().into(),
+            tool: b"tool".as_slice().into(),
+            answer: host::SettledAnswer::Host { error: false, body: b"answer".as_slice().into() },
+        }]),
+        messages: Box::new([host::StartMessage {
+            name: Token::new(5),
+            sender: b"sender".as_slice().into(),
+            words: b"words".as_slice().into(),
+        }]),
+    }
+}
+#[must_use]
+pub fn assignment_parts() -> Box<[Part]> {
+    Box::new([Part { token: Token::new(10), bytes: b"items".as_slice().into() }])
+}
+#[must_use]
+pub fn relay_answer(name: &[u8]) -> host::LinkDown {
+    host::LinkDown::Relayed {
+        run: RUN_SEVEN,
+        attempt: ATTEMPT_TWO,
+        call: name.into(),
+        answer: host::Relayed::Answer { error: false, text: b"answer".as_slice().into() },
+    }
 }
