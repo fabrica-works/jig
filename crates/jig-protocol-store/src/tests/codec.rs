@@ -683,7 +683,7 @@ fn a_carried_change_reads_back_as_its_own_family() {
 #[test]
 fn core_limits_past_the_settled_answer_ceiling_are_refused() {
     let mut domain = core_limits();
-    domain.call_answer_bytes = crate::core_v1::CEILINGS.settled_answer_host_body + 1;
+    domain.call_answer_bytes = crate::core_v2::CEILINGS.settled_answer_host_body + 1;
     assert!(crate::codec::core::limits(&domain).is_none());
 }
 

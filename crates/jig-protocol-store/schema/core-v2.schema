@@ -1,4 +1,4 @@
-family jig-store-core 1
+family jig-store-core 2
 
 record ProposerTask { value: u64 }
 record ProposerParty { value: u64 }
@@ -29,10 +29,10 @@ enum HostKind { worker, engine }
 record OutboxOutcomeHeld { entry: u64 }
 enum OutboxOutcome { made, failed, withdrawn, not_made, uncertain, held: OutboxOutcomeHeld }
 enum DeliveryOutcome { delivered, nothing, stale, refused, invalid, failed }
-record SettledAnswerHost { error: bool body: bytes 8192 }
-record SettledAnswerDelivery { outcome: DeliveryOutcome evidence: bytes 8192 }
+record SettledAnswerHost { error: bool body: bytes 1048576 }
+record SettledAnswerDelivery { outcome: DeliveryOutcome evidence: bytes 1048576 }
 enum SettledAnswer { host: SettledAnswerHost, delivery: SettledAnswerDelivery }
-record SettledCall { serial: u64 name: bytes 8192 tool: bytes 8192 answer: SettledAnswer }
+record SettledCall { serial: u64 name: bytes 8192 tool: bytes 1048576 answer: SettledAnswer }
 record CallKey { task: u64 attempt: u64 completion: u32 position: u32 }
 record CallPartEffect { connector: u16 entry: u64 deadline: u64 outcome: option OutboxOutcome }
 record CallPartConnector { connector: u16 }

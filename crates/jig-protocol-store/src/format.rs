@@ -4,7 +4,7 @@ use crate::codec::component;
 
 #[must_use]
 pub fn current(application: u32, deployment: [u8; 16]) -> component::Format {
-    component::Format { component: 1, core: 1, tasks: 2, people: 2, notes: 1, application, deployment }
+    component::Format { component: 1, core: 2, tasks: 2, people: 2, notes: 1, application, deployment }
 }
 
 pub fn check(found: &component::Format, wanted: &component::Format) -> Result<(), OpenRefusal> {

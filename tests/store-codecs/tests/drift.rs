@@ -53,7 +53,7 @@ fn the_people_familys_code_and_goldens_have_no_drift() {
 
 #[test]
 fn the_core_familys_code_and_goldens_have_no_drift() {
-    check("core", 1);
+    check("core", 2);
 }
 
 #[test]

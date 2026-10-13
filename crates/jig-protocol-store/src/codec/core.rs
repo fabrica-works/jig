@@ -1,5 +1,5 @@
 //! Core rows carried by their generated family (protocol/store.md, 5.1).
-use crate::core_v1 as wire;
+use crate::core_v2 as wire;
 use alloc::boxed::Box;
 use jig_domain_authority as authority;
 use jig_domain_core as domain;

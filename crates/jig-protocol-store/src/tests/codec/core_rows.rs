@@ -70,7 +70,7 @@ fn a_turn_frame_body_reads_back_with_its_version() {
 fn a_turn_frame_of_another_version_is_refused() {
     let limits = call_limits();
     let mut bytes = codec::turn(&fixtures::turn(), &limits).expect("turn within limits");
-    bytes[1] = 2;
+    bytes[1] = 3;
     assert_eq!(
         codec::read_turn(&bytes, &limits).expect_err("another core version").reason,
         skein_codec::Reason::Version

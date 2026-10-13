@@ -43,8 +43,8 @@ pub(crate) struct Read {
 }
 pub(crate) fn worst_case(limits: &Limits, codec: &codec::Limits) -> Option<u64> {
     let rows = limits.store.page.rows;
-    let turn = crate::core_v1::TurnRecord::worst_case_heap(&codec.core)?;
-    let frame = crate::core_v1::TurnRecord::worst_case_bytes(&codec.core)?.checked_add(12)?;
+    let turn = crate::core_v2::TurnRecord::worst_case_heap(&codec.core)?;
+    let frame = crate::core_v2::TurnRecord::worst_case_bytes(&codec.core)?.checked_add(12)?;
     Map::<Token, Read>::worst_case(limits.reads)?
         .checked_add(
             List::<TurnRecord>::worst_case(rows)?
@@ -431,7 +431,7 @@ fn length(
         return Ok(false);
     }
     let length = Reader::new(&bytes.finish()).u32().ok_or(())?;
-    let max = crate::core_v1::TurnRecord::worst_case_bytes(&store.codec.core).ok_or(())?.checked_add(12).ok_or(())?;
+    let max = crate::core_v2::TurnRecord::worst_case_bytes(&store.codec.core).ok_or(())?.checked_add(12).ok_or(())?;
     if length < 12 || u64::from(length) > max {
         return Err(());
     }

@@ -49,8 +49,8 @@ fn the_current_format_row_is_accepted() {
 fn another_family_is_refused_naming_the_first_difference() {
     let wanted = wanted();
     for (family, found) in [
-        (Family::Component, codec::component::Format { component: 2, core: 2, ..wanted }),
-        (Family::Core, codec::component::Format { core: 2, tasks: 2, ..wanted }),
+        (Family::Component, codec::component::Format { component: 2, core: 3, ..wanted }),
+        (Family::Core, codec::component::Format { core: 3, tasks: 2, ..wanted }),
         (Family::People, codec::component::Format { people: 3, notes: 2, ..wanted }),
         (Family::Notes, codec::component::Format { notes: 2, application: 2, ..wanted }),
         (Family::Application, codec::component::Format { application: 2, deployment: [9; 16], ..wanted }),
@@ -59,8 +59,8 @@ fn another_family_is_refused_naming_the_first_difference() {
             format::check(&found, &wanted),
             Err(OpenRefusal::Format {
                 family,
-                found: if family == Family::People { 3 } else { 2 },
-                wanted: if family == Family::People { 2 } else { 1 }
+                found: if family == Family::Core || family == Family::People { 3 } else { 2 },
+                wanted: if family == Family::Core || family == Family::People { 2 } else { 1 }
             })
         );
     }
