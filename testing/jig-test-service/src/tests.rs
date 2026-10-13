@@ -1,5 +1,6 @@
 mod engine;
 mod fixtures;
+mod worker;
 use crate::tests::fixtures::{engine_document, problem, with};
 use jig_protocol_config::{Path, Problem, What};
 
@@ -32,7 +33,8 @@ fn a_named_file_missing_from_those_handed_is_refused() {
     let last = files.entries.len().checked_sub(1).expect("credential file");
     assert_eq!(files.entries.get(last).expect("credential file").0.as_ref(), b"app.secret");
     files.entries.truncate(last);
-    let problems = crate::startup(&document, &files, None, &fixtures::seeds(), None).err().expect("startup refused");
+    let problems =
+        crate::startup(&document, &files, None, &fixtures::seeds(), None, None).err().expect("startup refused");
     assert_eq!(
         problems.problems.get(0),
         Some(&Problem { path: Path::root().member(b"application").member(b"credential"), what: What::Unreadable })
@@ -48,7 +50,7 @@ fn a_worst_case_past_the_memory_is_refused_saying_by_how_much() {
         .expect("service sizes fit");
     let memory = fixtures::decimal(bytes.checked_sub(1).expect("nonempty service"));
     let document = with(&engine_document(), b"1152921504606846976", &memory);
-    let found = crate::startup(&document, &fixtures::files(&document), None, &fixtures::seeds(), None)
+    let found = crate::startup(&document, &fixtures::files(&document), None, &fixtures::seeds(), None, None)
         .err()
         .expect("startup refused");
     assert_eq!(

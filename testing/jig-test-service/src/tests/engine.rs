@@ -334,7 +334,7 @@ fn a_signed_in_source_without_runtime_is_refused_at_its_path() {
         br#"{"handed_in": {"file": "accounts/chat.json"}}"#,
         fixtures::SIGNED_SOURCE,
     );
-    let found = crate::startup(&document, &fixtures::files(&document), None, &fixtures::seeds(), None)
+    let found = crate::startup(&document, &fixtures::files(&document), None, &fixtures::seeds(), None, None)
         .err()
         .expect("runtime absent");
     assert_eq!(

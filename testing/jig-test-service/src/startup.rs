@@ -110,9 +110,7 @@ fn parse(input: &[u8]) -> Result<Parsed, Problems> {
     let application = whole.required(&document, b"application", &path, &mut problems);
     if let Some(at) = whole.member(&document, b"workers") {
         let items = list(&document, at, document.len(), &path.member(b"workers"))?;
-        if !items.is_empty() {
-            problems.push(path.member(b"workers"), What::Refers);
-        }
+        drop(items);
     }
     let (accounts, workers) = components(&document, &mut whole, &mut problems)?;
     whole.finish(&document, &path, &mut problems);
@@ -143,6 +141,7 @@ fn parse(input: &[u8]) -> Result<Parsed, Problems> {
     let limits = limits::for_profile(profile, &engine.limits);
     let path = Path::root().member(b"application");
     let mut application = object(&document, application.expect("required application checked"), &path)?;
+    let _workers = application.member(&document, b"workers");
     let at = application.required(&document, b"credential", &path, &mut problems);
     let credential = match at {
         Some(at) => text(&document, at, length, &path.member(b"credential"))?,
@@ -252,7 +251,7 @@ fn connector_config(
     Ok((config, initial.into_boxed()))
 }
 
-pub fn named(document: &[u8]) -> Result<List<Box<[u8]>>, Problems> {
+fn engine_named(document: &[u8]) -> Result<List<Box<[u8]>>, Problems> {
     let parsed = parse(document)?;
     let files = config::files(&parsed.engine);
     let mut names =
@@ -296,14 +295,16 @@ fn check_files(parsed: &Parsed, files: &Files) -> Result<(), Problems> {
     Ok(())
 }
 
-pub fn startup(
+fn engine_startup(
     document: &[u8],
     files: &Files,
     _agent: Option<&Agent>,
     seeds: &Seeds,
     runtime: Option<crate::AccountsRuntime>,
-) -> Result<Service, Problems> {
+    own_workers: bool,
+) -> Result<(Engine, skein_io::Limits, u64, u64), Problems> {
     let mut parsed = parse(document)?;
+    parsed.workers |= own_workers;
     check_files(&parsed, files)?;
     for charter in &mut parsed.engine.charters {
         for (name, contents) in &files.entries {
@@ -385,5 +386,190 @@ pub fn startup(
         }
     }
     let engine = Engine::new(root, &parsed.limits.root, systems, accounts, workers, values);
-    Ok(Service::new(engine, parsed.limits.io, bytes))
+    Ok((engine, parsed.limits.io, bytes, parsed.engine.memory))
+}
+
+#[derive(Debug)]
+struct WorkerSpec {
+    config: config::Worker,
+    root: Box<[u8]>,
+}
+fn worker_specs(input: &[u8]) -> Result<(bool, List<WorkerSpec>), Problems> {
+    let length = u32::try_from(input.len()).or(Err(problem(Path::root(), What::Bound)))?;
+    let document = match config::document(input, &config::DocumentLimits { bytes: length, tokens: length, depth: 32 }) {
+        Ok(document) => document,
+        Err(found) => return Err(problem(found.path, found.what)),
+    };
+    let path = Path::root();
+    let mut whole = object(&document, 0, &path)?;
+    let engine = whole.member(&document, b"engine").is_some();
+    let application = whole.member(&document, b"application");
+    let workers = match whole.member(&document, b"workers") {
+        Some(at) => list(&document, at, document.len(), &path.member(b"workers"))?,
+        None => List::with_capacity(0),
+    };
+    let mut problems = Problems::empty();
+    if !engine {
+        let _service = components(&document, &mut whole, &mut problems)?;
+        whole.finish(&document, &path, &mut problems);
+    }
+    let root_path = path.member(b"application").member(b"workers");
+    let roots = match application {
+        Some(at) => {
+            let mut fields = object(&document, at, &path.member(b"application"))?;
+            let roots = match fields.member(&document, b"workers") {
+                Some(at) => list(&document, at, workers.len(), &root_path)?,
+                None => List::with_capacity(0),
+            };
+            if !engine {
+                fields.finish(&document, &path.member(b"application"), &mut problems);
+            }
+            roots
+        }
+        None => List::with_capacity(0),
+    };
+    if workers.len() != roots.len() {
+        problems.push(root_path.clone(), What::Missing);
+    }
+    if !engine && workers.is_empty() {
+        problems.push(path.member(b"engine"), What::Missing);
+    }
+    if !problems.is_empty() {
+        return Err(problems);
+    }
+    let mut specs = List::with_capacity(workers.len());
+    for (index, at) in workers.iter().enumerate() {
+        let here = indexed(&path.member(b"workers"), index);
+        let worker = match config::worker(&document, *at) {
+            Ok(worker) => worker,
+            Err(found) => {
+                for found in &found.problems {
+                    let mut complete = here.clone();
+                    for segment in &found.path.segments {
+                        complete = complete.child(segment.clone());
+                    }
+                    problems.push(complete, found.what);
+                }
+                return Err(problems);
+            }
+        };
+        let here = indexed(&root_path, index);
+        let mut fields =
+            object(&document, *roots.get(u32::try_from(index).expect("worker index")).expect("root count"), &here)?;
+        let at = fields.required(&document, b"root", &here, &mut problems);
+        fields.finish(&document, &here, &mut problems);
+        if !problems.is_empty() {
+            return Err(problems);
+        }
+        let root = text(&document, at.expect("root checked"), 4096, &here.member(b"root"))?;
+        specs.push(WorkerSpec { config: worker, root }).expect("worker count");
+    }
+    Ok((engine, specs))
+}
+
+pub fn named(document: &[u8]) -> Result<List<Box<[u8]>>, Problems> {
+    let (engine, specs) = worker_specs(document)?;
+    let names = if engine { engine_named(document)? } else { List::with_capacity(0) };
+    let capacity = names.len().checked_add(specs.len().checked_mul(2).expect("worker files")).expect("named files");
+    let mut files = List::with_capacity(capacity);
+    for name in names.into_boxed() {
+        files.push(name).expect("named files");
+    }
+    for spec in specs.into_boxed() {
+        for name in [spec.config.secret, spec.config.agent.configuration] {
+            if !files.as_slice().contains(&name) {
+                files.push(name).expect("named files");
+            }
+        }
+    }
+    Ok(files)
+}
+
+pub fn startup(
+    document: &[u8],
+    files: &Files,
+    agent: Option<&Agent>,
+    seeds: &Seeds,
+    accounts: Option<crate::AccountsRuntime>,
+    runtime: Option<crate::WorkerRuntime>,
+) -> Result<Service, Problems> {
+    let (has_engine, specs) = worker_specs(document)?;
+    let engine = if has_engine {
+        Some(engine_startup(document, files, agent, seeds, accounts, !specs.is_empty())?)
+    } else {
+        None
+    };
+    let mut io = match &engine {
+        Some((_, io, _, _)) => *io,
+        None => {
+            let mut io = specs.get(0).expect("engine or worker").config.limits.io;
+            io.sockets = 0;
+            io.names = 0;
+            io
+        }
+    };
+    let mut bytes = match &engine {
+        Some((_, _, bytes, _)) => *bytes,
+        None => 0,
+    };
+    let mut workers = List::with_capacity(specs.len());
+    let mut queue = match &engine {
+        Some((engine, _, _, _)) => engine.max_out.checked_mul(2).expect("service queue"),
+        None => 1,
+    };
+    for (index, spec) in specs.into_boxed().into_iter().enumerate() {
+        let path = indexed(&Path::root().member(b"application").member(b"workers"), index).member(b"root");
+        let index = u32::try_from(index).expect("worker index");
+        let runtime = runtime.as_ref().ok_or(problem(path.clone(), What::Refers))?;
+        let directory = *runtime.roots.get(index).ok_or(problem(path.clone(), What::Refers))?;
+        for prior in 0..index {
+            if runtime.roots.get(prior) == Some(&directory) {
+                return Err(problem(path.clone(), What::Duplicate));
+            }
+        }
+        let agent = agent.ok_or(problem(
+            Path::root().member(b"workers").child(Segment::Index(index)).member(b"agent"),
+            What::Refers,
+        ))?;
+        if files.contents(&spec.config.agent.configuration).is_none() {
+            return Err(problem(
+                Path::root().member(b"workers").child(Segment::Index(index)).member(b"agent").member(b"configuration"),
+                What::Unreadable,
+            ));
+        }
+        let bound = crate::worker::worst_case(&spec.config, agent, spec.root.len())
+            .ok_or(problem(path.clone(), What::Bound))?;
+        if let Err(what) = config::fits(spec.config.memory, &[config::Share { name: b"worker", bytes: bound }]) {
+            return Err(problem(
+                Path::root().member(b"workers").child(Segment::Index(index)).member(b"memory_bytes"),
+                what,
+            ));
+        }
+        bytes = bytes.checked_add(bound).ok_or(problem(path.clone(), What::Bound))?;
+        io.sockets = io.sockets.checked_add(spec.config.limits.io.sockets).ok_or(problem(path.clone(), What::Bound))?;
+        io.names = io.names.checked_add(spec.config.limits.io.names).ok_or(problem(path.clone(), What::Bound))?;
+        io.intake = io.intake.max(spec.config.limits.io.intake);
+        io.receive = io.receive.max(spec.config.limits.io.receive);
+        io.output = io.output.max(spec.config.limits.io.output);
+        io.sends = io.sends.max(spec.config.limits.io.sends);
+        let worker = crate::Worker::new(spec.config, agent, files, directory, index, seeds.seed)?;
+        queue = queue.max(worker.queue_room());
+        workers.push(worker).expect("worker count");
+    }
+    if !workers.is_empty() {
+        bytes = bytes
+            .checked_add(
+                limits::shared_worker_bytes(&io, queue, workers.len()).ok_or(problem(Path::root(), What::Bound))?,
+            )
+            .ok_or(problem(Path::root(), What::Bound))?;
+        if let Some((_, _, _, memory)) = &engine
+            && let Err(what) = config::fits(*memory, &[config::Share { name: b"service", bytes }])
+        {
+            return Err(problem(Path::root().member(b"engine").member(b"memory_bytes"), what));
+        }
+    }
+    match engine {
+        Some((engine, _, _, _)) => Ok(Service::new(Some(engine), workers, io, bytes, queue)),
+        None => Ok(Service::new(None, workers, io, bytes, queue)),
+    }
 }

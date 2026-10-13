@@ -177,3 +177,38 @@ fn workers(jig: &jig_protocol_config::Limits) -> jig_protocol_engine_workers::Li
         stall: link.stall,
     }
 }
+
+pub(super) fn worker_link(worker: &jig_protocol_config::Worker) -> jig_protocol_worker_link::Limits {
+    let profile = worker.limits.link;
+    let mut sizes = workers(&worker.limits).sizes;
+    sizes.slots = worker.slots;
+    jig_protocol_worker_link::Limits {
+        sizes,
+        chunk: profile.chunk,
+        handshake: profile.handshake,
+        ping: profile.ping,
+        silence: profile.silence,
+        stall: profile.stall,
+        backoff: profile.backoff,
+        ceiling: profile.ceiling,
+        proved: profile.proved,
+        grace: worker.graces.grace,
+        busy: profile.busy,
+    }
+}
+
+pub(super) fn shared_worker_bytes(io: &skein_io::Limits, queue: u32, workers: u32) -> Option<u64> {
+    let operations = skein_io::operations(io)?.checked_add(2)?.checked_add(workers)?;
+    skein_io::worst_case(io)?
+        .checked_add(Queue::<skein_io::kernel::Complete>::worst_case(queue)?)?
+        .checked_add(Queue::<skein_io::kernel::Submit>::worst_case(queue)?.checked_mul(2)?)?
+        .checked_add(Queue::<skein_io::Event>::worst_case(queue)?)?
+        .checked_add(u64::from(io.intake).checked_mul(u64::from(queue))?)?
+        .checked_add(
+            skein_lib::Map::<skein_lib::Token, (bool, skein_lib::Token, Option<skein_lib::Token>)>::worst_case(
+                operations,
+            )?,
+        )?
+        .checked_add(skein_lib::Map::<(bool, skein_lib::Token), skein_lib::Token>::worst_case(operations)?)?
+        .checked_add(skein_lib::List::<crate::Worker>::worst_case(workers)?)
+}

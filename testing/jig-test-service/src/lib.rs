@@ -6,8 +6,11 @@ mod accounts;
 mod boundary;
 mod tools;
 mod values;
+mod worker;
+mod worker_route;
 mod workers;
 pub use accounts::AccountsRuntime;
+pub use worker::{Worker, WorkerRuntime};
 mod engine;
 pub mod limits;
 mod route;
@@ -21,7 +24,7 @@ use skein_io::{
     self as io, Io,
     kernel::{Complete, Fd, Submit},
 };
-use skein_lib::{Env, Queue, Time, Token, Wall};
+use skein_lib::{Env, List, Queue, Time, Token, Wall};
 pub use startup::{named, startup};
 
 /// The worker's parsed agent values are supplied by its caller.
@@ -30,6 +33,7 @@ pub struct Agent {
     pub endpoints: smith_protocol_channel::Endpoints,
     pub limits: smith_host_protocol::Limits,
     pub bounds: jig_domain_host::Bounds,
+    pub host_limits: smith_host_domain::Limits,
 }
 
 #[expect(missing_debug_implementations, reason = "the service owns protocol account credentials")]
@@ -41,15 +45,16 @@ pub struct Service {
     raw_submissions: Queue<Submit>,
     kernel: accounts::Kernel,
     told: Queue<io::Event>,
-    engine: Engine,
+    engine: Option<Engine>,
+    workers: List<Worker>,
+    ended: Option<End>,
     signals: Option<Token>,
     signals_closing: bool,
     shutdowns: u8,
     bytes: u64,
 }
 impl Service {
-    fn new(engine: Engine, limits: io::Limits, bytes: u64) -> Self {
-        let queue = engine.max_out.checked_mul(2).expect("service queues fit");
+    fn new(engine: Option<Engine>, workers: List<Worker>, limits: io::Limits, bytes: u64, queue: u32) -> Self {
         Self {
             io: Io::new(&limits),
             io_env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
@@ -57,10 +62,17 @@ impl Service {
             submissions: Queue::with_capacity(queue),
             raw_submissions: Queue::with_capacity(queue),
             kernel: accounts::Kernel::new(
-                io::operations(&limits).expect("io operations").checked_add(2).expect("file operations"),
+                io::operations(&limits)
+                    .expect("io operations")
+                    .checked_add(2)
+                    .expect("file operations")
+                    .checked_add(workers.len())
+                    .expect("worker roots"),
             ),
             told: Queue::with_capacity(queue),
             engine,
+            workers,
+            ended: None,
             signals: None,
             signals_closing: false,
             shutdowns: 0,
@@ -86,11 +98,14 @@ impl Service {
         &mut self.submissions
     }
     pub const fn engine(&mut self) -> Option<&mut Engine> {
-        Some(&mut self.engine)
+        self.engine.as_mut()
     }
     #[must_use]
     pub const fn end(&self) -> Option<&End> {
-        self.engine.end.as_ref()
+        match &self.engine {
+            Some(engine) => engine.end.as_ref(),
+            None => self.ended.as_ref(),
+        }
     }
     #[must_use]
     pub const fn worst_case(&self) -> u64 {
@@ -98,20 +113,25 @@ impl Service {
     }
     #[must_use]
     pub fn operations(&self) -> u32 {
-        io::operations(&self.io_env.limits).expect("checked io operations").checked_add(2).expect("file operations")
+        io::operations(&self.io_env.limits)
+            .expect("checked io operations")
+            .checked_add(2)
+            .expect("file operations")
+            .checked_add(self.workers.len())
+            .expect("worker roots")
     }
     #[must_use]
     pub fn next_policy_deadline(&self) -> Option<Time> {
-        self.engine.next_deadline()
+        self.policy_deadline()
     }
     #[must_use]
     pub fn next_deadline(&self) -> Option<Time> {
         match self.io.next_deadline() {
-            Some(deadline) => Some(match self.engine.next_deadline() {
+            Some(deadline) => Some(match self.policy_deadline() {
                 Some(engine) => deadline.min(engine),
                 None => deadline,
             }),
-            None => self.engine.next_deadline(),
+            None => self.policy_deadline(),
         }
     }
     #[must_use]
@@ -121,33 +141,56 @@ impl Service {
             || !self.completions.is_empty()
             || !self.told.is_empty()
             || !self.raw_submissions.is_empty()
-            || self.engine.work_pending(now)
-            || (self.engine.end.is_some() && self.signals.is_some() && !self.signals_closing)
+            || match &self.engine {
+                Some(engine) => engine.work_pending(now),
+                None => false,
+            }
+            || self.workers_pending(now)
+            || (self.end().is_some() && self.signals.is_some() && !self.signals_closing)
     }
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.engine.end.is_some()
+        self.end().is_some()
+            && self.workers_empty()
             && self.io.is_empty()
             && self.completions.is_empty()
             && self.submissions.is_empty()
             && self.told.is_empty()
             && self.raw_submissions.is_empty()
             && self.kernel.is_empty()
-            && match &self.engine.accounts {
-                Some(accounts) => accounts.is_empty(),
+            && match &self.engine {
+                Some(engine) => match &engine.accounts {
+                    Some(accounts) => accounts.is_empty(),
+                    None => true,
+                },
                 None => true,
             }
     }
     pub fn shutdown(&mut self) {
         if self.shutdowns == 0 {
             self.shutdowns = 1;
-            self.engine.events.push(jig_test_domain::Event::Stop);
+            if let Some(engine) = &mut self.engine {
+                engine.events.push(jig_test_domain::Event::Stop);
+            }
+            for index in 0..self.workers.len() {
+                let worker = self.workers.get_mut(index).expect("worker index");
+                worker.stop();
+            }
         } else {
-            self.engine.end = Some(End::Aborted);
+            self.ended = Some(End::Aborted);
+            if let Some(engine) = &mut self.engine {
+                engine.end = Some(End::Aborted);
+            }
+            for index in 0..self.workers.len() {
+                let worker = self.workers.get_mut(index).expect("worker index");
+                worker.stop();
+            }
         }
     }
     fn route_components(&mut self) {
-        if let Some(workers) = &mut self.engine.workers {
+        if let Some(engine) = &mut self.engine
+            && let Some(workers) = &mut engine.workers
+        {
             for _ in 0..workers.io.len() {
                 if self.raw_submissions.room() < io::MAX_OUT_DOWN.submissions {
                     break;
@@ -156,7 +199,9 @@ impl Service {
                 io::down(&mut self.io, &self.io_env, request, &mut self.raw_submissions);
             }
         }
-        if let Some(accounts) = &mut self.engine.accounts {
+        if let Some(engine) = &mut self.engine
+            && let Some(accounts) = &mut engine.accounts
+        {
             for _ in 0..accounts.io.len() {
                 if self.raw_submissions.room() < io::MAX_OUT_DOWN.submissions {
                     break;
@@ -164,6 +209,81 @@ impl Service {
                 let request = accounts::tag(accounts.io.pop().expect("account io requests"));
                 io::down(&mut self.io, &self.io_env, request, &mut self.raw_submissions);
             }
+        }
+        for index in 0..self.workers.len() {
+            let worker = self.workers.get_mut(index).expect("worker index");
+            for _ in 0..worker.io.len() {
+                if self.raw_submissions.room() < io::MAX_OUT_DOWN.submissions || !self.io.takes() {
+                    break;
+                }
+                io::down(
+                    &mut self.io,
+                    &self.io_env,
+                    worker.io.pop().expect("worker io request"),
+                    &mut self.raw_submissions,
+                );
+            }
+        }
+    }
+    fn policy_deadline(&self) -> Option<Time> {
+        let mut next = match &self.engine {
+            Some(engine) => engine.next_deadline(),
+            None => None,
+        };
+        for worker in &self.workers {
+            if let Some(at) = worker.next_deadline() {
+                next = Some(match next {
+                    Some(next) => next.min(at),
+                    None => at,
+                });
+            }
+        }
+        next
+    }
+    fn workers_pending(&self, now: Time) -> bool {
+        for worker in &self.workers {
+            let ready = match &self.engine {
+                Some(engine) => match &engine.workers {
+                    Some(workers) => workers.opened(),
+                    None => true,
+                },
+                None => true,
+            };
+            if ready && worker.work_pending(now) {
+                return true;
+            }
+        }
+        false
+    }
+    fn workers_empty(&self) -> bool {
+        for worker in &self.workers {
+            if !worker.is_empty() {
+                return false;
+            }
+        }
+        true
+    }
+    fn io_room(&self) -> bool {
+        if let Some(engine) = &self.engine
+            && !engine.io_room()
+        {
+            return false;
+        }
+        for worker in &self.workers {
+            if !worker.room() {
+                return false;
+            }
+        }
+        true
+    }
+    fn close_signals(&mut self) {
+        if self.end().is_some()
+            && !self.signals_closing
+            && self.raw_submissions.room() >= io::MAX_OUT_DOWN.submissions
+            && let Some(entity) = self.signals
+        {
+            self.signals_closing = true;
+            io::down(&mut self.io, &self.io_env, io::Request::Close { entity }, &mut self.raw_submissions);
         }
     }
     fn room(&self, max: io::MaxOut) -> bool {
@@ -174,7 +294,9 @@ impl Service {
 pub fn iterate(service: &mut Service, now: Time, wall: Wall) {
     service.io_env.now = now;
     service.io_env.wall = wall;
-    if let Some(accounts) = &mut service.engine.accounts {
+    if let Some(engine) = &mut service.engine
+        && let Some(accounts) = &mut engine.accounts
+    {
         accounts.clock(now, wall);
     }
     for _ in 0..service.io_env.limits.sockets.checked_add(service.io_env.limits.refusals).expect("io entries") {
@@ -189,12 +311,31 @@ pub fn iterate(service: &mut Service, now: Time, wall: Wall) {
                 break;
             }
             let complete = service.completions.pop().expect("completion count");
-            let file_pending = pending_files(service.engine.accounts.as_ref());
+            let file_pending = pending_files(match &service.engine {
+                Some(engine) => engine.accounts.as_ref(),
+                None => None,
+            });
             let (files, complete) = service.kernel.complete(complete, &service.raw_submissions, file_pending);
             if files {
-                service.engine.accounts.as_mut().expect("file operation has accounts").complete(complete);
+                service
+                    .engine
+                    .as_mut()
+                    .expect("file operation has engine")
+                    .accounts
+                    .as_mut()
+                    .expect("file operation has accounts")
+                    .complete(complete);
             } else {
-                io::up(&mut service.io, &service.io_env, complete, &mut service.told, &mut service.raw_submissions);
+                let mut root_closed = false;
+                for index in 0..service.workers.len() {
+                    if service.workers.get_mut(index).expect("worker index").root_complete(&complete) {
+                        root_closed = true;
+                        break;
+                    }
+                }
+                if !root_closed {
+                    io::up(&mut service.io, &service.io_env, complete, &mut service.told, &mut service.raw_submissions);
+                }
             }
         }
         if service.completions.is_empty() {
@@ -206,49 +347,46 @@ pub fn iterate(service: &mut Service, now: Time, wall: Wall) {
             }
         }
     }
-    for _ in 0..service.told.len() {
-        if !service.engine.io_room() {
-            break;
-        }
-        let event = service.told.pop().expect("io event count");
-        if let io::Event::Shutdown { .. } = event {
-            service.shutdown();
-            continue;
-        }
-        if workers::owner(&event) == Some(Token::new(1)) {
-            if let io::Event::Closed { .. } = event {
-                service.signals = None;
-            }
-            continue;
-        }
-        if match workers::owner(&event) {
-            Some(owner) => accounts::owns(owner),
+    route_events(service, now);
+    let started = match &service.engine {
+        Some(engine) => match &engine.workers {
+            Some(workers) => workers.opened(),
+            None => true,
+        },
+        None => true,
+    };
+    if let Some(engine) = &mut service.engine {
+        engine::iterate(engine, now, wall);
+    }
+    for index in 0..service.workers.len() {
+        let worker = service.workers.get_mut(index).expect("worker index");
+        if match &service.engine {
+            Some(engine) => engine.end.is_some(),
             None => false,
         } {
-            if let Some(accounts) = &mut service.engine.accounts {
-                accounts.up(accounts::untag(event));
-            }
-        } else if let Some(workers) = &mut service.engine.workers {
-            if !workers.up(now, event, &mut service.engine.events) {
-                service.engine.end = Some(End::Stopped(Stop::Listener));
-            }
-        } else {
-            service.engine.end = Some(End::Stopped(Stop::Listener));
+            worker.stop();
+        }
+        if started && worker.room() {
+            worker.iterate(now, wall);
         }
     }
-    engine::iterate(&mut service.engine, now, wall);
-    if service.engine.end.is_some()
-        && !service.signals_closing
-        && service.raw_submissions.room() >= io::MAX_OUT_DOWN.submissions
-        && let Some(entity) = service.signals
-    {
-        service.signals_closing = true;
-        io::down(&mut service.io, &service.io_env, io::Request::Close { entity }, &mut service.raw_submissions);
+    for index in 0..service.workers.len() {
+        let worker = service.workers.get_mut(index).expect("worker index");
+        worker.close_root();
+        service.kernel.publish(false, &mut worker.submitted, &mut service.submissions);
     }
-    service.engine.abort_if_ended();
+    if service.engine.is_none() && service.workers_empty() {
+        service.ended = Some(End::Drained);
+    }
+    service.close_signals();
+    if let Some(engine) = &mut service.engine {
+        engine.abort_if_ended();
+    }
     service.route_components();
     service.kernel.publish(false, &mut service.raw_submissions, &mut service.submissions);
-    if let Some(accounts) = &mut service.engine.accounts {
+    if let Some(engine) = &mut service.engine
+        && let Some(accounts) = &mut engine.accounts
+    {
         service.kernel.publish(true, &mut accounts.submitted, &mut service.submissions);
     }
     service.io.reclaim();
@@ -264,4 +402,48 @@ fn account_submissions(accounts: &accounts::Accounts) -> &Queue<Submit> {
 fn pending_files(accounts: Option<&accounts::Accounts>) -> Option<&Queue<Submit>> {
     let accounts = accounts?;
     Some(account_submissions(accounts))
+}
+
+fn route_events(service: &mut Service, now: Time) {
+    for _ in 0..service.told.len() {
+        if !service.io_room() {
+            break;
+        }
+        let event = service.told.pop().expect("io event count");
+        if let io::Event::Shutdown { .. } = event {
+            service.shutdown();
+            continue;
+        }
+        if workers::owner(&event) == Some(Token::new(1)) {
+            if let io::Event::Closed { .. } = event {
+                service.signals = None;
+            }
+            continue;
+        }
+        let mut worker_index = None;
+        for (index, worker) in service.workers.iter().enumerate() {
+            if worker.accepts(&event) {
+                worker_index = Some(u32::try_from(index).expect("worker index"));
+                break;
+            }
+        }
+        if let Some(index) = worker_index {
+            service.workers.get_mut(index).expect("worker token owner").up(now, event);
+        } else if let Some(engine) = &mut service.engine {
+            if match workers::owner(&event) {
+                Some(owner) => accounts::owns(owner),
+                None => false,
+            } {
+                if let Some(accounts) = &mut engine.accounts {
+                    accounts.up(accounts::untag(event));
+                }
+            } else if let Some(workers) = &mut engine.workers {
+                if !workers.up(now, event, &mut engine.events) {
+                    engine.end = Some(End::Stopped(Stop::Listener));
+                }
+            } else {
+                engine.end = Some(End::Stopped(Stop::Listener));
+            }
+        }
+    }
 }

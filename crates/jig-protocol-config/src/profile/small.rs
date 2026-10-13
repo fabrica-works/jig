@@ -236,7 +236,8 @@ pub(super) const LIMITS: Limits = Limits {
     core: CORE,
     hub: HUB,
     link: LINK,
-    token: 8192,
+    // Smith keeps the two-byte id length and up to 256 id bytes in its 8192-byte value.
+    token: 7934,
     driver: DRIVER,
     clients: CLIENTS,
     io: IO,
@@ -270,7 +271,7 @@ pub(super) const DRIVER: skein_oauth_accounts::Limits = skein_oauth_accounts::Li
         document: skein_oauth::Limits {
             document_bytes: 65536,
             string_bytes: 16384,
-            token_bytes: 8192,
+            token_bytes: 7934,
             client_bytes: 1024,
             detail_bytes: 1024,
             record_bytes: 65536,

@@ -145,13 +145,13 @@ pub fn seeds() -> Seeds {
     Seeds { deployment: [7; 16], seed: 7, crypto: Secret::new(Box::new([7; 32])) }
 }
 pub fn started(document: &[u8]) -> Service {
-    crate::startup(document, &files(document), None, &seeds(), None).expect("fixture startup")
+    crate::startup(document, &files(document), None, &seeds(), None, None).expect("fixture startup")
 }
 pub fn turn(service: &mut Service) {
     iterate(service, Time::from_nanos(1), Wall::from_nanos(1));
 }
 pub fn problem(document: &[u8]) -> jig_protocol_config::Problem {
-    let found = crate::startup(document, &Files { entries: List::with_capacity(0) }, None, &seeds(), None)
+    let found = crate::startup(document, &Files { entries: List::with_capacity(0) }, None, &seeds(), None, None)
         .err()
         .expect("startup refused");
     found.problems.get(0).expect("one startup problem").clone()
@@ -389,4 +389,203 @@ pub fn call(input: &[u8]) -> jig_domain_fleet::Call {
         input: input.into(),
         deadline: skein_lib::Duration::from_secs(1),
     }
+}
+
+pub const WORKER_DOCUMENT: &[u8] = br#"{
+"workers":[{
+"engine":{"in_process":"workers"},"name":"worker-a","secret":"worker.secret","slots":1,
+"graces":{"grace_ms":10000,"agent_stop_ms":5000,"delivery_ms":1000,"save_ms":1000},
+"agent":{"program":"agent-program","configuration":"agent.json","arguments":["agent"]},
+"limits":{"profile":"small","overrides":{"hub.slots":1,"hub.run_calls":1,"hub.turns":1}},
+"memory_bytes":1152921504606846976
+}],"application":{"workers":[{"root":"agent-root"}]}}
+"#;
+pub fn worker_files() -> Files {
+    let mut entries = List::with_capacity(2);
+    entries
+        .push((b"worker.secret".as_slice().into(), Secret::new(b"worker-secret".as_slice().into())))
+        .expect("secret file");
+    entries.push((b"agent.json".as_slice().into(), Secret::new(b"{}".as_slice().into()))).expect("agent configuration");
+    Files { entries }
+}
+pub fn agent() -> crate::Agent {
+    use skein_lib::Duration;
+    let host_limits = smith_host_domain::Limits {
+        agents: 1,
+        directories: 1,
+        conflicts: 0,
+        path_bytes: 64,
+        name_bytes: 64,
+        accounts: 2,
+        charter_bytes: 65_536,
+        transcript_bytes: 262_144,
+        answered_bytes: 65_536,
+        message_bytes: 65_536,
+        messages: 2,
+        calls: 1,
+        call_bytes: 65_536,
+        answer_bytes: smith_host_domain::Delivered::worst_case(),
+        turns: 1,
+        turn_bytes: 65_536,
+        unacknowledged_bytes: 65_536,
+        fact_bytes: 65_536,
+        outcome_bytes: 4096,
+        detail_bytes: 64,
+        spawn_timeout: Duration::from_secs(1),
+        no_progress: Duration::from_secs(120),
+        silence: Duration::from_secs(60),
+        long_span: Duration::from_secs(60),
+        long_open: 1,
+        wall_time: Duration::from_secs(300),
+        cancel_grace: Duration::from_secs(5),
+        exit_grace: Duration::from_secs(5),
+        teardown: Duration::from_secs(1),
+        kill_after: Duration::from_secs(2),
+        facts: 1,
+    };
+    let mut limits = smith_host_protocol::Limits {
+        bodies: smith_channel::Limits {
+            turn_body: 65_536,
+            accepted_result: 4096,
+            host_ask_input: 4096,
+            message_text: 65_536,
+            host_reply_text: 65_536,
+            start_charter: 65_536,
+            start_transcript: 262_144,
+            start_answered: 4,
+            start_grants: 2,
+            start_messages: 2,
+            ..smith_channel::CEILINGS
+        },
+        charter: smith_charter::CEILINGS,
+        transcript: smith_transcript::CEILINGS,
+        endpoints: 1,
+        channel: skein_channel::Limits {
+            chunk: 64,
+            credential: 1,
+            skip: 1_048_576,
+            output_bytes: 1_048_576,
+            output_frames: 8,
+            kinds: 32,
+        },
+        start_bytes: 1_048_576,
+        calls: 1,
+    };
+    limits.channel.output_bytes = smith_host_protocol::output_bytes(&limits).expect("host frames");
+    crate::Agent {
+        endpoints: endpoints(),
+        limits,
+        host_limits,
+        bounds: jig_domain_host::Bounds {
+            models: Box::new([jig_domain_host::ModelBound {
+                name: b"small".as_slice().into(),
+                window: 8192,
+                output: 1024,
+            }]),
+            turns: 8,
+            spend: 100,
+            time: Duration::from_secs(300),
+            waiting: Duration::from_secs(60),
+            checks: Duration::from_secs(60),
+            message_bytes: 65_536,
+            inbox: 2,
+            unacknowledged: 1,
+        },
+    }
+}
+pub fn worker_runtime() -> crate::WorkerRuntime {
+    let mut roots = List::with_capacity(1);
+    roots.push(skein_io::kernel::Fd::new(9)).expect("worker root");
+    crate::WorkerRuntime { roots }
+}
+pub fn worker_service() -> Service {
+    crate::startup(WORKER_DOCUMENT, &worker_files(), Some(&agent()), &seeds(), None, Some(worker_runtime()))
+        .expect("worker service")
+}
+pub fn worker_assignment() -> jig_domain_host::LinkDown {
+    let names =
+        [jig_protocol_charter::EndpointName { number: 1, name: b"fake".as_slice().into(), account: 1, dialect: 0 }];
+    let mut assignment =
+        crate::tools::charter(assignment(&config()), &names, &seeds().deployment).expect("charter assignment");
+    assignment.assignment.identity = [3; 16];
+    assignment.assignment.run = Token::new(7);
+    assignment.assignment.attempt = Token::new(3);
+    assignment.assignment.grants = Box::new([jig_domain_host::Grant {
+        table: jig_domain_host::GrantTable::Accounts,
+        account: 1,
+        generation: 1,
+        valid: skein_lib::Duration::from_secs(30),
+    }]);
+    jig_domain_host::LinkDown::Assign { assignment }
+}
+pub fn concrete_turn() -> smith_host_domain::Turn {
+    use smith_domain_session::{llm, record};
+    let value = record::Turn {
+        version: record::VERSION,
+        endpoint: llm::Endpoint(1),
+        dialect: 0,
+        sequence: 1,
+        kind: record::Kind::First { affinity: llm::Affinity { key: [3; 16], thread: 1 } },
+        usage: llm::Usage {
+            input_tokens: Some(1),
+            output_tokens: Some(1),
+            cache_read_tokens: Some(0),
+            cache_write_tokens: Some(0),
+            reasoning_tokens: Some(0),
+        },
+        spent: 2,
+        messages: Box::default(),
+    };
+    smith_host_domain::Turn {
+        opens_window: false,
+        number: 1,
+        spent: 2,
+        read: None,
+        body: smith_host_domain::TurnValue::new(value, 65_536).expect("typed turn"),
+    }
+}
+
+pub fn two_workers() -> Service {
+    let start =
+        skein_lib::bytes::find(WORKER_DOCUMENT, b"[{\n").expect("worker start").checked_add(1).expect("member start");
+    let end = skein_lib::bytes::find(WORKER_DOCUMENT, b"],\"application\"").expect("worker end");
+    let member = &WORKER_DOCUMENT[start..end];
+    let second = with(member, b"worker-a", b"worker-b");
+    let document = join(&[
+        br#"{"workers":["#,
+        member,
+        b",",
+        &second,
+        br#"],"application":{"workers":[{"root":"agent-a"},{"root":"agent-b"}]}}"#,
+    ]);
+    let mut roots = List::with_capacity(2);
+    roots.push(skein_io::kernel::Fd::new(9)).expect("first root");
+    roots.push(skein_io::kernel::Fd::new(10)).expect("second root");
+    crate::startup(&document, &worker_files(), Some(&agent()), &seeds(), None, Some(crate::WorkerRuntime { roots }))
+        .expect("two worker layers")
+}
+
+pub fn combined_document() -> Box<[u8]> {
+    let at = skein_lib::bytes::find(WORKER_DOCUMENT, b"],\"application\"")
+        .expect("worker array end")
+        .checked_add(1)
+        .expect("array end");
+    let workers = &WORKER_DOCUMENT[1..at];
+    let document = with(&engine_document(), b"\"service\":", &join(&[workers, b",\"service\":"]));
+    with(
+        &document,
+        br#""application":{"credential":"#,
+        br#""application":{"workers":[{"root":"agent-root"}],"credential":"#,
+    )
+}
+
+pub fn combined_files(document: &[u8]) -> Files {
+    let mut entries = List::with_capacity(7);
+    for file in files(document).entries.into_boxed() {
+        entries.push(file).expect("engine files");
+    }
+    for file in worker_files().entries.into_boxed() {
+        entries.push(file).expect("worker files");
+    }
+    Files { entries }
 }

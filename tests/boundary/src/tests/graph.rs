@@ -429,6 +429,7 @@ fn test_worker_smith_breaches(manifests: &[CrateManifest]) -> Vec<String> {
         }
         for dependency in &manifest.dependencies {
             if dependency.starts_with("smith-")
+                && !(manifest.name.as_deref() == Some("jig-test-service") && dependency == "smith-domain-run")
                 && !["smith-host-domain", "smith-host-protocol", "smith-protocol-channel", "smith-channel"]
                     .contains(&dependency.as_str())
             {
@@ -601,4 +602,19 @@ fn worker_link_links_only_its_wire_host_and_channel_vocabulary() {
         dependencies,
         ["jig-domain-host", "jig-protocol-worker-wire", "skein-channel", "skein-codec", "skein-lib"]
     );
+}
+
+#[test]
+fn the_identity_dependency_is_allowed_for_the_test_service_alone() {
+    for (label, name, dependency, expected) in [
+        ("service identity", "jig-test-service", "smith-domain-run", Vec::<String>::new()),
+        ("worker identity", "jig-test-worker", "smith-domain-run", vec!["fixture/Cargo.toml: smith-domain-run".into()]),
+        ("service domain", "jig-test-service", "smith-domain", vec!["fixture/Cargo.toml: smith-domain".into()]),
+    ] {
+        let manifest = parse_manifest(
+            PathBuf::from("fixture/Cargo.toml"),
+            &format!("[package]\nname = \"{name}\"\n[dependencies]\n{dependency}.workspace = true\n"),
+        );
+        assert_eq!(test_worker_smith_breaches(&[manifest]), expected, "{label}");
+    }
 }

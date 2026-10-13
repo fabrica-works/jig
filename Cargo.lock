@@ -826,10 +826,13 @@ dependencies = [
  "jig-protocol-config",
  "jig-protocol-engine-workers",
  "jig-protocol-tools",
+ "jig-protocol-worker-link",
  "jig-protocol-worker-wire",
  "jig-test-connector",
  "jig-test-domain",
+ "jig-test-worker",
  "skein-channel",
+ "skein-fake-channel",
  "skein-io",
  "skein-json",
  "skein-lib",
@@ -837,8 +840,13 @@ dependencies = [
  "skein-oauth-accounts",
  "skein-tls",
  "smith-channel",
+ "smith-charter",
+ "smith-domain-run",
+ "smith-domain-session",
+ "smith-host-domain",
  "smith-host-protocol",
  "smith-protocol-channel",
+ "smith-transcript",
 ]
 
 [[package]]

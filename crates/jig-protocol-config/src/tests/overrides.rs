@@ -282,7 +282,7 @@ const SMALL: &[(&[u8], u64)] = &[
     (b"link.proved_ms", 60_000),
     (b"link.busy_ms", 2_000),
     (b"link.facts", 64),
-    (b"accounts.token", 8192),
+    (b"accounts.token", 7934),
     (b"tasks.retries.transient.retries", 3),
     (b"tasks.retries.transient.base_ms", 1_000),
     (b"tasks.retries.transient.max_ms", 30_000),

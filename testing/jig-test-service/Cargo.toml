@@ -20,6 +20,10 @@ jig-test-connector.workspace = true
 jig-protocol-config.workspace = true
 smith-protocol-channel.workspace = true
 smith-host-protocol.workspace = true
+smith-host-domain.workspace = true
+smith-domain-run.workspace = true
+jig-test-worker.workspace = true
+jig-protocol-worker-link.workspace = true
 
 skein-channel.workspace = true
 skein-oauth.workspace = true
@@ -33,6 +37,12 @@ jig-protocol-charter.workspace = true
 jig-protocol-tools.workspace = true
 jig-protocol-worker-wire.workspace = true
 jig-protocol-engine-workers.workspace = true
+
+[dev-dependencies]
+skein-fake-channel.workspace = true
+smith-charter.workspace = true
+smith-transcript.workspace = true
+smith-domain-session.workspace = true
 
 [lints]
 workspace = true
