@@ -1,86 +1,88 @@
 //! Root commits, numbered with skein-kv's (protocol/store.md, 6 and 11.2).
-use crate::{Event, Phase, Store, Write, codec, format, keys};
+use crate::{Event, Store, Write, codec, format, keys};
 use alloc::boxed::Box;
 use jig_domain_core::{CoreRecord, Record};
 use skein_lib::{List, Queue, Token};
 
-pub(crate) fn commit(store: &mut Store, number: u64, writes: Box<[Write]>, above: &mut Queue<Event>) {
-    let format_due = match store.phase {
-        Phase::Ready { next, format_due } => {
-            if number != next || store.stores.store.last().checked_add(1) != Some(number) {
-                failed(store, number, above);
-                return;
-            }
-            format_due
-        }
-        Phase::Closed => {
-            failed(store, number, above);
-            return;
-        }
-        Phase::Stopped => return,
-    };
-    let Some(ops) = operations(store, writes, format_due) else {
-        failed(store, number, above);
-        return;
-    };
+pub(crate) fn submit(
+    store: &mut Store,
+    env: &skein_lib::Env<crate::Limits>,
+    number: u64,
+    ops: Box<[skein_kv::Op]>,
+    above: &mut Queue<Event>,
+    below: &mut crate::Below,
+) {
+    let kv_env = crate::directory::env(store, env, false);
     let mut events = Queue::with_capacity(skein_kv::MAX_OUT.above);
-    let mut files = Queue::with_capacity(skein_kv::MAX_OUT.below);
     skein_kv::down(
         &mut store.stores.store,
-        &crate::memory_env(store.limits.store),
+        &kv_env,
         skein_kv::Request::Commit { owner: Token::new(number), ops },
         &mut events,
-        &mut files,
+        &mut below.store,
     );
-    assert!(files.is_empty(), "memory commits issue no file operation");
-    match events.pop().expect("a memory commit answers in its step") {
-        skein_kv::Event::Committed { owner: _, number: committed } => {
-            if committed != number {
-                failed(store, number, above);
-                return;
-            }
-            // At the integer's end, last() has no successor and the submission check rejects any repeat.
-            let next = number.checked_add(1).unwrap_or(number);
-            store.phase = Phase::Ready { next, format_due: false };
-            above.push(Event::Committed { number, fill: store.stores.store.used() });
-        }
-        skein_kv::Event::Refused { .. }
-        | skein_kv::Event::Failed { .. }
-        | skein_kv::Event::Opened { .. }
-        | skein_kv::Event::Got { .. }
-        | skein_kv::Event::Loaded { .. }
-        | skein_kv::Event::Closed { .. }
-        | skein_kv::Event::OpenFailed { .. }
-        | skein_kv::Event::Recovered { .. }
-        | skein_kv::Event::RecoveryFailed { .. } => failed(store, number, above),
-    }
+    crate::directory::events_up(store, false, &mut events, above);
 }
-
-pub(crate) fn operations(store: &Store, writes: Box<[Write]>, format_due: bool) -> Option<Box<[skein_kv::Op]>> {
+pub(crate) fn operations(
+    store: &mut Store,
+    number: u64,
+    writes: Box<[Write]>,
+    format_due: bool,
+) -> Option<crate::transcripts::Pending> {
     if writes.len() > usize::try_from(store.limits.journal.writes).ok()? {
         return None;
     }
-    let mut ops = List::with_capacity(store.limits.journal.writes.checked_add(1)?);
+    let mut ops = List::with_capacity(store.limits.journal.writes.checked_mul(2)?.checked_add(1)?);
+    let mut frames = Queue::with_capacity(store.limits.journal.writes);
     let mut bytes = 26;
     let mut deployment = None;
     for write in writes {
-        if let Some(id) = header_id(&write) {
-            deployment = Some(id);
+        match write {
+            Write::Save(Record::Core(CoreRecord::Turn(turn))) => {
+                let body = crate::transcripts::frame::encode(&turn, &store.codec)?;
+                let offset =
+                    crate::transcripts::place(store, number, &turn, u64::try_from(body.len()).ok()?, &mut ops)?;
+                frames.push(crate::transcripts::Frame { task: turn.task, offset, bytes: body });
+            }
+            write @ (Write::Save(
+                Record::Core(
+                    CoreRecord::Deployment(_)
+                    | CoreRecord::Projection(_)
+                    | CoreRecord::Call(_)
+                    | CoreRecord::RunProof(_)
+                    | CoreRecord::Terminal(_)
+                    | CoreRecord::ProposalDecision(_)
+                    | CoreRecord::EscalationDecision(_),
+                )
+                | Record::Tasks(_)
+                | Record::People(_)
+                | Record::Notes(_),
+            )
+            | Write::Erase(_)
+            | Write::Put { .. }
+            | Write::Remove { .. }
+            | Write::DropTranscript { .. }) => {
+                if let Some(id) = header_id(&write) {
+                    deployment = Some(id);
+                }
+                ops.push(operation(store, write)?).ok()?;
+            }
         }
-        let op = operation(store, write)?;
-        append(&mut ops, op, &mut bytes, store.limits.store.commit)?;
     }
     if format_due {
         let id = deployment.expect("the first root commit saves its deployment header");
-        let op = skein_kv::Op::Put {
+        ops.push(skein_kv::Op::Put {
             key: keys::encode_own(&keys::Own::Format, store.limits.store.key)?,
             value: format::current(store.application.version, id).encode().ok()?,
-        };
-        append(&mut ops, op, &mut bytes, store.limits.store.commit)?;
+        })
+        .ok()?;
     }
-    Some(ops.into_boxed())
+    let mut bounded = List::with_capacity(store.limits.journal.writes.checked_mul(2)?.checked_add(1)?);
+    for op in ops.into_boxed() {
+        append(&mut bounded, op, &mut bytes, store.limits.store.commit)?;
+    }
+    Some(crate::transcripts::Pending { number, frames, ops: bounded.into_boxed() })
 }
-
 fn operation(store: &Store, write: Write) -> Option<skein_kv::Op> {
     let limit = store.limits.store.key;
     match write {
@@ -91,7 +93,7 @@ fn operation(store: &Store, write: Write) -> Option<skein_kv::Op> {
         Write::Erase(key) => Some(skein_kv::Op::Erase { key: keys::encode(&key, limit)? }),
         Write::Put { key, value } => Some(skein_kv::Op::Put { key: keys::application(&key, limit)?, value }),
         Write::Remove { key } => Some(skein_kv::Op::Erase { key: keys::application(&key, limit)? }),
-        // Jig 17 replaces this refusal with removal of the whole transcript.
+        // Whole transcript removal joins in jig 17.4.
         Write::DropTranscript { task: _ } => None,
     }
 }
@@ -133,9 +135,4 @@ fn append(ops: &mut List<skein_kv::Op>, op: skein_kv::Op, bytes: &mut u64, limit
     ops.push(op).ok()?;
     *bytes = total;
     Some(())
-}
-
-fn failed(store: &mut Store, number: u64, above: &mut Queue<Event>) {
-    store.phase = Phase::Stopped;
-    above.push(Event::Failed { number });
 }

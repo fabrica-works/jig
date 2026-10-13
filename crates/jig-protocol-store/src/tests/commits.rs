@@ -198,15 +198,6 @@ fn later_commits_do_not_replace_the_format_row() {
 }
 
 #[test]
-fn a_turn_is_saved_as_a_row_until_transcript_files_land() {
-    let mut store = fixtures::opened();
-    let turn = Record::Core(CoreRecord::Turn(fixtures::core_rows::turn()));
-    let key = turn.key();
-    assert_committed(&commit(&mut store, 1, Box::new([fixtures::header(1), fixtures::save(turn.clone())])), 1);
-    assert_eq!(jig_row(&mut store, &key), Some(turn));
-}
-
-#[test]
 fn dropping_a_transcript_fails_without_submitting_the_commit() {
     let mut store = committed_header();
     let writes = Box::new([fixtures::header(2), Write::DropTranscript { task: 11 }]);

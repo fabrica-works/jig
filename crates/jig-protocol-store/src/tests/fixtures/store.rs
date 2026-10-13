@@ -37,6 +37,8 @@ pub fn limits() -> Limits {
         secrets: kv_limits(),
         journal: JournalLimits { commits: 2, writes: 4, held: 4, now: 4, release: 4 },
         joins: 32,
+        queue: 2,
+        files: 2,
     }
 }
 
@@ -264,4 +266,101 @@ pub fn events(above: &mut Queue<Event>) -> Box<[Event]> {
 }
 pub fn sign_in_secret(number: u64, byte: u8) -> Secrets {
     Secrets::Keep { owner: SecretOwner::SignIn, number, value: Secret::new(Box::new([byte; 32])) }
+}
+pub fn codec_limits() -> codec::Limits {
+    codec::limits(&CORE_LIMITS).expect("fixture codec limits")
+}
+pub fn turn(task: u64, attempt: u64, number: u32, bytes: &[u8]) -> jig_domain_core::TurnRecord {
+    let mut row = core_rows::turn();
+    row.task = task;
+    row.attempt = attempt;
+    row.turn = number;
+    row.transcript = Box::from(bytes);
+    row.opens_window = false;
+    row
+}
+pub fn window_turn(task: u64, attempt: u64, number: u32, bytes: &[u8]) -> jig_domain_core::TurnRecord {
+    let mut row = turn(task, attempt, number, bytes);
+    row.opens_window = true;
+    row
+}
+pub fn opened_with_transcripts() -> (Store, Below) {
+    let mut store = opened();
+    committed(&mut store, Box::new([header(1)]));
+    (store, below())
+}
+#[derive(Clone, Copy)]
+pub enum Answer {
+    Opened { len: u64 },
+    Missing,
+    Made,
+    Written,
+    Synced,
+    Closed,
+}
+pub fn script(store: &mut Store, mut below: Below, answers: &[Answer]) -> Box<[Event]> {
+    let count =
+        u32::try_from(answers.len()).expect("bounded script").checked_mul(crate::MAX_OUT_DOWN).expect("bounded events");
+    let mut found = List::with_capacity(count);
+    let base =
+        store.transcripts.touch.checked_mul(128).expect("bounded script").checked_add(1_000).expect("fixture token");
+    for (index, answer) in answers.iter().enumerate() {
+        let request = below.transcripts.pop().expect("transcript request");
+        assert!(below.transcripts.is_empty());
+        let event = match answer {
+            Answer::Opened { len } => {
+                let (skein_io::file::Request::OpenWriteNoFollow { owner, .. }
+                | skein_io::file::Request::CreateNoFollow { owner, .. }
+                | skein_io::file::Request::OpenDirectory { owner, .. }) = request
+                else {
+                    panic!("open operation");
+                };
+                let token = base.checked_add(u64::try_from(index).expect("script index")).expect("fixture token");
+                skein_io::file::Event::Opened { owner, file: Token::new(token), len: *len }
+            }
+            Answer::Missing => {
+                let skein_io::file::Request::OpenWriteNoFollow { owner, .. } = request else {
+                    panic!("missing open");
+                };
+                skein_io::file::Event::Failed {
+                    owner,
+                    error: skein_io::kernel::Error::NotFound,
+                    committed: false,
+                    residue: None,
+                }
+            }
+            Answer::Made => {
+                let skein_io::file::Request::MakeDirectory { owner, .. } = request else {
+                    panic!("make directory");
+                };
+                skein_io::file::Event::Made { owner }
+            }
+            Answer::Written => {
+                let skein_io::file::Request::WriteAt { owner, .. } = request else {
+                    panic!("write frame");
+                };
+                skein_io::file::Event::Written { owner }
+            }
+            Answer::Synced => {
+                let (skein_io::file::Request::Sync { owner, .. }
+                | skein_io::file::Request::SyncDirectory { owner, .. }) = request
+                else {
+                    panic!("sync operation");
+                };
+                skein_io::file::Event::Synced { owner }
+            }
+            Answer::Closed => {
+                let skein_io::file::Request::Close { owner, .. } = request else {
+                    panic!("close operation");
+                };
+                skein_io::file::Event::Closed { owner }
+            }
+        };
+        let (events, next) = self::answer(store, Io::Transcripts(crate::Arrived { event, fd: Some(Fd::new(10)) }));
+        for event in events {
+            found.push(event).expect("bounded script events");
+        }
+        below = next;
+    }
+    found.into_boxed()
 }

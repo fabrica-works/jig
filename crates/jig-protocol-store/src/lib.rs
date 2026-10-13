@@ -17,6 +17,7 @@ mod reads;
 mod restore;
 mod secrets;
 pub mod sizes;
+pub mod transcripts;
 use alloc::boxed::Box;
 use skein_lib::{Env, Queue, Time, Wall};
 
@@ -29,6 +30,8 @@ pub struct Limits {
     pub journal: skein_lib::JournalLimits,
     /// Point gets available to a party page's joins (store.md, 13).
     pub joins: u32,
+    pub queue: u32,
+    pub files: u32,
 }
 
 /// Stores made by the caller, kept across a world's crash (store.md, 14).
@@ -55,12 +58,17 @@ pub struct Store {
     phase: Phase,
     directory: directory::Directory,
     secret_state: secrets::State,
+    transcripts: transcripts::State,
 }
 
 impl Store {
     #[must_use]
     pub fn over(limits: &Limits, application: sizes::Application, stores: Stores) -> Store {
         assert!(limits.store.is_usable() && limits.secrets.is_usable(), "both stores' limits are usable");
+        assert!(
+            limits.queue > 0 && limits.queue <= limits.store.queued && limits.files > 0,
+            "transcript bounds fit the store queue"
+        );
         let codec = codec::limits(&limits.core).expect("the domain limits fit their families' ceilings");
         Store {
             limits: *limits,
@@ -70,6 +78,7 @@ impl Store {
             phase: Phase::Closed,
             directory: directory::Directory::new(),
             secret_state: secrets::State::new(limits.secrets.queued),
+            transcripts: transcripts::State::new(limits),
         }
     }
 
@@ -89,7 +98,7 @@ impl Store {
 }
 
 /// Most terminals from a component step, including a store batch.
-pub const MAX_OUT_DOWN: u32 = skein_kv::MAX_OUT.above;
+pub const MAX_OUT_DOWN: u32 = skein_kv::MAX_OUT.above.saturating_mul(2);
 
 /// Owned stores, component state and bounded temporary rows and operations.
 #[must_use]
@@ -125,6 +134,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Queue::<skein_io::file::Request>::worst_case(skein_kv::MAX_OUT.below)?)?
         .checked_add(Queue::<Event>::worst_case(MAX_OUT_DOWN)?)?
         .checked_add(secrets::worst_case(limits)?)?
+        .checked_add(transcripts::worst_case(limits)?)?
         .checked_add(Queue::<skein_io::file::Request>::worst_case(skein_kv::MAX_OUT.below.checked_mul(2)?)?)
 }
 
@@ -135,7 +145,7 @@ pub fn down(store: &mut Store, env: &Env<Limits>, request: Request, above: &mut 
     }
     match request {
         Request::Open { owner, root } => directory::open(store, env, owner, root, above, below),
-        Request::Commit { number, writes } => directory::commit(store, env, number, writes, above, below),
+        Request::Commit { number, writes } => transcripts::write::begin(store, env, number, writes, above, below),
         Request::Restore { owner, range, after, rows, bytes } => {
             restore::restore(store, env, owner, restore::Page { range, after, rows, bytes }, above, below);
         }
@@ -160,6 +170,7 @@ pub fn fire(store: &mut Store, env: &Env<Limits>, above: &mut Queue<Event>, belo
     if store.phase != Phase::Stopped {
         directory::fire(store, env, above, below);
         secrets::sweep(store, env, above, below);
+        transcripts::write::fire(store, env, above, below);
     }
 }
 

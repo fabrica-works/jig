@@ -44,6 +44,6 @@ pub fn decode(key: &domain::Key, bytes: &[u8], limits: &Limits) -> Option<domain
     }
 }
 
-fn core_limits(limits: &Limits) -> core::Limits {
+pub(crate) fn core_limits(limits: &Limits) -> core::Limits {
     core::Limits { core: limits.core, tasks: limits.tasks, notes: limits.notes }
 }

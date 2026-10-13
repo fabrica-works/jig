@@ -1,5 +1,5 @@
 //! Deployment directories and the two independent stores (store.md, 2, 6 and 10).
-use crate::{Arrived, Below, Event, Io, Limits, OpenRefusal, Phase, Root, Store, Write, commits, open, secrets};
+use crate::{Arrived, Below, Event, Io, Limits, OpenRefusal, Phase, Root, Store, open, secrets};
 use alloc::boxed::Box;
 use skein_io::file;
 use skein_lib::{Env, Queue, Token};
@@ -213,7 +213,11 @@ pub(crate) fn up(store: &mut Store, env: &Env<Limits>, io: Io, above: &mut Queue
         Io::Store(arrived) => (arrived, false),
         Io::Secrets(arrived) => (arrived, true),
         Io::Transcripts(arrived) => {
-            directory(store, env, arrived, above, below);
+            match store.phase {
+                Phase::Ready { .. } => crate::transcripts::write::arrived(store, env, arrived, above, below),
+                Phase::Closed => directory(store, env, arrived, above, below),
+                Phase::Stopped => {}
+            }
             return;
         }
     };
@@ -251,6 +255,7 @@ pub(crate) fn events_up(
                 if secret {
                     secrets::committed(store, owner, above);
                 } else if owner == Token::new(number) {
+                    crate::transcripts::committed(store, number);
                     above.push(Event::Committed { number, fill: store.stores.store.used() });
                 } else {
                     store.phase = Phase::Stopped;
@@ -260,13 +265,13 @@ pub(crate) fn events_up(
             skein_kv::Event::Refused { owner, .. } => {
                 store.phase = Phase::Stopped;
                 if !secret {
-                    above.push(Event::Failed { number: owner.raw() });
+                    crate::transcripts::failed(store, Some(owner.raw()), above);
                 }
             }
             skein_kv::Event::Failed { number, .. } => {
                 store.phase = Phase::Stopped;
                 if !secret {
-                    above.push(Event::Failed { number });
+                    crate::transcripts::failed(store, Some(number), above);
                 }
             }
             skein_kv::Event::OpenFailed { .. } => refuse(store, above),
@@ -276,51 +281,6 @@ pub(crate) fn events_up(
             }
         }
     }
-}
-pub(crate) fn commit(
-    store: &mut Store,
-    env: &Env<Limits>,
-    number: u64,
-    writes: Box<[Write]>,
-    above: &mut Queue<Event>,
-    below: &mut Below,
-) {
-    if !store.directory.disk {
-        commits::commit(store, number, writes, above);
-        return;
-    }
-    let due = match store.phase {
-        Phase::Ready { next, format_due } => {
-            if number != next || number <= store.stores.store.last() {
-                store.phase = Phase::Stopped;
-                above.push(Event::Failed { number });
-                return;
-            }
-            format_due
-        }
-        Phase::Closed => {
-            store.phase = Phase::Stopped;
-            above.push(Event::Failed { number });
-            return;
-        }
-        Phase::Stopped => return,
-    };
-    let Some(ops) = commits::operations(store, writes, due) else {
-        store.phase = Phase::Stopped;
-        above.push(Event::Failed { number });
-        return;
-    };
-    store.phase = Phase::Ready { next: number.checked_add(1).unwrap_or(number), format_due: false };
-    let kv_env = self::env(store, env, false);
-    let mut events = Queue::with_capacity(skein_kv::MAX_OUT.above);
-    skein_kv::down(
-        &mut store.stores.store,
-        &kv_env,
-        skein_kv::Request::Commit { owner: Token::new(number), ops },
-        &mut events,
-        &mut below.store,
-    );
-    events_up(store, false, &mut events, above);
 }
 pub(crate) fn fire(store: &mut Store, env: &Env<Limits>, above: &mut Queue<Event>, below: &mut Below) {
     for secret in [false, true] {

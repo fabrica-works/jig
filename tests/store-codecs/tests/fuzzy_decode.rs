@@ -129,3 +129,56 @@ fn arbitrary_core_rows_never_panic_and_round_trip_when_they_decode() {
 fn mutated_core_goldens_never_panic() {
     mutated("core", 0x5704_e019, core);
 }
+
+fn frames(bytes: &[u8]) {
+    use jig_protocol_store::{codec, core_v1, notes_v1, tasks_v1, transcripts::frame};
+    let limits = codec::Limits {
+        core: core_v1::CEILINGS,
+        tasks: tasks_v1::CEILINGS,
+        people: people_v1::CEILINGS,
+        notes: notes_v1::CEILINGS,
+    };
+    if let Ok(turn) = frame::decode(bytes, &limits) {
+        assert_eq!(frame::encode(&turn, &limits).expect("decoded frame fits").as_ref(), bytes);
+    }
+}
+#[test]
+fn arbitrary_frames_never_panic_and_round_trip_when_they_decode() {
+    arbitrary(0x5701_e017, frames);
+}
+#[test]
+fn mutated_and_short_frames_never_panic() {
+    use jig_protocol_store::{codec, core_v1, notes_v1, tasks_v1, transcripts::frame};
+    let limits = codec::Limits {
+        core: core_v1::CEILINGS,
+        tasks: tasks_v1::CEILINGS,
+        people: people_v1::CEILINGS,
+        notes: notes_v1::CEILINGS,
+    };
+    let turn = core_v1::TurnRecord::new(
+        &limits.core,
+        core_v1::TurnRecordParts {
+            opens_window: true,
+            task: 11,
+            attempt: 2,
+            turn: 1,
+            spent: 3,
+            read: Some(4),
+            at: 5,
+            transcript: Box::from(b"turn bytes".as_slice()),
+        },
+    )
+    .expect("bounded turn");
+    let mut writer = Writer::new(usize::try_from(turn.measure()).expect("body size"));
+    turn.encode(&mut writer).expect("measured body");
+    let codec = codec::core::Limits { core: limits.core, tasks: limits.tasks, notes: limits.notes };
+    let turn = codec::core::read_turn(&writer.finish(), &codec).expect("valid body");
+    let bytes = frame::encode(&turn, &limits).expect("valid frame");
+    frames(&bytes);
+    for index in 0..bytes.len() {
+        let mut changed = bytes.clone();
+        *changed.get_mut(index).expect("chosen byte") ^= 1;
+        frames(&changed);
+        frames(bytes.get(..index).expect("short frame"));
+    }
+}
