@@ -37,6 +37,13 @@ What is still open is listed in section 14.
   engine's own hub speaks. The engine's root routes a worker's link as
   it routes its own hub, with the same translations to and from the
   core's fleet (`../domain/root.md`, section 5).
+- **The link vocabulary names only what crosses.** It identifies a run
+  and an attempt by their numbers, and a call, a message or a turn by
+  the name or number the run or the engine gave it, which mean the same
+  on both ends. A handle one side mints for itself (a delivery's token,
+  a request's reply handle) is not in it: an assignment is answered by
+  its run and attempt, and a root that wants a handle of its own keeps
+  it beside them (6.3).
 - **What is not jig's crosses as bytes:** smith's payloads (the
   charter, a resumed run's transcript, turns, call names and a run's
   result), in smith's own versioned encodings, as the hub holds them
