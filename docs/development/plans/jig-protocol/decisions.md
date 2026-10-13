@@ -1489,6 +1489,19 @@ the file.
      profile's name, and checks them in the same sum; jig's profiles gain
      only jig's own (the journal's, the routes', io's). This narrows
      ruling 204.
+206. **The test root answers busy and always takes a store's answer**
+     (2026-10-13, the coordinator's block "jig 25.3: root admission and
+     store replies with a full journal", 2026-10-13T03:59:06Z). A defect
+     against the design: service.md, 2 has the root answer "busy, through
+     the door, an event the journal cannot take", and 4 "A store's answer
+     is always taken, however full the journal"; `jig-test-domain`'s
+     `decide` returns when `domain.journal.decision(&room)` is `None`,
+     dropping the input. 25.3 adds a public `try_step(..) -> Result<(),
+     Event>` to `jig-test-domain` that hands back an input the journal
+     cannot take, for the service to answer busy; a store's answers
+     (loads, a commit's acknowledgement or failure) are taken without a
+     decision's room. `step` stays for the worlds, unchanged. Inside
+     25.3's Files, named in its commit body.
 
 ## For the user
 
