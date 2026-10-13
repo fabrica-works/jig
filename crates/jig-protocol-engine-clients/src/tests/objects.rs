@@ -3,7 +3,7 @@ use crate::translate;
 use alloc::boxed::Box;
 use jig_domain_core::{documents as d, reads};
 use jig_domain_people as p;
-use jig_protocol_client_wire::v6 as w;
+use jig_protocol_client_wire::v7 as w;
 use jig_test_client_records as records;
 #[test]
 fn a_pending_proposal_becomes_its_owner_record() {

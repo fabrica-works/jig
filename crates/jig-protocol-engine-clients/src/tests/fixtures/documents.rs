@@ -1,7 +1,7 @@
 use alloc::boxed::Box;
 use jig_domain_core::documents as d;
 use jig_domain_tasks as t;
-use jig_protocol_client_wire::v6 as w;
+use jig_protocol_client_wire::v7 as w;
 use skein_lib::{Duration, List, Wall};
 pub fn wire_limits() -> w::Limits {
     jig_test_client_records::limits()

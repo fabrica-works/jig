@@ -34,7 +34,7 @@ pub fn world(settings: Settings) -> World<Test, Scripted> {
         settings,
         Scripted::new(
             Script {
-                versions: VersionRange { first: 6, last: 6 },
+                versions: VersionRange { first: 7, last: 7 },
                 truth,
                 bounds: Bounds {
                     text: 128,

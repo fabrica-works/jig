@@ -2,7 +2,7 @@
 use super::Untranslatable;
 use alloc::boxed::Box;
 use jig_domain_people as p;
-use jig_protocol_client_wire::v6 as w;
+use jig_protocol_client_wire::v7 as w;
 use skein_lib::{List, Reader, Wall};
 #[expect(clippy::manual_map, reason = "step code matches optional fields")]
 #[expect(clippy::too_many_lines, reason = "one total match names every wire ask")]

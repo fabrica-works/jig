@@ -1,6 +1,6 @@
 //! Sparse entrance facts without invented names, words or bounds (contract.md, 4).
 use jig_domain_people as p;
-use jig_protocol_client_wire::v6 as w;
+use jig_protocol_client_wire::v7 as w;
 use skein_lib::Writer;
 pub(crate) fn refusal(value: p::Refusal, limits: &w::Limits) -> Result<w::Refusal, w::Problem> {
     Ok(match value {

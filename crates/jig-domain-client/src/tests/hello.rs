@@ -66,7 +66,7 @@ fn an_invalid_hello_closes_watches_without_fabricating_frame_and_a_later_range_c
     assert_eq!(domain.frame().document, None);
     assert_eq!(domain.page(), &Page::OutOfDate);
     assert_eq!(domain.next_deadline(), None);
-    assert!(drive(&mut domain, Event::Hello { versions: VersionRange { first: 6, last: 6 } }).is_empty());
+    assert!(drive(&mut domain, Event::Hello { versions: VersionRange { first: 7, last: 7 } }).is_empty());
     assert!(
         drive(&mut domain, Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(frame(7)))) })
             .is_empty()
@@ -86,7 +86,7 @@ fn a_late_hello_cannot_restore_link_from_a_frame_whose_watch_already_dropped() {
         drive(&mut domain, Event::Ended { watch, end: crate::contract::WatchEnd::Dropped }).as_ref(),
         &[Request::Link { link: Link::Offline }]
     );
-    assert!(drive(&mut domain, Event::Hello { versions: VersionRange { first: 6, last: 6 } }).is_empty());
+    assert!(drive(&mut domain, Event::Hello { versions: VersionRange { first: 7, last: 7 } }).is_empty());
     assert_eq!(domain.link(), Link::Offline);
     let retry = domain.next_deadline().expect("dropped frame watch keeps its retry");
     let mut out = Queue::with_capacity(crate::max_out(&LIMITS));

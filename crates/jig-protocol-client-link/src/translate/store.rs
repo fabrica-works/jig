@@ -6,7 +6,7 @@ use jig_domain_client::{
     address::{Address, ProjectSection, TaskSection},
     contract as c,
 };
-use jig_protocol_client_wire::{self as wire, v6 as w};
+use jig_protocol_client_wire::{self as wire, v7 as w};
 use skein_lib::{List, Reader, RequestRecord, Wall, Writer, bytes};
 
 fn project_section(value: ProjectSection) -> w::ProjectSection {

@@ -41,7 +41,7 @@ fn drive(domain: &mut Domain, limits: &Limits, now: Time, event: Event) -> Box<[
         crate::step(
             domain,
             &Env { now, wall: Wall::EPOCH, limits: *limits },
-            Event::Hello { versions: VersionRange { first: 6, last: 6 } },
+            Event::Hello { versions: VersionRange { first: 7, last: 7 } },
             &mut out,
         );
     }

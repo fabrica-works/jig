@@ -340,3 +340,19 @@ fn each_turn_bytes_variant_round_trips_with_the_carried_ceiling() {
         assert_eq!(TurnBytes::decode(&limits, &mut Reader::new(&bytes)), Ok(value), "{name}");
     }
 }
+
+#[test]
+fn a_sign_in_not_ready_round_trips_unchanged() {
+    let limits = fixtures::limits();
+    let answer = SignInAnswer::NotReady;
+    let bytes = fixtures::encoded(&answer, SignInAnswer::measure, SignInAnswer::encode);
+    assert_eq!(SignInAnswer::decode(&limits, &mut Reader::new(&bytes)), Ok(answer), "sign-in not_ready");
+}
+
+#[test]
+fn a_sign_out_not_ready_round_trips_unchanged() {
+    let limits = fixtures::limits();
+    let answer = SignOutAnswer::NotReady;
+    let bytes = fixtures::encoded(&answer, SignOutAnswer::measure, SignOutAnswer::encode);
+    assert_eq!(SignOutAnswer::decode(&limits, &mut Reader::new(&bytes)), Ok(answer), "sign-out not_ready");
+}

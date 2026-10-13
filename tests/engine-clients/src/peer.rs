@@ -2,7 +2,7 @@
 use crate::fixtures;
 use jig_domain_core as core;
 use jig_domain_people as people;
-use jig_protocol_client_wire::v6 as w;
+use jig_protocol_client_wire::v7 as w;
 use jig_protocol_engine_clients::{
     Component, Event, Kept, Limits, Request, SecretOwner, SecretsAnswer, SecretsRequest, Settings,
 };
@@ -383,7 +383,7 @@ impl Peer {
         subject.encode(&mut record).expect("subject");
         let subject = w::Owned::new(
             &self.env.limits.wire,
-            w::OwnedParts { owner: w::Owner::Jig, version: 6, record: record.finish() },
+            w::OwnedParts { owner: w::Owner::Jig, version: 7, record: record.finish() },
         )
         .expect("subject owner");
         let open = w::Open::new(&self.env.limits.wire, w::OpenParts { stream, watch: self.next_watch, subject })
@@ -584,6 +584,7 @@ impl Peer {
         {
             w::SignInAnswer::SignedIn(answer) => answer,
             w::SignInAnswer::Refused => panic!("sign-in refused"),
+            w::SignInAnswer::NotReady => panic!("sign-in not ready"),
         }
     }
     pub fn answer_request(&mut self, to: ReplyTo, reply: people::Reply) {

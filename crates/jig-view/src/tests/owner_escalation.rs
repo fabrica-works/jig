@@ -300,7 +300,7 @@ fn presence_domain(l: jig_domain_client::Limits, documents: &[(ObjectKey, Option
             offset: jig_domain_client::boundary::Offset { minutes: 60 },
         },
     );
-    requests.extend(presence_step(&mut domain, l, Event::Hello { versions: VersionRange { first: 6, last: 6 } }));
+    requests.extend(presence_step(&mut domain, l, Event::Hello { versions: VersionRange { first: 7, last: 7 } }));
     let frame = requests
         .into_iter()
         .find_map(|request| match request {

@@ -4,7 +4,7 @@ use crate::{
     translate::{Untranslatable, asks::ask},
 };
 use jig_domain_people as p;
-use jig_protocol_client_wire::v6 as w;
+use jig_protocol_client_wire::v7 as w;
 #[test]
 fn a_start_chat_record_becomes_the_core_s_start_chat() {
     let limits = f::wire();
@@ -86,7 +86,7 @@ fn an_ask_that_does_not_translate_reaches_no_core() {
         out.put(&[0]).expect("tail");
         out.finish()
     }] {
-        let owner = exchange.post(f::keyed(w::Owner::Jig, 6, bytes));
+        let owner = exchange.post(f::keyed(w::Owner::Jig, 7, bytes));
         exchange.authenticate();
         assert!(exchange.out.is_empty());
         assert_eq!(exchange.response(owner), (400, b"".as_slice()));
@@ -115,7 +115,7 @@ fn an_application_record_is_routed_with_its_digest() {
 #[test]
 fn a_third_exchange_past_the_client_s_bound_is_busy() {
     let mut exchange = Exchange::new();
-    let body = f::keyed(w::Owner::Jig, 6, f::encode_ask(&f::start(&f::wire())));
+    let body = f::keyed(w::Owner::Jig, 7, f::encode_ask(&f::start(&f::wire())));
     for _ in 0..2_u32 {
         exchange.post(body.clone());
         exchange.authenticate();

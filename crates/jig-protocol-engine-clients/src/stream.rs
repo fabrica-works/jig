@@ -2,7 +2,7 @@
 use crate::{Limits, translate::watches as translate};
 use alloc::boxed::Box;
 use jig_domain_core as core;
-use jig_protocol_client_wire::v6 as w;
+use jig_protocol_client_wire::v7 as w;
 use skein_http::sse::writer as sse;
 use skein_lib::{Env, Map, Queue, Time, Token, stream::Down};
 #[derive(Debug)]
