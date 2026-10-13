@@ -15,7 +15,9 @@ pub(crate) struct Link {
 pub(crate) enum Waiting {
     Core,
     Keep { sign_in: u64, answer: w::SignedIn },
-    Get { sign_in: u64, digest: Secret },
+    Get { sign_in: u64, digest: Secret, body: Box<[u8]> },
+    Ask { sign_in: u64 },
+    Checked { sign_in: u64, body: Box<[u8]> },
 }
 #[derive(Debug)]
 pub(crate) struct Pending {

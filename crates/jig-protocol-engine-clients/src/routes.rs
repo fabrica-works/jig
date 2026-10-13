@@ -35,3 +35,10 @@ pub(crate) fn signed_in(_limits: &w::Limits, answer: w::SignedIn) -> Box<[u8]> {
     answer.encode(&mut out).expect("admitted sign-in");
     out.finish()
 }
+
+pub(crate) fn busy() -> Box<[u8]> {
+    let answer = w::Answer::Busy;
+    let mut out = skein_lib::Writer::new(1);
+    answer.encode(&mut out).expect("busy fits");
+    out.finish()
+}

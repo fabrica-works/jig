@@ -41,12 +41,18 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Queue::<skein_lib::stream::Down>::worst_case(8)?)?;
     Map::<Token, Connection>::worst_case(limits.connections)?
         .checked_add(each.checked_mul(u64::from(limits.connections))?)?
-        .checked_add(Map::<Token, Waiting>::worst_case(limits.exchanges)?)?
-        .checked_add(u64::from(limits.exchanges).checked_mul(80)?)?
+        .checked_add(Map::<Token, Waiting>::worst_case(limits.exchanges.checked_add(limits.connections)?)?)?
+        .checked_add(
+            u64::from(limits.exchanges.checked_add(limits.connections)?)
+                .checked_mul(u64::from(body).checked_add(80)?)?,
+        )?
         .checked_add(Queue::<Request>::worst_case(MAX_OUT_DOWN)?)?
         .checked_add(skein_lib::List::<crate::Served>::worst_case(limits.families)?)?
         .checked_add(skein_lib::List::<u16>::worst_case(limits.providers)?)?
         .checked_add(u64::from(limits.identity_bytes).checked_mul(u64::from(MAX_OUT_DOWN).checked_add(1)?)?)?
         .checked_add(u64::try_from(size_of::<jig_domain_core::Event>()).ok()?.checked_mul(u64::from(MAX_OUT_DOWN))?)?
+        // A decoded ask's enums and owned list entries are at most 64 times
+        // their wire body; reserve the current translation and its output slots.
+        .checked_add(u64::from(body).checked_mul(64)?.checked_mul(u64::from(MAX_OUT_DOWN).checked_add(1)?)?)?
         .checked_add(256)
 }

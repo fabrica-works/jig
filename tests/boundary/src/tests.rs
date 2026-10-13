@@ -273,6 +273,7 @@ fn engine_clients_link_only_their_boundary_wire_and_foundation() {
             "jig-domain-people",
             "jig-domain-views",
             "jig-protocol-client-wire",
+            "skein-codec",
             "skein-http",
             "skein-io",
             "skein-lib"

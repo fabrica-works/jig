@@ -301,6 +301,9 @@ impl Peer {
             w::SignInAnswer::Refused => panic!("sign-in refused"),
         }
     }
+    pub fn take_core(&mut self) -> Option<core::Event> {
+        self.core.pop_front()
+    }
     #[must_use]
     pub fn core_record(&self) -> &str {
         self.last_core.as_deref().expect("core sign-in")
