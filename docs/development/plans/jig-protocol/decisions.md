@@ -140,9 +140,11 @@ the file.
     rule); decision 16 holds otherwise.
 
 36. **A service's credential** reaches its owner once, in the answer
-    that makes the service: the client contract's `Made::Service` carries
-    it as a secret field, beside its party (`protocol/client.md`,
-    section 8).
+    that makes the service: on the wire beside the service's party, to
+    the owner's shell, never the client's domain, so the contract's
+    `Made::Service { party }` carries no secret; the service signs in with
+    it as a native client does (`protocol/client.md`, section 8; the
+    designer, 2026-10-13, jig `2dfb78a5`).
 37. **An LLM grant's value, as smith's agent processes take it,** is
     smith's envelope of the account's id and its access token (smith's
     agent service). The engine's table and jig's channel keep the two

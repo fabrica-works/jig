@@ -561,12 +561,13 @@ pub struct Served { pub family: Option<u16>, pub first: u32, pub last: u32 }
 
 ## Questions to raise when reached
 
-- **A service's credential** (`client.md`, section 8): "the engine's
-  protocol layer draws it, keeps its digest, and answers the owner's
-  request with it once". The contract's `Made::Service { party }`
-  (`contract/asks.rs`, `Made`) has no field for it. Raise at 31.3; until
-  answered, `MakeService` is answered as the contract has it, with no
-  credential.
+- **A service's credential:** settled by the designer (jig `2dfb78a5`;
+  `client.md`, section 8). The contract's `Made::Service { party }` stays
+  as it is: the credential crosses beside it on the wire, to the owner's
+  shell, never the client's domain; a service signs in with it at the
+  deployment provider's sign-in route. A step of the supervisor's after
+  31.3 builds it; 31.3 answers `MakeService` with no credential until
+  then.
 - **The link's span and the heartbeat** are limits: report the numbers
   chosen.
 
