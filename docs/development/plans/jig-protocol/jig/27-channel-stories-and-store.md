@@ -88,6 +88,32 @@ Proof: 27.1's mid-run shutdown story passes; the gate.
 Don't: change a public boundary; poll.
 Size: at most 20 lines of production code.
 
+### 27.s3 An answer's refused messages are committed with it
+
+A step not in the plan (decisions.md, ruling 265), found by 27.1's ending
+story on the real agent. `protocol/channel.md`, 5.1: the hub keeps each
+refusal "with the run's next turn, or its answer if none follows", and
+the core records it in the commit that takes the turn's read messages;
+`domain/tasks.md`, 8.2: a refused message stays in the inbox, untaken.
+The core's `route_answer_payload`
+(`crates/jig-domain-core/src/routing/run_payloads.rs:37-39`) validates an
+answer's refused names and drops them, routing only the activation,
+where `route_turn_payload` routes `tasks::Event::Refused`
+(`logs/jig-27/27.1-dev-ending.txt`).
+Needs: nothing; before 27.1 lands. Run by jig 27's session as its own
+commit.
+Files: `crates/jig-domain-core/src/routing/run_payloads.rs` and its tests.
+Shape: the answer's validated refused names reach the tasks child in the
+same decision as its terminal activation, as a turn's do, so they are
+committed with the answer.
+Test shape: a row in the core's routing tests: an answer with a refused
+name commits the refusal with its terminal; 27.1's
+`a_message_refused_while_ending_is_committed_with_the_answer` is the
+world proof.
+Proof: that story passes on the real agent; the gate.
+Don't: change the tasks child or the wire.
+Size: at most 30 lines of production code.
+
 ### 27.1 The channel's stories, its referee and the fuzzy sweep
 
 Scope: `tests/channel/src/{referee.rs, relay.rs, stories.rs}`: the

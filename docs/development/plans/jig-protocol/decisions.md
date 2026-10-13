@@ -2192,6 +2192,15 @@ the file.
      adds the two wire variants; 31.6 needs it and gains a test; 33.1 maps
      them. Keyed requests not ready, reads served and a new watch ended
      stopping stand.
+265. **jig 27.s3: an answer's refused messages are committed with it**
+     (2026-10-13, the coordinator's block "jig 27.1: final-answer refused
+     names are not committed", 2026-10-13T11:54:13Z). channel.md 5.1 keeps
+     a refusal with the run's next turn, or its answer if none follows,
+     and the core records it in that commit; the core's answer route
+     validates refused names and drops them. The design is clear, so no
+     question: a step not in the plan, jig 27.s3
+     (`jig/27-channel-stories-and-store.md`), routes them with the
+     answer's terminal; jig 27 runs it before 27.1 lands.
 
 ## For the user
 
