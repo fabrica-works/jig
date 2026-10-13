@@ -848,6 +848,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "jig-test"
+version = "0.0.0"
+dependencies = [
+ "jig-domain-host",
+ "jig-protocol-config",
+ "jig-test-service",
+ "skein-io",
+ "skein-json",
+ "skein-lib",
+ "skein-oauth-accounts",
+ "skein-shell",
+ "skein-tls",
+ "smith-agent-shell",
+ "smith-host-protocol",
+ "smith-local-service",
+]
+
+[[package]]
 name = "jig-test-client-kit"
 version = "0.0.0"
 dependencies = [
@@ -1652,6 +1670,72 @@ dependencies = [
  "smith-charter",
  "smith-domain",
  "smith-host-domain",
+ "smith-protocol-channel",
+ "smith-transcript",
+]
+
+[[package]]
+name = "smith-inline-agent"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+dependencies = [
+ "skein-lib",
+ "smith-domain",
+ "smith-host-domain",
+]
+
+[[package]]
+name = "smith-local-domain"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+dependencies = [
+ "skein-lib",
+ "smith-domain",
+ "smith-events",
+ "smith-host-domain",
+ "smith-inline-agent",
+]
+
+[[package]]
+name = "smith-local-protocol"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+dependencies = [
+ "skein-io",
+ "skein-json",
+ "skein-lib",
+ "skein-oauth",
+ "smith-channel",
+ "smith-charter",
+ "smith-domain",
+ "smith-events",
+ "smith-host-domain",
+ "smith-local-domain",
+ "smith-protocol-channel",
+ "smith-transcript",
+]
+
+[[package]]
+name = "smith-local-service"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+dependencies = [
+ "skein-channel",
+ "skein-http",
+ "skein-io",
+ "skein-lib",
+ "skein-oauth",
+ "skein-oauth-accounts",
+ "skein-tls",
+ "smith-agent-service",
+ "smith-channel",
+ "smith-domain",
+ "smith-events",
+ "smith-host-domain",
+ "smith-host-protocol",
+ "smith-inline-agent",
+ "smith-local-domain",
+ "smith-local-protocol",
  "smith-protocol-channel",
  "smith-transcript",
 ]

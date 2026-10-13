@@ -3,6 +3,7 @@
 [workspace]
 resolver = "3"
 members = [
+    "testing/jig-test",
     "crates/jig-shell-native",
     "tests/client-protocol",
     "testing/jig-test-client-records",
@@ -86,6 +87,7 @@ rust-version = "1.95"
 publish = false
 
 [workspace.dependencies]
+smith-local-service = { git = "https://github.com/forgetic/smith.git" }
 jig-protocol-client-link = { path = "crates/jig-protocol-client-link" }
 
 smith-protocol-llm = { git = "https://github.com/forgetic/smith.git" }
