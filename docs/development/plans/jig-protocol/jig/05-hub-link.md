@@ -912,17 +912,22 @@ A step not in the plan (decisions.md, ruling 192), before jig 25.1 lands.
 its attempt as invalid, naming why (6.3)"; 6.3: "refused at the entrance:
 busy; or invalid ... with smith's parts that do not decode (6.8), or as a
 start smith refuses, naming what".
-Shape: `jig_domain_host::FromAgent` gains `Refused { owner: Token, why:
-  Box<[u8]> }`, the agent's refusal of a start, its words bounded by the
-  hub's `detail_bytes`; `Invalid` (`boundary.rs:579`) gains `Start { why:
-  Box<[u8]> }`. The hub answers a start the agent refuses, while it is
-  starting, as `Answer::Invalid(Invalid::Start { why })` and frees its
-  slot. `Gone` while starting stays `Failure::Agent(Unstarted)`.
+Shape (ruling 193): `jig_domain_host::FromAgent` gains `StartRefused {
+  owner: Token, why: Box<[u8]> }` (the existing `Refused` is a message's),
+  its words bounded by the hub's `detail_bytes`; `Invalid`
+  (`boundary.rs:579`) gains `Start { why: Box<[u8]> }`. The hub answers a
+  start the agent refuses, while it is starting, through its existing
+  `Ending::Refused(Refusal::Invalid(Invalid::Start { why }))`, and frees
+  its slot. `Gone` while starting stays `Failure::Agent(Unstarted)`. The
+  worker wire carries it: `jig-protocol-worker-wire`'s schema gains the
+  invalid start with its words (`bytes` at `detail_bytes`' ceiling),
+  regenerated, the family's version moved once; jig 23's up translation
+  and jig 24's link translate it both ways, keeping `why`.
 Test shape: a hub unit test: a start the agent refuses is answered
   invalid with its words, and its slot is free again.
 Proof: the gate.
 Don't: add a refusal for a run already started; parse smith's words.
-Size: at most 60 lines of production code.
+Size: at most 140 lines of production code (ruling 193).
 
 ## Interface sketches
 

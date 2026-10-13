@@ -1333,6 +1333,17 @@ the file.
      `RunResult::Refused`. A step not in the plan, jig 05.s3
      (`jig/05-hub-link.md`), adds `FromAgent::Refused` and
      `Invalid::Start`; jig 25.1 lands after it, its scaffolding before.
+193. **jig 05.s3's names and wire** (2026-10-13, the coordinator's block
+     "jig 05.s3: Refused name collision and wire InvalidStart
+     counterparts", 2026-10-13T02:35:40Z). The supervisor's step named
+     `FromAgent::Refused`, which a message's refusal already is
+     (`crates/jig-domain-host/src/boundary.rs:284`): the start's is
+     `StartRefused`, the old name unchanged. The answer takes the hub's
+     existing `Ending::Refused(Refusal::Invalid(..))` path, the hub's
+     `Answer` being a struct. `Invalid::Start { why }` crosses the worker
+     wire with its words, so 05.s3's Files gain the worker wire's schema
+     and regenerated code (its version moved once) and jig 23's and 24's
+     translations of it both ways; Size 140.
 
 ## For the user
 
