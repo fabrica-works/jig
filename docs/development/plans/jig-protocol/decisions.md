@@ -1253,9 +1253,31 @@ the file.
      `reply_to`, the hub answers and refuses an assignment by its run and
      attempt; its Size is now 250. jig 23.2 translates `Answer` and
      `Assign` once 05.s1 lands; jig 24's link makes no `ReplyTo`.
+186. **smith-repin waits for the user on smith's settle test** (2026-10-13,
+     the coordinator's block "smith repin: full-suite settling timeout
+     after three attempts", 2026-10-13T01:07:11Z). On skein `4130d9b`
+     (02.s6 and 02.s7 in), smith's
+     `smith_check_json_lists_the_effective_limits_by_name` passes alone in
+     1,558 ms, but fails its 2,000 ms settle bound in the full suite at
+     2.049, 2.083 and 2.077 s; at smith's old pins it took 1,010 ms alone.
+     02.s6 took back about 490 ms of skein 02.s4's cost; the other 548 ms
+     come from skein commits since smith's pin that are not named yet,
+     some of them other machines' (`adopt_write_pipe`'s new argument
+     among them). smith-repin keeps its commit `bb26b6d9`; the closing jig
+     and temper repins wait for it; every other step goes on. To the user,
+     under "For the user".
 
 ## For the user
 
+- **smith's settle test on carbon-forge** (ruling 186): smith-repin's
+  last gate fails only smith's `smith_check_json_lists_the_effective_limits_by_name`
+  at 2.05–2.08 s against its 2,000 ms bound in the full suite; alone it
+  runs 1,558 ms now, 1,010 ms at smith's old pins. Options: (a) a step that
+  bisects skein between smith's old pin `4b61ac5` and `4130d9b`, one
+  isolated run per commit that touches code, to name the 548 ms; (b) land
+  smith's repin from smith's reliability machine, where its suite runs
+  faster (ruling 121); (c) raise the test's bound in smith. The closing jig
+  and temper repins wait on it; nothing else does.
 - **The code-graph daemon's priority** (ruling 144): on carbon-forge,
   `codebase-memory-mcp`'s daemon (pid 272, started at boot) re-indexed
   on every change at normal priority, taking about six of eight cores as
