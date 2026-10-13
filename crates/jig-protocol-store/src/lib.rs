@@ -6,7 +6,96 @@ pub mod boundary;
 pub mod codec;
 pub mod format;
 pub mod intervals;
+mod open;
 pub mod sizes;
+use skein_lib::{Env, Queue, Time, Wall};
+
+/// The store component's bounds (protocol/store.md, section 13).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Limits {
+    pub core: jig_domain_core::Limits,
+    pub store: skein_kv::Limits,
+    pub secrets: skein_kv::Limits,
+    pub journal: skein_lib::JournalLimits,
+}
+
+/// Stores made by the caller, kept across a world's crash (store.md, 14).
+#[derive(Debug)]
+pub struct Stores {
+    pub store: skein_kv::Store,
+    pub secrets: skein_kv::Store,
+}
+
+/// The component's open and stopped states (store.md, 6 and 10).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Phase {
+    Closed,
+    Ready { next: u64, format_due: bool },
+    Stopped,
+}
+
+#[derive(Debug)]
+pub struct Store {
+    limits: Limits,
+    application: sizes::Application,
+    codec: codec::Limits,
+    stores: Stores,
+    phase: Phase,
+}
+
+impl Store {
+    #[must_use]
+    pub fn over(limits: &Limits, application: sizes::Application, stores: Stores) -> Store {
+        assert!(limits.store.is_usable() && limits.secrets.is_usable(), "both stores' limits are usable");
+        let codec = codec::limits(&limits.core).expect("the domain limits fit their families' ceilings");
+        Store { limits: *limits, application, codec, stores, phase: Phase::Closed }
+    }
+
+    #[must_use]
+    pub fn into_stores(self) -> Stores {
+        self.stores
+    }
+}
+
+/// One terminal from a memory step.
+pub const MAX_OUT_DOWN: u32 = 1;
+
+/// Owned stores, component state and the open step's bounded temporary rows.
+#[must_use]
+pub fn worst_case(limits: &Limits) -> Option<u64> {
+    let state = u64::try_from(size_of::<Store>()).ok()?;
+    let rows = u64::from(limits.store.value).checked_add(u64::from(limits.store.key))?.checked_mul(2)?;
+    skein_kv::worst_case(&limits.store)?
+        .checked_add(skein_kv::worst_case(&limits.secrets)?)?
+        .checked_add(state)?
+        .checked_add(rows)?
+        .checked_add(Queue::<skein_kv::Event>::worst_case(skein_kv::MAX_OUT.above)?)?
+        .checked_add(Queue::<skein_io::file::Request>::worst_case(skein_kv::MAX_OUT.below)?)?
+        .checked_add(Queue::<Event>::worst_case(MAX_OUT_DOWN)?)
+}
+
+/// The memory component's requests (store.md, section 10).
+pub fn down(store: &mut Store, request: Request, above: &mut Queue<Event>) {
+    if store.phase == Phase::Stopped {
+        return;
+    }
+    match request {
+        Request::Open { owner, root: _ } => open::open(store, owner, above),
+        // Each remaining handler joins in its owning increment, before routing uses it.
+        Request::Commit { .. }
+        | Request::Restore { .. }
+        | Request::Load { .. }
+        | Request::Read { .. }
+        | Request::Get { .. }
+        | Request::Transcript { .. }
+        | Request::Secrets { .. } => {}
+    }
+}
+
+fn memory_env(limits: skein_kv::Limits) -> Env<skein_kv::Limits> {
+    // Memory gets and commits use no clock or file operation.
+    Env { now: Time::ZERO, wall: Wall::EPOCH, limits }
+}
 
 #[rustfmt::skip]
 #[path = "generated/component_v1.rs"]
