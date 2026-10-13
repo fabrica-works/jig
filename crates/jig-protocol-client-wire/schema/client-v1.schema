@@ -532,3 +532,33 @@ enum Refusal { role: RefusalRole, disposal: RefusalDisposal, taken: RefusalTaken
 record Done { outcome: Outcome }
 record Refused { refusal: Refusal }
 enum Final { done: Done, refused: Refused }
+# Reads keep the engine's cursor opaque (protocol/client.md, section 6).
+record Cursor { value: bytes 1024 }
+enum InboxReadGroup { needs, updates }
+enum InboxGroup { questions, proposals, escalations, person_tasks, results, replies }
+record ReadTask { task: u64 }
+record ReadProposal { proposal: ProposalKey }
+record ReadEscalation { task: u64 }
+record ReadQuestion { task: u64 message: u64 }
+record ReadPersonTask { task: u64 }
+record ReadResult { task: u64 }
+record ReadEnded { task: u64 after: option Cursor }
+record ReadHistory { task: u64 subtree: bool after: option Cursor }
+record ReadActivity { task: u64 before: option Cursor }
+record ReadInbox { group: InboxReadGroup project: option u32 kind: option InboxGroup goal: option u64 after: option Cursor }
+record ReadConversations { after: option Cursor }
+record ReadGoals { project: u32 after: option Cursor }
+record ReadSpend { project: u32 after: option Cursor }
+record ReadProject { project: u32 }
+# ReadNotes.description: jig_domain_client::Limits::text
+record ReadNotes { scope: NoteScope description: option text 65536 after: option Cursor }
+enum Read { frame, task: ReadTask, proposal: ReadProposal, escalation: ReadEscalation, question: ReadQuestion, person_task: ReadPersonTask, result: ReadResult, ended: ReadEnded, history: ReadHistory, activity: ReadActivity, inbox: ReadInbox, conversations: ReadConversations, goals: ReadGoals, spend: ReadSpend, project: ReadProject, notes: ReadNotes, deployment }
+# Unreachable is a local connection outcome; the engine sends no such record.
+enum ReadNone { unknown, refused, gone, busy, signed_out }
+record ReadAnswerNone { value: ReadNone }
+enum ReadAnswer { value: Owned, none: ReadAnswerNone }
+# Flat retained funding rows (contract/historical_pages.rs).
+record OwnerPeriodTimes { began: u64 next: option u64 }
+record OwnerFundingRecord { period: option OwnerPeriodTimes funder: Funder parent: option Funder numbers: OwnerNumbers made: u32 closed: bool }
+# OwnerSpendPage.rows: jig_domain_client::Limits::rows
+record OwnerSpendPage { rows: list 32 OwnerFundingRecord before: option Cursor after: option Cursor cut: bool }

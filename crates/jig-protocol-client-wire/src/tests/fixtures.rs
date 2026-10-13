@@ -6,6 +6,7 @@ use skein_lib::{List, Overflow, Writer};
 pub fn limits() -> Limits {
     let mut limits = CEILINGS;
     limits.keyed_request = 32;
+    limits.owner_spend_page_rows = 2;
     limits
 }
 
@@ -77,4 +78,36 @@ pub fn owned() -> Owned {
     let family = Family::new(&limits, FamilyParts { number: u16::MAX }).expect("whole family number");
     Owned::new(&limits, OwnedParts { owner: Owner::Family(family), version: u32::MAX, record: start_chat_bytes() })
         .expect("whole owner's version")
+}
+
+pub fn read_none(none: ReadNone) -> ReadAnswerNone {
+    ReadAnswerNone::new(&limits(), ReadAnswerNoneParts { value: none }).expect("wire read outcome")
+}
+
+pub fn funding_rows(count: u32) -> List<OwnerFundingRecord> {
+    let limits = limits();
+    let period = OwnerPeriodTimes::new(&limits, OwnerPeriodTimesParts { began: u64::MAX, next: None })
+        .expect("optional next period");
+    let numbers =
+        OwnerNumbers::new(&limits, OwnerNumbersParts { budget: u64::MAX, spent: 11, spent_below: 17, reserved: 23 })
+            .expect("owner funding numbers");
+    let source =
+        FunderPeriod::new(&limits, FunderPeriodParts { project: 17, period: u64::MAX }).expect("whole period identity");
+    let row = OwnerFundingRecord::new(
+        &limits,
+        OwnerFundingRecordParts {
+            period: Some(period),
+            funder: Funder::Period(source),
+            parent: None,
+            numbers,
+            made: u32::MAX,
+            closed: true,
+        },
+    )
+    .expect("whole funding row");
+    let mut rows = List::with_capacity(count);
+    for _ in 0..count {
+        rows.push(row.clone()).expect("reserved funding rows");
+    }
+    rows
 }

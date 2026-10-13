@@ -45,3 +45,41 @@ fn a_bearer_token_past_its_bound_is_refused() {
         Err(Problem { path: Path::SignedInToken, reason: skein_codec::Reason::Bound })
     );
 }
+
+#[test]
+fn a_cursor_past_its_bound_is_refused() {
+    let limits = fixtures::limits();
+    let value = fixtures::bytes(limits.cursor_value.checked_add(1).expect("small bound"));
+    assert_eq!(
+        Cursor::new(&limits, CursorParts { value }),
+        Err(Problem { path: Path::CursorValue, reason: skein_codec::Reason::Bound })
+    );
+}
+
+#[test]
+fn each_read_none_round_trips_unchanged() {
+    let limits = fixtures::limits();
+    for none in [ReadNone::Unknown, ReadNone::Refused, ReadNone::Gone, ReadNone::Busy, ReadNone::SignedOut] {
+        let answer = ReadAnswer::None(fixtures::read_none(none));
+        let bytes = fixtures::encoded(&answer, ReadAnswer::measure, ReadAnswer::encode);
+        assert_eq!(ReadAnswer::decode(&limits, &mut Reader::new(&bytes)), Ok(answer));
+    }
+}
+
+#[test]
+fn a_read_value_round_trips_with_its_owner_version() {
+    let limits = fixtures::limits();
+    let answer = ReadAnswer::Value(fixtures::owned());
+    let bytes = fixtures::encoded(&answer, ReadAnswer::measure, ReadAnswer::encode);
+    assert_eq!(ReadAnswer::decode(&limits, &mut Reader::new(&bytes)), Ok(answer));
+}
+
+#[test]
+fn a_page_one_row_past_its_limit_is_refused() {
+    let limits = fixtures::limits();
+    let rows = fixtures::funding_rows(limits.owner_spend_page_rows.checked_add(1).expect("small bound"));
+    assert_eq!(
+        OwnerSpendPage::new(&limits, OwnerSpendPageParts { rows, before: None, after: None, cut: false }),
+        Err(Problem { path: Path::OwnerSpendPageRows, reason: skein_codec::Reason::Bound })
+    );
+}

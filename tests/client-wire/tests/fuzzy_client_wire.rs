@@ -399,6 +399,34 @@ fn records_9(bytes: &[u8]) {
     check!(Final, bytes);
 }
 
+fn records_10(bytes: &[u8]) {
+    check!(Cursor, bytes);
+    check!(InboxReadGroup, bytes);
+    check!(InboxGroup, bytes);
+    check!(ReadTask, bytes);
+    check!(ReadProposal, bytes);
+    check!(ReadEscalation, bytes);
+    check!(ReadQuestion, bytes);
+    check!(ReadPersonTask, bytes);
+    check!(ReadResult, bytes);
+    check!(ReadEnded, bytes);
+    check!(ReadHistory, bytes);
+    check!(ReadActivity, bytes);
+    check!(ReadInbox, bytes);
+    check!(ReadConversations, bytes);
+    check!(ReadGoals, bytes);
+    check!(ReadSpend, bytes);
+    check!(ReadProject, bytes);
+    check!(ReadNotes, bytes);
+    check!(Read, bytes);
+    check!(ReadNone, bytes);
+    check!(ReadAnswerNone, bytes);
+    check!(ReadAnswer, bytes);
+    check!(OwnerPeriodTimes, bytes);
+    check!(OwnerFundingRecord, bytes);
+    check!(OwnerSpendPage, bytes);
+}
+
 fn decoders(bytes: &[u8]) {
     records_1(bytes);
     records_2(bytes);
@@ -409,6 +437,7 @@ fn decoders(bytes: &[u8]) {
     records_7(bytes);
     records_8(bytes);
     records_9(bytes);
+    records_10(bytes);
 }
 
 fn arbitrary(rng: &mut Rng) {
@@ -435,6 +464,9 @@ fn mutation_seed(path: &Path) -> bool {
             "enum_final_",
             "enum_fact_",
             "record_hold_reason_",
+            "enum_read_",
+            "enum_read_answer_",
+            "record_owner_spend_page_",
         ]
         .iter()
         .any(|prefix| name.starts_with(prefix))
