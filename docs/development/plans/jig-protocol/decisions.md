@@ -1860,9 +1860,9 @@ the file.
   same budget), the worlds staying one process per test, would save
   about a third of the suite's test time. It gives up nextest's
   per-test isolation and timeout for unit tests, in every repository
-  (skein's `testing-strategy.md`, 8 names nextest). Yours to choose;
-  nothing waits on it, and steps 10 to 12 of `tests-cost.md` go on
-  either way.
+  (skein's `testing-strategy.md`, 8 names nextest). **The user,
+  2026-10-13: not now; only when it is needed to keep the suite within
+  its budget.** Steps 10 to 12 of `tests-cost.md` go on.
 
 - **smith's settle test on carbon-forge** (ruling 186): smith-repin's
   last gate fails only smith's `smith_check_json_lists_the_effective_limits_by_name`
