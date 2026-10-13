@@ -45,8 +45,11 @@ pub(super) fn encode_note_scope(
         }
     })
 }
-pub(super) fn decode_note_scope(value: wire::NoteScope) -> domain::NoteScope {
-    match value {
+pub(super) fn decode_note_scope(
+    value: wire::NoteScope,
+    limits: &wire::Limits,
+) -> Result<domain::NoteScope, wire::Problem> {
+    Ok(match value {
         wire::NoteScope::Deployment => domain::NoteScope::Deployment,
         wire::NoteScope::Project => domain::NoteScope::Project,
         wire::NoteScope::Goal(value) => {
@@ -55,9 +58,9 @@ pub(super) fn decode_note_scope(value: wire::NoteScope) -> domain::NoteScope {
         }
         wire::NoteScope::Resources(value) => {
             let wire::NoteScopeResourcesParts { connector, pattern } = value.into_parts();
-            domain::NoteScope::Resources { connector, pattern: decode_pattern(pattern) }
+            domain::NoteScope::Resources { connector, pattern: decode_pattern(pattern, limits)? }
         }
-    }
+    })
 }
 
 pub(super) fn encode_note_change(
@@ -71,7 +74,12 @@ pub(super) fn encode_note_change(
                 wire::NoteChangeCorrectParts {
                     description: description.clone(),
                     body: body.clone(),
-                    references: encode_numbers(references, limits)?,
+                    references: encode_numbers(
+                        references,
+                        limits,
+                        limits.parameter_bytes_value,
+                        limits.note_change_correct_references,
+                    )?,
                     recalled: *recalled,
                 },
             )?)
@@ -82,17 +90,25 @@ pub(super) fn encode_note_change(
         )?),
     })
 }
-pub(super) fn decode_note_change(value: wire::NoteChange) -> domain::NoteChange {
-    match value {
+pub(super) fn decode_note_change(
+    value: wire::NoteChange,
+    limits: &wire::Limits,
+) -> Result<domain::NoteChange, wire::Problem> {
+    Ok(match value {
         wire::NoteChange::Correct(value) => {
             let wire::NoteChangeCorrectParts { description, body, references, recalled } = value.into_parts();
-            domain::NoteChange::Correct { description, body, references: decode_numbers(references), recalled }
+            domain::NoteChange::Correct {
+                description,
+                body,
+                references: decode_numbers(references, limits, limits.parameter_bytes_value)?,
+                recalled,
+            }
         }
         wire::NoteChange::Delete(value) => {
             let wire::NoteChangeDeleteParts { recalled } = value.into_parts();
             domain::NoteChange::Delete { recalled }
         }
-    }
+    })
 }
 
 pub(super) fn encode_resource_role(value: domain::ResourceRole, _limits: &wire::Limits) -> wire::ResourceRole {
@@ -117,12 +133,18 @@ pub(super) fn encode_resource_name(
     let domain::ResourceName { connector, path } = value;
     wire::ResourceName::new(
         limits,
-        wire::ResourceNameParts { connector: *connector, path: encode_segments(path, limits)? },
+        wire::ResourceNameParts {
+            connector: *connector,
+            path: encode_segments(path, limits, limits.parameter_bytes_value, limits.resource_name_path)?,
+        },
     )
 }
-pub(super) fn decode_resource_name(value: wire::ResourceName) -> domain::ResourceName {
+pub(super) fn decode_resource_name(
+    value: wire::ResourceName,
+    limits: &wire::Limits,
+) -> Result<domain::ResourceName, wire::Problem> {
     let wire::ResourceNameParts { connector, path } = value.into_parts();
-    domain::ResourceName { connector, path: decode_segments(path) }
+    Ok(domain::ResourceName { connector, path: decode_segments(path, limits, limits.parameter_bytes_value)? })
 }
 
 pub(super) fn encode_adoption(
@@ -135,17 +157,17 @@ pub(super) fn encode_adoption(
         wire::AdoptionParts {
             resource: encode_resource_name(resource, limits)?,
             role: encode_resource_role(*role, limits),
-            options: encode_segments(options, limits)?,
+            options: encode_segments(options, limits, limits.parameter_bytes_value, limits.adoption_options)?,
         },
     )
 }
-pub(super) fn decode_adoption(value: wire::Adoption) -> domain::Adoption {
+pub(super) fn decode_adoption(value: wire::Adoption, limits: &wire::Limits) -> Result<domain::Adoption, wire::Problem> {
     let wire::AdoptionParts { resource, role, options } = value.into_parts();
-    domain::Adoption {
-        resource: decode_resource_name(resource),
+    Ok(domain::Adoption {
+        resource: decode_resource_name(resource, limits)?,
         role: decode_resource_role(role),
-        options: decode_segments(options),
-    }
+        options: decode_segments(options, limits, limits.parameter_bytes_value)?,
+    })
 }
 
 pub(super) fn encode_disposal(
@@ -481,9 +503,8 @@ pub fn encode_ask(value: &domain::Ask, limits: &wire::Limits) -> Result<wire::As
 }
 #[expect(clippy::too_many_lines, reason = "one exhaustive arm translates each kind of keyed request")]
 #[expect(clippy::manual_map, reason = "step code translates optional fields through exhaustive matches")]
-#[must_use]
-pub fn decode_ask(value: wire::Ask) -> domain::Ask {
-    match value {
+pub fn decode_ask(value: wire::Ask, limits: &wire::Limits) -> Result<domain::Ask, wire::Problem> {
+    Ok(match value {
         wire::Ask::Close(value) => {
             let wire::AskCloseParts { project, chat, disposals } = value.into_parts();
             domain::Ask::Close { project, chat, disposals: decode_ask_close_disposals(disposals) }
@@ -501,8 +522,8 @@ pub fn decode_ask(value: wire::Ask) -> domain::Ask {
             domain::Ask::EditNote {
                 project,
                 name,
-                scope: Box::new(decode_note_scope(scope)),
-                change: Box::new(decode_note_change(change)),
+                scope: Box::new(decode_note_scope(scope, limits)?),
+                change: Box::new(decode_note_change(change, limits)?),
             }
         }
         wire::Ask::MakeService(value) => {
@@ -511,7 +532,7 @@ pub fn decode_ask(value: wire::Ask) -> domain::Ask {
         }
         wire::Ask::Adopt(value) => {
             let wire::AskAdoptParts { project, adoption } = value.into_parts();
-            domain::Ask::Adopt { project, adoption: decode_adoption(adoption) }
+            domain::Ask::Adopt { project, adoption: decode_adoption(adoption, limits)? }
         }
         wire::Ask::SetGoal(value) => {
             let wire::AskSetGoalParts { project, spec, executor, budget, priority, deadline } = value.into_parts();
@@ -578,7 +599,7 @@ pub fn decode_ask(value: wire::Ask) -> domain::Ask {
         }
         wire::Ask::Amend(value) => {
             let wire::AskAmendParts { project, task, revision, amendment, release } = (*value).into_parts();
-            domain::Ask::Amend { project, task, revision, amendment: decode_amendment(amendment), release }
+            domain::Ask::Amend { project, task, revision, amendment: decode_amendment(amendment, limits)?, release }
         }
         wire::Ask::SetRoles(value) => {
             let wire::AskSetRolesParts { project, holdings } = value.into_parts();
@@ -586,7 +607,7 @@ pub fn decode_ask(value: wire::Ask) -> domain::Ask {
         }
         wire::Ask::ChangePolicy(value) => {
             let wire::AskChangePolicyParts { project, change } = value.into_parts();
-            domain::Ask::ChangePolicy { project, change: decode_policy_change(change) }
+            domain::Ask::ChangePolicy { project, change: decode_policy_change(change, limits)? }
         }
         wire::Ask::SetPool(value) => {
             let wire::AskSetPoolParts { project, person, budget } = value.into_parts();
@@ -600,7 +621,7 @@ pub fn decode_ask(value: wire::Ask) -> domain::Ask {
             let wire::AskStartChatParts { project, words } = value.into_parts();
             domain::Ask::StartChat { project, words }
         }
-    }
+    })
 }
 
 fn encode_ask_close_disposals(

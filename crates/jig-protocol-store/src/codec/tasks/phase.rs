@@ -1,6 +1,6 @@
 //! Task lifecycle values and bounded creation templates (protocol/store.md, 5.1).
 use super::value;
-use crate::tasks_v1 as wire;
+use crate::tasks_v2 as wire;
 use alloc::boxed::Box;
 use jig_domain_tasks as domain;
 use skein_lib::{List, Wall};
@@ -626,17 +626,8 @@ pub fn result(source: &domain::TaskResult, limits: &wire::Limits) -> Result<wire
             wire::TaskResult::Report(wire::ReportResult::new(limits, wire::ReportResultParts { words: words.clone() })?)
         }
         domain::TaskResult::Verdict { code, fields, words } => {
-            let mut members = List::with_capacity(limits.verdict_result_fields);
-            for field in fields {
-                let domain::ResultField { name, value } = field;
-                let field = wire::ResultField::new(
-                    limits,
-                    wire::ResultFieldParts { name: name.clone(), value: value.clone() },
-                )?;
-                if members.push(field).is_err() {
-                    return Err(problem(wire::Path::VerdictResultFields));
-                }
-            }
+            let members =
+                super::pieces::fields(fields, limits, limits.verdict_result_fields, wire::Path::VerdictResultFields)?;
             wire::TaskResult::Verdict(wire::VerdictResult::new(
                 limits,
                 wire::VerdictResultParts { code: *code, fields: members, words: words.clone() },
@@ -669,12 +660,8 @@ pub fn read_result(source: wire::TaskResult, limits: &wire::Limits) -> Result<do
         wire::TaskResult::Report(value) => domain::TaskResult::Report { words: value.into_parts().words },
         wire::TaskResult::Verdict(value) => {
             let wire::VerdictResultParts { code, fields, words } = value.into_parts();
-            let mut members = List::with_capacity(fields.len());
-            for field in fields.into_boxed() {
-                let wire::ResultFieldParts { name, value } = field.into_parts();
-                members.push(domain::ResultField { name, value }).expect("same number of fields");
-            }
-            domain::TaskResult::Verdict { code, fields: members.into_boxed(), words }
+            let members = super::pieces::read_fields(fields, limits, wire::Path::VerdictResultFields)?;
+            domain::TaskResult::Verdict { code, fields: members, words }
         }
         wire::TaskResult::Change(value) => {
             let wire::ChangeResultParts { connector, kind, resource, words } = value.into_parts();

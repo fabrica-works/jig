@@ -87,8 +87,8 @@ fn a_store_of_another_deployment_refuses_to_open() {
 
 #[test]
 fn a_store_of_another_tasks_version_refuses_naming_tasks() {
-    let mut store = planted(&[version_put(2, 1), fixtures::header_put(fixtures::DEPLOYMENT, 1)]);
-    assert_refusal(&open(&mut store), OpenRefusal::Format { family: Family::Tasks, found: 2, wanted: 1 });
+    let mut store = planted(&[version_put(3, 1), fixtures::header_put(fixtures::DEPLOYMENT, 1)]);
+    assert_refusal(&open(&mut store), OpenRefusal::Format { family: Family::Tasks, found: 3, wanted: 2 });
 }
 
 #[test]
@@ -120,7 +120,7 @@ fn a_format_row_without_its_header_refuses_as_numbers() {
 
 #[test]
 fn an_unknown_core_version_is_refused_before_decoding_its_header() {
-    let mut store = planted(&[version_put(1, 2), corrupt_header()]);
+    let mut store = planted(&[version_put(2, 2), corrupt_header()]);
     assert_refusal(&open(&mut store), OpenRefusal::Format { family: Family::Core, found: 2, wanted: 1 });
 }
 

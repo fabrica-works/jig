@@ -7,11 +7,12 @@ fn store() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../crates/jig-protocol-store")
 }
 
-fn check(family: &str) {
-    let source = fs::read_to_string(store().join(format!("schema/{family}-v1.schema"))).expect("schema readable");
+fn check(family: &str, version: u16) {
+    let source =
+        fs::read_to_string(store().join(format!("schema/{family}-v{version}.schema"))).expect("schema readable");
     let output = generate(&parse(&source).expect("schema valid"));
-    let code = store().join(format!("src/generated/{family}_v1.rs"));
-    let goldens = store().join(format!("golden/{family}/v1"));
+    let code = store().join(format!("src/generated/{family}_v{version}.rs"));
+    let goldens = store().join(format!("golden/{family}/v{version}"));
     let write = std::env::var_os("SKEIN_CODEGEN_WRITE").is_some_and(|value| value == "1");
     let again = "run SKEIN_CODEGEN_WRITE=1 cargo nextest run -p jig-store-codecs-world --test drift";
     if write {
@@ -32,27 +33,27 @@ fn check(family: &str) {
 
 #[test]
 fn the_notes_familys_code_and_goldens_have_no_drift() {
-    check("notes");
+    check("notes", 1);
 }
 
 #[test]
 fn the_component_familys_code_and_goldens_have_no_drift() {
-    check("component");
+    check("component", 1);
 }
 
 #[test]
 fn the_tasks_familys_code_and_goldens_have_no_drift() {
-    check("tasks");
+    check("tasks", 2);
 }
 
 #[test]
 fn the_people_familys_code_and_goldens_have_no_drift() {
-    check("people");
+    check("people", 2);
 }
 
 #[test]
 fn the_core_familys_code_and_goldens_have_no_drift() {
-    check("core");
+    check("core", 1);
 }
 
 #[test]

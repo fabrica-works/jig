@@ -3,11 +3,12 @@ pub mod activity;
 pub mod carried;
 pub mod index;
 pub mod phase;
+mod pieces;
 pub mod proposals;
 pub mod record;
 pub mod state;
 pub mod value;
-use crate::tasks_v1 as wire;
+use crate::tasks_v2 as wire;
 use alloc::boxed::Box;
 use jig_domain_tasks as domain;
 use skein_lib::{Reader, Writer};
@@ -15,6 +16,23 @@ use skein_lib::{Reader, Writer};
 /// Translate the tasks child's bounds, refusing any schema ceiling.
 #[must_use]
 pub fn limits(domain: &domain::Limits) -> Option<wire::Limits> {
+    let empty = wire::Limits { field_rule_name: 0, result_field_name: 0, result_field_value: 0, ..wire::CEILINGS };
+    let rules = domain.result_bytes.checked_mul(
+        u32::try_from(
+            wire::FieldRule::worst_case_bytes(&empty)?
+                .checked_add(u64::try_from(size_of::<u32>()).expect("length size"))?
+                .checked_add(1)?,
+        )
+        .ok()?,
+    )?;
+    let fields = domain.result_bytes.checked_mul(
+        u32::try_from(
+            wire::ResultField::worst_case_bytes(&empty)?
+                .checked_add(u64::try_from(size_of::<u32>()).expect("length size"))?
+                .checked_add(1)?,
+        )
+        .ok()?,
+    )?;
     let limits = wire::Limits {
         task_problem_blocked_by_some: domain.delegates,
         result_followups_delegates_value: domain.batch,
@@ -27,7 +45,7 @@ pub fn limits(domain: &domain::Limits) -> Option<wire::Limits> {
         part_segment_bytes: domain.hold_bytes,
         part_path_segments: domain.hold_segments,
         field_rule_name: domain.result_bytes,
-        verdict_fields: domain.result_bytes,
+        verdict_fields: rules,
         approval_state: domain.result_bytes,
         choices_choices: domain.contract_choices,
         authority_segment_bytes: domain.authority_bytes,
@@ -43,7 +61,7 @@ pub fn limits(domain: &domain::Limits) -> Option<wire::Limits> {
         approved_state: domain.result_bytes,
         approved_words_some: domain.result_bytes,
         report_result_words: domain.result_bytes,
-        verdict_result_fields: domain.result_bytes,
+        verdict_result_fields: fields,
         verdict_result_words: domain.result_bytes,
         change_result_words: domain.result_bytes,
         failure_result_reason: domain.result_bytes,
@@ -59,7 +77,7 @@ pub fn limits(domain: &domain::Limits) -> Option<wire::Limits> {
         history_reason: domain.result_bytes.max(domain.message_bytes),
         rejected_person_proposal_reason: domain.message_bytes,
         approval_message_state: domain.result_bytes,
-        verdict_message_fields: domain.result_bytes,
+        verdict_message_fields: fields,
         word_words: domain.message_bytes.max(domain.result_bytes),
         activity_words_words: domain.message_bytes,
         rejected_escalation_reason: domain.result_bytes,

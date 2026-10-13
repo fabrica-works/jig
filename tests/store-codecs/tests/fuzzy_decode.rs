@@ -1,5 +1,5 @@
 //! Arbitrary and mutated family bytes (protocol/store.md, sections 5.1 and 14).
-use jig_protocol_store::{component_v1, notes_v1, people_v1};
+use jig_protocol_store::{component_v1, notes_v1, people_v2};
 use skein_lib::{Reader, Rng, Writer};
 use std::{fs, path::Path};
 
@@ -39,8 +39,9 @@ fn arbitrary(seed: u64, check: fn(&[u8])) {
     }
 }
 fn mutated(family: &str, seed: u64, check: fn(&[u8])) {
+    let version = if matches!(family, "tasks" | "people") { "v2" } else { "v1" };
     let root =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../crates/jig-protocol-store/golden").join(family).join("v1");
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../crates/jig-protocol-store/golden").join(family).join(version);
     mutate_goldens(&root, seed, check);
 }
 fn mutate_goldens(root: &Path, seed: u64, check: fn(&[u8])) {
@@ -83,8 +84,8 @@ fn mutated_component_goldens_never_panic() {
 }
 
 fn tasks(bytes: &[u8]) {
-    use jig_protocol_store::tasks_v1;
-    if let Ok(row) = tasks_v1::Row::decode(&tasks_v1::CEILINGS, &mut Reader::new(bytes)) {
+    use jig_protocol_store::tasks_v2;
+    if let Ok(row) = tasks_v2::Row::decode(&tasks_v2::CEILINGS, &mut Reader::new(bytes)) {
         let mut writer = Writer::new(usize::try_from(row.measure()).expect("measured length"));
         row.encode(&mut writer).expect("measured room");
         assert_eq!(writer.finish().as_ref(), bytes);
@@ -100,7 +101,7 @@ fn mutated_tasks_goldens_never_panic() {
 }
 
 fn people(bytes: &[u8]) {
-    if let Ok(row) = people_v1::Row::decode(&people_v1::CEILINGS, &mut Reader::new(bytes)) {
+    if let Ok(row) = people_v2::Row::decode(&people_v2::CEILINGS, &mut Reader::new(bytes)) {
         let mut writer = Writer::new(usize::try_from(row.measure()).expect("measured length"));
         row.encode(&mut writer).expect("measured room");
         assert_eq!(writer.finish().as_ref(), bytes);
@@ -134,11 +135,11 @@ fn mutated_core_goldens_never_panic() {
 }
 
 fn frames(bytes: &[u8]) {
-    use jig_protocol_store::{codec, core_v1, notes_v1, tasks_v1, transcripts::frame};
+    use jig_protocol_store::{codec, core_v1, notes_v1, tasks_v2, transcripts::frame};
     let limits = codec::Limits {
         core: core_v1::CEILINGS,
-        tasks: tasks_v1::CEILINGS,
-        people: people_v1::CEILINGS,
+        tasks: tasks_v2::CEILINGS,
+        people: people_v2::CEILINGS,
         notes: notes_v1::CEILINGS,
     };
     if let Ok(turn) = frame::decode(bytes, &limits) {
@@ -151,11 +152,11 @@ fn arbitrary_frames_never_panic_and_round_trip_when_they_decode() {
 }
 #[test]
 fn mutated_and_short_frames_never_panic() {
-    use jig_protocol_store::{codec, core_v1, notes_v1, tasks_v1, transcripts::frame};
+    use jig_protocol_store::{codec, core_v1, notes_v1, tasks_v2, transcripts::frame};
     let limits = codec::Limits {
         core: core_v1::CEILINGS,
-        tasks: tasks_v1::CEILINGS,
-        people: people_v1::CEILINGS,
+        tasks: tasks_v2::CEILINGS,
+        people: people_v2::CEILINGS,
         notes: notes_v1::CEILINGS,
     };
     let turn = core_v1::TurnRecord::new(

@@ -802,6 +802,7 @@ dependencies = [
 name = "jig-store-codecs-world"
 version = "0.0.0"
 dependencies = [
+ "jig-protocol-config",
  "jig-protocol-store",
  "jig-test-store",
  "skein-codegen",

@@ -1,33 +1,8 @@
 //! Durable task values translated exhaustively (protocol/store.md, 5.1).
 use super::{proposals, value};
-use crate::tasks_v1 as wire;
-use alloc::boxed::Box;
+use crate::tasks_v2 as wire;
 use jig_domain_tasks as domain;
-use skein_lib::{List, Wall};
-
-fn fields_to_wire(
-    source: &[domain::ResultField],
-    limits: &wire::Limits,
-) -> Result<List<wire::ResultField>, wire::Problem> {
-    let mut fields = List::with_capacity(limits.verdict_message_fields);
-    for field in source {
-        let domain::ResultField { name, value } = field;
-        let field =
-            wire::ResultField::new(limits, wire::ResultFieldParts { name: name.clone(), value: value.clone() })?;
-        if fields.push(field).is_err() {
-            return Err(wire::Problem { path: wire::Path::VerdictMessageFields, reason: skein_codec::Reason::Bound });
-        }
-    }
-    Ok(fields)
-}
-fn read_fields(source: List<wire::ResultField>) -> Box<[domain::ResultField]> {
-    let mut fields = List::with_capacity(source.len());
-    for field in source.into_boxed() {
-        let wire::ResultFieldParts { name, value } = field.into_parts();
-        fields.push(domain::ResultField { name, value }).expect("same number of fields");
-    }
-    fields.into_boxed()
-}
+use skein_lib::Wall;
 
 /// Translate `NoticeState` to its durable tag.
 #[must_use]
@@ -81,7 +56,15 @@ pub fn result_kind(source: &domain::ResultKind, limits: &wire::Limits) -> Result
         domain::ResultKind::Report => wire::ResultKind::Report,
         domain::ResultKind::Verdict { code, fields } => wire::ResultKind::Verdict(wire::VerdictMessage::new(
             limits,
-            wire::VerdictMessageParts { code: *code, fields: fields_to_wire(fields, limits)? },
+            wire::VerdictMessageParts {
+                code: *code,
+                fields: super::pieces::fields(
+                    fields,
+                    limits,
+                    limits.verdict_message_fields,
+                    wire::Path::VerdictMessageFields,
+                )?,
+            },
         )?),
         domain::ResultKind::Change { connector, kind, resource } => wire::ResultKind::Change(wire::ChangeMessage::new(
             limits,
@@ -92,7 +75,7 @@ pub fn result_kind(source: &domain::ResultKind, limits: &wire::Limits) -> Result
     })
 }
 /// Read `ResultKind` from its durable value.
-pub fn read_result_kind(source: wire::ResultKind, _limits: &wire::Limits) -> Result<domain::ResultKind, wire::Problem> {
+pub fn read_result_kind(source: wire::ResultKind, limits: &wire::Limits) -> Result<domain::ResultKind, wire::Problem> {
     Ok(match source {
         wire::ResultKind::Approved(source) => {
             let wire::ApprovalMessageParts { state, words_present } = source.into_parts();
@@ -101,7 +84,10 @@ pub fn read_result_kind(source: wire::ResultKind, _limits: &wire::Limits) -> Res
         wire::ResultKind::Report => domain::ResultKind::Report,
         wire::ResultKind::Verdict(source) => {
             let wire::VerdictMessageParts { code, fields } = source.into_parts();
-            domain::ResultKind::Verdict { code, fields: read_fields(fields) }
+            domain::ResultKind::Verdict {
+                code,
+                fields: super::pieces::read_fields(fields, limits, wire::Path::VerdictMessageFields)?,
+            }
         }
         wire::ResultKind::Change(source) => {
             let wire::ChangeMessageParts { connector, kind, resource } = source.into_parts();

@@ -32,8 +32,8 @@ fn check(store: &skein_kv::Limits) -> Result<sizes::Sizes, sizes::SizeRefusal> {
 fn a_format_row_of_another_tasks_version_is_refused_naming_tasks() {
     let wanted = format::current(fixtures::APPLICATION.version, fixtures::DEPLOYMENT);
     let mut found = wanted;
-    found.tasks = 2;
-    assert_eq!(format::check(&found, &wanted), Err(OpenRefusal::Format { family: Family::Tasks, found: 2, wanted: 1 }));
+    found.tasks = 3;
+    assert_eq!(format::check(&found, &wanted), Err(OpenRefusal::Format { family: Family::Tasks, found: 3, wanted: 2 }));
 }
 #[test]
 fn a_format_row_of_another_deployment_is_refused() {
@@ -51,11 +51,18 @@ fn another_family_is_refused_naming_the_first_difference() {
     for (family, found) in [
         (Family::Component, codec::component::Format { component: 2, core: 2, ..wanted }),
         (Family::Core, codec::component::Format { core: 2, tasks: 2, ..wanted }),
-        (Family::People, codec::component::Format { people: 2, notes: 2, ..wanted }),
+        (Family::People, codec::component::Format { people: 3, notes: 2, ..wanted }),
         (Family::Notes, codec::component::Format { notes: 2, application: 2, ..wanted }),
         (Family::Application, codec::component::Format { application: 2, deployment: [9; 16], ..wanted }),
     ] {
-        assert_eq!(format::check(&found, &wanted), Err(OpenRefusal::Format { family, found: 2, wanted: 1 }));
+        assert_eq!(
+            format::check(&found, &wanted),
+            Err(OpenRefusal::Format {
+                family,
+                found: if family == Family::People { 3 } else { 2 },
+                wanted: if family == Family::People { 2 } else { 1 }
+            })
+        );
     }
 }
 #[test]
@@ -68,23 +75,23 @@ fn a_key_limit_below_the_largest_note_line_is_refused() {
 fn a_value_limit_below_the_largest_task_record_is_refused() {
     let mut limits = store();
     limits.value = 1;
-    assert_eq!(check(&limits), Err(sizes::SizeRefusal::Value { needs: 724_517, has: 1 }));
+    assert_eq!(check(&limits), Err(sizes::SizeRefusal::Value { needs: 80_949, has: 1 }));
 }
 #[test]
 fn a_value_limit_below_the_largest_core_turn_is_refused() {
     let mut limits = store();
-    limits.value = 724_516;
-    assert_eq!(check(&limits), Err(sizes::SizeRefusal::Value { needs: 724_517, has: 724_516 }));
+    limits.value = 80_948;
+    assert_eq!(check(&limits), Err(sizes::SizeRefusal::Value { needs: 80_949, has: 80_948 }));
 }
 #[test]
 fn a_page_smaller_than_one_row_is_refused() {
     let mut limits = store();
-    limits.page.bytes = 724_628;
-    assert_eq!(check(&limits), Err(sizes::SizeRefusal::Page { needs: 724_629, has: 724_628 }));
+    limits.page.bytes = 81_060;
+    assert_eq!(check(&limits), Err(sizes::SizeRefusal::Page { needs: 81_061, has: 81_060 }));
 }
 #[test]
 fn fixture_limits_fit_their_store() {
-    assert_eq!(check(&store()), Ok(sizes::Sizes { key: 112, value: 724_517, ops: 9, commit: 6_521_768 }));
+    assert_eq!(check(&store()), Ok(sizes::Sizes { key: 112, value: 80_949, ops: 9, commit: 729_656 }));
 }
 #[test]
 fn too_few_operations_are_refused() {
@@ -95,8 +102,8 @@ fn too_few_operations_are_refused() {
 #[test]
 fn too_few_commit_bytes_are_refused() {
     let mut limits = store();
-    limits.commit = 6_521_767;
-    assert_eq!(check(&limits), Err(sizes::SizeRefusal::Commit { needs: 6_521_768, has: 6_521_767 }));
+    limits.commit = 729_655;
+    assert_eq!(check(&limits), Err(sizes::SizeRefusal::Commit { needs: 729_656, has: 729_655 }));
 }
 #[test]
 fn too_few_in_flight_slots_are_refused() {
@@ -115,8 +122,8 @@ fn a_journal_bound_past_the_queue_is_refused_at_start() {
 #[test]
 fn too_few_queued_bytes_are_refused() {
     let mut limits = store();
-    limits.queued_bytes = 13_043_535;
-    assert_eq!(check(&limits), Err(sizes::SizeRefusal::QueuedBytes { needs: 13_043_536, has: 13_043_535 }));
+    limits.queued_bytes = 1_459_311;
+    assert_eq!(check(&limits), Err(sizes::SizeRefusal::QueuedBytes { needs: 1_459_312, has: 1_459_311 }));
 }
 #[test]
 fn a_domain_limit_past_its_family_ceiling_is_refused_at_start() {

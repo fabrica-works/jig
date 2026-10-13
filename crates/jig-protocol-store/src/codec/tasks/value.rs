@@ -1,5 +1,5 @@
 //! Funding and resource values shared by tasks rows (protocol/store.md, 5.1).
-use crate::tasks_v1 as wire;
+use crate::tasks_v2 as wire;
 use jig_domain_tasks as domain;
 use skein_lib::{List, Wall};
 
@@ -495,14 +495,7 @@ pub fn contract(value: &domain::Contract, limits: &wire::Limits) -> Result<wire:
             let mut members = List::with_capacity(limits.choices_choices);
             for choice in choices {
                 let domain::Verdict { code, words, followups, fields } = choice;
-                let mut rules = List::with_capacity(limits.verdict_fields);
-                for rule in fields {
-                    let domain::FieldRule { name, max } = rule;
-                    let rule = wire::FieldRule::new(limits, wire::FieldRuleParts { name: name.clone(), max: *max })?;
-                    if rules.push(rule).is_err() {
-                        return Err(problem(wire::Path::VerdictFields));
-                    }
-                }
+                let rules = super::pieces::rules(fields, limits)?;
                 let choice = wire::Verdict::new(
                     limits,
                     wire::VerdictParts { code: *code, words: *words, followups: *followups, fields: rules },
@@ -532,13 +525,9 @@ pub fn read_contract(value: wire::Contract, limits: &wire::Limits) -> Result<dom
             let mut members = List::with_capacity(choices.len());
             for choice in choices.into_boxed() {
                 let wire::VerdictParts { code, words, followups, fields } = choice.into_parts();
-                let mut rules = List::with_capacity(fields.len());
-                for rule in fields.into_boxed() {
-                    let wire::FieldRuleParts { name, max } = rule.into_parts();
-                    rules.push(domain::FieldRule { name, max }).expect("same number of rules");
-                }
+                let rules = super::pieces::read_rules(fields, limits)?;
                 members
-                    .push(domain::Verdict { code, words, followups, fields: rules.into_boxed() })
+                    .push(domain::Verdict { code, words, followups, fields: rules })
                     .expect("same number of choices");
             }
             domain::Contract::Verdict { choices: members.into_boxed() }

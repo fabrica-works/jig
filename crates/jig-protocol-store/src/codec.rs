@@ -3,6 +3,7 @@ pub mod component;
 pub mod core;
 pub mod notes;
 pub mod people;
+mod pieces;
 pub mod tasks;
 use alloc::boxed::Box;
 use jig_domain_core as domain;
@@ -11,8 +12,8 @@ use jig_domain_core as domain;
 #[derive(Clone, Copy, Debug)]
 pub struct Limits {
     pub core: crate::core_v1::Limits,
-    pub tasks: crate::tasks_v1::Limits,
-    pub people: crate::people_v1::Limits,
+    pub tasks: crate::tasks_v2::Limits,
+    pub people: crate::people_v2::Limits,
     pub notes: crate::notes_v1::Limits,
 }
 

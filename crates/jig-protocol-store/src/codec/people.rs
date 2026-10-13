@@ -1,13 +1,20 @@
 //! People rows translated exhaustively (protocol/store.md, 5.1).
-use crate::people_v1 as wire;
+use crate::people_v2 as wire;
 use alloc::boxed::Box;
 use jig_domain_core as core;
 use jig_domain_people as domain;
 use skein_lib::{Duration, List, Reader, Wall, Writer};
 mod asks;
 mod outcomes;
-mod policy;
+mod pieces;
+pub(crate) mod policy;
 pub use asks::{decode_ask, encode_ask};
+use pieces::{
+    EMPTY, decode_authority_note_resources, decode_delegation_kinds, decode_grant_piece, decode_numbers,
+    decode_permissions, decode_requirement_piece, decode_segments, decode_spec_parameters,
+    encode_authority_note_resources, encode_delegation_kinds, encode_grant_piece, encode_numbers, encode_permissions,
+    encode_requirement_piece, encode_segments, encode_spec_parameters, permission_sum, piece_bound, shared_sum,
+};
 use policy::{
     decode_amendment, decode_executor, decode_grant, decode_parameter, decode_pattern, decode_permission_role,
     decode_policy_change, decode_policy_role, decode_policy_value, decode_requirement, decode_resource_scope,
@@ -18,30 +25,28 @@ use policy::{
 pub fn limits(domain: &core::Limits) -> Option<wire::Limits> {
     let people = &domain.people;
     let authority = &domain.authority;
-    let policy_bytes = u32::try_from(domain.policy_bytes).ok()?;
-    let limits = wire::Limits {
+    let mut limits = wire::Limits {
         identity_key_subject: people.identity_bytes,
         identity_login: people.identity_bytes,
         identity_name: people.identity_bytes,
         last_exact_value: people.amendment_bytes.max(authority.segment_bytes),
         last_open_value: people.amendment_bytes.max(authority.segment_bytes),
-        pattern_segments: members(people.amendment_bytes, size_of::<Box<[u8]>>())?.max(authority.segments),
-        delegation_kinds: members(people.amendment_bytes, size_of::<domain::Executor>())?.max(authority.executors),
-        authority_grants: members(people.amendment_bytes, size_of::<domain::Grant>())?.max(authority.grants),
-        authority_note_resources: members(people.amendment_bytes, size_of::<domain::ResourceScope>())?
-            .max(authority.grants),
+        pattern_segments: 0,
+        delegation_kinds: 0,
+        authority_grants: 0,
+        authority_note_resources: 0,
         policy_value_projections: authority.grants,
         policy_value_roles: authority.roles,
         policy_value_requirements: authority.requirements,
-        policy_value_permissions: members(policy_bytes, size_of::<domain::PermissionRole>())?,
-        policy_change_requirements_requirements: members(people.amendment_bytes, size_of::<domain::Requirement>())?,
-        policy_change_projections_grants: members(people.amendment_bytes, size_of::<domain::Grant>())?,
-        policy_change_permissions_mappings: members(people.amendment_bytes, size_of::<domain::PermissionRole>())?,
+        policy_value_permissions: 0,
+        policy_change_requirements_requirements: 0,
+        policy_change_projections_grants: 0,
+        policy_change_permissions_mappings: 0,
         note_change_correct_description: people.amendment_bytes,
         note_change_correct_body: people.amendment_bytes,
-        note_change_correct_references: members(people.amendment_bytes, size_of::<u64>())?,
-        resource_name_path: members(people.amendment_bytes, size_of::<Box<[u8]>>())?,
-        adoption_options: members(people.amendment_bytes, size_of::<Box<[u8]>>())?,
+        note_change_correct_references: 0,
+        resource_name_path: 0,
+        adoption_options: 0,
         person_result_approved_state: people.words,
         person_result_approved_words_some: people.words,
         person_result_report_words: people.words,
@@ -51,10 +56,10 @@ pub fn limits(domain: &core::Limits) -> Option<wire::Limits> {
         escalation_decision_reject_reason: people.words,
         parameter_bytes_value: people.amendment_bytes,
         spec_words: people.amendment_bytes,
-        spec_parameters: members(people.amendment_bytes, size_of::<domain::Parameter>())?,
-        spec_inputs: members(people.amendment_bytes, size_of::<u64>())?,
+        spec_parameters: 0,
+        spec_inputs: 0,
         amendment_instructions_some: people.amendment_bytes,
-        amendment_dependencies_some: members(people.amendment_bytes, size_of::<u64>())?,
+        amendment_dependencies_some: 0,
         amendment_reason: people.words,
         ask_close_disposals: domain::disposal_capacity(people),
         ask_make_service_name: people.words,
@@ -69,6 +74,8 @@ pub fn limits(domain: &core::Limits) -> Option<wire::Limits> {
         stored_roles_holdings: people.holdings,
         segment_bytes: people.amendment_bytes.max(authority.segment_bytes),
     };
+    derive_shared(domain, &mut limits)?;
+    derive_amendment(domain, &mut limits)?;
     wire::check_limits(&limits).ok()?;
     Some(limits)
 }
@@ -139,13 +146,13 @@ pub fn decode(bytes: &[u8], limits: &wire::Limits) -> Result<domain::Stored, wir
         }
         wire::Value::Policy(value) => {
             let wire::StoredPolicyParts { project, value } = value.into_parts();
-            domain::Stored::Policy { project, value: decode_policy_value(value) }
+            domain::Stored::Policy { project, value: decode_policy_value(value, limits)? }
         }
         wire::Value::Answer(value) => {
             let wire::StoredAnswerParts { key, ask, outcome, at } = value.into_parts();
             domain::Stored::Answer {
                 key: decode_request_key(key),
-                ask: Box::new(decode_ask(ask)),
+                ask: Box::new(decode_ask(ask, limits)?),
                 outcome: outcomes::decode_outcome(outcome),
                 at: Wall::from_nanos(at),
             }
@@ -163,9 +170,7 @@ fn count(length: usize) -> Result<u32, wire::Problem> {
         Err(_) => Err(problem()),
     }
 }
-fn members(bytes: u32, size: usize) -> Option<u32> {
-    bytes.checked_div(u32::try_from(size).ok()?)
-}
+
 pub(super) fn encode_role(value: domain::Role, limits: &wire::Limits) -> Result<wire::Role, wire::Problem> {
     Ok(match value {
         domain::Role::Owner => wire::Role::Owner,
@@ -239,42 +244,6 @@ pub fn decode_request_key(value: wire::RequestKey) -> domain::RequestKey {
     domain::RequestKey { person, key }
 }
 
-fn encode_delegation_kinds(
-    values: &[domain::Executor],
-    limits: &wire::Limits,
-) -> Result<List<wire::Executor>, wire::Problem> {
-    let mut result = List::with_capacity(count(values.len())?);
-    for value in values {
-        result.push(encode_executor(*value, limits)?).expect("same number of members");
-    }
-    Ok(result)
-}
-fn decode_delegation_kinds(values: List<wire::Executor>) -> Box<[domain::Executor]> {
-    let mut result = List::with_capacity(values.len());
-    for value in values.into_boxed() {
-        result.push(decode_executor(value)).expect("same number of members");
-    }
-    result.into_boxed()
-}
-
-fn encode_authority_note_resources(
-    values: &[domain::ResourceScope],
-    limits: &wire::Limits,
-) -> Result<List<wire::ResourceScope>, wire::Problem> {
-    let mut result = List::with_capacity(count(values.len())?);
-    for value in values {
-        result.push(encode_resource_scope(value, limits)?).expect("same number of members");
-    }
-    Ok(result)
-}
-fn decode_authority_note_resources(values: List<wire::ResourceScope>) -> Box<[domain::ResourceScope]> {
-    let mut result = List::with_capacity(values.len());
-    for value in values.into_boxed() {
-        result.push(decode_resource_scope(value)).expect("same number of members");
-    }
-    result.into_boxed()
-}
-
 fn encode_policy_value_roles(
     values: &[domain::PolicyRole],
     limits: &wire::Limits,
@@ -285,71 +254,23 @@ fn encode_policy_value_roles(
     }
     Ok(result)
 }
-fn decode_policy_value_roles(values: List<wire::PolicyRole>) -> Box<[domain::PolicyRole]> {
+fn decode_policy_value_roles(
+    values: List<wire::PolicyRole>,
+    limits: &wire::Limits,
+) -> Result<Box<[domain::PolicyRole]>, wire::Problem> {
     let mut result = List::with_capacity(values.len());
     for value in values.into_boxed() {
-        result.push(decode_policy_role(value)).expect("same number of members");
+        result.push(decode_policy_role(value, limits)?).expect("same number of members");
     }
-    result.into_boxed()
+    Ok(result.into_boxed())
 }
 
-fn encode_spec_parameters(
-    values: &[domain::Parameter],
-    limits: &wire::Limits,
-) -> Result<List<wire::Parameter>, wire::Problem> {
-    let mut result = List::with_capacity(count(values.len())?);
-    for value in values {
-        result.push(encode_parameter(value, limits)?).expect("same number of members");
-    }
-    Ok(result)
-}
-fn decode_spec_parameters(values: List<wire::Parameter>) -> Box<[domain::Parameter]> {
+fn decode_grants(values: List<wire::Grant>, limits: &wire::Limits) -> Result<Box<[domain::Grant]>, wire::Problem> {
     let mut result = List::with_capacity(values.len());
     for value in values.into_boxed() {
-        result.push(decode_parameter(value)).expect("same number of members");
+        result.push(decode_grant(value, limits)?).expect("same number of members");
     }
-    result.into_boxed()
-}
-
-fn decode_numbers(values: List<wire::Number64>) -> Box<[u64]> {
-    let mut result = List::with_capacity(values.len());
-    for value in values.into_boxed() {
-        result.push(value.into_parts().value).expect("same number of members");
-    }
-    result.into_boxed()
-}
-fn encode_numbers(values: &[u64], limits: &wire::Limits) -> Result<List<wire::Number64>, wire::Problem> {
-    let mut result = List::with_capacity(count(values.len())?);
-    for value in values {
-        result
-            .push(wire::Number64::new(limits, wire::Number64Parts { value: *value })?)
-            .expect("same number of members");
-    }
-    Ok(result)
-}
-fn decode_permissions(values: List<wire::PermissionRole>) -> Box<[domain::PermissionRole]> {
-    let mut result = List::with_capacity(values.len());
-    for value in values.into_boxed() {
-        result.push(decode_permission_role(value)).expect("same number of members");
-    }
-    result.into_boxed()
-}
-fn encode_permissions(
-    values: &[domain::PermissionRole],
-    limits: &wire::Limits,
-) -> Result<List<wire::PermissionRole>, wire::Problem> {
-    let mut result = List::with_capacity(count(values.len())?);
-    for value in values {
-        result.push(encode_permission_role(*value, limits)?).expect("same number of members");
-    }
-    Ok(result)
-}
-fn decode_grants(values: List<wire::Grant>) -> Box<[domain::Grant]> {
-    let mut result = List::with_capacity(values.len());
-    for value in values.into_boxed() {
-        result.push(decode_grant(value)).expect("same number of members");
-    }
-    result.into_boxed()
+    Ok(result.into_boxed())
 }
 fn encode_grants(values: &[domain::Grant], limits: &wire::Limits) -> Result<List<wire::Grant>, wire::Problem> {
     let mut result = List::with_capacity(count(values.len())?);
@@ -358,12 +279,15 @@ fn encode_grants(values: &[domain::Grant], limits: &wire::Limits) -> Result<List
     }
     Ok(result)
 }
-fn decode_requirements(values: List<wire::Requirement>) -> Box<[domain::Requirement]> {
+fn decode_requirements(
+    values: List<wire::Requirement>,
+    limits: &wire::Limits,
+) -> Result<Box<[domain::Requirement]>, wire::Problem> {
     let mut result = List::with_capacity(values.len());
     for value in values.into_boxed() {
-        result.push(decode_requirement(value)).expect("same number of members");
+        result.push(decode_requirement(value, limits)?).expect("same number of members");
     }
-    result.into_boxed()
+    Ok(result.into_boxed())
 }
 fn encode_requirements(
     values: &[domain::Requirement],
@@ -375,22 +299,7 @@ fn encode_requirements(
     }
     Ok(result)
 }
-fn decode_segments(values: List<wire::Segment>) -> Box<[Box<[u8]>]> {
-    let mut result = List::with_capacity(values.len());
-    for value in values.into_boxed() {
-        result.push(value.into_parts().bytes).expect("same number of members");
-    }
-    result.into_boxed()
-}
-fn encode_segments(values: &[Box<[u8]>], limits: &wire::Limits) -> Result<List<wire::Segment>, wire::Problem> {
-    let mut result = List::with_capacity(count(values.len())?);
-    for value in values {
-        result
-            .push(wire::Segment::new(limits, wire::SegmentParts { bytes: value.clone() })?)
-            .expect("same number of members");
-    }
-    Ok(result)
-}
+
 fn decode_holdings(values: List<wire::Holding>) -> Box<[domain::Holding]> {
     let mut result = List::with_capacity(values.len());
     for value in values.into_boxed() {
@@ -404,4 +313,84 @@ fn encode_holdings(values: &[domain::Holding], limits: &wire::Limits) -> Result<
         result.push(encode_holding(value, limits)?).expect("same number of members");
     }
     Ok(result)
+}
+
+fn derive_shared(domain: &core::Limits, limits: &mut wire::Limits) -> Option<()> {
+    let people = &domain.people;
+    let policy_bytes = u32::try_from(domain.policy_bytes).ok()?;
+    limits.pattern_segments = piece_bound(
+        people.amendment_bytes.max(policy_bytes),
+        size_of::<Box<[u8]>>(),
+        wire::Segment::worst_case_bytes(&EMPTY)?,
+        true,
+    )?;
+    limits.delegation_kinds = piece_bound(
+        people.amendment_bytes.max(policy_bytes),
+        size_of::<domain::Executor>(),
+        wire::Executor::worst_case_bytes(&EMPTY)?,
+        false,
+    )?;
+    limits.authority_grants = piece_bound(
+        people.amendment_bytes.max(policy_bytes),
+        size_of::<domain::Grant>(),
+        wire::Grant::worst_case_bytes(&EMPTY)?,
+        true,
+    )?;
+    limits.authority_note_resources = piece_bound(
+        people.amendment_bytes.max(policy_bytes),
+        size_of::<domain::ResourceScope>(),
+        wire::ResourceScope::worst_case_bytes(&EMPTY)?,
+        true,
+    )?;
+    limits.policy_value_permissions = piece_bound(
+        policy_bytes,
+        size_of::<domain::PermissionRole>(),
+        wire::PermissionRole::worst_case_bytes(&EMPTY)?,
+        false,
+    )?;
+    Some(())
+}
+
+fn derive_amendment(domain: &core::Limits, limits: &mut wire::Limits) -> Option<()> {
+    let people = &domain.people;
+    limits.policy_change_requirements_requirements = piece_bound(
+        people.amendment_bytes,
+        size_of::<domain::Requirement>(),
+        wire::Requirement::worst_case_bytes(&EMPTY)?,
+        true,
+    )?;
+    limits.policy_change_projections_grants =
+        piece_bound(people.amendment_bytes, size_of::<domain::Grant>(), wire::Grant::worst_case_bytes(&EMPTY)?, true)?;
+    limits.policy_change_permissions_mappings = piece_bound(
+        people.amendment_bytes,
+        size_of::<domain::PermissionRole>(),
+        wire::PermissionRole::worst_case_bytes(&EMPTY)?,
+        false,
+    )?;
+    limits.note_change_correct_references =
+        piece_bound(people.amendment_bytes, size_of::<u64>(), wire::Number64::worst_case_bytes(&EMPTY)?, false)?;
+    limits.resource_name_path =
+        piece_bound(people.amendment_bytes, size_of::<Box<[u8]>>(), wire::Segment::worst_case_bytes(&EMPTY)?, true)?;
+    limits.adoption_options =
+        piece_bound(people.amendment_bytes, size_of::<Box<[u8]>>(), wire::Segment::worst_case_bytes(&EMPTY)?, true)?;
+    limits.spec_parameters = piece_bound(
+        people.amendment_bytes,
+        size_of::<domain::Parameter>(),
+        wire::ParameterBytes::worst_case_bytes(&EMPTY)?.checked_add(
+            wire::Parameter::worst_case_bytes(&EMPTY)?
+                .checked_sub(wire::ParameterResource::worst_case_bytes(&EMPTY)?)?,
+        )?,
+        true,
+    )?
+    .max(piece_bound(
+        people.amendment_bytes,
+        size_of::<domain::Parameter>(),
+        wire::Parameter::worst_case_bytes(&EMPTY)?,
+        false,
+    )?);
+    limits.spec_inputs =
+        piece_bound(people.amendment_bytes, size_of::<u64>(), wire::Number64::worst_case_bytes(&EMPTY)?, false)?;
+    limits.amendment_dependencies_some =
+        piece_bound(people.amendment_bytes, size_of::<u64>(), wire::Number64::worst_case_bytes(&EMPTY)?, false)?;
+    Some(())
 }

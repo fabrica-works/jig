@@ -1,9 +1,11 @@
 //! Policy values retained by people (protocol/store.md, 5.1).
 use super::{
-    Duration, Wall, decode_authority_note_resources, decode_delegation_kinds, decode_grants, decode_numbers,
-    decode_permissions, decode_policy_value_roles, decode_requirements, decode_segments, decode_spec_parameters,
-    domain, encode_authority_note_resources, encode_delegation_kinds, encode_grants, encode_numbers,
-    encode_permissions, encode_policy_value_roles, encode_requirements, encode_segments, encode_spec_parameters, wire,
+    Duration, Wall, decode_authority_note_resources, decode_delegation_kinds, decode_grant_piece, decode_grants,
+    decode_numbers, decode_permissions, decode_policy_value_roles, decode_requirement_piece, decode_requirements,
+    decode_segments, decode_spec_parameters, domain, encode_authority_note_resources, encode_delegation_kinds,
+    encode_grant_piece, encode_grants, encode_numbers, encode_permissions, encode_policy_value_roles,
+    encode_requirement_piece, encode_requirements, encode_segments, encode_spec_parameters, permission_sum, shared_sum,
+    wire,
 };
 pub(super) fn encode_last(value: &domain::Last, limits: &wire::Limits) -> Result<wire::Last, wire::Problem> {
     Ok(match value {
@@ -28,16 +30,19 @@ pub(super) fn decode_last(value: wire::Last) -> domain::Last {
     }
 }
 
-pub(super) fn encode_pattern(value: &domain::Pattern, limits: &wire::Limits) -> Result<wire::Pattern, wire::Problem> {
+pub(crate) fn encode_pattern(value: &domain::Pattern, limits: &wire::Limits) -> Result<wire::Pattern, wire::Problem> {
     let domain::Pattern { segments, last } = value;
     wire::Pattern::new(
         limits,
-        wire::PatternParts { segments: encode_segments(segments, limits)?, last: encode_last(last, limits)? },
+        wire::PatternParts {
+            segments: encode_segments(segments, limits, shared_sum(limits), limits.pattern_segments)?,
+            last: encode_last(last, limits)?,
+        },
     )
 }
-pub(super) fn decode_pattern(value: wire::Pattern) -> domain::Pattern {
+pub(crate) fn decode_pattern(value: wire::Pattern, limits: &wire::Limits) -> Result<domain::Pattern, wire::Problem> {
     let wire::PatternParts { segments, last } = value.into_parts();
-    domain::Pattern { segments: decode_segments(segments), last: decode_last(last) }
+    Ok(domain::Pattern { segments: decode_segments(segments, limits, shared_sum(limits))?, last: decode_last(last) })
 }
 
 pub(super) fn encode_grant(value: &domain::Grant, limits: &wire::Limits) -> Result<wire::Grant, wire::Problem> {
@@ -47,9 +52,9 @@ pub(super) fn encode_grant(value: &domain::Grant, limits: &wire::Limits) -> Resu
         wire::GrantParts { connector: *connector, kind: *kind, pattern: encode_pattern(pattern, limits)? },
     )
 }
-pub(super) fn decode_grant(value: wire::Grant) -> domain::Grant {
+pub(super) fn decode_grant(value: wire::Grant, limits: &wire::Limits) -> Result<domain::Grant, wire::Problem> {
     let wire::GrantParts { connector, kind, pattern } = value.into_parts();
-    domain::Grant { connector, kind, pattern: decode_pattern(pattern) }
+    Ok(domain::Grant { connector, kind, pattern: decode_pattern(pattern, limits)? })
 }
 
 pub(super) fn encode_resource_scope(
@@ -62,9 +67,12 @@ pub(super) fn encode_resource_scope(
         wire::ResourceScopeParts { connector: *connector, pattern: encode_pattern(pattern, limits)? },
     )
 }
-pub(super) fn decode_resource_scope(value: wire::ResourceScope) -> domain::ResourceScope {
+pub(super) fn decode_resource_scope(
+    value: wire::ResourceScope,
+    limits: &wire::Limits,
+) -> Result<domain::ResourceScope, wire::Problem> {
     let wire::ResourceScopeParts { connector, pattern } = value.into_parts();
-    domain::ResourceScope { connector, pattern: decode_pattern(pattern) }
+    Ok(domain::ResourceScope { connector, pattern: decode_pattern(pattern, limits)? })
 }
 
 pub(super) fn encode_executor(value: domain::Executor, limits: &wire::Limits) -> Result<wire::Executor, wire::Problem> {
@@ -104,12 +112,19 @@ pub(super) fn encode_delegation(
     let domain::Delegation { kinds, tasks, depth } = value;
     wire::Delegation::new(
         limits,
-        wire::DelegationParts { kinds: encode_delegation_kinds(kinds, limits)?, tasks: *tasks, depth: *depth },
+        wire::DelegationParts {
+            kinds: encode_delegation_kinds(kinds, limits, shared_sum(limits), limits.delegation_kinds)?,
+            tasks: *tasks,
+            depth: *depth,
+        },
     )
 }
-pub(super) fn decode_delegation(value: wire::Delegation) -> domain::Delegation {
+pub(super) fn decode_delegation(
+    value: wire::Delegation,
+    limits: &wire::Limits,
+) -> Result<domain::Delegation, wire::Problem> {
     let wire::DelegationParts { kinds, tasks, depth } = value.into_parts();
-    domain::Delegation { kinds: decode_delegation_kinds(kinds), tasks, depth }
+    Ok(domain::Delegation { kinds: decode_delegation_kinds(kinds, limits, shared_sum(limits))?, tasks, depth })
 }
 
 #[expect(clippy::manual_map, reason = "step code translates optional fields through exhaustive matches")]
@@ -122,7 +137,7 @@ pub(super) fn encode_authority(
         limits,
         wire::AuthorityParts {
             tools: *tools,
-            grants: encode_grants(grants, limits)?,
+            grants: encode_grant_piece(grants, limits, shared_sum(limits), limits.authority_grants)?,
             delegation: encode_delegation(delegation, limits)?,
             spend: *spend,
             deadline: match deadline {
@@ -130,25 +145,33 @@ pub(super) fn encode_authority(
                 None => None,
             },
             notes: *notes,
-            note_resources: encode_authority_note_resources(note_resources, limits)?,
+            note_resources: encode_authority_note_resources(
+                note_resources,
+                limits,
+                shared_sum(limits),
+                limits.authority_note_resources,
+            )?,
         },
     )
 }
 #[expect(clippy::manual_map, reason = "step code translates optional fields through exhaustive matches")]
-pub(super) fn decode_authority(value: wire::Authority) -> domain::Authority {
+pub(super) fn decode_authority(
+    value: wire::Authority,
+    limits: &wire::Limits,
+) -> Result<domain::Authority, wire::Problem> {
     let wire::AuthorityParts { tools, grants, delegation, spend, deadline, notes, note_resources } = value.into_parts();
-    domain::Authority {
+    Ok(domain::Authority {
         tools,
-        grants: decode_grants(grants),
-        delegation: decode_delegation(delegation),
+        grants: decode_grant_piece(grants, limits, shared_sum(limits))?,
+        delegation: decode_delegation(delegation, limits)?,
         spend,
         deadline: match deadline {
             Some(value) => Some(Wall::from_nanos(value)),
             None => None,
         },
         notes,
-        note_resources: decode_authority_note_resources(note_resources),
-    }
+        note_resources: decode_authority_note_resources(note_resources, limits, shared_sum(limits))?,
+    })
 }
 
 pub(super) fn encode_judge(value: domain::Judge, limits: &wire::Limits) -> Result<wire::Judge, wire::Problem> {
@@ -196,16 +219,19 @@ pub(super) fn encode_requirement(
         },
     )
 }
-pub(super) fn decode_requirement(value: wire::Requirement) -> domain::Requirement {
+pub(super) fn decode_requirement(
+    value: wire::Requirement,
+    limits: &wire::Limits,
+) -> Result<domain::Requirement, wire::Problem> {
     let wire::RequirementParts { connector, kind, pattern, judge, guard, must_be_guarded } = value.into_parts();
-    domain::Requirement {
+    Ok(domain::Requirement {
         connector,
         kind,
-        pattern: decode_pattern(pattern),
+        pattern: decode_pattern(pattern, limits)?,
         judge: decode_judge(judge),
         guard: decode_guard(guard),
         must_be_guarded,
-    }
+    })
 }
 
 pub(super) fn encode_permission_role(
@@ -236,9 +262,12 @@ pub(super) fn encode_policy_role(
         },
     )
 }
-pub(super) fn decode_policy_role(value: wire::PolicyRole) -> domain::PolicyRole {
+pub(super) fn decode_policy_role(
+    value: wire::PolicyRole,
+    limits: &wire::Limits,
+) -> Result<domain::PolicyRole, wire::Problem> {
     let wire::PolicyRoleParts { number, authority, period_spend, requests, decides } = value.into_parts();
-    domain::PolicyRole { number, authority: decode_authority(authority), period_spend, requests, decides }
+    Ok(domain::PolicyRole { number, authority: decode_authority(authority, limits)?, period_spend, requests, decides })
 }
 
 pub(super) fn encode_policy_value(
@@ -253,19 +282,27 @@ pub(super) fn encode_policy_value(
             projections: encode_grants(projections, limits)?,
             roles: encode_policy_value_roles(roles, limits)?,
             requirements: encode_requirements(requirements, limits)?,
-            permissions: encode_permissions(permissions, limits)?,
+            permissions: encode_permissions(
+                permissions,
+                limits,
+                permission_sum(limits),
+                limits.policy_value_permissions,
+            )?,
         },
     )
 }
-pub(super) fn decode_policy_value(value: wire::PolicyValue) -> domain::PolicyValue {
+pub(super) fn decode_policy_value(
+    value: wire::PolicyValue,
+    limits: &wire::Limits,
+) -> Result<domain::PolicyValue, wire::Problem> {
     let wire::PolicyValueParts { period_spend, projections, roles, requirements, permissions } = value.into_parts();
-    domain::PolicyValue {
+    Ok(domain::PolicyValue {
         period_spend,
-        projections: decode_grants(projections),
-        roles: decode_policy_value_roles(roles),
-        requirements: decode_requirements(requirements),
-        permissions: decode_permissions(permissions),
-    }
+        projections: decode_grants(projections, limits)?,
+        roles: decode_policy_value_roles(roles, limits)?,
+        requirements: decode_requirements(requirements, limits)?,
+        permissions: decode_permissions(permissions, limits, permission_sum(limits))?,
+    })
 }
 
 pub(super) fn encode_policy_change(
@@ -286,46 +323,76 @@ pub(super) fn encode_policy_change(
         domain::PolicyChange::Requirements { requirements } => {
             wire::PolicyChange::Requirements(wire::PolicyChangeRequirements::new(
                 limits,
-                wire::PolicyChangeRequirementsParts { requirements: encode_requirements(requirements, limits)? },
+                wire::PolicyChangeRequirementsParts {
+                    requirements: encode_requirement_piece(
+                        requirements,
+                        limits,
+                        limits.parameter_bytes_value,
+                        limits.policy_change_requirements_requirements,
+                    )?,
+                },
             )?)
         }
         domain::PolicyChange::Projections { grants } => {
             wire::PolicyChange::Projections(wire::PolicyChangeProjections::new(
                 limits,
-                wire::PolicyChangeProjectionsParts { grants: encode_grants(grants, limits)? },
+                wire::PolicyChangeProjectionsParts {
+                    grants: encode_grant_piece(
+                        grants,
+                        limits,
+                        limits.parameter_bytes_value,
+                        limits.policy_change_projections_grants,
+                    )?,
+                },
             )?)
         }
         domain::PolicyChange::Permissions { mappings } => {
             wire::PolicyChange::Permissions(wire::PolicyChangePermissions::new(
                 limits,
-                wire::PolicyChangePermissionsParts { mappings: encode_permissions(mappings, limits)? },
+                wire::PolicyChangePermissionsParts {
+                    mappings: encode_permissions(
+                        mappings,
+                        limits,
+                        limits.parameter_bytes_value,
+                        limits.policy_change_permissions_mappings,
+                    )?,
+                },
             )?)
         }
     })
 }
-pub(super) fn decode_policy_change(value: wire::PolicyChange) -> domain::PolicyChange {
-    match value {
+pub(super) fn decode_policy_change(
+    value: wire::PolicyChange,
+    limits: &wire::Limits,
+) -> Result<domain::PolicyChange, wire::Problem> {
+    Ok(match value {
         wire::PolicyChange::ProjectSpend(value) => {
             let wire::PolicyChangeProjectSpendParts { period_spend } = value.into_parts();
             domain::PolicyChange::ProjectSpend { period_spend }
         }
         wire::PolicyChange::Role(value) => {
             let wire::PolicyChangeRoleParts { value } = value.into_parts();
-            domain::PolicyChange::Role(decode_policy_role(value))
+            domain::PolicyChange::Role(decode_policy_role(value, limits)?)
         }
         wire::PolicyChange::Requirements(value) => {
             let wire::PolicyChangeRequirementsParts { requirements } = value.into_parts();
-            domain::PolicyChange::Requirements { requirements: decode_requirements(requirements) }
+            domain::PolicyChange::Requirements {
+                requirements: decode_requirement_piece(requirements, limits, limits.parameter_bytes_value)?,
+            }
         }
         wire::PolicyChange::Projections(value) => {
             let wire::PolicyChangeProjectionsParts { grants } = value.into_parts();
-            domain::PolicyChange::Projections { grants: decode_grants(grants) }
+            domain::PolicyChange::Projections {
+                grants: decode_grant_piece(grants, limits, limits.parameter_bytes_value)?,
+            }
         }
         wire::PolicyChange::Permissions(value) => {
             let wire::PolicyChangePermissionsParts { mappings } = value.into_parts();
-            domain::PolicyChange::Permissions { mappings: decode_permissions(mappings) }
+            domain::PolicyChange::Permissions {
+                mappings: decode_permissions(mappings, limits, limits.parameter_bytes_value)?,
+            }
         }
-    }
+    })
 }
 
 pub(super) fn encode_person_address(
@@ -415,14 +482,23 @@ pub(super) fn encode_spec(value: &domain::Spec, limits: &wire::Limits) -> Result
         limits,
         wire::SpecParts {
             words: words.clone(),
-            parameters: encode_spec_parameters(parameters, limits)?,
-            inputs: encode_numbers(inputs, limits)?,
+            parameters: encode_spec_parameters(
+                parameters,
+                limits,
+                limits.parameter_bytes_value,
+                limits.spec_parameters,
+            )?,
+            inputs: encode_numbers(inputs, limits, limits.parameter_bytes_value, limits.spec_inputs)?,
         },
     )
 }
-pub(super) fn decode_spec(value: wire::Spec) -> domain::Spec {
+pub(super) fn decode_spec(value: wire::Spec, limits: &wire::Limits) -> Result<domain::Spec, wire::Problem> {
     let wire::SpecParts { words, parameters, inputs } = value.into_parts();
-    domain::Spec { words, parameters: decode_spec_parameters(parameters), inputs: decode_numbers(inputs) }
+    Ok(domain::Spec {
+        words,
+        parameters: decode_spec_parameters(parameters, limits, limits.parameter_bytes_value)?,
+        inputs: decode_numbers(inputs, limits, limits.parameter_bytes_value)?,
+    })
 }
 
 pub(super) fn encode_wake_rule(
@@ -495,10 +571,11 @@ pub(super) fn decode_wake_policy(value: wire::WakePolicy) -> domain::WakePolicy 
     }
 }
 
-pub(super) fn encode_amendment(
+pub(crate) fn encode_amendment(
     value: &domain::Amendment,
     limits: &wire::Limits,
 ) -> Result<wire::Amendment, wire::Problem> {
+    check_amendment(value, limits)?;
     let domain::Amendment { addressed, instructions, spec, wake, dependencies, authority, reason } = value;
     wire::Amendment::new(
         limits,
@@ -517,7 +594,12 @@ pub(super) fn encode_amendment(
                 None => None,
             },
             dependencies: match dependencies {
-                Some(value) => Some(encode_numbers(value, limits)?),
+                Some(value) => Some(encode_numbers(
+                    value,
+                    limits,
+                    limits.parameter_bytes_value,
+                    limits.amendment_dependencies_some,
+                )?),
                 None => None,
             },
             authority: match authority {
@@ -529,17 +611,20 @@ pub(super) fn encode_amendment(
     )
 }
 #[expect(clippy::manual_map, reason = "step code translates optional fields through exhaustive matches")]
-pub(super) fn decode_amendment(value: wire::Amendment) -> domain::Amendment {
+pub(crate) fn decode_amendment(
+    value: wire::Amendment,
+    limits: &wire::Limits,
+) -> Result<domain::Amendment, wire::Problem> {
     let wire::AmendmentParts { addressed, instructions, spec, wake, dependencies, authority, reason } =
         value.into_parts();
-    domain::Amendment {
+    let value = domain::Amendment {
         addressed: match addressed {
             Some(value) => Some(decode_address_change(value)),
             None => None,
         },
         instructions,
         spec: match spec {
-            Some(value) => Some(decode_spec(value)),
+            Some(value) => Some(decode_spec(value, limits)?),
             None => None,
         },
         wake: match wake {
@@ -547,13 +632,22 @@ pub(super) fn decode_amendment(value: wire::Amendment) -> domain::Amendment {
             None => None,
         },
         dependencies: match dependencies {
-            Some(value) => Some(decode_numbers(value)),
+            Some(value) => Some(decode_numbers(value, limits, limits.parameter_bytes_value)?),
             None => None,
         },
         authority: match authority {
-            Some(value) => Some(decode_authority(value)),
+            Some(value) => Some(decode_authority(value, limits)?),
             None => None,
         },
         reason,
+    };
+    check_amendment(&value, limits)?;
+    Ok(value)
+}
+
+fn check_amendment(value: &domain::Amendment, limits: &wire::Limits) -> Result<(), wire::Problem> {
+    match domain::amendment_bytes(value) {
+        Some(bytes) if bytes <= u64::from(limits.parameter_bytes_value) => Ok(()),
+        Some(_) | None => Err(super::problem()),
     }
 }
