@@ -157,3 +157,67 @@ entry), with the later of skein-02.s6's and 02.s7's commits (ruling 182); every 
 `crates/*/src/generated/` regenerates, golden `.bin` files unchanged; each
 `codec::<family>::limits` still calls its family's check once. It lands
 with `scripts/check.sh`.
+
+## The second pass (2026-10-13)
+
+From the designer's answer to "The focused suite's cost, a second pass"
+(skein `cb3cefbf`, `docs/foundation/testing-strategy.md`, 8: "What a
+test costs the suite", "A tool is not the code under test"). Measured on
+carbon-forge, each crate's tests in one process on one thread against
+their test time in the gate of `logs/20261013T051804-83.log`:
+`jig-view` 301 in 4.0 s against 13.6 s; `jig-client-world` 267 in 1.4 s
+against 10.8 s; `jig-protocol-store` 419 in 0.18 s against 6.1 s;
+`jig-domain-core` 210 in 0.36 s against 3.2 s; `jig-domain-client` 205
+in 0.21 s against 2.7 s; `jig-protocol-client-link` 133 in 0.22 s
+against 1.9 s; the snapshot world 24 in 0.69 s against 3.4 s. A process
+costs about 5 ms alone; 2,152 of the 3,508 tests take 15 ms or less in
+the gate, 27.2 s together.
+
+## 10. jig-tests.s4: the repository's tools built optimized
+
+Shape: jig's `Cargo.toml` gains `[profile.dev.package.jig-boundary]`
+and `[profile.dev.package.skein-codegen]`, each `opt-level = 3`, which
+the test profile inherits; `docs/development/workflow.md`, 2's "with
+unoptimized test builds" names the exception (testing-strategy.md, 8, "A
+tool is not the code under test").
+Test shape: none new; the boundary's and the drift tests' names and
+failures unchanged.
+Proof: `heavy cargo nextest run -p jig-boundary -p jig-store-codecs-world
+-p jig-client-wire-world` once: each vocabulary part under 0.1 s, each
+drift test under 0.3 s; the next gate's focused time in its `Gate-Result`.
+Expected: about 8 s of the gate's 97 s of test time (the boundary's
+7.7 s, the drifts' 1.6 s), about 1 s of wall time.
+Don't: optimize a crate whose code ships, a world, or a kit.
+
+## 11. jig-tests.s5: one behaviour's cases as rows, where they cost less than their process
+
+Shape: in the unit tests of `jig-protocol-store`, `jig-domain-core`,
+`jig-domain-client`, `jig-scripted-engine`, `jig-protocol-client-link`
+and `jig-protocol-config`, tests that check one behaviour over cases,
+each under 1 ms of work alone (the same assertion over a list of inputs,
+names differing only by the case), become rows of one table test per
+behaviour that checks every row and names each that fails
+(testing-strategy.md, 8, "A test is a process"). Each table keeps the
+behaviour's name; its rows keep the old tests' names as labels.
+Test shape: no assertion dropped; a planted failing row is named in the
+failure, once per table helper.
+Proof: the gate; the focused suite's test count and time before and
+after, in the report.
+Expected: about 12 ms of gate test time per test folded; folding 600
+into 60 saves about 7 s.
+Don't: fold tests of different behaviours, or a test past 1 ms of work;
+change an expected value.
+
+## 12. The steps left (31 to 35, 18, 25 to 27, 33)
+
+Each new test costs about 12 ms of the gate's total before its own work
+(testing-strategy.md, 8). So each step's tests are one per behaviour,
+with a behaviour's cases as rows; its fixtures are constants or built
+once in a test; its limits test-sized. A step's Proof names its tests'
+count. jig 34 and 35 write each document's wire record once: a test
+kit under `testing/` holds the records, a dev-dependency of both, which
+jig 34's encode tests expect and jig 35's decode tests take, each side
+keeping its own literal of its own value. jig 34's encoder does not
+replace jig 35's twins: a decoder tested against the encoder passes
+whatever mistake the two share; their round trip is jig 33's protocol
+world's.

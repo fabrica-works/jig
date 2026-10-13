@@ -1630,6 +1630,21 @@ the file.
 
 ## For the user
 
+- **Unit tests in one process each crate** (the designer, 2026-10-13;
+  `tests-cost.md`, "The second pass"): nextest runs every test in a
+  process of its own, and jig's unit-test binaries are 2,654 of its
+  3,508 focused tests and 63.2 s of their 97.1 s in the gate. The same
+  tests in one process take a fraction: `jig-view` 4.0 s against 13.6 s,
+  `jig-client-world` 1.4 s against 10.8 s, `jig-protocol-store` 0.18 s
+  against 6.1 s, `jig-domain-core` 0.36 s against 3.2 s. Running each
+  unit-test binary as one process (libtest's threads, under the suite's
+  same budget), the worlds staying one process per test, would save
+  about a third of the suite's test time. It gives up nextest's
+  per-test isolation and timeout for unit tests, in every repository
+  (skein's `testing-strategy.md`, 8 names nextest). Yours to choose;
+  nothing waits on it, and steps 10 to 12 of `tests-cost.md` go on
+  either way.
+
 - **smith's settle test on carbon-forge** (ruling 186): smith-repin's
   last gate fails only smith's `smith_check_json_lists_the_effective_limits_by_name`
   at 2.05–2.08 s against its 2,000 ms bound in the full suite; alone it
