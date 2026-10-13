@@ -286,21 +286,83 @@ Shape: each collection above, and any other list inside their records
   derives it; decoding counts each item against that sum as the domain
   counts it. A list the domain bounds by a count of its own stays a
   list. Each family's version moves once; regenerated, goldens added.
-Test shape: `both_shipped_profiles_are_admitted_by_the_store` (in
-  `tests/store-codecs`): for `Profile::Small` and `Profile::Standard`,
-  `codec::limits` gives limits and `sizes::check` against skein-kv
-  limits at its own largest sizes passes, printing the largest key,
-  value and commit; per family, a value at the domain's sum (an
-  amendment of 512 empty pattern segments, a verdict of 512 one-byte
-  fields) round-trips, and one past it is refused.
+Test shape: `both_shipped_profiles_admit_the_tasks_and_people_families`
+  (in `tests/store-codecs`): for `Profile::Small` and
+  `Profile::Standard`, `codec::tasks::limits` and
+  `codec::people::limits` give limits; per family, a value at the
+  domain's sum (an amendment of 512 empty pattern segments, a verdict of
+  512 one-byte fields) round-trips, and one past it is refused. Both
+  shipped profiles admitted by the whole store is 19.s3's test (the
+  designer's answer of 2026-10-13 on 19.s1's core scalars and commit
+  bound).
 Proof: unit, `heavy cargo nextest run -p jig-protocol-store -p
-  jig-store-codecs-world` once: the profiles' test passes, and the
-  report names each profile's largest value and commit, which jig 27.3
-  takes into the profiles' store limits.
+  jig-store-codecs-world` once: the families' test passes.
 Don't: raise a counted list's ceiling; change a profile's limits
   (ruling 235); cap a derived count below what the domain admits.
 Size: at most 400 lines of production code, generated code excluded.
 Removes: nothing.
+
+### 19.s2 A settled call's fields, to the channel's bound
+
+A step not in the plan, from the designer's answer on jig 19.s1's core
+scalars. The domain bounds a settled call's name, tool and answer by
+one sum, `call_answer_bytes`
+(`jig-domain-core/src/conversation.rs:41-56`; 32,768 in both shipped
+profiles), and the worker wire carries a settled
+answer's body and evidence up to 1,048,576 bytes
+(`jig-protocol-worker-wire/schema/worker-wire-v2.schema:92,94`).
+`core-v1.schema` stops each at 8,192 (`:32,33,35`), so `codec::limits`
+refuses the profiles at `settled_answer_host_body`,
+`settled_answer_delivery_evidence` and `settled_call_tool`. They are
+fields of one row (`CallRecord`, `:64`), not a collection: no list
+multiplies them, and they are no piece.
+Needs: 19.s1.
+Files: `crates/jig-protocol-store/schema/core-v1.schema`, its generated
+  code and goldens; `src/codec/core.rs`'s tests.
+Shape: `SettledAnswerHost.body`, `SettledAnswerDelivery.evidence` and
+  `SettledCall.tool` are `bytes 1048576`; `codec::core::limits` derives
+  them as now. The family's version moves once; regenerated, goldens
+  added.
+Test shape: for both shipped profiles, `codec::limits` gives limits; a
+  settled call whose name, tool and answer sum to `call_answer_bytes`
+  round-trips.
+Proof: unit, `-p jig-protocol-store -p jig-store-codecs-world` once.
+Don't: lower `call_answer_bytes`; make a piece of a scalar.
+Size: at most 30 lines of schema and Rust, generated code excluded.
+
+### 19.s3 A commit bounded by the map; both shipped profiles admitted
+
+A step not in the plan, from the designer's answer on jig 19.s1's commit
+bound (jig `1349fa8b`: `protocol/store.md`, 5.4 and 6). `sizes`
+(`src/sizes.rs:68-97`) prices a commit as the journal's writes, twice,
+times the largest key and row of any family: 31 GB in the small profile
+and 1.46 TB in the standard, past skein-kv's `u32` commit however the
+codecs are made. A commit's puts all land in the map, which stays
+within skein-kv's budget, once each key is written once per commit.
+Needs: 19.s1; 19.s2.
+Files: `crates/jig-protocol-store/src/{commits.rs, sizes.rs}`, their
+  tests; `tests/store-codecs`.
+Shape: `commits.rs` (`:81-107`) makes each commit's operations one per
+  key, the last write to it, in the order of the keys' first writes; the
+  orphan erases it adds are distinct keys already. `sizes::check` takes
+  the largest commit from skein-kv's budget: `store.budget` plus, for
+  each operation (`ops`, as now), the largest key and 9 bytes of
+  framing, plus the frame's 26; a budget whose sum passes `u32` is
+  refused as `SizeRefusal::Ceiling`. The largest value is checked as
+  now.
+Test shape: `both_shipped_profiles_are_admitted_by_the_store` (in
+  `tests/store-codecs`): for `Profile::Small` and `Profile::Standard`,
+  with a skein-kv budget of 256 MiB, `codec::limits` gives limits and
+  `sizes::check` passes, printing the largest key, value and commit;
+  `a_key_written_twice_in_a_commit_is_one_put_the_last`;
+  `a_put_then_an_erase_of_one_key_is_one_erase`.
+Proof: unit, `heavy cargo nextest run -p jig-protocol-store -p
+  jig-store-codecs-world` once: the profiles' test passes; the report
+  names each profile's largest value and commit, which jig 27.3 takes
+  into the profiles' store limits.
+Don't: price a commit by writes times the largest row; change
+  `journal.writes` or a profile's limits; split one decision's commit.
+Size: at most 120 lines of production code.
 
 ## Done when
 
