@@ -183,8 +183,11 @@ dependencies = [
  "jig-protocol-client-wire",
  "jig-protocol-engine-clients",
  "jig-shell-native",
+ "jig-test-connector",
  "jig-test-domain",
  "jig-test-domain-client",
+ "jig-test-protocol-client-wire",
+ "jig-test-service",
  "jig-view",
  "skein-http",
  "skein-io",
@@ -197,6 +200,7 @@ name = "jig-client-wire-world"
 version = "0.0.0"
 dependencies = [
  "jig-protocol-client-wire",
+ "jig-test-protocol-client-wire",
  "skein-codegen",
  "skein-lib",
 ]
@@ -900,6 +904,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "jig-test-protocol-client-wire"
+version = "0.0.0"
+dependencies = [
+ "skein-codec",
+ "skein-lib",
+]
+
+[[package]]
 name = "jig-test-service"
 version = "0.0.0"
 dependencies = [
@@ -913,12 +925,14 @@ dependencies = [
  "jig-protocol-accounts",
  "jig-protocol-charter",
  "jig-protocol-config",
+ "jig-protocol-engine-clients",
  "jig-protocol-engine-workers",
  "jig-protocol-tools",
  "jig-protocol-worker-link",
  "jig-protocol-worker-wire",
  "jig-test-connector",
  "jig-test-domain",
+ "jig-test-protocol-client-wire",
  "jig-test-worker",
  "skein-channel",
  "skein-fake-channel",

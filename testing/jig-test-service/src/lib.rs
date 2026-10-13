@@ -4,6 +4,7 @@
 extern crate alloc;
 mod accounts;
 mod boundary;
+pub mod family;
 mod tools;
 mod values;
 mod worker;

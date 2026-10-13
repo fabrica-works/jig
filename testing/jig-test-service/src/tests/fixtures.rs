@@ -1,3 +1,4 @@
+pub(crate) mod family;
 use crate::{End, Files, PartyOutput, Seeds, Service, StoreAnswer, StoreRequest, iterate};
 use jig_domain_core as core;
 use jig_domain_people as people;

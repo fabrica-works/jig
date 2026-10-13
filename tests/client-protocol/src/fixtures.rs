@@ -41,7 +41,10 @@ pub fn settings(rows: u32) -> jig_protocol_engine_clients::Settings {
         deployment_provider: 2,
         heartbeat: Duration::from_millis(50),
         rows,
-        served: jig_client_world::test::list([Served { family: None, first: 7, last: 7 }]),
+        served: jig_client_world::test::list([
+            Served { family: None, first: 7, last: 7 },
+            Served { family: Some(1), first: 1, last: 1 },
+        ]),
         providers: List::with_capacity(0),
         seed: Secret::new(Box::new([7; 32])),
         stream: 31,
@@ -55,7 +58,7 @@ pub fn engine_limits() -> Limits {
         watches_per_stream: 8,
         queued_bytes: 65536,
         identity_bytes: 32,
-        families: 1,
+        families: 2,
         providers: 1,
         exchanges: 8,
         exchanges_per_client: 4,
@@ -91,4 +94,13 @@ pub fn sign_in_then(
 #[must_use]
 pub fn world(seed: u64) -> World<Test, Protocol> {
     World::new(Settings { seed, ..Settings::default() }, Protocol::new(seed))
+}
+
+#[must_use]
+pub fn family_world(seed: u64) -> World<Test, Protocol> {
+    let mut world = self::world(seed);
+    let configuration = jig_core_world::world::config(seed);
+    let resource = configuration.first.resources.first().expect("configured first object").path.clone();
+    world.front().adopt_family_resource(resource);
+    world
 }

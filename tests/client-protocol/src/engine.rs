@@ -75,83 +75,120 @@ impl Engine {
                 };
                 self.event(Event::Secrets(answer));
             }
-            Request::Core(mut event) => {
-                if let core::Event::SignIn { reply_to, .. }
-                | core::Event::People(
-                    jig_domain_people::Event::Ask { reply_to, .. } | jig_domain_people::Event::SignOut { reply_to, .. },
-                ) = event.as_mut()
-                {
-                    let to = std::mem::replace(reply_to, skein_lib::ReplyTo::new(Token::new(0)));
-                    let token = to.into_token();
-                    *reply_to = skein_lib::ReplyTo::new(token);
-                    self.replies.insert(token);
-                }
-                let watcher = watcher(&event);
-                let peer = self.driver.world.client_peer.as_mut().expect("joint protocol peer");
-                peer.clear_replies();
-                for token in &self.replies {
-                    peer.register_reply(*token);
-                }
-                self.driver.world.send(root::Event::Core(*event));
-                let mut refused = false;
-                let peer = self.driver.world.client_peer.as_mut().expect("joint peer");
-                let held = std::mem::take(&mut peer.delivered);
-                let immediate = std::mem::take(&mut peer.now);
-                for (_, delivery) in held {
-                    if let root::Delivery::Core(held) = delivery
-                        && let Some(event) = held_event(held)
-                    {
-                        self.event(event);
-                    }
-                }
-                for now in immediate {
-                    if let core::Now::WatchRefused { watcher: owner, .. } = &now {
-                        refused |= Some(*owner) == watcher;
-                    }
-                    if let Some(event) = now_event(now) {
-                        self.event(event);
-                    }
-                }
-                if let Some(watcher) = watcher
-                    && !refused
-                {
-                    self.event(Event::Admitted { watcher });
+            Request::Core(event) => self.apply(root::Event::Core(*event)),
+            Request::Application(request) => {
+                match jig_test_service::family::to_root(
+                    request,
+                    &crate::fixtures::owner_limits().connector,
+                    crate::fixtures::owner_limits().core.documents.rows,
+                ) {
+                    Ok(event) => self.apply(event),
+                    Err(event) => self.event(*event),
                 }
             }
-            Request::Application(request) => match request {
-                clients::ToApplication::Request { reply_to, .. } => {
-                    self.event(Event::Application(clients::FromApplication::Undecodable { to: reply_to }));
-                }
-                clients::ToApplication::Read { reply, family, .. } => {
-                    self.event(Event::Application(clients::FromApplication::Read { reply, family, record: None }));
-                }
-                clients::ToApplication::Watch { watcher, .. } => {
-                    self.event(Event::WatchRefused { watcher, why: core::WatchRefusal::Unknown });
-                }
-            },
             Request::Provider { .. } => panic!("the world uses the printed link provider"),
             Request::Closed => {}
         }
         None
     }
-    pub fn poll(&mut self) -> bool {
-        self.driver.world.fire_due(self.env.now, self.env.wall);
+    fn apply(&mut self, mut event: root::Event) {
+        let to = if let root::Event::Core(
+            core::Event::SignIn { reply_to, .. }
+            | core::Event::People(
+                jig_domain_people::Event::Ask { reply_to, .. } | jig_domain_people::Event::SignOut { reply_to, .. },
+            ),
+        )
+        | root::Event::Application { reply_to, .. } = &mut event
+        {
+            Some(reply_to)
+        } else if let root::Event::ReadApplication { reply, .. } = &mut event {
+            Some(reply)
+        } else {
+            None
+        };
+        if let Some(to) = to {
+            let original = std::mem::replace(to, skein_lib::ReplyTo::new(Token::new(0))).into_token();
+            *to = skein_lib::ReplyTo::new(original);
+            self.replies.insert(original);
+        }
+        let watcher = if let root::Event::WatchApplication { watcher, .. } = &event {
+            Some(*watcher)
+        } else if let root::Event::Core(event) = &event {
+            watcher(event)
+        } else {
+            None
+        };
+        let peer = self.driver.world.client_peer.as_mut().expect("joint protocol peer");
+        peer.clear_replies();
+        for token in &self.replies {
+            peer.register_reply(*token);
+        }
+        self.driver.world.send(event);
+        let refused = self.deliveries(watcher);
+        if let Some(watcher) = watcher
+            && !refused
+        {
+            self.event(Event::Admitted { watcher });
+        }
+    }
+    fn deliveries(&mut self, watcher: Option<Token>) -> bool {
         let peer = self.driver.world.client_peer.as_mut().expect("joint protocol peer");
         let held = std::mem::take(&mut peer.delivered);
         let immediate = std::mem::take(&mut peer.now);
-        let active = !held.is_empty() || !immediate.is_empty();
+        let mut refused = false;
         for (_, delivery) in held {
-            if let root::Delivery::Core(held) = delivery
-                && let Some(event) = held_event(held)
-            {
-                self.event(event);
+            match delivery {
+                root::Delivery::Application { to, number, outcome } => {
+                    self.event(Event::Application(clients::FromApplication::Answered {
+                        to,
+                        family: number,
+                        record: jig_test_service::family::outcome(&outcome),
+                    }));
+                }
+                root::Delivery::ApplicationDocument { watcher, number, document } => {
+                    self.event(Event::Application(clients::FromApplication::Delivery {
+                        watcher,
+                        family: number,
+                        record: jig_test_service::family::document(&document),
+                    }));
+                }
+                root::Delivery::ApplicationRead { reply, number, answer } => {
+                    let record = Some(jig_test_service::family::read_answer(&answer));
+                    self.event(Event::Application(clients::FromApplication::Read { reply, family: number, record }));
+                }
+                root::Delivery::Core(held) => {
+                    if let Some(event) = held_event(held) {
+                        self.event(event);
+                    }
+                }
+                root::Delivery::Link { .. }
+                | root::Delivery::CallBusy { .. }
+                | root::Delivery::Projection { .. }
+                | root::Delivery::Message { .. }
+                | root::Delivery::Restart(_)
+                | root::Delivery::CallAnswer { .. }
+                | root::Delivery::Assigned { .. }
+                | root::Delivery::Fleet(_)
+                | root::Delivery::System { .. }
+                | root::Delivery::LostRead { .. }
+                | root::Delivery::Procedure { .. } => {}
             }
         }
         for now in immediate {
+            if let core::Now::WatchRefused { watcher: owner, .. } = &now {
+                refused |= Some(*owner) == watcher;
+            }
             if let Some(event) = now_event(now) {
                 self.event(event);
             }
         }
+        refused
+    }
+    pub fn poll(&mut self) -> bool {
+        self.driver.world.fire_due(self.env.now, self.env.wall);
+        let peer = self.driver.world.client_peer.as_ref().expect("joint protocol peer");
+        let active = !peer.delivered.is_empty() || !peer.now.is_empty();
+        self.deliveries(None);
         for snapshot in self.driver.snapshots() {
             self.observed.extend(self.truth.applied(snapshot));
         }
