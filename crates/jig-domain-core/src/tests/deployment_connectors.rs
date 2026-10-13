@@ -208,3 +208,39 @@ fn a_refused_hello_shows_its_agent_shortfall() {
         fleet::HelloRefusal::Agent { why: fleet::AgentShortfall::Model { charter: 1, model: 0 } }
     );
 }
+
+fn waiting_account() -> (Core, Limits) {
+    let (mut core, limits) = source(&[1], 2);
+    let env = Env { now: Time::from_nanos(100_000_000_000), wall: Wall::from_nanos(1_000_000_000_000), limits };
+    drop(step(&mut core, &env, Event::Account(accounts::Event::Want)));
+    drop(step(
+        &mut core,
+        &env,
+        Event::Account(accounts::Event::Component(accounts::FromComponent::Failed {
+            account: 1,
+            failure: accounts::Failure::Later { after: Some(Duration::from_secs(30)) },
+        })),
+    ));
+    (core, limits)
+}
+
+#[test]
+fn an_account_waiting_to_ask_again_carries_the_wall_it_asks_at() {
+    let (core, limits) = waiting_account();
+    let clock = DocumentClock { now: Time::from_nanos(110_000_000_000), wall: Wall::from_nanos(2_000_000_000_000) };
+    let Document::Deployment(value) =
+        make_with_clock(&core, &limits, 1, &Subject::Deployment, &window(), clock).unwrap()
+    else {
+        panic!("deployment document");
+    };
+    assert_eq!(
+        value.accounts.get(0).unwrap().state,
+        AccountState::Later { until: Some(Wall::from_nanos(2_020_000_000_000)) }
+    );
+}
+
+#[test]
+fn an_account_waiting_to_ask_again_has_no_wall_without_a_document_clock() {
+    let (core, limits) = waiting_account();
+    assert_eq!(deployment(&core, &limits).accounts.get(0).unwrap().state, AccountState::Later { until: None });
+}

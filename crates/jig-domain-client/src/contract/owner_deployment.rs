@@ -3,7 +3,7 @@
 //! client/domain/contract.md, 5 and 7.1;
 //! client/domain/pages.md, 7.
 use super::{AdmissionLimit, Chip, Funder, OwnerRequester, OwnerTaskLink, Proposer, Seen};
-use skein_lib::{Duration, List, Time, Wall};
+use skein_lib::{Duration, List, Wall};
 
 /// Whole supplied deployment facts with independent bounded loss counters.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -193,7 +193,7 @@ pub enum OwnerRunLocation {
 pub enum OwnerAccountState {
     Asking,
     Granted,
-    Later { until: Time },
+    Later { until: Option<Wall> },
     SignInAgain,
     Misconfigured,
     Unloaded { at: OwnerAccountPlace, why: OwnerAccountUnread },

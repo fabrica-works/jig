@@ -1727,7 +1727,7 @@ fn documents_deployment_accounts_are_secret_free_and_show_unusable_state() {
     let account = deployment.accounts.get(0).unwrap();
     assert!(!account.usable);
     assert_eq!(account.number, 1);
-    assert_eq!(account.state, accounts::State::Granted);
+    assert_eq!(account.state, AccountState::Granted);
     assert_eq!(account.spent_until, Some(Wall::from_nanos(1000 + Duration::from_secs(5).as_nanos())));
     assert!(!account.waiting.is_empty());
 }

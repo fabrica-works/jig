@@ -2,6 +2,7 @@
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AccountPhrase {
     Later,
+    LaterUnknown,
     Unloaded,
     Cancelled,
     Directory,
@@ -16,6 +17,7 @@ impl AccountPhrase {
     pub(super) const fn number(self) -> u16 {
         match self {
             Self::Later => 9400,
+            Self::LaterUnknown => 9421,
             Self::Unloaded => 9401,
             Self::Cancelled => 9402,
             Self::Directory => 9403,
@@ -29,7 +31,8 @@ impl AccountPhrase {
     }
     pub(super) const fn label(self) -> &'static [u8] {
         match self {
-            Self::Later => b"Account State Later",
+            Self::Later => b"Asks again at ",
+            Self::LaterUnknown => b"Asks again later",
             Self::Unloaded => b"Account State Unloaded",
             Self::Cancelled => b"Account State Cancelled",
             Self::Directory => b"Record directory",

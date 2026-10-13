@@ -90,7 +90,13 @@ fn account_state(b: &mut Builder, words: &Words, value: OwnerAccountState) {
         OwnerAccountState::Asking => P::AccountStateAsking,
         OwnerAccountState::SignInAgain => P::AccountStateSignInAgain,
         OwnerAccountState::Misconfigured => P::AccountStateMisconfigured,
-        OwnerAccountState::Later { .. } => P::AccountDetail(A::Later),
+        OwnerAccountState::Later { until } => {
+            match until {
+                Some(until) => text(b, words, P::AccountDetail(A::Later), &[Hole::Wall(words.adjusted_wall(until))]),
+                None => text(b, words, P::AccountDetail(A::LaterUnknown), &[]),
+            }
+            return;
+        }
         OwnerAccountState::Unloaded { at, why } => {
             text(b, words, P::AccountDetail(A::Unloaded), &[]);
             let place = match at {

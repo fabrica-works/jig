@@ -54,7 +54,7 @@ pub(crate) fn source() -> documents::Deployment {
             [documents::Account {
                 number: u32::MAX,
                 generation: Some(u64::MAX),
-                state: accounts::State::SignInAgain,
+                state: documents::AccountState::SignInAgain,
                 usable: false,
                 expiring: true,
                 attention: true,
@@ -355,23 +355,24 @@ fn deployment_attempt_and_account_lifecycles_preserve_every_supplied_state() {
 #[test]
 fn deployment_accounts_preserve_every_supplied_state() {
     for (source, expected) in [
-        (accounts::State::Granted, client::OwnerAccountState::Granted),
-        (accounts::State::Asking, client::OwnerAccountState::Asking),
-        (accounts::State::SignInAgain, client::OwnerAccountState::SignInAgain),
-        (accounts::State::Misconfigured, client::OwnerAccountState::Misconfigured),
+        (documents::AccountState::Granted, client::OwnerAccountState::Granted),
+        (documents::AccountState::Asking, client::OwnerAccountState::Asking),
+        (documents::AccountState::SignInAgain, client::OwnerAccountState::SignInAgain),
+        (documents::AccountState::Misconfigured, client::OwnerAccountState::Misconfigured),
         (
-            accounts::State::Later { until: skein_lib::Time::ZERO },
-            client::OwnerAccountState::Later { until: skein_lib::Time::ZERO },
+            documents::AccountState::Later { until: Some(Wall::EPOCH) },
+            client::OwnerAccountState::Later { until: Some(Wall::EPOCH) },
         ),
+        (documents::AccountState::Later { until: None }, client::OwnerAccountState::Later { until: None }),
         (
-            accounts::State::Unloaded { at: accounts::Place::File, why: accounts::Unread::Refused },
+            documents::AccountState::Unloaded { at: accounts::Place::File, why: accounts::Unread::Refused },
             client::OwnerAccountState::Unloaded {
                 at: client::OwnerAccountPlace::File,
                 why: client::OwnerAccountUnread::Refused,
             },
         ),
-        (accounts::State::Cancelled, client::OwnerAccountState::Cancelled),
-        (accounts::State::Closing, client::OwnerAccountState::Closing),
+        (documents::AccountState::Cancelled, client::OwnerAccountState::Cancelled),
+        (documents::AccountState::Closing, client::OwnerAccountState::Closing),
     ] {
         assert_eq!(account_state(source), expected);
     }

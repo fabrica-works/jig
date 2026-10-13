@@ -158,14 +158,14 @@ fn attempt(value: fleet::AttemptState) -> client::OwnerAttemptState {
     }
 }
 
-fn account_state(value: accounts::State) -> client::OwnerAccountState {
+fn account_state(value: documents::AccountState) -> client::OwnerAccountState {
     match value {
-        accounts::State::Granted => client::OwnerAccountState::Granted,
-        accounts::State::Asking => client::OwnerAccountState::Asking,
-        accounts::State::SignInAgain => client::OwnerAccountState::SignInAgain,
-        accounts::State::Misconfigured => client::OwnerAccountState::Misconfigured,
-        accounts::State::Later { until } => client::OwnerAccountState::Later { until },
-        accounts::State::Unloaded { at, why } => client::OwnerAccountState::Unloaded {
+        documents::AccountState::Granted => client::OwnerAccountState::Granted,
+        documents::AccountState::Asking => client::OwnerAccountState::Asking,
+        documents::AccountState::SignInAgain => client::OwnerAccountState::SignInAgain,
+        documents::AccountState::Misconfigured => client::OwnerAccountState::Misconfigured,
+        documents::AccountState::Later { until } => client::OwnerAccountState::Later { until },
+        documents::AccountState::Unloaded { at, why } => client::OwnerAccountState::Unloaded {
             at: match at {
                 accounts::Place::Directory => client::OwnerAccountPlace::Directory,
                 accounts::Place::File => client::OwnerAccountPlace::File,
@@ -178,8 +178,8 @@ fn account_state(value: accounts::State) -> client::OwnerAccountState {
                 accounts::Unread::TooLarge => client::OwnerAccountUnread::TooLarge,
             },
         },
-        accounts::State::Cancelled => client::OwnerAccountState::Cancelled,
-        accounts::State::Closing => client::OwnerAccountState::Closing,
+        documents::AccountState::Cancelled => client::OwnerAccountState::Cancelled,
+        documents::AccountState::Closing => client::OwnerAccountState::Closing,
     }
 }
 

@@ -54,6 +54,18 @@ pub struct Host {
     pub runs: List<HostRun>,
     pub cut: bool,
 }
+/// Account state at document time; the child's retry clock crosses as a wall.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum AccountState {
+    Asking,
+    Granted,
+    Later { until: Option<Wall> },
+    SignInAgain,
+    Misconfigured,
+    Unloaded { at: accounts::Place, why: accounts::Unread },
+    Cancelled,
+    Closing,
+}
 /// Secret-free account status, with runs using the configured account and tasks
 /// currently waiting for it; no secret or protocol refresh token crosses here.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -61,7 +73,7 @@ pub struct Host {
 pub struct Account {
     pub number: u32,
     pub generation: Option<u64>,
-    pub state: accounts::State,
+    pub state: AccountState,
     pub usable: bool,
     pub expiring: bool,
     pub attention: bool,
@@ -129,6 +141,18 @@ fn wall_deadline(clock: Option<DocumentClock>, at: Time) -> Option<Wall> {
         Some(Wall::from_nanos(clock.wall.as_nanos().saturating_add(at.saturating_since(clock.now).as_nanos())))
     } else {
         Some(Wall::from_nanos(clock.wall.as_nanos().saturating_sub(clock.now.saturating_since(at).as_nanos())))
+    }
+}
+fn account_state(state: accounts::State, clock: Option<DocumentClock>) -> AccountState {
+    match state {
+        accounts::State::Asking => AccountState::Asking,
+        accounts::State::Granted => AccountState::Granted,
+        accounts::State::Later { until } => AccountState::Later { until: wall_deadline(clock, until) },
+        accounts::State::SignInAgain => AccountState::SignInAgain,
+        accounts::State::Misconfigured => AccountState::Misconfigured,
+        accounts::State::Unloaded { at, why } => AccountState::Unloaded { at, why },
+        accounts::State::Cancelled => AccountState::Cancelled,
+        accounts::State::Closing => AccountState::Closing,
     }
 }
 #[expect(clippy::manual_map, reason = "step code has no closures (programming-model.md, section 10)")]
@@ -301,7 +325,7 @@ pub(super) fn deployment(
             .push(Account {
                 number: value.account,
                 generation: value.generation,
-                state: value.state,
+                state: account_state(value.state, clock),
                 usable: value.usable,
                 expiring: value.expiring,
                 attention: value.attention,

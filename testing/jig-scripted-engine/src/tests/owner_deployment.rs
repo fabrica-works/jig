@@ -137,7 +137,7 @@ fn account_states() -> [OwnerAccountState; 8] {
         OwnerAccountState::Asking,
         OwnerAccountState::SignInAgain,
         OwnerAccountState::Misconfigured,
-        OwnerAccountState::Later { until: skein_lib::Time::ZERO },
+        OwnerAccountState::Later { until: Some(Wall::EPOCH) },
         OwnerAccountState::Unloaded { at: OwnerAccountPlace::File, why: OwnerAccountUnread::Refused },
         OwnerAccountState::Cancelled,
         OwnerAccountState::Closing,

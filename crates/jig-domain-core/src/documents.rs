@@ -27,8 +27,8 @@ mod inbox_deployment;
 pub use inbox_deployment::{ConversationLine, Conversations, Inbox, InboxEntry, InboxObject, conversation_from_row};
 mod deployment;
 pub use deployment::{
-    Account, Capacity, Deployment, DocumentClock, HelloRefusalLine, Host, HostRun, ProjectCapacity, RunLocation,
-    StoreFill, make_with_clock,
+    Account, AccountState, Capacity, Deployment, DocumentClock, HelloRefusalLine, Host, HostRun, ProjectCapacity,
+    RunLocation, StoreFill, make_with_clock,
 };
 mod inbox_selection;
 pub(crate) use inbox_selection::retained as inbox_selection_from_ancestry;

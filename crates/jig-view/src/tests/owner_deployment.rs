@@ -122,6 +122,33 @@ fn round_trip(value: OwnerDeployment) -> Tree {
     );
     tree
 }
+fn waiting_account(until: Option<Wall>) -> OwnerDeployment {
+    let mut value = empty();
+    value
+        .accounts
+        .push(OwnerAccount {
+            number: 1,
+            generation: None,
+            state: OwnerAccountState::Later { until },
+            usable: false,
+            expiring: false,
+            attention: false,
+            spent_until: None,
+            runs: List::with_capacity(0),
+            waiting: List::with_capacity(0),
+            cut: false,
+        })
+        .unwrap();
+    value
+}
+#[test]
+fn an_account_waiting_to_ask_again_shows_the_wall_it_asks_at() {
+    assert!(contains(&round_trip(waiting_account(Some(Wall::from_nanos(46_920_000_000_000)))), b"Asks again at 14:02"));
+}
+#[test]
+fn an_account_waiting_to_ask_again_without_a_clock_shows_later() {
+    assert!(contains(&round_trip(waiting_account(None)), b"Asks again later"));
+}
 #[test]
 fn deployment_view_all_attempt_account_hello_states_clocks_keys_and_independent_counts_are_visible() {
     let states = [
@@ -283,7 +310,7 @@ fn deployment_view_normal_words_select_second_language_and_reject_missing_or_wro
     let tree = build(&client, &words, maximum);
     assert!(contains(&tree, b"selected "));
     assert!(!contains(&tree, b"Deployment diagnostics"));
-    assert_eq!(crate::owner_deployment_words::ALL.len(), 223);
+    assert_eq!(crate::owner_deployment_words::ALL.len(), 224);
     let mut wrong = crate::owner_deployment_words::language();
     let phrase = wrong.phrases.iter_mut().find(|p| p.id == P::Host.id()).unwrap();
     phrase.forms[0].segments = Box::new([Segment::Text(copy_of(b"host without number"))]);
@@ -676,7 +703,7 @@ fn deployment_view_configured_empty_and_clipped_catalogues_are_distinct_and_slot
 fn store_words() -> Words {
     let limits = PhraseLimits {
         languages: 1,
-        phrases: 223,
+        phrases: 224,
         holes: 1,
         segments: 512,
         text_bytes: 16_384,

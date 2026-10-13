@@ -218,7 +218,7 @@ pub enum DeploymentPhrase {
     StoreBytes,
     StoreMark,
 }
-pub const ALL: [DeploymentPhrase; 223] = [
+pub const ALL: [DeploymentPhrase; 224] = [
     DeploymentPhrase::Agent(AgentPhrase::Model),
     DeploymentPhrase::Agent(AgentPhrase::Window),
     DeploymentPhrase::Agent(AgentPhrase::Output),
@@ -332,6 +332,7 @@ pub const ALL: [DeploymentPhrase; 223] = [
     DeploymentPhrase::AccountStateSignInAgain,
     DeploymentPhrase::AccountStateMisconfigured,
     DeploymentPhrase::AccountDetail(AccountPhrase::Later),
+    DeploymentPhrase::AccountDetail(AccountPhrase::LaterUnknown),
     DeploymentPhrase::AccountDetail(AccountPhrase::Unloaded),
     DeploymentPhrase::AccountDetail(AccountPhrase::Cancelled),
     DeploymentPhrase::AccountDetail(AccountPhrase::Directory),
@@ -660,6 +661,9 @@ impl DeploymentPhrase {
     fn hole(self) -> Option<HoleKind> {
         match self {
             Self::Agent(phrase) => phrase.hole(),
+            Self::AccountDetail(AccountPhrase::Later) | Self::At | Self::GraceUntil | Self::SpentUntil => {
+                Some(HoleKind::Wall)
+            }
             Self::AccountDetail(..)
             | Self::Deployment
             | Self::Hosts
@@ -854,7 +858,6 @@ impl DeploymentPhrase {
             | Self::Bytes
             | Self::StoreBytes
             | Self::StoreMark => Some(HoleKind::Number),
-            Self::At | Self::GraceUntil | Self::SpentUntil => Some(HoleKind::Wall),
             Self::GraceRemaining | Self::GraceBound | Self::StopBound | Self::AllowedGrace | Self::Retention => {
                 Some(HoleKind::Span)
             }
