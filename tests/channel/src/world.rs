@@ -96,6 +96,7 @@ pub fn run(mut settings: Settings, script: Script) -> Outcome {
         if reset { reset_injected = true; }
         Some(skein_sim::Faults { reset: if reset { 1000 } else { 0 }, ..settings.config.faults })
     });
+    crate::referee::roots_at_end(&settled.procs);
     outcome(&settled.procs, &store.borrow(), &views.borrow(), reset_injected, settled.killed.len())
 }
 

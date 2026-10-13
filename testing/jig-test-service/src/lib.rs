@@ -127,6 +127,20 @@ impl Service {
         }
         roots.finish()
     }
+    /// Inputs handed to the roots, and passes that took output from them,
+    /// so far: a root's state changes only with one, so a check of the
+    /// roots' state need run only when it moved.
+    #[must_use]
+    pub fn root_steps(&self) -> u64 {
+        let mut steps = match &self.engine {
+            Some(engine) => engine.root_steps,
+            None => 0,
+        };
+        for worker in &self.workers {
+            steps = steps.wrapping_add(worker.root_steps);
+        }
+        steps
+    }
     #[must_use]
     pub const fn end(&self) -> Option<&End> {
         match &self.engine {

@@ -530,13 +530,13 @@ impl Referee {
         for proc in procs {
             if let Proc::Engine(host) | Proc::Worker(host) = proc
                 && !grants.is_empty()
-                && self.roots_observed.get(&host.revision.0) != Some(&host.revision.1)
+                && self.roots_observed.get(&host.revision.0) != Some(&host.service.root_steps())
             {
                 use std::fmt::Write;
                 self.formatted.clear();
                 write!(&mut self.formatted, "{:?}", Roots(&host.service)).expect("root state");
                 self.rules.roots(&self.formatted, &grants);
-                self.roots_observed.insert(host.revision.0, host.revision.1);
+                self.roots_observed.insert(host.revision.0, host.service.root_steps());
             }
         }
         assert_eq!(self.rules.verdict(), skein_world::domain::Verdict::Passed);
@@ -728,4 +728,16 @@ impl Referee {
             }
         }
     }
+}
+
+/// Check every surviving host's roots once more after teardown has settled.
+pub(crate) fn roots_at_end(procs: &[Proc]) {
+    let grants: Vec<_> = worker_wire(procs).grants.iter().map(AsRef::as_ref).collect();
+    let mut rules = Rules::default();
+    for proc in procs {
+        if let Proc::Engine(host) | Proc::Worker(host) = proc {
+            rules.roots(&format!("{:?}", Roots(&host.service)), &grants);
+        }
+    }
+    assert_eq!(rules.verdict(), skein_world::domain::Verdict::Passed);
 }

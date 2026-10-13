@@ -467,6 +467,7 @@ pub(super) fn answer(engine: &mut crate::Engine) {
                 if row.key() == root::Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Deployment)) {
                     engine.first_periods.truncate(0);
                 }
+                engine.root_steps = engine.root_steps.wrapping_add(1);
                 if !root::restore_record(&mut engine.domain, &engine.env, row) {
                     crate::stop::invalid_restore(engine);
                 }

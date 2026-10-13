@@ -20,6 +20,7 @@ pub struct WorkerRuntime {
 #[derive(Debug)]
 pub struct Worker {
     pub(super) root: root::Domain,
+    pub(super) root_steps: u64,
     env: Env<root::Limits>,
     agent: Agent,
     link: link::Component,
@@ -102,6 +103,7 @@ impl Worker {
             .ok_or(problem(index, b"slots", What::Bound))?;
         Ok(Self {
             root: root::Domain::new(&root_limits),
+            root_steps: 0,
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: root_limits },
             agent: Agent {
                 endpoints: agent.endpoints.clone(),
@@ -321,6 +323,7 @@ impl Worker {
         self.application.expire(now);
     }
     pub(super) fn step(&mut self, event: root::Event) {
+        self.root_steps = self.root_steps.wrapping_add(1);
         root::step(&mut self.root, &self.env, event, &mut self.out);
         for _ in 0..self.out.capacity() {
             let Some(request) = self.out.pop() else { break };
@@ -334,14 +337,17 @@ impl Worker {
                 root::Request::Process(request) => self.process(*request),
                 root::Request::Decode { agent, run, start } => {
                     let start = worker_route::decode(run, *start, &self.agent);
+                    self.root_steps = self.root_steps.wrapping_add(1);
                     root::step(&mut self.root, &self.env, root::Event::Decoded { agent, start }, &mut self.out);
                 }
                 root::Request::Encode { owner, value } => {
                     let encoded = worker_route::encode(value, &self.agent.limits, &self.agent.endpoints);
+                    self.root_steps = self.root_steps.wrapping_add(1);
                     root::step(&mut self.root, &self.env, root::Event::Encoded { owner, encoded }, &mut self.out);
                 }
                 root::Request::Fact { owner, body } => {
                     let activity = worker_route::activity(&body, &self.agent.limits);
+                    self.root_steps = self.root_steps.wrapping_add(1);
                     root::step(&mut self.root, &self.env, root::Event::Activity { owner, activity }, &mut self.out);
                 }
             }

@@ -323,3 +323,16 @@ fn a_worker_refuses_limits_that_cannot_carry_its_account_envelope() {
         );
     }
 }
+
+#[test]
+fn a_roots_step_count_moves_with_an_input_and_not_with_an_idle_iterate() {
+    let mut service = fixtures::worker_service();
+    let before = service.root_steps();
+    iterate(&mut service, Time::ZERO, Wall::EPOCH);
+    assert_eq!(service.root_steps(), before);
+    assign(&mut service);
+    assert!(service.root_steps() > before);
+    let after = service.root_steps();
+    iterate(&mut service, Time::ZERO, Wall::EPOCH);
+    assert_eq!(service.root_steps(), after);
+}

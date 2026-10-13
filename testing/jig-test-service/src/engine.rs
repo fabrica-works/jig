@@ -31,6 +31,7 @@ pub struct Engine {
     pending: Option<Box<root::Event>>,
     ready: bool,
     pub(crate) first_periods: skein_lib::List<(u32, u64)>,
+    pub(crate) root_steps: u64,
 }
 
 pub(crate) struct Children {
@@ -84,6 +85,7 @@ impl Engine {
             pending: None,
             ready: true,
             first_periods: skein_lib::List::with_capacity(limits.core.authority.projects),
+            root_steps: 0,
         }
     }
     pub const fn parties_in(&mut self) -> &mut Queue<core::Event> {
@@ -118,6 +120,7 @@ impl Engine {
             }
     }
     pub(crate) fn step(&mut self, event: root::Event) {
+        self.root_steps = self.root_steps.wrapping_add(1);
         let watcher = match &mut self.clients {
             Some(clients) => clients.root_event(&event),
             None => None,
@@ -350,6 +353,7 @@ pub fn iterate(engine: &mut Engine, now: Time, wall: Wall) {
         let event = engine.events.pop().expect("ready component input");
         engine.step(event);
     } else if let Some(event) = engine.parties.pop() {
+        engine.root_steps = engine.root_steps.wrapping_add(1);
         if let Err(event) = root::try_step(&mut engine.domain, &engine.env, root::Event::Core(event)) {
             engine.outputs.push(PartyOutput::Busy(Box::new(event)));
         }
@@ -378,6 +382,9 @@ fn release(engine: &mut Engine) {
             break;
         }
         root::release(&mut engine.domain, &engine.env, &mut engine.requests);
+        if !engine.requests.is_empty() {
+            engine.root_steps = engine.root_steps.wrapping_add(1);
+        }
         if !engine.requests.is_empty() || engine.domain.quiescent() {
             engine.blocked = false;
         }

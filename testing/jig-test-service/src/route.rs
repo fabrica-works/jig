@@ -121,6 +121,7 @@ fn restart(engine: &mut Engine, step: core::RestartStep) {
         }
         core::RestartStep::LoadCore | core::RestartStep::LoadInbox | core::RestartStep::RestoreConnector { .. } => {
             let census = if step == core::RestartStep::LoadInbox {
+                engine.root_steps = engine.root_steps.wrapping_add(1);
                 Some(root::inbox_census(&mut engine.domain, &engine.env.limits))
             } else {
                 None
