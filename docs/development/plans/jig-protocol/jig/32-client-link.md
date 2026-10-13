@@ -280,6 +280,25 @@ Don't: write a secret to the small store.
 Size: at most 400 lines.
 Removes: nothing.
 
+### 32.s1 The client's version follows its wire's
+
+A step not in the plan (decisions.md, ruling 213), before the joint
+client's proof. `crates/jig-domain-client/src/contract/versions.rs`'
+`CLIENT_VERSION` is 1 while the client wire's `VERSION` is 4 (jig 30's
+steps moved it); a hello serving 4..4 would put the current client out of
+date. contract.md, 8: "Each owner's documents and requests are
+versioned ... each range is one version".
+Shape: `CLIENT_VERSION` becomes the wire's current version; fixtures that
+  name the old number follow, behaviour unchanged. A test in
+  `jig-protocol-client-link`, which links both, asserts
+  `contract::CLIENT_VERSION == jig_protocol_client_wire::VERSION`, so a
+  later move of one without the other fails.
+Test shape: that one test; the existing versions tests, their numbers
+  the current version.
+Proof: the gate.
+Don't: remap a range in the link; make the domain depend on the wire.
+Size: at most 10 lines of production code.
+
 ## Interface sketches
 
 ```rust

@@ -1564,6 +1564,14 @@ the file.
      the supervisor's rulings added (203's staged activation, 204's root
      bounds, 206's root admission), every file under 800. Its Size becomes
      1,300; it lands after jig 11.s1 and its proof.
+213. **jig 32.s1: the client's version follows its wire's, checked**
+     (2026-10-13, the coordinator's block "jig 32.3: client domain
+     version1 rejects current wire version4", 2026-10-13T05:08:00Z).
+     `contract::CLIENT_VERSION` stayed 1 while jig 30's steps moved the
+     client wire to version 4. A step not in the plan, jig 32.s1
+     (`jig/32-client-link.md`), moves the constant and adds a test in the
+     client link that the two are equal, so the next move of one alone
+     fails the gate.
 
 ## For the user
 
