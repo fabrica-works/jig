@@ -89,44 +89,33 @@ impl Domain {
     }
 
     /// Whether the attempt is already hosted: wire retries are deduplicated
-    /// before constructing a new call and its `ReplyTo`.
+    /// before handing an assignment down.
     #[must_use]
     pub fn is_hosting(&self, run: Token, attempt: Token) -> bool {
         hosted::is_hosting(self, run, attempt)
     }
 
-    /// Whether a wire answer names a pending relay of this exact attempt.
+    /// Whether an answer names a pending relay of this exact attempt.
     #[must_use]
-    pub fn owns_relay(&self, run: Token, attempt: Token, call: Token) -> bool {
-        hosted::owns_relay(self, run, attempt, call)
+    pub fn owns_relay(&self, run: Token, attempt: Token, call: &[u8]) -> bool {
+        hosted::find_relay(self, run, attempt, call).is_some()
     }
 
-    /// Whether an engine answer names this pending delivery and its opaque call name.
+    /// Whether an engine answer names this attempt's pending call.
     #[must_use]
-    pub fn is_relayed_for(&self, run: Token, attempt: Token, delivery: Token, call: &[u8]) -> bool {
-        if !self.owns_relay(run, attempt, delivery) {
-            return false;
-        }
-        let Some(entry) = self.calls.get(Id::from_token(delivery)) else {
+    pub fn is_relayed_for(&self, run: Token, attempt: Token, call: &[u8]) -> bool {
+        self.owns_relay(run, attempt, call)
+    }
+
+    /// Whether this call still waits for the engine's answer.
+    #[must_use]
+    pub fn is_relayed(&self, run: Token, attempt: Token, call: &[u8]) -> bool {
+        let Some(id) = hosted::find_relay(self, run, attempt, call) else {
             return false;
         };
-        match &entry.name {
-            Some(name) => name.as_ref() == call,
-            None => false,
-        }
-    }
-
-    /// Whether the relayed call `call`, as the host names it, still waits for
-    /// the engine's answer: neither answered, withdrawn, nor answered as
-    /// unavailable as its run left live.
-    #[must_use]
-    pub fn is_relayed(&self, call: Token) -> bool {
-        match self.calls.get(Id::from_token(call)) {
-            Some(entry) => match entry.state {
-                call::State::Relayed { .. } => true,
-                call::State::Delivering { .. } | call::State::Settling | call::State::Closed => false,
-            },
-            None => false,
+        match self.calls.get(id).expect("found relay").state {
+            call::State::Relayed { .. } => true,
+            call::State::Delivering { .. } | call::State::Settling | call::State::Closed => false,
         }
     }
 
@@ -243,7 +232,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::Finished { owner, turns, spent, read, finish } => {
             hosted::finished(domain, env, owner, turns, spent, finish, read, out);
         }
-        Event::RelayCancelled { call } => hosted::relay_cancelled(domain, call, out),
+        Event::RelayCancelled { run, attempt, call } => hosted::relay_cancelled(domain, run, attempt, &call, out),
         Event::CancelAll { reason } => hosted::cancel_all(domain, reason),
         Event::Opened { stop_bound, workstreams, bounds } => {
             crate::answers::opened(domain, env.limits.slots, stop_bound, workstreams, bounds, out);
@@ -261,12 +250,12 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             LinkDown::Message { run, attempt, name, sender, words } => {
                 hosted::inbound(domain, env, run, attempt, name, sender, words, out);
             }
-            LinkDown::Assign { reply_to, assignment } => hosted::assign(domain, env, reply_to, assignment, out),
+            LinkDown::Assign { assignment } => hosted::assign(domain, env, assignment, out),
             LinkDown::TurnKept { run, attempt, turn } => hosted::acknowledge_turn(domain, env, run, attempt, turn, out),
             LinkDown::Grant { run, attempt, grant } => hosted::grant(domain, run, attempt, grant, out),
             LinkDown::Cancel { run, attempt } => hosted::cancel(domain, env, run, attempt, out),
             LinkDown::Relayed { run, attempt, call, answer } => {
-                hosted::relayed(domain, run, attempt, call, answer, out);
+                hosted::relayed(domain, run, attempt, &call, answer, out);
             }
             LinkDown::Acknowledge { run, attempt } => crate::answers::acknowledge(domain, run, attempt),
         },

@@ -51,7 +51,9 @@ pub enum Event {
     },
     /// Terminal for a cancelled relay: its local delivery and wait have ended.
     RelayCancelled {
-        call: Token,
+        run: Token,
+        attempt: Token,
+        call: Box<[u8]>,
     },
     /// From the top level: cancel every run hosted now, for `reason` (lost
     /// contact with the engine past its grace, or shutdown). The runs are
@@ -159,7 +161,9 @@ pub enum Request {
     /// follows: `RelayCancelled`, or `Relayed` if its answer won. Remote
     /// effects are not rolled back.
     CancelRelay {
-        call: Token,
+        run: Token,
+        attempt: Token,
+        call: Box<[u8]>,
     },
     /// To the engine: an inbound event for the run `run`'s attempt `attempt`
     /// was not passed on, for `reason`.

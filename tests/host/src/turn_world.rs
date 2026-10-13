@@ -10,7 +10,7 @@ use jig_domain_host::{
     self as host, Answer, AnsweredCall, Ask, Assignment, Delivery, DeliveryOutcome, Ending, Event, Finish, Limits,
     Reason, Request, RunAssignment, Turn, Workspace,
 };
-use skein_lib::{Duration, Env, Queue, ReplyTo, Time, Token, Wall};
+use skein_lib::{Duration, Env, Queue, Time, Token, Wall};
 
 const RUN: Token = Token::new(31);
 const ATTEMPT: Token = Token::new(932);
@@ -196,12 +196,7 @@ impl World {
             charter: Box::from(&b"charter"[..]),
             grants: Box::new([]),
         };
-        host::step(
-            &mut self.host,
-            &self.env,
-            crate::fixtures::assign(ReplyTo::new(assignment.run), assignment),
-            &mut self.out,
-        );
+        host::step(&mut self.host, &self.env, crate::fixtures::assign(assignment), &mut self.out);
         let Some(Request::Up(LinkUp::Answer { answer: Answer { ending: Ending::Refused(refusal), .. }, .. })) =
             self.out.pop()
         else {
@@ -246,7 +241,6 @@ impl World {
             grants,
         };
         self.send(Event::Down(LinkDown::Assign {
-            reply_to: ReplyTo::new(RUN),
             assignment: Assignment {
                 messages: Box::new([]),
                 assignment,
@@ -271,7 +265,6 @@ impl World {
             grants: Box::new([]),
         };
         self.send(Event::Down(LinkDown::Assign {
-            reply_to: ReplyTo::new(RUN),
             assignment: Assignment { messages: Box::new([]), assignment, turns, answered },
         }));
         assert!(self.owner.is_some() && self.agent_live && self.reading);
@@ -288,7 +281,7 @@ impl World {
             charter: Box::from(&b"charter"[..]),
             grants: Box::new([]),
         };
-        self.send(crate::fixtures::assign_with(ReplyTo::new(RUN), assignment, messages));
+        self.send(crate::fixtures::assign_with(assignment, messages));
     }
 
     /// The activation and committed state the scripted agent received.
@@ -563,14 +556,14 @@ impl World {
             Request::Up(record @ (LinkUp::Rejected { .. } | LinkUp::Exhausted { .. } | LinkUp::Activity { .. })) => {
                 self.receive_report(record);
             }
-            Request::Up(LinkUp::Call { run, attempt, call, delivery, tool, writes, input, deadline }) => {
+            Request::Up(LinkUp::Call { run, attempt, call, tool, writes, input, deadline }) => {
                 assert_eq!((run, attempt), (RUN, ATTEMPT));
-                self.relayed_call = Some(RelayedCall { name: call, tool, writes, input, deadline });
+                self.relayed_call = Some(RelayedCall { name: call.clone(), tool, writes, input, deadline });
                 self.stats.relays += 1;
                 self.events.push_back(Event::Down(LinkDown::Relayed {
                     run,
                     attempt,
-                    call: delivery,
+                    call,
                     answer: self
                         .next_relay
                         .take()
@@ -640,8 +633,8 @@ impl World {
                 self.space_live = false;
                 self.stats.releases += 1;
             }
-            Request::Up(LinkUp::Answer { reply_to, run, attempt, answer }) => {
-                assert_eq!((reply_to, run, attempt), (ReplyTo::new(RUN), RUN, ATTEMPT));
+            Request::Up(LinkUp::Answer { run, attempt, answer }) => {
+                assert_eq!((run, attempt), (RUN, ATTEMPT));
                 assert!(!self.agent_live && !self.space_live);
                 assert!(self.answer.is_none(), "one answer");
                 if self.connected {

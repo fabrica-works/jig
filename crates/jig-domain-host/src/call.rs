@@ -14,7 +14,7 @@ pub(crate) struct Call {
     /// The run that made it.
     pub(crate) hosted: Id<Hosted>,
     pub(crate) state: State,
-    /// The agent's opaque name, moved out when its one reply is sent.
+    /// The agent's opaque name, kept until a relay's terminal arrives.
     pub(crate) name: Option<Box<[u8]>>,
 }
 

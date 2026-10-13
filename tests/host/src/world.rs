@@ -2,7 +2,7 @@ use jig_domain_host::{LinkDown, LinkUp};
 use std::collections::{BTreeMap, BTreeSet};
 
 use jig_domain_host::{self as host, AgentFailure, Event, Fact, Failure, Limits, Reason, Reply, Request, RunFailure};
-use skein_lib::{Duration, ReplyTo, Rng, Time, Token};
+use skein_lib::{Duration, Rng, Time, Token};
 use skein_world::domain::{Ledger, Schedule, Span, Stage};
 
 use crate::engine::{self, Act, Engine, Plan};
@@ -331,7 +331,7 @@ pub struct World {
     left: BTreeSet<Token>,
     calls: Ledger<(Token, Token), Open>,
     /// Engine deliveries still awaited by the host, cancelled at this boundary.
-    relays: BTreeMap<Token, (Token, Token)>,
+    relays: BTreeSet<(Token, Token, Box<[u8]>)>,
     /// Pushes in flight as their runs left live: answered with how they went.
     kept: BTreeSet<(Token, Token)>,
     /// Whether the host has taken a shutdown.
@@ -376,7 +376,7 @@ impl World {
             agents: BTreeMap::new(),
             left: BTreeSet::new(),
             calls: Ledger::new("host call"),
-            relays: BTreeMap::new(),
+            relays: BTreeSet::new(),
             kept: BTreeSet::new(),
             shut: false,
             stats: Stats::default(),
@@ -560,7 +560,7 @@ impl World {
                     save: false,
                     charter: Box::from(&b"again"[..]),
                 };
-                let event = crate::fixtures::assign(ReplyTo::new(run), assignment);
+                let event = crate::fixtures::assign(assignment);
                 self.stage.inbox.push_front(Arrival { event, stale: false, duplicate: true });
             }
         }
@@ -594,7 +594,7 @@ impl World {
         }
         match event {
             Event::Down(LinkDown::Acknowledge { run, attempt }) => Taken::Acknowledged { run: *run, attempt: *attempt },
-            Event::Down(LinkDown::Assign { reply_to: _, assignment }) => {
+            Event::Down(LinkDown::Assign { assignment }) => {
                 Taken::Assign { run: assignment.assignment.run, attempt: assignment.assignment.attempt }
             }
             Event::Started { owner, agent } => Taken::Started { owner: *owner, agent: *agent },
@@ -721,7 +721,7 @@ impl World {
     /// `run`'s attempt `attempt`: a refusal, or a prepare that admits it.
     fn assigned(&mut self, run: Token, attempt: Token, request: &Request) {
         match request {
-            Request::Up(LinkUp::Answer { reply_to: _, run: answered, attempt: of, answer }) => {
+            Request::Up(LinkUp::Answer { run: answered, attempt: of, answer }) => {
                 assert_eq!((*answered, *of), (run, attempt), "an assignment is answered as itself");
                 match &answer.ending {
                     host::Ending::Refused(_) => {}
@@ -773,7 +773,7 @@ impl World {
             Request::Up(LinkUp::Activity { .. } | LinkUp::Rejected { .. } | LinkUp::Exhausted { .. }) => {
                 self.send_engine(request);
             }
-            Request::Up(LinkUp::Answer { reply_to, run, attempt, answer }) => {
+            Request::Up(LinkUp::Answer { run, attempt, answer }) => {
                 if let Some(owner) = self.admitted.get(&(run, attempt)).copied() {
                     assert!(self.parent.settled(owner), "a run answers once all of it has settled and is released");
                     let hosted = self.hosted.get(&owner).expect("admitted runs are hosted");
@@ -785,18 +785,18 @@ impl World {
                         self.path(path);
                     }
                 }
-                self.send_engine(Request::Up(LinkUp::Answer { reply_to, run, attempt, answer }));
+                self.send_engine(Request::Up(LinkUp::Answer { run, attempt, answer }));
             }
-            Request::Up(LinkUp::Call { run, attempt, delivery: call, .. }) => {
-                assert!(self.relays.insert(call, (run, attempt)).is_none(), "a relay starts once");
+            Request::Up(LinkUp::Call { run, attempt, ref call, .. }) => {
+                assert!(self.relays.insert((run, attempt, call.clone())), "a relay starts once");
                 self.send_engine(request);
             }
             Request::Up(LinkUp::Turn { .. }) | Request::AcknowledgeAgentTurn { .. } => {
                 panic!("turns are exercised by turn_world")
             }
-            Request::CancelRelay { call } => {
-                if self.relays.remove(&call).is_some() {
-                    let event = Event::RelayCancelled { call };
+            Request::CancelRelay { run, attempt, call } => {
+                if self.relays.remove(&(run, attempt, call.clone())) {
+                    let event = Event::RelayCancelled { run, attempt, call };
                     self.stage.push(Arrival { event, stale: false, duplicate: false });
                 }
             }
@@ -913,16 +913,16 @@ impl World {
             match delivery {
                 Delivery::Host { event, stale } => {
                     if let Event::Down(LinkDown::Relayed { run, attempt, call, .. }) = &event {
-                        if stale || self.relays.get(call) != Some(&(*run, *attempt)) {
+                        if stale || !self.relays.contains(&(*run, *attempt, call.clone())) {
                             continue;
                         }
-                        self.relays.remove(call);
+                        self.relays.remove(&(*run, *attempt, call.clone()));
                     }
                     self.stage.push(Arrival { event, stale, duplicate: false });
                 }
                 Delivery::Engine(request) => {
-                    if let Request::Up(LinkUp::Call { delivery: call, .. }) = &request
-                        && !self.relays.contains_key(call)
+                    if let Request::Up(LinkUp::Call { run, attempt, call, .. }) = &request
+                        && !self.relays.contains(&(*run, *attempt, call.clone()))
                     {
                         continue;
                     }

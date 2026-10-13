@@ -329,7 +329,7 @@ pub(crate) fn relayed(
     Some(crate::Released::Host(host::Event::Down(host::LinkDown::Relayed {
         run,
         attempt,
-        call: binding.delivery,
+        call,
         answer: host_answer(value.answer),
     })))
 }

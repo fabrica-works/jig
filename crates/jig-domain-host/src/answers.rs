@@ -2,12 +2,10 @@
 use crate::domain::Domain;
 use crate::{Answer, Bounds, Hello, Hosting, LinkUp, Phase, Request};
 use alloc::boxed::Box;
-use skein_lib::{Duration, List, Queue, ReplyTo, Token};
+use skein_lib::{Duration, List, Queue, Token};
 
 #[derive(Debug)]
 pub(crate) struct Kept {
-    // Retransmissions reuse the assignment's correlation token.
-    pub(crate) reply_to: Token,
     pub(crate) answer: Answer,
 }
 
@@ -20,12 +18,7 @@ pub(crate) fn at(domain: &Domain, index: u32) -> Option<LinkUp> {
         if u32::try_from(at).expect("bounded answer slots") == index {
             let run = domain.hosted.get(*id).expect("an answer holds its slot");
             let answer = run.answer.as_ref().expect("indexed answer");
-            return Some(LinkUp::Answer {
-                reply_to: ReplyTo::new(answer.reply_to),
-                run: run.run,
-                attempt: run.attempt,
-                answer: answer.answer.clone(),
-            });
+            return Some(LinkUp::Answer { run: run.run, attempt: run.attempt, answer: answer.answer.clone() });
         }
     }
     None

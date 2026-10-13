@@ -1,13 +1,13 @@
 //! The engine link's vocabulary (domain/hosts.md, sections 2 and 6.1).
 use crate::{Answer, Assignment, Grant, Hosting, Turn};
 use alloc::boxed::Box;
-use skein_lib::{Duration, ReplyTo, Token};
+use skein_lib::{Duration, Token};
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum LinkDown {
-    Assign { reply_to: ReplyTo, assignment: Assignment },
+    Assign { assignment: Assignment },
     Message { run: Token, attempt: Token, name: Token, sender: Box<[u8]>, words: Box<[u8]> },
-    Relayed { run: Token, attempt: Token, call: Token, answer: Relayed },
+    Relayed { run: Token, attempt: Token, call: Box<[u8]>, answer: Relayed },
     TurnKept { run: Token, attempt: Token, turn: u32 },
     Acknowledge { run: Token, attempt: Token },
     Cancel { run: Token, attempt: Token },
@@ -42,14 +42,12 @@ pub enum LinkUp {
         run: Token,
         attempt: Token,
         call: Box<[u8]>,
-        delivery: Token,
         tool: Box<[u8]>,
         writes: bool,
         input: Box<[u8]>,
         deadline: Duration,
     },
     Answer {
-        reply_to: ReplyTo,
         run: Token,
         attempt: Token,
         answer: Answer,

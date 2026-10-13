@@ -7,7 +7,7 @@ use jig_domain_host::{
     Reason, Refusal, Request, RunAssignment, Workspace, max_out, resume, step, worst_case,
 };
 use jig_domain_host::{LinkDown, LinkUp};
-use skein_lib::{Duration, Env, Queue, ReplyTo, Time, Token, Wall};
+use skein_lib::{Duration, Env, Queue, Time, Token, Wall};
 use skein_world::domain::heap::{self, Meter};
 
 #[global_allocator]
@@ -42,7 +42,7 @@ enum Asked {
     Prepare { owner: Token },
     Start,
     Delivery { owner: Token },
-    Relay { call: Token },
+    Relay { call: Box<[u8]> },
     Save { owner: Token },
     RunEnding { answer: Ending },
     Answer { answer: jig_domain_host::Answer },
@@ -100,7 +100,7 @@ impl Measured {
                 Request::Up(LinkUp::Activity { .. } | LinkUp::Rejected { .. } | LinkUp::Exhausted { .. }) => continue,
                 Request::Up(LinkUp::Turn { .. }) => Asked::Turn,
                 Request::Deliver { owner, .. } => Asked::Delivery { owner },
-                Request::Up(LinkUp::Call { delivery, .. }) => Asked::Relay { call: delivery },
+                Request::Up(LinkUp::Call { call, .. }) => Asked::Relay { call },
                 Request::Up(LinkUp::Answer { answer, .. }) => {
                     if answer.turns == 0 {
                         Asked::RunEnding { answer: answer.ending }
@@ -112,8 +112,8 @@ impl Measured {
                 Request::Prepare { owner, .. } => Asked::Prepare { owner },
                 Request::Save { owner, .. } => Asked::Save { owner },
                 Request::Hello { hello } => Asked::Hosting { runs: hello.hosting.len() },
-                Request::CancelRelay { call } => {
-                    cancelled.push(call);
+                Request::CancelRelay { run, attempt, call } => {
+                    cancelled.push(Event::RelayCancelled { run, attempt, call });
                     continue;
                 }
                 Request::Abort { .. }
@@ -128,8 +128,8 @@ impl Measured {
         self.meter.check(measured, self.bound, &self.env.limits);
         // The iteration ends: the reclaim point.
         self.domain.reclaim();
-        for call in cancelled {
-            asked.extend(self.step(Event::RelayCancelled { call }));
+        for event in cancelled {
+            asked.extend(self.step(event));
         }
         asked
     }
@@ -168,7 +168,6 @@ fn fill(limits: Limits) {
     let mut owners = Vec::new();
     for run in 0..u64::from(limits.slots) {
         let [Asked::Prepare { owner }] = host.step(jig_host_world::fixtures::assign_with(
-            ReplyTo::new(Token::new(run)),
             assignment(run, &limits),
             jig_host_world::fixtures::messages(&limits),
         ))[..] else {
@@ -215,19 +214,18 @@ fn fill(limits: Limits) {
         let mut calls = Vec::new();
         for call in 2..=u64::from(limits.run_calls) {
             let ask = jig_host_world::fixtures::relay(bytes(64));
-            let [Asked::Relay { call }] =
-                host.step(jig_host_world::fixtures::called(*owner, Token::new(call), ask))[..]
-            else {
+            let requests = host.step(jig_host_world::fixtures::called(*owner, Token::new(call), ask));
+            let [Asked::Relay { call }] = requests.as_slice() else {
                 panic!("relayed");
             };
-            calls.push(call);
+            calls.push(call.clone());
         }
         // The first relayed call is answered, and a delivery takes its place.
         if let Some(call) = calls.first() {
             let relayed = Event::Down(LinkDown::Relayed {
                 run: Token::new(index),
                 attempt: Token::new(index + 1000),
-                call: *call,
+                call: call.clone(),
                 answer: jig_domain_host::Relayed::Answer { error: false, text: bytes(64) },
             });
             assert_eq!(host.step(relayed), [Asked::Other]);
@@ -271,11 +269,9 @@ fn beyond(host: &mut Measured, limits: &Limits) {
     // Beyond the limits: refused, and nothing held.
     let mut beyond = assignment(0, limits);
     beyond.charter = bytes(limits.charter_bytes + 1);
-    let refused = host.step(jig_host_world::fixtures::assign(ReplyTo::new(Token::new(0)), beyond));
+    let refused = host.step(jig_host_world::fixtures::assign(beyond));
     assert_eq!(refused, [Asked::RunEnding { answer: Ending::Refused(Refusal::Invalid(Invalid::Charter)) }]);
-    let [Asked::Prepare { owner: _ }] =
-        host.step(jig_host_world::fixtures::assign(ReplyTo::new(Token::new(0)), assignment(0, limits)))[..]
-    else {
+    let [Asked::Prepare { owner: _ }] = host.step(jig_host_world::fixtures::assign(assignment(0, limits)))[..] else {
         panic!("admitted");
     };
     let large = jig_host_world::fixtures::inbound(
@@ -302,7 +298,6 @@ fn paths(limits: Limits) {
     let mut owners = Vec::new();
     for run in 0..u64::from(limits.slots) {
         let [Asked::Prepare { owner }] = host.step(Event::Down(LinkDown::Assign {
-            reply_to: ReplyTo::new(Token::new(run)),
             assignment: jig_domain_host::Assignment {
                 messages: Box::new([]),
                 assignment: assignment(run, &limits),
@@ -343,9 +338,7 @@ fn paths(limits: Limits) {
     }
     host.acknowledge_answers();
     // A fault, from a run that had started.
-    let [Asked::Prepare { owner }] =
-        host.step(jig_host_world::fixtures::assign(ReplyTo::new(Token::new(0)), assignment(0, &limits)))[..]
-    else {
+    let [Asked::Prepare { owner }] = host.step(jig_host_world::fixtures::assign(assignment(0, &limits)))[..] else {
         panic!("admitted");
     };
     assert_eq!(host.step(Event::Prepared { owner, workspace: owner }), [Asked::Start]);
@@ -381,9 +374,7 @@ fn ordered_transcripts_and_delivery_feedback_fit_the_hosts_bound() {
         let overhead = u64::try_from(size_of::<Box<[u8]>>()).expect("bounded");
         let turns = (0..16).map(|_| bytes(limits.turn_bytes - overhead)).collect::<Vec<_>>().into_boxed_slice();
         let next = Assignment { messages: Box::new([]), assignment, turns, answered: Box::new([]) };
-        let [Asked::Prepare { owner }] =
-            host.step(Event::Down(LinkDown::Assign { reply_to: ReplyTo::new(Token::new(run)), assignment: next }))[..]
-        else {
+        let [Asked::Prepare { owner }] = host.step(Event::Down(LinkDown::Assign { assignment: next }))[..] else {
             panic!("prepare")
         };
         owners.push(owner);

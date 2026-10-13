@@ -2,22 +2,17 @@
 //! as opaque names; names are opaque bytes.
 use jig_domain_host::LinkDown;
 use jig_domain_host::{Ask, Assignment, Event, Finish, RunAssignment};
-use skein_lib::{Duration, Reader, ReplyTo, Token};
+use skein_lib::{Duration, Reader, Token};
 /// The account named by the grant renewal story.
 pub const ANALYST: u32 = 3;
 
 #[must_use]
-pub fn assign(reply_to: ReplyTo, assignment: RunAssignment) -> Event {
-    assign_with(reply_to, assignment, Box::new([]))
+pub fn assign(assignment: RunAssignment) -> Event {
+    assign_with(assignment, Box::new([]))
 }
 #[must_use]
-pub fn assign_with(
-    reply_to: ReplyTo,
-    assignment: RunAssignment,
-    messages: Box<[jig_domain_host::StartMessage]>,
-) -> Event {
+pub fn assign_with(assignment: RunAssignment, messages: Box<[jig_domain_host::StartMessage]>) -> Event {
     Event::Down(LinkDown::Assign {
-        reply_to,
         assignment: Assignment { messages, assignment, turns: Box::new([]), answered: Box::new([]) },
     })
 }

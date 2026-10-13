@@ -2,7 +2,7 @@
 
 use crate::{LinkDown, LinkUp};
 use alloc::boxed::Box;
-use skein_lib::{Env, List, Queue, ReplyTo, Time, Token, Wall};
+use skein_lib::{Env, List, Queue, Time, Token, Wall};
 
 use crate::{
     Delivery, DeliveryOutcome, Domain, Event, Failure, Finish, Invalid, Limits, MessageRefusal, Preparation, Reason,
@@ -54,7 +54,7 @@ impl Harness {
 
     fn assign(&mut self, run: u64) -> (Token, Token) {
         let assignment = assignment(run);
-        let requests = self.step(fixtures::assign(ReplyTo::new(assignment.run), assignment));
+        let requests = self.step(fixtures::assign(assignment));
         let [Request::Prepare { owner, workspace }] = &*requests else { panic!("expected prepare: {requests:?}") };
         assert_eq!(
             *workspace,
@@ -104,7 +104,7 @@ fn an_itemless_run_starts_and_ends_without_a_workspace() {
     assignment.workspace = None;
     let run = assignment.run;
     let attempt = assignment.attempt;
-    let requests = h.step(fixtures::assign(ReplyTo::new(run), assignment));
+    let requests = h.step(fixtures::assign(assignment));
     let [Request::Start { owner, start }] = &*requests else {
         panic!("an itemless run starts without preparation: {requests:?}");
     };
@@ -143,7 +143,6 @@ fn turns_stay_in_the_host_until_their_own_ack_and_credit_returns() {
     assignment.workspace = None;
     let (run, attempt) = (assignment.run, assignment.attempt);
     let requests = h.step(Event::Down(LinkDown::Assign {
-        reply_to: ReplyTo::new(run),
         assignment: crate::Assignment {
             messages: Box::new([]),
             assignment,
@@ -200,7 +199,7 @@ fn a_bad_charter_is_refused_before_a_workspace_is_touched() {
     let mut h = Harness::new();
     let mut assignment = assignment(1);
     assignment.charter = Box::from([0_u8; 65]);
-    let requests = h.step(fixtures::assign(ReplyTo::new(assignment.run), assignment));
+    let requests = h.step(fixtures::assign(assignment));
     let [
         Request::Up(LinkUp::Answer {
             answer: crate::Answer { ending: crate::Ending::Refused(Refusal::Invalid(Invalid::Charter)), .. },
@@ -366,7 +365,6 @@ fn messages_held_during_a_failed_prepare_are_returned_by_name() {
     assert_eq!(
         &*requests,
         [Request::Up(LinkUp::Answer {
-            reply_to: ReplyTo::new(run),
             run,
             attempt,
             answer: crate::Answer {
@@ -416,7 +414,7 @@ mod fixtures {
     // Host records used by the lifecycle scripts. Callback tokens are encoded
     // as opaque names; names are opaque bytes.
     use crate::{Ask, Assignment, Event, Finish, LinkDown, RunAssignment};
-    use skein_lib::{Reader, ReplyTo, Token};
+    use skein_lib::{Reader, Token};
     const ANALYST: u32 = 3;
     pub fn account_grant(generation: u64) -> crate::Grant {
         crate::Grant {
@@ -430,9 +428,8 @@ mod fixtures {
     pub fn application_grant(generation: u64) -> crate::Grant {
         crate::Grant { table: crate::GrantTable::Application, ..account_grant(generation) }
     }
-    pub fn assign(reply_to: ReplyTo, assignment: RunAssignment) -> Event {
+    pub fn assign(assignment: RunAssignment) -> Event {
         Event::Down(LinkDown::Assign {
-            reply_to,
             assignment: Assignment { messages: Box::new([]), assignment, turns: Box::new([]), answered: Box::new([]) },
         })
     }
@@ -461,7 +458,7 @@ fn assigned_grants(h: &mut Harness, grants: Box<[crate::Grant]>) -> (Token, Box<
     let mut assignment = assignment(1);
     assignment.workspace = None;
     assignment.grants = grants;
-    let requests = h.step(fixtures::assign(ReplyTo::new(assignment.run), assignment));
+    let requests = h.step(fixtures::assign(assignment));
     assert_eq!(requests.len(), 1);
     let mut requests = requests.into_iter();
     let Some(Request::Start { owner, start }) = requests.next() else { panic!("expected start") };
@@ -563,4 +560,96 @@ fn an_agent_cannot_supply_the_hubs_turn_refusals() {
         }
     );
     assert!(answer.refused.is_empty());
+}
+
+fn named_relay(h: &mut Harness, owner: Token, name: &[u8]) {
+    let requests = h.step(Event::Called {
+        owner,
+        call: Box::from(name),
+        ask: crate::Ask::Relay {
+            tool: Box::from(&b"read"[..]),
+            writes: false,
+            input: Box::from(&b"{}"[..]),
+            deadline: skein_lib::Duration::from_secs(1),
+        },
+    });
+    let [Request::Up(LinkUp::Call { call, .. })] = &*requests else {
+        panic!("expected named relay: {requests:?}");
+    };
+    assert_eq!(call.as_ref(), name);
+}
+
+fn named_answer(run: u64, name: &[u8]) -> Event {
+    Event::Down(LinkDown::Relayed {
+        run: Token::new(run),
+        attempt: Token::new(run.checked_add(1000).expect("small run")),
+        call: Box::from(name),
+        answer: crate::Relayed::Answer { error: false, text: Box::from(&b"record"[..]) },
+    })
+}
+
+#[test]
+fn a_named_relay_answer_reaches_its_waiting_call() {
+    let mut h = Harness::new();
+    let (first, _, _) = h.live(1);
+    let (second, _, agent) = h.live(2);
+    named_relay(&mut h, first, b"read-call");
+    named_relay(&mut h, second, b"read-call");
+    let requests = h.step(named_answer(2, b"read-call"));
+    assert_eq!(
+        &*requests,
+        &[Request::Reply {
+            agent,
+            call: Box::from(&b"read-call"[..]),
+            reply: Reply::Relayed { error: false, text: Box::from(&b"record"[..]) },
+        }]
+    );
+    assert!(h.domain.is_relayed(Token::new(1), Token::new(1001), b"read-call"));
+}
+
+#[test]
+fn an_answer_naming_no_relay_of_its_attempt_is_dropped() {
+    let mut h = Harness::new();
+    let (first, _, _) = h.live(1);
+    let (second, _, _) = h.live(2);
+    named_relay(&mut h, first, b"first-call");
+    named_relay(&mut h, second, b"second-call");
+    assert!(h.step(named_answer(2, b"first-call")).is_empty());
+    assert!(h.domain.is_relayed(Token::new(1), Token::new(1001), b"first-call"));
+    assert!(h.domain.is_relayed(Token::new(2), Token::new(1002), b"second-call"));
+}
+
+#[test]
+fn an_assignment_is_answered_by_its_run_and_attempt() {
+    let mut h = Harness::new();
+    let (owner, workspace, agent) = h.live(7);
+    assert_eq!(&*h.step(fixtures::finished(owner, Finish::Parked)), &[Request::Stop { agent }]);
+    assert_eq!(&*h.step(Event::Gone { owner, detail: Box::new([]) }), &[Request::Save { owner, workspace }]);
+    let requests = h.step(Event::Saved { owner, at: None });
+    let [Request::Release { .. }, Request::Up(LinkUp::Answer { run, attempt, answer })] = &*requests else {
+        panic!("the assignment answers: {requests:?}");
+    };
+    assert_eq!((*run, *attempt), (Token::new(7), Token::new(1007)));
+    assert_eq!(answer.ending, crate::Ending::Parked { work: Work { left: None, saved: None } });
+}
+
+#[test]
+fn an_assignment_is_refused_by_its_run_and_attempt() {
+    let mut h = Harness::new();
+    let mut next = assignment(9);
+    next.charter = Box::new([0; 65]);
+    assert_eq!(
+        &*h.step(fixtures::assign(next)),
+        &[Request::Up(LinkUp::Answer {
+            run: Token::new(9),
+            attempt: Token::new(1009),
+            answer: crate::Answer {
+                read: None,
+                refused: Box::new([]),
+                turns: 0,
+                spent: 0,
+                ending: crate::Ending::Refused(Refusal::Invalid(Invalid::Charter)),
+            },
+        })]
+    );
 }

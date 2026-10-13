@@ -27,12 +27,11 @@ pub(crate) struct ReadCall {
     pub(crate) tool: Box<[u8]>,
 }
 
-/// The hub owns this relay's fenced destination and delivery continuation.
+/// This relay's fenced destination, in the engine's names.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct HostCall {
     pub(crate) run: Token,
     pub(crate) attempt: Token,
-    pub(crate) delivery: Token,
 }
 
 /// Configuration is handed to the child that owns each value.

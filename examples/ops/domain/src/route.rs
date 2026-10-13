@@ -262,13 +262,7 @@ fn core_held(domain: &mut Domain, decision: &mut Decision<Write, Output>, value:
             assert!(channel == Token::new(0), "ops engine's permanent link");
             let assignment = domain.assignments.remove(&run.raw()).expect("core asked to retain its assignment");
             assert!(assignment.attempt == attempt.raw(), "assignment fence");
-            child(
-                decision,
-                Released::Host(host::Event::Down(host::LinkDown::Assign {
-                    reply_to: ReplyTo::new(run),
-                    assignment: assignment.value,
-                })),
-            );
+            child(decision, Released::Host(host::Event::Down(host::LinkDown::Assign { assignment: assignment.value })));
         }
         core::Held::SettledCall { to, key: _, call } => {
             let answer = domain.payload(Payload::Settled(call));
@@ -1381,7 +1375,7 @@ fn core_now(domain: &mut Domain, env: &Env<Limits>, value: core::Now, work: &mut
                     Output::ToChild(Released::Host(host::Event::Down(host::LinkDown::Relayed {
                         run: binding.run,
                         attempt: binding.attempt,
-                        call: binding.delivery,
+                        call: call.name,
                         answer: crate::assemble::host_answer(core::SettledAnswer::Host {
                             error: true,
                             body: Box::from(&b"unavailable"[..]),
@@ -1419,19 +1413,10 @@ fn host_out(
         match request.to_agent() {
             Ok(request) => held(decision, Output::Agent(request)),
             Err(request) => match request {
-                host::Request::Up(host::LinkUp::Call {
-                    run,
-                    attempt,
-                    call,
-                    delivery,
-                    tool,
-                    writes,
-                    input,
-                    deadline,
-                }) => {
+                host::Request::Up(host::LinkUp::Call { run, attempt, call, tool, writes, input, deadline }) => {
                     domain
                         .host_calls
-                        .insert(call.clone(), crate::domain::HostCall { run, attempt, delivery })
+                        .insert(call.clone(), crate::domain::HostCall { run, attempt })
                         .expect("host bounded its relays");
                     work.push(Work::Core(core::Event::Fleet(fleet::Event::Relay {
                         channel: Token::new(0),
@@ -1503,18 +1488,9 @@ fn host_out(
                     })));
                 }
                 host::Request::Up(host::LinkUp::Activity { .. }) => unreachable!("activity is drained separately"),
-                host::Request::CancelRelay { call } => {
-                    let mut name = None;
-                    for (candidate, binding) in &domain.host_calls {
-                        if binding.delivery == call {
-                            name = Some(candidate.clone());
-                            break;
-                        }
-                    }
-                    if let Some(name) = name {
-                        domain.host_calls.remove(&name);
-                    }
-                    work.push(Work::Host(host::Event::RelayCancelled { call }));
+                host::Request::CancelRelay { run, attempt, call } => {
+                    domain.host_calls.remove(&call);
+                    work.push(Work::Host(host::Event::RelayCancelled { run, attempt, call }));
                 }
 
                 host::Request::Hello { .. } => {}

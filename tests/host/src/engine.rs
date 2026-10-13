@@ -26,7 +26,7 @@ use jig_domain_host::{
     AgentFailure, Assignment, Ending, Event, Failure, Hosting, Invalid, Limits, MessageRefusal, Preparation, Reason,
     Refusal, Request, RunAssignment, RunFailure, Workspace,
 };
-use skein_lib::{Duration, ReplyTo, Rng, Token};
+use skein_lib::{Duration, Rng, Token};
 use skein_world::domain::Span;
 
 /// How the engine behaves.
@@ -189,15 +189,14 @@ impl Engine {
     pub fn take(&mut self, request: Request) -> Vec<Act> {
         match request {
             Request::Up(LinkUp::Activity { .. } | LinkUp::Rejected { .. } | LinkUp::Exhausted { .. }) => Vec::new(),
-            Request::Up(LinkUp::Answer { reply_to, run, attempt, answer }) => {
-                assert_eq!(reply_to, ReplyTo::new(run), "an answer goes to its assignment");
+            Request::Up(LinkUp::Answer { run, attempt, answer }) => {
                 if self.open.contains_key(&(run, attempt)) {
                     self.refusals(&answer.refused);
                     self.answered(run, attempt, &answer.ending);
                 }
                 vec![Self::host(Event::Down(LinkDown::Acknowledge { run, attempt }), false)]
             }
-            Request::Up(LinkUp::Call { run, attempt, delivery: call, .. }) => self.relay(run, attempt, call),
+            Request::Up(LinkUp::Call { run, attempt, call, .. }) => self.relay(run, attempt, call),
 
             Request::Up(LinkUp::Turn { .. }) | Request::AcknowledgeAgentTurn { .. } => {
                 unreachable!("turns are exercised by turn_world")
@@ -253,7 +252,7 @@ impl Engine {
         let (assignment, invalid) = self.draw(run, attempt);
         let assigned = Assigned { invalid, next: 0, cancelled: false };
         assert!(self.open.insert((run, attempt), assigned).is_none(), "an attempt is assigned once");
-        acts.push(Self::host(Event::Down(LinkDown::Assign { reply_to: ReplyTo::new(run), assignment }), false));
+        acts.push(Self::host(Event::Down(LinkDown::Assign { assignment }), false));
         // What it sends the run while it is in flight.
         let events = self.rng.below(u64::from(self.script.events) + 1);
         let mut at = Duration::ZERO;
@@ -337,7 +336,7 @@ impl Engine {
         vec![Self::host(Event::Down(LinkDown::Cancel { run, attempt }), false)]
     }
 
-    fn relay(&mut self, run: Token, attempt: Token, call: Token) -> Vec<Act> {
+    fn relay(&mut self, run: Token, attempt: Token, call: Box<[u8]>) -> Vec<Act> {
         self.tally.relays += 1;
         let assigned = self.open.get(&(run, attempt)).expect("a relayed call is of an assignment in flight");
         if assigned.cancelled {
@@ -350,7 +349,7 @@ impl Engine {
             let event = Event::Down(LinkDown::Relayed {
                 run,
                 attempt: stale,
-                call,
+                call: call.clone(),
                 answer: jig_domain_host::Relayed::Answer { error: false, text: Box::from(&b"stale"[..]) },
             });
             acts.push(Self::host(event, true));

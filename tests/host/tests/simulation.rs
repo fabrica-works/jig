@@ -168,10 +168,7 @@ fn tracing_off_keeps_no_copies_and_on_replays_the_whole_host_boundary() {
     assert_eq!(off.stats(), on.stats(), "seed 11 trace settings change no outside results");
     assert_eq!(off.now(), on.now());
     assert!(on.trace().len() > 50, "seed 11 keeps every input and output");
-    assert!(
-        on.trace().iter().any(|line| line.contains("reply_to: ReplyTo(Token(")),
-        "seed 11 keeps the full reply identity"
-    );
+    assert!(on.trace().iter().any(|line| line.contains("attempt: Token(")), "seed 11 keeps the full attempt identity");
     assert!(on.trace().iter().any(|line| line.contains("host -> Up(Answer {")), "seed 11 keeps full answer payloads");
     let mut again = World::with_trace(&rough(11), true);
     again.run(ITERATIONS);
