@@ -7,6 +7,26 @@ pub use owner::*;
 pub fn limits() -> w::Limits {
     w::Limits {
         document_text_bytes: 32,
+        conversations_rows: 4096,
+        goals_rows: 4096,
+        tasks_rows: 4096,
+        owner_tree_rows: 4096,
+        owner_tree_row_dependencies: 4096,
+        owner_inbox_needs: 4096,
+        owner_inbox_updates: 4096,
+        owner_inbox_selection_some: 4096,
+        owner_deployment_hosts: 4096,
+        owner_deployment_attempts: 4096,
+        owner_deployment_accounts: 4096,
+        owner_host_runs: 4096,
+        owner_account_runs: 4096,
+        owner_account_waiting: 4096,
+        run_text_text: 32,
+        current_call_input: 32,
+        current_call_tool: 32,
+        call_identity_id: 32,
+        cursor_value: 32,
+        owner_inbox_selection_goals: 2,
         frame_projects: 2,
         document_specification_parameters: 2,
         document_specification_inputs: 2,
@@ -355,3 +375,8 @@ pub fn fact_bytes(value: &w::Fact) -> Box<[u8]> {
     skein_codec::piece::write(&mut piece, &row.finish()).expect("literal fixture fits");
     piece.finish()
 }
+
+mod live;
+pub use live::*;
+mod live_values;
+pub use live_values::*;

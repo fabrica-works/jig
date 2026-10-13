@@ -1,35 +1,7 @@
 use super::*;
 use skein_lib::List;
 pub fn owner_deployment_record() -> w::OwnerDeployment {
-    let lim = limits().wire;
-    w::OwnerDeployment::new(
-        &lim,
-        w::OwnerDeploymentParts {
-            store: w::StoreFill::new(&lim, w::StoreFillParts { bytes: 7, mark: 7 }).unwrap(),
-            hosts: Box::from([]),
-            attempts: Box::from([]),
-            accounts: Box::from([]),
-            tasks: w::OwnerCapacity::new(&lim, w::OwnerCapacityParts { used: 7, limit: 7 }).unwrap(),
-            workers: w::OwnerCapacity::new(&lim, w::OwnerCapacityParts { used: 7, limit: 7 }).unwrap(),
-            attempts_capacity: w::OwnerCapacity::new(&lim, w::OwnerCapacityParts { used: 7, limit: 7 }).unwrap(),
-            waiting_attempts: 7,
-            proposals: w::OwnerCapacity::new(&lim, w::OwnerCapacityParts { used: 7, limit: 7 }).unwrap(),
-            projects: List::with_capacity(0),
-            grace_bound: Duration::from_nanos(19),
-            hello_refusals: List::with_capacity(0),
-            hosts_forgotten: 7,
-            hello_refusals_forgotten: 7,
-            person_room_refusals: List::with_capacity(0),
-            person_room_refusals_forgotten: 7,
-            person_answer_retention: Duration::from_nanos(19),
-            task_room_refusals: List::with_capacity(0),
-            task_room_refusals_forgotten: 7,
-            cut: false,
-            connectors: List::with_capacity(0),
-            connectors_cut: false,
-        },
-    )
-    .unwrap()
+    jig_test_client_records::owner_deployment_record()
 }
 pub fn owner_deployment() -> c::OwnerDeployment {
     c::OwnerDeployment {

@@ -121,30 +121,13 @@ pub fn task() -> c::Task {
     }
 }
 pub fn run_state_record() -> w::RunState {
-    let lim = limits().wire;
-    w::RunState::new(&lim, w::RunStateParts { task: 7, attempt: None, committed_turn: 7, writing: None, call: None })
-        .unwrap()
+    jig_test_client_records::run_state_record()
 }
 pub fn run_state() -> c::RunState {
     c::RunState { task: 7, attempt: None, committed_turn: 7, writing: None, call: None }
 }
 pub fn run_text_record() -> w::RunText {
-    let lim = limits().wire;
-    w::RunText::new(
-        &lim,
-        w::RunTextParts {
-            attempt: 7,
-            began: None,
-            turn: w::ProvisionalTurnName::new(&lim, w::ProvisionalTurnNameParts { attempt: 7, number: 7, retry: 7 })
-                .unwrap(),
-            from: 7,
-            through: 7,
-            text: Box::from([]),
-            cut: false,
-            call: None,
-        },
-    )
-    .unwrap()
+    jig_test_client_records::run_text_record()
 }
 pub fn run_text() -> c::RunText {
     c::RunText {
@@ -159,22 +142,7 @@ pub fn run_text() -> c::RunText {
     }
 }
 pub fn current_call_record() -> w::CurrentCall {
-    let lim = limits().wire;
-    w::CurrentCall::new(
-        &lim,
-        w::CurrentCallParts {
-            identity: w::CallIdentity::new(
-                &lim,
-                w::CallIdentityParts { owner: 7, sequence: 7, retry: 7, id: Box::from([]) },
-            )
-            .unwrap(),
-            tool: Box::from([]),
-            input: Box::from([]),
-            cut: false,
-            began: None,
-        },
-    )
-    .unwrap()
+    jig_test_client_records::current_call_record()
 }
 pub fn current_call() -> c::CurrentCall {
     c::CurrentCall {
@@ -211,16 +179,7 @@ pub fn deployment() -> c::Deployment {
     }
 }
 pub fn conversations_record() -> w::Conversations {
-    let lim = limits().wire;
-    w::Conversations::new(
-        &lim,
-        w::ConversationsParts {
-            rows: Box::from([]),
-            more: false,
-            after: w::Cursor::new(&lim, w::CursorParts { value: Box::from([]) }).unwrap(),
-        },
-    )
-    .unwrap()
+    jig_test_client_records::conversations_record()
 }
 pub fn conversations() -> c::Conversations {
     c::Conversations {
@@ -256,28 +215,13 @@ pub fn inbox() -> c::Inbox {
     }
 }
 pub fn goals_record() -> w::Goals {
-    let lim = limits().wire;
-    w::Goals::new(&lim, w::GoalsParts { project: 7, rows: Box::from([]), more: false }).unwrap()
+    jig_test_client_records::goals_record()
 }
 pub fn goals() -> c::Goals {
     c::Goals { project: 7, rows: List::with_capacity(0), more: false }
 }
 pub fn tasks_record() -> w::Tasks {
-    let lim = limits().wire;
-    w::Tasks::new(
-        &lim,
-        w::TasksParts {
-            project: 7,
-            filter: w::TaskFilter::new(
-                &lim,
-                w::TaskFilterParts { phase: None, executor: None, goal: None, asked_by_me: false },
-            )
-            .unwrap(),
-            rows: Box::from([]),
-            more: false,
-        },
-    )
-    .unwrap()
+    jig_test_client_records::tasks_record()
 }
 pub fn tasks() -> c::Tasks {
     c::Tasks {

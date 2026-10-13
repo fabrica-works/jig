@@ -767,3 +767,7 @@ pub use services::*;
 #[path = "fixtures/documents.rs"]
 mod documents;
 pub use documents::*;
+
+#[path = "fixtures/live.rs"]
+mod live;
+pub use live::*;

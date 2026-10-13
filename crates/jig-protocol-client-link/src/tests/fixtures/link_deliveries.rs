@@ -25,17 +25,7 @@ pub fn run_event(name: u64) -> Box<[u8]> {
     ))
 }
 pub fn owner_tree_record() -> w::OwnerTree {
-    w::OwnerTree::new(
-        &limits().wire,
-        w::OwnerTreeParts {
-            root: chip_record(),
-            rows: Box::from([]),
-            folded: List::with_capacity(0),
-            held_below: 19,
-            next: None,
-        },
-    )
-    .unwrap()
+    jig_test_client_records::owner_tree_record()
 }
 pub fn owner_tree() -> c::OwnerTree {
     c::OwnerTree {
@@ -47,21 +37,7 @@ pub fn owner_tree() -> c::OwnerTree {
     }
 }
 pub fn owner_inbox_record() -> w::OwnerInbox {
-    w::OwnerInbox::new(
-        &limits().wire,
-        w::OwnerInboxParts {
-            party: 19,
-            needs: read_wire_owner_inbox_page().rows().into(),
-            updates: Box::from([]),
-            next: None,
-            cached_needs: 7,
-            cached_updates: w::Count::new(&limits().wire, w::CountParts { value: 9, limited: true }).unwrap(),
-            results_seen: 13,
-            updates_time_complete: false,
-            selection: Some(Box::from([])),
-        },
-    )
-    .unwrap()
+    jig_test_client_records::owner_inbox_record()
 }
 pub fn owner_inbox() -> c::OwnerInbox {
     c::OwnerInbox {

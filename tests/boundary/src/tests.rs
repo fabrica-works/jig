@@ -269,7 +269,9 @@ fn engine_clients_link_only_their_boundary_wire_and_foundation() {
     assert_eq!(
         dependencies,
         [
+            "jig-domain-accounts",
             "jig-domain-core",
+            "jig-domain-fleet",
             "jig-domain-people",
             "jig-domain-tasks",
             "jig-domain-views",

@@ -57,3 +57,87 @@ fn a_non_utf8_document_text_fails_translation() {
         );
     }
 }
+
+#[test]
+fn a_run_writing_with_a_call_becomes_its_run_state() {
+    let limits = fixtures::wire_limits();
+    let source = fixtures::run_writing();
+    assert_eq!(translate::live::run(&source, &limits), Ok(jig_test_client_records::run_writing_record()));
+}
+#[test]
+fn a_run_text_keeps_its_turn_retry_and_offsets() {
+    let limits = fixtures::wire_limits();
+    assert_eq!(translate::live::writing(&fixtures::writing(), &limits), Ok(jig_test_client_records::writing_record()));
+}
+#[test]
+fn an_inbox_with_both_groups_becomes_its_record() {
+    let limits = fixtures::wire_limits();
+    assert_eq!(
+        translate::inbox::document(&fixtures::inbox_document(), &limits),
+        Ok(jig_test_client_records::inbox_both_groups_record())
+    );
+}
+#[test]
+fn a_deployment_document_becomes_its_record() {
+    let limits = fixtures::wire_limits();
+    assert_eq!(
+        translate::deployment::document(&fixtures::deployment_document(), &limits),
+        Ok(jig_test_client_records::deployment_rows_record())
+    );
+}
+#[test]
+fn conversations_keep_their_rows_more_and_opaque_cursor() {
+    let limits = fixtures::wire_limits();
+    assert_eq!(
+        translate::live::conversations(
+            &fixtures::conversations(),
+            jig_test_client_records::live_cursor_record(),
+            &limits
+        ),
+        Ok(jig_test_client_records::conversations_rows_record())
+    );
+}
+#[test]
+fn goals_keep_all_ten_phase_counts_and_budget() {
+    let limits = fixtures::wire_limits();
+    assert_eq!(
+        translate::live::goals(7, &fixtures::goals(), &limits),
+        Ok(jig_test_client_records::goals_rows_record())
+    );
+}
+#[test]
+fn tasks_keep_the_filter_requester_goal_and_changed_wall() {
+    let limits = fixtures::wire_limits();
+    assert_eq!(
+        translate::live::tasks(&fixtures::tasks_document(), &limits),
+        Ok(jig_test_client_records::tasks_rows_record())
+    );
+}
+#[test]
+fn a_tree_keeps_its_rows_folds_dependencies_and_opaque_cursor() {
+    let limits = fixtures::wire_limits();
+    assert_eq!(
+        translate::live::tree(&fixtures::tree_document(), Some(jig_test_client_records::live_cursor_record()), &limits),
+        Ok(jig_test_client_records::tree_rows_record())
+    );
+}
+#[test]
+fn live_nested_pieces_past_the_wire_bounds_are_refused_naming_them() {
+    let source = fixtures::deployment_document();
+    let limits = fixtures::wire_limits();
+    let rows = [
+        ("host runs", w::Limits { owner_host_runs: 0, ..limits }, w::Path::OwnerHostRuns),
+        ("deployment hosts", w::Limits { owner_deployment_hosts: 0, ..limits }, w::Path::OwnerDeploymentHosts),
+        ("deployment attempts", w::Limits { owner_deployment_attempts: 0, ..limits }, w::Path::OwnerDeploymentAttempts),
+        ("account runs", w::Limits { owner_account_runs: 0, ..limits }, w::Path::OwnerAccountRuns),
+        ("account waiting", w::Limits { owner_account_waiting: 0, ..limits }, w::Path::OwnerAccountWaiting),
+        ("deployment accounts", w::Limits { owner_deployment_accounts: 0, ..limits }, w::Path::OwnerDeploymentAccounts),
+    ];
+    for (label, limits, path) in rows {
+        assert_eq!(
+            translate::deployment::document(&source, &limits),
+            Err(w::Problem { path, reason: skein_codec::Reason::Bound }),
+            "{label}"
+        );
+    }
+}

@@ -96,7 +96,7 @@ fn lack(value: p::Lack, limits: &w::Limits) -> Result<w::Lacking, w::Problem> {
         }
     })
 }
-fn limit(value: p::LimitKind) -> w::AdmissionLimit {
+pub(super) fn limit(value: p::LimitKind) -> w::AdmissionLimit {
     match value {
         p::LimitKind::Words => w::AdmissionLimit::Words,
         p::LimitKind::Identity => w::AdmissionLimit::Identity,
