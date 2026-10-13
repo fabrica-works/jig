@@ -547,6 +547,19 @@ Proof: as 02.s2's.
 Don't: change the bytes of any encoding; add an allowance.
 Size: at most 120 lines of production code (ruling 158).
 
+### 02.s7 skein-codec's piece helpers
+
+A step not in the plan (decisions.md, ruling 182), from the designer's
+answer on jig 30.2 (skein `58cc905a`, `docs/design/codec.md`, 2 and 3: "A
+sum crosses as one piece"); its text is the designer's.
+Shape: write items into one bounded byte string, each after a `u32`
+  length; split one back, refusing lengths that pass the end or do not end
+  exactly at it, with `skein-codec`'s reason for malformed.
+Test shape: unit tests of both, at a small bound.
+Proof: skein's gate.
+Don't: change an existing encoding.
+Size: at most 80 lines of production code.
+
 ## Interface sketches
 
 ```rust

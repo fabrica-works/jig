@@ -153,7 +153,7 @@ Size: at most 60 lines of production code.
 ## 9. jig-repin.s4: jig's families regenerated after skein-02.s6
 
 As jig-repin.s3 (ruling 147: cargo's move of the skein source, no smith
-entry), with skein-02.s6's commit; every family under
+entry), with the later of skein-02.s6's and 02.s7's commits (ruling 182); every family under
 `crates/*/src/generated/` regenerates, golden `.bin` files unchanged; each
 `codec::<family>::limits` still calls its family's check once. It lands
 with `scripts/check.sh`.

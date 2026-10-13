@@ -1210,6 +1210,17 @@ the file.
      every behavioural assertion (one restart, one acceptance, its person,
      by, choice and kind, the procedure's phases, the incident's
      resolution) and the seed.
+182. **skein 02.s7: the piece helpers; jig repins once for both** (2026-10-13,
+     the designer's answer to question.md's "jig 30.2: a page whose rows
+     nest chips past a u32"; skein `58cc905a`, jig `3c5f607c`,
+     `d8e4b2c8`). A collection its owner bounds by a sum crosses as one
+     piece, `bytes N` with each item after a `u32` length: a page's rows
+     and ruling 151's nine flattened tables, bounded by the client's
+     `document_bytes`, and jig 22.3's window. A step not in the plan,
+     skein 02.s7 (`skein/02-startup-and-secrets.md`), adds the helpers;
+     jig-repin.s4 waits for both 02.s6 and 02.s7 and pins the later, so
+     jig repins once; jig 30.2 lands its other reads and pages meanwhile,
+     and its pieces after jig-repin.s4.
 
 ## For the user
 
