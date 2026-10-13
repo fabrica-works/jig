@@ -116,6 +116,7 @@ skein-fake-peers = { git = "https://github.com/forgetic/skein.git" }
 skein-fake-machine = { git = "https://github.com/forgetic/skein.git" }
 skein-http = { git = "https://github.com/forgetic/skein.git" }
 skein-tls = { git = "https://github.com/forgetic/skein.git" }
+skein-tls-world = { git = "https://github.com/forgetic/skein.git" }
 
 jig-protocol-accounts = { path = "crates/jig-protocol-accounts" }
 skein-oauth = { git = "https://github.com/forgetic/skein.git" }

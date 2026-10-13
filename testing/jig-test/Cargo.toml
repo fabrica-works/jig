@@ -36,3 +36,20 @@ allow_attributes = "deny"
 allow_attributes_without_reason = "deny"
 disallowed_types = "deny"
 disallowed_methods = "deny"
+
+[dev-dependencies]
+jig-client-protocol-world = { path = "../../tests/client-protocol" }
+jig-channel-world = { path = "../../tests/channel" }
+jig-shell-native = { path = "../../crates/jig-shell-native" }
+skein-tls-world.workspace = true
+skein-world.workspace = true
+skein-fake-peers.workspace = true
+skein-fake-llm-domain.workspace = true
+skein-llm.workspace = true
+smith-agent-process-world.workspace = true
+serde_json = "1.0"
+tempfile = "3"
+
+[[test]]
+name = "process"
+path = "tests/process.rs"

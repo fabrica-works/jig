@@ -93,7 +93,11 @@ impl Component {
             listener_closing: false,
         };
         out.push(Request::Io(skein_io::Request::Listen { owner: LISTENER, addr: value.settings.listener }));
-        value.fresh_link(env, out);
+        if let Some(addr) = value.settings.listener.socket()
+            && addr.port() != 0
+        {
+            value.fresh_link(env, out);
+        }
         Ok(value)
     }
     fn name(&mut self) -> Token {
@@ -150,10 +154,12 @@ impl Component {
     }
     fn io(&mut self, env: &Env<Limits>, event: skein_io::Event, out: &mut Queue<Request>) {
         match event {
-            skein_io::Event::Listening { owner, listener, .. } => {
+            skein_io::Event::Listening { owner, listener, addr } => {
                 if owner == LISTENER {
                     self.listening = false;
                     self.listener = Some(listener);
+                    self.settings.listener = addr;
+                    self.fresh_link(env, out);
                     self.close_listener(out);
                 }
             }

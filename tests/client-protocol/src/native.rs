@@ -1,6 +1,7 @@
 //! The test application's native client over simulated or real io.
 use crate::{family, front::Side};
 use jig_client_world::{App, Test};
+use jig_domain_client::address::{Address, TaskSection};
 use jig_fake_person::{Doing, Find, Next, Person, Step, TreeFace};
 use jig_protocol_client_link as link;
 use jig_shell_native::{Settings, Shell, Signing};
@@ -19,6 +20,16 @@ impl Script {
         let mut steps = Self::start_chat(words).steps.into_vec();
         steps.push(Step::See { find: Find::text(answer), within: Duration::from_secs(5) });
         Self { steps: steps.into_boxed_slice() }
+    }
+    /// Open the durable conversation and read its answer after a restart.
+    #[must_use]
+    pub fn found_chat(answer: &[u8]) -> Self {
+        Self {
+            steps: Box::new([
+                Step::Go { address: client::Address::Jig(Address::Task { task: 1, section: TaskSection::Activity }) },
+                Step::See { find: Find::text(answer), within: Duration::from_secs(5) },
+            ]),
+        }
     }
     #[must_use]
     pub fn start_chat(words: &[u8]) -> Self {
@@ -253,7 +264,7 @@ impl Host for NativeClient {
                 self.wake = Some(now);
             }
             self.outputs();
-            if self.person_done && self.chats_made > 0 {
+            if self.person_done && self.root.jig().chats().starting.is_none() {
                 self.closing = true;
                 self.shell.close();
             }
