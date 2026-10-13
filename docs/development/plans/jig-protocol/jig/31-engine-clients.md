@@ -559,14 +559,13 @@ restart's sweep is the store's (jig 17), not the component's. `/jig/v1/sign-in/p
 answer `Event::Provider { exchange, verdict }`: an identity signs in as
 the link does, a refusal answers `SignInAnswer::refused`; an unconfigured
 provider 404. `Event::Stop`: the listener stops admitting, new exchanges
-answered `not_ready`, open streams go on: a sign-in and a sign-out
-among them, `SignInAnswer::not_ready` and `SignOutAnswer::not_ready`,
-nothing committed, kept or erased and the link's secret not spent
-(`protocol/client.md`, 8, "While the engine stops"); `Event::Close`:
-each stream
-ended, each connection closed once its last bytes are written, then
-`Request::Closed`; `Event::Abort`: dropped at once, then
-`Request::Closed`.
+answered `not_ready` (a sign-in and a sign-out among them, as
+`SignInAnswer::not_ready` and `SignOutAnswer::not_ready`, nothing
+committed, kept or erased, the link's secret not spent:
+`protocol/client.md`, 8, "While the engine stops"), open streams go on;
+`Event::Close`: each stream ended, each connection closed once its last
+bytes are written, then `Request::Closed`; `Event::Abort`: dropped at
+once, then `Request::Closed`.
 Needs: 31.5; jig 30.s4 (the two `not_ready` answers).
 Files: `src/{sign_in.rs, routes.rs, component.rs, boundary.rs}`;
 `tests/engine-clients/tests/{sign_in.rs, closing.rs}`.
