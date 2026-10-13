@@ -10,6 +10,8 @@ pub struct Engine {
     pub(crate) domain: root::Domain,
     pub(crate) accounts: Option<crate::accounts::Accounts>,
     pub(crate) workers: Option<crate::workers::Workers>,
+    pub(crate) clients: Option<crate::clients::Clients>,
+    pub(crate) admission: Option<skein_lib::Token>,
     pub(crate) values: crate::values::Values,
     pub(crate) tools: crate::tools::Tools,
     aborted: Option<()>,
@@ -30,20 +32,28 @@ pub struct Engine {
     ready: bool,
 }
 
+pub(crate) struct Children {
+    pub(crate) accounts: Option<crate::accounts::Accounts>,
+    pub(crate) workers: Option<crate::workers::Workers>,
+    pub(crate) clients: Option<crate::clients::Clients>,
+}
+
 impl Engine {
     pub(crate) fn new(
         config: root::Config,
         limits: &root::Limits,
         systems: [System; 2],
-        accounts: Option<crate::accounts::Accounts>,
-        workers: Option<crate::workers::Workers>,
+        children: Children,
         values: crate::values::Values,
         store: crate::store::Store,
     ) -> Self {
+        let Children { accounts, workers, clients } = children;
         let max_out = root::max_out(limits);
         let capacity = max_out.checked_mul(2).expect("engine queues fit u32");
         let mut events = Queue::with_capacity(
-            capacity.checked_mul(route_out(accounts.as_ref(), workers.as_ref())).expect("translated event room"),
+            capacity
+                .checked_mul(route_out(accounts.as_ref(), workers.as_ref(), clients.is_some()))
+                .expect("translated event room"),
         );
         if accounts.is_some() || workers.is_some() {
             events.push(root::Event::Credential { number: 1, generation: 1, valid: Duration::from_nanos(u64::MAX) });
@@ -52,6 +62,8 @@ impl Engine {
             domain: root::Domain::new(config, limits),
             accounts,
             workers,
+            clients,
+            admission: None,
             values,
             tools: crate::tools::Tools::new(&limits.core),
             aborted: None,
@@ -88,10 +100,14 @@ impl Engine {
             && self.events.room()
                 >= self
                     .max_out
-                    .checked_mul(route_out(self.accounts.as_ref(), self.workers.as_ref()))
+                    .checked_mul(route_out(self.accounts.as_ref(), self.workers.as_ref(), self.clients.is_some()))
                     .expect("root translated outputs")
             && match &self.workers {
                 Some(workers) => workers.batch_room(self.max_out),
+                None => true,
+            }
+            && match &self.clients {
+                Some(clients) => clients.room(self.max_out) && clients.commit_room(),
                 None => true,
             }
             && match &self.accounts {
@@ -100,9 +116,15 @@ impl Engine {
             }
     }
     pub(crate) fn step(&mut self, event: root::Event) {
+        let watcher = match &mut self.clients {
+            Some(clients) => clients.root_event(&event),
+            None => None,
+        };
         if let Err(event) = root::try_step(&mut self.domain, &self.env, event) {
             self.pending = Some(Box::new(event));
             self.blocked = true;
+        } else {
+            self.admission = watcher;
         }
     }
 
@@ -117,7 +139,15 @@ impl Engine {
                 Some(workers) => workers.next_deadline(),
                 None => None,
             };
-            return crate::accounts::earliest(crate::accounts::earliest(accounts, workers), self.store.next_deadline());
+            let next =
+                crate::accounts::earliest(crate::accounts::earliest(accounts, workers), self.store.next_deadline());
+            return crate::accounts::earliest(
+                next,
+                match &self.clients {
+                    Some(clients) => clients.next_deadline(),
+                    None => None,
+                },
+            );
         }
         let mut next = crate::accounts::earliest(self.store.next_deadline(), self.values.accounts.next_expiry());
         for (_, deadline) in self.domain.core_deadlines() {
@@ -140,6 +170,9 @@ impl Engine {
         if let Some(workers) = &self.workers {
             next = crate::accounts::earliest(next, workers.next_deadline());
         }
+        if let Some(clients) = &self.clients {
+            next = crate::accounts::earliest(next, clients.next_deadline());
+        }
         next
     }
     #[must_use]
@@ -151,6 +184,9 @@ impl Engine {
                     None => false,
                 } || match &self.workers {
                     Some(workers) => workers.work_pending(now),
+                    None => false,
+                } || match &self.clients {
+                    Some(clients) => clients.work_pending(now),
                     None => false,
                 });
         if self.end.is_some() || !self.store.opened || (self.begin && !self.listeners_open()) {
@@ -176,14 +212,21 @@ impl Engine {
                 Some(workers) => workers.room(),
                 None => true,
             }
+            && match &self.clients {
+                Some(clients) => clients.room(1),
+                None => true,
+            }
             && match &self.accounts {
                 Some(accounts) => accounts.up_room(),
                 None => true,
             }
     }
     pub(crate) fn listeners_open(&self) -> bool {
-        match &self.workers {
+        (match &self.workers {
             Some(workers) => workers.opened(),
+            None => true,
+        }) && match &self.clients {
+            Some(clients) => clients.opened,
             None => true,
         }
     }
@@ -199,6 +242,12 @@ impl Engine {
             self.store.close();
             if let Some(accounts) = &mut self.accounts {
                 accounts.abort();
+            }
+            if !self.store.opened {
+                self.clients = None;
+            }
+            if let Some(clients) = &mut self.clients {
+                clients.down(jig_protocol_engine_clients::Event::Abort);
             }
             if let Some(workers) = &mut self.workers {
                 if !self.store.opened {
@@ -239,13 +288,49 @@ pub fn iterate(engine: &mut Engine, now: Time, wall: Wall) {
     if let Some(workers) = &mut engine.workers {
         workers.iterate(now, &mut engine.events);
     }
+    if let Some(clients) = &mut engine.clients {
+        clients.starting = if engine.begin { Some(()) } else { None };
+        clients.iterate(
+            now,
+            wall,
+            &mut engine.events,
+            &engine.env.limits.connector,
+            engine.env.limits.core.documents.rows,
+        );
+    }
+    clients_pass(engine);
     stop::advance(engine);
     if engine.end.is_some() {
         engine.abort_if_ended();
         return;
     }
-    if !engine.room() || (engine.begin && !engine.listeners_open()) {
+    if !engine.room() {
         return;
+    }
+    if engine.begin
+        && let Some(clients) = &mut engine.clients
+    {
+        for _ in 0..clients.early.len() {
+            if !clients.room(1) {
+                break;
+            }
+            let event = clients.early.pop().expect("client startup input");
+            clients.not_ready(event);
+        }
+    }
+    if engine.begin && !engine.listeners_open() {
+        return;
+    }
+    if !engine.begin
+        && let Some(clients) = &mut engine.clients
+    {
+        for _ in 0..clients.early.len() {
+            if engine.events.room() == 0 {
+                break;
+            }
+            let event = clients.early.pop().expect("client startup inputs");
+            engine.events.push(event);
+        }
     }
     if engine.begin {
         engine.begin = false;
@@ -263,6 +348,21 @@ pub fn iterate(engine: &mut Engine, now: Time, wall: Wall) {
     } else if !engine.blocked {
         fire(engine);
     }
+    release(engine);
+    clients_pass(engine);
+}
+
+fn clients_pass(engine: &mut Engine) {
+    if let Some(clients) = &mut engine.clients {
+        clients.advance(&mut engine.events, &engine.env.limits.connector, engine.env.limits.core.documents.rows);
+        if engine.end.is_none() {
+            clients.secrets_step(&mut engine.store);
+        }
+        clients.advance(&mut engine.events, &engine.env.limits.connector, engine.env.limits.core.documents.rows);
+    }
+}
+
+fn release(engine: &mut Engine) {
     engine.ready = true;
     let mut empty = 0_u32;
     for _ in 0..engine.env.limits.routes {
@@ -289,6 +389,11 @@ pub fn iterate(engine: &mut Engine, now: Time, wall: Wall) {
             engine.ready = false;
             break;
         }
+    }
+    if let Some(watcher) = engine.admission.take()
+        && let Some(clients) = &mut engine.clients
+    {
+        clients.down(jig_protocol_engine_clients::Event::Admitted { watcher });
     }
     engine.domain.reclaim();
     stop::advance(engine);
@@ -321,12 +426,20 @@ fn fire(engine: &mut Engine) {
     }
 }
 
-fn route_out(accounts: Option<&crate::accounts::Accounts>, workers: Option<&crate::workers::Workers>) -> u32 {
+fn route_out(
+    accounts: Option<&crate::accounts::Accounts>,
+    workers: Option<&crate::workers::Workers>,
+    clients: bool,
+) -> u32 {
+    let mut count = 1;
     if workers.is_some() {
-        jig_protocol_engine_workers::MAX_OUT_DOWN
-    } else if accounts.is_some() {
-        skein_oauth_accounts::MAX_OUT_DOWN.above
-    } else {
-        1
+        count = count.max(jig_protocol_engine_workers::MAX_OUT_DOWN);
     }
+    if accounts.is_some() {
+        count = count.max(skein_oauth_accounts::MAX_OUT_DOWN.above);
+    }
+    if clients {
+        count = count.max(jig_protocol_engine_clients::MAX_OUT_DOWN);
+    }
+    count
 }

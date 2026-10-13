@@ -114,6 +114,16 @@ impl Component {
                     out,
                 );
             }
+            waiting @ Waiting::ApplicationRead { .. } => match answer {
+                core::reads::Answer::None(why) => {
+                    self.respond(env, exchange, routes::read_none(*why, &env.limits.wire));
+                }
+                core::reads::Answer::Document(_)
+                | core::reads::Answer::Historical(_)
+                | core::reads::Answer::Page(_) => {
+                    self.pending.exchanges.insert(exchange, waiting).expect("same unrelated slot");
+                }
+            },
             Waiting::Core
             | Waiting::Provider { .. }
             | Waiting::SignOut { .. }
@@ -122,7 +132,6 @@ impl Component {
             | Waiting::Get { .. }
             | Waiting::Made { .. }
             | Waiting::Ask { .. }
-            | Waiting::ApplicationRead { .. }
             | Waiting::Checked { .. } => {
                 self.pending.exchanges.insert(exchange, waiting).expect("same unrelated slot");
             }

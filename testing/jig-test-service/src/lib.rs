@@ -4,6 +4,7 @@
 extern crate alloc;
 mod accounts;
 mod boundary;
+mod clients;
 pub mod family;
 mod tools;
 mod values;
@@ -19,6 +20,7 @@ mod startup;
 mod stop;
 mod store;
 pub mod system;
+use alloc::boxed::Box;
 pub use boundary::{End, Files, PartyOutput, Seeds, Stop};
 pub use engine::Engine;
 pub use limits::Limits;
@@ -54,6 +56,7 @@ pub struct Service {
     signals_closing: bool,
     shutdowns: u8,
     bytes: u64,
+    links: Queue<Box<[u8]>>,
 }
 impl Service {
     fn new(engine: Option<Engine>, workers: List<Worker>, limits: io::Limits, bytes: u64, queue: u32) -> Self {
@@ -79,6 +82,7 @@ impl Service {
             signals_closing: false,
             shutdowns: 0,
             bytes,
+            links: Queue::with_capacity(queue),
         }
     }
     /// Adopt the deployment directory opened by the caller before driving startup.
@@ -105,6 +109,9 @@ impl Service {
     }
     pub const fn submissions(&mut self) -> &mut Queue<Submit> {
         &mut self.submissions
+    }
+    pub const fn links(&mut self) -> &mut Queue<Box<[u8]>> {
+        &mut self.links
     }
     pub const fn engine(&mut self) -> Option<&mut Engine> {
         self.engine.as_mut()
@@ -180,6 +187,13 @@ impl Service {
             && self.kernel.is_empty()
             && match &self.engine {
                 Some(engine) if !engine.store.closed() => false,
+                Some(engine) => match &engine.clients {
+                    Some(clients) => clients.closed && clients.io.is_empty(),
+                    None => true,
+                },
+                None => true,
+            }
+            && match &self.engine {
                 Some(engine) => match &engine.accounts {
                     Some(accounts) => accounts.is_empty(),
                     None => true,
@@ -227,6 +241,21 @@ impl Service {
             io::up(&mut self.io, &self.io_env, complete, &mut self.told, &mut self.raw_submissions);
         }
     }
+    fn clock(&mut self, now: Time, wall: Wall) {
+        self.io_env.now = now;
+        self.io_env.wall = wall;
+        if let Some(engine) = &mut self.engine
+            && let Some(clients) = &mut engine.clients
+        {
+            clients.env.now = now;
+            clients.env.wall = wall;
+        }
+        if let Some(engine) = &mut self.engine
+            && let Some(accounts) = &mut engine.accounts
+        {
+            accounts.clock(now, wall);
+        }
+    }
     fn route_components(&mut self) {
         if let Some(engine) = &mut self.engine {
             for _ in 0..engine.store.submitted.len() {
@@ -234,6 +263,25 @@ impl Service {
                     break;
                 }
                 self.raw_submissions.push(engine.store.submitted.pop().expect("store submissions"));
+            }
+        }
+        if let Some(engine) = &mut self.engine
+            && engine.store.opened
+            && let Some(clients) = &mut engine.clients
+        {
+            for _ in 0..clients.links.len() {
+                if self.links.room() == 0 {
+                    break;
+                }
+                let link = clients.links.pop().expect("client link count");
+                self.links.push(link);
+            }
+            for _ in 0..clients.io.len() {
+                if self.raw_submissions.room() < io::MAX_OUT_DOWN.submissions || !self.io.takes() {
+                    break;
+                }
+                let request = clients.io.pop().expect("client io requests");
+                io::down(&mut self.io, &self.io_env, request, &mut self.raw_submissions);
             }
         }
         if let Some(engine) = &mut self.engine
@@ -343,13 +391,7 @@ impl Service {
 }
 
 pub fn iterate(service: &mut Service, now: Time, wall: Wall) {
-    service.io_env.now = now;
-    service.io_env.wall = wall;
-    if let Some(engine) = &mut service.engine
-        && let Some(accounts) = &mut engine.accounts
-    {
-        accounts.clock(now, wall);
-    }
+    service.clock(now, wall);
     for _ in 0..service.io_env.limits.sockets.checked_add(service.io_env.limits.refusals).expect("io entries") {
         if !service.io.is_ready() || !service.room(io::MAX_OUT_RESUME) {
             break;
@@ -479,6 +521,15 @@ fn route_events(service: &mut Service, now: Time) {
             } {
                 if let Some(accounts) = &mut engine.accounts {
                     accounts.up(accounts::untag(event));
+                }
+            } else if match workers::owner(&event) {
+                Some(owner) => clients::owns(owner),
+                None => false,
+            } {
+                if let Some(clients) = &mut engine.clients
+                    && !clients.up(event)
+                {
+                    engine.end = Some(End::Stopped(Stop::Listener));
                 }
             } else if let Some(workers) = &mut engine.workers {
                 if !workers.up(now, event, &mut engine.events) {

@@ -1,15 +1,20 @@
 //! Exhaustive routing of the root's journal, with values kept in their owners (service.md, 4).
-use crate::{Engine, PartyOutput, stop};
+use crate::{Engine, PartyOutput, clients, stop};
 use jig_domain_core as core;
 use jig_test_connector as connector;
 use jig_test_domain as root;
 
 pub(super) fn request(engine: &mut Engine, request: root::Request) {
     match request {
-        root::Request::Commit { number, writes } => crate::store::request(
-            engine,
-            jig_test_store::StoreOut::Commit { number, writes: crate::store::writes(writes) },
-        ),
+        root::Request::Commit { number, writes } => {
+            if let Some(clients) = &mut engine.clients {
+                clients.commit(number, &writes);
+            }
+            crate::store::request(
+                engine,
+                jig_test_store::StoreOut::Commit { number, writes: crate::store::writes(writes) },
+            );
+        }
         root::Request::Restart(step) => restart(engine, step),
         root::Request::Deliver(delivery) => deliver(engine, delivery),
         root::Request::Now(now) => immediate(engine, now),
@@ -55,7 +60,13 @@ fn deliver(engine: &mut Engine, delivery: root::Delivery) {
         root::Delivery::Core(held) => core_held(engine, held),
         held @ (root::Delivery::ApplicationDocument { .. }
         | root::Delivery::ApplicationRead { .. }
-        | root::Delivery::Application { .. }) => engine.outputs.push(PartyOutput::Held(held)),
+        | root::Delivery::Application { .. }) => {
+            if let Some(clients) = &mut engine.clients {
+                clients.down(clients::application(held).expect("application output"));
+            } else {
+                engine.outputs.push(PartyOutput::Held(held));
+            }
+        }
         root::Delivery::Link { channel, down } => {
             if let jig_domain_host::LinkDown::Relayed { call, .. } = &down {
                 engine.tools.forget_name(call);
@@ -155,7 +166,12 @@ fn immediate(engine: &mut Engine, now: core::Now) {
             }
         }
         value @ (core::Now::SignInRefused { .. } | core::Now::WatchRefused { .. } | core::Now::RunText { .. }) => {
-            engine.outputs.push(PartyOutput::Now(value));
+            if let Some(clients) = &mut engine.clients {
+                let event = clients::immediate(value, &mut engine.admission).expect("immediate client output");
+                clients.down(event);
+            } else {
+                engine.outputs.push(PartyOutput::Now(value));
+            }
         }
         core::Now::Call { to, run, attempt, call } => engine.events.push(engine.tools.decode(to, run, attempt, &call)),
         core::Now::EffectAnswer { to, key, part } => {
@@ -203,10 +219,14 @@ fn core_held(engine: &mut Engine, held: core::Held) {
         held @ (core::Held::Read { .. }
         | core::Held::Delivery { .. }
         | core::Held::WatchEnded { .. }
-        | core::Held::PeopleReply { .. }
-        | core::Held::Result { .. }) => {
-            engine.outputs.push(PartyOutput::Held(root::Delivery::Core(held)));
+        | core::Held::PeopleReply { .. }) => {
+            if let Some(client) = &mut engine.clients {
+                client.down(clients::to_component(held).expect("clients output"));
+            } else {
+                engine.outputs.push(PartyOutput::Held(root::Delivery::Core(held)));
+            }
         }
+        held @ core::Held::Result { .. } => engine.outputs.push(PartyOutput::Held(root::Delivery::Core(held))),
         core::Held::MakeEffect { connector: number, entry } => {
             engine.events.push(root::Event::Connector { number, event: connector::Event::Make { entry } });
         }

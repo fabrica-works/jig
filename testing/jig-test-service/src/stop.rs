@@ -29,6 +29,9 @@ pub(super) fn shutdown(engine: &mut Engine) {
         if let Some(workers) = &mut engine.workers {
             workers.down(engine.env.now, jig_protocol_engine_workers::Event::Stop, &mut engine.events);
         }
+        if let Some(clients) = &mut engine.clients {
+            clients.down(jig_protocol_engine_clients::Event::Stop);
+        }
         engine.events.push(root::Event::Stop);
     }
 }
@@ -42,10 +45,15 @@ pub(super) fn drained(engine: &mut Engine) {
     drain.phase = Phase::Closing {
         waiting: u32::from(engine.workers.is_some())
             .checked_add(u32::from(engine.accounts.is_some()))
-            .expect("two engine components"),
+            .expect("two engine components")
+            .checked_add(u32::from(engine.clients.is_some()))
+            .expect("three engine components"),
     };
     if let Some(workers) = &mut engine.workers {
         workers.close(engine.env.now, &mut engine.events);
+    }
+    if let Some(clients) = &mut engine.clients {
+        clients.down(jig_protocol_engine_clients::Event::Close);
     }
     if engine.accounts.is_some() {
         engine.step(root::Event::Core(jig_domain_core::Event::Account(jig_domain_accounts::Event::Close)));
@@ -68,7 +76,12 @@ pub(super) fn advance(engine: &mut Engine) {
             Some(accounts) => !accounts.is_empty(),
             None => false,
         }))
-        .expect("two engine components");
+        .expect("two engine components")
+        .checked_add(u32::from(match &engine.clients {
+            Some(clients) => !clients.closed || !clients.io.is_empty(),
+            None => false,
+        }))
+        .expect("three engine components");
         drain.phase = Phase::Closing { waiting };
         if waiting == 0 && engine.store.idle() && engine.events.is_empty() && engine.requests.is_empty() {
             engine.store.close();

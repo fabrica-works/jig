@@ -19,6 +19,7 @@ pub(super) struct Parsed {
     credential: Box<[u8]>,
     accounts: bool,
     workers: bool,
+    clients: bool,
 }
 
 fn problem(path: Path, what: What) -> Problems {
@@ -64,9 +65,10 @@ fn components(
     document: &Document,
     whole: &mut read::Object,
     problems: &mut Problems,
-) -> Result<(bool, bool), Problems> {
+) -> Result<(bool, bool, bool), Problems> {
     let mut accounts = false;
     let mut workers = false;
+    let mut clients = false;
     if let Some(at) = whole.member(document, b"service") {
         let here = Path::root().member(b"service");
         let mut service = object(document, at, &here)?;
@@ -84,8 +86,11 @@ fn components(
                         workers = true;
                         continue;
                     }
-                    b"accounts" | b"workers" => What::Duplicate,
-                    b"clients" => What::Refers,
+                    b"clients" if !clients => {
+                        clients = true;
+                        continue;
+                    }
+                    b"accounts" | b"workers" | b"clients" => What::Duplicate,
                     _ => What::Unknown,
                 };
                 problems.push(here, what);
@@ -93,7 +98,7 @@ fn components(
         }
         service.finish(document, &here, problems);
     }
-    Ok((accounts, workers))
+    Ok((accounts, workers, clients))
 }
 
 pub(super) fn parse(input: &[u8]) -> Result<Parsed, Problems> {
@@ -112,7 +117,7 @@ pub(super) fn parse(input: &[u8]) -> Result<Parsed, Problems> {
         let items = list(&document, at, document.len(), &path.member(b"workers"))?;
         drop(items);
     }
-    let (accounts, workers) = components(&document, &mut whole, &mut problems)?;
+    let (accounts, workers, clients) = components(&document, &mut whole, &mut problems)?;
     whole.finish(&document, &path, &mut problems);
     if !problems.is_empty() {
         return Err(problems);
@@ -170,6 +175,7 @@ pub(super) fn parse(input: &[u8]) -> Result<Parsed, Problems> {
         credential,
         accounts,
         workers,
+        clients,
     })
 }
 
@@ -363,6 +369,7 @@ pub(super) fn engine_startup(
     } else {
         None
     };
+    let clients = clients_child(&parsed, seeds, max)?;
     let mut application = skein_lib::Map::with_capacity(parsed.limits.root.core.accounts.credentials);
     let credential = files.contents(&parsed.credential).expect("credential file checked");
     if credential.len() > usize::try_from(parsed.limits.root.connector.value_bytes).expect("credential bound") {
@@ -391,12 +398,26 @@ pub(super) fn engine_startup(
         root,
         &parsed.limits.root,
         systems,
-        accounts,
-        workers,
+        crate::engine::Children { accounts, workers, clients },
         values,
         crate::store::Store::new(&parsed.limits.root, &store_limits),
     );
     Ok((engine, parsed.limits.io, bytes, parsed.engine.memory))
+}
+
+fn clients_child(parsed: &Parsed, seeds: &Seeds, max: u32) -> Result<Option<crate::clients::Clients>, Problems> {
+    Ok(if parsed.clients {
+        Some(crate::clients::Clients::new(
+            &parsed.engine,
+            seeds,
+            max.checked_mul(2)
+                .expect("engine routes")
+                .checked_mul(jig_protocol_engine_clients::MAX_OUT_DOWN)
+                .expect("client routing room"),
+        )?)
+    } else {
+        None
+    })
 }
 
 #[derive(Debug)]
@@ -582,4 +603,10 @@ pub fn startup(
         Some((engine, _, _, _)) => Ok(Service::new(Some(engine), workers, io, bytes, queue)),
         None => Ok(Service::new(None, workers, io, bytes, queue)),
     }
+}
+
+#[cfg(test)]
+pub(super) fn fixture_connectors(document: &[u8]) -> (config::Engine, [connector::Config; 2]) {
+    let parsed = parse(document).expect("fixture configuration");
+    (parsed.engine, [parsed.first, parsed.second])
 }

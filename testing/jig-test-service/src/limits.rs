@@ -53,6 +53,7 @@ pub struct Limits {
     pub io: skein_io::Limits,
     pub accounts: skein_oauth_accounts::Limits,
     pub workers: jig_protocol_engine_workers::Limits,
+    pub clients: jig_protocol_engine_clients::Limits,
 }
 #[must_use]
 pub fn for_profile(name: Profile, jig: &jig_protocol_config::Limits) -> Limits {
@@ -68,6 +69,7 @@ pub fn for_profile(name: Profile, jig: &jig_protocol_config::Limits) -> Limits {
         io: jig.io,
         accounts,
         workers: workers(jig),
+        clients: jig.clients,
     }
 }
 #[must_use]
@@ -112,6 +114,13 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Queue::<jig_protocol_engine_workers::Request>::worst_case(
             jig_protocol_engine_workers::MAX_OUT_DOWN,
         )?)?
+        .checked_add(crate::clients::worst_case(
+            &limits.clients,
+            queue.checked_mul(jig_protocol_engine_clients::MAX_OUT_DOWN)?,
+            &limits.root.journal,
+        )?)?
+        .checked_add(Queue::<Box<[u8]>>::worst_case(queue)?)?
+        .checked_add(u64::from(queue).checked_mul(512)?)?
         .checked_add(skein_io::worst_case(&limits.io)?)?
         .checked_add(Queue::<crate::PartyOutput>::worst_case(queue)?)?
         .checked_add(Queue::<jig_domain_core::Event>::worst_case(queue)?)?

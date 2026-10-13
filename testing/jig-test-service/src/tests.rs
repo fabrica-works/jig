@@ -1,3 +1,4 @@
+mod clients;
 mod engine;
 mod family;
 mod fixtures;
@@ -68,23 +69,4 @@ fn a_worst_case_past_the_memory_is_refused_saying_by_how_much() {
         found.problems.get(0),
         Some(&Problem { path: Path::root().member(b"engine").member(b"memory_bytes"), what: What::Memory { over: 1 } })
     );
-}
-
-#[test]
-fn an_activation_of_an_unbuilt_component_is_refused_at_its_path() {
-    {
-        let name = b"clients".as_slice();
-        let value = fixtures::join(&[b"[\"", name, b"\"]"]);
-        let document = with(&engine_document(), b"\"components\":[]", &fixtures::join(&[b"\"components\":", &value]));
-        assert_eq!(
-            problem(&document),
-            Problem {
-                path: Path::root()
-                    .member(b"service")
-                    .member(b"components")
-                    .child(jig_protocol_config::Segment::Index(0)),
-                what: What::Refers,
-            }
-        );
-    }
 }
