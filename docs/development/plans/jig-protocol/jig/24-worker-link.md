@@ -296,7 +296,9 @@ Removes: nothing.
 ### 24.3 Relays across channels, and busy turns
 
 Scope: the relay table: an entry as the hub relays a call, keyed by its
-run, attempt and call name, holding its call record and the hub's token;
+run, attempt and call name, holding its call record (no token: the hub
+names a relay by its name both ways, channel.md, 6.3; the designer,
+2026-10-13, jig `fadbde24`);
 each entry sent again after every hello, in the order first sent, before
 what the hub sends again; ended once, by its relayed answer (busy among
 them, passed up as busy) or by the hub's cancel (`CancelRelay`, answered
@@ -509,9 +511,10 @@ pub enum Event {
     Hello { hello: host::LinkHello },
     /// From the root: a record from the hub toward the engine, its parts' bytes.
     Up { up: host::LinkUp, parts: Box<[Part]> },
-    /// From the root: the hub cancels the relay it named `call`; `RelayCancelled` answers it,
+    /// From the root: the hub cancels the relay of `run`'s `attempt` named `call` (its name's
+    /// bytes, channel.md, 6.3); `RelayCancelled` answers it,
     /// unless its answer went up first.
-    CancelRelay { call: Token },
+    CancelRelay { run: Token, attempt: Token, call: Box<[u8]> },
     /// From the root: the hub has given up what it keeps; no redial, finish, then `Closed`.
     Stop,
     /// From the root: close now; `Closed` follows.
@@ -537,7 +540,7 @@ pub enum Request {
     /// in its parts; the layer puts it in its agent capability's form (llm.md, 5.3).
     Value { table: host::GrantTable, account: u32, generation: u64, expires: Time, value: Secret, account_id: Secret },
     /// To the root: the relay `call` ended by the hub's cancel; the terminal of `CancelRelay`.
-    RelayCancelled { call: Token },
+    RelayCancelled { run: Token, attempt: Token, call: Box<[u8]> },
     /// To the root: hand back the hub's retained turn `turn` of this attempt, for a busy resend.
     Resend { run: Token, attempt: Token, turn: u32 },
     /// To the root: the link is lost; the grace's clock runs from now.

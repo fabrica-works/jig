@@ -557,7 +557,7 @@ pub enum Event {
     Lost,
     GracePassed,
     Resend { run: Token, attempt: Token, turn: u32 },
-    RelayCancelled { call: Token },
+    RelayCancelled { run: Token, attempt: Token, call: Box<[u8]> },
     /// smith's agent process events, as smith's host half hands them up.
     Process(smith::process::Event),
     /// A hand-out answered by the routing, in the order it went out.
@@ -573,7 +573,7 @@ pub enum Request {
     /// a relay's cancel, and the stop once the hub has given up what it keeps.
     Hello(host::Hello),
     Link(host::LinkUp),
-    CancelRelay { call: Token },
+    CancelRelay { run: Token, attempt: Token, call: Box<[u8]> },
     Stop,
     /// To smith's host half: spawn, send, read, wait, reap.
     Process(smith::process::Request),
