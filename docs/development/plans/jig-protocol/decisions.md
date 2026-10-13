@@ -2091,6 +2091,16 @@ the file.
      engine and worker files it needs in 27.1's Files. Editing `worker.rs`
      brings ruling 252's split of `Worker::process` into the same
      increment, counted for nothing (ruling 209).
+256. **jig 31.s3: the core names an own watch subject's party** (2026-10-13,
+     the designer's answer to question.md's "jig 31.5: an own watch
+     subject's party after a restart"; jig `d616ae9d`, `18f6a14e`). As
+     reads already do, the protocol layer hands the core the sign-in's
+     number and the core names the party from the sign-ins its people
+     child restores, so a restart loses nothing; no party is kept in the
+     protocol layer or the secrets' records. A step not in the plan, jig
+     31.s3 (`jig/31-engine-clients.md`), gives `Event::Watch` a `Watched`
+     subject with no party for the frame, inbox and conversations; 31.5
+     needs it for those three only.
 
 ## For the user
 
