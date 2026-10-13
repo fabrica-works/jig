@@ -1857,6 +1857,18 @@ the file.
      conformance routing its gate needs, as 18.4 specifies them; 18.4
      keeps its new snapshot test, its joint proof and the measure. No
      temporary bridge API, no fake store restored to the core world.
+237. **jig 25.4 lands at its count, 1,808 production lines** (2026-10-13,
+     the coordinator's block "jig 25.4: completed planned composition
+     exceeds its Size allowance", 2026-10-13T07:24:00Z). Its Size was 600,
+     800 with ruling 220, 1,200 under ruling 196's allowance. The work,
+     done and proven (26 tests in 0.066 s, clippy clean), composes the
+     reference service's accounts driver and private keeper (556 lines),
+     tools (412) and workers (309) with the planned routing, rulings 220,
+     222 and 223 included; nothing outside its scope, every file under 800
+     lines. Splitting finished work costs more than it saves; it lands as
+     counted, the 18 per-file counts in its commit body. The Size was
+     underestimated, for the retrospective; ruling 196 still binds every
+     other step.
 
 ## For the user
 
