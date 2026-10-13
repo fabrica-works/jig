@@ -2244,6 +2244,18 @@ the file.
      domain counts it; no ceiling raised, no profile changed. A step not
      in the plan, jig 19.s1 (`jig/19-store-codecs-core-people.md`), with
      a test that both shipped profiles are admitted; 27.3 needs it.
+270. **jig 19.s1's piece bound is the worst encoding of what the domain
+     admits** (2026-10-13, the coordinator's block "jig 19.s1: encoded
+     piece overhead exceeds domain byte sum", 2026-10-13T13:08:24Z). The
+     domain's sums count payload bytes or `size_of`, while a piece's items
+     carry their own length prefixes (a verdict of 512 one-byte fields
+     encodes in 6,656 bytes against a `result_bytes` of 512). As proposed,
+     (a): each piece's encoded limit is the largest encoding of any
+     collection within the domain's sum, items times their framing plus
+     the payload, derived in `codec::limits` with checked arithmetic, the
+     schema's `bytes N` ceiling large enough for it; decoding still admits
+     by the domain's own count, so nothing past the domain's sum is taken.
+     No item's encoding changes.
 
 ## For the user
 
