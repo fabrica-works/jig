@@ -2134,6 +2134,16 @@ the file.
      constant default. A row in the composition's tests, or the reference
      service's, checks a frame watched with the default window opens on
      the small profile.
+260. **jig 27.s1's cumulative read is checked in the core** (2026-10-13,
+     the coordinator's block "jig 27.s1: retained read fence is held by
+     core", 2026-10-13T11:14:10Z). Ruling 258 placed the attempt's last
+     committed read in the tasks domain; it is the core's
+     (`RunProof.turn.read`, `routing/run_payloads.rs:31-35`), and the tasks
+     child has no such field. As proposed: the core's run payload routing
+     compares a turn's read with it, hands the tasks child no read when
+     they are equal, keeps the read as sent in the retained payload, and
+     refuses a read before it. 27.s1's Files and Shape are amended; the
+     tasks domain does not change.
 
 ## For the user
 

@@ -46,12 +46,15 @@ it committed; the next turn is refused, and the attempt ends
 `Failed(Invalid)` (`logs/jig-27/27.1-dev-window11.txt`).
 Needs: nothing; before 27.1 lands. Run by jig 27's session as its own
 commit.
-Files: `crates/jig-domain-tasks/src/{admission.rs, inbox.rs}` and their
-tests.
+Files: `crates/jig-domain-core/src/routing/run_payloads.rs` and its tests
+(ruling 260); the tasks domain unchanged.
 Shape: a turn's read is admitted when it names a message still in the
 inbox (read now) or the attempt's last committed read (nothing new read);
-any other name is refused as now. The attempt keeps its last committed
-read where decision 32 already compares an answer's fence with it.
+any other name is refused as now. The core holds the last committed read
+(`RunProof.turn.read`, `routing/run_payloads.rs:31-35`, where decision 32
+compares an answer's fence): a turn whose read equals it passes no read to
+the tasks child, the retained payload keeping the read as sent; a read
+before it is refused (ruling 260).
 Test shape: rows in the admission tests: a turn repeating the attempt's
 last committed read is admitted and reads nothing new; a turn naming a
 message neither in the inbox nor the attempt's last read is refused.
