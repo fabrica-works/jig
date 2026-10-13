@@ -448,6 +448,16 @@ Size: nothing besides `Cargo.lock` and generated files.
 As jig-repin.s1, with skein 02.s3's commit, which follows 02.s2's
 (rulings 152, 157).
 
+### jig-repin.s5: skein's main, before jig 26.2 lands
+
+As jig-repin.s1, with skein's `main` once skein 03.s2 has landed (the
+designer's answer on jig 26.2's worker abort): jig 26.2's abort of a
+worker's children fails the simulator's check until jig takes it. The
+skein source moves to that commit from `886a7d4`, which jig's lock holds
+now, so it brings 03.s2 and whatever skein lands meanwhile. Where that
+needs a change in jig's code, it is made here, within what
+development.md, 5.7 lets a repin change.
+
 ## Pulse
 
 ```

@@ -355,6 +355,33 @@ Don't: sync a directory io did not make; change an existing directory's
   mode; answer `Made` for one that existed.
 Size: at most 120 lines of production code.
 
+### 03.s2 The simulator settles a child its owner ended
+
+A step not in the plan, from the designer's answer on jig 26.2's worker
+abort (skein `b638df3c`: `testing-strategy.md`, 6; `io.md`, 3, "Abort
+closes at once", and 6, closing a child kills its group). jig 26.2
+aborts a worker's children and their pipes, as `service.md`, 10 says,
+and the simulator then fails the world: `Sim::assert_hosted_settled`
+(`crates/skein-sim/src/sim/processes.rs:248-260`) asserts every hosted
+child's output pipe read to its end, whatever ended the child.
+Needs: nothing.
+Files: `crates/skein-sim/src/sim/processes.rs`;
+  `tests/sim/tests/processes.rs` (`skein-sim-tests`).
+Shape: the read-to-end assertion holds for a child whose exit is
+  `Exit::Code`; a child whose exit is `Exit::Signal` (its owner closed
+  it, killing its group, or signalled it) may leave its output pipes
+  unread. Every child still has exited.
+Test shape: `a_killed_childs_unread_output_is_settled` (a hosted child
+  writes past what its parent reads; the parent aborts the pipe and
+  closes the child; the world settles); and
+  `a_childs_own_exit_with_unread_output_is_caught` (a child exits with a
+  code, its output unread: the assertion's message). Under 20 ms each.
+Proof: unit, `heavy cargo nextest run -p skein-sim-tests --test
+  processes` once.
+Don't: count a closed pipe as read; loosen the check for a child that
+  exited with a code.
+Size: at most 20 lines of production code.
+
 ## Interface sketches
 
 ```rust

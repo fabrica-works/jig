@@ -198,7 +198,9 @@ groups killed as io closes them, nothing handed in); the service's end
 once io holds nothing; a second signal during the drain aborting each
 layer; a restart from the store, the in-process worker's claims settled
 at once (jig 09's `Config::workers_in_process`, which 27.2 passes on).
-Needs: nothing beyond the session's start: jig 27's 27.2 brings jig 09.
+Needs: nothing beyond the session's start: jig 27's 27.2 brings jig 09;
+jig-repin.s5 before it lands, for the simulator to settle the workers it
+aborts (skein 03.s2).
 Files: `testing/jig-test-service/src/{stop.rs, lib.rs, worker.rs,
 tests/stop.rs}`; `tests/one-process/{src/world.rs,
 tests/one_process.rs}`. Shared hotspots: `testing/jig-test-service`.
