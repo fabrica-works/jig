@@ -1,6 +1,6 @@
 # Agents and their hosts
 
-Provisional, 2026-10-07, revised 2026-10-12. Where an application's
+Provisional, 2026-10-07, revised 2026-10-13. Where an application's
 agents run, and what hosts them: the contract between the core and a
 host, the three shapes an application may take, the agent as a
 capability of two kinds, both smith's, jig's one host for runs wherever
@@ -350,7 +350,11 @@ cancel, from any state ──────────────► stop ─►
    (section 7).
 8. **Release** the workspace to the cache.
 9. **Answer** the engine, exactly once (section 2). The engine decides
-   what happens next, and its acknowledgement frees the slot.
+   what happens next, and its acknowledgement frees the slot. A start
+   refused, at the entrance (step 1) or by the agent capability (6.3),
+   is answered as refused and frees what it took then: the hub keeps
+   nothing of it, and nothing acknowledges it
+   (`../protocol/channel.md`, 5.1).
 
 A run with no workspace skips preparing, saving and releasing. A cancel
 from the engine, a lost link or shutdown, or a fault of the agent, takes

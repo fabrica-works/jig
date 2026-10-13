@@ -1,6 +1,6 @@
 # jig's channel
 
-Provisional, 2026-10-10, revised 2026-10-12. The channel between an
+Provisional, 2026-10-10, revised 2026-10-13. The channel between an
 engine and each of its workers: the contract of `../domain/hosts.md`,
 section 2, carried as frames of skein's framed channel (skein's
 `channel.md`) with records generated from schemas (skein's `codec.md`).
@@ -212,11 +212,20 @@ answer, and a **notice** is not answered.
 | hello | slots; stop bound, a duration; the agent's bounds: for each model it declares, its name, window and output; the most turns, spend, time and waiting a run may have; its checks' timeout; the largest message a run takes and how many its inbox holds; the turns it keeps unacknowledged (4.3); workstreams held; runs hosted, each with its task, attempt and phase; runs whose turns or answer wait for acknowledgement | first, once |
 | turn | task, attempt; its number within the attempt; its cumulative spend; the last message it read, by name, if any; the messages refused since the run's previous turn, each by name with smith's reason: too large as the run reads it, the run's inbox full, a name in use, or the run ending; whether it opens a window; its bytes, smith's (6.1) | notice, kept by the hub until acknowledged |
 | call | task, attempt; the run's name for the call, as bytes (section 7); the host tool's name; whether it writes; its input; the time left on its deadline | call |
-| answer | task, attempt; the turns it took; what it spent; the last message it read, by name, if any: the unread fence; the messages refused since the run's last turn, each by name with smith's reason, as a turn carries them; how it ended: refused (busy, or invalid and what), ended with its result, smith's bytes (6.1), parked, or failed with its typed failure and bounded detail; what it left on resources and what it saved, each the application's bytes (6.2) | answer to an assignment, kept by the hub until acknowledged |
+| answer | task, attempt; the turns it took; what it spent; the last message it read, by name, if any: the unread fence; the messages refused since the run's last turn, each by name with smith's reason, as a turn carries them; how it ended: refused (busy, or invalid and what), ended with its result, smith's bytes (6.1), parked, or failed with its typed failure and bounded detail; what it left on resources and what it saved, each the application's bytes (6.2) | answer to an assignment, kept by the hub until acknowledged; a refusal, kept by nothing (below) |
 | fact | task, attempt; activity: the run's phase, a long operation begun (checks, an LLM completion or a command, with its span) or ended, or a count from smith's channel facts (its kind, its time, its count), all jig's typed activity, never smith's bytes; or, from a host that gives them, a tool begun with its call's name, its tool and its input, or text (6.4) | notice, best effort |
 | rejected | task, attempt; an LLM account, generation | notice |
 | exhausted | task, attempt; an LLM account; how long until it may be used again | notice |
 
+- **A refused start is not kept.** An answer that refuses its start
+  (busy, a duplicate, or invalid, at the entrance or as a start the
+  agent refuses; `../domain/hosts.md`, 6.3) is the end of a run the host
+  never hosted: the hub frees what it took for it at once, keeps no
+  copy, and lists it at no hello, and the fleet closes the attempt as it
+  hears it, so it is never acknowledged (`../domain/engine.md`, section
+  8: a start ends once, refused). One lost with the channel leaves its
+  attempt unlisted at the next hello, and the start ends lost; the next
+  attempt is refused again, or placed.
 - **A call the run withdraws** ends on the worker: the hub answers the run
   that it is withdrawn and drops the engine's answer if one comes
   (`../domain/hosts.md`, 6.2). Nothing crosses for it. A call asked again
@@ -658,11 +667,14 @@ tests in the default suite, randomized ones in the fuzzy suite.
   - smith's facts reaching the views as activity, with no text from
     agent processes.
 
-  Its referee is the hub's and the fleet's: every turn and answer reaches
-  the engine once and is acknowledged once, every relayed call is answered
-  once, every message sent ends once (read, refused or unread), no attempt
-  is placed while a worker may still run the last, and no credential
-  grant's value appears in any domain's state.
+  Its referee is the hub's and the fleet's: every turn, and every answer
+  of a run the host started, reaches the engine once and is acknowledged
+  once; a refused start's answer reaches it at most once and is never
+  acknowledged, and the start ends once, refused or lost (5.1); every
+  relayed call is answered once, every message sent ends once (read,
+  refused or unread), no attempt is placed while a worker may still run
+  the last, and no credential grant's value appears in any domain's
+  state.
 - **The application's worlds** keep running its hosts without bytes
   (`../domain/testing.md`), on the domain's vocabulary.
 - **Fuzzing,** in the fuzzy suite: each record's decoder and the
