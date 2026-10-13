@@ -227,3 +227,12 @@ fn store_schema_module_names_pass_the_source_guard() {
     let failures = super::names::breaches(Path::new("fixture/codec.rs"), source);
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
+
+#[test]
+fn client_link_depends_only_on_client_vocabulary_and_foundation() {
+    let link =
+        manifests().into_iter().find(|m| m.name.as_deref() == Some("jig-protocol-client-link")).expect("link manifest");
+    assert!(link.dependencies.iter().all(|name| {
+        ["skein-lib", "skein-codec", "jig-domain-client", "jig-protocol-client-wire"].contains(&name.as_str())
+    }));
+}

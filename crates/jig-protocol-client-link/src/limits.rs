@@ -1,0 +1,173 @@
+//! Fixed attempt admission and receiving bounds (protocol/client.md, 13).
+use crate::component::Attempt;
+use jig_protocol_client_wire::v2 as w;
+use skein_lib::{Duration, Map};
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Limits {
+    pub client: jig_domain_client::Limits,
+    pub exchanges: u32,
+    pub deadline: Duration,
+    pub wire: w::Limits,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Unusable {
+    Limits,
+}
+impl Limits {
+    pub fn new(client: jig_domain_client::Limits, exchanges: u32, deadline: Duration) -> Result<Self, Unusable> {
+        let wire = wire(&client).ok_or(Unusable::Limits)?;
+        let value = Self { client, exchanges, deadline, wire };
+        worst_case(&value).ok_or(Unusable::Limits)?;
+        Ok(value)
+    }
+}
+#[expect(clippy::too_many_lines, reason = "the generated field bounds are assigned together at construction")]
+fn wire(client: &jig_domain_client::Limits) -> Option<w::Limits> {
+    let mut wire = w::CEILINGS;
+    wire.owned_record = u32::try_from(client.document_bytes).ok()?;
+    wire.document_text_bytes = client.text;
+    wire.owner_chip_phase_waiting_dependencies = client.rows;
+    wire.call_identity_id = client.text;
+    wire.run_work_tool_tool = client.text;
+    wire.part_resource_path = client.rows;
+    wire.part_resource_path_item = client.text;
+    wire.wake_policy_topics = client.rows;
+    wire.wake_policy_subscriptions = u32::try_from(client.document_bytes).ok()?;
+    wire.recipient_roles_roles = client.rows;
+    wire.taken_by_name_some = client.text;
+    wire.party_name = client.text;
+    wire.decision_rejected_reason = client.text;
+    wire.decision_left_held_reason = client.text;
+    wire.attempt_failure_reason = client.text;
+    wire.owner_part_key_path_value = client.rows;
+    wire.owner_part_key_path_value_item = client.text;
+    wire.result_field_name = client.text;
+    wire.result_field_value = client.text;
+    wire.chip_phase_waiting_fields_dependencies = client.rows;
+    wire.chip_phase_running_fields_tool_some = client.text;
+    wire.chip_phase_backing_off_fields_reason = client.text;
+    wire.closing_fields_connectors_some = client.rows;
+    wire.ending_failed_fields_reason_some = client.text;
+    wire.ending_cancelled_fields_reason_some = client.text;
+    wire.ending_withdrawn_fields_reason = client.text;
+    wire.hold_reason_tries_fields_failures = client.rows;
+    wire.hold_reason_stalled_fields_waiting = client.text;
+    wire.owner_chip_details_fields_resources = u32::try_from(client.document_bytes).ok()?;
+    wire.owner_chip_details_fields_closing_connectors_some = client.rows;
+    wire.result_value_owner_verdict_fields_fields = client.rows;
+    wire.result_value_verdict_fields_fields = client.rows;
+    wire.result_value_verdict_fields_tasks = client.rows;
+    wire.result_value_approved_fields_state = client.text;
+    wire.chip_rows = u32::try_from(client.document_bytes).ok()?;
+    wire.chip_phase_rows = u32::try_from(client.document_bytes).ok()?;
+    wire.closing_rows = u32::try_from(client.document_bytes).ok()?;
+    wire.ending_rows = u32::try_from(client.document_bytes).ok()?;
+    wire.held_runtime_rows = u32::try_from(client.document_bytes).ok()?;
+    wire.hold_reason_rows = u32::try_from(client.document_bytes).ok()?;
+    wire.owner_chip_details_rows = u32::try_from(client.document_bytes).ok()?;
+    wire.owner_chip_ending_rows = u32::try_from(client.document_bytes).ok()?;
+    wire.result_value_rows = u32::try_from(client.document_bytes).ok()?;
+    wire.person_answer_choice_reason = client.text;
+    wire.person_answer_approved_words_some = client.text;
+    wire.person_answer_words_value = client.text;
+    wire.person_answer_cannot_reason = client.text;
+    wire.parameter_bytes_value = client.text;
+    wire.specification_words = client.text;
+    wire.specification_parameters = client.rows;
+    wire.specification_inputs = client.rows;
+    wire.owner_pattern_end_exact_value = client.text;
+    wire.owner_pattern_end_open_value = client.text;
+    wire.owner_pattern_segments = client.rows;
+    wire.owner_pattern_segments_item = client.text;
+    wire.owner_delegation_kinds = client.rows;
+    wire.owner_authority_grants = u32::try_from(client.document_bytes).ok()?;
+    wire.owner_authority_note_resources = u32::try_from(client.document_bytes).ok()?;
+    wire.amendment_dependencies_some = client.rows;
+    wire.amendment_instructions_some = client.text;
+    wire.policy_edit_requirements_requirements = u32::try_from(client.document_bytes).ok()?;
+    wire.policy_edit_projections_grants = u32::try_from(client.document_bytes).ok()?;
+    wire.policy_edit_permissions_mappings = client.rows;
+    wire.start_chat_words = client.text;
+    wire.write_words = client.text;
+    wire.answer_question_words = client.text;
+    wire.amend_reason = client.text;
+    wire.cancel_reason = client.text;
+    wire.close_disposals = client.delegates;
+    wire.take_over_reason = client.text;
+    wire.set_goal_spec = client.text;
+    wire.prioritise_goals = client.rows;
+    wire.edit_note_description = client.text;
+    wire.edit_note_body = client.text;
+    wire.edit_note_references = client.rows;
+    wire.set_roles_holdings = client.rows;
+    wire.make_service_name = client.text;
+    wire.made_tasks_tasks = client.rows;
+    wire.read_notes_description_some = client.text;
+    wire.owner_spend_page_rows = client.rows;
+    wire.owner_word_result_approved_state = client.text;
+    wire.owner_word_result_verdict_fields = client.rows;
+    wire.owner_word_words = client.text;
+    wire.owner_activity_words_words = client.text;
+    wire.run_ending_failed_reason = client.text;
+    wire.field_rule_name = client.text;
+    wire.verdict_choice_fields = client.rows;
+    wire.task_contract_document_approval_state = client.text;
+    wire.task_contract_document_verdict_choices = u32::try_from(client.document_bytes).ok()?;
+    wire.result_details_delegates = u32::try_from(client.document_bytes).ok()?;
+    wire.result_details_followups_some = u32::try_from(client.document_bytes).ok()?;
+    wire.bounds_goal_charters = client.rows;
+    wire.bounds_goal_procedures = client.rows;
+    wire.bounds_amend_grants = u32::try_from(client.document_bytes).ok()?;
+    wire.bounds_amend_implications = client.rows;
+    wire.result_document_acts = u32::try_from(client.document_bytes).ok()?;
+    wire.activity_words_words = client.text;
+    wire.activity_run_began_why = client.text;
+    wire.activity_news_summary = client.text;
+    wire.activity_page_rows = u32::try_from(client.document_bytes).ok()?;
+    wire.hold_spend = client.rows;
+    wire.history_change_amended_before = client.text;
+    wire.history_change_amended_after = client.text;
+    wire.history_change_cancelled_reason = client.text;
+    wire.history_change_moved_reason = client.text;
+    wire.document_specification_parameters = client.rows;
+    wire.document_specification_inputs = client.rows;
+    wire.proposed_task_dependencies = client.rows;
+    wire.proposed_task_resources = u32::try_from(client.document_bytes).ok()?;
+    wire.owner_retained_amendment_dependencies_some = client.rows;
+    wire.owner_retained_action_batch_value = u32::try_from(client.document_bytes).ok()?;
+    wire.owner_amendment_state_dependencies = client.rows;
+    wire.history_page_rows = u32::try_from(client.document_bytes).ok()?;
+    wire.runtime_waiting_dependencies = client.rows;
+    wire.runtime_running_tool_some = client.text;
+    wire.runtime_backing_off_reason = client.text;
+    wire.inbox_entry_lineage = u32::try_from(client.document_bytes).ok()?;
+    wire.inbox_page_rows = u32::try_from(client.document_bytes).ok()?;
+    wire.conversation_page_rows = u32::try_from(client.document_bytes).ok()?;
+    wire.goal_page_rows = u32::try_from(client.document_bytes).ok()?;
+    wire.spend_period_pools = client.rows;
+    wire.spend_period_tasks = u32::try_from(client.document_bytes).ok()?;
+    wire.spend_page_rows = u32::try_from(client.document_bytes).ok()?;
+    wire.note_tasks = client.rows;
+    wire.note_acts = u32::try_from(client.document_bytes).ok()?;
+    wire.note_page_rows = u32::try_from(client.document_bytes).ok()?;
+    wire.object_page_rows = u32::try_from(client.document_bytes).ok()?;
+    wire.owner_ended_page_rows = u32::try_from(client.document_bytes).ok()?;
+    wire.owner_inbox_selection_goals = client.rows;
+    wire.owner_inbox_page_selection_some = u32::try_from(client.document_bytes).ok()?;
+    wire.owner_inbox_page_rows = u32::try_from(client.document_bytes).ok()?;
+    wire.draft_words = client.text;
+    w::check_limits(&wire).ok()?;
+    Some(wire)
+}
+#[must_use]
+pub fn worst_case(limits: &Limits) -> Option<u64> {
+    if limits.exchanges == 0 || limits.deadline == Duration::ZERO {
+        return None;
+    }
+    if wire(&limits.client)? != limits.wire {
+        return None;
+    }
+    limits.exchanges.checked_mul(2)?;
+    let map = Map::<skein_lib::Token, Attempt>::worst_case(limits.exchanges)?;
+    map.checked_add(skein_lib::List::<skein_lib::Token>::worst_case(limits.exchanges)?)
+}

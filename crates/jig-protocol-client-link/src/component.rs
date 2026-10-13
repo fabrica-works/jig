@@ -1,0 +1,159 @@
+//! One bounded exchange per request-table attempt (protocol/client.md, 5).
+use crate::{Answered, Ask, Event, Fact, Family, Limits, Request, Unusable, translate};
+use jig_protocol_client_wire::{self as wire, v2 as w};
+use skein_lib::{Map, Queue, Reader, RequestEnvelope, RequestKey, Time, Token, Writer};
+#[derive(Debug)]
+pub(crate) struct Attempt {
+    token: Token,
+    owner: w::Owner,
+    version: u32,
+    until: Time,
+}
+#[derive(Debug)]
+pub struct Link {
+    limits: Limits,
+    attempts: Map<Token, Attempt>,
+    next: u64,
+}
+impl Link {
+    pub fn new(limits: &Limits) -> Result<Self, Unusable> {
+        crate::worst_case(limits).ok_or(Unusable::Limits)?;
+        Ok(Self { limits: *limits, attempts: Map::with_capacity(limits.exchanges), next: 1 })
+    }
+    #[must_use]
+    pub fn max_out(&self) -> u32 {
+        self.limits.exchanges.saturating_mul(2).max(2)
+    }
+    #[must_use]
+    pub fn next_deadline(&self) -> Option<Time> {
+        let mut first = None;
+        for (_, attempt) in &self.attempts {
+            first = Some(match first {
+                Some(value) => core::cmp::min(value, attempt.until),
+                None => attempt.until,
+            });
+        }
+        first
+    }
+    pub fn reclaim(&mut self) {}
+    #[must_use]
+    pub fn worst_case(limits: &Limits) -> Option<u64> {
+        crate::worst_case(limits)
+    }
+    pub fn step(&mut self, now: Time, event: Event, out: &mut Queue<Request>) {
+        match event {
+            Event::Send { attempt, key, ask } => self.send(now, attempt, key, ask, out),
+            Event::Answered { exchange, status, body } => self.answered(exchange, status, &body, out),
+            Event::Failed { exchange } => {
+                if let Some(attempt) = self.attempts.remove(&exchange) {
+                    lost(attempt.token, out);
+                }
+            }
+        }
+    }
+    pub fn fire(&mut self, now: Time, out: &mut Queue<Request>) {
+        let mut expired = skein_lib::List::with_capacity(self.limits.exchanges);
+        for (exchange, attempt) in &self.attempts {
+            if now >= attempt.until {
+                expired.push(*exchange).expect("bounded attempts");
+            }
+        }
+        for exchange in &expired {
+            let attempt = self.attempts.remove(exchange).expect("collected live exchange");
+            out.push(Request::Abandon { exchange: *exchange });
+            lost(attempt.token, out);
+        }
+    }
+    fn send(&mut self, now: Time, attempt: Token, key: RequestKey, ask: Ask, out: &mut Queue<Request>) {
+        if self.attempts.len() == self.attempts.capacity() {
+            lost(attempt, out);
+            return;
+        }
+        let Some(next) = self.next.checked_add(1) else {
+            lost(attempt, out);
+            return;
+        };
+        let Ok(record) = keyed(key, ask, &self.limits.wire) else {
+            lost(attempt, out);
+            return;
+        };
+        let exchange = Token::new(self.next);
+        self.next = next;
+        let state = Attempt {
+            token: attempt,
+            owner: record.owner().clone(),
+            version: record.version(),
+            until: now.saturating_add(self.limits.deadline),
+        };
+        self.attempts.insert(exchange, state).expect("checked exchange capacity");
+        let mut writer = Writer::new(usize::try_from(record.measure()).expect("u32 fits usize"));
+        record.encode(&mut writer).expect("measured envelope");
+        out.push(Request::Exchange { exchange, path: b"/jig/v1/request", body: writer.finish() });
+    }
+    fn answered(&mut self, exchange: Token, status: u16, body: &[u8], out: &mut Queue<Request>) {
+        let Some(attempt) = self.attempts.remove(&exchange) else { return };
+        if status != 200 {
+            lost(attempt.token, out);
+            return;
+        }
+        let Ok(record) = w::Answer::decode(&self.limits.wire, &mut Reader::new(body)) else {
+            lost(attempt.token, out);
+            return;
+        };
+        let envelope = match record {
+            w::Answer::Busy | w::Answer::NotReady => RequestEnvelope::Again,
+            w::Answer::SignedOut => RequestEnvelope::SignedOut,
+            w::Answer::FinalAnswer(record) => {
+                let answer = if record.owner() != &attempt.owner || record.version() != attempt.version {
+                    Err(translate::Undecodable::Version)
+                } else {
+                    match record.owner() {
+                        w::Owner::Jig => match translate::answers::answer(w::Answer::FinalAnswer(record), &self.limits)
+                        {
+                            Ok(answer) => Ok(Answered::Jig(answer)),
+                            Err(problem) => Err(problem),
+                        },
+                        w::Owner::Family(owner) => Ok(Answered::Family(Family {
+                            family: owner.number(),
+                            version: record.version(),
+                            bytes: skein_lib::bytes::copy_of(record.record()),
+                        })),
+                    }
+                };
+                match answer {
+                    Ok(answer) => {
+                        out.push(Request::Answer {
+                            attempt: attempt.token,
+                            envelope: RequestEnvelope::Final,
+                            answer: Some(answer),
+                        });
+                        return;
+                    }
+                    Err(_) => {
+                        out.push(Request::Fact { fact: Fact::UndecodableAnswer });
+                        RequestEnvelope::Lost
+                    }
+                }
+            }
+        };
+        out.push(Request::Answer { attempt: attempt.token, envelope, answer: None });
+    }
+}
+fn lost(attempt: Token, out: &mut Queue<Request>) {
+    out.push(Request::Answer { attempt, envelope: RequestEnvelope::Lost, answer: None });
+}
+fn keyed(key: RequestKey, ask: Ask, limits: &w::Limits) -> Result<w::Keyed, w::Problem> {
+    let (owner, version, request) = match ask {
+        Ask::Jig(ask) => {
+            let record = translate::asks::ask(&ask, limits)?;
+            let mut writer = Writer::new(usize::try_from(record.measure()).expect("u32 fits usize"));
+            record.encode(&mut writer).expect("measured ask");
+            (w::Owner::Jig, wire::VERSION, writer.finish())
+        }
+        Ask::Family(record) => {
+            let owner = w::Family::new(limits, w::FamilyParts { number: record.family })?;
+            (w::Owner::Family(owner), record.version, record.bytes)
+        }
+    };
+    w::Keyed::new(limits, w::KeyedParts { key, owner, version, request })
+}

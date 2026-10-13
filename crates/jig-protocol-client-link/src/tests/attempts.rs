@@ -1,0 +1,101 @@
+use super::*;
+#[test]
+fn a_send_becomes_one_post_with_its_key() {
+    let (mut h, _) = fixtures::Harness::sending();
+    assert_eq!(h.out.len(), 1);
+    let Request::Exchange { path, body, .. } = h.out.pop().unwrap() else { panic!("expected exchange") };
+    assert_eq!(path, b"/jig/v1/request");
+    let record = w::Keyed::decode(&fixtures::limits().wire, &mut Reader::new(&body)).unwrap();
+    assert_eq!(record.key(), &fixtures::KEY);
+    assert_eq!(record.owner(), &w::Owner::Jig);
+    assert_eq!(record.version(), 2);
+}
+#[test]
+fn done_is_handed_up_final_with_its_outcome() {
+    let (mut h, exchange) = fixtures::Harness::sending();
+    h.answer(exchange, 200, &fixtures::answer_done_chat(31));
+    assert_eq!(
+        h.answered(fixtures::ATTEMPT),
+        Some((
+            RequestEnvelope::Final,
+            Some(&Answered::Jig(c::Answer::Done(c::Outcome::Made { what: c::Made::Chat { task: 31 } })))
+        ))
+    );
+}
+#[test]
+fn busy_is_handed_up_as_again_with_no_answer() {
+    let (mut h, exchange) = fixtures::Harness::sending();
+    h.answer(exchange, 200, &fixtures::answer_busy());
+    assert_eq!(h.answered(fixtures::ATTEMPT), Some((RequestEnvelope::Again, None)));
+}
+#[test]
+fn signed_out_is_handed_up_as_signed_out() {
+    let (mut h, exchange) = fixtures::Harness::sending();
+    h.answer(exchange, 200, &fixtures::answer_signed_out());
+    assert_eq!(h.answered(fixtures::ATTEMPT), Some((RequestEnvelope::SignedOut, None)));
+}
+#[test]
+fn a_failed_exchange_is_handed_up_lost() {
+    let (mut h, exchange) = fixtures::Harness::sending();
+    h.link.step(Time::ZERO, Event::Failed { exchange }, &mut h.out);
+    h.lost();
+}
+#[test]
+fn an_attempt_past_its_deadline_is_abandoned_and_lost() {
+    let (mut h, exchange) = fixtures::Harness::sending();
+    h.link.fire(Time::ZERO.saturating_add(fixtures::limits().deadline), &mut h.out);
+    assert!(h.has(&Request::Abandon { exchange }));
+    h.lost();
+    assert_eq!(h.link.next_deadline(), None);
+}
+#[test]
+fn a_final_answer_that_does_not_decode_is_lost_and_reported() {
+    let (mut h, exchange) = fixtures::Harness::sending();
+    h.answer(exchange, 200, &fixtures::malformed_final());
+    h.lost();
+    assert!(h.has(&Request::Fact { fact: Fact::UndecodableAnswer }));
+}
+#[test]
+fn a_late_answer_cannot_answer_an_abandoned_attempt_twice() {
+    let (mut h, exchange) = fixtures::Harness::sending();
+    h.link.fire(Time::ZERO.saturating_add(fixtures::limits().deadline), &mut h.out);
+    h.answer(exchange, 200, &fixtures::answer_done_chat(31));
+    assert_eq!(h.terminals(), 1);
+    h.lost();
+}
+#[test]
+fn non_success_statuses_and_malformed_outer_bodies_are_lost() {
+    for (status, body) in [(503, fixtures::answer_busy()), (200, Box::from([255]))] {
+        let (mut h, exchange) = fixtures::Harness::sending();
+        h.answer(exchange, status, &body);
+        h.lost();
+    }
+}
+
+#[test]
+fn a_final_refusal_keeps_its_revision_and_whole_hold_facts() {
+    let (mut h, exchange) = fixtures::Harness::sending();
+    h.answer(exchange, 200, &fixtures::refusal_with_hold(fixtures::fact_bytes(&fixtures::hold_budget_fact())));
+    let expected = c::Answer::Refused(c::Refusal::Moved {
+        now: c::Revision { value: u64::MAX },
+        what: c::Moved::Hold {
+            reason: Some(c::CurrentHold::Document(Box::new(c::HoldReason::Budget { spent: u64::MAX, limit: 16 }))),
+        },
+    });
+    assert_eq!(h.answered(fixtures::ATTEMPT), Some((RequestEnvelope::Final, Some(&Answered::Jig(expected)))));
+}
+#[test]
+fn malformed_piece_lengths_in_a_final_refusal_are_lost_and_reported() {
+    for rows in [Box::from([0, 0, 0].as_slice()), Box::from([0, 0, 0, 3, 1].as_slice())] {
+        let (mut h, exchange) = fixtures::Harness::sending();
+        h.answer(exchange, 200, &fixtures::refusal_with_hold(rows));
+        h.lost();
+        assert!(h.has(&Request::Fact { fact: Fact::UndecodableAnswer }));
+    }
+}
+#[test]
+fn an_invalid_client_limit_literal_is_refused() {
+    let mut invalid = fixtures::limits();
+    invalid.wire.owned_record = 16_777_217;
+    assert_eq!(Link::new(&invalid).unwrap_err(), Unusable::Limits);
+}

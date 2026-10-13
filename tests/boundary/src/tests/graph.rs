@@ -142,6 +142,7 @@ fn client_step(name: &str) -> bool {
             | "jig-view"
             | "jig-protocol-transcript"
             | "jig-protocol-client-wire"
+            | "jig-protocol-client-link"
             | "jig-test-domain-client"
             | "jig-test-view"
             | "jig-ops-domain-connectors"

@@ -545,6 +545,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "jig-protocol-client-link"
+version = "0.0.0"
+dependencies = [
+ "jig-domain-client",
+ "jig-protocol-client-wire",
+ "skein-codec",
+ "skein-lib",
+]
+
+[[package]]
 name = "jig-protocol-client-wire"
 version = "0.0.0"
 dependencies = [
