@@ -1637,6 +1637,21 @@ the file.
      Box<[u8]>, record: Box<[u8]> }` as the shell reads them; the family's
      key comes from the keeper-tagged storage key; `w::Kept` and the
      family's bytes are untouched.
+219. **The focused suite's second pass: two steps and a rule for the
+     rest** (2026-10-13, the designer's answer to question.md's "The
+     focused suite's cost, a second pass"; skein `cb3cefbf`, jig
+     `404ebd94`). Most of the suite's time is processes, each test about 5
+     ms alone and 12 ms in the gate's eight at once. Two steps not in the
+     plan (`tests-cost.md`, 10 and 11): jig-tests.s4, the repository's
+     tools (`jig-boundary`, `skein-codegen`) built optimized, about 8 s of
+     test time; jig-tests.s5, one behaviour's cases folded into a table
+     test in six unit-test crates, about 7 s. And `tests-cost.md`, 12 binds
+     every step left (31 to 35, 18, 25 to 27, 33): one test per behaviour,
+     cases as rows, fixtures constants or built once, test-sized limits,
+     the Proof naming its tests' count; jig 34 and 35 share each document's
+     wire record from one kit under `testing/`. The README's Rules say so.
+     Unit tests in one process per crate is the user's to choose (For the
+     user).
 
 ## For the user
 

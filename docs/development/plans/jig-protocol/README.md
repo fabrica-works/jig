@@ -327,6 +327,13 @@ ones before it in its session. Dependencies are by capability: "skein
   the standard library), fully qualified, naming the exact path, with a
   regression that jig's own use of the word is still refused; no question.
   jig's own names stay refused.
+- **A new test costs the suite about 12 ms before its work** (decisions.md,
+  ruling 219; `tests-cost.md`, 12). In every step left, tests are one per
+  behaviour, a behaviour's cases rows of one table test; fixtures are
+  constants or built once in a test; limits are test-sized; the Proof
+  names the step's tests' count. jig 34 and 35 take each document's wire
+  record from one kit under `testing/`, each side keeping its own literal
+  of its own value.
 
 ## Live services
 
