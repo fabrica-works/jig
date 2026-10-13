@@ -1752,6 +1752,19 @@ the file.
      stays (decision 36 settled) and the wire's `MadeService` gains
      `credential: secret 40`. A step not in the plan, jig 31.s1
      (`jig/31-engine-clients.md`), builds it after 31.3.
+229. **The peers' fixture journal is sized by the root's admitted bound**
+     (2026-10-13, the coordinator's block "jig 18.3: peer fixture journal
+     overflows the actual real-store ceiling", 2026-10-13T06:33:20Z).
+     `tests/core/src/peers.rs`'s fixture asks a journal of 10,000 writes;
+     the real store's `sizes` refuses it (the largest map row times twice
+     the writes past `u32`), as it should refuse a configuration no commit
+     can hold. The fixture's `journal.writes` becomes the root's admitted
+     bound, `core::room_max(&limits.core).writes + 2 * connector::MAX_OUT`,
+     at least 2,000, and `journal.held` follows it: a fixture input under
+     ruling 114 and the README's test-sized limits (ruling 219), every
+     test's name and expected value kept. Ruling 215 stands: the adapter
+     caps nothing. A test that then fails for want of journal room is a
+     finding, raised.
 
 ## For the user
 
