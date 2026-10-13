@@ -1572,6 +1572,15 @@ the file.
      (`jig/32-client-link.md`), moves the constant and adds a test in the
      client link that the two are equal, so the next move of one alone
      fails the gate.
+214. **jig 18.1 lands at 1,102 lines; jig 18 joins the codec rule**
+     (2026-10-13, the coordinator's block "jig 18.1: complete codec
+     count1102 over750 allowance", 2026-10-13T05:12:51Z). jig 18.1's store
+     codec for the test application's connector records carries, in its
+     twelve records' `ApplicationOutcome::CoreRefused`, the core's retained
+     facts, whose exhaustive translations are 463 of its 1,102 lines
+     against 500; every file under 800. It lands as it is, and jig 18
+     joins the README's rule for codec increments (up to twice their Size
+     without asking).
 
 ## For the user
 

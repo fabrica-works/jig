@@ -246,7 +246,7 @@ ones before it in its session. Dependencies are by capability: "skein
   it, is part of the increment's Files, at the increment's Size. It is no
   question.
 - **A codec increment lands past its Size, up to twice it**
-  (decisions.md, rulings 132, 151 and 188). In jig 14, jig 19, jig 20 and jig 30, an increment whose
+  (decisions.md, rulings 132, 151, 188 and 214). In jig 14, jig 18, jig 19, jig 20 and jig 30, an increment whose
   production code is only the schema, the facade and the translations of
   the types and rows its Scope names lands without asking up to twice its
   "Size: at most N lines", and its report gives the count by file. This
