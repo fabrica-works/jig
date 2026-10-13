@@ -136,6 +136,20 @@ the file.
      as landed in the ledger but not on main, which is this ruling, not a
      fault. The same defect twice became a standing rule in the README
      ("A commit's last paragraph is its trailers").
+103. **smith 03.1 keeps the run world's trace as it is** (plan defect,
+     smith 03's block of 2026-10-13T23:45:15Z). 03.1's Shape asked the run
+     world's trace to keep typed entries, formatted when read; but
+     `run::Event` and `run::Request` have no `Clone`, their `ReplyTo`
+     fields are single-use rights, and the trace is read whole by replays
+     (`tests/run/tests/fuzzy_messages.rs:22`, `simulation.rs:988`) and by
+     `Debug` text (`simulation.rs:564`, "Checking {"). Keeping it typed
+     needs either a new kit mechanism upstream in skein or a mirrored enum
+     of every variant, both past the increment's 30 lines and outside its
+     Files; the audit put the whole saving at "about 1 s" summed
+     (`findings/cost-smith.md`, 9, estimated), about 0.1 s of wall. 03.1
+     now changes only the agent world's log line
+     (`tests/agent/src/world.rs:1004`); the run world's trace goes to
+     `later.md`. No kit mechanism is added.
 
 ## For the user
 

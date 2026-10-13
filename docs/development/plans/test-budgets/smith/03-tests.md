@@ -62,11 +62,11 @@ about 14 s summed.
 Scope: jig's workflow.md, 2 ("Traces on failure"), in smith's worlds.
 Needs: smith 02.1 (smith's gate passes here).
 Files: `tests/agent/src/world.rs:1004` (the log line that formats a
-  33,554,433-byte text with `{:?}`); `tests/run/src/world.rs:897,1009`
-  (`Debug` traces built whatever happens).
+  33,554,433-byte text with `{:?}`). The run world's `Debug` traces
+  (`tests/run/src/world.rs:897,1009`) stay as they are (ruling 103;
+  `later.md`).
 Shape: the log line names the transcript by its length and digest, not
-  its bytes; the run world's trace keeps typed entries and formats them
-  when a test fails or reads them.
+  its bytes.
 Test shape: the worlds' tests, unchanged;
   `every_transient_history_refusal_is_exact_and_starts_no_provider_or_tool_effect`
   (`smith-agent-world::messages`) under 0.1 s alone (the audit: 1.25 s
@@ -74,8 +74,8 @@ Test shape: the worlds' tests, unchanged;
 Proof: world, `heavy --gate cargo nextest run -p smith-agent-world -p
   smith-run-world --profile measure -j 1` once: summed times in the
   report (at this plan's base, alone: `smith-agent-world::messages` 1.45 s,
-  `smith-run-world::simulation` 1.09 s); `smoke-tools` once before
-  `land`.
+  `smith-run-world::simulation` 1.09 s, which this increment does not
+  change); `smoke-tools` once before `land`.
 Don't: drop a line a replay or a referee compares.
 Size: test kit only, at most 30 lines.
 Removes: the formatting of unread traces.
