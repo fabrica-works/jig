@@ -2043,6 +2043,18 @@ the file.
      story, test code only: restartable constructors and access to the
      store's acknowledgement, reusing the simulated browser and issuer. No
      new kit, no real browser; production stays at most 120 lines.
+252. **jig 25.5 lands at 1,274 lines; jig 25's steps left ask past twice
+     their Size** (2026-10-13, the coordinator's block "jig 25.5: complete
+     worker composition size 1274 beyond 900", 2026-10-13T09:03:02Z). As
+     with 25.4 (ruling 237), the reference service's composition runs about
+     twice its Size: 25.5's worker root, link and process mapping is done
+     and proven (36 tests in 0.104 s), every file under 800 lines. It lands
+     as counted, the per-file counts in its commit body. For jig 25's steps
+     left, ruling 196's "1.5 times" is "twice" before asking; every other
+     session keeps 1.5. Its `Worker::process` (about 230 lines, one arm per
+     smith request) is split into one function per request kind when the
+     file is next edited (ruling 209: an unchanged move counts for
+     nothing). jig 25's Sizes are underestimated, for the retrospective.
 
 ## For the user
 
