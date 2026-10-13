@@ -12,10 +12,21 @@ pub enum Event {
     Unreachable,
     Lower { connection: Token, event: LowerEvent },
     Gone { connection: Token },
+    CancelRelay { run: Token, attempt: Token, call: Box<[u8]> },
 }
 #[derive(Debug)]
 pub enum Request {
     Ready,
+    RelayCancelled {
+        run: Token,
+        attempt: Token,
+        call: Box<[u8]>,
+    },
+    Resend {
+        run: Token,
+        attempt: Token,
+        turn: u32,
+    },
     Lost,
     Down {
         down: host::LinkDown,

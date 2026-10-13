@@ -131,6 +131,7 @@ impl World {
                 self.component.down(self.now, Event::Gone { connection }, &mut self.out);
             }
             Request::Fact { why } => self.facts.push(why),
+            request @ (Request::RelayCancelled { .. } | Request::Resend { .. }) => self.root.push(request),
             Request::Ready => self.root.push(Request::Ready),
             Request::Lost => self.root.push(Request::Lost),
             request @ Request::Down { .. } => {

@@ -2,8 +2,11 @@
 use crate::{
     Event, Limits, Request,
     backoff::Backoff,
+    busy::Busy,
     connection::{Connection, Phase},
-    limits, translate,
+    limits,
+    relays::Relays,
+    translate,
 };
 use alloc::boxed::Box;
 use core::mem;
@@ -33,6 +36,8 @@ pub struct Component {
     below: Queue<channel::Lower>,
     next_part: u64,
     dropped: u64,
+    relays: Relays,
+    busy: Busy,
 }
 impl Component {
     pub fn new(limits: &Limits, credential: Credential, seed: u64) -> Result<Self, Unusable> {
@@ -53,10 +58,17 @@ impl Component {
             below: Queue::with_capacity(channel::MAX_DOWN.saturating_mul(3)),
             next_part: 1,
             dropped: 0,
+            relays: Relays::new(limits),
+            busy: Busy::new(limits, seed),
         })
     }
     pub fn down(&mut self, now: Time, event: Event, out: &mut Queue<Request>) {
         match event {
+            Event::CancelRelay { run, attempt, call } => {
+                if self.relays.end(run, attempt, &call) {
+                    out.push(Request::RelayCancelled { run, attempt, call });
+                }
+            }
             Event::Dialled { connection } => self.dialled(now, connection, out),
             Event::Unreachable => match self.phase {
                 Phase::Connecting => {
@@ -76,16 +88,19 @@ impl Component {
             }
             Event::Gone { connection } => self.gone(now, connection, out),
             Event::Hello { hello } => {
-                self.hello(hello);
+                self.hello(now, hello, out);
                 self.pump(now, out);
             }
             Event::Up { up, parts } => {
-                self.up(up, &parts);
+                self.up(now, up, &parts, out);
                 self.pump(now, out);
             }
         }
     }
     pub fn fire(&mut self, now: Time, out: &mut Queue<Request>) {
+        if let Some((run, attempt, turn)) = self.busy.expire(now) {
+            out.push(Request::Resend { run, attempt, turn });
+        }
         match self.phase {
             Phase::Idle { at } => {
                 if now >= at {
@@ -128,12 +143,16 @@ impl Component {
     }
     #[must_use]
     pub fn next_deadline(&self) -> Option<Time> {
-        match self.phase {
+        let phase = match self.phase {
             Phase::Idle { at } => Some(at),
             Phase::Opening { until, .. } => Some(until),
             Phase::Closing { until, .. } => until,
             Phase::Open { proved, .. } => proved,
             Phase::Connecting => None,
+        };
+        match (phase, self.busy.next()) {
+            (Some(a), Some(b)) => Some(a.min(b)),
+            (a, b) => a.or(b),
         }
     }
     #[must_use]
@@ -176,6 +195,7 @@ impl Component {
         let at = match phase {
             Phase::Closing { retry, .. } => retry,
             Phase::Open { .. } => {
+                self.busy.clear();
                 out.push(Request::Lost);
                 out.push(Request::Fact { why: Closed::Stream });
                 let span = self.backoff.next();
@@ -191,7 +211,7 @@ impl Component {
         };
         self.phase = Phase::Idle { at };
     }
-    fn hello(&mut self, value: host::Hello) {
+    fn hello(&mut self, now: Time, value: host::Hello, out: &mut Queue<Request>) {
         match &mut self.phase {
             Phase::Open { hello, .. } => {
                 if *hello {
@@ -204,18 +224,45 @@ impl Component {
                 };
                 *hello = true;
                 self.command(channel::Request::Send { token: Token::new(0), frame });
+                // Queue replay without polling lower demands: one hello step stays bounded.
+                for index in 0..self.limits.sizes.slots.saturating_mul(self.limits.sizes.calls) {
+                    let Some(frame) = self.relays.replay(index) else { break };
+                    match self.phase {
+                        Phase::Open { .. } => {}
+                        Phase::Idle { .. } | Phase::Connecting | Phase::Opening { .. } | Phase::Closing { .. } => break,
+                    }
+                    self.command(channel::Request::Send { token: Token::new(1), frame });
+                    for _ in 0..channel::MAX_UP {
+                        let Some(event) = self.events.pop() else { break };
+                        self.received(now, event, out);
+                    }
+                }
             }
             Phase::Idle { .. } | Phase::Connecting | Phase::Opening { .. } | Phase::Closing { .. } => {}
         }
     }
-    fn up(&mut self, up: host::LinkUp, parts: &[wire::Part]) {
+    fn up(&mut self, now: Time, up: host::LinkUp, parts: &[wire::Part], out: &mut Queue<Request>) {
         match self.phase {
             Phase::Open { hello: true, .. } => {
                 let limits = sizes::limits(&self.limits.sizes).expect("checked sizes");
+                let relay = match &up {
+                    host::LinkUp::Call { run, attempt, call, .. } => Some((*run, *attempt, bytes::copy_of(call))),
+                    host::LinkUp::Activity { .. }
+                    | host::LinkUp::Rejected { .. }
+                    | host::LinkUp::Exhausted { .. }
+                    | host::LinkUp::Turn { .. }
+                    | host::LinkUp::Answer { .. } => None,
+                };
                 let Some(frame) = translate::up(up, parts, &limits) else {
                     self.dropped = self.dropped.saturating_add(1);
                     return;
                 };
+                if let Some((run, attempt, call)) = relay
+                    && !self.relays.add(run, attempt, call, &frame)
+                {
+                    self.lose(now, Closed::Owner, out);
+                    return;
+                }
                 self.command(channel::Request::Send { token: Token::new(1), frame });
             }
             Phase::Idle { .. }
@@ -311,10 +358,48 @@ impl Component {
             channel::Event::Ended | channel::Event::OutputFailed => self.lose(now, Closed::Stream, out),
             channel::Event::Body { kind, body } => {
                 let limits = sizes::limits(&self.limits.sizes).expect("checked sizes");
+                if kind == 0x0184 {
+                    let record = wire::TurnBusy::decode(&limits, &mut skein_lib::Reader::new(&body));
+                    match record {
+                        Ok(record)
+                            if self.busy.add(
+                                now,
+                                Token::new(record.task()),
+                                Token::new(record.attempt()),
+                                record.number(),
+                            ) =>
+                        {
+                            self.command(channel::Request::Read);
+                        }
+                        Ok(_) => self.lose(now, Closed::Owner, out),
+                        Err(_) => {
+                            self.command(channel::Request::Refuse { reason: 3, text: Box::new([]) });
+                            self.begin_loss(now, Closed::RefusedHere(3), out);
+                        }
+                    }
+                    return;
+                }
                 let mut parts = List::with_capacity(1);
                 match translate::down(kind, &body, &limits, now, &mut parts, &mut self.next_part, out) {
                     Some(down) => {
-                        out.push(Request::Down { down, parts: parts.into_boxed() });
+                        let forward = match &down {
+                            host::LinkDown::Relayed { run, attempt, call, .. } => self.relays.end(*run, *attempt, call),
+                            host::LinkDown::TurnKept { run, attempt, turn } => {
+                                self.busy.kept(*run, *attempt, *turn);
+                                true
+                            }
+                            host::LinkDown::Acknowledge { run, attempt } => {
+                                self.busy.acknowledged(*run, *attempt);
+                                true
+                            }
+                            host::LinkDown::Assign { .. }
+                            | host::LinkDown::Message { .. }
+                            | host::LinkDown::Cancel { .. }
+                            | host::LinkDown::Grant { .. } => true,
+                        };
+                        if forward {
+                            out.push(Request::Down { down, parts: parts.into_boxed() });
+                        }
                         self.command(channel::Request::Read);
                     }
                     None => {
@@ -342,6 +427,7 @@ impl Component {
         let mut started = false;
         self.phase = match phase {
             Phase::Open { connection, .. } => {
+                self.busy.clear();
                 out.push(Request::Lost);
                 let span = self.backoff.next();
                 out.push(Request::Fact { why });

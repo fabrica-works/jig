@@ -363,9 +363,24 @@ pub(crate) fn down(
             let grant = grant(record.grant, now, out);
             host::LinkDown::Grant { run: Token::new(record.task), attempt: Token::new(record.attempt), grant }
         }
-        // Relayed and TurnBusy remain refused until 24.3; up kinds are invalid here.
-        wire::Kind::Relayed
-        | wire::Kind::TurnBusy
+        wire::Kind::Relayed => {
+            let record = wire::Relayed::decode(limits, &mut reader).ok()?.into_parts();
+            let answer = match record.answer {
+                wire::RelayAnswer::Busy => host::Relayed::Busy,
+                wire::RelayAnswer::Text(text) => {
+                    let text = text.into_parts();
+                    host::Relayed::Answer { error: text.error, text: text.text }
+                }
+            };
+            host::LinkDown::Relayed {
+                run: Token::new(record.task),
+                attempt: Token::new(record.attempt),
+                call: record.name,
+                answer,
+            }
+        }
+        // TurnBusy is decoded below the hub by the component; up kinds are invalid here.
+        wire::Kind::TurnBusy
         | wire::Kind::Hello
         | wire::Kind::Turn
         | wire::Kind::Call

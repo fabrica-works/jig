@@ -47,7 +47,8 @@ pub fn channel_limits(limits: &Limits) -> Result<channel::Limits, Unusable> {
 }
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
-    if limits.backoff == Duration::ZERO
+    if limits.busy == Duration::ZERO
+        || limits.backoff == Duration::ZERO
         || limits.ceiling < limits.backoff
         || limits.handshake == Duration::ZERO
         || limits.proved == Duration::ZERO
@@ -61,6 +62,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     let state = u64::try_from(size_of::<Component>()).ok()?;
     bound
         .checked_add(state)?
+        .checked_add(crate::relays::Relays::worst_case(limits)?)?
+        .checked_add(crate::busy::Busy::worst_case(limits)?)?
         .checked_add(u64::from(channel.skip).checked_mul(2)?)?
         .checked_add(List::<Box<[u8]>>::worst_case(limits.sizes.transcript.checked_div(4)?)?)?
         .checked_add(List::<host::StartMessage>::worst_case(limits.sizes.inbox)?)?

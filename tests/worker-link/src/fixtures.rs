@@ -336,3 +336,46 @@ pub fn encoded<F: FnOnce(&mut Writer) -> Result<(), skein_lib::Overflow>>(measur
     encode(&mut writer).expect("measured record");
     writer.finish()
 }
+
+#[must_use]
+pub fn call(name: &[u8]) -> host::LinkUp {
+    host::LinkUp::Call {
+        run: RUN_SEVEN,
+        attempt: ATTEMPT_TWO,
+        call: name.into(),
+        tool: b"tool".as_slice().into(),
+        writes: true,
+        input: b"{}".as_slice().into(),
+        deadline: Duration::from_secs(60),
+    }
+}
+#[must_use]
+pub fn relayed(name: &[u8], busy: bool) -> skein_channel::Frame {
+    let limits = codec();
+    let answer = if busy {
+        wire::RelayAnswer::Busy
+    } else {
+        wire::RelayAnswer::Text(
+            wire::RelayText::new(&limits, wire::RelayTextParts { error: false, text: b"answer".as_slice().into() })
+                .expect("answer"),
+        )
+    };
+    let record = wire::Relayed::new(&limits, wire::RelayedParts { task: 7, attempt: 2, name: name.into(), answer })
+        .expect("relayed");
+    frame(0x0182, &encoded(record.measure(), |writer| record.encode(writer)))
+}
+#[must_use]
+pub fn turn_busy() -> skein_channel::Frame {
+    let record = wire::TurnBusy::new(&codec(), wire::TurnBusyParts { task: 7, attempt: 2, number: 1 }).expect("busy");
+    frame(0x0184, &encoded(record.measure(), |writer| record.encode(writer)))
+}
+#[must_use]
+pub fn turn_kept() -> skein_channel::Frame {
+    let record = wire::TurnKept::new(&codec(), wire::TurnKeptParts { task: 7, attempt: 2, number: 1 }).expect("kept");
+    frame(0x0183, &encoded(record.measure(), |writer| record.encode(writer)))
+}
+#[must_use]
+pub fn acknowledge() -> skein_channel::Frame {
+    let record = wire::Acknowledge::new(&codec(), wire::AcknowledgeParts { task: 7, attempt: 2 }).expect("acknowledge");
+    frame(0x0185, &encoded(record.measure(), |writer| record.encode(writer)))
+}

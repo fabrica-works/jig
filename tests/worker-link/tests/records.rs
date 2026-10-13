@@ -24,7 +24,9 @@ fn assignment(world: &World) -> &host::Assignment {
             | Request::Lower { .. }
             | Request::Close { .. }
             | Request::Abort { .. }
-            | Request::Fact { .. } => None,
+            | Request::Fact { .. }
+            | Request::Resend { .. }
+            | Request::RelayCancelled { .. } => None,
         })
         .expect("assignment")
 }
@@ -41,7 +43,9 @@ fn down(world: &World) -> Vec<&host::LinkDown> {
             | Request::Lower { .. }
             | Request::Close { .. }
             | Request::Abort { .. }
-            | Request::Fact { .. } => None,
+            | Request::Fact { .. }
+            | Request::Resend { .. }
+            | Request::RelayCancelled { .. } => None,
         })
         .collect()
 }
@@ -75,38 +79,24 @@ fn each_down_record_reaches_the_root_in_order() {
         world.play(frame);
     }
     let records = down(&world);
-    assert_eq!(records.len(), 6);
-    assert_eq!(assignment(&world).turns.as_ref(), [Box::from(b"one!".as_slice()), Box::from(b"two!".as_slice())]);
+    check_down_records(&world, &records);
+    world.down(Event::Up { up: fixtures::call(b"call"), parts: Box::new([]) });
+    world.play(fixtures::relayed(b"call", false));
+    world.play(fixtures::turn_busy());
+    let records = down(&world);
+    assert_eq!(records.len(), 7);
     assert_eq!(
-        (assignment(&world).assignment.run, assignment(&world).assignment.attempt),
-        (Token::new(7), Token::new(2))
-    );
-    assert_eq!(
-        *records[1],
-        host::LinkDown::Message {
+        *records[6],
+        host::LinkDown::Relayed {
             run: Token::new(7),
             attempt: Token::new(2),
-            name: Token::new(6),
-            sender: b"sender".as_slice().into(),
-            words: b"later".as_slice().into()
+            call: b"call".as_slice().into(),
+            answer: host::Relayed::Answer { error: false, text: b"answer".as_slice().into() },
         }
     );
-    assert_eq!(*records[2], host::LinkDown::TurnKept { run: Token::new(7), attempt: Token::new(2), turn: 1 });
-    assert_eq!(*records[3], host::LinkDown::Acknowledge { run: Token::new(7), attempt: Token::new(2) });
-    assert_eq!(*records[4], host::LinkDown::Cancel { run: Token::new(7), attempt: Token::new(2) });
-    assert_eq!(
-        *records[5],
-        host::LinkDown::Grant {
-            run: Token::new(7),
-            attempt: Token::new(2),
-            grant: host::Grant {
-                table: host::GrantTable::Accounts,
-                account: 1,
-                generation: 3,
-                valid: Duration::from_secs(60)
-            }
-        }
-    );
+    world.advance(Duration::from_millis(200));
+    assert!(world.root().iter().any(|request| matches!(request, Request::Resend { run, attempt, turn: 1 }
+        if *run == Token::new(7) && *attempt == Token::new(2))));
 }
 #[test]
 fn grant_values_reach_the_layer_before_the_assignment() {
@@ -199,4 +189,39 @@ fn a_named_part_missing_from_the_root_is_dropped_and_counted() {
     world.down(Event::Up { up: fixtures::answer(), parts: Box::new([]) });
     assert_eq!(world.dropped_records(), 1);
     assert_eq!(world.records()[0].iter().map(|record| record.kind).collect::<Vec<_>>(), [0x0100]);
+}
+
+fn check_down_records(world: &World, records: &[&host::LinkDown]) {
+    assert_eq!(records.len(), 6);
+    assert_eq!(assignment(world).turns.as_ref(), [Box::from(b"one!".as_slice()), Box::from(b"two!".as_slice())]);
+    assert_eq!(
+        (assignment(world).assignment.run, assignment(world).assignment.attempt),
+        (Token::new(7), Token::new(2))
+    );
+    assert_eq!(
+        *records[1],
+        host::LinkDown::Message {
+            run: Token::new(7),
+            attempt: Token::new(2),
+            name: Token::new(6),
+            sender: b"sender".as_slice().into(),
+            words: b"later".as_slice().into()
+        }
+    );
+    assert_eq!(*records[2], host::LinkDown::TurnKept { run: Token::new(7), attempt: Token::new(2), turn: 1 });
+    assert_eq!(*records[3], host::LinkDown::Acknowledge { run: Token::new(7), attempt: Token::new(2) });
+    assert_eq!(*records[4], host::LinkDown::Cancel { run: Token::new(7), attempt: Token::new(2) });
+    assert_eq!(
+        *records[5],
+        host::LinkDown::Grant {
+            run: Token::new(7),
+            attempt: Token::new(2),
+            grant: host::Grant {
+                table: host::GrantTable::Accounts,
+                account: 1,
+                generation: 3,
+                valid: Duration::from_secs(60)
+            }
+        }
+    );
 }
