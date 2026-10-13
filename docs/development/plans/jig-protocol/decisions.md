@@ -1684,6 +1684,16 @@ the file.
      and the worlds fill with their fakes; absent, an activation of signed-in
      sources is refused naming its path (ruling 203). No other public field
      or signature changes.
+223. **`jig-protocol-charter` exposes its encoding limits** (2026-10-13,
+     the coordinator's block "jig 25.4: charter encoder limits unavailable
+     through allowed dependencies", 2026-10-13T06:01:44Z). As ruling 201
+     for the transcript crate: `jig_protocol_charter::encode` takes
+     `smith_charter::v2::Limits`, which the service, linking only smith's
+     host and channel crates, cannot build. 25.4 adds to the charter kit a
+     public `limits() -> smith_charter::v2::Limits` returning the
+     ceilings it already encodes within (re-exported as the kit's own
+     type), at most 10 lines, no encoding behaviour changed, named in its
+     commit body; no smith dependency is added to the service.
 
 ## For the user
 
