@@ -68,23 +68,23 @@ fn a_key_limit_below_the_largest_note_line_is_refused() {
 fn a_value_limit_below_the_largest_task_record_is_refused() {
     let mut limits = store();
     limits.value = 1;
-    assert_eq!(check(&limits), Err(sizes::SizeRefusal::Value { needs: 8_388_663, has: 1 }));
+    assert_eq!(check(&limits), Err(sizes::SizeRefusal::Value { needs: 724_517, has: 1 }));
 }
 #[test]
 fn a_value_limit_below_the_largest_core_turn_is_refused() {
     let mut limits = store();
-    limits.value = 8_388_662;
-    assert_eq!(check(&limits), Err(sizes::SizeRefusal::Value { needs: 8_388_663, has: 8_388_662 }));
+    limits.value = 724_516;
+    assert_eq!(check(&limits), Err(sizes::SizeRefusal::Value { needs: 724_517, has: 724_516 }));
 }
 #[test]
 fn a_page_smaller_than_one_row_is_refused() {
     let mut limits = store();
-    limits.page.bytes = 8_388_774;
-    assert_eq!(check(&limits), Err(sizes::SizeRefusal::Page { needs: 8_388_775, has: 8_388_774 }));
+    limits.page.bytes = 724_628;
+    assert_eq!(check(&limits), Err(sizes::SizeRefusal::Page { needs: 724_629, has: 724_628 }));
 }
 #[test]
 fn fixture_limits_fit_their_store() {
-    assert_eq!(check(&store()), Ok(sizes::Sizes { key: 112, value: 8_388_663, ops: 9, commit: 75_499_082 }));
+    assert_eq!(check(&store()), Ok(sizes::Sizes { key: 112, value: 724_517, ops: 9, commit: 6_521_768 }));
 }
 #[test]
 fn too_few_operations_are_refused() {
@@ -95,8 +95,8 @@ fn too_few_operations_are_refused() {
 #[test]
 fn too_few_commit_bytes_are_refused() {
     let mut limits = store();
-    limits.commit = 75_499_081;
-    assert_eq!(check(&limits), Err(sizes::SizeRefusal::Commit { needs: 75_499_082, has: 75_499_081 }));
+    limits.commit = 6_521_767;
+    assert_eq!(check(&limits), Err(sizes::SizeRefusal::Commit { needs: 6_521_768, has: 6_521_767 }));
 }
 #[test]
 fn too_few_in_flight_slots_are_refused() {
@@ -115,8 +115,8 @@ fn a_journal_bound_past_the_queue_is_refused_at_start() {
 #[test]
 fn too_few_queued_bytes_are_refused() {
     let mut limits = store();
-    limits.queued_bytes = 150_998_163;
-    assert_eq!(check(&limits), Err(sizes::SizeRefusal::QueuedBytes { needs: 150_998_164, has: 150_998_163 }));
+    limits.queued_bytes = 13_043_535;
+    assert_eq!(check(&limits), Err(sizes::SizeRefusal::QueuedBytes { needs: 13_043_536, has: 13_043_535 }));
 }
 #[test]
 fn a_domain_limit_past_its_family_ceiling_is_refused_at_start() {

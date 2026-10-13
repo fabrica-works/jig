@@ -240,7 +240,18 @@ fn client_link_depends_only_on_client_vocabulary_and_foundation() {
 fn the_test_store_links_only_its_codec_boundary_and_foundation() {
     let store = manifests().into_iter().find(|m| m.name.as_deref() == Some("jig-test-store")).expect("store manifest");
     assert!(store.dependencies.iter().all(|name| {
-        ["jig-test-connector", "jig-protocol-store", "skein-kv", "skein-lib", "skein-codec"].contains(&name.as_str())
+        [
+            "jig-test-connector",
+            "jig-test-domain",
+            "jig-domain-core",
+            "jig-domain-notes",
+            "jig-domain-people",
+            "jig-protocol-store",
+            "skein-kv",
+            "skein-lib",
+            "skein-codec",
+        ]
+        .contains(&name.as_str())
     }));
     let source = fs::read_to_string(kit_root().join("testing/jig-test-store/src/lib.rs")).expect("store source");
     assert!(source.contains("cfg_attr(not(test), no_std)"));
@@ -282,4 +293,29 @@ fn unqualified_ip_variant_names_stay_refused() {
     for (source, expected) in cases {
         assert_eq!(super::names::breaches(Path::new("fixture/address.rs"), source), expected, "{source}");
     }
+}
+
+#[test]
+fn the_store_files_kit_uses_only_the_store_and_foundation() {
+    let kit = manifests()
+        .into_iter()
+        .find(|m| m.name.as_deref() == Some("jig-test-store-files"))
+        .expect("store files manifest");
+    assert!(kit.dependencies.iter().all(|name| {
+        [
+            "jig-test-store",
+            "jig-test-domain",
+            "jig-test-connector",
+            "jig-protocol-store",
+            "jig-domain-core",
+            "skein-lib",
+            "skein-io",
+            "skein-kv",
+            "skein-fake-machine",
+        ]
+        .contains(&name.as_str())
+    }));
+    let source = fs::read_to_string(kit.path).expect("store files manifest is readable");
+    assert!(source.contains("[lints.clippy]"));
+    assert!(kit_root().join("testing/jig-test-store-files/clippy.toml").is_file());
 }

@@ -219,6 +219,8 @@ dependencies = [
  "jig-test-connector",
  "jig-test-connector-world",
  "jig-test-domain",
+ "jig-test-store",
+ "jig-test-store-files",
  "jig-test-system",
  "skein-lib",
  "skein-world",
@@ -788,10 +790,33 @@ dependencies = [
 name = "jig-test-store"
 version = "0.0.0"
 dependencies = [
+ "jig-core-world",
+ "jig-domain-core",
+ "jig-domain-notes",
+ "jig-domain-people",
+ "jig-domain-tasks",
  "jig-protocol-store",
  "jig-test-connector",
  "jig-test-connector-world",
+ "jig-test-domain",
+ "jig-test-store-files",
  "skein-codec",
+ "skein-io",
+ "skein-kv",
+ "skein-lib",
+]
+
+[[package]]
+name = "jig-test-store-files"
+version = "0.0.0"
+dependencies = [
+ "jig-domain-core",
+ "jig-protocol-store",
+ "jig-test-connector",
+ "jig-test-domain",
+ "jig-test-store",
+ "skein-fake-machine",
+ "skein-io",
  "skein-kv",
  "skein-lib",
 ]

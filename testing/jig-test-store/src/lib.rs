@@ -2,9 +2,11 @@
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 extern crate alloc;
+use alloc::boxed::Box;
 use jig_test_connector as connector;
 pub mod keys;
 pub mod records;
+pub mod route;
 #[rustfmt::skip]
 #[path = "generated/v1.rs"]
 pub mod v1;
@@ -43,3 +45,21 @@ fn bounds(limits: &connector::Limits) -> Option<v1::Limits> {
 }
 #[cfg(test)]
 mod tests;
+
+/// Root outputs served by this transport.
+#[derive(Debug)]
+pub enum StoreOut {
+    Commit { number: u64, writes: Box<[jig_test_domain::Write]> },
+    Restart { step: jig_domain_core::RestartStep, census: Option<jig_domain_core::Census> },
+    ReadLoad { load: skein_lib::Token, range: Box<jig_domain_core::reads::Range> },
+    NotesLoad { owner: skein_lib::Token, range: jig_domain_notes::Range },
+    Now(jig_domain_core::Now),
+}
+/// A restored row, a root terminal or the next store request.
+#[derive(Debug)]
+#[expect(clippy::large_enum_variant, reason = "the routing passes the root's events by value")]
+pub enum Up {
+    Restore(jig_test_domain::Record),
+    Root(jig_test_domain::Event),
+    Ask(jig_protocol_store::Request),
+}

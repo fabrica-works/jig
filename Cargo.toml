@@ -16,6 +16,7 @@ members = [
     "crates/jig-protocol-accounts",
     "testing/jig-test-connector",
     "testing/jig-test-store",
+    "testing/jig-test-store-files",
     "testing/jig-test-domain",
     "testing/jig-test-worker",
     "testing/jig-test-service",
@@ -128,6 +129,7 @@ sha2 = { version = "=0.10.9", default-features = false }
 jig-domain-accounts = { path = "crates/jig-domain-accounts" }
 jig-test-connector = { path = "testing/jig-test-connector" }
 jig-test-store = { path = "testing/jig-test-store" }
+jig-test-store-files = { path = "testing/jig-test-store-files" }
 jig-test-connector-world = { path = "tests/test-connector" }
 jig-test-domain = { path = "testing/jig-test-domain" }
 jig-test-domain-client = { path = "testing/jig-test-domain-client" }
