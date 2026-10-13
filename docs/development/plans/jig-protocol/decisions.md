@@ -1182,6 +1182,22 @@ the file.
      jig-repin.s4; smith-repin then moves smith's skein source to 02.s6's
      commit, and smith's limits' derivations call their family's check
      where they do not already.
+180. **A stored turn's transcript takes the channel's turn ceiling**
+     (2026-10-13, the coordinator's block "jig 19.2: authoritative
+     transcript bound absent from core Limits", 2026-10-13T00:07:03Z).
+     `core::TurnRecord.transcript` (`crates/jig-domain-core/src/stored.rs:531`)
+     says "bounded by journal `transcript_bytes`", but skein's
+     `JournalLimits` (`crates/skein-lib/src/journal.rs:26`) has no such
+     field; the only `transcript_bytes` is the hub's
+     (`crates/jig-domain-host/src/limits.rs:22`), and a turn reaches the
+     core over the worker channel as `Turn.body: bytes 8388608`
+     (`crates/jig-protocol-worker-wire/schema/worker-wire-v1.schema:37`).
+     So the store admits what the channel admits: the core family's
+     transcript field has the ceiling 8,388,608, and
+     `codec::core::limits` sets its limit to that ceiling, no
+     `core::Limits` field bounding it (jig 14's rule: a field no domain
+     limit bounds). No signature changes, `codec::limits` and 19.5's
+     sketch included; 19.2 corrects the stale comment at `stored.rs:531`.
 
 ## For the user
 
