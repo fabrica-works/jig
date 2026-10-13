@@ -31,11 +31,13 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     }
     jig_protocol_client_wire::v5::check_limits(&limits.wire).ok()?;
     let body = u32::try_from(limits.http.body).ok()?;
+    let answer = jig_protocol_client_wire::v5::Answer::worst_case_bytes(&limits.wire)?;
     let each = skein_http::server::worst_case(&limits.http)?
         .checked_add(skein_lib::Intake::worst_case(body)?)?
         .checked_add(u64::from(limits.http.head))?
         .checked_add(skein_lib::List::<skein_http::Header>::worst_case(limits.http.headers)?)?
         .checked_add(u64::from(limits.wire.signed_in_token).checked_add(32)?)?
+        .checked_add(answer)?
         .checked_add(Queue::<skein_http::server::Event>::worst_case(8)?)?
         .checked_add(Queue::<skein_http::server::Request>::worst_case(8)?)?
         .checked_add(Queue::<skein_lib::stream::Down>::worst_case(8)?)?;
@@ -54,5 +56,6 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         // A decoded ask's enums and owned list entries are at most 64 times
         // their wire body; reserve the current translation and its output slots.
         .checked_add(u64::from(body).checked_mul(64)?.checked_mul(u64::from(MAX_OUT_DOWN).checked_add(1)?)?)?
+        .checked_add(answer.checked_mul(2)?)?
         .checked_add(256)
 }

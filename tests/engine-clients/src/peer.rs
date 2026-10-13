@@ -301,6 +301,9 @@ impl Peer {
             w::SignInAnswer::Refused => panic!("sign-in refused"),
         }
     }
+    pub fn answer_request(&mut self, to: ReplyTo, reply: people::Reply) {
+        self.event(Event::Reply { to, reply });
+    }
     pub fn take_core(&mut self) -> Option<core::Event> {
         self.core.pop_front()
     }

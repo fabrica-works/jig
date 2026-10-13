@@ -44,3 +44,38 @@ fn a_native_keyed_request_reaches_the_core_after_its_bearer_is_checked() {
     assert_eq!(key, [5; 16]);
     assert_eq!(ask, people::Ask::StartChat { project: 3, words: Box::from(b"hello".as_slice()) });
 }
+
+#[test]
+fn a_native_request_waits_for_the_released_reply_and_takes_its_task() {
+    let mut peer = Peer::started(&fixtures::settings());
+    let bearer = signed_in(&mut peer);
+    let socket = peer.post(b"/jig/v1/request", request(), Some(&bearer));
+    let Some(core::Event::People(people::Event::Ask { reply_to, .. })) = peer.take_core() else {
+        panic!("ask");
+    };
+    assert_eq!(peer.answered(socket), None);
+    peer.answer_request(reply_to, people::Reply::Outcome(people::Outcome::Started { task: 8 }));
+    let limits = fixtures::limits().wire;
+    let record = w::Answer::decode(&limits, &mut skein_lib::Reader::new(peer.answered(socket).expect("answer")))
+        .expect("wire answer");
+    let w::Answer::FinalAnswer(answer) = record else {
+        panic!("final answer");
+    };
+    assert_eq!(answer.owner(), &w::Owner::Jig);
+    assert_eq!(answer.version(), 5);
+    let outcome = w::Outcome::Owner(
+        w::OutcomeOwner::new(
+            &limits,
+            w::OutcomeOwnerParts {
+                value: w::OwnerOutcome::Started(
+                    w::OwnerOutcomeStarted::new(&limits, w::OwnerOutcomeStartedParts { task: 8 }).expect("started"),
+                ),
+            },
+        )
+        .expect("owner"),
+    );
+    assert_eq!(
+        w::Final::decode(&limits, &mut skein_lib::Reader::new(answer.record())),
+        Ok(w::Final::Done(w::Done::new(&limits, w::DoneParts { outcome }).expect("done")))
+    );
+}

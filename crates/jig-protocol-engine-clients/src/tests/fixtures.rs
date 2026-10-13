@@ -2,7 +2,14 @@ use super::super::*;
 use skein_lib::{Duration, List, Secret, Wall, Writer};
 pub const NUMBER: u64 = 41;
 pub fn wire() -> w::Limits {
-    w::Limits { keyed_request: 1024, start_chat_words: 64, amend_reason: 64, ..w::CEILINGS }
+    w::Limits {
+        keyed_request: 256,
+        owned_record: 256,
+        ending_rows: 128,
+        start_chat_words: 64,
+        amend_reason: 64,
+        ..w::CEILINGS
+    }
 }
 pub fn settings() -> Settings {
     let mut served = List::with_capacity(2);
@@ -29,7 +36,7 @@ pub fn env() -> Env<Limits> {
             providers: 0,
             exchanges: 4,
             exchanges_per_client: 2,
-            http: http::Limits { head: 4096, headers: 8, body: 1024, read: 256, response: 1024, send: 256 },
+            http: http::Limits { head: 512, headers: 4, body: 256, read: 32, response: 256, send: 32 },
             wire: wire(),
             link_span: Duration::from_secs(300),
             stall: Duration::from_secs(30),
@@ -666,4 +673,53 @@ pub fn malformed_piece() -> w::Ask {
         )
         .expect("policy"),
     )
+}
+
+#[path = "fixtures/answers.rs"]
+mod answers;
+pub use answers::*;
+impl Exchange {
+    pub fn ask(&mut self) -> (Token, ReplyTo) {
+        let body = keyed(w::Owner::Jig, 5, encode_ask(&start(&self.env.limits.wire)));
+        let owner = self.post(body);
+        self.authenticate();
+        let Some(Request::Core(event)) = self.out.pop() else {
+            panic!("core ask");
+        };
+        let core::Event::People(people::Event::Ask { reply_to, .. }) = *event else {
+            panic!("expected ask");
+        };
+        (owner, reply_to)
+    }
+    pub fn reply(&mut self, to: ReplyTo, reply: people::Reply) {
+        self.component.down(&self.env, Event::Reply { to, reply }, &mut self.out);
+    }
+    pub fn answer(&self, owner: Token) -> w::Answer {
+        let (status, bytes) = self.response(owner);
+        assert_eq!(status, 200);
+        w::Answer::decode(&self.env.limits.wire, &mut skein_lib::Reader::new(bytes)).expect("wire answer")
+    }
+    pub fn final_answer(&self, owner: Token) -> w::Final {
+        match self.answer(owner) {
+            w::Answer::FinalAnswer(answer) => {
+                assert_eq!(answer.owner(), &w::Owner::Jig);
+                assert_eq!(answer.version(), 5);
+                w::Final::decode(&self.env.limits.wire, &mut skein_lib::Reader::new(answer.record()))
+                    .expect("jig final")
+            }
+            other @ (w::Answer::Busy | w::Answer::NotReady | w::Answer::SignedOut) => {
+                panic!("expected final, got {other:?}")
+            }
+        }
+    }
+    pub fn application(&mut self) -> (Token, ReplyTo) {
+        let family =
+            w::Owner::Family(w::Family::new(&self.env.limits.wire, w::FamilyParts { number: 9 }).expect("family"));
+        let owner = self.post(keyed(family, 2, Box::from(b"abc".as_slice())));
+        self.authenticate();
+        let Some(Request::Application(crate::ToApplication::Request { reply_to, .. })) = self.out.pop() else {
+            panic!("application ask");
+        };
+        (owner, reply_to)
+    }
 }

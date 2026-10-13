@@ -2,3 +2,6 @@
 mod asks;
 #[path = "tests/fixtures.rs"]
 mod fixtures;
+
+#[path = "tests/answers.rs"]
+mod answers;

@@ -104,20 +104,19 @@ impl Component {
                     self.connections.get_mut(&owner).expect("exchange owner").respond(400, Box::new([]), &env.limits);
                 }
             }
+            Event::SignInEnded { sign_in } => self.ended(env, sign_in, out),
+            Event::Application(crate::FromApplication::Answered { to, family, record }) => {
+                self.application(env, to.into_token(), family, record, out);
+            }
             Event::Stop => self.stopping = true,
             Event::Close | Event::Abort => self.abort(out),
-            Event::SignInEnded { .. }
-            | Event::Read { .. }
+            Event::Read { .. }
             | Event::Admitted { .. }
             | Event::WatchRefused { .. }
             | Event::Delivery { .. }
             | Event::WatchEnded { .. }
             | Event::RunText { .. }
-            | Event::Application(
-                crate::FromApplication::Answered { .. }
-                | crate::FromApplication::Read { .. }
-                | crate::FromApplication::Delivery { .. },
-            )
+            | Event::Application(crate::FromApplication::Read { .. } | crate::FromApplication::Delivery { .. })
             | Event::Provider { .. } => {}
         }
     }
@@ -354,8 +353,105 @@ impl Component {
                     self.respond(env, exchange, routes::refused(&env.limits.wire));
                 }
             },
-            Waiting::Keep { .. } | Waiting::Get { .. } | Waiting::Ask { .. } | Waiting::Checked { .. } => {
+            Waiting::Ask { .. } => match reply {
+                people::Reply::Outcome(people::Outcome::Applied { .. }) => {
+                    self.pending.exchanges.insert(exchange, waiting).expect("same slot");
+                }
+                people::Reply::SignedIn { .. }
+                | people::Reply::SignedOut
+                | people::Reply::Outcome(_)
+                | people::Reply::Again(_)
+                | people::Reply::Refused(_) => {
+                    let answer = crate::translate::answers::answer(&reply, &env.limits.wire);
+                    self.answer(env, exchange, answer, out);
+                }
+            },
+            Waiting::Keep { .. } | Waiting::Get { .. } | Waiting::Checked { .. } => {
                 self.pending.exchanges.insert(exchange, waiting).expect("same slot");
+            }
+        }
+    }
+    fn answer(
+        &mut self,
+        env: &Env<Limits>,
+        exchange: Token,
+        answer: Result<w::Answer, w::Problem>,
+        out: &mut Queue<Request>,
+    ) {
+        let Some(owner) = self.owner(exchange) else {
+            return;
+        };
+        let connection = self.connections.get_mut(&owner).expect("exchange owner");
+        match answer {
+            Ok(answer) => {
+                let mut body = skein_lib::Writer::new(usize::try_from(answer.measure()).expect("wire size fits"));
+                answer.encode(&mut body).expect("measured answer");
+                connection.respond(200, body.finish(), &env.limits);
+            }
+            Err(_) => connection.close(out),
+        }
+    }
+    fn application(
+        &mut self,
+        env: &Env<Limits>,
+        exchange: Token,
+        family: u16,
+        record: Box<[u8]>,
+        out: &mut Queue<Request>,
+    ) {
+        let Some(waiting) = self.pending.exchanges.remove(&exchange) else {
+            return;
+        };
+        match waiting {
+            Waiting::Ask { family: Some(number), version, .. } if number == family => {
+                let answer = match w::Family::new(&env.limits.wire, w::FamilyParts { number }) {
+                    Ok(value) => {
+                        crate::translate::answers::owned(w::Owner::Family(value), version, record, &env.limits.wire)
+                    }
+                    Err(problem) => Err(problem),
+                };
+                self.answer(env, exchange, answer, out);
+            }
+            Waiting::Core
+            | Waiting::Keep { .. }
+            | Waiting::Get { .. }
+            | Waiting::Checked { .. }
+            | Waiting::Ask { .. } => {
+                self.pending.exchanges.insert(exchange, waiting).expect("same slot");
+            }
+        }
+    }
+    fn ended(&mut self, env: &Env<Limits>, sign_in: u64, out: &mut Queue<Request>) {
+        out.push(Request::Secrets(SecretsRequest::Erase { sign_in }));
+        for _ in 0..self.pending.exchanges.capacity() {
+            let mut found = None;
+            for (exchange, waiting) in &self.pending.exchanges {
+                match waiting {
+                    Waiting::Keep { sign_in: number, .. }
+                    | Waiting::Get { sign_in: number, .. }
+                    | Waiting::Checked { sign_in: number, .. }
+                    | Waiting::Ask { sign_in: number, .. }
+                        if *number == sign_in =>
+                    {
+                        found = Some(*exchange);
+                        break;
+                    }
+                    Waiting::Core
+                    | Waiting::Keep { .. }
+                    | Waiting::Get { .. }
+                    | Waiting::Checked { .. }
+                    | Waiting::Ask { .. } => {}
+                }
+            }
+            let Some(exchange) = found else {
+                break;
+            };
+            match self.pending.exchanges.remove(&exchange).expect("ended exchange") {
+                Waiting::Keep { .. } => self.respond(env, exchange, routes::refused(&env.limits.wire)),
+                Waiting::Get { .. } | Waiting::Checked { .. } | Waiting::Ask { .. } => {
+                    self.respond(env, exchange, routes::signed_out(&env.limits.wire));
+                }
+                Waiting::Core => {}
             }
         }
     }
@@ -459,7 +555,7 @@ impl Component {
         let mut active = 0_u32;
         for (_, waiting) in &self.pending.exchanges {
             match waiting {
-                Waiting::Ask { sign_in: number } if *number == sign_in => active = active.saturating_add(1),
+                Waiting::Ask { sign_in: number, .. } if *number == sign_in => active = active.saturating_add(1),
                 Waiting::Core
                 | Waiting::Keep { .. }
                 | Waiting::Get { .. }
@@ -522,7 +618,10 @@ impl Component {
                 })
             }
         };
-        self.pending.exchanges.insert(exchange, Waiting::Ask { sign_in }).expect("get released slot");
+        self.pending
+            .exchanges
+            .insert(exchange, Waiting::Ask { sign_in, family, version: keyed.version })
+            .expect("get released slot");
         out.push(request);
     }
     fn abort(&mut self, out: &mut Queue<Request>) {
