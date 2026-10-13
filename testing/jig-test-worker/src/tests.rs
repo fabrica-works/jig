@@ -116,3 +116,27 @@ fn a_deliver_is_answered_with_its_title_and_body() {
         ))
     );
 }
+
+#[test]
+fn a_stopping_worker_waits_on_its_agent_and_emits_stop_when_it_is_gone() {
+    let mut worker = Worker::started();
+    worker.step(Event::Shutdown);
+    worker.step(Event::Timer);
+    worker.sent();
+    worker.clear();
+    assert!(!worker.domain.work_pending(), "the live agent owes IO or its stop deadline");
+    assert!(worker.domain.next_deadline().is_some(), "the agent's stop has a deadline");
+    worker.gone();
+    worker.step(Event::Link(host::LinkDown::Acknowledge { run: fixtures::RUN, attempt: fixtures::ATTEMPT }));
+    worker.domain.reclaim();
+    assert!(worker.domain.work_pending(), "the last agent makes the final stop ready");
+    worker.step(Event::Timer);
+    let mut stopped = false;
+    for request in &worker.out {
+        if let Request::Stop = request {
+            stopped = true;
+        }
+    }
+    assert!(stopped, "the last agent releases the final stop");
+    assert!(!worker.domain.work_pending(), "the one stop was emitted");
+}

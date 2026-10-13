@@ -92,7 +92,11 @@ impl Domain {
 
     #[must_use]
     pub fn work_pending(&self) -> bool {
-        self.hub.is_ready() || !self.hub_out.is_empty() || !self.agent_out.is_empty() || self.stopping
+        self.hub.is_ready() || !self.hub_out.is_empty() || !self.agent_out.is_empty() || self.stopping_ready()
+    }
+
+    fn stopping_ready(&self) -> bool {
+        self.stopping && self.hub.hosted() == 0 && self.agent.agents() == 0 && self.pending.is_empty()
     }
 
     #[must_use]
@@ -212,7 +216,7 @@ fn route(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
         out.push(Request::Link(activity));
     }
     assert!(domain.hub_out.is_empty() && domain.agent_out.is_empty(), "bounded child hand-offs finish in one step");
-    if domain.stopping && domain.hub.hosted() == 0 && domain.agent.agents() == 0 && domain.pending.is_empty() {
+    if domain.stopping_ready() {
         out.push(Request::Stop);
         domain.stopping = false;
     }
