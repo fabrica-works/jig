@@ -1715,6 +1715,16 @@ the file.
      kept, past rulings 114's and 122's limits. A test whose subject is the
      opaque bytes themselves goes under ruling 123. The README's Rules now
      say so for any increment whose Shape makes a value invalid.
+226. **jig 31.3 lands with no service credential, the credential's shape
+     asked of the designer** (2026-10-13, the coordinator's block "jig
+     31.3: service credential design absent from contract and wire",
+     2026-10-13T06:28:00Z). `protocol/client.md`, section 8 and decision
+     36 give the owner a service's credential once, in `Made::Service`;
+     the contract's `Made::Service { party }` and the wire's `MadeService
+     { party }` have no field, and no step adds one. 31.3 takes its session
+     file's fallback, widening no contract, wire or keeper; the designer is
+     asked its shape, its digest's keeper, its check and its step, which
+     is added when answered.
 
 ## For the user
 
