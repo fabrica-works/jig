@@ -1,0 +1,26 @@
+wall_h	29.8	h
+running_h	29.5	h
+steps_planned	166	steps
+steps_added	51	steps
+steps_dropped	0	steps
+step_h	0.14	h per step
+escalations	boundary guard exception 1, boundary vocabulary and cross-session scope 1, core boundary/clock semantics question 1, cross-session Files scope 1, cross-session boundary question 1, cross-session boundary/design question 1, cross-session scope 48, design gap 36, design question and partial proof scope 2, design/contract question 3, infrastructure 8, infrastructure block, ruling140 third timeout 1, own-session outside-Files scope >20lines 1, plan Files gap 1, plan defect 111, plan/interface gap 1, process 33, scope and proof question 1, size exception 3, size exception question 1	by kind
+escalation_wait_min	1.6	min, median
+blocked_h	8.2	h
+answers_reversed	38	answers
+steers	24 sent, 0 points refused	
+restarts		by cause
+tokens_coordinator	699084868 in (99% cached), 1500677 out	tokens
+tokens_implementers	2761273439 in (98% cached), 9845909 out	tokens
+tokens_claude	5160897662 in (98% cached), 10116966 out; in: 0 before the claim, 5152602530 in the run, 8295132 after	tokens
+tokens_per_step	39789931	tokens per step, the run's
+coordinator_requests	3567, 67 after a wait ran out	requests
+compactions	9	compactions
+gates_per_step	2.2	gates per step
+queue_wait_ratio	2.24	waiting per running
+suites	first: scripts/check.sh passed: 1963 tests / 9.911 s; 98 tests / 43.341 s; 6 tests / 3.402 s; 148 s in all; last: scripts/check.sh passed: 3813 tests / 15.041 s; 109 tests / 15.679 s; 42 s in all	Gate-Result
+proofs	unit 92, world 71, joint 15, process 1, live 1, 2 below plan	steps
+report_lines	10 median, 11 p90	lines
+lines	code +355989 -129879, tests +114950 -18650	lines
+pin_lag	smith: skein 8; jig: skein 1, smith 0; temper: skein 250, smith 718, jig 1439	commits behind upstream main
+contexts	238K median, 319K p90 of the sessions' peaks; 70 handovers	
