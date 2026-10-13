@@ -840,3 +840,15 @@ fn full_pattern() -> OwnerPattern {
 fn full_cursor() -> Cursor {
     Cursor::new(full().into_bytes(), CLIENT.text).unwrap()
 }
+
+#[test]
+fn each_page_bound_keeps_its_value_at_the_client_limits() {
+    assert_eq!(crate::inbox_nodes(&CLIENT, 0), Some(337_498));
+    assert_eq!(crate::conversations_nodes(&CLIENT, 0), Some(85_190));
+    assert_eq!(crate::conversation_nodes(&CLIENT, 0), Some(1_010_760));
+    assert_eq!(crate::task_nodes(&CLIENT, 0), Some(1_166_880));
+    assert_eq!(crate::project_nodes(&CLIENT, 0), Some(506_352));
+    assert_eq!(crate::deployment_nodes(&CLIENT, 0), Some(2724));
+    assert_eq!(crate::not_the_work_nodes(&CLIENT, 0), Some(28));
+    assert_eq!(crate::page_nodes(&CLIENT, 0), Some(1_166_880));
+}
