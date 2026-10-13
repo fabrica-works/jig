@@ -1892,6 +1892,20 @@ the file.
      `tests/boundary`'s crate-graph check naming that crate and that
      dependency. No dummy channel `Start`; no other smith type through it.
      It goes when one of the four exports `Identity`.
+240. **An activity line carries its turn's bytes, as the design says;
+     where they join is asked** (2026-10-13, the coordinator's block "jig
+     34.3: activity archive references versus turn bytes",
+     2026-10-13T08:10:39Z). 34.3's Scope and Proof follow
+     `client/domain/contract.md` ("a turn as its bytes, within the page's
+     byte bound, which the client's protocol layer decodes, with no read
+     of its own") and `protocol/client.md`, 10; the core's
+     `tasks::Line::Turn`, the wire's `OwnerActivityTurn` and the joint
+     world's map carry only archive references (`decoded: None`), the
+     bytes reachable by a historical read alone. The proposal (references
+     only, bytes through `Past::Turn`) would put that read back in the
+     client, so it is declined. Where the bytes join an activity page (the
+     store's activity read, the core, or the protocol layer) is asked of
+     the designer; 34.3 waits for it, and 34.4 goes on.
 
 ## For the user
 
