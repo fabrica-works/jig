@@ -425,8 +425,8 @@ fn owner_milestone_second_checked_language_and_full_fragment_preserve_raw_slots_
         why: HoldCategory::PoolLost { pool: u64::MAX },
         source: Some(part(3)),
         ending: Some(OwnerChipEnding::Cancelled {
-            reason: doc(&[255; 8], true),
-            result: Some(ResultValue::Change { kind: u16::MAX, part: part(3), words: doc(&[254; 8], true) }),
+            reason: doc(UTF8_TEXTS[0], true),
+            result: Some(ResultValue::Change { kind: u16::MAX, part: part(3), words: doc(UTF8_TEXTS[1], true) }),
             by: OwnerRequester::Person(u64::MAX),
             at: Wall::from_nanos(u64::MAX),
         }),
@@ -449,3 +449,5 @@ fn owner_milestone_second_checked_language_and_full_fragment_preserve_raw_slots_
     assert_eq!(saying.text.as_ref(), b"second 18446744073709551615");
     assert_eq!(w.book.say(1, id, &[Hole::Wall(Wall::from_nanos(0))]).err(), Some(Invalid::Values { id }));
 }
+
+const UTF8_TEXTS: [&[u8]; 2] = [&[b'~'; 8], &[b'!'; 8]];

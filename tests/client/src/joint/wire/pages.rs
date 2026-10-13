@@ -239,6 +239,8 @@ pub fn notes_page(
 
 #[cfg(test)]
 mod tests {
+    const UTF8_WORDS: &[u8] = b"~\0";
+
     use super::*;
     use jig_domain_tasks as tasks;
     use skein_lib::Wall;
@@ -563,7 +565,7 @@ mod tests {
             number: u64::MAX,
             scope: jig_domain_core::documents::NoteLocation::Goal { project: u32::MAX, task: u64::MAX },
             description: jig_domain_core::documents::Text { bytes: Box::new([]), cut: false },
-            body: jig_domain_core::documents::Text { bytes: Box::from([255, 0]), cut: true },
+            body: jig_domain_core::documents::Text { bytes: Box::from(UTF8_WORDS), cut: true },
             writer: jig_domain_notes::Author::Task { task: u64::MAX, attempt: u64::MAX },
             tasks: List::with_capacity(4),
             changed: None,
@@ -604,7 +606,7 @@ mod tests {
         assert_eq!(row.scope, scope);
         assert_eq!(row.number, u64::MAX);
         assert_eq!(row.revision.value, u64::from(u32::MAX));
-        assert_eq!(row.body.bytes.bytes(), &[255, 0]);
+        assert_eq!(row.body.bytes.bytes(), UTF8_WORDS);
         assert!(row.body.cut && row.cut);
         assert_eq!(row.changed, None);
         assert_eq!(row.writer, client::NoteAuthor::Task { task: u64::MAX, attempt: u64::MAX });

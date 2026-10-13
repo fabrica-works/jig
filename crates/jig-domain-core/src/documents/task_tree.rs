@@ -171,7 +171,7 @@ pub struct ResourceLine {
 pub enum Parameter {
     /// An opaque named numeric value.
     Number { name: u32, value: u64 },
-    /// An opaque named text value.
+    /// A named UTF-8 text value.
     Bytes { name: u32, value: Text },
     /// A connector-owned numbered resource.
     Resource { name: u32, part: Part },

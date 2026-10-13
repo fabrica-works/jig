@@ -94,7 +94,7 @@ fn template(number: u64) -> ProposedTask {
         spec: SpecificationDocument {
             specification: DocumentSpecification {
                 words: doc(b"full template source", true),
-                parameters: list(4, [ParameterDocument::Bytes { name: u32::MAX, value: doc(&[255, 0, 254], true) }]),
+                parameters: list(4, [ParameterDocument::Bytes { name: u32::MAX, value: doc(UTF8_TEXTS[3], true) }]),
                 inputs: list(4, [u64::MAX, 0]),
             },
             cut: true,
@@ -193,7 +193,7 @@ fn source() -> OwnerProject {
                     party: u64::MAX,
                     kind: PartyKind::Service,
                     role: HeldRole::Policy { role: u32::MAX },
-                    login: doc(&[255, 0, 254], true),
+                    login: doc(UTF8_TEXTS[3], true),
                     name: doc(b"", false),
                 },
                 OwnerProjectMember {
@@ -201,7 +201,7 @@ fn source() -> OwnerProject {
                     kind: PartyKind::Person,
                     role: HeldRole::Owner,
                     login: doc(b"", false),
-                    name: doc(&[254, 0, 255], true),
+                    name: doc(UTF8_TEXTS[4], true),
                 },
             ],
         ),
@@ -464,7 +464,7 @@ fn owner_project_public_required_envelope_checks_last_nested_capacity_and_both_l
     changed.recurring.get_mut(0).unwrap().batch.get_mut(1).unwrap().resources = List::with_capacity(5);
     assert!(view::required(&changed, &limits(), w).is_none());
     let mut changed = value.clone();
-    changed.members.get_mut(1).unwrap().name = doc(&[255; 32], true);
+    changed.members.get_mut(1).unwrap().name = doc(UTF8_TEXTS[5], true);
     assert!(view::required(&changed, &limits(), w).is_some());
     let mut small = limits();
     small.text = 31;
@@ -901,10 +901,9 @@ fn owner_project_public_goal_form_decodes_whole_bounded_procedure_and_keeps_prop
     assert!(native_drive(&mut domain, Event::Act { act: Act::GoalForm { form: choice } }).is_empty());
     let (tree, mut bindings) = owner_page(&domain);
     let words_field = tree.nodes().iter().find(|node| node.role == Role::TextArea).unwrap().binding.unwrap().token;
-    let act =
-        crate::decode(&mut bindings, words_field, crate::Act::Input { value: copy_of(&[255, 0, b'/', 254]) }).unwrap();
+    let act = crate::decode(&mut bindings, words_field, crate::Act::Input { value: copy_of(UTF8_TEXTS[0]) }).unwrap();
     assert!(match &act {
-        Act::Edit { field: Purpose::NewGoal, text } if text.bytes() == [255, 0, b'/', 254] => true,
+        Act::Edit { field: Purpose::NewGoal, text } if text.bytes() == UTF8_TEXTS[0] => true,
         _ => false,
     });
     native_drive(&mut domain, Event::Act { act });
@@ -941,7 +940,7 @@ fn owner_project_public_goal_form_decodes_whole_bounded_procedure_and_keeps_prop
     assert_eq!(review.form.budget, 23);
     assert_eq!(review.form.priority, u32::MAX);
     assert_eq!(review.form.deadline, None);
-    assert_eq!(review.words.bytes(), &[255, 0, b'/', 254]);
+    assert_eq!(review.words.bytes(), UTF8_TEXTS[0]);
     assert_eq!(review.pool_left, 17);
     assert!(review.proposed);
     assert_eq!(review.to.as_ref(), Some(&recipient));
@@ -957,7 +956,7 @@ fn owner_project_public_goal_form_decodes_whole_bounded_procedure_and_keeps_prop
         asks,
         [&Ask::SetGoal {
             project: 4,
-            spec: Text::new(copy_of(&[255, 0, b'/', 254]), limits().text).unwrap(),
+            spec: Text::new(copy_of(UTF8_TEXTS[0]), limits().text).unwrap(),
             executor,
             budget: 23,
             priority: u32::MAX,
@@ -1092,8 +1091,8 @@ fn native_historical_project() -> (Domain, OwnerSpendPage) {
             _ => None,
         })
         .unwrap();
-    let before = Cursor { value: Text::new(copy_of(&[255, 0, 1]), 32).unwrap() };
-    let after = Cursor { value: Text::new(copy_of(&[254, 0, 2]), 32).unwrap() };
+    let before = Cursor::new(copy_of(UTF8_TEXTS[1]), 32).unwrap();
+    let after = Cursor::new(copy_of(UTF8_TEXTS[2]), 32).unwrap();
     let old = historical_old_spend(&before, &after);
     native_drive(&mut domain, Event::Read { read, result: ReadResult::Value(ReadValue::Spend(Box::new(old))) });
     let requests = native_drive(
@@ -1230,3 +1229,5 @@ fn owner_project_historical_companion_prices_whole_languages_and_refuses_one_und
     assert_eq!(domain.project_page().owner_spend.as_deref(), Some(&page));
     assert_eq!(domain.project_page().spend.get(0).unwrap().period, 997);
 }
+
+const UTF8_TEXTS: [&[u8]; 6] = [b"~\0/!", b"~\0\x01", b"!\0\x02", b"~\0!", b"!\0~", &[b'~'; 32]];

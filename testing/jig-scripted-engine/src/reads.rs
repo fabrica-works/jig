@@ -3,7 +3,7 @@ use crate::{Bounds, Engine, Invalid, Up, payload};
 use jig_domain_client::contract::{
     ActivityLine, ActivityPage, ConversationLine, ConversationPage, Cursor, GoalLine, GoalPage, HistoryPage,
     HistoryRow, InboxEntry, InboxGroup, InboxPage, InboxReadGroup, Note, NotePage, NoteScope, ObjectKey, ObjectPage,
-    Read, ReadNone, ReadResult, ReadValue, Result, SpendPage, SpendPeriod, Text,
+    Read, ReadNone, ReadResult, ReadValue, Result, SpendPage, SpendPeriod,
 };
 use skein_lib::{List, Time, Token};
 
@@ -140,9 +140,7 @@ pub(crate) struct Position {
     index: usize,
 }
 fn cursor(number: u64, bounds: &Bounds) -> Cursor {
-    Cursor {
-        value: Text::new(number.to_be_bytes().to_vec().into_boxed_slice(), bounds.text).expect("cursor bound checked"),
-    }
+    Cursor::new(number.to_be_bytes().to_vec().into_boxed_slice(), bounds.text).expect("cursor bound checked")
 }
 pub(crate) fn list<T: Clone>(rows: &[T]) -> List<T> {
     let mut list = List::with_capacity(u32::try_from(rows.len()).expect("bounded rows fit u32"));

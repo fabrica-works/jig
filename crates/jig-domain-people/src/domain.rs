@@ -1043,6 +1043,9 @@ fn goal_executor(value: crate::GoalExecutor) -> bool {
 }
 
 fn valid_ask(limits: &Limits, ask: &Ask) -> bool {
+    if !crate::words::valid(ask) {
+        return false;
+    }
     match ask {
         Ask::Close { chat, disposals, .. } => valid_close(limits, *chat, disposals),
         Ask::MarkSeen { seen } => match seen {

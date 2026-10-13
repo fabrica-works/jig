@@ -164,6 +164,8 @@ mod ledger_page_tests;
 
 #[cfg(test)]
 mod tests {
+    const UTF8_WORDS: &[u8] = b"~\0";
+
     use super::*;
     use crate::harness::ClientId;
     use jig_domain_people as people;
@@ -334,7 +336,7 @@ mod tests {
         assert_eq!(actual, native);
         assert_eq!(value.message, u64::MAX);
         assert_eq!(value.from, Some(client::OwnerRequester::Deployment { project: 0 }));
-        assert_eq!(value.words.bytes(), &[255, 0]);
+        assert_eq!(value.words.bytes(), UTF8_WORDS);
         assert!(transport.reply(to).is_none());
         assert_eq!(read(&mut transport, to, &source, &limits).err(), Some(Invalid::MissingRoute));
     }

@@ -14,7 +14,7 @@ fn source(maker: Proposer, part: OwnerPart) -> OwnerProposal {
     OwnerProposal {
         key: ProposalKey { proposer: maker, number: 7 },
         project: 41,
-        reason: DocumentText { bytes: objects::text(&[255, 0, 17]), cut: true },
+        reason: DocumentText { bytes: objects::text(UTF8_TEXT), cut: true },
         action: OwnerProposalAction::Effect {
             part,
             authority: objects::owner_authority(),
@@ -310,3 +310,5 @@ fn native_effect_card_refresh_registers_only_shown_current_facts_within_capacity
         }
     }
 }
+
+const UTF8_TEXT: &[u8] = b"~\0\x11";

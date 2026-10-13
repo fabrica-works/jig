@@ -26,7 +26,7 @@ fn question_sender_closed_widths_and_absence_keep_whole_facts_and_original_answe
         let mut supplied = question();
         supplied.from = from;
         supplied.message = u64::MAX;
-        supplied.words = text(&[255, 0, 128, b'?']);
+        supplied.words = text(UTF8_TEXT);
         supplied.since = Wall::from_nanos(u64::MAX);
         supplied.acts = List::with_capacity(2);
         supplied.acts.push(Offered { act: ActKind::Answer, admission: Admission::Allowed }).unwrap();
@@ -62,3 +62,5 @@ fn question_sender_closed_widths_and_absence_keep_whole_facts_and_original_answe
         assert_eq!(objects::question::facts(domain.objects.get(id).unwrap()), Some(&supplied));
     }
 }
+
+const UTF8_TEXT: &[u8] = b"~\0!?";

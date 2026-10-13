@@ -385,6 +385,8 @@ fn subscription(value: tasks::Subscription) -> client::Subscription {
 
 #[cfg(test)]
 pub(super) mod tests {
+    const UTF8_TEXTS: [&[u8]; 2] = [b"~\0", b"~/"];
+
     use super::*;
 
     pub(crate) fn amendment_source() -> documents::AmendmentState {
@@ -427,9 +429,9 @@ pub(super) mod tests {
         let contexts = [
             None,
             Some(documents::Text { bytes: Box::new([]), cut: false }),
-            Some(documents::Text { bytes: Box::new([255, 0]), cut: false }),
+            Some(documents::Text { bytes: Box::from(UTF8_TEXTS[0]), cut: false }),
             Some(documents::Text { bytes: Box::new([]), cut: true }),
-            Some(documents::Text { bytes: Box::new([255, 0]), cut: true }),
+            Some(documents::Text { bytes: Box::from(UTF8_TEXTS[0]), cut: true }),
         ];
         for instructions in contexts {
             for addressed in
@@ -548,7 +550,7 @@ pub(super) mod tests {
         parameters
             .push(documents::Parameter::Bytes {
                 name: u32::MAX,
-                value: documents::Text { bytes: Box::new([255, 0]), cut: true },
+                value: documents::Text { bytes: Box::from(UTF8_TEXTS[0]), cut: true },
             })
             .expect("the complete supplied fixture is admitted");
         let mut inputs = List::with_capacity(3);
@@ -573,7 +575,7 @@ pub(super) mod tests {
             panic!("opaque byte parameter")
         };
         assert_eq!(*name, u32::MAX);
-        assert_eq!(value.bytes.bytes(), &[255, 0]);
+        assert_eq!(value.bytes.bytes(), UTF8_TEXTS[0]);
         assert!(value.cut);
         assert!(actual.whole().is_none());
         assert_eq!(specification(&value_source(), &Limits { text: 2, ..limits }), Err(Invalid::TooLarge));
@@ -816,7 +818,7 @@ pub(super) mod tests {
         let source = documents::Frame {
             party: u64::MAX,
             kind: jig_domain_people::Kind::Service,
-            login: documents::Text { bytes: Box::from([255, b'/']), cut: true },
+            login: documents::Text { bytes: Box::from(UTF8_TEXTS[1]), cut: true },
             name: documents::Text { bytes: Box::new([]), cut: false },
             deployment_role: None,
             projects,
@@ -837,7 +839,7 @@ pub(super) mod tests {
         let translated = frame(&source, &limits).expect("the complete supplied fixture is admitted");
         assert_eq!(translated.party.number, u64::MAX);
         assert_eq!(translated.party.kind, client::PartyKind::Service);
-        assert_eq!(translated.party.login.bytes.bytes(), &[255, b'/']);
+        assert_eq!(translated.party.login.bytes.bytes(), UTF8_TEXTS[1]);
         assert!(translated.party.login.cut);
         assert_eq!(translated.party.name.bytes.bytes(), b"");
         assert!(!translated.party.name.cut);

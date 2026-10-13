@@ -17,7 +17,7 @@ pub struct SpecificationDocument {
     pub cut: bool,
 }
 
-/// An opaque named specification value; resources retain their connector identity.
+/// A named specification value; text is UTF-8 and resources retain their connector identity.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Parameter {
     Number { name: u32, value: u64 },

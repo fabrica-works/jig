@@ -394,6 +394,8 @@ pub fn application_reply(
 
 #[cfg(test)]
 mod tests {
+    const UTF8_WORDS: &[u8] = b"~\0";
+
     use super::*;
     fn transport() -> Transport {
         let mut value = Transport::new(client::VersionRange { first: 1, last: u32::MAX });
@@ -758,7 +760,7 @@ mod tests {
             turn: jig_domain_views::TurnName { attempt: u64::MAX, turn: 17, retry: u32::MAX },
             from: 91,
             to: 93,
-            text: Box::from([255, 0]),
+            text: Box::from(UTF8_WORDS),
             cut: true,
             call: None,
         };
@@ -777,7 +779,7 @@ mod tests {
         assert_eq!(text.turn.retry, u32::MAX);
         assert_eq!(text.from, 91);
         assert_eq!(text.through, 93);
-        assert_eq!(text.text.bytes(), &[255, 0]);
+        assert_eq!(text.text.bytes(), UTF8_WORDS);
         assert!(text.cut);
         assert!(
             matches!(transport.taken(ClientId(1), native), Some(jig_domain_core::Event::Delivered { watcher: actual }) if actual == watcher)

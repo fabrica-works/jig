@@ -53,14 +53,14 @@ mod part7;
 pub use part7::*;
 
 pub fn raw_cursor(value: &[u8]) -> c::Cursor {
-    c::Cursor { value: c::Text::new(Box::from(value), 256).unwrap() }
+    c::Cursor::new(Box::from(value), 256).unwrap()
 }
 pub fn wire_cursor(value: &[u8]) -> w::Cursor {
     w::Cursor::new(&w::CEILINGS, w::CursorParts { value: Box::from(value) }).unwrap()
 }
 pub fn note_page_with_cursors() -> w::NotePage {
     let mut parts = read_wire_note_page().into_parts();
-    parts.before = Some(wire_cursor(&[255; 48]));
+    parts.before = Some(wire_cursor(UTF8_TEXTS[0]));
     parts.after = Some(wire_cursor(&[0; 48]));
     parts.cut = true;
     w::NotePage::new(&w::CEILINGS, parts).unwrap()
@@ -68,7 +68,7 @@ pub fn note_page_with_cursors() -> w::NotePage {
 pub fn expected_note_page_with_cursors() -> c::NotePage {
     c::NotePage {
         rows: List::with_capacity(0),
-        before: Some(raw_cursor(&[255; 48])),
+        before: Some(raw_cursor(UTF8_TEXTS[0])),
         after: Some(raw_cursor(&[0; 48])),
         cut: true,
     }
@@ -153,3 +153,5 @@ pub fn proposal_with_words(words: &[u8]) -> w::Proposal {
     parts.why = Box::from(words);
     w::Proposal::new(&w::CEILINGS, parts).unwrap()
 }
+
+const UTF8_TEXTS: [&[u8]; 1] = [&[b'~'; 48]];

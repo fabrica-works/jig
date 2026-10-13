@@ -65,7 +65,7 @@ fn states(action: OwnerRetainedAction) {
         OwnerProposalHistoryState::Accepted { by: OwnerRequester::Task(u64::MAX) },
         OwnerProposalHistoryState::Rejected {
             by: OwnerRequester::Deployment { project: u32::MAX },
-            reason: doc(&[255, 0], true),
+            reason: doc(UTF8_TEXTS[0], true),
         },
         OwnerProposalHistoryState::Withdrawn,
     ] {
@@ -184,7 +184,7 @@ fn retained_proposal_fragment_validation_refuses_whole_allocated_rows_and_text_w
     let value = proposal(OwnerRetainedAction::Batch(List::with_capacity(limits.rows.checked_add(1).unwrap())));
     assert!(view::proposal_required(&value, &limits, words).is_none());
     let value = OwnerProposalHistory {
-        state: OwnerProposalHistoryState::Rejected { by: OwnerRequester::Person(0), reason: doc(&[255; 8], false) },
+        state: OwnerProposalHistoryState::Rejected { by: OwnerRequester::Person(0), reason: doc(UTF8_TEXTS[1], false) },
         ..proposal(OwnerRetainedAction::Release { task: 0 })
     };
     assert!(view::proposal_required(&value, &limits, words).is_some());
@@ -256,3 +256,5 @@ fn retained_proposal_fragment_preserves_absent_empty_and_independent_retained_lo
         assert_eq!(has(&tree, b"Retained dependency list incomplete"), dependency_cut);
     }
 }
+
+const UTF8_TEXTS: [&[u8]; 2] = [b"~\0", &[b'~'; 8]];

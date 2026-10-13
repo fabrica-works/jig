@@ -1,15 +1,22 @@
 //! One-terminal reads, bounded pages and opaque cursors; client/domain/contract.md, 6.
 //! A cursor is never decoded by the client. Live watches may overlap retained read pages.
 use super::{
-    ActivityLine, ConversationLine, Deployment, Escalation, Frame, GoalLine, HistoryRow, InboxEntry, InboxGroup, Note,
-    NoteScope, PersonTask, Project, Proposal, ProposalKey, Question, Result, Task, Text,
+    ActivityLine, Bytes, ConversationLine, Deployment, Escalation, Frame, GoalLine, HistoryRow, InboxEntry, InboxGroup,
+    Note, NoteScope, PersonTask, Project, Proposal, ProposalKey, Question, Result, Task, Text,
 };
 use alloc::boxed::Box;
 use skein_lib::List;
 /// An opaque page continuation within its byte bound.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Cursor {
-    pub value: Text,
+    pub value: Bytes,
+}
+impl Cursor {
+    /// Takes a complete opaque continuation within the client's cursor bound.
+    pub fn new(bytes: Box<[u8]>, limit: u32) -> core::result::Result<Self, Box<[u8]>> {
+        let value = Bytes::new(bytes, limit)?;
+        Ok(Self { value })
+    }
 }
 
 /// One inbox query order; the two groups carry independent opaque cursors.

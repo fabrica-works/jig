@@ -1,6 +1,6 @@
 //! Whole pages and single documents (protocol/client.md, 3 and 6).
 use super::{
-    Limits, List, Reader, Wall, authority_fields, budget_fields, c, offered_piece, owner_authority_fields,
+    Limits, List, Reader, Wall, authority_fields, budget_fields, c, offered_piece, opaque, owner_authority_fields,
     owner_message_proposal_kind_fields, part_piece, piece_problem, pool_fields, recurring_piece, role_policy_fields,
     specification_fields, task_contract_document_fields, task_spend_piece, text, too_large, w,
 };
@@ -109,7 +109,7 @@ pub(crate) fn owner_goal_holding_fields(
             }
             let mut list0 = List::with_capacity(row.path().len());
             for item in row.path() {
-                list0.push(text(item, limits)?).expect("reserved supplied list");
+                list0.push(opaque(item, limits)?).expect("reserved supplied list");
             }
             c::OwnerGoalHolding::Write { connector: row.connector(), path: list0, kind: row.kind() }
         }
@@ -119,7 +119,7 @@ pub(crate) fn owner_goal_holding_fields(
             }
             let mut list0 = List::with_capacity(row.path().len());
             for item in row.path() {
-                list0.push(text(item, limits)?).expect("reserved supplied list");
+                list0.push(opaque(item, limits)?).expect("reserved supplied list");
             }
             c::OwnerGoalHolding::Slot { connector: row.connector(), path: list0, kind: row.kind() }
         }

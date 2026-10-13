@@ -41,6 +41,8 @@ pub fn note(value: &documents::Note, limits: &Limits) -> Result<client::Note, ow
 
 #[cfg(test)]
 mod tests {
+    const UTF8_TEXTS: [&[u8]; 1] = [b"~\0"];
+
     use super::*;
     use jig_domain_core::acts;
     use jig_domain_people as people;
@@ -74,7 +76,7 @@ mod tests {
                 },
             },
             description: documents::Text { bytes: Box::new([]), cut: false },
-            body: documents::Text { bytes: Box::from([255, 0]), cut: true },
+            body: documents::Text { bytes: Box::from(UTF8_TEXTS[0]), cut: true },
             writer: notes::Author::Task { task: u64::MAX, attempt: u64::MAX },
             tasks,
             changed: None,
@@ -110,7 +112,7 @@ mod tests {
                 assert_eq!(value.revision.value, u64::from(u32::MAX));
                 assert_eq!(value.description.bytes.bytes(), b"");
                 assert!(!value.description.cut);
-                assert_eq!(value.body.bytes.bytes(), &[255, 0]);
+                assert_eq!(value.body.bytes.bytes(), UTF8_TEXTS[0]);
                 assert!(value.body.cut && value.cut);
                 assert_eq!(value.tasks.capacity(), 4);
                 assert_eq!(value.tasks.as_slice(), &[0, u64::MAX]);

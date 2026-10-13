@@ -12,6 +12,12 @@ use alloc::boxed::Box;
 use jig_domain_client::contract as c;
 use jig_protocol_client_wire::v5 as w;
 use skein_lib::{List, Reader, Wall, bytes};
+fn opaque(value: &[u8], limits: &Limits) -> Result<c::Bytes, w::Problem> {
+    match c::Bytes::new(bytes::copy_of(value), limits.client.text) {
+        Ok(value) => Ok(value),
+        Err(_) => Err(too_large()),
+    }
+}
 fn text(value: &[u8], limits: &Limits) -> Result<c::Text, w::Problem> {
     match c::Text::new(bytes::copy_of(value), limits.client.text) {
         Ok(value) => Ok(value),

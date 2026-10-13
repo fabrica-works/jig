@@ -176,7 +176,7 @@ fn held_prior_lifecycle_and_optional_closing_facts_keep_their_owner_meaning() {
 }
 #[test]
 fn full_runtime_tools_and_held_closing_fit_the_declared_tree_envelope() {
-    let full = text(&[b'x'; 128]);
+    let full = text(UTF8_TEXTS[0]);
     let mut run = active(RunStage::Running { attempt: u64::MAX });
     run.retry =
         Some(RetryNotice::Failed { class: FailureClass::Temporary, count: u32::MAX - 1, allowance: u32::MAX - 1 });
@@ -240,3 +240,5 @@ fn full_runtime_tools_and_held_closing_fit_the_declared_tree_envelope() {
 fn current_identity(id: &[u8]) -> CallIdentity {
     CallIdentity { owner: Token::new(u64::MAX), sequence: u32::MAX, retry: u32::MAX, id: text(id) }
 }
+
+const UTF8_TEXTS: [&[u8]; 1] = [&[b'x'; 128]];

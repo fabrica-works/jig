@@ -69,8 +69,8 @@ pub(crate) fn conversation_line_piece(
 }
 
 pub(crate) fn cursor_fields(value: &w::Cursor, limits: &Limits) -> Result<c::Cursor, w::Problem> {
-    match c::Text::new(bytes::copy_of(value.value()), limits.wire.cursor_value) {
-        Ok(value) => Ok(c::Cursor { value }),
+    match c::Cursor::new(bytes::copy_of(value.value()), limits.wire.cursor_value) {
+        Ok(value) => Ok(value),
         Err(_) => Err(too_large()),
     }
 }

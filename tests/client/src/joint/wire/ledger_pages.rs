@@ -100,6 +100,8 @@ pub fn spend(project: u32, page: &reads::Page, limits: &Limits) -> Result<client
 
 #[cfg(test)]
 pub(crate) mod tests {
+    const UTF8_TEXTS: [&[u8]; 2] = [b"~\0", b"\0~"];
+
     use super::*;
     use jig_domain_core::documents;
     use skein_lib::Wall;
@@ -142,12 +144,12 @@ pub(crate) mod tests {
         let mut page = page(reads::Scope::EndedDelegates { task: u64::MAX });
         for (index, ended) in [
             documents::Ending::Done(documents::ResultValue::Report(documents::Text {
-                bytes: Box::from([255, 0]),
+                bytes: Box::from(UTF8_TEXTS[0]),
                 cut: true,
             })),
             documents::Ending::Failed(documents::Text { bytes: Box::new([]), cut: false }),
             documents::Ending::Cancelled {
-                reason: documents::Text { bytes: Box::from([0, 255]), cut: true },
+                reason: documents::Text { bytes: Box::from(UTF8_TEXTS[1]), cut: true },
                 result: Some(documents::ResultValue::Approved { state: Box::from([255, 0]), words: None }),
                 by: tasks::Party::Deployment { project: u32::MAX },
                 at: Wall::EPOCH,

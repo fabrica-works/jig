@@ -67,7 +67,7 @@ fn value() -> OwnerPersonTask {
         spec: SpecificationDocument {
             specification: DocumentSpecification {
                 words: doc(b"question bytes"),
-                parameters: rows([ParameterDocument::Bytes { name: u32::MAX, value: doc(&[255, 0, 47]) }]),
+                parameters: rows([ParameterDocument::Bytes { name: u32::MAX, value: doc(UTF8_TEXTS[0]) }]),
                 inputs: rows([u64::MAX]),
             },
             cut: true,
@@ -271,10 +271,10 @@ fn person_owner_approval_renders_opaque_parts_without_inventing_application_scop
 }
 fn full_value(l: &jig_domain_client::Limits) -> OwnerPersonTask {
     let mut value = value();
-    value.task.title = doc(&[255; 128]);
-    value.spec.specification.words = doc(&[b'q'; 128]);
+    value.task.title = doc(UTF8_TEXTS[1]);
+    value.spec.specification.words = doc(UTF8_TEXTS[2]);
     value.spec.specification.parameters =
-        rows((0..l.rows).map(|name| ParameterDocument::Bytes { name, value: doc(&[255; 128]) }));
+        rows((0..l.rows).map(|name| ParameterDocument::Bytes { name, value: doc(UTF8_TEXTS[1]) }));
     value.spec.specification.inputs = rows(0..u64::from(l.rows));
     let contract = TaskContractDocument::Verdict {
         choices: rows((0..l.rows).map(|code| VerdictChoice {
@@ -291,7 +291,7 @@ fn full_value(l: &jig_domain_client::Limits) -> OwnerPersonTask {
         let mut result = result(number);
         result.value = Some(ResultValue::OwnerVerdict {
             verdict: u32::MAX,
-            words: doc(&[b'w'; 128]),
+            words: doc(UTF8_TEXTS[3]),
             fields: rows((0..l.rows).map(|_| ResultField { name: copy_of(&[255; 128]), value: copy_of(&[128; 128]) })),
         });
         let details = result.details.as_mut().unwrap();
@@ -516,3 +516,5 @@ fn person_owner_view_admits_closed_offer_capacity_without_expanding_shown_result
     assert_eq!(original.acts.capacity(), MAX_OFFERED_ACTS);
     assert!(MAX_OFFERED_ACTS > l.rows);
 }
+
+const UTF8_TEXTS: [&[u8]; 4] = [b"~\0/", &[b'~'; 128], &[b'q'; 128], &[b'w'; 128]];

@@ -356,7 +356,7 @@ fn conversations_show_live_before_ended_and_read_more_using_the_opaque_cursor() 
     let mut rows = List::with_capacity(2);
     rows.push(list_entry(7, Phase::Done, 30)).unwrap();
     rows.push(list_entry(8, Phase::Idle, 10)).unwrap();
-    let cursor = Cursor { value: text(b"next") };
+    let cursor = Cursor::new(Box::from(b"next".as_slice()), 1024).expect("bounded opaque cursor");
     drive(
         &mut domain,
         Time::ZERO,
@@ -610,7 +610,7 @@ fn task_plan_keeps_folded_held_counts_and_filters_without_losing_rows() {
     let Request::Read { read, what: Read::Ended { task: 9, after: None } } = asked[0] else {
         panic!("ended subtree read");
     };
-    let cursor = Cursor { value: text(b"opaque subtree") };
+    let cursor = Cursor::new(Box::from(b"opaque subtree".as_slice()), 1024).expect("bounded opaque cursor");
     drive(
         &mut domain,
         Time::ZERO,
@@ -661,7 +661,7 @@ fn task_history_pages_and_scope_changes_discard_old_scope_reads() {
     let Request::Read { read, what: Read::History { subtree: true, .. } } = requests[0] else {
         panic!("subtree read");
     };
-    let cursor = Cursor { value: text(b"opaque history edge") };
+    let cursor = Cursor::new(Box::from(b"opaque history edge".as_slice()), 1024).expect("bounded opaque cursor");
     let mut rows = List::with_capacity(1);
     rows.push(HistoryRow::Line(Box::new(HistoryLine {
         position: 1,
@@ -869,7 +869,7 @@ fn project_board_orders_live_waiting_and_ended_goals_and_names_task_cards() {
     let mut rows = List::with_capacity(2);
     rows.push(goal_line(8, 1, Phase::Done, 1)).unwrap();
     rows.push(goal_line(9, 2, Phase::Done, 2)).unwrap();
-    let cursor = Cursor { value: text(b"ended goals edge") };
+    let cursor = Cursor::new(Box::from(b"ended goals edge".as_slice()), 1024).expect("bounded opaque cursor");
     drive(
         &mut domain,
         Time::ZERO,
@@ -1232,7 +1232,7 @@ fn project_task_filters_and_spend_pages() {
         tasks: List::with_capacity(0),
     })
     .unwrap();
-    let cursor = Cursor { value: text(b"past period edge") };
+    let cursor = Cursor::new(Box::from(b"past period edge".as_slice()), 1024).expect("bounded opaque cursor");
     drive(
         &mut domain,
         Time::ZERO,
@@ -1360,7 +1360,7 @@ fn inbox_reply_receipts_keep_whole_chat_facts_shared_task_documents_and_seen_req
             result: ReadResult::Value(ReadValue::Inbox(Box::new(InboxPage {
                 cut: false,
                 rows,
-                before: Some(Cursor { value: text(b"back") }),
+                before: Some(Cursor::new(Box::from(b"back".as_slice()), 1024).expect("bounded opaque cursor")),
                 after: None,
             }))),
         },
@@ -1383,7 +1383,7 @@ fn inbox_reply_receipts_keep_whole_chat_facts_shared_task_documents_and_seen_req
             result: ReadResult::Value(ReadValue::Inbox(Box::new(InboxPage {
                 cut: false,
                 rows,
-                before: Some(Cursor { value: text(b"back") }),
+                before: Some(Cursor::new(Box::from(b"back".as_slice()), 1024).expect("bounded opaque cursor")),
                 after: None,
             }))),
         },
@@ -1454,7 +1454,7 @@ fn conversation_reply_windows_replace_sources_drop_rows_and_clear_committed_seen
         Event::Watch { watch, event: WatchEvent::Delivered(conversation_delivery(rows.clone(), true)) },
     );
     assert!(domain.objects().get(nine).unwrap().reply.is_none(), "committed seen facts remove stale unread metadata");
-    let cursor = Cursor { value: text(b"older") };
+    let cursor = Cursor::new(Box::from(b"older".as_slice()), 1024).expect("bounded opaque cursor");
     drive(
         &mut domain,
         Time::ZERO,
@@ -1490,7 +1490,7 @@ fn conversation_reply_windows_replace_sources_drop_rows_and_clear_committed_seen
             result: ReadResult::Value(ReadValue::Conversations(Box::new(ConversationPage {
                 cut: false,
                 rows,
-                before: Some(Cursor { value: text(b"back") }),
+                before: Some(Cursor::new(Box::from(b"back".as_slice()), 1024).expect("bounded opaque cursor")),
                 after: None,
             }))),
         },
@@ -1708,8 +1708,8 @@ fn check_inbox_group_pages_keep_orders_cursors_and_live_precedence() {
     let mut updates = List::with_capacity(2);
     updates.push(row(10, InboxGroup::Results, 4)).unwrap();
     updates.push(row(11, InboxGroup::Results, 5)).unwrap();
-    let needs_after = Cursor { value: text(b"needs-next") };
-    let updates_after = Cursor { value: text(b"updates-next") };
+    let needs_after = Cursor::new(Box::from(b"needs-next".as_slice()), 1024).expect("bounded opaque cursor");
+    let updates_after = Cursor::new(Box::from(b"updates-next".as_slice()), 1024).expect("bounded opaque cursor");
     for (query, rows, cursor) in [(&needs_query, needs, &needs_after), (&updates_query, updates, &updates_after)] {
         send(
             &mut domain,
@@ -1752,7 +1752,7 @@ fn check_inbox_group_pages_keep_orders_cursors_and_live_precedence() {
             result: ReadResult::Value(ReadValue::Inbox(Box::new(InboxPage {
                 cut: false,
                 rows: List::with_capacity(0),
-                before: Some(Cursor { value: text(b"needs-back") }),
+                before: Some(Cursor::new(Box::from(b"needs-back".as_slice()), 1024).expect("bounded opaque cursor")),
                 after: None,
             }))),
         },
@@ -2456,7 +2456,7 @@ fn owner_conversation_replacement_keeps_absent_facts_whole_text_and_independent_
     current.runtime = None;
     current.changed = None;
     current.unread = None;
-    current.first_words = DocumentText { bytes: text(b"\xff\0whole"), cut: true };
+    current.first_words = DocumentText { bytes: text(UTF8_TEXTS[0]), cut: true };
     current.cached_replies = u32::MAX;
     current.seen = 0;
     current.last_reply = u64::MAX;
@@ -2474,7 +2474,7 @@ fn owner_conversation_replacement_keeps_absent_facts_whole_text_and_independent_
     assert_eq!(reply.first_unread, 1);
     let mut rows = List::with_capacity(1);
     rows.push(old).unwrap();
-    let cursor = Cursor { value: text(b"\xff\0opaque-row") };
+    let cursor = Cursor::new(Box::from(UTF8_TEXTS[1]), 1024).expect("bounded opaque cursor");
     drive(
         &mut domain,
         Time::ZERO,
@@ -2585,6 +2585,8 @@ fn conversation_delivery(rows: List<ConversationLine>, more: bool) -> Delivery {
     Delivery::Conversations(Box::new(Conversations {
         rows,
         more,
-        after: Cursor { value: text(b"fixture-watch-after") },
+        after: Cursor::new(Box::from(b"fixture-watch-after".as_slice()), 1024).expect("bounded opaque cursor"),
     }))
 }
+
+const UTF8_TEXTS: [&[u8]; 2] = [b"~\0whole", b"~\0opaque-row"];

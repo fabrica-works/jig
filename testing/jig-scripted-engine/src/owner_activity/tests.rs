@@ -19,7 +19,7 @@ fn word(kind: OwnerMessageKind) -> OwnerWord {
         number: u64::MAX,
         from: OwnerRequester::Task(u64::MAX),
         kind,
-        words: text(&[255, 0]),
+        words: text(UTF8_TEXTS[0]),
         at: Wall::from_nanos(u64::MAX),
         hits: u32::MAX,
         eligible: true,
@@ -62,11 +62,11 @@ fn owner_activity_whole_word_and_line_price_every_inline_reserved_field_and_opaq
 #[test]
 fn owner_activity_approved_absent_empty_nonempty_and_invalid_presence_are_whole_and_independent() {
     let mut saved = Vec::new();
-    for (present, bytes_value) in [(false, b"".as_slice()), (true, b""), (true, &[255, 0])] {
+    for (present, bytes_value) in [(false, b"".as_slice()), (true, b""), (true, UTF8_TEXTS[0])] {
         let value = OwnerWord {
             words: text(bytes_value),
             ..word(OwnerMessageKind::Result(OwnerWordResult::Approved {
-                state: text(&[254, 0]),
+                state: text(UTF8_TEXTS[1]),
                 words_present: present,
             }))
         };
@@ -225,3 +225,5 @@ fn owner_activity_full_fields_and_approved_state_reach_the_declared_whole_worst_
     assert_eq!(worst_case(&Bounds { rows: u32::MAX, text: u32::MAX, ..bounds() }), None);
     assert_eq!(word_worst_case(&Bounds { rows: u32::MAX, text: u32::MAX, ..bounds() }), None);
 }
+
+const UTF8_TEXTS: [&[u8]; 2] = [b"~\0", b"!\0"];

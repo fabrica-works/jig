@@ -3,20 +3,21 @@
 //! moves in; list owners choose capacities from limits. See client/domain/contract.md, 5.
 use alloc::boxed::Box;
 use skein_lib::{List, Wall};
-/// Owned text, checked by its owner before it is kept.
+/// Owned UTF-8 text, checked by its owner before it is kept.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Text {
     bytes: Box<[u8]>,
 }
 impl Text {
-    /// Takes bytes only when their length fits the owner's bound.
+    /// Takes UTF-8 bytes only when their length fits the owner's bound.
+    #[expect(clippy::disallowed_methods, reason = "client/domain/contract.md, 5.3 requires UTF-8 text validation")]
     pub fn new(bytes: Box<[u8]>, limit: u32) -> Result<Self, Box<[u8]>> {
-        if bytes.len() > usize::try_from(limit).expect("u32 fits usize") {
+        if bytes.len() > usize::try_from(limit).expect("u32 fits usize") || core::str::from_utf8(&bytes).is_err() {
             return Err(bytes);
         }
         Ok(Self { bytes })
     }
-    /// The opaque words, never parsed by the domain.
+    /// UTF-8 words for showing.
     #[must_use]
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
@@ -32,6 +33,36 @@ impl Text {
         self.bytes
     }
 }
+/// Owned opaque bytes, checked against their owner's bound before being kept.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Bytes {
+    bytes: Box<[u8]>,
+}
+impl Bytes {
+    /// Takes opaque bytes only when their length fits the owner's bound.
+    pub fn new(bytes: Box<[u8]>, limit: u32) -> Result<Self, Box<[u8]>> {
+        if bytes.len() > usize::try_from(limit).expect("u32 fits usize") {
+            return Err(bytes);
+        }
+        Ok(Self { bytes })
+    }
+    /// The complete opaque bytes.
+    #[must_use]
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+    /// Whether the bytes fit another owner's byte bound.
+    #[must_use]
+    pub fn fits(&self, limit: u32) -> bool {
+        self.bytes.len() <= usize::try_from(limit).expect("u32 fits usize")
+    }
+    /// Moves the complete bytes to their next owner.
+    #[must_use]
+    pub fn into_bytes(self) -> Box<[u8]> {
+        self.bytes
+    }
+}
+
 /// The version of one independently decidable thing.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Revision {

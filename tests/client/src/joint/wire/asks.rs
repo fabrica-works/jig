@@ -315,6 +315,8 @@ fn escalation_decision(value: &client::Decision) -> Result<people::EscalationDec
 
 #[cfg(test)]
 mod tests {
+    const UTF8_TEXTS: [&[u8]; 3] = [b"~/\0", b"~\0", b"~/"];
+
     use super::*;
     fn text(value: &[u8]) -> client::Text {
         client::Text::new(Box::from(value), 128).expect("the complete supplied fixture is admitted")
@@ -322,7 +324,7 @@ mod tests {
 
     #[test]
     fn amendment_requests_keep_supplied_empty_or_opaque_reason_and_independent_address_spec_and_release_revisions() {
-        for reason in [text(b""), text(&[255, b'/', 0])] {
+        for reason in [text(b""), text(UTF8_TEXTS[0])] {
             for address in [client::PersonAddress::Party(u64::MAX), client::PersonAddress::Role(u32::MAX)] {
                 let request = client::Ask::Amend {
                     project: u32::MAX,
@@ -366,7 +368,7 @@ mod tests {
     fn amendment_whole_selected_specification_authority_and_wake_keep_every_parameter_channel_and_optional_absence() {
         let mut parameters = List::with_capacity(7);
         parameters.push(client::Parameter::Number { name: u32::MAX, value: u64::MAX }).expect("room");
-        parameters.push(client::Parameter::Bytes { name: 0, value: text(&[255, 0]) }).expect("room");
+        parameters.push(client::Parameter::Bytes { name: 0, value: text(UTF8_TEXTS[1]) }).expect("room");
         parameters.push(client::Parameter::Resource { name: 3, connector: u16::MAX, resource: 0 }).expect("room");
         let mut inputs = List::with_capacity(5);
         inputs.push(u64::MAX).expect("room");
@@ -411,7 +413,7 @@ mod tests {
             spec.parameters.as_ref(),
             &[
                 people::Parameter::Number { name: u32::MAX, value: u64::MAX },
-                people::Parameter::Bytes { name: 0, value: Box::from([255, 0]) },
+                people::Parameter::Bytes { name: 0, value: Box::from(UTF8_TEXTS[1]) },
                 people::Parameter::Resource { name: 3, connector: u16::MAX, resource: 0 },
             ]
         );
@@ -458,13 +460,13 @@ mod tests {
                 ask(&client::Ask::DecideProposal {
                     project: 4,
                     proposal: client::ProposalKey { proposer, number: 7 },
-                    decision: client::Decision::Rejected { reason: text(&[255, b'/', 0]) }
+                    decision: client::Decision::Rejected { reason: text(UTF8_TEXTS[0]) }
                 }),
                 Ok(people::Ask::DecideProposal {
                     project: 4,
                     proposer: owner,
                     proposal: 7,
-                    decision: people::ProposalDecision::Reject { reason: Box::from([255, b'/', 0]) }
+                    decision: people::ProposalDecision::Reject { reason: Box::from(UTF8_TEXTS[0]) }
                 })
             );
         }
@@ -498,7 +500,7 @@ mod tests {
             scope: client::NoteScope::Project(4),
             revision: client::Revision { value: u64::from(u32::MAX) },
             description: text(b""),
-            body: text(&[255, b'/']),
+            body: text(UTF8_TEXTS[2]),
             references,
         };
         assert_eq!(
@@ -509,7 +511,7 @@ mod tests {
                 scope: Box::new(people::NoteScope::Project),
                 change: Box::new(people::NoteChange::Correct {
                     description: Box::new([]),
-                    body: Box::from([255, b'/']),
+                    body: Box::from(UTF8_TEXTS[2]),
                     references: Box::from([u64::MAX, 13]),
                     recalled: u32::MAX
                 })
@@ -738,8 +740,8 @@ mod tests {
                 .expect("the complete supplied fixture is admitted");
             expected.push(people::Holding { person: party, role: actual });
             assert_eq!(
-                ask(&client::Ask::MakeService { project: u32::MAX, name: text(&[255, b'/', 0]), role: supplied }),
-                Ok(people::Ask::MakeService { project: u32::MAX, name: Box::from([255, b'/', 0]), role: actual })
+                ask(&client::Ask::MakeService { project: u32::MAX, name: text(UTF8_TEXTS[0]), role: supplied }),
+                Ok(people::Ask::MakeService { project: u32::MAX, name: Box::from(UTF8_TEXTS[0]), role: actual })
             );
         }
         assert_eq!(

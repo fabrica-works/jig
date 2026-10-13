@@ -414,7 +414,7 @@ fn conversations(words: &Words) {
         Delivery::Conversations(Box::new(Conversations {
             rows: list([line(8), line(9)]),
             more: true,
-            after: Cursor { value: full() },
+            after: full_cursor(),
         })),
     );
     render(&d, words);
@@ -467,8 +467,8 @@ fn inbox(words: &Words) {
                     result: ReadResult::Value(ReadValue::Inbox(Box::new(InboxPage {
                         cut: false,
                         rows: list([first, second]),
-                        before: Some(Cursor { value: full() }),
-                        after: Some(Cursor { value: full() }),
+                        before: Some(full_cursor()),
+                        after: Some(full_cursor()),
                     }))),
                 },
             );
@@ -632,8 +632,8 @@ fn fill_activity(d: &mut Domain, read: Token) {
                         },
                     ),
                 ]),
-                before: Some(Cursor { value: full() }),
-                after: Some(Cursor { value: full() }),
+                before: Some(full_cursor()),
+                after: Some(full_cursor()),
             }))),
         },
     );
@@ -674,8 +674,8 @@ fn fill_history(d: &mut Domain, read: Token) {
                         change: HistoryChange::Amended { before: full(), after: full() },
                     })),
                 ]),
-                before: Some(Cursor { value: full() }),
-                after: Some(Cursor { value: full() }),
+                before: Some(full_cursor()),
+                after: Some(full_cursor()),
             }))),
         },
     );
@@ -730,8 +730,8 @@ fn fill_ended_goals(d: &mut Domain, read: Token, _doc: &Project) {
             result: ReadResult::Value(ReadValue::Goals(Box::new(GoalPage {
                 cut: false,
                 rows: list([goal(10), goal(11)]),
-                before: Some(Cursor { value: full() }),
-                after: Some(Cursor { value: full() }),
+                before: Some(full_cursor()),
+                after: Some(full_cursor()),
             }))),
         },
     );
@@ -799,8 +799,8 @@ fn fill_notes(d: &mut Domain, read: Token) {
             result: ReadResult::Value(ReadValue::Notes(Box::new(NotePage {
                 cut: false,
                 rows: list([note(1), note(2)]),
-                before: Some(Cursor { value: full() }),
-                after: Some(Cursor { value: full() }),
+                before: Some(full_cursor()),
+                after: Some(full_cursor()),
             }))),
         },
     );
@@ -815,8 +815,8 @@ fn fill_spend(d: &mut Domain, read: Token, doc: &Project) {
             result: ReadResult::Value(ReadValue::Spend(Box::new(SpendPage {
                 cut: false,
                 rows: list([period.clone(), period]),
-                before: Some(Cursor { value: full() }),
-                after: Some(Cursor { value: full() }),
+                before: Some(full_cursor()),
+                after: Some(full_cursor()),
             }))),
         },
     );
@@ -835,4 +835,8 @@ fn full_path() -> List<Box<[u8]>> {
 }
 fn full_pattern() -> OwnerPattern {
     OwnerPattern { segments: full_path(), last: OwnerPatternEnd::Exact(full().into_bytes()) }
+}
+
+fn full_cursor() -> Cursor {
+    Cursor::new(full().into_bytes(), CLIENT.text).unwrap()
 }

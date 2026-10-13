@@ -361,6 +361,8 @@ impl Transport {
 
 #[cfg(test)]
 mod tests {
+    const UTF8_TEXTS: [&[u8]; 1] = [b"~\0"];
+
     use super::*;
 
     fn identity(subject: &[u8]) -> people::Identity {
@@ -512,9 +514,9 @@ mod tests {
         let native = Token::new(u64::MAX);
         let what = Read::Goals {
             project: u32::MAX,
-            after: Some(jig_domain_client::contract::Cursor {
-                value: jig_domain_client::contract::Text::new(Box::from([255, 0]), 2).expect("whole opaque cursor"),
-            }),
+            after: Some(
+                jig_domain_client::contract::Cursor::new(Box::from(UTF8_TEXTS[0]), 2).expect("whole opaque cursor"),
+            ),
         };
         let jig = Reply::Read { client: ClientId(0), read: native, what: what.clone() };
         let subject =
@@ -530,10 +532,10 @@ mod tests {
             what,
             Read::Goals {
                 project: u32::MAX,
-                after: Some(jig_domain_client::contract::Cursor {
-                    value: jig_domain_client::contract::Text::new(Box::from([255, 0]), 2)
+                after: Some(
+                    jig_domain_client::contract::Cursor::new(Box::from(UTF8_TEXTS[0]), 2)
                         .expect("original whole cursor")
-                })
+                )
             }
         );
         assert_eq!(subject.scope, family::Scope::Project(u32::MAX));

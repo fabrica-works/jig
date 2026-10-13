@@ -267,13 +267,15 @@ pub fn chip(value: &documents::Chip, limits: &Limits) -> Result<client::Chip, ow
 
 #[cfg(test)]
 pub(super) mod tests {
+    const UTF8_TEXTS: [&[u8]; 1] = [b"~/"];
+
     use super::*;
     use skein_lib::{Duration, List, Token, Wall};
 
     pub(crate) fn source_chip() -> documents::Chip {
         documents::Chip {
             number: u64::MAX,
-            title: documents::Text { bytes: Box::from([255, b'/']), cut: true },
+            title: documents::Text { bytes: Box::from(UTF8_TEXTS[0]), cut: true },
             executor: documents::ExecutorKind::Person,
             phase: documents::PhaseLine::Ended,
             details: Box::new(documents::ChipDetails {
@@ -392,7 +394,7 @@ pub(super) mod tests {
             let actual = chip(&source, &limits).expect("complete owner chip fits");
             assert_eq!(source, before);
             assert_eq!(actual.task, u64::MAX);
-            assert_eq!(actual.title.bytes.bytes(), &[255, b'/']);
+            assert_eq!(actual.title.bytes.bytes(), UTF8_TEXTS[0]);
             assert!(actual.title.cut);
             assert_eq!(actual.executor, client::Executor::Role { project: u32::MAX, role: u32::MAX });
             assert_eq!(actual.phase, client::Phase::Ended, "generic ending never becomes a guessed outcome");

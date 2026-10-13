@@ -621,7 +621,7 @@ fn approval_confirmation_keeps_the_whole_state_and_actual_optional_explanation()
         let (mut domain, _) = live();
         let mut row = person();
         row.contract = PersonContract::Approval {
-            state: text(&[0, 255, 1]),
+            state: text(UTF8_TEXTS[0]),
             part: Part::Resource {
                 connector: 1,
                 path: {
@@ -643,7 +643,7 @@ fn approval_confirmation_keeps_the_whole_state_and_actual_optional_explanation()
                 project: 1,
                 task: 8,
                 revision: Revision { value: 4 },
-                answer: PersonAnswer::Approved { state: Box::new([0, 255, 1]), words: explanation },
+                answer: PersonAnswer::Approved { state: Box::from(UTF8_TEXTS[0]), words: explanation },
             }
         );
     }
@@ -800,3 +800,5 @@ mod amendment_reason;
 mod task_hold;
 
 mod owner_escalation;
+
+const UTF8_TEXTS: [&[u8]; 1] = [b"\0~\x01"];

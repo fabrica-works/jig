@@ -2,6 +2,8 @@
 //! (`domain/engine.md`, 5 and 6; `client/domain/contract.md`, 3.1 and 4).
 use super::*;
 
+const UTF8_IDENTITY_WORDS: (&[u8], &[u8]) = (b"~\0\x01", b"\0^!");
+
 fn env() -> Env<Limits> {
     Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits() }
 }
@@ -9,8 +11,8 @@ fn env() -> Env<Limits> {
 fn identity() -> people::Identity {
     people::Identity {
         key: people::IdentityKey { provider: 0, subject: Box::new([0, 255, 128, 7]) },
-        login: Box::new([255, 0, 1]),
-        name: Box::new([0, 128, 254]),
+        login: Box::from(UTF8_IDENTITY_WORDS.0),
+        name: Box::from(UTF8_IDENTITY_WORDS.1),
     }
 }
 

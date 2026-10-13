@@ -16,7 +16,7 @@ fn task_context_parent_prices_actual_optional_box_and_all_reserved_children_with
     context.writer_slots = List::with_capacity(2);
     context.escalation = None;
     context.closing = None;
-    context.runtime = Runtime::Running { attempt: u64::MAX, since: Wall::EPOCH, tool: Some(text(&[254_u8; 32])) };
+    context.runtime = Runtime::Running { attempt: u64::MAX, since: Wall::EPOCH, tool: Some(text(UTF8_TEXTS[0])) };
     row.context = Some(context.clone());
     let child = u64::try_from(size_of::<TaskContext>()).unwrap()
         + 2 * u64::try_from(size_of::<Part>()).unwrap()
@@ -41,3 +41,5 @@ fn task_context_parent_prices_actual_optional_box_and_all_reserved_children_with
     ));
     assert_eq!(row.context, None);
 }
+
+const UTF8_TEXTS: [&[u8]; 1] = [&[b'!'; 32]];

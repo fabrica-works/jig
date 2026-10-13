@@ -1331,12 +1331,14 @@ impl World {
 
 impl World {
     pub fn say(&mut self, key: u8) -> u64 {
+        let mut text = [0; 4];
+        let words = char::from(key).encode_utf8(&mut text);
         let task = self.assigned.as_ref().expect("assigned chat").task;
         self.send(root::Event::Core(core::Event::People(people::Event::Ask {
             reply_to: ReplyTo::new(Token::new(3000 + u64::from(key))),
             sign_in: self.sign_in.expect("signed in"),
             key: [key; 16],
-            ask: people::Ask::Say { project: 1, task, words: Box::from([key]), release: false },
+            ask: people::Ask::Say { project: 1, task, words: Box::from(words.as_bytes()), release: false },
         })));
         self.people_answers
             .iter()

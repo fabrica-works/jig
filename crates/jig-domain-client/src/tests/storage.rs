@@ -21,7 +21,10 @@ fn text(bytes: &[u8]) -> Text {
     Text::new(Box::from(bytes), 32).unwrap()
 }
 fn edges() -> Edges {
-    Edges { before: Edge::More(Cursor { value: text(b"before") }), after: Edge::More(Cursor { value: text(b"after") }) }
+    Edges {
+        before: Edge::More(Cursor::new(Box::from(b"before".as_slice()), 1024).expect("bounded opaque cursor")),
+        after: Edge::More(Cursor::new(Box::from(b"after".as_slice()), 1024).expect("bounded opaque cursor")),
+    }
 }
 fn chip(task: u64) -> Chip {
     Chip {

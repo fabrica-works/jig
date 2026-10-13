@@ -5,7 +5,7 @@ use core::mem::size_of;
 #[test]
 fn scripted_task_ending_refusals_keep_whole_owner_facts_after_keyed_durability_and_replay() {
     let ending = OwnerChipEnding::Cancelled {
-        reason: DocumentText { bytes: text(&[254; 32]), cut: true },
+        reason: DocumentText { bytes: text(UTF8_TEXTS[0]), cut: true },
         result: Some(ResultValue::Approved {
             state: Box::from([255_u8; 32]),
             words: Some(DocumentText { bytes: text(b""), cut: true }),
@@ -49,7 +49,7 @@ fn whole_task_endings_price_actual_boxes_raw_state_text_loss_and_optional_retain
         }),
     ] {
         let ending = OwnerChipEnding::Cancelled {
-            reason: DocumentText { bytes: text(&[254; 32]), cut: true },
+            reason: DocumentText { bytes: text(UTF8_TEXTS[0]), cut: true },
             result: retained.clone(),
             by: OwnerRequester::Deployment { project: u32::MAX },
             at: Wall::from_nanos(u64::MAX),
@@ -85,3 +85,5 @@ fn whole_task_endings_price_actual_boxes_raw_state_text_loss_and_optional_retain
     );
     assert_eq!(row.result, Some(TaskResult::Document(Box::new(value))));
 }
+
+const UTF8_TEXTS: [&[u8]; 1] = [&[b'!'; 32]];

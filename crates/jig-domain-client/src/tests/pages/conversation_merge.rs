@@ -60,7 +60,7 @@ fn read_rows(
     );
 }
 fn cursor(value: &[u8]) -> Cursor {
-    Cursor { value: text(value) }
+    Cursor::new(Box::from(value), 1024).expect("bounded opaque cursor")
 }
 fn reply(domain: &Domain, task: u64) -> &crate::objects::result::Reply {
     domain.objects().get(domain.objects().find(ObjectKey::Task(task)).unwrap()).unwrap().reply.as_ref().unwrap()
@@ -76,7 +76,7 @@ fn live_watch_growth_keeps_a_continuation_to_known_dropped_past() {
     let after_nine = cursor(b"owner-issued-after-nine");
     read_rows(&mut domain, first, &[eight.clone(), ended], None, Some(after_nine), true);
     let ten = list_entry(10, Phase::Idle, 11);
-    let restart = cursor(b"\xffowner-store-start");
+    let restart = cursor(UTF8_TEXTS[0]);
     drive(
         &mut domain,
         Time::ZERO,
@@ -111,7 +111,7 @@ fn a_stale_read_preserves_one_current_conversation_and_its_reply() {
     let old = list_entry(8, Phase::Idle, 99);
     watch_rows(&mut domain, watch, core::slice::from_ref(&old));
     let mut current = old.clone();
-    current.first_words = DocumentText { bytes: text(b"\xff\x00whole"), cut: true };
+    current.first_words = DocumentText { bytes: text(UTF8_TEXTS[1]), cut: true };
     current.seen = 0;
     current.last_reply = u64::MAX;
     current.changed = None;
@@ -120,15 +120,15 @@ fn a_stale_read_preserves_one_current_conversation_and_its_reply() {
     current.cached_replies = u32::MAX;
     current.budget.left = u64::MAX;
     watch_rows(&mut domain, watch, core::slice::from_ref(&current));
-    assert_eq!(reply(&domain, 8).first_words.bytes(), b"\xff\x00whole");
-    let opaque = cursor(b"\xff\x00opaque-row");
+    assert_eq!(reply(&domain, 8).first_words.bytes(), UTF8_TEXTS[1]);
+    let opaque = cursor(UTF8_TEXTS[2]);
     read_rows(&mut domain, first, &[old], None, Some(opaque.clone()), true);
     assert_eq!(domain.conversation_rows().rows.as_slice(), &[current]);
     assert_eq!(domain.conversation_rows().edges.after, Edge::More(opaque));
     assert!(domain.conversation_rows().cut);
-    assert_eq!(reply(&domain, 8).first_words.bytes(), b"\xff\x00whole");
+    assert_eq!(reply(&domain, 8).first_words.bytes(), UTF8_TEXTS[1]);
     assert_eq!(reply(&domain, 8).first_unread, 1);
-    assert_eq!(reply(&domain, 8).first_words, DocumentText { bytes: text(b"\xff\x00whole"), cut: true });
+    assert_eq!(reply(&domain, 8).first_words, DocumentText { bytes: text(UTF8_TEXTS[1]), cut: true });
     let id = domain.objects().find(ObjectKey::Task(8)).unwrap();
     assert_eq!(domain.objects().get(id).unwrap().sources.len(), 1);
     assert!(domain.objects().get(id).unwrap().sources.contains(&Source::Watch(skein_lib::Id::from_token(watch))));
@@ -150,7 +150,7 @@ fn overlap_is_deduplicated_before_both_bounded_slides() {
             ),
             0
         );
-        let incoming = Edges { before: Edge::More(cursor(b"\xffback")), after: Edge::More(cursor(b"\x00next")) };
+        let incoming = Edges { before: Edge::More(cursor(UTF8_TEXTS[3])), after: Edge::More(cursor(b"\x00next")) };
         assert_eq!(window.slide(rows(&[stale, ten.clone()]), incoming.clone(), end), 1);
         match end {
             End::After => assert_eq!(window.rows.as_slice(), &[nine, ten]),
@@ -183,10 +183,10 @@ fn opposite_edge_reads_keep_their_opaque_cursor_and_drop_the_other_end() {
     let nine = list_entry(9, Phase::Done, 9);
     let ten = list_entry(10, Phase::Done, 8);
     watch_rows(&mut domain, watch, core::slice::from_ref(&eight));
-    let older = cursor(b"\xff\x00older");
+    let older = cursor(UTF8_TEXTS[4]);
     read_rows(&mut domain, first, &[eight.clone(), nine.clone()], None, Some(older.clone()), true);
     let read = more(&mut domain, End::After, &older);
-    let back = cursor(b"\x00\xffreverse");
+    let back = cursor(UTF8_TEXTS[5]);
     read_rows(&mut domain, read, &[nine.clone(), ten.clone()], Some(back.clone()), None, false);
     assert_eq!(domain.conversation_rows().rows.as_slice(), &[nine.clone(), ten.clone()]);
     assert_eq!(domain.conversation_rows().edges.before, Edge::More(back.clone()));
@@ -207,7 +207,7 @@ fn opposite_edge_reads_keep_their_opaque_cursor_and_drop_the_other_end() {
     let object = domain.objects().get(domain.objects().find(ObjectKey::Task(10)).unwrap()).unwrap();
     assert_eq!(object.card, crate::objects::Card::Open);
     let read = more(&mut domain, End::Before, &back);
-    let forward = cursor(b"\xffforward");
+    let forward = cursor(UTF8_TEXTS[6]);
     read_rows(&mut domain, read, &[eight.clone(), nine.clone()], None, Some(forward.clone()), false);
     assert_eq!(domain.conversation_rows().rows.as_slice(), &[eight, nine]);
     assert_eq!(domain.conversation_rows().edges.before, Edge::End);
@@ -264,14 +264,14 @@ fn old_page_terminals_and_sibling_clients_cannot_replace_current_conversations()
     let read = read_named(&entered, &Read::Conversations { after: None });
     let mut current = list_entry(8, Phase::Idle, 1);
     current.project = 2;
-    current.first_words = DocumentText { bytes: text(b"\xffcurrent"), cut: true };
+    current.first_words = DocumentText { bytes: text(UTF8_TEXTS[7]), cut: true };
     watch_rows(&mut domain, watch, core::slice::from_ref(&current));
     watch_rows(&mut domain, old_watch, &[list_entry(90, Phase::Idle, 99)]);
     read_rows(&mut domain, old_read, &[list_entry(91, Phase::Idle, 99)], None, Some(cursor(b"stale")), true);
     read_rows(&mut domain, read, &[list_entry(8, Phase::Idle, 99)], None, None, false);
     assert_eq!(domain.conversation_rows().rows.as_slice(), &[current]);
     assert!(!domain.conversation_rows().cut);
-    assert_eq!(reply(&domain, 8).first_words.bytes(), b"\xffcurrent");
+    assert_eq!(reply(&domain, 8).first_words.bytes(), UTF8_TEXTS[7]);
     assert!(domain.objects().find(ObjectKey::Task(90)).is_none());
     assert!(domain.objects().find(ObjectKey::Task(91)).is_none());
     assert_eq!(sibling.conversation_rows().rows.as_slice(), &[sibling_row]);
@@ -282,7 +282,7 @@ fn old_page_terminals_and_sibling_clients_cannot_replace_current_conversations()
 fn a_full_live_window_keeps_both_winners_when_a_read_disagrees_on_every_key() {
     let (mut domain, watch, first) = live_conversation_page(7105);
     let mut eight = list_entry(8, Phase::Running, 8);
-    eight.first_words = DocumentText { bytes: text(b"\x00\xffeight"), cut: true };
+    eight.first_words = DocumentText { bytes: text(UTF8_TEXTS[8]), cut: true };
     eight.seen = 0;
     eight.last_reply = u64::MAX;
     let mut nine = list_entry(9, Phase::Idle, 9);
@@ -293,14 +293,14 @@ fn a_full_live_window_keeps_both_winners_when_a_read_disagrees_on_every_key() {
     watch_rows(&mut domain, watch, &[eight.clone(), nine.clone()]);
     let stale_eight = list_entry(8, Phase::Done, 99);
     let stale_nine = list_entry(9, Phase::Done, 99);
-    let opaque = cursor(b"\xff\x00same-keys");
+    let opaque = cursor(UTF8_TEXTS[9]);
     read_rows(&mut domain, first, &[stale_eight, stale_nine], None, Some(opaque.clone()), true);
     assert_eq!(domain.conversation_rows().rows.as_slice(), &[nine, eight]);
     assert_eq!(domain.conversation_rows().rows.len(), LIMITS.rows);
     assert!(domain.conversation_rows().edges.reaches(End::Before));
     assert_eq!(domain.conversation_rows().edges.after, Edge::More(opaque));
     assert_eq!(reply(&domain, 8).first_unread, 1);
-    assert_eq!(reply(&domain, 8).first_words.bytes(), b"\x00\xffeight");
+    assert_eq!(reply(&domain, 8).first_words.bytes(), UTF8_TEXTS[8]);
     assert_eq!(reply(&domain, 9).first_unread, 11);
     assert_eq!(reply(&domain, 9).first_words.bytes(), b"nine");
     for (task, project) in [(8, 1), (9, 2)] {
@@ -393,12 +393,12 @@ fn owner_restart_order_keeps_current_overlap_whole_and_recovers_both_displaced_e
     let (mut domain, watch, first) = three();
     let eight = list_entry(8, Phase::Idle, 10);
     let mut thirteen = past(13);
-    thirteen.first_words = DocumentText { bytes: text(b"\xff\x00current-thirteen"), cut: true };
+    thirteen.first_words = DocumentText { bytes: text(UTF8_TEXTS[10]), cut: true };
     thirteen.seen = 7;
     thirteen.last_reply = 9;
     thirteen.cached_replies = u32::MAX;
     let twelve = past(12);
-    let restart = cursor(b"\xffowner-store-start");
+    let restart = cursor(UTF8_TEXTS[0]);
     watch_three(&mut domain, watch, core::slice::from_ref(&eight), &restart);
     let next = cursor(b"owner-after-twelve");
     page_three(&mut domain, first, &[eight.clone(), thirteen.clone(), twelve.clone()], None, Some(next));
@@ -429,7 +429,7 @@ fn owner_restart_order_keeps_current_overlap_whole_and_recovers_both_displaced_e
 fn repeated_owner_replays_recover_multiple_past_pages_and_new_source_prefixes() {
     let (mut domain, watch, first) = three();
     let eight = list_entry(8, Phase::Idle, 10);
-    let restart = cursor(b"\xffstore-owner");
+    let restart = cursor(UTF8_TEXTS[11]);
     watch_three(&mut domain, watch, core::slice::from_ref(&eight), &restart);
     page_three(&mut domain, first, &[eight.clone(), past(13), past(12)], None, Some(cursor(b"after12")));
     for task in [10, 11] {
@@ -458,7 +458,7 @@ fn repeated_owner_replays_recover_multiple_past_pages_and_new_source_prefixes() 
 fn empty_owner_pages_preserve_the_held_opposite_edge_and_whole_rows() {
     let (mut domain, _watch, first) = live_conversation_page(7112);
     let eight = list_entry(8, Phase::Idle, 10);
-    let held_before = cursor(b"\xffheld-before");
+    let held_before = cursor(UTF8_TEXTS[12]);
     let next = cursor(b"\x00next");
     read_rows(&mut domain, first, &[eight, past(13)], Some(held_before.clone()), Some(next.clone()), true);
     let before = domain.conversation_rows().rows.clone();
@@ -570,7 +570,7 @@ fn a_short_owner_restart_places_its_prefix_before_the_retained_past() {
 fn an_in_flight_owner_replay_keeps_its_original_provenance_across_watch_changes() {
     let (mut domain, watch, first) = three();
     let eight = list_entry(8, Phase::Idle, 10);
-    let original = cursor(b"\xfforiginal-owner");
+    let original = cursor(UTF8_TEXTS[13]);
     watch_three(&mut domain, watch, core::slice::from_ref(&eight), &original);
     page_three(&mut domain, first, &[eight.clone(), past(13), past(12)], None, Some(cursor(b"after12")));
     watch_three(&mut domain, watch, &[list_entry(10, Phase::Idle, 11), eight.clone()], &original);
@@ -584,3 +584,20 @@ fn an_in_flight_owner_replay_keeps_its_original_provenance_across_watch_changes(
     assert_eq!(reply(&domain, 8).first_words.bytes(), b"help checkout");
     assert_eq!(reply(&domain, 8).first_unread, 3);
 }
+
+const UTF8_TEXTS: [&[u8]; 14] = [
+    b"~owner-store-start",
+    b"~\x00whole",
+    b"~\x00opaque-row",
+    b"~back",
+    b"~\x00older",
+    b"\x00~reverse",
+    b"~forward",
+    b"~current",
+    b"\x00~eight",
+    b"~\x00same-keys",
+    b"~\x00current-thirteen",
+    b"~store-owner",
+    b"~held-before",
+    b"~original-owner",
+];

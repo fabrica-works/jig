@@ -147,7 +147,7 @@ fn inbox_edges(words: &crate::words::Words) {
                         cut: false,
                         rows: List::with_capacity(0),
                         before: None,
-                        after: Some(Cursor { value: text(b"next") }),
+                        after: Some(Cursor::new(Box::from(b"next".as_slice()), 1024).expect("bounded opaque cursor")),
                     }))),
                 },
             );
@@ -233,8 +233,8 @@ fn inbox_committed_read_position(words: &crate::words::Words) {
             result: ReadResult::Value(ReadValue::Inbox(Box::new(InboxPage {
                 cut: false,
                 rows,
-                before: Some(Cursor { value: text(b"earlier") }),
-                after: Some(Cursor { value: text(b"later") }),
+                before: Some(Cursor::new(Box::from(b"earlier".as_slice()), 1024).expect("bounded opaque cursor")),
+                after: Some(Cursor::new(Box::from(b"later".as_slice()), 1024).expect("bounded opaque cursor")),
             }))),
         },
     );
@@ -380,8 +380,8 @@ fn conversation_states(words: &crate::words::Words) {
                 result: ReadResult::Value(ReadValue::Conversations(Box::new(ConversationPage {
                     cut: false,
                     rows,
-                    before: Some(Cursor { value: text(b"before") }),
-                    after: Some(Cursor { value: text(b"after") }),
+                    before: Some(Cursor::new(Box::from(b"before".as_slice()), 1024).expect("bounded opaque cursor")),
+                    after: Some(Cursor::new(Box::from(b"after".as_slice()), 1024).expect("bounded opaque cursor")),
                 }))),
             },
         );
@@ -424,9 +424,17 @@ fn inbox_group_controls_decode_independent_windows() {
                         cut: false,
                         rows: List::with_capacity(0),
                         before: None,
-                        after: Some(Cursor {
-                            value: text(if *group == InboxReadGroup::Needs { b"needs" } else { b"updates" }),
-                        }),
+                        after: Some(
+                            Cursor::new(
+                                Box::from(if *group == InboxReadGroup::Needs {
+                                    b"needs".as_slice()
+                                } else {
+                                    b"updates".as_slice()
+                                }),
+                                1024,
+                            )
+                            .expect("bounded opaque cursor"),
+                        ),
                     }))),
                 },
             );

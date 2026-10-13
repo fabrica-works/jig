@@ -4,6 +4,9 @@ use jig_domain_client::{Limits, contract as client};
 use jig_domain_tasks as tasks;
 use skein_lib::List;
 
+fn opaque(value: &[u8], limits: &Limits) -> Result<client::Bytes, owner::Invalid> {
+    client::Bytes::new(owner::bytes(value, limits)?, limits.text).map_err(|_| owner::Invalid::TooLarge)
+}
 pub(super) fn text(value: &[u8], limits: &Limits) -> Result<client::Text, owner::Invalid> {
     client::Text::new(owner::bytes(value, limits)?, limits.text).map_err(|_| owner::Invalid::TooLarge)
 }
@@ -123,7 +126,7 @@ pub(super) fn goal(value: &tasks::New, limits: &Limits) -> Result<client::OwnerP
                 tasks::Holding::Slot { pool, kind } => (pool, *kind),
             };
             let connector = name.connector;
-            let path = list(&name.path, limits, |value| text(value, limits))?;
+            let path = list(&name.path, limits, |value| opaque(value, limits))?;
             Ok(match value {
                 tasks::Holding::Write { .. } => client::OwnerGoalHolding::Write { connector, path, kind },
                 tasks::Holding::Slot { .. } => client::OwnerGoalHolding::Slot { connector, path, kind },

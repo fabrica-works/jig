@@ -68,8 +68,8 @@ fn whole_history_page_prices_all_boxes_stored_presence_and_reserved_rows_without
     let page = HistoryPage {
         cut: true,
         rows: list(values.to_vec()),
-        before: Some(Cursor { value: text(b"opaque before") }),
-        after: Some(Cursor { value: text(b"opaque after") }),
+        before: Some(Cursor::new(Box::from(b"opaque before".as_slice()), 1024).expect("bounded opaque cursor")),
+        after: Some(Cursor::new(Box::from(b"opaque after".as_slice()), 1024).expect("bounded opaque cursor")),
     };
     let mut expected = u64::try_from(size_of::<HistoryPage>()).unwrap()
         + List::<HistoryRow>::worst_case(3).unwrap()

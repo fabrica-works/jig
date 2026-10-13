@@ -2,7 +2,7 @@
 //! The protocol layer interprets the bytes; the client only echoes them
 //! (client/domain/contract.md, 6). No live cursor table owns continuation state.
 mod index;
-use jig_domain_client::contract::{Cursor, Text};
+use jig_domain_client::contract::Cursor;
 use jig_domain_core::{CallKey, CoreKey, Key, ProjectionKey, documents, reads};
 use jig_domain_notes as notes;
 use jig_domain_people as people;
@@ -19,8 +19,7 @@ pub fn encode(value: &reads::Cursor, limit: u32) -> Result<Cursor, TooLarge> {
     let mut writer = Writer { bytes: Vec::new(), limit: usize::try_from(limit).map_err(|_| TooLarge)? };
     writer.byte(1).ok_or(TooLarge)?;
     put_cursor(&mut writer, value).ok_or(TooLarge)?;
-    let value = Text::new(writer.bytes.into_boxed_slice(), limit).map_err(|_| TooLarge)?;
-    Ok(Cursor { value })
+    Cursor::new(writer.bytes.into_boxed_slice(), limit).map_err(|_| TooLarge)
 }
 
 /// Rejects malformed, over-bound and trailing data before admitting a cursor.
@@ -51,7 +50,7 @@ pub fn encode_tree(value: &documents::Cursor, task: u64, window: u32, limit: u32
     writer.u64(task).ok_or(TooLarge)?;
     writer.u32(window).ok_or(TooLarge)?;
     put_document_cursor(&mut writer, value).ok_or(TooLarge)?;
-    Ok(Cursor { value: Text::new(writer.bytes.into_boxed_slice(), limit).map_err(|_| TooLarge)? })
+    Cursor::new(writer.bytes.into_boxed_slice(), limit).map_err(|_| TooLarge)
 }
 
 /// Echoed continuations keep their complete original Tree identity.
@@ -949,7 +948,7 @@ mod tests {
             let length = u32::try_from(encoded.value.bytes().len()).expect("bounded cursor");
             assert_eq!(encode(&source, length).expect("exact bound"), encoded);
             assert_eq!(encode(&source, length - 1), Err(TooLarge));
-            let saved = Cursor { value: Text::new(encoded.value.into_bytes(), length).expect("saved whole bytes") };
+            let saved = Cursor::new(encoded.value.into_bytes(), length).expect("saved whole bytes");
             assert_eq!(decode(&saved, length), Some(source.clone()));
             assert!(belongs_to(&source, &reads::Scope::Conversations));
             assert!(!belongs_to(&source, &reads::Scope::Goals { project: 0 }));
@@ -995,7 +994,7 @@ mod tests {
         assert_eq!(encode(&cursor, length - 1), Err(TooLarge));
         // Only saved bytes survive. A newly made reader reconstructs the complete owner cursor.
         let saved = encoded.value.into_bytes();
-        let restored = Cursor { value: Text::new(saved, length).expect("saved whole bytes") };
+        let restored = Cursor::new(saved, length).expect("saved whole bytes");
         assert_eq!(decode(&restored, length), Some(cursor));
         assert_eq!(decode(&restored, length - 1), None);
     }
@@ -1004,23 +1003,22 @@ mod tests {
     fn cursor_decoder_refuses_truncation_trailing_bytes_unknown_tags_and_oversized_segment_counts() {
         let expected = reads::Cursor::Store { scope: reads::Scope::Conversations, after: None };
         let bytes = vec![1, 1, 12, 0];
-        let cursor = Cursor { value: Text::new(bytes.clone().into_boxed_slice(), 64).expect("short cursor") };
+        let cursor = Cursor::new(bytes.clone().into_boxed_slice(), 64).expect("short cursor");
         assert_eq!(decode(&cursor, 64), Some(expected.clone()));
         assert_eq!(encode(&expected, 64).expect("whole cursor").value.bytes(), bytes);
         for length in 0..bytes.len() {
-            let cut =
-                Cursor { value: Text::new(bytes[..length].to_vec().into_boxed_slice(), 64).expect("short bytes") };
+            let cut = Cursor::new(bytes[..length].to_vec().into_boxed_slice(), 64).expect("short bytes");
             assert_eq!(decode(&cut, 64), None);
         }
         for malformed in [vec![1, 1, 12, 0, 0], vec![2, 1, 12, 0], vec![1, 2], vec![1, 1, 255], vec![1, 1, 12, 2]] {
-            let value = Cursor { value: Text::new(malformed.into_boxed_slice(), 64).expect("bounded malformed bytes") };
+            let value = Cursor::new(malformed.into_boxed_slice(), 64).expect("bounded malformed bytes");
             assert_eq!(decode(&value, 64), None);
         }
         let mut huge_count = vec![1, 1, 15, 3];
         huge_count.extend_from_slice(&1_u32.to_le_bytes());
         huge_count.extend_from_slice(&2_u16.to_le_bytes());
         huge_count.extend_from_slice(&u32::MAX.to_le_bytes());
-        let value = Cursor { value: Text::new(huge_count.into_boxed_slice(), 64).expect("bounded count prefix") };
+        let value = Cursor::new(huge_count.into_boxed_slice(), 64).expect("bounded count prefix");
         assert_eq!(decode(&value, 64), None);
     }
 

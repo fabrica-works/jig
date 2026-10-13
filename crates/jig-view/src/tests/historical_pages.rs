@@ -324,7 +324,7 @@ fn historical_ended_view_exact_node_depth_text_binding_and_slot_storage_refuses_
     empty.rows = List::with_capacity(CLIENT.rows + 1);
     assert!(view::ended_required(&empty, &CLIENT, &w).is_none());
     let mut text_over = page.clone();
-    text_over.after = Some(Cursor { value: Text::new(copy_of(&[0; 129]), 129).unwrap() });
+    text_over.after = Some(Cursor::new(copy_of(&[0; 129]), 129).unwrap());
     assert!(view::ended_required(&text_over, &CLIENT, &w).is_none());
     assert!(view::ended_nodes(&jig_domain_client::Limits { rows: u32::MAX, ..CLIENT }).is_none());
 }

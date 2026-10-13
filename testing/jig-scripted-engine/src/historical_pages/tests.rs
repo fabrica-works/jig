@@ -19,8 +19,8 @@ fn page(ended: OwnerChipEnding, at: Option<Wall>) -> OwnerEndedPage {
     rows.push(OwnerEndedDelegate { chip: chip(), ended, at }).expect("row fits");
     OwnerEndedPage {
         rows,
-        before: Some(Cursor { value: Text::new(Box::from([255, 0, 47]), 8).expect("opaque fits") }),
-        after: Some(Cursor { value: Text::new(Box::from([0, 255]), 8).expect("opaque fits") }),
+        before: Some(Cursor::new(Box::from(UTF8_TEXTS[0]), 8).expect("opaque fits")),
+        after: Some(Cursor::new(Box::from(UTF8_TEXTS[1]), 8).expect("opaque fits")),
         cut: true,
     }
 }
@@ -101,7 +101,7 @@ fn historical_funding_all_four_source_kinds_keep_period_parent_counters_and_rese
                     let source = OwnerSpendPage {
                         rows,
                         before: None,
-                        after: Some(Cursor { value: Text::new(Box::from([255, 0]), 8).expect("cursor fits") }),
+                        after: Some(Cursor::new(Box::from(UTF8_TEXTS[2]), 8).expect("cursor fits")),
                         cut: true,
                     };
                     let original = source.clone();
@@ -202,3 +202,5 @@ fn historical_ended_whole_chip_metadata_prices_reserved_resources_connectors_and
     assert!(!ended_fits(&over, &bounds));
     assert_eq!(source, original);
 }
+
+const UTF8_TEXTS: [&[u8]; 3] = [b"~\0/", b"\0~", b"~\0"];

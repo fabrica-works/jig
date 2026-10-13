@@ -361,7 +361,11 @@ pub fn conversations_record() -> w::Conversations {
     .unwrap()
 }
 pub fn conversations() -> c::Conversations {
-    c::Conversations { rows: List::with_capacity(0), more: false, after: c::Cursor { value: text(b"") } }
+    c::Conversations {
+        rows: List::with_capacity(0),
+        more: false,
+        after: c::Cursor::new(Box::from(b"".as_slice()), 1024).expect("bounded opaque cursor"),
+    }
 }
 pub fn inbox_record() -> w::Inbox {
     let lim = limits().wire;
@@ -578,12 +582,12 @@ pub fn run_text_one_past_text_limit() -> w::RunText {
 pub fn conversations_with_cursor() -> w::Conversations {
     let lim = limits().wire;
     let mut parts = conversations_record().into_parts();
-    parts.after = w::Cursor::new(&lim, w::CursorParts { value: Box::from([255; 40]) }).unwrap();
+    parts.after = w::Cursor::new(&lim, w::CursorParts { value: Box::from(UTF8_TEXTS[0]) }).unwrap();
     w::Conversations::new(&lim, parts).unwrap()
 }
 pub fn conversations_cursor_expected() -> c::Conversations {
     let mut value = conversations();
-    value.after = c::Cursor { value: c::Text::new(Box::from([255; 40]), 1024).unwrap() };
+    value.after = c::Cursor::new(Box::from(UTF8_TEXTS[0]), 1024).unwrap();
     value
 }
 pub fn raw_live_call() -> w::LiveCall {
@@ -643,3 +647,5 @@ pub fn decoded_live_call_expected() -> c::LiveCall {
         parts: List::with_capacity(0),
     })
 }
+
+const UTF8_TEXTS: [&[u8]; 1] = [&[b'~'; 40]];

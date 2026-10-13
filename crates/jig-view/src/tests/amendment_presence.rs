@@ -31,7 +31,7 @@ fn amendment_single_field_inputs_select_only_whole_property_and_explicit_empty_i
     *row.chip.details = ChipPhase::Person { addressed: Recipient::Party(1), taken: None, since: None };
     row.spec.specification.parameters = list([
         ParameterDocument::Number { name: 7, value: u64::MAX },
-        ParameterDocument::Bytes { name: 8, value: DocumentText::complete(text(&[0, 255])) },
+        ParameterDocument::Bytes { name: 8, value: DocumentText::complete(text(UTF8_TEXTS[0])) },
     ]);
     row.spec.specification.inputs = list([u64::MAX]);
     let mut specification = row.spec.whole().unwrap();
@@ -134,7 +134,7 @@ fn amendment_loss_in_specification_does_not_select_or_block_independent_fields()
         row.spec.specification.words.cut = mask & 1 != 0;
         row.spec.specification.parameters = list([ParameterDocument::Bytes {
             name: 8,
-            value: DocumentText { bytes: text(&[0, 255]), cut: mask & 2 != 0 },
+            value: DocumentText { bytes: text(UTF8_TEXTS[0]), cut: mask & 2 != 0 },
         }]);
         row.spec.cut = mask & 4 != 0;
         let (mut domain, _) = open(row);
@@ -143,7 +143,7 @@ fn amendment_loss_in_specification_does_not_select_or_block_independent_fields()
         assert!(!tree.nodes().iter().any(|node| node.name.as_deref() == Some(b"New specification")));
         assert!(contains(&tree, b"The specification is incomplete"));
         assert!(contains(&tree, b"whole task specification"));
-        assert!(contains(&tree, &[0, 255]));
+        assert!(contains(&tree, UTF8_TEXTS[0]));
         assert_eq!(contains(&tree, b"Only part of this text was supplied"), mask & 3 != 0);
         drive(&mut domain, Event::Act { act: input(&tree, b"New instructions", b"", &mut bindings) });
         let out = drive(&mut domain, Event::Act { act: Action::Confirm });
@@ -280,3 +280,5 @@ fn address_controls_require_actual_person_revision_and_keep_task_recipients_outs
     assert!(!tree.nodes().iter().any(|node| node.name.as_deref() == Some(b"Address to party number")));
     assert!(tree.nodes().iter().any(|node| node.name.as_deref() == Some(b"New budget")));
 }
+
+const UTF8_TEXTS: [&[u8]; 1] = [b"\0~"];

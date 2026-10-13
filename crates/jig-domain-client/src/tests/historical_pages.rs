@@ -10,7 +10,7 @@ use crate::{
 };
 use skein_lib::{List, Time, Token, Wall};
 fn cursor(bytes: &[u8]) -> Cursor {
-    Cursor { value: objects::text(bytes) }
+    Cursor::new(Box::from(bytes), 1024).expect("bounded opaque cursor")
 }
 fn rows<T>(values: impl IntoIterator<Item = T>) -> List<T> {
     let mut rows = List::with_capacity(2);
@@ -35,8 +35,8 @@ fn ended(cut: bool) -> OwnerEndedPage {
             },
             at: None,
         }]),
-        before: Some(cursor(&[255, 0, 47])),
-        after: Some(cursor(&[0, 254])),
+        before: Some(cursor(UTF8_TEXTS[1])),
+        after: Some(cursor(UTF8_TEXTS[0])),
         cut,
     }
 }
@@ -50,8 +50,8 @@ fn funding(project: u32) -> OwnerSpendPage {
             made: u32::MAX,
             closed: false,
         }]),
-        before: Some(cursor(&[255, 0, 47])),
-        after: Some(cursor(&[0, 254])),
+        before: Some(cursor(UTF8_TEXTS[1])),
+        after: Some(cursor(UTF8_TEXTS[0])),
         cut: true,
     }
 }
@@ -322,7 +322,7 @@ fn historical_owner_wrong_query_and_reserved_capacity_refusals_preserve_the_orig
     );
     assert!(d.project_page().owner_spend.is_none());
     let mut over = funding(1);
-    over.after = Some(Cursor { value: Text::new(skein_lib::bytes::copy_of(&[0; 33]), 33).unwrap() });
+    over.after = Some(Cursor::new(skein_lib::bytes::copy_of(&[0; 33]), 33).unwrap());
     drive(
         &mut d,
         Time::ZERO,
@@ -425,3 +425,5 @@ fn historical_owner_old_spend_period_budget_pool_and_task_envelope_stays_indepen
     assert!(d.project_page().spend_cut);
     assert_eq!(d.project_page().spend_after, Some(cursor(b"old exact edge")));
 }
+
+const UTF8_TEXTS: [&[u8]; 2] = [b"\0!", b"~\0/"];

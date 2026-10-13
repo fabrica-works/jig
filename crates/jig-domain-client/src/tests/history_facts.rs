@@ -58,7 +58,7 @@ fn mixed_history_window_retains_revision_position_and_line_identity_in_source_or
     let mut window = HistoryWindow::new(2);
     assert_eq!(window.slide(rows([semantic.clone(), lifecycle.clone()]), edges(), End::After), 0);
     assert_eq!(window.rows.as_slice(), &[semantic.clone(), lifecycle.clone()]);
-    let opaque = Cursor { value: text(b"opaque reverse") };
+    let opaque = Cursor::new(Box::from(b"opaque reverse".as_slice()), 1024).expect("bounded opaque cursor");
     let mut next = List::with_capacity(2);
     next.push(supplied_line.clone()).unwrap();
     assert_eq!(window.slide(next, Edges { before: Edge::More(opaque.clone()), after: Edge::End }, End::After), 1);
@@ -101,7 +101,7 @@ fn owner_history_original_scope_cursors_and_page_loss_survive_continuation_and_r
     drive(&mut domain, Time::ZERO, Event::Read { read: original, result: ReadResult::Value(page(true, None)) });
     assert!(domain.history_rows().rows.is_empty());
     assert!(!domain.history_rows().cut);
-    let cursor = Cursor { value: text(b"whole supplied cursor") };
+    let cursor = Cursor::new(Box::from(b"whole supplied cursor".as_slice()), 1024).expect("bounded opaque cursor");
     drive(
         &mut domain,
         Time::ZERO,

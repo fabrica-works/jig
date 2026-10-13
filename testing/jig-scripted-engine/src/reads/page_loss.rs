@@ -2,15 +2,12 @@ use crate::{Bounds, Engine, Script};
 use jig_domain_client::contract::*;
 use skein_lib::List;
 
-fn text(bytes: &[u8]) -> Text {
-    Text::new(bytes.into(), 4096).unwrap()
-}
 use crate::payload::{self, Payload};
 use core::mem::size_of;
 
 fn page_values(capacity: u32, cut: bool) -> [ReadValue; 8] {
-    let before = Some(Cursor { value: text(b"\xff\0before") });
-    let after = Some(Cursor { value: text(b"after/opaque") });
+    let before = Some(Cursor::new(Box::from(UTF8_TEXTS[0]), 1024).expect("bounded opaque cursor"));
+    let after = Some(Cursor::new(Box::from(b"after/opaque".as_slice()), 1024).expect("bounded opaque cursor"));
     [
         ReadValue::Ended(Box::new(ObjectPage {
             cut,
@@ -80,3 +77,5 @@ fn page_loss_envelopes_admit_exact_whole_boxes_and_refuse_reserved_capacity_with
         }
     }
 }
+
+const UTF8_TEXTS: [&[u8]; 1] = [b"\x7e\0before"];

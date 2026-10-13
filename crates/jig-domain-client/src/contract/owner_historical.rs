@@ -3,7 +3,7 @@
 //! Raw person goals are admitted with recurrence absent at both entry and restore;
 //! their boundary translator must refuse an unadmitted recurrence before copying.
 use super::{
-    Funder, ObjectKey, OwnerActivity, OwnerActivityLine, OwnerAuthority, OwnerExecutor, OwnerMessageKind,
+    Bytes, Funder, ObjectKey, OwnerActivity, OwnerActivityLine, OwnerAuthority, OwnerExecutor, OwnerMessageKind,
     OwnerMessageProposalKind, OwnerMilestoneLine, OwnerNumbers, OwnerPersonTask, OwnerProposalChoice,
     OwnerProposalHistory, OwnerProposalHistoryState, OwnerRequester, OwnerWakePolicy, ProposalKey, Proposer, Question,
     Result, Specification, Task, TaskContractDocument, Text,
@@ -14,8 +14,8 @@ use skein_lib::{List, Wall};
 /// A raw goal holding retains kind and literal segment boundaries.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum OwnerGoalHolding {
-    Write { connector: u16, path: List<Text>, kind: u16 },
-    Slot { connector: u16, path: List<Text>, kind: u16 },
+    Write { connector: u16, path: List<Bytes>, kind: u16 },
+    Slot { connector: u16, path: List<Bytes>, kind: u16 },
 }
 /// Whole admitted New facts, not a clipped future-task document projection.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

@@ -56,7 +56,7 @@ fn historical() -> OwnerHistorical {
             result: Box::new(Result {
                 task: document.chip.clone(),
                 ending: Ending::Done,
-                value: Some(ResultValue::Report(DocumentText { bytes: objects::text(&[255, 0, 7]), cut: true })),
+                value: Some(ResultValue::Report(DocumentText { bytes: objects::text(UTF8_TEXT), cut: true })),
                 at: None,
                 details: None,
                 acts: List::with_capacity(0),
@@ -177,3 +177,5 @@ fn an_unknown_non_task_page_watch_does_not_issue_a_retained_task_read() {
     }
     assert_eq!(work_address(&domain), &Address::Inbox { project: None });
 }
+
+const UTF8_TEXT: &[u8] = b"~\0\x07";

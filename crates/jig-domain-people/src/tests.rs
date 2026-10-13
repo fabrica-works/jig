@@ -1592,3 +1592,5 @@ fn a_proposal_makers_kind_is_kept_in_its_key_and_restored_answer() {
 }
 
 mod marked_chats;
+
+mod utf8;

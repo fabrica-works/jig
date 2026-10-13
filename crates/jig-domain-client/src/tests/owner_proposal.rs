@@ -21,7 +21,7 @@ fn value(maker: Proposer, offered: ActKind) -> OwnerProposal {
     OwnerProposal {
         key: ProposalKey { proposer: maker, number: u64::MAX },
         project: u32::MAX,
-        reason: DocumentText { bytes: text(&[255, 0, b'?']), cut: true },
+        reason: DocumentText { bytes: text(UTF8_TEXTS[1]), cut: true },
         action: OwnerProposalAction::Batch(List::with_capacity(2)),
         as_holder: false,
         waiting: OwnerProposalWaiting {
@@ -52,7 +52,7 @@ fn owner_proposal_original_maker_keys_all_three_decisions_and_reason_survive_dou
                 drive(
                     &mut domain,
                     Time::ZERO,
-                    Event::Act { act: Act::Edit { field: Purpose::Reason, text: text(&[254, 0, b'!']) } },
+                    Event::Act { act: Act::Edit { field: Purpose::Reason, text: text(UTF8_TEXTS[0]) } },
                 );
             }
             let sent = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
@@ -60,7 +60,7 @@ fn owner_proposal_original_maker_keys_all_three_decisions_and_reason_survive_dou
             let Request::Send { ask, request, .. } = &sent[0] else { panic!("one original keyed request") };
             let decision = match act {
                 ActKind::Accept => Decision::Accepted,
-                ActKind::Reject => Decision::Rejected { reason: text(&[254, 0, b'!']) },
+                ActKind::Reject => Decision::Rejected { reason: text(UTF8_TEXTS[0]) },
                 ActKind::PassUp => Decision::PassedUp,
                 _ => unreachable!(),
             };
@@ -168,3 +168,5 @@ fn sent(request: &Request) -> bool {
 fn side_or_send(request: &Request) -> bool {
     if let Request::ShowPart { .. } = request { true } else { sent(request) }
 }
+
+const UTF8_TEXTS: [&[u8]; 2] = [b"!\0!", b"~\0?"];

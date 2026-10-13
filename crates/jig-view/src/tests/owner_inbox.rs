@@ -206,8 +206,8 @@ fn owner_inbox_both_full_groups_two_read_windows_counts_source_cuts_fit_the_whol
                     selection: None,
                     cut: true,
                     rows,
-                    before: Some(Cursor { value: Text::new(copy_of(after), CLIENT.text).unwrap() }),
-                    after: Some(Cursor { value: Text::new(copy_of(after), CLIENT.text).unwrap() }),
+                    before: Some(Cursor::new(copy_of(after), CLIENT.text).unwrap()),
+                    after: Some(Cursor::new(copy_of(after), CLIENT.text).unwrap()),
                 }))),
             },
         );

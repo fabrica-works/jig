@@ -24,7 +24,7 @@ use skein_lib::{Id, List, Wall, bytes::copy_of};
 fn fixture(from: Option<OwnerRequester>) -> (Domain, Id<Object>, Question) {
     let mut value = question();
     value.from = from;
-    value.words = text(&[b'w', 255, 0, 128, b'?']);
+    value.words = text(UTF8_TEXTS[0]);
     value.since = Wall::from_nanos(23);
     let (d, id) = loaded(
         ObjectKey::Question { task: value.task.task, message: value.message },
@@ -153,8 +153,8 @@ fn question_sender_maximum_card_has_finite_bounds_and_retains_independent_older_
     ] {
         let mut value = question();
         value.from = Some(OwnerRequester::Deployment { project: u32::MAX });
-        value.words = text(&[b'x'; 128]);
-        value.task.title = DocumentText::complete(text(&[b't'; 128]));
+        value.words = text(UTF8_TEXTS[1]);
+        value.task.title = DocumentText::complete(text(UTF8_TEXTS[2]));
         let mut dependencies = List::with_capacity(CLIENT.rows);
         for number in [0, u64::MAX] {
             dependencies.push(number).unwrap();
@@ -220,3 +220,5 @@ fn question_sender_maximum_card_has_finite_bounds_and_retains_independent_older_
     }
     assert!(crate::question_nodes(&jig_domain_client::Limits { rows: u32::MAX, ..CLIENT }).is_none());
 }
+
+const UTF8_TEXTS: [&[u8]; 3] = [b"w~\0^?", &[b'x'; 128], &[b't'; 128]];

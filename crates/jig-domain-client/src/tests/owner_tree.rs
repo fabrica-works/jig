@@ -78,7 +78,7 @@ fn tree(root: u64) -> OwnerTree {
         rows,
         folded,
         held_below: 19,
-        next: Some(Cursor { value: Text::new(Box::from(&[255, 0, 47][..]), 32).unwrap() }),
+        next: Some(Cursor::new(Box::from(UTF8_TEXT), 32).unwrap()),
     }
 }
 fn opened(root: u64) -> (Domain, Token) {
@@ -217,3 +217,5 @@ fn owner_tree_departed_same_task_watch_and_clear_are_fenced_and_older_replacemen
     );
     assert_eq!(d.task_page().plan.owner.as_deref(), Some(&value));
 }
+
+const UTF8_TEXT: &[u8] = b"~\0/";

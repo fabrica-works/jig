@@ -10,10 +10,10 @@ fn raw_goal() -> tasks::New {
         project: u32::MAX,
         executor: tasks::Executor::Procedure { connector: u16::MAX, code: u32::MAX },
         spec: tasks::Spec {
-            words: Box::from([255, 0]),
+            words: Box::from(UTF8_TEXTS[0]),
             parameters: Box::new([
                 tasks::Parameter::Number { name: 0, value: u64::MAX },
-                tasks::Parameter::Bytes { name: u32::MAX, value: Box::from([0, 255]) },
+                tasks::Parameter::Bytes { name: u32::MAX, value: Box::from(UTF8_TEXTS[1]) },
                 tasks::Parameter::Resource { name: 1, connector: u16::MAX, resource: u64::MAX },
             ]),
             inputs: Box::new([0, u64::MAX]),
@@ -103,7 +103,7 @@ pub(crate) fn sources() -> Vec<(client::Read, reads::Historical)> {
                     revision: u64::MAX,
                     by: u64::MAX,
                     at: Wall::EPOCH,
-                    decision: people::EscalationDecision::Reject { reason: Box::from([255, 0]) },
+                    decision: people::EscalationDecision::Reject { reason: Box::from(UTF8_TEXTS[0]) },
                 },
                 hold: None,
             },
@@ -161,7 +161,7 @@ fn historical_six_whole_sources_keep_the_original_kind_outer_facts_and_independe
                 assert_eq!(hold, None);
             }
             client::OwnerHistoricalValue::Question { question, answer, ending } => {
-                assert_eq!(question.words.bytes(), [255, 0]);
+                assert_eq!(question.words.bytes(), UTF8_TEXTS[0]);
                 assert_eq!(answer, None);
                 assert_eq!(ending, None);
             }
@@ -183,7 +183,7 @@ fn historical_raw_person_goal_keeps_all_four_counters_authority_parameters_and_l
     };
     let goal = proposal.goal;
     assert_eq!(goal.numbers, client::OwnerNumbers { budget: 2, spent: 3, spent_below: 5, reserved: 7 });
-    assert_eq!(goal.spec.words.bytes(), [255, 0]);
+    assert_eq!(goal.spec.words.bytes(), UTF8_TEXTS[0]);
     assert_eq!(goal.spec.parameters.capacity(), 3);
     assert_eq!(goal.spec.inputs.as_slice(), [0, u64::MAX]);
     assert_eq!(goal.dependencies.as_slice(), [0, u64::MAX]);
@@ -200,7 +200,7 @@ fn historical_raw_person_goal_keeps_all_four_counters_authority_parameters_and_l
         panic!("write")
     };
     assert_eq!((*connector, *kind), (u16::MAX, 0));
-    assert_eq!(path.iter().map(client::Text::bytes).collect::<Vec<_>>(), [b"one/two".as_slice(), [255, 0].as_slice()]);
+    assert_eq!(path.iter().map(client::Bytes::bytes).collect::<Vec<_>>(), [b"one/two".as_slice(), [255, 0].as_slice()]);
     let client::OwnerGoalHolding::Slot { connector, path, kind } = goal.holdings.get(1).expect("slot holding") else {
         panic!("slot")
     };
@@ -259,7 +259,7 @@ fn historical_question_answer_and_ending_are_independent_of_each_other_and_outer
                         message: 0,
                         by: tasks::Party::Person(0),
                         kind: tasks::MessageKind::Answer { question: u64::MAX },
-                        words: Box::from([0, 255]),
+                        words: Box::from(UTF8_TEXTS[1]),
                     },
                 });
             }
@@ -298,7 +298,7 @@ fn historical_task_all_eight_optional_source_families_survive_the_complete_envel
             (mask & 16 != 0).then_some(jig_domain_core::documents::Text { bytes: Box::new([]), cut: false });
         document.result =
             (mask & 32 != 0).then_some(jig_domain_core::documents::Ending::Failed(jig_domain_core::documents::Text {
-                bytes: Box::from([255]),
+                bytes: Box::from(UTF8_TEXTS[2]),
                 cut: true,
             }));
         if mask & 64 == 0 {
@@ -362,7 +362,7 @@ fn historical_person_proposal_states_keep_the_independent_whole_decision_and_cre
         tasks::PersonProposalState::Accepted { by: tasks::Party::Person(0) },
         tasks::PersonProposalState::Rejected {
             by: tasks::Party::Deployment { project: 0 },
-            reason: Box::from([255, 0]),
+            reason: Box::from(UTF8_TEXTS[0]),
             message: u64::MAX,
             at: Wall::EPOCH,
         },
@@ -406,7 +406,7 @@ fn historical_person_proposal_states_keep_the_independent_whole_decision_and_cre
                         panic!("rejection facts")
                     };
                     assert_eq!(by, client::OwnerRequester::Deployment { project: 0 });
-                    assert_eq!(reason.bytes(), [255, 0]);
+                    assert_eq!(reason.bytes(), UTF8_TEXTS[0]);
                     assert_eq!(message, u64::MAX);
                     assert_eq!(at, Wall::EPOCH);
                 }
@@ -482,3 +482,5 @@ fn historical_raw_goal_contracts_keep_opaque_state_closed_machine_fields_and_cha
         }
     }
 }
+
+const UTF8_TEXTS: [&[u8]; 3] = [b"~\0", b"\0~", b"~"];

@@ -65,6 +65,7 @@ mod policy_value;
 mod refusals;
 #[cfg(test)]
 mod tests;
+mod words;
 pub use amendment::{
     AddressChange, Amendment, Authority, Delegation, Executor, Grant, Last, Parameter, Pattern, PersonAddress,
     ResourceScope, ResultsWake, Spec, WakePolicy, WakeRule, amendment_bytes, authority_bytes,

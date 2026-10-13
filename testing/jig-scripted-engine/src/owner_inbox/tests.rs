@@ -28,7 +28,7 @@ fn row() -> OwnerInboxEntry {
         reply: Some(Box::new(ConversationLine {
             chip: chip(),
             project: 0,
-            first_words: doc(&[255; 8]),
+            first_words: doc(UTF8_TEXTS[0]),
             runtime: None,
             delegates: 0,
             budget: budget(),
@@ -101,8 +101,8 @@ fn owner_inbox_whole_page_opaque_bytes_allocation_boundaries_and_stored_links_ar
         selection: None,
         cut: true,
         rows,
-        before: Some(Cursor { value: Text::new(copy_of(&[255; 8]), 8).unwrap() }),
-        after: Some(Cursor { value: Text::new(copy_of(&[254; 8]), 8).unwrap() }),
+        before: Some(Cursor::new(copy_of(UTF8_TEXTS[0]), 8).unwrap()),
+        after: Some(Cursor::new(copy_of(UTF8_TEXTS[1]), 8).unwrap()),
     };
     let expected =
         u64::try_from(size_of::<OwnerInboxPage>()).unwrap() + List::<OwnerInboxEntry>::worst_case(3).unwrap() + 16;
@@ -155,3 +155,5 @@ fn owner_inbox_selection_roots_exceed_page_rows_without_clipping_and_price_whole
     assert_eq!(bytes(&supplied, &bounds()), Some(absent_bytes + List::<OwnerInboxSelection>::worst_case(3).unwrap()));
     assert!(bytes(&supplied, &Bounds { rows: 2, ..bounds() }).is_none());
 }
+
+const UTF8_TEXTS: [&[u8]; 2] = [&[b'~'; 8], &[b'!'; 8]];

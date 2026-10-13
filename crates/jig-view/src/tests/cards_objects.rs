@@ -1435,7 +1435,7 @@ fn whole_specification_words_edit_preserves_parameters_and_input_identities() {
     let mut row = task_doc(&[ActKind::Amend]);
     row.spec.specification.parameters = list([
         ParameterDocument::Number { name: u32::MAX, value: u64::MAX },
-        ParameterDocument::Bytes { name: 8, value: DocumentText::complete(text(&[0, 255, 1])) },
+        ParameterDocument::Bytes { name: 8, value: DocumentText::complete(text(UTF8_TEXTS[0])) },
         ParameterDocument::Resource { name: 9, connector: u16::MAX, resource: u64::MAX },
     ]);
     row.spec.specification.inputs = list([u64::MAX, 0]);
@@ -1446,7 +1446,7 @@ fn whole_specification_words_edit_preserves_parameters_and_input_identities() {
     let words = words();
     let mut bindings = JigBindings::new(256, CLIENT.text);
     let tree = dialog(&domain, words, &mut bindings);
-    assert!(contains(&tree, &[0, 255, 1]));
+    assert!(contains(&tree, UTF8_TEXTS[0]));
     assert!(contains(&tree, b"Parameter 4294967295 has value 18446744073709551615"));
     assert!(contains(&tree, b"Parameter 9 names connector 65535 resource 18446744073709551615"));
     assert!(contains(&tree, b"Input task 18446744073709551615"));
@@ -1545,7 +1545,7 @@ fn specification_documents_keep_independent_text_and_list_loss_and_block_whole_e
         let mut row = task_doc(&[ActKind::Amend]);
         row.spec.specification.parameters = list([ParameterDocument::Bytes {
             name: 8,
-            value: DocumentText { bytes: text(&[0, 255, 1]), cut: mask & 2 != 0 },
+            value: DocumentText { bytes: text(UTF8_TEXTS[0]), cut: mask & 2 != 0 },
         }]);
         row.spec.specification.words.cut = mask & 1 != 0;
         row.spec.cut = mask & 4 != 0;
@@ -1556,7 +1556,7 @@ fn specification_documents_keep_independent_text_and_list_loss_and_block_whole_e
         let mut builder = Builder::new(&limits());
         crate::specification::document(&mut builder, &row.spec, words);
         let tree = builder.finish();
-        assert!(contains(&tree, &[0, 255, 1]));
+        assert!(contains(&tree, UTF8_TEXTS[0]));
         assert_eq!(contains(&tree, b"Only part of this text was supplied"), mask & 3 != 0);
         let (mut domain, id) = loaded(ObjectKey::Task(8), ReadValue::Task(Box::new(row)));
         drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::Amend } });
@@ -1574,7 +1574,7 @@ fn specification_documents_keep_independent_text_and_list_loss_and_block_whole_e
                     Ask::Amend { change, .. } =>
                         change.spec.as_ref().is_some_and(|spec| spec.words.bytes() == b"replacement"
                             && spec.inputs == list([u64::MAX])
-                            && spec.parameters == list([Parameter::Bytes { name: 8, value: text(&[0, 255, 1]) }])),
+                            && spec.parameters == list([Parameter::Bytes { name: 8, value: text(UTF8_TEXTS[0]) }])),
                     _ => false,
                 },
                 _ => false,
@@ -1979,3 +1979,5 @@ fn moved_effect_facts_say_the_supplied_connector_proposal_without_inventing_a_ma
         assert!(tree.nodes().iter().all(|node| node.slot.is_none() && node.binding.is_none()));
     }
 }
+
+const UTF8_TEXTS: [&[u8]; 1] = [b"\0~\x01"];

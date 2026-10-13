@@ -27,7 +27,7 @@ fn amendment_requires_person_reason_presence_and_accepts_explicit_empty() {
     assert!(acts::ask(domain.objects().get(id).unwrap(), domain.confirmation().unwrap(), domain.fields()).is_none());
     assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
     edit(&mut domain, Purpose::Instructions, b"unrelated");
-    let too_long = Text::new(Box::from([0xff; 33]), 33).unwrap();
+    let too_long = Text::new(Box::from(UTF8_TEXTS[0]), 33).unwrap();
     let refused =
         drive(&mut domain, Time::ZERO, Event::Act { act: Act::Edit { field: Purpose::Reason, text: too_long } });
     assert!(
@@ -79,8 +79,8 @@ fn amendment_reason_receipt_resets_without_losing_domain_clear_write_counts() {
 #[test]
 fn amendment_release_keeps_opaque_reason_delta_and_independent_revisions_in_one_send() {
     let (mut domain, _) = opened(ActKind::AmendRelease);
-    let bytes = [0xff; 32];
-    edit(&mut domain, Purpose::Reason, &bytes);
+    let bytes = UTF8_TEXTS[1];
+    edit(&mut domain, Purpose::Reason, bytes);
     let selected = domain.confirmation().unwrap().choices.change.clone().unwrap();
     assert_eq!(selected, change());
     let out = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
@@ -92,7 +92,7 @@ fn amendment_release_keeps_opaque_reason_delta_and_independent_revisions_in_one_
             revision: Revision { value: 9 },
             change: selected,
             release: Some(Revision { value: 3 }),
-            reason: text(&bytes)
+            reason: text(bytes)
         }
     );
     assert!(domain.fields().get(Purpose::Reason).unwrap().text.bytes().is_empty());
@@ -127,3 +127,5 @@ fn a_late_amendment_answer_preserves_another_forms_supplied_reason_until_page_sw
     assert!(domain.fields().get(Purpose::Reason).unwrap().text.bytes().is_empty());
     assert_eq!(domain.fields().get(Purpose::Reason).unwrap().writes, writes.checked_add(1).unwrap());
 }
+
+const UTF8_TEXTS: [&[u8]; 2] = [&[b'x'; 33], &[b'x'; 32]];

@@ -32,7 +32,7 @@ pub fn activity_rows(rows: &[w::ActivityLine]) -> w::ActivityPage {
     }
     w::ActivityPage::new(
         &w::CEILINGS,
-        w::ActivityPageParts { rows: piece.finish(), cut: true, before: None, after: Some(wire_cursor(&[255, 0, 1])) },
+        w::ActivityPageParts { rows: piece.finish(), cut: true, before: None, after: Some(wire_cursor(UTF8_TEXTS[0])) },
     )
     .unwrap()
 }
@@ -50,7 +50,7 @@ pub fn decoded_turn(words: &[u8], cut: bool) -> c::TurnRead {
     })
 }
 pub fn expected_activity_rows(rows: List<c::ActivityLine>) -> c::ActivityPage {
-    c::ActivityPage { rows, cut: true, before: None, after: Some(raw_cursor(&[255, 0, 1])) }
+    c::ActivityPage { rows, cut: true, before: None, after: Some(raw_cursor(UTF8_TEXTS[0])) }
 }
 pub fn expected_turn_line(position: u64, at: u64, number: u32, turn: c::TurnRead) -> c::ActivityLine {
     c::ActivityLine {
@@ -160,3 +160,5 @@ pub fn turn_limits(text: u32, document_bytes: u64) -> Limits {
     client.document_bytes = document_bytes;
     Limits::new(client, 4, original.deadline).unwrap()
 }
+
+const UTF8_TEXTS: [&[u8]; 1] = [b"~\0\x01"];

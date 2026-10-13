@@ -37,7 +37,7 @@ fn tree() -> OwnerTree {
         rows,
         folded: List::with_capacity(3),
         held_below: u32::MAX,
-        next: Some(Cursor { value: Text::new(Box::from(&[255, 0, 47][..]), 8).unwrap() }),
+        next: Some(Cursor::new(Box::from(UTF8_TEXTS[0]), 8).unwrap()),
     }
 }
 fn bounds() -> Bounds {
@@ -86,7 +86,7 @@ fn owner_tree_over_reserved_empty_nested_lists_and_cursor_bytes_refuse_without_s
     oversized.rows.get_mut(0).unwrap().proposals = List::with_capacity(4);
     assert!(!fits(&oversized, &b));
     oversized = value.clone();
-    oversized.next = Some(Cursor { value: Text::new(Box::from(b"123456789".as_slice()), 9).unwrap() });
+    oversized.next = Some(Cursor::new(Box::from(b"123456789".as_slice()), 9).unwrap());
     assert!(!fits(&oversized, &b));
     let mut empty = value.clone();
     empty.rows = List::with_capacity(0);
@@ -99,7 +99,7 @@ fn owner_tree_over_reserved_empty_nested_lists_and_cursor_bytes_refuse_without_s
 fn owner_tree_empty_dependencies_keep_row_loss_and_absent_or_empty_cursor_independent_of_reserved_folds() {
     let b = bounds();
     for cut in [false, true] {
-        for next in [None, Some(Cursor { value: Text::new(Box::from(b"".as_slice()), 8).unwrap() })] {
+        for next in [None, Some(Cursor::new(Box::from(b"".as_slice()), 8).unwrap())] {
             let mut value = tree();
             value.rows.get_mut(0).unwrap().dependencies = List::with_capacity(3);
             value.rows.get_mut(0).unwrap().cut = cut;
@@ -116,3 +116,5 @@ fn owner_tree_empty_dependencies_keep_row_loss_and_absent_or_empty_cursor_indepe
         }
     }
 }
+
+const UTF8_TEXTS: [&[u8]; 1] = [b"~\0/"];

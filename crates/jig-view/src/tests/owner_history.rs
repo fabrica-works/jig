@@ -570,7 +570,7 @@ fn owner_history_normal_selected_language_checks_all_holes_and_nested_tree_bindi
 
 fn full_state() -> OwnerAmendmentState {
     let mut value = state();
-    value.instructions = Some(doc(&[255; 8], true));
+    value.instructions = Some(doc(UTF8_TEXTS[0], true));
     value.spec.specification.words = doc(b"**x** y!", true);
     value.spec.cut = true;
     value.spec.specification.parameters.clear();
@@ -583,7 +583,7 @@ fn full_state() -> OwnerAmendmentState {
             .spec
             .specification
             .parameters
-            .push(ParameterDocument::Bytes { name: n, value: doc(&[254; 8], true) })
+            .push(ParameterDocument::Bytes { name: n, value: doc(UTF8_TEXTS[1], true) })
             .unwrap();
         value.spec.specification.inputs.push(u64::from(n)).unwrap();
         value.dependencies.push(u64::from(n)).unwrap();
@@ -621,7 +621,7 @@ fn owner_history_full_row_and_byte_nested_batch_hits_exact_raw_slot_capacity_wit
         batch.push(value).unwrap();
     }
     let value = OwnerHistoryLine {
-        reason: doc(&[255; 8], true),
+        reason: doc(UTF8_TEXTS[0], true),
         proposal: Some(proposal(OwnerRetainedAction::Batch(batch))),
         amendment: Some((Box::new(source.clone()), Box::new(source))),
         ..line()
@@ -692,3 +692,5 @@ fn owner_history_composed_normal_book_prices_every_entry_segment_literal_and_che
 }
 
 mod proposal_fragment;
+
+const UTF8_TEXTS: [&[u8]; 2] = [&[b'~'; 8], &[b'!'; 8]];

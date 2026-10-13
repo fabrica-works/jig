@@ -123,7 +123,7 @@ fn chip_admission_refuses_oversized_terminal_bytes_nested_raw_parts_and_unused_l
     let bounds = Bounds { text: 6, rows: 3, document_bytes: u64::MAX, ..Bounds::default() };
     let base = value();
     let mut invalid = base.clone();
-    invalid.ending = Some(OwnerChipEnding::Failed(doc(&[255; 7], true)));
+    invalid.ending = Some(OwnerChipEnding::Failed(doc(UTF8_TEXTS[0], true)));
     assert!(!pricing::fits(&invalid, &bounds), "cut never permits silently shortening terminal bytes");
     let mut invalid = base.clone();
     invalid.ending = Some(OwnerChipEnding::Done(ResultValue::Approved { state: Box::new([255; 7]), words: None }));
@@ -146,7 +146,7 @@ fn chip_admission_refuses_oversized_terminal_bytes_nested_raw_parts_and_unused_l
     assert!(!pricing::fits(&invalid, &bounds), "unused nested segment capacity remains bounded");
     let mut invalid = base.clone();
     invalid.hold.as_mut().unwrap().escalation =
-        Some(OwnerHoldEscalation::Rejected { by: u64::MAX, reason: doc(&[255; 7], false) });
+        Some(OwnerHoldEscalation::Rejected { by: u64::MAX, reason: doc(UTF8_TEXTS[0], false) });
     assert!(!pricing::fits(&invalid, &bounds));
     let mut invalid = base.clone();
     invalid.hold.as_mut().unwrap().source = Some(OwnerPart {
@@ -217,3 +217,5 @@ fn owner_retry_scalar_notices_price_whole_retained_and_boxed_envelopes_at_adjace
         }
     }
 }
+
+const UTF8_TEXTS: [&[u8]; 1] = [&[b'~'; 7]];

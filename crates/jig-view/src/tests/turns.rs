@@ -159,7 +159,7 @@ fn replacement(words: &Words) {
                         },
                     },
                 ]),
-                before: Some(Cursor { value: text(b"older") }),
+                before: Some(Cursor::new(Box::from(b"older".as_slice()), 1024).expect("bounded opaque cursor")),
                 after: None,
             }))),
         },
@@ -294,8 +294,8 @@ fn activities(words: &Words) {
                             event: event.clone(),
                         }
                     })),
-                    before: Some(Cursor { value: text(b"older") }),
-                    after: Some(Cursor { value: text(b"newer") }),
+                    before: Some(Cursor::new(Box::from(b"older".as_slice()), 1024).expect("bounded opaque cursor")),
+                    after: Some(Cursor::new(Box::from(b"newer".as_slice()), 1024).expect("bounded opaque cursor")),
                 }))),
             },
         );
@@ -473,10 +473,10 @@ fn raw_live_call_rendering_omits_unsupplied_wall_and_preserves_escaped_literals_
     let (mut d, _, run, _) = ready();
     let name = ProvisionalTurnName { retry: 0, attempt: u64::MAX, number: u32::MAX };
     let raw = CurrentCall {
-        identity: current_identity(b"id/\xff"),
+        identity: current_identity(UTF8_TEXTS[0]),
         began: None,
-        tool: text(b"raw/tool\xff"),
-        input: text(b"a/b\x00\xfe"),
+        tool: text(UTF8_TEXTS[1]),
+        input: text(UTF8_TEXTS[2]),
         cut: true,
     };
     let mut value = RunText {
@@ -494,9 +494,9 @@ fn raw_live_call_rendering_omits_unsupplied_wall_and_preserves_escaped_literals_
     assert_eq!(d.conversation().live.get(0).unwrap().call, value.call);
     let (folded, bindings) = build(&d, 3, words);
     access(&folded);
-    assert!(contains(&folded, b"\\x72\\x61\\x77\\x2F\\x74\\x6F\\x6F\\x6C\\xFF"));
-    assert!(!contains(&folded, b"\\x61\\x2F\\x62\\x00\\xFE"));
-    assert!(contains(&folded, b"\\x69\\x64\\x2F\\xFF"));
+    assert!(contains(&folded, UTF8_TEXTS[1]));
+    assert!(!contains(&folded, UTF8_TEXTS[2]));
+    assert!(contains(&folded, UTF8_TEXTS[0]));
     let missing_nodes = folded.nodes().len();
     drop(bindings);
     value.began = Some(Wall::EPOCH);
@@ -507,7 +507,7 @@ fn raw_live_call_rendering_omits_unsupplied_wall_and_preserves_escaped_literals_
     drive(&mut d, Event::Act { act: Act::FoldCurrentCall { identity: raw.identity.clone(), open: true } });
     let expanded = build(&d, 3, words).0;
     access(&expanded);
-    assert!(contains(&expanded, b"\\x61\\x2F\\x62\\x00\\xFE"));
+    assert!(contains(&expanded, UTF8_TEXTS[2]));
     assert!(expanded.nodes().iter().any(|node| node.states.as_slice().contains(&crate::State::Expanded)));
     assert_eq!(d.conversation().parts(4).len(), 0);
     match value.call.as_mut().unwrap() {
@@ -518,7 +518,7 @@ fn raw_live_call_rendering_omits_unsupplied_wall_and_preserves_escaped_literals_
     deliver(&mut d, run, Delivery::Run(Box::new(value)));
     let uncut = build(&d, 3, words).0;
     assert_eq!(uncut.nodes().len() + 4, expanded.nodes().len(), "wall and raw-call loss are independent leaves");
-    assert!(contains(&uncut, b"\\x61\\x2F\\x62\\x00\\xFE"));
+    assert!(contains(&uncut, UTF8_TEXTS[2]));
     let mut first_seen = RunText {
         attempt: name.attempt,
         began: None,
@@ -545,12 +545,16 @@ fn maximum_raw_live_calls_fit_whole_page_and_escaped_phrase_capacities() {
     use super::cards::CLIENT;
     let words = words();
     let (mut d, _, run, _) = ready();
-    let tool = full_raw_byte(0xff);
-    let input = full_raw_byte(0xfe);
+    let tool = full_raw_byte(UTF8_TEXTS[3][0]);
+    let input = full_raw_byte(UTF8_TEXTS[4][0]);
     for number in 1..=CLIENT.rows {
         let name = ProvisionalTurnName { retry: 0, attempt: u64::MAX, number };
         let call = CurrentCall {
-            identity: CallIdentity { sequence: number, id: full_raw_byte(0xfd), ..current_identity(b"id/\xff") },
+            identity: CallIdentity {
+                sequence: number,
+                id: full_raw_byte(UTF8_TEXTS[5][0]),
+                ..current_identity(UTF8_TEXTS[0])
+            },
             began: Some(Wall::EPOCH),
             tool: tool.clone(),
             input: input.clone(),
@@ -591,13 +595,13 @@ fn maximum_raw_live_calls_fit_whole_page_and_escaped_phrase_capacities() {
     assert!(u32::try_from(tree.nodes().len()).unwrap() <= limits.nodes);
     let mut escaped = Vec::new();
     for _ in 0..CLIENT.text {
-        escaped.extend_from_slice(b"\\xFE");
+        escaped.push(UTF8_TEXTS[4][0]);
     }
     assert!(contains(&tree, &escaped));
     match d.conversation().live.get(0).unwrap().call.as_ref().unwrap() {
         LiveCall::Raw(call) => {
             assert_eq!(call.identity.owner, Token::new(u64::MAX));
-            assert_eq!(call.identity.id, full_raw_byte(0xfd));
+            assert_eq!(call.identity.id, full_raw_byte(UTF8_TEXTS[5][0]));
         }
         LiveCall::Decoded(_) => panic!("expected the supplied raw current call"),
     }
@@ -616,7 +620,7 @@ fn maximum_raw_live_calls_fit_whole_page_and_escaped_phrase_capacities() {
             text: text(b""),
             cut: false,
             call: Some(LiveCall::Raw(CurrentCall {
-                identity: current_identity(b"id/\xff"),
+                identity: current_identity(UTF8_TEXTS[0]),
                 began: None,
                 tool,
                 input,
@@ -676,7 +680,7 @@ fn raw_live_call_controls_use_selected_normal_language_and_checked_capacity() {
             text: text(b""),
             cut: false,
             call: Some(LiveCall::Raw(CurrentCall {
-                identity: current_identity(b"id/\xff"),
+                identity: current_identity(UTF8_TEXTS[0]),
                 began: None,
                 tool: text(b"literal/tool"),
                 input: text(b"input"),
@@ -716,7 +720,7 @@ fn whole_run_call_only_is_visible_once_without_a_turn_and_uses_normal_document_a
     let words = words();
     let (mut d, _, run, _) = ready();
     let raw = CurrentCall {
-        identity: current_identity(b"id/\xff"),
+        identity: current_identity(UTF8_TEXTS[0]),
         began: None,
         tool: text(b"call-only-tool"),
         input: text(b"call-only-input"),
@@ -785,10 +789,10 @@ fn maximum_independent_current_call_fits_page_with_all_existing_provisional_rows
         live(&mut d, run, number);
     }
     let call = CurrentCall {
-        identity: CallIdentity { id: full_raw_byte(0xfd), ..current_identity(b"id") },
+        identity: CallIdentity { id: full_raw_byte(UTF8_TEXTS[5][0]), ..current_identity(b"id") },
         began: Some(Wall::from_nanos(u64::MAX)),
-        tool: full_raw_byte(0xff),
-        input: full_raw_byte(0xfe),
+        tool: full_raw_byte(UTF8_TEXTS[3][0]),
+        input: full_raw_byte(UTF8_TEXTS[4][0]),
         cut: true,
     };
     deliver(
@@ -820,7 +824,7 @@ fn maximum_independent_current_call_fits_page_with_all_existing_provisional_rows
     assert!(u32::try_from(tree.nodes().len()).unwrap() <= limits.nodes);
     let mut escaped = Vec::new();
     for _ in 0..CLIENT.text {
-        escaped.extend_from_slice(b"\\xFE");
+        escaped.push(UTF8_TEXTS[4][0]);
     }
     assert!(contains(&tree, &escaped));
     assert_eq!(d.conversation().live.len(), CLIENT.rows);
@@ -939,3 +943,5 @@ fn whole_owner_activity_and_fetched_archive_keep_numeric_senders_references_and_
     let limits = crate::Limits::of_words(&super::cards::CLIENT, words).unwrap();
     assert!(tree.nodes.len() <= limits.nodes);
 }
+
+const UTF8_TEXTS: [&[u8]; 6] = [b"id/\x7e", b"raw/tool\x7e", b"a/b\x00\x21", b"~", b"!", b"?"];

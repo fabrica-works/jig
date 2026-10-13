@@ -6,8 +6,16 @@ use jig_domain_tasks as tasks;
 use skein_lib::List;
 use skein_lib::bytes::copy_of;
 
+#[expect(clippy::disallowed_methods, reason = "client/domain/contract.md, 5.3 requires UTF-8 text validation")]
 pub(super) fn text(bytes: &[u8], maximum: u32) -> Text {
-    let length = bytes.len().min(usize::try_from(maximum).expect("text bound fits usize"));
+    let source = core::str::from_utf8(bytes).expect("source text is UTF-8 at the engine entrance");
+    let mut length = bytes.len().min(usize::try_from(maximum).expect("text bound fits usize"));
+    for _ in 0_u8..3 {
+        if source.is_char_boundary(length) {
+            break;
+        }
+        length = length.saturating_sub(1);
+    }
     Text { bytes: copy_of(bytes.get(..length).expect("bounded prefix")), cut: length < bytes.len() }
 }
 
@@ -163,4 +171,16 @@ pub(super) fn run(core: &Core, limits: &Limits, party: u64, number: u64) -> Resu
         limits.documents.text_bytes,
     );
     Ok(Run { task: number, attempt: Some(proof.attempt), committed_turn, writing, call })
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn a_text_cut_inside_a_character_keeps_it_out_and_says_it_was_cut() {
+        for (maximum, expected, cut) in [(0, "", true), (1, "a", true), (2, "a", true), (3, "aé", false)] {
+            let actual = super::text("aé".as_bytes(), maximum);
+            assert_eq!(actual.bytes.as_ref(), expected.as_bytes(), "bound {maximum}");
+            assert_eq!(actual.cut, cut, "bound {maximum}");
+        }
+    }
 }

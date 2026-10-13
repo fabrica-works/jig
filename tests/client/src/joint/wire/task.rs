@@ -77,6 +77,8 @@ fn copy(source: &documents::Task, limits: &Limits) -> Result<client::Task, owner
 
 #[cfg(test)]
 pub(crate) mod tests {
+    const UTF8_TEXTS: [&[u8]; 1] = [b"~\0"];
+
     use super::*;
     use jig_domain_tasks as tasks;
     use skein_lib::{List, Wall};
@@ -133,7 +135,7 @@ pub(crate) mod tests {
             subscriptions: List::with_capacity(4),
             wake: state.wake,
             contract: documents::ContractLine::Change { connector: u16::MAX, kind: 0, words: u32::MAX },
-            result: Some(documents::Ending::Failed(documents::Text { bytes: Box::from([255, 0]), cut: true })),
+            result: Some(documents::Ending::Failed(documents::Text { bytes: Box::from(UTF8_TEXTS[0]), cut: true })),
             budget: chip.details.budget,
             authority: state.authority,
             hold: Some(documents::HoldLine {
@@ -196,7 +198,7 @@ pub(crate) mod tests {
             panic!("no full Result metadata is supplied")
         };
         let client::OwnerChipEnding::Failed(words) = *ending else { panic!("source failure") };
-        assert_eq!(words.bytes.bytes(), &[255, 0]);
+        assert_eq!(words.bytes.bytes(), UTF8_TEXTS[0]);
         assert!(words.cut);
         assert_eq!(actual.delegates.get(0).expect("whole delegate").takeover_budget, u64::MAX);
         assert_eq!(source, original);

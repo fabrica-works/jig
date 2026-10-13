@@ -12,14 +12,14 @@ fn question(from: Option<OwnerRequester>) -> Question {
     Question {
         task: Chip {
             task: u64::MAX,
-            title: DocumentText::complete(Text::new(copy_of(&[255, 0, 128]), 3).unwrap()),
+            title: DocumentText::complete(Text::new(copy_of(UTF8_TEXTS[0]), 3).unwrap()),
             executor: Executor::Agent { charter: u32::MAX },
             phase: Phase::Waiting,
             details: Box::new(ChipPhase::Waiting { dependencies, hold: None }),
         },
         from,
         message: u64::MAX,
-        words: Text::new(copy_of(&[128, 0, 255]), 3).unwrap(),
+        words: Text::new(copy_of(UTF8_TEXTS[1]), 3).unwrap(),
         since: Wall::from_nanos(u64::MAX),
         acts,
         ending: None,
@@ -58,8 +58,8 @@ fn question_sender_whole_box_prices_reserved_chip_and_offer_allocations_at_exact
         assert!(!fits(&packet, &bounds));
         assert_eq!(packet, before);
         assert_eq!(value.from, from);
-        assert_eq!(value.task.title.bytes.bytes(), &[255, 0, 128]);
-        assert_eq!(value.words.bytes(), &[128, 0, 255]);
+        assert_eq!(value.task.title.bytes.bytes(), UTF8_TEXTS[0]);
+        assert_eq!(value.words.bytes(), UTF8_TEXTS[1]);
         assert_eq!(value.acts.capacity(), 2);
     }
 }
@@ -85,3 +85,5 @@ fn question_sender_malformed_nested_capacity_and_words_are_refused_whole_without
     malformed.words = Text::new(copy_of(b"abcd"), 4).unwrap();
     assert!(!fits(&ReadValue::Question(Box::new(malformed)), &bounds));
 }
+
+const UTF8_TEXTS: [&[u8]; 2] = [b"~\0^", b"^\0~"];

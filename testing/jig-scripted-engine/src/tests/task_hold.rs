@@ -18,7 +18,7 @@ fn task_hold_parent_prices_whole_owner_box_reserved_source_and_rejected_words_at
         before: OwnerPriorPhase::Closing(ClosingStage::Effects),
         escalation: Some(OwnerHoldEscalation::Rejected {
             by: u64::MAX,
-            reason: DocumentText { bytes: text(&[254_u8; 32]), cut: true },
+            reason: DocumentText { bytes: text(UTF8_TEXTS[0]), cut: true },
         }),
         tries: OwnerFailureTries { transient: 1, permanent: 2, run: 3, agent: 4, lost: 5, invalid: u32::MAX },
         hold_wait_since: None,
@@ -101,3 +101,5 @@ fn scripted_owner_hold_moves_return_exact_category_for_release_and_atomic_amend_
         );
     }
 }
+
+const UTF8_TEXTS: [&[u8]; 1] = [&[b'!'; 32]];

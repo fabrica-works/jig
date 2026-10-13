@@ -98,6 +98,8 @@ pub fn scope(value: &client::Read, text: u32) -> Option<jig_domain_core::reads::
 
 #[cfg(test)]
 pub(crate) mod tests {
+    const UTF8_WORDS: &[u8] = b"~\0";
+
     use super::*;
     use jig_domain_people as people;
     use skein_lib::Wall;
@@ -183,7 +185,7 @@ pub(crate) mod tests {
         }
         let reply = copied.updates.get(0).expect("reply row").reply.as_ref().expect("whole reply");
         assert!(reply.first_words.cut);
-        assert_eq!(reply.first_words.bytes.bytes(), &[255, 0]);
+        assert_eq!(reply.first_words.bytes.bytes(), UTF8_WORDS);
         assert_eq!((&reply.runtime, reply.changed, reply.unread), (&None, None, None));
         assert_eq!((reply.cached_replies, reply.seen, reply.last_reply), (u32::MAX, u64::MAX, 0));
         assert_eq!(

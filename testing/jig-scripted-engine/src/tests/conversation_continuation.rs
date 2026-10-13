@@ -9,7 +9,7 @@ fn line(number: u64, phase: Phase) -> ConversationLine {
     ConversationLine {
         chip,
         project: 1,
-        first_words: DocumentText { bytes: text(&[0xff, 0, 0xfe]), cut: true },
+        first_words: DocumentText { bytes: text(UTF8_TEXTS[0]), cut: true },
         cached_replies: 7,
         unread: None,
         delegates: 0,
@@ -148,7 +148,7 @@ fn whole_watch_envelope_prices_cursor_bytes_and_refuses_text_or_reserved_row_ove
         let value = Delivery::Conversations(Box::new(Conversations {
             rows: list(vec![]),
             more: false,
-            after: Cursor { value: text(bytes) },
+            after: Cursor::new(Box::from(bytes), 1024).expect("bounded opaque cursor"),
         }));
         let kept = value.clone();
         let heap = u64::try_from(size_of::<Conversations>()).unwrap() + u64::try_from(bytes.len()).unwrap();
@@ -160,9 +160,15 @@ fn whole_watch_envelope_prices_cursor_bytes_and_refuses_text_or_reserved_row_ove
         assert_eq!(value, kept);
     }
     bounds.document_bytes = u64::MAX;
-    let mut value = Conversations { rows: list(vec![]), more: false, after: Cursor { value: text(&[0xff; 33]) } };
+    let mut value = Conversations {
+        rows: list(vec![]),
+        more: false,
+        after: Cursor::new(Box::from(UTF8_TEXTS[1]), 1024).expect("bounded opaque cursor"),
+    };
     assert!(!payload::fits(&value, &bounds));
-    value.after = Cursor { value: text(b"opaque") };
+    value.after = Cursor::new(Box::from(b"opaque".as_slice()), 1024).expect("bounded opaque cursor");
     value.rows = List::with_capacity(3);
     assert!(!payload::fits(&value, &bounds));
 }
+
+const UTF8_TEXTS: [&[u8]; 2] = [b"~\0!", &[b'~'; 33]];

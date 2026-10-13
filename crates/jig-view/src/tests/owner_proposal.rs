@@ -64,7 +64,7 @@ fn state(words: &[u8], cut: bool) -> OwnerAmendmentState {
     let mut inputs = List::with_capacity(3);
     let mut dependencies = List::with_capacity(3);
     for n in 0..3 {
-        parameters.push(ParameterDocument::Bytes { name: n, value: doc(&[255; 32], true) }).unwrap();
+        parameters.push(ParameterDocument::Bytes { name: n, value: doc(UTF8_TEXTS[0], true) }).unwrap();
         inputs.push(u64::MAX.checked_sub(u64::from(n)).unwrap()).unwrap();
         dependencies.push(u64::from(n)).unwrap();
     }
@@ -543,3 +543,5 @@ fn whole_linked_owner_carrier(w: &Words) {
         Some(&linked),
     );
 }
+
+const UTF8_TEXTS: [&[u8]; 1] = [&[b'~'; 32]];

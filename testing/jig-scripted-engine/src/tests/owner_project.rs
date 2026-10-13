@@ -73,7 +73,7 @@ fn owner_project_kit_checks_final_member_text_and_whole_segment_and_nested_reser
             party: u64::MAX,
             kind: PartyKind::Service,
             role: HeldRole::Policy { role: u32::MAX },
-            login: DocumentText { bytes: text(&[255, 0, 254, 0]), cut: true },
+            login: DocumentText { bytes: text(UTF8_TEXTS[0]), cut: true },
             name: DocumentText::complete(text(b"")),
         })
         .unwrap();
@@ -100,7 +100,7 @@ fn owner_project_kit_checks_final_member_text_and_whole_segment_and_nested_reser
     value = original.clone();
     value.resources.get_mut(0).unwrap().part.key = OwnerPartKey::Path(List::with_capacity(3));
     assert!(!owner_project::fits(&value, &bounds));
-    assert_eq!(original.members.get(0).unwrap().login.bytes(), &[255, 0, 254, 0]);
+    assert_eq!(original.members.get(0).unwrap().login.bytes(), UTF8_TEXTS[0]);
 }
 #[test]
 fn owner_project_kit_original_public_read_keeps_whole_source_and_rejects_unadmitted_truth_before_delivery() {
@@ -293,3 +293,5 @@ fn owner_project_last_of_twenty_five_offers_keeps_recursive_rows_and_source_orde
     value.members = List::with_capacity(3);
     assert!(!owner_project::fits(&value, &bounds));
 }
+
+const UTF8_TEXTS: [&[u8]; 1] = [b"~\0!\0"];

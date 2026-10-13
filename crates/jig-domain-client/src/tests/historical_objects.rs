@@ -20,7 +20,7 @@ fn question(terminal: bool) -> OwnerHistorical {
                 message: 9,
                 by: OwnerRequester::Deployment { project: u32::MAX },
                 kind: OwnerMessageKind::Answer { question: q.message },
-                words: objects::text(&[255, 0]),
+                words: objects::text(UTF8_TEXT),
             },
         })
     } else {
@@ -183,3 +183,5 @@ fn historical_pending_request_and_answered_card_fences_survive_terminal_read_and
     assert_eq!(answered.objects.get(id).unwrap().answer, Some(answer));
     assert!(answered.objects.get(id).unwrap().body.is_none());
 }
+
+const UTF8_TEXT: &[u8] = b"~\0";

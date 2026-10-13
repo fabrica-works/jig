@@ -307,8 +307,8 @@ fn history(words: &Words) {
                             change: change.clone(),
                         }))
                     })),
-                    before: Some(Cursor { value: text(b"before") }),
-                    after: Some(Cursor { value: text(b"after") }),
+                    before: Some(Cursor::new(Box::from(b"before".as_slice()), 1024).expect("bounded opaque cursor")),
+                    after: Some(Cursor::new(Box::from(b"after".as_slice()), 1024).expect("bounded opaque cursor")),
                 }))),
             },
         );
@@ -400,8 +400,12 @@ pub(super) fn project_rows(d: &mut Domain, out: &[Request]) {
                                 acts: list([Offered { act: ActKind::EditNote, admission: Admission::Allowed }]),
                                 cut: false,
                             }]),
-                            before: Some(Cursor { value: text(b"before") }),
-                            after: Some(Cursor { value: text(b"after") }),
+                            before: Some(
+                                Cursor::new(Box::from(b"before".as_slice()), 1024).expect("bounded opaque cursor"),
+                            ),
+                            after: Some(
+                                Cursor::new(Box::from(b"after".as_slice()), 1024).expect("bounded opaque cursor"),
+                            ),
                         }))),
                     },
                 );

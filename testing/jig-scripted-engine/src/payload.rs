@@ -4,21 +4,22 @@ use crate::Bounds;
 use core::mem::size_of;
 use jig_domain_client::contract::{
     Account, ActKind, ActiveRun, Activity, ActivityLine, ActivityPage, Actor, AddressChange, Admission, AdmissionLimit,
-    Amendment, Answer, Ask, AttemptFailure, Authority, Beyond, Block, Budget, Call, Capacity, Charter, Chip, ChipPhase,
-    Closing, ClosingStage, ConversationLine, ConversationPage, Conversations, Count, CurrentCall, CurrentHold, Cursor,
-    Decider, Decision, Delivery, Deployment, Disposal, DisposalIssue, DocumentSpecification, DocumentText, Ending,
-    Escalation, Executor, FailureClass, FieldRule, Frame, FrameParty, GoalExecutor, GoalLine, GoalPage, GoalProcedure,
-    Goals, Grant, HeldRole, HeldRuntime, HistoryChange, HistoryLine, HistoryPage, Hold, HoldCategory, HoldFailure,
-    HoldReason, Holding, Host, Impact, Inbox, InboxEntry, InboxGroup, InboxPage, Lacking, Limit, LiveCall,
-    LiveDelegate, Made, Message, Moved, Needs, Note, NoteAuthor, NotePage, NoteScope, ObjectKey, ObjectPage, Offered,
-    OfferedCharters, OptionLine, Outcome, OwnerChipPhase, Parameter, ParameterDocument, Part, PartScope, Party,
-    PartyKind, Passed, PersonAnswer, PersonContract, PersonTask, Phase, PhaseCounts, Policy, Pool, Priority, Project,
-    ProjectRole, Proposal, ProposalAction, ProposalKey, ProposedTask, Proposer, ProvisionalTurnName, Question, Read,
-    ReadNone, ReadResult, ReadValue, Recipient, Recurring, Refusal, ReplyPosition, Result, ResultContract, ResultField,
-    ResultValue, RetryNotice, Revision, RolePolicy, RunBeginning, RunEnding, RunObservation, RunStage, RunState,
-    RunText, RunWork, Runtime, Seen, Speaker, Specification, SpecificationDocument, SpendLine, SpendPage, SpendPeriod,
-    Steering, Subject, TakenBy, Task, TaskContext, TaskFilter, TaskHold, TaskLine, TaskSpend, Tasks, Text, Tree,
-    TreeNode, Turn, TurnLimits, TurnName, Usage, VersionRange, WakePolicy, WatchEnd, WatchEvent, WriterSlot,
+    Amendment, Answer, Ask, AttemptFailure, Authority, Beyond, Block, Budget, Bytes, Call, Capacity, Charter, Chip,
+    ChipPhase, Closing, ClosingStage, ConversationLine, ConversationPage, Conversations, Count, CurrentCall,
+    CurrentHold, Cursor, Decider, Decision, Delivery, Deployment, Disposal, DisposalIssue, DocumentSpecification,
+    DocumentText, Ending, Escalation, Executor, FailureClass, FieldRule, Frame, FrameParty, GoalExecutor, GoalLine,
+    GoalPage, GoalProcedure, Goals, Grant, HeldRole, HeldRuntime, HistoryChange, HistoryLine, HistoryPage, Hold,
+    HoldCategory, HoldFailure, HoldReason, Holding, Host, Impact, Inbox, InboxEntry, InboxGroup, InboxPage, Lacking,
+    Limit, LiveCall, LiveDelegate, Made, Message, Moved, Needs, Note, NoteAuthor, NotePage, NoteScope, ObjectKey,
+    ObjectPage, Offered, OfferedCharters, OptionLine, Outcome, OwnerChipPhase, Parameter, ParameterDocument, Part,
+    PartScope, Party, PartyKind, Passed, PersonAnswer, PersonContract, PersonTask, Phase, PhaseCounts, Policy, Pool,
+    Priority, Project, ProjectRole, Proposal, ProposalAction, ProposalKey, ProposedTask, Proposer, ProvisionalTurnName,
+    Question, Read, ReadNone, ReadResult, ReadValue, Recipient, Recurring, Refusal, ReplyPosition, Result,
+    ResultContract, ResultField, ResultValue, RetryNotice, Revision, RolePolicy, RunBeginning, RunEnding,
+    RunObservation, RunStage, RunState, RunText, RunWork, Runtime, Seen, Speaker, Specification, SpecificationDocument,
+    SpendLine, SpendPage, SpendPeriod, Steering, Subject, TakenBy, Task, TaskContext, TaskFilter, TaskHold, TaskLine,
+    TaskSpend, Tasks, Text, Tree, TreeNode, Turn, TurnLimits, TurnName, Usage, VersionRange, WakePolicy, WatchEnd,
+    WatchEvent, WriterSlot,
 };
 use skein_lib::{Duration, List, Token, Wall};
 
@@ -58,6 +59,11 @@ impl Payload for RetryNotice {
     }
 }
 impl Payload for Text {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        if self.fits(bounds.text) { u64::try_from(self.bytes().len()).ok() } else { None }
+    }
+}
+impl Payload for Bytes {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         if self.fits(bounds.text) { u64::try_from(self.bytes().len()).ok() } else { None }
     }

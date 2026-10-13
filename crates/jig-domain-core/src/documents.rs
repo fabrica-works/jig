@@ -64,7 +64,7 @@ use jig_domain_people as people;
 use jig_domain_tasks as tasks;
 use skein_lib::{Duration, List, Wall};
 
-/// One bounded opaque text value, with loss stated separately.
+/// One bounded UTF-8 text value, with loss stated separately.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Text {
     pub bytes: Box<[u8]>,

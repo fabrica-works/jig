@@ -98,7 +98,7 @@ fn members() -> List<documents::Member> {
                 party: if role == (people::Role::Policy { role: u32::MAX }) { u64::MAX } else { 0 },
                 kind: if role == people::Role::Member { people::Kind::Person } else { people::Kind::Service },
                 role,
-                login: documents::Text { bytes: Box::from([255, 0]), cut: true },
+                login: documents::Text { bytes: Box::from(UTF8_TEXTS[0]), cut: true },
                 name: documents::Text { bytes: Box::new([]), cut: false },
             })
             .expect("member");
@@ -241,7 +241,7 @@ fn whole_project_keeps_all_resource_roles_members_raw_text_and_independent_sourc
     assert_eq!(actual.members.get(4).expect("service").kind, client::PartyKind::Service);
     assert_eq!(actual.members.get(4).expect("party identity").party, u64::MAX);
     for member in &actual.members {
-        assert_eq!(member.login.bytes(), &[255, 0]);
+        assert_eq!(member.login.bytes(), UTF8_TEXTS[0]);
         assert!(member.login.cut);
         assert!(member.name.bytes().is_empty());
         assert!(!member.name.cut);
@@ -444,3 +444,5 @@ fn project_read_rejects_reserved_empty_collections_final_nested_text_and_the_twe
     source.members.get_mut(4).expect("final member").name.bytes = Box::new([]);
     assert!(super::super::documents::project_read(&source, &limits).is_ok());
 }
+
+const UTF8_TEXTS: [&[u8]; 1] = [b"~\0"];

@@ -60,6 +60,8 @@ pub fn goal(value: &documents::GoalLine, limits: &Limits) -> Result<client::Goal
 
 #[cfg(test)]
 pub(crate) mod tests {
+    const UTF8_TEXTS: [&[u8]; 1] = [b"~\0"];
+
     use super::*;
     use skein_lib::Wall;
 
@@ -73,7 +75,7 @@ pub(crate) mod tests {
             budget: chip.details.budget,
             chip,
             project: u32::MAX,
-            first_words: documents::Text { bytes: Box::from([255, 0]), cut: true },
+            first_words: documents::Text { bytes: Box::from(UTF8_TEXTS[0]), cut: true },
             seen: u64::MAX,
             last_reply: 0,
             replies_unread: None,
@@ -112,7 +114,7 @@ pub(crate) mod tests {
         assert_eq!(value.unread, None);
         assert_eq!(value.cached_replies, u32::MAX);
         assert_eq!((value.project, value.seen, value.last_reply, value.delegates), (u32::MAX, u64::MAX, 0, 17));
-        assert_eq!(value.first_words.bytes.bytes(), &[255, 0]);
+        assert_eq!(value.first_words.bytes.bytes(), UTF8_TEXTS[0]);
         assert!(value.first_words.cut);
         assert_eq!(value.budget, owner::budget(&source.budget));
         let client::ChipPhase::Owner { details, .. } = value.chip.details.as_ref() else { panic!("whole chip") };

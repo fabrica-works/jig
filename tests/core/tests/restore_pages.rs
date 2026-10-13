@@ -7,13 +7,13 @@ use skein_lib::{Duration, ReplyTo, Token};
 
 const SEED: u64 = 645;
 const KEY: [u8; 16] = [0x91; 16];
-const WORDS: &[u8] = &[0, 255, 128, 1, 0, 254];
+const UTF8_TEXTS: [&[u8]; 3] = [b"\0~^\x01\0!", b"~\0\x01", b"\0^!"];
 
 fn identity() -> people::Identity {
     people::Identity {
         key: people::IdentityKey { provider: 0, subject: Box::from([0, 255, 128, 7]) },
-        login: Box::from([255, 0, 1]),
-        name: Box::from([0, 128, 254]),
+        login: Box::from(UTF8_TEXTS[1]),
+        name: Box::from(UTF8_TEXTS[2]),
     }
 }
 
@@ -26,7 +26,7 @@ fn ask(sign_in: u64, token: u64) -> root::Event {
         reply_to: ReplyTo::new(Token::new(token)),
         sign_in,
         key: KEY,
-        ask: people::Ask::StartChat { project: 1, words: WORDS.into() },
+        ask: people::Ask::StartChat { project: 1, words: UTF8_TEXTS[0].into() },
     }))
 }
 
@@ -154,7 +154,7 @@ fn finishing_held_original_pages_restores_real_authentication_and_admission() {
     assert!(matches!(reply(&mut world, 7105).1, people::Reply::Outcome(people::Outcome::Started { .. })));
     assert!(world.store.rows.values().any(|row| matches!(row,
         root::Record::Core(core::Record::People(people::Stored::Answer { key, ask, .. }))
-        if key.key == KEY && **ask == people::Ask::StartChat { project: 1, words: WORDS.into() }
+        if key.key == KEY && **ask == people::Ask::StartChat { project: 1, words: UTF8_TEXTS[0].into() }
     )));
 }
 
@@ -166,7 +166,7 @@ fn default_restore_replays_the_same_durable_whole_request_without_making_it_twic
     assert!(matches!(answer, people::Reply::Outcome(people::Outcome::Started { .. })));
     assert!(world.store.rows.values().any(|row| matches!(row,
         root::Record::Core(core::Record::People(people::Stored::Answer { key, ask, .. }))
-        if key.key == KEY && **ask == people::Ask::StartChat { project: 1, words: WORDS.into() }
+        if key.key == KEY && **ask == people::Ask::StartChat { project: 1, words: UTF8_TEXTS[0].into() }
     )));
     let rows = world.store.rows.clone();
     let applied = world.store.applied;

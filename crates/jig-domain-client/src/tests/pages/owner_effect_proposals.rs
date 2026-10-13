@@ -9,7 +9,7 @@ fn proposal(proposer: Proposer, effect: u64) -> OwnerProposal {
     OwnerProposal {
         key: ProposalKey { proposer, number: 7 },
         project: 41,
-        reason: DocumentText { bytes: text(&[255, 0, 17]), cut: true },
+        reason: DocumentText { bytes: text(UTF8_TEXT), cut: true },
         action: OwnerProposalAction::Effect {
             part: OwnerPart { connector: u16::MAX, kind: OwnerPartKind::Effect, key: OwnerPartKey::Number(effect) },
             authority: super::super::objects::owner_authority(),
@@ -128,3 +128,5 @@ fn native_proposal_page_reads_and_watches_refuse_part_capacity_while_preserving_
         assert!(domain.notices().ids().iter().next().is_none(), "work-page refusals remain on their page");
     }
 }
+
+const UTF8_TEXT: &[u8] = b"~\0\x11";

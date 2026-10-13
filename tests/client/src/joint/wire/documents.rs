@@ -347,6 +347,8 @@ pub fn run_delivery(value: &documents::Run, limits: &Limits) -> Result<client::D
 
 #[cfg(test)]
 pub(crate) mod tests {
+    const UTF8_TEXTS: [&[u8]; 4] = [b"~\0", b"\0~", b"~\0/", b"/~"];
+
     use super::*;
     use skein_lib::{Duration, List, Token, Wall};
 
@@ -472,9 +474,7 @@ pub(crate) mod tests {
             bytes.push(0);
             assert_eq!(
                 cursor::decode_tree(
-                    &client::Cursor {
-                        value: client::Text::new(bytes.into_boxed_slice(), 200).expect("trailing fixture")
-                    },
+                    &client::Cursor::new(bytes.into_boxed_slice(), 200).expect("trailing fixture"),
                     u64::MAX,
                     u32::MAX,
                     200
@@ -497,7 +497,7 @@ pub(crate) mod tests {
             message: u64::MAX,
             from: jig_domain_tasks::Party::Task(0),
             at: Wall::EPOCH,
-            words: Box::from([255, 0]),
+            words: Box::from(UTF8_TEXTS[0]),
         }
     }
     #[test]
@@ -517,7 +517,7 @@ pub(crate) mod tests {
             };
             assert_eq!(value.from, Some(results::requester(sender)));
             assert_eq!(value.message, u64::MAX);
-            assert_eq!(value.words.bytes(), &[255, 0]);
+            assert_eq!(value.words.bytes(), UTF8_TEXTS[0]);
             assert_eq!(value.since, Wall::EPOCH);
             assert_eq!(value.ending, None);
             assert!(value.task.title.cut);
@@ -680,10 +680,10 @@ pub(crate) mod tests {
         let limits = Limits { rows: 8, text: 200, document_bytes: 100_000, ..crate::test::limits().jig };
         for terminal in [
             documents::Ending::Done(documents::ResultValue::Report(documents::Text {
-                bytes: Box::from([255, 0]),
+                bytes: Box::from(UTF8_TEXTS[0]),
                 cut: true,
             })),
-            documents::Ending::Failed(documents::Text { bytes: Box::from([0, 255]), cut: true }),
+            documents::Ending::Failed(documents::Text { bytes: Box::from(UTF8_TEXTS[1]), cut: true }),
             documents::Ending::Cancelled {
                 reason: documents::Text { bytes: Box::new([]), cut: true },
                 result: Some(documents::ResultValue::Approved { state: Box::from([255, 0]), words: None }),
@@ -746,7 +746,7 @@ pub(crate) mod tests {
         documents::Frame {
             party: u64::MAX,
             kind: jig_domain_people::Kind::Person,
-            login: documents::Text { bytes: Box::from([255, 0]), cut: true },
+            login: documents::Text { bytes: Box::from(UTF8_TEXTS[0]), cut: true },
             name: documents::Text { bytes: Box::new([]), cut: false },
             deployment_role: None,
             projects: List::with_capacity(2),
@@ -766,9 +766,9 @@ pub(crate) mod tests {
                 owner: Token::new(u64::MAX),
                 sequence: u32::MAX,
                 retry: u32::MAX,
-                id: Box::from([255, 0, b'/']),
+                id: Box::from(UTF8_TEXTS[2]),
             },
-            tool: Box::from([b'/', 255]),
+            tool: Box::from(UTF8_TEXTS[3]),
             input: Box::new([]),
             cut: true,
             began,
@@ -786,7 +786,7 @@ pub(crate) mod tests {
         let delivery = frame_delivery(&source, &limits).expect("whole frame watch fits");
         let client::Delivery::Frame(delivery) = delivery else { panic!("actual Frame watch envelope") };
         assert_eq!(read, delivery);
-        assert_eq!(read.party.login.bytes.bytes(), &[255, 0]);
+        assert_eq!(read.party.login.bytes.bytes(), UTF8_TEXTS[0]);
         assert!(read.party.login.cut);
         assert!(read.cut);
         assert_eq!(read.projects.capacity(), 2);
@@ -819,8 +819,8 @@ pub(crate) mod tests {
             assert_eq!(retained.identity.owner, Token::new(u64::MAX));
             assert_eq!(retained.identity.sequence, u32::MAX);
             assert_eq!(retained.identity.retry, u32::MAX);
-            assert_eq!(retained.identity.id.bytes(), &[255, 0, b'/']);
-            assert_eq!(retained.tool.bytes(), &[b'/', 255]);
+            assert_eq!(retained.identity.id.bytes(), UTF8_TEXTS[2]);
+            assert_eq!(retained.tool.bytes(), UTF8_TEXTS[3]);
             assert_eq!(retained.input.bytes(), b"");
             assert!(retained.cut);
             assert_eq!(retained.began, began);
@@ -843,7 +843,7 @@ pub(crate) mod tests {
                 turn: views::TurnName { attempt: 19, turn: 17, retry: 3 },
                 from: 31,
                 to: 33,
-                text: Box::from([255, 0]),
+                text: Box::from(UTF8_TEXTS[0]),
                 cut: true,
                 call: None,
             }),
@@ -860,7 +860,7 @@ pub(crate) mod tests {
         assert_eq!(writing.began, None);
         assert_eq!(writing.from, 31);
         assert_eq!(writing.through, 33);
-        assert_eq!(writing.text.bytes(), &[255, 0]);
+        assert_eq!(writing.text.bytes(), UTF8_TEXTS[0]);
         assert!(writing.cut);
         assert_eq!(writing.call, None);
         let current = translated.call.expect("independently supplied current call retained");

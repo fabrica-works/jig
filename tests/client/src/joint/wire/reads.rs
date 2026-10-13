@@ -112,6 +112,8 @@ pub(crate) fn note_scope(value: &client::NoteScope) -> notes::Scope {
 
 #[cfg(test)]
 mod tests {
+    const UTF8_TEXTS: [&[u8]; 2] = [&[1u8, b'~'], b"~\0"];
+
     use super::*;
 
     #[test]
@@ -161,9 +163,8 @@ mod tests {
                 .expect("the complete supplied fixture is admitted"),
             reads::Read::Goals { project: u32::MAX, from: Some(retained) }
         );
-        let malformed = client::Cursor {
-            value: client::Text::new(Box::from([1u8, 255]), 1024).expect("the complete supplied fixture is admitted"),
-        };
+        let malformed =
+            client::Cursor::new(Box::from(UTF8_TEXTS[0]), 1024).expect("the complete supplied fixture is admitted");
         assert_eq!(read(&client::Read::Conversations { after: Some(malformed) }, 1024), Err(Invalid::Cursor));
         assert_eq!(
             read(&client::Read::Conversations { after: None }, 1024)
@@ -220,7 +221,7 @@ mod tests {
             let retained = reads::Cursor::Store {
                 scope: reads::Scope::ScopedNotes {
                     scope: supplied_scope.clone(),
-                    description: Some(Box::from([255, 0])),
+                    description: Some(Box::from(UTF8_TEXTS[1])),
                 },
                 after: Some(reads::Position::Owner(jig_domain_core::Key::Notes(notes::Key::Line {
                     scope: supplied_scope,
@@ -230,7 +231,7 @@ mod tests {
             let encoded = super::super::cursor::encode(&retained, 1024).expect("whole cursor");
             let query = client::Read::Notes {
                 scope,
-                description: Some(client::Text::new(Box::from([255, 0]), 1024).expect("literal description")),
+                description: Some(client::Text::new(Box::from(UTF8_TEXTS[1]), 1024).expect("literal description")),
                 after: Some(encoded),
             };
             let before = query.clone();
@@ -250,7 +251,7 @@ mod tests {
                             },
                         },
                     },
-                    description: Some(Box::from([255, 0])),
+                    description: Some(Box::from(UTF8_TEXTS[1])),
                     from: Some(retained),
                 })
             );

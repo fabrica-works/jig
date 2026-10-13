@@ -69,6 +69,8 @@ pub fn disposal(value: &client::Disposal) -> people::Disposal {
 
 #[cfg(test)]
 mod tests {
+    const UTF8_TEXTS: [&[u8]; 1] = [b"~/\0"];
+
     use super::*;
 
     fn text(value: &[u8]) -> client::Text {
@@ -97,8 +99,8 @@ mod tests {
                 people::PersonResult::Report { words: Box::from(b"report/bytes".as_slice()) },
             ),
             (
-                client::PersonAnswer::Cannot { reason: text(&[255, b'/', 0]) },
-                people::PersonResult::Failure { reason: Box::from([255, b'/', 0]) },
+                client::PersonAnswer::Cannot { reason: text(UTF8_TEXTS[0]) },
+                people::PersonResult::Failure { reason: Box::from(UTF8_TEXTS[0]) },
             ),
         ];
         for (given, expected) in cases {

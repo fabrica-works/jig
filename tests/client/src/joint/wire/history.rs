@@ -201,6 +201,8 @@ pub fn milestone(
 
 #[cfg(test)]
 pub(super) mod tests {
+    const UTF8_TEXTS: [&[u8]; 1] = [b"~\0"];
+
     use super::*;
     use skein_lib::{List, Wall};
     pub(crate) fn limits() -> Limits {
@@ -217,7 +219,7 @@ pub(super) mod tests {
             revision: 0,
             by: tasks::Party::Deployment { project: u32::MAX },
             change: tasks::Change::Prioritised { priority: u32::MAX },
-            reason: documents::Text { bytes: Box::from([255, 0]), cut: true },
+            reason: documents::Text { bytes: Box::from(UTF8_TEXTS[0]), cut: true },
             proposal: Some(documents::ProposalHistory {
                 action: documents::RetainedAction::Release { task: u64::MAX },
                 number: u64::MAX,
@@ -238,7 +240,7 @@ pub(super) mod tests {
         let copied = line(&source, &limits()).expect("whole history");
         assert_eq!((copied.task, copied.revision, copied.at), (u64::MAX, 0, None));
         assert_eq!(copied.by, client::OwnerRequester::Deployment { project: u32::MAX });
-        assert_eq!(copied.reason.bytes.bytes(), &[255, 0]);
+        assert_eq!(copied.reason.bytes.bytes(), UTF8_TEXTS[0]);
         assert!(copied.reason.cut);
         assert_eq!(copied.change, client::OwnerHistoryChange::Prioritised { priority: u32::MAX });
         let proposal = copied.proposal.expect("retained proposal");

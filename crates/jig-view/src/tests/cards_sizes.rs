@@ -11,7 +11,7 @@ fn full_text() -> Text {
     text(&bytes)
 }
 fn full_name() -> Text {
-    text(&[b'n'; 128])
+    text(UTF8_TEXTS[0])
 }
 fn full_owner_authority() -> OwnerAuthorityDocument {
     let pattern = full_pattern();
@@ -502,3 +502,5 @@ fn full_path() -> List<Box<[u8]>> {
 fn full_pattern() -> OwnerPattern {
     OwnerPattern { segments: full_path(), last: OwnerPatternEnd::Exact(full_name().into_bytes()) }
 }
+
+const UTF8_TEXTS: [&[u8]; 1] = [&[b'n'; 128]];

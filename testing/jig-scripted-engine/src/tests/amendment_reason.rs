@@ -22,7 +22,7 @@ fn amendment(reason: &[u8]) -> Ask {
 #[test]
 fn whole_amendment_request_prices_full_reason_and_rejects_text_or_document_overflow() {
     let mut bounds = Bounds { text: 32, rows: 2, document_bytes: u64::MAX, ..Bounds::default() };
-    for bytes in [b"".as_slice(), [0xff; 32].as_slice()] {
+    for bytes in [b"".as_slice(), UTF8_TEXTS[0]] {
         let ask = amendment(bytes);
         let before = ask.clone();
         assert_eq!(ask.heap(&bounds).unwrap(), u64::try_from(bytes.len()).unwrap());
@@ -34,7 +34,7 @@ fn whole_amendment_request_prices_full_reason_and_rejects_text_or_document_overf
         assert_eq!(ask, before);
         bounds.document_bytes = u64::MAX;
     }
-    assert!(!payload::fits(&amendment(&[0xff; 33]), &bounds));
+    assert!(!payload::fits(&amendment(UTF8_TEXTS[1]), &bounds));
 }
 #[test]
 fn durable_amendment_key_replay_keeps_reason_and_changed_reason_is_a_conflict() {
@@ -42,7 +42,7 @@ fn durable_amendment_key_replay_keeps_reason_and_changed_reason_is_a_conflict() 
     let mut row = task();
     row.acts = list(vec![Offered { act: ActKind::Amend, admission: Admission::Allowed }]);
     setup.truth.objects.insert(ObjectKey::Task(8), ReadValue::Task(Box::new(row)));
-    let ask = amendment(&[0xff, 0, 0xfe]);
+    let ask = amendment(UTF8_TEXTS[2]);
     let mut engine = Engine::new(setup, 1).unwrap();
     send(&mut engine, 0, 11, 1, 1, ask.clone());
     send(&mut engine, 1, 12, 1, 2, ask.clone());
@@ -62,3 +62,5 @@ fn durable_amendment_key_replay_keeps_reason_and_changed_reason_is_a_conflict() 
     assert_eq!(engine.commits().len(), 1);
     assert_eq!(engine.commits()[0].ask.as_ref(), Some(&ask));
 }
+
+const UTF8_TEXTS: [&[u8]; 3] = [&[b'~'; 32], &[b'~'; 33], b"~\0!"];

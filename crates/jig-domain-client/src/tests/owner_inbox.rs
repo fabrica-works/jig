@@ -113,7 +113,7 @@ fn owner_inbox_whole_groups_aggregate_counts_live_winner_and_unknown_time_source
         project: None,
         kind: None,
         goal: None,
-        after: Some(Cursor { value: Text::new(Box::from([255, 0]), 2).unwrap() }),
+        after: Some(Cursor::new(Box::from(UTF8_TEXTS[0]), 2).unwrap()),
     };
     let mut old = a.clone();
     old.activity = Some(99);
@@ -125,7 +125,7 @@ fn owner_inbox_whole_groups_aggregate_counts_live_winner_and_unknown_time_source
             cut: true,
             rows: list([old]),
             before: None,
-            after: Some(Cursor { value: Text::new(Box::from([254, 0]), 2).unwrap() }),
+            after: Some(Cursor::new(Box::from(UTF8_TEXTS[2]), 2).unwrap()),
         },
     );
     assert!(page.needs_window.rows.is_empty());
@@ -165,7 +165,7 @@ fn owner_inbox_read_group_original_goal_query_cut_and_opaque_cursor_are_preserve
     let mut row = entry(3, OwnerInboxObject::Question { message: 5 });
     row.project = Some(1);
     let original = row.clone();
-    let cursor = Cursor { value: Text::new(Box::from([255, 0, 254]), 3).unwrap() };
+    let cursor = Cursor::new(Box::from(UTF8_TEXTS[1]), 3).unwrap();
     let wrong = OwnerInboxPage {
         selection: None,
         cut: true,
@@ -285,7 +285,7 @@ fn owner_inbox_superseded_query_terminal_retires_without_replacing_the_new_filte
         cut: true,
         rows: list([entry(3, OwnerInboxObject::Question { message: 5 })]),
         before: None,
-        after: Some(Cursor { value: super::objects::text(b"obsolete") }),
+        after: Some(Cursor::new(Box::from(b"obsolete".as_slice()), 1024).expect("bounded opaque cursor")),
     };
     drive(
         &mut domain,
@@ -358,3 +358,5 @@ fn owner_inbox_live_supplied_cursor_roots_control_membership_without_reinterpret
     assert!(!page.goal_context_pending);
     assert!(page.rows.is_empty());
 }
+
+const UTF8_TEXTS: [&[u8]; 3] = [b"~\0", b"~\0!", b"!\0"];

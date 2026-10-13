@@ -236,6 +236,8 @@ pub fn with_archive(
 
 #[cfg(test)]
 mod tests {
+    const UTF8_TEXTS: [&[u8]; 2] = [b"~\0/", b"~"];
+
     use super::*;
     use skein_lib::Wall;
     fn limits() -> Limits {
@@ -249,7 +251,7 @@ mod tests {
             number: u64::MAX,
             from: tasks::Party::Deployment { project: u32::MAX },
             kind,
-            words: Box::from([255, 0, b'/']),
+            words: Box::from(UTF8_TEXTS[0]),
             at: Wall::EPOCH,
             hits: u32::MAX,
             eligible: false,
@@ -396,7 +398,7 @@ mod tests {
     #[test]
     fn whole_activity_admission_rejects_invalid_presence_and_preserves_absent_versus_zero_archive_read() {
         let mut invalid = word_source(tasks::MessageKind::Result(tasks::ResultKind::Approved {
-            state: Box::from([255]),
+            state: Box::from(UTF8_TEXTS[1]),
             words_present: false,
         }));
         assert_eq!(word(&invalid, &limits()), Err(Invalid::Payload));

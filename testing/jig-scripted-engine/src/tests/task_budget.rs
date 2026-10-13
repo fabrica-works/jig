@@ -76,7 +76,7 @@ fn owner_row_parent_admission_prices_full_text_optional_runtime_and_allocated_wi
     let row = ConversationLine {
         chip: task().chip,
         project: u32::MAX,
-        first_words: DocumentText { bytes: text(&[0xff; 32]), cut: true },
+        first_words: DocumentText { bytes: text(UTF8_TEXTS[0]), cut: true },
         unread: Some(Count { value: u32::MAX, limited: true }),
         cached_replies: u32::MAX,
         delegates: u32::MAX,
@@ -101,7 +101,7 @@ fn owner_row_parent_admission_prices_full_text_optional_runtime_and_allocated_wi
             rows,
             cut: true,
             before: None,
-            after: Some(Cursor { value: text(b"\xff\0opaque") }),
+            after: Some(Cursor::new(Box::from(UTF8_TEXTS[1]), 1024).expect("bounded opaque cursor")),
         }));
         whole_budget_fits(&page);
         let mut too_short = bounds;
@@ -141,7 +141,9 @@ fn owner_goal_payload_admits_all_independent_full_width_stages_and_whole_budget_
         rows: list(vec![row]),
         cut: true,
         before: None,
-        after: Some(Cursor { value: text(b"\xff\0opaque-goal") }),
+        after: Some(Cursor::new(Box::from(UTF8_TEXTS[2]), 1024).expect("bounded opaque cursor")),
     }));
     whole_budget_fits(&page);
 }
+
+const UTF8_TEXTS: [&[u8]; 3] = [&[b'~'; 32], b"\x7e\0opaque", b"\x7e\0opaque-goal"];

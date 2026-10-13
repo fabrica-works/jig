@@ -89,7 +89,7 @@ fn goal(b: &mut Builder, value: &OwnerPersonProposalGoal, words: &Words, binding
         number(b, words, P::Connector, u64::from(connector));
         number(b, words, P::Kind, u64::from(kind));
         for segment in path {
-            raw(b, segment);
+            crate::literal_segment::render(b, segment.bytes());
         }
         b.close();
     }

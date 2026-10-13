@@ -12,7 +12,7 @@ fn text(bytes: &[u8]) -> Text {
     Text::new(bytes.into(), 100).unwrap()
 }
 fn cursor(bytes: &[u8]) -> Cursor {
-    Cursor { value: text(bytes) }
+    Cursor::new(Box::from(bytes), 1024).expect("bounded opaque cursor")
 }
 fn row(position: u64) -> ActivityLine {
     ActivityLine {
@@ -793,10 +793,10 @@ fn raw_live_calls_keep_optional_wall_literals_cut_and_full_identity_without_made
     value.turn = name;
     value.began = None;
     value.call = Some(LiveCall::Raw(CurrentCall {
-        identity: current_identity(b"id/\xff"),
+        identity: current_identity(UTF8_TEXTS[0]),
         began: None,
-        tool: text(b"raw/tool\xff"),
-        input: text(b"a/b\x00\xfe"),
+        tool: text(UTF8_TEXTS[1]),
+        input: text(UTF8_TEXTS[2]),
         cut: true,
     }));
     assert!(c.stream(value.clone(), 100));
@@ -805,7 +805,7 @@ fn raw_live_calls_keep_optional_wall_literals_cut_and_full_identity_without_made
     assert_eq!(held.call, value.call);
     assert!(c.names(4).is_empty());
     assert!(c.parts(4).is_empty());
-    let call = current_identity(b"id/\xff");
+    let call = current_identity(UTF8_TEXTS[0]);
     assert!(c.set_current_fold(call.clone(), Fold::Open));
     assert!(!c.set_current_fold(
         crate::contract::CallIdentity { owner: skein_lib::Token::new(1), ..call.clone() },
@@ -814,9 +814,9 @@ fn raw_live_calls_keep_optional_wall_literals_cut_and_full_identity_without_made
     assert!(!c.set_fold(CallName { attempt: name.attempt, turn: name.number, call: u64::MAX }, Fold::Open));
     value.began = Some(Wall::EPOCH);
     value.call = Some(LiveCall::Raw(CurrentCall {
-        identity: current_identity(b"id/\xff"),
+        identity: current_identity(UTF8_TEXTS[0]),
         began: None,
-        tool: text(b"raw/tool\xff"),
+        tool: text(UTF8_TEXTS[1]),
         input: text(b"new literal"),
         cut: false,
     }));
@@ -870,12 +870,12 @@ fn current_identity(id: &[u8]) -> crate::contract::CallIdentity {
 fn opaque_current_calls_replace_by_full_owner_completion_and_id_without_numeric_matching() {
     use crate::contract::{CallIdentity, CurrentCall, LiveCall};
     let mut c = Conversation::new(9, 4);
-    let identity = current_identity(b"same/id\xff\x00");
+    let identity = current_identity(UTF8_TEXTS[3]);
     let mut value = stream(1, 0, 3, b"one", false);
     value.began = None;
     let raw = CurrentCall {
         identity: identity.clone(),
-        tool: text(b"tool/\xfe"),
+        tool: text(UTF8_TEXTS[4]),
         input: text(b"first"),
         cut: false,
         began: Some(Wall::EPOCH),
@@ -894,7 +894,7 @@ fn opaque_current_calls_replace_by_full_owner_completion_and_id_without_numeric_
         CallIdentity { owner: skein_lib::Token::new(1), ..identity.clone() },
         CallIdentity { sequence: 1, ..identity.clone() },
         CallIdentity { retry: 1, ..identity.clone() },
-        CallIdentity { id: text(b"same/id\xff\x01"), ..identity.clone() },
+        CallIdentity { id: text(UTF8_TEXTS[5]), ..identity.clone() },
     ] {
         value.call = Some(LiveCall::Raw(CurrentCall { identity: different.clone(), began: None, ..raw.clone() }));
         assert!(c.stream(value.clone(), 100));
@@ -923,10 +923,10 @@ fn opaque_current_calls_replace_by_full_owner_completion_and_id_without_numeric_
 fn whole_run_state_keeps_call_only_and_postcommit_facts_without_a_synthetic_turn() {
     use crate::contract::{CurrentCall, LiveCall, RunState};
     let mut c = Conversation::new(9, 4);
-    let identity = current_identity(b"opaque/\xff\x00");
+    let identity = current_identity(UTF8_TEXTS[6]);
     let call = CurrentCall {
         identity: identity.clone(),
-        tool: text(b"tool/\xfe"),
+        tool: text(UTF8_TEXTS[4]),
         input: text(b"literal/\x00"),
         cut: true,
         began: Some(Wall::from_nanos(71)),
@@ -989,7 +989,7 @@ fn whole_current_call_replacement_copies_each_supplied_current_clock_without_a_h
     use crate::contract::{CurrentCall, RunState};
     let mut c = Conversation::new(9, 4);
     let a = CurrentCall {
-        identity: current_identity(b"same/\xff"),
+        identity: current_identity(UTF8_TEXTS[7]),
         tool: text(b"tool"),
         input: text(b"input"),
         cut: false,
@@ -1169,3 +1169,6 @@ fn owner_archive_reference_keeps_committed_read_and_local_author_separate_from_r
     assert!(page.rows.get(0).unwrap().event.decoded_turn().is_none());
     assert_eq!(page.rows.get(0).unwrap().event.committed_turn(), Some(TurnName { attempt: 3, number: 4 }));
 }
+
+const UTF8_TEXTS: [&[u8]; 8] =
+    [b"id/~", b"raw/tool~", b"a/b\x00!", b"same/id~\x00", b"tool/!", b"same/id~\x01", b"opaque/~\x00", b"same/~"];

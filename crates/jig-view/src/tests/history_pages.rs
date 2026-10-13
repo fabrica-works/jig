@@ -66,7 +66,12 @@ fn history_page() -> HistoryPage {
         change: HistoryChange::Made { batch: 99 },
     })))
     .unwrap();
-    HistoryPage { cut: true, rows, before: None, after: Some(Cursor { value: cards::text(b"opaque") }) }
+    HistoryPage {
+        cut: true,
+        rows,
+        before: None,
+        after: Some(Cursor::new(Box::from(b"opaque".as_slice()), 1024).expect("bounded opaque cursor")),
+    }
 }
 fn populated() -> Domain {
     let mut domain = Domain::new(&fixture::client_limits(), 208);

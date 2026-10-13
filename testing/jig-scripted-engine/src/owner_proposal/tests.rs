@@ -21,7 +21,7 @@ fn authority() -> OwnerAuthorityDocument {
 }
 fn state() -> OwnerAmendmentState {
     let mut parameters = List::with_capacity(3);
-    parameters.push(ParameterDocument::Bytes { name: u32::MAX, value: doc(&[255; 8]) }).unwrap();
+    parameters.push(ParameterDocument::Bytes { name: u32::MAX, value: doc(UTF8_TEXTS[0]) }).unwrap();
     OwnerAmendmentState {
         addressed: Some(PersonAddress::Party(u64::MAX)),
         taken_by: Some(u64::MAX),
@@ -71,7 +71,7 @@ fn proposal(action: OwnerProposalAction) -> OwnerProposal {
     OwnerProposal {
         key: ProposalKey { proposer: Proposer::Party(u64::MAX), number: u64::MAX },
         project: u32::MAX,
-        reason: doc(&[255; 8]),
+        reason: doc(UTF8_TEXTS[0]),
         action,
         as_holder: true,
         waiting: OwnerProposalWaiting {
@@ -267,3 +267,5 @@ fn owner_proposal_full_batch_members_price_every_nested_spec_contract_authority_
     assert!(!fits(&rejected, &bounds));
     assert_eq!(rejected, unchanged);
 }
+
+const UTF8_TEXTS: [&[u8]; 1] = [&[b'~'; 8]];

@@ -378,10 +378,10 @@ fn held_prior_stages_have_no_invented_clocks_and_escalations_keep_holder_scope_a
         }
     }
     value.hold.as_mut().unwrap().escalation =
-        Some(OwnerHoldEscalation::Rejected { by: u64::MAX, reason: doc(&[255], true) });
+        Some(OwnerHoldEscalation::Rejected { by: u64::MAX, reason: doc(UTF8_TEXTS[0], true) });
     let tree = build(&value, words()).0;
     assert!(has(&tree, b"Left held by: 18446744073709551615"));
-    assert!(has(&tree, b"\\xFF"));
+    assert!(has(&tree, UTF8_TEXTS[0]));
     assert!(has(&tree, b"Supplied words incomplete"));
 }
 #[test]
@@ -514,7 +514,7 @@ fn maximum_chip_fragment_checks_selected_language_storage_raw_slots_loss_and_ari
         value.closing_connectors.as_mut().unwrap().push(u16::MAX).unwrap();
     }
     value.hold.as_mut().unwrap().escalation =
-        Some(OwnerHoldEscalation::Rejected { by: u64::MAX, reason: doc(&[255; 256], true) });
+        Some(OwnerHoldEscalation::Rejected { by: u64::MAX, reason: doc(UTF8_TEXTS[1], true) });
     value.observation = Some(OwnerChipObservation {
         channel: Token::new(u64::MAX),
         work: OwnerChipWork::Tool { call: copy_of(&[255; 256]), tool: copy_of(&[254; 256]) },
@@ -523,7 +523,7 @@ fn maximum_chip_fragment_checks_selected_language_storage_raw_slots_loss_and_ari
         started: Some(Wall::from_nanos(180)),
     });
     value.ending = Some(OwnerChipEnding::Cancelled {
-        reason: doc(&[253; 256], true),
+        reason: doc(UTF8_TEXTS[2], true),
         result: Some(ResultValue::Change { kind: u16::MAX, part: part(), words: doc(b"change", true) }),
         by: OwnerRequester::Deployment { project: u32::MAX },
         at: Wall::from_nanos(190),
@@ -765,3 +765,5 @@ fn supplied_hold_account_and_origin_keep_distinct_public_slots_and_absence() {
         }
     }
 }
+
+const UTF8_TEXTS: [&[u8]; 3] = [b"~", &[b'~'; 256], &[b'?'; 256]];

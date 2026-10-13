@@ -21,7 +21,7 @@ fn fixture(kind: OwnerMessageKind) -> OwnerWord {
         number: u64::MAX,
         from: OwnerRequester::Person(u64::MAX),
         kind,
-        words: text(&[255, 0]),
+        words: text(UTF8_TEXTS[0]),
         at: Wall::from_nanos(u64::MAX),
         hits: u32::MAX,
         eligible: true,
@@ -160,7 +160,7 @@ fn owner_activity_all_eight_lines_keep_task_commit_clock_and_exact_variant_facts
                 message: u64::MAX,
                 by: OwnerRequester::Task(u64::MAX),
                 kind: OwnerMessageKind::Words,
-                words: text(&[255, 0]),
+                words: text(UTF8_TEXTS[0]),
             },
             b"Words recorded",
         ),
@@ -206,7 +206,7 @@ fn assert_line_fields(tree: &Tree, line: &OwnerActivity) {
         OwnerActivity::Words { .. } => {
             assert!(has(tree, b"Message: 18446744073709551615"));
             assert!(has(tree, b"Task: 18446744073709551615"));
-            assert!(has(tree, b"\\xFF\\x00"));
+            assert!(has(tree, UTF8_TEXTS[0]));
         }
         OwnerActivity::Heard(_) => {
             assert!(has(tree, b"Message: 18446744073709551615"));
@@ -256,7 +256,7 @@ fn owner_activity_all_thirteen_message_kinds_keep_whole_word_hits_clock_and_flag
             b"Recorded at: 18446744073709551615",
             b"Merged hints: 4294967295",
             b"Eligible",
-            b"\\xFF\\x00",
+            UTF8_TEXTS[0],
         ] {
             assert!(has(&tree, bytes));
         }
@@ -458,7 +458,7 @@ fn assert_time_presentation() {
 #[test]
 fn owner_activity_all_six_result_metadata_keep_approved_presence_opaque_fields_and_change_identity() {
     let variants: Box<[(OwnerWordResult, &[u8])]> = Box::new([
-        (OwnerWordResult::Approved { state: text(&[254, 0]), words_present: true }, b"Result: approved"),
+        (OwnerWordResult::Approved { state: text(UTF8_TEXTS[1]), words_present: true }, b"Result: approved"),
         (OwnerWordResult::Report, b"Result: report"),
         (OwnerWordResult::Verdict { code: u32::MAX, fields: fields() }, b"Result: verdict"),
         (OwnerWordResult::Change { connector: u16::MAX, kind: u16::MAX, resource: u64::MAX }, b"Result: change"),
@@ -483,7 +483,7 @@ fn owner_activity_all_six_result_metadata_keep_approved_presence_opaque_fields_a
         .filter(|r| r.run == crate::Run::Code)
         .map(|r| r.text.as_ref())
         .collect();
-    assert_eq!(codes.as_ref(), [b"\\xFF\\x00".as_slice(), b"opaque", b"a/b", b"\\xFE\\x01", b"\\xFF\\x00"].as_slice());
+    assert_eq!(codes.as_ref(), [b"\\xFF\\x00".as_slice(), b"opaque", b"a/b", b"\\xFE\\x01", UTF8_TEXTS[0]].as_slice());
     let tree = build_word(
         &fixture(OwnerMessageKind::Result(OwnerWordResult::Change {
             connector: u16::MAX,
@@ -570,18 +570,16 @@ fn owner_activity_selected_normal_language_and_full_opaque_tree_envelope_refuse_
             fields.push(ResultField { name: copy_of(&[254; 8]), value: copy_of(&[253; 8]) }).unwrap();
         }
     }
-    word.words = text(&[255; 8]);
+    word.words = text(UTF8_TEXTS[2]);
     let value = activity(OwnerActivity::Notified {
         recipient: OwnerRequester::Deployment { project: u32::MAX },
         word: word.clone(),
     });
     let tree = build(&value, &selected);
     assert!(has(&tree, b"selected activity: 4294967295"));
-    for bytes in [
-        b"\\xFF\\xFF\\xFF\\xFF\\xFF\\xFF\\xFF\\xFF".as_slice(),
-        b"\\xFE\\xFE\\xFE\\xFE\\xFE\\xFE\\xFE\\xFE",
-        b"\\xFD\\xFD\\xFD\\xFD\\xFD\\xFD\\xFD\\xFD",
-    ] {
+    for bytes in
+        [UTF8_TEXTS[2], b"\\xFE\\xFE\\xFE\\xFE\\xFE\\xFE\\xFE\\xFE", b"\\xFD\\xFD\\xFD\\xFD\\xFD\\xFD\\xFD\\xFD"]
+    {
         assert!(has(&tree, bytes));
     }
     assert!(tree.nodes().iter().any(|n| n.name.as_ref().is_some_and(|name| name.as_ref() == b"selected activity: ")));
@@ -604,7 +602,7 @@ fn owner_activity_selected_normal_language_and_full_opaque_tree_envelope_refuse_
         fields.get_mut(0).unwrap().name = copy_of(b"123456789");
     }
     assert!(view::word_required(&word, &client_limits(), &selected).is_none());
-    assert_eq!(saved.words.bytes(), &[255; 8]);
+    assert_eq!(saved.words.bytes(), UTF8_TEXTS[2]);
 }
 fn assert_each_text_bound(words: &Words) {
     let mutations: [fn(&mut OwnerWord); 4] = [
@@ -667,3 +665,5 @@ fn owner_activity_checked_normal_book_rejects_missing_duplicate_wrong_number_and
         );
     }
 }
+
+const UTF8_TEXTS: [&[u8]; 3] = [b"~\0", b"!\0", &[b'~'; 8]];

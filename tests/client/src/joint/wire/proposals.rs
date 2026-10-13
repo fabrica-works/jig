@@ -98,6 +98,8 @@ pub fn document(value: &documents::Proposal, limits: &Limits) -> Result<client::
 
 #[cfg(test)]
 pub(crate) mod tests {
+    const UTF8_TEXTS: [&[u8]; 1] = [b"~\0^"];
+
     use super::*;
     use jig_domain_tasks as tasks;
     use skein_lib::{List, Wall};
@@ -117,7 +119,7 @@ pub(crate) mod tests {
             proposer: documents::Proposer::Task(u64::MAX),
             number: u64::MAX,
             project: u32::MAX,
-            reason: documents::Text { bytes: Box::new([255, 0, 128]), cut: true },
+            reason: documents::Text { bytes: Box::from(UTF8_TEXTS[0]), cut: true },
             action: documents::ProposalAction::Release {
                 task: documents::TaskLink::Stored { number: 0, status: None },
                 hold: None,
@@ -144,7 +146,7 @@ pub(crate) mod tests {
             let actual = document(&source, &limits).expect("whole pending source");
             assert_eq!(actual.key, client::ProposalKey { proposer: expected, number: u64::MAX });
             assert_eq!(actual.project, u32::MAX);
-            assert_eq!(actual.reason.bytes.bytes(), &[255, 0, 128]);
+            assert_eq!(actual.reason.bytes.bytes(), UTF8_TEXTS[0]);
             assert!(actual.reason.cut);
             assert!(actual.as_holder);
             assert_eq!(actual.waiting.since, Wall::EPOCH);

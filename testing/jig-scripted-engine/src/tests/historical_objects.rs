@@ -5,15 +5,15 @@ use skein_lib::{List, Wall};
 fn goal() -> OwnerPersonProposalGoal {
     let mut parameters = List::with_capacity(3);
     parameters.push(Parameter::Number { name: u32::MAX, value: u64::MAX }).expect("number fits");
-    parameters.push(Parameter::Bytes { name: 0, value: super::text(&[255, 0, 47]) }).expect("bytes fit");
+    parameters.push(Parameter::Bytes { name: 0, value: super::text(UTF8_TEXTS[0]) }).expect("bytes fit");
     parameters.push(Parameter::Resource { name: 7, connector: u16::MAX, resource: u64::MAX }).expect("resource fits");
     let mut inputs = List::with_capacity(3);
     inputs.push(u64::MAX).expect("input fits");
     let mut holdings = List::with_capacity(3);
     for write in [true, false] {
         let mut path = List::with_capacity(3);
-        path.push(super::text(b"a/b")).expect("literal segment fits");
-        path.push(super::text(&[255, 0])).expect("opaque segment fits");
+        path.push(Bytes::new(Box::from(b"a/b".as_slice()), 4096).unwrap()).expect("literal segment fits");
+        path.push(Bytes::new(Box::from([255, 0]), 4096).unwrap()).expect("opaque segment fits");
         let holding = if write {
             OwnerGoalHolding::Write { connector: u16::MAX, path, kind: u16::MAX }
         } else {
@@ -25,7 +25,7 @@ fn goal() -> OwnerPersonProposalGoal {
         number: u64::MAX,
         project: u32::MAX,
         executor: OwnerExecutor::Agent { charter: u32::MAX },
-        spec: Specification { words: super::text(&[255, 0, 47]), parameters, inputs },
+        spec: Specification { words: super::text(UTF8_TEXTS[0]), parameters, inputs },
         contract: TaskContractDocument::Report { words: u32::MAX },
         authority: super::owner_authority().authority,
         numbers: OwnerNumbers { budget: 1, spent: 7, spent_below: 11, reserved: u64::MAX },
@@ -66,7 +66,7 @@ fn question() -> Question {
         task: super::task().chip,
         from: Some(OwnerRequester::Deployment { project: u32::MAX }),
         message: u64::MAX,
-        words: super::text(&[255, 0, 47]),
+        words: super::text(UTF8_TEXTS[0]),
         since: Wall::EPOCH,
         acts: List::with_capacity(0),
         ending: None,
@@ -81,7 +81,7 @@ fn answer() -> OwnerActivityLine {
             message: 0,
             by: OwnerRequester::Task(u64::MAX),
             kind: OwnerMessageKind::Answer { question: u64::MAX },
-            words: super::text(&[255, 0]),
+            words: super::text(UTF8_TEXTS[1]),
         },
     }
 }
@@ -106,12 +106,12 @@ fn historical_person_goal_keeps_raw_project_all_four_numbers_parameters_and_dist
     assert_eq!(proposal.goal.project, u32::MAX);
     assert_eq!(proposal.goal.number, u64::MAX);
     assert_eq!(proposal.goal.numbers, OwnerNumbers { budget: 1, spent: 7, spent_below: 11, reserved: u64::MAX });
-    assert_eq!(proposal.goal.spec.words.bytes(), &[255, 0, 47]);
+    assert_eq!(proposal.goal.spec.words.bytes(), UTF8_TEXTS[0]);
     assert_eq!(proposal.goal.spec.parameters.capacity(), 3);
     assert_eq!(proposal.goal.spec.parameters.get(0), Some(&Parameter::Number { name: u32::MAX, value: u64::MAX }));
     assert_eq!(
         proposal.goal.spec.parameters.get(1),
-        Some(&Parameter::Bytes { name: 0, value: super::text(&[255, 0, 47]) })
+        Some(&Parameter::Bytes { name: 0, value: super::text(UTF8_TEXTS[0]) })
     );
     assert_eq!(
         proposal.goal.spec.parameters.get(2),
@@ -152,7 +152,7 @@ fn historical_person_states_keep_independent_decisions_choices_created_pairs_and
                 OwnerPersonProposalState::Accepted { by: OwnerRequester::Person(u64::MAX) },
                 OwnerPersonProposalState::Rejected {
                     by: OwnerRequester::Person(1),
-                    reason: super::text(&[255, 0]),
+                    reason: super::text(UTF8_TEXTS[1]),
                     message: u64::MAX,
                     at: Wall::EPOCH,
                 },
@@ -314,7 +314,7 @@ fn historical_recursive_admission_prices_reserved_raw_goal_paths_boxes_and_each_
     let value = person_value(
         OwnerPersonProposalState::Rejected {
             by: OwnerRequester::Person(1),
-            reason: super::text(&[255; 32]),
+            reason: super::text(UTF8_TEXTS[2]),
             message: u64::MAX,
             at: Wall::EPOCH,
         },
@@ -350,7 +350,7 @@ fn historical_task_proposal_states_preserve_raw_maker_and_do_not_use_outer_conte
         OwnerProposalHistoryState::Accepted { by: OwnerRequester::Deployment { project: u32::MAX } },
         OwnerProposalHistoryState::Rejected {
             by: OwnerRequester::Task(0),
-            reason: DocumentText { bytes: super::text(&[255, 0]), cut: true },
+            reason: DocumentText { bytes: super::text(UTF8_TEXTS[1]), cut: true },
         },
         OwnerProposalHistoryState::Withdrawn,
     ];
@@ -381,7 +381,7 @@ fn historical_escalation_decisions_keep_opaque_rejection_and_independent_optiona
         OwnerEscalationDecision::Release,
         OwnerEscalationDecision::Pass,
         OwnerEscalationDecision::Reject { reason: super::text(b"") },
-        OwnerEscalationDecision::Reject { reason: super::text(&[255, 0, 47]) },
+        OwnerEscalationDecision::Reject { reason: super::text(UTF8_TEXTS[0]) },
     ] {
         for hold in
             [None, Some(OwnerMilestoneLine { task: 8, position: 0, phase: OwnerMilestonePhase::Waiting, at: None })]
@@ -459,3 +459,5 @@ fn historical_whole_task_and_result_boxes_charge_each_copy_with_independent_meta
     assert_eq!(result.at, Some(Wall::EPOCH));
     assert!(result.details.is_none());
 }
+
+const UTF8_TEXTS: [&[u8]; 3] = [b"~\0/", b"~\0", &[b'~'; 32]];

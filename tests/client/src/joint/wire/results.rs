@@ -135,6 +135,8 @@ pub fn document(source: &documents::ResultDoc, limits: &Limits) -> Result<client
 
 #[cfg(test)]
 pub(crate) mod tests {
+    const UTF8_TEXTS: [&[u8]; 3] = [b"\0~", b"~\0", b"~"];
+
     use super::*;
     use skein_lib::Wall;
 
@@ -147,7 +149,7 @@ pub(crate) mod tests {
         let source = documents::ResultValue::Verdict {
             code: u32::MAX,
             fields: Box::new([tasks::ResultField { name: Box::from([255, 0]), value: Box::from([b'/', 255]) }]),
-            words: text(&[0, 255], true),
+            words: text(UTF8_TEXTS[0], true),
         };
         let before = source.clone();
         let limits = Limits { text: 2, rows: 1, ..crate::test::limits().jig };
@@ -156,7 +158,7 @@ pub(crate) mod tests {
             panic!("the actual payload has no chip or proposal arrays")
         };
         assert_eq!(verdict, u32::MAX);
-        assert_eq!(words.bytes.bytes(), &[0, 255]);
+        assert_eq!(words.bytes.bytes(), UTF8_TEXTS[0]);
         assert!(words.cut);
         assert_eq!(fields.capacity(), 1);
         assert_eq!(&*fields.get(0).expect("supplied machine field").name, &[255, 0]);
@@ -169,7 +171,7 @@ pub(crate) mod tests {
     #[test]
     fn approved_result_state_and_optional_empty_explanation_are_copied_independently_from_failure_words() {
         let limits = Limits { text: 2, ..crate::test::limits().jig };
-        for words in [None, Some(text(b"", false)), Some(text(&[255, 0], true))] {
+        for words in [None, Some(text(b"", false)), Some(text(UTF8_TEXTS[1], true))] {
             let source = documents::ResultValue::Approved { state: Box::from([0, 255]), words: words.clone() };
             let actual = value(&source, &limits).expect("whole approval");
             let client::ResultValue::Approved { state, words: actual } = actual else { panic!("exact approved state") };
@@ -197,7 +199,7 @@ pub(crate) mod tests {
         ] {
             for result in [None, Some(documents::ResultValue::Approved { state: Box::new([]), words: None })] {
                 let source = documents::Ending::Cancelled {
-                    reason: text(&[255], true),
+                    reason: text(UTF8_TEXTS[2], true),
                     result: result.clone(),
                     by,
                     at: Wall::EPOCH,
@@ -207,7 +209,7 @@ pub(crate) mod tests {
                 let client::OwnerChipEnding::Cancelled { reason, result: actual, by: actor, at } = actual else {
                     panic!("whole cancellation")
                 };
-                assert_eq!(reason.bytes.bytes(), &[255]);
+                assert_eq!(reason.bytes.bytes(), UTF8_TEXTS[2]);
                 assert!(reason.cut);
                 assert_eq!(actor, requester(by));
                 assert_eq!(at, Wall::EPOCH);
@@ -224,7 +226,7 @@ pub(crate) mod tests {
             acts: List::with_capacity(4),
             task: super::super::chips::tests::source_chip(),
             contract: documents::ContractLine::Change { connector: u16::MAX, kind: u16::MAX, words: u32::MAX },
-            ending: documents::Ending::Failed(text(&[255, 0], true)),
+            ending: documents::Ending::Failed(text(UTF8_TEXTS[1], true)),
             at: None,
             requester: tasks::Party::Deployment { project: u32::MAX },
             executor: tasks::Executor::Procedure { connector: u16::MAX, code: u32::MAX },

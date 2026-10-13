@@ -1337,7 +1337,7 @@ fn specification(words: jig_domain_client::contract::Text) -> jig_domain_client:
 fn whole_specification_prices_parameter_and_input_capacity_and_refuses_partial_values() {
     let mut parameters = List::with_capacity(4);
     parameters.push(Parameter::Number { name: u32::MAX, value: u64::MAX }).unwrap();
-    parameters.push(Parameter::Bytes { name: 7, value: text(&[0, 255, 1]) }).unwrap();
+    parameters.push(Parameter::Bytes { name: 7, value: text(UTF8_TEXTS[0]) }).unwrap();
     parameters.push(Parameter::Resource { name: 8, connector: u16::MAX, resource: u64::MAX }).unwrap();
     let mut inputs = List::with_capacity(3);
     inputs.push(u64::MAX).unwrap();
@@ -1632,7 +1632,7 @@ fn procedure_goal_bounds_price_allocated_pairs_and_judge_the_exact_executor() {
 #[test]
 fn document_text_loss_is_preserved_and_priced_with_whole_document_parameter_capacity() {
     for cut in [false, true] {
-        let value = DocumentText { bytes: text(&[0, 255, 1]), cut };
+        let value = DocumentText { bytes: text(UTF8_TEXTS[0]), cut };
         let mut bounds = Bounds {
             text: 3,
             document_bytes: u64::try_from(core::mem::size_of::<DocumentText>() + 3).unwrap(),
@@ -1640,7 +1640,7 @@ fn document_text_loss_is_preserved_and_priced_with_whole_document_parameter_capa
         };
         assert!(crate::payload::fits(&value, &bounds));
         assert_eq!(value.whole().is_some(), !cut);
-        assert_eq!(value.bytes(), [0, 255, 1]);
+        assert_eq!(value.bytes(), UTF8_TEXTS[0]);
         bounds.document_bytes -= 1;
         assert!(!crate::payload::fits(&value, &bounds));
         bounds.document_bytes = u64::MAX;
@@ -1648,7 +1648,7 @@ fn document_text_loss_is_preserved_and_priced_with_whole_document_parameter_capa
         assert!(!crate::payload::fits(&value, &bounds));
     }
     let mut parameters = List::with_capacity(4);
-    parameters.push(Parameter::Bytes { name: u32::MAX, value: text(&[0, 255, 1]) }).unwrap();
+    parameters.push(Parameter::Bytes { name: u32::MAX, value: text(UTF8_TEXTS[0]) }).unwrap();
     let value = SpecificationDocument::complete(Specification {
         words: text(b"w"),
         parameters,
@@ -1935,10 +1935,10 @@ fn live_raw_calls_price_both_texts_whole_and_refuse_without_replacing_retained_r
     use crate::payload::Payload;
     let name = TurnName { attempt: u64::MAX, number: u32::MAX };
     let raw = CurrentCall {
-        identity: current_identity(b"id/\xff"),
+        identity: current_identity(UTF8_TEXTS[1]),
         began: None,
-        tool: text(b"raw/tool\xff"),
-        input: text(b"a/b\x00\xfe"),
+        tool: text(UTF8_TEXTS[2]),
+        input: text(UTF8_TEXTS[3]),
         cut: true,
     };
     let run = RunText {
@@ -1965,7 +1965,7 @@ fn live_raw_calls_price_both_texts_whole_and_refuse_without_replacing_retained_r
     bounds.text = 8;
     assert!(!crate::payload::fits(&run, &bounds), "the whole raw tool must fit its own bound");
     let whole_identity = LiveCall::Raw(CurrentCall {
-        identity: CallIdentity { id: text(b"opaque/provider/id\xff"), ..raw.identity.clone() },
+        identity: CallIdentity { id: text(UTF8_TEXTS[4]), ..raw.identity.clone() },
         tool: text(b"t"),
         input: text(b"i"),
         ..raw.clone()
@@ -1981,10 +1981,10 @@ fn live_raw_calls_price_both_texts_whole_and_refuse_without_replacing_retained_r
     bounds.text = 18;
     assert!(!crate::payload::fits(&whole_identity, &bounds), "id admission never cuts or parses provider bytes");
     let large = CurrentCall {
-        identity: current_identity(b"id/\xff"),
+        identity: current_identity(UTF8_TEXTS[1]),
         began: None,
-        tool: text(&vec![0xff; 4096]),
-        input: text(&vec![0xfe; 4096]),
+        tool: text(UTF8_TEXTS[5]),
+        input: text(UTF8_TEXTS[6]),
         cut: true,
     };
     let held = RunText { call: Some(LiveCall::Raw(large)), ..run.clone() };
@@ -2049,8 +2049,8 @@ fn whole_run_state_prices_independent_call_and_writing_and_preserves_refused_sna
     let setup = live_script();
     let original = setup.bounds;
     let call = CurrentCall {
-        identity: current_identity(b"id/\xff"),
-        tool: text(b"tool/\xfe"),
+        identity: current_identity(UTF8_TEXTS[1]),
+        tool: text(UTF8_TEXTS[7]),
         input: text(b"input/\x00"),
         cut: true,
         began: Some(Wall::from_nanos(73)),
@@ -2089,9 +2089,9 @@ fn whole_run_state_prices_independent_call_and_writing_and_preserves_refused_sna
         "the supplied independent call and writing are separately allocated and priced"
     );
     let large = CurrentCall {
-        identity: CallIdentity { id: text(&vec![0xfd; 4096]), ..state.call.as_ref().unwrap().identity.clone() },
-        tool: text(&vec![0xff; 4096]),
-        input: text(&vec![0xfe; 4096]),
+        identity: CallIdentity { id: text(UTF8_TEXTS[8]), ..state.call.as_ref().unwrap().identity.clone() },
+        tool: text(UTF8_TEXTS[5]),
+        input: text(UTF8_TEXTS[6]),
         ..state.call.clone().unwrap()
     };
     let held = RunState { call: Some(large), ..state.clone() };
@@ -2294,3 +2294,15 @@ mod owner_person_task;
 
 mod historical_objects;
 mod owner_deployment;
+
+const UTF8_TEXTS: [&[u8]; 9] = [
+    b"\0~\x01",
+    b"id/\x7e",
+    b"raw/tool\x7e",
+    b"a/b\x00\x21",
+    b"opaque/provider/id\x7e",
+    &[b'~'; 4096],
+    &[b'!'; 4096],
+    b"tool/\x21",
+    &[b'?'; 4096],
+];

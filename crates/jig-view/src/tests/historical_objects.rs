@@ -30,8 +30,8 @@ fn person() -> OwnerHistorical {
     let task = task();
     let source = super::owner_history::state();
     let mut path = List::with_capacity(2);
-    path.push(text(b"a/b")).unwrap();
-    path.push(text(&[255, 0])).unwrap();
+    path.push(Bytes::new(Box::from(b"a/b".as_slice()), 128).unwrap()).unwrap();
+    path.push(Bytes::new(Box::from([255, 0]), 128).unwrap()).unwrap();
     let mut holdings = List::with_capacity(2);
     holdings.push(OwnerGoalHolding::Write { connector: u16::MAX, path: path.clone(), kind: u16::MAX }).unwrap();
     holdings.push(OwnerGoalHolding::Slot { connector: 0, path, kind: 0 }).unwrap();
@@ -83,7 +83,7 @@ fn question(answer: bool, ending: bool) -> OwnerHistorical {
                 message: 99,
                 by: OwnerRequester::Deployment { project: u32::MAX },
                 kind: OwnerMessageKind::Answer { question: q.message },
-                words: text(&[255, 0]),
+                words: text(UTF8_TEXTS[0]),
             },
         })
     } else {
@@ -217,7 +217,7 @@ fn historical_escalation_keeps_rejection_revision_sender_and_optional_retained_h
                 revision: u64::MAX,
                 by: 17,
                 at: Wall::EPOCH,
-                decision: OwnerEscalationDecision::Reject { reason: text(&[255, 0]) },
+                decision: OwnerEscalationDecision::Reject { reason: text(UTF8_TEXTS[0]) },
             },
             hold: None,
         },
@@ -226,7 +226,7 @@ fn historical_escalation_keeps_rejection_revision_sender_and_optional_retained_h
     assert!(contains(&tree, b"Revision: 18446744073709551615"));
     assert!(contains(&tree, b"Decision person: 17"));
     assert!(contains(&tree, b"Retained hold not supplied"));
-    assert!(contains(&tree, b"\\xFF\\x00"));
+    assert!(contains(&tree, UTF8_TEXTS[0]));
 }
 #[test]
 fn historical_question_keeps_answer_full_result_and_outer_absence_as_three_independent_sources() {
@@ -279,7 +279,7 @@ fn historical_whole_receiving_refuses_reserved_paths_and_nested_text_excess_with
     assert!(view::required(&value, &jig_domain_client::Limits { rows: 1, ..CLIENT }, words()).is_none());
     let mut large = value.clone();
     let OwnerHistoricalValue::PersonProposal { proposal, .. } = &mut large.value else { panic!("raw proposal") };
-    proposal.goal.spec.words = Text::new(Box::new([255; 129]), 129).unwrap();
+    proposal.goal.spec.words = Text::new(Box::from(UTF8_TEXTS[1]), 129).unwrap();
     assert!(view::required(&large, &CLIENT, words()).is_none());
     assert_eq!(value, original);
     assert!(view::max_nodes(&jig_domain_client::Limits { rows: u32::MAX, ..CLIENT }).is_none());
@@ -544,3 +544,5 @@ fn historical_selected_language_uses_checked_native_captions_and_preserves_opaqu
         assert!(words.book.capacity(phrase.id()).is_some());
     }
 }
+
+const UTF8_TEXTS: [&[u8]; 2] = [b"~\0", &[b'~'; 129]];

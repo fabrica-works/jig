@@ -66,7 +66,7 @@ fn source() -> OwnerTree {
         rows,
         folded,
         held_below: 19,
-        next: Some(Cursor { value: Text::new(copy_of(&[255, 0, 47]), 128).unwrap() }),
+        next: Some(Cursor::new(copy_of(UTF8_TEXTS[0]), 128).unwrap()),
     }
 }
 fn domain(value: &OwnerTree) -> Domain {
@@ -262,7 +262,7 @@ fn owner_tree_local_filters_folds_cycles_and_empty_loss_continuations_remain_bou
     let d = domain(&value);
     let tree = build(&value, &d, w, None);
     assert_eq!(tree.nodes().iter().filter(|n| n.role == Role::TreeItem).count(), 2);
-    for next in [None, Some(Cursor { value: Text::new(copy_of(b""), 128).unwrap() })] {
+    for next in [None, Some(Cursor::new(copy_of(b""), 128).unwrap())] {
         value.rows = List::with_capacity(2);
         value.folded = List::with_capacity(2);
         value.next = next.clone();
@@ -378,3 +378,5 @@ fn owner_tree_departure_keeps_a_separately_named_deciding_card_until_its_answer_
     assert!(contains(&answered, b"Accepted"));
     assert!(contains(&answered, b"supplied pending reason"));
 }
+
+const UTF8_TEXTS: [&[u8]; 1] = [b"~\0/"];

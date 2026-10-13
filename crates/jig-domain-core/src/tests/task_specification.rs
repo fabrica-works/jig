@@ -1,6 +1,8 @@
 //! Specification source facts through the public task document constructor.
 use super::*;
 
+const UTF8_WORDS: &[u8] = b"~\0^\x01";
+
 #[test]
 fn task_specification_keeps_source_inputs_and_separate_page_loss() {
     let (core, mut limits) = make_tree();
@@ -60,7 +62,7 @@ fn task_specification_preserves_parameter_identity_and_local_text_loss() {
     let mut row = core.tasks.task(2).unwrap().clone();
     row.spec.words = Box::from(&b"abcdef"[..]);
     row.spec.parameters = Box::new([
-        tasks::Parameter::Bytes { name: u32::MAX, value: Box::from(&[0xff, 0, 0x80, 1][..]) },
+        tasks::Parameter::Bytes { name: u32::MAX, value: Box::from(UTF8_WORDS) },
         tasks::Parameter::Number { name: 2, value: u64::MAX },
         tasks::Parameter::Resource { name: 3, connector: u16::MAX, resource: u64::MAX },
     ]);
@@ -70,7 +72,7 @@ fn task_specification_preserves_parameter_identity_and_local_text_loss() {
     assert_eq!(task.spec.words, Text { bytes: Box::from(&b"abc"[..]), cut: true });
     assert_eq!(
         task.spec.parameters.get(0),
-        Some(&Parameter::Bytes { name: u32::MAX, value: Text { bytes: Box::from(&[0xff, 0, 0x80][..]), cut: true } })
+        Some(&Parameter::Bytes { name: u32::MAX, value: Text { bytes: Box::from(&UTF8_WORDS[..3]), cut: true } })
     );
     assert_eq!(task.spec.parameters.get(1), Some(&Parameter::Number { name: 2, value: u64::MAX }));
     assert_eq!(

@@ -17,7 +17,7 @@ use jig_domain_client::{
 use skein_lib::{List, Token};
 
 fn cursor() -> Cursor {
-    Cursor { value: text(b"\xff/\0opaque") }
+    Cursor::new(Box::from(UTF8_TEXTS[0]), 1024).expect("bounded opaque cursor")
 }
 fn read(out: &[Request], kind: u8) -> Token {
     out.iter()
@@ -306,7 +306,7 @@ fn owner_conversation_rows_render_whole_text_loss_independent_cache_and_only_sup
     let row = ConversationLine {
         chip: super::work_pages::chip(8),
         project: 4,
-        first_words: DocumentText { bytes: text(b"\xff\0whole words"), cut: true },
+        first_words: DocumentText { bytes: text(UTF8_TEXTS[1]), cut: true },
         unread: None,
         cached_replies: u32::MAX,
         runtime: None,
@@ -320,7 +320,7 @@ fn owner_conversation_rows_render_whole_text_loss_independent_cache_and_only_sup
     drive(&mut domain, Event::Read { read, result: ReadResult::Value(ReadValue::Conversations(Box::new(page))) });
     let selected = row_selected_words();
     let tree = build(&domain, 1, &selected).0;
-    assert!(contains(&tree, b"\xff\0whole words"));
+    assert!(contains(&tree, UTF8_TEXTS[1]));
     assert!(contains(&tree, b"ALT Only part of this text was supplied"));
     assert!(contains(&tree, b"4294967295ALT Cached replies "));
     assert!(!contains(&tree, b"ALT Updates"));
@@ -388,3 +388,5 @@ fn owner_goal_rows_render_every_distinct_stage_without_generic_ended_and_keep_pu
     assert_eq!(domain.project_page().listed_goals.get(0), Some(&row));
     assert!(tree.len() <= crate::page_nodes(&super::cards::CLIENT, 0).unwrap());
 }
+
+const UTF8_TEXTS: [&[u8]; 2] = [b"\x7e/\0opaque", b"\x7e\0whole words"];

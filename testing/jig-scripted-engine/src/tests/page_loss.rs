@@ -28,7 +28,7 @@ fn a_page_loss_flag_is_independent_of_row_text_loss_and_whole_cursor_bytes() {
         cut: false,
         rows: list(vec![source]),
         before: None,
-        after: Some(Cursor { value: text(b"\xff/\0") }),
+        after: Some(Cursor::new(Box::from(CURSOR_BYTES[0]), 1024).expect("bounded opaque cursor")),
     }));
     let bounds = Bounds { document_bytes: u64::MAX, ..Bounds::default() };
     let before = page.clone();
@@ -44,3 +44,5 @@ fn a_page_loss_flag_is_independent_of_row_text_loss_and_whole_cursor_bytes() {
     assert!(page.rows.get(0).unwrap().chip.title.cut);
     assert_eq!(page.after.as_ref().unwrap().value.bytes(), b"\xff/\0");
 }
+
+const CURSOR_BYTES: [&[u8]; 1] = [b"\xff/\0"];
