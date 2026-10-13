@@ -1581,6 +1581,21 @@ the file.
      against 500; every file under 800. It lands as it is, and jig 18
      joins the README's rule for codec increments (up to twice their Size
      without asking).
+215. **The map's sizes leave out what goes to the transcripts' files**
+     (2026-10-13, the coordinator's block "jig 18.2: file transcript body
+     included in impossible map commit sizing", 2026-10-13T05:23:05Z). A
+     plan defect in jig 19.5's `sizes`: `sizes::largest` takes the core
+     family's worst row, a turn with its 8,388,608-byte transcript (ruling
+     180), as a map value and multiplies it by a commit's writes, so with
+     the world's `journal.writes` (at least 2,000) no configuration passes
+     skein-kv's `u32` commit. store.md: "**Transcripts are files, one per
+     task,** each turn a frame written" there, the map holding their
+     places. So `sizes` sizes the map and a commit by the rows the map
+     stores, a turn's body bounded by the file's write instead; the 8 MiB
+     decoder ceiling stays. 18.2 makes the change in `sizes.rs` and its
+     format tests, whose expected values for the map's largest value
+     follow (ruling 122), named in its commit body; the world's journal
+     bound is not capped.
 
 ## For the user
 
