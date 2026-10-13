@@ -1765,6 +1765,22 @@ the file.
      test's name and expected value kept. Ruling 215 stands: the adapter
      caps nothing. A test that then fails for want of journal room is a
      finding, raised.
+230. **An expectation the fake made against the design follows the
+     design** (2026-10-13, the coordinator's block "jig 18.3: fake-store
+     subtree history assertions contradict documented member order",
+     2026-10-13T06:39:38Z). `tests/core/tests/reads.rs`'s
+     `a_subtree_history_reads_each_delegates_rows_found_by_index` expects
+     the fake's global sort of (kind, task, position); `protocol/store.md`,
+     7.3 reads a subtree "task by task: the task's own rows, then each
+     delegate's in that index's order, each task's rows in its own
+     history's order", which the real store answers. Its two ordering
+     assertions become exact equalities with the designed order (the
+     goal's rows, then the delegate's, each in its own order), name and
+     every other assertion kept, and its direct edit of the fake's mirror
+     becomes a real erase through the fixture, its `is_some` kept. This
+     is not fitting a test to the real store, which 18.3's Don't forbids:
+     the design, not the component, gives the expected values. The
+     README's Rules now say so.
 
 ## For the user
 

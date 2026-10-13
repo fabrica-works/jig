@@ -347,6 +347,12 @@ ones before it in its session. Dependencies are by capability: "skein
   constant, never read back from the component; name and every other
   expected value kept, each named in the commit body. Any other failure
   on the real component is a finding, as the step's Don't says.
+- **An expectation the fake made against the design follows the design**
+  (decisions.md, ruling 230). Where a test moving to a real component
+  expects what the fake did and the design says otherwise, its expected
+  values become the design's, exact, quoting the design's section in the
+  commit body; name and every other expected value kept. When the design
+  is silent or the real component disagrees with it, it stays a finding.
 - **A new test costs the suite about 12 ms before its work** (decisions.md,
   ruling 219; `tests-cost.md`, 12). In every step left, tests are one per
   behaviour, a behaviour's cases rows of one table test; fixtures are
