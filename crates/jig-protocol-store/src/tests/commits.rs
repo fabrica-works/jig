@@ -225,7 +225,7 @@ fn the_first_commit_without_a_header_is_an_owners_bug() {
 fn a_committed_store_reopens_at_its_last_number() {
     let store = committed_header();
     let mut restarted = fixtures::over(store.into_stores());
-    let events = fixtures::run(&mut restarted, Request::Open { owner: Token::new(1), root: fixtures::ROOT_FD });
+    let events = fixtures::run(&mut restarted, Request::Open { owner: Token::new(1), root: fixtures::ROOT });
     let [Event::Opened { owner, last }] = &*events else {
         panic!("committed store opens: {events:?}");
     };

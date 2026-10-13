@@ -1,25 +1,46 @@
 //! Restart pages, including the inbox census joins (protocol/store.md, 7.2).
 use crate::pages::Decoded as Restored;
+use crate::{Below, Limits, secrets};
 use crate::{Cursor, Event, Phase, Restore, Row, Store, codec, intervals, keys, pages};
 use alloc::boxed::Box;
 use jig_domain_core::{Key, Record};
 use jig_domain_tasks as tasks;
-use skein_lib::{List, Queue, Token};
+use skein_lib::{Env, List, Queue, Token};
 
+pub(crate) struct Page {
+    pub range: Restore,
+    pub after: Option<Cursor>,
+    pub rows: u32,
+    pub bytes: u64,
+}
 pub(crate) fn restore(
     store: &mut Store,
+    env: &Env<Limits>,
     owner: Token,
-    range: Restore,
-    after: Option<Cursor>,
-    rows: u32,
-    bytes: u64,
+    page: Page,
     above: &mut Queue<Event>,
+    below: &mut Below,
 ) {
+    let Page { range, after, rows, bytes } = page;
+    let people = people_interval(&range);
     let Some(walked) = restore_page(store, range, after.as_ref(), rows, bytes) else {
         store.phase = Phase::Stopped;
         above.push(Event::Corrupt { owner });
         return;
     };
+    if let Some(interval) = people {
+        let done = match &walked.next {
+            Some(next) => next.interval > interval,
+            None => true,
+        };
+        if done {
+            secrets::start_sweep(store);
+            secrets::sweep(store, env, above, below);
+            if store.phase == Phase::Stopped {
+                return;
+            }
+        }
+    }
     above.push(Event::Restored { owner, rows: walked.rows, next: walked.next });
 }
 
@@ -85,4 +106,25 @@ fn decode(store: &mut Store, row: skein_kv::Row) -> Option<(Row, u64)> {
         return None;
     }
     Some((Row::Jig(record), u64::try_from(value.len()).ok()?))
+}
+
+fn people_interval(range: &Restore) -> Option<u32> {
+    match range {
+        Restore::Jig(ranges) => {
+            let mut interval = 0_u32;
+            let mut people = None;
+            for range in ranges {
+                match range {
+                    jig_domain_core::RestoreRange::People => people = Some(interval),
+                    jig_domain_core::RestoreRange::Deployment
+                    | jig_domain_core::RestoreRange::Tasks
+                    | jig_domain_core::RestoreRange::Core
+                    | jig_domain_core::RestoreRange::Census(_) => {}
+                }
+                interval = interval.checked_add(u32::try_from(intervals::restore(range).len()).ok()?)?;
+            }
+            people
+        }
+        Restore::Application(_) => None,
+    }
 }

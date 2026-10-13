@@ -5,6 +5,7 @@ extern crate alloc;
 pub mod boundary;
 pub mod codec;
 mod commits;
+mod directory;
 pub mod format;
 mod gets;
 pub mod historical;
@@ -14,6 +15,7 @@ mod open;
 mod pages;
 mod reads;
 mod restore;
+mod secrets;
 pub mod sizes;
 use alloc::boxed::Box;
 use skein_lib::{Env, Queue, Time, Wall};
@@ -51,6 +53,8 @@ pub struct Store {
     codec: codec::Limits,
     stores: Stores,
     phase: Phase,
+    directory: directory::Directory,
+    secret_state: secrets::State,
 }
 
 impl Store {
@@ -58,7 +62,24 @@ impl Store {
     pub fn over(limits: &Limits, application: sizes::Application, stores: Stores) -> Store {
         assert!(limits.store.is_usable() && limits.secrets.is_usable(), "both stores' limits are usable");
         let codec = codec::limits(&limits.core).expect("the domain limits fit their families' ceilings");
-        Store { limits: *limits, application, codec, stores, phase: Phase::Closed }
+        Store {
+            limits: *limits,
+            application,
+            codec,
+            stores,
+            phase: Phase::Closed,
+            directory: directory::Directory::new(),
+            secret_state: secrets::State::new(limits.secrets.queued),
+        }
+    }
+
+    #[must_use]
+    pub fn on_directory(limits: &Limits, application: sizes::Application) -> Store {
+        let stores =
+            Stores { store: skein_kv::Store::new(&limits.store), secrets: skein_kv::Store::new(&limits.secrets) };
+        let mut store = Store::over(limits, application, stores);
+        store.directory.disk = true;
+        store
     }
 
     #[must_use]
@@ -67,8 +88,8 @@ impl Store {
     }
 }
 
-/// One terminal from a memory step.
-pub const MAX_OUT_DOWN: u32 = 1;
+/// Most terminals from a component step, including a store batch.
+pub const MAX_OUT_DOWN: u32 = skein_kv::MAX_OUT.above;
 
 /// Owned stores, component state and bounded temporary rows and operations.
 #[must_use]
@@ -102,19 +123,21 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(skein_lib::List::<skein_kv::Op>::worst_case(limits.journal.writes.checked_add(1)?)?)?
         .checked_add(Queue::<skein_kv::Event>::worst_case(skein_kv::MAX_OUT.above)?)?
         .checked_add(Queue::<skein_io::file::Request>::worst_case(skein_kv::MAX_OUT.below)?)?
-        .checked_add(Queue::<Event>::worst_case(MAX_OUT_DOWN)?)
+        .checked_add(Queue::<Event>::worst_case(MAX_OUT_DOWN)?)?
+        .checked_add(secrets::worst_case(limits)?)?
+        .checked_add(Queue::<skein_io::file::Request>::worst_case(skein_kv::MAX_OUT.below.checked_mul(2)?)?)
 }
 
 /// The memory component's requests (store.md, section 10).
-pub fn down(store: &mut Store, request: Request, above: &mut Queue<Event>) {
+pub fn down(store: &mut Store, env: &Env<Limits>, request: Request, above: &mut Queue<Event>, below: &mut Below) {
     if store.phase == Phase::Stopped {
         return;
     }
     match request {
-        Request::Open { owner, root: _ } => open::open(store, owner, above),
-        Request::Commit { number, writes } => commits::commit(store, number, writes, above),
+        Request::Open { owner, root } => directory::open(store, env, owner, root, above, below),
+        Request::Commit { number, writes } => directory::commit(store, env, number, writes, above, below),
         Request::Restore { owner, range, after, rows, bytes } => {
-            restore::restore(store, owner, range, after, rows, bytes, above);
+            restore::restore(store, env, owner, restore::Page { range, after, rows, bytes }, above, below);
         }
         Request::Load { owner, range, after, rows, bytes } => {
             loads::load(store, owner, range, after, rows, bytes, above);
@@ -122,7 +145,21 @@ pub fn down(store: &mut Store, request: Request, above: &mut Queue<Event>) {
         Request::Get { owner, key } => gets::get(store, owner, key, above),
         Request::Read { owner, range } => reads::read(store, owner, range, above),
         // Each remaining handler joins in its owning increment, before routing uses it.
-        Request::Transcript { .. } | Request::Secrets { .. } => {}
+        Request::Secrets { owner, request } => secrets::secrets(store, env, owner, request, above, below),
+        Request::Transcript { .. } => {}
+    }
+}
+
+/// File terminals routed through their independent drivers.
+pub fn up(store: &mut Store, env: &Env<Limits>, io: Io, above: &mut Queue<Event>, below: &mut Below) {
+    directory::up(store, env, io, above, below);
+}
+
+/// Bounded background store work and the orphan sweep.
+pub fn fire(store: &mut Store, env: &Env<Limits>, above: &mut Queue<Event>, below: &mut Below) {
+    if store.phase != Phase::Stopped {
+        directory::fire(store, env, above, below);
+        secrets::sweep(store, env, above, below);
     }
 }
 
@@ -148,7 +185,8 @@ pub mod tasks_v1;
 pub mod core_v1;
 pub mod keys;
 pub use boundary::{
-    Cursor, Event, Family, Get, Load, OpenRefusal, Request, Restore, Row, SecretOwner, Secrets, TranscriptRead, Write,
+    Arrived, Below, Cursor, Event, Family, Get, Io, Load, OpenRefusal, Request, Restore, Root, Row, SecretOwner,
+    SecretRow, Secrets, TranscriptRead, Write,
 };
 
 #[cfg(test)]

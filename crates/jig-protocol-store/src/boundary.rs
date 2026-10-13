@@ -2,8 +2,9 @@
 use alloc::boxed::Box;
 use jig_domain_core::{self as core, RestoreRange, reads};
 use jig_domain_notes as notes;
+use skein_io::file;
 use skein_io::kernel::Fd;
-use skein_lib::Token;
+use skein_lib::{Queue, Secret, Token};
 
 /// What the engine's protocol layer asks of the component. Each request but
 /// `Commit` names its asker's token; each has one terminal event.
@@ -12,7 +13,7 @@ pub enum Request {
     /// Open both stores in the deployment's directory (store.md 10); the
     /// component's own rows and the core's header are checked before
     /// `Opened`. In skein-kv's memory mode, the worlds' component needs none.
-    Open { owner: Token, root: Fd },
+    Open { owner: Token, root: Root },
     /// Commit `number` (store.md 6): its writes, in order, one skein-kv
     /// commit with the same number. Terminal: `Committed` or `Failed`.
     Commit { number: u64, writes: Box<[Write]> },
@@ -100,12 +101,20 @@ pub enum SecretOwner {
     Application,
 }
 
-/// A request to the secrets' store. jig 17 makes `value` a `skein_lib::Secret`.
+/// A request to the secrets' store (store.md, section 9).
 #[derive(Debug)]
 pub enum Secrets {
-    Keep { owner: SecretOwner, number: u64, value: Box<[u8]> },
+    Keep { owner: SecretOwner, number: u64, value: Secret },
     Erase { owner: SecretOwner, number: u64 },
     Get { owner: SecretOwner, number: u64 },
+    Load { owner: SecretOwner, after: Option<u64> },
+}
+
+#[derive(Debug)]
+pub struct SecretRow {
+    pub owner: SecretOwner,
+    pub number: u64,
+    pub value: Secret,
 }
 
 /// Where a page stopped: the interval of the request's list, and the last
@@ -211,11 +220,45 @@ pub enum Event {
     },
     Secret {
         owner: Token,
-        value: Option<Box<[u8]>>,
+        value: Option<Secret>,
+    },
+    SecretsLoaded {
+        owner: Token,
+        rows: Box<[SecretRow]>,
+        next: Option<u64>,
     },
     /// A stored row did not decode: the request's terminal; the engine
     /// stops (store.md 7.1).
     Corrupt {
         owner: Token,
     },
+}
+
+/// A directory adopted by the service (io.md, section 9).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Root {
+    pub token: Token,
+    pub fd: Fd,
+}
+
+/// Independent file drivers (store.md, section 13).
+#[derive(Debug)]
+pub struct Below {
+    pub store: Queue<file::Request>,
+    pub secrets: Queue<file::Request>,
+    pub transcripts: Queue<file::Request>,
+}
+
+/// A file terminal and its descriptor, read by the service alone.
+#[derive(Debug)]
+pub struct Arrived {
+    pub event: file::Event,
+    pub fd: Option<Fd>,
+}
+
+#[derive(Debug)]
+pub enum Io {
+    Store(Arrived),
+    Secrets(Arrived),
+    Transcripts(Arrived),
 }

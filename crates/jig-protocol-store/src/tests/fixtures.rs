@@ -792,7 +792,8 @@ pub use reads::{
     with_proposal_rows, with_question_lines,
 };
 pub use store::{
-    ALICE, ENDED, LIVE, OTHER_DEPLOYMENT, PROJECT, ROOT_FD, call, commit, committed, conversation_index, ended_task,
-    format_put, get_kv, header, header_put, header_record, history, live_task, notes_entry, notes_line, opened,
-    opened_with_budget, over, person, plant, result_index, run, run_proof, save, stores,
+    ALICE, ENDED, LIVE, OTHER_DEPLOYMENT, PROJECT, ROOT, answer, below, call, commit, committed, conversation_index,
+    directory, ended_task, env, format_put, get_kv, header, header_put, header_record, history, live_task, notes_entry,
+    notes_line, opened, opened_with_budget, over, person, plant, result_index, run, run_proof, save, sign_in_secret,
+    stores,
 };

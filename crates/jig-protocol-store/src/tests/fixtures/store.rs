@@ -3,14 +3,15 @@ use super::{
     APPLICATION, CORE_LIMITS, DEPLOYMENT, KEY_LIMIT, calls, core_rows, identity, note_entry, note_line, task_history,
     task_record,
 };
+use crate::{Below, Io, Root, SecretOwner, Secrets};
 use crate::{Event, Limits, Request, Store, Stores, Write, codec, format, keys};
 use alloc::boxed::Box;
 use jig_domain_core::{CoreKey, CoreRecord, Key, Record};
 use skein_io::kernel::Fd;
-use skein_lib::{Duration, JournalLimits, List, Queue, Token};
+use skein_lib::{Duration, Env, JournalLimits, List, Queue, Secret, Token};
 
 pub const OTHER_DEPLOYMENT: [u8; 16] = [9; 16];
-pub const ROOT_FD: Fd = Fd::new(0);
+pub const ROOT: Root = Root { token: Token::new(900), fd: Fd::new(3) };
 
 fn kv_limits() -> skein_kv::Limits {
     skein_kv::Limits {
@@ -29,7 +30,7 @@ fn kv_limits() -> skein_kv::Limits {
     }
 }
 
-fn limits() -> Limits {
+pub fn limits() -> Limits {
     Limits {
         core: CORE_LIMITS,
         store: kv_limits(),
@@ -92,7 +93,8 @@ pub fn over(stores: Stores) -> Store {
 
 pub fn run(store: &mut Store, request: Request) -> Box<[Event]> {
     let mut above = Queue::with_capacity(crate::MAX_OUT_DOWN);
-    crate::down(store, request, &mut above);
+    let mut below = below();
+    crate::down(store, &env(), request, &mut above, &mut below);
     let mut events = List::with_capacity(crate::MAX_OUT_DOWN);
     for _ in 0..crate::MAX_OUT_DOWN {
         if let Some(event) = above.pop() {
@@ -110,7 +112,7 @@ pub fn opened_with_budget(budget: u64) -> Store {
     let mut limits = limits();
     limits.store.budget = budget;
     let mut store = Store::over(&limits, APPLICATION, stores_with(&limits));
-    let events = run(&mut store, Request::Open { owner: Token::new(1), root: ROOT_FD });
+    let events = run(&mut store, Request::Open { owner: Token::new(1), root: ROOT });
     let [Event::Opened { owner: _, last: 0 }] = &*events else {
         panic!("empty store opens: {events:?}");
     };
@@ -225,4 +227,41 @@ pub fn notes_line(scope: &jig_domain_notes::Scope, name: u64) -> Record {
     row.scope = scope.clone();
     row.name = name;
     Record::Notes(jig_domain_notes::Record::Line(row))
+}
+
+pub fn env() -> Env<Limits> {
+    Env { now: skein_lib::Time::ZERO, wall: skein_lib::Wall::EPOCH, limits: limits() }
+}
+pub fn below() -> Below {
+    Below {
+        store: Queue::with_capacity(skein_kv::MAX_OUT.below),
+        secrets: Queue::with_capacity(skein_kv::MAX_OUT.below),
+        transcripts: Queue::with_capacity(skein_kv::MAX_OUT.below),
+    }
+}
+pub fn directory() -> (Store, Below) {
+    let mut store = Store::on_directory(&limits(), APPLICATION);
+    let mut below = below();
+    let mut above = Queue::with_capacity(crate::MAX_OUT_DOWN);
+    crate::down(&mut store, &env(), Request::Open { owner: Token::new(1), root: ROOT }, &mut above, &mut below);
+    assert!(above.is_empty());
+    (store, below)
+}
+pub fn answer(store: &mut Store, io: Io) -> (Box<[Event]>, Below) {
+    let mut above = Queue::with_capacity(crate::MAX_OUT_DOWN);
+    let mut below = below();
+    crate::up(store, &env(), io, &mut above, &mut below);
+    (events(&mut above), below)
+}
+pub fn events(above: &mut Queue<Event>) -> Box<[Event]> {
+    let mut events = List::with_capacity(crate::MAX_OUT_DOWN);
+    for _ in 0..crate::MAX_OUT_DOWN {
+        if let Some(event) = above.pop() {
+            events.push(event).expect("bounded events");
+        }
+    }
+    events.into_boxed()
+}
+pub fn sign_in_secret(number: u64, byte: u8) -> Secrets {
+    Secrets::Keep { owner: SecretOwner::SignIn, number, value: Secret::new(Box::new([byte; 32])) }
 }

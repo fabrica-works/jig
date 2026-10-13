@@ -56,7 +56,7 @@ pub(crate) fn commit(store: &mut Store, number: u64, writes: Box<[Write]>, above
     }
 }
 
-fn operations(store: &Store, writes: Box<[Write]>, format_due: bool) -> Option<Box<[skein_kv::Op]>> {
+pub(crate) fn operations(store: &Store, writes: Box<[Write]>, format_due: bool) -> Option<Box<[skein_kv::Op]>> {
     if writes.len() > usize::try_from(store.limits.journal.writes).ok()? {
         return None;
     }

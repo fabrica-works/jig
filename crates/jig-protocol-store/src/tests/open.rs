@@ -6,7 +6,7 @@ use jig_domain_core::{CoreKey, Key};
 use skein_lib::Token;
 
 fn open(store: &mut Store) -> Box<[Event]> {
-    fixtures::run(store, Request::Open { owner: Token::new(1), root: fixtures::ROOT_FD })
+    fixtures::run(store, Request::Open { owner: Token::new(1), root: fixtures::ROOT })
 }
 
 fn planted(ops: &[skein_kv::Op]) -> Store {
