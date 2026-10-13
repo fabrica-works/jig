@@ -158,9 +158,33 @@ fn agent(_spawn: &skein_io::kernel::Spawn, inherited: &Inherited) -> Proc {
     let host = smith_agent_process_world::configured(channel::agent_configuration(), fixtures::SEED, inherited, errors);
     Proc::Agent { host: Box::new(capture.host(host)) }
 }
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Scenario {
+    Answer,
+    MidRun,
+    Restart,
+}
 struct Judge {
     handed: bool,
     done: bool,
+    scenario: Scenario,
+    controls: Option<skein_world::Controls>,
+    restored: Option<Store>,
+}
+fn settled(store: &Store) -> u32 {
+    u32::try_from(
+        store
+            .rows
+            .values()
+            .filter(|row| {
+                matches!(row,
+                    root::Record::Core(core::Record::Core(core::CoreRecord::Terminal(terminal)))
+                    if matches!(terminal.end, jig_domain_tasks::End::Failed(jig_domain_tasks::Class::Lost))
+                )
+            })
+            .count(),
+    )
+    .expect("settled worker claims")
 }
 fn terminals(store: &Store) -> u32 {
     u32::try_from(
@@ -186,8 +210,12 @@ impl Referee<Proc> for Judge {
                 Proc::Service(_) | Proc::Agent { .. } | Proc::Peer(_) => None,
             })
             .all(|done| done);
+        let agent_started = procs.iter().any(|proc| matches!(proc, Proc::Agent { .. }));
         let (services, other) = procs.split_at_mut(1);
         let Proc::Service(service) = &mut services[0] else { panic!("one service process") };
+        if let Some(store) = self.restored.take() {
+            service.store = store;
+        }
         if !self.handed
             && let Some(link) = service.service.links().pop()
         {
@@ -198,8 +226,21 @@ impl Referee<Proc> for Judge {
             }
             self.handed = true;
         }
-        if !self.done && clients_done && terminals(&service.store) > 0 {
-            service.service.shutdown();
+        let reached = match self.scenario {
+            Scenario::Answer => clients_done && terminals(&service.store) > 0,
+            Scenario::MidRun => {
+                clients_done
+                    && agent_started
+                    && service
+                        .store
+                        .rows
+                        .values()
+                        .any(|row| matches!(row, root::Record::Core(core::Record::Core(core::CoreRecord::Turn(_)))))
+            }
+            Scenario::Restart => settled(&service.store) > 0,
+        };
+        if !self.done && reached {
+            self.controls.as_ref().expect("world controls").signal(0, skein_io::kernel::ServiceSignal::Terminate);
             self.done = true;
         }
         if self.done {
@@ -244,14 +285,38 @@ impl skein_world::Machine for Machine {
 }
 #[must_use]
 pub fn run(settings: Settings, people: Box<[Script]>) -> Outcome {
-    assert_eq!(people.len(), 1, "the first one-process story has one person");
+    run_phase(settings, people, machine(), Store::new(), Scenario::Answer).0
+}
+#[must_use]
+pub fn drain_mid_run(settings: Settings, restart: bool) -> Outcome {
+    let (mut outcome, machine, store) =
+        run_phase(settings, Box::new([Script::start_chat(b"Hello")]), machine(), Store::new(), Scenario::MidRun);
+    if restart {
+        let (restarted, _, _) = run_phase(settings, Box::new([]), machine, store, Scenario::Restart);
+        outcome.claims_settled_at_restart = restarted.claims_settled_at_restart;
+        outcome.drained &= restarted.drained;
+    }
+    outcome
+}
+fn machine() -> skein_fake_machine::Machine {
     let mut machine = skein_fake_machine::Machine::for_user(1000);
-    let _deployment = machine.lay(&[]);
-    let _worker = machine.lay(&[]);
-    let client_root = machine.lay(&[]);
-    let judge = Judge { handed: false, done: false };
-    let mut world = skein_world::World::new(settings.seed, settings.config, judge, Memory::Unchecked)
-        .with_machine(Machine(machine));
+    for _ in 0..3 {
+        let _root = machine.lay(&[]);
+    }
+    machine
+}
+fn run_phase(
+    settings: Settings,
+    people: Box<[Script]>,
+    mut machine: skein_fake_machine::Machine,
+    durable_observer: Store,
+    scenario: Scenario,
+) -> (Outcome, skein_fake_machine::Machine, Store) {
+    let client_root = machine.reopen_root(2);
+    let mut world = skein_world::World::new_controlled(settings.seed, settings.config, Memory::Unchecked, |controls| {
+        Judge { handed: false, done: false, scenario, controls: Some(controls), restored: Some(durable_observer) }
+    })
+    .with_machine(Machine(machine));
     world.host(skein_world::HostedProgram {
         program: b"agent-program".as_slice().into(),
         make: agent,
@@ -271,7 +336,7 @@ pub fn run(settings: Settings, people: Box<[Script]>) -> Outcome {
         });
     }
     world.spawn(|| Proc::Peer(Box::new(fixtures::provider())));
-    let outcome = world.run();
+    let mut outcome = world.run();
     let chats_made = outcome
         .procs
         .iter()
@@ -280,7 +345,7 @@ pub fn run(settings: Settings, people: Box<[Script]>) -> Outcome {
             Proc::Service(_) | Proc::Agent { .. } | Proc::Peer(_) => None,
         })
         .sum();
-    Outcome {
+    let result = Outcome {
         verdict: skein_world::domain::Verdict::Passed,
         chats_made,
         runs_answered: outcome
@@ -291,7 +356,27 @@ pub fn run(settings: Settings, people: Box<[Script]>) -> Outcome {
                 Proc::Client(_) | Proc::Agent { .. } | Proc::Peer(_) => None,
             })
             .expect("one service"),
-        drained: outcome.procs.iter().all(Host::is_empty),
-        claims_settled_at_restart: 0,
-    }
+        drained: outcome.procs.iter().all(Host::is_empty)
+            && outcome.procs.iter().all(|proc| match proc {
+                Proc::Service(service) => service.store.pending.is_empty(),
+                Proc::Client(_) | Proc::Agent { .. } | Proc::Peer(_) => true,
+            }),
+        claims_settled_at_restart: outcome
+            .procs
+            .iter()
+            .find_map(|proc| match proc {
+                Proc::Service(service) => Some(settled(&service.store)),
+                Proc::Client(_) | Proc::Agent { .. } | Proc::Peer(_) => None,
+            })
+            .expect("one service"),
+    };
+    let store = outcome
+        .procs
+        .iter_mut()
+        .find_map(|proc| match proc {
+            Proc::Service(service) => Some(std::mem::take(&mut service.store)),
+            Proc::Client(_) | Proc::Agent { .. } | Proc::Peer(_) => None,
+        })
+        .expect("one service observer");
+    (result, std::mem::replace(&mut outcome.machine.0, skein_fake_machine::Machine::for_user(1000)), store)
 }

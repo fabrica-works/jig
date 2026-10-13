@@ -219,7 +219,7 @@ impl Service {
             }
             for index in 0..self.workers.len() {
                 let worker = self.workers.get_mut(index).expect("worker index");
-                worker.stop();
+                worker.abort();
             }
         }
     }
@@ -449,7 +449,7 @@ pub fn iterate(service: &mut Service, now: Time, wall: Wall) {
             Some(engine) => engine.end.is_some(),
             None => false,
         } {
-            worker.stop();
+            worker.abort();
         }
         if started && worker.room() {
             worker.iterate(now, wall);

@@ -114,3 +114,53 @@ fn a_call_the_root_answers_busy_while_stopping_reaches_its_worker() {
     );
     assert_eq!(service.end(), None);
 }
+
+fn combined() -> crate::Service {
+    let mut service = components();
+    service.workers = fixtures::worker_service().workers;
+    service
+}
+fn in_process_worker(service: &crate::Service) -> &crate::Worker {
+    service.workers.get(0).expect("one worker layer")
+}
+
+#[test]
+fn the_worker_goes_on_while_the_engine_drains() {
+    let mut service = combined();
+    service.shutdown();
+    assert!(in_process_worker(&service).aborted.is_none());
+    assert_eq!(service.end(), None);
+}
+
+#[test]
+fn the_worker_is_aborted_only_once_the_engine_has_drained() {
+    let mut service = combined();
+    service.shutdown();
+    assert!(in_process_worker(&service).aborted.is_none());
+    stop::drained(fixtures::engine(&mut service));
+    settle(&mut service);
+    assert_eq!(service.end(), Some(&End::Drained));
+    assert!(in_process_worker(&service).aborted.is_some());
+}
+
+#[test]
+fn a_second_signal_aborts_both_layers() {
+    let mut service = combined();
+    service.shutdown();
+    service.shutdown();
+    assert_eq!(service.end(), Some(&End::Aborted));
+    assert!(in_process_worker(&service).aborted.is_some());
+    let count = in_process_worker(&service).io.len();
+    service.shutdown();
+    assert_eq!(in_process_worker(&service).io.len(), count, "abort is idempotent");
+}
+
+#[test]
+fn the_service_ends_once_io_holds_nothing() {
+    let mut service = components();
+    service.shutdown();
+    assert!(!service.is_empty(), "the components have not reported closed");
+    settle(&mut service);
+    assert_eq!(service.end(), Some(&End::Drained));
+    assert!(service.is_empty());
+}

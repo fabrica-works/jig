@@ -46,6 +46,7 @@ pub struct Worker {
     pub(super) started: bool,
     closed: bool,
     stopping: bool,
+    pub(super) aborted: Option<()>,
 }
 fn problem(index: u32, member: &[u8], what: What) -> Problems {
     let mut problems = Problems::empty();
@@ -115,7 +116,7 @@ impl Worker {
             process_events: Queue::with_capacity(room),
             processes: Map::with_capacity(slots),
             owners: Map::with_capacity(slots),
-            entities: Map::with_capacity(slots.checked_mul(3).expect("process pipes")),
+            entities: Map::with_capacity(slots.checked_mul(4).expect("process entities")),
             retired: List::with_capacity(slots),
             values: Table::new(
                 config.limits.core.accounts.accounts.checked_add(1).expect("account slots"),
@@ -138,6 +139,7 @@ impl Worker {
             started: false,
             closed: false,
             stopping: false,
+            aborted: None,
         })
     }
     #[cfg(test)]
@@ -156,6 +158,24 @@ impl Worker {
         if !self.stopping {
             self.stopping = true;
             self.events.push(root::Event::Shutdown);
+        }
+    }
+    /// End immediately, dropping domain work and aborting every owned IO entity.
+    pub fn abort(&mut self) {
+        if self.aborted.is_some() {
+            return;
+        }
+        self.aborted = Some(());
+        self.stopping = true;
+        for _ in 0..self.events.len() {
+            let _event = self.events.pop();
+        }
+        for _ in 0..self.out.len() {
+            let _request = self.out.pop();
+        }
+        self.link_down(self.env.now, link::Event::Abort);
+        for (entity, _) in &self.entities {
+            self.io.push(io::Request::Abort { entity: *entity });
         }
     }
     pub(super) fn accepts(&self, event: &io::Event) -> bool {
@@ -180,7 +200,12 @@ impl Worker {
         let owner = crate::workers::owner(&event).expect("routed owner");
         if owner == Token::new(self.prefix) {
             match event {
-                io::Event::Connecting { socket, .. } => self.socket = Some(socket),
+                io::Event::Connecting { socket, .. } => {
+                    self.socket = Some(socket);
+                    if self.aborted.is_some() {
+                        self.io.push(io::Request::Abort { entity: socket });
+                    }
+                }
                 io::Event::Connected { .. } => {
                     self.link_down(now, link::Event::Dialled { connection: Token::new(self.prefix) });
                 }
@@ -211,9 +236,16 @@ impl Worker {
                 Some(agent) => *agent,
                 None => *self.entities.get(&owner).expect("owned pipe"),
             };
-            if let io::Event::Spawned { pipes, .. } = &event {
+            if let io::Event::Spawned { child, pipes, .. } = &event {
+                self.entities.insert(*child, agent).expect("child per process");
+                if self.aborted.is_some() {
+                    self.io.push(io::Request::Abort { entity: *child });
+                }
                 for pipe in pipes {
                     self.entities.insert(*pipe, agent).expect("three pipes per process");
+                    if self.aborted.is_some() {
+                        self.io.push(io::Request::Abort { entity: *pipe });
+                    }
                 }
             }
             let process = self.processes.get_mut(&agent).expect("owned process");
@@ -435,8 +467,15 @@ impl Worker {
                 | host::ProcessEvent::Exited { .. }
                 | host::ProcessEvent::Channel { .. } => {}
             }
-            if let Some(event) = worker_route::process(event) {
+            if self.aborted.is_none()
+                && let Some(event) = worker_route::process(event)
+            {
                 self.events.push(event);
+            }
+        }
+        if self.aborted.is_some() {
+            for _ in 0..self.events.len() {
+                let _event = self.events.pop();
             }
         }
         for _ in 0..self.events.capacity() {
@@ -446,11 +485,12 @@ impl Worker {
             let Some(event) = self.events.pop() else { break };
             self.step(event);
         }
-        if self.root.work_pending()
-            || match self.root.next_deadline() {
-                Some(deadline) => deadline <= now,
-                None => false,
-            }
+        if self.aborted.is_none()
+            && (self.root.work_pending()
+                || match self.root.next_deadline() {
+                    Some(deadline) => deadline <= now,
+                    None => false,
+                })
         {
             self.step(root::Event::Timer);
         }
@@ -488,7 +528,7 @@ impl Worker {
         self.root.reclaim();
     }
     pub(super) fn next_deadline(&self) -> Option<Time> {
-        if !self.started {
+        if !self.started || self.aborted.is_some() {
             return None;
         }
         let mut next = [
@@ -516,7 +556,7 @@ impl Worker {
             || !self.events.is_empty()
             || !self.process_events.is_empty()
             || !self.submitted.is_empty()
-            || self.root.work_pending()
+            || (self.aborted.is_none() && self.root.work_pending())
             || match self.next_deadline() {
                 Some(at) => at <= now,
                 None => false,
@@ -633,8 +673,8 @@ pub(super) fn worst_case(worker: &config::Worker, agent: &Agent, root_bytes: usi
         .checked_add(Queue::<link::Request>::worst_case(link::MAX_OUT_DOWN)?)?
         .checked_add(Queue::<io::Request>::worst_case(lower)?)?
         .checked_add(Map::<Token, host::Process>::worst_case(worker.slots)?)?
-        .checked_add(Map::<Token, Token>::worst_case(worker.slots.checked_mul(4)?)?)?
-        .checked_add(List::<Token>::worst_case(worker.slots)?.checked_mul(5)?)?
+        .checked_add(Map::<Token, Token>::worst_case(worker.slots.checked_mul(5)?)?)?
+        .checked_add(List::<Token>::worst_case(worker.slots)?.checked_mul(6)?)?
         .checked_add(Queue::<io::kernel::Submit>::worst_case(1)?)?
         .checked_add(payload.checked_mul(u64::from(room).checked_mul(3)?)?)?
         .checked_add(command.checked_mul(u64::from(worker.slots).checked_add(1)?)?)?
