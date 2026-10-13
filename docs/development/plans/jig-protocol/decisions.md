@@ -2233,6 +2233,17 @@ the file.
      recorded measures, no repeat; its gate's focused total goes in the
      report. Past 13.5 s (90 %), the budget rule of ruling 249 and an
      improvement pass apply.
+269. **jig 19.s1: collections the domain bounds by bytes cross the store
+     as pieces** (2026-10-13, the designer's answer to question.md's "jig
+     27.3: the shipped profiles are refused by the store's codecs"; jig
+     `2fa034fb`, `2b69ef3c`). The tasks and people schemas carry fourteen
+     collections the domain bounds only by a byte sum as counted lists
+     with small ceilings, so both shipped profiles derive counts past them
+     and the real service cannot start. As skein's codec.md 3 says for a
+     sum, each becomes one `bytes N` piece, counted on decode as the
+     domain counts it; no ceiling raised, no profile changed. A step not
+     in the plan, jig 19.s1 (`jig/19-store-codecs-core-people.md`), with
+     a test that both shipped profiles are admitted; 27.3 needs it.
 
 ## For the user
 
