@@ -160,6 +160,18 @@ the file.
      and its `Step` trailer reads `skein-02.2`. The README gains "The
      coordinator's check of a landed report": the cleanliness check runs
      only while the worktree is on the landed step's branch.
+105. **smith 03.1's transcript is named by its length and a bounded
+     fingerprint** (plan defect, smith 03's block of
+     2026-10-13T23:58:15Z). 03.1's Shape said "its length and digest";
+     hashing the whole 33,554,433-byte transcript in the unoptimized
+     test build still took 0.232 s against the test's 0.1 s ceiling
+     (`logs/20261013T235436-155.log`), past twice it (development.md,
+     8.2), and the world has no faster hasher. The line now holds the
+     exact length and a hash of at most the first 512 and last 512
+     bytes, labelled a fingerprint; payloads of at most 1 KiB are
+     formatted as before. Two runs that differ only inside a large
+     payload's middle are no longer told apart by the trace; the
+     transcript's content is fixed by its story. No dependency is added.
 
 ## For the user
 

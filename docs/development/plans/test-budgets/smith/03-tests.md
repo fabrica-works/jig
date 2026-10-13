@@ -65,8 +65,10 @@ Files: `tests/agent/src/world.rs:1004` (the log line that formats a
   33,554,433-byte text with `{:?}`). The run world's `Debug` traces
   (`tests/run/src/world.rs:897,1009`) stay as they are (ruling 103;
   `later.md`).
-Shape: the log line names the transcript by its length and digest, not
-  its bytes.
+Shape: the log line names the transcript by its exact length and a
+  fingerprint, not its bytes: a hash (the world's existing hasher) of
+  at most its first 512 and its last 512 bytes, labelled as such (ruling
+  105). A payload of at most 1 KiB is formatted as today.
 Test shape: the worlds' tests, unchanged;
   `every_transient_history_refusal_is_exact_and_starts_no_provider_or_tool_effect`
   (`smith-agent-world::messages`) under 0.1 s alone (the audit: 1.25 s
