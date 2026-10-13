@@ -56,6 +56,12 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Queue::<core::Now>::worst_case(limits.journal.now)?)?
         .checked_add(Queue::<Box<crate::Event>>::worst_case(limits.routes)?)?
         .checked_add(Map::<u64, Assignment>::worst_case(limits.core.tasks.tasks)?)?
+        .checked_add(Map::<u64, Box<[jig_domain_brief::GatherPlaced]>>::worst_case(limits.core.tasks.tasks)?)?
+        .checked_add(
+            skein_lib::List::<jig_domain_brief::GatherPlaced>::worst_case(limits.core.brief.sections)?
+                .checked_add(u64::from(limits.core.brief.brief_bytes))?
+                .checked_mul(u64::from(limits.core.tasks.tasks).checked_add(u64::from(limits.journal.held))?)?,
+        )?
         .checked_add(Map::<u64, Box<[tasks::Name]>>::worst_case(limits.core.tasks.tasks)?)?
         .checked_add(Map::<u64, (u64, u16)>::worst_case(limits.core.tasks.tasks)?)?
         .checked_add(Map::<Token, connector::Effect>::worst_case(

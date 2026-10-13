@@ -49,6 +49,8 @@ pub const STANDARD: connector::Limits = connector::Limits {
 pub struct Limits {
     pub root: root::Limits,
     pub io: skein_io::Limits,
+    pub accounts: skein_oauth_accounts::Limits,
+    pub workers: jig_protocol_engine_workers::Limits,
 }
 #[must_use]
 pub fn for_profile(name: Profile, jig: &jig_protocol_config::Limits) -> Limits {
@@ -56,7 +58,14 @@ pub fn for_profile(name: Profile, jig: &jig_protocol_config::Limits) -> Limits {
         Profile::Small => SMALL,
         Profile::Standard => STANDARD,
     };
-    Limits { root: root::Limits { core: jig.core, connector, journal: jig.journal, routes: jig.routes }, io: jig.io }
+    let mut accounts = jig.driver;
+    accounts.accounts = jig.core.accounts.accounts.checked_add(1).expect("account zero slot");
+    Limits {
+        root: root::Limits { core: jig.core, connector, journal: jig.journal, routes: jig.routes },
+        io: jig.io,
+        accounts,
+        workers: workers(jig),
+    }
 }
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
@@ -64,20 +73,107 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     let queue = root::max_out(&limits.root).checked_mul(2)?;
     let payload = jig_domain_core::worst_case(&limits.root.core)?
         .checked_add(connector::worst_case(&limits.root.connector)?.checked_mul(2)?)?;
-    root.checked_add(skein_io::worst_case(&limits.io)?)?
+    root.checked_add(skein_oauth_accounts::worst_case(&limits.accounts)?)?
+        .checked_add(jig_protocol_engine_workers::worst_case(&limits.workers)?.checked_mul(2)?)?
+        .checked_add(jig_protocol_accounts::table::worst_case(
+            limits.root.core.accounts.accounts.checked_add(1)?,
+            limits.accounts.client.document.token_bytes,
+        )?)?
+        .checked_add(skein_lib::Map::<u32, skein_lib::Secret>::worst_case(limits.root.core.accounts.credentials)?)?
+        .checked_add(
+            u64::from(limits.root.connector.value_bytes)
+                .checked_mul(u64::from(limits.root.core.accounts.credentials))?,
+        )?
+        .checked_add(skein_io::file_layer::FileIo::worst_case(
+            limits.accounts.accounts.checked_add(2)?,
+            limits.accounts.http.read,
+            1,
+            limits.accounts.client.document.record_bytes,
+        )?)?
+        .checked_add(crate::accounts::worst_case(&limits.accounts, &limits.io, queue.checked_mul(3)?)?)?
+        .checked_add(crate::tools::worst_case(&limits.root.core)?)?
+        .checked_add(Queue::<skein_io::Request>::worst_case(
+            queue.checked_mul(jig_protocol_engine_workers::MAX_OUT_DOWN)?,
+        )?)?
+        .checked_add(skein_lib::Map::<skein_lib::Token, skein_lib::Token>::worst_case(
+            limits.workers.workers.checked_add(limits.workers.opening)?,
+        )?)?
+        .checked_add(skein_lib::List::<(skein_lib::Token, Option<skein_lib::Token>)>::worst_case(limits.io.sockets)?)?
+        .checked_add(Queue::<jig_protocol_engine_workers::Request>::worst_case(
+            jig_protocol_engine_workers::MAX_OUT_DOWN,
+        )?)?
+        .checked_add(skein_io::worst_case(&limits.io)?)?
         .checked_add(Queue::<crate::StoreRequest>::worst_case(queue)?)?
         .checked_add(Queue::<crate::StoreAnswer>::worst_case(queue)?)?
         .checked_add(Queue::<crate::PartyOutput>::worst_case(queue)?)?
         .checked_add(Queue::<jig_domain_core::Event>::worst_case(queue)?)?
-        .checked_add(Queue::<root::Event>::worst_case(queue)?)?
+        .checked_add(Queue::<root::Event>::worst_case(queue.checked_mul(jig_protocol_engine_workers::MAX_OUT_DOWN)?)?)?
         .checked_add(Queue::<root::Request>::worst_case(root::max_out(&limits.root))?)?
-        .checked_add(payload.checked_mul(u64::from(queue).checked_mul(6)?.checked_add(1)?)?)?
+        .checked_add(
+            payload.checked_mul(
+                u64::from(queue)
+                    .checked_mul(u64::from(jig_protocol_engine_workers::MAX_OUT_DOWN).checked_add(5)?)?
+                    .checked_add(1)?,
+            )?,
+        )?
         .checked_add(crate::system::worst_case(&limits.root.connector)?.checked_mul(2)?)?
         .checked_add(Queue::<skein_io::kernel::Complete>::worst_case(queue)?)?
-        .checked_add(Queue::<skein_io::kernel::Submit>::worst_case(queue)?)?
+        .checked_add(Queue::<skein_io::kernel::Submit>::worst_case(queue)?.checked_mul(2)?)?
         .checked_add(Queue::<skein_io::Event>::worst_case(queue)?)
 }
 #[must_use]
 pub fn profile_limits(name: Profile) -> Limits {
     for_profile(name, &profile(name))
+}
+
+fn workers(jig: &jig_protocol_config::Limits) -> jig_protocol_engine_workers::Limits {
+    let core = jig.core;
+    let hub = jig.hub;
+    let link = jig.link;
+    let ceilings = jig_protocol_worker_wire::CEILINGS;
+    let sizes = jig_protocol_worker_wire::sizes::Sizes {
+        charter: u32::try_from(hub.charter_bytes).expect("channel byte bound"),
+        transcript: u32::try_from(hub.transcript_bytes).expect("channel byte bound"),
+        turn: u32::try_from(hub.turn_bytes).expect("channel byte bound"),
+        message: core.tasks.message_bytes,
+        sender: ceilings.message_sender,
+        call_name: u32::try_from(core.fleet.call_name_bytes).expect("call name bound"),
+        tool_name: ceilings.call_tool,
+        call_input: core.call_answer_bytes,
+        answer: core.call_answer_bytes,
+        result: u32::try_from(hub.outcome_bytes).expect("channel byte bound"),
+        detail: hub.detail_bytes,
+        grant: jig.driver.client.document.token_bytes,
+        account_id: jig_protocol_accounts::ACCOUNT_ID_BYTES,
+        name: link.name,
+        secret: link.secret,
+        model_name: ceilings.model_bound_name,
+        items: 0,
+        left: 0,
+        saved: 0,
+        evidence: u32::try_from(hub.delivery_evidence_bytes).expect("channel byte bound"),
+        resource: 0,
+        slots: core.fleet.slots,
+        calls: hub.run_calls,
+        turns: hub.turns,
+        inbox: core.tasks.run_inbox,
+        answered: core.call_records,
+        models: ceilings.bounds_models,
+        workstreams: core.fleet.workstreams,
+        accounts: core.accounts.accounts,
+        credentials: core.accounts.credentials,
+        facts: link.facts,
+    };
+    jig_protocol_engine_workers::Limits {
+        sizes,
+        names: link.names,
+        workers: core.fleet.workers,
+        opening: link.opening,
+        chunk: link.chunk,
+        handshake: link.handshake,
+        hello: link.hello,
+        ping: link.ping,
+        silence: link.silence,
+        stall: link.stall,
+    }
 }

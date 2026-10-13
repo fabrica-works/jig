@@ -232,8 +232,17 @@ pub(super) const IO: skein_io::Limits = skein_io::Limits {
 };
 pub(super) const JOURNAL: skein_lib::JournalLimits =
     skein_lib::JournalLimits { commits: 3, writes: 12_226, held: 36_678, now: 256, release: 256 };
-pub(super) const LIMITS: Limits =
-    Limits { core: CORE, hub: HUB, link: LINK, token: 16384, clients: CLIENTS, io: IO, journal: JOURNAL, routes: 512 };
+pub(super) const LIMITS: Limits = Limits {
+    core: CORE,
+    hub: HUB,
+    link: LINK,
+    token: 8192,
+    driver: DRIVER,
+    clients: CLIENTS,
+    io: IO,
+    journal: JOURNAL,
+    routes: 512,
+};
 
 /// Native client HTTP: 4 sockets, 8 exchanges, 5 minute link, 30 second stall.
 pub(super) const CLIENTS: jig_protocol_engine_clients::Limits = jig_protocol_engine_clients::Limits {
@@ -247,4 +256,40 @@ pub(super) const CLIENTS: jig_protocol_engine_clients::Limits = jig_protocol_eng
     wire: jig_protocol_client_wire::v5::CEILINGS,
     link_span: Duration::from_secs(300),
     stall: Duration::from_secs(30),
+};
+
+/// Accounts use bounded OAuth exchanges and the shared socket limits.
+pub(super) const DRIVER: skein_oauth_accounts::Limits = skein_oauth_accounts::Limits {
+    accounts: CORE.accounts.accounts.checked_add(1).expect("account zero slot"),
+    file_stall: Duration::from_secs(30),
+    exchanges: 4,
+    listeners: 0,
+    server: skein_http::server::Limits { head: 4096, headers: 32, body: 1024, read: 1024, response: 4096, send: 1024 },
+    refresh_lead: Duration::from_secs(60),
+    client: skein_oauth::ClientLimits {
+        document: skein_oauth::Limits {
+            document_bytes: 65536,
+            string_bytes: 16384,
+            token_bytes: 8192,
+            client_bytes: 1024,
+            detail_bytes: 1024,
+            record_bytes: 65536,
+            depth: 16,
+            tokens: 4096,
+        },
+        uri_bytes: 4096,
+        scope_bytes: 4096,
+        state_bytes: 64,
+        code_bytes: 4096,
+        url_bytes: 16384,
+        request_bytes: 65536,
+        sign_in_time: Duration::from_secs(300),
+        request_time: Duration::from_secs(30),
+        backoff_base: Duration::from_secs(1),
+        backoff_ceiling: Duration::from_secs(30),
+        max_attempts: 5,
+    },
+    http: skein_http::client::Limits { request: 65536, head: 16384, headers: 32, read: 16384, send: 16384 },
+    tls: skein_tls::client::Limits { read: 16384, send: 65536, records: 131_072 },
+    io: IO,
 };

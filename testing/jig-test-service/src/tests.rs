@@ -32,7 +32,7 @@ fn a_named_file_missing_from_those_handed_is_refused() {
     let last = files.entries.len().checked_sub(1).expect("credential file");
     assert_eq!(files.entries.get(last).expect("credential file").0.as_ref(), b"app.secret");
     files.entries.truncate(last);
-    let problems = crate::startup(&document, &files, None, &fixtures::seeds()).unwrap_err();
+    let problems = crate::startup(&document, &files, None, &fixtures::seeds(), None).err().expect("startup refused");
     assert_eq!(
         problems.problems.get(0),
         Some(&Problem { path: Path::root().member(b"application").member(b"credential"), what: What::Unreadable })
@@ -42,10 +42,15 @@ fn a_named_file_missing_from_those_handed_is_refused() {
 #[test]
 fn a_worst_case_past_the_memory_is_refused_saying_by_how_much() {
     let limits = crate::limits::profile_limits(jig_protocol_config::Profile::Small);
-    let bytes = crate::limits::worst_case(&limits).expect("profile sizes fit");
+    let bytes = crate::limits::worst_case(&limits)
+        .expect("profile sizes fit")
+        .checked_add(crate::workers::configured_bytes(&fixtures::config()).expect("configured sizes fit"))
+        .expect("service sizes fit");
     let memory = fixtures::decimal(bytes.checked_sub(1).expect("nonempty service"));
     let document = with(&engine_document(), b"1152921504606846976", &memory);
-    let found = crate::startup(&document, &fixtures::files(&document), None, &fixtures::seeds()).unwrap_err();
+    let found = crate::startup(&document, &fixtures::files(&document), None, &fixtures::seeds(), None)
+        .err()
+        .expect("startup refused");
     assert_eq!(
         found.problems.get(0),
         Some(&Problem { path: Path::root().member(b"engine").member(b"memory_bytes"), what: What::Memory { over: 1 } })
@@ -54,7 +59,8 @@ fn a_worst_case_past_the_memory_is_refused_saying_by_how_much() {
 
 #[test]
 fn an_activation_of_an_unbuilt_component_is_refused_at_its_path() {
-    for name in [b"accounts".as_slice(), b"workers", b"clients"] {
+    {
+        let name = b"clients".as_slice();
         let value = fixtures::join(&[b"[\"", name, b"\"]"]);
         let document = with(&engine_document(), b"\"components\":[]", &fixtures::join(&[b"\"components\":", &value]));
         assert_eq!(

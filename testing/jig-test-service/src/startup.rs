@@ -17,6 +17,8 @@ struct Parsed {
     second: connector::Config,
     initial: [Initial; 2],
     credential: Box<[u8]>,
+    accounts: bool,
+    workers: bool,
 }
 
 fn problem(path: Path, what: What) -> Problems {
@@ -58,6 +60,42 @@ fn integer(document: &Document, at: u32, path: &Path) -> Result<u64, Problems> {
     }
 }
 
+fn components(
+    document: &Document,
+    whole: &mut read::Object,
+    problems: &mut Problems,
+) -> Result<(bool, bool), Problems> {
+    let mut accounts = false;
+    let mut workers = false;
+    if let Some(at) = whole.member(document, b"service") {
+        let here = Path::root().member(b"service");
+        let mut service = object(document, at, &here)?;
+        if let Some(at) = service.member(document, b"components") {
+            let items = list(document, at, document.len(), &here.member(b"components"))?;
+            for (index, at) in items.iter().enumerate() {
+                let here = indexed(&here.member(b"components"), index);
+                let name = text(document, *at, 32, &here)?;
+                let what = match name.as_ref() {
+                    b"accounts" if !accounts => {
+                        accounts = true;
+                        continue;
+                    }
+                    b"workers" if !workers => {
+                        workers = true;
+                        continue;
+                    }
+                    b"accounts" | b"workers" => What::Duplicate,
+                    b"clients" => What::Refers,
+                    _ => What::Unknown,
+                };
+                problems.push(here, what);
+            }
+        }
+        service.finish(document, &here, problems);
+    }
+    Ok((accounts, workers))
+}
+
 fn parse(input: &[u8]) -> Result<Parsed, Problems> {
     let length = u32::try_from(input.len()).or(Err(problem(Path::root(), What::Bound)))?;
     let bounds = config::DocumentLimits { bytes: length, tokens: length, depth: 32 };
@@ -76,23 +114,7 @@ fn parse(input: &[u8]) -> Result<Parsed, Problems> {
             problems.push(path.member(b"workers"), What::Refers);
         }
     }
-    if let Some(at) = whole.member(&document, b"service") {
-        let here = path.member(b"service");
-        let mut service = object(&document, at, &here)?;
-        if let Some(at) = service.member(&document, b"components") {
-            let items = list(&document, at, document.len(), &here.member(b"components"))?;
-            for (index, at) in items.iter().enumerate() {
-                let here = indexed(&here.member(b"components"), index);
-                let name = text(&document, *at, 32, &here)?;
-                let what = match name.as_ref() {
-                    b"accounts" | b"workers" | b"clients" => What::Refers,
-                    _ => What::Unknown,
-                };
-                problems.push(here, what);
-            }
-        }
-        service.finish(&document, &here, &mut problems);
-    }
+    let (accounts, workers) = components(&document, &mut whole, &mut problems)?;
     whole.finish(&document, &path, &mut problems);
     if !problems.is_empty() {
         return Err(problems);
@@ -140,7 +162,16 @@ fn parse(input: &[u8]) -> Result<Parsed, Problems> {
     }
     let first = connector_config(&document, *items.get(0).expect("two connectors"), 0, &limits.root.connector)?;
     let second = connector_config(&document, *items.get(1).expect("two connectors"), 1, &limits.root.connector)?;
-    Ok(Parsed { engine, limits, first: first.0, second: second.0, initial: [first.1, second.1], credential })
+    Ok(Parsed {
+        engine,
+        limits,
+        first: first.0,
+        second: second.0,
+        initial: [first.1, second.1],
+        credential,
+        accounts,
+        workers,
+    })
 }
 
 fn indexed(path: &Path, index: usize) -> Path {
@@ -237,8 +268,7 @@ pub fn named(document: &[u8]) -> Result<List<Box<[u8]>>, Problems> {
     Ok(names)
 }
 
-pub fn startup(document: &[u8], files: &Files, _agent: Option<&Agent>, seeds: &Seeds) -> Result<Service, Problems> {
-    let mut parsed = parse(document)?;
+fn check_files(parsed: &Parsed, files: &Files) -> Result<(), Problems> {
     let mut problems = Problems::empty();
     for file in config::files(&parsed.engine) {
         let mut found = None;
@@ -263,6 +293,18 @@ pub fn startup(document: &[u8], files: &Files, _agent: Option<&Agent>, seeds: &S
     if !problems.is_empty() {
         return Err(problems);
     }
+    Ok(())
+}
+
+pub fn startup(
+    document: &[u8],
+    files: &Files,
+    _agent: Option<&Agent>,
+    seeds: &Seeds,
+    runtime: Option<crate::AccountsRuntime>,
+) -> Result<Service, Problems> {
+    let mut parsed = parse(document)?;
+    check_files(&parsed, files)?;
     for charter in &mut parsed.engine.charters {
         for (name, contents) in &files.entries {
             if *name == charter.policy.instructions {
@@ -271,13 +313,66 @@ pub fn startup(document: &[u8], files: &Files, _agent: Option<&Agent>, seeds: &S
             }
         }
     }
+    let trust = match &runtime {
+        Some(runtime) if runtime.trust_roots > 0 => {
+            skein_tls::roots_worst_case(runtime.trust_roots, runtime.trust_root_bytes)
+        }
+        Some(_) | None => Some(0),
+    }
+    .ok_or(problem(Path::root().member(b"engine").member(b"memory_bytes"), What::Bound))?;
+    let configured = crate::workers::configured_bytes(&parsed.engine)
+        .ok_or(problem(Path::root().member(b"engine").member(b"memory_bytes"), What::Bound))?;
     let bytes = limits::worst_case(&parsed.limits)
+        .ok_or(problem(Path::root().member(b"engine").member(b"memory_bytes"), What::Bound))?
+        .checked_add(trust)
+        .ok_or(problem(Path::root().member(b"engine").member(b"memory_bytes"), What::Bound))?;
+    let bytes = bytes
+        .checked_add(configured)
         .ok_or(problem(Path::root().member(b"engine").member(b"memory_bytes"), What::Bound))?;
     if let Err(what) = config::fits(parsed.engine.memory, &[config::Share { name: b"service", bytes }]) {
         return Err(problem(Path::root().member(b"engine").member(b"memory_bytes"), what));
     }
     parsed.first.deployment = seeds.deployment;
     parsed.second.deployment = seeds.deployment;
+    let max = root::max_out(&parsed.limits.root);
+    let accounts = if parsed.accounts {
+        Some(crate::accounts::Accounts::new(
+            &parsed.engine,
+            files,
+            seeds,
+            runtime,
+            max.checked_mul(6).expect("account routing room"),
+        )?)
+    } else {
+        None
+    };
+    let workers = if parsed.workers {
+        Some(crate::workers::Workers::new(
+            &parsed.engine,
+            files,
+            seeds.deployment,
+            &parsed.limits.workers,
+            max.checked_mul(2)
+                .expect("engine routes")
+                .checked_mul(jig_protocol_engine_workers::MAX_OUT_DOWN)
+                .expect("worker routing room"),
+        )?)
+    } else {
+        None
+    };
+    let mut application = skein_lib::Map::with_capacity(parsed.limits.root.core.accounts.credentials);
+    let credential = files.contents(&parsed.credential).expect("credential file checked");
+    if credential.len() > usize::try_from(parsed.limits.root.connector.value_bytes).expect("credential bound") {
+        return Err(problem(Path::root().member(b"application").member(b"credential"), What::Bound));
+    }
+    application.insert(1, config::secret(credential.into())).expect("one application credential");
+    let values = crate::values::Values {
+        application,
+        accounts: jig_protocol_accounts::table::Table::new(
+            parsed.limits.root.core.accounts.accounts.checked_add(1).expect("numbered accounts"),
+            parsed.limits.accounts.client.document.token_bytes,
+        ),
+    };
     let core = config::core(&parsed.engine, seeds.deployment, seeds.seed);
     let root = root::Config { core, first: parsed.first, second: parsed.second };
     let connector = parsed.limits.root.connector;
@@ -289,6 +384,6 @@ pub fn startup(document: &[u8], files: &Files, _agent: Option<&Agent>, seeds: &S
             system.seed(resource, state).expect("configuration checked resource count");
         }
     }
-    let engine = Engine::new(root, &parsed.limits.root, systems);
+    let engine = Engine::new(root, &parsed.limits.root, systems, accounts, workers, values);
     Ok(Service::new(engine, parsed.limits.io, bytes))
 }

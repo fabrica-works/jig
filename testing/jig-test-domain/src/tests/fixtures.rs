@@ -176,6 +176,7 @@ pub fn run() -> Box<core::RunCharter> {
 }
 pub fn assignment() -> Assignment {
     Assignment {
+        brief: Box::new([]),
         conversation: 1,
         task: RUN.raw(),
         attempt: ATTEMPT.raw(),

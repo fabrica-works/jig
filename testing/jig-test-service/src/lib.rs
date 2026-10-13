@@ -2,7 +2,12 @@
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 extern crate alloc;
+mod accounts;
 mod boundary;
+mod tools;
+mod values;
+mod workers;
+pub use accounts::AccountsRuntime;
 mod engine;
 pub mod limits;
 mod route;
@@ -27,12 +32,14 @@ pub struct Agent {
     pub bounds: jig_domain_host::Bounds,
 }
 
-#[derive(Debug)]
+#[expect(missing_debug_implementations, reason = "the service owns protocol account credentials")]
 pub struct Service {
     io: Io,
     io_env: Env<io::Limits>,
     completions: Queue<Complete>,
     submissions: Queue<Submit>,
+    raw_submissions: Queue<Submit>,
+    kernel: accounts::Kernel,
     told: Queue<io::Event>,
     engine: Engine,
     signals: Option<Token>,
@@ -48,6 +55,10 @@ impl Service {
             io_env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
             completions: Queue::with_capacity(queue),
             submissions: Queue::with_capacity(queue),
+            raw_submissions: Queue::with_capacity(queue),
+            kernel: accounts::Kernel::new(
+                io::operations(&limits).expect("io operations").checked_add(2).expect("file operations"),
+            ),
             told: Queue::with_capacity(queue),
             engine,
             signals: None,
@@ -87,7 +98,7 @@ impl Service {
     }
     #[must_use]
     pub fn operations(&self) -> u32 {
-        io::operations(&self.io_env.limits).expect("checked io operations")
+        io::operations(&self.io_env.limits).expect("checked io operations").checked_add(2).expect("file operations")
     }
     #[must_use]
     pub fn next_policy_deadline(&self) -> Option<Time> {
@@ -109,6 +120,7 @@ impl Service {
             || self.io.is_due(now)
             || !self.completions.is_empty()
             || !self.told.is_empty()
+            || !self.raw_submissions.is_empty()
             || self.engine.work_pending(now)
             || (self.engine.end.is_some() && self.signals.is_some() && !self.signals_closing)
     }
@@ -119,6 +131,12 @@ impl Service {
             && self.completions.is_empty()
             && self.submissions.is_empty()
             && self.told.is_empty()
+            && self.raw_submissions.is_empty()
+            && self.kernel.is_empty()
+            && match &self.engine.accounts {
+                Some(accounts) => accounts.is_empty(),
+                None => true,
+            }
     }
     pub fn shutdown(&mut self) {
         if self.shutdowns == 0 {
@@ -128,19 +146,42 @@ impl Service {
             self.engine.end = Some(End::Aborted);
         }
     }
+    fn route_components(&mut self) {
+        if let Some(workers) = &mut self.engine.workers {
+            for _ in 0..workers.io.len() {
+                if self.raw_submissions.room() < io::MAX_OUT_DOWN.submissions {
+                    break;
+                }
+                let request = workers.io.pop().expect("worker io requests");
+                io::down(&mut self.io, &self.io_env, request, &mut self.raw_submissions);
+            }
+        }
+        if let Some(accounts) = &mut self.engine.accounts {
+            for _ in 0..accounts.io.len() {
+                if self.raw_submissions.room() < io::MAX_OUT_DOWN.submissions {
+                    break;
+                }
+                let request = accounts::tag(accounts.io.pop().expect("account io requests"));
+                io::down(&mut self.io, &self.io_env, request, &mut self.raw_submissions);
+            }
+        }
+    }
     fn room(&self, max: io::MaxOut) -> bool {
-        self.told.room() >= max.events && self.submissions.room() >= max.submissions
+        self.told.room() >= max.events && self.raw_submissions.room() >= max.submissions
     }
 }
 
 pub fn iterate(service: &mut Service, now: Time, wall: Wall) {
     service.io_env.now = now;
     service.io_env.wall = wall;
+    if let Some(accounts) = &mut service.engine.accounts {
+        accounts.clock(now, wall);
+    }
     for _ in 0..service.io_env.limits.sockets.checked_add(service.io_env.limits.refusals).expect("io entries") {
         if !service.io.is_ready() || !service.room(io::MAX_OUT_RESUME) {
             break;
         }
-        io::resume(&mut service.io, &service.io_env, &mut service.told, &mut service.submissions);
+        io::resume(&mut service.io, &service.io_env, &mut service.told, &mut service.raw_submissions);
     }
     if !service.io.is_ready() {
         for _ in 0..service.completions.len() {
@@ -148,49 +189,79 @@ pub fn iterate(service: &mut Service, now: Time, wall: Wall) {
                 break;
             }
             let complete = service.completions.pop().expect("completion count");
-            io::up(&mut service.io, &service.io_env, complete, &mut service.told, &mut service.submissions);
+            let file_pending = pending_files(service.engine.accounts.as_ref());
+            let (files, complete) = service.kernel.complete(complete, &service.raw_submissions, file_pending);
+            if files {
+                service.engine.accounts.as_mut().expect("file operation has accounts").complete(complete);
+            } else {
+                io::up(&mut service.io, &service.io_env, complete, &mut service.told, &mut service.raw_submissions);
+            }
         }
         if service.completions.is_empty() {
             for _ in 0..service.io_env.limits.sockets.checked_mul(2).expect("io timers") {
                 if !service.io.is_due(now) || !service.room(io::MAX_OUT_FIRE) {
                     break;
                 }
-                io::fire(&mut service.io, &service.io_env, &mut service.told, &mut service.submissions);
+                io::fire(&mut service.io, &service.io_env, &mut service.told, &mut service.raw_submissions);
             }
         }
     }
     for _ in 0..service.told.len() {
-        if service.engine.events.room() == 0 {
+        if !service.engine.io_room() {
             break;
         }
-        match service.told.pop().expect("io event count") {
-            io::Event::Shutdown { .. } => service.shutdown(),
-            io::Event::Closed { .. } => service.signals = None,
-            io::Event::Failed { .. }
-            | io::Event::Listening { .. }
-            | io::Event::Accepted { .. }
-            | io::Event::Connecting { .. }
-            | io::Event::Connected { .. }
-            | io::Event::Stream { .. }
-            | io::Event::Output { .. }
-            | io::Event::Spawned { .. }
-            | io::Event::Exited { .. }
-            | io::Event::Usage { .. }
-            | io::Event::Resized
-            | io::Event::Window { .. } => service.engine.end = Some(End::Stopped(Stop::Listener)),
+        let event = service.told.pop().expect("io event count");
+        if let io::Event::Shutdown { .. } = event {
+            service.shutdown();
+            continue;
+        }
+        if workers::owner(&event) == Some(Token::new(1)) {
+            if let io::Event::Closed { .. } = event {
+                service.signals = None;
+            }
+            continue;
+        }
+        if match workers::owner(&event) {
+            Some(owner) => accounts::owns(owner),
+            None => false,
+        } {
+            if let Some(accounts) = &mut service.engine.accounts {
+                accounts.up(accounts::untag(event));
+            }
+        } else if let Some(workers) = &mut service.engine.workers {
+            if !workers.up(now, event, &mut service.engine.events) {
+                service.engine.end = Some(End::Stopped(Stop::Listener));
+            }
+        } else {
+            service.engine.end = Some(End::Stopped(Stop::Listener));
         }
     }
     engine::iterate(&mut service.engine, now, wall);
     if service.engine.end.is_some()
         && !service.signals_closing
-        && service.submissions.room() >= io::MAX_OUT_DOWN.submissions
+        && service.raw_submissions.room() >= io::MAX_OUT_DOWN.submissions
         && let Some(entity) = service.signals
     {
         service.signals_closing = true;
-        io::down(&mut service.io, &service.io_env, io::Request::Close { entity }, &mut service.submissions);
+        io::down(&mut service.io, &service.io_env, io::Request::Close { entity }, &mut service.raw_submissions);
+    }
+    service.engine.abort_if_ended();
+    service.route_components();
+    service.kernel.publish(false, &mut service.raw_submissions, &mut service.submissions);
+    if let Some(accounts) = &mut service.engine.accounts {
+        service.kernel.publish(true, &mut accounts.submitted, &mut service.submissions);
     }
     service.io.reclaim();
 }
 
 #[cfg(test)]
 mod tests;
+
+fn account_submissions(accounts: &accounts::Accounts) -> &Queue<Submit> {
+    &accounts.submitted
+}
+
+fn pending_files(accounts: Option<&accounts::Accounts>) -> Option<&Queue<Submit>> {
+    let accounts = accounts?;
+    Some(account_submissions(accounts))
+}

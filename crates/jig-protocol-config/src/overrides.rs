@@ -8,6 +8,7 @@ pub fn apply(limits: &mut Limits, name: &[u8], value: u64) -> Result<(), What> {
     let Limits { core, hub, link, token, .. } = limits;
     if name == b"accounts.token" {
         *token = count(value)?;
+        limits.driver.client.document.token_bytes = *token;
         return Ok(());
     }
     let dot = bytes::find(name, b".").ok_or(What::Override)?;

@@ -34,6 +34,7 @@ pub struct Limits {
     pub hub: host::Limits,
     pub link: Link,
     pub token: u32,
+    pub driver: skein_oauth_accounts::Limits,
     pub io: skein_io::Limits,
     pub journal: skein_lib::JournalLimits,
     pub routes: u32,

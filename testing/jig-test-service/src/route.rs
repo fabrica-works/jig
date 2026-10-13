@@ -11,7 +11,7 @@ pub(super) fn request(engine: &mut Engine, request: root::Request) {
         root::Request::Deliver(delivery) => deliver(engine, delivery),
         root::Request::Now(now) => immediate(engine, now),
         root::Request::Busy { event } => engine.outputs.push(PartyOutput::Busy(event)),
-        root::Request::ReadResult { .. } => stop::unavailable(engine, b"workers"),
+        root::Request::ReadResult { payload, outcome } => engine.events.push(crate::tools::result(payload, &outcome)),
         root::Request::Stop => stop::invalid_restore(engine),
     }
 }
@@ -47,11 +47,22 @@ fn deliver(engine: &mut Engine, delivery: root::Delivery) {
         held @ (root::Delivery::ApplicationDocument { .. }
         | root::Delivery::ApplicationRead { .. }
         | root::Delivery::Application { .. }) => engine.outputs.push(PartyOutput::Held(held)),
-        root::Delivery::Link { .. }
-        | root::Delivery::Assigned { .. }
-        | root::Delivery::Message { .. }
-        | root::Delivery::CallAnswer { .. }
-        | root::Delivery::CallBusy { .. } => stop::unavailable(engine, b"workers"),
+        root::Delivery::Link { channel, down } => {
+            if let jig_domain_host::LinkDown::Relayed { call, .. } = &down {
+                engine.tools.forget_name(call);
+            }
+            if let Some(workers) = &mut engine.workers {
+                workers.send(engine.env.now, channel, down, &engine.values, &mut engine.events);
+            }
+        }
+        root::Delivery::Assigned { channel, assignment } => {
+            if let Some(workers) = &mut engine.workers {
+                workers.assignment(engine.env.now, channel, assignment, &engine.values, &mut engine.events);
+            }
+        }
+        root::Delivery::Message { .. } | root::Delivery::CallAnswer { .. } | root::Delivery::CallBusy { .. } => {
+            stop::unavailable(engine, b"workers");
+        }
     }
 }
 
@@ -108,21 +119,30 @@ fn immediate(engine: &mut Engine, now: core::Now) {
             engine.stores.push(StoreRequest::Load(value));
         }
         // Configuration is parsed whole; inactive account components receive no requests.
-        core::Now::Account(_) => {}
+        core::Now::Account(request) => {
+            if let Some(accounts) = &mut engine.accounts {
+                accounts.request(request);
+            }
+        }
         value @ (core::Now::SignInRefused { .. } | core::Now::WatchRefused { .. } | core::Now::RunText { .. }) => {
             engine.outputs.push(PartyOutput::Now(value));
         }
+        core::Now::Call { to, run, attempt, call } => engine.events.push(engine.tools.decode(to, run, attempt, &call)),
+        core::Now::EffectAnswer { to, key, part } => {
+            if let Some(event) = engine.tools.render(to, key, &part, false) {
+                engine.events.push(event);
+            }
+        }
+        core::Now::DropCall { call } => {
+            engine.tools.forget_name(&call.name);
+        }
+        core::Now::NoteBusy { key, .. } | core::Now::SettledCallRefused { key, .. } => engine.tools.forget(key),
         core::Now::CallBusy { .. }
         | core::Now::Relayed { .. }
-        | core::Now::EffectAnswer { .. }
-        | core::Now::SettledCallRefused { .. }
-        | core::Now::Call { .. }
-        | core::Now::DropCall { .. }
         | core::Now::Undelivered { .. }
         | core::Now::NotesIndexed { .. }
         | core::Now::NotesRecalled { .. }
-        | core::Now::NotesRefused { .. }
-        | core::Now::NoteBusy { .. } => stop::unavailable(engine, b"accounts"),
+        | core::Now::NotesRefused { .. } => stop::unavailable(engine, b"accounts"),
         core::Now::DropPayload { .. }
         | core::Now::DropAssignment { .. }
         | core::Now::TurnPayload { .. }
@@ -157,6 +177,32 @@ fn core_held(engine: &mut Engine, held: core::Held) {
         core::Held::MakeEffect { connector: number, entry } => {
             engine.events.push(root::Event::Connector { number, event: connector::Event::Make { entry } });
         }
+        core::Held::TurnBusy { channel, run, attempt, turn } => {
+            if let Some(workers) = &mut engine.workers {
+                workers.down(
+                    engine.env.now,
+                    jig_protocol_engine_workers::Event::TurnBusy { channel, run, attempt, turn },
+                    &mut engine.events,
+                );
+            }
+        }
+        core::Held::Refuse { channel } => {
+            if let Some(workers) = &mut engine.workers {
+                workers.down(
+                    engine.env.now,
+                    jig_protocol_engine_workers::Event::NotAdmitted {
+                        channel,
+                        text: b"not admitted".as_slice().into(),
+                    },
+                    &mut engine.events,
+                );
+            }
+        }
+        core::Held::CallAnswer { to, key, part } => {
+            if let Some(event) = engine.tools.render(to, key, &part, true) {
+                engine.events.push(event);
+            }
+        }
         core::Held::Assign { .. }
         | core::Held::Grant { .. }
         | core::Held::Relayed { .. }
@@ -167,13 +213,10 @@ fn core_held(engine: &mut Engine, held: core::Held) {
         | core::Held::TaskTurnKept { .. }
         | core::Held::AcknowledgeTurn { .. }
         | core::Held::Cancel { .. }
-        | core::Held::Refuse { .. }
-        | core::Held::TurnBusy { .. }
         | core::Held::StopRun { .. } => stop::unavailable(engine, b"workers"),
-        core::Held::SettledCall { .. }
-        | core::Held::CallAnswer { .. }
-        | core::Held::NotesWritten { .. }
-        | core::Held::NotesDeleted { .. } => stop::unavailable(engine, b"accounts"),
+        core::Held::SettledCall { .. } | core::Held::NotesWritten { .. } | core::Held::NotesDeleted { .. } => {
+            stop::unavailable(engine, b"accounts");
+        }
         core::Held::Applied { .. }
         | core::Held::ApplicationDelivery { .. }
         | core::Held::ApplicationWatchEnded { .. } => stop::invalid_restore(engine),

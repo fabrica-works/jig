@@ -600,6 +600,9 @@ dependencies = [
  "skein-io",
  "skein-json",
  "skein-lib",
+ "skein-oauth",
+ "skein-oauth-accounts",
+ "skein-tls",
 ]
 
 [[package]]
@@ -761,6 +764,7 @@ version = "0.0.0"
 dependencies = [
  "jig-domain-accounts",
  "jig-domain-authority",
+ "jig-domain-brief",
  "jig-domain-core",
  "jig-domain-fleet",
  "jig-domain-host",
@@ -787,15 +791,29 @@ dependencies = [
 name = "jig-test-service"
 version = "0.0.0"
 dependencies = [
+ "jig-domain-accounts",
+ "jig-domain-brief",
  "jig-domain-core",
+ "jig-domain-fleet",
  "jig-domain-host",
  "jig-domain-people",
+ "jig-domain-tasks",
+ "jig-protocol-accounts",
+ "jig-protocol-charter",
  "jig-protocol-config",
+ "jig-protocol-engine-workers",
+ "jig-protocol-tools",
+ "jig-protocol-worker-wire",
  "jig-test-connector",
  "jig-test-domain",
+ "skein-channel",
  "skein-io",
  "skein-json",
  "skein-lib",
+ "skein-oauth",
+ "skein-oauth-accounts",
+ "skein-tls",
+ "smith-channel",
  "smith-host-protocol",
  "smith-protocol-channel",
 ]

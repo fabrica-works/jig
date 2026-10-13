@@ -8,6 +8,9 @@ publish.workspace = true
 
 [dependencies]
 skein-http.workspace = true
+skein-oauth.workspace = true
+skein-oauth-accounts.workspace = true
+skein-tls.workspace = true
 jig-protocol-client-wire.workspace = true
 jig-protocol-engine-clients.workspace = true
 jig-domain-core.workspace = true

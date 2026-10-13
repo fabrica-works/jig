@@ -10,6 +10,8 @@ publish.workspace = true
 skein-lib.workspace = true
 skein-io.workspace = true
 skein-json.workspace = true
+skein-tls.workspace = true
+smith-channel.workspace = true
 jig-domain-core.workspace = true
 jig-domain-people.workspace = true
 jig-domain-host.workspace = true
@@ -18,6 +20,19 @@ jig-test-connector.workspace = true
 jig-protocol-config.workspace = true
 smith-protocol-channel.workspace = true
 smith-host-protocol.workspace = true
+
+skein-channel.workspace = true
+skein-oauth.workspace = true
+skein-oauth-accounts.workspace = true
+jig-domain-accounts.workspace = true
+jig-domain-brief.workspace = true
+jig-domain-fleet.workspace = true
+jig-domain-tasks.workspace = true
+jig-protocol-accounts.workspace = true
+jig-protocol-charter.workspace = true
+jig-protocol-tools.workspace = true
+jig-protocol-worker-wire.workspace = true
+jig-protocol-engine-workers.workspace = true
 
 [lints]
 workspace = true

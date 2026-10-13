@@ -24,3 +24,9 @@ pub use charter::charter;
 pub use encode::{EndpointName, encode};
 pub use identity::run_identity;
 pub use result::{Field, RunResult, Unreadable, result};
+
+/// The encoding ceilings already owned by this kit (protocol/channel.md, 6.1).
+#[must_use]
+pub const fn limits() -> smith_charter::v2::Limits {
+    smith_charter::v2::CEILINGS
+}

@@ -551,7 +551,8 @@ fn configuration_links_only_its_vocabulary_and_foundation() {
         .expect("configuration manifest");
     for dependency in &config.dependencies {
         assert!(
-            ["skein-lib", "skein-json", "skein-io"].contains(&dependency.as_str())
+            ["skein-lib", "skein-json", "skein-io", "skein-oauth", "skein-oauth-accounts", "skein-tls"]
+                .contains(&dependency.as_str())
                 || CORE_FAMILY.contains(&dependency.as_str())
                 || ["jig-domain-host", "jig-protocol-engine-clients", "jig-protocol-client-wire", "skein-http"]
                     .contains(&dependency.as_str()),

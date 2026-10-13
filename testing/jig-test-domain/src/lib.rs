@@ -108,6 +108,8 @@ pub enum Delivery {
 /// The root's assembled, worker assignment.
 #[derive(Debug)]
 pub struct Assignment {
+    /// Ordered sections selected by the brief child, typed until protocol routing.
+    pub brief: Box<[jig_domain_brief::GatherPlaced]>,
     /// The conversation's first attempt, shared by its resumes.
     pub conversation: u64,
     /// Claimed task and activation fence.
@@ -316,6 +318,7 @@ pub struct Domain {
     links: Set<Token>,
     busy: Queue<Box<Event>>,
     assignments: Map<u64, Assignment>,
+    briefs: Map<u64, Box<[jig_domain_brief::GatherPlaced]>>,
     workspace_writes: Map<u64, Box<[tasks::Name]>>,
     procedure_steps: Map<u64, (u64, u16)>,
     effects: Map<Token, connector::Effect>,
@@ -391,6 +394,7 @@ impl Domain {
             links: Set::with_capacity(limits.core.fleet.workers),
             busy: Queue::with_capacity(limits.routes),
             assignments: Map::with_capacity(limits.core.tasks.tasks),
+            briefs: Map::with_capacity(limits.core.tasks.tasks),
             workspace_writes: Map::with_capacity(limits.core.tasks.tasks),
             procedure_steps: Map::with_capacity(limits.core.tasks.tasks),
             effects: Map::with_capacity(

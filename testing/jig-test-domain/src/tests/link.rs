@@ -147,3 +147,122 @@ fn a_start_refusal_reaches_the_core_as_invalid_without_reading_a_result() {
     };
     assert_eq!(end, tasks::End::Failed(tasks::Class::Invalid));
 }
+
+fn core_request(request: core::Request) -> core::Requests {
+    let mut out = Queue::with_capacity(1);
+    out.push(request);
+    core::Requests::Out(out)
+}
+fn gather_brief(
+    domain: &mut crate::Domain,
+    env: &skein_lib::Env<crate::Limits>,
+    decision: &mut skein_lib::Decision<crate::Write, Delivery>,
+    work: &mut Queue<crate::Work>,
+) {
+    use jig_domain_brief::{Core, Planned};
+    let mut sections = skein_lib::List::with_capacity(2);
+    for (kind, text) in [(Core::Task, b"request".as_slice()), (Core::Results, b"previous".as_slice())] {
+        sections
+            .push(Planned::Core { kind, text: text.into(), limit: 32, priority: 0, required: true })
+            .expect("sections");
+    }
+    crate::routes::route_core(
+        domain,
+        env,
+        decision,
+        core_request(core::Request::Now(Box::new(core::Now::BriefCorePlanned {
+            task: fixtures::RUN.raw(),
+            parent: None,
+            sections,
+        }))),
+        work,
+    );
+    let crate::Work::Core(core::Event::Brief(event)) = work.pop().expect("brief planned") else {
+        panic!("brief child");
+    };
+    let mut completed = Queue::with_capacity(jig_domain_brief::gather_max_out(&env.limits.core.brief));
+    jig_domain_brief::gather_step(
+        &mut domain.core.brief,
+        &skein_lib::Env { now: env.now, wall: env.wall, limits: env.limits.core.brief },
+        event,
+        &mut completed,
+    );
+    let jig_domain_brief::GatherRequest::Complete { brief, order } = completed.pop().expect("completed brief") else {
+        panic!("complete typed sections");
+    };
+    crate::routes::route_core(
+        domain,
+        env,
+        decision,
+        core_request(core::Request::Now(Box::new(core::Now::CompleteBrief { brief, order }))),
+        work,
+    );
+}
+fn prepare_brief_assignment(
+    domain: &mut crate::Domain,
+    env: &skein_lib::Env<crate::Limits>,
+    decision: &mut skein_lib::Decision<crate::Write, Delivery>,
+    work: &mut Queue<crate::Work>,
+) {
+    let fixture = fixtures::assignment();
+    domain.workspace_writes.insert(fixture.task, Box::default()).expect("workspace");
+    crate::routes::route_core(
+        domain,
+        env,
+        decision,
+        core_request(core::Request::Now(Box::new(core::Now::RunPrepared {
+            task: fixture.task,
+            attempt: fixture.attempt,
+            conversation: fixture.conversation,
+            charter: fixture.charter,
+            run: fixture.run,
+            messages: fixture.messages,
+            transcript: fixture.transcript,
+            saved: Box::default(),
+            answered: Box::default(),
+            grants: fixture.grants,
+        }))),
+        work,
+    );
+    crate::routes::route_core(
+        domain,
+        env,
+        decision,
+        core_request(core::Request::Held(Box::new(core::Held::Assign {
+            channel: fixtures::CHANNEL,
+            run: fixtures::RUN,
+            attempt: fixtures::ATTEMPT,
+            activation: 3,
+            assignment: fleet::Assignment { turns: fixtures::RUN, answered: fixtures::RUN },
+        }))),
+        work,
+    );
+}
+#[test]
+fn an_assignment_carries_its_brief_s_sections_in_order() {
+    let mut domain = fixtures::domain();
+    let env = fixtures::env();
+    let mut decision = domain.journal.decision(&JournalRoom { writes: 0, held: 1 }).expect("assignment room");
+    let mut work = fixtures::work();
+    gather_brief(&mut domain, &env, &mut decision, &mut work);
+    prepare_brief_assignment(&mut domain, &env, &mut decision, &mut work);
+    domain.journal.accept(decision);
+    let mut released = Queue::with_capacity(8);
+    crate::release(&mut domain, &env, &mut released);
+    let Request::Deliver(Delivery::Assigned { assignment, .. }) = released.pop().expect("assignment") else {
+        panic!("typed assignment");
+    };
+    assert_eq!(
+        assignment.brief.as_ref(),
+        [
+            jig_domain_brief::GatherPlaced::Core {
+                kind: jig_domain_brief::Core::Task,
+                text: b"request".as_slice().into()
+            },
+            jig_domain_brief::GatherPlaced::Core {
+                kind: jig_domain_brief::Core::Results,
+                text: b"previous".as_slice().into()
+            },
+        ]
+    );
+}

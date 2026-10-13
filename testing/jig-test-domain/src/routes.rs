@@ -11,6 +11,7 @@ use jig_domain_tasks as tasks;
 use jig_test_connector as connector;
 use skein_lib::{Decision, Env, List, Queue, ReplyTo, Token};
 
+mod brief;
 mod workspace;
 
 use crate::{Delivery, Domain, Key, Limits, Record, Work, Write, hold, write};
@@ -334,7 +335,7 @@ fn route_now(
     work: &mut Queue<Work>,
 ) {
     match now {
-        core::Now::CallBusy { to } => crate::stopping::call(domain, to, work),
+        core::Now::CallBusy { to } | core::Now::NoteBusy { to, .. } => crate::stopping::call(domain, to, work),
         core::Now::Relayed { channel, run, attempt, call: name, answer } => {
             let delivery = crate::stopping::relayed(domain, channel, run, attempt, name, answer, false);
             let delivery = crate::link::down(domain, delivery);
@@ -365,9 +366,8 @@ fn route_now(
             })));
             domain.now.push(crate::Request::Now(value));
         }
-        core::Now::BriefCorePlanned { task, .. } => {
-            work.push(Work::Core(core::Event::BriefAssembled { task, ready: true }));
-        }
+        core::Now::BriefCorePlanned { task, sections, .. } => brief::plan(env, task, sections, work),
+        core::Now::CompleteBrief { brief: token, order } => brief::complete(domain, token, order, work),
         core::Now::WorkspaceRequest { task, attempt, context } => {
             let mut names = List::with_capacity(env.limits.core.tasks.holdings);
             let mut checks = List::with_capacity(env.limits.core.authority.writes);
@@ -425,6 +425,7 @@ fn route_now(
                             task,
                             attempt,
                             conversation,
+                            brief: domain.briefs.remove(&task).expect("completed brief"),
                             charter,
                             run,
                             messages,
@@ -441,6 +442,7 @@ fn route_now(
         }
         core::Now::RunPreparationFailed { task } | core::Now::DropAssignment { task } => {
             drop(domain.assignments.remove(&task));
+            drop(domain.briefs.remove(&task));
             drop(domain.workspace_writes.remove(&task));
         }
         core::Now::DropPayload { payload } => {
@@ -499,7 +501,7 @@ fn route_now(
             };
             work.push(Work::Core(core::Event::RefusedPayload { request, problem, payload }));
         }
-        core::Now::CompleteBrief { .. } | core::Now::RestoreRefused => {
+        core::Now::RestoreRefused => {
             unreachable!("this route awaits the testing application's scripted peer");
         }
         core::Now::ProcedureDelegateOutcome { task, step, child } => {
@@ -527,8 +529,7 @@ fn route_now(
         | core::Now::RunText { .. }
         | core::Now::NotesIndexed { .. }
         | core::Now::NotesRecalled { .. }
-        | core::Now::NotesRefused { .. }
-        | core::Now::NoteBusy { .. }) => domain.now.push(crate::Request::Now(other)),
+        | core::Now::NotesRefused { .. }) => domain.now.push(crate::Request::Now(other)),
     }
 }
 
