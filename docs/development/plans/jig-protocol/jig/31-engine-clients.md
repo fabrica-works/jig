@@ -559,11 +559,15 @@ restart's sweep is the store's (jig 17), not the component's. `/jig/v1/sign-in/p
 answer `Event::Provider { exchange, verdict }`: an identity signs in as
 the link does, a refusal answers `SignInAnswer::refused`; an unconfigured
 provider 404. `Event::Stop`: the listener stops admitting, new exchanges
-answered `not_ready`, open streams go on; `Event::Close`: each stream
+answered `not_ready`, open streams go on: a sign-in and a sign-out
+among them, `SignInAnswer::not_ready` and `SignOutAnswer::not_ready`,
+nothing committed, kept or erased and the link's secret not spent
+(`protocol/client.md`, 8, "While the engine stops"); `Event::Close`:
+each stream
 ended, each connection closed once its last bytes are written, then
 `Request::Closed`; `Event::Abort`: dropped at once, then
 `Request::Closed`.
-Needs: nothing beyond 31.5.
+Needs: 31.5; jig 30.s4 (the two `not_ready` answers).
 Files: `src/{sign_in.rs, routes.rs, component.rs, boundary.rs}`;
 `tests/engine-clients/tests/{sign_in.rs, closing.rs}`.
 Shape: as the interface sketch.
@@ -572,6 +576,8 @@ Test shape: `signing_out_erases_the_digest_and_refuses_the_token`,
 `a_provider_identity_signs_in_as_the_link_does`,
 `a_provider_refusal_signs_nobody_in`,
 `after_stop_a_new_exchange_is_answered_not_ready`,
+`after_stop_a_sign_in_and_a_sign_out_are_answered_not_ready` (the
+digest kept, the link still live),
 `close_ends_each_stream_then_says_closed`. Under 20 ms each.
 Proof: world, `heavy cargo nextest run -p jig-engine-clients-world
 --test closing`, run once: signing out erases the digest and refuses the

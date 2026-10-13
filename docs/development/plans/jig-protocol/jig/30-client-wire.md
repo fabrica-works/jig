@@ -434,6 +434,22 @@ Don't: change `ActivityTurn` or another record; read a turn in the
   client.
 Size: at most 80 lines of schema and Rust, generated code excluded.
 
+### 30.s4 A sign-in's and a sign-out's not ready
+
+A step not in the plan, from the designer's answer on jig 31.6 (jig
+`4af5f3d2`: `protocol/client.md`, 8, "While the engine stops";
+`domain/engine.md`, 6.1). A sign-in commits one and a sign-out ends one, so while the
+engine stops each is answered not ready; `SignInAnswer` has only
+`signed_in` and `refused`, `SignOutAnswer` only `signed_out`
+(`schema/client-v6.schema:10,12`).
+Shape: `enum SignInAnswer { signed_in: SignedIn, refused, not_ready }`,
+  `enum SignOutAnswer { signed_out, not_ready }`. The family's version
+  moves once; regenerated, goldens added.
+Test shape: both new variants round-trip.
+Proof: unit, `-p jig-protocol-client-wire` once.
+Don't: change another record, or `Answer`.
+Size: at most 20 lines of schema and Rust, generated code excluded.
+
 ## Interface sketches
 
 The schema, in skein's language (`codec.md`, section 3); records the

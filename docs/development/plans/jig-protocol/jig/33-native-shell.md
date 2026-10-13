@@ -135,7 +135,10 @@ skein HTTP client machines, each exchange with `Host`, `Content-Type:
 application/octet-stream`, `Content-Length` and `Authorization: Bearer`;
 each answer's body and the stream's bytes handed to the link; `sign_in(link)`
 and `sign_out()`, the shell's own exchanges, the client root's `Request::SignOut` (jig
-03) answered by `sign_out()` and `Event::SignedOut`. The world
+03) answered by `sign_out()` and `Event::SignedOut`; `not_ready` to
+either is *again*, nothing taken: `sign_in` hands it to its caller to
+send again, and a sign-out shows as not reaching the engine
+(`client/domain/client.md`, 12; jig 30.s4). The world
 `tests/client-protocol` (`jig-client-protocol-world`): `net.rs` (io for
 jig 31's component: `Listen` answered, a socket per client connection,
 its stream records joined to the client's connection through a `Wire`
