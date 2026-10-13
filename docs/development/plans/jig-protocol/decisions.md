@@ -1986,6 +1986,21 @@ the file.
      rulings 114's and 122's limits: each names the new version, names and
      every other expected value kept, no alias for the old version left
      behind. The README's Rules now say so for any family's version move.
+248. **smith-repin holds: smith's focused suite does not fit 15 s on
+     carbon-forge** (2026-10-13, the coordinator's block "smith repin:
+     full focused Proof global timeout with settle passed",
+     2026-10-13T08:41:01Z). With ruling 242's two fixes the settle test
+     passes (0.259 s in the suite, 0.086 s alone), but smith's focused
+     suite reached 930 of 1,921 tests at its 15 s budget. The code-graph
+     indexer's per-session processes ran at 590 % CPU then; the
+     supervisor set all 22 to idle priority, as ruling 144 did the
+     daemon. The designer's measure of the same suite ran 16.6 s, so it
+     is over budget here even unloaded. The user measures budgets on the
+     slowest machine and raises one only after the suite and its code are
+     made as cheap as they can be: smith-repin keeps its clean commit
+     `ecb78e34` and lands nothing until the user chooses between a test-
+     cost pass on smith's suite and another course. The closing jig and
+     temper repins wait; every other step goes on.
 
 ## For the user
 
