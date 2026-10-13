@@ -198,14 +198,6 @@ fn later_commits_do_not_replace_the_format_row() {
 }
 
 #[test]
-fn dropping_a_transcript_fails_without_submitting_the_commit() {
-    let mut store = committed_header();
-    let writes = Box::new([fixtures::header(2), Write::DropTranscript { task: 11 }]);
-    assert_failed(&commit(&mut store, 2, writes), 2);
-    assert_eq!(store.stores.store.last(), 1);
-}
-
-#[test]
 #[should_panic(expected = "the first root commit saves its deployment header")]
 fn the_first_commit_without_a_header_is_an_owners_bug() {
     let mut store = fixtures::opened();

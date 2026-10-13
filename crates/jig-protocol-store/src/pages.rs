@@ -62,7 +62,7 @@ pub(crate) fn walk(store: &mut Store, intervals: &[Range], after: Option<&Cursor
     Some(Walked { rows: found.into_boxed(), next: None })
 }
 
-fn past(key: &[u8]) -> Option<Box<[u8]>> {
+pub(crate) fn past(key: &[u8]) -> Option<Box<[u8]>> {
     let mut writer = KeyWriter::new(u32::MAX);
     for &byte in key {
         writer.tag(byte);
@@ -71,12 +71,12 @@ fn past(key: &[u8]) -> Option<Box<[u8]>> {
     writer.finish()
 }
 
-struct Page {
-    rows: Box<[skein_kv::Row]>,
-    next: Option<Box<[u8]>>,
+pub(crate) struct Page {
+    pub(crate) rows: Box<[skein_kv::Row]>,
+    pub(crate) next: Option<Box<[u8]>>,
 }
 
-fn load(store: &mut Store, range: Range) -> Option<Page> {
+pub(crate) fn load(store: &mut Store, range: Range) -> Option<Page> {
     let mut limits = store.limits.store;
     // A valid maximum-length key's exclusive cursor has one extra byte.
     // This widens range endpoints only; stored keys retain their own bound.

@@ -589,3 +589,204 @@ fn a_read_waiting_on_a_writer_keeps_its_durable_places() {
     assert_eq!(found, &turns);
     assert_eq!(next, None);
 }
+fn cut_open(length: Option<u64>, claimed: bool) -> (Store, Box<[Event]>, Below) {
+    let mut store = fixtures::over(fixtures::stores());
+    let mut ops = skein_lib::List::with_capacity(4);
+    ops.push(fixtures::format_put(fixtures::DEPLOYMENT)).expect("format");
+    ops.push(fixtures::header_put(fixtures::DEPLOYMENT, 1)).expect("header");
+    if claimed {
+        let record = fixtures::run_proof(LIVE);
+        ops.push(skein_kv::Op::Put {
+            key: crate::keys::encode(&record.key(), fixtures::KEY_LIMIT).expect("proof key"),
+            value: crate::codec::encode(&record, &store.codec).expect("proof"),
+        })
+        .expect("proof slot");
+    }
+    if let Some(length) = length {
+        ops.push(skein_kv::Op::Put {
+            key: crate::keys::encode_own(&crate::keys::Own::Transcript { task: LIVE }, fixtures::KEY_LIMIT)
+                .expect("place key"),
+            value: crate::codec::component::Transcript { length, window: 0 }.encode().expect("place"),
+        })
+        .expect("place slot");
+    }
+    fixtures::plant(&mut store.stores, ops.as_slice());
+    let mut above = Queue::with_capacity(crate::MAX_OUT_DOWN);
+    let mut below = fixtures::below();
+    crate::down(
+        &mut store,
+        &fixtures::env(),
+        crate::Request::Open { owner: Token::new(801), root: fixtures::ROOT },
+        &mut above,
+        &mut below,
+    );
+    (store, fixtures::events(&mut above), below)
+}
+fn cut_length(request: &file::Request) -> u64 {
+    let file::Request::Cut { length, .. } = request else {
+        panic!("cut request");
+    };
+    *length
+}
+fn cut_request(store: &mut Store, mut below: Below, len: u64) -> (file::Request, Below) {
+    let Some(file::Request::OpenWriteNoFollow { owner, name, .. }) = below.transcripts.pop() else {
+        panic!("claimed file open");
+    };
+    assert_eq!(&*name, b"0000000000000000/0000000000000015");
+    let (events, mut below) = fixtures::answer(
+        store,
+        Io::Transcripts(Arrived { event: file::Event::Opened { owner, file: Token::new(750), len }, fd: None }),
+    );
+    assert!(events.is_empty());
+    let request = below.transcripts.pop().expect("cut claimed file");
+    (request, below)
+}
+fn cut_done(store: &mut Store, request: file::Request, mut below: Below) -> Box<[Event]> {
+    below.transcripts.push(request);
+    fixtures::script(store, below, &[Answer::Cut, Answer::Synced, Answer::Closed])
+}
+fn opened(events: &[Event]) {
+    let [Event::Opened { owner, last }] = events else {
+        panic!("open after cuts: {events:?}");
+    };
+    assert_eq!(*owner, Token::new(801));
+    assert_eq!(*last, 1);
+}
+#[test]
+fn open_cuts_a_claimed_tasks_file_to_its_committed_length() {
+    let (mut store, events, below) = cut_open(Some(63), true);
+    assert!(events.is_empty());
+    let (request, below) = cut_request(&mut store, below, 120);
+    assert_eq!(cut_length(&request), 63);
+    opened(&cut_done(&mut store, request, below));
+}
+#[test]
+fn open_cuts_a_file_without_places_to_zero() {
+    let (mut store, events, below) = cut_open(None, true);
+    assert!(events.is_empty());
+    let (request, below) = cut_request(&mut store, below, 120);
+    assert_eq!(cut_length(&request), 0);
+    opened(&cut_done(&mut store, request, below));
+}
+#[test]
+fn open_leaves_a_missing_file_missing() {
+    let (mut store, events, below) = cut_open(Some(63), true);
+    assert!(events.is_empty());
+    opened(&fixtures::script(&mut store, below, &[Answer::Missing]));
+}
+#[test]
+fn open_leaves_an_ended_tasks_file_untouched() {
+    let (_, events, below) = cut_open(Some(63), false);
+    opened(&events);
+    assert!(below.transcripts.is_empty());
+}
+fn committed(events: &[Event], number: u64) {
+    let [Event::Committed { number: found, .. }] = events else {
+        panic!("committed terminal: {events:?}");
+    };
+    assert_eq!(*found, number);
+}
+fn drop_submit(store: &mut Store, number: u64, task: u64) -> (Box<[Event]>, Below) {
+    let mut above = Queue::with_capacity(crate::MAX_OUT_DOWN);
+    let mut below = fixtures::below();
+    crate::down(
+        store,
+        &fixtures::env(),
+        fixtures::commit(number, Box::new([fixtures::header(number), crate::Write::DropTranscript { task }])),
+        &mut above,
+        &mut below,
+    );
+    (fixtures::events(&mut above), below)
+}
+fn removed(store: &mut Store, below: Below, answer: Answer) -> Box<[Event]> {
+    fixtures::script(store, below, &[Answer::Closed, Answer::Opened { len: 0 }, answer, Answer::Synced, Answer::Closed])
+}
+fn attempt_place(store: &mut Store, attempt: u64) -> Option<Box<[u8]>> {
+    let key = crate::keys::encode_own(&crate::keys::Own::Attempt { task: LIVE, attempt }, fixtures::KEY_LIMIT)
+        .expect("attempt key");
+    fixtures::get_kv(store, &key)
+}
+fn transcript_place(store: &mut Store) -> Option<Box<[u8]>> {
+    let key =
+        crate::keys::encode_own(&crate::keys::Own::Transcript { task: LIVE }, fixtures::KEY_LIMIT).expect("place key");
+    fixtures::get_kv(store, &key)
+}
+fn dropped() -> Store {
+    let turns = [fixtures::turn(LIVE, 1, 1, b"one"), fixtures::turn(LIVE, 2, 1, b"two")];
+    let (mut store, _) = readable(&turns);
+    let (events, below) = drop_submit(&mut store, 3, LIVE);
+    assert!(events.is_empty());
+    removed(&mut store, below, Answer::Removed);
+    store
+}
+#[test]
+fn a_dropped_transcript_is_removed_before_its_commit() {
+    let (mut store, _) = readable(&pair());
+    let (events, below) = drop_submit(&mut store, 3, LIVE);
+    assert!(events.is_empty());
+    assert_eq!(store.stores.store.last(), 2);
+    let events = removed(&mut store, below, Answer::Removed);
+    committed(&events, 3);
+    assert_eq!(transcript_place(&mut store), None);
+}
+#[test]
+fn dropping_a_missing_file_is_not_a_failure() {
+    let (mut store, _) = readable(&pair());
+    let (_, below) = drop_submit(&mut store, 3, LIVE);
+    let events = removed(&mut store, below, Answer::NotFound);
+    committed(&events, 3);
+}
+#[test]
+fn places_without_a_file_read_as_unread() {
+    let (mut store, _) = readable(&pair());
+    let (_, below) = drop_submit(&mut store, 3, LIVE);
+    fixtures::script(&mut store, below, &[Answer::Closed, Answer::Opened { len: 0 }, Answer::Removed]);
+    assert!(transcript_place(&mut store).is_some());
+    let mut store = reopen(store);
+    let (_, below) = ask(&mut store, 801, forwards(None), 2, 4096);
+    unread(&fixtures::script(&mut store, below, &[Answer::Missing]));
+}
+#[test]
+fn a_drop_erases_the_transcript_place_and_leaves_its_attempts_as_orphans() {
+    let mut store = dropped();
+    assert_eq!(transcript_place(&mut store), None);
+    assert!(attempt_place(&mut store, 1).is_some());
+    assert!(attempt_place(&mut store, 2).is_some());
+}
+#[test]
+fn orphan_attempts_go_a_bounded_number_per_later_commit() {
+    let mut store = dropped();
+    submit(&mut store, 4, &[]);
+    assert_eq!(attempt_place(&mut store, 1), None);
+    assert!(attempt_place(&mut store, 2).is_some());
+    submit(&mut store, 5, &[]);
+    assert_eq!(attempt_place(&mut store, 2), None);
+    assert_eq!(store.stores.store.last(), 5);
+}
+#[test]
+fn open_queues_attempts_whose_transcript_place_is_gone() {
+    let mut store = reopen(dropped());
+    submit(&mut store, 4, &[]);
+    assert_eq!(attempt_place(&mut store, 1), None);
+    assert!(attempt_place(&mut store, 2).is_some());
+}
+#[test]
+fn orphan_erases_are_included_in_the_commits_operation_bound() {
+    let limits = fixtures::store_limits();
+    let sizes =
+        crate::sizes::check(&limits.core, &fixtures::APPLICATION, &limits.journal, &limits.store, 1).expect("fits");
+    assert_eq!(sizes.ops, 10);
+}
+#[test]
+fn dropping_a_transcript_fails_without_submitting_the_commit() {
+    let (mut store, _) = fixtures::opened_with_transcripts();
+    let (events, below) = drop_submit(&mut store, 2, 11);
+    assert!(events.is_empty());
+    let events = fixtures::script(
+        &mut store,
+        below,
+        &[Answer::Opened { len: 0 }, Answer::NotFound, Answer::Synced, Answer::Closed],
+    );
+    committed(&events, 2);
+    assert_eq!(store.stores.store.last(), 2);
+}

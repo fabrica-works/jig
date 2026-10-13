@@ -33,6 +33,7 @@ pub struct Limits {
     pub queue: u32,
     pub files: u32,
     pub reads: u32,
+    pub orphan_erases: u32,
 }
 
 /// Stores made by the caller, kept across a world's crash (store.md, 14).
@@ -74,6 +75,7 @@ impl Store {
             limits.reads >= limits.core.load_slots.checked_add(limits.core.tasks.tasks).expect("bounded readers"),
             "transcript readers fit party loads and all live task preparations"
         );
+        assert!(limits.orphan_erases > 0, "orphan cleanup makes progress");
         let codec = codec::limits(&limits.core).expect("the domain limits fit their families' ceilings");
         Store {
             limits: *limits,

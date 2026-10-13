@@ -1,4 +1,6 @@
 //! Transcript frames, queued commits and durable places (protocol/store.md, 8).
+pub(crate) mod cut;
+pub(crate) mod drop;
 pub mod frame;
 pub(crate) mod read;
 pub(crate) mod write;
@@ -16,6 +18,7 @@ pub(crate) struct Pending {
     pub number: u64,
     pub frames: Queue<Frame>,
     pub ops: Box<[skein_kv::Op]>,
+    pub drops: Queue<u64>,
 }
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Place {
@@ -41,6 +44,7 @@ pub(crate) enum Stage {
     Syncing,
     DirectorySync,
     DirectoryClose,
+    Dropping,
 }
 #[derive(Debug)]
 pub(crate) struct State {
@@ -55,6 +59,8 @@ pub(crate) struct State {
     pub touch: u64,
     pub reads: Map<Token, read::Read>,
     pub reading: Option<Token>,
+    pub cut: cut::State,
+    pub drop: drop::State,
 }
 impl State {
     pub fn new(limits: &Limits) -> State {
@@ -71,10 +77,12 @@ impl State {
             touch: 0,
             reads: Map::with_capacity(limits.reads),
             reading: None,
+            cut: cut::State::new(),
+            drop: drop::State::new(limits),
         }
     }
 }
-fn reservation_count(limits: &Limits) -> Option<u32> {
+pub(crate) fn reservation_count(limits: &Limits) -> Option<u32> {
     limits.queue.checked_add(1)?.checked_add(limits.store.queued)?.checked_mul(limits.journal.writes)
 }
 pub(crate) fn worst_case(limits: &Limits) -> Option<u64> {
@@ -89,8 +97,10 @@ pub(crate) fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(pending.checked_mul(u64::from(limits.queue.checked_add(1)?))?)?
         .checked_add(frame.checked_mul(u64::from(limits.journal.writes.checked_add(2)?))?)?
         .checked_add(
-            List::<skein_kv::Op>::worst_case(limits.journal.writes.checked_mul(2)?.checked_add(1)?)?
-                .checked_mul(u64::from(limits.queue.checked_add(3)?))?,
+            List::<skein_kv::Op>::worst_case(
+                limits.journal.writes.checked_mul(2)?.checked_add(1)?.checked_add(limits.orphan_erases)?,
+            )?
+            .checked_mul(u64::from(limits.queue.checked_add(3)?))?,
         )?
         .checked_add(List::<u64>::worst_case(count)?)?
         .checked_add(List::<(u64, u64)>::worst_case(count)?)?
@@ -98,6 +108,11 @@ pub(crate) fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Map::<(u64, u64), u64>::worst_case(count)?)?
         .checked_add(Map::<u64, File>::worst_case(limits.files)?)?
         .checked_add(read::worst_case(limits, &codec)?)?
+        .checked_add(u64::from(limits.store.key))?
+        .checked_add(drop::worst_case(limits)?)?
+        .checked_add(
+            Queue::<u64>::worst_case(limits.journal.writes)?.checked_mul(u64::from(limits.queue.checked_add(1)?))?,
+        )?
         .checked_add(64)
 }
 pub(crate) fn place(

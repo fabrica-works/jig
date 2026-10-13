@@ -102,7 +102,7 @@ fn a_recovery_beneath_the_store_stops_it() {
     let mut kv = Queue::with_capacity(skein_kv::MAX_OUT.above);
     kv.push(skein_kv::Event::Recovered { last: 0 });
     let mut above = Queue::with_capacity(crate::MAX_OUT_DOWN);
-    crate::directory::events_up(&mut store, false, &mut kv, &mut above);
+    crate::directory::events_up(&mut store, false, &mut kv, &mut above, &mut fixtures::below());
     assert_eq!(store.phase, Phase::Stopped);
 }
 #[test]

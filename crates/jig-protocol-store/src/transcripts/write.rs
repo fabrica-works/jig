@@ -58,7 +58,8 @@ pub(crate) fn fire(store: &mut Store, env: &Env<Limits>, above: &mut Queue<Event
         | Stage::Writing
         | Stage::Syncing
         | Stage::DirectorySync
-        | Stage::DirectoryClose => return,
+        | Stage::DirectoryClose
+        | Stage::Dropping => return,
     }
     for _ in 0..store.limits.queue.saturating_add(1) {
         if store.transcripts.current.is_none() {
@@ -70,6 +71,11 @@ pub(crate) fn fire(store: &mut Store, env: &Env<Limits>, above: &mut Queue<Event
         if let Some(frame) = pending.frames.pop() {
             store.transcripts.frame = Some(frame);
             start(store, above, below);
+            return;
+        }
+        if let Some(task) = pending.drops.pop() {
+            let number = pending.number;
+            super::drop::begin(store, number, &[task], above, below);
             return;
         }
         let pending = store.transcripts.current.take().expect("current commit");
@@ -300,7 +306,7 @@ pub(crate) fn arrived(
             store.transcripts.directory = None;
             finish(store, env, above, below);
         }
-        Stage::Idle => transcripts::failed(store, None, above),
+        Stage::Idle | Stage::Dropping => transcripts::failed(store, None, above),
     }
 }
 

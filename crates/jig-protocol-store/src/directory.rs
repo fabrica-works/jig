@@ -51,7 +51,7 @@ pub(crate) fn open(
 ) {
     if !store.directory.disk {
         store.directory.transcripts = Some(root);
-        open::open(store, owner, above);
+        open::open(store, owner, above, below);
         return;
     }
     store.directory.owner = owner;
@@ -190,7 +190,7 @@ fn directory(store: &mut Store, env: &Env<Limits>, arrived: Arrived, above: &mut
                 &mut events,
                 &mut below.store,
             );
-            events_up(store, false, &mut events, above);
+            events_up(store, false, &mut events, above, below);
             let kv_env = self::env(store, env, true);
             let mut events = Queue::with_capacity(skein_kv::MAX_OUT.above);
             skein_kv::down(
@@ -200,7 +200,7 @@ fn directory(store: &mut Store, env: &Env<Limits>, arrived: Arrived, above: &mut
                 &mut events,
                 &mut below.secrets,
             );
-            events_up(store, true, &mut events, above);
+            events_up(store, true, &mut events, above, below);
         }
         Opening::Idle | Opening::Stores => refuse(store, above),
     }
@@ -215,7 +215,11 @@ pub(crate) fn up(store: &mut Store, env: &Env<Limits>, io: Io, above: &mut Queue
         Io::Transcripts(arrived) => {
             match store.phase {
                 Phase::Ready { .. } => {
-                    if arrived.event.owner() == crate::transcripts::read::OWNER {
+                    if arrived.event.owner() == crate::transcripts::cut::OWNER {
+                        crate::transcripts::cut::arrived(store, arrived, above, below);
+                    } else if arrived.event.owner() == crate::transcripts::drop::OWNER {
+                        crate::transcripts::drop::arrived(store, env, arrived, above, below);
+                    } else if arrived.event.owner() == crate::transcripts::read::OWNER {
                         crate::transcripts::read::arrived(store, arrived, above, below);
                     } else {
                         crate::transcripts::write::arrived(store, env, arrived, above, below);
@@ -238,13 +242,14 @@ pub(crate) fn up(store: &mut Store, env: &Env<Limits>, io: Io, above: &mut Queue
     } else {
         skein_kv::up(&mut store.stores.store, &kv_env, arrived.event, &mut events, &mut below.store);
     }
-    events_up(store, secret, &mut events, above);
+    events_up(store, secret, &mut events, above, below);
 }
 pub(crate) fn events_up(
     store: &mut Store,
     secret: bool,
     events: &mut Queue<skein_kv::Event>,
     above: &mut Queue<Event>,
+    below: &mut Below,
 ) {
     for _ in 0..skein_kv::MAX_OUT.above {
         let Some(event) = events.pop() else {
@@ -254,7 +259,7 @@ pub(crate) fn events_up(
             skein_kv::Event::Opened { .. } => {
                 store.directory.opened |= if secret { 2 } else { 1 };
                 if store.directory.opened == 3 {
-                    open::open(store, store.directory.owner, above);
+                    open::open(store, store.directory.owner, above, below);
                 }
             }
             skein_kv::Event::Committed { owner, number } => {
@@ -299,6 +304,6 @@ pub(crate) fn fire(store: &mut Store, env: &Env<Limits>, above: &mut Queue<Event
         } else if skein_kv::is_ready(&store.stores.store, &kv_env.limits) {
             skein_kv::fire(&mut store.stores.store, &kv_env, &mut events, &mut below.store);
         }
-        events_up(store, secret, &mut events, above);
+        events_up(store, secret, &mut events, above, below);
     }
 }

@@ -4,7 +4,7 @@ use alloc::boxed::Box;
 use jig_domain_core::{CoreKey, CoreRecord, Key, Record};
 use skein_lib::{Queue, Token};
 
-pub(crate) fn open(store: &mut Store, owner: Token, above: &mut Queue<Event>) {
+pub(crate) fn open(store: &mut Store, owner: Token, above: &mut Queue<Event>, below: &mut crate::Below) {
     if store.phase != Phase::Closed {
         refuse(store, owner, OpenRefusal::Failed, above);
         return;
@@ -33,7 +33,7 @@ pub(crate) fn open(store: &mut Store, owner: Token, above: &mut Queue<Event>) {
                 above,
             );
         } else if last == 0 {
-            ready(store, owner, last, true, above);
+            ready(store, owner, last, true, above, below);
         } else {
             refuse(store, owner, OpenRefusal::Numbers { store: last, header: 0 }, above);
         }
@@ -65,7 +65,7 @@ pub(crate) fn open(store: &mut Store, owner: Token, above: &mut Queue<Event>) {
             } else if header.commits != last {
                 refuse(store, owner, OpenRefusal::Numbers { store: last, header: header.commits }, above);
             } else {
-                ready(store, owner, last, false, above);
+                ready(store, owner, last, false, above, below);
             }
         }
         Record::Core(
@@ -108,16 +108,24 @@ pub(crate) fn get(store: &mut Store, owner: Token, key: Box<[u8]>) -> Result<Opt
     }
 }
 
-fn ready(store: &mut Store, owner: Token, last: u64, format_due: bool, above: &mut Queue<Event>) {
+fn ready(
+    store: &mut Store,
+    owner: Token,
+    last: u64,
+    format_due: bool,
+    above: &mut Queue<Event>,
+    below: &mut crate::Below,
+) {
     let Some(next) = last.checked_add(1) else {
         refuse(store, owner, OpenRefusal::Failed, above);
         return;
     };
     store.phase = Phase::Ready { next, format_due };
-    above.push(Event::Opened { owner, last });
+    store.directory.owner = owner;
+    crate::transcripts::cut::begin(store, above, below);
 }
 
-fn refuse(store: &mut Store, owner: Token, why: OpenRefusal, above: &mut Queue<Event>) {
+pub(crate) fn refuse(store: &mut Store, owner: Token, why: OpenRefusal, above: &mut Queue<Event>) {
     store.phase = Phase::Stopped;
     above.push(Event::OpenRefused { owner, why });
 }

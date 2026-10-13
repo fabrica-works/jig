@@ -133,7 +133,7 @@ fn submit(
         &mut events,
         &mut below.secrets,
     );
-    directory::events_up(store, true, &mut events, above);
+    directory::events_up(store, true, &mut events, above, below);
 }
 pub(crate) fn committed(store: &mut Store, owner: Token, above: &mut Queue<Event>) {
     let Some(pending) = store.secret_state.pending.remove(&owner.raw()) else {

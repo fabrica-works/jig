@@ -127,7 +127,8 @@ pub(crate) fn fire(store: &mut Store, above: &mut Queue<Event>, below: &mut Belo
         | Stage::Writing
         | Stage::Syncing
         | Stage::DirectorySync
-        | Stage::DirectoryClose => return,
+        | Stage::DirectoryClose
+        | Stage::Dropping => return,
     }
     let owner = match store.transcripts.reads.first() {
         Some((owner, _)) => *owner,

@@ -21,7 +21,7 @@ pub(crate) fn submit(
         &mut events,
         &mut below.store,
     );
-    crate::directory::events_up(store, false, &mut events, above);
+    crate::directory::events_up(store, false, &mut events, above, below);
 }
 pub(crate) fn operations(
     store: &mut Store,
@@ -32,12 +32,20 @@ pub(crate) fn operations(
     if writes.len() > usize::try_from(store.limits.journal.writes).ok()? {
         return None;
     }
-    let mut ops = List::with_capacity(store.limits.journal.writes.checked_mul(2)?.checked_add(1)?);
+    let mut ops = List::with_capacity(
+        store.limits.journal.writes.checked_mul(2)?.checked_add(1)?.checked_add(store.limits.orphan_erases)?,
+    );
     let mut frames = Queue::with_capacity(store.limits.journal.writes);
+    let mut drops = Queue::with_capacity(store.limits.journal.writes);
     let mut bytes = 26;
     let mut deployment = None;
     for write in writes {
         match write {
+            Write::DropTranscript { task } => {
+                crate::transcripts::drop::queue(store, task, number)?;
+                ops.push(operation(store, Write::DropTranscript { task })?).ok()?;
+                drops.push(task);
+            }
             Write::Save(Record::Core(CoreRecord::Turn(turn))) => {
                 let body = crate::transcripts::frame::encode(&turn, &store.codec)?;
                 let offset =
@@ -60,8 +68,7 @@ pub(crate) fn operations(
             )
             | Write::Erase(_)
             | Write::Put { .. }
-            | Write::Remove { .. }
-            | Write::DropTranscript { .. }) => {
+            | Write::Remove { .. }) => {
                 if let Some(id) = header_id(&write) {
                     deployment = Some(id);
                 }
@@ -77,11 +84,14 @@ pub(crate) fn operations(
         })
         .ok()?;
     }
-    let mut bounded = List::with_capacity(store.limits.journal.writes.checked_mul(2)?.checked_add(1)?);
+    crate::transcripts::drop::erases(store, &mut ops)?;
+    let mut bounded = List::with_capacity(
+        store.limits.journal.writes.checked_mul(2)?.checked_add(1)?.checked_add(store.limits.orphan_erases)?,
+    );
     for op in ops.into_boxed() {
         append(&mut bounded, op, &mut bytes, store.limits.store.commit)?;
     }
-    Some(crate::transcripts::Pending { number, frames, ops: bounded.into_boxed() })
+    Some(crate::transcripts::Pending { number, frames, ops: bounded.into_boxed(), drops })
 }
 fn operation(store: &Store, write: Write) -> Option<skein_kv::Op> {
     let limit = store.limits.store.key;
@@ -93,8 +103,9 @@ fn operation(store: &Store, write: Write) -> Option<skein_kv::Op> {
         Write::Erase(key) => Some(skein_kv::Op::Erase { key: keys::encode(&key, limit)? }),
         Write::Put { key, value } => Some(skein_kv::Op::Put { key: keys::application(&key, limit)?, value }),
         Write::Remove { key } => Some(skein_kv::Op::Erase { key: keys::application(&key, limit)? }),
-        // Whole transcript removal joins in jig 17.4.
-        Write::DropTranscript { task: _ } => None,
+        Write::DropTranscript { task } => {
+            Some(skein_kv::Op::Erase { key: keys::encode_own(&keys::Own::Transcript { task }, limit)? })
+        }
     }
 }
 

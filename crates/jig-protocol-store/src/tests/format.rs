@@ -26,7 +26,7 @@ fn store() -> skein_kv::Limits {
     }
 }
 fn check(store: &skein_kv::Limits) -> Result<sizes::Sizes, sizes::SizeRefusal> {
-    sizes::check(&fixtures::CORE_LIMITS, &fixtures::APPLICATION, &JOURNAL, store)
+    sizes::check(&fixtures::CORE_LIMITS, &fixtures::APPLICATION, &JOURNAL, store, 0)
 }
 #[test]
 fn a_format_row_of_another_tasks_version_is_refused_naming_tasks() {
@@ -108,7 +108,7 @@ fn too_few_in_flight_slots_are_refused() {
 fn a_journal_bound_past_the_queue_is_refused_at_start() {
     let journal = JournalLimits { commits: 3, ..JOURNAL };
     assert_eq!(
-        sizes::check(&fixtures::CORE_LIMITS, &fixtures::APPLICATION, &journal, &store()),
+        sizes::check(&fixtures::CORE_LIMITS, &fixtures::APPLICATION, &journal, &store(), 0),
         Err(sizes::SizeRefusal::Queue { needs: 3, has: 2 }),
     );
 }
@@ -122,13 +122,13 @@ fn too_few_queued_bytes_are_refused() {
 fn a_domain_limit_past_its_family_ceiling_is_refused_at_start() {
     let mut domain = fixtures::CORE_LIMITS;
     domain.notes.body_bytes = u32::MAX;
-    assert_eq!(sizes::check(&domain, &fixtures::APPLICATION, &JOURNAL, &store()), Err(sizes::SizeRefusal::Ceiling));
+    assert_eq!(sizes::check(&domain, &fixtures::APPLICATION, &JOURNAL, &store(), 0), Err(sizes::SizeRefusal::Ceiling));
 }
 #[test]
 fn an_application_key_that_cannot_hold_its_tag_is_refused() {
     let application = sizes::Application { key: u32::MAX, ..fixtures::APPLICATION };
     assert_eq!(
-        sizes::check(&fixtures::CORE_LIMITS, &application, &JOURNAL, &store()),
+        sizes::check(&fixtures::CORE_LIMITS, &application, &JOURNAL, &store(), 0),
         Err(sizes::SizeRefusal::Ceiling)
     );
 }
@@ -184,7 +184,7 @@ fn the_largest_note_line_key_reaches_its_calculated_bound() {
 fn larger_application_encodings_are_included_in_the_bounds() {
     let application = sizes::Application { version: 1, key: 256, value: 9_000_000 };
     assert_eq!(
-        sizes::check(&fixtures::CORE_LIMITS, &application, &JOURNAL, &store()),
+        sizes::check(&fixtures::CORE_LIMITS, &application, &JOURNAL, &store(), 0),
         Ok(sizes::Sizes { key: 257, value: 9_000_000, ops: 9, commit: 81_002_420 }),
     );
 }
@@ -192,7 +192,7 @@ fn larger_application_encodings_are_included_in_the_bounds() {
 fn a_journal_whose_operation_count_overflows_is_refused() {
     let journal = JournalLimits { writes: u32::MAX, ..JOURNAL };
     assert_eq!(
-        sizes::check(&fixtures::CORE_LIMITS, &fixtures::APPLICATION, &journal, &store()),
+        sizes::check(&fixtures::CORE_LIMITS, &fixtures::APPLICATION, &journal, &store(), 0),
         Err(sizes::SizeRefusal::Ceiling),
     );
 }

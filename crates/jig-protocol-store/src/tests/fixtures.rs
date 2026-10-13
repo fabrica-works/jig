@@ -604,4 +604,5 @@ pub use store::{
     save, sign_in_secret, stores, turn, window_turn,
 };
 
+pub use store::limits as store_limits;
 pub use store::{Answer, events, opened_with_transcripts, script, written};

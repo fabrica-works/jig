@@ -40,6 +40,7 @@ pub fn limits() -> Limits {
         queue: 2,
         files: 2,
         reads: 4,
+        orphan_erases: 1,
     }
 }
 
@@ -299,6 +300,9 @@ pub enum Answer {
     Synced,
     Closed,
     Read { bytes: Box<[u8]> },
+    Cut,
+    Removed,
+    NotFound,
 }
 pub fn script(store: &mut Store, mut below: Below, answers: &[Answer]) -> Box<[Event]> {
     let count =
@@ -352,6 +356,24 @@ pub fn script(store: &mut Store, mut below: Below, answers: &[Answer]) -> Box<[E
                 };
                 assert!(bytes.len() <= usize::try_from(max).expect("read size"));
                 file::Event::Read { owner, bytes: bytes.clone() }
+            }
+            Answer::Removed => {
+                let file::Request::Remove { owner, .. } = request else {
+                    panic!("remove operation");
+                };
+                file::Event::Removed { owner }
+            }
+            Answer::NotFound => {
+                let file::Request::Remove { owner, .. } = request else {
+                    panic!("missing removal");
+                };
+                file::Event::Failed { owner, error: skein_io::kernel::Error::NotFound, committed: false, residue: None }
+            }
+            Answer::Cut => {
+                let file::Request::Cut { owner, .. } = request else {
+                    panic!("cut operation");
+                };
+                file::Event::Cut { owner }
             }
             Answer::Closed => {
                 let file::Request::Close { owner, .. } = request else {
