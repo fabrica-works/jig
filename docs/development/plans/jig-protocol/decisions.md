@@ -1266,6 +1266,16 @@ the file.
      among them). smith-repin keeps its commit `bb26b6d9`; the closing jig
      and temper repins wait for it; every other step goes on. To the user,
      under "For the user".
+187. **jig 05.s2: `ops`'s root keeps its own hub's turn busy** (2026-10-13,
+     the designer's answer to question.md's "jig 23.3: where the engine's
+     'turn busy' comes from on its way down"; jig `e484056a`, `df25be1b`).
+     Turn busy is "the fleet's word to what keeps the backoff below the
+     hub, never the hub's": jig 23.3's component takes it as
+     `Event::TurnBusy` and encodes the wire's record; jig 24's link keeps
+     the backoff on a worker. For the engine's own hub the root keeps it;
+     `ops`'s root today passes `core::Held::TurnBusy` out as an output
+     (`examples/ops/domain/src/route.rs:350`). A step not in the plan, jig
+     05.s2 (`jig/05-hub-link.md`), gives `ops`'s root that backoff.
 
 ## For the user
 

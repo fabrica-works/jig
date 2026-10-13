@@ -886,6 +886,25 @@ Don't: put a token for a call, or a request's reply handle, in the link
 vocabulary, or keep a table from names to tokens in a root or a link.
 Size: at most 250 lines of production code.
 
+### 05.s2 The engine's own hub's turn busy, kept by its root
+
+A step not in the plan (decisions.md, ruling 187), from the designer's
+answer on jig 23.3 (jig `e484056a`, `protocol/channel.md`, 5.2: "For the
+engine's own hub, its root keeps the backoff the same way, on its
+protocol layer's timers").
+Shape: `ops`'s root, for a `core::Held::TurnBusy` on channel 0 (the
+  engine's own hub), keeps the turn's run, attempt and number with a
+  jittered backoff deadline, and at the deadline reads the hub's kept copy
+  (`jig_domain_host::Domain::turn`, `domain.rs:174`) and sends it up again
+  as any turn; a turn the hub no longer keeps is dropped. Busy turns on
+  workers' channels go to jig 23's component (23.3). The test root's
+  worlds keep resending as they do (`tests/core/src/effects.rs:810`).
+Test shape: an `ops` world test: a turn answered busy on channel 0 is
+  sent again after its backoff and then kept, once.
+Proof: the gate.
+Don't: add turn busy to `host::LinkDown`; arm a timer in the hub.
+Size: at most 80 lines of production code.
+
 ## Interface sketches
 
 ```rust
