@@ -44,7 +44,9 @@ hold in jig.
   seeds. It is not run by default, only with `--profile fuzzy`, as the
   gate before merging to main, and it takes at most **1 minute**.
 
-Tests cost what they check, with unoptimized test builds:
+Tests cost what they check, with unoptimized test builds except for the
+repository's tools, `jig-boundary` and `skein-codegen`, which are built
+optimized (testing-strategy.md, 8, "A tool is not the code under test"):
 
 - **Fixtures once.** Build a phrasebook, configuration or worst-case size
   once per test process or world when it is a fixture, then share it.

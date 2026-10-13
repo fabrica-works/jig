@@ -162,6 +162,12 @@ jig-protocol-charter = { path = "crates/jig-protocol-charter" }
 panic = "abort"
 overflow-checks = true
 
+[profile.dev.package.jig-boundary]
+opt-level = 3
+
+[profile.dev.package.skein-codegen]
+opt-level = 3
+
 [profile.release]
 panic = "abort"
 overflow-checks = true
