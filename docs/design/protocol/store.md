@@ -329,14 +329,21 @@ relates to.
 | a question, a reply | the task's activity line, by its position, with the line that answers a question, where its answer was heard (below), or the turn a reply was (from the transcript, 8.3) |
 | a turn | the task's transcript (8.3) |
 | a task's activity, newest first | the activity family, read backwards (7.4) |
-| a task's history, or a subtree's | the history and milestone families; a subtree's by the index of its delegates |
+| a task's history, or a subtree's | the history and milestone families; a subtree's by the index of its delegates, task by task: the task's own rows, then each delegate's in that index's order, each task's rows in its own history's order |
 | a task's ended delegates | the index of ended delegates by requester |
 | an inbox group | the index of the party's inbox, by time: what needs them oldest first, updates newest first; a group, and the filter, select within it |
 | conversations | the index of the party's conversations, newest first |
 | a project's goals | the index of the project's goals, live then ended newest first |
-| a project's notes, a scope's notes | the notes' lines of the project's scopes, or of the one scope, filtered by description, each with its entry: by scope, then by name within it, as the lines are keyed; a page's position is the last line it examined, so a filtered page goes on past what it skipped |
+| a project's notes, a scope's notes | the notes' lines of the project's scopes, or of the one scope, filtered by description, each with its entry: by scope, then by name within it, as the lines are keyed |
 | a project's spend | the funders' periods of the project |
 
+- **A page goes on from the last row it examined,** in its scope's
+  order, not from the last it returned. A page that skips rows (an index
+  row whose owner is gone, 7.4) or leaves them out (an inbox group, a
+  description's filter) goes on past them; a page that reached its bound
+  and returned none is cut, not ended, and the client reads on from its
+  position. A subtree's history is in its scope's order, task by task,
+  its position the task and the row.
 - **Joins are point reads** in the same step, priced within the read's
   bounds: a page's rows times the joins each may need. A turn's is read
   from its transcript, and answers once its frame is read.
