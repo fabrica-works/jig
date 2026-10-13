@@ -2267,6 +2267,17 @@ the file.
      jig 33: its translations land at their count, the per-file counts in
      the commit body, no code compacted to fit; hand-written logic beyond
      translation keeps ruling 196's limit.
+272. **jig 19.s1's people fixture: values exactly at the sum, not 512
+     segments under a grant** (2026-10-13, the coordinator's block "jig
+     19.s1: full Amendment fixture exceeds its admitted sum",
+     2026-10-13T13:18:00Z). 19.s1's example, an amendment of 512 empty
+     pattern segments, costs 8,240 bytes with its enclosing grant against
+     an `amendment_bytes` of 8,192. Its intent stands: a value at the
+     domain's sum round-trips and one past it is refused. As proposed: the
+     pattern's piece is proved at the sum itself (512 segments in, 513
+     refused), and a whole amendment at its full sum with fewer segments
+     (and one byte past it refused). No ceiling raised, no profile
+     changed.
 
 ## For the user
 
