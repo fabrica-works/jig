@@ -197,7 +197,7 @@ impl Link {
                 read_none(attempt.token, &attempt.owner, translate::reads::none(record.value()), out);
                 return;
             }
-            Ok(w::ReadAnswer::Value(record)) => family_read_value(&attempt, record),
+            Ok(w::ReadAnswer::Value(record)) => read_value(&attempt, record, &self.limits),
             Err(_) => Err(translate::Undecodable::Malformed),
         };
         match result {
@@ -209,13 +209,15 @@ impl Link {
         }
     }
 }
-fn family_read_value(attempt: &Attempt, record: w::Owned) -> Result<Readout, translate::Undecodable> {
+fn read_value(attempt: &Attempt, record: w::Owned, limits: &Limits) -> Result<Readout, translate::Undecodable> {
     if record.owner() != &attempt.owner || record.version() != attempt.version {
         return Err(translate::Undecodable::Version);
     }
     match record.owner() {
-        // Ruling 208: jig read values require 30.s1's discriminated wire.
-        w::Owner::Jig => Err(translate::Undecodable::Version),
+        w::Owner::Jig => {
+            let value = translate::reads::value(record.record(), limits)?;
+            Ok(Readout::Jig(jig_domain_client::contract::ReadResult::Value(value)))
+        }
         w::Owner::Family(owner) => {
             let family = owner.number();
             Ok(Readout::Family { family, record: Some(record.into_parts().record) })

@@ -160,3 +160,82 @@ fn reads_and_attempts_share_the_exchange_admission_bound() {
     assert_eq!(h.read_terminals(), 1);
     assert_eq!(h.out.len(), 2);
 }
+
+#[test]
+fn a_read_is_answered_once_with_its_value() {
+    let (mut h, exchange) = fixtures::Harness::reading();
+    h.answer(exchange, 200, &fixtures::jig_read_value_answer(&fixtures::frame_read_value()));
+    h.answer(exchange, 200, &fixtures::read_none_answer(w::ReadNone::Unknown));
+    assert_eq!(h.read_answered(), Some(&fixtures::expected_frame_read()));
+    assert_eq!(h.read_terminals(), 1);
+    assert_eq!(h.link.next_deadline(), None);
+}
+#[test]
+fn a_value_past_the_client_s_limits_is_unreachable_and_reported() {
+    for value in fixtures::values_past_client_limits() {
+        let (mut h, exchange) = fixtures::Harness::reading();
+        h.answer(exchange, 200, &fixtures::jig_read_value_answer(&value));
+        h.read_unreachable();
+        assert!(h.has(&Request::Fact { fact: Fact::UndecodableDocument }));
+        assert_eq!(h.read_terminals(), 1);
+    }
+}
+#[test]
+fn each_discriminated_read_value_reaches_its_contract_variant() {
+    for (wire, expected) in fixtures::read_value_cases() {
+        let (mut h, exchange) = fixtures::Harness::reading();
+        h.answer(exchange, 200, &fixtures::jig_read_value_answer(&wire));
+        assert_eq!(h.read_answered(), Some(&Readout::Jig(c::ReadResult::Value(expected))));
+        assert!(!h.has(&Request::Fact { fact: Fact::UndecodableDocument }));
+    }
+}
+#[test]
+fn a_malformed_read_value_is_unreachable_and_reported() {
+    for value in fixtures::malformed_read_values() {
+        let (mut h, exchange) = fixtures::Harness::reading();
+        h.answer(exchange, 200, &fixtures::jig_read_record_answer(value, jig_protocol_client_wire::VERSION));
+        h.read_unreachable();
+        assert!(h.has(&Request::Fact { fact: Fact::UndecodableDocument }));
+    }
+}
+#[test]
+fn a_read_value_of_another_wire_version_is_unreachable_and_reported() {
+    let (mut h, exchange) = fixtures::Harness::reading();
+    let value = fixtures::encoded_read_value(&fixtures::frame_read_value());
+    h.answer(exchange, 200, &fixtures::jig_read_record_answer(value, 2));
+    h.read_unreachable();
+    assert!(h.has(&Request::Fact { fact: Fact::UndecodableDocument }));
+}
+#[test]
+fn a_read_value_counts_its_discriminator_against_the_document_byte_bound() {
+    let value = fixtures::encoded_read_value(&fixtures::frame_read_value());
+    let bytes = u64::try_from(value.len()).unwrap();
+    let limits = fixtures::read_byte_limits(bytes);
+    assert_eq!(translate::reads::value(&value, &limits), Ok(c::ReadValue::Frame(Box::new(fixtures::frame()))));
+    let short = fixtures::read_byte_limits(bytes.checked_sub(1).unwrap());
+    assert_eq!(translate::reads::value(&value, &short), Err(Undecodable::TooLarge));
+}
+#[test]
+fn a_read_value_rejects_mutated_original_limits() {
+    let value = fixtures::encoded_read_value(&fixtures::frame_read_value());
+    let mut limits = fixtures::limits();
+    limits.wire.cursor_value = 1;
+    assert_eq!(translate::reads::value(&value, &limits), Err(Undecodable::TooLarge));
+}
+#[test]
+fn a_read_page_keeps_both_long_cursors_without_parsing_them() {
+    let (mut h, exchange) = fixtures::Harness::reading();
+    let value = w::ReadValue::Notes(fixtures::note_page_with_cursors());
+    h.answer(exchange, 200, &fixtures::jig_read_value_answer(&value));
+    let expected = c::ReadValue::Notes(Box::new(fixtures::expected_note_page_with_cursors()));
+    assert_eq!(h.read_answered(), Some(&Readout::Jig(c::ReadResult::Value(expected))));
+}
+#[test]
+fn a_read_activity_keeps_each_undecodable_turn_in_its_page() {
+    for (record, expected) in fixtures::unread_pages() {
+        let (mut h, exchange) = fixtures::Harness::reading();
+        h.answer(exchange, 200, &fixtures::jig_read_value_answer(&w::ReadValue::Activity(record)));
+        let expected = c::ReadValue::Activity(Box::new(expected));
+        assert_eq!(h.read_answered(), Some(&Readout::Jig(c::ReadResult::Value(expected))));
+    }
+}

@@ -1,10 +1,12 @@
 //! One read per exchange with opaque cursor bytes (protocol/client.md, 6).
 use super::asks::{wire_note_scope, wire_proposal_key};
-use crate::Readable;
+use super::{Undecodable, documents, objects, pages};
+use crate::{Limits, Readable};
+use alloc::boxed::Box;
 use jig_domain_client::contract as c;
 use jig_protocol_client_wire::VERSION;
 use jig_protocol_client_wire::v3 as w;
-use skein_lib::{Writer, bytes};
+use skein_lib::{Reader, Writer, bytes};
 
 #[expect(clippy::manual_map, reason = "step code matches optional fields without closures")]
 pub fn read(read: &c::Read, limits: &w::Limits) -> Result<w::Read, w::Problem> {
@@ -131,4 +133,66 @@ pub fn none(value: &w::ReadNone) -> c::ReadNone {
         w::ReadNone::Busy => c::ReadNone::Busy,
         w::ReadNone::SignedOut => c::ReadNone::SignedOut,
     }
+}
+
+/// Decodes a whole discriminated document against the original client limits.
+pub fn value(bytes: &[u8], limits: &Limits) -> Result<c::ReadValue, Undecodable> {
+    if crate::limits::worst_case(limits).is_none()
+        || u64::try_from(bytes.len()).expect("usize fits u64") > limits.client.document_bytes
+    {
+        return Err(Undecodable::TooLarge);
+    }
+    let receiving = pages::receiving(limits)?;
+    let record = match w::ReadValue::decode(&receiving.wire, &mut Reader::new(bytes)) {
+        Ok(record) => record,
+        Err(problem) => return Err(documents::classify(problem)),
+    };
+    Ok(match record {
+        w::ReadValue::OwnerProject(record) => {
+            c::ReadValue::OwnerProject(Box::new(documents::owner_project(record, limits)?))
+        }
+        w::ReadValue::Historical(record) => {
+            c::ReadValue::Historical(Box::new(objects::owner_historical(*record, limits)?))
+        }
+        w::ReadValue::Frame(record) => c::ReadValue::Frame(Box::new(documents::frame(record, limits)?)),
+        w::ReadValue::Task(record) => c::ReadValue::Task(Box::new(documents::task(record, limits)?)),
+        w::ReadValue::Proposal(record) => c::ReadValue::Proposal(Box::new(objects::proposal(record, limits)?)),
+        w::ReadValue::OwnerProposal(record) => {
+            c::ReadValue::OwnerProposal(Box::new(objects::owner_proposal(record, limits)?))
+        }
+        w::ReadValue::Escalation(record) => c::ReadValue::Escalation(Box::new(objects::escalation(record, limits)?)),
+        w::ReadValue::OwnerEscalation(record) => {
+            c::ReadValue::OwnerEscalation(Box::new(objects::owner_escalation(record, limits)?))
+        }
+        w::ReadValue::Question(record) => c::ReadValue::Question(Box::new(objects::question(record, limits)?)),
+        w::ReadValue::PersonTask(record) => c::ReadValue::PersonTask(Box::new(objects::person_task(record, limits)?)),
+        w::ReadValue::OwnerPersonTask(record) => {
+            c::ReadValue::OwnerPersonTask(Box::new(objects::owner_person_task(record, limits)?))
+        }
+        w::ReadValue::Result(record) => c::ReadValue::Result(Box::new(objects::result(record, limits)?)),
+        w::ReadValue::Ended(record) => c::ReadValue::Ended(Box::new(pages::object_page(record, limits)?)),
+        w::ReadValue::OwnerEnded(record) => {
+            c::ReadValue::OwnerEnded(Box::new(pages::owner_ended_page(record, limits)?))
+        }
+        w::ReadValue::History(record) => c::ReadValue::History(Box::new(pages::history_page(record, limits)?)),
+        w::ReadValue::Activity(record) => c::ReadValue::Activity(Box::new(pages::activity_page(record, limits)?)),
+        w::ReadValue::Inbox(record) => c::ReadValue::Inbox(Box::new(pages::inbox_page(record, limits)?)),
+        w::ReadValue::OwnerInbox(record) => {
+            c::ReadValue::OwnerInbox(Box::new(pages::owner_inbox_page(record, limits)?))
+        }
+        w::ReadValue::Conversations(record) => {
+            c::ReadValue::Conversations(Box::new(pages::conversation_page(record, limits)?))
+        }
+        w::ReadValue::Goals(record) => c::ReadValue::Goals(Box::new(pages::goal_page(record, limits)?)),
+        w::ReadValue::Spend(record) => c::ReadValue::Spend(Box::new(pages::spend_page(record, limits)?)),
+        w::ReadValue::OwnerSpend(record) => {
+            c::ReadValue::OwnerSpend(Box::new(pages::owner_spend_page(record, limits)?))
+        }
+        w::ReadValue::Project(record) => c::ReadValue::Project(Box::new(objects::project(record, limits)?)),
+        w::ReadValue::Notes(record) => c::ReadValue::Notes(Box::new(pages::note_page(record, limits)?)),
+        w::ReadValue::Deployment(record) => c::ReadValue::Deployment(Box::new(documents::deployment(record, limits)?)),
+        w::ReadValue::OwnerDeployment(record) => {
+            c::ReadValue::OwnerDeployment(Box::new(documents::owner_deployment(record, limits)?))
+        }
+    })
 }
