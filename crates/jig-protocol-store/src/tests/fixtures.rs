@@ -785,4 +785,7 @@ pub const APPLICATION: crate::sizes::Application = crate::sizes::Application { v
 pub const DEPLOYMENT: [u8; 16] = [7; 16];
 
 mod store;
-pub use store::{OTHER_DEPLOYMENT, ROOT_FD, format_put, header_put, opened, over, plant, run, stores};
+pub use store::{
+    OTHER_DEPLOYMENT, ROOT_FD, commit, format_put, get_kv, header, header_put, opened, opened_with_budget, over, plant,
+    run, save, stores,
+};

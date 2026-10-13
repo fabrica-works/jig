@@ -4,6 +4,7 @@
 extern crate alloc;
 pub mod boundary;
 pub mod codec;
+mod commits;
 pub mod format;
 pub mod intervals;
 mod open;
@@ -60,7 +61,7 @@ impl Store {
 /// One terminal from a memory step.
 pub const MAX_OUT_DOWN: u32 = 1;
 
-/// Owned stores, component state and the open step's bounded temporary rows.
+/// Owned stores, component state and bounded temporary rows and operations.
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
     let state = u64::try_from(size_of::<Store>()).ok()?;
@@ -69,6 +70,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(skein_kv::worst_case(&limits.secrets)?)?
         .checked_add(state)?
         .checked_add(rows)?
+        .checked_add(u64::from(limits.store.commit))?
+        .checked_add(skein_lib::List::<skein_kv::Op>::worst_case(limits.journal.writes.checked_add(1)?)?)?
         .checked_add(Queue::<skein_kv::Event>::worst_case(skein_kv::MAX_OUT.above)?)?
         .checked_add(Queue::<skein_io::file::Request>::worst_case(skein_kv::MAX_OUT.below)?)?
         .checked_add(Queue::<Event>::worst_case(MAX_OUT_DOWN)?)
@@ -81,9 +84,9 @@ pub fn down(store: &mut Store, request: Request, above: &mut Queue<Event>) {
     }
     match request {
         Request::Open { owner, root: _ } => open::open(store, owner, above),
+        Request::Commit { number, writes } => commits::commit(store, number, writes, above),
         // Each remaining handler joins in its owning increment, before routing uses it.
-        Request::Commit { .. }
-        | Request::Restore { .. }
+        Request::Restore { .. }
         | Request::Load { .. }
         | Request::Read { .. }
         | Request::Get { .. }

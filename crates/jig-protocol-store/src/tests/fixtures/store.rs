@@ -1,6 +1,6 @@
 //! Memory component fixtures (protocol/store.md, section 14).
-use super::{APPLICATION, CORE_LIMITS, KEY_LIMIT, core_rows};
-use crate::{Event, Limits, Request, Store, Stores, codec, format, keys};
+use super::{APPLICATION, CORE_LIMITS, DEPLOYMENT, KEY_LIMIT, core_rows};
+use crate::{Event, Limits, Request, Store, Stores, Write, codec, format, keys};
 use alloc::boxed::Box;
 use jig_domain_core::{CoreKey, CoreRecord, Key, Record};
 use skein_io::kernel::Fd;
@@ -36,7 +36,11 @@ fn limits() -> Limits {
 }
 
 pub fn stores() -> Stores {
-    Stores { store: skein_kv::Store::memory(&kv_limits()), secrets: skein_kv::Store::memory(&kv_limits()) }
+    stores_with(&limits())
+}
+
+fn stores_with(limits: &Limits) -> Stores {
+    Stores { store: skein_kv::Store::memory(&limits.store), secrets: skein_kv::Store::memory(&limits.secrets) }
 }
 
 pub fn plant(stores: &mut Stores, ops: &[skein_kv::Op]) {
@@ -64,14 +68,18 @@ pub fn format_put(deployment: [u8; 16]) -> skein_kv::Op {
 }
 
 pub fn header_put(deployment: [u8; 16], commits: u64) -> skein_kv::Op {
-    let mut header = core_rows::deployment();
-    header.id = deployment;
-    header.commits = commits;
-    let record = Record::Core(CoreRecord::Deployment(header));
+    let record = header_record(deployment, commits);
     skein_kv::Op::Put {
         key: keys::encode(&Key::Core(CoreKey::Deployment), KEY_LIMIT).expect("header key fits"),
         value: codec::encode(&record, &codec::limits(&CORE_LIMITS).expect("fixture limits")).expect("header fits"),
     }
+}
+
+fn header_record(deployment: [u8; 16], commits: u64) -> Record {
+    let mut header = core_rows::deployment();
+    header.id = deployment;
+    header.commits = commits;
+    Record::Core(CoreRecord::Deployment(header))
 }
 
 pub fn over(stores: Stores) -> Store {
@@ -91,10 +99,46 @@ pub fn run(store: &mut Store, request: Request) -> Box<[Event]> {
 }
 
 pub fn opened() -> Store {
-    let mut store = over(stores());
+    opened_with_budget(16_384)
+}
+
+pub fn opened_with_budget(budget: u64) -> Store {
+    let mut limits = limits();
+    limits.store.budget = budget;
+    let mut store = Store::over(&limits, APPLICATION, stores_with(&limits));
     let events = run(&mut store, Request::Open { owner: Token::new(1), root: ROOT_FD });
     let [Event::Opened { owner: _, last: 0 }] = &*events else {
         panic!("empty store opens: {events:?}");
     };
     store
+}
+
+pub fn commit(number: u64, writes: Box<[Write]>) -> Request {
+    Request::Commit { number, writes }
+}
+
+pub fn header(commits: u64) -> Write {
+    save(header_record(DEPLOYMENT, commits))
+}
+
+pub fn save(record: Record) -> Write {
+    Write::Save(record)
+}
+
+pub fn get_kv(store: &mut Store, key: &[u8]) -> Option<Box<[u8]>> {
+    let mut above = Queue::with_capacity(skein_kv::MAX_OUT.above);
+    let mut below = Queue::with_capacity(skein_kv::MAX_OUT.below);
+    skein_kv::down(
+        &mut store.stores.store,
+        &crate::memory_env(store.limits.store),
+        skein_kv::Request::Get { owner: Token::new(0), key: Box::from(key) },
+        &mut above,
+        &mut below,
+    );
+    assert!(below.is_empty(), "memory gets issue no files");
+    let Some(skein_kv::Event::Got { value, .. }) = above.pop() else {
+        panic!("memory get answers immediately");
+    };
+    assert!(above.is_empty());
+    value
 }

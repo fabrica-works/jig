@@ -105,6 +105,14 @@ fn too_few_in_flight_slots_are_refused() {
     assert_eq!(check(&limits), Err(sizes::SizeRefusal::Queue { needs: 2, has: 1 }));
 }
 #[test]
+fn a_journal_bound_past_the_queue_is_refused_at_start() {
+    let journal = JournalLimits { commits: 3, ..JOURNAL };
+    assert_eq!(
+        sizes::check(&fixtures::CORE_LIMITS, &fixtures::APPLICATION, &journal, &store()),
+        Err(sizes::SizeRefusal::Queue { needs: 3, has: 2 }),
+    );
+}
+#[test]
 fn too_few_queued_bytes_are_refused() {
     let mut limits = store();
     limits.queued_bytes = 150_998_163;

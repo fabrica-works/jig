@@ -1,0 +1,234 @@
+//! Commits answered only after the same skein-kv number (protocol/store.md, 6).
+use super::fixtures;
+use crate::{Event, Phase, Request, Store, Write, codec, keys};
+use alloc::boxed::Box;
+use jig_domain_core::{CoreKey, CoreRecord, Key, Record};
+use skein_lib::Token;
+
+fn assert_committed(events: &[Event], number: u64) -> u64 {
+    let [Event::Committed { number: found, fill }] = events else {
+        panic!("one committed terminal: {events:?}");
+    };
+    assert_eq!(*found, number);
+    *fill
+}
+
+fn assert_failed(events: &[Event], number: u64) {
+    let [Event::Failed { number: found }] = events else {
+        panic!("one failed terminal: {events:?}");
+    };
+    assert_eq!(*found, number);
+}
+
+fn commit(store: &mut Store, number: u64, writes: Box<[Write]>) -> Box<[Event]> {
+    fixtures::run(store, fixtures::commit(number, writes))
+}
+
+fn jig_row(store: &mut Store, key: &Key) -> Option<Record> {
+    let encoded = keys::encode(key, fixtures::KEY_LIMIT).expect("fixture key fits");
+    let bytes = fixtures::get_kv(store, &encoded)?;
+    codec::decode(key, &bytes, &store.codec)
+}
+
+fn format_row(store: &mut Store) -> codec::component::Format {
+    let bytes = fixtures::get_kv(store, &[0, 0]).expect("format row exists");
+    codec::component::Format::decode(&bytes).expect("format decodes")
+}
+
+fn note() -> Record {
+    Record::Notes(jig_domain_notes::Record::Entry(fixtures::note_entry()))
+}
+
+fn other_header(commits: u64) -> Write {
+    let mut header = fixtures::core_rows::deployment();
+    header.id = fixtures::OTHER_DEPLOYMENT;
+    header.commits = commits;
+    fixtures::save(Record::Core(CoreRecord::Deployment(header)))
+}
+
+fn application_put() -> Write {
+    Write::Put { key: Box::new([41]), value: Box::new([42, 43]) }
+}
+
+fn application_row(store: &mut Store) -> Option<Box<[u8]>> {
+    fixtures::get_kv(store, &[2, 41])
+}
+
+fn save_note(store: &mut Store) -> Box<[Event]> {
+    commit(store, 1, Box::new([fixtures::header(1), fixtures::save(note())]))
+}
+
+fn failed_number() -> Store {
+    let mut store = fixtures::opened();
+    assert_failed(&commit(&mut store, 2, Box::new([fixtures::header(2)])), 2);
+    store
+}
+
+fn committed_header() -> Store {
+    let mut store = fixtures::opened();
+    assert_committed(&commit(&mut store, 1, Box::new([fixtures::header(1)])), 1);
+    store
+}
+
+fn committed_note() -> Store {
+    let mut store = fixtures::opened();
+    assert_committed(&save_note(&mut store), 1);
+    store
+}
+
+#[test]
+fn a_first_commit_puts_the_format_row_with_its_header() {
+    let mut store = committed_header();
+    assert_eq!(
+        format_row(&mut store),
+        codec::component::Format {
+            component: 1,
+            core: 1,
+            tasks: 1,
+            people: 1,
+            notes: 1,
+            application: 1,
+            deployment: fixtures::DEPLOYMENT,
+        },
+    );
+    let Some(Record::Core(CoreRecord::Deployment(header))) = jig_row(&mut store, &Key::Core(CoreKey::Deployment))
+    else {
+        panic!("header exists under its key");
+    };
+    assert_eq!(header.id, fixtures::DEPLOYMENT);
+    assert_eq!(header.commits, 1);
+}
+
+#[test]
+fn a_save_puts_the_encoded_record_under_its_key() {
+    let mut store = committed_note();
+    assert_eq!(jig_row(&mut store, &note().key()), Some(note()));
+}
+
+#[test]
+fn an_erase_removes_the_key_from_the_store() {
+    let mut store = committed_note();
+    assert_committed(&commit(&mut store, 2, Box::new([fixtures::header(2), Write::Erase(note().key())])), 2);
+    assert_eq!(jig_row(&mut store, &note().key()), None);
+}
+
+#[test]
+fn application_writes_land_under_the_application_tag() {
+    let mut store = fixtures::opened();
+    let writes = Box::new([fixtures::header(1), application_put()]);
+    assert_committed(&commit(&mut store, 1, writes), 1);
+    assert_eq!(application_row(&mut store), Some(Box::from([42, 43])));
+    assert_eq!(fixtures::get_kv(&mut store, &[41]), None);
+}
+
+#[test]
+fn application_removes_erase_the_tagged_key() {
+    let mut store = fixtures::opened();
+    let writes = Box::new([fixtures::header(1), application_put(), Write::Remove { key: Box::new([41]) }]);
+    assert_committed(&commit(&mut store, 1, writes), 1);
+    assert_eq!(application_row(&mut store), None);
+}
+
+#[test]
+fn a_committed_answer_carries_the_stores_used_bytes() {
+    let mut store = fixtures::opened();
+    let events = save_note(&mut store);
+    let fill = assert_committed(&events, 1);
+    assert_eq!(fill, store.stores.store.used());
+}
+
+#[test]
+fn a_commit_numbered_past_the_next_fails() {
+    let store = failed_number();
+    assert_eq!(store.stores.store.last(), 0);
+}
+
+#[test]
+fn a_commit_numbered_behind_the_next_fails() {
+    let mut store = committed_header();
+    assert_failed(&commit(&mut store, 1, Box::new([fixtures::header(1)])), 1);
+    assert_eq!(store.stores.store.last(), 1);
+}
+
+#[test]
+fn a_refused_skein_commit_is_answered_failed() {
+    let mut store = fixtures::opened_with_budget(1);
+    assert_failed(&commit(&mut store, 1, Box::new([fixtures::header(1)])), 1);
+    assert_eq!(store.stores.store.last(), 0);
+    assert!(store.stores.store.is_empty());
+}
+
+#[test]
+fn nothing_is_answered_after_a_failure() {
+    let mut store = failed_number();
+    assert!(commit(&mut store, 1, Box::new([fixtures::header(1)])).is_empty());
+    assert_eq!(store.stores.store.last(), 0);
+}
+
+#[test]
+fn consecutive_commits_keep_the_skein_numbers_equal() {
+    let mut store = committed_header();
+    assert_committed(&commit(&mut store, 2, Box::new([fixtures::header(2)])), 2);
+    assert_eq!(store.stores.store.last(), 2);
+    assert_eq!(store.phase, Phase::Ready { next: 3, format_due: false });
+}
+
+#[test]
+fn writes_to_the_same_key_keep_their_order() {
+    let mut store = fixtures::opened();
+    let writes =
+        Box::new([fixtures::header(1), Write::Erase(note().key()), fixtures::save(note()), Write::Erase(note().key())]);
+    assert_committed(&commit(&mut store, 1, writes), 1);
+    assert_eq!(jig_row(&mut store, &note().key()), None);
+}
+
+#[test]
+fn the_first_format_uses_the_last_saved_header_id() {
+    let mut store = fixtures::opened();
+    let writes = Box::new([fixtures::header(1), other_header(1)]);
+    assert_committed(&commit(&mut store, 1, writes), 1);
+    assert_eq!(format_row(&mut store).deployment, fixtures::OTHER_DEPLOYMENT);
+}
+
+#[test]
+fn later_commits_do_not_replace_the_format_row() {
+    let mut store = committed_header();
+    assert_committed(&commit(&mut store, 2, Box::new([other_header(2)])), 2);
+    assert_eq!(format_row(&mut store).deployment, fixtures::DEPLOYMENT);
+}
+
+#[test]
+fn a_turn_is_saved_as_a_row_until_transcript_files_land() {
+    let mut store = fixtures::opened();
+    let turn = Record::Core(CoreRecord::Turn(fixtures::core_rows::turn()));
+    let key = turn.key();
+    assert_committed(&commit(&mut store, 1, Box::new([fixtures::header(1), fixtures::save(turn.clone())])), 1);
+    assert_eq!(jig_row(&mut store, &key), Some(turn));
+}
+
+#[test]
+fn dropping_a_transcript_fails_without_submitting_the_commit() {
+    let mut store = committed_header();
+    let writes = Box::new([fixtures::header(2), Write::DropTranscript { task: 11 }]);
+    assert_failed(&commit(&mut store, 2, writes), 2);
+    assert_eq!(store.stores.store.last(), 1);
+}
+
+#[test]
+#[should_panic(expected = "the first root commit saves its deployment header")]
+fn the_first_commit_without_a_header_is_an_owners_bug() {
+    let mut store = fixtures::opened();
+    commit(&mut store, 1, Box::new([fixtures::save(note())]));
+}
+
+#[test]
+fn a_committed_store_reopens_at_its_last_number() {
+    let store = committed_header();
+    let mut restarted = fixtures::over(store.into_stores());
+    let events = fixtures::run(&mut restarted, Request::Open { owner: Token::new(1), root: fixtures::ROOT_FD });
+    let [Event::Opened { owner, last }] = &*events else {
+        panic!("committed store opens: {events:?}");
+    };
+    assert_eq!(*owner, Token::new(1));
+    assert_eq!(*last, 1);
+}
