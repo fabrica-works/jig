@@ -1323,6 +1323,16 @@ the file.
      document gains `documents::AccountState`, mirroring the accounts
      child's state with that field. This narrows the designer's `until:
      Wall` (ruling 190) to the clock-free case only.
+192. **jig 05.s3: a start the agent refuses fails as invalid** (2026-10-13,
+     the coordinator's block "jig 25.1: missing agent start-refusal and
+     invalid vocabulary", 2026-10-13T02:30:54Z). A plan defect: hosts.md,
+     8 has "A start smith refuses all the same fails its attempt as
+     invalid, naming why (6.3)", but jig 05's hub (`FromAgent`,
+     `Invalid` at `crates/jig-domain-host/src/boundary.rs:243, 579`) has
+     no such refusal, so jig 25.1 cannot translate smith's
+     `RunResult::Refused`. A step not in the plan, jig 05.s3
+     (`jig/05-hub-link.md`), adds `FromAgent::Refused` and
+     `Invalid::Start`; jig 25.1 lands after it, its scaffolding before.
 
 ## For the user
 

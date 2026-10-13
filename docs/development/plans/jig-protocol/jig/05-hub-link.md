@@ -905,6 +905,25 @@ Proof: the gate.
 Don't: add turn busy to `host::LinkDown`; arm a timer in the hub.
 Size: at most 80 lines of production code.
 
+### 05.s3 A start the agent refuses fails its attempt as invalid
+
+A step not in the plan (decisions.md, ruling 192), before jig 25.1 lands.
+`domain/hosts.md` (section 8): "A start smith refuses all the same fails
+its attempt as invalid, naming why (6.3)"; 6.3: "refused at the entrance:
+busy; or invalid ... with smith's parts that do not decode (6.8), or as a
+start smith refuses, naming what".
+Shape: `jig_domain_host::FromAgent` gains `Refused { owner: Token, why:
+  Box<[u8]> }`, the agent's refusal of a start, its words bounded by the
+  hub's `detail_bytes`; `Invalid` (`boundary.rs:579`) gains `Start { why:
+  Box<[u8]> }`. The hub answers a start the agent refuses, while it is
+  starting, as `Answer::Invalid(Invalid::Start { why })` and frees its
+  slot. `Gone` while starting stays `Failure::Agent(Unstarted)`.
+Test shape: a hub unit test: a start the agent refuses is answered
+  invalid with its words, and its slot is free again.
+Proof: the gate.
+Don't: add a refusal for a run already started; parse smith's words.
+Size: at most 60 lines of production code.
+
 ## Interface sketches
 
 ```rust
