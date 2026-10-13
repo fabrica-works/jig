@@ -12,8 +12,10 @@ pub mod intervals;
 mod loads;
 mod open;
 mod pages;
+mod reads;
 mod restore;
 pub mod sizes;
+use alloc::boxed::Box;
 use skein_lib::{Env, Queue, Time, Wall};
 
 /// The store component's bounds (protocol/store.md, section 13).
@@ -23,6 +25,8 @@ pub struct Limits {
     pub store: skein_kv::Limits,
     pub secrets: skein_kv::Limits,
     pub journal: skein_lib::JournalLimits,
+    /// Point gets available to a party page's joins (store.md, 13).
+    pub joins: u32,
 }
 
 /// Stores made by the caller, kept across a world's crash (store.md, 14).
@@ -90,6 +94,10 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(state)?
         .checked_add(rows)?
         .checked_add(page)?
+        .checked_add(decoded.checked_mul(u64::from(limits.joins))?)?
+        .checked_add(skein_lib::List::<Box<jig_domain_tasks::TaskRecord>>::worst_case(limits.joins)?)?
+        .checked_add(skein_lib::List::<u64>::worst_case(limits.core.tasks.depth)?)?
+        .checked_add(skein_lib::Set::<u64>::worst_case(limits.joins)?)?
         .checked_add(u64::from(limits.store.commit))?
         .checked_add(skein_lib::List::<skein_kv::Op>::worst_case(limits.journal.writes.checked_add(1)?)?)?
         .checked_add(Queue::<skein_kv::Event>::worst_case(skein_kv::MAX_OUT.above)?)?
@@ -112,8 +120,9 @@ pub fn down(store: &mut Store, request: Request, above: &mut Queue<Event>) {
             loads::load(store, owner, range, after, rows, bytes, above);
         }
         Request::Get { owner, key } => gets::get(store, owner, key, above),
+        Request::Read { owner, range } => reads::read(store, owner, range, above),
         // Each remaining handler joins in its owning increment, before routing uses it.
-        Request::Read { .. } | Request::Transcript { .. } | Request::Secrets { .. } => {}
+        Request::Transcript { .. } | Request::Secrets { .. } => {}
     }
 }
 

@@ -784,7 +784,9 @@ pub mod people_outcomes;
 pub const APPLICATION: crate::sizes::Application = crate::sizes::Application { version: 1, key: 64, value: 128 };
 pub const DEPLOYMENT: [u8; 16] = [7; 16];
 
+mod reads;
 mod store;
+pub use reads::{CHILD, GOAL, GRANDCHILD, ended_of, read, terminal, with_links};
 pub use store::{
     ALICE, ENDED, LIVE, OTHER_DEPLOYMENT, PROJECT, ROOT_FD, call, commit, committed, conversation_index, ended_task,
     format_put, get_kv, header, header_put, header_record, history, live_task, notes_entry, notes_line, opened,

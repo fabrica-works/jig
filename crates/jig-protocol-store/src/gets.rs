@@ -10,7 +10,7 @@ pub(crate) fn get(store: &mut Store, owner: Token, key: Get, above: &mut Queue<E
     above.push(Event::Got { owner, row });
 }
 
-fn row(store: &mut Store, owner: Token, key: Get) -> Result<Option<crate::Row>, ()> {
+pub(crate) fn row(store: &mut Store, owner: Token, key: Get) -> Result<Option<crate::Row>, ()> {
     match store.phase {
         Phase::Ready { .. } => {}
         Phase::Closed | Phase::Stopped => return Err(()),

@@ -8,4 +8,5 @@ mod intervals;
 mod keys;
 mod open;
 mod pages;
+mod reads;
 mod restore;

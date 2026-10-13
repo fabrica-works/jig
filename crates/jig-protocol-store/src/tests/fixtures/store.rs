@@ -35,6 +35,7 @@ fn limits() -> Limits {
         store: kv_limits(),
         secrets: kv_limits(),
         journal: JournalLimits { commits: 2, writes: 4, held: 4, now: 4, release: 4 },
+        joins: 32,
     }
 }
 
