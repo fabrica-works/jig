@@ -1,5 +1,5 @@
 //! Arbitrary and mutated client bytes (skein's codec.md, section 6).
-use jig_protocol_client_wire::v1::*;
+use jig_protocol_client_wire::v2::*;
 use skein_lib::{Reader, Rng, Writer};
 use std::{fs, path::Path};
 
@@ -427,6 +427,202 @@ fn records_10(bytes: &[u8]) {
     check!(OwnerSpendPage, bytes);
 }
 
+fn records_11(bytes: &[u8]) {
+    check!(OwnerMessageProposalKind, bytes);
+    check!(OwnerNoticeState, bytes);
+    check!(OwnerNewsClass, bytes);
+    check!(OwnerWordResultApproved, bytes);
+    check!(OwnerWordResultVerdict, bytes);
+    check!(OwnerWordResultChange, bytes);
+    check!(OwnerWordResult, bytes);
+    check!(OwnerMessageKindEscalation, bytes);
+    check!(OwnerMessageKindProposal, bytes);
+    check!(OwnerMessageKindPersonStalled, bytes);
+    check!(OwnerMessageKindProposalDecision, bytes);
+    check!(OwnerMessageKindEffectNotMade, bytes);
+    check!(OwnerMessageKindAmendment, bytes);
+    check!(OwnerMessageKindAnswer, bytes);
+    check!(OwnerMessageKindNotice, bytes);
+    check!(OwnerMessageKindTimer, bytes);
+    check!(OwnerMessageKindNews, bytes);
+    check!(OwnerMessageKindResult, bytes);
+    check!(OwnerMessageKind, bytes);
+    check!(OwnerWord, bytes);
+    check!(OwnerRunWhyMessage, bytes);
+    check!(OwnerRunWhyRetry, bytes);
+    check!(OwnerRunWhy, bytes);
+    check!(OwnerRunEndFailed, bytes);
+    check!(OwnerRunEnd, bytes);
+    check!(OwnerActivityWords, bytes);
+    check!(OwnerActivityHeard, bytes);
+    check!(OwnerActivityNotified, bytes);
+    check!(OwnerActivityRunBegan, bytes);
+    check!(OwnerActivityRunEnded, bytes);
+    check!(OwnerActivityTurn, bytes);
+    check!(OwnerActivityDecided, bytes);
+    check!(OwnerActivityMilestone, bytes);
+    check!(OwnerActivity, bytes);
+    check!(OwnerActivityLine, bytes);
+    check!(TurnName, bytes);
+    check!(ArchivedTurn, bytes);
+    check!(RunBeginningFresh, bytes);
+}
+
+fn records_12(bytes: &[u8]) {
+    check!(RunBeginning, bytes);
+    check!(RunEndingFailed, bytes);
+    check!(RunEnding, bytes);
+    check!(FieldRule, bytes);
+    check!(VerdictChoice, bytes);
+    check!(TaskContractDocumentApproval, bytes);
+    check!(TaskContractDocumentReport, bytes);
+    check!(TaskContractDocumentVerdict, bytes);
+    check!(TaskContractDocumentChange, bytes);
+    check!(TaskContractDocument, bytes);
+    check!(OwnerTaskStatus, bytes);
+    check!(OwnerTaskLinkLive, bytes);
+    check!(OwnerTaskLinkRetained, bytes);
+    check!(OwnerTaskLinkStored, bytes);
+    check!(OwnerTaskLink, bytes);
+    check!(ResultDetails, bytes);
+    check!(ActKind, bytes);
+    check!(GoalProcedure, bytes);
+    check!(OwnerKindImplication, bytes);
+    check!(OwnerAuthorityDocument, bytes);
+    check!(BoundsGoal, bytes);
+    check!(BoundsAmend, bytes);
+    check!(Bounds, bytes);
+    check!(BeyondProposed, bytes);
+    check!(BeyondRefused, bytes);
+    check!(Beyond, bytes);
+    check!(AdmissionProposed, bytes);
+    check!(AdmissionBounded, bytes);
+    check!(AdmissionRefused, bytes);
+    check!(Admission, bytes);
+    check!(Offered, bytes);
+    check!(ResultDocument, bytes);
+    check!(ObjectKeyTask, bytes);
+    check!(ObjectKeyProposal, bytes);
+    check!(ObjectKeyEscalation, bytes);
+    check!(ObjectKeyQuestion, bytes);
+    check!(ObjectKeyPersonTask, bytes);
+    check!(ObjectKeyResult, bytes);
+}
+
+fn records_13(bytes: &[u8]) {
+    check!(ObjectKeyNote, bytes);
+    check!(ObjectKey, bytes);
+    check!(ActivityOwner, bytes);
+    check!(ActivityWords, bytes);
+    check!(ActivityRunBegan, bytes);
+    check!(ActivityRunEnded, bytes);
+    check!(ActivityTurn, bytes);
+    check!(ActivityResult, bytes);
+    check!(ActivityNews, bytes);
+    check!(ActivityDecision, bytes);
+    check!(Activity, bytes);
+    check!(ActivityLine, bytes);
+    check!(ActivityPage, bytes);
+    check!(SpendLine, bytes);
+    check!(Hold, bytes);
+    check!(HistoryChangeMade, bytes);
+    check!(HistoryChangeAmended, bytes);
+    check!(HistoryChangeHeld, bytes);
+    check!(HistoryChangeCancelled, bytes);
+    check!(HistoryChangeMoved, bytes);
+    check!(HistoryChange, bytes);
+    check!(HistoryLine, bytes);
+    check!(OwnerHistoryChangePrioritised, bytes);
+    check!(OwnerHistoryChange, bytes);
+    check!(ParameterDocumentNumber, bytes);
+    check!(ParameterDocumentBytes, bytes);
+    check!(ParameterDocumentResource, bytes);
+    check!(ParameterDocument, bytes);
+    check!(DocumentSpecification, bytes);
+    check!(SpecificationDocument, bytes);
+    check!(ProposedTask, bytes);
+    check!(OwnerRetainedAmendment, bytes);
+    check!(OwnerRetainedActionBatch, bytes);
+    check!(OwnerRetainedActionEffect, bytes);
+    check!(OwnerRetainedActionProcedureEffect, bytes);
+    check!(OwnerRetainedActionAmend, bytes);
+    check!(OwnerRetainedActionWiden, bytes);
+    check!(OwnerRetainedActionRelease, bytes);
+}
+
+fn records_14(bytes: &[u8]) {
+    check!(OwnerRetainedAction, bytes);
+    check!(OwnerHistoryHolderTask, bytes);
+    check!(OwnerHistoryHolderPerson, bytes);
+    check!(OwnerHistoryHolderPolicy, bytes);
+    check!(OwnerHistoryHolder, bytes);
+    check!(OwnerProposalHistoryStatePending, bytes);
+    check!(OwnerProposalHistoryStateAccepted, bytes);
+    check!(OwnerProposalHistoryStateRejected, bytes);
+    check!(OwnerProposalHistoryState, bytes);
+    check!(OwnerProposalHistory, bytes);
+    check!(OwnerAmendmentState, bytes);
+    check!(OwnerHistoryAmendment, bytes);
+    check!(OwnerHistoryLine, bytes);
+    check!(OwnerMilestonePhaseActive, bytes);
+    check!(OwnerMilestonePhaseClosing, bytes);
+    check!(OwnerMilestonePhaseHeld, bytes);
+    check!(OwnerMilestonePhaseEnded, bytes);
+    check!(OwnerMilestonePhase, bytes);
+    check!(OwnerMilestoneLine, bytes);
+    check!(HistoryRowLine, bytes);
+    check!(HistoryRowChange, bytes);
+    check!(HistoryRowMilestone, bytes);
+    check!(HistoryRow, bytes);
+    check!(HistoryPage, bytes);
+    check!(RuntimeActive, bytes);
+    check!(RuntimeWaiting, bytes);
+    check!(RuntimeRunning, bytes);
+    check!(RuntimeWaitingForWords, bytes);
+    check!(RuntimeBackingOff, bytes);
+    check!(RuntimeProcedure, bytes);
+    check!(RuntimePerson, bytes);
+    check!(RuntimeClosing, bytes);
+    check!(RuntimeHeld, bytes);
+    check!(Runtime, bytes);
+    check!(Count, bytes);
+    check!(ConversationLine, bytes);
+    check!(InboxEntry, bytes);
+    check!(InboxPage, bytes);
+}
+
+fn records_15(bytes: &[u8]) {
+    check!(ConversationPage, bytes);
+    check!(OwnerPhaseCounts, bytes);
+    check!(GoalLine, bytes);
+    check!(GoalPage, bytes);
+    check!(Budget, bytes);
+    check!(Pool, bytes);
+    check!(TaskSpend, bytes);
+    check!(SpendPeriod, bytes);
+    check!(SpendPage, bytes);
+    check!(NoteAuthorParty, bytes);
+    check!(NoteAuthorTask, bytes);
+    check!(NoteAuthor, bytes);
+    check!(Note, bytes);
+    check!(NotePage, bytes);
+    check!(ObjectPage, bytes);
+    check!(OwnerEndedDelegate, bytes);
+    check!(OwnerEndedPage, bytes);
+    check!(OwnerInboxObjectQuestion, bytes);
+    check!(OwnerInboxObjectProposal, bytes);
+    check!(OwnerInboxObjectEscalation, bytes);
+    check!(OwnerInboxObjectReply, bytes);
+    check!(OwnerInboxObjectResult, bytes);
+    check!(OwnerInboxObject, bytes);
+    check!(OwnerInboxCursorNumber, bytes);
+    check!(OwnerInboxCursorInbox, bytes);
+    check!(OwnerInboxCursor, bytes);
+    check!(OwnerInboxSelection, bytes);
+    check!(OwnerInboxEntry, bytes);
+    check!(OwnerInboxPage, bytes);
+}
+
 fn decoders(bytes: &[u8]) {
     records_1(bytes);
     records_2(bytes);
@@ -438,6 +634,11 @@ fn decoders(bytes: &[u8]) {
     records_8(bytes);
     records_9(bytes);
     records_10(bytes);
+    records_11(bytes);
+    records_12(bytes);
+    records_13(bytes);
+    records_14(bytes);
+    records_15(bytes);
 }
 
 fn arbitrary(rng: &mut Rng) {
@@ -467,13 +668,16 @@ fn mutation_seed(path: &Path) -> bool {
             "enum_read_",
             "enum_read_answer_",
             "record_owner_spend_page_",
+            "record_activity_page_",
+            "record_history_page_",
+            "record_owner_inbox_page_",
         ]
         .iter()
         .any(|prefix| name.starts_with(prefix))
 }
 
 fn mutated(rng: &mut Rng) {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../crates/jig-protocol-client-wire/golden/v1");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../crates/jig-protocol-client-wire/golden/v2");
     let mut paths: Vec<_> =
         fs::read_dir(root).expect("golden directory").map(|entry| entry.expect("golden entry").path()).collect();
     paths.sort();

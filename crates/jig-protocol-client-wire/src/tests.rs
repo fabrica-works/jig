@@ -83,3 +83,34 @@ fn a_page_one_row_past_its_limit_is_refused() {
         Err(Problem { path: Path::OwnerSpendPageRows, reason: skein_codec::Reason::Bound })
     );
 }
+
+#[test]
+fn an_activity_line_carries_its_turn_bytes_unchanged() {
+    let limits = fixtures::limits();
+    let line = fixtures::activity_line(Box::from([0, 255, 1]));
+    let bytes = fixtures::encoded(&line, ActivityLine::measure, ActivityLine::encode);
+    assert_eq!(ActivityLine::decode(&limits, &mut Reader::new(&bytes)), Ok(line));
+}
+
+#[test]
+fn a_page_whose_rows_do_not_split_to_its_end_is_refused_as_malformed() {
+    let limits = fixtures::limits_with_activity_bytes(4096);
+    for rows in fixtures::malformed_activity_pieces() {
+        let page = fixtures::activity_page(&limits, rows);
+        let bytes = fixtures::encoded(&page, ActivityPage::measure, ActivityPage::encode);
+        assert_eq!(
+            fixtures::decode_activity_page(&limits, &bytes, 8),
+            Err(Problem { path: Path::ActivityPageRows, reason: skein_codec::Reason::Malformed })
+        );
+    }
+}
+
+#[test]
+fn a_page_of_many_small_rows_and_one_of_a_few_large_rows_fit_one_bound() {
+    let limits = fixtures::limits_with_activity_bytes(4096);
+    for (count, width) in [(4, 16), (2, 512)] {
+        let rows = fixtures::activity_rows(count, width);
+        let bytes = fixtures::encoded_activity_page(&limits, &rows);
+        assert_eq!(fixtures::decode_activity_page(&limits, &bytes, 8), Ok(rows));
+    }
+}
