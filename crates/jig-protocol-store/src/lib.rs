@@ -32,6 +32,7 @@ pub struct Limits {
     pub joins: u32,
     pub queue: u32,
     pub files: u32,
+    pub reads: u32,
 }
 
 /// Stores made by the caller, kept across a world's crash (store.md, 14).
@@ -68,6 +69,10 @@ impl Store {
         assert!(
             limits.queue > 0 && limits.queue <= limits.store.queued && limits.files > 0,
             "transcript bounds fit the store queue"
+        );
+        assert!(
+            limits.reads >= limits.core.load_slots.checked_add(limits.core.tasks.tasks).expect("bounded readers"),
+            "transcript readers fit party loads and all live task preparations"
         );
         let codec = codec::limits(&limits.core).expect("the domain limits fit their families' ceilings");
         Store {
@@ -154,15 +159,20 @@ pub fn down(store: &mut Store, env: &Env<Limits>, request: Request, above: &mut 
         }
         Request::Get { owner, key } => gets::get(store, owner, key, above),
         Request::Read { owner, range } => reads::read(store, owner, range, above),
-        // Each remaining handler joins in its owning increment, before routing uses it.
         Request::Secrets { owner, request } => secrets::secrets(store, env, owner, request, above, below),
-        Request::Transcript { .. } => {}
+        Request::Transcript { owner, read, rows, bytes } => {
+            transcripts::read::transcript(store, owner, read, rows, bytes, above, below);
+        }
     }
 }
 
 /// File terminals routed through their independent drivers.
 pub fn up(store: &mut Store, env: &Env<Limits>, io: Io, above: &mut Queue<Event>, below: &mut Below) {
     directory::up(store, env, io, above, below);
+    if store.phase != Phase::Stopped {
+        transcripts::read::fire(store, above, below);
+        transcripts::write::fire(store, env, above, below);
+    }
 }
 
 /// Bounded background store work and the orphan sweep.
@@ -170,6 +180,7 @@ pub fn fire(store: &mut Store, env: &Env<Limits>, above: &mut Queue<Event>, belo
     if store.phase != Phase::Stopped {
         directory::fire(store, env, above, below);
         secrets::sweep(store, env, above, below);
+        transcripts::read::fire(store, above, below);
         transcripts::write::fire(store, env, above, below);
     }
 }

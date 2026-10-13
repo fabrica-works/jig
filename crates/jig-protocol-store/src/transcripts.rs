@@ -1,5 +1,6 @@
 //! Transcript frames, queued commits and durable places (protocol/store.md, 8).
 pub mod frame;
+pub(crate) mod read;
 pub(crate) mod write;
 use crate::{Event, Limits, Phase, Store, codec, keys, open};
 use alloc::boxed::Box;
@@ -25,6 +26,7 @@ pub(crate) struct Place {
 pub(crate) struct File {
     pub token: Token,
     pub touched: u64,
+    pub writable: bool,
 }
 #[derive(Debug)]
 pub(crate) enum Stage {
@@ -51,6 +53,8 @@ pub(crate) struct State {
     pub stage: Stage,
     pub directory: Option<crate::Root>,
     pub touch: u64,
+    pub reads: Map<Token, read::Read>,
+    pub reading: Option<Token>,
 }
 impl State {
     pub fn new(limits: &Limits) -> State {
@@ -65,6 +69,8 @@ impl State {
             stage: Stage::Idle,
             directory: None,
             touch: 0,
+            reads: Map::with_capacity(limits.reads),
+            reading: None,
         }
     }
 }
@@ -91,6 +97,7 @@ pub(crate) fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Map::<u64, Place>::worst_case(count)?)?
         .checked_add(Map::<(u64, u64), u64>::worst_case(count)?)?
         .checked_add(Map::<u64, File>::worst_case(limits.files)?)?
+        .checked_add(read::worst_case(limits, &codec)?)?
         .checked_add(64)
 }
 pub(crate) fn place(

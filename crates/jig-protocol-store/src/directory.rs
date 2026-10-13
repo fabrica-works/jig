@@ -214,7 +214,13 @@ pub(crate) fn up(store: &mut Store, env: &Env<Limits>, io: Io, above: &mut Queue
         Io::Secrets(arrived) => (arrived, true),
         Io::Transcripts(arrived) => {
             match store.phase {
-                Phase::Ready { .. } => crate::transcripts::write::arrived(store, env, arrived, above, below),
+                Phase::Ready { .. } => {
+                    if arrived.event.owner() == crate::transcripts::read::OWNER {
+                        crate::transcripts::read::arrived(store, arrived, above, below);
+                    } else {
+                        crate::transcripts::write::arrived(store, env, arrived, above, below);
+                    }
+                }
                 Phase::Closed => directory(store, env, arrived, above, below),
                 Phase::Stopped => {}
             }

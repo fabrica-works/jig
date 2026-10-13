@@ -44,6 +44,9 @@ pub(crate) fn begin(
     fire(store, env, above, below);
 }
 pub(crate) fn fire(store: &mut Store, env: &Env<Limits>, above: &mut Queue<Event>, below: &mut Below) {
+    if store.transcripts.reading.is_some() {
+        return;
+    }
     match store.transcripts.stage {
         Stage::Idle => {}
         Stage::Opening
@@ -84,8 +87,13 @@ fn task(store: &Store) -> u64 {
 }
 fn start(store: &mut Store, above: &mut Queue<Event>, below: &mut Below) {
     let task = task(store);
-    if store.transcripts.files.contains_key(&task) {
-        write(store, above, below);
+    if let Some(file) = store.transcripts.files.get(&task) {
+        if file.writable {
+            write(store, above, below);
+        } else {
+            store.transcripts.stage = Stage::Evicting { task };
+            below.transcripts.push(file::Request::Close { owner: OWNER, file: file.token });
+        }
         return;
     }
     if store.transcripts.files.len() == store.limits.files {
@@ -130,7 +138,12 @@ fn write(store: &mut Store, above: &mut Queue<Event>, below: &mut Below) {
 }
 fn file_opened(store: &mut Store, file: Token, above: &mut Queue<Event>, below: &mut Below) {
     let task = task(store);
-    if store.transcripts.files.insert(task, File { token: file, touched: store.transcripts.touch }).is_err() {
+    if store
+        .transcripts
+        .files
+        .insert(task, File { token: file, touched: store.transcripts.touch, writable: true })
+        .is_err()
+    {
         transcripts::failed(store, None, above);
         return;
     }
