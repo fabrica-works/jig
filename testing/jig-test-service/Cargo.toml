@@ -9,6 +9,9 @@ publish.workspace = true
 [dependencies]
 jig-test-protocol-client-wire.workspace = true
 jig-protocol-engine-clients.workspace = true
+jig-protocol-store.workspace = true
+jig-test-store.workspace = true
+skein-kv.workspace = true
 skein-lib.workspace = true
 skein-io.workspace = true
 skein-json.workspace = true

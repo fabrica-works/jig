@@ -234,6 +234,7 @@ pub(super) const JOURNAL: skein_lib::JournalLimits =
     skein_lib::JournalLimits { commits: 3, writes: 12_226, held: 36_678, now: 256, release: 256 };
 pub(super) const LIMITS: Limits = Limits {
     core: CORE,
+    store: STORE,
     hub: HUB,
     link: LINK,
     // Smith keeps the two-byte id length and up to 256 id bytes in its 8192-byte value.
@@ -296,4 +297,31 @@ pub(super) const DRIVER: skein_oauth_accounts::Limits = skein_oauth_accounts::Li
     http: skein_http::client::Limits { request: 65536, head: 16384, headers: 32, read: 16384, send: 16384 },
     tls: skein_tls::client::Limits { read: 16384, send: 65536, records: 131_072 },
     io: IO,
+};
+
+// 19.s3: application key2078/value4304, one orphan erase, 256 MiB map.
+pub(super) const STORE_KV: skein_kv::Limits = skein_kv::Limits {
+    key: 2079,
+    value: 1_281_011,
+    ops: 24_454,
+    commit: 319_495_434,
+    queued: 3,
+    queued_bytes: 958_486_302,
+    budget: 268_435_456,
+    segment: 638_990_868,
+    snapshot_after: 319_495_434,
+    chunk: 1_283_110,
+    page: skein_kv::Page { rows: 2, bytes: 1_283_090 },
+    deadline: Duration::from_secs(30),
+};
+pub(super) const STORE: jig_protocol_store::Limits = jig_protocol_store::Limits {
+    core: CORE,
+    store: STORE_KV,
+    secrets: STORE_KV,
+    journal: JOURNAL,
+    joins: 4,
+    queue: 3,
+    files: 8,
+    reads: 12,
+    orphan_erases: 1,
 };

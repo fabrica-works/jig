@@ -4,7 +4,6 @@ use jig_test_service::{Files, Seeds};
 use skein_lib::{Duration, List, Secret};
 
 pub const SEED: u64 = 7;
-pub(crate) const NOTES_LOAD_ROWS: u32 = 4;
 pub const TOKEN: &[u8] = b"test-token";
 const DIGEST: &[u8] = b"6fb46f7a92742970166379ed5195e79c4493a7cc5664280c039cfd4095ba5faf";
 const REPORT: &[u8] = br#"{"form":"report","text":"Hello","fields":{}}"#;
@@ -28,6 +27,7 @@ pub fn one_chat(words: &[u8]) -> Script {
 
 const ENGINE: &[u8] = br#"{
 "limits": {"profile": "small", "overrides": {
+"tasks.result_bytes":32,"people.amendment_bytes":64,"core.policy_bytes":256,"tasks.spec_bytes":128,"tasks.message_bytes":512,"tasks.hold_bytes":64,"tasks.authority_bytes":64,"people.words":512,"core.call_answer_bytes":2048,"notes.recalled":1,
 "tasks.tasks":1,"tasks.funders":2,"tasks.project_tasks":1,"tasks.tree_tasks":1,
 "tasks.batch":1,"tasks.dependencies":1,"tasks.delegates":1,"tasks.charters":1,
 "people.people":1,"people.projects":1,"people.sign_ins":1,"people.holdings":1,
@@ -110,7 +110,7 @@ pub const WORKER_DOCUMENT: &[u8] = br#"{
 "engine":{"socket":"127.0.0.1:7200"},"name":"worker-a","secret":"worker.secret","slots":1,
 "graces":{"grace_ms":10000,"agent_stop_ms":5000,"delivery_ms":1000,"save_ms":1000},
 "agent":{"program":"agent-program","configuration":"agent.json","arguments":["agent"]},
-"limits":{"profile":"small","overrides":{"hub.slots":1,"hub.run_calls":1}},
+"limits":{"profile":"small","overrides":{"hub.slots":1,"hub.run_calls":1,"tasks.message_bytes":512,"people.words":512,"core.call_answer_bytes":2048}},
 "memory_bytes":1152921504606846976
 }],"application":{"workers":[{"root":"agent-root"}]}}
 "#;
@@ -246,7 +246,7 @@ pub(crate) fn agent_configuration() -> smith_agent_service::Config {
 }
 
 pub(crate) fn peer_bounds() -> (skein_channel::Schema, skein_channel::Limits) {
-    let profile = jig_test_service::limits::profile_limits(jig_protocol_config::Profile::Small);
+    let profile = store_limits();
     let sizes = profile.workers.sizes;
     let codec = jig_protocol_worker_wire::sizes::limits(&sizes).expect("small wire");
     let cap = jig_protocol_worker_wire::sizes::worker_cap(&sizes).expect("peer output").cap;
@@ -413,8 +413,17 @@ pub(crate) fn party_script(script: &Script) -> Box<[jig_fake_parties::Act]> {
 }
 
 pub(crate) fn engine_message_document() -> Vec<u8> {
-    String::from_utf8(engine_document())
-        .expect("fixture UTF-8")
-        .replace("\"core.load_slots\":1", "\"core.load_slots\":1,\"tasks.message_bytes\":512,\"people.words\":512")
-        .into_bytes()
+    engine_document()
+}
+
+/// Match the fixture's final admitted core bounds, once per engine instance.
+pub(crate) fn store_limits() -> jig_test_service::limits::Limits {
+    let bounds = jig_protocol_config::DocumentLimits {
+        bytes: u32::try_from(ENGINE.len()).expect("fixture document size"),
+        tokens: u32::try_from(ENGINE.len()).expect("fixture document size"),
+        depth: 32,
+    };
+    let document = jig_protocol_config::document(ENGINE, &bounds).expect("fixture document");
+    let engine = jig_protocol_config::engine(&document, 0).expect("fixture engine");
+    jig_test_service::limits::for_profile(jig_protocol_config::Profile::Small, &engine.limits)
 }

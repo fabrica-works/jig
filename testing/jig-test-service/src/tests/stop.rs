@@ -7,18 +7,6 @@ fn components() -> crate::Service {
         let mut service = fixtures::started(&fixtures::workers_document());
         for _ in 0..64 {
             fixtures::turn(&mut service);
-            let engine = fixtures::engine(&mut service);
-            while let Some(request) = engine.store_requests().pop() {
-                match request {
-                    crate::StoreRequest::Restart(step) => {
-                        engine.store_answers().push(crate::StoreAnswer::Restored { step, rows: Box::default() });
-                    }
-                    crate::StoreRequest::Commit { number, .. } => {
-                        engine.store_answers().push(crate::StoreAnswer::Committed { number, fill: 0 });
-                    }
-                    crate::StoreRequest::Load(_) | crate::StoreRequest::Read(_) => panic!("only startup records"),
-                }
-            }
             if !service.work_pending(skein_lib::Time::from_nanos(1)) && fixtures::engine(&mut service).domain.ready() {
                 break;
             }

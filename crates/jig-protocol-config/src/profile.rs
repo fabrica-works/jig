@@ -31,6 +31,7 @@ pub struct Link {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Limits {
     pub core: core::Limits,
+    pub store: jig_protocol_store::Limits,
     pub hub: host::Limits,
     pub link: Link,
     pub token: u32,

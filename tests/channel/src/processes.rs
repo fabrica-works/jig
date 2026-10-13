@@ -1,5 +1,5 @@
 //! Host adapters expose only service ports to the scenario (service.md, 4).
-use crate::{fixtures, relay::Relay};
+use crate::{fixtures, relay::Relay, world::Capture};
 use jig_test_service::Service;
 use skein_io::kernel;
 use skein_lib::{Queue, Time, Wall};
@@ -16,11 +16,22 @@ pub(crate) enum Proc {
     Probe(Box<crate::relay::Peer>),
 }
 
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "independent host, shutdown, held-write and transcript-fault controls"
+)]
 pub(crate) struct ServiceHost {
     pub(crate) service: Service,
     pub(crate) wire: Wire,
     pub(crate) stopping: bool,
     worker: bool,
+    pub(crate) files: Capture,
+    pub(crate) codec: jig_protocol_store::codec::Limits,
+    pub(crate) store_limits: jig_test_service::limits::Limits,
+    pub(crate) holding: bool,
+    pub(crate) corrupt_transcript: bool,
+    pub(crate) restart_root: Option<kernel::Fd>,
+    held: Queue<kernel::Submit>,
     pub(crate) relay: Relay,
     pub(crate) revision: (u64, u64),
 }
@@ -32,6 +43,14 @@ impl ServiceHost {
             wire: Wire::default(),
             stopping: false,
             worker,
+            files: Capture::default(),
+            codec: jig_protocol_store::codec::limits(&fixtures::store_limits().root.core)
+                .expect("admitted fixture codec"),
+            store_limits: fixtures::store_limits(),
+            holding: false,
+            corrupt_transcript: false,
+            restart_root: None,
+            held: Queue::with_capacity(4),
             relay: Relay::new(1024),
             revision: (NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed), 0),
         }
@@ -39,12 +58,29 @@ impl ServiceHost {
 }
 impl Host for ServiceHost {
     fn iterate(&mut self, now: Time, wall: Wall) {
+        if !self.holding {
+            while let Some(submit) = self.held.pop() {
+                self.service.submissions().push(submit);
+            }
+        }
         self.relay.receive(now, self.service.completions());
         for complete in self.service.completions().iter() {
             self.wire.complete(complete, self.worker, now);
+            self.files.complete(complete);
         }
         jig_test_service::iterate(&mut self.service, now, wall);
         self.revision.1 += 1;
+        for _ in 0..self.service.submissions().len() {
+            let mut submit = self.service.submissions().pop().expect("service submissions");
+            if self.corrupt_transcript {
+                self.files.corrupt_transcript(&mut submit.kind, &self.codec);
+            }
+            if self.files.pending(&submit.kind) && self.holding {
+                self.held.push(submit);
+            } else {
+                self.service.submissions().push(submit);
+            }
+        }
         for submit in self.service.submissions().iter() {
             if let kernel::Op::Close { fd } = submit.kind
                 && let Some(bound) = self.wire.stop_bounds.get(&fd.raw())
@@ -60,7 +96,7 @@ impl Host for ServiceHost {
         self.service.submissions()
     }
     fn work_pending(&self, now: Time) -> bool {
-        self.service.work_pending(now) || self.relay.ready(now)
+        self.service.work_pending(now) || self.relay.ready(now) || (!self.holding && !self.held.is_empty())
     }
     fn next_deadline(&self) -> Option<Time> {
         [self.service.next_deadline(), self.relay.until].into_iter().flatten().min()
@@ -69,7 +105,7 @@ impl Host for ServiceHost {
         self.service.next_policy_deadline()
     }
     fn is_empty(&self) -> bool {
-        self.service.is_empty()
+        self.service.is_empty() && self.restart_root.is_none()
     }
     fn worst_case(&self) -> u64 {
         self.service.worst_case().checked_add(2_097_152).expect("port observations")
@@ -135,6 +171,9 @@ impl Host for Proc {
 pub(crate) fn engine(inherited: &Inherited) -> Proc {
     engine_configured(inherited, false)
 }
+pub(crate) fn engine_drain(inherited: &Inherited) -> Proc {
+    engine_configured(inherited, false)
+}
 pub(crate) fn engine_calls(inherited: &Inherited) -> Proc {
     engine_configured(inherited, true)
 }
@@ -152,7 +191,12 @@ fn engine_document(inherited: &Inherited, document: &[u8]) -> Proc {
         jig_test_service::startup(document, &fixtures::files(false), None, &fixtures::seeds(), None, None)
             .expect("engine configuration");
     service.adopt_signals(inherited.signal).expect("engine signal source");
-    Proc::Engine(Box::new(ServiceHost::new(service, false)))
+    let root = inherited.roots.iter().find(|(name, _)| name.as_ref() == b"state").expect("deployment root").1;
+    service.adopt_store(root, 1000).expect("store directory");
+    let mut host = ServiceHost::new(service, false);
+    host.files.root(root);
+    host.restart_root = inherited.roots.iter().find(|(name, _)| name.as_ref() == b"restart-state").map(|(_, fd)| *fd);
+    Proc::Engine(Box::new(host))
 }
 pub(crate) fn worker(root: kernel::Fd) -> Proc {
     worker_configured(root, false, false)
@@ -175,16 +219,9 @@ fn worker_configured(root: kernel::Fd, bad_charter: bool, message: bool) -> Proc
         agent.host_limits.message_bytes = 256;
         agent.bounds.message_bytes = 512;
     }
-    let document = if message {
-        String::from_utf8(fixtures::WORKER_DOCUMENT.to_vec())
-            .expect("worker fixture")
-            .replace("\"hub.slots\":1", "\"hub.slots\":1,\"tasks.message_bytes\":512")
-            .into_bytes()
-    } else {
-        fixtures::WORKER_DOCUMENT.to_vec()
-    };
+    let document = fixtures::WORKER_DOCUMENT;
     let service = jig_test_service::startup(
-        &document,
+        document,
         &fixtures::files(true),
         Some(&agent),
         &fixtures::seeds(),
@@ -323,6 +360,13 @@ impl Wire {
 
 pub(crate) struct Machine(pub(crate) skein_fake_machine::Machine);
 impl skein_world::Machine for Machine {
+    fn open_root(&mut self, path: &[u8]) -> Result<skein_sim::Handle, kernel::Error> {
+        assert_eq!(path, b"state");
+        Ok(skein_sim::Handle::new(self.0.reopen_root(0).raw()))
+    }
+    fn close_root(&mut self, root: skein_sim::Handle) {
+        self.0.close(skein_fake_machine::Opened::new(root.raw()));
+    }
     fn cut(&mut self, cut: skein_world::Cut, held: &[skein_sim::Handle], seed: u64) {
         match cut {
             skein_world::Cut::Kill => {

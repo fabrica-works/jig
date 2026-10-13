@@ -70,12 +70,11 @@ pub(super) fn advance(engine: &mut Engine) {
         }))
         .expect("two engine components");
         drain.phase = Phase::Closing { waiting };
-        if waiting == 0
-            && engine.stores.is_empty()
-            && engine.answers.is_empty()
-            && engine.events.is_empty()
-            && engine.requests.is_empty()
-        {
+        if waiting == 0 && engine.store.idle() && engine.events.is_empty() && engine.requests.is_empty() {
+            engine.store.close();
+            if !engine.store.closed() {
+                return;
+            }
             drain.phase = Phase::Drained;
             for _ in 0..drain.busy.len() {
                 let _event = drain.busy.pop().expect("deferred input count");

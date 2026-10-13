@@ -142,12 +142,12 @@ fn write(store: &mut Store, above: &mut Queue<Event>, below: &mut Below) {
     store.transcripts.stage = Stage::Writing;
     below.transcripts.push(file::Request::WriteAt { owner: OWNER, file: file.token, offset: frame.offset, bytes });
 }
-fn file_opened(store: &mut Store, file: Token, above: &mut Queue<Event>, below: &mut Below) {
+fn file_opened(store: &mut Store, file: Token, readable: bool, above: &mut Queue<Event>, below: &mut Below) {
     let task = task(store);
     if store
         .transcripts
         .files
-        .insert(task, File { token: file, touched: store.transcripts.touch, writable: true })
+        .insert(task, File { token: file, touched: store.transcripts.touch, writable: true, readable })
         .is_err()
     {
         transcripts::failed(store, None, above);
@@ -265,7 +265,7 @@ pub(crate) fn arrived(
                 transcripts::failed(store, None, above);
                 return;
             }
-            file_opened(store, arrived.file.expect("file opened token"), above, below);
+            file_opened(store, arrived.file.expect("file opened token"), false, above, below);
         }
         Stage::Writing => {
             if arrived.kind != Kind::Written {
@@ -312,7 +312,7 @@ pub(crate) fn arrived(
 
 fn opening(store: &mut Store, arrived: Arrival, above: &mut Queue<Event>, below: &mut Below) {
     if arrived.kind == Kind::Opened {
-        file_opened(store, arrived.file.expect("opened token"), above, below);
+        file_opened(store, arrived.file.expect("opened token"), true, above, below);
     } else if arrived.kind == Kind::Missing {
         store.transcripts.stage = Stage::Making;
         below.transcripts.push(file::Request::MakeDirectory {

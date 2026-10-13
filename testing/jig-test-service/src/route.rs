@@ -1,12 +1,15 @@
 //! Exhaustive routing of the root's journal, with values kept in their owners (service.md, 4).
-use crate::{Engine, PartyOutput, StoreRequest, stop};
+use crate::{Engine, PartyOutput, stop};
 use jig_domain_core as core;
 use jig_test_connector as connector;
 use jig_test_domain as root;
 
 pub(super) fn request(engine: &mut Engine, request: root::Request) {
     match request {
-        root::Request::Commit { number, writes } => engine.stores.push(StoreRequest::Commit { number, writes }),
+        root::Request::Commit { number, writes } => crate::store::request(
+            engine,
+            jig_test_store::StoreOut::Commit { number, writes: crate::store::writes(writes) },
+        ),
         root::Request::Restart(step) => restart(engine, step),
         root::Request::Deliver(delivery) => deliver(engine, delivery),
         root::Request::Now(now) => immediate(engine, now),
@@ -106,7 +109,12 @@ fn restart(engine: &mut Engine, step: core::RestartStep) {
             }
         }
         core::RestartStep::LoadCore | core::RestartStep::LoadInbox | core::RestartStep::RestoreConnector { .. } => {
-            engine.stores.push(StoreRequest::Restart(step));
+            let census = if step == core::RestartStep::LoadInbox {
+                Some(root::inbox_census(&mut engine.domain, &engine.env.limits))
+            } else {
+                None
+            };
+            crate::store::request(engine, jig_test_store::StoreOut::Restart { step, census });
         }
         core::RestartStep::AdoptRuns | core::RestartStep::SettleOutbox { .. } | core::RestartStep::Open => {
             stop::invalid_restore(engine);
@@ -138,7 +146,7 @@ fn immediate(engine: &mut Engine, now: core::Now) {
         | core::Now::HistoricalProposal { .. }
         | core::Now::HistoricalEscalation { .. }
         | core::Now::StartPreparation { .. }) => {
-            engine.stores.push(StoreRequest::Load(value));
+            crate::store::request(engine, jig_test_store::StoreOut::Now(value));
         }
         // Configuration is parsed whole; inactive account components receive no requests.
         core::Now::Account(request) => {
@@ -186,8 +194,11 @@ fn immediate(engine: &mut Engine, now: core::Now) {
 fn core_held(engine: &mut Engine, held: core::Held) {
     match held {
         core::Held::Drained => stop::drained(engine),
-        held @ (core::Held::ReadLoad { .. } | core::Held::NotesLoad { .. }) => {
-            engine.stores.push(StoreRequest::Read(held));
+        core::Held::ReadLoad { load, range } => {
+            crate::store::request(engine, jig_test_store::StoreOut::ReadLoad { load, range });
+        }
+        core::Held::NotesLoad { owner, range } => {
+            crate::store::request(engine, jig_test_store::StoreOut::NotesLoad { owner, range });
         }
         held @ (core::Held::Read { .. }
         | core::Held::Delivery { .. }

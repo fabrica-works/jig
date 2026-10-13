@@ -7,6 +7,8 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
+jig-protocol-store.workspace = true
+skein-kv.workspace = true
 skein-http.workspace = true
 skein-oauth.workspace = true
 skein-oauth-accounts.workspace = true

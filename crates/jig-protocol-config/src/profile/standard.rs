@@ -117,6 +117,7 @@ pub(super) const HUB: host::Limits = host::Limits { slots: 4, accounts: 32, fact
 pub(super) const LINK: Link = Link { names: 64, opening: 16, facts: 256, ..small::LINK };
 pub(super) const LIMITS: Limits = Limits {
     core: CORE,
+    store: STORE,
     hub: HUB,
     link: LINK,
     // Smith keeps the two-byte id length and up to 256 id bytes in its 8192-byte value.
@@ -129,9 +130,33 @@ pub(super) const LIMITS: Limits = Limits {
     },
     clients: CLIENTS,
     io: skein_io::Limits { sockets: 64, names: 64, ..small::IO },
-    journal: skein_lib::JournalLimits { commits: 3, writes: 70_236, held: 210_708, now: 1024, release: 1024 },
+    journal: JOURNAL,
     routes: 2048,
 };
 
 pub(super) const CLIENTS: jig_protocol_engine_clients::Limits =
     jig_protocol_engine_clients::Limits { connections: 16, streams: 8, exchanges: 32, ..small::CLIENTS };
+
+const JOURNAL: skein_lib::JournalLimits =
+    skein_lib::JournalLimits { commits: 3, writes: 70_236, held: 210_708, now: 1024, release: 1024 };
+// Same 19.s3 composition as small; the standard domain supplies the larger value and operation bounds.
+const STORE_KV: skein_kv::Limits = skein_kv::Limits {
+    value: 10_374_043,
+    ops: 140_474,
+    commit: 561_745_194,
+    queued_bytes: 1_685_235_582,
+    segment: 1_123_490_388,
+    snapshot_after: 561_745_194,
+    chunk: 10_376_142,
+    page: skein_kv::Page { rows: 2, bytes: 10_376_122 },
+    ..small::STORE_KV
+};
+const STORE: jig_protocol_store::Limits = jig_protocol_store::Limits {
+    core: CORE,
+    store: STORE_KV,
+    secrets: STORE_KV,
+    journal: JOURNAL,
+    joins: 16,
+    reads: 48,
+    ..small::STORE
+};

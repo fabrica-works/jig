@@ -1,5 +1,5 @@
 //! One root decision per input, with store terminals taken before decisions (service.md, 4).
-use crate::{End, PartyOutput, StoreAnswer, StoreRequest, route, stop, system::System};
+use crate::{End, PartyOutput, route, stop, system::System};
 use alloc::boxed::Box;
 use jig_domain_core as core;
 use jig_test_domain as root;
@@ -14,8 +14,7 @@ pub struct Engine {
     pub(crate) tools: crate::tools::Tools,
     aborted: Option<()>,
     pub(crate) env: Env<root::Limits>,
-    pub(crate) stores: Queue<StoreRequest>,
-    pub(crate) answers: Queue<StoreAnswer>,
+    pub(crate) store: crate::store::Store,
     pub(crate) parties: Queue<core::Event>,
     pub(crate) outputs: Queue<PartyOutput>,
     pub(crate) events: Queue<root::Event>,
@@ -26,7 +25,7 @@ pub struct Engine {
     pub(crate) max_out: u32,
     pub(crate) restart_reads: Option<(u16, u32)>,
     pub(crate) drain: Option<stop::Drain>,
-    blocked: bool,
+    pub(super) blocked: bool,
     pending: Option<Box<root::Event>>,
     ready: bool,
 }
@@ -39,6 +38,7 @@ impl Engine {
         accounts: Option<crate::accounts::Accounts>,
         workers: Option<crate::workers::Workers>,
         values: crate::values::Values,
+        store: crate::store::Store,
     ) -> Self {
         let max_out = root::max_out(limits);
         let capacity = max_out.checked_mul(2).expect("engine queues fit u32");
@@ -56,8 +56,7 @@ impl Engine {
             tools: crate::tools::Tools::new(&limits.core),
             aborted: None,
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits },
-            stores: Queue::with_capacity(capacity),
-            answers: Queue::with_capacity(capacity),
+            store,
             parties: Queue::with_capacity(capacity),
             outputs: Queue::with_capacity(capacity),
             events,
@@ -73,12 +72,6 @@ impl Engine {
             ready: true,
         }
     }
-    pub const fn store_requests(&mut self) -> &mut Queue<StoreRequest> {
-        &mut self.stores
-    }
-    pub const fn store_answers(&mut self) -> &mut Queue<StoreAnswer> {
-        &mut self.answers
-    }
     pub const fn parties_in(&mut self) -> &mut Queue<core::Event> {
         &mut self.parties
     }
@@ -90,7 +83,7 @@ impl Engine {
         (match &self.drain {
             Some(drain) => drain.busy.room() >= self.max_out,
             None => true,
-        }) && self.stores.room() >= self.max_out
+        }) && self.store.room()
             && self.outputs.room() >= self.max_out
             && self.events.room()
                 >= self
@@ -124,9 +117,9 @@ impl Engine {
                 Some(workers) => workers.next_deadline(),
                 None => None,
             };
-            return crate::accounts::earliest(accounts, workers);
+            return crate::accounts::earliest(crate::accounts::earliest(accounts, workers), self.store.next_deadline());
         }
-        let mut next = self.values.accounts.next_expiry();
+        let mut next = crate::accounts::earliest(self.store.next_deadline(), self.values.accounts.next_expiry());
         for (_, deadline) in self.domain.core_deadlines() {
             if let Some(deadline) = deadline {
                 next = Some(match next {
@@ -151,14 +144,16 @@ impl Engine {
     }
     #[must_use]
     pub fn work_pending(&self, now: Time) -> bool {
-        let components = match &self.accounts {
-            Some(accounts) => accounts.work_pending(now),
-            None => false,
-        } || match &self.workers {
-            Some(workers) => workers.work_pending(now),
-            None => false,
-        };
-        if self.end.is_some() || (self.begin && !self.listeners_open()) {
+        let components = self.store.work_pending(now)
+            || (self.store.opened || self.end.is_some())
+                && (match &self.accounts {
+                    Some(accounts) => accounts.work_pending(now),
+                    None => false,
+                } || match &self.workers {
+                    Some(workers) => workers.work_pending(now),
+                    None => false,
+                });
+        if self.end.is_some() || !self.store.opened || (self.begin && !self.listeners_open()) {
             return components;
         }
         let due = match self.next_deadline() {
@@ -166,7 +161,8 @@ impl Engine {
             None => false,
         };
         components
-            || !self.answers.is_empty()
+            || !self.store.above.is_empty()
+            || !self.store.routed.is_empty()
             || (self.room()
                 && (self.begin
                     || !self.parties.is_empty()
@@ -200,10 +196,16 @@ impl Engine {
     pub(crate) fn abort_components(&mut self) {
         if self.aborted.is_none() {
             self.aborted = Some(());
+            self.store.close();
             if let Some(accounts) = &mut self.accounts {
                 accounts.abort();
             }
             if let Some(workers) = &mut self.workers {
+                if !self.store.opened {
+                    for _ in 0..workers.io.len() {
+                        let _unstarted = workers.io.pop();
+                    }
+                }
                 workers.abort(self.env.now, &mut self.events);
             }
         }
@@ -225,6 +227,12 @@ fn wall_deadline(next: Option<Time>, deadline: Option<Wall>, env: &Env<root::Lim
 pub fn iterate(engine: &mut Engine, now: Time, wall: Wall) {
     engine.env.now = now;
     engine.env.wall = wall;
+    engine.store.clock(now, wall);
+    engine.store.iterate();
+    crate::store::answer(engine);
+    if !engine.store.opened && engine.end.is_none() {
+        return;
+    }
     if let Some(accounts) = &mut engine.accounts {
         accounts.iterate(now, wall, &mut engine.values, &mut engine.events);
     }
@@ -234,18 +242,7 @@ pub fn iterate(engine: &mut Engine, now: Time, wall: Wall) {
     stop::advance(engine);
     if engine.end.is_some() {
         engine.abort_if_ended();
-        for _ in 0..engine.answers.len() {
-            let _answer = engine.answers.pop().expect("late store terminal");
-        }
         return;
-    }
-    for _ in 0..engine.answers.len() {
-        let answer = engine.answers.pop().expect("store answer count");
-        engine.blocked = false;
-        store_answer(engine, answer);
-        if engine.end.is_some() {
-            return;
-        }
     }
     if !engine.room() || (engine.begin && !engine.listeners_open()) {
         return;
@@ -295,27 +292,6 @@ pub fn iterate(engine: &mut Engine, now: Time, wall: Wall) {
     }
     engine.domain.reclaim();
     stop::advance(engine);
-}
-
-fn store_answer(engine: &mut Engine, answer: StoreAnswer) {
-    match answer {
-        StoreAnswer::Committed { number, fill } => engine.step(root::Event::Committed { number, fill }),
-        StoreAnswer::Failed { number } => stop::failed(engine, number),
-        StoreAnswer::Core(event) => engine.step(root::Event::Core(*event)),
-        StoreAnswer::Transcript { task, rows, done } => engine.step(root::Event::TranscriptLoaded { task, rows, done }),
-        StoreAnswer::Restored { step, rows } => {
-            for row in rows {
-                if !root::restore_record(&mut engine.domain, &engine.env, row) {
-                    stop::invalid_restore(engine);
-                    return;
-                }
-            }
-            if step == core::RestartStep::LoadCore {
-                engine.events.push(root::Event::Core(core::Event::People(jig_domain_people::Event::Restored)));
-            }
-            engine.events.push(root::Event::RestartDone(step));
-        }
-    }
 }
 
 fn fire(engine: &mut Engine) {

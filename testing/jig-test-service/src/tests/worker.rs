@@ -279,14 +279,13 @@ fn the_engine_s_listener_opens_before_its_workers_start() {
         Some(fixtures::worker_runtime()),
     )
     .expect("combined service");
+    fixtures::memory_store(service.engine().expect("engine"));
     iterate(&mut service, Time::ZERO, Wall::EPOCH);
     assert!(!worker(&mut service).started);
-    assert!(service.engine().expect("engine").store_requests().is_empty());
+    assert!(service.engine().expect("engine").store.above.is_empty());
     iterate(&mut service, Time::ZERO, Wall::EPOCH);
     assert!(worker(&mut service).started);
-    let Some(crate::StoreRequest::Restart(jig_domain_core::RestartStep::LoadCore)) =
-        service.engine().expect("engine").store_requests().pop()
-    else {
+    let Some(jig_protocol_store::Event::Restored { .. }) = service.engine().expect("engine").store.above.pop() else {
         panic!("restart begins after listener");
     };
 }

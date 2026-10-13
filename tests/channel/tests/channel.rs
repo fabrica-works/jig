@@ -68,7 +68,7 @@ fn a_partition_seen_late_by_the_engine_places_no_attempt_early() {
 
 #[test]
 fn a_restarted_engine_adopts_the_worker_s_run_at_its_hello() {
-    let outcome = run(Story::Restart { before: 20 });
+    let outcome = run(Story::Restart { before: 80 });
     assert!(outcome.adopting_hellos > 0);
     assert_eq!(outcome.verdict, Verdict::Passed);
     assert_eq!(outcome.turns_committed, 1);
@@ -240,4 +240,19 @@ fn a_shutdown_mid_run_drains_with_nothing_waiting_for_a_commit() {
     assert_eq!(outcome.turns_committed, 2);
     assert_eq!(outcome.answers_acknowledged, 1);
     assert_eq!(outcome.agent_starts, 1, "the kept turn finishes on the restarted engine");
+}
+
+#[test]
+fn a_restart_reads_back_only_what_was_durable() {
+    let outcome = run(Story::DurableRestart);
+    assert_eq!(outcome.verdict, Verdict::Passed);
+    assert!(outcome.durable_at_restart > 0, "earlier real commits were durable");
+    let held = outcome.held_at_restart.expect("kill while the real turn commit is held");
+    assert_eq!(held, outcome.durable_at_restart + 1);
+    for number in 1..=outcome.durable_at_restart {
+        assert!(outcome.recovered_commits.contains(&number), "durable commit {number} was read back");
+    }
+    assert!(!outcome.recovered_commits.contains(&held), "held commit {held} was absent at recovery");
+    assert_eq!(outcome.turns_committed, 1);
+    assert_eq!(outcome.answers_acknowledged, 1);
 }

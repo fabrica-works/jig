@@ -3,7 +3,7 @@ use alloc::boxed::Box;
 use jig_domain_core as core;
 use jig_protocol_config::Problems;
 use jig_test_domain as root;
-use skein_lib::{List, Queue, Secret};
+use skein_lib::{List, Secret};
 
 #[derive(Debug)]
 pub struct Files {
@@ -26,21 +26,6 @@ pub enum Stop {
     CommitFailed { number: u64 },
     Start(Problems),
     Listener,
-}
-#[derive(Debug)]
-pub enum StoreRequest {
-    Commit { number: u64, writes: Queue<root::Write> },
-    Restart(core::RestartStep),
-    Load(core::Now),
-    Read(core::Held),
-}
-#[derive(Debug)]
-pub enum StoreAnswer {
-    Committed { number: u64, fill: u64 },
-    Failed { number: u64 },
-    Restored { step: core::RestartStep, rows: Box<[root::Record]> },
-    Core(Box<core::Event>),
-    Transcript { task: u64, rows: Box<[core::TurnRecord]>, done: bool },
 }
 #[derive(Debug)]
 pub enum PartyOutput {

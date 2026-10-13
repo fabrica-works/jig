@@ -269,29 +269,38 @@ pub(crate) fn fire(store: &mut Store, above: &mut Queue<Event>, below: &mut Belo
     };
     let mut read = store.transcripts.reads.remove(&owner).expect("waiting reader");
     store.transcripts.reading = Some(owner);
-    let ready = if store.transcripts.files.contains_key(&read.task) {
-        next(store, &mut read, below)
-    } else {
-        if store.transcripts.files.len() == store.limits.files {
-            let mut oldest = None;
-            for (task, file) in &store.transcripts.files {
-                if let Some((_, touched)) = oldest
-                    && file.touched >= touched
-                {
-                    continue;
-                }
-                oldest = Some((*task, file.touched));
-            }
-            let (task, _) = oldest.expect("a full nonempty file set");
-            read.step = Step::Evicting { task };
-            let file = store.transcripts.files.get(&task).expect("oldest file").token;
-            below.transcripts.push(file::Request::Close { owner: OWNER, file });
-        } else {
-            opening(store, &mut read, below);
+    let ready = match store.transcripts.files.get(&read.task) {
+        Some(file) if file.readable => next(store, &mut read, below),
+        Some(file) => {
+            read.step = Step::Evicting { task: read.task };
+            below.transcripts.push(file::Request::Close { owner: OWNER, file: file.token });
+            Ok(false)
         }
-        Ok(false)
+        None => {
+            waiting_file(store, &mut read, below);
+            Ok(false)
+        }
     };
     settle(store, owner, read, ready, above);
+}
+fn waiting_file(store: &mut Store, read: &mut Read, below: &mut Below) {
+    if store.transcripts.files.len() == store.limits.files {
+        let mut oldest = None;
+        for (task, file) in &store.transcripts.files {
+            if let Some((_, touched)) = oldest
+                && file.touched >= touched
+            {
+                continue;
+            }
+            oldest = Some((*task, file.touched));
+        }
+        let (task, _) = oldest.expect("a full nonempty file set");
+        read.step = Step::Evicting { task };
+        let file = store.transcripts.files.get(&task).expect("oldest file").token;
+        below.transcripts.push(file::Request::Close { owner: OWNER, file });
+    } else {
+        opening(store, read, below);
+    }
 }
 fn opening(store: &Store, read: &mut Read, below: &mut Below) {
     read.step = Step::Opening;
@@ -348,7 +357,10 @@ fn advance(store: &mut Store, read: &mut Read, event: Arrival, below: &mut Below
             store
                 .transcripts
                 .files
-                .insert(read.task, File { token: file, touched: store.transcripts.touch, writable: false })
+                .insert(
+                    read.task,
+                    File { token: file, touched: store.transcripts.touch, writable: false, readable: true },
+                )
                 .expect("bounded file slot after open");
             next(store, read, below)
         }

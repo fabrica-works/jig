@@ -28,6 +28,7 @@ pub enum Story {
     InvalidCharter,
     Restart { before: u32 },
     HeldCommit,
+    DurableRestart,
     Partition { engine: Duration, worker: Duration },
 }
 
@@ -81,7 +82,7 @@ pub fn drawn(seed: u64) -> Outcome {
         2 => Story::Call,
         3 => Story::HeldCommit,
         4 => Story::MidFrame,
-        5 => Story::Restart { before: 20 },
+        5 => Story::Restart { before: 80 },
         _ => panic!("bounded draw"),
     };
     world::run(settings, script(story))

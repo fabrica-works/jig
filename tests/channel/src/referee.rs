@@ -35,25 +35,33 @@ impl skein_world::Referee<Proc> for Referee {
         for proc in procs {
             match proc {
                 Proc::Engine(host) => {
-                    let engine = host.service.engine().expect("engine layer");
                     let mut store = self.store.borrow_mut();
                     if self.engine_instance.is_some_and(|instance| instance != host.revision.0) {
+                        if matches!(self.story, crate::stories::Story::DurableRestart) {
+                            let mut views = self.views.borrow_mut();
+                            views.durable_at_restart = store.applied;
+                            views.held_at_restart = store.pending.front().map(|commit| commit.number);
+                            self.injected = true;
+                        }
                         store.crash();
+                        self.period = false;
                     }
                     self.engine_instance = Some(host.revision.0);
                     answer_store(
-                        engine,
+                        host,
                         &mut store,
                         &mut self.rules,
-                        matches!(self.story, crate::stories::Story::HeldCommit | crate::stories::Story::Drain)
-                            && now < Time::from_nanos(1_000_000_000),
+                        matches!(self.story, crate::stories::Story::DurableRestart) && !self.injected
+                            || matches!(self.story, crate::stories::Story::HeldCommit | crate::stories::Story::Drain)
+                                && now < Time::from_nanos(1_000_000_000),
                         self.story,
                         now,
                     );
+                    let engine = host.service.engine().expect("engine layer");
                     self.views.borrow_mut().messages_ended = self.rules.message_ends.len();
                     self.views.borrow_mut().refusals_kept = !self.rules.refused_messages.is_empty();
                     answer_parties(engine, &mut self.party, &mut self.views.borrow_mut());
-                    if !self.period && store.applied > 0 {
+                    if !self.period && self.party.sign_in.is_some() {
                         engine.parties_in().push(core::Event::Period {
                             project: 1,
                             period: 1,
@@ -62,7 +70,7 @@ impl skein_world::Referee<Proc> for Referee {
                         });
                         self.period = true;
                     }
-                    if self.period
+                    if store.applied > 0
                         && !self.passed
                         && let Some(up) = self.party.tick(now)
                     {
@@ -170,7 +178,7 @@ impl skein_world::Referee<Proc> for Referee {
                 self.party.replies,
                 turns(&self.store.borrow()).len(),
                 self.rules
-            )
+            ) + &self.formatted
         })
     }
     fn passed(&self) -> bool {
@@ -415,7 +423,8 @@ impl Referee {
             | crate::stories::Story::Window
             | crate::stories::Story::InvalidCharter
             | crate::stories::Story::Restart { .. }
-            | crate::stories::Story::HeldCommit => return,
+            | crate::stories::Story::HeldCommit
+            | crate::stories::Story::DurableRestart => return,
         };
         if self.injected
             || !procs.iter().any(|proc| match proc {
@@ -536,6 +545,13 @@ impl Referee {
 
 impl Referee {
     fn observe_engine(&mut self, now: Time, engine: &crate::processes::ServiceHost) {
+        if now >= Time::from_nanos(300_000_000_000) {
+            self.formatted = format!(
+                "engine frames {:?}; roots {:?}",
+                engine.wire.frames.iter().map(|(_, kind, _)| *kind).collect::<Vec<_>>(),
+                Roots(&engine.service)
+            );
+        }
         for (&(task, attempt), &fd) in &engine.wire.placements {
             if let Some(until) = engine.wire.lost.get(&fd) {
                 self.rules.lost(task, attempt, *until);
@@ -704,6 +720,9 @@ impl Referee {
                         None,
                     )
                     .expect("restart after drained");
+                    let root = host.restart_root.take().expect("independent directory for the drained restart");
+                    host.service.adopt_store(root, 1000).expect("restart store directory");
+                    host.files.root(root);
                     host.revision.0 += 1_000_000;
                 }
             }

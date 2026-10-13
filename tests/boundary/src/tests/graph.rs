@@ -556,7 +556,8 @@ fn configuration_links_only_its_vocabulary_and_foundation() {
                 .contains(&dependency.as_str())
                 || CORE_FAMILY.contains(&dependency.as_str())
                 || ["jig-domain-host", "jig-protocol-engine-clients", "jig-protocol-client-wire", "skein-http"]
-                    .contains(&dependency.as_str()),
+                    .contains(&dependency.as_str())
+                || ["jig-protocol-store", "skein-kv"].contains(&dependency.as_str()),
             "configuration dependency: {dependency}"
         );
     }

@@ -1,5 +1,5 @@
 //! Two reference services joined by loopback, with independent parties and durable rows.
-//! Contract: protocol/channel.md, 12; the temporary store port lasts until 27.3.
+//! Contract: protocol/channel.md, 12, on the real deployment store.
 use crate::{
     fixtures,
     processes::{self, Machine, Proc},
@@ -8,12 +8,13 @@ use jig_domain_core as core;
 use jig_domain_people as people;
 use jig_fake_parties as parties;
 use jig_test_domain as root;
-use jig_test_service::{PartyOutput, StoreAnswer, StoreRequest};
+use jig_test_service::PartyOutput;
 use skein_lib::{Duration, ReplyTo, Token};
 use skein_world::domain::Verdict;
 use std::{cell::RefCell, rc::Rc};
 
-pub(crate) type Store = jig_fake_store::Store<root::Key, root::Record>;
+mod store;
+pub(crate) use store::{Capture, Store};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Settings {
@@ -64,6 +65,9 @@ pub struct Outcome {
     pub refusals_kept: bool,
     pub engine_drained: bool,
     pub commits_waiting_at_drain: usize,
+    pub durable_at_restart: u64,
+    pub held_at_restart: Option<u64>,
+    pub recovered_commits: Vec<u64>,
 }
 
 /// Run one person's chat through the actual agent and all channel layers.
@@ -76,6 +80,7 @@ pub fn run(mut settings: Settings, script: Script) -> Outcome {
     let views = Rc::new(RefCell::new(Views::default()));
     let referee = make_referee(&script, store.clone(), views.clone());
     let mut machine = skein_fake_machine::Machine::new();
+    let _store_root = machine.lay(&[]);
     let root = (!matches!(script.story, crate::stories::Story::Opening(_))).then(|| machine.lay(&[]));
     let mut harness = skein_world::World::new(settings.seed, settings.config, referee, skein_world::Memory::Unchecked)
         .with_machine(Machine(machine));
@@ -115,6 +120,9 @@ fn outcome(procs: &[Proc], store: &Store, views: &Views, reset_injected: bool, k
         })
         .collect();
     Outcome {
+        durable_at_restart: views.durable_at_restart,
+        held_at_restart: views.held_at_restart,
+        recovered_commits: store.recovered.iter().copied().collect(),
         engine_drained: views.engine_drained,
         commits_waiting_at_drain: views.commits_waiting_at_drain,
         recorded: recorded(worker),
@@ -168,93 +176,40 @@ pub(crate) fn terminal(store: &Store, task: u64, attempt: u64, scenario: crate::
 pub(crate) fn pending_turn(store: &Store) -> bool {
     store.pending.iter().any(|pending| {
         pending.writes.iter().any(|write| {
-            matches!(
-                write,
-                jig_fake_store::Write::Save {
-                    row: root::Record::Core(core::Record::Core(core::CoreRecord::Turn(_))),
-                    ..
-                }
-            )
+            matches!(write, root::Write::Save(root::Record::Core(core::Record::Core(core::CoreRecord::Turn(_)))))
         })
     })
 }
 
 pub(crate) fn answer_store(
-    engine: &mut jig_test_service::Engine,
+    host: &mut processes::ServiceHost,
     store: &mut Store,
     rules: &mut crate::referee::Rules,
     hold: bool,
     scenario: crate::stories::Story,
     now: skein_lib::Time,
 ) {
-    while let Some(request) = engine.store_requests().pop() {
-        match request {
-            StoreRequest::Commit { number, mut writes } => {
-                let mut transaction = Vec::with_capacity(usize::try_from(writes.len()).expect("bounded writes"));
-                while let Some(write) = writes.pop() {
-                    transaction.push(match write {
-                        root::Write::Save(row) => jig_fake_store::Write::Save { key: row.key(), row },
-                        root::Write::Erase(key) => jig_fake_store::Write::Erase(key),
-                    });
-                }
-                store.submit(number, transaction.into_boxed_slice(), 0);
-            }
-            StoreRequest::Restart(step) => {
-                let rows = restore(store, step);
-                engine.store_answers().push(StoreAnswer::Restored { step, rows });
-            }
-            StoreRequest::Load(core::Now::StartPreparation { task, from, .. }) => {
-                let mut rows: Box<[core::TurnRecord]> = turns(store)
-                    .into_iter()
-                    .filter(|row| row.task == task && from.is_some_and(|at| (row.attempt, row.turn) >= at))
-                    .cloned()
-                    .collect();
-                if matches!(scenario, crate::stories::Story::InvalidTranscript) {
-                    for row in &mut rows {
-                        row.transcript[0] = 0xff;
-                    }
-                }
-                engine.store_answers().push(StoreAnswer::Transcript { task, rows, done: true });
-            }
-            StoreRequest::Load(other) => panic!("this chat does not request {other:?}"),
-            StoreRequest::Read(core::Held::NotesLoad { owner, range }) => {
-                engine.store_answers().push(StoreAnswer::Core(Box::new(core::Event::Notes(
-                    jig_domain_notes::Event::Loaded { owner, rows: note_rows(store, &range), more: false },
-                ))));
-            }
-            StoreRequest::Read(other) => panic!("this chat does not read {other:?}"),
-        }
-    }
-    while !store.pending.is_empty() {
-        let pending = store.pending.front().expect("pending commit");
-        if hold
-            && pending.writes.iter().any(|write| {
-                matches!(
-                    write,
-                    jig_fake_store::Write::Save {
-                        row: root::Record::Core(core::Record::Core(core::CoreRecord::Turn(_))),
-                        ..
-                    }
-                )
-            })
-        {
-            break;
-        }
-        for write in &pending.writes {
-            if let jig_fake_store::Write::Save { row, .. } = write {
+    host.holding = hold;
+    host.corrupt_transcript = matches!(scenario, crate::stories::Story::InvalidTranscript);
+    for commit in store.observe(&mut host.files.events, &host.codec, &host.store_limits.root.connector) {
+        for write in &commit.writes {
+            if let root::Write::Save(row) = write {
                 match row {
                     root::Record::Core(core::Record::Core(core::CoreRecord::Turn(turn))) => {
                         rules.turned(turn.task, turn.attempt, turn.turn);
                         rules.read(turn.task, turn.attempt, turn.read);
                     }
                     root::Record::Core(core::Record::Core(core::CoreRecord::Terminal(answer))) => {
+                        answer_refusals(host, store, answer, rules);
                         if answer.end == jig_domain_tasks::End::Failed(jig_domain_tasks::Class::Lost) {
                             rules.lost_ended(answer.task, answer.attempt, now);
                         } else {
                             rules.answered(answer.task, answer.attempt);
                         }
                     }
-                    root::Record::Core(core::Record::Tasks(jig_domain_tasks::Stored::Live(task))) => {
+                    root::Record::Core(core::Record::Tasks(
+                        jig_domain_tasks::Stored::Live(task) | jig_domain_tasks::Stored::Ended(task),
+                    )) => {
                         for &name in &task.refused {
                             rules.message_refused(task.number, task.attempt, name);
                         }
@@ -263,34 +218,42 @@ pub(crate) fn answer_store(
                 }
             }
         }
-        let number = store.tick(false).expect("fault-free store").expect("commit completed");
-        engine.store_answers().push(StoreAnswer::Committed { number, fill: 0 });
     }
 }
-pub(crate) fn restore(store: &Store, step: core::RestartStep) -> Box<[root::Record]> {
-    match step {
-        core::RestartStep::LoadCore => core::RestoreRange::LIVE
-            .iter()
-            .flat_map(|range| {
-                store.rows.iter().filter_map(move |(key, row)| match key {
-                    root::Key::Core(key) if range.admits(key) => Some(row.clone()),
-                    root::Key::Core(_) | root::Key::Connector { .. } => None,
-                })
-            })
-            .collect(),
-        core::RestartStep::RestoreConnector { connector } => store
-            .rows
-            .iter()
-            .filter_map(|(key, row)| match key {
-                root::Key::Connector { number, .. } if *number == connector => Some(row.clone()),
-                root::Key::Core(_) | root::Key::Connector { .. } => None,
-            })
-            .collect(),
-        core::RestartStep::LoadInbox
-        | core::RestartStep::AdoptRuns
-        | core::RestartStep::ReadAfresh { .. }
-        | core::RestartStep::SettleOutbox { .. }
-        | core::RestartStep::Open => Box::default(),
+
+// An ended attempt drops its refusal marks; its refused messages remain in the durable inbox (tasks.md, 8.2).
+fn answer_refusals(
+    host: &processes::ServiceHost,
+    store: &Store,
+    terminal: &core::TerminalRecord,
+    rules: &mut crate::referee::Rules,
+) {
+    for (_, kind, bytes) in &host.wire.frames {
+        if *kind != 0x0103 {
+            continue;
+        }
+        let answer = jig_protocol_worker_wire::Answer::decode(
+            &jig_protocol_worker_wire::CEILINGS,
+            &mut skein_lib::Reader::new(bytes),
+        )
+        .expect("received terminal");
+        if (answer.task(), answer.attempt()) != (terminal.task, terminal.attempt) {
+            continue;
+        }
+        for refused in answer.refused() {
+            let retained = store.rows.values().any(|row| match row {
+                root::Record::Core(core::Record::Tasks(
+                    jig_domain_tasks::Stored::Live(task) | jig_domain_tasks::Stored::Ended(task),
+                )) => {
+                    task.number == terminal.task
+                        && task.attempt == terminal.attempt
+                        && task.inbox.iter().any(|word| word.number == refused.name())
+                }
+                root::Record::Core(_) | root::Record::Connector { .. } => false,
+            });
+            assert!(retained, "refused message {} is retained in the durable terminal inbox", refused.name());
+            rules.message_refused(terminal.task, terminal.attempt, refused.name());
+        }
     }
 }
 
@@ -337,10 +300,13 @@ pub(crate) fn answer_parties(engine: &mut jig_test_service::Engine, party: &mut 
                     people::Reply::Outcome(people::Outcome::Said { task, message, released }) => {
                         parties::Reply::Said { task, message, released }
                     }
-                    other @ (people::Reply::SignedOut
-                    | people::Reply::Outcome(_)
-                    | people::Reply::Again(_)
-                    | people::Reply::Refused(_)) => panic!("one-chat reply {other:?}"),
+                    people::Reply::Again(reason) => parties::Reply::Again(match reason {
+                        people::Again::Busy => parties::Again::Busy,
+                        people::Again::NotReady => parties::Again::NotReady,
+                    }),
+                    other @ (people::Reply::SignedOut | people::Reply::Outcome(_) | people::Reply::Refused(_)) => {
+                        panic!("one-chat reply {other:?}")
+                    }
                 };
                 party.reply(to.into_token().raw(), reply);
             }
@@ -367,26 +333,6 @@ pub(crate) fn answer_parties(engine: &mut jig_test_service::Engine, party: &mut 
             PartyOutput::Held(_) | PartyOutput::Now(_) => {}
         }
     }
-}
-
-pub(crate) fn note_rows(store: &Store, range: &jig_domain_notes::Range) -> jig_domain_notes::Rows {
-    use jig_domain_notes::{Key, Range};
-    let mut records = skein_lib::List::with_capacity(fixtures::NOTES_LOAD_ROWS);
-    for row in store.rows.values() {
-        if let root::Record::Core(core::Record::Notes(note)) = row {
-            let includes = match (range, note.key()) {
-                (Range::Entry { name }, Key::Entry { name: found }) => *name == found,
-                (Range::Lines { scope, after }, Key::Line { scope: found, name }) => {
-                    *scope == found && after.is_none_or(|after| name > after)
-                }
-                (Range::Entry { .. }, Key::Line { .. }) | (Range::Lines { .. }, Key::Entry { .. }) => false,
-            };
-            if includes {
-                records.push(note.clone()).expect("bounded note load");
-            }
-        }
-    }
-    jig_domain_notes::Rows { records }
 }
 
 pub(crate) fn diagnostics(procs: &[Proc]) -> String {
@@ -463,6 +409,8 @@ pub(crate) struct Views {
     pub(crate) refusals_kept: bool,
     pub(crate) engine_drained: bool,
     pub(crate) commits_waiting_at_drain: usize,
+    pub(crate) durable_at_restart: u64,
+    pub(crate) held_at_restart: Option<u64>,
 }
 
 fn transcript_count(bytes: &[u8]) -> u32 {
@@ -507,6 +455,7 @@ fn make_referee(script: &Script, store: Rc<RefCell<Store>>, views: Rc<RefCell<Vi
             | crate::stories::Story::MidFrame
             | crate::stories::Story::Restart { .. }
             | crate::stories::Story::HeldCommit
+            | crate::stories::Story::DurableRestart
             | crate::stories::Story::Partition { .. } => script.leading_turns + 1,
         },
         expected_answers: if matches!(script.story, crate::stories::Story::Window) { 3 } else { 1 },
@@ -544,6 +493,8 @@ fn launch(
         )
     ) {
         processes::engine_message
+    } else if matches!(script.story, crate::stories::Story::Drain) {
+        processes::engine_drain
     } else if matches!(script.story, crate::stories::Story::Call) {
         processes::engine_calls
     } else if matches!(script.story, crate::stories::Story::Window) {
@@ -551,13 +502,24 @@ fn launch(
     } else {
         processes::engine
     };
-    harness.spawn_restartable(Vec::new(), engine_factory);
+    let mut roots =
+        vec![skein_world::StartupRoot { name: b"state".as_slice().into(), path: b"state".as_slice().into() }];
+    if matches!(script.story, crate::stories::Story::Drain) {
+        roots.push(skein_world::StartupRoot {
+            name: b"restart-state".as_slice().into(),
+            path: b"state".as_slice().into(),
+        });
+    }
+    harness.spawn_restartable(roots, engine_factory);
 
+    if matches!(script.story, crate::stories::Story::DurableRestart) {
+        harness.cut(0, 80, skein_world::Cut::Kill);
+    }
     if let crate::stories::Story::Restart { before } = script.story {
         harness.cut(0, before, skein_world::Cut::Kill);
     }
     if matches!(script.story, crate::stories::Story::Refusals(crate::stories::MessageRefusal::Replay)) {
-        harness.cut(0, 18, skein_world::Cut::Kill);
+        harness.cut(0, 78, skein_world::Cut::Kill);
     }
     spawn_channel_side(harness, root, script);
     if !matches!(

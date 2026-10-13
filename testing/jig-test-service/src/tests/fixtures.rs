@@ -1,12 +1,12 @@
 pub(crate) mod family;
-use crate::{End, Files, PartyOutput, Seeds, Service, StoreAnswer, StoreRequest, iterate};
+use crate::{End, Files, PartyOutput, Seeds, Service, iterate};
 use jig_domain_core as core;
 use jig_domain_people as people;
 use skein_lib::{List, ReplyTo, Secret, Time, Token, Wall};
 use skein_lib::{Queue, Writer};
 
 const ENGINE: &[u8] = br#"{
-"limits": {"profile": "small"},
+"limits": {"profile": "small", "overrides": {"tasks.result_bytes":32,"people.amendment_bytes":64,"core.policy_bytes":256,"tasks.spec_bytes":128,"tasks.message_bytes":512,"tasks.hold_bytes":64,"tasks.authority_bytes":64,"people.words":512,"core.call_answer_bytes":2048,"notes.recalled":1}},
 "llm": {
 "endpoints": [{
 "name": "fake",
@@ -145,8 +145,52 @@ pub fn files(_document: &[u8]) -> Files {
 pub fn seeds() -> Seeds {
     Seeds { deployment: [7; 16], seed: 7, crypto: Secret::new(Box::new([7; 32])) }
 }
+pub fn journal(limits: &jig_test_domain::Limits) -> skein_lib::JournalLimits {
+    let room = core::room_max(&limits.core).expect("final core limits");
+    let connector = jig_test_connector::MAX_OUT * 2;
+    skein_lib::JournalLimits {
+        writes: room.writes.checked_add(connector).expect("journal writes").max(2000),
+        held: room
+            .held
+            .checked_add(connector)
+            .expect("journal held")
+            .max(2000)
+            .checked_mul(limits.journal.commits)
+            .expect("journal commits"),
+        ..limits.journal
+    }
+}
 pub fn started(document: &[u8]) -> Service {
-    crate::startup(document, &files(document), None, &seeds(), None, None).expect("fixture startup")
+    let mut parsed = crate::startup::parse(document).expect("fixture parsed");
+    parsed.limits.root.journal = journal(&parsed.limits.root);
+    let (mut engine, io, bytes, _) =
+        crate::startup::engine_startup(parsed, &files(document), None, &seeds(), None, false).expect("fixture startup");
+    memory_store(&mut engine);
+    Service::new(Some(engine), List::with_capacity(0), io, bytes, engine_queue())
+}
+fn engine_queue() -> u32 {
+    jig_test_domain::max_out(&crate::limits::profile_limits(jig_protocol_config::Profile::Small).root)
+        .checked_mul(2)
+        .expect("engine queue")
+}
+pub fn memory_store(engine: &mut crate::Engine) {
+    let limits = crate::store::limits(
+        &engine.env.limits,
+        &crate::limits::profile_limits(jig_protocol_config::Profile::Small).store,
+    )
+    .expect("final admitted fixture store");
+    engine.store.component = jig_protocol_store::Store::over(
+        &limits,
+        jig_test_store::application(&engine.env.limits.connector),
+        jig_protocol_store::Stores {
+            store: skein_kv::Store::memory(&limits.store),
+            secrets: skein_kv::Store::memory(&limits.secrets),
+        },
+    );
+    engine.store.ask(jig_protocol_store::Request::Open {
+        owner: OWNER,
+        root: jig_protocol_store::Root { token: OWNER, fd: skein_io::kernel::Fd::new(1) },
+    });
 }
 pub fn turn(service: &mut Service) {
     iterate(service, Time::from_nanos(1), Wall::from_nanos(1));
@@ -166,6 +210,7 @@ pub struct Driven {
     pub busy: Queue<Box<jig_test_domain::Event>>,
     pub reply: Option<people::Reply>,
     pub sign_in: Token,
+    pub held: alloc::collections::BTreeMap<u64, jig_protocol_store::Event>,
 }
 impl Driven {
     pub fn started(document: &[u8]) -> Self {
@@ -176,6 +221,7 @@ impl Driven {
             busy: Queue::with_capacity(16),
             reply: None,
             sign_in: OWNER,
+            held: alloc::collections::BTreeMap::new(),
         };
         for _ in 0_u32..64 {
             driven.turn(true);
@@ -208,18 +254,13 @@ impl Driven {
     pub fn turn(&mut self, commit: bool) {
         turn(&mut self.service);
         let engine = engine(&mut self.service);
-        for _ in 0..engine.store_requests().len() {
-            match engine.store_requests().pop().expect("store request") {
-                StoreRequest::Commit { number, .. } => {
-                    self.commits.push(number);
-                    if commit {
-                        engine.store_answers().push(StoreAnswer::Committed { number, fill: 0 });
-                    }
-                }
-                StoreRequest::Restart(step) => {
-                    engine.store_answers().push(StoreAnswer::Restored { step, rows: Box::new([]) });
-                }
-                StoreRequest::Load(_) | StoreRequest::Read(_) => panic!("fixture has no stored history"),
+        for _ in 0..engine.store.above.len() {
+            let event = engine.store.above.pop().expect("store terminal");
+            if let jig_protocol_store::Event::Committed { number, .. } = &event {
+                self.commits.push(*number);
+                self.held.insert(*number, event);
+            } else {
+                engine.store.above.push(event);
             }
         }
         for _ in 0..engine.parties_out().len() {
@@ -238,7 +279,10 @@ impl Driven {
         }
         if commit {
             for _ in 0..self.commits.len() {
-                let _number = self.commits.pop();
+                let number = self.commits.pop().expect("held commits");
+                if let Some(event) = self.held.remove(&number) {
+                    engine.store.above.push(event);
+                }
             }
         }
     }
@@ -252,17 +296,19 @@ impl Driven {
         }
     }
     pub fn commit_asked(&mut self) -> u64 {
-        match self.commits.pop() {
-            Some(number) => number,
-            None => panic!("a commit left this iteration; last reply {:?}, sign in {:?}", self.reply, self.sign_in),
-        }
+        self.commits.pop().expect("a commit left this iteration")
+    }
+    pub fn terminal(&mut self, number: u64) -> jig_protocol_store::Event {
+        self.held.remove(&number).expect("real commit terminal held by the fixture")
     }
     pub fn commit(&mut self, number: u64) {
-        engine(&mut self.service).store_answers().push(StoreAnswer::Committed { number, fill: 0 });
+        let event = self.terminal(number);
+        engine(&mut self.service).store.above.push(event);
         self.turn(false);
     }
     pub fn fail(&mut self, number: u64) {
-        engine(&mut self.service).store_answers().push(StoreAnswer::Failed { number });
+        self.held.remove(&number);
+        engine(&mut self.service).store.above.push(jig_protocol_store::Event::Failed { number });
         self.turn(false);
     }
     pub fn released_to_parties(&self) -> usize {
@@ -589,4 +635,14 @@ pub fn combined_files(document: &[u8]) -> Files {
         entries.push(file).expect("worker files");
     }
     Files { entries }
+}
+
+pub fn service_bytes(document: &[u8]) -> u64 {
+    let mut parsed = crate::startup::parse(document).expect("fixture parsed");
+    let store = crate::store::limits(&parsed.limits.root, &parsed.limits.store).expect("fixture admitted");
+    parsed.limits.store = store;
+    crate::limits::worst_case(&parsed.limits)
+        .expect("root bounds")
+        .checked_add(crate::workers::configured_bytes(&parsed.engine).expect("configured bounds"))
+        .expect("service total")
 }

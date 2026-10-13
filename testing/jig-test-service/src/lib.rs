@@ -17,8 +17,9 @@ pub mod limits;
 mod route;
 mod startup;
 mod stop;
+mod store;
 pub mod system;
-pub use boundary::{End, Files, PartyOutput, Seeds, Stop, StoreAnswer, StoreRequest};
+pub use boundary::{End, Files, PartyOutput, Seeds, Stop};
 pub use engine::Engine;
 pub use limits::Limits;
 use skein_io::{
@@ -65,7 +66,7 @@ impl Service {
             kernel: accounts::Kernel::new(
                 io::operations(&limits)
                     .expect("io operations")
-                    .checked_add(2)
+                    .checked_add(8)
                     .expect("file operations")
                     .checked_add(workers.len())
                     .expect("worker roots"),
@@ -78,6 +79,13 @@ impl Service {
             signals_closing: false,
             shutdowns: 0,
             bytes,
+        }
+    }
+    /// Adopt the deployment directory opened by the caller before driving startup.
+    pub fn adopt_store(&mut self, root: Fd, effective_user: u32) -> Result<(), Fd> {
+        match &mut self.engine {
+            Some(engine) => engine.store.adopt(root, effective_user),
+            None => Err(root),
         }
     }
     pub fn adopt_signals(&mut self, descriptor: Fd) -> Result<(), Fd> {
@@ -127,7 +135,7 @@ impl Service {
     pub fn operations(&self) -> u32 {
         io::operations(&self.io_env.limits)
             .expect("checked io operations")
-            .checked_add(2)
+            .checked_add(8)
             .expect("file operations")
             .checked_add(self.workers.len())
             .expect("worker roots")
@@ -171,6 +179,7 @@ impl Service {
             && self.raw_submissions.is_empty()
             && self.kernel.is_empty()
             && match &self.engine {
+                Some(engine) if !engine.store.closed() => false,
                 Some(engine) => match &engine.accounts {
                     Some(accounts) => accounts.is_empty(),
                     None => true,
@@ -200,8 +209,35 @@ impl Service {
             }
         }
     }
+    fn root_complete(&mut self, complete: &Complete) -> bool {
+        for index in 0..self.workers.len() {
+            if self.workers.get_mut(index).expect("worker index").root_complete(complete) {
+                return true;
+            }
+        }
+        false
+    }
+    fn complete_record(&mut self, complete: Complete) {
+        if self.root_complete(&complete) {
+            return;
+        }
+        if store::owns(complete.op) {
+            self.engine.as_mut().expect("store engine").store.complete(complete);
+        } else {
+            io::up(&mut self.io, &self.io_env, complete, &mut self.told, &mut self.raw_submissions);
+        }
+    }
     fn route_components(&mut self) {
+        if let Some(engine) = &mut self.engine {
+            for _ in 0..engine.store.submitted.len() {
+                if self.raw_submissions.room() == 0 {
+                    break;
+                }
+                self.raw_submissions.push(engine.store.submitted.pop().expect("store submissions"));
+            }
+        }
         if let Some(engine) = &mut self.engine
+            && engine.store.opened
             && let Some(workers) = &mut engine.workers
         {
             for _ in 0..workers.io.len() {
@@ -213,6 +249,7 @@ impl Service {
             }
         }
         if let Some(engine) = &mut self.engine
+            && engine.store.opened
             && let Some(accounts) = &mut engine.accounts
         {
             for _ in 0..accounts.io.len() {
@@ -256,6 +293,7 @@ impl Service {
     fn workers_pending(&self, now: Time) -> bool {
         for worker in &self.workers {
             let ready = match &self.engine {
+                Some(engine) if !engine.store.opened => false,
                 Some(engine) => match &engine.workers {
                     Some(workers) => workers.opened(),
                     None => true,
@@ -339,16 +377,7 @@ pub fn iterate(service: &mut Service, now: Time, wall: Wall) {
                     .expect("file operation has accounts")
                     .complete(complete);
             } else {
-                let mut root_closed = false;
-                for index in 0..service.workers.len() {
-                    if service.workers.get_mut(index).expect("worker index").root_complete(&complete) {
-                        root_closed = true;
-                        break;
-                    }
-                }
-                if !root_closed {
-                    io::up(&mut service.io, &service.io_env, complete, &mut service.told, &mut service.raw_submissions);
-                }
+                service.complete_record(complete);
             }
         }
         if service.completions.is_empty() {
@@ -362,6 +391,7 @@ pub fn iterate(service: &mut Service, now: Time, wall: Wall) {
     }
     route_events(service, now);
     let started = match &service.engine {
+        Some(engine) if !engine.store.opened => false,
         Some(engine) => match &engine.workers {
             Some(workers) => workers.opened(),
             None => true,

@@ -30,6 +30,7 @@ pub(crate) struct File {
     pub token: Token,
     pub touched: u64,
     pub writable: bool,
+    pub readable: bool,
 }
 #[derive(Debug)]
 pub(crate) enum Stage {

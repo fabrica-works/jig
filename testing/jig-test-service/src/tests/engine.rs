@@ -1,25 +1,26 @@
 use super::fixtures;
-use crate::{End, Stop, StoreAnswer, StoreRequest};
+use crate::{End, Stop};
 use jig_domain_core as core;
+use jig_protocol_store::Event as StoreEvent;
 
 #[test]
 fn the_restart_asks_one_load_at_a_time() {
     let mut service = fixtures::started(&fixtures::engine_document());
     fixtures::turn(&mut service);
-    fixtures::turn(&mut service);
     let engine = fixtures::engine(&mut service);
-    assert_eq!(engine.store_requests().len(), 1);
-    let Some(StoreRequest::Restart(step)) = engine.store_requests().pop() else {
-        panic!("restart load requested");
+    assert_eq!(engine.store.above.len(), 1);
+    let Some(StoreEvent::Restored { owner, rows, next }) = engine.store.above.pop() else {
+        panic!("restart load completed by the real store");
     };
-    assert_eq!(step, core::RestartStep::LoadCore);
-    engine.store_answers().push(StoreAnswer::Restored { step: core::RestartStep::LoadCore, rows: Box::new([]) });
+    assert_eq!(rows.len(), 0);
+    assert_eq!(next, None);
+    engine.store.above.push(StoreEvent::Restored { owner, rows, next });
     fixtures::turn(&mut service);
     let engine = fixtures::engine(&mut service);
-    let Some(StoreRequest::Commit { .. }) = engine.store_requests().pop() else {
+    let Some(StoreEvent::Committed { .. }) = engine.store.above.pop() else {
         panic!("restart writes commit first");
     };
-    assert_eq!(engine.store_requests().len(), 0);
+    assert_eq!(engine.store.above.len(), 0);
 }
 
 fn period(driven: &mut fixtures::Driven, number: u64) {
@@ -34,7 +35,7 @@ fn a_store_answer_is_taken_with_the_journal_full() {
     }
     let first = driven.commit_asked();
     driven.commit(first);
-    assert_eq!(fixtures::engine(&mut driven.service).store_answers().len(), 0);
+    assert_eq!(fixtures::engine(&mut driven.service).store.above.len(), 0);
     period(&mut driven, 5);
     assert_eq!(driven.commits.len(), 3);
 }
@@ -73,7 +74,7 @@ fn a_failed_commit_releases_nothing_after_it() {
     driven.fail(first);
     driven.commit(second);
     assert_eq!(driven.released_to_parties(), 0);
-    assert_eq!(fixtures::engine(&mut driven.service).store_answers().len(), 0);
+    assert_eq!(fixtures::engine(&mut driven.service).store.above.len(), 0);
     assert_eq!(driven.end(), Some(&End::Stopped(Stop::CommitFailed { number: first })));
 }
 
@@ -81,6 +82,7 @@ fn a_failed_commit_releases_nothing_after_it() {
 fn the_service_waits_while_its_load_is_outstanding() {
     let mut service = fixtures::started(&fixtures::engine_document());
     fixtures::turn(&mut service);
+    let _held = fixtures::engine(&mut service).store.above.pop().expect("hold the actual load terminal");
     assert!(!service.work_pending(skein_lib::Time::from_nanos(1)), "waiting for the store is not work");
 }
 
@@ -89,16 +91,17 @@ fn a_store_answer_is_work_when_party_outputs_are_full() {
     let mut driven = fixtures::Driven::started(&fixtures::engine_document());
     period(&mut driven, 2);
     let number = driven.commit_asked();
+    let terminal = driven.terminal(number);
     let engine = fixtures::engine(&mut driven.service);
     for _ in 0..engine.parties_out().room() {
         engine.parties_out().push(crate::PartyOutput::Busy(Box::new(jig_test_domain::Event::Core(
             core::Event::Period { project: 1, period: 3, budget: 100, next: None },
         ))));
     }
-    engine.store_answers().push(StoreAnswer::Committed { number, fill: 0 });
+    engine.store.above.push(terminal);
     assert!(driven.service.work_pending(skein_lib::Time::from_nanos(1)));
     fixtures::turn(&mut driven.service);
-    assert_eq!(fixtures::engine(&mut driven.service).store_answers().len(), 0);
+    assert_eq!(fixtures::engine(&mut driven.service).store.above.len(), 0);
 }
 
 fn path() -> jig_test_connector::Path {
@@ -306,13 +309,11 @@ fn the_run_s_identity_is_shared_by_a_conversation_s_attempts() {
 fn the_workers_listener_opens_before_the_restart() {
     let mut service = fixtures::started(&fixtures::workers_document());
     fixtures::turn(&mut service);
-    assert!(fixtures::engine(&mut service).store_requests().is_empty());
+    assert!(fixtures::engine(&mut service).store.above.is_empty());
     assert!(!fixtures::engine(&mut service).workers.as_ref().expect("workers").opened());
     fixtures::turn(&mut service);
     assert!(fixtures::engine(&mut service).workers.as_ref().expect("workers").opened());
-    let Some(StoreRequest::Restart(core::RestartStep::LoadCore)) =
-        fixtures::engine(&mut service).store_requests().pop()
-    else {
+    let Some(StoreEvent::Restored { .. }) = fixtures::engine(&mut service).store.above.pop() else {
         panic!("restart follows listener");
     };
 }
@@ -464,4 +465,46 @@ fn a_signed_in_source_uses_its_runtime_private_keeper() {
         panic!("private root opens");
     };
     assert_eq!(root, skein_io::kernel::Fd::new(7), "the keeper uses the shell's root");
+}
+
+#[test]
+fn a_store_refusal_at_open_ends_the_start() {
+    let mut service = fixtures::started(&fixtures::engine_document());
+    let engine = fixtures::engine(&mut service);
+    let _opened = engine.store.above.pop();
+    engine
+        .store
+        .above
+        .push(StoreEvent::OpenRefused { owner: fixtures::OWNER, why: jig_protocol_store::OpenRefusal::Failed });
+    fixtures::turn(&mut service);
+    let Some(End::Stopped(Stop::Start(problems))) = service.end() else {
+        panic!("store refused startup");
+    };
+    assert_eq!(problems.problems.len(), 1);
+    assert_eq!(
+        problems.problems.get(0).expect("open refusal").path,
+        jig_protocol_config::Path::root().member(b"deployment")
+    );
+}
+#[test]
+fn a_commit_reaches_the_store_and_its_answer_the_journal() {
+    let mut driven = fixtures::Driven::started(&fixtures::engine_document());
+    driven.chat(101, b"one");
+    let number = driven.commit_asked();
+    assert_eq!(driven.released_to_parties(), 0);
+    driven.commit(number);
+    assert_eq!(driven.reply, Some(jig_domain_people::Reply::Outcome(jig_domain_people::Outcome::Started { task: 1 })));
+}
+
+#[test]
+fn the_store_waits_for_other_drivers_before_closing_its_root() {
+    let mut service = fixtures::started(&fixtures::engine_document());
+    let engine = fixtures::engine(&mut service);
+    engine.store.adopt(skein_io::kernel::Fd::new(9), 0).expect("fixture deployment root");
+    engine.store.iterate();
+    assert_eq!(engine.store.submitted.len(), 2, "other drivers are opening their directory handles");
+    while engine.store.submitted.pop().is_some() {}
+    engine.store.close();
+    assert!(!engine.store.work_pending(skein_lib::Time::ZERO), "root close waits for outstanding drivers");
+    assert!(!engine.store.closed(), "the owned root is still held");
 }

@@ -10,11 +10,11 @@ use skein_lib::{List, bytes};
 type Initial = Box<[(connector::Path, u64)]>;
 
 #[derive(Debug)]
-struct Parsed {
-    engine: config::Engine,
-    limits: Limits,
-    first: connector::Config,
-    second: connector::Config,
+pub(super) struct Parsed {
+    pub(super) engine: config::Engine,
+    pub(super) limits: Limits,
+    pub(super) first: connector::Config,
+    pub(super) second: connector::Config,
     initial: [Initial; 2],
     credential: Box<[u8]>,
     accounts: bool,
@@ -96,7 +96,7 @@ fn components(
     Ok((accounts, workers))
 }
 
-fn parse(input: &[u8]) -> Result<Parsed, Problems> {
+pub(super) fn parse(input: &[u8]) -> Result<Parsed, Problems> {
     let length = u32::try_from(input.len()).or(Err(problem(Path::root(), What::Bound)))?;
     let bounds = config::DocumentLimits { bytes: length, tokens: length, depth: 32 };
     let document = match config::document(input, &bounds) {
@@ -295,15 +295,14 @@ fn check_files(parsed: &Parsed, files: &Files) -> Result<(), Problems> {
     Ok(())
 }
 
-fn engine_startup(
-    document: &[u8],
+pub(super) fn engine_startup(
+    mut parsed: Parsed,
     files: &Files,
     _agent: Option<&Agent>,
     seeds: &Seeds,
     runtime: Option<crate::AccountsRuntime>,
     own_workers: bool,
 ) -> Result<(Engine, skein_io::Limits, u64, u64), Problems> {
-    let mut parsed = parse(document)?;
     parsed.workers |= own_workers;
     check_files(&parsed, files)?;
     for charter in &mut parsed.engine.charters {
@@ -314,6 +313,9 @@ fn engine_startup(
             }
         }
     }
+    let store_limits = crate::store::limits(&parsed.limits.root, &parsed.limits.store)
+        .ok_or(problem(Path::root().member(b"engine").member(b"limits"), What::Bound))?;
+    parsed.limits.store = store_limits;
     let trust = match &runtime {
         Some(runtime) if runtime.trust_roots > 0 => {
             skein_tls::roots_worst_case(runtime.trust_roots, runtime.trust_root_bytes)
@@ -385,7 +387,15 @@ fn engine_startup(
             system.seed(resource, state).expect("configuration checked resource count");
         }
     }
-    let engine = Engine::new(root, &parsed.limits.root, systems, accounts, workers, values);
+    let engine = Engine::new(
+        root,
+        &parsed.limits.root,
+        systems,
+        accounts,
+        workers,
+        values,
+        crate::store::Store::new(&parsed.limits.root, &store_limits),
+    );
     Ok((engine, parsed.limits.io, bytes, parsed.engine.memory))
 }
 
@@ -495,7 +505,7 @@ pub fn startup(
 ) -> Result<Service, Problems> {
     let (has_engine, specs) = worker_specs(document)?;
     let engine = if has_engine {
-        Some(engine_startup(document, files, agent, seeds, accounts, !specs.is_empty())?)
+        Some(engine_startup(parse(document)?, files, agent, seeds, accounts, !specs.is_empty())?)
     } else {
         None
     };

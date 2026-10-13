@@ -49,6 +49,7 @@ pub const STANDARD: connector::Limits = connector::Limits {
 #[derive(Clone, Copy, Debug)]
 pub struct Limits {
     pub root: root::Limits,
+    pub store: jig_protocol_store::Limits,
     pub io: skein_io::Limits,
     pub accounts: skein_oauth_accounts::Limits,
     pub workers: jig_protocol_engine_workers::Limits,
@@ -63,6 +64,7 @@ pub fn for_profile(name: Profile, jig: &jig_protocol_config::Limits) -> Limits {
     accounts.accounts = jig.core.accounts.accounts.checked_add(1).expect("account zero slot");
     Limits {
         root: root::Limits { core: jig.core, connector, journal: jig.journal, routes: jig.routes },
+        store: jig_protocol_store::Limits { core: jig.core, journal: jig.journal, ..jig.store },
         io: jig.io,
         accounts,
         workers: workers(jig),
@@ -74,7 +76,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     let queue = root::max_out(&limits.root).checked_mul(2)?;
     let payload = jig_domain_core::worst_case(&limits.root.core)?
         .checked_add(connector::worst_case(&limits.root.connector)?.checked_mul(2)?)?;
-    root.checked_add(skein_oauth_accounts::worst_case(&limits.accounts)?)?
+    root.checked_add(crate::store::worst_case(&limits.store, root::max_out(&limits.root))?)?
+        .checked_add(skein_oauth_accounts::worst_case(&limits.accounts)?)?
         .checked_add(jig_protocol_engine_workers::worst_case(&limits.workers)?.checked_mul(2)?)?
         .checked_add(jig_protocol_accounts::table::worst_case(
             limits.root.core.accounts.accounts.checked_add(1)?,
@@ -110,8 +113,6 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
             jig_protocol_engine_workers::MAX_OUT_DOWN,
         )?)?
         .checked_add(skein_io::worst_case(&limits.io)?)?
-        .checked_add(Queue::<crate::StoreRequest>::worst_case(queue)?)?
-        .checked_add(Queue::<crate::StoreAnswer>::worst_case(queue)?)?
         .checked_add(Queue::<crate::PartyOutput>::worst_case(queue)?)?
         .checked_add(Queue::<jig_domain_core::Event>::worst_case(queue)?)?
         .checked_add(Queue::<root::Event>::worst_case(queue.checked_mul(jig_protocol_engine_workers::MAX_OUT_DOWN)?)?)?
