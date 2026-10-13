@@ -22,7 +22,6 @@ fn current_record() -> domain::TaskRecord {
     record
 }
 
-#[test]
 fn a_live_task_record_reads_back_whole() {
     let row = domain::Stored::Live(Box::new(fixtures::task_record()));
     assert_eq!(saved_tasks(&row), Ok(row));
@@ -221,7 +220,6 @@ fn each_subscription_kind_reads_back() {
         assert_eq!(saved_tasks(&row), Ok(row));
     }
 }
-#[test]
 fn a_task_record_without_optional_values_reads_back() {
     let mut record = fixtures::task_record();
     record.instructions = None;
@@ -242,7 +240,6 @@ fn a_task_record_without_optional_values_reads_back() {
     let row = live_record(record);
     assert_eq!(saved_tasks(&row), Ok(row));
 }
-#[test]
 fn a_task_record_at_its_inbox_bound_reads_back() {
     let mut record = fixtures::task_record();
     let mut first = fixtures::task_word(5);
@@ -313,4 +310,27 @@ fn a_person_wait_without_a_stall_notice_reads_back() {
     record.person_wait.as_mut().expect("fixture wait").notice = None;
     let row = live_record(record);
     assert_eq!(saved_tasks(&row), Ok(row));
+}
+
+#[test]
+fn live_task_records_read_back_whole() {
+    table([
+        ("a_live_task_record_reads_back_whole", a_live_task_record_reads_back_whole),
+        ("a_task_record_without_optional_values_reads_back", a_task_record_without_optional_values_reads_back),
+        ("a_task_record_at_its_inbox_bound_reads_back", a_task_record_at_its_inbox_bound_reads_back),
+    ]);
+}
+
+type Case = (&'static str, fn());
+
+fn table<const N: usize>(cases: [Case; N]) {
+    let mut failures = [None; N];
+    let mut passed = true;
+    for ((name, case), failure) in cases.into_iter().zip(&mut failures) {
+        if std::panic::catch_unwind(case).is_err() {
+            *failure = Some(name);
+            passed = false;
+        }
+    }
+    assert!(passed, "{failures:?}");
 }

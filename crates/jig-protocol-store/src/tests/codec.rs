@@ -3,19 +3,11 @@ use super::fixtures;
 use crate::codec::{component, notes};
 use jig_domain_notes as domain;
 
-#[test]
 fn a_notes_entry_reads_back_as_it_was_saved() {
-    let limits = notes::limits(&fixtures::NOTES_LIMITS).expect("within the schema's ceilings");
-    let entry = domain::Record::Entry(fixtures::note_entry());
-    let bytes = notes::encode(&entry, &limits).expect("within its limits");
-    assert_eq!(notes::decode(&bytes, &limits), Ok(entry));
+    notes_round_trip(domain::Record::Entry(fixtures::note_entry()));
 }
-#[test]
 fn a_resources_line_reads_back_with_its_pattern() {
-    let limits = notes::limits(&fixtures::NOTES_LIMITS).expect("within the schema's ceilings");
-    let line = domain::Record::Line(fixtures::note_line());
-    let bytes = notes::encode(&line, &limits).expect("within its limits");
-    assert_eq!(notes::decode(&bytes, &limits), Ok(line));
+    notes_round_trip(domain::Record::Line(fixtures::note_line()));
 }
 #[test]
 fn a_notes_row_of_another_version_does_not_decode() {
@@ -124,12 +116,10 @@ fn saved_tasks(row: &jig_domain_tasks::Stored) -> Result<jig_domain_tasks::Store
     let bytes = crate::codec::tasks::encode(row, &limits).expect("within its limits");
     crate::codec::tasks::decode(&bytes, &limits)
 }
-#[test]
 fn a_period_ledger_reads_back_as_it_was_saved() {
     let row = jig_domain_tasks::Stored::Ledger(fixtures::task_funding());
     assert_eq!(saved_tasks(&row), Ok(row));
 }
-#[test]
 fn a_pool_ledger_with_its_parent_reads_back() {
     let mut ledger = fixtures::task_funding();
     ledger.parent = Some(ledger.funder);
@@ -138,19 +128,16 @@ fn a_pool_ledger_with_its_parent_reads_back() {
     let row = jig_domain_tasks::Stored::Ledger(ledger);
     assert_eq!(saved_tasks(&row), Ok(row));
 }
-#[test]
 fn a_writer_slot_reads_back() {
     let row = jig_domain_tasks::Stored::Writer(fixtures::task_writer());
     assert_eq!(saved_tasks(&row), Ok(row));
 }
-#[test]
 fn an_effect_writer_slot_reads_back() {
     let mut slot = fixtures::task_writer();
     slot.writer = jig_domain_tasks::Writer::Effect { entry: u64::MAX };
     let row = jig_domain_tasks::Stored::Writer(slot);
     assert_eq!(saved_tasks(&row), Ok(row));
 }
-#[test]
 fn a_closed_ledger_reads_back() {
     let mut ledger = fixtures::task_funding();
     ledger.closed = true;
@@ -186,12 +173,10 @@ fn saved_authority(
     let value = saved_wire(value, Authority::measure, Authority::encode, Authority::decode);
     translate::read_authority(value, &tasks_limits())
 }
-#[test]
 fn an_authority_with_every_grant_kind_reads_back() {
     let value = fixtures::task_authority();
     assert_eq!(saved_authority(&value), Ok(value));
 }
-#[test]
 fn an_authority_without_a_deadline_reads_back() {
     let mut value = fixtures::task_authority();
     value.budget.deadline = None;
@@ -352,7 +337,6 @@ fn authority_with_bytes(bytes: usize) -> jig_domain_tasks::Authority {
     }]);
     value
 }
-#[test]
 fn an_authority_at_its_shared_byte_bound_reads_back() {
     let value = authority_with_bytes(32);
     assert_eq!(saved_authority(&value), Ok(value));
@@ -425,7 +409,6 @@ fn a_tasks_row_of_another_version_does_not_decode() {
         Err(crate::tasks_v1::Problem { path: crate::tasks_v1::Path::RowVersion, reason: skein_codec::Reason::Version })
     );
 }
-#[test]
 fn task_funded_accounting_reads_back() {
     let mut value = fixtures::task_funding();
     value.funder = jig_domain_tasks::Funder::Task(u64::MAX);
@@ -713,3 +696,58 @@ fn end_round_trip(end: jig_domain_tasks::End) {
 mod core_rows;
 
 mod people_outcomes;
+
+#[test]
+fn task_ledgers_read_back() {
+    table([
+        ("a_period_ledger_reads_back_as_it_was_saved", a_period_ledger_reads_back_as_it_was_saved),
+        ("a_pool_ledger_with_its_parent_reads_back", a_pool_ledger_with_its_parent_reads_back),
+        ("a_closed_ledger_reads_back", a_closed_ledger_reads_back),
+        ("task_funded_accounting_reads_back", task_funded_accounting_reads_back),
+    ]);
+}
+
+#[test]
+fn writer_slots_read_back() {
+    table([
+        ("a_writer_slot_reads_back", a_writer_slot_reads_back),
+        ("an_effect_writer_slot_reads_back", an_effect_writer_slot_reads_back),
+    ]);
+}
+
+#[test]
+fn authorities_read_back() {
+    table([
+        ("an_authority_with_every_grant_kind_reads_back", an_authority_with_every_grant_kind_reads_back),
+        ("an_authority_without_a_deadline_reads_back", an_authority_without_a_deadline_reads_back),
+        ("an_authority_at_its_shared_byte_bound_reads_back", an_authority_at_its_shared_byte_bound_reads_back),
+    ]);
+}
+
+#[test]
+fn notes_rows_read_back_as_saved() {
+    table([
+        ("a_notes_entry_reads_back_as_it_was_saved", a_notes_entry_reads_back_as_it_was_saved),
+        ("a_resources_line_reads_back_with_its_pattern", a_resources_line_reads_back_with_its_pattern),
+    ]);
+}
+
+type Case = (&'static str, fn());
+
+fn table<const N: usize>(cases: [Case; N]) {
+    let mut failures = [None; N];
+    let mut passed = true;
+    for ((name, case), failure) in cases.into_iter().zip(&mut failures) {
+        if std::panic::catch_unwind(case).is_err() {
+            *failure = Some(name);
+            passed = false;
+        }
+    }
+    assert!(passed, "{failures:?}");
+}
+
+fn notes_round_trip(row: domain::Record) {
+    let limits = notes::limits(&fixtures::NOTES_LIMITS).expect("within the schema's ceilings");
+    let bytes = notes::encode(&row, &limits).expect("within its limits");
+    assert_eq!(notes::decode(&bytes, &limits), Ok(row));
+}

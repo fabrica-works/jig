@@ -83,14 +83,12 @@ fn a_run_state_keeps_every_supplied_field() {
 fn a_current_call_keeps_every_supplied_field() {
     assert_eq!(live::current_call(fixtures::current_call_record(), &fixtures::limits()), Ok(fixtures::current_call()));
 }
-#[test]
 fn a_task_piece_with_a_partial_header_is_malformed() {
     assert_eq!(
         documents::task(fixtures::task_with_piece(&[1, 0, 0]), &fixtures::limits()),
         Err(Undecodable::Malformed)
     );
 }
-#[test]
 fn a_task_piece_past_its_end_is_malformed() {
     assert_eq!(
         documents::task(fixtures::task_with_piece(&[5, 0, 0, 0, 1]), &fixtures::limits()),
@@ -161,4 +159,26 @@ fn a_decoded_live_call_keeps_its_committed_call() {
         live::live_call(fixtures::decoded_live_call(), &fixtures::limits()),
         Ok(fixtures::decoded_live_call_expected())
     );
+}
+
+#[test]
+fn malformed_task_pieces_are_refused() {
+    table([
+        ("a_task_piece_with_a_partial_header_is_malformed", a_task_piece_with_a_partial_header_is_malformed),
+        ("a_task_piece_past_its_end_is_malformed", a_task_piece_past_its_end_is_malformed),
+    ]);
+}
+
+type Case = (&'static str, fn());
+
+fn table<const N: usize>(cases: [Case; N]) {
+    let mut failures = [None; N];
+    let mut passed = true;
+    for ((name, case), failure) in cases.into_iter().zip(&mut failures) {
+        if std::panic::catch_unwind(case).is_err() {
+            *failure = Some(name);
+            passed = false;
+        }
+    }
+    assert!(passed, "{failures:?}");
 }

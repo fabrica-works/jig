@@ -1,12 +1,10 @@
 //! Task lifecycle and proposal rows in both directions (protocol/store.md, 5.1).
 use super::{bound_problem, fixtures, saved_tasks, saved_wire, tasks_limits};
 
-#[test]
 fn a_history_row_with_an_amendment_reads_back() {
     let row = jig_domain_tasks::Stored::History(fixtures::task_history());
     assert_eq!(saved_tasks(&row), Ok(row));
 }
-#[test]
 fn a_held_phase_reads_back_with_its_source() {
     let source = fixtures::task_phase();
     assert_eq!(saved_phase(&source), Ok(source));
@@ -70,7 +68,6 @@ fn saved_phase(source: &jig_domain_tasks::Phase) -> Result<jig_domain_tasks::Pha
     let encoded = saved_wire(encoded, Phase::measure, Phase::encode, Phase::decode);
     phase::read_phase(encoded, &tasks_limits())
 }
-#[test]
 fn each_lifecycle_phase_reads_back() {
     use jig_domain_tasks::{Active, Closing, Ending, Phase, Stage};
     for source in [
@@ -85,7 +82,6 @@ fn each_lifecycle_phase_reads_back() {
         assert_eq!(saved_phase(&source), Ok(source));
     }
 }
-#[test]
 fn each_prior_held_phase_reads_back() {
     use jig_domain_tasks::{Active, Closing, Ending, Hold, HoldSource, Party, Phase, Stage, Was};
     for was in [
@@ -109,7 +105,6 @@ fn each_prior_held_phase_reads_back() {
         assert_eq!(saved_phase(&source), Ok(source));
     }
 }
-#[test]
 fn a_held_phase_without_a_source_reads_back() {
     let source = jig_domain_tasks::Phase::Held {
         was: jig_domain_tasks::Was::Waiting,
@@ -126,7 +121,6 @@ fn saved_result(
     let encoded = saved_wire(encoded, TaskResult::measure, TaskResult::encode, TaskResult::decode);
     phase::read_result(encoded, &tasks_limits())
 }
-#[test]
 fn each_result_kind_reads_back() {
     use jig_domain_tasks::{ResultField, TaskResult};
     for source in [
@@ -146,7 +140,6 @@ fn each_result_kind_reads_back() {
 fn result_with_state(bytes: usize) -> jig_domain_tasks::TaskResult {
     jig_domain_tasks::TaskResult::Approved { state: skein_lib::bytes::zeroed(bytes), words: Some(Box::new([1])) }
 }
-#[test]
 fn a_result_at_its_shared_byte_bound_reads_back() {
     let source = result_with_state(31);
     assert_eq!(saved_result(&source), Ok(source));
@@ -232,7 +225,6 @@ fn an_amendment_without_replacements_reads_back() {
     let encoded = saved_wire(encoded, Amendment::measure, Amendment::encode, Amendment::decode);
     assert_eq!(proposals::read_amendment(encoded, &tasks_limits()), Ok(source));
 }
-#[test]
 fn a_history_without_optional_details_reads_back() {
     let mut source = fixtures::task_history();
     source.proposal = None;
@@ -267,4 +259,44 @@ fn each_retry_notice_reads_back() {
         let encoded = saved_wire(encoded, RetryNotice::measure, RetryNotice::encode, RetryNotice::decode);
         assert_eq!(phase::read_retry_notice(encoded, &tasks_limits()), Ok(source));
     }
+}
+
+#[test]
+fn history_rows_read_back() {
+    table([
+        ("a_history_row_with_an_amendment_reads_back", a_history_row_with_an_amendment_reads_back),
+        ("a_history_without_optional_details_reads_back", a_history_without_optional_details_reads_back),
+    ]);
+}
+
+#[test]
+fn lifecycle_phases_read_back() {
+    table([
+        ("a_held_phase_reads_back_with_its_source", a_held_phase_reads_back_with_its_source),
+        ("a_held_phase_without_a_source_reads_back", a_held_phase_without_a_source_reads_back),
+        ("each_lifecycle_phase_reads_back", each_lifecycle_phase_reads_back),
+        ("each_prior_held_phase_reads_back", each_prior_held_phase_reads_back),
+    ]);
+}
+
+#[test]
+fn results_read_back() {
+    table([
+        ("each_result_kind_reads_back", each_result_kind_reads_back),
+        ("a_result_at_its_shared_byte_bound_reads_back", a_result_at_its_shared_byte_bound_reads_back),
+    ]);
+}
+
+type Case = (&'static str, fn());
+
+fn table<const N: usize>(cases: [Case; N]) {
+    let mut failures = [None; N];
+    let mut passed = true;
+    for ((name, case), failure) in cases.into_iter().zip(&mut failures) {
+        if std::panic::catch_unwind(case).is_err() {
+            *failure = Some(name);
+            passed = false;
+        }
+    }
+    assert!(passed, "{failures:?}");
 }

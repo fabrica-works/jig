@@ -9,11 +9,9 @@ use jig_domain_tasks as tasks;
 fn the_deployment_header_reads_back_with_its_id() {
     core_round_trip(core::CoreRecord::Deployment(fixtures::deployment()));
 }
-#[test]
 fn a_run_proof_with_its_terminal_reads_back() {
     core_round_trip(core::CoreRecord::RunProof(fixtures::run()));
 }
-#[test]
 fn a_claim_before_its_first_turn_reads_back() {
     let mut run = fixtures::run();
     run.host = jig_domain_fleet::HostKind::Engine;
@@ -107,4 +105,26 @@ fn a_turn_exceeding_load_bytes_still_reads_back() {
     let turn = fixtures::turn();
     let bytes = codec::turn(&turn, &limits).expect("within the worker channel bound");
     assert_eq!(codec::read_turn(&bytes, &limits), Ok(turn));
+}
+
+#[test]
+fn run_proofs_read_back_with_their_optional_fields() {
+    table([
+        ("a_run_proof_with_its_terminal_reads_back", a_run_proof_with_its_terminal_reads_back),
+        ("a_claim_before_its_first_turn_reads_back", a_claim_before_its_first_turn_reads_back),
+    ]);
+}
+
+type Case = (&'static str, fn());
+
+fn table<const N: usize>(cases: [Case; N]) {
+    let mut failures = [None; N];
+    let mut passed = true;
+    for ((name, case), failure) in cases.into_iter().zip(&mut failures) {
+        if std::panic::catch_unwind(case).is_err() {
+            *failure = Some(name);
+            passed = false;
+        }
+    }
+    assert!(passed, "{failures:?}");
 }

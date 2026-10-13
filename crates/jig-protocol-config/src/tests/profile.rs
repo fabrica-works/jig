@@ -42,19 +42,15 @@ fn the_small_profile_fits_every_childs_worst_case() {
 fn the_standard_profile_fits_every_childs_worst_case() {
     assert_children_fit(Profile::Standard);
 }
-#[test]
 fn the_small_profile_fits_the_cores_worst_case() {
     assert!(core_bytes(Profile::Small).is_some(), "small core bound");
 }
-#[test]
 fn the_standard_profile_fits_the_cores_worst_case() {
     assert!(core_bytes(Profile::Standard).is_some(), "standard core bound");
 }
-#[test]
 fn the_small_profiles_hub_fits_its_worst_case() {
     assert!(hub_bytes(Profile::Small).is_some(), "small hub bound");
 }
-#[test]
 fn the_standard_profiles_hub_fits_its_worst_case() {
     assert!(hub_bytes(Profile::Standard).is_some(), "standard hub bound");
 }
@@ -67,4 +63,34 @@ fn a_sum_past_a_u64_is_refused() {
 fn a_sum_within_memory_is_its_total() {
     let shares = shares();
     assert_eq!(fits(1_200, &shares), Ok(1_100));
+}
+
+#[test]
+fn profiles_fit_the_cores_worst_case() {
+    table([
+        ("the_small_profile_fits_the_cores_worst_case", the_small_profile_fits_the_cores_worst_case),
+        ("the_standard_profile_fits_the_cores_worst_case", the_standard_profile_fits_the_cores_worst_case),
+    ]);
+}
+
+#[test]
+fn profiles_hubs_fit_their_worst_case() {
+    table([
+        ("the_small_profiles_hub_fits_its_worst_case", the_small_profiles_hub_fits_its_worst_case),
+        ("the_standard_profiles_hub_fits_its_worst_case", the_standard_profiles_hub_fits_its_worst_case),
+    ]);
+}
+
+type Case = (&'static str, fn());
+
+fn table<const N: usize>(cases: [Case; N]) {
+    let mut failures = [None; N];
+    let mut passed = true;
+    for ((name, case), failure) in cases.into_iter().zip(&mut failures) {
+        if std::panic::catch_unwind(case).is_err() {
+            *failure = Some(name);
+            passed = false;
+        }
+    }
+    assert!(passed, "{failures:?}");
 }

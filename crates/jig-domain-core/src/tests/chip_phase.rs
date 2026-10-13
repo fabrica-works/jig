@@ -261,17 +261,37 @@ fn long_operation_work(operation: fleet::Operation) -> ChipWork {
     chip_from_row_with_core(&core, &limits, &row).unwrap().details.observation.unwrap().work
 }
 
-#[test]
 fn a_long_completion_shows_the_run_as_writing() {
     assert_eq!(long_operation_work(fleet::Operation::Completion), ChipWork::Writing);
 }
 
-#[test]
 fn long_checks_shows_the_run_as_active() {
     assert_eq!(long_operation_work(fleet::Operation::Checks), ChipWork::Active);
 }
 
-#[test]
 fn a_long_command_shows_the_run_as_active() {
     assert_eq!(long_operation_work(fleet::Operation::Command), ChipWork::Active);
+}
+
+#[test]
+fn long_operations_show_the_runs_work() {
+    table([
+        ("a_long_completion_shows_the_run_as_writing", a_long_completion_shows_the_run_as_writing),
+        ("long_checks_shows_the_run_as_active", long_checks_shows_the_run_as_active),
+        ("a_long_command_shows_the_run_as_active", a_long_command_shows_the_run_as_active),
+    ]);
+}
+
+type Case = (&'static str, fn());
+
+fn table<const N: usize>(cases: [Case; N]) {
+    let mut failures = [None; N];
+    let mut passed = true;
+    for ((name, case), failure) in cases.into_iter().zip(&mut failures) {
+        if std::panic::catch_unwind(case).is_err() {
+            *failure = Some(name);
+            passed = false;
+        }
+    }
+    assert!(passed, "{failures:?}");
 }

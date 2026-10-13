@@ -24,7 +24,6 @@ fn an_override_replaces_one_limit_of_the_profile() {
 fn an_override_of_an_unknown_name_is_refused() {
     assert_eq!(overrides::apply(&mut small(), b"tasks.absent", 1), Err(What::Override));
 }
-#[test]
 fn an_override_past_its_type_is_refused() {
     assert_eq!(overrides::apply(&mut small(), b"hub.slots", 4_294_967_296), Err(What::Override));
 }
@@ -50,7 +49,6 @@ fn duration_overrides_read_as_milliseconds() {
     expected.link.ping = skein_lib::Duration::from_millis(6_000);
     assert_eq!(parse(br#"{"profile":"small","overrides":{"link.ping_ms":6000}}"#), Ok(expected));
 }
-#[test]
 fn a_duration_override_past_its_type_is_refused() {
     assert_eq!(overrides::apply(&mut small(), b"link.ping_ms", u64::MAX), Err(What::Override));
 }
@@ -306,3 +304,25 @@ const SMALL: &[(&[u8], u64)] = &[
     (b"documents.versions.minimum", 1),
     (b"documents.versions.maximum", 1),
 ];
+
+#[test]
+fn overrides_past_their_types_are_refused() {
+    table([
+        ("an_override_past_its_type_is_refused", an_override_past_its_type_is_refused),
+        ("a_duration_override_past_its_type_is_refused", a_duration_override_past_its_type_is_refused),
+    ]);
+}
+
+type Case = (&'static str, fn());
+
+fn table<const N: usize>(cases: [Case; N]) {
+    let mut failures = [None; N];
+    let mut passed = true;
+    for ((name, case), failure) in cases.into_iter().zip(&mut failures) {
+        if std::panic::catch_unwind(case).is_err() {
+            *failure = Some(name);
+            passed = false;
+        }
+    }
+    assert!(passed, "{failures:?}");
+}
