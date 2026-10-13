@@ -1,3 +1,4 @@
+use jig_core_world::Fault;
 use jig_core_world::{
     Store,
     client_peer::ClientPeer,
@@ -6,8 +7,8 @@ use jig_core_world::{
 };
 use jig_domain_core as core;
 use jig_domain_people as people;
-use jig_fake_store::{Fault, Write};
 use jig_test_domain as root;
+use jig_test_domain::Write;
 use skein_lib::{Duration, ReplyTo, Time, Token, Wall};
 
 fn sign_in(number: u8) -> root::Event {
@@ -82,7 +83,7 @@ fn repeated_drains_and_released_acknowledgements_do_not_duplicate_a_snapshot() {
     assert_eq!(world.client_peer.as_ref().expect("client").delivered.len(), 1);
     assert!(world.store_peer.as_mut().expect("store peer").take().is_empty());
     let mut empty = StorePeer::new();
-    empty.capture(Time::from_nanos(1), &Store::new());
+    empty.capture(Time::from_nanos(1), &Store::new(&jig_core_world::world::limits()));
     assert!(empty.take().is_empty(), "no invented Durable0");
 }
 
@@ -105,58 +106,59 @@ fn a_single_drain_preserves_every_intermediate_applied_number_and_whole_snapshot
 
 #[test]
 fn whole_opaque_rows_remain_immutable_after_later_save_erase_and_store_mutation() {
-    let mut store = Store::new();
+    let mut store = Store::new(&jig_core_world::world::limits());
     let mut peer = StorePeer::new();
     let original = opaque_turn(&[0, 255, 128, 1, 0, 254]);
     let key = original.key();
-    store.submit(1, Box::new([Write::Save { key: key.clone(), row: original.clone() }]), 0);
+    store.submit(1, writes(1, Write::Save(original.clone())), 0);
     assert_eq!(store.tick(false), Ok(Some(1)));
     peer.capture(Time::from_nanos(17), &store);
     let first = peer.take().pop().expect("first durable snapshot");
     assert_eq!(first.rows.get(&key), Some(&original));
     let replacement = opaque_turn(b"replacement allocation");
-    store.submit(2, Box::new([Write::Save { key: key.clone(), row: replacement.clone() }]), 0);
+    store.submit(2, writes(2, Write::Save(replacement.clone())), 0);
     assert_eq!(store.tick(false), Ok(Some(2)));
     peer.capture(Time::from_nanos(18), &store);
-    store.submit(3, Box::new([Write::Erase(key.clone())]), 0);
+    store.submit(3, writes(3, Write::Erase(key.clone())), 0);
     assert_eq!(store.tick(false), Ok(Some(3)));
     peer.capture(Time::from_nanos(19), &store);
     let later = peer.take();
     assert_eq!(later[0].rows.get(&key), Some(&replacement));
-    assert!(later[1].rows.is_empty());
-    store.rows.insert(key.clone(), opaque_turn(b"external mutation"));
+    assert_eq!(later[1].rows, header_rows(3));
+    store.submit(4, writes(4, Write::Save(opaque_turn(b"external mutation"))), 0);
+    assert_eq!(store.tick(false), Ok(Some(4)));
     assert_eq!(first.rows.get(&key), Some(&original), "all allocated bytes and scalar facts survived");
     assert_eq!(later[0].rows.get(&key), Some(&replacement));
-    assert!(later[1].rows.is_empty());
+    assert_eq!(later[1].rows, header_rows(3));
 }
 
 #[test]
 fn pending_failed_and_abandoned_transactions_emit_nothing_and_crash_preserves_captured_rows() {
-    let mut store = Store::new();
+    let mut store = Store::new(&jig_core_world::world::limits());
     let mut peer = StorePeer::new();
     let durable = opaque_turn(b"actually applied");
     let key = durable.key();
-    store.submit(1, Box::new([Write::Save { key: key.clone(), row: durable.clone() }]), 0);
+    store.submit(1, writes(1, Write::Save(durable.clone())), 0);
     assert_eq!(store.tick(true), Ok(None));
     peer.capture(Time::from_nanos(20), &store);
-    store.submit(2, Box::new([Write::Erase(key.clone())]), 2);
+    store.submit(2, writes(2, Write::Erase(key.clone())), 2);
     assert_eq!(store.tick(false), Ok(None));
     peer.capture(Time::from_nanos(21), &store);
-    store.crash();
+    store.crash(18);
     peer.capture(Time::from_nanos(22), &store);
     let captured = peer.take();
     assert_eq!(captured.len(), 1);
     assert_eq!(captured[0].rows.get(&key), Some(&durable));
     store.fault(Fault::Fail { commit: 2 });
-    store.submit(2, Box::new([Write::Erase(key.clone())]), 0);
-    store.submit(3, Box::new([Write::Save { key: key.clone(), row: opaque_turn(b"abandoned after failure") }]), 0);
+    store.submit(2, writes(2, Write::Erase(key.clone())), 0);
+    store.submit(3, writes(3, Write::Save(opaque_turn(b"abandoned after failure"))), 0);
     assert_eq!(store.tick(false), Err(2));
     peer.capture(Time::from_nanos(23), &store);
     assert!(peer.take().is_empty());
     assert_eq!(store.applied, 1);
     assert_eq!(store.rows.get(&key), Some(&durable));
     assert!(store.pending.is_empty());
-    store.crash();
+    store.crash(18);
     peer.capture(Time::from_nanos(24), &store);
     assert!(peer.take().is_empty());
     assert_eq!(captured[0].rows.get(&key), Some(&durable));
@@ -164,10 +166,10 @@ fn pending_failed_and_abandoned_transactions_emit_nothing_and_crash_preserves_ca
 
 #[test]
 fn supplied_monotonic_time_is_exact_and_independent_of_wall_corrections() {
-    let mut store = Store::new();
+    let mut store = Store::new(&jig_core_world::world::limits());
     let mut peer = StorePeer::new();
     let row = opaque_turn(b"independent wall timestamp");
-    store.submit(1, Box::new([Write::Save { key: row.key(), row }]), 0);
+    store.submit(1, writes(1, Write::Save(row)), 0);
     assert_eq!(store.tick(false), Ok(Some(1)));
     peer.capture(Time::from_nanos(7), &store);
     assert_eq!(peer.take()[0].at, Time::from_nanos(7), "no conversion from the row's unrelated Wall");
@@ -182,4 +184,29 @@ fn supplied_monotonic_time_is_exact_and_independent_of_wall_corrections() {
     assert_eq!(second.len(), 1);
     assert_eq!(first[0].at, second[0].at, "Wall corrections never alter the supplied monotonic tick");
     assert_eq!(first[0].commit, second[0].commit);
+}
+
+const HEADER: core::Deployment = core::Deployment {
+    id: [18; 16],
+    tasks: 0,
+    people: 0,
+    sign_ins: 0,
+    messages: 0,
+    runs: 0,
+    calls: 0,
+    connector_rows: 0,
+    applications: 0,
+    commits: 0,
+};
+fn header(commits: u64) -> root::Record {
+    let mut header = HEADER;
+    header.commits = commits;
+    root::Record::Core(core::Record::Core(core::CoreRecord::Deployment(header)))
+}
+fn header_rows(commits: u64) -> std::collections::BTreeMap<root::Key, root::Record> {
+    let header = header(commits);
+    std::collections::BTreeMap::from([(root::Key::Core(core::Key::Core(core::CoreKey::Deployment)), header)])
+}
+fn writes(number: u64, write: Write) -> Box<[Write]> {
+    Box::new([Write::Save(header(number)), write])
 }

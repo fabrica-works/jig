@@ -89,7 +89,7 @@ fn random_pool_sizes_shrink_and_grow_while_finishes_wait_for_their_commits() {
             assert_eq!(world.assignments.len(), 1 + usize::try_from(initial).expect("small pool"));
             pool(&mut world, 0);
             for child in children.iter().take(usize::try_from(initial).expect("small pool")) {
-                world.store.fault(jig_fake_store::Fault::Hold { commits: 1 });
+                world.store.fault(jig_core_world::Fault::Hold { commits: 1 });
                 finish(&mut world, *child);
                 assert_eq!(world.assignments.len(), 1 + usize::try_from(initial).expect("small pool"));
                 world.release_commits();
@@ -158,7 +158,7 @@ fn random_period_budgets_reset_before_a_standing_template_creates_its_next_batch
             finish(&mut world, first);
             for period in 2..=3 {
                 let count = world.assignments.len();
-                world.store.fault(jig_fake_store::Fault::Hold { commits: 1 });
+                world.store.fault(jig_core_world::Fault::Hold { commits: 1 });
                 world.send(root::Event::Core(core::Event::Period { project: 1, period, budget: 140, next: None }));
                 assert_eq!(world.assignments.len(), count, "a new batch waits for the reset commit");
                 world.release_commits();
@@ -176,55 +176,60 @@ fn random_period_budgets_reset_before_a_standing_template_creates_its_next_batch
     }
 }
 
+fn narrowed_policy_case(seed: u64) {
+    let mut rng = Rng::new(seed);
+    let (config, mut limits) = jig_core_world::effects::fixture(seed, true);
+    limits.core.call_records = 8;
+    limits.core.people.amendment_bytes = 256;
+    limits.core.people.inbox_recipients = 16;
+    jig_core_world::peers::journal(&mut limits);
+    let mut world = World::configured(seed, true, config, limits);
+    world.call(1, 9200);
+    world.observed(13);
+    world.hold_writes = true;
+    world.call(1, 9201);
+    let proposal = world.propose(2);
+    world.send(root::Event::Core(core::Event::People(jig_domain_people::Event::Ask {
+        reply_to: ReplyTo::new(Token::new(9400)),
+        sign_in: world.sign_in.expect("person"),
+        key: [43; 16],
+        ask: jig_domain_people::Ask::ChangePolicy {
+            project: 1,
+            change: jig_domain_people::PolicyChange::Requirements {
+                requirements: Box::new([jig_domain_people::Requirement {
+                    connector: 1,
+                    kind: 5,
+                    pattern: jig_domain_people::Pattern {
+                        segments: Box::new([]),
+                        last: jig_domain_people::Last::Open(Box::new([])),
+                    },
+                    judge: jig_domain_people::Judge {
+                        connector: 2,
+                        requirement: 9 + u16::try_from(rng.below(4)).expect("requirement"),
+                        parameters: 0,
+                    },
+                    guard: jig_domain_people::Guard::Guarded,
+                    must_be_guarded: true,
+                }]),
+            },
+        },
+    })));
+    world.release_writes();
+    world.decide_proposal(proposal, true, 44);
+    world.call(3, 9203);
+    assert!(matches!(
+        world.answers.last(),
+        Some((_, _, core::CallPart::EffectDenied { answer: jig_domain_authority::Answer::Refuse, .. }))
+    ));
+    assert_eq!(world.systems[0].observed().iter().filter(|row| row.applied).count(), 1);
+    assert_eq!(world.spent(), 3);
+}
+
 #[test]
 fn random_policy_changes_leave_a_committed_flight_whole_and_recheck_waiting_proposals() {
     for seed in 209..=224 {
         let replay = std::panic::catch_unwind(|| {
-            let mut rng = Rng::new(seed);
-            let (config, mut limits) = jig_core_world::effects::fixture(seed, true);
-            limits.core.call_records = 8;
-            limits.journal.writes = 10_000;
-            limits.journal.held = 10_000;
-            let mut world = World::configured(seed, true, config, limits);
-            world.call(1, 9200);
-            world.observed(13);
-            world.hold_writes = true;
-            world.call(1, 9201);
-            let proposal = world.propose(2);
-            world.send(root::Event::Core(core::Event::People(jig_domain_people::Event::Ask {
-                reply_to: ReplyTo::new(Token::new(9400)),
-                sign_in: world.sign_in.expect("person"),
-                key: [43; 16],
-                ask: jig_domain_people::Ask::ChangePolicy {
-                    project: 1,
-                    change: jig_domain_people::PolicyChange::Requirements {
-                        requirements: Box::new([jig_domain_people::Requirement {
-                            connector: 1,
-                            kind: 5,
-                            pattern: jig_domain_people::Pattern {
-                                segments: Box::new([]),
-                                last: jig_domain_people::Last::Open(Box::new([])),
-                            },
-                            judge: jig_domain_people::Judge {
-                                connector: 2,
-                                requirement: 9 + u16::try_from(rng.below(4)).expect("requirement"),
-                                parameters: 0,
-                            },
-                            guard: jig_domain_people::Guard::Guarded,
-                            must_be_guarded: true,
-                        }]),
-                    },
-                },
-            })));
-            world.release_writes();
-            world.decide_proposal(proposal, true, 44);
-            world.call(3, 9203);
-            assert!(matches!(
-                world.answers.last(),
-                Some((_, _, core::CallPart::EffectDenied { answer: jig_domain_authority::Answer::Refuse, .. }))
-            ));
-            assert_eq!(world.systems[0].observed().iter().filter(|row| row.applied).count(), 1);
-            assert_eq!(world.spent(), 3);
+            narrowed_policy_case(seed);
         });
         assert!(replay.is_ok(), "replay policy seed {seed}");
     }

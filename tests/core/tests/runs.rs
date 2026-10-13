@@ -638,10 +638,8 @@ fn a_transcript_read_as_unread_fails_the_run_and_the_next_starts_fresh() {
     let mut world = World::new(117, false);
     world.turn(1, 1, None, b"unread window");
     park_chat(&mut world, 1);
-    let proof = current_window_proof(&world);
-    let key =
-        root::Key::Core(core::Key::Core(core::CoreKey::Turn { task: proof.task, attempt: proof.attempt, turn: 1 }));
-    world.store.rows.remove(&key);
+    let task = current_window_proof(&world).task;
+    world.store.unread_transcript(task);
     let assigned = world.assignments.len();
     world.say(89);
     assert_eq!(world.assignments.len(), assigned);

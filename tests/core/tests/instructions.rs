@@ -15,7 +15,7 @@ fn an_instruction_amendment_reaches_the_live_run_after_its_commit_and_future_run
     assert_eq!(before.instructions.expect("the agent document includes its initial instructions").bytes, original);
     let messages = w.inbound.len();
     let answers = w.people_answers.len();
-    w.store.fault(jig_fake_store::Fault::Hold { commits: 1 });
+    w.store.fault(jig_core_world::Fault::Hold { commits: 1 });
     request(
         &mut w,
         180,

@@ -1,8 +1,8 @@
+use jig_core_world::Fault as StoreFault;
 use jig_core_world::{
     effects::{Cut, World},
     faults,
 };
-use jig_fake_store::Fault as StoreFault;
 use jig_fake_workers::Fault;
 use skein_lib::Duration;
 

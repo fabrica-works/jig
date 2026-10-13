@@ -33,6 +33,14 @@ impl Files {
         self.handles.clear();
         self.handles.insert(Token::new(self.root.raw()), self.root);
     }
+    /// Inject an unread physical transcript while retaining its committed map places.
+    pub(super) fn unread_transcript(&mut self, task: u64) {
+        let name = format!("{:016x}/{task:016x}", task >> 12);
+        let file = self.machine.open(self.root, name.as_bytes(), How::Write).expect("kept transcript file");
+        self.machine.truncate(file, 0).expect("write-open transcript");
+        self.machine.sync(file);
+        self.machine.close(file);
+    }
     /// Answer every operation the store's persistent file face reaches.
     #[must_use]
     pub fn answer(&mut self, request: file::Request) -> Arrived {

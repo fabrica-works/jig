@@ -265,7 +265,7 @@ fn a_charter_both_kinds_may_run_claims_the_engine_when_only_its_slot_is_free() {
 fn a_claim_for_the_engine_is_placed_only_on_the_engine() {
     let mut world = both_host_world(150);
     let assigned = world.assignments.len();
-    world.store.fault(jig_fake_store::Fault::Hold { commits: 2 });
+    world.store.fault(jig_core_world::Fault::Hold { commits: 2 });
     world.delegate_agent(2, b"keep the claimed kind");
     world.release_commits();
     assert_eq!(world.assignments.len(), assigned, "claim waits for its completion");

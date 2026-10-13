@@ -31,8 +31,7 @@ fn two_projects(seed: u64) -> (root::Config, root::Limits) {
     limits.core.tasks.funders = 8;
     limits.core.people.projects = 2;
     limits.core.people.initial_owners = 2;
-    limits.journal.writes = 10000;
-    limits.journal.held = 10000;
+    jig_core_world::peers::journal(&mut limits);
     let policy = config.core.authority.policy(1).expect("first policy").clone();
     config.core.authority =
         authority::Domain::new(config.core.authority.rules().clone(), limits.core.authority).expect("two projects");
@@ -81,8 +80,7 @@ fn a_chat_takes_the_most_that_fits_under_its_persons_role() {
     });
     let mut limits = world::limits();
     limits.core.tasks.tree_tasks = 4;
-    limits.journal.writes = 10000;
-    limits.journal.held = 10000;
+    jig_core_world::peers::journal(&mut limits);
     let mut world = World::configured(602, false, config, limits);
     ask(&mut world, 6, people::Ask::StartChat { project: 1, words: b"use the remainder".as_slice().into() });
     let task = 2;

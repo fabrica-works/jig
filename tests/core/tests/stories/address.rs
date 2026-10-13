@@ -34,7 +34,7 @@ fn a_person_task_is_readdressed_after_durability_and_the_previous_taker_cannot_a
     edit.addressed = Some(people::AddressChange { revision: 0, address: people::PersonAddress::Person(second) });
     let request = people::Ask::Amend { project: 1, task, revision: 0, release: None, amendment: edit };
     let answers = w.people_answers.len();
-    w.store.fault(jig_fake_store::Fault::Hold { commits: 1 });
+    w.store.fault(jig_core_world::Fault::Hold { commits: 1 });
     ask(&mut w, 187, request.clone());
     assert_eq!(w.people_answers.len(), answers, "address outcome waits for its decision");
     w.release_commits();

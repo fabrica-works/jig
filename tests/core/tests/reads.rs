@@ -14,7 +14,7 @@ fn a_read_waits_for_the_commit_in_flight_before_it() {
     let mut world = world(761);
     let task = world.assigned.as_ref().expect("chat").task;
     let number = world.store.applied + 1;
-    world.store.fault(jig_fake_store::Fault::Hold { commits: 1 });
+    world.store.fault(jig_core_world::Fault::Hold { commits: 1 });
     world.cut = Some(Cut::Submitted(number));
     request(
         &mut world,
@@ -525,6 +525,7 @@ fn question_world(seed: u64, bound: Option<u32>) -> (jig_core_world::effects::Wo
         limits.core.tasks.inbox_messages = bound;
         limits.core.tasks.run_inbox = bound;
     }
+    jig_core_world::peers::journal(&mut limits);
     let mut world = jig_core_world::effects::World::configured(seed, false, configuration, limits);
     world.reads = Some(jig_core_world::reads::Parties::new(world.store.applied));
     let parent = chat_task(&world);
@@ -587,7 +588,7 @@ fn finish_goal(world: &mut jig_core_world::effects::World, key: u8, delegate: bo
         world.delegate();
         world.observed(13);
         let child = world.procedure.expect("goal delegate");
-        assert!(world.store.rows.remove(&root::Key::Core(core::Key::Tasks(tasks::Key::Ended(child)))).is_some());
+        assert!(world.erase(root::Key::Core(core::Key::Tasks(tasks::Key::Ended(child)))).is_some());
         let message = live_task(world, goal).inbox.last().expect("delegate result").number;
         take_message(world, goal, 1, message);
     }
@@ -668,10 +669,7 @@ fn seed_history(world: &mut jig_core_world::effects::World, task: u64) {
         at: skein_lib::Wall::EPOCH,
         amendment: None,
     };
-    world.store.rows.insert(
-        root::Key::Core(core::Key::Tasks(tasks::Key::History { task, revision: 1 })),
-        root::Record::Core(core::Record::Tasks(tasks::Stored::History(row))),
-    );
+    world.seed(Box::new([root::Record::Core(core::Record::Tasks(tasks::Stored::History(row)))]));
 }
 
 fn subtree_history(world: &mut jig_core_world::effects::World, task: u64) -> Vec<(u8, u64, u64)> {
@@ -711,13 +709,14 @@ fn a_subtree_history_reads_each_delegates_rows_found_by_index() {
     let rows = subtree_history(&mut world, goal);
     assert!(rows.iter().any(|row| row.1 == goal));
     assert!(rows.iter().any(|row| row.1 == delegate));
-    assert_eq!(&rows[..2], &[(0, goal, 1), (0, delegate, 1)]);
-    assert!(rows.windows(2).all(|pair| pair[0] < pair[1]));
+    assert_eq!(&rows[..2], &[(0, goal, 1), (1, goal, 1)]);
+    let mut members: Vec<_> = rows.iter().map(|row| row.1).collect();
+    members.dedup();
+    assert_eq!(members, [goal, delegate]);
+    assert!(rows.windows(2).all(|pair| pair[0].1 != pair[1].1 || (pair[0].0, pair[0].2) < (pair[1].0, pair[1].2)));
     assert!(
         world
-            .store
-            .rows
-            .remove(&root::Key::Core(core::Key::Tasks(tasks::Key::Delegate { requester: goal, task: delegate })))
+            .erase(root::Key::Core(core::Key::Tasks(tasks::Key::Delegate { requester: goal, task: delegate })))
             .is_some()
     );
     let without_edge = subtree_history(&mut world, goal);

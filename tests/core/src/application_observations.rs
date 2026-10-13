@@ -1,11 +1,11 @@
-//! Translate only authenticated peer input and transactions received by the fake store.
+//! Translate only authenticated peer input and transactions received by the store.
 use crate::Store;
 use jig_conformance::referee as r;
 use jig_domain_core as core;
 use jig_domain_people as people;
-use jig_fake_store::Write;
 use jig_test_connector as connector;
 use jig_test_domain as root;
+use jig_test_domain::Write;
 
 pub(crate) fn requested(store: &Store, event: &mut root::Event) -> Option<r::Observed> {
     let root::Event::Application { reply_to, sign_in, key, number, digest, .. } = event else { return None };
@@ -47,17 +47,16 @@ pub(crate) fn submitted(store: &Store) -> Vec<r::Observed> {
     let Some(pending) = store.pending.back() else { return Vec::new() };
     let mut observed = Vec::new();
     for write in &pending.writes {
-        if let Write::Save {
-            row:
-                root::Record::Connector { number, record: connector::Record::ApplicationAnswer { token, until, outcome } },
-            ..
-        } = write
+        if let Write::Save(root::Record::Connector {
+            number,
+            record: connector::Record::ApplicationAnswer { token, until, outcome },
+        }) = write
         {
             let (key, digest) = pending
                 .writes
                 .iter()
                 .find_map(|write| match write {
-                    Write::Save { row, .. } => marker(row, *number, token.raw()),
+                    Write::Save(row) => marker(row, *number, token.raw()),
                     Write::Erase(_) => None,
                 })
                 .or_else(|| store.rows.values().find_map(|row| marker(row, *number, token.raw())))

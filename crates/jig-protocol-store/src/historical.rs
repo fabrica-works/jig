@@ -6,7 +6,7 @@ use jig_domain_tasks as tasks;
 #[must_use]
 pub fn key(now: &Now) -> Option<Key> {
     match now {
-        Now::SeenChat { task, .. } | Now::HistoricalPersonTask { task, .. } => {
+        Now::LoadEndedChat { task } | Now::SeenChat { task, .. } | Now::HistoricalPersonTask { task, .. } => {
             Some(Key::Tasks(tasks::Key::Ended(*task)))
         }
         Now::HistoricalProposal { proposer, proposal, .. } => {
@@ -39,7 +39,6 @@ pub fn key(now: &Now) -> Option<Key> {
         | Now::Activate { .. }
         | Now::PrepareAgent { .. }
         | Now::StartPreparation { .. }
-        | Now::LoadEndedChat { .. }
         | Now::CompleteBrief { .. }
         | Now::BriefCorePlanned { .. }
         | Now::WorkspaceRequest { .. }
@@ -53,6 +52,7 @@ pub fn key(now: &Now) -> Option<Key> {
 #[must_use]
 pub fn answer(now: Now, row: Option<Record>) -> Option<core::Event> {
     Some(match now {
+        Now::LoadEndedChat { .. } => core::Event::ForgetChat { row: ended(row)? },
         Now::SeenChat { request, .. } => core::Event::SeenChatLoaded { request, row: ended(row), busy: false },
         Now::HistoricalPersonTask { request, person, project, task } => {
             core::Event::HistoricalPersonTask { request, person, project, task, row: ended(row), busy: false }
@@ -99,7 +99,6 @@ pub fn answer(now: Now, row: Option<Record>) -> Option<core::Event> {
         | Now::Activate { .. }
         | Now::PrepareAgent { .. }
         | Now::StartPreparation { .. }
-        | Now::LoadEndedChat { .. }
         | Now::CompleteBrief { .. }
         | Now::BriefCorePlanned { .. }
         | Now::WorkspaceRequest { .. }

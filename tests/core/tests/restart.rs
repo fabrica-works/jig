@@ -134,11 +134,15 @@ fn nothing_is_decided_before_every_connector_has_settled_its_outbox() {
     let mut world = World::new(115, false);
     applied_without_answer(&mut world);
     world.end(tasks::End::Parked, 0);
-    for record in world.store.rows.values_mut() {
-        if let root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row))) = record {
+    let mut seeded = Vec::new();
+    for record in world.store.rows.values().cloned() {
+        let mut record = record;
+        if let root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row))) = &mut record {
             row.phase = tasks::Phase::Active(tasks::Active::Due);
+            seeded.push(record);
         }
     }
+    world.seed(seeded.into_boxed_slice());
     world.assigned = None;
     world.hold_lookups = true;
     world.restart(115, false);
@@ -178,11 +182,15 @@ fn a_restart_after_a_turn_committed_resumes_from_it() {
 fn an_engine_claim_is_settled_at_once_instead_of_waiting_for_a_worker() {
     let mut world = World::new(117, false);
     world.turn(1, 2, None, b"engine turn");
-    for record in world.store.rows.values_mut() {
-        if let root::Record::Core(core::Record::Core(core::CoreRecord::RunProof(proof))) = record {
+    let mut seeded = Vec::new();
+    for record in world.store.rows.values().cloned() {
+        let mut record = record;
+        if let root::Record::Core(core::Record::Core(core::CoreRecord::RunProof(proof))) = &mut record {
             proof.host = fleet::HostKind::Engine;
+            seeded.push(record);
         }
     }
+    world.seed(seeded.into_boxed_slice());
     world.restart(117, false);
     assert!(world.store.rows.values().any(|record| matches!(record, root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row))) if row.tries.lost==1)));
     assert!(world.domain.ready());
@@ -247,7 +255,7 @@ fn an_uncertain_effect_released_without_making_it_again_tells_its_executor() {
         })))
     );
     let made = world.systems[0].observed().iter().filter(|row| row.applied).count();
-    world.store.fault(jig_fake_store::Fault::Hold { commits: 1 });
+    world.store.fault(jig_core_world::Fault::Hold { commits: 1 });
     let answers = world.people_answers.len();
     world.send(root::Event::Core(core::Event::People(people::Event::Ask {
         reply_to: ReplyTo::new(Token::new(7002)),

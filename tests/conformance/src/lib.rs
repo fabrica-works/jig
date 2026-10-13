@@ -14,9 +14,10 @@ use jig_fake_workers::{Script, Worker};
 use jig_test_connector as connector;
 use jig_test_domain as root;
 use jig_test_system::System;
-use skein_lib::{Duration, Env, List, Queue, Time, Wall};
+use skein_lib::{Duration, Env, Queue, Time, Wall};
 use std::collections::BTreeMap;
-mod census;
+mod store;
+use jig_test_store::{StoreOut, Up};
 
 /// Tiny limits and seeded vocabulary, reconstructed on every cold start.
 #[derive(Clone, Copy, Debug)]
@@ -59,12 +60,13 @@ impl Config {
         if self.scenario == Some(Scenario::ShrinkingPool) {
             limits.core.fleet.slots = 3;
             limits.core.tasks.inbox_bytes = 512;
-            limits.core.tasks.inbox_messages = 8;
+            limits.core.tasks.inbox_messages = 5;
+            limits.core.people.inbox_recipients = 24;
             jig_core_world::world::edit_role(&mut config.core, |role| role.authority.budget.spend = 80);
         }
         if self.scenario == Some(Scenario::StandingTask) {
-            limits.core.tasks.tasks = 8;
-            limits.core.tasks.project_tasks = 8;
+            limits.core.tasks.tasks = 5;
+            limits.core.tasks.project_tasks = 5;
         }
         if self.scenario == Some(Scenario::OtherHand) {
             for kind in &mut config.first.kinds {
@@ -90,6 +92,7 @@ impl Config {
             assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
             config.core.authority = checked;
         }
+        jig_core_world::peers::journal(&mut limits);
         (config, limits)
     }
 }
@@ -117,7 +120,6 @@ pub struct Neighbours {
     pub peers: Peers,
     observer: Observer,
     restart_reads: BTreeMap<u16, core::RestartStep>,
-    restoring: Option<Restore>,
     account_ready: bool,
     pub assignments: Vec<(u64, u64)>,
     pub answers: u64,
@@ -135,15 +137,6 @@ pub struct Neighbours {
     pub saved_deadline: Option<Wall>,
     fault: negative::Fault,
     routes: Vec<jig_conformance::referee::Observed>,
-}
-
-#[derive(Clone, Debug)]
-struct Restore {
-    step: core::RestartStep,
-    first: root::Key,
-    last: root::Key,
-    rows: Vec<root::Record>,
-    remaining: std::collections::VecDeque<(root::Key, root::Key)>,
 }
 
 fn env(config: &Config, clock: Clock) -> Env<root::Limits> {
@@ -178,25 +171,12 @@ impl Neighbours {
             }
         }
     }
-
-    fn restored(step: core::RestartStep, rows: &[root::Record]) -> Vec<Input<root::Event, root::Record>> {
-        let mut inputs = Vec::new();
-        if step == core::RestartStep::LoadInbox {
-            inputs.extend(rows.iter().cloned().map(Input::Restore));
-            inputs.push(Input::Event(root::Event::RestartDone(step)));
-            return inputs;
-        }
-        inputs.extend(rows.iter().cloned().map(Input::Restore));
-        if step == core::RestartStep::LoadCore {
-            inputs.push(Input::Event(root::Event::Core(core::Event::People(people::Event::Restored))));
-        }
-        inputs.push(Input::Event(root::Event::RestartDone(step)));
-        inputs
-    }
 }
 
 impl Application for Testing {
     type Domain = root::Domain;
+    type Store = Store;
+    type Write = root::Write;
     type Config = Config;
     type Systems = [System; 2];
     type Peers = Neighbours;
@@ -205,6 +185,9 @@ impl Application for Testing {
     type Event = root::Event;
     type Delivery = Delivery;
 
+    fn store(config: &Config) -> Store {
+        Store::new(&config.limits)
+    }
     fn build(config: &Config) -> root::Domain {
         let (configuration, limits) = config.root();
         let mut domain = root::Domain::new(configuration, &limits);
@@ -297,7 +280,6 @@ impl Application for Testing {
             ),
             observer,
             restart_reads: BTreeMap::new(),
-            restoring: None,
             account_ready: false,
             assignments: Vec::new(),
             answers: 0,
@@ -336,19 +318,13 @@ impl Application for Testing {
         }
     }
 
-    fn start(_: &Config, store: &mut Store) -> Vec<root::Event> {
-        if store.rows.is_empty() {
-            let row =
-                root::Record::Core(core::Record::People(people::Stored::Roles { project: 1, holdings: Box::new([]) }));
-            store.rows.insert(row.key(), row);
-        }
+    fn start(_: &Config, _: &mut Store) -> Vec<root::Event> {
         vec![root::Event::RestartBegin]
     }
 
     fn cold(peers: &mut Neighbours, store: &Store, clock: Clock) {
         peers.observer.cold(clock.now, store);
         peers.peers.restart();
-        peers.restoring = None;
         peers.restart_reads.clear();
         peers.account_ready = false;
         peers.pending_writes.clear();
@@ -375,11 +351,7 @@ impl Application for Testing {
         }
     }
 
-    fn release(
-        domain: &mut root::Domain,
-        config: &Config,
-        clock: Clock,
-    ) -> Vec<Output<root::Key, root::Record, Delivery>> {
+    fn release(domain: &mut root::Domain, config: &Config, clock: Clock) -> Vec<Output<root::Write, Delivery>> {
         let mut queue = Queue::with_capacity(128);
         root::release(domain, &env(config, clock), &mut queue);
         let mut outputs = Vec::new();
@@ -390,7 +362,7 @@ impl Application for Testing {
                     while let Some(write) = writes.pop() {
                         rows.push(write);
                     }
-                    Output::Commit { number, writes: jig_core_world::store_writes(rows) }
+                    Output::Commit { number, writes: rows.into_boxed_slice() }
                 }
                 root::Request::Restart(core::RestartStep::LoadInbox)
                 | root::Request::Deliver(root::Delivery::Restart(core::RestartStep::LoadInbox)) => {
@@ -444,32 +416,21 @@ impl Application for Testing {
                         accounts::FromComponent::Closed,
                     ))))]
                 }
-                Delivery::Now(core::Now::StartPreparation { task, from, .. }) => {
-                    let rows: Vec<core::TurnRecord> = store
-                        .rows
-                        .values()
-                        .filter_map(|record| match record {
-                            root::Record::Core(core::Record::Core(core::CoreRecord::Turn(turn)))
-                                if turn.task == task
-                                    && from.is_some_and(|start| (turn.attempt, turn.turn) >= start) =>
-                            {
-                                Some(turn.clone())
-                            }
-                            root::Record::Core(_) | root::Record::Connector { .. } => None,
-                        })
-                        .collect();
-                    if let Some(start) = from
-                        && !rows.first().is_some_and(|row| (row.attempt, row.turn) == start && row.opens_window)
-                    {
-                        return vec![Input::Event(root::Event::Core(core::Event::TranscriptUnread { task }))];
-                    }
-                    vec![Input::Event(root::Event::TranscriptLoaded {
-                        task,
-                        rows: rows.into_boxed_slice(),
-                        done: true,
-                    })]
+                Delivery::Now(core::Now::StartPreparation { task, from: None, .. }) => {
+                    vec![Input::Event(root::Event::TranscriptLoaded { task, rows: Box::new([]), done: true })]
                 }
-                Delivery::Census(census) => peers.restart(store, core::RestartStep::LoadInbox, Some(&census)),
+                Delivery::Now(
+                    now @ (core::Now::StartPreparation { from: Some(_), .. }
+                    | core::Now::SeenChat { .. }
+                    | core::Now::HistoricalPersonTask { .. }
+                    | core::Now::HistoricalProposal { .. }
+                    | core::Now::HistoricalEscalation { .. }
+                    | core::Now::LoadEndedChat { .. }),
+                ) => {
+                    store.ask(StoreOut::Now(now));
+                    Vec::new()
+                }
+                Delivery::Census(census) => peers.restart(store, core::RestartStep::LoadInbox, Some(census)),
                 Delivery::Busy(event) => {
                     peers.busy_events.push(std::rc::Rc::new(*event));
                     Vec::new()
@@ -558,28 +519,12 @@ impl Application for Testing {
                 })]
             }
             root::Delivery::Core(core::Held::NotesLoad { owner, range }) => {
-                let mut records = List::with_capacity(jig_core_world::world::limits().core.notes.load_rows);
-                let mut more = false;
-                for row in store.rows.values() {
-                    let root::Record::Core(core::Record::Notes(record)) = row else { continue };
-                    let selected = match (&range, record) {
-                        (jig_domain_notes::Range::Entry { name }, jig_domain_notes::Record::Entry(entry)) => {
-                            *name == entry.name
-                        }
-                        (jig_domain_notes::Range::Lines { scope, after }, jig_domain_notes::Record::Line(line)) => {
-                            *scope == line.scope && after.is_none_or(|previous| line.name > previous)
-                        }
-                        _ => false,
-                    };
-                    if selected && records.push(record.clone()).is_err() {
-                        more = true;
-                    }
-                }
-                vec![Input::Event(root::Event::Core(core::Event::Notes(jig_domain_notes::Event::Loaded {
-                    owner,
-                    rows: jig_domain_notes::Rows { records },
-                    more,
-                })))]
+                store.ask(StoreOut::NotesLoad { owner, range });
+                Vec::new()
+            }
+            root::Delivery::Core(core::Held::ReadLoad { load, range }) => {
+                store.ask(StoreOut::ReadLoad { load, range });
+                Vec::new()
             }
             root::Delivery::Core(core::Held::CallAnswer { to, key, part }) => {
                 let answer = peers.peers.protocol.answer(to.into_token(), key, &part, true);
@@ -606,24 +551,13 @@ impl Application for Testing {
         ready: bool,
     ) -> Vec<Input<root::Event, root::Record>> {
         let mut events = Vec::new();
-        for (owner, page) in store.tick_pages() {
-            assert_eq!(owner, 1);
-            let mut restore = peers.restoring.take().expect("cold page requested");
-            if restore.step == core::RestartStep::LoadInbox {
-                restore.rows.extend(page.rows.into_iter().filter_map(|row| census::owner(store, &row)));
-            } else {
-                restore.rows.extend(page.rows);
-            }
-            if let Some(after) = page.next {
-                store.load(1, &restore.first, &restore.last, Some(&after), 2);
-                peers.restoring = Some(restore);
-            } else if let Some((first, last)) = restore.remaining.pop_front() {
-                store.load(1, &first, &last, None, 2);
-                restore.first = first;
-                restore.last = last;
-                peers.restoring = Some(restore);
-            } else {
-                events.extend(Neighbours::restored(restore.step, &restore.rows));
+        for answer in store.answers() {
+            match answer {
+                Up::Restore(row) => events.push(Input::Restore(row)),
+                Up::Root(event) => {
+                    events.push(Input::Event(event));
+                }
+                Up::Ask(_) => panic!("adapter follows its own page continuations"),
             }
         }
         if ready {

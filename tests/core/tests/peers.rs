@@ -201,7 +201,7 @@ fn a_person_stops_a_scripted_run_and_words_release_it_for_a_new_attempt() {
     acts(&mut world, 2, Box::new([Act::Request { key: [7; 16], ask: Ask::Stop { task: Task::Last } }]));
     assert_eq!(world.cancellations.len(), 1);
     let task = world.peers.as_ref().expect("peers").parties[2].last_task.expect("started task");
-    world.store.fault(jig_fake_store::Fault::Hold { commits: 1 });
+    world.store.fault(jig_core_world::Fault::Hold { commits: 1 });
     acts(
         &mut world,
         2,
@@ -277,7 +277,7 @@ fn a_worker_reconnects_and_resends_retained_turns_after_hello() {
     );
     acts(&mut world, 2, Box::new([Act::Request { key: [10; 16], ask: Ask::Chat { words: Box::from(&b"hello"[..]) } }]));
     // Hold the next turn's completion while the worker is still live.
-    world.store.fault(jig_fake_store::Fault::Hold { commits: 1 });
+    world.store.fault(jig_core_world::Fault::Hold { commits: 1 });
     world.advance(Duration::from_millis(100));
     let now = Time::from_nanos(world.wall_time().as_nanos());
     let reports = world.peers.as_mut().expect("peers").workers[0]

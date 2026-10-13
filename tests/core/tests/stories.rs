@@ -207,12 +207,12 @@ fn a_recurring_task_creates_one_batch_per_period_after_the_reset() {
     assert_eq!(world.assignments.len(), count);
 }
 
-#[test]
-fn a_policy_narrowed_while_a_proposal_waits_keeps_the_committed_entry_and_checks_the_live_run() {
+fn narrowed_policy_world() -> (World, u64, (u64, u64)) {
     let (configuration, mut limits) = fixture(126, true);
     limits.core.call_records = 8;
-    limits.journal.writes = 10_000;
-    limits.journal.held = 10_000;
+    limits.core.people.amendment_bytes = 256;
+    limits.core.people.inbox_recipients = 16;
+    jig_core_world::peers::journal(&mut limits);
     let mut world = World::configured(126, true, configuration, limits);
     world.call(1, 9200);
     world.observed(13);
@@ -238,6 +238,12 @@ fn a_policy_narrowed_while_a_proposal_waits_keeps_the_committed_entry_and_checks
             },
         },
     );
+    (world, proposal, run)
+}
+
+#[test]
+fn a_policy_narrowed_while_a_proposal_waits_keeps_the_committed_entry_and_checks_the_live_run() {
+    let (mut world, proposal, run) = narrowed_policy_world();
     assert!(
         world
             .people_answers
@@ -662,7 +668,7 @@ fn a_lost_writer_is_read_afresh_only_after_its_loss_is_committed() {
     let child = delegate(&mut world, parent, 1, spec);
     let run = running(&world, child);
     let reads = world.systems[0].reads().len();
-    world.store.fault(jig_fake_store::Fault::Hold { commits: 1 });
+    world.store.fault(jig_core_world::Fault::Hold { commits: 1 });
     world.send(root::Event::Core(core::Event::Fleet(jig_domain_fleet::Event::Lost { channel: Token::new(7) })));
     world.advance(skein_lib::Duration::from_secs(6));
     assert_eq!(world.systems[0].reads().len(), reads, "fresh reads wait for the loss commit's completion");
@@ -982,7 +988,7 @@ fn an_amendment_and_a_release_are_one_decision() {
     let hold = live_row(&world, task).revisions.hold;
     let revision = live_row(&world, task).revisions.spec;
     let answers = world.people_answers.len();
-    world.store.fault(jig_fake_store::Fault::Hold { commits: 1 });
+    world.store.fault(jig_core_world::Fault::Hold { commits: 1 });
     ask(
         &mut world,
         55,
@@ -1275,7 +1281,7 @@ fn a_widening_amendment_with_release_is_proposed_and_released_on_acceptance(worl
         Some(&people::Reply::Outcome(people::Outcome::PolicyChanged { project: 1 }))
     );
     let answers = world.people_answers.len();
-    world.store.fault(jig_fake_store::Fault::Hold { commits: 1 });
+    world.store.fault(jig_core_world::Fault::Hold { commits: 1 });
     ask(
         world,
         82,
@@ -1427,7 +1433,7 @@ fn approval_world(seed: u64) -> (World, u64, u64, u64) {
 fn a_person_approves_the_exact_state_and_its_delegate_result_waits_for_commit() {
     let (mut world, parent, task, revision) = approval_world(451);
     world.people_answers.clear();
-    world.store.fault(jig_fake_store::Fault::Hold { commits: 1 });
+    world.store.fault(jig_core_world::Fault::Hold { commits: 1 });
     ask(
         &mut world,
         82,
@@ -1610,7 +1616,7 @@ fn an_approval_reaches_its_asking_procedure_connector_as_the_whole_durable_input
     ask(&mut world, 81, people::Ask::TakePerson { project: 1, task });
     let revision = live_row(&world, task).revisions.person;
     let before = world.procedure_inputs.len();
-    world.store.fault(jig_fake_store::Fault::Hold { commits: 1 });
+    world.store.fault(jig_core_world::Fault::Hold { commits: 1 });
     ask(
         &mut world,
         82,
@@ -1707,7 +1713,7 @@ fn a_verdicts_machine_fields_reach_its_requester_whole_after_commit_and_restart(
     let fields: Box<[tasks::ResultField]> =
         Box::new([tasks::ResultField { name: b"state".as_slice().into(), value: b"\x00\xff".as_slice().into() }]);
     let before = world.inbound.len();
-    world.store.fault(jig_fake_store::Fault::Hold { commits: 1 });
+    world.store.fault(jig_core_world::Fault::Hold { commits: 1 });
     world.send(root::Event::Answer {
         read: None,
         refused: Box::new([]),
@@ -1776,7 +1782,7 @@ fn a_procedure_delegate_identity_is_committed_with_its_child_by_the_actual_conne
     let mut child = member(&world, tasks::Executor::Person(tasks::PersonAddress::Role(0)), b"child");
     child.authority.budget.spend = 5;
     child.authority.delegation = tasks::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 };
-    world.store.fault(jig_fake_store::Fault::Hold { commits: 1 });
+    world.store.fault(jig_core_world::Fault::Hold { commits: 1 });
     world.send(root::Event::Core(core::Event::ProcedureStep {
         task: parent,
         step,

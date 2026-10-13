@@ -46,8 +46,8 @@ pub struct OpsApplication;
 /// Project only actual durable core rows into the reusable jig observer/store face.
 /// Connector rows remain with Ops's own conformance referee.
 #[must_use]
-pub fn core_store(store: &Rows) -> jig_core_world::Store {
-    let mut values = jig_core_world::Store::default();
+pub fn core_store(store: &Rows) -> super::reads::Store {
+    let mut values = super::reads::Store::default();
     for row in store.rows.values() {
         match row {
             root::Record::Core(record) => {
@@ -61,7 +61,7 @@ pub fn core_store(store: &Rows) -> jig_core_world::Store {
     values
 }
 
-fn task_row(store: &jig_core_world::Store, number: u64) -> Option<&jig_domain_tasks::TaskRecord> {
+fn task_row(store: &super::reads::Store, number: u64) -> Option<&jig_domain_tasks::TaskRecord> {
     store.rows.values().find_map(|record| match record {
         jig_test_domain::Record::Core(core::Record::Tasks(
             jig_domain_tasks::Stored::Live(task) | jig_domain_tasks::Stored::Ended(task),
@@ -75,7 +75,7 @@ fn task_row(store: &jig_core_world::Store, number: u64) -> Option<&jig_domain_ta
 fn read_page(store: &Rows, range: &core::reads::Range, tree_tasks: u32) -> core::reads::Loaded {
     let store = core_store(store);
     let core::reads::Scope::Proposal { proposer: core::documents::Proposer::Task(task), proposal } = range.scope else {
-        return jig_core_world::reads::page(&store, range, tree_tasks);
+        return super::reads::page(&store, range, tree_tasks);
     };
     let mut ordered = std::collections::BTreeMap::new();
     for record in store.rows.values() {
@@ -144,6 +144,8 @@ fn read_page(store: &Rows, range: &core::reads::Range, tree_tasks: u32) -> core:
 
 impl Application for OpsApplication {
     type Domain = root::Domain;
+    type Store = jig_fake_store::Store<root::Key, root::Record>;
+    type Write = jig_fake_store::Write<root::Key, root::Record>;
     type Config = Config;
     type Systems = Systems;
     type Peers = Peers;
@@ -152,6 +154,9 @@ impl Application for OpsApplication {
     type Event = root::Event;
     type Delivery = Delivery;
 
+    fn store(_: &Config) -> Self::Store {
+        jig_fake_store::Store::new()
+    }
     fn build(config: &Config) -> root::Domain {
         Ops::build(config)
     }
@@ -208,7 +213,7 @@ impl Application for OpsApplication {
         domain: &mut root::Domain,
         config: &Config,
         clock: Clock,
-    ) -> Vec<Output<root::Key, root::Record, Delivery>> {
+    ) -> Vec<Output<jig_fake_store::Write<root::Key, root::Record>, Delivery>> {
         Ops::release(domain, config, clock)
     }
     fn inbound(peers: &mut Peers, store: &Rows, clock: Clock, event: &mut root::Event) {

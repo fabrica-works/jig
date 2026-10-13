@@ -90,6 +90,7 @@ fn configured_with_bounds(
     );
     assert_eq!(out.pop(), Some(jig_domain_authority::PolicyFact::Added { project: 1 }));
     configure(&mut configuration, &owner);
+    jig_core_world::peers::journal(&mut owner);
     let roles = [PartyRole::Owner, PartyRole::Maintainer, PartyRole::Member, PartyRole::Observer];
     let parties = roles
         .iter()

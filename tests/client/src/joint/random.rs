@@ -127,7 +127,7 @@ fn pending(
     let applied = world.front().session.driver.world.store.applied;
     let submitted = applied + 1;
     if engine == EngineFault::Failed {
-        world.front().session.driver.world.store.fail_at = Some(submitted);
+        world.front().session.driver.world.store.fault(jig_core_world::Fault::Fail { commit: submitted });
     } else {
         world.front().session.driver.world.cut = Some(jig_core_world::effects::Cut::Submitted(submitted));
     }

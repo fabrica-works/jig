@@ -3,9 +3,54 @@
 //! checks observations after every iteration (`domain/testing.md`, 5–6).
 use crate::referee::{Observed, Policy, Recovery, Referee, Violation};
 use crate::trace::Trace;
-use jig_fake_store::{Store, Write};
 use std::collections::VecDeque;
 use std::fmt::Debug;
+
+/// A durable store driven by the application-independent loop.
+pub trait Durable: Sized {
+    type Write: Debug;
+    fn submit(&mut self, number: u64, writes: Box<[Self::Write]>, delay: u32);
+    /// # Errors
+    /// Returns the first failed numbered commit.
+    fn tick(&mut self, hold: bool) -> Result<Option<u64>, u64>;
+    fn release_held(&mut self) -> Option<u64>;
+    fn crash(&mut self, seed: u64);
+    #[must_use]
+    fn fork(&self) -> Self;
+    fn applied(&self) -> u64;
+    /// No submitted commit or page remains in flight.
+    fn idle(&self) -> bool;
+    /// A durable answer remains held from the root.
+    fn holding(&self) -> bool;
+}
+
+impl<K: Ord + Clone + Debug, R: Clone + Debug> Durable for jig_fake_store::Store<K, R> {
+    type Write = jig_fake_store::Write<K, R>;
+    fn submit(&mut self, number: u64, writes: Box<[Self::Write]>, delay: u32) {
+        Self::submit(self, number, writes, delay);
+    }
+    fn tick(&mut self, hold: bool) -> Result<Option<u64>, u64> {
+        Self::tick(self, hold)
+    }
+    fn release_held(&mut self) -> Option<u64> {
+        Self::release_held(self)
+    }
+    fn crash(&mut self, _: u64) {
+        Self::crash(self);
+    }
+    fn fork(&self) -> Self {
+        self.clone()
+    }
+    fn applied(&self) -> u64 {
+        self.applied
+    }
+    fn idle(&self) -> bool {
+        self.pending.is_empty() && !self.loading()
+    }
+    fn holding(&self) -> bool {
+        !self.held.is_empty()
+    }
+}
 
 /// Simulated time supplied to every application and fake.
 #[derive(Clone, Copy, Debug)]
@@ -28,9 +73,9 @@ pub enum Input<E, R> {
 
 /// What the application's journal released, without interpreting its records.
 #[derive(Debug)]
-pub enum Output<K, R, D> {
+pub enum Output<W, D> {
     /// One whole decision submitted to the store.
-    Commit { number: u64, writes: Box<[Write<K, R>]> },
+    Commit { number: u64, writes: Box<[W]> },
     /// A released peer output or a core-scripted load.
     Deliver(D),
     /// The failed store stopped the engine.
@@ -43,6 +88,9 @@ pub enum Output<K, R, D> {
 pub trait Application {
     /// The concrete application engine root.
     type Domain;
+    /// Concrete durable storage and the writes it accepts.
+    type Store: Durable<Write = Self::Write>;
+    type Write: Debug;
     /// Scenario configuration retained for cold starts.
     type Config;
     /// Independent system fakes.
@@ -60,6 +108,8 @@ pub trait Application {
 
     /// Build the engine from its original scenario configuration.
     fn build(config: &Self::Config) -> Self::Domain;
+    /// Construct empty storage using the scenario's final limits.
+    fn store(config: &Self::Config) -> Self::Store;
     /// Construct independent system fakes from the scenario seed.
     fn systems(config: &Self::Config, seed: u64) -> Self::Systems;
     /// Construct scripted hosts, parties and observation translations.
@@ -71,9 +121,9 @@ pub trait Application {
     /// Declare each configured effect kind’s recovery class.
     fn recovery(config: &Self::Config, connector: u16, kind: u16) -> Recovery;
     /// Prepare the initial durable fixture and begin the cold-load script.
-    fn start(config: &Self::Config, store: &mut Store<Self::Key, Self::Record>) -> Vec<Self::Event>;
+    fn start(config: &Self::Config, store: &mut Self::Store) -> Vec<Self::Event>;
     /// Reconnect retained peers and observe the last durable store on a crash.
-    fn cold(peers: &mut Self::Peers, store: &Store<Self::Key, Self::Record>, clock: Clock);
+    fn cold(peers: &mut Self::Peers, store: &Self::Store, clock: Clock);
     /// Translate the application’s fleet, task and connector timers.
     fn timers(config: &Self::Config) -> Vec<Self::Event>;
     /// Feed one event or store row to the concrete engine.
@@ -83,14 +133,14 @@ pub trait Application {
         domain: &mut Self::Domain,
         config: &Self::Config,
         clock: Clock,
-    ) -> Vec<Output<Self::Key, Self::Record, Self::Delivery>>;
+    ) -> Vec<Output<Self::Write, Self::Delivery>>;
     /// Record a peer’s request before the root receives it.
-    fn inbound(peers: &mut Self::Peers, store: &Store<Self::Key, Self::Record>, clock: Clock, input: &mut Self::Event);
+    fn inbound(peers: &mut Self::Peers, store: &Self::Store, clock: Clock, input: &mut Self::Event);
     /// Translate a released output to the peer that owns it.
     fn deliver(
         peers: &mut Self::Peers,
         systems: &mut Self::Systems,
-        store: &mut Store<Self::Key, Self::Record>,
+        store: &mut Self::Store,
         clock: Clock,
         delivery: Self::Delivery,
     ) -> Vec<Input<Self::Event, Self::Record>>;
@@ -98,19 +148,14 @@ pub trait Application {
     fn poll(
         peers: &mut Self::Peers,
         systems: &mut Self::Systems,
-        store: &mut Store<Self::Key, Self::Record>,
+        store: &mut Self::Store,
         clock: Clock,
         ready: bool,
     ) -> Vec<Input<Self::Event, Self::Record>>;
-    /// Observe the concrete transaction the fake store has just received.
-    fn submitted(_peers: &mut Self::Peers, _store: &Store<Self::Key, Self::Record>, _clock: Clock) {}
+    /// Observe the concrete transaction the store has just received.
+    fn submitted(_peers: &mut Self::Peers, _store: &Self::Store, _clock: Clock) {}
     /// Map new system, host and durable-store evidence in arrival order.
-    fn observed(
-        peers: &mut Self::Peers,
-        systems: &Self::Systems,
-        store: &Store<Self::Key, Self::Record>,
-        clock: Clock,
-    ) -> Vec<Observed>;
+    fn observed(peers: &mut Self::Peers, systems: &Self::Systems, store: &Self::Store, clock: Clock) -> Vec<Observed>;
     /// Report whether the root’s restart script has opened admission.
     fn ready(domain: &Self::Domain) -> bool;
     /// Report whether the root has immediate work remaining.
@@ -152,7 +197,7 @@ pub struct Harness<A: Application> {
     pub domain: A::Domain,
     pub systems: A::Systems,
     pub peers: A::Peers,
-    pub store: Store<A::Key, A::Record>,
+    pub store: A::Store,
     pub referee: Referee,
     policy_generation: u64,
     pub trace: Trace,
@@ -161,7 +206,7 @@ pub struct Harness<A: Application> {
     config: A::Config,
     seed: u64,
     events: VecDeque<Input<A::Event, A::Record>>,
-    outputs: Vec<Output<A::Key, A::Record, A::Delivery>>,
+    outputs: Vec<Output<A::Write, A::Delivery>>,
     meter: skein_world::domain::heap::Meter,
     clock: Clock,
     iterations: u64,
@@ -187,7 +232,7 @@ impl<A: Application> Harness<A> {
     fn start(config: A::Config, seed: u64, trace: Trace) -> Self {
         let peers = A::peers(&config, seed);
         let systems = A::systems(&config, seed);
-        let mut store = Store::new();
+        let mut store = A::store(&config);
         let events = A::start(&config, &mut store).into_iter().map(Input::Event).collect();
         let policy = A::policy(&peers).clone();
         let policy_generation = A::policy_generation(&peers);
@@ -250,9 +295,9 @@ impl<A: Application> Harness<A> {
     /// # Errors
     /// Returns a receipt missing after restart or another broken promise.
     pub fn crash(&mut self) -> Result<(), Violation> {
-        self.crashes.push(self.store.applied);
+        self.crashes.push(self.store.applied());
         self.referee.observe(self.clock.now, Observed::Restart)?;
-        self.store.crash();
+        self.store.crash(self.seed);
         self.events.clear();
         self.outputs.clear();
         A::cold(&mut self.peers, &self.store, self.clock);
@@ -318,23 +363,23 @@ impl<A: Application> Harness<A> {
             }
         }
         if !self.stopped {
-            let previous = self.store.applied;
+            let previous = self.store.applied();
             match self.store.tick(false) {
                 Ok(Some(number)) => self.events.push_front(Input::Committed(number)),
                 Ok(None) => {}
                 Err(number) => self.events.push_front(Input::Failed(number)),
             }
             self.inspect()?;
-            if self.store.applied != previous {
+            if self.store.applied() != previous {
                 if let Some(mut hook) = self.commit_hook.take() {
                     hook(self);
                     self.commit_hook = Some(hook);
                 }
                 let should_cut = match self.cut {
                     Cut::None => false,
-                    Cut::AfterCommit(number) => number == self.store.applied,
+                    Cut::AfterCommit(number) => number == self.store.applied(),
                     Cut::Random { seed } => {
-                        let mut random = skein_lib::Rng::new(seed ^ self.store.applied);
+                        let mut random = skein_lib::Rng::new(seed ^ self.store.applied());
                         random.below(4) == 0
                     }
                 };
@@ -364,9 +409,8 @@ impl<A: Application> Harness<A> {
         Ok(!self.stopped
             && !(empty
                 && self.events.is_empty()
-                && self.store.pending.is_empty()
-                && !self.store.loading()
-                && (A::quiescent(&self.domain) || !self.store.held.is_empty())))
+                && self.store.idle()
+                && (A::quiescent(&self.domain) || self.store.holding())))
     }
 
     fn inspect(&mut self) -> Result<(), Violation> {
@@ -383,7 +427,7 @@ impl<A: Application> Harness<A> {
     fn inspect_outside(
         peers: &mut A::Peers,
         systems: &A::Systems,
-        store: &Store<A::Key, A::Record>,
+        store: &A::Store,
         referee: &mut Referee,
         policy_generation: &mut u64,
         clock: Clock,
@@ -451,7 +495,7 @@ impl<A: Application> Harness<A> {
     #[must_use]
     pub fn outcome(&self) -> Outcome {
         Outcome {
-            commits: self.store.applied,
+            commits: self.store.applied(),
             iterations: self.iterations,
             stopped: self.stopped,
             crashes: self.crashes.clone(),
@@ -466,7 +510,7 @@ pub struct ColdSnapshot<A: Application> {
     seed: u64,
     systems: A::Systems,
     peers: A::Peers,
-    store: Store<A::Key, A::Record>,
+    store: A::Store,
     referee: Referee,
     policy_generation: u64,
     trace: Trace,
@@ -491,7 +535,7 @@ where
             seed: self.seed,
             systems: self.systems.clone(),
             peers: self.peers.clone(),
-            store: self.store.clone(),
+            store: self.store.fork(),
             referee: self.referee.clone(),
             policy_generation: self.policy_generation,
             trace: self.trace.clone(),
@@ -510,9 +554,9 @@ where
     pub fn from_snapshot(mut snapshot: ColdSnapshot<A>) -> Result<Self, Violation> {
         let meter = skein_world::domain::heap::Meter::new();
         // Exactly crash's outside sequence, before constructing its one new root.
-        snapshot.crashes.push(snapshot.store.applied);
+        snapshot.crashes.push(snapshot.store.applied());
         snapshot.referee.observe(snapshot.clock.now, Observed::Restart)?;
-        snapshot.store.crash();
+        snapshot.store.crash(snapshot.seed);
         A::cold(&mut snapshot.peers, &snapshot.store, snapshot.clock);
         Self::inspect_outside(
             &mut snapshot.peers,

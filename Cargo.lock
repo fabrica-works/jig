@@ -186,11 +186,11 @@ dependencies = [
  "jig-domain-people",
  "jig-domain-tasks",
  "jig-fake-parties",
- "jig-fake-store",
  "jig-fake-workers",
  "jig-test-connector",
  "jig-test-connector-world",
  "jig-test-domain",
+ "jig-test-store",
  "jig-test-system",
  "sha2",
  "skein-lib",
@@ -212,7 +212,6 @@ dependencies = [
  "jig-domain-tasks",
  "jig-domain-views",
  "jig-fake-parties",
- "jig-fake-store",
  "jig-fake-workers",
  "jig-protocol-charter",
  "jig-protocol-tools",
@@ -825,6 +824,7 @@ dependencies = [
 name = "jig-test-store-files"
 version = "0.0.0"
 dependencies = [
+ "jig-conformance",
  "jig-domain-core",
  "jig-protocol-store",
  "jig-test-connector",

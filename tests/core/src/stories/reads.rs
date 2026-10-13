@@ -141,6 +141,12 @@ pub fn scoped_description_search_pages_durable_notes_after_restart() {
         (4, notes::Scope::Goal { project: 1, goal: 98 }, b"warm another goal".as_slice()),
         (5, scope.clone(), b"warm cache".as_slice()),
     ] {
+        let line = root::Record::Core(core::Record::Notes(notes::Record::Line(notes::Line {
+            scope: scope.clone(),
+            name,
+            description: description.into(),
+            revision: 2,
+        })));
         let row = root::Record::Core(core::Record::Notes(notes::Record::Entry(notes::Entry {
             name,
             scope,
@@ -151,7 +157,7 @@ pub fn scoped_description_search_pages_durable_notes_after_restart() {
             revision: 2,
             changed: Wall::from_nanos(name),
         })));
-        world.store.rows.insert(row.key(), row);
+        world.seed(Box::new([row, line]));
     }
     for restart in [false, true] {
         if restart {
@@ -275,7 +281,7 @@ pub fn conversation_owner_replay_keeps_every_retained_page_after_durability_and_
     }
     ended.reverse();
     let prerequisite = world.store.applied + 1;
-    world.store.fault(jig_fake_store::Fault::Hold { commits: 1 });
+    world.store.fault(crate::Fault::Hold { commits: 1 });
     world.cut = Some(crate::effects::Cut::Submitted(prerequisite));
     request(&mut world, 50, people::Ask::StartChat { project: 1, words: b"current live chat".as_slice().into() });
     assert_eq!(world.reached_cut, Some(crate::effects::Cut::Submitted(prerequisite)));

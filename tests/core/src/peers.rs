@@ -552,7 +552,9 @@ pub fn fixture(seed: u64, engine_slots: u32) -> (root::Config, root::Limits) {
     limits.core.people.sign_ins = 4;
     limits.core.people.holdings = 4;
     limits.core.people.inbox_entries = 4;
+    limits.core.people.inbox_recipients = 16;
     limits.core.people.requests = 32;
+    limits.core.people.amendment_bytes = 256;
     limits.core.authority.roles = 4;
     limits.core.authority.executors = 3;
     limits.core.fleet.workers = 3;
@@ -563,8 +565,7 @@ pub fn fixture(seed: u64, engine_slots: u32) -> (root::Config, root::Limits) {
     limits.core.brief.briefs = 5;
     limits.core.views.runs = 5;
     limits.core.call_records = 16;
-    limits.journal.writes = 10_000;
-    limits.journal.held = 10_000;
+    journal(&mut limits);
     configuration.core.settings.charters[0].hosts = fleet::Kinds::Both;
     let kinds = Box::new([policy::Executor::Charter(1), policy::Executor::Procedure(1), policy::Executor::Role(1)]);
     let mut rules = configuration.core.authority.rules().clone();
@@ -748,3 +749,11 @@ fn party_ending_party(value: people::Party) -> parties::EndingParty {
 
 /// Independent consumers of contract documents, alongside the scripted peers.
 pub use crate::watches::Parties as WatchParties;
+
+/// Derive the admitted journal room after a peer fixture's final limits.
+pub fn journal(limits: &mut root::Limits) {
+    let room = core::room_max(&limits.core).expect("peer root room");
+    let connectors = jig_test_connector::MAX_OUT * 2;
+    limits.journal.writes = (room.writes + connectors).max(2000);
+    limits.journal.held = ((room.held + connectors) * limits.journal.commits).max(2000);
+}

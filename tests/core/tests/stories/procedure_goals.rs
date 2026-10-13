@@ -77,7 +77,7 @@ fn a_procedure_goal_commits_before_delivery_and_replays_its_exact_owner_facts() 
     world.hold_procedures = true;
     let assignments = world.assignments.len();
     let replies = world.people_answers.len();
-    world.store.fault(jig_fake_store::Fault::Hold { commits: 1 });
+    world.store.fault(jig_core_world::Fault::Hold { commits: 1 });
     ask(&mut world, 90, goal(100));
     assert_eq!(world.people_answers.len(), replies);
     assert!(world.procedure_inputs.is_empty(), "no procedure receives an uncommitted goal");

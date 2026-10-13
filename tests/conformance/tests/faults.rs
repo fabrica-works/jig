@@ -1,5 +1,5 @@
 use jig_conformance_world::actions;
-use jig_fake_store::Fault as StoreFault;
+use jig_core_world::Fault as StoreFault;
 use jig_fake_workers::Fault;
 use skein_lib::Duration;
 #[global_allocator]

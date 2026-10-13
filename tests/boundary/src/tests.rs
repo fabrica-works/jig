@@ -305,6 +305,7 @@ fn the_store_files_kit_uses_only_the_store_and_foundation() {
         .expect("store files manifest");
     assert!(kit.dependencies.iter().all(|name| {
         [
+            "jig-conformance",
             "jig-test-store",
             "jig-test-domain",
             "jig-test-connector",

@@ -4,9 +4,9 @@
 use crate::{Config, Delivery, Testing, env};
 use jig_conformance::{Application, Clock, Input, Output};
 use jig_domain_core as core;
-use jig_fake_store::Write;
 use jig_test_connector as connector;
 use jig_test_domain as root;
+use jig_test_domain::Write;
 use skein_lib::{Token, Wall};
 
 /// One deliberately broken root or connector, selected before construction.
@@ -36,7 +36,7 @@ pub enum Fault {
     DifferentDecision,
 }
 
-type EngineOutput = Output<root::Key, root::Record, Delivery>;
+type EngineOutput = Output<root::Write, Delivery>;
 
 pub(crate) fn input(
     domain: &mut root::Domain,
@@ -135,18 +135,12 @@ pub(crate) fn released(
             continue;
         };
         let effect = writes.iter().any(|write| {
-            matches!(
-                write,
-                Write::Save { row: root::Record::Connector { record: connector::Record::Outbox(_), .. }, .. }
-            )
+            matches!(write, Write::Save(root::Record::Connector { record: connector::Record::Outbox(_), .. }))
         });
         let signin = writes.iter().any(|write| {
             matches!(
                 write,
-                Write::Save {
-                    row: root::Record::Core(core::Record::People(jig_domain_people::Stored::SignIn { .. })),
-                    ..
-                }
+                Write::Save(root::Record::Core(core::Record::People(jig_domain_people::Stored::SignIn { .. })))
             )
         });
         match config.fault {
@@ -158,10 +152,7 @@ pub(crate) fn released(
             }
             Fault::SplitDecision if effect => {
                 let (outbox, rest): (Vec<_>, Vec<_>) = writes.into_vec().into_iter().partition(|write| {
-                    matches!(
-                        write,
-                        Write::Save { row: root::Record::Connector { record: connector::Record::Outbox(_), .. }, .. }
-                    )
+                    matches!(write, Write::Save(root::Record::Connector { record: connector::Record::Outbox(_), .. }))
                 });
                 corrupt.push(Output::Commit { number, writes: outbox.into_boxed_slice() });
                 corrupt.push(Output::Commit { number: number + 1, writes: rest.into_boxed_slice() });
@@ -170,9 +161,7 @@ pub(crate) fn released(
                 let writes = writes
                     .into_vec()
                     .into_iter()
-                    .filter(|write| {
-                        !matches!(write, Write::Save { row: root::Record::Core(core::Record::Tasks(_)), .. })
-                    })
+                    .filter(|write| !matches!(write, Write::Save(root::Record::Core(core::Record::Tasks(_)))))
                     .collect();
                 corrupt.push(Output::Commit { number, writes });
             }

@@ -44,6 +44,7 @@ pub struct Store {
     holding: bool,
     fail_at: Option<u64>,
     page_delay: u32,
+    pages_paused: bool,
     failed: bool,
 }
 impl fmt::Debug for Store {
@@ -86,10 +87,15 @@ impl Store {
             holding: false,
             fail_at: None,
             page_delay: 0,
+            pages_paused: false,
             failed: false,
         };
         store.open();
         store
+    }
+    /// Make a real transcript read unread without altering its typed mirror.
+    pub fn unread_transcript(&mut self, task: u64) {
+        self.files.unread_transcript(task);
     }
     pub fn fault(&mut self, fault: Fault) {
         match fault {
@@ -279,7 +285,9 @@ impl Store {
                 }
             }
             Event::Failed { .. } | Event::OpenRefused { .. } => self.failed = true,
-            event @ (Event::Restored { .. } | Event::Loaded { .. } | Event::Read { .. }) if self.page_delay != 0 => {
+            event @ (Event::Restored { .. } | Event::Loaded { .. } | Event::Read { .. })
+                if self.page_delay != 0 || self.pages_paused =>
+            {
                 self.delayed.push_back(Delayed { event, delay: self.page_delay });
             }
             event @ Event::Corrupt { .. } => {
@@ -308,7 +316,14 @@ impl Store {
             }
         }
     }
+    /// Suspend captured pages without losing their original store flights.
+    pub fn pause_pages(&mut self, paused: bool) {
+        self.pages_paused = paused;
+    }
     fn tick_pages(&mut self) {
+        if self.pages_paused {
+            return;
+        }
         let mut ready = Queue::with_capacity(u32::try_from(self.delayed.len()).expect("bounded flight table"));
         let count = self.delayed.len();
         for _ in 0..count {

@@ -539,18 +539,17 @@ impl Observer {
         }
     }
 
-    /// Observe the application records the fake store has just received.
+    /// Observe the application records the store has just received.
     pub fn submitted(&mut self, now: u64, store: &Store) {
         if let Some(pending) = store.pending.back() {
             let mut tasks = Vec::new();
             for write in &pending.writes {
-                if let jig_fake_store::Write::Erase(root::Key::Core(core::Key::Tasks(tasks::Key::Ended(task)))) = write
-                {
+                if let root::Write::Erase(root::Key::Core(core::Key::Tasks(tasks::Key::Ended(task)))) = write {
                     for key in store.rows.keys() {
                         if matches!(key, root::Key::Core(core::Key::People(people::Key::ReadChat { task: chat, .. })) if chat == task)
                         {
                             assert!(
-                                pending.writes.contains(&jig_fake_store::Write::Erase(key.clone())),
+                                pending.writes.contains(&root::Write::Erase(key.clone())),
                                 "read marker erases with its owner"
                             );
                         }
@@ -1036,7 +1035,7 @@ mod activity_tests {
         for erased in [false, true] {
             let configuration = crate::effects::fixture(507, false).0;
             let mut observer = Observer::new(&configuration);
-            let mut store = Store::new();
+            let mut store = Store::new(&crate::world::limits());
             let row = root::Record::Core(core::Record::Tasks(tasks::Stored::Activity(tasks::ActivityLine {
                 task: 1,
                 position: 1,

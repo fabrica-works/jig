@@ -1,7 +1,7 @@
+use jig_core_world::Fault;
 use jig_core_world::effects::World;
 use jig_domain_core as core;
 use jig_domain_tasks as tasks;
-use jig_fake_store::Fault;
 use jig_test_domain as root;
 use skein_lib::{ReplyTo, Token};
 
@@ -65,46 +65,7 @@ fn a_crash_before_a_turn_is_durable_loses_only_its_uncommitted_turn() {
     let task = assignment.task;
     let attempt = assignment.attempt;
     world.store_delay = 500;
-    // One iteration is driven directly so the crash precedes storage application.
-    let env = skein_lib::Env {
-        now: skein_lib::Time::from_nanos(world.wall_time().as_nanos()),
-        wall: skein_lib::Wall::from_nanos(world.wall_time().as_nanos()),
-        limits: jig_core_world::world::limits(),
-    };
-    root::step(
-        &mut world.domain,
-        &env,
-        root::Event::Turn {
-            opens_window: false,
-            refused: Box::new([]),
-            channel: Token::new(7),
-            task,
-            attempt,
-            turn: 1,
-            cumulative: 3,
-            read: None,
-            transcript: b"not durable".as_slice().into(),
-        },
-    );
-    let mut out = skein_lib::Queue::with_capacity(128);
-    root::release(&mut world.domain, &env, &mut out);
-    while let Some(request) = out.pop() {
-        match request {
-            root::Request::Commit { number, mut writes } => {
-                let mut rows = Vec::new();
-                while let Some(row) = writes.pop() {
-                    rows.push(row);
-                }
-                world.store.submit(number, jig_core_world::store_writes(rows), 500);
-            }
-            other @ (root::Request::Restart(_)
-            | root::Request::Deliver(_)
-            | root::Request::ReadResult { .. }
-            | root::Request::Now(_)
-            | root::Request::Busy { .. }
-            | root::Request::Stop) => panic!("nothing leaves before the turn commit: {other:?}"),
-        }
-    }
+    submit_delayed_turn(&mut world, task, attempt);
     assert!(!world.store.pending.is_empty());
     world.store_delay = 0;
     world.restart(124, false);
@@ -243,13 +204,7 @@ fn a_running_chat_goes_on_above_the_fill_mark() {
 fn a_fill_below_the_mark_admits_a_chat_again() {
     let mut world = filled_chat(131);
     world.fill = jig_core_world::world::limits().core.fill_mark - 1;
-    world.end(
-        tasks::End::Finished {
-            result: tasks::TaskResult::Report { words: b"finished chat".as_slice().into() },
-            cancel_delegates: false,
-        },
-        1,
-    );
+    finish_chat(&mut world, 1, b"finished chat");
     start_chat(&mut world, 81);
     assert!(
         matches!(
@@ -259,4 +214,108 @@ fn a_fill_below_the_mark_admits_a_chat_again() {
         "{:?}",
         world.people_answers.last()
     );
+}
+
+fn finish_chat(world: &mut World, cumulative: u64, words: &[u8]) {
+    world.end(
+        tasks::End::Finished { result: tasks::TaskResult::Report { words: words.into() }, cancel_delegates: false },
+        cumulative,
+    );
+}
+#[test]
+fn a_seen_chat_is_read_back_through_the_store_after_restart() {
+    let mut world = World::new(127, false);
+    let task = world.assigned.as_ref().expect("the world's chat").task;
+    world.turn(1, 3, None, b"the chat's reply");
+    finish_chat(&mut world, 3, b"done");
+    world.restart(127, false);
+    let seen = jig_domain_people::Seen::Chat { task, through: 1 };
+    jig_core_world::stories::reads::request(&mut world, 62, jig_domain_people::Ask::MarkSeen { seen });
+    assert_eq!(
+        world.people_answers.last(),
+        Some(&jig_domain_people::Reply::Outcome(jig_domain_people::Outcome::MarkedSeen { seen }))
+    );
+}
+#[test]
+fn a_historical_escalation_is_read_through_the_store() {
+    let mut world = World::new(132, false);
+    let task = world.assigned.as_ref().expect("the world's chat").task;
+    jig_core_world::stories::reads::request(&mut world, 63, jig_domain_people::Ask::Stop { project: 1, task });
+    world.end(tasks::End::Parked, 0);
+    let root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row))) =
+        &world.store.rows[&root::Key::Core(core::Key::Tasks(tasks::Key::Live(task)))]
+    else {
+        panic!("held chat");
+    };
+    let revision = row.revisions.hold;
+    release_escalation(&mut world, 64, task, revision);
+    let answer = world.people_answers.last().copied();
+    assert!(matches!(
+        answer,
+        Some(jig_domain_people::Reply::Outcome(jig_domain_people::Outcome::EscalationDecided { .. }))
+    ));
+    world.restart(132, false);
+    world.enable_tracing();
+    release_escalation(&mut world, 65, task, revision);
+    assert!(
+        world.trace.iter().any(|line| line.starts_with("output Now(HistoricalEscalation")),
+        "historical store lookup"
+    );
+    assert_eq!(world.people_answers.last().copied(), answer);
+}
+
+fn release_escalation(world: &mut World, key: u8, task: u64, revision: u64) {
+    jig_core_world::stories::reads::request(
+        world,
+        key,
+        jig_domain_people::Ask::DecideEscalation {
+            project: 1,
+            task,
+            revision,
+            decision: jig_domain_people::EscalationDecision::Release,
+        },
+    );
+}
+
+fn submit_delayed_turn(world: &mut World, task: u64, attempt: u64) {
+    // One iteration is driven directly so the crash precedes storage application.
+    let env = skein_lib::Env {
+        now: skein_lib::Time::from_nanos(world.wall_time().as_nanos()),
+        wall: skein_lib::Wall::from_nanos(world.wall_time().as_nanos()),
+        limits: jig_core_world::world::limits(),
+    };
+    root::step(
+        &mut world.domain,
+        &env,
+        root::Event::Turn {
+            opens_window: false,
+            refused: Box::new([]),
+            channel: Token::new(7),
+            task,
+            attempt,
+            turn: 1,
+            cumulative: 3,
+            read: None,
+            transcript: b"not durable".as_slice().into(),
+        },
+    );
+    let mut out = skein_lib::Queue::with_capacity(128);
+    root::release(&mut world.domain, &env, &mut out);
+    while let Some(request) = out.pop() {
+        match request {
+            root::Request::Commit { number, mut writes } => {
+                let mut rows = Vec::new();
+                while let Some(row) = writes.pop() {
+                    rows.push(row);
+                }
+                world.store.submit(number, rows.into_boxed_slice(), 500);
+            }
+            other @ (root::Request::Restart(_)
+            | root::Request::Deliver(_)
+            | root::Request::ReadResult { .. }
+            | root::Request::Now(_)
+            | root::Request::Busy { .. }
+            | root::Request::Stop) => panic!("nothing leaves before the turn commit: {other:?}"),
+        }
+    }
 }

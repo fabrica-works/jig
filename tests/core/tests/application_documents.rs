@@ -103,7 +103,7 @@ fn a_panel_read_waits_for_the_commit_it_reflects() {
         event: connector::Event::Adopt { project: 1, resource: path.clone(), role: connector::ResourceRole::Owned },
     });
     let commit = world.store.applied + 1;
-    world.store.fault(jig_fake_store::Fault::Hold { commits: 1 });
+    world.store.fault(jig_core_world::Fault::Hold { commits: 1 });
     world.cut = Some(Cut::Submitted(commit));
     world.send(root::Event::Connector {
         number: 1,

@@ -90,13 +90,14 @@ pub fn plan_fixture(seed: u64) -> (jig_test_domain::Config, jig_test_domain::Lim
     limits.core.tasks.delegates = 3;
     limits.core.tasks.funders = 16;
     limits.core.tasks.inbox_bytes = 512;
-    limits.core.tasks.inbox_messages = 8;
+    limits.core.tasks.inbox_messages = 7;
     limits.core.views.runs = 5;
     limits.core.fleet.slots = 3;
     limits.core.fleet.attempts = 5;
     limits.core.call_records = 8;
-    limits.journal.writes = 10_000;
-    limits.journal.held = 10_000;
+    limits.core.people.amendment_bytes = 256;
+    limits.core.people.inbox_recipients = 21;
+    crate::peers::journal(&mut limits);
     let mut rules = configuration.core.authority.rules().clone();
     rules.ceiling.delegation.tasks = 6;
     rules.ceiling.delegation.depth = 3;

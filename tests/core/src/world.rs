@@ -1,5 +1,6 @@
 //! Seeded fixtures and scripts for the testing application.
 
+mod deliveries;
 use crate::Store;
 use jig_domain_accounts as accounts;
 use jig_domain_authority as authority;
@@ -453,7 +454,7 @@ impl World {
         let heap = crate::observations::Heap::new(&limits);
         World {
             domain: root::Domain::new(config(seed), &limits),
-            store: Store::new(),
+            store: Store::new(&limits),
             events,
             trace: Vec::new(),
             sign_in: None,
@@ -495,7 +496,7 @@ impl World {
                     while let Some(write) = writes.pop() {
                         rows.push(write);
                     }
-                    self.store.submit(number, crate::store_writes(rows), 0);
+                    self.store.submit(number, rows.into_boxed_slice(), 0);
                     let applied = self.store.tick(false).expect("store did not fail").expect("ready commit");
                     self.observer.durable(self.iteration * 1_000_000, &self.store);
                     self.events.push_front(root::Event::Committed { number: applied, fill: 0 });
@@ -514,35 +515,26 @@ impl World {
                         accounts::FromComponent::Closed,
                     ))));
                 }
-                root::Request::Now(core::Now::HistoricalPersonTask { request, person, project, task }) => {
-                    let key = root::Key::Core(core::Key::Tasks(tasks::Key::Ended(task)));
-                    let row = match self.store.rows.get(&key) {
-                        Some(root::Record::Core(core::Record::Tasks(tasks::Stored::Ended(row)))) => Some(row.clone()),
-                        Some(_) | None => None,
-                    };
-                    self.events.push_back(root::Event::Core(core::Event::HistoricalPersonTask {
-                        request,
-                        person,
-                        project,
-                        task,
-                        row,
-                        busy: false,
-                    }));
-                }
-                root::Request::Now(core::Now::HistoricalProposal { request, person, project, proposer, proposal }) => {
-                    self.events.push_back(crate::historical::proposal(
-                        &self.store,
-                        request,
-                        person,
-                        project,
-                        proposer,
-                        proposal,
-                    ));
-                }
+                root::Request::Now(
+                    now @ (core::Now::HistoricalPersonTask { .. }
+                    | core::Now::HistoricalProposal { .. }
+                    | core::Now::HistoricalEscalation { .. }
+                    | core::Now::SeenChat { .. }
+                    | core::Now::LoadEndedChat { .. }
+                    | core::Now::StartPreparation { from: Some(_), .. }),
+                ) => self.store.ask(jig_test_store::StoreOut::Now(now)),
                 root::Request::Now(_) => {}
                 root::Request::Restart(_) => panic!("walking fixture uses restored markers"),
                 root::Request::Busy { .. } => panic!("this world does not stop"),
                 root::Request::Stop => panic!("testing root stopped: {:?}", self.trace),
+            }
+        }
+        for answer in self.store.answers() {
+            match answer {
+                jig_test_store::Up::Root(event) => self.events.push_back(event),
+                jig_test_store::Up::Restore(_) | jig_test_store::Up::Ask(_) => {
+                    panic!("walking fixture does not restart")
+                }
             }
         }
         self.domain.reclaim();
@@ -566,236 +558,6 @@ impl World {
                 cumulative: 3,
                 transcript: b"procedure finished".as_slice().into(),
             });
-        }
-    }
-
-    #[expect(clippy::too_many_lines, reason = "one script handles each externally observed delivery")]
-    fn delivered(&mut self, mut delivery: root::Delivery) {
-        self.observer.delivered(self.iteration * 1_000_000, &mut delivery);
-        match delivery {
-            root::Delivery::Projection { connector, feed } => {
-                if feed.closing {
-                    self.events.push_back(root::Event::Core(core::Event::ProjectionSettled {
-                        goal: feed.goal.number,
-                        connector,
-                    }));
-                }
-            }
-            root::Delivery::Restart(_) => panic!("walking fixture uses the restored-marker path"),
-            root::Delivery::Core(core::Held::NotesLoad { owner, range }) => {
-                let mut rows = skein_lib::List::with_capacity(self.limits.core.notes.load_rows);
-                let mut more = false;
-                for record in self.store.rows.values() {
-                    let root::Record::Core(core::Record::Notes(record)) = record else { continue };
-                    let matches = match (&range, record) {
-                        (jig_domain_notes::Range::Entry { name }, jig_domain_notes::Record::Entry(entry)) => {
-                            *name == entry.name
-                        }
-                        (jig_domain_notes::Range::Lines { scope, after }, jig_domain_notes::Record::Line(line)) => {
-                            *scope == line.scope && after.is_none_or(|cursor| line.name > cursor)
-                        }
-                        _ => false,
-                    };
-                    if matches && rows.push(record.clone()).is_err() {
-                        more = true;
-                    }
-                }
-                self.events.push_back(root::Event::Core(core::Event::Notes(jig_domain_notes::Event::Loaded {
-                    owner,
-                    rows: jig_domain_notes::Rows { records: rows },
-                    more,
-                })));
-            }
-            root::Delivery::Core(core::Held::PeopleReply {
-                reply: people::Reply::SignedIn { sign_in, .. }, ..
-            }) => {
-                self.sign_in = Some(sign_in);
-                let ask = match self.scenario {
-                    Scenario::Chat => people::Ask::StartChat { project: 1, words: b"hello".as_slice().into() },
-                    Scenario::Goal | Scenario::Batch => people::Ask::SetGoal {
-                        project: 1,
-                        spec: b"complete procedure".as_slice().into(),
-                        executor: jig_domain_people::GoalExecutor::Charter(1),
-                        budget: 100,
-                        priority: 1,
-                        deadline: None,
-                    },
-                };
-                self.events.push_back(root::Event::Core(core::Event::People(people::Event::Ask {
-                    reply_to: ReplyTo::new(Token::new(102)),
-                    sign_in,
-                    key: [5; 16],
-                    ask,
-                })));
-            }
-            root::Delivery::Core(core::Held::PeopleReply {
-                reply: people::Reply::Outcome(people::Outcome::Started { task }),
-                ..
-            }) => {
-                self.chat = Some(task);
-                assert!(
-                    self.store.rows.contains_key(&root::Key::Core(core::Key::Tasks(tasks::Key::Live(task)))),
-                    "party saw task only after commit"
-                );
-            }
-            root::Delivery::Core(core::Held::PeopleReply {
-                reply: people::Reply::Outcome(people::Outcome::GoalStarted { task }),
-                ..
-            }) => {
-                self.chat = Some(task);
-                assert!(self.store.rows.contains_key(&root::Key::Core(core::Key::Tasks(tasks::Key::Live(task)))));
-            }
-            root::Delivery::Assigned { channel, assignment } => {
-                assert_eq!(channel, Token::new(7));
-                assert!(
-                    self.store
-                        .rows
-                        .contains_key(&root::Key::Core(core::Key::Core(core::CoreKey::RunProof(assignment.task))))
-                );
-                let task = assignment.task;
-                let attempt = assignment.attempt;
-                self.assignment = Some(assignment);
-                match self.scenario {
-                    Scenario::Chat => self.events.push_back(root::Event::Turn {
-                        opens_window: false,
-                        refused: Box::new([]),
-                        channel,
-                        task,
-                        attempt,
-                        turn: 1,
-                        read: None,
-                        cumulative: 3,
-                        transcript: b"answer".as_slice().into(),
-                    }),
-                    Scenario::Goal | Scenario::Batch => {
-                        let authority = tasks::Authority {
-                            tools: tasks::Tools(0),
-                            grants: Box::new([]),
-                            delegation: tasks::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 },
-                            budget: tasks::Budget { spend: 0, deadline: None },
-                            notes: tasks::Scopes(0),
-                            note_resources: Box::new([]),
-                        };
-                        self.delegated = true;
-                        let delegate = core::Delegate {
-                            executor: tasks::Executor::Procedure { connector: 1, code: 1 },
-                            spec: tasks::Spec {
-                                words: b"run the check".as_slice().into(),
-                                parameters: Box::new([]),
-                                inputs: Box::new([]),
-                            },
-                            contract: tasks::Contract::Report { words: 0 },
-                            authority,
-                            symbolic_grants: Box::new([]),
-                            dependencies: Box::new([]),
-                            wake: tasks::WakePolicy::DEFAULT,
-                        };
-                        let batch = match self.scenario {
-                            Scenario::Goal => vec![delegate].into_boxed_slice(),
-                            Scenario::Batch => vec![delegate.clone(), delegate].into_boxed_slice(),
-                            Scenario::Chat => unreachable!("chat does not delegate"),
-                        };
-                        self.events.push_back(root::Event::Core(core::Event::DelegateValidated {
-                            to: ReplyTo::new(Token::new(104)),
-                            key: core::CallKey { task, attempt, completion: 1, position: 0 },
-                            batch,
-                            stubs: Box::new([]),
-                        }));
-                    }
-                }
-            }
-            root::Delivery::Procedure { task, connector, code, context, .. } => {
-                self.procedure = Some(task);
-                self.events.push_back(root::Event::Connector {
-                    number: connector,
-                    event: jig_test_connector::Event::Procedure {
-                        project: context.project,
-                        task,
-                        number: code,
-                        resource: jig_test_connector_world::path(1, 1),
-                        signal: jig_test_connector::ProcedureSignal::Activate,
-                    },
-                });
-            }
-            root::Delivery::Core(core::Held::CallAnswer { part: core::CallPart::Delegated(tasks), .. }) => {
-                assert_eq!(tasks.len(), 1);
-                self.procedure = Some(tasks[0]);
-            }
-            root::Delivery::Core(core::Held::CallAnswer {
-                part: core::CallPart::DelegationDenied { findings, .. },
-                ..
-            }) => {
-                assert_eq!(self.scenario, Scenario::Batch);
-                assert!(!findings.is_empty(), "worker receives a reason for the atomic refusal");
-                self.batch_refusals += 1;
-            }
-            root::Delivery::Core(core::Held::CallAnswer {
-                part: core::CallPart::DelegationRefused(problem), ..
-            }) => {
-                assert_eq!(self.scenario, Scenario::Batch);
-                assert_eq!(problem.why, tasks::Refusal::Batch);
-                self.batch_refusals += 1;
-            }
-            root::Delivery::Message { channel, task: run, attempt, word } => {
-                assert_eq!(word.from, tasks::Party::Task(self.procedure.expect("delegated child")));
-                self.events.push_back(root::Event::Answer {
-                    read: None,
-                    refused: Box::new([]),
-                    channel,
-                    task: run,
-                    attempt,
-                    cumulative: 3,
-                    end: tasks::End::Finished {
-                        result: tasks::TaskResult::Report { words: b"done".as_slice().into() },
-                        cancel_delegates: false,
-                    },
-                });
-            }
-            root::Delivery::Core(core::Held::AcknowledgeTurn { channel, run, attempt, turn }) => {
-                assert_eq!(channel, Token::new(7));
-                assert!(
-                    self.store.rows.contains_key(&root::Key::Core(core::Key::Core(core::CoreKey::Turn {
-                        task: run.raw(),
-                        attempt: attempt.raw(),
-                        turn,
-                    }))),
-                    "worker saw ACK only after turn committed"
-                );
-                self.turn_acks += 1;
-                self.events.push_back(root::Event::Answer {
-                    read: None,
-                    refused: Box::new([]),
-                    channel,
-                    task: run.raw(),
-                    attempt: attempt.raw(),
-                    cumulative: 3,
-                    end: tasks::End::Finished {
-                        result: tasks::TaskResult::Report { words: b"done".as_slice().into() },
-                        cancel_delegates: false,
-                    },
-                });
-            }
-            root::Delivery::Core(core::Held::Acknowledge { .. }) => self.answer_acks += 1,
-            root::Delivery::Core(core::Held::Result { task, words, .. }) => {
-                assert!(self.store.rows.contains_key(&root::Key::Core(core::Key::Tasks(tasks::Key::Ended(task)))));
-                assert_eq!(words.as_ref(), b"done");
-                self.results += 1;
-            }
-            root::Delivery::ApplicationDocument { .. }
-            | root::Delivery::ApplicationRead { .. }
-            | root::Delivery::Core(
-                core::Held::Delivery { .. } | core::Held::WatchEnded { .. } | core::Held::Grant { .. },
-            ) => {}
-            other @ (root::Delivery::Link { .. }
-            | root::Delivery::CallBusy { .. }
-            | root::Delivery::CallAnswer { .. }
-            | root::Delivery::Core(_)
-            | root::Delivery::Fleet(_)
-            | root::Delivery::System { .. }
-            | root::Delivery::Application { .. }
-            | root::Delivery::LostRead { .. }) => {
-                panic!("unhandled walking delivery {other:?}: {:?}", self.trace)
-            }
         }
     }
 

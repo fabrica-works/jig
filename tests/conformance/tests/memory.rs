@@ -14,7 +14,7 @@ fn full_live_task_and_host_slots_fit_with_a_decision_held_in_the_journal() {
     Testing::action(&mut world, Action::FillPool).expect("two holders and a waiter fit");
     world.drain().expect("full host slots fit");
     assert_eq!(world.peers.assignments.len(), 3);
-    world.store.fault(jig_fake_store::Fault::Hold { commits: 1 });
+    world.store.fault(jig_core_world::Fault::Hold { commits: 1 });
     world.peers.peers.parties[0].extend(Box::new([Act::Request {
         key: [42; 16],
         ask: Ask::Chat { words: b"fifth live task".as_slice().into() },

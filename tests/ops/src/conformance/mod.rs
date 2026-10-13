@@ -145,6 +145,8 @@ fn env(config: &Config, clock: Clock) -> Env<root::Limits> {
 
 impl Application for Ops {
     type Domain = root::Domain;
+    type Store = jig_fake_store::Store<root::Key, root::Record>;
+    type Write = jig_fake_store::Write<root::Key, root::Record>;
     type Config = Config;
     type Systems = Systems;
     type Peers = Peers;
@@ -153,6 +155,9 @@ impl Application for Ops {
     type Event = root::Event;
     type Delivery = Delivery;
 
+    fn store(_: &Config) -> Self::Store {
+        jig_fake_store::Store::new()
+    }
     fn build(config: &Config) -> root::Domain {
         let configuration = config::root_for(config.seed, config.story == Story::Environment).0;
         root::Domain::new(configuration, &config.limits)
@@ -262,7 +267,7 @@ impl Application for Ops {
         domain: &mut root::Domain,
         config: &Config,
         clock: Clock,
-    ) -> Vec<Output<root::Key, root::Record, Delivery>> {
+    ) -> Vec<Output<jig_fake_store::Write<root::Key, root::Record>, Delivery>> {
         let mut queue = Queue::with_capacity(256);
         root::release(domain, &env(config, clock), &mut queue);
         let mut outputs = Vec::new();

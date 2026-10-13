@@ -1,3 +1,4 @@
+use jig_core_world::Fault;
 use jig_core_world::{
     client_peer::ClientPeer,
     effects::World,
@@ -5,7 +6,6 @@ use jig_core_world::{
 };
 use jig_domain_core::{self as core, documents, reads};
 use jig_domain_people as people;
-use jig_fake_store::Fault;
 use jig_fake_workers::{Script, Worker};
 use jig_test_domain as root;
 use skein_lib::{ReplyTo, Token};

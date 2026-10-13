@@ -165,11 +165,9 @@ fn tree_world() -> (World, root::Config) {
     limits.core.call_records = 4;
     limits.core.views.runs = 4;
     limits.core.brief.briefs = 4;
-    let room = core::room_max(&limits.core).expect("bounded story");
-    limits.journal.writes = (room.writes + jig_test_connector::MAX_OUT * 2) * 4;
-    limits.journal.held = (room.held + jig_test_connector::MAX_OUT * 2) * 4;
     limits.routes = 500;
     limits.journal.commits = 8;
+    jig_core_world::peers::journal(&mut limits);
     let mut policy = configuration.core.authority.policy(1).expect("fixture policy").clone();
     policy.projections.clone_from(&policy.ceiling.grants);
     policy.ceiling.delegation.depth = 3;

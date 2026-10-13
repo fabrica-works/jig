@@ -1361,7 +1361,11 @@ mod tests {
         let watcher = session.driver.transport.watch_token(ClientId(0), native).expect("original route");
         let durable = session.driver.world.store.applied;
         let rows = session.driver.world.store.rows.clone();
-        session.driver.world.store.fail_at = Some(durable.checked_add(1).expect("next actual transaction"));
+        session
+            .driver
+            .world
+            .store
+            .fault(jig_core_world::Fault::Fail { commit: durable.checked_add(1).expect("next actual transaction") });
         let key = [17; 16];
         let request = |attempt| Request::Send {
             attempt,

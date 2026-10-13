@@ -147,8 +147,9 @@ fn inbox_across_projects_stories() {
         config.core.projects.push(project).expect("two projects");
         config.core.permission_roles.insert(project, permissions.clone()).expect("two permissions");
     }
-    limits.journal.writes = 10_000;
-    limits.journal.held = 10_000;
+    limits.core.people.amendment_bytes = 256;
+    limits.core.people.inbox_recipients = 16;
+    jig_core_world::peers::journal(&mut limits);
     let mut world = jig_core_world::effects::World::configured(788, false, config, limits);
     world.watches = Some(Parties::new(788, world.store.applied, true));
     open(&mut world, 1, Subject::Frame { party: 1 });

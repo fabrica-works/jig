@@ -150,7 +150,13 @@ fn a_failed_commit_stops_the_engine_and_the_person_sees_offline_before_keyed_rec
         let owner = &world.front().session.driver.world;
         (owner.store.applied, owner.store.rows.clone())
     };
-    world.front().session.driver.world.store.fail_at = Some(applied.checked_add(1).expect("next actual transaction"));
+    world
+        .front()
+        .session
+        .driver
+        .world
+        .store
+        .fault(jig_core_world::Fault::Fail { commit: applied.checked_add(1).expect("next actual transaction") });
     world.person(
         client,
         vec![

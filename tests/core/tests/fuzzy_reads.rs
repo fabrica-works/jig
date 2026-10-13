@@ -17,7 +17,7 @@ fn seeded_reads_wait_for_prior_commits_and_keep_receipts_across_restart_cuts() {
             let task = world.assigned.as_ref().expect("chat").task;
             world.store_delay = u32::try_from(rng.below(6)).expect("bounded delay");
             let number = world.store.applied + 1;
-            world.store.fault(jig_fake_store::Fault::Hold { commits: 1 });
+            world.store.fault(jig_core_world::Fault::Hold { commits: 1 });
             world.cut = Some(Cut::Submitted(number));
             world.send(root::Event::Core(core::Event::People(people::Event::Ask {
                 reply_to: ReplyTo::new(Token::new(30_001)),

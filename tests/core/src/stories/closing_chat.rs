@@ -29,8 +29,11 @@ fn live(world: &World, number: u64) -> &tasks::TaskRecord {
 fn fixture_with_delegates() -> (World, root::Config, u64, [u64; 2]) {
     let (configuration, mut limits) = fixture(7074, 0);
     limits.core.fleet.slots = 3;
-    limits.core.tasks.inbox_messages = 8;
+    limits.core.tasks.inbox_messages = 7;
     limits.core.tasks.inbox_bytes = 512;
+    limits.core.tasks.contract_choices = 1;
+    limits.core.people.inbox_recipients = 24;
+    crate::peers::journal(&mut limits);
     let mut world = World::scripted(
         fixture(7074, 0).0,
         limits,

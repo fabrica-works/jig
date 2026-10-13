@@ -44,7 +44,7 @@ fn a_drained_shutdown_ends_with_nothing_waiting_for_a_commit() {
     let mut world = actions::world(32, false);
     world.drain().expect("startup conforms");
     let answers = world.peers.answers;
-    world.store.fault(jig_fake_store::Fault::Hold { commits: 1 });
+    world.store.fault(jig_core_world::Fault::Hold { commits: 1 });
     actions::say(&mut world, 2);
     world.drain().expect("party decision waits for its commit completion");
     assert_eq!(world.peers.answers, answers);

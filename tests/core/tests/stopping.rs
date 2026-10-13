@@ -123,7 +123,7 @@ fn drained_is_released_once_after_the_last_commit_is_durable() {
     let mut world = World::new(169, false);
     let task = world.task();
     let commits = world.store.applied;
-    world.store.fault(jig_fake_store::Fault::Hold { commits: 1 });
+    world.store.fault(jig_core_world::Fault::Hold { commits: 1 });
     request(
         &mut world,
         57,
