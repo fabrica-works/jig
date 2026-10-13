@@ -317,6 +317,15 @@ answer; *signed out*.
 - **Times are wall times,** which the store keeps, so a document means the
   same after a restart.
 - **Bounded:** each document within its limits, in bytes and rows.
+- **Texts are UTF-8,** words for showing. A source's text is UTF-8 where
+  it enters the engine: a party's words, refused at their request's
+  entrance when they are not; a provider's login and name, from its
+  identity; a run's output; an application's words through its own
+  documents. A text cut to its bound is cut at a character's boundary,
+  never inside a character, and says it was cut. So every text a
+  document carries is UTF-8, as the wire's text fields check
+  (`../../protocol/client.md`, section 3), and the engine never makes a
+  document its wire refuses.
 
 ## 6. Reads
 
@@ -431,8 +440,9 @@ commit, so they leave through the journal's door (`../../README.md`,
   says the activity has moved, and held until durable (section 6). The
   client keeps a turn's provisional text until then (client.md,
   section 10).
-- **Past its bound,** the text is cut from its start, and the delivery
-  says so; the turn, once committed, has it all.
+- **Past its bound,** the text is cut from its start, at a character's
+  boundary, and the delivery says so; the turn, once committed, has it
+  all.
 - **The watch follows the task,** not one attempt: a new run's text
   follows the last, and its beginning is in the document.
 - **Only from a host that gives it.** A run's text and the call it is
