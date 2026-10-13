@@ -663,6 +663,27 @@ Proof: the gate.
 Don't: drop an undecodable turn, or show another in its place.
 Size: at most 120 lines of production code.
 
+### 03.s2 Texts UTF-8, cut at a character's boundary
+
+A step not in the plan (decisions.md, ruling 224), from the designer's
+answer on jig 34.1 (jig `1bc30fd0`, `client/domain/contract.md`, 5.3:
+"**Texts are UTF-8,** words for showing ... A text cut to its bound is cut
+at a character's boundary, never inside a character, and says it was
+cut"); its text is the designer's. Before jig 34.1 lands.
+Shape: the core cuts a text at a character's boundary
+  (`crates/jig-domain-core/src/documents/small.rs:9-11`), `cut: true` as
+  now. The client's `Text::new` (`contract/common.rs:13-18`) refuses bytes
+  that are not UTF-8, and the contract's "opaque" goes. A party's words
+  that are not UTF-8 are refused at their request's entrance. The joint
+  world's login fixture (`tests/client/src/joint/wire/owner.rs:822, 845`)
+  becomes UTF-8.
+Test shape: a core unit test that a text cut inside "é" keeps the whole
+  character out and says it was cut; a refusal test for words that are
+  not UTF-8.
+Proof: the gate.
+Don't: pass a text as bytes past the wire's `text`.
+Size: at most 60 lines of production code.
+
 ## Interface sketches
 
 ```rust

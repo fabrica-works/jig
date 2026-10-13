@@ -1694,6 +1694,15 @@ the file.
      ceilings it already encodes within (re-exported as the kit's own
      type), at most 10 lines, no encoding behaviour changed, named in its
      commit body; no smith dependency is added to the service.
+224. **jig 03.s2: texts UTF-8, cut at a character's boundary** (2026-10-13,
+     the designer's answer to question.md's "jig 34.1: a document's text,
+     bytes or UTF-8"; jig `1bc30fd0`, `e2f4ba51`). The client wire's
+     `DocumentText.bytes` is `text` (UTF-8) while the core cut texts at a
+     byte length and the client's `Text` took any bytes; the designer
+     makes texts UTF-8 end to end. A step not in the plan, jig 03.s2
+     (`jig/03-people-and-tasks.md`), changes the core's cut, the client's
+     `Text`, the people child's entrance and one fixture; jig 34.1 lands
+     after it, its fixtures UTF-8 meanwhile.
 
 ## For the user
 
