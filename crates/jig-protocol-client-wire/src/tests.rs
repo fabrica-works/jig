@@ -301,3 +301,20 @@ fn each_read_value_variant_round_trips_unchanged() {
         assert_eq!(ReadValue::decode(&limits, &mut Reader::new(&bytes)), Ok(value.clone()), "{name}");
     }
 }
+
+#[test]
+fn a_stream_text_event_round_trips_with_its_watch() {
+    let limits = fixtures::stream_limits();
+    let event = StreamEvent::Text(fixtures::stream_text(&limits, fixtures::raw_live_call(&limits)));
+    let bytes = fixtures::encoded(&event, StreamEvent::measure, StreamEvent::encode);
+    assert_eq!(StreamEvent::decode(&limits, &mut Reader::new(&bytes)), Ok(event));
+}
+
+#[test]
+fn each_delivery_value_variant_round_trips_unchanged() {
+    let limits = fixtures::limits();
+    for (name, value) in &fixtures::delivery_values(&limits) {
+        let bytes = fixtures::encoded(value, DeliveryValue::measure, DeliveryValue::encode);
+        assert_eq!(DeliveryValue::decode(&limits, &mut Reader::new(&bytes)), Ok(value.clone()), "{name}");
+    }
+}

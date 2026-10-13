@@ -1,5 +1,5 @@
 //! Arbitrary and mutated client bytes (skein's codec.md, section 6).
-use jig_protocol_client_wire::v3::*;
+use jig_protocol_client_wire::v4::*;
 use skein_lib::{Reader, Rng, Writer};
 use std::{fs, path::Path};
 
@@ -18,6 +18,10 @@ mod documents;
 
 fn records_1(bytes: &[u8]) {
     check!(ReadValue, bytes);
+    check!(DeliveryValue, bytes);
+    check!(StreamText, bytes);
+    check!(Chips, bytes);
+    check!(OwnerInbox, bytes);
     check!(Keeper, bytes);
     check!(Kept, bytes);
     check!(ProjectSection, bytes);
@@ -685,6 +689,10 @@ fn mutation_seed(path: &Path) -> bool {
             "enum_read_",
             "enum_read_answer_",
             "enum_read_value_",
+            "enum_delivery_value_",
+            "record_chips_",
+            "record_owner_inbox_",
+            "record_stream_text_",
             "record_owner_spend_page_",
             "record_activity_page_",
             "record_history_page_",
@@ -707,7 +715,7 @@ fn mutation_seed(path: &Path) -> bool {
 }
 
 fn mutated(rng: &mut Rng) {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../crates/jig-protocol-client-wire/golden/v3");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../crates/jig-protocol-client-wire/golden/v4");
     let mut paths: Vec<_> =
         fs::read_dir(root).expect("golden directory").map(|entry| entry.expect("golden entry").path()).collect();
     paths.sort();

@@ -1,6 +1,6 @@
 //! One bounded exchange per request-table attempt (protocol/client.md, 5).
 use crate::{Answered, Ask, Event, Fact, Family, Limits, Readable, Readout, Request, Unusable, translate};
-use jig_protocol_client_wire::{self as wire, v3 as w};
+use jig_protocol_client_wire::{self as wire, v4 as w};
 use skein_lib::{Map, Queue, Reader, RequestEnvelope, RequestKey, Time, Token, Writer};
 #[derive(Debug)]
 pub(crate) struct Attempt {

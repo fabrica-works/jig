@@ -1,6 +1,6 @@
 //! Fixed attempt admission and receiving bounds (protocol/client.md, 13).
 use crate::component::Attempt;
-use jig_protocol_client_wire::v3 as w;
+use jig_protocol_client_wire::v4 as w;
 use skein_lib::{Duration, Map};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {

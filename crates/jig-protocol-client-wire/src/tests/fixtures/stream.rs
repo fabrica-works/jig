@@ -124,8 +124,8 @@ pub fn stream_events(limits: &Limits) -> [StreamEvent; 5] {
     [
         StreamEvent::Hello(hello(limits)),
         StreamEvent::Delivery(delivery),
-        StreamEvent::Text(run_text(limits, raw_live_call(limits))),
-        StreamEvent::Text(run_text(limits, decoded_live_call(limits))),
+        StreamEvent::Text(stream_text(limits, raw_live_call(limits))),
+        StreamEvent::Text(stream_text(limits, decoded_live_call(limits))),
         StreamEvent::Ended(ended(limits, WatchEnd::SubjectEnded)),
     ]
 }
@@ -188,4 +188,9 @@ pub fn historical_goal_holding(limits: &Limits) -> OwnerGoalHolding {
         OwnerGoalHoldingWrite::new(limits, OwnerGoalHoldingWriteParts { connector: u16::MAX, path, kind: 0 })
             .expect("whole raw goal holding"),
     )
+}
+
+pub fn stream_text(limits: &Limits, call: LiveCall) -> StreamText {
+    StreamText::new(limits, StreamTextParts { watch: 37, value: run_text(limits, call) })
+        .expect("text tagged with its watch")
 }

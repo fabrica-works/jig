@@ -1,0 +1,68 @@
+record OwnerTaskCapacityActionSource { funder: Funder }
+record OwnerTaskCapacityActionIntroduce { left: u64 right: u64 }
+record OwnerTaskCapacityActionSubscription { number: u64 }
+record OwnerTaskCapacityActionEffect { entry: u64 }
+record OwnerTaskCapacityActionClaim { attempt: u64 }
+enum OwnerTaskCapacityAction { batch: OwnerTaskCapacityActionBatch, proposal: OwnerTaskCapacityActionProposal, person_proposal: OwnerTaskCapacityActionPersonProposal, message: OwnerTaskCapacityActionMessage, source: OwnerTaskCapacityActionSource, introduce: OwnerTaskCapacityActionIntroduce, subscription: OwnerTaskCapacityActionSubscription, effect: OwnerTaskCapacityActionEffect, claim: OwnerTaskCapacityActionClaim, release, move_task }
+record OwnerTaskCapacityCauseTasks { limit: u32 }
+record OwnerTaskCapacityCauseCreationFlights { limit: u32 }
+record OwnerTaskCapacityCauseResourceReports { limit: u32 }
+record OwnerTaskCapacityCauseProjectTasks { limit: u32 }
+record OwnerTaskCapacityCauseTree { limit: u32 }
+record OwnerTaskCapacityCauseDelegates { limit: u32 }
+record OwnerTaskCapacityCauseInbox { task: u64 messages: u32 bytes: u32 }
+record OwnerTaskCapacityCauseHoldings { limit: u32 }
+record OwnerTaskCapacityCauseHoldWaiters { limit: u32 }
+record OwnerTaskCapacityCauseProposals { limit: u32 }
+record OwnerTaskCapacityCauseReferences { limit: u32 }
+record OwnerTaskCapacityCauseSubscriptions { limit: u32 }
+record OwnerTaskCapacityCauseFunders { limit: u32 }
+record OwnerTaskCapacityCauseWriters { limit: u32 }
+enum OwnerTaskCapacityCause { tasks: OwnerTaskCapacityCauseTasks, creation_flights: OwnerTaskCapacityCauseCreationFlights, resource_reports: OwnerTaskCapacityCauseResourceReports, project_tasks: OwnerTaskCapacityCauseProjectTasks, tree: OwnerTaskCapacityCauseTree, delegates: OwnerTaskCapacityCauseDelegates, inbox: OwnerTaskCapacityCauseInbox, holdings: OwnerTaskCapacityCauseHoldings, hold_waiters: OwnerTaskCapacityCauseHoldWaiters, proposals: OwnerTaskCapacityCauseProposals, references: OwnerTaskCapacityCauseReferences, subscriptions: OwnerTaskCapacityCauseSubscriptions, funders: OwnerTaskCapacityCauseFunders, writers: OwnerTaskCapacityCauseWriters }
+record OwnerTaskCapacityRequest { project: option u32 by: OwnerRequester action: OwnerTaskCapacityAction cause: OwnerTaskCapacityCause }
+record OwnerTaskCapacityRefusal { request: OwnerTaskCapacityRequest at: u64 }
+enum WatchEnd { closed, unknown, not_allowed, busy, subject_ended, signed_out, stopping }
+enum WatchRefusal { unknown, not_allowed, busy, signed_out }
+record Open { stream: fixed 16 watch: u64 subject: Owned }
+record OpenAnswerRefused { why: WatchRefusal }
+enum OpenAnswer { admitted, refused: OpenAnswerRefused }
+record WatchClose { stream: fixed 16 watch: u64 }
+enum CloseAnswer { closed, signed_out }
+record Gone { stream: fixed 16 }
+record Served { owner: Owner first: u32 last: u32 }
+record Hello { stream: fixed 16 served: list 16 Served heartbeat: duration }
+record Delivery { watch: u64 document: Owned }
+record Ended { watch: u64 why: WatchEnd }
+record StreamText { watch: u64 value: RunText }
+enum StreamEvent { hello: Hello, delivery: Delivery, text: StreamText, ended: Ended }
+# Account deadlines follow the optional-wall contract (rulings 190 and 191).
+record OwnerAccountStateLater { until: option u64 }
+enum OwnerAccountPlace { directory, file }
+enum OwnerAccountUnread { unreadable, refused, failed, stalled, too_large }
+record OwnerAccountStateUnloaded { at: OwnerAccountPlace why: OwnerAccountUnread }
+enum OwnerAccountState { asking, granted, later: OwnerAccountStateLater, sign_in_again, misconfigured, unloaded: OwnerAccountStateUnloaded, cancelled, closing }
+record OwnerAccount { number: u32 generation: option u64 state: OwnerAccountState usable: bool expiring: bool attention: bool spent_until: option u64 runs: bytes 16777216 waiting: bytes 16777216 cut: bool }
+record OwnerDeployment { store: StoreFill hosts: bytes 16777216 attempts: bytes 16777216 accounts: bytes 16777216 tasks: OwnerCapacity workers: OwnerCapacity attempts_capacity: OwnerCapacity waiting_attempts: u32 proposals: OwnerCapacity projects: list 32 OwnerProjectCapacity grace_bound: duration hello_refusals: list 32 OwnerHelloRefusalLine hosts_forgotten: u64 hello_refusals_forgotten: u64 person_room_refusals: list 32 OwnerPersonCapacityRefusal person_room_refusals_forgotten: u64 person_answer_retention: duration task_room_refusals: list 32 OwnerTaskCapacityRefusal task_room_refusals_forgotten: u64 cut: bool connectors: list 32 u16 connectors_cut: bool }
+# Small store (protocol/client.md, 10); Draft.words: jig_domain_client::Limits::text; TableEntry.request has Keyed.request's ceiling; other opaque kept records use the unbounded-field ceiling (ruling 149).
+enum Keeper { jig, table, family: Family }
+versioned record Kept { keeper: Keeper store_version: u16 record: bytes 65536 }
+enum ProjectSection { overview, goals, tasks, notes, settings, resources, policy, roles, spend, recurring }
+enum TaskSection { overview, activity, plan, history, budget, panels }
+record AddressInbox { project: option u32 }
+record AddressConversations { project: option u32 }
+record AddressTask { task: u64 section: TaskSection }
+record AddressProject { project: u32 section: ProjectSection }
+enum Address { inbox: AddressInbox, conversations: AddressConversations, task: AddressTask, project: AddressProject, deployment }
+record Place { party: u64 address: Address }
+record Draft { party: u64 task: u64 words: text 65536 touched: u64 }
+record TableEntry { key: fixed 16 scope: u64 first_sent: option u64 owner: Owner version: u32 request: bytes 1048576 }
+
+# A read value preserves the contract variant as well as its existing document (ruling 208).
+enum ReadValue { owner_project: OwnerProject, historical: boxed OwnerHistorical, frame: Frame, task: Task, proposal: Proposal, owner_proposal: OwnerProposal, escalation: Escalation, owner_escalation: OwnerEscalation, question: Question, person_task: PersonTask, owner_person_task: OwnerPersonTask, result: ResultDocument, ended: ObjectPage, owner_ended: OwnerEndedPage, history: HistoryPage, activity: ActivityPage, inbox: InboxPage, owner_inbox: OwnerInboxPage, conversations: ConversationPage, goals: GoalPage, spend: SpendPage, owner_spend: OwnerSpendPage, project: Project, notes: NotePage, deployment: Deployment, owner_deployment: OwnerDeployment }
+
+# Chips.rows and OwnerInbox.needs/updates/selection: jig_domain_client::Limits::document_bytes; each item is a length-prefixed piece (rulings 182 and 184).
+record Chips { rows: bytes 16777216 }
+record OwnerInbox { party: u64 needs: bytes 16777216 updates: bytes 16777216 next: option OwnerInboxCursor cached_needs: u32 cached_updates: Count results_seen: u64 updates_time_complete: bool selection: option bytes 16777216 }
+
+# A delivery preserves its contract variant and the whole document (ruling 211).
+enum DeliveryValue { owner_project: OwnerProject, frame: Frame, task: boxed Task, owner_proposal: OwnerProposal, tree: Tree, owner_tree: OwnerTree, chips: Chips, inbox: Inbox, owner_inbox: OwnerInbox, goals: Goals, tasks: Tasks, conversations: Conversations, run: RunText, run_state: RunState, deployment: Deployment, owner_deployment: OwnerDeployment }
