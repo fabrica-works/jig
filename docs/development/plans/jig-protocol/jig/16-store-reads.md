@@ -326,7 +326,18 @@ Files: `crates/jig-protocol-store/src/reads/indexed.rs (new)`,
 `src/reads.rs`, `src/tests/reads.rs` (split at 800 lines, see 16.1).
 Shape: `indexed::ended_delegates`, `indexed::subtree_history`,
 `indexed::inbox`, `indexed::conversations`, `indexed::goals`, each
-`(store, range, spent) -> Page`.
+`(store, range, spent) -> Page`. A page's `next` is the last row it
+examined in its scope's order, not the last it returned: past index rows
+whose owner is gone (7.4) and rows an inbox group or filter leaves out;
+a page that reached its bound and returned none is cut, not ended, its
+`next` the last row examined. A subtree's history comes task by task, the
+task's own rows then each delegate's in the `Delegate` index's order,
+each task's rows in its own history's order, `next` naming the task and
+the row (store.md, 7.3, "A page goes on from the last row it examined";
+the designer, 2026-10-13, jig `b31e0964`). The core's `from_store`,
+`row_key` and `position_allowed` (`crates/jig-domain-core/src/reads/rows.rs`)
+admit both for these scopes, as 16.3 does for notes; 16.4 may edit them
+for these scopes only.
 Test shape: `src/tests/reads.rs` (or `src/tests/reads/paged.rs` after
 the split); fixtures as above plus the index rows as jig 12 keys them:
 `update(party, at, task, object)`, `conversation(party, at, task)`,
@@ -338,7 +349,11 @@ task)`, `delegate(requester, task)`. Tests:
 `inbox_results_read_newest_first_within_the_group`,
 `an_inbox_filter_keeps_one_projects_rows`,
 `conversations_read_newest_first_from_the_index`,
-`ended_goals_read_newest_first_with_their_counts`. Each under 20 ms.
+`ended_goals_read_newest_first_with_their_counts`,
+`an_inbox_page_that_skipped_rows_goes_on_from_the_last_examined`,
+`a_page_that_returned_none_within_its_bound_is_cut_not_ended`,
+`a_subtree_history_page_moves_from_one_task_to_the_next`. Each under
+20 ms.
 Proof: unit, `reads::inbox_results_read_newest_first_within_the_group`,
 run once with `heavy cargo nextest run -p jig-protocol-store -E
 'test(inbox_results_read_newest_first_within_the_group)'`: three results
