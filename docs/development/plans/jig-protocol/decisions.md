@@ -1391,6 +1391,18 @@ the file.
      is an implementation choice in any session's files, named in the
      commit body, when it changes no behaviour, signature or test. Public
      API across crates stays a question. The README's Rules say so.
+198. **A session may replace what its own earlier increments landed**
+     (2026-10-13, the coordinator's block "jig 17.2: replace old directory
+     commit path outside Files", 2026-10-13T03:03:02Z). 17.2's common
+     transcript writer replaces 17.1's `directory::commit` (45 lines in
+     `directory.rs`, jig 17's own file, not in 17.2's Files); development.md,
+     8.2: "Removing a mechanism removes all of it". From now to the run's
+     end, an increment that replaces a mechanism its own session's earlier
+     increments landed edits and removes it in those files, past ruling
+     114's 20 lines, keeping every test's name and expected value unless
+     its Shape changes the behaviour, named in its commit body. Another
+     session's files stay under rulings 114 and 145. The README's Rules
+     say so.
 
 ## For the user
 

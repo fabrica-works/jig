@@ -311,6 +311,12 @@ ones before it in its session. Dependencies are by capability: "skein
   module reuses it, in any session's files, named in the commit body, when
   it changes no behaviour, signature or test. Public API across crates
   stays a question.
+- **A session may replace what its own earlier increments landed**
+  (decisions.md, ruling 198): an increment that replaces its own session's
+  mechanism edits and removes it in that session's files, past ruling
+  114's 20 lines, every test's name and expected value kept unless the
+  Shape changes the behaviour, named in the commit body. Another
+  session's files stay under rulings 114 and 145.
 
 ## Live services
 
