@@ -46,69 +46,7 @@ pub fn limits(domain: &domain::Limits) -> Option<Limits> {
         task_bytes_value: u32::try_from(crate::tasks_v1::TaskProblem::worst_case_bytes(&tasks)?).ok()?,
         note_bytes_value: u32::try_from(crate::notes_v1::Row::worst_case_bytes(&notes)?).ok()?,
     };
-    if core.escalation_decision_reject_reason > wire::CEILINGS.escalation_decision_reject_reason {
-        return None;
-    }
-    if core.settled_answer_host_body > wire::CEILINGS.settled_answer_host_body {
-        return None;
-    }
-    if core.settled_answer_delivery_evidence > wire::CEILINGS.settled_answer_delivery_evidence {
-        return None;
-    }
-    if core.settled_call_name > wire::CEILINGS.settled_call_name {
-        return None;
-    }
-    if core.settled_call_tool > wire::CEILINGS.settled_call_tool {
-        return None;
-    }
-    if core.call_part_effect_denied_findings > wire::CEILINGS.call_part_effect_denied_findings {
-        return None;
-    }
-    if core.call_part_tool_denied_findings > wire::CEILINGS.call_part_tool_denied_findings {
-        return None;
-    }
-    if core.call_part_delegated_value > wire::CEILINGS.call_part_delegated_value {
-        return None;
-    }
-    if core.call_part_delegation_denied_findings > wire::CEILINGS.call_part_delegation_denied_findings {
-        return None;
-    }
-    if core.call_part_note_recalled_entries > wire::CEILINGS.call_part_note_recalled_entries {
-        return None;
-    }
-    if core.task_bytes_value > wire::CEILINGS.task_bytes_value {
-        return None;
-    }
-    if core.note_bytes_value > wire::CEILINGS.note_bytes_value {
-        return None;
-    }
-    if core.phase_bytes_value > wire::CEILINGS.phase_bytes_value {
-        return None;
-    }
-    if core.change_bytes_value > wire::CEILINGS.change_bytes_value {
-        return None;
-    }
-    if core.end_bytes_value > wire::CEILINGS.end_bytes_value {
-        return None;
-    }
-    if core.projection_goal_words > wire::CEILINGS.projection_goal_words {
-        return None;
-    }
-    if core.projection_task_words > wire::CEILINGS.projection_task_words {
-        return None;
-    }
-    if core.projection_milestone_words > wire::CEILINGS.projection_milestone_words {
-        return None;
-    }
-    if core.projection_goal_row_pending > wire::CEILINGS.projection_goal_row_pending {
-        return None;
-    }
-    if core.run_proof_credentials > wire::CEILINGS.run_proof_credentials {
-        return None;
-    }
-    if core.turn_record_transcript > wire::CEILINGS.turn_record_transcript {
-        return None;
-    }
+    wire::check_limits(&core).ok()?;
     Some(Limits { core, tasks, notes })
 }
 pub fn encode(row: &domain::CoreRecord, limits: &Limits) -> Result<Box<[u8]>, wire::Problem> {

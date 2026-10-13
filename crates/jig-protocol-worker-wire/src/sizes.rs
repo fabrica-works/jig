@@ -91,46 +91,8 @@ pub fn limits(sizes: &Sizes) -> Option<v1::Limits> {
         relay_text_text: sizes.answer,
         relayed_name: sizes.call_name,
     };
-    if within_ceilings(&limits) { Some(limits) } else { None }
-}
-
-fn within_ceilings(limits: &v1::Limits) -> bool {
-    let ceilings = &v1::CEILINGS;
-    limits.credential_name <= ceilings.credential_name
-        && limits.credential_secret <= ceilings.credential_secret
-        && limits.model_bound_name <= ceilings.model_bound_name
-        && limits.bounds_models <= ceilings.bounds_models
-        && limits.hello_workstreams <= ceilings.hello_workstreams
-        && limits.hello_hosting <= ceilings.hello_hosting
-        && limits.turn_refused <= ceilings.turn_refused
-        && limits.turn_body <= ceilings.turn_body
-        && limits.call_name <= ceilings.call_name
-        && limits.call_tool <= ceilings.call_tool
-        && limits.call_input <= ceilings.call_input
-        && limits.work_left_some <= ceilings.work_left_some
-        && limits.work_saved_some <= ceilings.work_saved_some
-        && limits.ended_outcome <= ceilings.ended_outcome
-        && limits.resource_resource_some <= ceilings.resource_resource_some
-        && limits.failed_detail <= ceilings.failed_detail
-        && limits.answer_refused <= ceilings.answer_refused
-        && limits.message_sender <= ceilings.message_sender
-        && limits.message_words <= ceilings.message_words
-        && limits.workspace_items <= ceilings.workspace_items
-        && limits.host_answer_body <= ceilings.host_answer_body
-        && limits.delivery_answer_evidence <= ceilings.delivery_answer_evidence
-        && limits.answered_call_name <= ceilings.answered_call_name
-        && limits.answered_call_tool <= ceilings.answered_call_tool
-        && limits.grant_value <= ceilings.grant_value
-        && limits.grant_account_id <= ceilings.grant_account_id
-        && limits.assignment_charter <= ceilings.assignment_charter
-        && limits.assignment_transcript <= ceilings.assignment_transcript
-        && limits.assignment_answered <= ceilings.assignment_answered
-        && limits.assignment_messages <= ceilings.assignment_messages
-        && limits.assignment_grants <= ceilings.assignment_grants
-        && limits.inbound_sender <= ceilings.inbound_sender
-        && limits.inbound_words <= ceilings.inbound_words
-        && limits.relay_text_text <= ceilings.relay_text_text
-        && limits.relayed_name <= ceilings.relayed_name
+    v1::check_limits(&limits).ok()?;
+    Some(limits)
 }
 
 #[must_use]

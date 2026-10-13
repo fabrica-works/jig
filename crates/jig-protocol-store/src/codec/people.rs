@@ -68,65 +68,10 @@ pub fn limits(domain: &core::Limits) -> Option<wire::Limits> {
         stored_roles_holdings: people.holdings,
         segment_bytes: people.amendment_bytes.max(authority.segment_bytes),
     };
-    if within(&limits) { Some(limits) } else { None }
+    wire::check_limits(&limits).ok()?;
+    Some(limits)
 }
 
-fn within(limits: &wire::Limits) -> bool {
-    for fits in [
-        limits.identity_key_subject <= wire::CEILINGS.identity_key_subject,
-        limits.identity_login <= wire::CEILINGS.identity_login,
-        limits.identity_name <= wire::CEILINGS.identity_name,
-        limits.last_exact_value <= wire::CEILINGS.last_exact_value,
-        limits.last_open_value <= wire::CEILINGS.last_open_value,
-        limits.pattern_segments <= wire::CEILINGS.pattern_segments,
-        limits.delegation_kinds <= wire::CEILINGS.delegation_kinds,
-        limits.authority_grants <= wire::CEILINGS.authority_grants,
-        limits.authority_note_resources <= wire::CEILINGS.authority_note_resources,
-        limits.policy_value_projections <= wire::CEILINGS.policy_value_projections,
-        limits.policy_value_roles <= wire::CEILINGS.policy_value_roles,
-        limits.policy_value_requirements <= wire::CEILINGS.policy_value_requirements,
-        limits.policy_value_permissions <= wire::CEILINGS.policy_value_permissions,
-        limits.policy_change_requirements_requirements <= wire::CEILINGS.policy_change_requirements_requirements,
-        limits.policy_change_projections_grants <= wire::CEILINGS.policy_change_projections_grants,
-        limits.policy_change_permissions_mappings <= wire::CEILINGS.policy_change_permissions_mappings,
-        limits.note_change_correct_description <= wire::CEILINGS.note_change_correct_description,
-        limits.note_change_correct_body <= wire::CEILINGS.note_change_correct_body,
-        limits.note_change_correct_references <= wire::CEILINGS.note_change_correct_references,
-        limits.resource_name_path <= wire::CEILINGS.resource_name_path,
-        limits.adoption_options <= wire::CEILINGS.adoption_options,
-        limits.person_result_approved_state <= wire::CEILINGS.person_result_approved_state,
-        limits.person_result_approved_words_some <= wire::CEILINGS.person_result_approved_words_some,
-        limits.person_result_report_words <= wire::CEILINGS.person_result_report_words,
-        limits.person_result_verdict_words <= wire::CEILINGS.person_result_verdict_words,
-        limits.person_result_failure_reason <= wire::CEILINGS.person_result_failure_reason,
-        limits.proposal_decision_reject_reason <= wire::CEILINGS.proposal_decision_reject_reason,
-        limits.escalation_decision_reject_reason <= wire::CEILINGS.escalation_decision_reject_reason,
-        limits.parameter_bytes_value <= wire::CEILINGS.parameter_bytes_value,
-        limits.spec_words <= wire::CEILINGS.spec_words,
-        limits.spec_parameters <= wire::CEILINGS.spec_parameters,
-        limits.spec_inputs <= wire::CEILINGS.spec_inputs,
-        limits.amendment_instructions_some <= wire::CEILINGS.amendment_instructions_some,
-        limits.amendment_dependencies_some <= wire::CEILINGS.amendment_dependencies_some,
-        limits.amendment_reason <= wire::CEILINGS.amendment_reason,
-        limits.ask_close_disposals <= wire::CEILINGS.ask_close_disposals,
-        limits.ask_make_service_name <= wire::CEILINGS.ask_make_service_name,
-        limits.ask_set_goal_spec <= wire::CEILINGS.ask_set_goal_spec,
-        limits.ask_cancel_reason <= wire::CEILINGS.ask_cancel_reason,
-        limits.ask_move_reason <= wire::CEILINGS.ask_move_reason,
-        limits.ask_say_words <= wire::CEILINGS.ask_say_words,
-        limits.ask_answer_question_words <= wire::CEILINGS.ask_answer_question_words,
-        limits.ask_prioritise_goals <= wire::CEILINGS.ask_prioritise_goals,
-        limits.ask_set_roles_holdings <= wire::CEILINGS.ask_set_roles_holdings,
-        limits.ask_start_chat_words <= wire::CEILINGS.ask_start_chat_words,
-        limits.stored_roles_holdings <= wire::CEILINGS.stored_roles_holdings,
-        limits.segment_bytes <= wire::CEILINGS.segment_bytes,
-    ] {
-        if !fits {
-            return false;
-        }
-    }
-    true
-}
 pub fn encode(row: &domain::Stored, limits: &wire::Limits) -> Result<Box<[u8]>, wire::Problem> {
     let value = match row {
         domain::Stored::Person { number, identity } => wire::Value::Person(wire::StoredPerson::new(

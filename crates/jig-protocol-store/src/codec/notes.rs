@@ -7,24 +7,16 @@ use skein_lib::{List, Reader, Wall, Writer};
 /// Translate the notes child's bounds, refusing a schema ceiling.
 #[must_use]
 pub fn limits(domain: &domain::Limits) -> Option<wire::Limits> {
-    let ceilings = &wire::CEILINGS;
-    if domain.pattern_bytes > ceilings.segment_bytes
-        || domain.pattern_bytes > ceilings.pattern_segments
-        || domain.description_bytes > ceilings.entry_description
-        || domain.description_bytes > ceilings.line_description
-        || domain.body_bytes > ceilings.entry_body
-        || domain.references > ceilings.entry_references
-    {
-        return None;
-    }
-    Some(wire::Limits {
+    let limits = wire::Limits {
         segment_bytes: domain.pattern_bytes,
         pattern_segments: domain.pattern_bytes,
         entry_description: domain.description_bytes,
         line_description: domain.description_bytes,
         entry_body: domain.body_bytes,
         entry_references: domain.references,
-    })
+    };
+    wire::check_limits(&limits).ok()?;
+    Some(limits)
 }
 
 /// Encode one versioned notes row within the configured bounds.

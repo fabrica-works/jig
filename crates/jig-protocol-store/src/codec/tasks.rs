@@ -15,13 +15,7 @@ use skein_lib::{Reader, Writer};
 /// Translate the tasks child's bounds, refusing any schema ceiling.
 #[must_use]
 pub fn limits(domain: &domain::Limits) -> Option<wire::Limits> {
-    if domain.delegates > wire::CEILINGS.task_problem_blocked_by_some
-        || domain.batch > wire::CEILINGS.result_followups_delegates_value
-        || !limits_fit(domain)
-    {
-        return None;
-    }
-    Some(wire::Limits {
+    let limits = wire::Limits {
         task_problem_blocked_by_some: domain.delegates,
         result_followups_delegates_value: domain.batch,
         segment_bytes: domain.hold_bytes,
@@ -86,7 +80,9 @@ pub fn limits(domain: &domain::Limits) -> Option<wire::Limits> {
         task_interests_subscriptions: domain.subscriptions,
         task_interests_inbox: domain.inbox_messages,
         task_interests_saved: domain.saved_resources,
-    })
+    };
+    wire::check_limits(&limits).ok()?;
+    Some(limits)
 }
 
 /// Encode one tasks row within the configured bounds.
@@ -189,69 +185,4 @@ pub fn decode(bytes: &[u8], limits: &wire::Limits) -> Result<domain::Stored, wir
             domain::Stored::Pool(domain::PoolSlots { number, pool: value::read_name(pool, limits)?, slots })
         }
     })
-}
-
-fn limits_fit(domain: &domain::Limits) -> bool {
-    domain.hold_bytes <= wire::CEILINGS.segment_bytes
-        && domain.hold_segments <= wire::CEILINGS.name_path
-        && domain.spec_bytes <= wire::CEILINGS.bytes_parameter_value
-        && domain.spec_bytes <= wire::CEILINGS.spec_words
-        && domain.parameters <= wire::CEILINGS.spec_parameters
-        && domain.inputs <= wire::CEILINGS.spec_inputs
-        && domain.hold_bytes <= wire::CEILINGS.part_segment_bytes
-        && domain.hold_segments <= wire::CEILINGS.part_path_segments
-        && domain.result_bytes <= wire::CEILINGS.field_rule_name
-        && domain.result_bytes <= wire::CEILINGS.verdict_fields
-        && domain.result_bytes <= wire::CEILINGS.approval_state
-        && domain.contract_choices <= wire::CEILINGS.choices_choices
-        && domain.authority_bytes <= wire::CEILINGS.authority_segment_bytes
-        && domain.authority_segments <= wire::CEILINGS.pattern_segments
-        && domain.authority_grants <= wire::CEILINGS.authority_grants
-        && domain.authority_grants <= wire::CEILINGS.authority_note_resources
-        && domain.executor_kinds <= wire::CEILINGS.delegation_kinds
-        && domain.dependencies <= wire::CEILINGS.member_dependencies
-        && domain.holdings <= wire::CEILINGS.member_holdings
-        && domain.batch <= wire::CEILINGS.recurring_template_batch
-        && domain.result_bytes <= wire::CEILINGS.result_field_name
-        && domain.result_bytes <= wire::CEILINGS.result_field_value
-        && domain.result_bytes <= wire::CEILINGS.approved_state
-        && domain.result_bytes <= wire::CEILINGS.approved_words_some
-        && domain.result_bytes <= wire::CEILINGS.report_result_words
-        && domain.result_bytes <= wire::CEILINGS.verdict_result_fields
-        && domain.result_bytes <= wire::CEILINGS.verdict_result_words
-        && domain.result_bytes <= wire::CEILINGS.change_result_words
-        && domain.result_bytes <= wire::CEILINGS.failure_result_reason
-        && domain.result_bytes <= wire::CEILINGS.cancelled_reason
-        && domain.message_bytes <= wire::CEILINGS.rejected_proposal_reason
-        && domain.message_bytes <= wire::CEILINGS.amendment_instructions_some
-        && domain.dependencies <= wire::CEILINGS.amendment_dependencies_some
-        && domain.message_bytes <= wire::CEILINGS.amendment_reason
-        && domain.batch <= wire::CEILINGS.proposed_batch_members
-        && domain.message_bytes <= wire::CEILINGS.proposal_reason
-        && domain.message_bytes <= wire::CEILINGS.settings_instructions_some
-        && domain.dependencies <= wire::CEILINGS.settings_dependencies
-        && domain.result_bytes.max(domain.message_bytes) <= wire::CEILINGS.history_reason
-        && domain.message_bytes <= wire::CEILINGS.rejected_person_proposal_reason
-        && domain.result_bytes <= wire::CEILINGS.approval_message_state
-        && domain.result_bytes <= wire::CEILINGS.verdict_message_fields
-        && domain.message_bytes.max(domain.result_bytes) <= wire::CEILINGS.word_words
-        && domain.message_bytes <= wire::CEILINGS.activity_words_words
-        && domain.result_bytes <= wire::CEILINGS.rejected_escalation_reason
-        && domain.batch <= wire::CEILINGS.recurring_state_last_batch
-        && domain.authority_segments <= wire::CEILINGS.saved_resource_path
-        && domain.inbox_messages <= wire::CEILINGS.task_history_question_lines
-        && domain.inbox_messages <= wire::CEILINGS.task_history_proposal_rows
-        && domain.message_bytes <= wire::CEILINGS.task_history_instructions_some
-        && domain.inbox_messages <= wire::CEILINGS.task_history_refused
-        && domain.inbox_messages <= wire::CEILINGS.task_run_replies
-        && domain.dependencies <= wire::CEILINGS.task_definition_dependencies
-        && domain.dependencies <= wire::CEILINGS.task_definition_waiting_on
-        && domain.holdings <= wire::CEILINGS.task_interests_holdings
-        && domain.delegates <= wire::CEILINGS.task_interests_delegates
-        && domain.batch <= wire::CEILINGS.task_interests_result_followups
-        && domain.references <= wire::CEILINGS.task_interests_references
-        && domain.inbox_messages <= wire::CEILINGS.task_interests_questions
-        && domain.subscriptions <= wire::CEILINGS.task_interests_subscriptions
-        && domain.inbox_messages <= wire::CEILINGS.task_interests_inbox
-        && domain.saved_resources <= wire::CEILINGS.task_interests_saved
 }

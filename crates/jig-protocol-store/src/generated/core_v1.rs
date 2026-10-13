@@ -588,7 +588,8 @@ pub struct Problem {
     pub reason: skein_codec::Reason,
 }
 
-fn check_limits(limits: &Limits) -> Result<(), Problem> {
+/// Checks the family limits, naming the first limit past its ceiling.
+pub fn check_limits(limits: &Limits) -> Result<(), Problem> {
     check_limits_0(limits)?;
     Ok(())
 }
@@ -633,9 +634,8 @@ pub struct ProposerTask {
 
 impl ProposerTask {
     /// Makes a value within the given limits.
-    pub fn new(limits: &Limits, parts: ProposerTaskParts) -> Result<Self, Problem> {
+    pub fn new(_limits: &Limits, parts: ProposerTaskParts) -> Result<Self, Problem> {
         let ProposerTaskParts { value } = parts;
-        check_limits(limits)?;
         let value = Self { value };
         Ok(value)
     }
@@ -665,9 +665,8 @@ pub struct ProposerParty {
 
 impl ProposerParty {
     /// Makes a value within the given limits.
-    pub fn new(limits: &Limits, parts: ProposerPartyParts) -> Result<Self, Problem> {
+    pub fn new(_limits: &Limits, parts: ProposerPartyParts) -> Result<Self, Problem> {
         let ProposerPartyParts { value } = parts;
-        check_limits(limits)?;
         let value = Self { value };
         Ok(value)
     }
@@ -693,8 +692,7 @@ pub enum Proposer {
 
 impl Proposer {
     /// Checks the payload against the given limits.
-    pub fn new(limits: &Limits, value: Self) -> Result<Self, Problem> {
-        check_limits(limits)?;
+    pub fn new(_limits: &Limits, value: Self) -> Result<Self, Problem> {
         Ok(value)
     }
 
@@ -717,8 +715,7 @@ pub enum ProposalChoice {
 
 impl ProposalChoice {
     /// Checks the payload against the given limits.
-    pub fn new(limits: &Limits, value: Self) -> Result<Self, Problem> {
-        check_limits(limits)?;
+    pub fn new(_limits: &Limits, value: Self) -> Result<Self, Problem> {
         Ok(value)
     }
 
@@ -741,7 +738,6 @@ impl EscalationDecisionReject {
     /// Makes a value within the given limits.
     pub fn new(limits: &Limits, parts: EscalationDecisionRejectParts) -> Result<Self, Problem> {
         let EscalationDecisionRejectParts { reason } = parts;
-        check_limits(limits)?;
         let value = Self { reason };
         value.check(limits)?;
         Ok(value)
@@ -775,7 +771,6 @@ pub enum EscalationDecision {
 impl EscalationDecision {
     /// Checks the payload against the given limits.
     pub fn new(limits: &Limits, value: Self) -> Result<Self, Problem> {
-        check_limits(limits)?;
         value.check(limits)?;
         Ok(value)
     }
@@ -806,8 +801,7 @@ pub enum ProposalKind {
 
 impl ProposalKind {
     /// Checks the payload against the given limits.
-    pub fn new(limits: &Limits, value: Self) -> Result<Self, Problem> {
-        check_limits(limits)?;
+    pub fn new(_limits: &Limits, value: Self) -> Result<Self, Problem> {
         Ok(value)
     }
 
@@ -828,9 +822,8 @@ pub struct EscalationOutcomePassed {
 
 impl EscalationOutcomePassed {
     /// Makes a value within the given limits.
-    pub fn new(limits: &Limits, parts: EscalationOutcomePassedParts) -> Result<Self, Problem> {
+    pub fn new(_limits: &Limits, parts: EscalationOutcomePassedParts) -> Result<Self, Problem> {
         let EscalationOutcomePassedParts { revision } = parts;
-        check_limits(limits)?;
         let value = Self { revision };
         Ok(value)
     }
@@ -864,8 +857,7 @@ pub enum EscalationOutcome {
 
 impl EscalationOutcome {
     /// Checks the payload against the given limits.
-    pub fn new(limits: &Limits, value: Self) -> Result<Self, Problem> {
-        check_limits(limits)?;
+    pub fn new(_limits: &Limits, value: Self) -> Result<Self, Problem> {
         Ok(value)
     }
 
@@ -888,8 +880,7 @@ pub enum ProposalOutcome {
 
 impl ProposalOutcome {
     /// Checks the payload against the given limits.
-    pub fn new(limits: &Limits, value: Self) -> Result<Self, Problem> {
-        check_limits(limits)?;
+    pub fn new(_limits: &Limits, value: Self) -> Result<Self, Problem> {
         Ok(value)
     }
 
@@ -910,8 +901,7 @@ pub enum Source {
 
 impl Source {
     /// Checks the payload against the given limits.
-    pub fn new(limits: &Limits, value: Self) -> Result<Self, Problem> {
-        check_limits(limits)?;
+    pub fn new(_limits: &Limits, value: Self) -> Result<Self, Problem> {
         Ok(value)
     }
 
@@ -932,9 +922,8 @@ pub struct Lacks {
 
 impl Lacks {
     /// Makes a value within the given limits.
-    pub fn new(limits: &Limits, parts: LacksParts) -> Result<Self, Problem> {
+    pub fn new(_limits: &Limits, parts: LacksParts) -> Result<Self, Problem> {
         let LacksParts { skein_bools } = parts;
-        check_limits(limits)?;
         let value = Self { skein_bools };
         Ok(value)
     }
@@ -998,9 +987,8 @@ pub struct Judge {
 
 impl Judge {
     /// Makes a value within the given limits.
-    pub fn new(limits: &Limits, parts: JudgeParts) -> Result<Self, Problem> {
+    pub fn new(_limits: &Limits, parts: JudgeParts) -> Result<Self, Problem> {
         let JudgeParts { connector, requirement, parameters } = parts;
-        check_limits(limits)?;
         let value = Self { connector, requirement, parameters };
         Ok(value)
     }
@@ -1038,8 +1026,7 @@ pub enum Answer {
 
 impl Answer {
     /// Checks the payload against the given limits.
-    pub fn new(limits: &Limits, value: Self) -> Result<Self, Problem> {
-        check_limits(limits)?;
+    pub fn new(_limits: &Limits, value: Self) -> Result<Self, Problem> {
         Ok(value)
     }
 
@@ -1063,9 +1050,8 @@ pub struct FindingAuthority {
 
 impl FindingAuthority {
     /// Makes a value within the given limits.
-    pub fn new(limits: &Limits, parts: FindingAuthorityParts) -> Result<Self, Problem> {
+    pub fn new(_limits: &Limits, parts: FindingAuthorityParts) -> Result<Self, Problem> {
         let FindingAuthorityParts { source, lacks } = parts;
-        check_limits(limits)?;
         let value = Self { source, lacks };
         Ok(value)
     }
@@ -1099,9 +1085,8 @@ pub struct FindingExecutor {
 
 impl FindingExecutor {
     /// Makes a value within the given limits.
-    pub fn new(limits: &Limits, parts: FindingExecutorParts) -> Result<Self, Problem> {
+    pub fn new(_limits: &Limits, parts: FindingExecutorParts) -> Result<Self, Problem> {
         let FindingExecutorParts { source } = parts;
-        check_limits(limits)?;
         let value = Self { source };
         Ok(value)
     }
@@ -1131,9 +1116,8 @@ pub struct FindingTasks {
 
 impl FindingTasks {
     /// Makes a value within the given limits.
-    pub fn new(limits: &Limits, parts: FindingTasksParts) -> Result<Self, Problem> {
+    pub fn new(_limits: &Limits, parts: FindingTasksParts) -> Result<Self, Problem> {
         let FindingTasksParts { source } = parts;
-        check_limits(limits)?;
         let value = Self { source };
         Ok(value)
     }
@@ -1163,9 +1147,8 @@ pub struct FindingSpend {
 
 impl FindingSpend {
     /// Makes a value within the given limits.
-    pub fn new(limits: &Limits, parts: FindingSpendParts) -> Result<Self, Problem> {
+    pub fn new(_limits: &Limits, parts: FindingSpendParts) -> Result<Self, Problem> {
         let FindingSpendParts { source } = parts;
-        check_limits(limits)?;
         let value = Self { source };
         Ok(value)
     }
@@ -1195,9 +1178,8 @@ pub struct FindingGrant {
 
 impl FindingGrant {
     /// Makes a value within the given limits.
-    pub fn new(limits: &Limits, parts: FindingGrantParts) -> Result<Self, Problem> {
+    pub fn new(_limits: &Limits, parts: FindingGrantParts) -> Result<Self, Problem> {
         let FindingGrantParts { source } = parts;
-        check_limits(limits)?;
         let value = Self { source };
         Ok(value)
     }
@@ -1227,9 +1209,8 @@ pub struct FindingPrice {
 
 impl FindingPrice {
     /// Makes a value within the given limits.
-    pub fn new(limits: &Limits, parts: FindingPriceParts) -> Result<Self, Problem> {
+    pub fn new(_limits: &Limits, parts: FindingPriceParts) -> Result<Self, Problem> {
         let FindingPriceParts { source } = parts;
-        check_limits(limits)?;
         let value = Self { source };
         Ok(value)
     }
@@ -1259,9 +1240,8 @@ pub struct FindingScope {
 
 impl FindingScope {
     /// Makes a value within the given limits.
-    pub fn new(limits: &Limits, parts: FindingScopeParts) -> Result<Self, Problem> {
+    pub fn new(_limits: &Limits, parts: FindingScopeParts) -> Result<Self, Problem> {
         let FindingScopeParts { source } = parts;
-        check_limits(limits)?;
         let value = Self { source };
         Ok(value)
     }
@@ -1291,9 +1271,8 @@ pub struct FindingRequired {
 
 impl FindingRequired {
     /// Makes a value within the given limits.
-    pub fn new(limits: &Limits, parts: FindingRequiredParts) -> Result<Self, Problem> {
+    pub fn new(_limits: &Limits, parts: FindingRequiredParts) -> Result<Self, Problem> {
         let FindingRequiredParts { judge } = parts;
-        check_limits(limits)?;
         let value = Self { judge };
         Ok(value)
     }
@@ -1323,9 +1302,8 @@ pub struct FindingFailed {
 
 impl FindingFailed {
     /// Makes a value within the given limits.
-    pub fn new(limits: &Limits, parts: FindingFailedParts) -> Result<Self, Problem> {
+    pub fn new(_limits: &Limits, parts: FindingFailedParts) -> Result<Self, Problem> {
         let FindingFailedParts { judge } = parts;
-        check_limits(limits)?;
         let value = Self { judge };
         Ok(value)
     }
@@ -1355,9 +1333,8 @@ pub struct FindingUnguarded {
 
 impl FindingUnguarded {
     /// Makes a value within the given limits.
-    pub fn new(limits: &Limits, parts: FindingUnguardedParts) -> Result<Self, Problem> {
+    pub fn new(_limits: &Limits, parts: FindingUnguardedParts) -> Result<Self, Problem> {
         let FindingUnguardedParts { judge } = parts;
-        check_limits(limits)?;
         let value = Self { judge };
         Ok(value)
     }
@@ -1431,8 +1408,7 @@ pub enum Finding {
 
 impl Finding {
     /// Checks the payload against the given limits.
-    pub fn new(limits: &Limits, value: Self) -> Result<Self, Problem> {
-        check_limits(limits)?;
+    pub fn new(_limits: &Limits, value: Self) -> Result<Self, Problem> {
         Ok(value)
     }
 
@@ -1449,8 +1425,7 @@ pub enum HostKind {
 
 impl HostKind {
     /// Checks the payload against the given limits.
-    pub fn new(limits: &Limits, value: Self) -> Result<Self, Problem> {
-        check_limits(limits)?;
+    pub fn new(_limits: &Limits, value: Self) -> Result<Self, Problem> {
         Ok(value)
     }
 
@@ -1471,9 +1446,8 @@ pub struct OutboxOutcomeHeld {
 
 impl OutboxOutcomeHeld {
     /// Makes a value within the given limits.
-    pub fn new(limits: &Limits, parts: OutboxOutcomeHeldParts) -> Result<Self, Problem> {
+    pub fn new(_limits: &Limits, parts: OutboxOutcomeHeldParts) -> Result<Self, Problem> {
         let OutboxOutcomeHeldParts { entry } = parts;
-        check_limits(limits)?;
         let value = Self { entry };
         Ok(value)
     }
@@ -1507,8 +1481,7 @@ pub enum OutboxOutcome {
 
 impl OutboxOutcome {
     /// Checks the payload against the given limits.
-    pub fn new(limits: &Limits, value: Self) -> Result<Self, Problem> {
-        check_limits(limits)?;
+    pub fn new(_limits: &Limits, value: Self) -> Result<Self, Problem> {
         Ok(value)
     }
 
@@ -1533,8 +1506,7 @@ pub enum DeliveryOutcome {
 
 impl DeliveryOutcome {
     /// Checks the payload against the given limits.
-    pub fn new(limits: &Limits, value: Self) -> Result<Self, Problem> {
-        check_limits(limits)?;
+    pub fn new(_limits: &Limits, value: Self) -> Result<Self, Problem> {
         Ok(value)
     }
 
@@ -1560,7 +1532,6 @@ impl SettledAnswerHost {
     /// Makes a value within the given limits.
     pub fn new(limits: &Limits, parts: SettledAnswerHostParts) -> Result<Self, Problem> {
         let SettledAnswerHostParts { error, body } = parts;
-        check_limits(limits)?;
         let value = Self { error, body };
         value.check(limits)?;
         Ok(value)
@@ -1604,7 +1575,6 @@ impl SettledAnswerDelivery {
     /// Makes a value within the given limits.
     pub fn new(limits: &Limits, parts: SettledAnswerDeliveryParts) -> Result<Self, Problem> {
         let SettledAnswerDeliveryParts { outcome, evidence } = parts;
-        check_limits(limits)?;
         let value = Self { outcome, evidence };
         value.check(limits)?;
         Ok(value)
@@ -1640,7 +1610,6 @@ pub enum SettledAnswer {
 impl SettledAnswer {
     /// Checks the payload against the given limits.
     pub fn new(limits: &Limits, value: Self) -> Result<Self, Problem> {
-        check_limits(limits)?;
         value.check(limits)?;
         Ok(value)
     }
@@ -1680,7 +1649,6 @@ impl SettledCall {
     /// Makes a value within the given limits.
     pub fn new(limits: &Limits, parts: SettledCallParts) -> Result<Self, Problem> {
         let SettledCallParts { serial, name, tool, answer } = parts;
-        check_limits(limits)?;
         let value = Self { serial, name, tool, answer };
         value.check(limits)?;
         Ok(value)
@@ -1738,9 +1706,8 @@ pub struct CallKey {
 
 impl CallKey {
     /// Makes a value within the given limits.
-    pub fn new(limits: &Limits, parts: CallKeyParts) -> Result<Self, Problem> {
+    pub fn new(_limits: &Limits, parts: CallKeyParts) -> Result<Self, Problem> {
         let CallKeyParts { task, attempt, completion, position } = parts;
-        check_limits(limits)?;
         let value = Self { task, attempt, completion, position };
         Ok(value)
     }
@@ -1791,9 +1758,8 @@ pub struct CallPartEffect {
 
 impl CallPartEffect {
     /// Makes a value within the given limits.
-    pub fn new(limits: &Limits, parts: CallPartEffectParts) -> Result<Self, Problem> {
+    pub fn new(_limits: &Limits, parts: CallPartEffectParts) -> Result<Self, Problem> {
         let CallPartEffectParts { connector, entry, deadline, outcome } = parts;
-        check_limits(limits)?;
         let value = Self { connector, entry, deadline, outcome };
         Ok(value)
     }
@@ -1835,9 +1801,8 @@ pub struct CallPartConnector {
 
 impl CallPartConnector {
     /// Makes a value within the given limits.
-    pub fn new(limits: &Limits, parts: CallPartConnectorParts) -> Result<Self, Problem> {
+    pub fn new(_limits: &Limits, parts: CallPartConnectorParts) -> Result<Self, Problem> {
         let CallPartConnectorParts { connector } = parts;
-        check_limits(limits)?;
         let value = Self { connector };
         Ok(value)
     }
@@ -1872,7 +1837,6 @@ impl CallPartEffectDenied {
     /// Makes a value within the given limits.
     pub fn new(limits: &Limits, parts: CallPartEffectDeniedParts) -> Result<Self, Problem> {
         let CallPartEffectDeniedParts { answer, findings } = parts;
-        check_limits(limits)?;
         let value = Self { answer, findings };
         value.check(limits)?;
         Ok(value)
@@ -1916,7 +1880,6 @@ impl CallPartToolDenied {
     /// Makes a value within the given limits.
     pub fn new(limits: &Limits, parts: CallPartToolDeniedParts) -> Result<Self, Problem> {
         let CallPartToolDeniedParts { answer, findings } = parts;
-        check_limits(limits)?;
         let value = Self { answer, findings };
         value.check(limits)?;
         Ok(value)
@@ -1961,9 +1924,8 @@ pub struct CallPartEscalationDecided {
 
 impl CallPartEscalationDecided {
     /// Makes a value within the given limits.
-    pub fn new(limits: &Limits, parts: CallPartEscalationDecidedParts) -> Result<Self, Problem> {
+    pub fn new(_limits: &Limits, parts: CallPartEscalationDecidedParts) -> Result<Self, Problem> {
         let CallPartEscalationDecidedParts { task, revision, outcome } = parts;
-        check_limits(limits)?;
         let value = Self { task, revision, outcome };
         Ok(value)
     }
@@ -2001,9 +1963,8 @@ pub struct CallPartProposed {
 
 impl CallPartProposed {
     /// Makes a value within the given limits.
-    pub fn new(limits: &Limits, parts: CallPartProposedParts) -> Result<Self, Problem> {
+    pub fn new(_limits: &Limits, parts: CallPartProposedParts) -> Result<Self, Problem> {
         let CallPartProposedParts { proposal } = parts;
-        check_limits(limits)?;
         let value = Self { proposal };
         Ok(value)
     }
@@ -2036,9 +1997,8 @@ pub struct CallPartProposalDecided {
 
 impl CallPartProposalDecided {
     /// Makes a value within the given limits.
-    pub fn new(limits: &Limits, parts: CallPartProposalDecidedParts) -> Result<Self, Problem> {
+    pub fn new(_limits: &Limits, parts: CallPartProposalDecidedParts) -> Result<Self, Problem> {
         let CallPartProposalDecidedParts { proposal, outcome } = parts;
-        check_limits(limits)?;
         let value = Self { proposal, outcome };
         Ok(value)
     }
@@ -2072,9 +2032,8 @@ pub struct CallPartControlDenied {
 
 impl CallPartControlDenied {
     /// Makes a value within the given limits.
-    pub fn new(limits: &Limits, parts: CallPartControlDeniedParts) -> Result<Self, Problem> {
+    pub fn new(_limits: &Limits, parts: CallPartControlDeniedParts) -> Result<Self, Problem> {
         let CallPartControlDeniedParts { answer } = parts;
-        check_limits(limits)?;
         let value = Self { answer };
         Ok(value)
     }
@@ -2104,9 +2063,8 @@ pub struct CallPartSent {
 
 impl CallPartSent {
     /// Makes a value within the given limits.
-    pub fn new(limits: &Limits, parts: CallPartSentParts) -> Result<Self, Problem> {
+    pub fn new(_limits: &Limits, parts: CallPartSentParts) -> Result<Self, Problem> {
         let CallPartSentParts { message } = parts;
-        check_limits(limits)?;
         let value = Self { message };
         Ok(value)
     }
@@ -2136,9 +2094,8 @@ pub struct CallPartSubscribed {
 
 impl CallPartSubscribed {
     /// Makes a value within the given limits.
-    pub fn new(limits: &Limits, parts: CallPartSubscribedParts) -> Result<Self, Problem> {
+    pub fn new(_limits: &Limits, parts: CallPartSubscribedParts) -> Result<Self, Problem> {
         let CallPartSubscribedParts { subscription } = parts;
-        check_limits(limits)?;
         let value = Self { subscription };
         Ok(value)
     }
@@ -2173,7 +2130,6 @@ impl CallPartDelegationDenied {
     /// Makes a value within the given limits.
     pub fn new(limits: &Limits, parts: CallPartDelegationDeniedParts) -> Result<Self, Problem> {
         let CallPartDelegationDeniedParts { answer, findings } = parts;
-        check_limits(limits)?;
         let value = Self { answer, findings };
         value.check(limits)?;
         Ok(value)
@@ -2215,9 +2171,8 @@ pub struct CallPartNoteWritten {
 
 impl CallPartNoteWritten {
     /// Makes a value within the given limits.
-    pub fn new(limits: &Limits, parts: CallPartNoteWrittenParts) -> Result<Self, Problem> {
+    pub fn new(_limits: &Limits, parts: CallPartNoteWrittenParts) -> Result<Self, Problem> {
         let CallPartNoteWrittenParts { name, revision } = parts;
-        check_limits(limits)?;
         let value = Self { name, revision };
         Ok(value)
     }
@@ -2253,7 +2208,6 @@ impl TaskBytes {
     /// Makes a value within the given limits.
     pub fn new(limits: &Limits, parts: TaskBytesParts) -> Result<Self, Problem> {
         let TaskBytesParts { value } = parts;
-        check_limits(limits)?;
         let value = Self { value };
         value.check(limits)?;
         Ok(value)
@@ -2290,7 +2244,6 @@ impl CallPartEscalationRefused {
     /// Makes a value within the given limits.
     pub fn new(limits: &Limits, parts: CallPartEscalationRefusedParts) -> Result<Self, Problem> {
         let CallPartEscalationRefusedParts { value } = parts;
-        check_limits(limits)?;
         let value = Self { value };
         value.check(limits)?;
         Ok(value)
@@ -2327,7 +2280,6 @@ impl CallPartProposalRefused {
     /// Makes a value within the given limits.
     pub fn new(limits: &Limits, parts: CallPartProposalRefusedParts) -> Result<Self, Problem> {
         let CallPartProposalRefusedParts { value } = parts;
-        check_limits(limits)?;
         let value = Self { value };
         value.check(limits)?;
         Ok(value)
@@ -2364,7 +2316,6 @@ impl CallPartControlRefused {
     /// Makes a value within the given limits.
     pub fn new(limits: &Limits, parts: CallPartControlRefusedParts) -> Result<Self, Problem> {
         let CallPartControlRefusedParts { value } = parts;
-        check_limits(limits)?;
         let value = Self { value };
         value.check(limits)?;
         Ok(value)
@@ -2401,7 +2352,6 @@ impl CallPartMessageRefused {
     /// Makes a value within the given limits.
     pub fn new(limits: &Limits, parts: CallPartMessageRefusedParts) -> Result<Self, Problem> {
         let CallPartMessageRefusedParts { value } = parts;
-        check_limits(limits)?;
         let value = Self { value };
         value.check(limits)?;
         Ok(value)
@@ -2438,7 +2388,6 @@ impl CallPartSubscriptionRefused {
     /// Makes a value within the given limits.
     pub fn new(limits: &Limits, parts: CallPartSubscriptionRefusedParts) -> Result<Self, Problem> {
         let CallPartSubscriptionRefusedParts { value } = parts;
-        check_limits(limits)?;
         let value = Self { value };
         value.check(limits)?;
         Ok(value)
@@ -2475,7 +2424,6 @@ impl CallPartDelegationRefused {
     /// Makes a value within the given limits.
     pub fn new(limits: &Limits, parts: CallPartDelegationRefusedParts) -> Result<Self, Problem> {
         let CallPartDelegationRefusedParts { value } = parts;
-        check_limits(limits)?;
         let value = Self { value };
         value.check(limits)?;
         Ok(value)
@@ -2510,9 +2458,8 @@ pub struct Number {
 
 impl Number {
     /// Makes a value within the given limits.
-    pub fn new(limits: &Limits, parts: NumberParts) -> Result<Self, Problem> {
+    pub fn new(_limits: &Limits, parts: NumberParts) -> Result<Self, Problem> {
         let NumberParts { value } = parts;
-        check_limits(limits)?;
         let value = Self { value };
         Ok(value)
     }
@@ -2544,7 +2491,6 @@ impl CallPartDelegated {
     /// Makes a value within the given limits.
     pub fn new(limits: &Limits, parts: CallPartDelegatedParts) -> Result<Self, Problem> {
         let CallPartDelegatedParts { value } = parts;
-        check_limits(limits)?;
         let value = Self { value };
         value.check(limits)?;
         Ok(value)
@@ -2581,7 +2527,6 @@ impl NoteBytes {
     /// Makes a value within the given limits.
     pub fn new(limits: &Limits, parts: NoteBytesParts) -> Result<Self, Problem> {
         let NoteBytesParts { value } = parts;
-        check_limits(limits)?;
         let value = Self { value };
         value.check(limits)?;
         Ok(value)
@@ -2621,7 +2566,6 @@ impl CallPartNoteRecalled {
     /// Makes a value within the given limits.
     pub fn new(limits: &Limits, parts: CallPartNoteRecalledParts) -> Result<Self, Problem> {
         let CallPartNoteRecalledParts { entries, more } = parts;
-        check_limits(limits)?;
         let value = Self { entries, more };
         value.check(limits)?;
         Ok(value)
@@ -2663,9 +2607,8 @@ pub struct NoteRefusalMoved {
 
 impl NoteRefusalMoved {
     /// Makes a value within the given limits.
-    pub fn new(limits: &Limits, parts: NoteRefusalMovedParts) -> Result<Self, Problem> {
+    pub fn new(_limits: &Limits, parts: NoteRefusalMovedParts) -> Result<Self, Problem> {
         let NoteRefusalMovedParts { revision } = parts;
-        check_limits(limits)?;
         let value = Self { revision };
         Ok(value)
     }
@@ -2701,8 +2644,7 @@ pub enum NoteRefusal {
 
 impl NoteRefusal {
     /// Checks the payload against the given limits.
-    pub fn new(limits: &Limits, value: Self) -> Result<Self, Problem> {
-        check_limits(limits)?;
+    pub fn new(_limits: &Limits, value: Self) -> Result<Self, Problem> {
         Ok(value)
     }
 
@@ -2723,9 +2665,8 @@ pub struct CallPartNoteRefused {
 
 impl CallPartNoteRefused {
     /// Makes a value within the given limits.
-    pub fn new(limits: &Limits, parts: CallPartNoteRefusedParts) -> Result<Self, Problem> {
+    pub fn new(_limits: &Limits, parts: CallPartNoteRefusedParts) -> Result<Self, Problem> {
         let CallPartNoteRefusedParts { value } = parts;
-        check_limits(limits)?;
         let value = Self { value };
         Ok(value)
     }
@@ -2798,7 +2739,6 @@ pub enum CallPart {
 impl CallPart {
     /// Checks the payload against the given limits.
     pub fn new(limits: &Limits, value: Self) -> Result<Self, Problem> {
-        check_limits(limits)?;
         value.check(limits)?;
         Ok(value)
     }
@@ -2845,7 +2785,6 @@ impl CallRecord {
     /// Makes a value within the given limits.
     pub fn new(limits: &Limits, parts: CallRecordParts) -> Result<Self, Problem> {
         let CallRecordParts { key, part, settled } = parts;
-        check_limits(limits)?;
         let value = Self { key, part, settled };
         value.check(limits)?;
         Ok(value)
@@ -2918,9 +2857,8 @@ pub struct Deployment {
 
 impl Deployment {
     /// Makes a value within the given limits.
-    pub fn new(limits: &Limits, parts: DeploymentParts) -> Result<Self, Problem> {
+    pub fn new(_limits: &Limits, parts: DeploymentParts) -> Result<Self, Problem> {
         let DeploymentParts { id, tasks, people, sign_ins, messages, runs, calls, connector_rows, applications, commits } = parts;
-        check_limits(limits)?;
         let value = Self { id, tasks, people, sign_ins, messages, runs, calls, connector_rows, applications, commits };
         Ok(value)
     }
@@ -2988,7 +2926,6 @@ impl PhaseBytes {
     /// Makes a value within the given limits.
     pub fn new(limits: &Limits, parts: PhaseBytesParts) -> Result<Self, Problem> {
         let PhaseBytesParts { value } = parts;
-        check_limits(limits)?;
         let value = Self { value };
         value.check(limits)?;
         Ok(value)
@@ -3025,7 +2962,6 @@ impl ChangeBytes {
     /// Makes a value within the given limits.
     pub fn new(limits: &Limits, parts: ChangeBytesParts) -> Result<Self, Problem> {
         let ChangeBytesParts { value } = parts;
-        check_limits(limits)?;
         let value = Self { value };
         value.check(limits)?;
         Ok(value)
@@ -3062,7 +2998,6 @@ impl EndBytes {
     /// Makes a value within the given limits.
     pub fn new(limits: &Limits, parts: EndBytesParts) -> Result<Self, Problem> {
         let EndBytesParts { value } = parts;
-        check_limits(limits)?;
         let value = Self { value };
         value.check(limits)?;
         Ok(value)
@@ -3097,9 +3032,8 @@ pub struct PartyTask {
 
 impl PartyTask {
     /// Makes a value within the given limits.
-    pub fn new(limits: &Limits, parts: PartyTaskParts) -> Result<Self, Problem> {
+    pub fn new(_limits: &Limits, parts: PartyTaskParts) -> Result<Self, Problem> {
         let PartyTaskParts { value } = parts;
-        check_limits(limits)?;
         let value = Self { value };
         Ok(value)
     }
@@ -3129,9 +3063,8 @@ pub struct PartyPerson {
 
 impl PartyPerson {
     /// Makes a value within the given limits.
-    pub fn new(limits: &Limits, parts: PartyPersonParts) -> Result<Self, Problem> {
+    pub fn new(_limits: &Limits, parts: PartyPersonParts) -> Result<Self, Problem> {
         let PartyPersonParts { value } = parts;
-        check_limits(limits)?;
         let value = Self { value };
         Ok(value)
     }
@@ -3161,9 +3094,8 @@ pub struct PartyDeployment {
 
 impl PartyDeployment {
     /// Makes a value within the given limits.
-    pub fn new(limits: &Limits, parts: PartyDeploymentParts) -> Result<Self, Problem> {
+    pub fn new(_limits: &Limits, parts: PartyDeploymentParts) -> Result<Self, Problem> {
         let PartyDeploymentParts { project } = parts;
-        check_limits(limits)?;
         let value = Self { project };
         Ok(value)
     }
@@ -3191,8 +3123,7 @@ pub enum Party {
 
 impl Party {
     /// Checks the payload against the given limits.
-    pub fn new(limits: &Limits, value: Self) -> Result<Self, Problem> {
-        check_limits(limits)?;
+    pub fn new(_limits: &Limits, value: Self) -> Result<Self, Problem> {
         Ok(value)
     }
 
@@ -3227,7 +3158,6 @@ impl ProjectionGoal {
     /// Makes a value within the given limits.
     pub fn new(limits: &Limits, parts: ProjectionGoalParts) -> Result<Self, Problem> {
         let ProjectionGoalParts { number, project, priority, words, phase } = parts;
-        check_limits(limits)?;
         let value = Self { number, project, priority, words, phase };
         value.check(limits)?;
         Ok(value)
@@ -3290,7 +3220,6 @@ impl ProjectionTask {
     /// Makes a value within the given limits.
     pub fn new(limits: &Limits, parts: ProjectionTaskParts) -> Result<Self, Problem> {
         let ProjectionTaskParts { number, requester, words, phase } = parts;
-        check_limits(limits)?;
         let value = Self { number, requester, words, phase };
         value.check(limits)?;
         Ok(value)
@@ -3341,9 +3270,8 @@ pub struct MilestoneLifecycle {
 
 impl MilestoneLifecycle {
     /// Makes a value within the given limits.
-    pub fn new(limits: &Limits, parts: MilestoneLifecycleParts) -> Result<Self, Problem> {
+    pub fn new(_limits: &Limits, parts: MilestoneLifecycleParts) -> Result<Self, Problem> {
         let MilestoneLifecycleParts { task, position } = parts;
-        check_limits(limits)?;
         let value = Self { task, position };
         Ok(value)
     }
@@ -3380,9 +3308,8 @@ pub struct MilestoneRevision {
 
 impl MilestoneRevision {
     /// Makes a value within the given limits.
-    pub fn new(limits: &Limits, parts: MilestoneRevisionParts) -> Result<Self, Problem> {
+    pub fn new(_limits: &Limits, parts: MilestoneRevisionParts) -> Result<Self, Problem> {
         let MilestoneRevisionParts { task, revision } = parts;
-        check_limits(limits)?;
         let value = Self { task, revision };
         Ok(value)
     }
@@ -3412,8 +3339,7 @@ pub enum MilestoneId {
 
 impl MilestoneId {
     /// Checks the payload against the given limits.
-    pub fn new(limits: &Limits, value: Self) -> Result<Self, Problem> {
-        check_limits(limits)?;
+    pub fn new(_limits: &Limits, value: Self) -> Result<Self, Problem> {
         Ok(value)
     }
 
@@ -3445,7 +3371,6 @@ impl ProjectionMilestone {
     /// Makes a value within the given limits.
     pub fn new(limits: &Limits, parts: ProjectionMilestoneParts) -> Result<Self, Problem> {
         let ProjectionMilestoneParts { identity, phase, change, words } = parts;
-        check_limits(limits)?;
         let value = Self { identity, phase, change, words };
         value.check(limits)?;
         Ok(value)
@@ -3498,9 +3423,8 @@ pub struct Connector {
 
 impl Connector {
     /// Makes a value within the given limits.
-    pub fn new(limits: &Limits, parts: ConnectorParts) -> Result<Self, Problem> {
+    pub fn new(_limits: &Limits, parts: ConnectorParts) -> Result<Self, Problem> {
         let ConnectorParts { value } = parts;
-        check_limits(limits)?;
         let value = Self { value };
         Ok(value)
     }
@@ -3541,7 +3465,6 @@ impl ProjectionGoalRow {
     /// Makes a value within the given limits.
     pub fn new(limits: &Limits, parts: ProjectionGoalRowParts) -> Result<Self, Problem> {
         let ProjectionGoalRowParts { goal, pending, changed, fed_at } = parts;
-        check_limits(limits)?;
         let value = Self { goal, pending, changed, fed_at };
         value.check(limits)?;
         Ok(value)
@@ -3594,7 +3517,6 @@ impl ProjectionTaskRow {
     /// Makes a value within the given limits.
     pub fn new(limits: &Limits, parts: ProjectionTaskRowParts) -> Result<Self, Problem> {
         let ProjectionTaskRowParts { goal, task } = parts;
-        check_limits(limits)?;
         let value = Self { goal, task };
         value.check(limits)?;
         Ok(value)
@@ -3638,7 +3560,6 @@ impl ProjectionMilestoneRow {
     /// Makes a value within the given limits.
     pub fn new(limits: &Limits, parts: ProjectionMilestoneRowParts) -> Result<Self, Problem> {
         let ProjectionMilestoneRowParts { goal, milestone } = parts;
-        check_limits(limits)?;
         let value = Self { goal, milestone };
         value.check(limits)?;
         Ok(value)
@@ -3676,7 +3597,6 @@ pub enum ProjectionRecord {
 impl ProjectionRecord {
     /// Checks the payload against the given limits.
     pub fn new(limits: &Limits, value: Self) -> Result<Self, Problem> {
-        check_limits(limits)?;
         value.check(limits)?;
         Ok(value)
     }
@@ -3717,7 +3637,6 @@ impl TerminalRecord {
     /// Makes a value within the given limits.
     pub fn new(limits: &Limits, parts: TerminalRecordParts) -> Result<Self, Problem> {
         let TerminalRecordParts { task, attempt, cumulative, end } = parts;
-        check_limits(limits)?;
         let value = Self { task, attempt, cumulative, end };
         value.check(limits)?;
         Ok(value)
@@ -3770,9 +3689,8 @@ pub struct TurnProof {
 
 impl TurnProof {
     /// Makes a value within the given limits.
-    pub fn new(limits: &Limits, parts: TurnProofParts) -> Result<Self, Problem> {
+    pub fn new(_limits: &Limits, parts: TurnProofParts) -> Result<Self, Problem> {
         let TurnProofParts { turn, cumulative, read } = parts;
-        check_limits(limits)?;
         let value = Self { turn, cumulative, read };
         Ok(value)
     }
@@ -3813,9 +3731,8 @@ pub struct Window {
 
 impl Window {
     /// Makes a value within the given limits.
-    pub fn new(limits: &Limits, parts: WindowParts) -> Result<Self, Problem> {
+    pub fn new(_limits: &Limits, parts: WindowParts) -> Result<Self, Problem> {
         let WindowParts { attempt, turn } = parts;
-        check_limits(limits)?;
         let value = Self { attempt, turn };
         Ok(value)
     }
@@ -3849,9 +3766,8 @@ pub struct Credential {
 
 impl Credential {
     /// Makes a value within the given limits.
-    pub fn new(limits: &Limits, parts: CredentialParts) -> Result<Self, Problem> {
+    pub fn new(_limits: &Limits, parts: CredentialParts) -> Result<Self, Problem> {
         let CredentialParts { value } = parts;
-        check_limits(limits)?;
         let value = Self { value };
         Ok(value)
     }
@@ -3907,7 +3823,6 @@ impl RunProof {
     /// Makes a value within the given limits.
     pub fn new(limits: &Limits, parts: RunProofParts) -> Result<Self, Problem> {
         let RunProofParts { task, attempt, conversation, credentials, window, host, offered, turn, terminal } = parts;
-        check_limits(limits)?;
         let value = Self { task, attempt, conversation, credentials, window, host, offered, turn, terminal };
         value.check(limits)?;
         Ok(value)
@@ -4000,7 +3915,6 @@ impl TurnRecord {
     /// Makes a value within the given limits.
     pub fn new(limits: &Limits, parts: TurnRecordParts) -> Result<Self, Problem> {
         let TurnRecordParts { opens_window, task, attempt, turn, spent, read, at, transcript } = parts;
-        check_limits(limits)?;
         let value = Self { opens_window, task, attempt, turn, spent, read, at, transcript };
         value.check(limits)?;
         Ok(value)
@@ -4066,9 +3980,8 @@ pub struct Created {
 
 impl Created {
     /// Makes a value within the given limits.
-    pub fn new(limits: &Limits, parts: CreatedParts) -> Result<Self, Problem> {
+    pub fn new(_limits: &Limits, parts: CreatedParts) -> Result<Self, Problem> {
         let CreatedParts { first, last } = parts;
-        check_limits(limits)?;
         let value = Self { first, last };
         Ok(value)
     }
@@ -4123,9 +4036,8 @@ pub struct ProposalDecisionRecord {
 
 impl ProposalDecisionRecord {
     /// Makes a value within the given limits.
-    pub fn new(limits: &Limits, parts: ProposalDecisionRecordParts) -> Result<Self, Problem> {
+    pub fn new(_limits: &Limits, parts: ProposalDecisionRecordParts) -> Result<Self, Problem> {
         let ProposalDecisionRecordParts { project, proposer, proposal, kind, by, at, choice, created } = parts;
-        check_limits(limits)?;
         let value = Self { project, proposer, proposal, kind, by, at, choice, created };
         Ok(value)
     }
@@ -4203,7 +4115,6 @@ impl EscalationDecisionRecord {
     /// Makes a value within the given limits.
     pub fn new(limits: &Limits, parts: EscalationDecisionRecordParts) -> Result<Self, Problem> {
         let EscalationDecisionRecordParts { project, requester, task, revision, by, at, decision } = parts;
-        check_limits(limits)?;
         let value = Self { project, requester, task, revision, by, at, decision };
         value.check(limits)?;
         Ok(value)
@@ -4264,7 +4175,6 @@ impl ProjectionValue {
     /// Makes a value within the given limits.
     pub fn new(limits: &Limits, parts: ProjectionValueParts) -> Result<Self, Problem> {
         let ProjectionValueParts { value } = parts;
-        check_limits(limits)?;
         let value = Self { value };
         value.check(limits)?;
         Ok(value)
@@ -4308,7 +4218,6 @@ pub enum Value {
 impl Value {
     /// Checks the payload against the given limits.
     pub fn new(limits: &Limits, value: Self) -> Result<Self, Problem> {
-        check_limits(limits)?;
         value.check(limits)?;
         Ok(value)
     }
@@ -4344,7 +4253,6 @@ impl Row {
     /// Makes a value within the given limits.
     pub fn new(limits: &Limits, parts: RowParts) -> Result<Self, Problem> {
         let RowParts { value } = parts;
-        check_limits(limits)?;
         let value = Self { value };
         value.check(limits)?;
         Ok(value)
@@ -4382,7 +4290,6 @@ impl ProposerTask {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::ProposerTaskTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -4412,7 +4319,6 @@ impl ProposerParty {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::ProposerPartyTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -4445,7 +4351,6 @@ impl Proposer {
 
     /// Reads a whole variant and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::ProposerTag, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -4485,7 +4390,6 @@ impl ProposalChoice {
 
     /// Reads a whole variant and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::ProposalChoiceTag, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -4526,7 +4430,6 @@ impl EscalationDecisionReject {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::EscalationDecisionRejectTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -4560,7 +4463,6 @@ impl EscalationDecision {
 
     /// Reads a whole variant and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::EscalationDecisionTag, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -4601,7 +4503,6 @@ impl ProposalKind {
 
     /// Reads a whole variant and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::ProposalKindTag, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -4639,7 +4540,6 @@ impl EscalationOutcomePassed {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::EscalationOutcomePassedTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -4676,7 +4576,6 @@ impl EscalationOutcome {
 
     /// Reads a whole variant and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::EscalationOutcomeTag, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -4720,7 +4619,6 @@ impl ProposalOutcome {
 
     /// Reads a whole variant and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::ProposalOutcomeTag, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -4762,7 +4660,6 @@ impl Source {
 
     /// Reads a whole variant and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::SourceTag, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -4820,7 +4717,6 @@ impl Lacks {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::LacksTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -4863,7 +4759,6 @@ impl Judge {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::JudgeTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -4899,7 +4794,6 @@ impl Answer {
 
     /// Reads a whole variant and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::AnswerTag, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -4941,7 +4835,6 @@ impl FindingAuthority {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::FindingAuthorityTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -4973,7 +4866,6 @@ impl FindingExecutor {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::FindingExecutorTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -5004,7 +4896,6 @@ impl FindingTasks {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::FindingTasksTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -5035,7 +4926,6 @@ impl FindingSpend {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::FindingSpendTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -5066,7 +4956,6 @@ impl FindingGrant {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::FindingGrantTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -5097,7 +4986,6 @@ impl FindingPrice {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::FindingPriceTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -5128,7 +5016,6 @@ impl FindingScope {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::FindingScopeTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -5159,7 +5046,6 @@ impl FindingRequired {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::FindingRequiredTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -5190,7 +5076,6 @@ impl FindingFailed {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::FindingFailedTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -5221,7 +5106,6 @@ impl FindingUnguarded {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::FindingUnguardedTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -5287,7 +5171,6 @@ impl Finding {
 
     /// Reads a whole variant and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::FindingTag, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -5348,7 +5231,6 @@ impl HostKind {
 
     /// Reads a whole variant and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::HostKindTag, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -5383,7 +5265,6 @@ impl OutboxOutcomeHeld {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::OutboxOutcomeHeldTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -5420,7 +5301,6 @@ impl OutboxOutcome {
 
     /// Reads a whole variant and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::OutboxOutcomeTag, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -5465,7 +5345,6 @@ impl DeliveryOutcome {
 
     /// Reads a whole variant and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::DeliveryOutcomeTag, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -5510,7 +5389,6 @@ impl SettledAnswerHost {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::SettledAnswerHostTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -5548,7 +5426,6 @@ impl SettledAnswerDelivery {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::SettledAnswerDeliveryTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -5582,7 +5459,6 @@ impl SettledAnswer {
 
     /// Reads a whole variant and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::SettledAnswerTag, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -5633,7 +5509,6 @@ impl SettledCall {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::SettledCallTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -5675,7 +5550,6 @@ impl CallKey {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::CallKeyTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -5727,7 +5601,6 @@ impl CallPartEffect {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::CallPartEffectTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -5760,7 +5633,6 @@ impl CallPartConnector {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::CallPartConnectorTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -5801,7 +5673,6 @@ impl CallPartEffectDenied {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::CallPartEffectDeniedTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -5843,7 +5714,6 @@ impl CallPartToolDenied {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::CallPartToolDeniedTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -5881,7 +5751,6 @@ impl CallPartEscalationDecided {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::CallPartEscalationDecidedTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -5913,7 +5782,6 @@ impl CallPartProposed {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::CallPartProposedTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -5947,7 +5815,6 @@ impl CallPartProposalDecided {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::CallPartProposalDecidedTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -5979,7 +5846,6 @@ impl CallPartControlDenied {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::CallPartControlDeniedTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -6009,7 +5875,6 @@ impl CallPartSent {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::CallPartSentTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -6039,7 +5904,6 @@ impl CallPartSubscribed {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::CallPartSubscribedTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -6080,7 +5944,6 @@ impl CallPartDelegationDenied {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::CallPartDelegationDeniedTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -6114,7 +5977,6 @@ impl CallPartNoteWritten {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::CallPartNoteWrittenTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -6148,7 +6010,6 @@ impl TaskBytes {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::TaskBytesTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -6179,7 +6040,6 @@ impl CallPartEscalationRefused {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::CallPartEscalationRefusedTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -6210,7 +6070,6 @@ impl CallPartProposalRefused {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::CallPartProposalRefusedTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -6241,7 +6100,6 @@ impl CallPartControlRefused {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::CallPartControlRefusedTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -6272,7 +6130,6 @@ impl CallPartMessageRefused {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::CallPartMessageRefusedTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -6303,7 +6160,6 @@ impl CallPartSubscriptionRefused {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::CallPartSubscriptionRefusedTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -6334,7 +6190,6 @@ impl CallPartDelegationRefused {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::CallPartDelegationRefusedTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -6364,7 +6219,6 @@ impl Number {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::NumberTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -6401,7 +6255,6 @@ impl CallPartDelegated {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::CallPartDelegatedTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -6434,7 +6287,6 @@ impl NoteBytes {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::NoteBytesTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -6474,7 +6326,6 @@ impl CallPartNoteRecalled {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::CallPartNoteRecalledTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -6505,7 +6356,6 @@ impl NoteRefusalMoved {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::NoteRefusalMovedTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -6543,7 +6393,6 @@ impl NoteRefusal {
 
     /// Reads a whole variant and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::NoteRefusalTag, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -6584,7 +6433,6 @@ impl CallPartNoteRefused {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::CallPartNoteRefusedTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -6660,7 +6508,6 @@ impl CallPart {
 
     /// Reads a whole variant and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::CallPartTag, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -6736,7 +6583,6 @@ impl CallRecord {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::CallRecordTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -6795,7 +6641,6 @@ impl Deployment {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::DeploymentTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -6837,7 +6682,6 @@ impl PhaseBytes {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::PhaseBytesTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -6870,7 +6714,6 @@ impl ChangeBytes {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::ChangeBytesTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -6903,7 +6746,6 @@ impl EndBytes {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::EndBytesTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -6933,7 +6775,6 @@ impl PartyTask {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::PartyTaskTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -6963,7 +6804,6 @@ impl PartyPerson {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::PartyPersonTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -6993,7 +6833,6 @@ impl PartyDeployment {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::PartyDeploymentTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -7028,7 +6867,6 @@ impl Party {
 
     /// Reads a whole variant and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::PartyTag, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -7080,7 +6918,6 @@ impl ProjectionGoal {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::ProjectionGoalTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -7128,7 +6965,6 @@ impl ProjectionTask {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::ProjectionTaskTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -7164,7 +7000,6 @@ impl MilestoneLifecycle {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::MilestoneLifecycleTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -7198,7 +7033,6 @@ impl MilestoneRevision {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::MilestoneRevisionTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -7232,7 +7066,6 @@ impl MilestoneId {
 
     /// Reads a whole variant and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::MilestoneIdTag, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -7300,7 +7133,6 @@ impl ProjectionMilestone {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::ProjectionMilestoneTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -7333,7 +7165,6 @@ impl Connector {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::ConnectorTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -7390,7 +7221,6 @@ impl ProjectionGoalRow {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::ProjectionGoalRowTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -7427,7 +7257,6 @@ impl ProjectionTaskRow {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::ProjectionTaskRowTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -7462,7 +7291,6 @@ impl ProjectionMilestoneRow {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::ProjectionMilestoneRowTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -7498,7 +7326,6 @@ impl ProjectionRecord {
 
     /// Reads a whole variant and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::ProjectionRecordTag, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -7544,7 +7371,6 @@ impl TerminalRecord {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::TerminalRecordTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -7593,7 +7419,6 @@ impl TurnProof {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::TurnProofTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -7628,7 +7453,6 @@ impl Window {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::WindowTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -7659,7 +7483,6 @@ impl Credential {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::CredentialTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -7761,7 +7584,6 @@ impl RunProof {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::RunProofTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -7835,7 +7657,6 @@ impl TurnRecord {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::TurnRecordTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -7877,7 +7698,6 @@ impl Created {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::CreatedTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -7942,7 +7762,6 @@ impl ProposalDecisionRecord {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::ProposalDecisionRecordTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -7998,7 +7817,6 @@ impl EscalationDecisionRecord {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::EscalationDecisionRecordTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -8035,7 +7853,6 @@ impl ProjectionValue {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::ProjectionValueTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -8080,7 +7897,6 @@ impl Value {
 
     /// Reads a whole variant and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::ValueTag, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -8124,7 +7940,6 @@ impl Row {
 
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        check_limits(limits)?;
         let value = Self::decode_from(limits, reader)?;
         if !reader.is_empty() { return Err(Problem { path: Path::RowTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
@@ -8138,15 +7953,11 @@ impl Row {
     }
 }
 
-fn limits_valid(limits: &Limits) -> bool {
-    limits.escalation_decision_reject_reason <= CEILINGS.escalation_decision_reject_reason && limits.settled_answer_host_body <= CEILINGS.settled_answer_host_body && limits.settled_answer_delivery_evidence <= CEILINGS.settled_answer_delivery_evidence && limits.settled_call_name <= CEILINGS.settled_call_name && limits.settled_call_tool <= CEILINGS.settled_call_tool && limits.call_part_effect_denied_findings <= CEILINGS.call_part_effect_denied_findings && limits.call_part_tool_denied_findings <= CEILINGS.call_part_tool_denied_findings && limits.call_part_delegation_denied_findings <= CEILINGS.call_part_delegation_denied_findings && limits.task_bytes_value <= CEILINGS.task_bytes_value && limits.call_part_delegated_value <= CEILINGS.call_part_delegated_value && limits.note_bytes_value <= CEILINGS.note_bytes_value && limits.call_part_note_recalled_entries <= CEILINGS.call_part_note_recalled_entries && limits.phase_bytes_value <= CEILINGS.phase_bytes_value && limits.change_bytes_value <= CEILINGS.change_bytes_value && limits.end_bytes_value <= CEILINGS.end_bytes_value && limits.projection_goal_words <= CEILINGS.projection_goal_words && limits.projection_task_words <= CEILINGS.projection_task_words && limits.projection_milestone_words <= CEILINGS.projection_milestone_words && limits.projection_goal_row_pending <= CEILINGS.projection_goal_row_pending && limits.run_proof_credentials <= CEILINGS.run_proof_credentials && limits.turn_record_transcript <= CEILINGS.turn_record_transcript
-}
-
 impl ProposerTask {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(8_u64)?;
         Some(size)
@@ -8155,7 +7966,7 @@ impl ProposerTask {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?;
         Some(heap)
@@ -8166,7 +7977,7 @@ impl ProposerParty {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(8_u64)?;
         Some(size)
@@ -8175,7 +7986,7 @@ impl ProposerParty {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?;
         Some(heap)
@@ -8186,7 +7997,7 @@ impl Proposer {
     /// Maximum encoded bytes among variants.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut biggest = 0_u64;
         biggest = biggest.max(ProposerTask::worst_case_bytes(limits)?);
         biggest = biggest.max(ProposerParty::worst_case_bytes(limits)?);
@@ -8196,7 +8007,7 @@ impl Proposer {
     /// Maximum heap held by any decoded variant.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut biggest = 0_u64;
         biggest = biggest.max(ProposerTask::worst_case_heap(limits)?);
         biggest = biggest.max(ProposerParty::worst_case_heap(limits)?);
@@ -8208,7 +8019,7 @@ impl ProposalChoice {
     /// Maximum encoded bytes among variants.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let biggest = 0_u64;
         1_u64.checked_add(biggest)
     }
@@ -8216,7 +8027,7 @@ impl ProposalChoice {
     /// Maximum heap held by any decoded variant.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let biggest = 0_u64;
         Some(biggest)
     }
@@ -8226,7 +8037,7 @@ impl EscalationDecisionReject {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(4_u64.checked_add(u64::from(limits.escalation_decision_reject_reason))?)?;
         Some(size)
@@ -8235,7 +8046,7 @@ impl EscalationDecisionReject {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(u64::from(limits.escalation_decision_reject_reason))?;
         Some(heap)
@@ -8246,7 +8057,7 @@ impl EscalationDecision {
     /// Maximum encoded bytes among variants.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut biggest = 0_u64;
         biggest = biggest.max(EscalationDecisionReject::worst_case_bytes(limits)?);
         1_u64.checked_add(biggest)
@@ -8255,7 +8066,7 @@ impl EscalationDecision {
     /// Maximum heap held by any decoded variant.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut biggest = 0_u64;
         biggest = biggest.max(EscalationDecisionReject::worst_case_heap(limits)?);
         Some(biggest)
@@ -8266,7 +8077,7 @@ impl ProposalKind {
     /// Maximum encoded bytes among variants.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let biggest = 0_u64;
         1_u64.checked_add(biggest)
     }
@@ -8274,7 +8085,7 @@ impl ProposalKind {
     /// Maximum heap held by any decoded variant.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let biggest = 0_u64;
         Some(biggest)
     }
@@ -8284,7 +8095,7 @@ impl EscalationOutcomePassed {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(8_u64)?;
         Some(size)
@@ -8293,7 +8104,7 @@ impl EscalationOutcomePassed {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?;
         Some(heap)
@@ -8304,7 +8115,7 @@ impl EscalationOutcome {
     /// Maximum encoded bytes among variants.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut biggest = 0_u64;
         biggest = biggest.max(EscalationOutcomePassed::worst_case_bytes(limits)?);
         1_u64.checked_add(biggest)
@@ -8313,7 +8124,7 @@ impl EscalationOutcome {
     /// Maximum heap held by any decoded variant.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut biggest = 0_u64;
         biggest = biggest.max(EscalationOutcomePassed::worst_case_heap(limits)?);
         Some(biggest)
@@ -8324,7 +8135,7 @@ impl ProposalOutcome {
     /// Maximum encoded bytes among variants.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let biggest = 0_u64;
         1_u64.checked_add(biggest)
     }
@@ -8332,7 +8143,7 @@ impl ProposalOutcome {
     /// Maximum heap held by any decoded variant.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let biggest = 0_u64;
         Some(biggest)
     }
@@ -8342,7 +8153,7 @@ impl Source {
     /// Maximum encoded bytes among variants.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let biggest = 0_u64;
         1_u64.checked_add(biggest)
     }
@@ -8350,7 +8161,7 @@ impl Source {
     /// Maximum heap held by any decoded variant.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let biggest = 0_u64;
         Some(biggest)
     }
@@ -8360,7 +8171,7 @@ impl Lacks {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(1_u64)?;
         size = size.checked_add(1_u64)?;
@@ -8376,7 +8187,7 @@ impl Lacks {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?;
         heap = heap.checked_add(0_u64)?;
@@ -8394,7 +8205,7 @@ impl Judge {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(2_u64)?;
         size = size.checked_add(2_u64)?;
@@ -8405,7 +8216,7 @@ impl Judge {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?;
         heap = heap.checked_add(0_u64)?;
@@ -8418,7 +8229,7 @@ impl Answer {
     /// Maximum encoded bytes among variants.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let biggest = 0_u64;
         1_u64.checked_add(biggest)
     }
@@ -8426,7 +8237,7 @@ impl Answer {
     /// Maximum heap held by any decoded variant.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let biggest = 0_u64;
         Some(biggest)
     }
@@ -8436,7 +8247,7 @@ impl FindingAuthority {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(Source::worst_case_bytes(limits)?)?;
         size = size.checked_add(Lacks::worst_case_bytes(limits)?)?;
@@ -8446,7 +8257,7 @@ impl FindingAuthority {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(Source::worst_case_heap(limits)?)?;
         heap = heap.checked_add(Lacks::worst_case_heap(limits)?)?;
@@ -8458,7 +8269,7 @@ impl FindingExecutor {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(Source::worst_case_bytes(limits)?)?;
         Some(size)
@@ -8467,7 +8278,7 @@ impl FindingExecutor {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(Source::worst_case_heap(limits)?)?;
         Some(heap)
@@ -8478,7 +8289,7 @@ impl FindingTasks {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(Source::worst_case_bytes(limits)?)?;
         Some(size)
@@ -8487,7 +8298,7 @@ impl FindingTasks {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(Source::worst_case_heap(limits)?)?;
         Some(heap)
@@ -8498,7 +8309,7 @@ impl FindingSpend {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(Source::worst_case_bytes(limits)?)?;
         Some(size)
@@ -8507,7 +8318,7 @@ impl FindingSpend {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(Source::worst_case_heap(limits)?)?;
         Some(heap)
@@ -8518,7 +8329,7 @@ impl FindingGrant {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(Source::worst_case_bytes(limits)?)?;
         Some(size)
@@ -8527,7 +8338,7 @@ impl FindingGrant {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(Source::worst_case_heap(limits)?)?;
         Some(heap)
@@ -8538,7 +8349,7 @@ impl FindingPrice {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(Source::worst_case_bytes(limits)?)?;
         Some(size)
@@ -8547,7 +8358,7 @@ impl FindingPrice {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(Source::worst_case_heap(limits)?)?;
         Some(heap)
@@ -8558,7 +8369,7 @@ impl FindingScope {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(Source::worst_case_bytes(limits)?)?;
         Some(size)
@@ -8567,7 +8378,7 @@ impl FindingScope {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(Source::worst_case_heap(limits)?)?;
         Some(heap)
@@ -8578,7 +8389,7 @@ impl FindingRequired {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(Judge::worst_case_bytes(limits)?)?;
         Some(size)
@@ -8587,7 +8398,7 @@ impl FindingRequired {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(Judge::worst_case_heap(limits)?)?;
         Some(heap)
@@ -8598,7 +8409,7 @@ impl FindingFailed {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(Judge::worst_case_bytes(limits)?)?;
         Some(size)
@@ -8607,7 +8418,7 @@ impl FindingFailed {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(Judge::worst_case_heap(limits)?)?;
         Some(heap)
@@ -8618,7 +8429,7 @@ impl FindingUnguarded {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(Judge::worst_case_bytes(limits)?)?;
         Some(size)
@@ -8627,7 +8438,7 @@ impl FindingUnguarded {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(Judge::worst_case_heap(limits)?)?;
         Some(heap)
@@ -8638,7 +8449,7 @@ impl Finding {
     /// Maximum encoded bytes among variants.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut biggest = 0_u64;
         biggest = biggest.max(FindingAuthority::worst_case_bytes(limits)?);
         biggest = biggest.max(FindingExecutor::worst_case_bytes(limits)?);
@@ -8656,7 +8467,7 @@ impl Finding {
     /// Maximum heap held by any decoded variant.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut biggest = 0_u64;
         biggest = biggest.max(FindingAuthority::worst_case_heap(limits)?);
         biggest = biggest.max(FindingExecutor::worst_case_heap(limits)?);
@@ -8676,7 +8487,7 @@ impl HostKind {
     /// Maximum encoded bytes among variants.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let biggest = 0_u64;
         1_u64.checked_add(biggest)
     }
@@ -8684,7 +8495,7 @@ impl HostKind {
     /// Maximum heap held by any decoded variant.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let biggest = 0_u64;
         Some(biggest)
     }
@@ -8694,7 +8505,7 @@ impl OutboxOutcomeHeld {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(8_u64)?;
         Some(size)
@@ -8703,7 +8514,7 @@ impl OutboxOutcomeHeld {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?;
         Some(heap)
@@ -8714,7 +8525,7 @@ impl OutboxOutcome {
     /// Maximum encoded bytes among variants.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut biggest = 0_u64;
         biggest = biggest.max(OutboxOutcomeHeld::worst_case_bytes(limits)?);
         1_u64.checked_add(biggest)
@@ -8723,7 +8534,7 @@ impl OutboxOutcome {
     /// Maximum heap held by any decoded variant.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut biggest = 0_u64;
         biggest = biggest.max(OutboxOutcomeHeld::worst_case_heap(limits)?);
         Some(biggest)
@@ -8734,7 +8545,7 @@ impl DeliveryOutcome {
     /// Maximum encoded bytes among variants.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let biggest = 0_u64;
         1_u64.checked_add(biggest)
     }
@@ -8742,7 +8553,7 @@ impl DeliveryOutcome {
     /// Maximum heap held by any decoded variant.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let biggest = 0_u64;
         Some(biggest)
     }
@@ -8752,7 +8563,7 @@ impl SettledAnswerHost {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(1_u64)?;
         size = size.checked_add(4_u64.checked_add(u64::from(limits.settled_answer_host_body))?)?;
@@ -8762,7 +8573,7 @@ impl SettledAnswerHost {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?;
         heap = heap.checked_add(u64::from(limits.settled_answer_host_body))?;
@@ -8774,7 +8585,7 @@ impl SettledAnswerDelivery {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(DeliveryOutcome::worst_case_bytes(limits)?)?;
         size = size.checked_add(4_u64.checked_add(u64::from(limits.settled_answer_delivery_evidence))?)?;
@@ -8784,7 +8595,7 @@ impl SettledAnswerDelivery {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(DeliveryOutcome::worst_case_heap(limits)?)?;
         heap = heap.checked_add(u64::from(limits.settled_answer_delivery_evidence))?;
@@ -8796,7 +8607,7 @@ impl SettledAnswer {
     /// Maximum encoded bytes among variants.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut biggest = 0_u64;
         biggest = biggest.max(SettledAnswerHost::worst_case_bytes(limits)?);
         biggest = biggest.max(SettledAnswerDelivery::worst_case_bytes(limits)?);
@@ -8806,7 +8617,7 @@ impl SettledAnswer {
     /// Maximum heap held by any decoded variant.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut biggest = 0_u64;
         biggest = biggest.max(SettledAnswerHost::worst_case_heap(limits)?);
         biggest = biggest.max(SettledAnswerDelivery::worst_case_heap(limits)?);
@@ -8818,7 +8629,7 @@ impl SettledCall {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(8_u64)?;
         size = size.checked_add(4_u64.checked_add(u64::from(limits.settled_call_name))?)?;
@@ -8830,7 +8641,7 @@ impl SettledCall {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?;
         heap = heap.checked_add(u64::from(limits.settled_call_name))?;
@@ -8844,7 +8655,7 @@ impl CallKey {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(8_u64)?;
         size = size.checked_add(8_u64)?;
@@ -8856,7 +8667,7 @@ impl CallKey {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?;
         heap = heap.checked_add(0_u64)?;
@@ -8870,7 +8681,7 @@ impl CallPartEffect {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(2_u64)?;
         size = size.checked_add(8_u64)?;
@@ -8882,7 +8693,7 @@ impl CallPartEffect {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?;
         heap = heap.checked_add(0_u64)?;
@@ -8896,7 +8707,7 @@ impl CallPartConnector {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(2_u64)?;
         Some(size)
@@ -8905,7 +8716,7 @@ impl CallPartConnector {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?;
         Some(heap)
@@ -8916,7 +8727,7 @@ impl CallPartEffectDenied {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(Answer::worst_case_bytes(limits)?)?;
         size = size.checked_add(4_u64.checked_add(u64::from(limits.call_part_effect_denied_findings).checked_mul(Finding::worst_case_bytes(limits)?)?)?)?;
@@ -8926,7 +8737,7 @@ impl CallPartEffectDenied {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(Answer::worst_case_heap(limits)?)?;
         heap = heap.checked_add(List::<Finding>::worst_case(limits.call_part_effect_denied_findings)?.checked_add(u64::from(limits.call_part_effect_denied_findings).checked_mul(Finding::worst_case_heap(limits)?)?)?)?;
@@ -8938,7 +8749,7 @@ impl CallPartToolDenied {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(Answer::worst_case_bytes(limits)?)?;
         size = size.checked_add(4_u64.checked_add(u64::from(limits.call_part_tool_denied_findings).checked_mul(Finding::worst_case_bytes(limits)?)?)?)?;
@@ -8948,7 +8759,7 @@ impl CallPartToolDenied {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(Answer::worst_case_heap(limits)?)?;
         heap = heap.checked_add(List::<Finding>::worst_case(limits.call_part_tool_denied_findings)?.checked_add(u64::from(limits.call_part_tool_denied_findings).checked_mul(Finding::worst_case_heap(limits)?)?)?)?;
@@ -8960,7 +8771,7 @@ impl CallPartEscalationDecided {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(8_u64)?;
         size = size.checked_add(8_u64)?;
@@ -8971,7 +8782,7 @@ impl CallPartEscalationDecided {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?;
         heap = heap.checked_add(0_u64)?;
@@ -8984,7 +8795,7 @@ impl CallPartProposed {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(8_u64)?;
         Some(size)
@@ -8993,7 +8804,7 @@ impl CallPartProposed {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?;
         Some(heap)
@@ -9004,7 +8815,7 @@ impl CallPartProposalDecided {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(8_u64)?;
         size = size.checked_add(ProposalOutcome::worst_case_bytes(limits)?)?;
@@ -9014,7 +8825,7 @@ impl CallPartProposalDecided {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?;
         heap = heap.checked_add(ProposalOutcome::worst_case_heap(limits)?)?;
@@ -9026,7 +8837,7 @@ impl CallPartControlDenied {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(Answer::worst_case_bytes(limits)?)?;
         Some(size)
@@ -9035,7 +8846,7 @@ impl CallPartControlDenied {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(Answer::worst_case_heap(limits)?)?;
         Some(heap)
@@ -9046,7 +8857,7 @@ impl CallPartSent {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(8_u64)?;
         Some(size)
@@ -9055,7 +8866,7 @@ impl CallPartSent {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?;
         Some(heap)
@@ -9066,7 +8877,7 @@ impl CallPartSubscribed {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(8_u64)?;
         Some(size)
@@ -9075,7 +8886,7 @@ impl CallPartSubscribed {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?;
         Some(heap)
@@ -9086,7 +8897,7 @@ impl CallPartDelegationDenied {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(Answer::worst_case_bytes(limits)?)?;
         size = size.checked_add(4_u64.checked_add(u64::from(limits.call_part_delegation_denied_findings).checked_mul(Finding::worst_case_bytes(limits)?)?)?)?;
@@ -9096,7 +8907,7 @@ impl CallPartDelegationDenied {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(Answer::worst_case_heap(limits)?)?;
         heap = heap.checked_add(List::<Finding>::worst_case(limits.call_part_delegation_denied_findings)?.checked_add(u64::from(limits.call_part_delegation_denied_findings).checked_mul(Finding::worst_case_heap(limits)?)?)?)?;
@@ -9108,7 +8919,7 @@ impl CallPartNoteWritten {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(8_u64)?;
         size = size.checked_add(4_u64)?;
@@ -9118,7 +8929,7 @@ impl CallPartNoteWritten {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?;
         heap = heap.checked_add(0_u64)?;
@@ -9130,7 +8941,7 @@ impl TaskBytes {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(4_u64.checked_add(u64::from(limits.task_bytes_value))?)?;
         Some(size)
@@ -9139,7 +8950,7 @@ impl TaskBytes {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(u64::from(limits.task_bytes_value))?;
         Some(heap)
@@ -9150,7 +8961,7 @@ impl CallPartEscalationRefused {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(TaskBytes::worst_case_bytes(limits)?)?;
         Some(size)
@@ -9159,7 +8970,7 @@ impl CallPartEscalationRefused {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(TaskBytes::worst_case_heap(limits)?)?;
         Some(heap)
@@ -9170,7 +8981,7 @@ impl CallPartProposalRefused {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(TaskBytes::worst_case_bytes(limits)?)?;
         Some(size)
@@ -9179,7 +8990,7 @@ impl CallPartProposalRefused {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(TaskBytes::worst_case_heap(limits)?)?;
         Some(heap)
@@ -9190,7 +9001,7 @@ impl CallPartControlRefused {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(TaskBytes::worst_case_bytes(limits)?)?;
         Some(size)
@@ -9199,7 +9010,7 @@ impl CallPartControlRefused {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(TaskBytes::worst_case_heap(limits)?)?;
         Some(heap)
@@ -9210,7 +9021,7 @@ impl CallPartMessageRefused {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(TaskBytes::worst_case_bytes(limits)?)?;
         Some(size)
@@ -9219,7 +9030,7 @@ impl CallPartMessageRefused {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(TaskBytes::worst_case_heap(limits)?)?;
         Some(heap)
@@ -9230,7 +9041,7 @@ impl CallPartSubscriptionRefused {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(TaskBytes::worst_case_bytes(limits)?)?;
         Some(size)
@@ -9239,7 +9050,7 @@ impl CallPartSubscriptionRefused {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(TaskBytes::worst_case_heap(limits)?)?;
         Some(heap)
@@ -9250,7 +9061,7 @@ impl CallPartDelegationRefused {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(TaskBytes::worst_case_bytes(limits)?)?;
         Some(size)
@@ -9259,7 +9070,7 @@ impl CallPartDelegationRefused {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(TaskBytes::worst_case_heap(limits)?)?;
         Some(heap)
@@ -9270,7 +9081,7 @@ impl Number {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(8_u64)?;
         Some(size)
@@ -9279,7 +9090,7 @@ impl Number {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?;
         Some(heap)
@@ -9290,7 +9101,7 @@ impl CallPartDelegated {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(4_u64.checked_add(u64::from(limits.call_part_delegated_value).checked_mul(Number::worst_case_bytes(limits)?)?)?)?;
         Some(size)
@@ -9299,7 +9110,7 @@ impl CallPartDelegated {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(List::<Number>::worst_case(limits.call_part_delegated_value)?.checked_add(u64::from(limits.call_part_delegated_value).checked_mul(Number::worst_case_heap(limits)?)?)?)?;
         Some(heap)
@@ -9310,7 +9121,7 @@ impl NoteBytes {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(4_u64.checked_add(u64::from(limits.note_bytes_value))?)?;
         Some(size)
@@ -9319,7 +9130,7 @@ impl NoteBytes {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(u64::from(limits.note_bytes_value))?;
         Some(heap)
@@ -9330,7 +9141,7 @@ impl CallPartNoteRecalled {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(4_u64.checked_add(u64::from(limits.call_part_note_recalled_entries).checked_mul(NoteBytes::worst_case_bytes(limits)?)?)?)?;
         size = size.checked_add(1_u64)?;
@@ -9340,7 +9151,7 @@ impl CallPartNoteRecalled {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(List::<NoteBytes>::worst_case(limits.call_part_note_recalled_entries)?.checked_add(u64::from(limits.call_part_note_recalled_entries).checked_mul(NoteBytes::worst_case_heap(limits)?)?)?)?;
         heap = heap.checked_add(0_u64)?;
@@ -9352,7 +9163,7 @@ impl NoteRefusalMoved {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(4_u64)?;
         Some(size)
@@ -9361,7 +9172,7 @@ impl NoteRefusalMoved {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?;
         Some(heap)
@@ -9372,7 +9183,7 @@ impl NoteRefusal {
     /// Maximum encoded bytes among variants.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut biggest = 0_u64;
         biggest = biggest.max(NoteRefusalMoved::worst_case_bytes(limits)?);
         1_u64.checked_add(biggest)
@@ -9381,7 +9192,7 @@ impl NoteRefusal {
     /// Maximum heap held by any decoded variant.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut biggest = 0_u64;
         biggest = biggest.max(NoteRefusalMoved::worst_case_heap(limits)?);
         Some(biggest)
@@ -9392,7 +9203,7 @@ impl CallPartNoteRefused {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(NoteRefusal::worst_case_bytes(limits)?)?;
         Some(size)
@@ -9401,7 +9212,7 @@ impl CallPartNoteRefused {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(NoteRefusal::worst_case_heap(limits)?)?;
         Some(heap)
@@ -9412,7 +9223,7 @@ impl CallPart {
     /// Maximum encoded bytes among variants.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut biggest = 0_u64;
         biggest = biggest.max(CallPartEffect::worst_case_bytes(limits)?);
         biggest = biggest.max(CallPartConnector::worst_case_bytes(limits)?);
@@ -9441,7 +9252,7 @@ impl CallPart {
     /// Maximum heap held by any decoded variant.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut biggest = 0_u64;
         biggest = biggest.max(CallPartEffect::worst_case_heap(limits)?);
         biggest = biggest.max(CallPartConnector::worst_case_heap(limits)?);
@@ -9472,7 +9283,7 @@ impl CallRecord {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(CallKey::worst_case_bytes(limits)?)?;
         size = size.checked_add(CallPart::worst_case_bytes(limits)?)?;
@@ -9483,7 +9294,7 @@ impl CallRecord {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(CallKey::worst_case_heap(limits)?)?;
         heap = heap.checked_add(CallPart::worst_case_heap(limits)?)?;
@@ -9496,7 +9307,7 @@ impl Deployment {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(u64::from(16_u32))?;
         size = size.checked_add(8_u64)?;
@@ -9514,7 +9325,7 @@ impl Deployment {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?;
         heap = heap.checked_add(0_u64)?;
@@ -9534,7 +9345,7 @@ impl PhaseBytes {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(4_u64.checked_add(u64::from(limits.phase_bytes_value))?)?;
         Some(size)
@@ -9543,7 +9354,7 @@ impl PhaseBytes {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(u64::from(limits.phase_bytes_value))?;
         Some(heap)
@@ -9554,7 +9365,7 @@ impl ChangeBytes {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(4_u64.checked_add(u64::from(limits.change_bytes_value))?)?;
         Some(size)
@@ -9563,7 +9374,7 @@ impl ChangeBytes {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(u64::from(limits.change_bytes_value))?;
         Some(heap)
@@ -9574,7 +9385,7 @@ impl EndBytes {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(4_u64.checked_add(u64::from(limits.end_bytes_value))?)?;
         Some(size)
@@ -9583,7 +9394,7 @@ impl EndBytes {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(u64::from(limits.end_bytes_value))?;
         Some(heap)
@@ -9594,7 +9405,7 @@ impl PartyTask {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(8_u64)?;
         Some(size)
@@ -9603,7 +9414,7 @@ impl PartyTask {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?;
         Some(heap)
@@ -9614,7 +9425,7 @@ impl PartyPerson {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(8_u64)?;
         Some(size)
@@ -9623,7 +9434,7 @@ impl PartyPerson {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?;
         Some(heap)
@@ -9634,7 +9445,7 @@ impl PartyDeployment {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(4_u64)?;
         Some(size)
@@ -9643,7 +9454,7 @@ impl PartyDeployment {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?;
         Some(heap)
@@ -9654,7 +9465,7 @@ impl Party {
     /// Maximum encoded bytes among variants.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut biggest = 0_u64;
         biggest = biggest.max(PartyTask::worst_case_bytes(limits)?);
         biggest = biggest.max(PartyPerson::worst_case_bytes(limits)?);
@@ -9665,7 +9476,7 @@ impl Party {
     /// Maximum heap held by any decoded variant.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut biggest = 0_u64;
         biggest = biggest.max(PartyTask::worst_case_heap(limits)?);
         biggest = biggest.max(PartyPerson::worst_case_heap(limits)?);
@@ -9678,7 +9489,7 @@ impl ProjectionGoal {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(8_u64)?;
         size = size.checked_add(4_u64)?;
@@ -9691,7 +9502,7 @@ impl ProjectionGoal {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?;
         heap = heap.checked_add(0_u64)?;
@@ -9706,7 +9517,7 @@ impl ProjectionTask {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(8_u64)?;
         size = size.checked_add(Party::worst_case_bytes(limits)?)?;
@@ -9718,7 +9529,7 @@ impl ProjectionTask {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?;
         heap = heap.checked_add(Party::worst_case_heap(limits)?)?;
@@ -9732,7 +9543,7 @@ impl MilestoneLifecycle {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(8_u64)?;
         size = size.checked_add(8_u64)?;
@@ -9742,7 +9553,7 @@ impl MilestoneLifecycle {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?;
         heap = heap.checked_add(0_u64)?;
@@ -9754,7 +9565,7 @@ impl MilestoneRevision {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(8_u64)?;
         size = size.checked_add(8_u64)?;
@@ -9764,7 +9575,7 @@ impl MilestoneRevision {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?;
         heap = heap.checked_add(0_u64)?;
@@ -9776,7 +9587,7 @@ impl MilestoneId {
     /// Maximum encoded bytes among variants.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut biggest = 0_u64;
         biggest = biggest.max(MilestoneLifecycle::worst_case_bytes(limits)?);
         biggest = biggest.max(MilestoneRevision::worst_case_bytes(limits)?);
@@ -9786,7 +9597,7 @@ impl MilestoneId {
     /// Maximum heap held by any decoded variant.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut biggest = 0_u64;
         biggest = biggest.max(MilestoneLifecycle::worst_case_heap(limits)?);
         biggest = biggest.max(MilestoneRevision::worst_case_heap(limits)?);
@@ -9798,7 +9609,7 @@ impl ProjectionMilestone {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(MilestoneId::worst_case_bytes(limits)?)?;
         size = size.checked_add(1_u64.checked_add(PhaseBytes::worst_case_bytes(limits)?)?)?;
@@ -9810,7 +9621,7 @@ impl ProjectionMilestone {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(MilestoneId::worst_case_heap(limits)?)?;
         heap = heap.checked_add(PhaseBytes::worst_case_heap(limits)?)?;
@@ -9824,7 +9635,7 @@ impl Connector {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(2_u64)?;
         Some(size)
@@ -9833,7 +9644,7 @@ impl Connector {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?;
         Some(heap)
@@ -9844,7 +9655,7 @@ impl ProjectionGoalRow {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(ProjectionGoal::worst_case_bytes(limits)?)?;
         size = size.checked_add(4_u64.checked_add(u64::from(limits.projection_goal_row_pending).checked_mul(Connector::worst_case_bytes(limits)?)?)?)?;
@@ -9856,7 +9667,7 @@ impl ProjectionGoalRow {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(ProjectionGoal::worst_case_heap(limits)?)?;
         heap = heap.checked_add(List::<Connector>::worst_case(limits.projection_goal_row_pending)?.checked_add(u64::from(limits.projection_goal_row_pending).checked_mul(Connector::worst_case_heap(limits)?)?)?)?;
@@ -9870,7 +9681,7 @@ impl ProjectionTaskRow {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(8_u64)?;
         size = size.checked_add(ProjectionTask::worst_case_bytes(limits)?)?;
@@ -9880,7 +9691,7 @@ impl ProjectionTaskRow {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?;
         heap = heap.checked_add(ProjectionTask::worst_case_heap(limits)?)?;
@@ -9892,7 +9703,7 @@ impl ProjectionMilestoneRow {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(8_u64)?;
         size = size.checked_add(ProjectionMilestone::worst_case_bytes(limits)?)?;
@@ -9902,7 +9713,7 @@ impl ProjectionMilestoneRow {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?;
         heap = heap.checked_add(ProjectionMilestone::worst_case_heap(limits)?)?;
@@ -9914,7 +9725,7 @@ impl ProjectionRecord {
     /// Maximum encoded bytes among variants.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut biggest = 0_u64;
         biggest = biggest.max(ProjectionGoalRow::worst_case_bytes(limits)?);
         biggest = biggest.max(ProjectionTaskRow::worst_case_bytes(limits)?);
@@ -9925,7 +9736,7 @@ impl ProjectionRecord {
     /// Maximum heap held by any decoded variant.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut biggest = 0_u64;
         biggest = biggest.max(ProjectionGoalRow::worst_case_heap(limits)?);
         biggest = biggest.max(ProjectionTaskRow::worst_case_heap(limits)?);
@@ -9938,7 +9749,7 @@ impl TerminalRecord {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(8_u64)?;
         size = size.checked_add(8_u64)?;
@@ -9950,7 +9761,7 @@ impl TerminalRecord {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?;
         heap = heap.checked_add(0_u64)?;
@@ -9964,7 +9775,7 @@ impl TurnProof {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(4_u64)?;
         size = size.checked_add(8_u64)?;
@@ -9975,7 +9786,7 @@ impl TurnProof {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?;
         heap = heap.checked_add(0_u64)?;
@@ -9988,7 +9799,7 @@ impl Window {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(8_u64)?;
         size = size.checked_add(4_u64)?;
@@ -9998,7 +9809,7 @@ impl Window {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?;
         heap = heap.checked_add(0_u64)?;
@@ -10010,7 +9821,7 @@ impl Credential {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(4_u64)?;
         Some(size)
@@ -10019,7 +9830,7 @@ impl Credential {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?;
         Some(heap)
@@ -10030,7 +9841,7 @@ impl RunProof {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(8_u64)?;
         size = size.checked_add(8_u64)?;
@@ -10047,7 +9858,7 @@ impl RunProof {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?;
         heap = heap.checked_add(0_u64)?;
@@ -10066,7 +9877,7 @@ impl TurnRecord {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 2_u64;
         size = size.checked_add(1_u64)?;
         size = size.checked_add(8_u64)?;
@@ -10082,7 +9893,7 @@ impl TurnRecord {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?;
         heap = heap.checked_add(0_u64)?;
@@ -10100,7 +9911,7 @@ impl Created {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(8_u64)?;
         size = size.checked_add(8_u64)?;
@@ -10110,7 +9921,7 @@ impl Created {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?;
         heap = heap.checked_add(0_u64)?;
@@ -10122,7 +9933,7 @@ impl ProposalDecisionRecord {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(4_u64)?;
         size = size.checked_add(Proposer::worst_case_bytes(limits)?)?;
@@ -10138,7 +9949,7 @@ impl ProposalDecisionRecord {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?;
         heap = heap.checked_add(Proposer::worst_case_heap(limits)?)?;
@@ -10156,7 +9967,7 @@ impl EscalationDecisionRecord {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(4_u64)?;
         size = size.checked_add(8_u64)?;
@@ -10171,7 +9982,7 @@ impl EscalationDecisionRecord {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?;
         heap = heap.checked_add(0_u64)?;
@@ -10188,7 +9999,7 @@ impl ProjectionValue {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 0_u64;
         size = size.checked_add(ProjectionRecord::worst_case_bytes(limits)?)?;
         Some(size)
@@ -10197,7 +10008,7 @@ impl ProjectionValue {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(ProjectionRecord::worst_case_heap(limits)?)?;
         Some(heap)
@@ -10208,7 +10019,7 @@ impl Value {
     /// Maximum encoded bytes among variants.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut biggest = 0_u64;
         biggest = biggest.max(CallRecord::worst_case_bytes(limits)?);
         biggest = biggest.max(Deployment::worst_case_bytes(limits)?);
@@ -10224,7 +10035,7 @@ impl Value {
     /// Maximum heap held by any decoded variant.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut biggest = 0_u64;
         biggest = biggest.max(CallRecord::worst_case_heap(limits)?);
         biggest = biggest.max(Deployment::worst_case_heap(limits)?);
@@ -10242,7 +10053,7 @@ impl Row {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut size = 2_u64;
         size = size.checked_add(Value::worst_case_bytes(limits)?)?;
         Some(size)
@@ -10251,7 +10062,7 @@ impl Row {
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if !limits_valid(limits) { return None; }
+        if check_limits(limits).is_err() { return None; }
         let mut heap = 0_u64;
         heap = heap.checked_add(Value::worst_case_heap(limits)?)?;
         Some(heap)
@@ -10261,7 +10072,7 @@ impl Row {
 /// Maximum wire bytes among this family's top-level types.
 #[must_use]
 pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-    if !limits_valid(limits) { return None; }
+    if check_limits(limits).is_err() { return None; }
     let mut biggest = 0_u64;
     biggest = biggest.max(ProposerTask::worst_case_bytes(limits)?);
     biggest = biggest.max(ProposerParty::worst_case_bytes(limits)?);
@@ -10362,7 +10173,7 @@ pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
 /// Maximum heap held by one decoded top-level value.
 #[must_use]
 pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-    if !limits_valid(limits) { return None; }
+    if check_limits(limits).is_err() { return None; }
     let mut biggest = 0_u64;
     biggest = biggest.max(ProposerTask::worst_case_heap(limits)?);
     biggest = biggest.max(ProposerParty::worst_case_heap(limits)?);
