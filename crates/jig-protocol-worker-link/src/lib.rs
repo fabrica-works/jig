@@ -7,6 +7,7 @@ mod boundary;
 mod component;
 mod connection;
 mod limits;
+mod translate;
 pub use boundary::{Event, Request};
 pub use component::{Component, Credential, Unusable};
 pub use limits::{Limits, MAX_OUT_DOWN, MAX_OUT_FIRE, channel_limits, worst_case};

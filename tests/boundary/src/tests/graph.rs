@@ -591,5 +591,8 @@ fn worker_link_links_only_its_wire_host_and_channel_vocabulary() {
     assert_eq!(roots.len(), 1, "one worker link component");
     let mut dependencies = roots[0].dependencies.clone();
     dependencies.sort();
-    assert_eq!(dependencies, ["jig-domain-host", "jig-protocol-worker-wire", "skein-channel", "skein-lib"]);
+    assert_eq!(
+        dependencies,
+        ["jig-domain-host", "jig-protocol-worker-wire", "skein-channel", "skein-codec", "skein-lib"]
+    );
 }

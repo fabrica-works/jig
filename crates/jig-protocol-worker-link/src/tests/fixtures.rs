@@ -54,3 +54,163 @@ pub const LIMITS: Limits = Limits {
 pub fn credential() -> Credential {
     Credential { name: WORKER_A.into(), secret: Secret::new(SECRET_A.into()), payload: PAYLOAD }
 }
+
+use jig_domain_host as host;
+use jig_protocol_worker_wire::{self as wire, Part};
+use skein_lib::{List, Token, Writer};
+pub const TOKEN_ONE: &[u8] = b"access";
+pub const ACCOUNT_ONE: &[u8] = b"account";
+pub const RUN_SEVEN: Token = Token::new(7);
+pub const ATTEMPT_TWO: Token = Token::new(2);
+pub fn codec() -> wire::v1::Limits {
+    wire::sizes::limits(&SIZES).expect("small codec limits")
+}
+pub fn hello() -> host::Hello {
+    host::Hello {
+        slots: 1,
+        stop_bound: Duration::from_secs(1),
+        workstreams: Box::new([3]),
+        hosting: Box::new([host::Hosting { run: RUN_SEVEN, attempt: ATTEMPT_TWO, phase: host::Phase::Active }]),
+        bounds: host::Bounds {
+            models: Box::new([host::ModelBound { name: b"model".as_slice().into(), window: 16, output: 8 }]),
+            turns: 1,
+            spend: 10,
+            time: Duration::from_secs(60),
+            waiting: Duration::from_secs(5),
+            checks: Duration::from_secs(10),
+            message_bytes: 16,
+            inbox: 1,
+            unacknowledged: 1,
+        },
+    }
+}
+pub fn turn() -> host::LinkUp {
+    host::LinkUp::Turn {
+        run: RUN_SEVEN,
+        attempt: ATTEMPT_TWO,
+        turn: host::Turn {
+            opens_window: true,
+            refused: Box::new([host::Refused { name: Token::new(4), reason: host::MessageRefusal::Full }]),
+            turn: 1,
+            spent: 3,
+            read: Some(Token::new(5)),
+            body: b"turn".as_slice().into(),
+        },
+    }
+}
+pub fn answer() -> host::LinkUp {
+    host::LinkUp::Answer {
+        run: RUN_SEVEN,
+        attempt: ATTEMPT_TWO,
+        answer: host::Answer {
+            read: Some(Token::new(5)),
+            refused: Box::new([]),
+            turns: 1,
+            spent: 3,
+            ending: host::Ending::Ended {
+                outcome: b"result".as_slice().into(),
+                work: host::Work { left: Some(Token::new(10)), saved: Some(Token::new(11)) },
+            },
+        },
+    }
+}
+pub fn work_parts() -> Box<[Part]> {
+    Box::new([
+        Part { token: Token::new(10), bytes: b"left".as_slice().into() },
+        Part { token: Token::new(11), bytes: b"saved".as_slice().into() },
+    ])
+}
+pub fn grant_record(table: wire::GrantTable) -> wire::Grant {
+    wire::Grant::new(
+        &codec(),
+        wire::GrantParts {
+            table,
+            account: 1,
+            generation: 3,
+            valid: Duration::from_secs(60),
+            value: Secret::new(TOKEN_ONE.into()),
+            account_id: Secret::new(ACCOUNT_ONE.into()),
+        },
+    )
+    .expect("grant")
+}
+pub fn assignment_record(transcript: Box<[u8]>) -> wire::Assignment {
+    let limits = codec();
+    let workspace =
+        wire::Workspace::new(&limits, wire::WorkspaceParts { workstream: 3, items: b"items".as_slice().into() })
+            .expect("workspace");
+    let mut messages = List::with_capacity(1);
+    messages
+        .push(
+            wire::Message::new(
+                &limits,
+                wire::MessageParts { name: 5, sender: b"sender".as_slice().into(), words: b"words".as_slice().into() },
+            )
+            .expect("message"),
+        )
+        .expect("room");
+    let mut grants = List::with_capacity(2);
+    grants.push(grant_record(wire::GrantTable::Accounts)).expect("room");
+    grants.push(grant_record(wire::GrantTable::Application)).expect("room");
+    let mut answered = List::with_capacity(1);
+    let answer =
+        wire::HostAnswer::new(&limits, wire::HostAnswerParts { error: false, body: b"answer".as_slice().into() })
+            .expect("answer");
+    answered
+        .push(
+            wire::AnsweredCall::new(
+                &limits,
+                wire::AnsweredCallParts {
+                    name: b"call".as_slice().into(),
+                    tool: b"tool".as_slice().into(),
+                    answer: wire::SettledAnswer::Host(answer),
+                },
+            )
+            .expect("call"),
+        )
+        .expect("room");
+    wire::Assignment::new(
+        &limits,
+        wire::AssignmentParts {
+            task: 7,
+            attempt: 2,
+            identity: [9; 16],
+            workspace: Some(workspace),
+            save: true,
+            charter: b"charter".as_slice().into(),
+            transcript,
+            answered,
+            messages,
+            grants,
+        },
+    )
+    .expect("assignment")
+}
+pub fn window() -> Box<[u8]> {
+    let mut writer = Writer::new(16);
+    skein_codec::piece::write(&mut writer, b"one!").expect("first turn");
+    skein_codec::piece::write(&mut writer, b"two!").expect("second turn");
+    writer.finish()
+}
+
+fn writer(measured: u32) -> Writer {
+    Writer::new(usize::try_from(measured).expect("small record"))
+}
+
+pub fn assignment_bytes(record: &wire::Assignment) -> Box<[u8]> {
+    let mut bytes = writer(record.measure());
+    record.encode(&mut bytes).expect("measured assignment");
+    bytes.finish()
+}
+
+pub fn granted_bytes(record: &wire::Granted) -> Box<[u8]> {
+    let mut bytes = writer(record.measure());
+    record.encode(&mut bytes).expect("measured granted");
+    bytes.finish()
+}
+
+pub fn inbound_bytes(record: &wire::Inbound) -> Box<[u8]> {
+    let mut bytes = writer(record.measure());
+    record.encode(&mut bytes).expect("measured inbound");
+    bytes.finish()
+}

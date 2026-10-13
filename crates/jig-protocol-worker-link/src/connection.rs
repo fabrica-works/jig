@@ -11,7 +11,7 @@ pub(crate) enum Phase {
     Idle { at: Time },
     Connecting,
     Opening { connection: Connection, until: Time },
-    Open { connection: Connection, proved: Option<Time> },
+    Open { connection: Connection, proved: Option<Time>, hello: bool },
     Closing { connection: Connection, retry: Time, until: Option<Time> },
 }
 impl Phase {

@@ -100,3 +100,239 @@ pub fn engine_with_terms(kind: u16, largest: u32) -> skein_fake_channel::Scripte
     }
     peer(schema)
 }
+
+use jig_domain_host as host;
+use jig_protocol_worker_wire::{self as wire, Part};
+use skein_lib::{List, Token, Writer};
+pub const TOKEN_ONE: &[u8] = b"access";
+pub const ACCOUNT_ONE: &[u8] = b"account";
+pub const RUN_SEVEN: Token = Token::new(7);
+pub const ATTEMPT_TWO: Token = Token::new(2);
+#[must_use]
+pub fn codec() -> wire::v1::Limits {
+    wire::sizes::limits(&SIZES).expect("small codec limits")
+}
+#[must_use]
+pub fn hello() -> host::Hello {
+    host::Hello {
+        slots: 1,
+        stop_bound: Duration::from_secs(1),
+        workstreams: Box::new([3]),
+        hosting: Box::new([host::Hosting { run: RUN_SEVEN, attempt: ATTEMPT_TWO, phase: host::Phase::Active }]),
+        bounds: host::Bounds {
+            models: Box::new([host::ModelBound { name: b"model".as_slice().into(), window: 16, output: 8 }]),
+            turns: 1,
+            spend: 10,
+            time: Duration::from_secs(60),
+            waiting: Duration::from_secs(5),
+            checks: Duration::from_secs(10),
+            message_bytes: 16,
+            inbox: 1,
+            unacknowledged: 1,
+        },
+    }
+}
+#[must_use]
+pub fn turn() -> host::LinkUp {
+    host::LinkUp::Turn {
+        run: RUN_SEVEN,
+        attempt: ATTEMPT_TWO,
+        turn: host::Turn {
+            opens_window: true,
+            refused: Box::new([host::Refused { name: Token::new(4), reason: host::MessageRefusal::Full }]),
+            turn: 1,
+            spent: 3,
+            read: Some(Token::new(5)),
+            body: b"turn".as_slice().into(),
+        },
+    }
+}
+#[must_use]
+pub fn up_records() -> Vec<(host::LinkUp, Box<[Part]>)> {
+    vec![
+        (turn(), Box::new([])),
+        (
+            host::LinkUp::Call {
+                run: RUN_SEVEN,
+                attempt: ATTEMPT_TWO,
+                call: b"call".as_slice().into(),
+                tool: b"tool".as_slice().into(),
+                writes: true,
+                input: b"{}".as_slice().into(),
+                deadline: Duration::from_secs(60),
+            },
+            Box::new([]),
+        ),
+        (answer(), work_parts()),
+        (
+            host::LinkUp::Activity {
+                run: RUN_SEVEN,
+                attempt: ATTEMPT_TWO,
+                activity: host::Activity::Long { operation: host::Operation::Command, span: Duration::from_secs(2) },
+            },
+            Box::new([]),
+        ),
+        (host::LinkUp::Rejected { run: RUN_SEVEN, attempt: ATTEMPT_TWO, account: 1, generation: 3 }, Box::new([])),
+        (
+            host::LinkUp::Exhausted {
+                run: RUN_SEVEN,
+                attempt: ATTEMPT_TWO,
+                account: 1,
+                retry_after: Duration::from_secs(60),
+            },
+            Box::new([]),
+        ),
+    ]
+}
+#[must_use]
+pub fn answer() -> host::LinkUp {
+    host::LinkUp::Answer {
+        run: RUN_SEVEN,
+        attempt: ATTEMPT_TWO,
+        answer: host::Answer {
+            read: Some(Token::new(5)),
+            refused: Box::new([]),
+            turns: 1,
+            spent: 3,
+            ending: host::Ending::Ended {
+                outcome: b"result".as_slice().into(),
+                work: host::Work { left: Some(Token::new(10)), saved: Some(Token::new(11)) },
+            },
+        },
+    }
+}
+#[must_use]
+pub fn work_parts() -> Box<[Part]> {
+    Box::new([
+        Part { token: Token::new(10), bytes: b"left".as_slice().into() },
+        Part { token: Token::new(11), bytes: b"saved".as_slice().into() },
+    ])
+}
+#[must_use]
+pub fn grant_record(table: wire::GrantTable) -> wire::Grant {
+    wire::Grant::new(
+        &codec(),
+        wire::GrantParts {
+            table,
+            account: 1,
+            generation: 3,
+            valid: Duration::from_secs(60),
+            value: Secret::new(TOKEN_ONE.into()),
+            account_id: Secret::new(ACCOUNT_ONE.into()),
+        },
+    )
+    .expect("grant")
+}
+#[must_use]
+pub fn assignment_record(transcript: Box<[u8]>) -> wire::Assignment {
+    let limits = codec();
+    let workspace =
+        wire::Workspace::new(&limits, wire::WorkspaceParts { workstream: 3, items: b"items".as_slice().into() })
+            .expect("workspace");
+    let mut messages = List::with_capacity(1);
+    messages
+        .push(
+            wire::Message::new(
+                &limits,
+                wire::MessageParts { name: 5, sender: b"sender".as_slice().into(), words: b"words".as_slice().into() },
+            )
+            .expect("message"),
+        )
+        .expect("room");
+    let mut grants = List::with_capacity(2);
+    grants.push(grant_record(wire::GrantTable::Accounts)).expect("room");
+    grants.push(grant_record(wire::GrantTable::Application)).expect("room");
+    let mut answered = List::with_capacity(1);
+    let answer =
+        wire::HostAnswer::new(&limits, wire::HostAnswerParts { error: false, body: b"answer".as_slice().into() })
+            .expect("answer");
+    answered
+        .push(
+            wire::AnsweredCall::new(
+                &limits,
+                wire::AnsweredCallParts {
+                    name: b"call".as_slice().into(),
+                    tool: b"tool".as_slice().into(),
+                    answer: wire::SettledAnswer::Host(answer),
+                },
+            )
+            .expect("call"),
+        )
+        .expect("room");
+    wire::Assignment::new(
+        &limits,
+        wire::AssignmentParts {
+            task: 7,
+            attempt: 2,
+            identity: [9; 16],
+            workspace: Some(workspace),
+            save: true,
+            charter: b"charter".as_slice().into(),
+            transcript,
+            answered,
+            messages,
+            grants,
+        },
+    )
+    .expect("assignment")
+}
+#[must_use]
+pub fn window() -> Box<[u8]> {
+    let mut writer = Writer::new(16);
+    skein_codec::piece::write(&mut writer, b"one!").expect("first turn");
+    skein_codec::piece::write(&mut writer, b"two!").expect("second turn");
+    writer.finish()
+}
+#[must_use]
+pub fn frame(kind: u16, body: &[u8]) -> skein_channel::Frame {
+    let mut frame = skein_channel::frame_writer(kind, u32::try_from(body.len()).expect("small body")).expect("frame");
+    frame.put(body).expect("measured body");
+    frame.finish().expect("complete")
+}
+#[must_use]
+pub fn assignment_frame(transcript: Box<[u8]>) -> skein_channel::Frame {
+    let record = assignment_record(transcript);
+    let body = encoded(record.measure(), |writer| record.encode(writer));
+    frame(0x0180, &body)
+}
+#[must_use]
+pub fn down_frames() -> Vec<skein_channel::Frame> {
+    let limits = codec();
+    let mut frames = vec![assignment_frame(window())];
+    let record = wire::Inbound::new(
+        &limits,
+        wire::InboundParts {
+            task: 7,
+            attempt: 2,
+            name: 6,
+            sender: b"sender".as_slice().into(),
+            words: b"later".as_slice().into(),
+        },
+    )
+    .expect("message");
+    let body = encoded(record.measure(), |writer| record.encode(writer));
+    frames.push(frame(0x0181, &body));
+    let record = wire::TurnKept::new(&limits, wire::TurnKeptParts { task: 7, attempt: 2, number: 1 }).expect("kept");
+    let body = encoded(record.measure(), |writer| record.encode(writer));
+    frames.push(frame(0x0183, &body));
+    let record = wire::Acknowledge::new(&limits, wire::AcknowledgeParts { task: 7, attempt: 2 }).expect("acknowledge");
+    let body = encoded(record.measure(), |writer| record.encode(writer));
+    frames.push(frame(0x0185, &body));
+    let record = wire::Cancel::new(&limits, wire::CancelParts { task: 7, attempt: 2 }).expect("cancel");
+    let body = encoded(record.measure(), |writer| record.encode(writer));
+    frames.push(frame(0x0186, &body));
+    let record = wire::Granted::new(
+        &limits,
+        wire::GrantedParts { task: 7, attempt: 2, grant: grant_record(wire::GrantTable::Accounts) },
+    )
+    .expect("grant");
+    let body = encoded(record.measure(), |writer| record.encode(writer));
+    frames.push(frame(0x0187, &body));
+    frames
+}
+
+pub fn encoded<F: FnOnce(&mut Writer) -> Result<(), skein_lib::Overflow>>(measured: u32, encode: F) -> Box<[u8]> {
+    let mut writer = Writer::new(usize::try_from(measured).expect("small record"));
+    encode(&mut writer).expect("measured record");
+    writer.finish()
+}

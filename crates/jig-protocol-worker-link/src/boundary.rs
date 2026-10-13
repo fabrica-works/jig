@@ -1,8 +1,13 @@
 //! Streams belong to the layer; the dial policy belongs here (channel.md, 10.1).
+use alloc::boxed::Box;
+use jig_domain_host as host;
+use jig_protocol_worker_wire::Part;
 use skein_channel::{Closed, Lower, LowerEvent};
-use skein_lib::Token;
+use skein_lib::{Secret, Time, Token};
 #[derive(Debug)]
 pub enum Event {
+    Hello { hello: host::Hello },
+    Up { up: host::LinkUp, parts: Box<[Part]> },
     Dialled { connection: Token },
     Unreachable,
     Lower { connection: Token, event: LowerEvent },
@@ -10,6 +15,20 @@ pub enum Event {
 }
 #[derive(Debug)]
 pub enum Request {
+    Ready,
+    Lost,
+    Down {
+        down: host::LinkDown,
+        parts: Box<[Part]>,
+    },
+    Value {
+        table: host::GrantTable,
+        account: u32,
+        generation: u64,
+        expires: Time,
+        value: Secret,
+        account_id: Secret,
+    },
     Dial,
     Lower {
         connection: Token,

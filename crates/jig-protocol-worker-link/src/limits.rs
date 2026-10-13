@@ -1,11 +1,14 @@
 //! Bounds supplied by the layer (protocol/channel.md, 11).
 use crate::{Component, Unusable};
+use alloc::boxed::Box;
 use core::mem::size_of;
+use jig_domain_host as host;
 use jig_protocol_worker_wire::{
     self as wire,
     sizes::{self, Sizes},
 };
 use skein_channel::{self as channel, Role};
+use skein_lib::List;
 use skein_lib::{Duration, Queue};
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Limits {
@@ -21,7 +24,7 @@ pub struct Limits {
     pub grace: Duration,
     pub busy: Duration,
 }
-pub const MAX_OUT_DOWN: u32 = 24;
+pub const MAX_OUT_DOWN: u32 = 96;
 pub const MAX_OUT_FIRE: u32 = 12;
 pub fn channel_limits(limits: &Limits) -> Result<channel::Limits, Unusable> {
     let bodies = sizes::limits(&limits.sizes).ok_or(Unusable::Limits)?;
@@ -58,6 +61,12 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     let state = u64::try_from(size_of::<Component>()).ok()?;
     bound
         .checked_add(state)?
+        .checked_add(u64::from(channel.skip).checked_mul(2)?)?
+        .checked_add(List::<Box<[u8]>>::worst_case(limits.sizes.transcript.checked_div(4)?)?)?
+        .checked_add(List::<host::StartMessage>::worst_case(limits.sizes.inbox)?)?
+        .checked_add(List::<host::AnsweredCall>::worst_case(limits.sizes.answered)?)?
+        .checked_add(List::<host::Grant>::worst_case(limits.sizes.accounts.checked_add(limits.sizes.credentials)?)?)?
+        .checked_add(List::<wire::Part>::worst_case(1)?)?
         .checked_add(u64::from(limits.sizes.name))?
         .checked_add(u64::from(limits.sizes.secret))?
         .checked_add(Queue::<channel::Event>::worst_case(channel::MAX_UP.checked_mul(3)?)?)?

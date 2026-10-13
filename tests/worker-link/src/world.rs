@@ -20,6 +20,9 @@ pub struct World {
     silence_next: bool,
     other_version_next: bool,
     refused: Vec<(u16, Box<[u8]>)>,
+    observed: Vec<Vec<skein_fake_channel::Observed>>,
+    values: Vec<Request>,
+    order: Vec<&'static str>,
 }
 impl World {
     #[must_use]
@@ -40,6 +43,9 @@ impl World {
             silence_next: false,
             other_version_next: false,
             refused: Vec::new(),
+            observed: Vec::new(),
+            values: Vec::new(),
+            order: Vec::new(),
         }
     }
     pub fn engine(&mut self, peer: ScriptedPeer) {
@@ -59,7 +65,7 @@ impl World {
         self.run();
     }
     pub fn lose_channel(&mut self) {
-        self.net = None;
+        self.archive();
         self.down(Event::Gone { connection: self.connection });
     }
     pub fn advance(&mut self, span: Duration) {
@@ -121,15 +127,57 @@ impl World {
             }
             Request::Close { connection } | Request::Abort { connection } => {
                 assert_eq!(connection, self.connection);
-                if let Some(net) = self.net.take()
-                    && let Some(refused) = net.refused
-                {
-                    self.refused.push(refused);
-                }
+                self.archive();
                 self.component.down(self.now, Event::Gone { connection }, &mut self.out);
             }
             Request::Fact { why } => self.facts.push(why),
+            Request::Ready => self.root.push(Request::Ready),
+            Request::Lost => self.root.push(Request::Lost),
+            request @ Request::Down { .. } => {
+                self.order.push("down");
+                self.root.push(request);
+            }
+            request @ Request::Value { .. } => {
+                self.order.push("value");
+                self.values.push(request);
+            }
         }
+    }
+    fn archive(&mut self) {
+        if let Some(net) = self.net.take() {
+            self.observed.push(net.peer.observed().to_vec());
+            if let Some(refused) = net.refused {
+                self.refused.push(refused);
+            }
+        }
+    }
+    pub fn play(&mut self, frame: skein_channel::Frame) {
+        self.net.as_mut().expect("open channel").peer.play(frame);
+        self.run();
+    }
+    #[must_use]
+    pub fn records(&self) -> Vec<Vec<skein_fake_channel::Observed>> {
+        let mut records = self.observed.clone();
+        if let Some(net) = &self.net {
+            records.push(net.peer.observed().to_vec());
+        }
+        records
+    }
+    #[must_use]
+    pub fn dropped_records(&self) -> u64 {
+        self.component.dropped_records()
+    }
+    #[must_use]
+    pub fn values(&self) -> &[Request] {
+        &self.values
+    }
+    #[must_use]
+    pub fn order(&self) -> &[&'static str] {
+        &self.order
+    }
+    #[must_use]
+    pub fn now(&self) -> Time {
+        self.now
     }
     #[must_use]
     pub fn dials(&self) -> &[Time] {

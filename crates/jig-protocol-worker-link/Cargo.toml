@@ -9,6 +9,7 @@ publish.workspace = true
 [dependencies]
 skein-lib.workspace = true
 skein-channel.workspace = true
+skein-codec.workspace = true
 jig-protocol-worker-wire.workspace = true
 jig-domain-host.workspace = true
 
