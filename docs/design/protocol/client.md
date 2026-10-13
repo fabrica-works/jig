@@ -312,6 +312,12 @@ the platform's HTTP stack, TLS                  TLS server, or plaintext on loop
     the subject the service (`../domain/people.md`, section 3); it
     expires as any, and the shell signs in again. So exchanges are checked
     one way, by sign-in, and the credential's digest only at sign-in.
+  - *Once:* a request made again by its key is answered as it was, its
+    party, and no credential, since the engine keeps only its digest. An
+    owner who lost it reissues it (`../domain/people.md`, section 3).
+  - *Replaced* when an owner reissues it: a new credential is drawn, its
+    digest replaces the old, durable before the answer, which carries it
+    once; the sign-ins made with the old end.
   - *Ended* when an owner removes the service: its digest is erased and
     its sign-ins end.
 - **Signed out:** a secret the engine does not know, or a sign-in ended or

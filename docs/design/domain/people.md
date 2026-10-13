@@ -80,6 +80,15 @@ authority and to the tasks.
   makes one in a project, with a role, and the protocol layer issues its
   credential. A service makes requests (section 5) but starts no chat,
   and its inbox is read through the client's protocol, not shown.
+  - *Its identity* is the deployment and the service's number, recorded
+    when the service is made, so its sign-ins find it; a sign-in of the
+    deployment's naming no service makes no party.
+  - *An owner reissues its credential:* a new one replaces it, and the
+    sign-ins made with the old end. This is how an owner who lost the
+    credential, or fears it leaked, gets one again; the party, its role
+    and its history stay.
+  - *An owner removes it:* its credential and its sign-ins end, and its
+    party is kept, as every party is, for the history that names it.
 - **The deployment's own link,** a provider of jig's for one person's
   machine: the engine prints at start a link carrying a one-time secret,
   and opening it signs in the configured first owner it names
