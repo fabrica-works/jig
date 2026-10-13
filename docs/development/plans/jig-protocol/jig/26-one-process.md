@@ -282,6 +282,34 @@ Don't: read a file once the loop runs; print a secret.
 Size: at most 300 lines.
 Removes: nothing.
 
+### 26.s1 The reference service opens each project's first period
+
+A step not in the plan, from the designer's answer on the reference
+binary's period calendar (jig `b4a79914`: `protocol/configuration.md`,
+5, "The smallest source"; `protocol/service.md`, 7). The real service
+starts with no `core::Event::Period`, so its first chat is refused for
+funding; worlds say the period themselves
+(`tests/channel/src/referee.rs`, 33.4's world, ruling 275), and the process and live proofs run the
+binary with no world. The core takes a period with no next start
+(`crates/jig-domain-core/src/routing/vocabulary.rs:426`, `next:
+Option<Wall>`).
+Needs: nothing.
+Files: `testing/jig-test-service/src/{startup.rs, engine.rs}` and its
+  tests.
+Shape: on a deployment's first start (`configuration.md`, 8: the store
+  empty), once the core's restart is done and before it admits a
+  party's request, the reference service's root says, for each project
+  its configuration seeds, `core::Event::Period { project, period: 1,
+  budget, next: None }`, `budget` the project policy's `period_spend`.
+  A later start says none.
+Test shape: `a_first_start_opens_each_seeded_projects_period` (a chat
+  requested first is funded); `a_later_start_says_no_period` (the
+  store's period stands, no `Event::Period` said). Under 20 ms each.
+Proof: unit, `heavy cargo nextest run -p jig-test-service` once.
+Don't: keep a calendar or arm a deadline (later.md); say a period at a
+  later start; take a budget past the policy's `period_spend`.
+Size: at most 80 lines of production code.
+
 ### 26.5 The process proof
 
 Scope: `testing/jig-test/tests/process.rs` (`[[test]] name = "process"`):
@@ -304,7 +332,7 @@ signs in by the new link and finds the chat with its answer.
 `test-threads = 1`). `scripts/proof-one-process.sh`: `cargo build -p
 jig-test --bin jig-test`, then `cargo nextest run -p jig-test --profile
 process`, exiting with its status, at most 30 lines.
-Needs: nothing beyond 26.4.
+Needs: 26.4; 26.s1 (the first period).
 Files: `testing/jig-test/{Cargo.toml, tests/process.rs,
 tests/support/mod.rs}`; `.config/nextest.toml`;
 `scripts/proof-one-process.sh`. Shared hotspots: `.config/nextest.toml`.
