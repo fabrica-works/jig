@@ -520,7 +520,7 @@ answer on jig 30.4 (jig `83c781c9`, `protocol/client.md`, 3: "A deadline
 the engine keeps on its own clock (an account's next ask, a grace's end)
 crosses as the wall it falls at"); before jig 30.4 carries the owner's
 deployment document.
-Shape: `OwnerAccountState::Later { until: Wall }` in
+Shape (ruling 191: `Option<Wall>`, as the document's other deadlines): `OwnerAccountState::Later { until: Option<Wall> }` in
   `crates/jig-domain-client/src/contract/owner_deployment.rs` (:196),
   beside the document's other walls (`spent_until`, `grace_until`,
   `Adrift.until`). The producers make it from the engine's clock and wall

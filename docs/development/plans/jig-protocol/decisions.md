@@ -1308,6 +1308,21 @@ the file.
      in the plan, jig 08.s1, changes the contract and its producers; jig
      30.4 carries the wall after it, and lands its other documents
      meanwhile.
+191. **The next ask is an `Option<Wall>`, as the document's other
+     deadlines** (2026-10-13, the coordinator's block "jig 08.s1:
+     clock-free core deployment document cannot project account
+     deadline", 2026-10-13T01:51:25Z). The core makes the owner's
+     deployment document with a clock (`make_with_clock`) or without one
+     (`make`); without, no wall can be made. The document's other
+     deadlines already say so: `spent_until`, `grace_until` and
+     `Adrift.until` are `Option<Wall>`
+     (`crates/jig-domain-client/src/contract/owner_deployment.rs:69, 84,
+     97, 188`). So `Later { until: Option<Wall> }`: `Some` from
+     `wall_deadline` when the document is made with a clock, `None`
+     without one; the view says "asks again later" for `None`. The core's
+     document gains `documents::AccountState`, mirroring the accounts
+     child's state with that field. This narrows the designer's `until:
+     Wall` (ruling 190) to the clock-free case only.
 
 ## For the user
 
