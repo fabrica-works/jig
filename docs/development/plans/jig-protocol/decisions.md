@@ -2333,6 +2333,16 @@ the file.
      the plan: skein 03.s2 (`skein/03-files.md`, at most 20 lines) and
      jig-repin.s5 (jig's skein source to skein's `main`); jig 26.2 lands
      after them, its abort as written.
+278. **A power loss restarts the world's own processes, not hosted
+     children: skein 03.s3 and jig-repin.s6 before 26.3 lands**
+     (2026-10-13, the designer's answer to question.md's "skein's world:
+     a power loss with hosted children"; skein `2f89cf78`, jig
+     `9517d028`). As after a real boot, the services restart and a child
+     comes back only if its parent spawns it again; skein's world asked a
+     restart factory of every process, hosted children included. Steps
+     not in the plan: skein 03.s3 (`skein/03-files.md`, at most 60 lines)
+     and jig-repin.s6 (jig-repin.s5 had already landed); jig 26.3 lands
+     after them, its mid-run power-loss story as prescribed.
 
 ## For the user
 
