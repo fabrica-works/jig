@@ -64,6 +64,30 @@ Don't: accept any earlier name than the attempt's last committed read;
 change smith or the wire.
 Size: at most 40 lines of production code.
 
+### 27.s2 A stopping worker waits, not spins
+
+A step not in the plan (decisions.md, ruling 263), found by 27.1's
+mid-run shutdown story on the real agent: `jig-test-worker`'s
+`Domain::work_pending` returns `... || self.stopping`
+(`testing/jig-test-worker/src/domain.rs:100`), and stopping lasts until no
+run is hosted, no agent lives and nothing is pending (`route`, :215-217).
+While it waits on an agent's IO or a stop deadline it reports work
+pending without any, so a loop spins and the simulated world's clock never
+advances (`logs/jig-27/27.1-dev-scenes5.txt`).
+Needs: nothing; before 27.1 lands. Run by jig 27's session as its own
+commit.
+Files: `testing/jig-test-worker/src/domain.rs` and its tests.
+Shape: while stopping, `work_pending` is true only when the final stop
+can be taken now (nothing hosted, no agent, nothing pending) or other
+work is pending; otherwise the worker waits for its children's IO and
+its deadlines like any idle root (`next_deadline`).
+Test shape: a row: a stopping worker with a live agent and no IO reports
+no work pending and names its stop deadline; one whose last agent has
+ended reports the stop pending. 27.1's shutdown story is the world proof.
+Proof: 27.1's mid-run shutdown story passes; the gate.
+Don't: change a public boundary; poll.
+Size: at most 20 lines of production code.
+
 ### 27.1 The channel's stories, its referee and the fuzzy sweep
 
 Scope: `tests/channel/src/{referee.rs, relay.rs, stories.rs}`: the

@@ -2172,6 +2172,15 @@ the file.
      only, every landed test's name and expected value kept, no
      production or boundary change, named in the commit body. The README's
      Rules now say so.
+263. **jig 27.s2: a stopping worker waits, not spins** (2026-10-13, the
+     coordinator's block "jig 27.1: worker shutdown readiness prevents
+     clock advancement", 2026-10-13T11:40:52Z). `jig-test-worker` reports
+     work pending for as long as it is stopping, even while it only waits
+     on an agent's IO or a deadline: a busy loop in a real process, and a
+     stopped clock in the simulated world. A step not in the plan, jig
+     27.s2 (`jig/27-channel-stories-and-store.md`), reports the stop
+     pending only when it can be taken; jig 27 runs it before 27.1
+     lands.
 
 ## For the user
 
