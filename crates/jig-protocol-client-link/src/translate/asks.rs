@@ -2,7 +2,7 @@
 use crate::translate::too_large;
 use alloc::boxed::Box;
 use jig_domain_client::contract as c;
-use jig_protocol_client_wire::v2 as w;
+use jig_protocol_client_wire::v3 as w;
 use skein_lib::{List, Writer, bytes};
 pub(crate) fn wire_revision(value: c::Revision, limits: &w::Limits) -> Result<w::Revision, w::Problem> {
     w::Revision::new(limits, w::RevisionParts { value: value.value })

@@ -3,7 +3,7 @@ use crate::Limits;
 use crate::translate::{piece_problem, too_large};
 use alloc::boxed::Box;
 use jig_domain_client::contract as c;
-use jig_protocol_client_wire::v2 as w;
+use jig_protocol_client_wire::v3 as w;
 use skein_lib::Map;
 use skein_lib::Reader;
 #[path = "facts_part0.rs"]

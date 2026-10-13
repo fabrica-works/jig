@@ -3,7 +3,7 @@ use super::asks::{wire_note_scope, wire_proposal_key};
 use crate::Readable;
 use jig_domain_client::contract as c;
 use jig_protocol_client_wire::VERSION;
-use jig_protocol_client_wire::v2 as w;
+use jig_protocol_client_wire::v3 as w;
 use skein_lib::{Writer, bytes};
 
 #[expect(clippy::manual_map, reason = "step code matches optional fields without closures")]

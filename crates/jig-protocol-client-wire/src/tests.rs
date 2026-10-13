@@ -245,7 +245,7 @@ fn a_kept_record_of_another_family_version_is_refused() {
         let kept = Kept::new(&limits, KeptParts { keeper, store_version: u16::MAX, record: Box::from([255, 0]) })
             .expect("bounded kept record");
         let mut bytes = fixtures::encoded(&kept, Kept::measure, Kept::encode);
-        bytes[0] = 3;
+        bytes[0] = 2;
         bytes[1] = 0;
         assert_eq!(
             Kept::decode(&limits, &mut Reader::new(&bytes)),
@@ -291,4 +291,13 @@ fn a_table_entry_never_sent_round_trips_with_no_wall() {
     let decoded = TableEntry::decode(&limits, &mut Reader::new(&bytes)).expect("whole table entry");
     assert_eq!(decoded.first_sent(), &None);
     assert_eq!(decoded, entry);
+}
+
+#[test]
+fn each_read_value_variant_round_trips_unchanged() {
+    let limits = fixtures::limits();
+    for (name, value) in &fixtures::read_values(&limits) {
+        let bytes = fixtures::encoded(value, ReadValue::measure, ReadValue::encode);
+        assert_eq!(ReadValue::decode(&limits, &mut Reader::new(&bytes)), Ok(value.clone()), "{name}");
+    }
 }
