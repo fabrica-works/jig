@@ -415,7 +415,11 @@ holds, and neither of its components reads them.
   out to be encoded before the hub relays the call (6.1); the hub, this
   channel and the engine carry and echo its bytes, which no domain reads
   (`../domain/engine.md`, 7.3), and the hub matches a relayed answer by
-  them. They are decoded back on the worker for the calls committed
+  them. The hub's link vocabulary names a relayed call by these bytes
+  both ways, its answer and its cancel included: a delivery's token is
+  the hub's own handle and never leaves it, so neither the worker's link
+  nor a root that composes a hub, the engine's own included, keeps a
+  table from names to tokens. They are decoded back on the worker for the calls committed
   since a resumed run's last turn, and by `jig-protocol-charter` in the
   engine, which reads the call's key (its completion and position) as
   the protocol layer decodes the call (6.3), so a connector keys the
