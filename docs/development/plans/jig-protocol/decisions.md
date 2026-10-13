@@ -2144,6 +2144,10 @@ the file.
   lasting fix is yours: start the daemon under `nice -n 19 chrt --idle 0
   ionice -c 3`, or set `auto_watch` off and index `main` through the
   queue (`heavy codebase-memory-mcp cli index_repository ...`).
+  **Done, 2026-10-13, at the user's request:** `codebase-memory-mcp` starts
+  through `~/.local/bin/codebase-memory-mcp-idle` (`ionice -c 3 chrt
+  --idle 0`), its command in Codex's and Claude's MCP configs; its daemon
+  inherits the priority.
 - **The gate lane bounds the run** (supervision.md, checks of 17:22 and
   18:22): gates ran 81 to 91 % of each hour, pausing the build lane, so a
   build command waited about 4 minutes and landings fell to 8 to 14 an
