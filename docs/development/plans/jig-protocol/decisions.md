@@ -1534,6 +1534,29 @@ the file.
      within 40 lines, does not count toward ruling 114's 20 lines; the
      inputs and expected values changed still do. 11.s1 lands with its
      edits, each named in its commit body. The README's Rules say so.
+210. **The people child forgets its configured owners at a restart**
+     (2026-10-13, the coordinator's block "jig 11.s1: forget configured
+     initial owners after restart begins", 2026-10-13T04:37:42Z).
+     configuration.md, 3: `owners` are "the deployment's first owners ...
+     on a first start", and later starts ignore the configuration's seeds;
+     but the core hands its configured owners to `people::Domain::new` on
+     every start, so a restart after the configuration names a new owner
+     grants it (11.s1's regression
+     `a_restart_does_not_grant_new_configured_owners`). 11.s1 adds a public
+     `people::Domain::forget_initial_owners(&mut self)`, which drops only
+     its bounded list of first owners, and the core's `restart_begin`
+     calls it on a restart; a first start seeds from them as 11.s1 does;
+     `step`'s worlds are unchanged. About 6 lines.
+211. **jig 30.s2: run text tagged with its watch; a delivery discriminated**
+     (2026-10-13, the coordinator's blocks "jig 32.3: run-text stream event
+     lacks destination watch" and "jig 32.3: stream delivery wire document
+     discriminator missing", 2026-10-13T04:37:42Z and 04:38:15Z). Two plan
+     defects in jig 30's schema: client.md, 1 tags each stream event with
+     its watch, but `StreamEvent::text` is a bare `RunText`; and a
+     delivery's document has no discriminator among `contract::Delivery`'s
+     16 variants, as reads had none before ruling 208. A step not in the
+     plan, jig 30.s2 (`jig/30-client-wire.md`), adds `StreamText` and
+     `DeliveryValue`; jig 32.3 lands its other stream work meanwhile.
 
 ## For the user
 

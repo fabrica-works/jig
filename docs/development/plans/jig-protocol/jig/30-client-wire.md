@@ -385,6 +385,26 @@ Proof: unit, the crate's tests once.
 Don't: write a translation (34 and 35 do); change another record.
 Size: at most 80 lines of schema and Rust, generated code excluded.
 
+### 30.s2 The stream's run text tagged with its watch; a delivery discriminated
+
+A step not in the plan (decisions.md, ruling 211), before jig 32.3 lands.
+`protocol/client.md`, 1: each stream event is "tagged with its watch";
+the schema's `StreamEvent::text` carries a bare `RunText` (no watch), and
+`Delivery.document` is an `Owned.record` with no discriminator among
+`contract::Delivery`'s 16 variants (`Task` and `OwnerProposal`, `Tree` and
+`OwnerTree`, `Run` and `RunState`, ...), the gap 30.s1 closed for reads.
+Shape: `record StreamText { watch: u64 value: RunText }`, and
+  `StreamEvent::text` carries it (`RunText` itself unchanged, the
+  documents use it); `enum DeliveryValue`, one variant per
+  `contract::Delivery` variant, each holding its document's record, which
+  jig's deliveries carry encoded as `Owned.record`, as `ReadValue` (30.s1).
+  The family's version moves once; regenerated, goldens added.
+Test shape: a table test that each `DeliveryValue` variant round-trips;
+  a stream text event round-trips with its watch.
+Proof: unit, the crate's tests once.
+Don't: write a translation; change `RunText` or another record.
+Size: at most 80 lines of schema and Rust, generated code excluded.
+
 ## Interface sketches
 
 The schema, in skein's language (`codec.md`, section 3); records the
