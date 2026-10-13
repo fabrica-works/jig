@@ -1664,6 +1664,13 @@ the file.
      assembly: it keeps the planned core sections (bounded and priced in
      its worst case), completes the brief, and carries the sections typed
      in the assignment, with one regression; its Size grows by 200.
+221. **jig 18.2's test drops a forbidden word from its name** (2026-10-13,
+     the coordinator's block "jig 18.2: prescribed new test name contains
+     forbidden Typed", 2026-10-13T05:57:52Z). The plan named the test
+     `a_connectors_step_restores_its_records_typed`; jig's vocabulary guard
+     refuses "typed" in jig's own names (rulings 199, 216 keep it so). It is
+     `a_connectors_step_restores_its_records`, body, fixture and expected
+     equality unchanged; 18.2's file says so.
 
 ## For the user
 

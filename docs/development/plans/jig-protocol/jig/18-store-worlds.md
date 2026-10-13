@@ -326,7 +326,7 @@ fn a_crash_keeps_a_durable_turn_and_loses_a_held_one() {
 
 Tests (`routes.rs`): `a_commit_routes_connector_records_as_bytes`,
 `load_core_pages_reach_the_root_then_people_restored`,
-`a_connectors_step_restores_its_records_typed`,
+`a_connectors_step_restores_its_records`,
 `a_seen_chat_is_answered_from_the_store`,
 `a_window_read_reaches_the_root_as_transcript_pages`;
 (`tests.rs`): `a_synced_write_survives_a_crash`,
