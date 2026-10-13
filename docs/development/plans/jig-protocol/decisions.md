@@ -1299,6 +1299,15 @@ the file.
      limits checked where they are made), keeping settings and state
      private. The files', queue's and reads' bounds join it in jig 17,
      which owns them.
+190. **jig 08.s1: an account's next ask crosses as a wall** (2026-10-13, the
+     designer's answer to question.md's "jig 30.4: an account's 'later'
+     deadline in a document that carries walls only"; jig `83c781c9`,
+     `78f2b285`). `OwnerAccountState::Later { until: Time }` alone in the
+     owner's deployment document is on the engine's clock; client.md, 3
+     now has such a deadline cross "as the wall it falls at". A step not
+     in the plan, jig 08.s1, changes the contract and its producers; jig
+     30.4 carries the wall after it, and lands its other documents
+     meanwhile.
 
 ## For the user
 

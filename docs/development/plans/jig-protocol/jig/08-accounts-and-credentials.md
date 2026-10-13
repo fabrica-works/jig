@@ -513,6 +513,27 @@ beyond what the compiler asks (`ops` names no credential).
 Size: at most 120 lines of production code.
 Removes: nothing.
 
+### 08.s1 An account's next ask carried as a wall
+
+A step not in the plan (decisions.md, ruling 190), from the designer's
+answer on jig 30.4 (jig `83c781c9`, `protocol/client.md`, 3: "A deadline
+the engine keeps on its own clock (an account's next ask, a grace's end)
+crosses as the wall it falls at"); before jig 30.4 carries the owner's
+deployment document.
+Shape: `OwnerAccountState::Later { until: Wall }` in
+  `crates/jig-domain-client/src/contract/owner_deployment.rs` (:196),
+  beside the document's other walls (`spent_until`, `grace_until`,
+  `Adrift.until`). The producers make it from the engine's clock and wall
+  as they make the document (`wall_now + (until - now)`): the core's
+  document, and `tests/client/src/joint/wire/deployment`'s translation
+  (`tests.rs:363-364`, `Time::ZERO` today); the view's words show it as
+  its other walls ("asks again at 14:02").
+Test shape: the core's document carries the wall its account asks again
+  at; the existing deployment tests, their expected values the walls.
+Proof: the gate.
+Don't: carry a monotonic `Time` to the client; add a remaining span.
+Size: at most 60 lines of production code.
+
 ## Interface sketches
 
 ```rust
