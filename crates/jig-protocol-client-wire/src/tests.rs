@@ -114,3 +114,41 @@ fn a_page_of_many_small_rows_and_one_of_a_few_large_rows_fit_one_bound() {
         assert_eq!(fixtures::decode_activity_page(&limits, &bytes, 8), Ok(rows));
     }
 }
+
+#[test]
+fn a_frame_at_its_ceilings_round_trips_unchanged() {
+    let limits = fixtures::document_limits();
+    let frame = fixtures::frame_at_ceilings(&limits);
+    let bytes = fixtures::encoded(&frame, Frame::measure, Frame::encode);
+    assert_eq!(Frame::decode(&limits, &mut Reader::new(&bytes)), Ok(frame));
+}
+
+#[test]
+fn a_task_one_byte_past_its_text_bound_is_refused() {
+    let mut limits = fixtures::document_limits();
+    let task = fixtures::task(&limits);
+    let bytes = fixtures::encoded(&task, Task::measure, Task::encode);
+    limits.document_text_bytes -= 1;
+    let expected = Err(Problem { path: Path::DocumentTextBytes, reason: skein_codec::Reason::Bound });
+    assert_eq!(Task::decode(&limits, &mut Reader::new(&bytes)), expected);
+    assert_eq!(Task::new(&limits, task.into_parts()), expected);
+}
+
+#[test]
+fn a_run_state_without_writing_or_call_round_trips() {
+    let limits = fixtures::document_limits();
+    let run = fixtures::run_state(&limits);
+    let bytes = fixtures::encoded(&run, RunState::measure, RunState::encode);
+    assert_eq!(RunState::decode(&limits, &mut Reader::new(&bytes)), Ok(run));
+}
+
+#[test]
+fn a_chip_with_each_phase_round_trips_unchanged() {
+    let limits = fixtures::document_limits();
+    for phase in fixtures::chip_phases(&limits) {
+        let rows = fixtures::chip_facts(&limits, phase);
+        let chip = fixtures::chip(&limits, &rows);
+        let bytes = fixtures::encoded(&chip, Chip::measure, Chip::encode);
+        assert_eq!(fixtures::decode_chip_facts(&limits, &bytes), rows);
+    }
+}

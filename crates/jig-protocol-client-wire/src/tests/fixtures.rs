@@ -195,3 +195,578 @@ pub fn malformed_activity_pieces() -> [Box<[u8]>; 3] {
     out.put(&[255]).expect("room for trailing fragment");
     [Box::from([0, 0, 0]), Box::from([0, 0, 0, 5, 1, 2]), out.finish()]
 }
+
+// Shared task and run fixtures retain supplied values independently of wire order.
+pub fn document_limits() -> Limits {
+    let mut limits = CEILINGS;
+    limits.document_text_bytes = 4;
+    limits.frame_projects = 2;
+    limits.offered_charters_chats = 2;
+    limits.offered_charters_goals = 2;
+    limits.frame_charters = 146;
+    check_limits(&limits).expect("document fixtures below ceilings");
+    limits
+}
+
+pub fn repeated<T: Clone + core::fmt::Debug>(value: T, count: u32) -> List<T> {
+    let mut values = List::with_capacity(count);
+    for _ in 0..count {
+        values.push(value.clone()).expect("reserved fixture list");
+    }
+    values
+}
+
+pub fn document_text(limits: &Limits) -> DocumentText {
+    DocumentText::new(limits, DocumentTextParts { bytes: ceiling_text(limits.document_text_bytes), cut: true })
+        .expect("bounded document_text")
+}
+
+pub fn owner_numbers(limits: &Limits) -> OwnerNumbers {
+    OwnerNumbers::new(limits, OwnerNumbersParts { budget: u64::MAX, spent: 11, spent_below: 17, reserved: 23 })
+        .expect("bounded owner_numbers")
+}
+
+pub fn funder_period(limits: &Limits) -> FunderPeriod {
+    FunderPeriod::new(limits, FunderPeriodParts { project: u32::MAX, period: u64::MAX }).expect("bounded funder_period")
+}
+
+pub fn owner_budget(limits: &Limits) -> OwnerBudget {
+    OwnerBudget::new(
+        limits,
+        OwnerBudgetParts {
+            numbers: owner_numbers(limits),
+            left: u64::MAX,
+            funder: Funder::Period(funder_period(limits)),
+            deadline: Some(u64::MAX),
+        },
+    )
+    .expect("bounded owner_budget")
+}
+
+pub fn pool_ledger(limits: &Limits) -> PoolLedger {
+    PoolLedger::new(
+        limits,
+        PoolLedgerParts {
+            source: Funder::Period(funder_period(limits)),
+            parent: Some(Funder::Task(funder_task(limits))),
+            numbers: owner_numbers(limits),
+            left: u64::MAX,
+            closed: true,
+            began: Some(u64::MAX),
+            next: None,
+        },
+    )
+    .expect("bounded pool_ledger")
+}
+
+pub fn funder_task(limits: &Limits) -> FunderTask {
+    FunderTask::new(limits, FunderTaskParts { value: u64::MAX }).expect("bounded funder_task")
+}
+
+pub fn held_role_policy(limits: &Limits) -> HeldRolePolicy {
+    HeldRolePolicy::new(limits, HeldRolePolicyParts { role: u32::MAX }).expect("bounded held_role_policy")
+}
+
+pub fn project_role(limits: &Limits) -> ProjectRole {
+    ProjectRole::new(
+        limits,
+        ProjectRoleParts {
+            project: u32::MAX,
+            name: Some(document_text(limits)),
+            role: HeldRole::Policy(held_role_policy(limits)),
+            pool: Some(pool_ledger(limits)),
+            chat_budget: u64::MAX,
+        },
+    )
+    .expect("bounded project_role")
+}
+
+pub fn frame_party(limits: &Limits) -> FrameParty {
+    FrameParty::new(
+        limits,
+        FramePartyParts {
+            number: u64::MAX,
+            kind: PartyKind::Service,
+            login: document_text(limits),
+            name: document_text(limits),
+        },
+    )
+    .expect("bounded frame_party")
+}
+
+pub fn needs(limits: &Limits) -> Needs {
+    Needs::new(
+        limits,
+        NeedsParts { questions: u32::MAX, proposals: u32::MAX, escalations: u32::MAX, person_tasks: u32::MAX },
+    )
+    .expect("bounded needs")
+}
+
+pub fn count(limits: &Limits) -> Count {
+    Count::new(limits, CountParts { value: u32::MAX, limited: true }).expect("bounded count")
+}
+
+pub fn charter(limits: &Limits) -> Charter {
+    Charter::new(limits, CharterParts { number: u32::MAX, name: Some(document_text(limits)) }).expect("bounded charter")
+}
+
+pub fn offered_charters(limits: &Limits) -> OfferedCharters {
+    OfferedCharters::new(
+        limits,
+        OfferedChartersParts {
+            project: u32::MAX,
+            chats: repeated(charter(limits), limits.offered_charters_chats),
+            goals: repeated(charter(limits), limits.offered_charters_goals),
+            cut: true,
+        },
+    )
+    .expect("bounded offered_charters")
+}
+
+pub fn run_state(limits: &Limits) -> RunState {
+    RunState::new(
+        limits,
+        RunStateParts { task: u64::MAX, attempt: Some(u64::MAX), committed_turn: u32::MAX, writing: None, call: None },
+    )
+    .expect("bounded run_state")
+}
+
+pub fn revision(limits: &Limits) -> Revision {
+    Revision::new(limits, RevisionParts { value: u64::MAX }).expect("bounded revision")
+}
+
+pub fn wake_rule_batch(limits: &Limits) -> WakeRuleBatch {
+    WakeRuleBatch::new(limits, WakeRuleBatchParts { count: u32::MAX, age: skein_lib::Duration::from_nanos(u64::MAX) })
+        .expect("bounded wake_rule_batch")
+}
+
+pub fn owner_wake_policy(limits: &Limits) -> OwnerWakePolicy {
+    OwnerWakePolicy::new(
+        limits,
+        OwnerWakePolicyParts {
+            words: WakeRule::Batch(wake_rule_batch(limits)),
+            notices: WakeRule::Immediate,
+            news: WakeRule::Never,
+            results: ResultsWake::LastOrFailure,
+            questions: true,
+            answers: false,
+            timers: true,
+        },
+    )
+    .expect("bounded owner_wake_policy")
+}
+
+pub fn document_specification(limits: &Limits) -> DocumentSpecification {
+    DocumentSpecification::new(
+        limits,
+        DocumentSpecificationParts {
+            words: document_text(limits),
+            parameters: List::with_capacity(0),
+            inputs: List::with_capacity(0),
+        },
+    )
+    .expect("bounded document_specification")
+}
+
+pub fn specification_document(limits: &Limits) -> SpecificationDocument {
+    SpecificationDocument::new(
+        limits,
+        SpecificationDocumentParts { specification: document_specification(limits), cut: true },
+    )
+    .expect("bounded specification_document")
+}
+
+pub fn subscriptions(limits: &Limits) -> Subscriptions {
+    Subscriptions::new(limits, SubscriptionsParts { entries: List::with_capacity(0) }).expect("bounded subscriptions")
+}
+
+pub fn task_contract_document_report(limits: &Limits) -> TaskContractDocumentReport {
+    TaskContractDocumentReport::new(limits, TaskContractDocumentReportParts { words: u32::MAX })
+        .expect("bounded task_contract_document_report")
+}
+
+pub fn owner_delegation(limits: &Limits) -> OwnerDelegation {
+    OwnerDelegation::new(
+        limits,
+        OwnerDelegationParts { kinds: List::with_capacity(0), tasks: u32::MAX, depth: u32::MAX },
+    )
+    .expect("bounded owner_delegation")
+}
+
+pub fn owner_authority(limits: &Limits) -> OwnerAuthority {
+    OwnerAuthority::new(
+        limits,
+        OwnerAuthorityParts {
+            tools: u64::MAX,
+            grants: Box::from([]),
+            delegation: owner_delegation(limits),
+            spend: u64::MAX,
+            deadline: None,
+            notes: u8::MAX,
+            note_resources: Box::from([]),
+        },
+    )
+    .expect("bounded owner_authority")
+}
+
+pub fn owner_authority_document(limits: &Limits) -> OwnerAuthorityDocument {
+    OwnerAuthorityDocument::new(limits, OwnerAuthorityDocumentParts { authority: owner_authority(limits), cut: true })
+        .expect("bounded owner_authority_document")
+}
+
+pub fn owner_requester_person(limits: &Limits) -> OwnerRequesterPerson {
+    OwnerRequesterPerson::new(limits, OwnerRequesterPersonParts { value: u64::MAX })
+        .expect("bounded owner_requester_person")
+}
+
+pub fn active_run(limits: &Limits) -> ActiveRun {
+    ActiveRun::new(
+        limits,
+        ActiveRunParts {
+            stage: RunStage::Idle,
+            phase_since: u64::MAX,
+            attempt: None,
+            placement: Some(u64::MAX),
+            retry: None,
+            observation: None,
+        },
+    )
+    .expect("bounded active_run")
+}
+
+pub fn executor_agent(limits: &Limits) -> ExecutorAgent {
+    ExecutorAgent::new(limits, ExecutorAgentParts { charter: u32::MAX }).expect("bounded executor_agent")
+}
+
+pub fn chip_phase_owner_fields(limits: &Limits) -> ChipPhaseOwnerFields {
+    ChipPhaseOwnerFields::new(limits, ChipPhaseOwnerFieldsParts { phase: OwnerChipPhase::Ended, details: 2 })
+        .expect("bounded chip_phase_owner_fields")
+}
+
+pub fn chip_phase_active_fields(limits: &Limits) -> ChipPhaseActiveFields {
+    ChipPhaseActiveFields::new(limits, ChipPhaseActiveFieldsParts { value: active_run(limits) })
+        .expect("bounded chip_phase_active_fields")
+}
+
+pub fn chip_phase_waiting_fields(limits: &Limits) -> ChipPhaseWaitingFields {
+    ChipPhaseWaitingFields::new(limits, ChipPhaseWaitingFieldsParts { dependencies: repeated(u64::MAX, 2), hold: None })
+        .expect("bounded chip_phase_waiting_fields")
+}
+
+pub fn chip_phase_idle_fields(limits: &Limits) -> ChipPhaseIdleFields {
+    ChipPhaseIdleFields::new(limits, ChipPhaseIdleFieldsParts { wake: wake_policy(limits) })
+        .expect("bounded chip_phase_idle_fields")
+}
+
+pub fn wake_policy(limits: &Limits) -> WakePolicy {
+    WakePolicy::new(
+        limits,
+        WakePolicyParts { words: true, results: false, topics: repeated(u16::MAX, 2), subscriptions: Box::from([]) },
+    )
+    .expect("bounded wake_policy")
+}
+
+pub fn chip_phase_running_fields(limits: &Limits) -> ChipPhaseRunningFields {
+    ChipPhaseRunningFields::new(
+        limits,
+        ChipPhaseRunningFieldsParts { attempt: u64::MAX, since: u64::MAX, tool: Some(ceiling_text(4)) },
+    )
+    .expect("bounded chip_phase_running_fields")
+}
+
+pub fn chip_phase_waiting_for_words_fields(limits: &Limits) -> ChipPhaseWaitingForWordsFields {
+    ChipPhaseWaitingForWordsFields::new(
+        limits,
+        ChipPhaseWaitingForWordsFieldsParts { attempt: u64::MAX, since: u64::MAX },
+    )
+    .expect("bounded chip_phase_waiting_for_words_fields")
+}
+
+pub fn chip_phase_backing_off_fields(limits: &Limits) -> ChipPhaseBackingOffFields {
+    ChipPhaseBackingOffFields::new(
+        limits,
+        ChipPhaseBackingOffFieldsParts {
+            at: u64::MAX,
+            attempt: u64::MAX,
+            tries: u32::MAX,
+            class: FailureClass::Stall,
+            reason: ceiling_text(4),
+        },
+    )
+    .expect("bounded chip_phase_backing_off_fields")
+}
+
+pub fn chip_phase_procedure_fields(limits: &Limits) -> ChipPhaseProcedureFields {
+    ChipPhaseProcedureFields::new(limits, ChipPhaseProcedureFieldsParts { panel: Part::Panel(part_panel(limits)) })
+        .expect("bounded chip_phase_procedure_fields")
+}
+
+pub fn part_panel(limits: &Limits) -> PartPanel {
+    PartPanel::new(limits, PartPanelParts { connector: u16::MAX, task: u64::MAX }).expect("bounded part_panel")
+}
+
+pub fn chip_phase_person_fields(limits: &Limits) -> ChipPhasePersonFields {
+    ChipPhasePersonFields::new(
+        limits,
+        ChipPhasePersonFieldsParts {
+            addressed: Recipient::Party(recipient_party(limits)),
+            taken: Some(taken_by(limits)),
+            since: None,
+        },
+    )
+    .expect("bounded chip_phase_person_fields")
+}
+
+pub fn recipient_party(limits: &Limits) -> RecipientParty {
+    RecipientParty::new(limits, RecipientPartyParts { value: u64::MAX }).expect("bounded recipient_party")
+}
+
+pub fn taken_by(limits: &Limits) -> TakenBy {
+    TakenBy::new(limits, TakenByParts { number: u64::MAX, name: None }).expect("bounded taken_by")
+}
+
+pub fn chip_phase_closing_fields(limits: &Limits) -> ChipPhaseClosingFields {
+    ChipPhaseClosingFields::new(limits, ChipPhaseClosingFieldsParts { value: 2 })
+        .expect("bounded chip_phase_closing_fields")
+}
+
+pub fn chip_phase_held_fields(limits: &Limits) -> ChipPhaseHeldFields {
+    ChipPhaseHeldFields::new(
+        limits,
+        ChipPhaseHeldFieldsParts { reason: 2, since: u64::MAX, revision: revision(limits), was: None },
+    )
+    .expect("bounded chip_phase_held_fields")
+}
+
+pub fn chip_phase_ended_fields(limits: &Limits) -> ChipPhaseEndedFields {
+    ChipPhaseEndedFields::new(limits, ChipPhaseEndedFieldsParts { how: 2, at: u64::MAX })
+        .expect("bounded chip_phase_ended_fields")
+}
+
+pub fn owner_executor_agent(limits: &Limits) -> OwnerExecutorAgent {
+    OwnerExecutorAgent::new(limits, OwnerExecutorAgentParts { charter: u32::MAX })
+        .expect("bounded owner_executor_agent")
+}
+
+pub fn owner_chip_details_fields(limits: &Limits) -> OwnerChipDetailsFields {
+    OwnerChipDetailsFields::new(
+        limits,
+        OwnerChipDetailsFieldsParts {
+            project: u32::MAX,
+            executor: OwnerExecutor::Agent(owner_executor_agent(limits)),
+            phase_since: u64::MAX,
+            run_since: None,
+            attempt: Some(u64::MAX),
+            retry: None,
+            wake: owner_wake_policy(limits),
+            person_wait: None,
+            hold: None,
+            budget: owner_budget(limits),
+            activity: u64::MAX,
+            resources: Box::from([]),
+            resources_cut: true,
+            resources_observed: false,
+            procedure: None,
+            live_delegates: u32::MAX,
+            closing_connectors: Some(List::with_capacity(0)),
+            ending: None,
+            ended_at: None,
+            observation: None,
+        },
+    )
+    .expect("bounded owner_chip_details_fields")
+}
+
+pub fn closing_fields(limits: &Limits) -> ClosingFields {
+    ClosingFields::new(
+        limits,
+        ClosingFieldsParts {
+            delegates: u32::MAX,
+            connectors: Some(repeated(u16::MAX, 2)),
+            stage: Some(ClosingStage::Settled),
+            ending: None,
+        },
+    )
+    .expect("bounded closing_fields")
+}
+
+pub fn hold_reason_budget_fields(limits: &Limits) -> HoldReasonBudgetFields {
+    HoldReasonBudgetFields::new(limits, HoldReasonBudgetFieldsParts { spent: u64::MAX, limit: u64::MAX })
+        .expect("bounded hold_reason_budget_fields")
+}
+
+pub fn frame_at_ceilings(limits: &Limits) -> Frame {
+    let charters = repeated(offered_charters(limits), limits.frame_projects);
+    let charters = piece_items(&charters, OfferedCharters::measure, OfferedCharters::encode);
+    assert_eq!(charters.len(), usize::try_from(limits.frame_charters).expect("small piece"));
+    Frame::new(
+        limits,
+        FrameParts {
+            party: frame_party(limits),
+            projects: repeated(project_role(limits), limits.frame_projects),
+            needs: needs(limits),
+            needs_total: u32::MAX,
+            updates: count(limits),
+            results_seen: u64::MAX,
+            charters,
+            cut: true,
+            retention: skein_lib::Duration::from_nanos(u64::MAX),
+            deployment_role: Some(HeldRole::Owner),
+        },
+    )
+    .expect("frame at configured ceilings")
+}
+
+pub fn chip_phases(limits: &Limits) -> [ChipPhaseFields; 13] {
+    [
+        ChipPhaseFields::Owner(chip_phase_owner_fields(limits)),
+        ChipPhaseFields::Active(chip_phase_active_fields(limits)),
+        ChipPhaseFields::Waiting(chip_phase_waiting_fields(limits)),
+        ChipPhaseFields::Idle(chip_phase_idle_fields(limits)),
+        ChipPhaseFields::Starting,
+        ChipPhaseFields::Running(chip_phase_running_fields(limits)),
+        ChipPhaseFields::WaitingForWords(chip_phase_waiting_for_words_fields(limits)),
+        ChipPhaseFields::BackingOff(chip_phase_backing_off_fields(limits)),
+        ChipPhaseFields::Procedure(chip_phase_procedure_fields(limits)),
+        ChipPhaseFields::Person(chip_phase_person_fields(limits)),
+        ChipPhaseFields::Closing(chip_phase_closing_fields(limits)),
+        ChipPhaseFields::Held(chip_phase_held_fields(limits)),
+        ChipPhaseFields::Ended(chip_phase_ended_fields(limits)),
+    ]
+}
+
+fn phase_fact(limits: &Limits, phase: &ChipPhaseFields) -> Option<Fact> {
+    match phase {
+        ChipPhaseFields::Owner(_) => Some(Fact::OwnerChipDetails(Box::new(
+            OwnerChipDetailsRow::new(
+                limits,
+                OwnerChipDetailsRowParts { parent: Some(1), value: owner_chip_details_fields(limits) },
+            )
+            .expect("whole owner details"),
+        ))),
+        ChipPhaseFields::Closing(_) => Some(Fact::Closing(
+            ClosingRow::new(limits, ClosingRowParts { parent: Some(1), value: closing_fields(limits) })
+                .expect("whole closing"),
+        )),
+        ChipPhaseFields::Held(_) => Some(Fact::HoldReason(
+            HoldReasonRow::new(
+                limits,
+                HoldReasonRowParts {
+                    parent: Some(1),
+                    value: HoldReasonFields::Budget(hold_reason_budget_fields(limits)),
+                },
+            )
+            .expect("whole hold"),
+        )),
+        ChipPhaseFields::Ended(_) => Some(Fact::Ending(
+            EndingRow::new(limits, EndingRowParts { parent: Some(1), value: EndingFields::Done })
+                .expect("whole ending"),
+        )),
+        ChipPhaseFields::Active(_)
+        | ChipPhaseFields::Waiting(_)
+        | ChipPhaseFields::Idle(_)
+        | ChipPhaseFields::Starting
+        | ChipPhaseFields::Running(_)
+        | ChipPhaseFields::WaitingForWords(_)
+        | ChipPhaseFields::BackingOff(_)
+        | ChipPhaseFields::Procedure(_)
+        | ChipPhaseFields::Person(_) => None,
+    }
+}
+
+fn compact_phase(phase: &ChipPhaseFields) -> Phase {
+    match phase {
+        ChipPhaseFields::Owner(_) => Phase::Ended,
+        ChipPhaseFields::Active(_) | ChipPhaseFields::Procedure(_) | ChipPhaseFields::Person(_) => Phase::Active,
+        ChipPhaseFields::Waiting(_) => Phase::Waiting,
+        ChipPhaseFields::Idle(_) => Phase::Idle,
+        ChipPhaseFields::Starting => Phase::Due,
+        ChipPhaseFields::Running(_) | ChipPhaseFields::WaitingForWords(_) => Phase::Running,
+        ChipPhaseFields::BackingOff(_) => Phase::BackingOff,
+        ChipPhaseFields::Closing(_) => Phase::Closing,
+        ChipPhaseFields::Held(_) => Phase::Held,
+        ChipPhaseFields::Ended(_) => Phase::Done,
+    }
+}
+
+pub fn chip_facts(limits: &Limits, phase: ChipPhaseFields) -> List<Fact> {
+    let mut rows = List::with_capacity(3);
+    let fields = ChipFields::new(
+        limits,
+        ChipFieldsParts {
+            task: u64::MAX,
+            title: document_text(limits),
+            executor: Executor::Agent(executor_agent(limits)),
+            phase: compact_phase(&phase),
+            details: 1,
+        },
+    )
+    .expect("whole chip header");
+    rows.push(Fact::Chip(ChipRow::new(limits, ChipRowParts { parent: None, value: fields }).expect("chip root")))
+        .expect("reserved root");
+    let extra = phase_fact(limits, &phase);
+    rows.push(Fact::ChipPhase(
+        ChipPhaseRow::new(limits, ChipPhaseRowParts { parent: Some(0), value: phase }).expect("child phase"),
+    ))
+    .expect("reserved phase");
+    if let Some(extra) = extra {
+        rows.push(extra).expect("reserved details");
+    }
+    rows
+}
+
+pub fn chip(limits: &Limits, rows: &List<Fact>) -> Chip {
+    let rows = piece_items(rows, Fact::measure, Fact::encode);
+    Chip::new(limits, ChipParts { rows }).expect("whole chip piece")
+}
+
+pub fn decode_chip_facts(limits: &Limits, bytes: &[u8]) -> List<Fact> {
+    let chip = Chip::decode(limits, &mut skein_lib::Reader::new(bytes)).expect("whole generated chip");
+    let mut reader = skein_lib::Reader::new(chip.rows());
+    let mut rows = List::with_capacity(3);
+    while let Some(bytes) = skein_codec::piece::split(&mut reader).expect("exact chip pieces") {
+        let fact = Fact::decode(limits, &mut skein_lib::Reader::new(&bytes)).expect("whole generated fact");
+        rows.push(fact).expect("bounded fact rows");
+    }
+    rows
+}
+
+pub fn task(limits: &Limits) -> Task {
+    let rows = chip_facts(limits, ChipPhaseFields::Starting);
+    Task::new(
+        limits,
+        TaskParts {
+            chip: chip(limits, &rows),
+            goal: Some(u64::MAX),
+            priority: Some(u32::MAX),
+            lineage_chips: Box::from([]),
+            inputs: Box::from([]),
+            project: u32::MAX,
+            requester: OwnerRequester::Person(owner_requester_person(limits)),
+            lineage: List::with_capacity(0),
+            spec: specification_document(limits),
+            spec_revision: revision(limits),
+            person_revision: None,
+            taken_by: Some(u64::MAX),
+            instructions: Some(document_text(limits)),
+            wake: owner_wake_policy(limits),
+            subscriptions: subscriptions(limits),
+            result_contract: TaskContractDocument::Report(task_contract_document_report(limits)),
+            dependencies: Box::from([]),
+            references: Box::from([]),
+            cut: true,
+            resources: Box::from([]),
+            budget: owner_budget(limits),
+            authority: owner_authority_document(limits),
+            hold: None,
+            proposals: List::with_capacity(0),
+            activity: u64::MAX,
+            changed: u64::MAX,
+            acts: Box::from([]),
+            result: None,
+            delegates: Box::from([]),
+            context: None,
+        },
+    )
+    .expect("whole task")
+}

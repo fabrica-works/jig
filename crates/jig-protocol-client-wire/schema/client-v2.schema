@@ -704,3 +704,53 @@ record OwnerInboxSelection { cursor: OwnerInboxCursor goals: list 32 u64 }
 record OwnerInboxEntry { reply: option ConversationLine task: OwnerTaskLink project: option u32 object: OwnerInboxObject activity: option u64 at: option u64 unread: option bool cursor: OwnerInboxCursor }
 # OwnerInboxPage.selection: jig_domain_client::Limits::document_bytes; OwnerInboxPage.rows: jig_domain_client::Limits::document_bytes
 record OwnerInboxPage { selection: option bytes 16777216 cut: bool rows: bytes 16777216 before: option Cursor after: option Cursor }
+
+# Task and run documents (client/domain/contract.md, 5 and 7.3).
+record PoolLedger { source: Funder parent: option Funder numbers: OwnerNumbers left: u64 closed: bool began: option u64 next: option u64 }
+record FrameParty { number: u64 kind: PartyKind login: DocumentText name: DocumentText }
+record Needs { questions: u32 proposals: u32 escalations: u32 person_tasks: u32 }
+record ProjectRole { project: u32 name: option DocumentText role: HeldRole pool: option PoolLedger chat_budget: u64 }
+record Charter { number: u32 name: option DocumentText }
+record OfferedCharters { project: u32 chats: list 4 Charter goals: list 4 Charter cut: bool }
+record Frame { party: FrameParty projects: list 7 ProjectRole needs: Needs needs_total: u32 updates: Count results_seen: u64 charters: bytes 16777216 cut: bool retention: duration deployment_role: option HeldRole }
+record PhaseCounts { ended: u32 waiting: u32 running: u32 held: u32 closing: u32 done: u32 failed: u32 cancelled: u32 }
+record Impact { tasks: PhaseCounts live_runs: u32 proposals: u32 effects_pending: u32 effects_settling: u32 takeover_budget: u64 }
+record WriterSlot { resource: Part task: u64 attempt: option u64 }
+record LiveDelegate { chip: Chip takeover_budget: u64 }
+record Steering { addressed: option Recipient person_revision: option Revision taken_by: option u64 revision: Revision spec: SpecificationDocument instructions: option DocumentText wake: OwnerWakePolicy dependencies: list 32 u64 authority: OwnerAuthorityDocument budget: Budget }
+record Passed { by: Actor at: u64 reason: text 65536 lacking: option Lacking }
+record Escalation { ending: option Ending task: Chip hold: Hold steering: Steering impact: Impact waiting: Recipient trail: bytes 16777216 acts: bytes 16777216 }
+record TaskContext { escalation: option Escalation parts: bytes 16777216 closing: option Closing spend: list 32 SpendLine runtime: Runtime impact: Impact writer_slots: bytes 16777216 }
+record TaskResultDocument { value: ResultDocument }
+record TaskResultEnding { value: OwnerChipEnding }
+enum TaskResult { document: boxed TaskResultDocument, ending: TaskResultEnding }
+record TaskResourcePart { value: Part }
+record TaskResourceOwner { value: OwnerResourceLine }
+enum TaskResource { part: TaskResourcePart, owner: TaskResourceOwner }
+record TaskHoldDocument { value: Hold }
+record TaskHoldOwner { value: OwnerChipHold }
+enum TaskHold { document: TaskHoldDocument, owner: TaskHoldOwner }
+record SubscriptionKindTask { target: u64 held: bool result: bool }
+record SubscriptionKindTimer { at: u64 period: option duration }
+record SubscriptionKindTopic { connector: u16 topic: u64 }
+enum SubscriptionKind { task: SubscriptionKindTask, timer: SubscriptionKindTimer, topic: SubscriptionKindTopic }
+record Subscription { number: u64 kind: SubscriptionKind }
+record Subscriptions { entries: list 32 Subscription }
+record Task { chip: Chip goal: option u64 priority: option u32 lineage_chips: bytes 16777216 inputs: bytes 16777216 project: u32 requester: OwnerRequester lineage: list 32 u64 spec: SpecificationDocument spec_revision: Revision person_revision: option Revision taken_by: option u64 instructions: option DocumentText wake: OwnerWakePolicy subscriptions: Subscriptions result_contract: TaskContractDocument dependencies: bytes 16777216 references: bytes 16777216 cut: bool resources: bytes 16777216 budget: OwnerBudget authority: OwnerAuthorityDocument hold: option TaskHold proposals: list 32 ProposalKey activity: u64 changed: u64 acts: bytes 16777216 result: option TaskResult delegates: bytes 16777216 context: option TaskContext }
+record TreeNode { chip: Chip parent: option u64 dependencies: list 32 u64 proposals: list 32 ProposalKey spend: u64 folded: PhaseCounts held_below: u32 }
+record Tree { task: u64 nodes: bytes 16777216 folded: PhaseCounts held_below: u32 }
+record ReplyPosition { chat: u64 through: u64 }
+record Inbox { entries: bytes 16777216 needs: Needs updates: Count results_seen: u64 replies_seen: list 32 ReplyPosition more: bool }
+record Conversations { rows: bytes 16777216 more: bool after: Cursor }
+record Goals { project: u32 rows: bytes 16777216 more: bool }
+record TaskFilter { phase: option Phase executor: option Executor goal: option u64 asked_by_me: bool }
+record TaskLine { asked_by_me: bool chip: Chip goal: option u64 requester: OwnerRequester changed: u64 }
+record Tasks { project: u32 filter: TaskFilter rows: bytes 16777216 more: bool }
+record Call { number: u64 tool: text 65536 input: text 65536 outcome: option text 65536 failed: bool objects: list 32 ObjectKey parts: bytes 16777216 }
+record CurrentCall { identity: CallIdentity tool: text 65536 input: text 65536 cut: bool began: option u64 }
+record LiveCallDecoded { value: Call }
+record LiveCallRaw { value: CurrentCall }
+enum LiveCall { decoded: LiveCallDecoded, raw: LiveCallRaw }
+record ProvisionalTurnName { attempt: u64 number: u32 retry: u32 }
+record RunText { attempt: u64 began: option u64 turn: ProvisionalTurnName from: u32 through: u32 text: text 65536 cut: bool call: option LiveCall }
+record RunState { task: u64 attempt: option u64 committed_turn: u32 writing: option RunText call: option CurrentCall }
