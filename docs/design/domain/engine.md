@@ -1,6 +1,6 @@
 # The core
 
-Provisional, 2026-10-07, revised 2026-10-12. What jig's core is, as a
+Provisional, 2026-10-07, revised 2026-10-13. What jig's core is, as a
 domain layer inside an application's engine: its parts and how they fit,
 what crosses between it and the application's root, how a decision
 reaches the store before anything leaves the engine, how it restarts,
@@ -394,7 +394,8 @@ the core hears it from its root before anything closes
 would make a commit:
 
 - **a party's request** is answered not ready, and an application's
-  request likewise;
+  request likewise, and so are a sign-in and a sign-out, which commit
+  too (`../protocol/client.md`, section 8);
 - **a run's turn or call** is answered busy, and its answer left
   unacknowledged, so its host keeps them and sends them again, to this
   engine or the next;

@@ -1,6 +1,6 @@
 # The client domain
 
-Provisional, 2026-10-09, revised 2026-10-12. `jig-domain-client`: what a
+Provisional, 2026-10-09, revised 2026-10-13. `jig-domain-client`: what a
 party's client knows of the engine's work, and what it does with it. It
 is the client's counterpart of the engine's core: a child of the
 application's client root, holding jig's part of the client: the frame
@@ -474,7 +474,8 @@ What a chat's page leads with, and every agent task's activity
   the sign-in on the engine (`../../domain/people.md`, section 3), and the
   client then shows the sign-in page, as when signed out.
 - **A sign-out that does not reach the engine** (lost,
-  `../../protocol/client.md`, section 4) leaves the person signed in, as
+  `../../protocol/client.md`, section 4, or answered not ready while the
+  engine stops, section 8 there) leaves the person signed in, as
   they still are: the sign-in's secret still works wherever its shell
   keeps it, and a browser's cookie only the engine clears. The frame says
   the sign-out did not reach the engine and offers it again; nothing is
