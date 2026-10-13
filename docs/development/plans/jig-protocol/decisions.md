@@ -1221,6 +1221,17 @@ the file.
      jig-repin.s4 waits for both 02.s6 and 02.s7 and pins the later, so
      jig repins once; jig 30.2 lands its other reads and pages meanwhile,
      and its pieces after jig-repin.s4.
+183. **jig 05.s1: the hub's vocabulary names a relayed call by its bytes**
+     (2026-10-13, the designer's answer to question.md's "jig 23.2: how a
+     relayed call's delivery token meets the wire's call name"; jig
+     `fadbde24`, `7ea05d7f`). channel.md, 6.3 already had the hub match a
+     relayed answer by the call's bytes; the landed vocabulary
+     (`crates/jig-domain-host/src/link.rs:10`, `Relayed { .., call: Token,
+     .. }`) and `ops`'s `host_calls` table depart from it. A step not in
+     the plan, jig 05.s1 (`jig/05-hub-link.md`), moves the vocabulary to
+     the call's bytes both ways; jig 23.2 and 23.3 translate names both
+     ways, 23.2 landing its other records first; jig 24.3's relay table
+     holds no token.
 
 ## For the user
 

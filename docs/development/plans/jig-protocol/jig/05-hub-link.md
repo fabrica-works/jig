@@ -856,6 +856,28 @@ a hello against charters no host of its kind may run.
 Size: at most 350 lines of production code.
 Removes: nothing.
 
+### 05.s1 A relayed call named by its bytes in the hub's vocabulary
+
+A step not in the plan (decisions.md, ruling 183), from the designer's
+answer on jig 23.2 (jig `fadbde24`, `protocol/channel.md`, 6.3: "a
+delivery's token is the hub's own handle and never leaves it"); its text
+is the designer's.
+vocabulary:
+Shape: `host::LinkDown::Relayed { run, attempt, call: Box<[u8]>,
+answer }`. `host::LinkUp::Call` keeps `call` and loses `delivery`.
+The hub's `Request::CancelRelay` and `Event::RelayCancelled` name
+`run`, `attempt` and the call's bytes. The hub finds a relayed call
+by its name among its attempt's relays. `ops`'s root keeps no
+delivery token (`host_calls`' `delivery` goes). `tests/host`'s
+worlds follow.
+Test shape: a hub unit test that a relayed answer naming a call
+reaches the call waiting for it, and that one naming no relayed call
+of its attempt is dropped.
+Proof: the gate.
+Don't: put a token for a call in the link vocabulary, or keep a
+table from names to tokens in a root or a link.
+Size: at most 150 lines of production code.
+
 ## Interface sketches
 
 ```rust
