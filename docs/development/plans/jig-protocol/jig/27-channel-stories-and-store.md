@@ -98,21 +98,27 @@ the core records it in the commit that takes the turn's read messages;
 The core's `route_answer_payload`
 (`crates/jig-domain-core/src/routing/run_payloads.rs:37-39`) validates an
 answer's refused names and drops them, routing only the activation,
-where `route_turn_payload` routes `tasks::Event::Refused`
+where `route_turn_payload` carries a turn's refused names inside `tasks::Event::Turn`
 (`logs/jig-27/27.1-dev-ending.txt`).
 Needs: nothing; before 27.1 lands. Run by jig 27's session as its own
 commit.
-Files: `crates/jig-domain-core/src/routing/run_payloads.rs` and its tests.
+Files: `crates/jig-domain-core/src/routing/run_payloads.rs`;
+`crates/jig-domain-tasks/src/` (the event or activation type, its
+admission) and both crates' tests (ruling 266).
 Shape: the answer's validated refused names reach the tasks child in the
 same decision as its terminal activation, as a turn's do, so they are
-committed with the answer.
+committed with the answer. The tasks child takes them by one bounded
+field on the terminal activation, or one refusal input admitted in the
+same decision before the terminal, the implementer's choice, kept by the
+existing `inbox::keep_refusals` (ruling 266).
 Test shape: a row in the core's routing tests: an answer with a refused
 name commits the refusal with its terminal; 27.1's
 `a_message_refused_while_ending_is_committed_with_the_answer` is the
 world proof.
 Proof: that story passes on the real agent; the gate.
-Don't: change the tasks child or the wire.
-Size: at most 30 lines of production code.
+Don't: invent a turn, charge or turn number for the answer; change the
+wire.
+Size: at most 50 lines of production code.
 
 ### 27.1 The channel's stories, its referee and the fuzzy sweep
 

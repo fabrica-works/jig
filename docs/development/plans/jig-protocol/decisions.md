@@ -2201,6 +2201,16 @@ the file.
      question: a step not in the plan, jig 27.s3
      (`jig/27-channel-stories-and-store.md`), routes them with the
      answer's terminal; jig 27 runs it before 27.1 lands.
+266. **jig 27.s3 may open the tasks child for an answer's refusals**
+     (2026-10-13, the coordinator's block "jig 27.s3: Tasks has no
+     refusal-only terminal input", 2026-10-13T11:56:13Z). Ruling 265 named
+     a `tasks::Event::Refused` that does not exist: a turn's refusals ride
+     in `Event::Turn`, kept by the tasks child's `inbox::keep_refusals`, and
+     no input carries an answer's. 27.s3 is amended: the tasks child takes
+     them by one bounded field on the terminal activation or one refusal
+     input in the same decision, the implementer's choice, kept by
+     `keep_refusals` before the terminal; no invented turn. Files gain the
+     tasks crate; Size 50.
 
 ## For the user
 
