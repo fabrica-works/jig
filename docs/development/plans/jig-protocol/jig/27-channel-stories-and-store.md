@@ -38,6 +38,9 @@ this session as they bind jig 25.
 Scope: `tests/channel/src/{referee.rs, relay.rs, stories.rs}`: the
 referee's rules as `channel.md`, section 12 lists them, the last checked
 by searching each root's formatted state for each grant value's bytes;
+a refused start's answer reaches the engine at most once and is never
+acknowledged, its start ending once, refused or lost (jig `332724e6`;
+`channel.md`, 5.1);
 the hub's world's stories through bytes (`tests/host/tests/simulation.rs`
 and `turns.rs`: runs that progress, call, take turns, wait, end; a link
 dropped for less and for more than the grace; shutdown); the channel's
@@ -72,6 +75,7 @@ Test shape: focused (`tests/channel.rs`), a few seeds each:
 `a_message_refused_by_the_run_is_committed_with_its_next_turn`,
 `a_resumed_run_is_sent_only_its_current_window`. Referee's negatives
 (`tests/referee.rs`): `an_answer_acknowledged_twice_is_caught`,
+`a_refused_start_acknowledged_is_caught`,
 `a_grant_value_planted_in_a_root_s_state_is_caught`. Fuzzy
 (`tests/fuzzy_channel.rs`): `drawn_channel_worlds_keep_the_referee_s_rules`,
 seeds sized to about 3 s. Ceilings: focused under 0.5 s each. Reference
