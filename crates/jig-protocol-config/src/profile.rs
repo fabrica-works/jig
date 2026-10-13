@@ -37,6 +37,7 @@ pub struct Limits {
     pub io: skein_io::Limits,
     pub journal: skein_lib::JournalLimits,
     pub routes: u32,
+    pub clients: jig_protocol_engine_clients::Limits,
 }
 #[must_use]
 pub fn profile(profile: Profile) -> Limits {

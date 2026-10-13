@@ -3,6 +3,8 @@
 [workspace]
 resolver = "3"
 members = [
+    "crates/jig-protocol-engine-clients",
+    "tests/engine-clients",
     "crates/jig-protocol-client-link",
     "crates/jig-protocol-client-wire",
     "tests/client-wire",
@@ -79,6 +81,7 @@ publish = false
 [workspace.dependencies]
 smith-host-protocol = { git = "https://github.com/forgetic/smith.git" }
 jig-test-service = { path = "testing/jig-test-service" }
+jig-protocol-engine-clients = { path = "crates/jig-protocol-engine-clients" }
 smith-protocol-channel = { git = "https://github.com/forgetic/smith.git" }
 smith-domain = { git = "https://github.com/forgetic/smith.git" }
 smith-domain-session = { git = "https://github.com/forgetic/smith.git" }

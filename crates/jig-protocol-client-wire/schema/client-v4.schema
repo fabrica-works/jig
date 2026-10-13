@@ -6,7 +6,7 @@ record Keyed { key: fixed 16 owner: Owner version: u32 request: bytes 1048576 }
 record Owned { owner: Owner version: u32 record: bytes 16777216 }
 enum Answer { final_answer: Owned, busy, not_ready, signed_out }
 record LinkSignIn { secret: bytes 64 }
-record SignedIn { token: bytes 48 party: u64 expires: u64 }
+record SignedIn { token: secret 48 party: u64 expires: u64 }
 enum SignInAnswer { signed_in: SignedIn, refused }
 record SignOut {}
 enum SignOutAnswer { signed_out }

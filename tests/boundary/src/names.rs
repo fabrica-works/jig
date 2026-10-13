@@ -242,7 +242,11 @@ pub(super) fn scan(path: &Path, source: &str, words: &[String], names: bool) -> 
                 index += 1;
             }
             let name = &source[start..index];
-            if forbidden_name(name, false) && (!codec_module(name) || forbidden_name(name, true)) {
+            let foreign_ip = matches!(name, "V4" | "V6")
+                && source[..start].strip_suffix("core::net::IpAddr::").is_some_and(|prefix| {
+                    prefix.chars().next_back().is_none_or(|ch| !(ch.is_alphanumeric() || ch == '_' || ch == ':'))
+                });
+            if !foreign_ip && forbidden_name(name, false) && (!codec_module(name) || forbidden_name(name, true)) {
                 failures.push(format!("{}:{line}: identifier {name}", path.display()));
             }
         } else {

@@ -1,0 +1,30 @@
+[package]
+name = "jig-engine-clients-world"
+description = "Native client exchanges against scripted HTTP peers"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+[dependencies]
+skein-world.workspace = true
+jig-protocol-engine-clients.workspace = true
+jig-protocol-client-wire.workspace = true
+jig-domain-core.workspace = true
+jig-domain-people.workspace = true
+skein-http.workspace = true
+skein-lib.workspace = true
+skein-io.workspace = true
+[lints.rust]
+unsafe_code = "forbid"
+elided_lifetimes_in_paths = "deny"
+unused_must_use = "deny"
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+missing_panics_doc = "allow"
+wildcard_enum_match_arm = "deny"
+match_wildcard_for_single_variants = "deny"
+unwrap_used = "deny"
+allow_attributes = "deny"
+allow_attributes_without_reason = "deny"
+disallowed_types = "deny"
+disallowed_methods = "deny"

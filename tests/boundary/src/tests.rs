@@ -245,3 +245,41 @@ fn the_test_store_links_only_its_codec_boundary_and_foundation() {
     let source = fs::read_to_string(kit_root().join("testing/jig-test-store/src/lib.rs")).expect("store source");
     assert!(source.contains("cfg_attr(not(test), no_std)"));
 }
+
+#[test]
+fn engine_clients_link_only_their_boundary_wire_and_foundation() {
+    let selected: Vec<_> = manifests()
+        .into_iter()
+        .filter(|manifest| manifest.name.as_deref() == Some("jig-protocol-engine-clients"))
+        .collect();
+    assert_eq!(selected.len(), 1, "one engine client component");
+    let mut dependencies = selected[0].dependencies.clone();
+    dependencies.sort();
+    assert_eq!(
+        dependencies,
+        [
+            "jig-domain-core",
+            "jig-domain-people",
+            "jig-domain-views",
+            "jig-protocol-client-wire",
+            "skein-http",
+            "skein-io",
+            "skein-lib"
+        ]
+    );
+}
+
+#[test]
+fn unqualified_ip_variant_names_stay_refused() {
+    let cases: [(&str, &[&str]); 6] = [
+        ("core::net::IpAddr::V4", &[]),
+        ("core::net::IpAddr::V6", &[]),
+        ("V4", &["fixture/address.rs:1: identifier V4"]),
+        ("V6", &["fixture/address.rs:1: identifier V6"]),
+        ("jig::V4", &["fixture/address.rs:1: identifier V4"]),
+        ("customcore::net::IpAddr::V4", &["fixture/address.rs:1: identifier V4"]),
+    ];
+    for (source, expected) in cases {
+        assert_eq!(super::names::breaches(Path::new("fixture/address.rs"), source), expected, "{source}");
+    }
+}

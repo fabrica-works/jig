@@ -553,7 +553,8 @@ fn configuration_links_only_its_vocabulary_and_foundation() {
         assert!(
             ["skein-lib", "skein-json", "skein-io"].contains(&dependency.as_str())
                 || CORE_FAMILY.contains(&dependency.as_str())
-                || dependency == "jig-domain-host",
+                || ["jig-domain-host", "jig-protocol-engine-clients", "jig-protocol-client-wire", "skein-http"]
+                    .contains(&dependency.as_str()),
             "configuration dependency: {dependency}"
         );
     }

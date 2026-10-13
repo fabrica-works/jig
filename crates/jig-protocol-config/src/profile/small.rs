@@ -233,4 +233,18 @@ pub(super) const IO: skein_io::Limits = skein_io::Limits {
 pub(super) const JOURNAL: skein_lib::JournalLimits =
     skein_lib::JournalLimits { commits: 3, writes: 12_226, held: 36_678, now: 256, release: 256 };
 pub(super) const LIMITS: Limits =
-    Limits { core: CORE, hub: HUB, link: LINK, token: 16384, io: IO, journal: JOURNAL, routes: 512 };
+    Limits { core: CORE, hub: HUB, link: LINK, token: 16384, clients: CLIENTS, io: IO, journal: JOURNAL, routes: 512 };
+
+/// Native client HTTP: 4 sockets, 8 exchanges, 5 minute link, 30 second stall.
+pub(super) const CLIENTS: jig_protocol_engine_clients::Limits = jig_protocol_engine_clients::Limits {
+    connections: 4,
+    identity_bytes: 1024,
+    families: 32,
+    providers: 32,
+    exchanges: 8,
+    exchanges_per_client: 2,
+    http: skein_http::server::Limits { head: 4096, headers: 32, body: 65536, read: 16384, response: 1024, send: 16384 },
+    wire: jig_protocol_client_wire::v4::CEILINGS,
+    link_span: Duration::from_secs(300),
+    stall: Duration::from_secs(30),
+};

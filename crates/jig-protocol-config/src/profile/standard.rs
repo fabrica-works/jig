@@ -120,7 +120,11 @@ pub(super) const LIMITS: Limits = Limits {
     hub: HUB,
     link: LINK,
     token: 16384,
+    clients: CLIENTS,
     io: skein_io::Limits { sockets: 64, names: 64, ..small::IO },
     journal: skein_lib::JournalLimits { commits: 3, writes: 70_236, held: 210_708, now: 1024, release: 1024 },
     routes: 2048,
 };
+
+pub(super) const CLIENTS: jig_protocol_engine_clients::Limits =
+    jig_protocol_engine_clients::Limits { connections: 16, exchanges: 32, ..small::CLIENTS };
