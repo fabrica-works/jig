@@ -1671,6 +1671,19 @@ the file.
      refuses "typed" in jig's own names (rulings 199, 216 keep it so). It is
      `a_connectors_step_restores_its_records`, body, fixture and expected
      equality unchanged; 18.2's file says so.
+222. **The shell hands the accounts component its runtime resources at
+     startup** (2026-10-13, the coordinator's block "jig 25.4: signed-in
+     account startup lacks private keeper and transport resources",
+     2026-10-13T05:59:50Z). A plan defect: an active accounts component
+     builds its sign-in sources over skein's private keeper and transport,
+     but 25.4's `startup(document, Files, Agent, Seeds)` brings only the
+     files' bytes. As proposed: `startup` gains an optional
+     `AccountsRuntime` (the private keeper's root descriptor and effective
+     user, the resolved issuer addresses, the prepared TLS configuration),
+     which the binary's shell fills before the listeners and the restart,
+     and the worlds fill with their fakes; absent, an activation of signed-in
+     sources is refused naming its path (ruling 203). No other public field
+     or signature changes.
 
 ## For the user
 
