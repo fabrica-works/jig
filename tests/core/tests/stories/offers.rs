@@ -137,14 +137,14 @@ fn an_observer_is_offered_nothing_and_told_why() {
 fn a_policy_narrowed_withdraws_an_offer_in_the_next_delivery() {
     use jig_domain_core::{
         acts::{Act, Admission},
-        documents::{Document, Subject},
+        documents::Document,
     };
     let mut world = jig_core_world::stories::offers::world(183, None);
     let run = world.assignments[0];
     let mut child = member(&world, tasks::Executor::Agent { charter: 1 }, b"delegated work");
     child.authority.delegation = tasks::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 };
     let task = delegate(&mut world, run, 7, child);
-    jig_core_world::watches::open(&mut world, 91, Subject::Task { task });
+    jig_core_world::watches::open(&mut world, 91, core::documents::Watched::Task { task });
     let Document::Task(value) = jig_core_world::watches::latest(&world, 91) else {
         panic!("task");
     };

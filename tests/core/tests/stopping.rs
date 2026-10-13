@@ -65,7 +65,7 @@ fn a_new_watch_after_the_stop_is_ended_as_stopping() {
     world.send(root::Event::Core(core::Event::Watch {
         watcher: Token::new(801),
         sign_in: world.sign_in.expect("signed in"),
-        subject: documents::Subject::Task { task: world.task() },
+        subject: documents::Watched::Task { task: world.task() },
         window: documents::Window { rows: 1, after: None },
     }));
     assert!(world.stop_deliveries.iter().any(

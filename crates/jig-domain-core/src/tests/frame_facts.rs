@@ -93,11 +93,7 @@ fn frame_watch_receives_pool_ledger_changes_after_their_decision() {
     }
     let watcher = Token::new(30);
     let period = core.period(1);
-    watch_outputs(
-        &mut core,
-        &limits,
-        Event::Watch { watcher, sign_in: 10, subject: Subject::Frame { party: 1 }, window: window() },
-    );
+    watch_outputs(&mut core, &limits, Event::Watch { watcher, sign_in: 10, subject: Watched::Frame, window: window() });
     watch_outputs(&mut core, &limits, Event::Delivered { watcher });
     watch_outputs(
         &mut core,

@@ -86,7 +86,7 @@ fn a_client_watch_coalesces_until_its_delivery_is_taken() {
     world.send(root::Event::Core(core::Event::Watch {
         watcher,
         sign_in,
-        subject: documents::Subject::Task { task },
+        subject: documents::Watched::Task { task },
         window: documents::Window { rows: 8, after: None },
     }));
     assert_eq!(world.client_peer.as_ref().expect("client peer").delivered.len(), 1);
@@ -122,7 +122,7 @@ fn a_client_watch_refusal_is_immediate_without_a_store_commit() {
     world.send(root::Event::Core(core::Event::Watch {
         watcher,
         sign_in: u64::MAX,
-        subject: documents::Subject::Frame { party: 0 },
+        subject: documents::Watched::Frame,
         window: documents::Window { rows: 8, after: None },
     }));
     assert_eq!(world.store.applied, before);

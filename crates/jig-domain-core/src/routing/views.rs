@@ -9,7 +9,7 @@
 //! | Delivered | child clears its in-flight mark | next current held delivery if changed |
 //! | Unwatch | child closes after outstanding terminals | held watch ending |
 
-use crate::documents::{self, Missing, Subject, Window};
+use crate::documents::{self, Missing, Subject, Watched, Window};
 use crate::{Core, Held, Limits, Now, Request, Requests, WatchBinding, WatchRefusal, WatchedSubject};
 use alloc::boxed::Box;
 use jig_domain_views as views;
@@ -137,28 +137,21 @@ pub(super) fn open(
     env: &Env<Limits>,
     watcher: Token,
     sign_in: u64,
-    subject: Subject,
+    subject: Watched,
     window: Window,
 ) -> Requests {
     let follow = match &subject {
-        Subject::Run { task } => Some(views::Follow { run: Token::new(*task), turn: None, offset: 0 }),
-        Subject::Frame { .. }
-        | Subject::Task { .. }
-        | Subject::Tree { .. }
-        | Subject::Chips { .. }
-        | Subject::Inbox { .. }
-        | Subject::Goals { .. }
-        | Subject::Tasks { .. }
-        | Subject::Conversations { .. }
-        | Subject::Deployment
-        | Subject::Proposal { .. }
-        | Subject::Escalation { .. }
-        | Subject::Question { .. }
-        | Subject::PersonTask { .. }
-        | Subject::Result { .. }
-        | Subject::Project { .. }
-        | Subject::Note { .. }
-        | Subject::Application { .. } => None,
+        Watched::Run { task } => Some(views::Follow { run: Token::new(*task), turn: None, offset: 0 }),
+        Watched::Frame
+        | Watched::Task { .. }
+        | Watched::Tree { .. }
+        | Watched::Chips { .. }
+        | Watched::Inbox
+        | Watched::Goals { .. }
+        | Watched::Tasks { .. }
+        | Watched::Conversations
+        | Watched::Deployment
+        | Watched::Application { .. } => None,
     };
     open_follow(core, env, watcher, sign_in, subject, window, follow)
 }
@@ -177,7 +170,7 @@ pub(super) fn open_run(
         env,
         watcher,
         sign_in,
-        Subject::Run { task },
+        Watched::Run { task },
         Window { rows: env.limits.documents.rows, after: None },
         Some(views::Follow { run: Token::new(task), turn, offset }),
     )
@@ -188,18 +181,30 @@ fn open_follow(
     env: &Env<Limits>,
     watcher: Token,
     sign_in: u64,
-    subject: Subject,
+    subject: Watched,
     window: Window,
     follow: Option<views::Follow>,
 ) -> Requests {
     let Some(party) = core.people.person(sign_in, env.now, env.wall) else {
-        return refused_subject(watcher, &subject, WatchRefusal::SignedOut);
+        return match subject {
+            Watched::Application { scope, connector, subject } => {
+                refused_subject(watcher, &Subject::Application { scope, connector, subject }, WatchRefusal::SignedOut)
+            }
+            Watched::Frame
+            | Watched::Task { .. }
+            | Watched::Tree { .. }
+            | Watched::Chips { .. }
+            | Watched::Inbox
+            | Watched::Goals { .. }
+            | Watched::Tasks { .. }
+            | Watched::Conversations
+            | Watched::Run { .. }
+            | Watched::Deployment => refused(watcher, WatchRefusal::SignedOut),
+        };
     };
+    let subject = named_subject(subject, party);
     if core.view_subjects.contains_key(&watcher) || core.view_subjects.len() >= env.limits.views.watchers {
         return refused_subject(watcher, &subject, WatchRefusal::Busy);
-    }
-    if !watch_subject(&subject) {
-        return refused_subject(watcher, &subject, WatchRefusal::Unknown);
     }
     if let Some(why) = admission(core, env, party, &subject, &window) {
         return refused_subject(watcher, &subject, why);
@@ -303,26 +308,19 @@ fn admission(core: &Core, env: &Env<Limits>, party: u64, subject: &Subject, wind
     }
 }
 
-fn watch_subject(subject: &Subject) -> bool {
+fn named_subject(subject: Watched, party: u64) -> Subject {
     match subject {
-        Subject::Frame { .. }
-        | Subject::Task { .. }
-        | Subject::Tree { .. }
-        | Subject::Chips { .. }
-        | Subject::Inbox { .. }
-        | Subject::Goals { .. }
-        | Subject::Tasks { .. }
-        | Subject::Conversations { .. }
-        | Subject::Run { .. }
-        | Subject::Deployment
-        | Subject::Application { .. } => true,
-        Subject::Proposal { .. }
-        | Subject::Escalation { .. }
-        | Subject::Question { .. }
-        | Subject::PersonTask { .. }
-        | Subject::Result { .. }
-        | Subject::Project { .. }
-        | Subject::Note { .. } => false,
+        Watched::Application { scope, connector, subject } => Subject::Application { scope, connector, subject },
+        Watched::Frame => Subject::Frame { party },
+        Watched::Task { task } => Subject::Task { task },
+        Watched::Tree { task } => Subject::Tree { task },
+        Watched::Chips { tasks } => Subject::Chips { tasks },
+        Watched::Inbox => Subject::Inbox { party },
+        Watched::Goals { project } => Subject::Goals { project },
+        Watched::Tasks { project, filter } => Subject::Tasks { project, filter },
+        Watched::Conversations => Subject::Conversations { party },
+        Watched::Run { task } => Subject::Run { task },
+        Watched::Deployment => Subject::Deployment,
     }
 }
 

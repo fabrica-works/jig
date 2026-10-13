@@ -1,7 +1,7 @@
 use jig_core_world::watches::{latest, open, world};
 use jig_domain_core::{
     self as core,
-    documents::{Document, Subject},
+    documents::{Document, Watched},
 };
 use jig_domain_tasks as tasks;
 use jig_test_domain as root;
@@ -15,7 +15,7 @@ fn seeded_parties_take_frame_chat_tree_and_inbox_deliveries_at_their_own_pace() 
             let mut world = world(seed, true);
             let assignment = world.assigned.as_ref().expect("assignment");
             let (task, attempt) = (assignment.task, assignment.attempt);
-            open(&mut world, 5, Subject::Run { task });
+            open(&mut world, 5, Watched::Run { task });
             world.store_delay = u32::try_from(rng.below(6)).expect("small delay");
             let mut burst = Vec::new();
             for turn in 1..=3 {

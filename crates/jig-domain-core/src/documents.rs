@@ -148,6 +148,23 @@ pub enum Subject {
     Note { note: u64 },
 }
 
+/// The subjects a watch may name (`protocol/client.md`, section 7).
+/// Own subjects take their party from the authenticated sign-in in the core.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum Watched {
+    Application { scope: ApplicationScope, connector: u16, subject: skein_lib::Token },
+    Frame,
+    Task { task: u64 },
+    Tree { task: u64 },
+    Chips { tasks: List<u64> },
+    Inbox,
+    Goals { project: u32 },
+    Tasks { project: u32, filter: TaskFilter },
+    Conversations,
+    Run { task: u64 },
+    Deployment,
+}
+
 /// Role scope named by an application's client (`client/domain/contract.md`, 7.1).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum ApplicationScope {

@@ -105,7 +105,7 @@ fn event_in(
             work.push(Work::Core(core::Event::Watch {
                 watcher,
                 sign_in,
-                subject: core::documents::Subject::Application { scope, connector: number, subject: token },
+                subject: core::documents::Watched::Application { scope, connector: number, subject: token },
                 window,
             }));
         }

@@ -10,7 +10,7 @@ use skein_lib::{ReplyTo, Token};
 
 fn world(seed: u64) -> World {
     let mut world = World::new(seed, false);
-    world.watches = Some(watches::Parties::new(seed, world.store.applied, false));
+    world.watches = Some(watches::Parties::new(seed, world.store.applied, false, world.sign_in.expect("signed in")));
     world.reads = Some(reads::Parties::new(world.store.applied));
     world.send(root::Event::Connector {
         number: 1,

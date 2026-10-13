@@ -109,7 +109,7 @@ fn a_procedure_goal_commits_before_delivery_and_replays_its_exact_owner_facts() 
     assert_eq!(world.people_answers.last(), Some(&people::Reply::Outcome(people::Outcome::GoalStarted { task })));
     assert_eq!(live_row(&world, task).executor, row.executor);
     assert_eq!(live_row(&world, task).tracked, row.tracked);
-    jig_core_world::watches::open(&mut world, 93, core::documents::Subject::Task { task });
+    jig_core_world::watches::open(&mut world, 93, core::documents::Watched::Task { task });
     let core::documents::Document::Task(document) = jig_core_world::watches::latest(&world, 93) else {
         panic!("actual task document")
     };

@@ -43,7 +43,7 @@ impl Referee {
         if let root::Event::Core(core::Event::Watch { watcher, sign_in, subject, .. }) = event
             && let Some(party) = self.people.get(sign_in)
         {
-            self.watches.insert(watcher.raw(), (*party, subject.clone()));
+            self.watches.insert(watcher.raw(), (*party, crate::watches::named_subject(subject, *party)));
         }
         if let root::Event::Core(core::Event::Read { sign_in, read, .. }) = event
             && let Some(party) = self.people.get(sign_in)

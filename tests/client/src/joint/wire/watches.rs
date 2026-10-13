@@ -14,13 +14,7 @@ pub enum Invalid {
 
 /// # Errors
 /// Refuses a mismatched executor role project or any whole window/subject allocation above the receiving bounds.
-pub fn watch(
-    watcher: Token,
-    sign_in: u64,
-    party: u64,
-    value: &client::Subject,
-    default_rows: u32,
-) -> Result<Event, Invalid> {
+pub fn watch(watcher: Token, sign_in: u64, value: &client::Subject, default_rows: u32) -> Result<Event, Invalid> {
     if let client::Subject::Run { task, turn, offset } = value {
         return Ok(Event::WatchRun {
             watcher,
@@ -30,28 +24,24 @@ pub fn watch(
             offset: *offset,
         });
     }
-    let (subject, window) = subject(value, party, default_rows)?;
+    let (subject, window) = subject(value, default_rows)?;
     Ok(Event::Watch { watcher, sign_in, subject, window })
 }
 
-fn subject(
-    value: &client::Subject,
-    party: u64,
-    default_rows: u32,
-) -> Result<(documents::Subject, documents::Window), Invalid> {
+fn subject(value: &client::Subject, default_rows: u32) -> Result<(documents::Watched, documents::Window), Invalid> {
     let (subject, rows) = match value {
-        client::Subject::Frame => (documents::Subject::Frame { party }, default_rows),
-        client::Subject::Task { task } => (documents::Subject::Task { task: *task }, default_rows),
-        client::Subject::Tree { task, window } => (documents::Subject::Tree { task: *task }, *window),
-        client::Subject::Chips { tasks } => (documents::Subject::Chips { tasks: tasks.clone() }, default_rows),
-        client::Subject::Inbox { window } => (documents::Subject::Inbox { party }, *window),
-        client::Subject::Goals { project } => (documents::Subject::Goals { project: *project }, default_rows),
+        client::Subject::Frame => (documents::Watched::Frame, default_rows),
+        client::Subject::Task { task } => (documents::Watched::Task { task: *task }, default_rows),
+        client::Subject::Tree { task, window } => (documents::Watched::Tree { task: *task }, *window),
+        client::Subject::Chips { tasks } => (documents::Watched::Chips { tasks: tasks.clone() }, default_rows),
+        client::Subject::Inbox { window } => (documents::Watched::Inbox, *window),
+        client::Subject::Goals { project } => (documents::Watched::Goals { project: *project }, default_rows),
         client::Subject::Tasks { project, filter, window } => {
-            (documents::Subject::Tasks { project: *project, filter: task_filter(*project, filter)? }, *window)
+            (documents::Watched::Tasks { project: *project, filter: task_filter(*project, filter)? }, *window)
         }
-        client::Subject::Conversations => (documents::Subject::Conversations { party }, default_rows),
-        client::Subject::Run { task, turn: _, offset: _ } => (documents::Subject::Run { task: *task }, default_rows),
-        client::Subject::Deployment => (documents::Subject::Deployment, default_rows),
+        client::Subject::Conversations => (documents::Watched::Conversations, default_rows),
+        client::Subject::Run { task, turn: _, offset: _ } => (documents::Watched::Run { task: *task }, default_rows),
+        client::Subject::Deployment => (documents::Watched::Deployment, default_rows),
     };
     Ok((subject, documents::Window { rows, after: None }))
 }
@@ -150,9 +140,8 @@ mod tests {
     #[test]
     fn run_watch_translation_keeps_absent_and_full_width_turn_positions_on_the_actual_producer() {
         for turn in [None, Some(client::ProvisionalTurnName { attempt: u64::MAX, number: u32::MAX, retry: u32::MAX })] {
-            let result =
-                watch(Token::new(71), 19, 23, &client::Subject::Run { task: u64::MAX, turn, offset: u32::MAX }, 2)
-                    .expect("the complete supplied fixture is admitted");
+            let result = watch(Token::new(71), 19, &client::Subject::Run { task: u64::MAX, turn, offset: u32::MAX }, 2)
+                .expect("the complete supplied fixture is admitted");
             let Event::WatchRun { watcher, sign_in, task, turn: actual, offset } = result else {
                 panic!("run positions require the named producer")
             };
@@ -173,19 +162,25 @@ mod tests {
         chips.push(u64::MAX).expect("the complete supplied fixture is admitted");
         chips.push(1).expect("the complete supplied fixture is admitted");
         let values = [
-            (client::Subject::Frame, documents::Subject::Frame { party: 37 }, 5),
-            (client::Subject::Task { task: u64::MAX }, documents::Subject::Task { task: u64::MAX }, 5),
-            (client::Subject::Tree { task: 9, window: u32::MAX }, documents::Subject::Tree { task: 9 }, u32::MAX),
-            (client::Subject::Chips { tasks: chips.clone() }, documents::Subject::Chips { tasks: chips }, 5),
-            (client::Subject::Inbox { window: 0 }, documents::Subject::Inbox { party: 37 }, 0),
-            (client::Subject::Goals { project: u32::MAX }, documents::Subject::Goals { project: u32::MAX }, 5),
-            (client::Subject::Conversations, documents::Subject::Conversations { party: 37 }, 5),
-            (client::Subject::Deployment, documents::Subject::Deployment, 5),
+            ("Frame", client::Subject::Frame, documents::Watched::Frame, 5),
+            ("Task", client::Subject::Task { task: u64::MAX }, documents::Watched::Task { task: u64::MAX }, 5),
+            (
+                "Tree",
+                client::Subject::Tree { task: 9, window: u32::MAX },
+                documents::Watched::Tree { task: 9 },
+                u32::MAX,
+            ),
+            ("Chips", client::Subject::Chips { tasks: chips.clone() }, documents::Watched::Chips { tasks: chips }, 5),
+            ("Inbox", client::Subject::Inbox { window: 0 }, documents::Watched::Inbox, 0),
+            ("Goals", client::Subject::Goals { project: u32::MAX }, documents::Watched::Goals { project: u32::MAX }, 5),
+            ("Conversations", client::Subject::Conversations, documents::Watched::Conversations, 5),
+            ("Deployment", client::Subject::Deployment, documents::Watched::Deployment, 5),
         ];
-        for (value, expected, rows) in values {
+        for (label, value, expected, rows) in values {
             assert_eq!(
-                subject(&value, 37, 5).expect("the complete supplied fixture is admitted"),
-                (expected, documents::Window { rows, after: None })
+                subject(&value, 5).expect("the complete supplied fixture is admitted"),
+                (expected, documents::Window { rows, after: None }),
+                "{label}"
             );
         }
     }

@@ -168,7 +168,7 @@ fn chip_changes_refresh_inline_inbox_and_named_documents() {
     finish_watch_outputs(&mut core, &limits);
     let mut numbers = List::with_capacity(1);
     numbers.push(2).unwrap();
-    for (watcher, subject) in [(30, Subject::Inbox { party: 1 }), (31, Subject::Chips { tasks: numbers })] {
+    for (watcher, subject) in [(30, Watched::Inbox), (31, Watched::Chips { tasks: numbers })] {
         watch_outputs(
             &mut core,
             &limits,

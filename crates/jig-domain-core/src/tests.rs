@@ -1794,31 +1794,29 @@ fn watch_outputs(core: &mut Core, limits: &Limits, event: Event) -> Box<[Request
     }
 }
 
-fn watch_subjects() -> [Subject; 10] {
+fn watch_subjects() -> [(&'static str, Watched, Subject); 10] {
     let mut chips = List::with_capacity(1);
     chips.push(1).unwrap();
+    let filter = TaskFilter { phase: None, executor: None, goal: None, asked_by_me: false };
     [
-        Subject::Frame { party: 1 },
-        Subject::Task { task: 1 },
-        Subject::Tree { task: 1 },
-        Subject::Chips { tasks: chips },
-        Subject::Inbox { party: 1 },
-        Subject::Goals { project: 1 },
-        Subject::Tasks {
-            project: 1,
-            filter: TaskFilter { phase: None, executor: None, goal: None, asked_by_me: false },
-        },
-        Subject::Conversations { party: 1 },
-        Subject::Run { task: 1 },
-        Subject::Deployment,
+        ("Frame", Watched::Frame, Subject::Frame { party: 1 }),
+        ("Task", Watched::Task { task: 1 }, Subject::Task { task: 1 }),
+        ("Tree", Watched::Tree { task: 1 }, Subject::Tree { task: 1 }),
+        ("Chips", Watched::Chips { tasks: chips.clone() }, Subject::Chips { tasks: chips }),
+        ("Inbox", Watched::Inbox, Subject::Inbox { party: 1 }),
+        ("Goals", Watched::Goals { project: 1 }, Subject::Goals { project: 1 }),
+        ("Tasks", Watched::Tasks { project: 1, filter }, Subject::Tasks { project: 1, filter }),
+        ("Conversations", Watched::Conversations, Subject::Conversations { party: 1 }),
+        ("Run", Watched::Run { task: 1 }, Subject::Run { task: 1 }),
+        ("Deployment", Watched::Deployment, Subject::Deployment),
     ]
 }
 
 #[test]
 fn an_unkeyed_watch_on_each_subject_makes_its_first_document_as_a_held_output() {
-    for subject in watch_subjects() {
+    for (label, subject, named) in watch_subjects() {
         let (mut core, limits) = watch_core();
-        let expected = make(&core, &limits, 1, &subject, &window()).unwrap();
+        let expected = make(&core, &limits, 1, &named, &window()).unwrap();
         let out = watch_outputs(
             &mut core,
             &limits,
@@ -1828,35 +1826,26 @@ fn an_unkeyed_watch_on_each_subject_makes_its_first_document_as_a_held_output() 
         let Request::Held(held) = &out[0] else { panic!("document is held") };
         let Held::Delivery { watcher, document } = held.as_ref() else { panic!("typed delivery") };
         assert_eq!(*watcher, Token::new(30));
-        assert_eq!(document.as_ref(), &expected);
+        assert_eq!(document.as_ref(), &expected, "{label}");
         let Request::Decided = &out[1] else { panic!("one decision") };
     }
 }
 
 #[test]
 fn watch_admission_checks_each_subjects_project_or_owner() {
-    for subject in watch_subjects() {
+    for (label, subject, _) in watch_subjects() {
+        match subject {
+            Watched::Frame | Watched::Inbox | Watched::Conversations => continue,
+            Watched::Task { .. }
+            | Watched::Tree { .. }
+            | Watched::Chips { .. }
+            | Watched::Goals { .. }
+            | Watched::Tasks { .. }
+            | Watched::Run { .. }
+            | Watched::Deployment
+            | Watched::Application { .. } => {}
+        }
         let (mut core, limits) = watch_core();
-        let subject = match subject {
-            Subject::Frame { .. } => Subject::Frame { party: 2 },
-            Subject::Inbox { .. } => Subject::Inbox { party: 2 },
-            Subject::Conversations { .. } => Subject::Conversations { party: 2 },
-            other @ (Subject::Task { .. }
-            | Subject::Tree { .. }
-            | Subject::Chips { .. }
-            | Subject::Goals { .. }
-            | Subject::Tasks { .. }
-            | Subject::Run { .. }
-            | Subject::Deployment
-            | Subject::Proposal { .. }
-            | Subject::Escalation { .. }
-            | Subject::Question { .. }
-            | Subject::PersonTask { .. }
-            | Subject::Result { .. }
-            | Subject::Project { .. }
-            | Subject::Note { .. }
-            | Subject::Application { .. }) => other,
-        };
         let mut out = Queue::with_capacity(people::max_out(&limits.people));
         for project in [0, 1] {
             people::step(
@@ -1872,17 +1861,16 @@ fn watch_admission_checks_each_subjects_project_or_owner() {
             Event::Watch { watcher: Token::new(30), sign_in: 10, subject, window: window() },
         );
         assert_watch_refusal(&out[0], WatchRefusal::NotAllowed);
-        assert!(core.view_subjects.is_empty());
+        assert!(core.view_subjects.is_empty(), "{label}");
     }
 }
 
 #[test]
 fn signed_out_unknown_and_full_watches_are_refused_without_keyed_work() {
     let (mut core, limits) = watch_core();
-    for (sign_in, subject, why) in [
-        (99, Subject::Frame { party: 1 }, WatchRefusal::SignedOut),
-        (10, Subject::Task { task: 99 }, WatchRefusal::Unknown),
-        (10, Subject::Project { project: 1 }, WatchRefusal::Unknown),
+    for (label, sign_in, subject, why) in [
+        ("SignedOut", 99, Watched::Frame, WatchRefusal::SignedOut),
+        ("Unknown", 10, Watched::Task { task: 99 }, WatchRefusal::Unknown),
     ] {
         let out = watch_outputs(
             &mut core,
@@ -1890,6 +1878,7 @@ fn signed_out_unknown_and_full_watches_are_refused_without_keyed_work() {
             Event::Watch { watcher: Token::new(30), sign_in, subject, window: window() },
         );
         assert_watch_refusal(&out[0], why);
+        assert!(core.view_subjects.is_empty(), "{label}");
     }
     for watcher in 1..=limits.views.watchers {
         watch_outputs(
@@ -1898,7 +1887,7 @@ fn signed_out_unknown_and_full_watches_are_refused_without_keyed_work() {
             Event::Watch {
                 watcher: Token::new(u64::from(watcher)),
                 sign_in: 10,
-                subject: Subject::Frame { party: 1 },
+                subject: Watched::Frame,
                 window: window(),
             },
         );
@@ -1906,7 +1895,7 @@ fn signed_out_unknown_and_full_watches_are_refused_without_keyed_work() {
     let out = watch_outputs(
         &mut core,
         &limits,
-        Event::Watch { watcher: Token::new(30), sign_in: 10, subject: Subject::Frame { party: 1 }, window: window() },
+        Event::Watch { watcher: Token::new(30), sign_in: 10, subject: Watched::Frame, window: window() },
     );
     assert_watch_refusal(&out[0], WatchRefusal::Busy);
 }
@@ -1915,11 +1904,7 @@ fn signed_out_unknown_and_full_watches_are_refused_without_keyed_work() {
 fn an_unwatch_waits_for_its_delivery_then_ends_as_a_held_output() {
     let (mut core, limits) = watch_core();
     let watcher = Token::new(30);
-    watch_outputs(
-        &mut core,
-        &limits,
-        Event::Watch { watcher, sign_in: 10, subject: Subject::Frame { party: 1 }, window: window() },
-    );
+    watch_outputs(&mut core, &limits, Event::Watch { watcher, sign_in: 10, subject: Watched::Frame, window: window() });
     let out = watch_outputs(&mut core, &limits, Event::Unwatch { watcher });
     assert_eq!(out.len(), 1);
     let out = watch_outputs(&mut core, &limits, Event::Delivered { watcher });
@@ -1965,11 +1950,11 @@ fn one_task_change_marks_its_task_every_tree_goals_and_named_chips_once() {
     let mut chips = List::with_capacity(1);
     chips.push(2).unwrap();
     let subjects = [
-        Subject::Task { task: 2 },
-        Subject::Tree { task: 2 },
-        Subject::Tree { task: 1 },
-        Subject::Goals { project: 1 },
-        Subject::Chips { tasks: chips },
+        Watched::Task { task: 2 },
+        Watched::Tree { task: 2 },
+        Watched::Tree { task: 1 },
+        Watched::Goals { project: 1 },
+        Watched::Chips { tasks: chips },
     ];
     for (index, subject) in subjects.into_iter().enumerate() {
         let watcher = Token::new(u64::try_from(index).unwrap() + 30);
@@ -1997,11 +1982,7 @@ fn one_task_change_marks_its_task_every_tree_goals_and_named_chips_once() {
 fn ten_changed_decisions_coalesce_behind_one_inflight_delivery() {
     let (mut core, limits) = watch_core();
     let watcher = Token::new(30);
-    watch_outputs(
-        &mut core,
-        &limits,
-        Event::Watch { watcher, sign_in: 10, subject: Subject::Inbox { party: 1 }, window: window() },
-    );
+    watch_outputs(&mut core, &limits, Event::Watch { watcher, sign_in: 10, subject: Watched::Inbox, window: window() });
     for message in 1..=10 {
         watch_outputs(
             &mut core,
@@ -2044,7 +2025,7 @@ fn a_no_write_watch_delivery_waits_for_the_last_commit_already_made() {
     let out = watch_outputs(
         &mut core,
         &limits,
-        Event::Watch { watcher: Token::new(30), sign_in: 10, subject: Subject::Task { task: 1 }, window: window() },
+        Event::Watch { watcher: Token::new(30), sign_in: 10, subject: Watched::Task { task: 1 }, window: window() },
     );
     let mut decision = journal.decision(&skein_lib::JournalRoom { writes: 0, held: 1 }).unwrap();
     for request in out {
@@ -2072,7 +2053,7 @@ fn watches_share_subject_tokens_and_expired_signins_end_only_their_own_watch() {
         watch_outputs(
             &mut core,
             &limits,
-            Event::Watch { watcher, sign_in, subject: Subject::Task { task: 1 }, window: window() },
+            Event::Watch { watcher, sign_in, subject: Watched::Task { task: 1 }, window: window() },
         );
         watch_outputs(&mut core, &limits, Event::Delivered { watcher });
     }
@@ -2099,11 +2080,7 @@ fn watches_share_subject_tokens_and_expired_signins_end_only_their_own_watch() {
 fn taking_a_changed_delivery_after_signin_expiry_ends_instead_of_making_a_document() {
     let (mut core, limits) = watch_core();
     let watcher = Token::new(30);
-    watch_outputs(
-        &mut core,
-        &limits,
-        Event::Watch { watcher, sign_in: 10, subject: Subject::Frame { party: 1 }, window: window() },
-    );
+    watch_outputs(&mut core, &limits, Event::Watch { watcher, sign_in: 10, subject: Watched::Frame, window: window() });
     core.touch_party(1);
     finish_watch_outputs(&mut core, &limits);
     let at = Duration::from_secs(61).as_nanos();
@@ -2127,7 +2104,7 @@ fn open_run_watch(core: &mut Core, limits: &Limits, number: u64) {
     watch_outputs(
         core,
         limits,
-        Event::Watch { watcher, sign_in: 10, subject: Subject::Run { task: 1 }, window: window() },
+        Event::Watch { watcher, sign_in: 10, subject: Watched::Run { task: 1 }, window: window() },
     );
     watch_outputs(core, limits, Event::Delivered { watcher });
 }
@@ -3006,3 +2983,5 @@ mod windows;
 use funding_fixtures::set_role_authority;
 
 mod read_activity;
+
+mod own_watches;

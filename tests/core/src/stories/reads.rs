@@ -290,11 +290,11 @@ pub fn conversation_owner_replay_keeps_every_retained_page_after_durability_and_
     request(&mut world, 50, people::Ask::StartChat { project: 1, words: b"current live chat".as_slice().into() });
     assert_eq!(world.reached_cut, Some(crate::effects::Cut::Submitted(prerequisite)));
     assert!(world.store.applied < prerequisite);
-    world.watches = Some(watches::Parties::new(769, prerequisite, false));
+    world.watches = Some(watches::Parties::new(769, prerequisite, false, world.sign_in.expect("signed in")));
     world.send(root::Event::Core(core::Event::Watch {
         watcher: Token::new(60),
         sign_in: world.sign_in.expect("signed in"),
-        subject: documents::Subject::Conversations { party: 1 },
+        subject: documents::Watched::Conversations,
         window: documents::Window { rows: 2, after: None },
     }));
     assert!(world.watches.as_ref().expect("watcher").deliveries.is_empty());

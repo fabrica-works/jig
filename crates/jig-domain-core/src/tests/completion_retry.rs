@@ -151,7 +151,7 @@ fn the_last_watch_can_close_and_reopen_after_an_unwatched_retry() {
     let opened = watch_outputs(
         &mut core,
         &limits,
-        Event::Watch { watcher: Token::new(31), sign_in: 10, subject: Subject::Run { task: 1 }, window: window() },
+        Event::Watch { watcher: Token::new(31), sign_in: 10, subject: Watched::Run { task: 1 }, window: window() },
     );
     assert_stream(
         current_stream(&opened),
@@ -191,7 +191,7 @@ fn opaque_content_calls_are_attempt_fenced_without_deriving_a_text_turn() {
     let opened = watch_outputs(
         &mut core,
         &limits,
-        Event::Watch { watcher: Token::new(30), sign_in: 10, subject: Subject::Run { task: 1 }, window: window() },
+        Event::Watch { watcher: Token::new(30), sign_in: 10, subject: Watched::Run { task: 1 }, window: window() },
     );
     let Request::Now(now) = current_stream(&opened) else { panic!("now stream") };
     let Now::RunText { turn, text, call: Some(shown), .. } = now.as_ref() else { panic!("opaque current call") };
@@ -274,7 +274,7 @@ fn committed_main_text_keeps_its_independent_call_on_reopen_and_end_releases_it(
     let opened = watch_outputs(
         &mut core,
         &limits,
-        Event::Watch { watcher: Token::new(30), sign_in: 10, subject: Subject::Run { task: 1 }, window: window() },
+        Event::Watch { watcher: Token::new(30), sign_in: 10, subject: Watched::Run { task: 1 }, window: window() },
     );
     let shown = delivered_run(&opened).unwrap();
     assert_eq!(shown.committed_turn, 1);
@@ -286,7 +286,7 @@ fn committed_main_text_keeps_its_independent_call_on_reopen_and_end_releases_it(
     let reopened = watch_outputs(
         &mut core,
         &limits,
-        Event::Watch { watcher: Token::new(31), sign_in: 10, subject: Subject::Run { task: 1 }, window: window() },
+        Event::Watch { watcher: Token::new(31), sign_in: 10, subject: Watched::Run { task: 1 }, window: window() },
     );
     assert_eq!(delivered_run(&reopened).unwrap().call, shown.call);
     core.proofs.get_mut(&1).unwrap().terminal =

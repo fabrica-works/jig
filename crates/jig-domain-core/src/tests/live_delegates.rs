@@ -96,7 +96,7 @@ fn a_delegate_change_refreshes_its_requesters_task_document() {
     watch_outputs(
         &mut core,
         &limits,
-        Event::Watch { watcher: Token::new(30), sign_in: 10, subject: Subject::Task { task: 1 }, window: window() },
+        Event::Watch { watcher: Token::new(30), sign_in: 10, subject: Watched::Task { task: 1 }, window: window() },
     );
     watch_outputs(&mut core, &limits, Event::Delivered { watcher: Token::new(30) });
     watch_outputs(&mut core, &limits, Event::Tasks(tasks::Event::Hold { task: 2, why: tasks::Hold::Budget }));

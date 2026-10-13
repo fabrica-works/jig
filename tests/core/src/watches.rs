@@ -95,6 +95,7 @@ struct Consumer {
 pub struct Parties {
     rng: Rng,
     made: u64,
+    sign_in: u64,
     automatic: bool,
     consumers: BTreeMap<u64, Consumer>,
     projects: BTreeMap<u64, BTreeSet<u32>>,
@@ -108,10 +109,11 @@ pub struct Parties {
 
 impl Parties {
     #[must_use]
-    pub fn new(seed: u64, made: u64, automatic: bool) -> Self {
+    pub fn new(seed: u64, made: u64, automatic: bool, sign_in: u64) -> Self {
         Self {
             rng: Rng::new(seed),
             made,
+            sign_in,
             automatic,
             consumers: BTreeMap::new(),
             projects: BTreeMap::new(),
@@ -146,13 +148,14 @@ impl Parties {
                     "independent application watch admission"
                 );
             }
-            root::Event::Core(core::Event::Watch { watcher, subject, .. }) => {
+            root::Event::Core(core::Event::Watch { watcher, sign_in, subject, .. }) => {
+                assert_eq!(*sign_in, self.sign_in, "the fixture party owns this sign-in");
                 assert!(
                     self.consumers
                         .insert(
                             watcher.raw(),
                             Consumer {
-                                subject: Watched::Jig(subject.clone()),
+                                subject: Watched::Jig(named_subject(subject, 1)),
                                 fence: Fence::opened(self.made),
                                 automatic: self.automatic,
                                 queued: false,
@@ -535,13 +538,13 @@ pub fn world(seed: u64, automatic: bool) -> crate::effects::World {
     limits.journal.writes = (room.writes + connectors) * 2;
     limits.journal.held = (room.held + connectors) * 2;
     let mut world = crate::effects::World::configured(seed, false, configuration, limits);
-    world.watches = Some(Parties::new(seed, world.store.applied, automatic));
+    world.watches = Some(Parties::new(seed, world.store.applied, automatic, world.sign_in.expect("signed in")));
     let task = world.assigned.as_ref().expect("assigned chat").task;
     for (watcher, subject) in [
-        (1, Subject::Frame { party: 1 }),
-        (2, Subject::Task { task }),
-        (3, Subject::Tree { task }),
-        (4, Subject::Inbox { party: 1 }),
+        (1, core::documents::Watched::Frame),
+        (2, core::documents::Watched::Task { task }),
+        (3, core::documents::Watched::Tree { task }),
+        (4, core::documents::Watched::Inbox),
     ] {
         open(&mut world, watcher, subject);
     }
@@ -565,7 +568,7 @@ pub fn application(
     });
 }
 
-pub fn open(world: &mut crate::effects::World, watcher: u64, subject: Subject) {
+pub fn open(world: &mut crate::effects::World, watcher: u64, subject: core::documents::Watched) {
     world.send(root::Event::Core(core::Event::Watch {
         watcher: Token::new(watcher),
         sign_in: world.sign_in.expect("signed in"),
@@ -586,4 +589,24 @@ pub fn latest(world: &crate::effects::World, watcher: u64) -> &Document {
         .find(|(received, _, _)| *received == watcher)
         .expect("received document")
         .2
+}
+
+// Independent translation from the observed admission and its registered party.
+pub(crate) fn named_subject(value: &core::documents::Watched, party: u64) -> Subject {
+    use core::documents::Watched as W;
+    match value {
+        W::Application { scope, connector, subject } => {
+            Subject::Application { scope: *scope, connector: *connector, subject: *subject }
+        }
+        W::Frame => Subject::Frame { party },
+        W::Task { task } => Subject::Task { task: *task },
+        W::Tree { task } => Subject::Tree { task: *task },
+        W::Chips { tasks } => Subject::Chips { tasks: tasks.clone() },
+        W::Inbox => Subject::Inbox { party },
+        W::Goals { project } => Subject::Goals { project: *project },
+        W::Tasks { project, filter } => Subject::Tasks { project: *project, filter: *filter },
+        W::Conversations => Subject::Conversations { party },
+        W::Run { task } => Subject::Run { task: *task },
+        W::Deployment => Subject::Deployment,
+    }
 }

@@ -88,11 +88,8 @@ fn frame_delivery(out: &[Request], watcher: Token) -> Option<Frame> {
 }
 
 fn open_frame(core: &mut Core, limits: &Limits, watcher: Token) -> Frame {
-    let initial = watch_outputs(
-        core,
-        limits,
-        Event::Watch { watcher, sign_in: 10, subject: Subject::Frame { party: 1 }, window: window() },
-    );
+    let initial =
+        watch_outputs(core, limits, Event::Watch { watcher, sign_in: 10, subject: Watched::Frame, window: window() });
     frame_delivery(&initial, watcher).expect("authenticated first frame delivery")
 }
 

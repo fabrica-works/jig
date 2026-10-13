@@ -4,7 +4,7 @@ use jig_core_world::{
 };
 use jig_domain_core::{
     self as core,
-    documents::{Count, Document, PhaseLine, Subject},
+    documents::{Count, Document, PhaseLine, Watched},
 };
 use jig_domain_tasks as tasks;
 use jig_domain_views as views;
@@ -52,7 +52,7 @@ fn a_slow_watcher_of_a_tree_sees_fewer_deliveries_and_the_last_state() {
 fn a_delivery_never_shows_what_a_crash_took_back() {
     let mut world = world(703, true);
     let task = world.assigned.as_ref().expect("assignment").task;
-    open(&mut world, 5, Subject::Run { task });
+    open(&mut world, 5, Watched::Run { task });
     let before = world.watches.as_ref().expect("watches").deliveries.len();
     let next = world.store.applied + 1;
     world.cut = Some(Cut::Submitted(next));
@@ -60,7 +60,7 @@ fn a_delivery_never_shows_what_a_crash_took_back() {
     assert_eq!(world.reached_cut, Some(Cut::Submitted(next)));
     assert_eq!(world.watches.as_ref().expect("watches").deliveries.len(), before);
     world.restart(703, false);
-    open(&mut world, 6, Subject::Run { task });
+    open(&mut world, 6, Watched::Run { task });
     let Document::Run(run) = latest(&world, 6) else { panic!("reopened run") };
     assert_eq!(run.committed_turn, 0);
     assert!(world.store.rows.values().all(|row| !matches!(row, root::Record::Core(core::Record::Core(core::CoreRecord::Turn(turn))) if turn.task == task && turn.turn == 1)));
@@ -72,7 +72,7 @@ fn a_run_s_text_streams_by_turn_and_is_replaced_by_the_committed_turn() {
     let mut world = world(704, true);
     let assignment = world.assigned.as_ref().expect("assignment");
     let (task, attempt) = (assignment.task, assignment.attempt);
-    open(&mut world, 5, Subject::Run { task });
+    open(&mut world, 5, Watched::Run { task });
     let committed = world.store.applied;
     for (offset, text) in [(0, b"hello ".as_slice()), (6, b"world".as_slice())] {
         world.send(root::Event::Text { task, attempt, turn: 1, offset, text: text.into() });
@@ -151,9 +151,9 @@ fn inbox_across_projects_stories() {
     limits.core.people.inbox_recipients = 16;
     jig_core_world::peers::journal(&mut limits);
     let mut world = jig_core_world::effects::World::configured(788, false, config, limits);
-    world.watches = Some(Parties::new(788, world.store.applied, true));
-    open(&mut world, 1, Subject::Frame { party: 1 });
-    open(&mut world, 4, Subject::Inbox { party: 1 });
+    world.watches = Some(Parties::new(788, world.store.applied, true, world.sign_in.expect("signed in")));
+    open(&mut world, 1, Watched::Frame);
+    open(&mut world, 4, Watched::Inbox);
     let first_sign_in = world.sign_in.expect("first party");
     world.send(root::Event::Core(core::Event::SignIn {
         reply_to: skein_lib::ReplyTo::new(Token::new(6090)),

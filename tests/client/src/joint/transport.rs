@@ -427,7 +427,7 @@ mod tests {
         );
         assert_eq!(front.watch(owner).expect("original watch").subject, Watched::Jig(exact.clone()));
         assert!(front.continued(ClientId(0), native, exact.clone()).expect("duplicate callback").is_none());
-        let resumed = crate::joint::wire::watches::watch(Token::new(77), 23, 7, &exact, 2).expect("exact resume");
+        let resumed = crate::joint::wire::watches::watch(Token::new(77), 23, &exact, 2).expect("exact resume");
         assert!(
             matches!(resumed, Event::WatchRun { watcher, sign_in: 23, task: u64::MAX, turn: Some(jig_domain_views::TurnName { attempt: u64::MAX, turn: u32::MAX, retry: u32::MAX }), offset: u32::MAX } if watcher == Token::new(77))
         );

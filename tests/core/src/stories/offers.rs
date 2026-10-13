@@ -61,7 +61,8 @@ pub fn world(seed: u64, role: Option<people::Role>) -> World {
     let mut referee = crate::referee::offers::Referee::default();
     referee.register(world.sign_in.expect("signed in"), person, world.store.applied);
     world.offers = Some(referee);
-    world.watches = Some(crate::watches::Parties::new(seed, world.store.applied, true));
+    world.watches =
+        Some(crate::watches::Parties::new(seed, world.store.applied, true, world.sign_in.expect("signed in")));
     world.reads = Some(crate::reads::Parties::new(world.store.applied));
     crate::reads::ask(&mut world, 91, core::reads::Read::Project { project: 1 });
     world

@@ -53,7 +53,7 @@ pub fn send(
             JigOut::Open { watch, subject } => {
                 let sign_in = sign_in.ok_or(Invalid::Session)?;
                 let watcher = driver.transport.open(client, *watch, Watched::Jig(subject.clone()));
-                match wire::watches::watch(watcher, sign_in, driver.transport.party(client), subject, limits.rows) {
+                match wire::watches::watch(watcher, sign_in, subject, limits.rows) {
                     Ok(event) => root::Event::Core(event),
                     Err(why) => {
                         driver.transport.end_watch(watcher);

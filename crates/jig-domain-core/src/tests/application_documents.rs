@@ -2,8 +2,8 @@
 use super::*;
 use crate::documents::ApplicationScope;
 
-fn application_subject(scope: ApplicationScope) -> Subject {
-    Subject::Application { scope, connector: 1, subject: Token::new(500) }
+fn application_subject(scope: ApplicationScope) -> Watched {
+    Watched::Application { scope, connector: 1, subject: Token::new(500) }
 }
 fn document_asks(out: &[Request]) -> usize {
     let mut count = 0_usize;

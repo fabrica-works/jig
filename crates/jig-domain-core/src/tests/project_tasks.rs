@@ -111,7 +111,7 @@ fn filtered_task_watches_coalesce_enter_leave_and_ending_then_revoke_visibility(
         Event::Watch {
             watcher,
             sign_in: 10,
-            subject: Subject::Tasks { project: 1, filter },
+            subject: Watched::Tasks { project: 1, filter },
             window: Window { rows: 2, after: None },
         },
     );
@@ -201,7 +201,7 @@ fn an_ended_task_watch_stays_empty_when_a_live_task_ends() {
         Event::Watch {
             watcher,
             sign_in: 10,
-            subject: Subject::Tasks { project: 1, filter },
+            subject: Watched::Tasks { project: 1, filter },
             window: Window { rows: 2, after: None },
         },
     );

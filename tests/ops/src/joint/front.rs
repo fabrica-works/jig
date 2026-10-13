@@ -164,10 +164,6 @@ impl Joint {
             self.incoming(packet);
         }
     }
-    #[expect(
-        clippy::too_many_lines,
-        reason = "one exhaustive match keeps every client wire route and shell duty explicit"
-    )]
     fn request(&mut self, client: ClientId, value: client::Request) {
         if self.offline_until.is_some() {
             self.parked.entry(client).or_default().push(value);
@@ -213,14 +209,8 @@ impl Joint {
                 }
                 client::JigOut::Open { watch, subject } => {
                     let watcher = self.engine.peers.transport.open(client, watch, Watched::Jig(subject.clone()));
-                    let event = wire::watches::watch(
-                        watcher,
-                        sign_in,
-                        self.engine.peers.transport.party(client),
-                        &subject,
-                        self.limits.jig.rows,
-                    )
-                    .expect("whole jig watch uses 45 wire");
+                    let event = wire::watches::watch(watcher, sign_in, &subject, self.limits.jig.rows)
+                        .expect("whole jig watch uses 45 wire");
                     self.send_event(root::Event::Core(event));
                 }
                 client::JigOut::Continue { watch, subject } => {

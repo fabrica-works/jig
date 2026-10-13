@@ -9,7 +9,7 @@ fn a_reconnected_run_watch_receives_only_its_unacknowledged_suffix() {
     let mut world = world(769, true);
     let assignment = world.assigned.as_ref().expect("live chat");
     let (task, attempt) = (assignment.task, assignment.attempt);
-    open(&mut world, 5, core::documents::Subject::Run { task });
+    open(&mut world, 5, core::documents::Watched::Run { task });
     let durable = world.store.applied;
     world.send(root::Event::Text { task, attempt, turn: 1, offset: 0, text: b"abcdef".as_slice().into() });
     let turn = views::TurnName { attempt, turn: 1, retry: 0 };
