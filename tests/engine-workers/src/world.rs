@@ -1,5 +1,5 @@
 //! The layer's scripted routing around the component.
-use crate::net::Net;
+use crate::net::{Net, WriteRoom};
 use jig_protocol_engine_workers::{Component, Event, Limits, MAX_OUT_DOWN, Request, Worker};
 use skein_fake_channel::ScriptedPeer;
 use skein_lib::{Duration, Queue, Rng, Time, Token};
@@ -69,6 +69,9 @@ impl World {
             }
             if let Some(event) = event {
                 self.down(event);
+            } else if self.component.next_deadline().is_some_and(|at| at <= self.now) {
+                self.component.fire(self.now, &mut self.out);
+                self.route();
             } else {
                 self.component.reclaim();
                 return;
@@ -112,7 +115,34 @@ impl World {
         self.component.dropped_down()
     }
     pub fn withhold_write_room(&mut self, connection: Token) {
-        self.net(connection).write_room = false;
+        self.net(connection).write_room = WriteRoom::Withheld;
+    }
+    pub fn grant_one_frame(&mut self, connection: Token) {
+        let net = self.net(connection);
+        net.write_room = WriteRoom::One;
+    }
+    pub fn grant_write_room(&mut self, connection: Token) {
+        self.net(connection).write_room = WriteRoom::Free;
+    }
+    pub fn inject(&mut self, connection: Token, bytes: &[u8]) {
+        self.net(connection).inject(bytes);
+    }
+    pub fn end_stream(&mut self, connection: Token) {
+        self.net(connection).ended = true;
+    }
+    pub fn fail_stream(&mut self, connection: Token) {
+        self.down(Event::Lower {
+            connection,
+            event: skein_channel::LowerEvent::Read(skein_lib::stream::Up::Failed(skein_lib::stream::Fault::Reset)),
+        });
+    }
+    pub fn reporting(&mut self, name: &[u8], secret: &[u8]) -> (Token, Token) {
+        let connection = self.connect(crate::fixtures::reporting_worker(name, secret));
+        self.run();
+        let Request::Hello { channel, .. } = self.root.last().expect("hello") else {
+            panic!("hello first");
+        };
+        (connection, *channel)
     }
     fn net(&mut self, connection: Token) -> &mut Net {
         self.nets.get_mut(&connection).expect("known stream")

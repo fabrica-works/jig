@@ -1,6 +1,6 @@
 //! One accepted stream and its opening (protocol/channel.md, 10.3).
 use crate::Limits;
-use skein_channel::{Event, Lower, LowerEvent, Machine, Request, Role, Schema, StreamMode};
+use skein_channel::{Event, Lower, LowerEvent, Machine, Request, Role, Schema, StreamMode, WriteWait};
 use skein_lib::{Queue, Time, Token};
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum Phase {
@@ -9,6 +9,12 @@ pub(crate) enum Phase {
     Hello,
     Open,
     Closing,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum Ending {
+    Active,
+    Graceful,
+    Abort,
 }
 #[derive(Debug)]
 pub(crate) struct Connection {
@@ -22,6 +28,10 @@ pub(crate) struct Connection {
     pub terminal: bool,
     pub heard: bool,
     pub hello_deadline: Option<Time>,
+    pub ping: Option<Time>,
+    pub silence: Option<Time>,
+    pub stall: Option<Time>,
+    pub ending: Ending,
 }
 impl Connection {
     pub fn new(schema: Schema, limits: &Limits, now: Time) -> Self {
@@ -38,6 +48,10 @@ impl Connection {
             terminal: false,
             heard: false,
             hello_deadline: None,
+            ping: None,
+            silence: None,
+            stall: None,
+            ending: Ending::Active,
         }
     }
     pub fn down(&mut self, request: Request, connection: Token, out: &mut Queue<crate::Request>) {
@@ -52,10 +66,32 @@ impl Connection {
         self.machine.poll(&mut self.above, &mut self.below);
         self.flush(connection, out);
     }
+    pub fn queued(&self) -> bool {
+        match self.machine.waiting().write {
+            WriteWait::Frames => true,
+            WriteWait::Nothing => false,
+        }
+    }
+    pub fn next_deadline(&self) -> Option<Time> {
+        let next = earlier(self.deadline, self.silence);
+        let next = earlier(next, self.stall);
+        if self.queued() { next } else { earlier(next, self.ping) }
+    }
+
     fn flush(&mut self, connection: Token, out: &mut Queue<crate::Request>) {
         for _ in 0..skein_channel::MAX_DOWN {
             let Some(lower) = self.below.pop() else { break };
             out.push(crate::Request::Lower { connection, lower });
         }
+    }
+}
+
+fn earlier(left: Option<Time>, right: Option<Time>) -> Option<Time> {
+    match left {
+        Some(left) => match right {
+            Some(right) => Some(left.min(right)),
+            None => Some(left),
+        },
+        None => right,
     }
 }

@@ -31,3 +31,27 @@ fn the_component_at_its_limits_stays_within_its_worst_case() {
     }
     assert!(meter.held() > 0, "all connection machines are retained");
 }
+
+#[test]
+fn every_connection_at_its_cap_stays_within_the_worst_case() {
+    use jig_engine_workers_world::World;
+    let limits = fixtures::limits();
+    let bound = worst_case(&limits).expect("bounded component");
+    let cap = jig_protocol_worker_wire::sizes::engine_cap(&limits.sizes).expect("cap");
+    let meter = Meter::new();
+    meter.start();
+    let mut world = World::new(&limits, &fixtures::workers(), 1);
+    let peers = [(fixtures::WORKER_A, fixtures::SECRET_A), (fixtures::WORKER_B, fixtures::SECRET_B)];
+    for (name, secret) in peers {
+        let (connection, channel) = world.reporting(name, secret);
+        world.withhold_write_room(connection);
+        for _ in 0..cap.frames {
+            world.down(Event::TurnBusy { channel, run: Token::new(7), attempt: Token::new(2), turn: 3 });
+        }
+        assert!(!world.gone(connection), "every frame fits the cap");
+    }
+    world.connect(fixtures::worker(fixtures::WORKER_C, fixtures::SECRET_C, fixtures::PAYLOAD));
+    let measured = meter.end();
+    meter.check(measured, bound, &"engine channels at cap, including byte-world overhead");
+    assert!(meter.held() > 0);
+}

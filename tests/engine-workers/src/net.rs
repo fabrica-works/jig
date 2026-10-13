@@ -3,13 +3,20 @@ use skein_channel::{Control, Lower, LowerEvent, decode_control, parse_header};
 use skein_fake_channel::ScriptedPeer;
 use skein_lib::{Intake, Rng, Token, stream};
 use std::collections::VecDeque;
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum WriteRoom {
+    Free,
+    Withheld,
+    One,
+}
 pub(crate) struct Net {
     pub peer: ScriptedPeer,
     intake: Intake,
     read: stream::Read,
     bytes: VecDeque<u8>,
     right: Option<Token>,
-    pub write_room: bool,
+    pub write_room: WriteRoom,
+    pub ended: bool,
     pub gone: bool,
     pub taken: bool,
     pub refused: Option<(u16, Box<[u8]>)>,
@@ -23,7 +30,8 @@ impl Net {
             read: stream::Read::Nothing,
             bytes: VecDeque::new(),
             right: None,
-            write_room: true,
+            write_room: WriteRoom::Free,
+            ended: false,
             gone: false,
             taken: false,
             refused: None,
@@ -77,9 +85,12 @@ impl Net {
         if let Some(event) = self.events.pop_front() {
             return Some(event);
         }
-        if self.write_room
+        if self.write_room != WriteRoom::Withheld
             && let Some(right) = self.right.take()
         {
+            if self.write_room == WriteRoom::One {
+                self.write_room = WriteRoom::Withheld;
+            }
             return Some(LowerEvent::Write(stream::OutputUp::Settled {
                 right,
                 outcome: stream::OutputOutcome::Granted,
@@ -102,6 +113,13 @@ impl Net {
             self.read = stream::Read::Nothing;
             return Some(LowerEvent::Read(stream::Up::Bytes(bytes)));
         }
+        if self.ended && self.read != stream::Read::Nothing {
+            self.ended = false;
+            return Some(LowerEvent::Read(stream::Up::End));
+        }
         None
+    }
+    pub fn inject(&mut self, bytes: &[u8]) {
+        self.bytes.extend(bytes);
     }
 }

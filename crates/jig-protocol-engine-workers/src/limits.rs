@@ -42,7 +42,12 @@ pub(crate) fn schema(limits: &Limits) -> Option<Schema> {
 }
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
-    if limits.handshake == Duration::ZERO || limits.hello == Duration::ZERO || limits.stall == Duration::ZERO {
+    if limits.handshake == Duration::ZERO
+        || limits.hello == Duration::ZERO
+        || limits.stall == Duration::ZERO
+        || limits.ping == Duration::ZERO
+        || limits.silence < limits.ping.saturating_mul(3)
+    {
         return None;
     }
     let connections = limits.workers.checked_add(limits.opening)?;

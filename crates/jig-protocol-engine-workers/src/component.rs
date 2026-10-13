@@ -1,7 +1,7 @@
 //! Worker channel ownership and routing (protocol/channel.md, sections 4 and 10.2).
 use crate::{
     Event, Limits, Request, Worker,
-    connection::{Connection, Phase},
+    connection::{Connection, Ending, Phase},
     opening::Verdict,
 };
 use alloc::boxed::Box;
@@ -13,6 +13,14 @@ pub enum Unusable {
     Limits,
     Workers,
 }
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Life {
+    Running,
+    Stopping,
+    Closing,
+    Aborting,
+    Closed,
+}
 #[derive(Debug)]
 pub struct Component {
     pub(crate) limits: Limits,
@@ -23,7 +31,7 @@ pub struct Component {
     schema: skein_channel::Schema,
     next_channel: u64,
     next_part: u64,
-    stopping: bool,
+    life: Life,
     dropped_down: u64,
 }
 impl Component {
@@ -54,7 +62,7 @@ impl Component {
             schema,
             next_channel: 1,
             next_part: 1,
-            stopping: false,
+            life: Life::Running,
             dropped_down: 0,
         })
     }
@@ -63,6 +71,16 @@ impl Component {
             Event::Accepted { connection } => self.accepted(now, connection, out),
             Event::Lower { connection, event } => {
                 if let Some(mut state) = self.connections.remove(&connection) {
+                    match &event {
+                        skein_channel::LowerEvent::Read(skein_lib::stream::Up::Bytes(_))
+                            if state.phase == Phase::Open =>
+                        {
+                            state.silence = Some(now.saturating_add(self.limits.silence));
+                        }
+                        skein_channel::LowerEvent::Read(_)
+                        | skein_channel::LowerEvent::Write(_)
+                        | skein_channel::LowerEvent::WriteFailed(_) => {}
+                    }
                     state.up(event, connection, out);
                     self.progress(now, connection, &mut state, out);
                     self.keep(connection, state);
@@ -73,7 +91,23 @@ impl Component {
                     lost(&mut state, out);
                 }
             }
-            Event::Stop | Event::Close | Event::Abort => self.stopping = true,
+            Event::Stop => {
+                if self.life == Life::Running {
+                    self.life = Life::Stopping;
+                }
+            }
+            Event::Close => {
+                if self.life != Life::Closed && self.life != Life::Aborting {
+                    self.life = Life::Closing;
+                }
+                self.fire(now, out);
+            }
+            Event::Abort => {
+                if self.life != Life::Closed {
+                    self.life = Life::Aborting;
+                }
+                self.fire(now, out);
+            }
             Event::Down { channel, down, parts, values } => {
                 if let Some(connection) = self.target(channel) {
                     let record = crate::translate::down(down, &parts, values, &self.codec);
@@ -99,6 +133,13 @@ impl Component {
                 }
             }
         }
+        self.completed(out);
+    }
+    fn completed(&mut self, out: &mut Queue<Request>) {
+        if (self.life == Life::Closing || self.life == Life::Aborting) && self.connections.is_empty() {
+            self.life = Life::Closed;
+            out.push(Request::Closed);
+        }
     }
     fn target(&self, channel: Token) -> Option<Token> {
         for (connection, state) in &self.connections {
@@ -119,7 +160,10 @@ impl Component {
         self.keep(connection, state);
     }
     fn accepted(&mut self, now: Time, connection: Token, out: &mut Queue<Request>) {
-        if self.connections.len() == self.connections.capacity() || self.connections.contains_key(&connection) {
+        if self.life == Life::Closed
+            || self.connections.len() == self.connections.capacity()
+            || self.connections.contains_key(&connection)
+        {
             out.push(Request::TurnAway { connection });
             return;
         }
@@ -145,6 +189,23 @@ impl Component {
             }
         }
         assert!(state.above.is_empty(), "channel decisions settle within three polls");
+        if state.terminal {
+            return;
+        }
+        if state.queued() {
+            if state.stall.is_none() {
+                state.stall = Some(now.saturating_add(self.limits.stall));
+            }
+        } else {
+            state.stall = None;
+            if state.ending == Ending::Graceful {
+                state.down(ChannelRequest::Close, connection, out);
+                for _ in 0..skein_channel::MAX_UP {
+                    let Some(event) = state.above.pop() else { break };
+                    self.heard(now, connection, state, event, out);
+                }
+            }
+        }
     }
     fn heard(
         &mut self,
@@ -157,7 +218,7 @@ impl Component {
         match event {
             ChannelEvent::Opening { credential, .. } => {
                 let verdict = self.judge(&credential);
-                if self.stopping {
+                if self.life != Life::Running {
                     self.refuse(now, connection, state, Reason::Stopping.code(), Box::new([]), out);
                     return;
                 }
@@ -213,13 +274,28 @@ impl Component {
             }
             ChannelEvent::Closed { why } => closed(connection, state, why, out),
             ChannelEvent::Body { kind, body } => self.body(now, connection, state, kind, &body, out),
-            ChannelEvent::Ping => state.down(ChannelRequest::Read, connection, out),
-            ChannelEvent::Ended | ChannelEvent::Refused { .. } => state.down(ChannelRequest::Close, connection, out),
-            ChannelEvent::Unsupported { .. }
-            | ChannelEvent::Sent { .. }
-            | ChannelEvent::Unsent { .. }
-            | ChannelEvent::Drained
-            | ChannelEvent::OutputFailed => {}
+            ChannelEvent::Ping | ChannelEvent::Unsupported { .. } => {
+                if state.phase == Phase::Open {
+                    state.silence = Some(now.saturating_add(self.limits.silence));
+                    state.down(ChannelRequest::Read, connection, out);
+                } else if state.phase == Phase::Hello {
+                    state.down(ChannelRequest::Read, connection, out);
+                }
+            }
+            ChannelEvent::Ended
+            | ChannelEvent::Refused { .. }
+            | ChannelEvent::Unsent { why: skein_channel::Unsent::Full, .. }
+            | ChannelEvent::OutputFailed => {
+                lose(state, out);
+                state.down(ChannelRequest::Close, connection, out);
+            }
+            ChannelEvent::Drained => {
+                if state.phase == Phase::Open {
+                    state.ping = Some(now.saturating_add(self.limits.ping));
+                }
+                state.stall = Some(now.saturating_add(self.limits.stall));
+            }
+            ChannelEvent::Sent { .. } | ChannelEvent::Unsent { .. } => {}
         }
     }
     fn body(
@@ -240,6 +316,8 @@ impl Component {
                     state.phase = Phase::Open;
                     state.heard = true;
                     state.deadline = None;
+                    state.ping = Some(now.saturating_add(self.limits.ping));
+                    state.silence = Some(now.saturating_add(self.limits.silence));
                     out.push(Request::Hello { channel: state.channel, hello });
                     state.down(ChannelRequest::Read, connection, out);
                     return;
@@ -247,6 +325,7 @@ impl Component {
                 self.refuse(now, connection, state, 3, Box::new([]), out);
             }
             Phase::Open => {
+                state.silence = Some(now.saturating_add(self.limits.silence));
                 if let Some(record) = crate::translate::decode(kind, body, &self.codec) {
                     let mut parts = crate::translate::Parts::new(self.next_part);
                     let up = crate::translate::up(record, &mut parts);
@@ -257,7 +336,8 @@ impl Component {
                     self.refuse(now, connection, state, 3, Box::new([]), out);
                 }
             }
-            Phase::Opening | Phase::Terms | Phase::Closing => self.refuse(now, connection, state, 3, Box::new([]), out),
+            Phase::Closing => {}
+            Phase::Opening | Phase::Terms => self.refuse(now, connection, state, 3, Box::new([]), out),
         }
     }
     fn refuse(
@@ -272,35 +352,65 @@ impl Component {
         lost(state, out);
         state.worker = None;
         state.phase = Phase::Closing;
+        state.ping = None;
+        state.silence = None;
         state.deadline = Some(now.saturating_add(self.limits.stall));
         state.down(ChannelRequest::Refuse { reason, text }, connection, out);
     }
     pub fn fire(&mut self, now: Time, out: &mut Queue<Request>) {
         let mut due = None;
         for (token, state) in &self.connections {
-            if let Some(deadline) = state.deadline
-                && deadline <= now
-            {
+            if self.shutdown_pending(state) || expired(state.next_deadline(), now) {
                 due = Some(*token);
                 break;
             }
         }
         if let Some(connection) = due {
             let mut state = self.connections.remove(&connection).expect("due connection exists");
-            lost(&mut state, out);
-            state.deadline = None;
-            state.worker = None;
-            state.phase = Phase::Closing;
-            state.down(ChannelRequest::Close, connection, out);
+            if self.shutdown_pending(&state) {
+                state.phase = Phase::Closing;
+                state.ping = None;
+                state.silence = None;
+                state.deadline = None;
+                state.ending = if self.life == Life::Aborting { Ending::Abort } else { Ending::Graceful };
+                if self.life == Life::Aborting {
+                    lost(&mut state, out);
+                    state.down(ChannelRequest::Close, connection, out);
+                } else {
+                    state.down(ChannelRequest::Finish, connection, out);
+                }
+            } else if expired(state.deadline, now) || expired(state.silence, now) || expired(state.stall, now) {
+                lost(&mut state, out);
+                state.deadline = None;
+                state.silence = None;
+                state.stall = None;
+                state.ping = None;
+                state.worker = None;
+                state.phase = Phase::Closing;
+                state.down(ChannelRequest::Close, connection, out);
+            } else {
+                state.ping = Some(now.saturating_add(self.limits.ping));
+                state.down(ChannelRequest::Ping, connection, out);
+            }
             self.progress(now, connection, &mut state, out);
             self.keep(connection, state);
         }
+        self.completed(out);
+    }
+    fn shutdown_pending(&self, state: &Connection) -> bool {
+        (self.life == Life::Closing || self.life == Life::Aborting)
+            && !state.terminal
+            && ((state.ending == Ending::Active && (self.life == Life::Aborting || state.phase != Phase::Closing))
+                || (self.life == Life::Aborting && state.ending == Ending::Graceful))
     }
     #[must_use]
     pub fn next_deadline(&self) -> Option<Time> {
         let mut next = None;
         for (_, state) in &self.connections {
-            if let Some(deadline) = state.deadline {
+            if self.shutdown_pending(state) {
+                return Some(Time::ZERO);
+            }
+            if let Some(deadline) = state.next_deadline() {
                 next = Some(match next {
                     Some(before) => deadline.min(before),
                     None => deadline,
@@ -325,8 +435,12 @@ fn closed(connection: Token, state: &mut Connection, why: Closed, out: &mut Queu
     state.terminal = true;
     state.worker = None;
     state.deadline = None;
+    state.ping = None;
+    state.silence = None;
+    state.stall = None;
     state.phase = Phase::Closing;
     match why {
+        Closed::Owner if state.ending == Ending::Graceful => out.push(Request::Close { connection }),
         Closed::RefusedHere(_) => out.push(Request::Close { connection }),
         Closed::Owner | Closed::RefusedPeer(_) | Closed::Framing | Closed::Stream | Closed::Truncated => {
             out.push(Request::Abort { connection });
@@ -339,4 +453,20 @@ fn lost(state: &mut Connection, out: &mut Queue<Request>) {
         state.heard = false;
         out.push(Request::Lost { channel: state.channel });
     }
+}
+
+fn expired(deadline: Option<Time>, now: Time) -> bool {
+    match deadline {
+        Some(at) => at <= now,
+        None => false,
+    }
+}
+
+fn lose(state: &mut Connection, out: &mut Queue<Request>) {
+    lost(state, out);
+    state.phase = Phase::Closing;
+    state.ping = None;
+    state.silence = None;
+    state.stall = None;
+    state.deadline = None;
 }
