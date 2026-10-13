@@ -1,6 +1,6 @@
 # The client's protocol
 
-Provisional, 2026-10-10, revised 2026-10-12. What carries the contract
+Provisional, 2026-10-10, revised 2026-10-13. What carries the contract
 between a party's client and the engine (`../client/domain/contract.md`)
 as bytes: the wire's records and their versions, the one connection a
 client keeps, its exchanges and its stream, how a keyed request's answer
@@ -134,7 +134,10 @@ the platform's HTTP stack, TLS                  TLS server, or plaintext on loop
 - **Turns cross as their bytes,** smith's, inside the documents that
   carry them, and are decoded by `jig-protocol-transcript` in the
   client's protocol layer (`../client/domain/client.md`, section 10); a
-  turn that does not decode crosses up as such, never dropped.
+  turn that does not decode crosses up as such, never dropped. An
+  activity line's turn crosses beside the line's references: its bytes;
+  its size, where the turn alone passes the read's byte bound; or unread
+  (`store.md`, 7.3).
 - **No time crosses, only walls.** Documents carry wall times, which the
   store keeps (`../client/domain/contract.md`, 5.3); durations (a
   retention, a heartbeat) cross as durations. A deadline the engine keeps

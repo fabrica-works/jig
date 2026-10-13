@@ -1,14 +1,15 @@
 # The store
 
-Provisional, 2026-10-12. What lies beneath the engine's store vocabulary:
-skein's key-value store, embedded in the engine's process, holds every
-record jig's core and the application keep, transcripts are files beside
-it, and secrets are in a second store. jig ships the component that does
-this, `jig-protocol-store`; the application hands it its own records as
-bytes it encodes. The domain's half (commits, loads, what is kept) is
-`../domain/engine.md`, section 5, and what the rest of the protocol layer
-relies on is `README.md`, section 9. Read it with skein's `kv.md`. What is
-still open is listed in section 16.
+Provisional, 2026-10-12, revised 2026-10-13. What lies beneath the
+engine's store vocabulary: skein's key-value store, embedded in the
+engine's process, holds every record jig's core and the application
+keep, transcripts are files beside it, and secrets are in a second
+store. jig ships the component that does this, `jig-protocol-store`; the
+application hands it its own records as bytes it encodes. The domain's
+half (commits, loads, what is kept) is `../domain/engine.md`, section 5,
+and what the rest of the protocol layer relies on is `README.md`,
+section 9. Read it with skein's `kv.md`. What is still open is listed in
+section 16.
 
 ## 1. In one page
 
@@ -338,7 +339,7 @@ relates to.
 | an escalation | its decision, by the revision its task's record names, with the hold's milestone |
 | a question, a reply | the task's activity line, by its position, with the line that answers a question, where its answer was heard (below), or the turn a reply was (from the transcript, 8.3) |
 | a turn | the task's transcript (8.3) |
-| a task's activity, newest first | the activity family, read backwards (7.4) |
+| a task's activity, newest first | the activity family, read backwards (7.4); each turn's line with its turn, from the transcript (8.3) |
 | a task's history, or a subtree's | the history and milestone families; a subtree's by the index of its delegates, task by task: the task's own rows, then each delegate's in that index's order, each task's rows in its own history's order |
 | a task's ended delegates | the index of ended delegates by requester |
 | an inbox group | the index of the party's inbox, by time: what needs them oldest first, updates newest first; a group, and the filter, select within it |
@@ -357,6 +358,19 @@ relates to.
 - **Joins are point reads** in the same step, priced within the read's
   bounds: a page's rows times the joins each may need. A turn's is read
   from its transcript, and answers once its frame is read.
+- **A page of a task's activity carries its turns.** Each turn's line
+  comes with its turn: its spend, the last message it read, its time,
+  and smith's bytes. A turn and its line commit together, so a page's
+  turn lines are the transcript's frames in the same order, one each,
+  and the component reads them in one walk (8.3). A turn counts its
+  bytes with its line's against the read's byte bound, and one join:
+  - a turn whose line and bytes together pass the read's whole byte
+    bound comes with its size in place of its bytes, and counts without
+    them, so no page comes back empty for a turn;
+  - one that fits the bound but not what is left of the page ends the
+    page before its line, and the next page starts with it;
+  - a frame that does not read whole (8.3) comes as unread, and ends
+    the page.
 - **Single reads go by key.** Where a task's record does not name the
   key a single read needs (a question's line and its answer's, an
   escalation's hold, a task's proposal in its proposer's history), the
@@ -451,6 +465,11 @@ the committed length. The next open cuts the file to its committed length
   5.4); a window that starts at another turn fails the read as unread.
 - **A turn,** for a party's read: from its attempt's first turn, walking
   frames forwards to its number.
+- **A page's turns,** for a party's page of a task's activity (7.3):
+  backwards, one frame for each turn line, from the frame of the page's
+  newest turn: the transcript's last frame when the page reads from the
+  activity's end, otherwise found as a turn is. A turn past the page's
+  bound has its fields and length read, not its bytes.
 - **A page of a task's turns,** forwards or backwards, from a cursor that
   is an offset the component gives and takes back.
 - **A tail,** for a fresh run's brief: backwards from the end, within the

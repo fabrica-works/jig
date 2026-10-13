@@ -1,6 +1,6 @@
 # The client and the engine
 
-Provisional, 2026-10-09, revised 2026-10-12. What crosses between a
+Provisional, 2026-10-09, revised 2026-10-13. What crosses between a
 party's client and the engine, at the level of the two domains: who the
 party is, the keyed requests and their answers, the documents the engine
 gives, the reads and watches that bring them, and versions. It is to
@@ -264,7 +264,9 @@ answer; *signed out*.
     section 10); a turn as its bytes, within the page's byte bound, which
     the client's protocol layer decodes, with no read of its own, into
     the client's turn or into a turn that does not decode, with why
-    (client.md, section 10);
+    (client.md, section 10): a turn that alone passes the page's bound
+    comes with its size instead, and does not decode, as too large; one
+    the engine could not read whole, as malformed;
   - *a conversation's line:* one of a party's chats, for their list;
   - *a goal's line,* a project's, its policy, roles and spend, a note;
     a project's document carries its recurring tasks' lines, each saying
