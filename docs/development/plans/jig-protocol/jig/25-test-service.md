@@ -377,7 +377,7 @@ back (the eight tests above); under 0.2 s. The joint layer opens at
 25.6.
 Don't: parse JSON outside jig 20's parser and the application's own
 members; read a file.
-Size: at most 600 lines.
+Size: at most 1,300 lines of production code (ruling 212).
 Removes: nothing.
 
 ### 25.4 The engine's components

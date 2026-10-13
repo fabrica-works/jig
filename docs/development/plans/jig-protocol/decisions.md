@@ -1557,6 +1557,13 @@ the file.
      16 variants, as reads had none before ruling 208. A step not in the
      plan, jig 30.s2 (`jig/30-client-wire.md`), adds `StreamText` and
      `DeliveryValue`; jig 32.3 lands its other stream work meanwhile.
+212. **jig 25.3 lands at 1,293 lines** (2026-10-13, the coordinator's block
+     "jig 25.3: production count1293 over900 allowance",
+     2026-10-13T04:41:42Z). Against "at most 600" (900 with ruling 196):
+     the service's parser and routing over every engine record, and scope
+     the supervisor's rulings added (203's staged activation, 204's root
+     bounds, 206's root admission), every file under 800. Its Size becomes
+     1,300; it lands after jig 11.s1 and its proof.
 
 ## For the user
 
