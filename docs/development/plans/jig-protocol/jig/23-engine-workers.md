@@ -306,8 +306,11 @@ Scope: `translate.rs`'s down half: each `host::LinkDown` variant to its
 record, the parts' bytes written whole, each grant's value moved in from
 `Down`'s values, a grant without one left out; an assignment's window
 turns joined into one piece, each after its `u32` length (channel.md,
-6.1, "A window crosses as one piece"); a `Down` for a channel that is
-gone, or not yet heard, dropped (channel.md, 5.2, 6.1, 6.2, 8, 10.3).
+6.1, "A window crosses as one piece"); `Event::TurnBusy`, the fleet's
+busy answer to a turn, encoded as the wire's `TurnBusy` record beside
+the hub's (channel.md, 5.2, "Busy, sent again"); a `Down` or a
+`TurnBusy` for a channel that is gone, or not yet heard, dropped
+(channel.md, 5.2, 6.1, 6.2, 8, 10.3).
 The assignment's run identity is the 16 bytes the hub's assignment
 carries, made by `jig_protocol_charter::run_identity` (jig 06.2) where
 the engine's protocol layer puts the assignment together; this component
@@ -453,6 +456,9 @@ pub enum Event {
     /// From the root: a record for the worker on `channel`, its parts' bytes, and one value
     /// per grant it names, in order (None: the table no longer holds it; the grant is left out).
     Down { channel: Token, down: host::LinkDown, parts: Box<[Part]>, values: Box<[Option<GrantValue>]> },
+    /// From the root: the fleet answered `turn` of `run`'s `attempt` busy (core's `Held::TurnBusy`);
+    /// encoded as the wire's `TurnBusy`, never a hub record (channel.md, 5.2).
+    TurnBusy { channel: Token, run: Token, attempt: Token, turn: u32 },
     /// From the root: the fleet refused `channel`'s hello; `text` is its reason, at most 256 bytes.
     NotAdmitted { channel: Token, text: Box<[u8]> },
     /// From the root: shutting down; new openings are refused *stopping*.
@@ -556,10 +562,10 @@ impl Component {
   Questions): if jig 05 lands no `LinkUp`, `LinkDown` and hello as one
   value, raise it before 23.2 starts; this session never edits the hub's
   boundary (decisions.md, 6).
-- **Turn busy in the hub's vocabulary.** The worker's hub never hears a
-  turn's busy (channel.md, 5.2), but this component must take one from
-  the root: if jig 05's `host::LinkDown` has no turn busy, raise it
-  before 23.3 lands.
+- **Turn busy in the hub's vocabulary:** settled by the designer (jig
+  `e484056a`; channel.md, 5.2): turn busy is not in the link vocabulary;
+  this component takes it from the root as `Event::TurnBusy`, from the
+  fleet's request, and encodes the wire's record.
 - **The deadlines and openings at once** are profile numbers (jig 20),
   and channel.md, 14 keeps the timings open: report the values the world
   uses.
