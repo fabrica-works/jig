@@ -2055,6 +2055,18 @@ the file.
      smith request) is split into one function per request kind when the
      file is next edited (ruling 209: an unchanged move counts for
      nothing). jig 25's Sizes are underestimated, for the retrospective.
+253. **skein-03.s1's two absent-root stories: every power loss at each
+     file step, under 0.5 s** (2026-10-13, the coordinator's block "skein
+     03.s1: complete durability cut stories above 20ms ceiling",
+     2026-10-13T09:06:45Z). 03.s1's "each test under 20 ms" is its step
+     tests'. Its two world stories, cut at every submission for kill and
+     power loss, took 0.143 s (io) and 1.450 s (accounts). As proposed,
+     with skein's focused suite at 91 % of its budget: they keep every
+     power-loss cut at each file operation that makes or stores (and the
+     first after the acknowledgement), drop the kill rows, which the
+     existing cut worlds cover, and use owner-only test-sized capacities;
+     each runs under 0.5 s; no assertion weakened. The step tests keep 20
+     ms.
 
 ## For the user
 
