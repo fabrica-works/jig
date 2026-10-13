@@ -1286,6 +1286,19 @@ the file.
      becomes 1,200. From now, jig 20's later increments land without
      asking up to twice their Size, as the README's rule for codec
      increments says, now naming jig 20.
+189. **jig 15.1 defines the store component's `Limits`** (2026-10-13, the
+     coordinator's block "jig 15.1: component Limits sketch has no landed
+     owner", 2026-10-13T01:37:56Z). A plan defect: 15.1's sketch has
+     `Store::over(limits: &Limits, ..)` with `Limits` labelled "jig 13's",
+     but `jig-protocol-store` on `main` has no component `Limits`; 19.5
+     has `codec::Limits` and `sizes::check(core, application, journal,
+     kv)`. As proposed: 15.1's `lib.rs` defines `Limits { core:
+     jig_domain_core::Limits, store: skein_kv::Limits, secrets:
+     skein_kv::Limits, journal: skein_lib::JournalLimits }` (store.md, 13),
+     and `Store::over` derives `codec::limits` once from it (ruling 179:
+     limits checked where they are made), keeping settings and state
+     private. The files', queue's and reads' bounds join it in jig 17,
+     which owns them.
 
 ## For the user
 
