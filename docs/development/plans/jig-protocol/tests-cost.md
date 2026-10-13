@@ -34,8 +34,13 @@ every other at `CEILINGS`, and decodes at it and one past it;
 `generate()` (`lib.rs:136`) computes once a map from name to
 declaration, each type's `has_bounds` and the bound paths, and passes
 them down (`bound_names` and the declaration scans go); one
-family-level limits check, called once per public `new` and `decode`,
-in place of `emit_limit_checks` per type.
+family-level limits check, public, in place of `emit_limit_checks` per
+type, which the family's owner calls once where it makes its limits;
+`new` and `decode` check values only, each against its limit no higher
+than its ceiling, as they do (skein's codec.md, 4; the designer,
+2026-10-13, skein `b68a17a9`). As landed, 02.s4 calls the check in every
+public `new` and `decode`, which doubled a smith test's time; skein-02.s6
+removes those calls.
 Test shape: the generator's own tests on a small schema: its table
 tests name a planted failing case; a bound test's limit is the small
 one; generating a 400-declaration schema takes under 0.5 s unoptimised.
