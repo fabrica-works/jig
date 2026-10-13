@@ -2352,6 +2352,21 @@ the file.
      the limit (29 bytes) and the changed crates' clippy passing, the live
      proof runs exactly once more; if it fails after reaching the provider,
      it is a block, not another try.
+280. **jig 26.6's live proof failed on its own fixture; fixed offline, it
+     runs live once more** (2026-10-13, the coordinator's block "jig 26.6:
+     offline cause found, fixture charter exceeds receiving bound",
+     2026-10-13T18:00:25Z). The live run's charter gave the task 69 bytes
+     of instructions; the native client took the test client's limits (32
+     bytes of text), so the task's document did not decode, the client
+     answered it unreachable, and the person never saw the answer. The fake
+     provider reproduces it, and passes with the instructions within the
+     bound. Not a model's wording, a defect of the engine, or a timeout. The
+     fixture's engine and native client take consistent limits (the
+     charter within the client's text bound, or the client at the
+     deployment's profile), and the person's observation is scoped to the
+     answer, never the request's echo; verified on the fake provider, the
+     live proof runs exactly once more (17 of 40 live runs used). If it
+     fails again, it goes to the user.
 
 ## For the user
 
