@@ -17,6 +17,8 @@ skein-http.workspace = true
 skein-io.workspace = true
 jig-protocol-client-wire.workspace = true
 jig-domain-core.workspace = true
+jig-domain-notes.workspace = true
+jig-protocol-store.workspace = true
 jig-domain-people.workspace = true
 jig-domain-views.workspace = true
 

@@ -13,3 +13,6 @@ mod services;
 
 #[path = "tests/objects.rs"]
 mod objects;
+
+#[path = "tests/pages.rs"]
+mod pages;

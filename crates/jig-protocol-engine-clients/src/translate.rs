@@ -2,14 +2,17 @@
 use alloc::boxed::Box;
 use jig_protocol_client_wire::v6 as w;
 use skein_lib::{List, Writer};
+pub mod activity;
 pub(crate) mod answers;
 pub(crate) mod asks;
 pub mod chips;
 pub mod deployment;
+pub mod history;
 pub mod inbox;
 pub mod live;
 pub mod objects;
 pub mod owner;
+pub mod pages;
 pub(crate) mod refusals;
 pub mod task;
 pub use objects::document;

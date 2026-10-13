@@ -1,41 +1,6 @@
 use super::*;
+pub use jig_test_client_records::FULL_TURN;
 use skein_lib::{List, Wall};
-pub const FULL_TURN: &[u8] = &[
-    0, 3, 0, 1, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 255, 255, 255, 255, 0,
-    0, 0, 3, 97, 98, 99, 0, 0, 0, 3, 97, 98, 99, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255,
-    255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255,
-    255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 1, 0, 0, 0, 0, 1,
-    0, 0, 0, 0, 3, 97, 98, 99, 1, 0, 0, 0, 3, 97, 98, 99, 0, 0, 0, 3, 0, 127, 255,
-];
-pub fn turn_line(position: u64, at: u64, number: u32, bytes: &[u8]) -> w::ActivityLine {
-    let lim = w::CEILINGS;
-    let turn = w::ActivityTurn::new(
-        &lim,
-        w::ActivityTurnParts {
-            name: w::TurnName::new(&lim, w::TurnNameParts { attempt: 44, number }).unwrap(),
-            turn: Box::from(bytes),
-        },
-    )
-    .unwrap();
-    w::ActivityLine::new(&lim, w::ActivityLineParts { position, at, event: w::Activity::Turn(turn) }).unwrap()
-}
-pub fn activity_rows(rows: &[w::ActivityLine]) -> w::ActivityPage {
-    let mut length = 0_usize;
-    for row in rows {
-        length = length.checked_add(usize::try_from(row.measure()).unwrap()).unwrap().checked_add(4).unwrap();
-    }
-    let mut piece = Writer::new(length);
-    for row in rows {
-        let mut bytes = Writer::new(usize::try_from(row.measure()).unwrap());
-        row.encode(&mut bytes).unwrap();
-        skein_codec::piece::write(&mut piece, &bytes.finish()).unwrap();
-    }
-    w::ActivityPage::new(
-        &w::CEILINGS,
-        w::ActivityPageParts { rows: piece.finish(), cut: true, before: None, after: Some(wire_cursor(UTF8_TEXTS[0])) },
-    )
-    .unwrap()
-}
 pub fn decoded_turn(words: &[u8], cut: bool) -> c::TurnRead {
     let mut blocks = List::with_capacity(1);
     blocks.push(c::Block::Text(text(words))).unwrap();
@@ -60,7 +25,7 @@ pub fn expected_turn_line(position: u64, at: u64, number: u32, turn: c::TurnRead
     }
 }
 pub fn decoded_activity_record() -> w::ActivityPage {
-    activity_rows(&[turn_line(10, 20, 1, FULL_TURN), turn_line(11, 21, 2, FULL_TURN)])
+    jig_test_client_records::decoded_activity_record()
 }
 pub fn decoded_activity_page() -> c::ActivityPage {
     expected_two_turns(decoded_turn(b"abc", false))
@@ -72,7 +37,7 @@ pub fn expected_two_turns(first: c::TurnRead) -> c::ActivityPage {
     expected_activity_rows(rows)
 }
 pub fn unread_activity_record(bytes: &[u8]) -> w::ActivityPage {
-    activity_rows(&[turn_line(10, 20, 1, bytes), turn_line(11, 21, 2, FULL_TURN)])
+    jig_test_client_records::unread_activity_record(bytes)
 }
 pub fn unread_activity_page(why: c::TurnProblem) -> c::ActivityPage {
     expected_two_turns(c::TurnRead::Undecodable { why })
@@ -85,7 +50,7 @@ pub fn unread_pages() -> [(w::ActivityPage, c::ActivityPage); 3] {
     ]
 }
 pub fn cut_activity_record() -> w::ActivityPage {
-    activity_rows(&[turn_line(10, 20, 1, FULL_TURN)])
+    jig_test_client_records::cut_activity_record()
 }
 pub fn cut_activity_page() -> c::ActivityPage {
     expected_one_activity_line(expected_turn_line(10, 20, 1, decoded_turn(b"ab", true)))
@@ -95,53 +60,12 @@ pub fn expected_one_activity_line(row: c::ActivityLine) -> c::ActivityPage {
     rows.push(row).unwrap();
     expected_activity_rows(rows)
 }
-fn owner_turn_source() -> w::OwnerActivityLine {
-    let lim = w::CEILINGS;
-    w::OwnerActivityLine::new(
-        &lim,
-        w::OwnerActivityLineParts {
-            task: 7,
-            position: 88,
-            at: 66,
-            line: w::OwnerActivity::Turn(
-                w::OwnerActivityTurn::new(
-                    &lim,
-                    w::OwnerActivityTurnParts { reply: 999, attempt: 44, turn: 3, read: Some(77) },
-                )
-                .unwrap(),
-            ),
-        },
-    )
-    .unwrap()
-}
+
 pub fn archived_activity_record() -> w::ActivityPage {
-    let lim = w::CEILINGS;
-    let turn = w::TurnCarried::new(&lim, w::TurnCarriedParts { bytes: Box::from([0, 4]) }).unwrap();
-    owner_turn_activity_record(Some(w::TurnBytes::Carried(turn)))
+    jig_test_client_records::archived_activity_record()
 }
 pub fn owner_turn_activity_record(turn: Option<w::TurnBytes>) -> w::ActivityPage {
-    let lim = w::CEILINGS;
-    let source = owner_turn_source();
-    let mut decoded = None;
-    if let Some(turn) = turn {
-        decoded = Some(
-            w::ArchivedTurn::new(
-                &lim,
-                w::ArchivedTurnParts {
-                    task: 7,
-                    name: w::TurnName::new(&lim, w::TurnNameParts { attempt: 44, number: 3 }).unwrap(),
-                    cumulative: 123,
-                    read: Some(78),
-                    at: 99,
-                    turn,
-                },
-            )
-            .unwrap(),
-        );
-    }
-    let event = w::Activity::Owner(w::ActivityOwner::new(&lim, w::ActivityOwnerParts { source, decoded }).unwrap());
-    let row = w::ActivityLine::new(&lim, w::ActivityLineParts { position: 50, at: 51, event }).unwrap();
-    activity_rows(&[row])
+    jig_test_client_records::owner_turn_activity_record(turn)
 }
 pub fn archived_activity_page() -> c::ActivityPage {
     archived_activity_page_with_problem(c::TurnProblem::Version { found: 4 })
