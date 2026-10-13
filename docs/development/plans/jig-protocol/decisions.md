@@ -1627,6 +1627,16 @@ the file.
      Draft }` in the client wire (its version moved once), as `ReadValue`
      and `DeliveryValue` are (rulings 208, 211), not a private byte; it
      joins 32.4's Files.
+218. **`Start` hands the link each kept record with its storage key**
+     (2026-10-13, the coordinator's block "jig 32.4: opaque family
+     restoration loses its stored key at Start", 2026-10-13T05:34:04Z).
+     32.4's sketched `Saved::Family { family, version, key, bytes }` needs
+     the key, but `Start` read only the records' bytes, and a family's
+     record is its own opaque bytes. As proposed: `Start { versions:
+     List<StoreVersion>, kept: List<StoreRead> }`, `StoreRead { key:
+     Box<[u8]>, record: Box<[u8]> }` as the shell reads them; the family's
+     key comes from the keeper-tagged storage key; `w::Kept` and the
+     family's bytes are untouched.
 
 ## For the user
 
