@@ -33,6 +33,34 @@ this session as they bind jig 25.
 
 ## Increments
 
+### 27.s1 A turn's read is cumulative
+
+A step not in the plan (decisions.md, ruling 258), found by 27.1's
+current-window story on the real agent: smith sends each turn "the last
+message it read, by name, if any" (`protocol/channel.md`, the turn row),
+so consecutive turns repeat a read already committed. jig's tasks domain
+admits a turn's read only when it names a message still in the inbox
+(`crates/jig-domain-tasks/src/admission.rs:80-84`,
+`inbox.rs:433-455`), and the message the first turn read was removed when
+it committed; the next turn is refused, and the attempt ends
+`Failed(Invalid)` (`logs/jig-27/27.1-dev-window11.txt`).
+Needs: nothing; before 27.1 lands. Run by jig 27's session as its own
+commit.
+Files: `crates/jig-domain-tasks/src/{admission.rs, inbox.rs}` and their
+tests.
+Shape: a turn's read is admitted when it names a message still in the
+inbox (read now) or the attempt's last committed read (nothing new read);
+any other name is refused as now. The attempt keeps its last committed
+read where decision 32 already compares an answer's fence with it.
+Test shape: rows in the admission tests: a turn repeating the attempt's
+last committed read is admitted and reads nothing new; a turn naming a
+message neither in the inbox nor the attempt's last read is refused.
+27.1's current-window story is the world's proof.
+Proof: 27.1's current-window story passes on the real agent; the gate.
+Don't: accept any earlier name than the attempt's last committed read;
+change smith or the wire.
+Size: at most 40 lines of production code.
+
 ### 27.1 The channel's stories, its referee and the fuzzy sweep
 
 Scope: `tests/channel/src/{referee.rs, relay.rs, stories.rs}`: the

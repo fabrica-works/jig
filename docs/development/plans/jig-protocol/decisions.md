@@ -2112,6 +2112,16 @@ the file.
      refused or lost. No step changes fleet or hub; 27.1's referee takes
      the rule, with the negative test
      `a_refused_start_acknowledged_is_caught`.
+258. **jig 27.s1: a turn's read is cumulative** (2026-10-13, the
+     coordinator's block "jig 27.1: cumulative native read fence refused
+     after its earlier commit", 2026-10-13T11:08:05Z). The channel's turn
+     carries "the last message it read, by name, if any", so smith repeats
+     a committed read on the next turn; jig's tasks admission refuses a
+     read no longer in the inbox, and the attempt fails invalid. The
+     design is clear, so no question: a step not in the plan, jig 27.s1
+     (`jig/27-channel-stories-and-store.md`), admits a read naming the
+     attempt's last committed read as reading nothing new; jig 27 runs it
+     before 27.1 lands.
 
 ## For the user
 
