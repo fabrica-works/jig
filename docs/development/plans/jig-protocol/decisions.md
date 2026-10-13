@@ -1418,6 +1418,22 @@ the file.
      that build one, each named; every other check of the word stays.
      Not a dropped check: a foreign name excepted, as jig's own names are
      not.
+200. **jig 25.2's link keeps payloads in the root and hands assignments on
+     typed** (2026-10-13, the coordinator's block "jig 25.2: typed
+     assignment and payload-retention translation sketch",
+     2026-10-13T03:22:07Z). A plan defect: 25.2's sketch had a pure
+     `link::up(channel, up) -> core::Event`, which cannot keep a turn's or
+     an answer's payload under the tokens the fleet's events carry, and a
+     pure `link::down(fleet::Request) -> Option<(Token, host::LinkDown)>`,
+     which cannot carry an assignment's typed `RunCharter` for the routing
+     to encode (the README: no encoding in the root). As proposed:
+     `link::up` takes `&mut Domain` and keeps the payloads before making
+     the fleet's event; an assignment stays the existing typed
+     `Delivery::Assigned`, which the service's routing encodes;
+     `Delivery::Link` carries only the hub's records already typed. The
+     test `an_assignment_for_a_channel_leaves_as_the_hub_s_record` checks
+     the typed hand-off and the kept `RunCharter`. No payload encoding in
+     the root.
 
 ## For the user
 
