@@ -984,37 +984,7 @@ fn person_scope(value: &people::Authority) -> r::Scope {
 /// fit without teaching the generic referee the root's record vocabulary.
 #[must_use]
 pub fn root_bound(limits: &root::Limits) -> Option<u64> {
-    use skein_lib::{Journal, Map, Queue, Token};
-    let children =
-        core::worst_case(&limits.core)?.checked_add(connector::worst_case(&limits.connector)?.checked_mul(2)?)?;
-    let slots = u64::from(limits.journal.writes)
-        .checked_mul(u64::from(limits.journal.commits).checked_add(1)?)?
-        .checked_add(u64::from(limits.journal.held).checked_mul(2)?)?
-        .checked_add(u64::from(limits.journal.now))?
-        .checked_add(u64::from(limits.core.tasks.tasks).checked_mul(3)?)?
-        .checked_add(u64::from(limits.core.call_records))?
-        .checked_add(u64::from(limits.core.fleet.turns))?
-        .checked_add(u64::from(limits.core.fleet.attempts))?;
-    let entries = limits.connector.entries.checked_mul(2)?;
-    children
-        .checked_mul(slots.checked_add(2)?)?
-        .checked_add(Journal::<root::Write, root::Delivery>::worst_case(&limits.journal)?)?
-        .checked_add(
-            core::reads::answer_worst_case(&limits.core)?
-                .max(connector::document_worst_case(&limits.connector)?)
-                .checked_mul(u64::from(limits.journal.held).checked_add(u64::from(limits.journal.release))?)?,
-        )?
-        .checked_add(Queue::<core::Now>::worst_case(limits.journal.now)?)?
-        .checked_add(Map::<u64, root::Assignment>::worst_case(limits.core.tasks.tasks)?)?
-        .checked_add(Map::<u64, Box<[tasks::Name]>>::worst_case(limits.core.tasks.tasks)?)?
-        .checked_add(Map::<u64, (u64, u16)>::worst_case(limits.core.tasks.tasks)?)?
-        .checked_add(Map::<Token, connector::Effect>::worst_case(
-            limits.core.call_records.checked_add(limits.core.tasks.tasks)?,
-        )?)?
-        .checked_add(Map::<Token, u64>::worst_case(limits.core.tasks.tasks)?)?
-        .checked_add(Map::<u64, u16>::worst_case(entries)?)?
-        .checked_add(Map::<u64, u64>::worst_case(entries)?)?
-        .checked_add(Map::<Token, (Token, authority::Judge, [u8; 32])>::worst_case(limits.core.authority.facts)?)
+    root::worst_case(limits)
 }
 
 /// A conservative heap observation at each testing-root iteration. Test peers'

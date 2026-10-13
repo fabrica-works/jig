@@ -115,4 +115,12 @@ pub(super) const CORE: core::Limits = core::Limits {
 };
 pub(super) const HUB: host::Limits = host::Limits { slots: 4, accounts: 32, facts: 256, told: 256, ..small::HUB };
 pub(super) const LINK: Link = Link { names: 64, opening: 16, facts: 256, ..small::LINK };
-pub(super) const LIMITS: Limits = Limits { core: CORE, hub: HUB, link: LINK, token: 16384 };
+pub(super) const LIMITS: Limits = Limits {
+    core: CORE,
+    hub: HUB,
+    link: LINK,
+    token: 16384,
+    io: skein_io::Limits { sockets: 64, names: 64, ..small::IO },
+    journal: skein_lib::JournalLimits { commits: 3, writes: 70_236, held: 210_708, now: 1024, release: 1024 },
+    routes: 2048,
+};

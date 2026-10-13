@@ -16,6 +16,7 @@ members = [
     "testing/jig-test-store",
     "testing/jig-test-domain",
     "testing/jig-test-worker",
+    "testing/jig-test-service",
     "testing/jig-test-domain-client",
     "testing/jig-test-client-kit",
     "testing/jig-test-view",
@@ -76,6 +77,8 @@ rust-version = "1.95"
 publish = false
 
 [workspace.dependencies]
+smith-host-protocol = { git = "https://github.com/forgetic/smith.git" }
+jig-test-service = { path = "testing/jig-test-service" }
 smith-protocol-channel = { git = "https://github.com/forgetic/smith.git" }
 smith-domain = { git = "https://github.com/forgetic/smith.git" }
 smith-domain-session = { git = "https://github.com/forgetic/smith.git" }

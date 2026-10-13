@@ -5,7 +5,7 @@ use skein_lib::{Duration, bytes};
 
 /// Replace one whole scalar limit. The composed reader checks the resulting profile.
 pub fn apply(limits: &mut Limits, name: &[u8], value: u64) -> Result<(), What> {
-    let Limits { core, hub, link, token } = limits;
+    let Limits { core, hub, link, token, .. } = limits;
     if name == b"accounts.token" {
         *token = count(value)?;
         return Ok(());

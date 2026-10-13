@@ -312,6 +312,7 @@ pub struct Domain {
     second: connector::Domain,
     journal: Journal<Write, Delivery>,
     now: Queue<Request>,
+    store_answers: Queue<Box<Event>>,
     links: Set<Token>,
     busy: Queue<Box<Event>>,
     assignments: Map<u64, Assignment>,
@@ -386,6 +387,7 @@ impl Domain {
             second: connector::Domain::new(config.second, &limits.connector),
             journal: Journal::new(&limits.journal),
             now: Queue::with_capacity(limits.journal.now),
+            store_answers: Queue::with_capacity(limits.routes),
             links: Set::with_capacity(limits.core.fleet.workers),
             busy: Queue::with_capacity(limits.routes),
             assignments: Map::with_capacity(limits.core.tasks.tasks),
@@ -789,6 +791,7 @@ fn numbered(domain: &mut Domain, number: u16) -> &mut connector::Domain {
 
 /// Drain at most one commit and all currently durable outputs.
 pub fn release(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
+    admission::resume(domain, env);
     stopping::release(domain, out);
     if let Some(step) = domain.restart_load.take() {
         out.push(Request::Restart(step));
@@ -942,6 +945,11 @@ mod tests;
 use messages::Payload;
 mod stopping;
 use routes::{route_connector, route_core};
+
+mod limits;
+pub use limits::{max_out, worst_case};
+mod admission;
+pub use admission::try_step;
 
 mod census;
 pub use census::inbox_census;

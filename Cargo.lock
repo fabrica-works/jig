@@ -738,6 +738,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "jig-test-service"
+version = "0.0.0"
+dependencies = [
+ "jig-domain-core",
+ "jig-domain-host",
+ "jig-domain-people",
+ "jig-protocol-config",
+ "jig-test-connector",
+ "jig-test-domain",
+ "skein-io",
+ "skein-json",
+ "skein-lib",
+ "smith-host-protocol",
+ "smith-protocol-channel",
+]
+
+[[package]]
 name = "jig-test-store"
 version = "0.0.0"
 dependencies = [
@@ -1166,6 +1183,22 @@ source = "git+https://github.com/forgetic/smith.git#6a6b1c3e9d272ea9991db34dc90a
 dependencies = [
  "skein-lib",
  "smith-domain",
+]
+
+[[package]]
+name = "smith-host-protocol"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/smith.git#6a6b1c3e9d272ea9991db34dc90abead50b0630c"
+dependencies = [
+ "skein-channel",
+ "skein-io",
+ "skein-lib",
+ "smith-channel",
+ "smith-charter",
+ "smith-domain",
+ "smith-host-domain",
+ "smith-protocol-channel",
+ "smith-transcript",
 ]
 
 [[package]]

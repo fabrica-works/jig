@@ -34,6 +34,9 @@ pub struct Limits {
     pub hub: host::Limits,
     pub link: Link,
     pub token: u32,
+    pub io: skein_io::Limits,
+    pub journal: skein_lib::JournalLimits,
+    pub routes: u32,
 }
 #[must_use]
 pub fn profile(profile: Profile) -> Limits {

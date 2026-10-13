@@ -1,0 +1,71 @@
+mod engine;
+mod fixtures;
+use crate::tests::fixtures::{engine_document, problem, with};
+use jig_protocol_config::{Path, Problem, What};
+
+#[test]
+fn the_document_names_the_files_its_caller_reads() {
+    let names = crate::named(&engine_document()).expect("fixture document");
+    assert_eq!(names.len(), 5);
+    for (name, expected) in names.iter().zip(fixtures::NAMES) {
+        assert_eq!(name.as_ref(), expected);
+    }
+}
+
+#[test]
+fn both_jig_profiles_have_a_bounded_service() {
+    for name in [jig_protocol_config::Profile::Small, jig_protocol_config::Profile::Standard] {
+        assert!(crate::limits::worst_case(&crate::limits::profile_limits(name)).is_some());
+    }
+}
+
+#[test]
+fn a_document_with_an_unknown_member_is_refused_naming_its_path() {
+    let document = with(&engine_document(), b"\"service\":", b"\"extra\":true,\"service\":");
+    assert_eq!(problem(&document), Problem { path: Path::root().member(b"extra"), what: What::Unknown });
+}
+
+#[test]
+fn a_named_file_missing_from_those_handed_is_refused() {
+    let document = engine_document();
+    let mut files = fixtures::files(&document);
+    let last = files.entries.len().checked_sub(1).expect("credential file");
+    assert_eq!(files.entries.get(last).expect("credential file").0.as_ref(), b"app.secret");
+    files.entries.truncate(last);
+    let problems = crate::startup(&document, &files, None, &fixtures::seeds()).unwrap_err();
+    assert_eq!(
+        problems.problems.get(0),
+        Some(&Problem { path: Path::root().member(b"application").member(b"credential"), what: What::Unreadable })
+    );
+}
+
+#[test]
+fn a_worst_case_past_the_memory_is_refused_saying_by_how_much() {
+    let limits = crate::limits::profile_limits(jig_protocol_config::Profile::Small);
+    let bytes = crate::limits::worst_case(&limits).expect("profile sizes fit");
+    let memory = fixtures::decimal(bytes.checked_sub(1).expect("nonempty service"));
+    let document = with(&engine_document(), b"1152921504606846976", &memory);
+    let found = crate::startup(&document, &fixtures::files(&document), None, &fixtures::seeds()).unwrap_err();
+    assert_eq!(
+        found.problems.get(0),
+        Some(&Problem { path: Path::root().member(b"engine").member(b"memory_bytes"), what: What::Memory { over: 1 } })
+    );
+}
+
+#[test]
+fn an_activation_of_an_unbuilt_component_is_refused_at_its_path() {
+    for name in [b"accounts".as_slice(), b"workers", b"clients"] {
+        let value = fixtures::join(&[b"[\"", name, b"\"]"]);
+        let document = with(&engine_document(), b"\"components\":[]", &fixtures::join(&[b"\"components\":", &value]));
+        assert_eq!(
+            problem(&document),
+            Problem {
+                path: Path::root()
+                    .member(b"service")
+                    .member(b"components")
+                    .child(jig_protocol_config::Segment::Index(0)),
+                what: What::Refers,
+            }
+        );
+    }
+}

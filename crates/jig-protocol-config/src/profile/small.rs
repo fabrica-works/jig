@@ -217,4 +217,20 @@ pub(super) const LINK: Link = Link {
     busy: Duration::from_secs(2),
     facts: 64,
 };
-pub(super) const LIMITS: Limits = Limits { core: CORE, hub: HUB, link: LINK, token: 16384 };
+pub(super) const IO: skein_io::Limits = skein_io::Limits {
+    sockets: 16,
+    names: 8,
+    refusals: 8,
+    intake: 1_048_576,
+    receive: 16_384,
+    output: 1_048_576,
+    sends: 8,
+    accepts: 4,
+    backlog: 16,
+    close_timeout: Duration::from_secs(30),
+    retry: Duration::from_millis(250),
+};
+pub(super) const JOURNAL: skein_lib::JournalLimits =
+    skein_lib::JournalLimits { commits: 3, writes: 12_226, held: 36_678, now: 256, release: 256 };
+pub(super) const LIMITS: Limits =
+    Limits { core: CORE, hub: HUB, link: LINK, token: 16384, io: IO, journal: JOURNAL, routes: 512 };

@@ -1,0 +1,134 @@
+//! Admission at the service boundary; store terminals keep their reserved rights (service.md, 4).
+use crate::{Domain, Event, Limits, step};
+use alloc::boxed::Box;
+use jig_domain_core as core;
+use skein_lib::{Env, JournalRoom};
+
+/// Return an unadmitted input to its owner; a store terminal always enters its root-owned queue.
+#[expect(clippy::result_large_err, reason = "the service admission boundary returns the original event by value")]
+pub fn try_step(domain: &mut Domain, env: &Env<Limits>, event: Event) -> Result<(), Event> {
+    match event {
+        event @ (Event::Committed { .. } | Event::Failed { .. }) => {
+            step(domain, env, event);
+            Ok(())
+        }
+        event @ (Event::RestartDone(_)
+        | Event::TranscriptLoaded { .. }
+        | Event::Core(
+            core::Event::ReadLoaded { .. }
+            | core::Event::SeenChatLoaded { .. }
+            | core::Event::HistoricalPersonTask { .. }
+            | core::Event::HistoricalProposal { .. }
+            | core::Event::HistoricalEscalation { .. }
+            | core::Event::Notes(_),
+        )) => {
+            domain.store_answers.push(Box::new(event));
+            Ok(())
+        }
+        event @ (Event::Link { .. }
+        | Event::ResultRead { .. }
+        | Event::Stop
+        | Event::Application { .. }
+        | Event::ConnectorTimer { .. }
+        | Event::WriterRead { .. }
+        | Event::RestartBegin
+        | Event::ProjectionEffect { .. }
+        | Event::EffectCall { .. }
+        | Event::Timer(_)
+        | Event::Core(_)
+        | Event::Credential { .. }
+        | Event::WatchApplication { .. }
+        | Event::ReadApplication { .. }
+        | Event::CallAnswered { .. }
+        | Event::Connector { .. }
+        | Event::Text { .. }
+        | Event::Turn { .. }
+        | Event::Answer { .. }) => {
+            let room = room(env, &event);
+            if !domain.journal.takes(&room) {
+                return Err(event);
+            }
+            step(domain, env, event);
+            Ok(())
+        }
+    }
+}
+
+fn room(env: &Env<Limits>, event: &Event) -> JournalRoom {
+    let core = match event {
+        Event::Core(event) => core::room(&env.limits.core, event),
+        Event::Link { .. }
+        | Event::ResultRead { .. }
+        | Event::Stop
+        | Event::Application { .. }
+        | Event::ConnectorTimer { .. }
+        | Event::WriterRead { .. }
+        | Event::RestartBegin
+        | Event::RestartDone(_)
+        | Event::TranscriptLoaded { .. }
+        | Event::Committed { .. }
+        | Event::Failed { .. }
+        | Event::ProjectionEffect { .. }
+        | Event::EffectCall { .. }
+        | Event::Timer(_)
+        | Event::Credential { .. }
+        | Event::WatchApplication { .. }
+        | Event::ReadApplication { .. }
+        | Event::CallAnswered { .. }
+        | Event::Connector { .. }
+        | Event::Text { .. }
+        | Event::Turn { .. }
+        | Event::Answer { .. } => core::room_max(&env.limits.core),
+    }
+    .expect("validated core room");
+    let connectors = jig_test_connector::MAX_OUT.checked_mul(2).expect("two connectors");
+    JournalRoom {
+        writes: core.writes.checked_add(connectors).expect("root writes"),
+        held: core.held.checked_add(connectors).expect("root deliveries"),
+    }
+}
+
+pub(super) fn resume(domain: &mut Domain, env: &Env<Limits>) {
+    for _ in 0..domain.store_answers.len() {
+        let Some(event) = domain.store_answers.iter().next() else {
+            break;
+        };
+        if !domain.journal.takes(&room(env, event)) {
+            break;
+        }
+        let event = domain.store_answers.pop().expect("reserved store terminal");
+        step(domain, env, *event);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::try_step;
+    use crate::{Event, tests::fixtures};
+    use jig_domain_core as core;
+    use jig_domain_people as people;
+    use skein_lib::{JournalRoom, ReplyTo, Token};
+
+    #[test]
+    fn a_full_journal_returns_its_input_and_takes_its_commit_answer() {
+        let env = fixtures::env();
+        let mut domain = fixtures::domain();
+        fixtures::fill_journal(&mut domain, &env);
+        let event = Event::Core(core::Event::People(people::Event::Ask {
+            reply_to: ReplyTo::new(Token::new(7)),
+            sign_in: 1,
+            key: [1; 16],
+            ask: people::Ask::StartChat { project: 1, words: b"kept".as_slice().into() },
+        }));
+        let Err(Event::Core(core::Event::People(people::Event::Ask { ask, .. }))) = try_step(&mut domain, &env, event)
+        else {
+            panic!("unadmitted input returns to its owner");
+        };
+        let people::Ask::StartChat { words, .. } = ask else {
+            panic!("same party input");
+        };
+        assert_eq!(words.as_ref(), b"kept");
+        try_step(&mut domain, &env, Event::Committed { number: 1, fill: 0 }).expect("commit answers are taken");
+        assert!(domain.journal.takes(&JournalRoom { writes: 1, held: 0 }), "commit answer frees the journal");
+    }
+}

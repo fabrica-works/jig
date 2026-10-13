@@ -312,3 +312,14 @@ fn held_records() -> [(core::Held, host::LinkDown); 4] {
         ),
     ]
 }
+
+pub fn fill_journal(domain: &mut Domain, env: &Env<Limits>) {
+    for _ in 0..env.limits.journal.commits {
+        let mut decision = domain.journal.decision(&skein_lib::JournalRoom { writes: 1, held: 0 }).expect("one write");
+        decision
+            .write(crate::Write::Erase(crate::Key::Core(core::Key::Tasks(tasks::Key::Ended(1)))))
+            .expect("reserved write");
+        domain.journal.accept(decision);
+        let _commit = domain.journal.commit().expect("commit in flight");
+    }
+}
