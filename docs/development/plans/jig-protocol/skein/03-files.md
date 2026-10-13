@@ -312,6 +312,49 @@ Don't: make `Cut` cancellable; add `Cut` for a root's descriptor.
 Size: at most 90 lines of production code.
 Removes: nothing.
 
+### 03.s1 A directory io makes, synced into its parent; `make_root`
+
+A step not in the plan (decisions.md, rulings 241 and 245), from the
+designer's answer on a directory io makes (skein `63e81ded`: `io.md`, 5,
+"What a request makes by a path, io makes durable", 5.3 and 8;
+`shell.md`, 6, `make_root`). jig's store lost `store/`, `transcripts/`
+and `secrets/` to a power loss after an acknowledged commit (jig 18.s1,
+18.s2); skein-oauth-accounts' private root, which smith's credentials
+open through it, has the same gap; and skein's crash worlds lay every
+directory before they start, so none was cut.
+Needs: nothing.
+Files: `crates/skein-io/src/file_layer/private.rs` (`up`, :201-283) and
+  its step tests; `crates/skein-shell/src/ring.rs` (`make_root`, beside
+  `open_root`, :1593); `tests/io/src/cuts.rs`;
+  `tests/oauth-accounts/src/private.rs`.
+Shape: in `private::up`, once a `MakeDirectory` io issued completes
+  (`Phase::Making`, for `Action::Make` and `Action::Private` alike), io
+  issues `Op::Sync` of the parent it holds (a phase of its own), and
+  only then answers `Made`, or opens the private root; a failed sync
+  answers `Failed { committed: true }`, the parent closed as now. A
+  private root found (opened at once, or `Exists` while making) is not
+  synced. `skein_shell::make_root(path: &Path, mode: u32) -> Result<Fd,
+  i32>`: from the first existing ancestor, makes each absent component
+  with `mode`, syncs each directory it made one in, then opens the last
+  as `open_root` does; an existing component is never changed.
+Test shape: step tests
+  `a_made_directory_answers_after_its_parent_is_synced`,
+  `a_private_root_made_is_synced_before_it_is_opened`,
+  `a_private_root_found_is_not_synced`,
+  `a_failed_parent_sync_answers_committed`; in io's cut world and the
+  oauth accounts' private world, a story whose private root starts
+  absent, cut at every step and at a power loss: after the cut the root
+  is there whenever its open was answered, and the record whenever its
+  store was; `make_root` on the real kernel: a nested absent path made
+  and opened, a file in its way refused.
+Proof: unit, `heavy cargo nextest run -p skein-io -p skein-io-world -p
+  skein-oauth-accounts-world` once: the new story, run before the
+  change, loses the root at the power loss after the make, and passes
+  after it; each test under 20 ms.
+Don't: sync a directory io did not make; change an existing directory's
+  mode; answer `Made` for one that existed.
+Size: at most 120 lines of production code.
+
 ## Interface sketches
 
 ```rust
