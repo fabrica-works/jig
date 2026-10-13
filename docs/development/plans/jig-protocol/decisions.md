@@ -2032,6 +2032,17 @@ the file.
      recorded for smith's own plan (`later.md`). A step not in the plan,
      skein-03.s1 (`skein/03-files.md`), at most 120 lines; nothing waits
      on it, and the final jig-repin takes it if it lands first.
+251. **skein-03.s1's accounts story may restart the sign-in world**
+     (2026-10-13, the coordinator's block "skein 03.s1: private accounts
+     sign-in world moved helpers for acknowledged record",
+     2026-10-13T08:52:55Z). With its private root absent, the existing
+     `private_cuts` keeper world ends its grant expired before any store,
+     so it cannot show an acknowledged record surviving. As proposed: the
+     private sign-in world's owner and restart helpers in
+     `tests/oauth-accounts/src/sign_in.rs` are 03.s1's Files for that
+     story, test code only: restartable constructors and access to the
+     store's acknowledgement, reusing the simulated browser and issuer. No
+     new kit, no real browser; production stays at most 120 lines.
 
 ## For the user
 
