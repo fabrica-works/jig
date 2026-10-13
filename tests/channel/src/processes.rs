@@ -1,5 +1,5 @@
 //! Host adapters expose only service ports to the scenario (service.md, 4).
-use crate::fixtures;
+use crate::{fixtures, relay::Relay};
 use jig_test_service::Service;
 use skein_io::kernel;
 use skein_lib::{Queue, Time, Wall};
@@ -13,6 +13,7 @@ pub(crate) enum Proc {
     Worker(Box<ServiceHost>),
     Agent { host: Box<PipeHost<smith_agent_shell::Agent>>, errors: agent_fixture::AgentErrors },
     Peer(Box<skein_fake_peers::llm::Peer>),
+    Probe(Box<crate::relay::Peer>),
 }
 
 pub(crate) struct ServiceHost {
@@ -20,18 +21,37 @@ pub(crate) struct ServiceHost {
     pub(crate) wire: Wire,
     pub(crate) stopping: bool,
     worker: bool,
+    pub(crate) relay: Relay,
+    pub(crate) revision: (u64, u64),
 }
 impl ServiceHost {
     fn new(service: Service, worker: bool) -> Self {
-        Self { service, wire: Wire::default(), stopping: false, worker }
+        static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        Self {
+            service,
+            wire: Wire::default(),
+            stopping: false,
+            worker,
+            relay: Relay::new(1024),
+            revision: (NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed), 0),
+        }
     }
 }
 impl Host for ServiceHost {
     fn iterate(&mut self, now: Time, wall: Wall) {
+        self.relay.receive(now, self.service.completions());
         for complete in self.service.completions().iter() {
-            self.wire.complete(complete, self.worker);
+            self.wire.complete(complete, self.worker, now);
         }
         jig_test_service::iterate(&mut self.service, now, wall);
+        self.revision.1 += 1;
+        for submit in self.service.submissions().iter() {
+            if let kernel::Op::Close { fd } = submit.kind
+                && let Some(bound) = self.wire.stop_bounds.get(&fd.raw())
+            {
+                self.wire.lost.entry(fd.raw()).or_insert(now.saturating_add(*bound));
+            }
+        }
     }
     fn completions(&mut self) -> &mut Queue<kernel::Complete> {
         self.service.completions()
@@ -40,10 +60,10 @@ impl Host for ServiceHost {
         self.service.submissions()
     }
     fn work_pending(&self, now: Time) -> bool {
-        self.service.work_pending(now)
+        self.service.work_pending(now) || self.relay.ready(now)
     }
     fn next_deadline(&self) -> Option<Time> {
-        self.service.next_deadline()
+        [self.service.next_deadline(), self.relay.until].into_iter().flatten().min()
     }
     fn next_policy_deadline(&self) -> Option<Time> {
         self.service.next_policy_deadline()
@@ -64,6 +84,7 @@ impl Proc {
             Self::Engine(host) | Self::Worker(host) => host.as_ref(),
             Self::Agent { host, .. } => host.as_ref(),
             Self::Peer(peer) => peer.as_ref(),
+            Self::Probe(peer) => peer.as_ref(),
         }
     }
     fn host_mut(&mut self) -> &mut dyn Host {
@@ -71,6 +92,7 @@ impl Proc {
             Self::Engine(host) | Self::Worker(host) => host.as_mut(),
             Self::Agent { host, .. } => host.as_mut(),
             Self::Peer(peer) => peer.as_mut(),
+            Self::Probe(peer) => peer.as_mut(),
         }
     }
 }
@@ -111,25 +133,60 @@ impl Host for Proc {
 }
 
 pub(crate) fn engine(inherited: &Inherited) -> Proc {
-    let mut service = jig_test_service::startup(
-        &fixtures::engine_document(),
-        &fixtures::files(false),
-        None,
-        &fixtures::seeds(),
-        None,
-        None,
-    )
-    .expect("engine configuration");
+    engine_configured(inherited, false)
+}
+pub(crate) fn engine_calls(inherited: &Inherited) -> Proc {
+    engine_configured(inherited, true)
+}
+pub(crate) fn engine_message(inherited: &Inherited) -> Proc {
+    engine_document(inherited, &fixtures::engine_message_document())
+}
+pub(crate) fn engine_window(inherited: &Inherited) -> Proc {
+    engine_document(inherited, &fixtures::engine_window_document())
+}
+fn engine_configured(inherited: &Inherited, calls: bool) -> Proc {
+    engine_document(inherited, &if calls { fixtures::engine_call_document() } else { fixtures::engine_document() })
+}
+fn engine_document(inherited: &Inherited, document: &[u8]) -> Proc {
+    let mut service =
+        jig_test_service::startup(document, &fixtures::files(false), None, &fixtures::seeds(), None, None)
+            .expect("engine configuration");
     service.adopt_signals(inherited.signal).expect("engine signal source");
     Proc::Engine(Box::new(ServiceHost::new(service, false)))
 }
 pub(crate) fn worker(root: kernel::Fd) -> Proc {
+    worker_configured(root, false, false)
+}
+pub(crate) fn worker_bad_charter(root: kernel::Fd) -> Proc {
+    worker_configured(root, true, false)
+}
+pub(crate) fn worker_message(root: kernel::Fd) -> Proc {
+    worker_configured(root, false, true)
+}
+fn worker_configured(root: kernel::Fd, bad_charter: bool, message: bool) -> Proc {
     let mut roots = skein_lib::List::with_capacity(1);
     roots.push(root).expect("one worker root");
+    let mut agent = fixtures::agent();
+
+    if bad_charter {
+        agent.endpoints = smith_protocol_channel::Endpoints::new(skein_lib::List::with_capacity(0));
+    }
+    if message {
+        agent.host_limits.message_bytes = 256;
+        agent.bounds.message_bytes = 512;
+    }
+    let document = if message {
+        String::from_utf8(fixtures::WORKER_DOCUMENT.to_vec())
+            .expect("worker fixture")
+            .replace("\"hub.slots\":1", "\"hub.slots\":1,\"tasks.message_bytes\":512")
+            .into_bytes()
+    } else {
+        fixtures::WORKER_DOCUMENT.to_vec()
+    };
     let service = jig_test_service::startup(
-        fixtures::WORKER_DOCUMENT,
+        &document,
         &fixtures::files(true),
-        Some(&fixtures::agent()),
+        Some(&agent),
         &fixtures::seeds(),
         None,
         Some(jig_test_service::WorkerRuntime { roots }),
@@ -138,9 +195,20 @@ pub(crate) fn worker(root: kernel::Fd) -> Proc {
     Proc::Worker(Box::new(ServiceHost::new(service, true)))
 }
 pub(crate) fn agent(_spawn: &kernel::Spawn, inherited: &Inherited) -> Proc {
+    agent_configured(inherited, false)
+}
+pub(crate) fn agent_slow(_spawn: &kernel::Spawn, inherited: &Inherited) -> Proc {
+    agent_configured(inherited, true)
+}
+fn agent_configured(inherited: &Inherited, slow: bool) -> Proc {
     let fd = inherited.pipes.iter().find(|(child, _)| *child == 2).expect("stderr").1;
     let (errors, capture) = agent_fixture::AgentErrors::pipe(fd);
-    let agent = agent_fixture::configured(fixtures::agent_configuration(), fixtures::SEED, inherited, errors.clone());
+    let mut configuration = fixtures::agent_configuration();
+    if slow {
+        configuration.domain.models[0].head = skein_lib::Duration::from_secs(30);
+    }
+
+    let agent = agent_fixture::configured(configuration, fixtures::SEED, inherited, errors.clone());
     Proc::Agent { host: Box::new(capture.host(agent)), errors }
 }
 
@@ -149,31 +217,94 @@ pub(crate) fn agent(_spawn: &kernel::Spawn, inherited: &Inherited) -> Proc {
 #[derive(Default)]
 pub(crate) struct Wire {
     completed: BTreeSet<skein_lib::Token>,
-    streams: BTreeMap<i32, Vec<u8>>,
+    streams: BTreeMap<(i32, bool), Vec<u8>>,
     pub(crate) acknowledgements: Vec<(u64, u64)>,
     pub(crate) calls_answered: u32,
+    pub(crate) frames: Vec<(Time, u16, Box<[u8]>)>,
+    pub(crate) grants: Vec<Box<[u8]>>,
+    pub(crate) channel: Option<kernel::Fd>,
+    pub(crate) adopting_hellos: u32,
+    pub(crate) start_messages: u32,
+    pub(crate) waited: bool,
+    pub(crate) closed: bool,
+    pub(crate) lost: BTreeMap<i32, Time>,
+    stop_bounds: BTreeMap<i32, skein_lib::Duration>,
+    pub(crate) placements: BTreeMap<(u64, u64), i32>,
 }
 impl Wire {
-    fn complete(&mut self, complete: &kernel::Complete, worker: bool) {
+    pub(crate) fn complete(&mut self, complete: &kernel::Complete, worker: bool, now: Time) {
+        if worker
+            && let kernel::Op::Connect { fd, .. } = &complete.kind
+            && complete.result.is_ok()
+        {
+            self.channel = Some(*fd);
+        }
+        if let kernel::Op::Close { fd } = complete.kind
+            && self.streams.keys().any(|(known, _)| *known == fd.raw())
+        {
+            self.closed = true;
+        }
         let Ok(kernel::Done::Count(count)) = complete.result else { return };
         let (fd, bytes) = match (&complete.kind, worker) {
-            (kernel::Op::Send { fd, bytes, from }, false) => {
+            (kernel::Op::Send { fd, bytes, from }, _) => {
                 let start = usize::try_from(*from).expect("send offset");
                 (*fd, &bytes[start..start + usize::try_from(count).expect("send length")])
             }
-            (kernel::Op::Recv { fd, buf }, true) => (*fd, &buf[..usize::try_from(count).expect("receive length")]),
+            (kernel::Op::Recv { fd, buf }, _) => (*fd, &buf[..usize::try_from(count).expect("receive length")]),
             _ => return,
         };
         if !self.completed.insert(complete.op) {
             return;
         }
-        let stream = self.streams.entry(fd.raw()).or_default();
+        let send = matches!(&complete.kind, kernel::Op::Send { .. });
+        if worker && Some(fd) != self.channel {
+            return;
+        }
+        let stream = self.streams.entry((fd.raw(), send)).or_default();
         stream.extend_from_slice(bytes);
         while stream.len() >= 8 {
             let header = skein_channel::parse_header(&stream[..8]).expect("channel frame header");
             let end = 8 + usize::try_from(header.body_len).expect("bounded frame body");
             if stream.len() < end {
                 break;
+            }
+            self.channel = Some(fd);
+            self.frames.push((now, header.kind, stream[8..end].into()));
+            if header.kind == 0x0180 {
+                let assignment = jig_protocol_worker_wire::Assignment::decode(
+                    &jig_protocol_worker_wire::CEILINGS,
+                    &mut skein_lib::Reader::new(&stream[8..end]),
+                )
+                .expect("assignment");
+                self.placements.insert((assignment.task(), assignment.attempt()), fd.raw());
+                self.start_messages += assignment.messages().len();
+                for grant in assignment.grants() {
+                    self.grants.push(grant.value().expose().into());
+                    if !grant.account_id().is_empty() {
+                        self.grants.push(grant.account_id().expose().into());
+                    }
+                }
+            }
+            if header.kind == 0x0104 {
+                let fact = jig_protocol_worker_wire::Fact::decode(
+                    &jig_protocol_worker_wire::CEILINGS,
+                    &mut skein_lib::Reader::new(&stream[8..end]),
+                )
+                .expect("activity fact");
+                if let jig_protocol_worker_wire::Activity::Phase(value) = fact.activity() {
+                    self.waited |= matches!(value.value(), jig_protocol_worker_wire::Phase::Waiting);
+                }
+            }
+            if header.kind == 0x0100 {
+                let hello = jig_protocol_worker_wire::Hello::decode(
+                    &jig_protocol_worker_wire::CEILINGS,
+                    &mut skein_lib::Reader::new(&stream[8..end]),
+                )
+                .expect("hello");
+                self.stop_bounds.insert(fd.raw(), hello.stop_bound());
+                if !hello.hosting().is_empty() {
+                    self.adopting_hellos += 1;
+                }
             }
             if header.kind == 0x0185 {
                 let ack = jig_protocol_worker_wire::Acknowledge::decode(
@@ -192,7 +323,48 @@ impl Wire {
 
 pub(crate) struct Machine(pub(crate) skein_fake_machine::Machine);
 impl skein_world::Machine for Machine {
+    fn cut(&mut self, cut: skein_world::Cut, held: &[skein_sim::Handle], seed: u64) {
+        match cut {
+            skein_world::Cut::Kill => {
+                for handle in held {
+                    self.0.close(skein_fake_machine::Opened::new(handle.raw()));
+                }
+            }
+            skein_world::Cut::PowerLoss => self.0.crash(seed),
+        }
+    }
     fn step(&mut self, call: skein_sim::Call, answers: &mut Queue<skein_sim::Answer>) {
         skein_fake_machine::step(&mut self.0, call, answers);
     }
+}
+
+/// A seeded real provider: the second request fails with context-too-long;
+/// subsequent requests accept the native compaction and resumed run.
+pub(crate) fn window_provider(scripts: Box<[skein_fake_llm_domain::api::Script]>) -> skein_fake_peers::llm::Peer {
+    use skein_fake_llm_protocol::{documents, provider};
+    let mut config = skein_llm_world::fake::config();
+    config.too_long = 200;
+    let mut protocol = skein_llm_world::fake::limits(&skein_llm_world::limits());
+    protocol.documents.openai.request = 32_768;
+    protocol.documents.openai.strings = 16_384;
+    protocol.documents.openai.tokens = 4096;
+    protocol.documents.openai.output_items = 256;
+    protocol.documents.anthropic.output_items = 256;
+    skein_fake_peers::llm::Peer::new(
+        (std::net::Ipv4Addr::LOCALHOST, 443).into(),
+        skein_fake_peers::Transport::Plaintext,
+        agent_fixture::fake::limits(),
+        provider::Config {
+            echo: skein_llm::openai::Echo::NONE,
+            usage_fields: documents::UsageFields::ALL,
+            provider: documents::Provider::OpenAi,
+            path: skein_llm_world::call(1).endpoint.target,
+            headers: Box::default(),
+        },
+        skein_llm::Credential { access_token: fixtures::TOKEN.into(), account_id: b"acc".as_slice().into() },
+        protocol,
+        skein_fake_llm_domain::Domain::try_scripted(&config, 12, scripts).expect("window provider script"),
+        config,
+    )
+    .expect("window provider")
 }

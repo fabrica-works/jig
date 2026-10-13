@@ -87,6 +87,8 @@ smith-protocol-llm = { git = "https://github.com/forgetic/smith.git" }
 smith-agent-service = { git = "https://github.com/forgetic/smith.git" }
 smith-agent-shell = { git = "https://github.com/forgetic/smith.git" }
 smith-agent-process-world = { git = "https://github.com/forgetic/smith.git" }
+skein-llm-world = { git = "https://github.com/forgetic/skein.git" }
+skein-fake-llm-protocol = { git = "https://github.com/forgetic/skein.git" }
 skein-fake-llm-domain = { git = "https://github.com/forgetic/skein.git" }
 skein-llm = { git = "https://github.com/forgetic/skein.git" }
 skein-shell = { git = "https://github.com/forgetic/skein.git" }

@@ -8,7 +8,7 @@ pub(crate) const NOTES_LOAD_ROWS: u32 = 4;
 pub const TOKEN: &[u8] = b"test-token";
 const DIGEST: &[u8] = b"6fb46f7a92742970166379ed5195e79c4493a7cc5664280c039cfd4095ba5faf";
 const REPORT: &[u8] = br#"{"form":"report","text":"Hello","fields":{}}"#;
-const ACCOUNT: &[u8] = br#"{"access_token":"test-token","expires_at":1767225720,"account_id":"acc"}"#;
+const ACCOUNT: &[u8] = br#"{"access_token":"test-token","expires_at":1767229200,"account_id":"acc"}"#;
 
 #[must_use]
 pub fn calm(seed: u64) -> Settings {
@@ -16,11 +16,27 @@ pub fn calm(seed: u64) -> Settings {
 }
 #[must_use]
 pub fn one_chat(words: &[u8]) -> Script {
-    Script { words: words.into(), result: REPORT.into() }
+    Script {
+        words: words.into(),
+        result: REPORT.into(),
+        leading_turns: 0,
+        latency: Duration::ZERO,
+        story: crate::stories::Story::Chat,
+        recorded: None,
+    }
 }
 
 const ENGINE: &[u8] = br#"{
-"limits": {"profile": "small"},
+"limits": {"profile": "small", "overrides": {
+"tasks.tasks":1,"tasks.funders":2,"tasks.project_tasks":1,"tasks.tree_tasks":1,
+"tasks.batch":1,"tasks.dependencies":1,"tasks.delegates":1,"tasks.charters":1,
+"people.people":1,"people.projects":1,"people.sign_ins":1,"people.holdings":1,
+"people.inbox_tasks":2,"people.pending":1,"people.waiters":1,"people.goals":1,
+"fleet.attempts":1,"fleet.calls":1,"fleet.turns":8,
+"brief.briefs":1,"brief.sections":1,
+"notes.entries_per_scope":1,"views.runs":1,"views.watchers":2,"views.watchers_per_party":2,
+"core.load_slots":1
+}},
 "llm": {
 "endpoints": [{
 "name": "fake",
@@ -227,4 +243,178 @@ pub(crate) fn agent_configuration() -> smith_agent_service::Config {
     )
     .expect("provider account");
     config
+}
+
+pub(crate) fn peer_bounds() -> (skein_channel::Schema, skein_channel::Limits) {
+    let profile = jig_test_service::limits::profile_limits(jig_protocol_config::Profile::Small);
+    let sizes = profile.workers.sizes;
+    let codec = jig_protocol_worker_wire::sizes::limits(&sizes).expect("small wire");
+    let cap = jig_protocol_worker_wire::sizes::worker_cap(&sizes).expect("peer output").cap;
+    let limits = skein_channel::Limits {
+        chunk: 16_384,
+        credential: 4096,
+        skip: 16_384,
+        output_bytes: cap.bytes,
+        output_frames: cap.frames,
+        kinds: 15,
+    };
+    (jig_protocol_worker_wire::schema(&codec).expect("small schema"), limits)
+}
+
+pub(crate) fn engine_call_document() -> Vec<u8> {
+    String::from_utf8(engine_document())
+        .expect("fixture UTF-8")
+        .replace("\"tools\": 0", "\"tools\": 256")
+        .replace("\"notes\": 0", "\"notes\": 1")
+        .into_bytes()
+}
+
+pub const TASK: u64 = 1;
+pub const ATTEMPT: u64 = 1;
+#[must_use]
+pub fn referee() -> crate::referee::Rules {
+    crate::referee::Rules::default()
+}
+
+pub(crate) fn engine_window_document() -> Vec<u8> {
+    String::from_utf8(engine_document()).expect("fixture UTF-8").replace("\"turns\": 4", "\"turns\": 8").into_bytes()
+}
+
+pub(crate) fn peer_hello() -> skein_channel::Frame {
+    use jig_protocol_worker_wire as wire;
+    let codec = &wire::CEILINGS;
+    let mut models = List::with_capacity(1);
+    models
+        .push(
+            wire::ModelBound::new(
+                codec,
+                wire::ModelBoundParts { name: b"fake".as_slice().into(), window: 1_048_576, output: 512 },
+            )
+            .expect("peer model"),
+        )
+        .expect("one model");
+    let bounds = wire::Bounds::new(
+        codec,
+        wire::BoundsParts {
+            models,
+            turns: 8,
+            spend: 100,
+            time: Duration::from_secs(300),
+            waiting: Duration::from_secs(60),
+            checks: Duration::from_secs(60),
+            message_bytes: 65_536,
+            inbox: 8,
+            unacknowledged: 8,
+        },
+    )
+    .expect("peer bounds");
+    let hello = wire::Hello::new(
+        codec,
+        wire::HelloParts {
+            slots: 1,
+            stop_bound: Duration::from_secs(15),
+            workstreams: List::with_capacity(0),
+            hosting: List::with_capacity(0),
+            bounds,
+        },
+    )
+    .expect("peer hello");
+    let mut body = skein_lib::Writer::new(hello.measure() as usize);
+    hello.encode(&mut body).expect("peer hello");
+    let mut frame = skein_channel::frame_writer(0x0100, hello.measure()).expect("hello frame");
+    frame.put(&body.finish()).expect("hello body");
+    frame.finish().expect("hello frame")
+}
+
+pub(crate) fn provider_turns(script: &Script) -> Box<[skein_fake_llm_domain::api::Turn]> {
+    use skein_fake_llm_domain::api::{Finish, Line, Turn};
+    if matches!(script.story, crate::stories::Story::Window) {
+        return vec![
+            Turn {
+                lines: Box::new([Line::Text { text: b"Progress".as_slice().into() }]),
+                finish: Finish::Stop,
+                tokens: 1,
+            },
+            Turn {
+                lines: Box::new([Line::Call { name: b"wait".as_slice().into(), arguments: b"{}".as_slice().into() }]),
+                finish: Finish::ToolCalls,
+                tokens: 1,
+            },
+            Turn {
+                lines: Box::new([Line::Text { text: b"Current summary".as_slice().into() }]),
+                finish: Finish::Stop,
+                tokens: 1,
+            },
+            Turn {
+                lines: Box::new([Line::Call { name: b"finish".as_slice().into(), arguments: script.result.clone() }]),
+                finish: Finish::ToolCalls,
+                tokens: 1,
+            },
+        ]
+        .into_boxed_slice();
+    }
+    let mut turns = Vec::new();
+    for number in 0..script.leading_turns {
+        turns.push(Turn {
+            lines: Box::new([if matches!(script.story, crate::stories::Story::Call) {
+                Line::Call {
+                    name: b"recall".as_slice().into(),
+                    arguments: br#"{"kind":"name","name":1}"#.as_slice().into(),
+                }
+            } else if matches!(script.story, crate::stories::Story::Wait | crate::stories::Story::InvalidTranscript) {
+                Line::Call { name: b"wait".as_slice().into(), arguments: b"{}".as_slice().into() }
+            } else {
+                Line::Text { text: format!("Progress {number}").into_bytes().into() }
+            }]),
+            finish: if matches!(
+                script.story,
+                crate::stories::Story::Call | crate::stories::Story::Wait | crate::stories::Story::InvalidTranscript
+            ) {
+                Finish::ToolCalls
+            } else {
+                Finish::Stop
+            },
+            tokens: 1,
+        });
+    }
+    turns.push(Turn {
+        lines: Box::new([Line::Call { name: b"finish".as_slice().into(), arguments: script.result.clone() }]),
+        finish: Finish::ToolCalls,
+        tokens: 1,
+    });
+    turns.into_boxed_slice()
+}
+
+pub(crate) fn party_script(script: &Script) -> Box<[jig_fake_parties::Act]> {
+    if matches!(
+        script.story,
+        crate::stories::Story::Stalled | crate::stories::Story::Quiet | crate::stories::Story::Replaced
+    ) {
+        return Box::default();
+    }
+    let mut acts = vec![
+        jig_fake_parties::Act::SignIn { provider: 1, subject: b"owner-a".as_slice().into() },
+        jig_fake_parties::Act::Request {
+            key: [1; 16],
+            ask: jig_fake_parties::Ask::Chat { words: script.words.clone() },
+        },
+    ];
+    if matches!(script.story, crate::stories::Story::Inbox) {
+        acts.push(jig_fake_parties::Act::Request {
+            key: [2; 16],
+            ask: jig_fake_parties::Ask::Say {
+                task: jig_fake_parties::Task::Last,
+                words: b"From the person".as_slice().into(),
+                release: false,
+            },
+        });
+    }
+    acts.into_boxed_slice()
+}
+
+pub(crate) fn engine_message_document() -> Vec<u8> {
+    String::from_utf8(engine_document())
+        .expect("fixture UTF-8")
+        .replace("\"core.load_slots\":1", "\"core.load_slots\":1,\"tasks.message_bytes\":512,\"people.words\":512")
+        .into_bytes()
 }

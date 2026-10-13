@@ -100,6 +100,17 @@ impl Service {
     pub const fn engine(&mut self) -> Option<&mut Engine> {
         self.engine.as_mut()
     }
+    /// Format domain roots alone for the protocol world's isolation check.
+    pub fn fmt_roots(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut roots = formatter.debug_list();
+        if let Some(engine) = &self.engine {
+            roots.entry(&engine.domain);
+        }
+        for worker in &self.workers {
+            roots.entry(&worker.root);
+        }
+        roots.finish()
+    }
     #[must_use]
     pub const fn end(&self) -> Option<&End> {
         match &self.engine {

@@ -19,7 +19,7 @@ pub struct WorkerRuntime {
 }
 #[derive(Debug)]
 pub struct Worker {
-    root: root::Domain,
+    pub(super) root: root::Domain,
     env: Env<root::Limits>,
     agent: Agent,
     link: link::Component,
@@ -318,92 +318,98 @@ impl Worker {
     }
     fn process(&mut self, request: smith::process::Request) {
         match request {
-            smith::process::Request::Spawn { owner, deadline, .. } => {
-                let mut process = host::Process::new(
-                    owner,
-                    &self.agent.limits,
-                    self.env.limits.agent.detail_bytes,
-                    self.agent.endpoints.clone(),
-                )
-                .expect("startup checks process limits");
-                let mut spawned = Queue::with_capacity(1);
-                process.spawn(
-                    host::Launch {
-                        program: self.program.clone(),
-                        arguments: self.arguments.clone(),
-                        environment: Box::default(),
-                        root: self.directory.expect("prepared worker root"),
-                        directory: b".".as_slice().into(),
-                    },
-                    deadline,
-                    &mut spawned,
-                );
-                let global = Token::new(self.prefix.checked_add(self.next).expect("worker owner range"));
-                self.next = self.next.checked_add(1).expect("worker owner sequence");
-                assert!(self.next < (1_u64 << 48_u32), "worker owner range");
-                self.owners.insert(global, owner).expect("one owner per process");
-                self.processes.insert(owner, process).expect("root bounds processes");
-                let mut request = spawned.pop().expect("one spawn");
-                if let io::Request::Spawn { owner, .. } = &mut request {
-                    *owner = global;
-                }
-                self.io.push(request);
-            }
-            smith::process::Request::Send { owner, message, .. } => {
-                let values = match &message {
-                    smith::Down::Start { start, .. } => start_values(&self.values, &start.grants, self.env.now),
-                    smith::Down::Grant { grant } => grant_value(&self.values, *grant, self.env.now),
-                    smith::Down::Message { .. }
-                    | smith::Down::Answer { .. }
-                    | smith::Down::Acknowledge { .. }
-                    | smith::Down::Cancel => Some(host::Values { paths: Box::default(), credentials: Box::default() }),
-                };
-                let Some(values) = values else {
-                    self.events.push(root::Event::Process(Box::new(smith::process::Event::Unsent { owner })));
-                    return;
-                };
-                let process = self.processes.get_mut(&owner).expect("root owns process");
-                let token = owner;
-                let sent = match message {
-                    smith::Down::Start { start, window } => {
-                        process.send_start(start, window, values, token, &mut self.process_events, &mut self.io)
-                    }
-                    smith::Down::Grant { grant } => process.send_grant(
-                        grant,
-                        values.credentials.into_iter().next().expect("one value"),
-                        token,
-                        &mut self.process_events,
-                        &mut self.io,
-                    ),
-                    smith::Down::Message { name, label, text } => {
-                        process.send_message(name, label, text, token, &mut self.process_events, &mut self.io)
-                    }
-                    smith::Down::Answer { call, reply } => {
-                        process.send_reply(call, reply, token, &mut self.process_events, &mut self.io)
-                    }
-                    smith::Down::Acknowledge { turn } => {
-                        process.send_acknowledge(turn, token, &mut self.process_events, &mut self.io)
-                    }
-                    smith::Down::Cancel => process.send_cancel(token, &mut self.process_events, &mut self.io),
-                };
-                if sent.is_err() {
-                    self.events.push(root::Event::Process(Box::new(smith::process::Event::Unsent { owner })));
-                }
-            }
-            smith::process::Request::Signal { owner, signal, .. } => {
-                let signal = match signal {
-                    smith::Signal::Terminate => io::kernel::Signal::Terminate,
-                    smith::Signal::Kill => io::kernel::Signal::Kill,
-                };
-                self.processes.get(&owner).expect("root owns process").signal(signal, &mut self.io);
-                self.events.push(root::Event::Process(Box::new(smith::process::Event::Signalled { owner })));
-            }
-            // Smith's process adapter keeps reads, exit waits and reaping active.
-            smith::process::Request::Read { .. }
-            | smith::process::Request::Wait { .. }
-            | smith::process::Request::Reap { .. } => {}
+            smith::process::Request::Spawn { owner, deadline, .. } => self.process_spawn(owner, deadline),
+            smith::process::Request::Send { owner, message, .. } => self.process_send(owner, message),
+            smith::process::Request::Signal { owner, signal, .. } => self.process_signal(owner, signal),
+            smith::process::Request::Read { .. } => Self::process_read(),
+            smith::process::Request::Wait { .. } => Self::process_wait(),
+            smith::process::Request::Reap { .. } => Self::process_reap(),
         }
     }
+    fn process_spawn(&mut self, owner: Token, deadline: Time) {
+        let mut process = host::Process::new(
+            owner,
+            &self.agent.limits,
+            self.env.limits.agent.detail_bytes,
+            self.agent.endpoints.clone(),
+        )
+        .expect("startup checks process limits");
+        let mut spawned = Queue::with_capacity(1);
+        process.spawn(
+            host::Launch {
+                program: self.program.clone(),
+                arguments: self.arguments.clone(),
+                environment: Box::default(),
+                root: self.directory.expect("prepared worker root"),
+                directory: b".".as_slice().into(),
+            },
+            deadline,
+            &mut spawned,
+        );
+        let global = Token::new(self.prefix.checked_add(self.next).expect("worker owner range"));
+        self.next = self.next.checked_add(1).expect("worker owner sequence");
+        assert!(self.next < (1_u64 << 48_u32), "worker owner range");
+        self.owners.insert(global, owner).expect("one owner per process");
+        self.processes.insert(owner, process).expect("root bounds processes");
+        let mut request = spawned.pop().expect("one spawn");
+        if let io::Request::Spawn { owner, .. } = &mut request {
+            *owner = global;
+        }
+        self.io.push(request);
+    }
+    fn process_send(&mut self, owner: Token, message: smith::Down) {
+        let values = match &message {
+            smith::Down::Start { start, .. } => start_values(&self.values, &start.grants, self.env.now),
+            smith::Down::Grant { grant } => grant_value(&self.values, *grant, self.env.now),
+            smith::Down::Message { .. }
+            | smith::Down::Answer { .. }
+            | smith::Down::Acknowledge { .. }
+            | smith::Down::Cancel => Some(host::Values { paths: Box::default(), credentials: Box::default() }),
+        };
+        let Some(values) = values else {
+            self.events.push(root::Event::Process(Box::new(smith::process::Event::Unsent { owner })));
+            return;
+        };
+        let process = self.processes.get_mut(&owner).expect("root owns process");
+        let token = owner;
+        let sent = match message {
+            smith::Down::Start { start, window } => {
+                process.send_start(start, window, values, token, &mut self.process_events, &mut self.io)
+            }
+            smith::Down::Grant { grant } => process.send_grant(
+                grant,
+                values.credentials.into_iter().next().expect("one value"),
+                token,
+                &mut self.process_events,
+                &mut self.io,
+            ),
+            smith::Down::Message { name, label, text } => {
+                process.send_message(name, label, text, token, &mut self.process_events, &mut self.io)
+            }
+            smith::Down::Answer { call, reply } => {
+                process.send_reply(call, reply, token, &mut self.process_events, &mut self.io)
+            }
+            smith::Down::Acknowledge { turn } => {
+                process.send_acknowledge(turn, token, &mut self.process_events, &mut self.io)
+            }
+            smith::Down::Cancel => process.send_cancel(token, &mut self.process_events, &mut self.io),
+        };
+        if sent.is_err() {
+            self.events.push(root::Event::Process(Box::new(smith::process::Event::Unsent { owner })));
+        }
+    }
+    fn process_signal(&mut self, owner: Token, signal: smith::Signal) {
+        let signal = match signal {
+            smith::Signal::Terminate => io::kernel::Signal::Terminate,
+            smith::Signal::Kill => io::kernel::Signal::Kill,
+        };
+        self.processes.get(&owner).expect("root owns process").signal(signal, &mut self.io);
+        self.events.push(root::Event::Process(Box::new(smith::process::Event::Signalled { owner })));
+    }
+    // Smith's process adapter keeps reads, exit waits and reaping active.
+    fn process_read() {}
+    fn process_wait() {}
+    fn process_reap() {}
     pub(super) fn iterate(&mut self, now: Time, wall: Wall) {
         self.env.now = now;
         self.env.wall = wall;
