@@ -213,12 +213,9 @@ fn the_store_codecs_world_is_among_the_workspace_worlds() {
         manifests().into_iter().filter(|m| m.name.as_deref() == Some("jig-store-codecs-world")).collect();
     assert_eq!(worlds.len(), 1, "one store codecs world");
     let manifest = &worlds[0];
-    assert!(
-        manifest
-            .dependencies
-            .iter()
-            .all(|name| ["jig-protocol-store", "skein-codegen", "skein-lib", "skein-heap"].contains(&name.as_str()))
-    );
+    assert!(manifest.dependencies.iter().all(|name| {
+        ["jig-protocol-store", "jig-test-store", "skein-codegen", "skein-lib", "skein-heap"].contains(&name.as_str())
+    }));
 }
 
 #[test]
@@ -237,4 +234,14 @@ fn client_link_depends_only_on_client_vocabulary_and_foundation() {
             .contains(&name.as_str())
             || name == "jig-protocol-transcript"
     }));
+}
+
+#[test]
+fn the_test_store_links_only_its_codec_boundary_and_foundation() {
+    let store = manifests().into_iter().find(|m| m.name.as_deref() == Some("jig-test-store")).expect("store manifest");
+    assert!(store.dependencies.iter().all(|name| {
+        ["jig-test-connector", "jig-protocol-store", "skein-kv", "skein-lib", "skein-codec"].contains(&name.as_str())
+    }));
+    let source = fs::read_to_string(kit_root().join("testing/jig-test-store/src/lib.rs")).expect("store source");
+    assert!(source.contains("cfg_attr(not(test), no_std)"));
 }

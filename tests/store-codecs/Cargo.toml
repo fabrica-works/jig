@@ -8,6 +8,7 @@ publish.workspace = true
 
 [dev-dependencies]
 jig-protocol-store.workspace = true
+jig-test-store.workspace = true
 skein-codegen.workspace = true
 skein-lib.workspace = true
 skein-heap.workspace = true

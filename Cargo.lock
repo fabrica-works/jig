@@ -668,6 +668,7 @@ name = "jig-store-codecs-world"
 version = "0.0.0"
 dependencies = [
  "jig-protocol-store",
+ "jig-test-store",
  "skein-codegen",
  "skein-heap",
  "skein-lib",
@@ -733,6 +734,18 @@ version = "0.0.0"
 dependencies = [
  "jig-domain-client",
  "jig-test-connector",
+ "skein-lib",
+]
+
+[[package]]
+name = "jig-test-store"
+version = "0.0.0"
+dependencies = [
+ "jig-protocol-store",
+ "jig-test-connector",
+ "jig-test-connector-world",
+ "skein-codec",
+ "skein-kv",
  "skein-lib",
 ]
 

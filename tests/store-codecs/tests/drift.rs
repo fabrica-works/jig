@@ -54,3 +54,27 @@ fn the_people_familys_code_and_goldens_have_no_drift() {
 fn the_core_familys_code_and_goldens_have_no_drift() {
     check("core");
 }
+
+#[test]
+fn the_test_connectors_code_and_goldens_have_no_drift() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../testing/jig-test-store");
+    let source = fs::read_to_string(root.join("schema/test-connector-v1.schema")).expect("schema readable");
+    let output = generate(&parse(&source).expect("schema valid"));
+    let code = root.join("src/generated/v1.rs");
+    let goldens = root.join("golden/v1");
+    let write = std::env::var_os("SKEIN_CODEGEN_WRITE").is_some_and(|value| value == "1");
+    if write {
+        fs::write(code, &output.rust).expect("write code");
+        fs::create_dir_all(&goldens).expect("golden directory");
+    } else {
+        assert_eq!(fs::read_to_string(code).expect("code committed"), output.rust);
+    }
+    for golden in output.goldens {
+        let path = goldens.join(golden.name);
+        if write {
+            fs::write(path, golden.bytes).expect("write golden");
+        } else {
+            assert_eq!(fs::read(path).expect("golden committed"), golden.bytes);
+        }
+    }
+}

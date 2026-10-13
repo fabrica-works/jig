@@ -41,6 +41,9 @@ fn arbitrary(seed: u64, check: fn(&[u8])) {
 fn mutated(family: &str, seed: u64, check: fn(&[u8])) {
     let root =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../crates/jig-protocol-store/golden").join(family).join("v1");
+    mutate_goldens(&root, seed, check);
+}
+fn mutate_goldens(root: &Path, seed: u64, check: fn(&[u8])) {
     let mut rng = Rng::new(seed);
     let mut paths: Vec<_> =
         fs::read_dir(root).expect("golden directory").map(|entry| entry.expect("golden entry").path()).collect();
@@ -181,4 +184,23 @@ fn mutated_and_short_frames_never_panic() {
         frames(&changed);
         frames(bytes.get(..index).expect("short frame"));
     }
+}
+
+fn test_connector(bytes: &[u8]) {
+    use jig_test_store::v1;
+    if let Ok(row) = v1::Row::decode(&v1::CEILINGS, &mut Reader::new(bytes)) {
+        let mut writer = Writer::new(usize::try_from(row.measure()).expect("measured length"));
+        row.encode(&mut writer).expect("measured room");
+        assert_eq!(writer.finish().as_ref(), bytes);
+    }
+}
+#[test]
+fn arbitrary_test_connector_rows_never_panic_and_round_trip_when_they_decode() {
+    arbitrary(0x5701_e018, test_connector);
+}
+
+#[test]
+fn mutated_test_connector_goldens_never_panic() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../testing/jig-test-store/golden/v1");
+    mutate_goldens(&root, 0x5702_e018, test_connector);
 }
