@@ -313,7 +313,15 @@ Shape: as the interface sketch. A run's text is a `StreamEvent::text`:
 `RunText` with the turn's name (attempt `u64`, number `u32`, retry
 `u32`), `from` and `through` (`u32`), its bytes, `cut`, and the call
 being made (`option LiveCall`), as `contract::RunText` has them.
+`OwnerAccountState::Later` carries `until` as a wall, `u64` nanoseconds
+as every other wall (client.md, 3: "A deadline the engine keeps on its
+own clock ... crosses as the wall it falls at"; the designer, 2026-10-13,
+jig `83c781c9`). The contract changes first, `Later { until: Wall }` in
+`crates/jig-domain-client/src/contract/owner_deployment.rs`, and its
+producers make the wall from the engine's clock and wall as they make
+the document: a step of the supervisor's, before 30.4 carries it.
 Test shape: as 30.1. Tests:
+`an_account_waiting_to_ask_again_carries_the_wall_it_asks_at`,
 `a_hello_naming_two_owners_round_trips_unchanged`,
 `a_stream_event_at_its_ceiling_round_trips_unchanged`,
 `an_open_for_a_tree_carries_its_window`,
