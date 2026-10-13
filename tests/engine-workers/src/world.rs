@@ -76,6 +76,9 @@ impl World {
         }
         panic!("world must settle");
     }
+    pub fn play(&mut self, connection: Token, frame: skein_channel::Frame) {
+        self.net(connection).peer.play(frame);
+    }
     pub fn advance(&mut self, duration: Duration) {
         self.now = self.now.saturating_add(duration);
         while self.component.next_deadline().is_some_and(|at| at <= self.now) {

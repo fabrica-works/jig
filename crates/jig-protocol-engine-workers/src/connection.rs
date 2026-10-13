@@ -7,6 +7,7 @@ pub(crate) enum Phase {
     Opening,
     Terms,
     Hello,
+    Open,
     Closing,
 }
 #[derive(Debug)]
@@ -19,6 +20,8 @@ pub(crate) struct Connection {
     pub above: Queue<Event>,
     pub below: Queue<Lower>,
     pub terminal: bool,
+    pub heard: bool,
+    pub hello_deadline: Option<Time>,
 }
 impl Connection {
     pub fn new(schema: Schema, limits: &Limits, now: Time) -> Self {
@@ -33,6 +36,8 @@ impl Connection {
             above: Queue::with_capacity(skein_channel::MAX_UP),
             below: Queue::with_capacity(skein_channel::MAX_DOWN),
             terminal: false,
+            heard: false,
+            hello_deadline: None,
         }
     }
     pub fn down(&mut self, request: Request, connection: Token, out: &mut Queue<crate::Request>) {

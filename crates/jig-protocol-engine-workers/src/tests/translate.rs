@@ -1,0 +1,77 @@
+use super::fixtures;
+use crate::translate;
+use skein_lib::{Duration, Token};
+#[test]
+fn a_hello_record_becomes_the_hubs_hello_with_its_bounds() {
+    let hello = translate::hello(fixtures::hello_record());
+    assert_eq!(hello.slots, 1);
+    assert_eq!(hello.stop_bound, Duration::from_secs(20));
+    assert_eq!(hello.workstreams.as_ref(), &[9]);
+    assert_eq!(
+        hello.hosting.as_ref(),
+        &[jig_domain_host::Hosting {
+            run: Token::new(7),
+            attempt: Token::new(2),
+            phase: jig_domain_host::Phase::Waiting
+        }]
+    );
+    let model = hello.bounds.models.first().expect("one model");
+    assert_eq!(model.name.as_ref(), b"model");
+    assert_eq!(model.window, 8192);
+    assert_eq!(model.output, 1024);
+    assert_eq!(hello.bounds.turns, 8);
+    assert_eq!(hello.bounds.spend, 100);
+    assert_eq!(hello.bounds.time, Duration::from_secs(60));
+    assert_eq!(hello.bounds.waiting, Duration::from_secs(10));
+    assert_eq!(hello.bounds.checks, Duration::from_secs(2));
+    assert_eq!(hello.bounds.message_bytes, 16);
+    assert_eq!(hello.bounds.inbox, 1);
+    assert_eq!(hello.bounds.unacknowledged, 1);
+}
+
+#[test]
+fn a_turn_record_becomes_the_hubs_turn_with_its_refusals() {
+    let link = translate::up(translate::Up::Turn(fixtures::turn_record()));
+    let jig_domain_host::LinkUp::Turn { run, attempt, turn } = link else {
+        panic!("a turn");
+    };
+    assert_eq!((run, attempt), (Token::new(7), Token::new(2)));
+    assert!(turn.opens_window, "window marker kept");
+    assert_eq!(
+        turn.refused.as_ref(),
+        &[jig_domain_host::Refused { name: Token::new(8), reason: jig_domain_host::MessageRefusal::Full }]
+    );
+    assert_eq!(turn.read, Some(Token::new(9)));
+    assert_eq!(turn.body.as_ref(), b"opaque-turn");
+}
+#[test]
+fn a_fact_record_becomes_the_hubs_activity() {
+    assert_eq!(
+        translate::up(translate::Up::Fact(fixtures::fact_record())),
+        jig_domain_host::LinkUp::Activity {
+            run: Token::new(7),
+            attempt: Token::new(2),
+            activity: jig_domain_host::Activity::Count {
+                kind: jig_domain_host::CountKind::LlmStarted,
+                elapsed: Duration::from_secs(2),
+                count: 3
+            }
+        }
+    );
+}
+#[test]
+fn rejected_and_exhausted_records_become_notices() {
+    assert_eq!(
+        translate::up(translate::Up::Rejected(fixtures::rejected_record())),
+        jig_domain_host::LinkUp::Rejected { run: Token::new(7), attempt: Token::new(2), account: 1, generation: 4 }
+    );
+    assert_eq!(
+        translate::up(translate::Up::Exhausted(fixtures::exhausted_record())),
+        jig_domain_host::LinkUp::Exhausted {
+            run: Token::new(7),
+            attempt: Token::new(2),
+            account: 1,
+            retry_after: Duration::from_secs(5)
+        }
+    );
+}

@@ -7,7 +7,7 @@ use crate::{
 use alloc::boxed::Box;
 use jig_protocol_worker_wire::{self as wire, Reason};
 use skein_channel::{Closed, Event as ChannelEvent, Request as ChannelRequest, Role};
-use skein_lib::{Decimal, Map, Queue, Time, Token, bytes};
+use skein_lib::{Decimal, Map, Queue, Reader, Time, Token, bytes};
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Unusable {
     Limits,
@@ -56,10 +56,27 @@ impl Component {
                 }
             }
             Event::Gone { connection } => {
-                drop(self.connections.remove(&connection));
+                if let Some(mut state) = self.connections.remove(&connection) {
+                    lost(&mut state, out);
+                }
             }
             Event::Stop | Event::Close | Event::Abort => self.stopping = true,
-            Event::Down { .. } | Event::NotAdmitted { .. } => {}
+            Event::Down { .. } => {}
+            Event::NotAdmitted { channel, text } => {
+                let mut target = None;
+                for (connection, state) in &self.connections {
+                    if state.channel == channel && state.heard {
+                        target = Some(*connection);
+                        break;
+                    }
+                }
+                if let Some(connection) = target {
+                    let mut state = self.connections.remove(&connection).expect("heard channel has its connection");
+                    self.refuse(now, connection, &mut state, Reason::NotAdmitted.code(), text, out);
+                    self.progress(now, connection, &mut state, out);
+                    self.keep(connection, state);
+                }
+            }
         }
     }
     fn accepted(&mut self, now: Time, connection: Token, out: &mut Queue<Request>) {
@@ -142,6 +159,7 @@ impl Component {
                 self.next_channel =
                     self.next_channel.checked_add(1).expect("channel tokens never wrap in a process life");
                 state.phase = Phase::Terms;
+                state.hello_deadline = Some(now.saturating_add(self.limits.hello));
                 state.down(ChannelRequest::Accept { version: wire::VERSION }, connection, out);
             }
             ChannelEvent::Ready { terms, .. } => {
@@ -150,19 +168,55 @@ impl Component {
                     self.refuse(now, connection, state, 2, text, out);
                 } else {
                     state.phase = Phase::Hello;
-                    state.deadline = None;
+                    state.deadline = state.hello_deadline;
+                    state.down(ChannelRequest::Read, connection, out);
                 }
             }
             ChannelEvent::Closed { why } => closed(connection, state, why, out),
-            ChannelEvent::Body { .. }
-            | ChannelEvent::Ping
-            | ChannelEvent::Unsupported { .. }
-            | ChannelEvent::Refused { .. }
-            | ChannelEvent::Ended
+            ChannelEvent::Body { kind, body } => self.body(now, connection, state, kind, &body, out),
+            ChannelEvent::Ping => state.down(ChannelRequest::Read, connection, out),
+            ChannelEvent::Ended | ChannelEvent::Refused { .. } => state.down(ChannelRequest::Close, connection, out),
+            ChannelEvent::Unsupported { .. }
             | ChannelEvent::Sent { .. }
             | ChannelEvent::Unsent { .. }
             | ChannelEvent::Drained
             | ChannelEvent::OutputFailed => {}
+        }
+    }
+    fn body(
+        &mut self,
+        now: Time,
+        connection: Token,
+        state: &mut Connection,
+        kind: u16,
+        body: &[u8],
+        out: &mut Queue<Request>,
+    ) {
+        match state.phase {
+            Phase::Hello => {
+                if kind == 0x0100
+                    && let Ok(record) = wire::Hello::decode(&self.codec, &mut Reader::new(body))
+                {
+                    let hello = crate::translate::hello(record);
+                    state.phase = Phase::Open;
+                    state.heard = true;
+                    state.deadline = None;
+                    out.push(Request::Hello { channel: state.channel, hello });
+                    state.down(ChannelRequest::Read, connection, out);
+                    return;
+                }
+                self.refuse(now, connection, state, 3, Box::new([]), out);
+            }
+            Phase::Open => {
+                if let Some(record) = crate::translate::decode(kind, body, &self.codec) {
+                    let up = crate::translate::up(record);
+                    out.push(Request::Up { channel: state.channel, up, parts: Box::new([]) });
+                    state.down(ChannelRequest::Read, connection, out);
+                } else {
+                    self.refuse(now, connection, state, 3, Box::new([]), out);
+                }
+            }
+            Phase::Opening | Phase::Terms | Phase::Closing => self.refuse(now, connection, state, 3, Box::new([]), out),
         }
     }
     fn refuse(
@@ -174,6 +228,7 @@ impl Component {
         text: Box<[u8]>,
         out: &mut Queue<Request>,
     ) {
+        lost(state, out);
         state.worker = None;
         state.phase = Phase::Closing;
         state.deadline = Some(now.saturating_add(self.limits.stall));
@@ -191,6 +246,7 @@ impl Component {
         }
         if let Some(connection) = due {
             let mut state = self.connections.remove(&connection).expect("due connection exists");
+            lost(&mut state, out);
             state.deadline = None;
             state.worker = None;
             state.phase = Phase::Closing;
@@ -219,6 +275,7 @@ fn closed(connection: Token, state: &mut Connection, why: Closed, out: &mut Queu
     if state.terminal {
         return;
     }
+    lost(state, out);
     state.terminal = true;
     state.worker = None;
     state.deadline = None;
@@ -228,5 +285,12 @@ fn closed(connection: Token, state: &mut Connection, why: Closed, out: &mut Queu
         Closed::Owner | Closed::RefusedPeer(_) | Closed::Framing | Closed::Stream | Closed::Truncated => {
             out.push(Request::Abort { connection });
         }
+    }
+}
+
+fn lost(state: &mut Connection, out: &mut Queue<Request>) {
+    if state.heard {
+        state.heard = false;
+        out.push(Request::Lost { channel: state.channel });
     }
 }

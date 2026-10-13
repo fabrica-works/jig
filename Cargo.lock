@@ -314,6 +314,7 @@ dependencies = [
 name = "jig-engine-workers-world"
 version = "0.0.0"
 dependencies = [
+ "jig-domain-host",
  "jig-protocol-engine-workers",
  "jig-protocol-worker-wire",
  "skein-channel",
