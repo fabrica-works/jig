@@ -1,7 +1,9 @@
 //! Exhaustive owner translations (protocol/client.md, 3 and 5).
 pub mod answers;
 pub mod asks;
+pub mod documents;
 mod facts;
+pub mod live;
 use alloc::boxed::Box;
 use jig_protocol_client_wire::v2 as w;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

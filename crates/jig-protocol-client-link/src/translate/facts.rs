@@ -8,18 +8,20 @@ use skein_lib::Map;
 use skein_lib::Reader;
 #[path = "facts_part0.rs"]
 mod part0;
-use part0::{
-    active_run, chip_fields, closing_stage, document_text, failure_class, hold_category, owner_chip_phase, part,
-    person_address, proposal_key, recipient, retry_notice, revision, run_stage, taken_by, wake_policy,
+use part0::chip_fields;
+pub(crate) use part0::{
+    active_run, call_identity, closing_stage, document_text, failure_class, hold_category, owner_chip_phase, part,
+    person_address, phase, proposal_key, recipient, retry_notice, revision, run_stage, taken_by, wake_policy,
 };
 #[path = "facts_part1.rs"]
 mod part1;
-use part1::{
-    chip_phase_fields, closing_fields, ending_fields, held_runtime_fields, hold_reason_fields, owner_chip_hold,
-    owner_executor, owner_numbers, owner_part, owner_person_wait, owner_wake_policy, party,
+use part1::{chip_phase_fields, closing_fields, ending_fields, held_runtime_fields, hold_reason_fields};
+pub(crate) use part1::{
+    owner_chip_hold, owner_executor, owner_numbers, owner_part, owner_person_wait, owner_wake_policy, party,
 };
 #[path = "facts_part2.rs"]
 mod part2;
+pub(crate) use part2::{funder, owner_budget, owner_requester, owner_resource_line};
 use part2::{owner_chip_details_fields, owner_chip_ending_fields, result_value_fields};
 
 #[derive(Debug)]
@@ -28,7 +30,7 @@ struct Child {
     value: Node,
 }
 #[derive(Debug)]
-enum Node {
+pub(crate) enum Node {
     Chip(Box<c::Chip>),
     ChipPhase(Box<c::ChipPhase>),
     Closing(Box<c::Closing>),
@@ -235,7 +237,7 @@ fn take_result_value(index: u32, parent: u32, children: &mut Map<u32, Child>) ->
     }
 }
 
-fn decode(bytes: &[u8], limits: &Limits) -> Result<Node, w::Problem> {
+pub(crate) fn decode(bytes: &[u8], limits: &Limits) -> Result<Node, w::Problem> {
     let mut reader = Reader::new(bytes);
     let bound = match u32::try_from(limits.client.document_bytes.checked_div(4).ok_or(too_large())?) {
         Ok(value) => value,
