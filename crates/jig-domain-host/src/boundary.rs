@@ -87,6 +87,11 @@ pub enum Event {
         owner: Token,
         agent: Token,
     },
+    /// Terminal for a start the agent refused; its bounded words name why.
+    StartRefused {
+        owner: Token,
+        why: Box<[u8]>,
+    },
     /// The agent could not take an inbound event for the run, for `reason`.
     Refused {
         owner: Token,
@@ -281,6 +286,11 @@ pub enum FromAgent {
         owner: Token,
         agent: Token,
     },
+    /// The agent refused its start, before any run began.
+    StartRefused {
+        owner: Token,
+        why: Box<[u8]>,
+    },
     Refused {
         owner: Token,
         name: Token,
@@ -314,6 +324,7 @@ impl Event {
                 Event::Finished { owner, turns, spent, read, finish }
             }
             FromAgent::Started { owner, agent } => Event::Started { owner, agent },
+            FromAgent::StartRefused { owner, why } => Event::StartRefused { owner, why },
             FromAgent::Refused { owner, name, reason } => Event::Refused { owner, name, reason },
             FromAgent::Yielded { owner } => Event::Yielded { owner },
             FromAgent::Faulted { owner, fault } => Event::Faulted { owner, fault },
@@ -563,7 +574,7 @@ pub struct Work {
 }
 
 /// Why an assignment was refused.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Refusal {
     /// Every slot is taken (by a run hosted, or one whose answer the engine
     /// has yet to acknowledge), the run is hosted already under another
@@ -575,8 +586,12 @@ pub enum Refusal {
 }
 
 /// What about an assignment does not fit the limits.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Invalid {
+    /// The agent refused the start; its words are for operators.
+    Start {
+        why: Box<[u8]>,
+    },
     /// The charter holds more bytes than a run may.
     Charter,
     Transcript,

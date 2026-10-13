@@ -166,7 +166,7 @@ fn down(record: jig_domain_host::LinkDown) -> translate::Down {
     };
     translated.expect("complete output")
 }
-fn codec() -> jig_protocol_worker_wire::v1::Limits {
+fn codec() -> jig_protocol_worker_wire::v2::Limits {
     jig_protocol_worker_wire::sizes::limits(&fixtures::SIZES).expect("small codec")
 }
 fn assignment_output() -> jig_domain_host::LinkDown {
@@ -388,4 +388,27 @@ fn answered_call(
     calls: &skein_lib::List<jig_protocol_worker_wire::AnsweredCall>,
 ) -> &jig_protocol_worker_wire::AnsweredCall {
     calls.get(0).expect("call")
+}
+
+#[test]
+fn an_invalid_start_answer_keeps_its_words_in_the_hub() {
+    use jig_protocol_worker_wire as wire;
+    let limits = codec();
+    let start =
+        wire::InvalidStart::new(&limits, wire::InvalidStartParts { why: b"budget too small".as_slice().into() })
+            .expect("bounded reason");
+    let invalid = wire::InvalidValue::new(&limits, wire::InvalidValueParts { value: wire::Invalid::Start(start) })
+        .expect("invalid start");
+    let refusal = wire::RefusalValue::new(&limits, wire::RefusalValueParts { value: wire::Refusal::Invalid(invalid) })
+        .expect("refusal");
+    let mut fields = fixtures::answer_record().into_parts();
+    fields.ending = wire::Ending::Refused(refusal);
+    let record = wire::Answer::new(&limits, fields).expect("answer");
+    let (answer, _) = answer(record);
+    assert_eq!(
+        answer.ending,
+        jig_domain_host::Ending::Refused(jig_domain_host::Refusal::Invalid(jig_domain_host::Invalid::Start {
+            why: b"budget too small".as_slice().into()
+        },))
+    );
 }

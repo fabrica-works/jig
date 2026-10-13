@@ -1,5 +1,5 @@
 //! Project record sizes into skein's schema (protocol/channel.md, 4.1).
-use crate::{MAGIC, VERSION, v1};
+use crate::{MAGIC, VERSION, v2};
 use skein_channel::{Direction, Kind as ChannelKind, Role, Schema, Term, Version};
 use skein_lib::List;
 
@@ -55,25 +55,25 @@ pub enum Overflow {
     Frame,
 }
 
-pub fn schema(limits: &v1::Limits) -> Result<Schema, Overflow> {
+pub fn schema(limits: &v2::Limits) -> Result<Schema, Overflow> {
     let mut kinds = List::with_capacity(u32::try_from(KINDS.len()).expect("kind count fits"));
     for rule in KINDS {
         let largest = match rule.body {
-            Kind::Hello => v1::Hello::worst_case_bytes(limits),
-            Kind::Turn => v1::Turn::worst_case_bytes(limits),
-            Kind::Call => v1::Call::worst_case_bytes(limits),
-            Kind::Answer => v1::Answer::worst_case_bytes(limits),
-            Kind::Fact => v1::Fact::worst_case_bytes(limits),
-            Kind::Rejected => v1::Rejected::worst_case_bytes(limits),
-            Kind::Exhausted => v1::Exhausted::worst_case_bytes(limits),
-            Kind::Assignment => v1::Assignment::worst_case_bytes(limits),
-            Kind::Message => v1::Inbound::worst_case_bytes(limits),
-            Kind::Relayed => v1::Relayed::worst_case_bytes(limits),
-            Kind::TurnKept => v1::TurnKept::worst_case_bytes(limits),
-            Kind::TurnBusy => v1::TurnBusy::worst_case_bytes(limits),
-            Kind::Acknowledge => v1::Acknowledge::worst_case_bytes(limits),
-            Kind::Cancel => v1::Cancel::worst_case_bytes(limits),
-            Kind::Grant => v1::Granted::worst_case_bytes(limits),
+            Kind::Hello => v2::Hello::worst_case_bytes(limits),
+            Kind::Turn => v2::Turn::worst_case_bytes(limits),
+            Kind::Call => v2::Call::worst_case_bytes(limits),
+            Kind::Answer => v2::Answer::worst_case_bytes(limits),
+            Kind::Fact => v2::Fact::worst_case_bytes(limits),
+            Kind::Rejected => v2::Rejected::worst_case_bytes(limits),
+            Kind::Exhausted => v2::Exhausted::worst_case_bytes(limits),
+            Kind::Assignment => v2::Assignment::worst_case_bytes(limits),
+            Kind::Message => v2::Inbound::worst_case_bytes(limits),
+            Kind::Relayed => v2::Relayed::worst_case_bytes(limits),
+            Kind::TurnKept => v2::TurnKept::worst_case_bytes(limits),
+            Kind::TurnBusy => v2::TurnBusy::worst_case_bytes(limits),
+            Kind::Acknowledge => v2::Acknowledge::worst_case_bytes(limits),
+            Kind::Cancel => v2::Cancel::worst_case_bytes(limits),
+            Kind::Grant => v2::Granted::worst_case_bytes(limits),
         };
         let largest = largest.ok_or(Overflow::Body)?;
         let Ok(largest) = u32::try_from(largest) else { return Err(Overflow::Frame) };

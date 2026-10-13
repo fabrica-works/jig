@@ -1,5 +1,5 @@
 //! Channel bounds from the owners' numbers (protocol/channel.md, 9 and 11).
-use crate::{Kind, v1};
+use crate::{Kind, v2};
 
 /// Bounds supplied by the domains and the application's protocol layer.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -53,8 +53,8 @@ pub struct WorkerCap {
 
 /// Map field and count bounds without inspecting any payload or sum.
 #[must_use]
-pub fn limits(sizes: &Sizes) -> Option<v1::Limits> {
-    let limits = v1::Limits {
+pub fn limits(sizes: &Sizes) -> Option<v2::Limits> {
+    let limits = v2::Limits {
         credential_name: sizes.name,
         credential_secret: sizes.secret,
         model_bound_name: sizes.model_name,
@@ -71,6 +71,7 @@ pub fn limits(sizes: &Sizes) -> Option<v1::Limits> {
         ended_outcome: sizes.result,
         resource_resource_some: sizes.resource,
         failed_detail: sizes.detail,
+        invalid_start_why: sizes.detail,
         answer_refused: sizes.inbox,
         message_sender: sizes.sender,
         message_words: sizes.message,
@@ -91,7 +92,7 @@ pub fn limits(sizes: &Sizes) -> Option<v1::Limits> {
         relay_text_text: sizes.answer,
         relayed_name: sizes.call_name,
     };
-    v1::check_limits(&limits).ok()?;
+    v2::check_limits(&limits).ok()?;
     Some(limits)
 }
 
@@ -100,28 +101,28 @@ pub fn largest_body(sizes: &Sizes, kind: Kind) -> Option<u32> {
     body(&limits(sizes)?, kind)
 }
 
-fn body(limits: &v1::Limits, kind: Kind) -> Option<u32> {
+fn body(limits: &v2::Limits, kind: Kind) -> Option<u32> {
     let bytes = match kind {
-        Kind::Hello => v1::Hello::worst_case_bytes(limits),
-        Kind::Turn => v1::Turn::worst_case_bytes(limits),
-        Kind::Call => v1::Call::worst_case_bytes(limits),
-        Kind::Answer => v1::Answer::worst_case_bytes(limits),
-        Kind::Fact => v1::Fact::worst_case_bytes(limits),
-        Kind::Rejected => v1::Rejected::worst_case_bytes(limits),
-        Kind::Exhausted => v1::Exhausted::worst_case_bytes(limits),
-        Kind::Assignment => v1::Assignment::worst_case_bytes(limits),
-        Kind::Message => v1::Inbound::worst_case_bytes(limits),
-        Kind::Relayed => v1::Relayed::worst_case_bytes(limits),
-        Kind::TurnKept => v1::TurnKept::worst_case_bytes(limits),
-        Kind::TurnBusy => v1::TurnBusy::worst_case_bytes(limits),
-        Kind::Acknowledge => v1::Acknowledge::worst_case_bytes(limits),
-        Kind::Cancel => v1::Cancel::worst_case_bytes(limits),
-        Kind::Grant => v1::Granted::worst_case_bytes(limits),
+        Kind::Hello => v2::Hello::worst_case_bytes(limits),
+        Kind::Turn => v2::Turn::worst_case_bytes(limits),
+        Kind::Call => v2::Call::worst_case_bytes(limits),
+        Kind::Answer => v2::Answer::worst_case_bytes(limits),
+        Kind::Fact => v2::Fact::worst_case_bytes(limits),
+        Kind::Rejected => v2::Rejected::worst_case_bytes(limits),
+        Kind::Exhausted => v2::Exhausted::worst_case_bytes(limits),
+        Kind::Assignment => v2::Assignment::worst_case_bytes(limits),
+        Kind::Message => v2::Inbound::worst_case_bytes(limits),
+        Kind::Relayed => v2::Relayed::worst_case_bytes(limits),
+        Kind::TurnKept => v2::TurnKept::worst_case_bytes(limits),
+        Kind::TurnBusy => v2::TurnBusy::worst_case_bytes(limits),
+        Kind::Acknowledge => v2::Acknowledge::worst_case_bytes(limits),
+        Kind::Cancel => v2::Cancel::worst_case_bytes(limits),
+        Kind::Grant => v2::Granted::worst_case_bytes(limits),
     }?;
     u32::try_from(bytes).ok()
 }
 
-fn frame(limits: &v1::Limits, kind: Kind) -> Option<u32> {
+fn frame(limits: &v2::Limits, kind: Kind) -> Option<u32> {
     body(limits, kind)?.checked_add(8)
 }
 

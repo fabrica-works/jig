@@ -131,7 +131,7 @@ fn a_reason_below_256_reads_as_none() {
 #[test]
 fn the_schema_lists_the_hello_from_the_initiator() {
     let schema = hello_schema();
-    let version = schema.version(1).expect("one version");
+    let version = schema.version(2).expect("one version");
     assert_eq!(schema.magic, *b"jigw");
     assert_eq!(version.kinds.len(), 15);
     assert_eq!(
@@ -394,7 +394,7 @@ fn an_assignment_past_its_grant_bound_is_refused() {
 #[test]
 fn the_schema_lists_every_down_kind_from_the_responder() {
     let schema = hello_schema();
-    let version = schema.version(1).expect("one version");
+    let version = schema.version(2).expect("one version");
     assert_eq!(version.kinds.len(), 15);
     for term in &down_terms() {
         assert_eq!(

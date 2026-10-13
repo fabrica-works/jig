@@ -56,7 +56,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     let each = skein_channel::worst_case(&schema, Role::Responder, &channel)?;
     let codec = sizes::limits(&limits.sizes)?;
     // A decoded value and its converted output, with part slots, for each request and one transient.
-    let records = wire::v1::worst_case_heap(&codec)?
+    let records = wire::v2::worst_case_heap(&codec)?
         .checked_mul(2)?
         .checked_add(skein_lib::List::<wire::Part>::worst_case(3)?)?
         .checked_mul(u64::from(MAX_OUT_DOWN).checked_add(1)?)?;

@@ -1,6 +1,6 @@
 use crate::{
     Bounds, BoundsParts, Credential, CredentialParts, Hello, HelloParts, Hosting, HostingParts, ModelBound,
-    ModelBoundParts, Phase, v1,
+    ModelBoundParts, Phase, v2,
 };
 use alloc::boxed::Box;
 use skein_lib::{Duration, List, Secret, Writer};
@@ -9,7 +9,7 @@ pub const WORKER_A: &[u8] = b"worker-a";
 pub const WORKER_B: &[u8] = b"worker-b";
 pub const MODEL_SMALL: &[u8] = b"small";
 
-pub const LIMITS: v1::Limits = v1::Limits {
+pub const LIMITS: v2::Limits = v2::Limits {
     credential_name: 16,
     credential_secret: 32,
     model_bound_name: 16,
@@ -26,6 +26,7 @@ pub const LIMITS: v1::Limits = v1::Limits {
     ended_outcome: 32,
     resource_resource_some: 16,
     failed_detail: 16,
+    invalid_start_why: 16,
     answer_refused: 2,
     message_sender: 16,
     message_words: 32,
@@ -348,7 +349,7 @@ pub const SIZES_LARGE: crate::sizes::Sizes = crate::sizes::Sizes {
     facts: 4096,
 };
 
-fn one_slot_limits() -> v1::Limits {
+fn one_slot_limits() -> v2::Limits {
     crate::sizes::limits(&SIZES_ONE_SLOT).expect("small size bounds")
 }
 
@@ -376,7 +377,7 @@ pub fn fullest_turn() -> crate::Turn {
     .expect("full turn")
 }
 
-fn fullest_call(limits: &v1::Limits) -> crate::AnsweredCall {
+fn fullest_call(limits: &v2::Limits) -> crate::AnsweredCall {
     let answer = crate::HostAnswer::new(limits, crate::HostAnswerParts { error: true, body: full_bytes() })
         .expect("full host answer");
     crate::AnsweredCall::new(
@@ -386,7 +387,7 @@ fn fullest_call(limits: &v1::Limits) -> crate::AnsweredCall {
     .expect("full answered call")
 }
 
-fn fullest_grants(limits: &v1::Limits) -> List<crate::Grant> {
+fn fullest_grants(limits: &v2::Limits) -> List<crate::Grant> {
     let mut grants = List::with_capacity(2);
     for account in [5, 6] {
         let grant = crate::Grant::new(

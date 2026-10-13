@@ -372,7 +372,7 @@ impl Engine {
     fn answered(&mut self, run: Token, attempt: Token, answer: &Ending) {
         let assigned = self.open.remove(&(run, attempt)).expect("an assignment is answered once, while in flight");
         let refused = match answer {
-            Ending::Refused(Refusal::Invalid(refused)) => Some(*refused),
+            Ending::Refused(Refusal::Invalid(refused)) => Some(refused.clone()),
             Ending::Refused(Refusal::Busy) | Ending::Ended { .. } | Ending::Parked { .. } | Ending::Failed { .. } => {
                 None
             }

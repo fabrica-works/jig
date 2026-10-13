@@ -94,7 +94,7 @@ impl Net {
             && let Some(mut bytes) = self.peer.pop_output()
         {
             if self.other_version && parse_header(&bytes[..8]).expect("frame").kind == 2 {
-                bytes[8..10].copy_from_slice(&2_u16.to_be_bytes());
+                bytes[8..10].copy_from_slice(&3_u16.to_be_bytes());
                 self.other_version = false;
             }
             self.bytes.extend(bytes);

@@ -70,8 +70,14 @@ pub fn schema() -> skein_channel::Schema {
     jig_protocol_worker_wire::schema(&codec).expect("small schema")
 }
 fn peer(schema: skein_channel::Schema) -> skein_fake_channel::ScriptedPeer {
-    skein_fake_channel::ScriptedPeer::new(schema, skein_channel::Role::Responder, channel_limits(), 1, Box::new([]))
-        .expect("scripted engine")
+    skein_fake_channel::ScriptedPeer::new(
+        schema,
+        skein_channel::Role::Responder,
+        channel_limits(),
+        wire::VERSION,
+        Box::new([]),
+    )
+    .expect("scripted engine")
 }
 #[must_use]
 pub fn engine_accepting() -> skein_fake_channel::ScriptedPeer {
@@ -110,7 +116,7 @@ pub const ACCOUNT_ONE: &[u8] = b"account";
 pub const RUN_SEVEN: Token = Token::new(7);
 pub const ATTEMPT_TWO: Token = Token::new(2);
 #[must_use]
-pub fn codec() -> wire::v1::Limits {
+pub fn codec() -> wire::v2::Limits {
     wire::sizes::limits(&SIZES).expect("small codec limits")
 }
 #[must_use]
@@ -386,7 +392,7 @@ pub fn engine_accepting_with(limits: &Limits) -> skein_fake_channel::ScriptedPee
     let codec = wire::sizes::limits(&limits.sizes).expect("sizes");
     let schema = wire::schema(&codec).expect("schema");
     let channel = jig_protocol_worker_link::channel_limits(limits).expect("channel limits");
-    skein_fake_channel::ScriptedPeer::new(schema, skein_channel::Role::Responder, channel, 1, Box::new([]))
+    skein_fake_channel::ScriptedPeer::new(schema, skein_channel::Role::Responder, channel, wire::VERSION, Box::new([]))
         .expect("engine")
 }
 

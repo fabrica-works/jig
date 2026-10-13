@@ -37,6 +37,7 @@ impl Referee {
             | Event::Down(_)
             | Event::Prepared { .. }
             | Event::Unprepared { .. }
+            | Event::StartRefused { .. }
             | Event::Yielded { .. }
             | Event::Faulted { .. }
             | Event::Gone { .. }

@@ -1,4 +1,4 @@
-family jig-worker-wire 1
+family jig-worker-wire 2
 
 # The worker's credential (protocol/channel.md, 4.1).
 record Credential { name: text 256 secret: secret 1024 payload: u32 }
@@ -44,7 +44,8 @@ record Call {
     input: bytes 1048576
     deadline: duration
 }
-enum Invalid { charter, transcript, grants, messages }
+record InvalidStart { why: bytes 4096 }
+enum Invalid { charter, transcript, grants, messages, start: InvalidStart }
 record InvalidValue { value: Invalid }
 enum Refusal { busy, invalid: InvalidValue }
 record RefusalValue { value: Refusal }

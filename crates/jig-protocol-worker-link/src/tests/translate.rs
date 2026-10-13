@@ -2,7 +2,7 @@ use crate::{Request, tests::fixtures, translate};
 use jig_domain_host as host;
 use jig_protocol_worker_wire::{self as wire, Part};
 use skein_lib::{List, Queue, Reader, Time, Token};
-fn translated(kind: u16, bytes: &[u8], limits: &wire::v1::Limits) -> (host::LinkDown, Box<[Part]>, Queue<Request>) {
+fn translated(kind: u16, bytes: &[u8], limits: &wire::v2::Limits) -> (host::LinkDown, Box<[Part]>, Queue<Request>) {
     let mut parts = List::with_capacity(1);
     let mut values = Queue::with_capacity(4);
     let down =
@@ -149,4 +149,19 @@ fn the_hello_carries_the_hubs_agent_bounds_and_hosting() {
         (bounds.turns(), bounds.spend(), bounds.inbox(), bounds.message_bytes(), bounds.unacknowledged()),
         (1, 10, 1, 16, 1)
     );
+}
+
+#[test]
+fn a_hub_invalid_start_keeps_its_words_in_the_answer_record() {
+    let host::LinkUp::Answer { run, attempt, mut answer } = fixtures::answer() else { panic!("answer") };
+    answer.ending = host::Ending::Refused(host::Refusal::Invalid(host::Invalid::Start {
+        why: b"budget too small".as_slice().into(),
+    }));
+    let frame = translate::up(host::LinkUp::Answer { run, attempt, answer }, &[], &fixtures::codec())
+        .expect("invalid start answer");
+    let record = wire::Answer::decode(&fixtures::codec(), &mut body(&frame)).expect("answer");
+    let wire::Ending::Refused(refusal) = record.ending() else { panic!("refusal") };
+    let wire::Refusal::Invalid(invalid) = refusal.value() else { panic!("invalid") };
+    let wire::Invalid::Start(start) = invalid.value() else { panic!("start") };
+    assert_eq!(start.why(), b"budget too small");
 }

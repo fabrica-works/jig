@@ -647,6 +647,7 @@ impl World {
             | Event::RelayCancelled { .. }
             | Event::Withdrawn { .. }
             | Event::Refused { .. }
+            | Event::StartRefused { .. }
             | Event::Yielded { .. }
             | Event::Turn { .. }
             | Event::Faulted { .. } => Taken::Other,

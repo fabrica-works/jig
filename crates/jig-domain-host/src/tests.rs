@@ -653,3 +653,105 @@ fn an_assignment_is_refused_by_its_run_and_attempt() {
         })]
     );
 }
+
+fn pending_start(h: &mut Harness, run: u64) -> (Token, Token) {
+    let (owner, workspace) = h.assign(run);
+    let requests = h.step(Event::Prepared { owner, workspace });
+    let [Request::Start { owner: started, start }] = &*requests else { panic!("expected start: {requests:?}") };
+    assert_eq!((*started, start.workspace), (owner, Some(workspace)));
+    (owner, workspace)
+}
+
+#[test]
+fn a_refused_start_answers_invalid_with_its_words_and_frees_its_slot() {
+    let mut h = Harness::new();
+    let (owner, workspace) = pending_start(&mut h, 1);
+    let _other = h.assign(2);
+    let requests =
+        h.step(Event::from_agent(crate::FromAgent::StartRefused { owner, why: b"budget".as_slice().into() }));
+    assert_eq!(
+        requests.as_ref(),
+        &[
+            Request::Release { workspace },
+            Request::Up(LinkUp::Answer {
+                run: Token::new(1),
+                attempt: Token::new(1001),
+                answer: crate::Answer {
+                    turns: 0,
+                    spent: 0,
+                    read: None,
+                    refused: Box::new([]),
+                    ending: crate::Ending::Refused(Refusal::Invalid(Invalid::Start {
+                        why: b"budget".as_slice().into(),
+                    })),
+                },
+            }),
+        ]
+    );
+    assert_eq!(h.domain.kept_answers(), 0);
+    h.domain.reclaim();
+    let _replacement = h.assign(3);
+}
+
+#[test]
+fn a_refused_starts_words_keep_only_the_bounded_detail_tail() {
+    let mut h = Harness::new();
+    let (owner, _) = pending_start(&mut h, 1);
+    let requests =
+        h.step(Event::from_agent(crate::FromAgent::StartRefused { owner, why: b"prefix detailed".as_slice().into() }));
+    let [Request::Release { .. }, Request::Up(LinkUp::Answer { answer, .. })] = &*requests else {
+        panic!("expected refusal: {requests:?}")
+    };
+    assert_eq!(
+        answer.ending,
+        crate::Ending::Refused(Refusal::Invalid(Invalid::Start { why: b"detailed".as_slice().into() }))
+    );
+}
+
+#[test]
+fn gone_while_starting_still_answers_an_unstarted_agent_failure() {
+    let mut h = Harness::new();
+    let (owner, workspace) = pending_start(&mut h, 1);
+    let requests = h.step(Event::Gone { owner, detail: b"exit".as_slice().into() });
+    assert_eq!(
+        requests.as_ref(),
+        &[
+            Request::Release { workspace },
+            Request::Up(LinkUp::Answer {
+                run: Token::new(1),
+                attempt: Token::new(1001),
+                answer: crate::Answer {
+                    turns: 0,
+                    spent: 0,
+                    read: None,
+                    refused: Box::new([]),
+                    ending: crate::Ending::Failed {
+                        failure: Failure::Agent(crate::AgentFailure::Unstarted),
+                        detail: b"exit".as_slice().into(),
+                        work: Work { left: None, saved: None },
+                    },
+                },
+            }),
+        ]
+    );
+}
+
+#[test]
+fn a_start_refusal_after_cancel_keeps_the_cancellations_answer() {
+    let mut h = Harness::new();
+    let (owner, _) = pending_start(&mut h, 1);
+    assert!(h.step(Event::Down(LinkDown::Cancel { run: Token::new(1), attempt: Token::new(1001) })).is_empty());
+    let requests =
+        h.step(Event::from_agent(crate::FromAgent::StartRefused { owner, why: b"budget".as_slice().into() }));
+    let [Request::Release { .. }, Request::Up(LinkUp::Answer { answer, .. })] = &*requests else {
+        panic!("expected cancellation: {requests:?}")
+    };
+    assert_eq!(
+        answer.ending,
+        crate::Ending::Failed {
+            failure: Failure::Cancelled(Reason::Engine),
+            detail: b"budget".as_slice().into(),
+            work: Work { left: None, saved: None },
+        }
+    );
+}

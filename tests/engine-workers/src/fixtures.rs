@@ -125,7 +125,7 @@ pub fn peer(
 }
 #[must_use]
 pub fn worker(name: &[u8], secret: &[u8], payload: u32) -> skein_fake_channel::ScriptedPeer {
-    peer(schema(), 1, name, secret, payload)
+    peer(schema(), jig_protocol_worker_wire::VERSION, name, secret, payload)
 }
 
 #[must_use]
@@ -288,7 +288,7 @@ pub fn exhausted_record() -> jig_protocol_worker_wire::Exhausted {
     .expect("exhausted")
 }
 
-fn codec() -> jig_protocol_worker_wire::v1::Limits {
+fn codec() -> jig_protocol_worker_wire::v2::Limits {
     jig_protocol_worker_wire::sizes::limits(&SIZES).expect("small codec")
 }
 fn refused_messages() -> skein_lib::List<jig_protocol_worker_wire::Refused> {
