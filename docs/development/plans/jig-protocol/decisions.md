@@ -2144,6 +2144,21 @@ the file.
      they are equal, keeps the read as sent in the retained payload, and
      refuses a read before it. 27.s1's Files and Shape are amended; the
      tasks domain does not change.
+261. **Refusals the engine never provokes come from the fake channel
+     peer** (2026-10-13, the coordinator's block "jig 27.1: native refusal
+     story admission bounds", 2026-10-13T11:23:22Z). smith's `Full` and
+     `NameInUse` refusals need a ninth unread message past an inbox of
+     eight, or a replay; the core's relays keep to the worker's advertised
+     inbox and the fleet admits no worker whose inbox the run's does not
+     fit, so the real engine never reaches them on an honestly admitted
+     worker. As proposed: 27.1's stories for those two take the
+     independent `skein-fake-channel` worker peer reporting each typed
+     refusal with a recorded turn or result; ordinary runs and the
+     reachable refusals (too large, replay) keep the real smith agent and
+     fake provider. No worker advertised falsely. If the ending story
+     confirms that an answer's refused names are validated and not kept
+     (`route_answer_payload`), the failing assertion stays and the session
+     raises it.
 
 ## For the user
 
