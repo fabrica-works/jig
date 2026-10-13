@@ -111,6 +111,19 @@ the file.
 
 (The supervisor's, from 101.)
 
+101. **skein 02.2 regenerates all four of `tests/codec`'s families**
+     (plan defect, skein 02's block of 2026-10-13T23:15:24Z). 02.2's Files
+     named only `tests/codec/src/generated/`, but `tests/codec/tests/drift.rs`
+     checks four schemas against their generated code (`src/secrets/v1.rs`,
+     `src/generated/v1.rs`, `src/scalars/v1.rs`, `src/lints/v1.rs`), so the
+     generator's change fails three drift tests unless all four regenerate.
+     They regenerate, once, with the drift test's own variable
+     (`SKEIN_CODEGEN_WRITE=1 cargo nextest run -p skein-codec-tests --test
+     drift`, through `heavy`); nothing in them is edited by hand, and the
+     golden `.bin` files stay unchanged. 02.2's Files now names the four
+     families. Generated code counts toward neither the Size nor the
+     20-line allowance outside Files (development.md, 8.2).
+
 ## For the user
 
 - **No benchmark probe for smith's readers** (decision 9): smith's
