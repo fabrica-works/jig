@@ -340,3 +340,68 @@ pub fn answer_frame() -> skein_channel::Frame {
     let answer = answer_record();
     encoded(0x0103, answer.measure(), |writer| answer.encode(writer))
 }
+
+pub const TOKEN_ONE: &[u8] = b"TOKEN_ONE";
+pub const TOKEN_TWO: &[u8] = b"TOKEN_TWO";
+pub const ACCOUNT_ID: &[u8] = b"ID_ONE";
+pub const IDENTITY: [u8; 16] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+#[must_use]
+pub fn grant(table: jig_domain_host::GrantTable) -> jig_domain_host::Grant {
+    jig_domain_host::Grant { table, account: 1, generation: 4, valid: Duration::from_secs(30) }
+}
+#[must_use]
+pub fn values() -> Box<[Option<jig_protocol_engine_workers::GrantValue>]> {
+    Box::new([
+        Some(jig_protocol_engine_workers::GrantValue {
+            value: Secret::new(Box::from(TOKEN_ONE)),
+            account_id: Secret::new(Box::from(ACCOUNT_ID)),
+        }),
+        Some(jig_protocol_engine_workers::GrantValue {
+            value: Secret::new(Box::from(TOKEN_TWO)),
+            account_id: Secret::new(Box::new([])),
+        }),
+    ])
+}
+#[must_use]
+pub fn parts() -> Box<[jig_protocol_worker_wire::Part]> {
+    Box::new([jig_protocol_worker_wire::Part {
+        token: skein_lib::Token::new(500),
+        bytes: Box::from(b"items".as_slice()),
+    }])
+}
+#[must_use]
+pub fn assignment() -> jig_domain_host::Assignment {
+    use jig_domain_host as host;
+    use skein_lib::Token;
+    host::Assignment {
+        assignment: host::RunAssignment {
+            run: Token::new(7),
+            attempt: Token::new(2),
+            identity: IDENTITY,
+            workspace: Some(host::Workspace { workstream: 9, items: Token::new(500) }),
+            save: true,
+            charter: Box::from(b"charter".as_slice()),
+            grants: Box::new([grant(host::GrantTable::Accounts), grant(host::GrantTable::Application)]),
+        },
+        turns: Box::new([Box::from([0, 127]), Box::from([255, 1, 2])]),
+        answered: Box::new([host::AnsweredCall {
+            name: Box::from([0, 2, 7]),
+            tool: Box::from(b"read".as_slice()),
+            answer: host::SettledAnswer::Host { error: true, body: Box::from(b"answer".as_slice()) },
+        }]),
+        messages: Box::new([host::StartMessage {
+            name: Token::new(8),
+            sender: Box::from(b"sender".as_slice()),
+            words: Box::from(b"message".as_slice()),
+        }]),
+    }
+}
+#[must_use]
+pub fn assignment_down(channel: skein_lib::Token) -> jig_protocol_engine_workers::Event {
+    jig_protocol_engine_workers::Event::Down {
+        channel,
+        down: jig_domain_host::LinkDown::Assign { assignment: assignment() },
+        parts: parts(),
+        values: values(),
+    }
+}

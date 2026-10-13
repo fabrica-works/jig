@@ -24,6 +24,7 @@ pub struct Component {
     next_channel: u64,
     next_part: u64,
     stopping: bool,
+    dropped_down: u64,
 }
 impl Component {
     pub fn new(limits: &Limits, workers: Box<[Worker]>, payload: u32) -> Result<Self, Unusable> {
@@ -54,6 +55,7 @@ impl Component {
             next_channel: 1,
             next_part: 1,
             stopping: false,
+            dropped_down: 0,
         })
     }
     pub fn down(&mut self, now: Time, event: Event, out: &mut Queue<Request>) {
@@ -72,16 +74,24 @@ impl Component {
                 }
             }
             Event::Stop | Event::Close | Event::Abort => self.stopping = true,
-            Event::Down { .. } => {}
-            Event::NotAdmitted { channel, text } => {
-                let mut target = None;
-                for (connection, state) in &self.connections {
-                    if state.channel == channel && state.heard {
-                        target = Some(*connection);
-                        break;
-                    }
+            Event::Down { channel, down, parts, values } => {
+                if let Some(connection) = self.target(channel) {
+                    let record = crate::translate::down(down, &parts, values, &self.codec);
+                    self.send(now, connection, record, out);
+                } else {
+                    self.dropped_down = self.dropped_down.saturating_add(1);
                 }
-                if let Some(connection) = target {
+            }
+            Event::TurnBusy { channel, run, attempt, turn } => {
+                if let Some(connection) = self.target(channel) {
+                    let record = crate::translate::turn_busy(run, attempt, turn, &self.codec);
+                    self.send(now, connection, Some(record), out);
+                } else {
+                    self.dropped_down = self.dropped_down.saturating_add(1);
+                }
+            }
+            Event::NotAdmitted { channel, text } => {
+                if let Some(connection) = self.target(channel) {
                     let mut state = self.connections.remove(&connection).expect("heard channel has its connection");
                     self.refuse(now, connection, &mut state, Reason::NotAdmitted.code(), text, out);
                     self.progress(now, connection, &mut state, out);
@@ -89,6 +99,24 @@ impl Component {
                 }
             }
         }
+    }
+    fn target(&self, channel: Token) -> Option<Token> {
+        for (connection, state) in &self.connections {
+            if state.channel == channel && state.heard && state.phase == Phase::Open {
+                return Some(*connection);
+            }
+        }
+        None
+    }
+    fn send(&mut self, now: Time, connection: Token, record: Option<crate::translate::Down>, out: &mut Queue<Request>) {
+        let Some(record) = record else {
+            self.dropped_down = self.dropped_down.saturating_add(1);
+            return;
+        };
+        let mut state = self.connections.remove(&connection).expect("heard channel exists");
+        state.down(ChannelRequest::Send { token: state.channel, frame: record.frame() }, connection, out);
+        self.progress(now, connection, &mut state, out);
+        self.keep(connection, state);
     }
     fn accepted(&mut self, now: Time, connection: Token, out: &mut Queue<Request>) {
         if self.connections.len() == self.connections.capacity() || self.connections.contains_key(&connection) {
@@ -280,6 +308,11 @@ impl Component {
             }
         }
         next
+    }
+    /// Outputs dropped because their channel, parts or values are unavailable, or bounds do not fit.
+    #[must_use]
+    pub fn dropped_down(&self) -> u64 {
+        self.dropped_down
     }
     pub fn reclaim(&mut self) {}
 }

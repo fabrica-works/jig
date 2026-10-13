@@ -317,3 +317,226 @@ pub(crate) fn call(record: wire::Call) -> host::LinkUp {
         deadline: fields.deadline,
     }
 }
+
+/// These records are private to the translation; the wire crate exposes individual codecs.
+#[derive(Debug)]
+pub(crate) enum Down {
+    Assign(wire::Assignment),
+    Message(wire::Inbound),
+    Relayed(wire::Relayed),
+    TurnKept(wire::TurnKept),
+    TurnBusy(wire::TurnBusy),
+    Acknowledge(wire::Acknowledge),
+    Cancel(wire::Cancel),
+    Grant(wire::Granted),
+}
+impl Down {
+    pub fn frame(self) -> skein_channel::Frame {
+        let (kind, length) = match &self {
+            Self::Assign(record) => (0x0180, record.measure()),
+            Self::Message(record) => (0x0181, record.measure()),
+            Self::Relayed(record) => (0x0182, record.measure()),
+            Self::TurnKept(record) => (0x0183, record.measure()),
+            Self::TurnBusy(record) => (0x0184, record.measure()),
+            Self::Acknowledge(record) => (0x0185, record.measure()),
+            Self::Cancel(record) => (0x0186, record.measure()),
+            Self::Grant(record) => (0x0187, record.measure()),
+        };
+        let mut writer = skein_channel::frame_writer(kind, length).expect("checked record fits a frame");
+        let mut body = skein_lib::Writer::new(usize::try_from(length).expect("checked body length"));
+        let encoded = match self {
+            Self::Assign(record) => record.encode(&mut body),
+            Self::Message(record) => record.encode(&mut body),
+            Self::Relayed(record) => record.encode(&mut body),
+            Self::TurnKept(record) => record.encode(&mut body),
+            Self::TurnBusy(record) => record.encode(&mut body),
+            Self::Acknowledge(record) => record.encode(&mut body),
+            Self::Cancel(record) => record.encode(&mut body),
+            Self::Grant(record) => record.encode(&mut body),
+        };
+        encoded.expect("measured record");
+        writer.put(&body.finish()).expect("measured body fits frame");
+        writer.finish().expect("complete record")
+    }
+}
+pub(crate) fn down(
+    down: host::LinkDown,
+    parts: &[wire::Part],
+    values: Box<[Option<crate::GrantValue>]>,
+    limits: &wire::v1::Limits,
+) -> Option<Down> {
+    match down {
+        host::LinkDown::Assign { assignment } => {
+            Some(Down::Assign(assignment_record(assignment, parts, values, limits)?))
+        }
+        host::LinkDown::Message { run, attempt, name, sender, words } => Some(Down::Message(
+            wire::Inbound::new(
+                limits,
+                wire::InboundParts { task: run.raw(), attempt: attempt.raw(), name: name.raw(), sender, words },
+            )
+            .ok()?,
+        )),
+        host::LinkDown::Relayed { run, attempt, call, answer } => {
+            let answer = match answer {
+                host::Relayed::Busy => wire::RelayAnswer::Busy,
+                host::Relayed::Answer { error, text } => {
+                    wire::RelayAnswer::Text(wire::RelayText::new(limits, wire::RelayTextParts { error, text }).ok()?)
+                }
+            };
+            Some(Down::Relayed(
+                wire::Relayed::new(
+                    limits,
+                    wire::RelayedParts { task: run.raw(), attempt: attempt.raw(), name: call, answer },
+                )
+                .ok()?,
+            ))
+        }
+        host::LinkDown::TurnKept { run, attempt, turn } => Some(Down::TurnKept(
+            wire::TurnKept::new(limits, wire::TurnKeptParts { task: run.raw(), attempt: attempt.raw(), number: turn })
+                .ok()?,
+        )),
+        host::LinkDown::Acknowledge { run, attempt } => Some(Down::Acknowledge(
+            wire::Acknowledge::new(limits, wire::AcknowledgeParts { task: run.raw(), attempt: attempt.raw() }).ok()?,
+        )),
+        host::LinkDown::Cancel { run, attempt } => Some(Down::Cancel(
+            wire::Cancel::new(limits, wire::CancelParts { task: run.raw(), attempt: attempt.raw() }).ok()?,
+        )),
+        host::LinkDown::Grant { run, attempt, grant } => {
+            let value = values.into_iter().next()??;
+            let grant = grant_record(grant, value, limits)?;
+            Some(Down::Grant(
+                wire::Granted::new(limits, wire::GrantedParts { task: run.raw(), attempt: attempt.raw(), grant })
+                    .ok()?,
+            ))
+        }
+    }
+}
+fn assignment_record(
+    assignment: host::Assignment,
+    parts: &[wire::Part],
+    values: Box<[Option<crate::GrantValue>]>,
+    limits: &wire::v1::Limits,
+) -> Option<wire::Assignment> {
+    let run = assignment.assignment;
+    let workspace = match run.workspace {
+        Some(workspace) => Some(
+            wire::Workspace::new(
+                limits,
+                wire::WorkspaceParts { workstream: workspace.workstream, items: part(workspace.items, parts)? },
+            )
+            .ok()?,
+        ),
+        None => None,
+    };
+    let mut messages = List::with_capacity(limits.assignment_messages);
+    for message in assignment.messages {
+        messages
+            .push(
+                wire::Message::new(
+                    limits,
+                    wire::MessageParts { name: message.name.raw(), sender: message.sender, words: message.words },
+                )
+                .ok()?,
+            )
+            .ok()?;
+    }
+    let mut answered = List::with_capacity(limits.assignment_answered);
+    for call in assignment.answered {
+        let answer = settled(call.answer, limits)?;
+        answered
+            .push(
+                wire::AnsweredCall::new(limits, wire::AnsweredCallParts { name: call.name, tool: call.tool, answer })
+                    .ok()?,
+            )
+            .ok()?;
+    }
+    let mut grants = List::with_capacity(limits.assignment_grants);
+    for (grant, value) in run.grants.into_iter().zip(values) {
+        if let Some(value) = value {
+            grants.push(grant_record(grant, value, limits)?).ok()?;
+        }
+    }
+    let transcript = transcript(&assignment.turns, limits.assignment_transcript)?;
+    wire::Assignment::new(
+        limits,
+        wire::AssignmentParts {
+            task: run.run.raw(),
+            attempt: run.attempt.raw(),
+            identity: run.identity,
+            workspace,
+            save: run.save,
+            charter: run.charter,
+            transcript,
+            answered,
+            messages,
+            grants,
+        },
+    )
+    .ok()
+}
+fn part(token: Token, parts: &[wire::Part]) -> Option<Box<[u8]>> {
+    for part in parts {
+        if part.token == token {
+            return Some(part.bytes.clone());
+        }
+    }
+    None
+}
+fn transcript(turns: &[Box<[u8]>], bound: u32) -> Option<Box<[u8]>> {
+    let mut length = 0_u32;
+    for turn in turns {
+        length = length.checked_add(u32::try_from(turn.len()).ok()?.checked_add(4)?)?;
+        if length > bound {
+            return None;
+        }
+    }
+    let mut writer = skein_lib::Writer::new(usize::try_from(length).ok()?);
+    for turn in turns {
+        skein_codec::piece::write(&mut writer, turn).ok()?;
+    }
+    Some(writer.finish())
+}
+fn grant_record(grant: host::Grant, value: crate::GrantValue, limits: &wire::v1::Limits) -> Option<wire::Grant> {
+    let table = match grant.table {
+        host::GrantTable::Accounts => wire::GrantTable::Accounts,
+        host::GrantTable::Application => wire::GrantTable::Application,
+    };
+    wire::Grant::new(
+        limits,
+        wire::GrantParts {
+            table,
+            account: grant.account,
+            generation: grant.generation,
+            valid: grant.valid,
+            value: value.value,
+            account_id: value.account_id,
+        },
+    )
+    .ok()
+}
+fn settled(answer: host::SettledAnswer, limits: &wire::v1::Limits) -> Option<wire::SettledAnswer> {
+    match answer {
+        host::SettledAnswer::Host { error, body } => {
+            Some(wire::SettledAnswer::Host(wire::HostAnswer::new(limits, wire::HostAnswerParts { error, body }).ok()?))
+        }
+        host::SettledAnswer::Delivery { outcome, evidence } => {
+            let outcome = match outcome {
+                host::DeliveryOutcome::Delivered => wire::DeliveryOutcome::Delivered,
+                host::DeliveryOutcome::Nothing => wire::DeliveryOutcome::Nothing,
+                host::DeliveryOutcome::Stale => wire::DeliveryOutcome::Stale,
+                host::DeliveryOutcome::Refused => wire::DeliveryOutcome::Refused,
+                host::DeliveryOutcome::Failed => wire::DeliveryOutcome::Failed,
+            };
+            Some(wire::SettledAnswer::Delivery(
+                wire::DeliveryAnswer::new(limits, wire::DeliveryAnswerParts { outcome, evidence }).ok()?,
+            ))
+        }
+    }
+}
+
+pub(crate) fn turn_busy(run: Token, attempt: Token, turn: u32, limits: &wire::v1::Limits) -> Down {
+    Down::TurnBusy(
+        wire::TurnBusy::new(limits, wire::TurnBusyParts { task: run.raw(), attempt: attempt.raw(), number: turn })
+            .expect("fixed turn busy fields fit"),
+    )
+}

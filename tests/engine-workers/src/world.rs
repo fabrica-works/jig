@@ -103,6 +103,14 @@ impl World {
     pub fn gone(&self, connection: Token) -> bool {
         self.nets.get(&connection).expect("known stream").gone
     }
+    #[must_use]
+    pub fn observed(&self, connection: Token) -> &[skein_fake_channel::Observed] {
+        self.nets.get(&connection).expect("known stream").peer.observed()
+    }
+    #[must_use]
+    pub fn dropped_down(&self) -> u64 {
+        self.component.dropped_down()
+    }
     pub fn withhold_write_room(&mut self, connection: Token) {
         self.net(connection).write_room = false;
     }

@@ -126,3 +126,108 @@ mod records {
         );
     }
 }
+
+mod down_records {
+    use jig_domain_host::LinkDown;
+    use jig_engine_workers_world::{World, fixtures};
+    use jig_protocol_engine_workers::{Event, Request};
+    use skein_lib::Token;
+
+    fn world() -> World {
+        World::new(&fixtures::limits(), &fixtures::workers(), 1)
+    }
+    fn joined() -> (World, Token, Token) {
+        let mut world = world();
+        let connection = world.connect(fixtures::reporting_worker(fixtures::WORKER_A, fixtures::SECRET_A));
+        world.run();
+        let Request::Hello { channel, .. } = world.root()[0] else {
+            panic!("hello first");
+        };
+        (world, connection, channel)
+    }
+    fn send(world: &mut World, channel: Token, down: LinkDown) {
+        world.down(Event::Down { channel, down, parts: Box::new([]), values: Box::new([]) });
+    }
+    fn records() -> [LinkDown; 5] {
+        let run = Token::new(7);
+        let attempt = Token::new(2);
+        [
+            LinkDown::Message {
+                run,
+                attempt,
+                name: Token::new(8),
+                sender: Box::from(b"sender".as_slice()),
+                words: Box::from(b"message".as_slice()),
+            },
+            LinkDown::Relayed { run, attempt, call: Box::from([0, 2, 7]), answer: jig_domain_host::Relayed::Busy },
+            LinkDown::TurnKept { run, attempt, turn: 3 },
+            LinkDown::Acknowledge { run, attempt },
+            LinkDown::Cancel { run, attempt },
+        ]
+    }
+    #[test]
+    fn each_down_record_reaches_the_worker_in_order() {
+        let (mut world, connection, channel) = joined();
+        world.down(fixtures::assignment_down(channel));
+        for record in records() {
+            send(&mut world, channel, record);
+        }
+        world.down(turn_busy(channel));
+        world.down(Event::Down {
+            channel,
+            down: LinkDown::Grant {
+                run: Token::new(7),
+                attempt: Token::new(2),
+                grant: fixtures::grant(jig_domain_host::GrantTable::Accounts),
+            },
+            parts: Box::new([]),
+            values: Box::new([fixtures::values()[0].take()]),
+        });
+        world.run();
+        let kinds: Vec<_> = world.observed(connection).iter().map(|record| record.kind).collect();
+        assert_eq!(kinds, [0x0180, 0x0181, 0x0182, 0x0183, 0x0185, 0x0186, 0x0184, 0x0187]);
+    }
+    #[test]
+    fn a_replaced_channel_receives_no_later_down_record() {
+        let (mut world, older, channel) = joined();
+        let newer = world.connect(fixtures::reporting_worker(fixtures::WORKER_A, fixtures::SECRET_A));
+        world.run();
+        world.down(fixtures::assignment_down(channel));
+        world.run();
+        for connection in [older, newer] {
+            assert!(world.observed(connection).iter().all(|record| record.kind != 0x0180));
+        }
+        assert_eq!(world.dropped_down(), 1);
+    }
+    fn turn_busy(channel: Token) -> Event {
+        Event::TurnBusy { channel, run: Token::new(7), attempt: Token::new(2), turn: 3 }
+    }
+    fn busy(world: &mut World, channel: Token) {
+        world.down(turn_busy(channel));
+        world.run();
+    }
+    #[test]
+    fn a_turn_busy_reaches_the_worker_with_its_attempt_and_turn() {
+        let (mut world, connection, channel) = joined();
+        busy(&mut world, channel);
+        let record = world.observed(connection).iter().find(|record| record.kind == 0x0184).expect("busy crossed");
+        assert_eq!(record.body.as_ref(), &[0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 3]);
+    }
+    #[test]
+    fn a_turn_busy_for_a_lost_channel_is_dropped() {
+        let (mut world, connection, channel) = joined();
+        world.down(Event::Gone { connection });
+        busy(&mut world, channel);
+        assert!(world.observed(connection).iter().all(|record| record.kind != 0x0184));
+        assert_eq!(world.dropped_down(), 1);
+    }
+    #[test]
+    fn a_turn_busy_before_the_hello_is_dropped() {
+        let mut world = world();
+        let connection = world.connect(fixtures::worker(fixtures::WORKER_A, fixtures::SECRET_A, fixtures::PAYLOAD));
+        world.run();
+        busy(&mut world, Token::new(1));
+        assert!(world.observed(connection).iter().all(|record| record.kind != 0x0184));
+        assert_eq!(world.dropped_down(), 1);
+    }
+}

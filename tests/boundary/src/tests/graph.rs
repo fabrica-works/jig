@@ -579,7 +579,10 @@ fn engine_worker_channels_link_only_their_boundary_and_foundation() {
     assert_eq!(roots.len(), 1, "one engine worker channel component");
     let mut dependencies = roots[0].dependencies.clone();
     dependencies.sort();
-    assert_eq!(dependencies, ["jig-domain-host", "jig-protocol-worker-wire", "skein-channel", "skein-io", "skein-lib"]);
+    assert_eq!(
+        dependencies,
+        ["jig-domain-host", "jig-protocol-worker-wire", "skein-channel", "skein-codec", "skein-io", "skein-lib"]
+    );
 }
 
 #[test]

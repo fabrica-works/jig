@@ -151,3 +151,241 @@ fn a_failed_answers_resource_precedes_its_left_and_saved_parts() {
     assert_eq!(parts[1].bytes.as_ref(), b"left");
     assert_eq!(parts[2].bytes.as_ref(), b"saved");
 }
+
+fn down(record: jig_domain_host::LinkDown) -> translate::Down {
+    use jig_domain_host::LinkDown;
+    let translated = match record {
+        LinkDown::Assign { .. } | LinkDown::Grant { .. } => {
+            translate::down(record, &fixtures::parts(), fixtures::values(), &codec())
+        }
+        LinkDown::Message { .. }
+        | LinkDown::Relayed { .. }
+        | LinkDown::TurnKept { .. }
+        | LinkDown::Acknowledge { .. }
+        | LinkDown::Cancel { .. } => translate::down(record, &[], Box::new([]), &codec()),
+    };
+    translated.expect("complete output")
+}
+fn codec() -> jig_protocol_worker_wire::v1::Limits {
+    jig_protocol_worker_wire::sizes::limits(&fixtures::SIZES).expect("small codec")
+}
+fn assignment_output() -> jig_domain_host::LinkDown {
+    jig_domain_host::LinkDown::Assign { assignment: fixtures::assignment() }
+}
+fn assigned() -> jig_protocol_worker_wire::Assignment {
+    assignment_record(down(assignment_output()))
+}
+fn assignment_record(record: translate::Down) -> jig_protocol_worker_wire::Assignment {
+    let translate::Down::Assign(record) = record else {
+        panic!("assignment");
+    };
+    record
+}
+#[test]
+fn an_assignment_keeps_its_start_messages_and_identity() {
+    let fields = assigned().into_parts();
+    assert_eq!((fields.task, fields.attempt), (7, 2));
+    assert_eq!(fields.identity, fixtures::IDENTITY);
+    assert_eq!(fields.messages.len(), 1);
+    let message = &fields.messages.get(0).expect("message");
+    assert_eq!(message.name(), 8);
+    assert_eq!(message.sender(), b"sender");
+    assert_eq!(message.words(), b"message");
+}
+#[test]
+fn an_assignments_items_come_from_their_part() {
+    let fields = assigned().into_parts();
+    let workspace = fields.workspace.expect("workspace");
+    assert_eq!(workspace.workstream(), 9);
+    assert_eq!(workspace.items(), b"items");
+    assert!(fields.save);
+}
+#[test]
+fn a_missing_workspace_part_drops_the_assignment() {
+    assert!(translate::down(assignment_output(), &[], fixtures::values(), &codec(),).is_none());
+}
+#[test]
+fn an_assignments_window_is_one_piece_with_each_turns_length() {
+    assert_eq!(assigned().transcript(), &[0, 0, 0, 2, 0, 127, 0, 0, 0, 3, 255, 1, 2]);
+}
+#[test]
+fn a_transcript_past_its_bound_including_lengths_drops_the_assignment() {
+    let mut limits = codec();
+    limits.assignment_transcript = 12;
+    assert!(translate::down(assignment_output(), &fixtures::parts(), fixtures::values(), &limits,).is_none());
+}
+#[test]
+fn a_fresh_assignment_has_an_empty_transcript_piece() {
+    let mut assignment = fixtures::assignment();
+    assignment.turns = Box::new([]);
+    let record = assignment_record(down(jig_domain_host::LinkDown::Assign { assignment }));
+    assert!(record.transcript().is_empty());
+}
+#[test]
+fn a_grant_without_a_value_is_left_out() {
+    let record = assignment_record(
+        translate::down(
+            assignment_output(),
+            &fixtures::parts(),
+            Box::new([None, fixtures::values()[1].take()]),
+            &codec(),
+        )
+        .expect("assignment"),
+    );
+    assert_eq!(record.grants().len(), 1);
+    assert_eq!(assignment_grant(&record).table(), &jig_protocol_worker_wire::GrantTable::Application);
+    assert_eq!(assignment_grant(&record).value().expose(), fixtures::TOKEN_TWO);
+}
+#[test]
+fn a_standalone_grant_without_a_value_is_not_sent() {
+    assert!(
+        translate::down(
+            jig_domain_host::LinkDown::Grant {
+                run: Token::new(7),
+                attempt: Token::new(2),
+                grant: fixtures::grant(jig_domain_host::GrantTable::Accounts),
+            },
+            &[],
+            Box::new([None]),
+            &codec(),
+        )
+        .is_none()
+    );
+}
+#[test]
+fn a_down_event_debug_shows_value_lengths_only() {
+    let text = alloc::fmt::format(format_args!("{:?}", fixtures::assignment_down(Token::new(1))));
+    for secret in [fixtures::TOKEN_ONE, fixtures::TOKEN_TWO, fixtures::ACCOUNT_ID] {
+        for window in text.as_bytes().windows(secret.len()) {
+            assert_ne!(window, secret);
+        }
+        assert!(!text.contains(&alloc::fmt::format(format_args!("{secret:?}"))));
+    }
+    assert!(text.contains("Secret"));
+}
+#[test]
+fn a_relayed_busy_answer_carries_no_text() {
+    let translate::Down::Relayed(record) = down(jig_domain_host::LinkDown::Relayed {
+        run: Token::new(7),
+        attempt: Token::new(2),
+        call: Box::from([0, 2, 7]),
+        answer: jig_domain_host::Relayed::Busy,
+    }) else {
+        panic!("relayed");
+    };
+    assert_eq!((record.task(), record.attempt()), (7, 2));
+    assert_eq!(record.name(), &[0, 2, 7]);
+    assert_eq!(record.answer(), &jig_protocol_worker_wire::RelayAnswer::Busy);
+}
+#[test]
+fn a_turn_kept_record_names_the_turn() {
+    let translate::Down::TurnKept(record) =
+        down(jig_domain_host::LinkDown::TurnKept { run: Token::new(7), attempt: Token::new(2), turn: 3 })
+    else {
+        panic!("kept");
+    };
+    assert_eq!((record.task(), record.attempt(), record.number()), (7, 2, 3));
+}
+#[test]
+fn an_assignments_committed_call_keeps_its_answer() {
+    let fields = assigned().into_parts();
+    assert_eq!(fields.answered.len(), 1);
+    let call = answered_call(&fields.answered);
+    assert_eq!(call.name(), &[0, 2, 7]);
+    assert_eq!(call.tool(), b"read");
+    let jig_protocol_worker_wire::SettledAnswer::Host(answer) = call.answer() else {
+        panic!("host answer");
+    };
+    assert!(answer.error());
+    assert_eq!(answer.body(), b"answer");
+}
+
+#[test]
+fn a_message_record_keeps_its_name_sender_and_words() {
+    let translate::Down::Message(record) = down(jig_domain_host::LinkDown::Message {
+        run: Token::new(7),
+        attempt: Token::new(2),
+        name: Token::new(8),
+        sender: Box::from(b"sender".as_slice()),
+        words: Box::from(b"message".as_slice()),
+    }) else {
+        panic!("message");
+    };
+    assert_eq!((record.task(), record.attempt(), record.name()), (7, 2, 8));
+    assert_eq!(record.sender(), b"sender");
+    assert_eq!(record.words(), b"message");
+}
+#[test]
+fn a_relayed_answer_keeps_its_text_and_error() {
+    let translate::Down::Relayed(record) = down(jig_domain_host::LinkDown::Relayed {
+        run: Token::new(7),
+        attempt: Token::new(2),
+        call: Box::from([0, 2, 7]),
+        answer: jig_domain_host::Relayed::Answer { error: true, text: Box::from(b"error".as_slice()) },
+    }) else {
+        panic!("relayed");
+    };
+    let jig_protocol_worker_wire::RelayAnswer::Text(answer) = record.answer() else {
+        panic!("text");
+    };
+    assert!(answer.error());
+    assert_eq!(answer.text(), b"error");
+}
+#[test]
+fn an_acknowledgement_names_its_attempt() {
+    let translate::Down::Acknowledge(record) =
+        down(jig_domain_host::LinkDown::Acknowledge { run: Token::new(7), attempt: Token::new(2) })
+    else {
+        panic!("acknowledge");
+    };
+    assert_eq!((record.task(), record.attempt()), (7, 2));
+}
+#[test]
+fn a_cancel_names_its_attempt() {
+    let translate::Down::Cancel(record) =
+        down(jig_domain_host::LinkDown::Cancel { run: Token::new(7), attempt: Token::new(2) })
+    else {
+        panic!("cancel");
+    };
+    assert_eq!((record.task(), record.attempt()), (7, 2));
+}
+#[test]
+fn each_committed_delivery_outcome_keeps_its_evidence() {
+    use jig_domain_host as host;
+    use jig_protocol_worker_wire as wire;
+    for (input, expected) in [
+        (host::DeliveryOutcome::Delivered, wire::DeliveryOutcome::Delivered),
+        (host::DeliveryOutcome::Nothing, wire::DeliveryOutcome::Nothing),
+        (host::DeliveryOutcome::Stale, wire::DeliveryOutcome::Stale),
+        (host::DeliveryOutcome::Refused, wire::DeliveryOutcome::Refused),
+        (host::DeliveryOutcome::Failed, wire::DeliveryOutcome::Failed),
+    ] {
+        let mut assignment = fixtures::assignment();
+        assignment.answered[0].answer =
+            host::SettledAnswer::Delivery { outcome: input, evidence: Box::from([255, 0, 127]) };
+        let record = assignment_record(down(host::LinkDown::Assign { assignment }));
+        let call = answered_call(record.answered());
+        let wire::SettledAnswer::Delivery(answer) = call.answer() else {
+            panic!("delivery");
+        };
+        assert_eq!(answer.outcome(), &expected);
+        assert_eq!(answer.evidence(), &[255, 0, 127]);
+    }
+}
+
+fn assignment_grant(record: &jig_protocol_worker_wire::Assignment) -> &jig_protocol_worker_wire::Grant {
+    record.grants().get(0).expect("grant")
+}
+#[test]
+fn a_turn_busy_record_names_the_turn() {
+    let translate::Down::TurnBusy(record) = translate::turn_busy(Token::new(7), Token::new(2), 3, &codec()) else {
+        panic!("busy");
+    };
+    assert_eq!((record.task(), record.attempt(), record.number()), (7, 2, 3));
+}
+
+fn answered_call(
+    calls: &skein_lib::List<jig_protocol_worker_wire::AnsweredCall>,
+) -> &jig_protocol_worker_wire::AnsweredCall {
+    calls.get(0).expect("call")
+}

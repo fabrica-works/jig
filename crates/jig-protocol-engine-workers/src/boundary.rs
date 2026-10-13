@@ -17,11 +17,33 @@ pub struct GrantValue {
 }
 #[derive(Debug)]
 pub enum Event {
-    Accepted { connection: Token },
-    Lower { connection: Token, event: LowerEvent },
-    Gone { connection: Token },
-    Down { channel: Token, down: host::LinkDown, parts: Box<[Part]>, values: Box<[Option<GrantValue>]> },
-    NotAdmitted { channel: Token, text: Box<[u8]> },
+    Accepted {
+        connection: Token,
+    },
+    Lower {
+        connection: Token,
+        event: LowerEvent,
+    },
+    Gone {
+        connection: Token,
+    },
+    Down {
+        channel: Token,
+        down: host::LinkDown,
+        parts: Box<[Part]>,
+        values: Box<[Option<GrantValue>]>,
+    },
+    /// The fleet's busy answer, handled below the hub (protocol/channel.md, 5.2).
+    TurnBusy {
+        channel: Token,
+        run: Token,
+        attempt: Token,
+        turn: u32,
+    },
+    NotAdmitted {
+        channel: Token,
+        text: Box<[u8]>,
+    },
     Stop,
     Close,
     Abort,
