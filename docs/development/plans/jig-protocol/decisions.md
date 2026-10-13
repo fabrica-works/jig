@@ -2020,6 +2020,18 @@ the file.
      suite gets a test-cost pass (the suite and the code it tests made
      cheaper, as jig's focused suite's two passes did), then its budget
      goes back; listed under "For the user".
+250. **skein-03.s1: io makes durable what it makes by a path** (2026-10-13,
+     the designer's answer to question.md's "skein: a directory io makes,
+     and its entry's durability"; skein `63e81ded`, jig `e70bd54e`, smith
+     `1cdc3b20`, `22486b49`). After jig 18.s1 and 18.s2, the designer puts
+     the parent's sync in io (`MakeDirectory`, and `OpenPrivate` when it
+     makes its root), adds the shell's `make_root`, and has crash worlds
+     start with their roots absent. That fixes `skein-oauth-accounts`'
+     private root, and smith's credentials once smith takes it. smith's
+     shell makes its directories with std and never syncs them; that is
+     recorded for smith's own plan (`later.md`). A step not in the plan,
+     skein-03.s1 (`skein/03-files.md`), at most 120 lines; nothing waits
+     on it, and the final jig-repin takes it if it lands first.
 
 ## For the user
 
