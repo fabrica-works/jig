@@ -2367,6 +2367,17 @@ the file.
      answer, never the request's echo; verified on the fake provider, the
      live proof runs exactly once more (17 of 40 live runs used). If it
      fails again, it goes to the user.
+281. **temper takes the smith and skein jig's lock holds** (2026-10-13,
+     the coordinator's block "temper repin: current Smith main breaks
+     upstream Jig charter", 2026-10-13T19:26:35Z). temper-repin resolved
+     smith to its latest `main` (`ea3db980`), which smith's own machine
+     moved past jig's pin (a new `effort` in its charter's `Llm`), so
+     jig's `jig-protocol-charter` does not build in temper's graph.
+     Chasing smith's newer work is not this plan's: temper's lock takes
+     jig's `main` and exactly the smith and skein revisions jig's lock
+     holds, a stack that builds together, and the repin then measures
+     temper's own gap as the README's Repin section says (at most about
+     200 lines; else it lands nothing and records the gap).
 
 ## For the user
 
