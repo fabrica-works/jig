@@ -1,0 +1,17 @@
+[package]
+name = "jig-protocol-engine-workers"
+description = "Engine side of the workers channel"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+skein-lib.workspace = true
+skein-channel.workspace = true
+skein-io.workspace = true
+jig-protocol-worker-wire.workspace = true
+jig-domain-host.workspace = true
+
+[lints]
+workspace = true

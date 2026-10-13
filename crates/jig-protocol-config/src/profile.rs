@@ -15,6 +15,7 @@ pub struct Link {
     pub chunk: u32,
     pub name: u32,
     pub secret: u32,
+    pub names: u32,
     pub opening: u32,
     pub handshake: Duration,
     pub hello: Duration,

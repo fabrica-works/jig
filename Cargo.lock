@@ -311,6 +311,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "jig-engine-workers-world"
+version = "0.0.0"
+dependencies = [
+ "jig-protocol-engine-workers",
+ "jig-protocol-worker-wire",
+ "skein-channel",
+ "skein-fake-channel",
+ "skein-io",
+ "skein-lib",
+ "skein-world",
+]
+
+[[package]]
 name = "jig-fake-parties"
 version = "0.0.0"
 dependencies = [
@@ -554,6 +567,17 @@ dependencies = [
  "jig-domain-views",
  "skein-io",
  "skein-json",
+ "skein-lib",
+]
+
+[[package]]
+name = "jig-protocol-engine-workers"
+version = "0.0.0"
+dependencies = [
+ "jig-domain-host",
+ "jig-protocol-worker-wire",
+ "skein-channel",
+ "skein-io",
  "skein-lib",
 ]
 
@@ -825,6 +849,15 @@ dependencies = [
 name = "skein-codegen"
 version = "0.0.0"
 source = "git+https://github.com/forgetic/skein.git#4e6f2742541ca63c36db538c63ad20df992e0923"
+
+[[package]]
+name = "skein-fake-channel"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/skein.git#4e6f2742541ca63c36db538c63ad20df992e0923"
+dependencies = [
+ "skein-channel",
+ "skein-lib",
+]
 
 [[package]]
 name = "skein-fake-llm-domain"

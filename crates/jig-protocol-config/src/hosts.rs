@@ -21,8 +21,8 @@ pub(crate) fn parse(
     problems: &mut Problems,
 ) -> Option<Hosts> {
     let mut object = check::object(document, at, path, problems)?;
-    let mut workers = List::<WorkerName>::with_capacity(limits.core.fleet.workers);
-    if let Some(items) = check::list(&mut object, document, b"workers", limits.core.fleet.workers, path, problems) {
+    let mut workers = List::<WorkerName>::with_capacity(limits.link.names);
+    if let Some(items) = check::list(&mut object, document, b"workers", limits.link.names, path, problems) {
         for (index, at) in items.iter().enumerate() {
             let path =
                 path.member(b"workers").child(Segment::Index(u32::try_from(index).expect("list bounded by u32")));

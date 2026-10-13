@@ -12,7 +12,7 @@
 //! **budgets**: `task=4096, dependencies=2048, attempts=1024, plan=2048, notes=2048`.
 //! **core**: `fill_mark=268435456, connectors=2, resume_bytes=65536, run_bytes=16384, policy_bytes=16384, escalation_reason_bytes=512, load_slots=4, load_bytes=65536, call_records=32, call_answer_bytes=32768, tasks=TASKS, authority=AUTHORITY, people=PEOPLE, fleet=FLEET, brief=BRIEF, brief_parts=8, brief_core_budgets=BUDGETS, accounts=ACCOUNTS, notes=NOTES, documents=DOCUMENTS, views=VIEWS`.
 //! **hub**: `slots=2, accounts=8, charter_bytes=65536, transcript_bytes=262144, delivery_evidence_bytes=4096, turn_bytes=65536, outcome_bytes=4096, detail_bytes=4096, held=8, inbox=8, event_bytes=65536, run_calls=8, facts=64, told=64, turns=8, turn_queue_bytes=524288`.
-//! **link**: `chunk=16384, name=32, secret=256, opening=4, handshake=Duration::from_secs(10), hello=Duration::from_secs(10), ping=Duration::from_secs(5), silence=Duration::from_secs(15), stall=Duration::from_secs(30), backoff=Duration::from_millis(250), ceiling=Duration::from_secs(30), proved=Duration::from_secs(60), busy=Duration::from_secs(2), facts=64`.
+//! **link**: `chunk=16384, name=32, secret=256, names=8, opening=4, handshake=Duration::from_secs(10), hello=Duration::from_secs(10), ping=Duration::from_secs(5), silence=Duration::from_secs(15), stall=Duration::from_secs(30), backoff=Duration::from_millis(250), ceiling=Duration::from_secs(30), proved=Duration::from_secs(60), busy=Duration::from_secs(2), facts=64`.
 use super::{Limits, Link};
 use jig_domain_accounts as accounts;
 use jig_domain_authority as authority;
@@ -204,6 +204,7 @@ pub(super) const LINK: Link = Link {
     chunk: 16_384,
     name: 32,
     secret: 256,
+    names: 8,
     opening: 4,
     handshake: Duration::from_secs(10),
     hello: Duration::from_secs(10),

@@ -60,6 +60,8 @@ members = [
     "tests/store-codecs",
     "crates/jig-protocol-worker-wire",
     "tests/worker-wire",
+    "crates/jig-protocol-engine-workers",
+    "tests/engine-workers",
 ]
 
 [workspace.package]
@@ -69,6 +71,8 @@ rust-version = "1.95"
 publish = false
 
 [workspace.dependencies]
+jig-protocol-engine-workers = { path = "crates/jig-protocol-engine-workers" }
+skein-fake-channel = { git = "https://github.com/forgetic/skein.git" }
 skein-sim = { git = "https://github.com/forgetic/skein.git" }
 skein-fake-oauth = { git = "https://github.com/forgetic/skein.git" }
 skein-fake-peers = { git = "https://github.com/forgetic/skein.git" }

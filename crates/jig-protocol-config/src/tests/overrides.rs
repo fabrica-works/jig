@@ -272,6 +272,7 @@ const SMALL: &[(&[u8], u64)] = &[
     (b"link.chunk", 16_384),
     (b"link.name", 32),
     (b"link.secret", 256),
+    (b"link.names", 8),
     (b"link.opening", 4),
     (b"link.handshake_ms", 10_000),
     (b"link.hello_ms", 10_000),
