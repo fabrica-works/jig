@@ -1727,6 +1727,22 @@ the file.
      file's fallback, widening no contract, wire or keeper; the designer is
      asked its shape, its digest's keeper, its check and its step, which
      is added when answered.
+227. **A fixture gains what the real component requires, and an expected
+     value that sees exactly that gain changes with it** (2026-10-13, the
+     coordinator's block "jig 18.3: real-store deployment header
+     contradicts old whole-map emptiness assertions",
+     2026-10-13T06:30:51Z). The real store requires the first root
+     commit's deployment header, which the fake did not;
+     `tests/core/tests/store_peer.rs`'s
+     `whole_opaque_rows_remain_immutable_after_later_save_erase_and_store_mutation`
+     then cannot see an empty map after erasing its turn. Its fixture
+     commits the real header first, and its two `later[1].rows.is_empty()`
+     become exact equalities with the header's rows, built from the
+     fixture's own constant; name and every other assertion kept; the
+     other two raw-store tests take headers with no assertion changed.
+     18.3's "Don't: change an existing test's expected values to fit the
+     real store" stands for anything else. The README's Rules now say so
+     for any world moving to a real component.
 
 ## For the user
 

@@ -339,6 +339,14 @@ ones before it in its session. Dependencies are by capability: "skein
   rulings 114's or 122's limits; the commit body names the files. A test
   whose subject is the refused value itself is a removed mechanism's,
   under ruling 123.
+- **A fixture gains what the real component requires** (decisions.md,
+  ruling 227). Where a world moves to a real component that requires
+  something the fake did not (the real store's deployment header), the
+  fixture supplies it, and an assertion that sees exactly that addition
+  becomes an exact equality with it, built from the fixture's own
+  constant, never read back from the component; name and every other
+  expected value kept, each named in the commit body. Any other failure
+  on the real component is a finding, as the step's Don't says.
 - **A new test costs the suite about 12 ms before its work** (decisions.md,
   ruling 219; `tests-cost.md`, 12). In every step left, tests are one per
   behaviour, a behaviour's cases rows of one table test; fixtures are
