@@ -1477,6 +1477,18 @@ the file.
      copy; the profiles gain the two connectors' limits and the journal's
      and routes' (README, "A component's limits join the profiles").
      Inside 25.3's Files, named in its commit body.
+205. **The test application's connector limits are its own, by profile**
+     (2026-10-13, the coordinator's block "jig 25.3: application connector
+     profile limits versus protocol dependency boundary",
+     2026-10-13T03:49:04Z). Ruling 204's "the profiles gain the two
+     connectors' limits" would make `jig-protocol-config` depend on
+     `jig-test-connector`, which code-organization.md, 3 forbids.
+     configuration.md, 6: "The application's limits are its own members,
+     checked in the same sum." So the test service's `limits.rs` holds the
+     two connectors' limits for each of jig's profiles, chosen by the
+     profile's name, and checks them in the same sum; jig's profiles gain
+     only jig's own (the journal's, the routes', io's). This narrows
+     ruling 204.
 
 ## For the user
 
