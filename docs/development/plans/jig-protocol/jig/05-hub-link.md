@@ -862,7 +862,6 @@ A step not in the plan (decisions.md, ruling 183), from the designer's
 answer on jig 23.2 (jig `fadbde24`, `protocol/channel.md`, 6.3: "a
 delivery's token is the hub's own handle and never leaves it"); its text
 is the designer's.
-vocabulary:
 Shape: `host::LinkDown::Relayed { run, attempt, call: Box<[u8]>,
 answer }`. `host::LinkUp::Call` keeps `call` and loses `delivery`.
 The hub's `Request::CancelRelay` and `Event::RelayCancelled` name
