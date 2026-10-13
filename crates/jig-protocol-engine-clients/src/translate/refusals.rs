@@ -215,7 +215,7 @@ fn ending(value: p::Ending, limits: &w::Limits) -> Result<w::Ending, w::Problem>
         )?),
         p::Ending::Deleted => w::EndingFields::Deleted,
     };
-    let row = w::EndingRow::new(limits, w::EndingRowParts { parent: None, value })?;
+    let row = w::Fact::Ending(w::EndingRow::new(limits, w::EndingRowParts { parent: None, value })?);
     let size = row
         .measure()
         .checked_add(4)

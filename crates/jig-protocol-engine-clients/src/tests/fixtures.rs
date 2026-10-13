@@ -723,3 +723,36 @@ impl Exchange {
         (owner, reply_to)
     }
 }
+
+pub fn client_limits() -> jig_protocol_client_link::Limits {
+    let client = jig_domain_client::Limits {
+        watches: 4,
+        notices: 2,
+        notice_life: Duration::from_secs(5),
+        linger: Duration::from_secs(5),
+        save_delay: Duration::from_secs(1),
+        intents: 2,
+        fields: 4,
+        providers: 2,
+        objects: 2,
+        sources: 8,
+        reads: 4,
+        parts: 8,
+        delegates: 2,
+        document_bytes: 65_536,
+        records: 2,
+        kept: 4,
+        drafts: 1,
+        projects: 2,
+        roles: 2,
+        charters: 2,
+        text: 32,
+        rows: 2,
+        conversation_words: 2,
+        navigation_entries: 8,
+        updates_count: 99,
+        backoff: jig_domain_client::limits::Backoff { first: Duration::from_nanos(10), most: Duration::from_nanos(80) },
+        heartbeat: Duration::from_nanos(100),
+    };
+    jig_protocol_client_link::Limits::new(client, 4, Duration::from_secs(10)).expect("valid receiving limits")
+}

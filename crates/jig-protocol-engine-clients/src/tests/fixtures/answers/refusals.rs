@@ -129,7 +129,8 @@ pub fn refusals() -> [(p::Refusal, w::Refusal); 8] {
 }
 pub fn ending_refusal(value: w::EndingFields) -> w::Refusal {
     let limits = wire();
-    let row = w::EndingRow::new(&limits, w::EndingRowParts { parent: None, value }).expect("ending row");
+    let row =
+        w::Fact::Ending(w::EndingRow::new(&limits, w::EndingRowParts { parent: None, value }).expect("ending row"));
     let mut out = Writer::new(usize::try_from(row.measure().checked_add(4).expect("length")).expect("small row"));
     out.put(&row.measure().to_be_bytes()).expect("row length");
     row.encode(&mut out).expect("row");

@@ -606,9 +606,11 @@ dependencies = [
 name = "jig-protocol-engine-clients"
 version = "0.0.0"
 dependencies = [
+ "jig-domain-client",
  "jig-domain-core",
  "jig-domain-people",
  "jig-domain-views",
+ "jig-protocol-client-link",
  "jig-protocol-client-wire",
  "skein-codec",
  "skein-http",

@@ -18,3 +18,7 @@ jig-domain-views.workspace = true
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+jig-protocol-client-link = {path = "../jig-protocol-client-link"}
+jig-domain-client = {path = "../jig-domain-client"}
