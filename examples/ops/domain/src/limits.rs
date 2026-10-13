@@ -65,7 +65,10 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Map::<Token, (Token, authority::Judge, [u8; 32])>::worst_case(limits.core.authority.facts)?)?
         .checked_add(Map::<u64, (u64, u16, u32)>::worst_case(limits.core.tasks.tasks)?)?
         .checked_add(Map::<Token, u64>::worst_case(limits.core.tasks.tasks)?)?
-        .checked_add(Map::<Box<[u8]>, HostCall>::worst_case(calls)?)?;
+        .checked_add(Map::<Box<[u8]>, HostCall>::worst_case(calls)?)?
+        .checked_add(skein_lib::Deadlines::<(Token, Token, u32)>::worst_case(
+            limits.host.slots.checked_mul(limits.host.turns)?,
+        )?)?;
     // A complete assignment includes its charter, transcript, grants and
     // settled call tail. Held documents and provisional suffixes have their
     // own independent bounds; the queued carrier below takes their maximum.

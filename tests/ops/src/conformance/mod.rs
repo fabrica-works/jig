@@ -246,6 +246,7 @@ impl Application for Ops {
             root::Event::Timer(core::Timer::Brief),
             root::Event::ObservabilityTimer,
             root::Event::InfrastructureTimer,
+            root::Event::TurnTimer,
         ]
     }
     fn step(domain: &mut root::Domain, config: &Config, clock: Clock, input: Input<root::Event, root::Record>) {
@@ -1070,3 +1071,4 @@ fn census_owner(store: &Store, row: &root::Record) -> Option<root::Record> {
 }
 
 mod funding;
+pub mod turn_backoff;

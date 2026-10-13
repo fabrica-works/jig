@@ -74,6 +74,8 @@ pub struct Domain {
     pub(crate) procedures: Map<u64, (u64, u16, u32)>,
     pub(crate) effect_procedures: Map<Token, u64>,
     pub(crate) host_calls: Map<Box<[u8]>, HostCall>,
+    pub(crate) turn_backoffs: skein_lib::Deadlines<(Token, Token, u32)>,
+    pub(crate) turn_rng: skein_lib::Rng,
     pub(crate) next_token: u64,
     pub(crate) wrote: bool,
     pub(crate) stopped_reported: bool,
@@ -122,6 +124,7 @@ impl Domain {
         assert!(tool_bytes <= limits.host.charter_bytes, "configured tools fit the charter byte bound");
         let host_calls = limits.host.slots.checked_mul(limits.host.run_calls).expect("hub relays");
         let deployment = config.core.deployment;
+        let turn_rng = skein_lib::Rng::new(config.core.seed ^ 0x5455_524E_4255_5359);
         let mut core_config = config.core;
         core_config.hub_turns = limits.host.turns;
         let mut core = core::Core::new(core_config, &limits.core);
@@ -167,6 +170,10 @@ impl Domain {
             procedures: Map::with_capacity(limits.core.tasks.tasks),
             effect_procedures: Map::with_capacity(limits.core.tasks.tasks),
             host_calls: Map::with_capacity(host_calls),
+            turn_backoffs: skein_lib::Deadlines::with_capacity(
+                limits.host.slots.checked_mul(limits.host.turns).expect("hub retained turns"),
+            ),
+            turn_rng,
             next_token: 1,
             wrote: false,
             stopped_reported: false,
@@ -185,6 +192,12 @@ impl Domain {
     #[must_use]
     pub fn quiescent(&self) -> bool {
         self.journal.idle() && (!self.ready() || (!self.host.is_ready() && !self.core.due_ready()))
+    }
+
+    /// The protocol timer adapter wakes the root at this hub retry deadline.
+    #[must_use]
+    pub fn next_turn_deadline(&self) -> Option<skein_lib::Time> {
+        self.turn_backoffs.next()
     }
 
     /// Reclaim child-retired slots after an iteration.
@@ -248,6 +261,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event) {
         | Event::Timer(_)
         | Event::ObservabilityTimer
         | Event::InfrastructureTimer
+        | Event::TurnTimer
         | Event::ResultRead { .. }
         | Event::Effect { .. }) => decide(domain, env, Work::Event(other)),
     }
@@ -325,6 +339,7 @@ pub fn fire(domain: &mut Domain, env: &Env<Limits>, timer: crate::Timer) {
         crate::Timer::Core(timer) => Event::Timer(timer),
         crate::Timer::Observability => Event::ObservabilityTimer,
         crate::Timer::Infrastructure => Event::InfrastructureTimer,
+        crate::Timer::Turn => Event::TurnTimer,
     };
     step(domain, env, event);
 }

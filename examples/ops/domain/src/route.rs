@@ -186,6 +186,7 @@ fn event_in(
                 core::fire(&mut domain.core, &Env { now: env.now, wall: env.wall, limits: env.limits.core }, timer);
             core_out(domain, env, decision, requests, work);
         }
+        Event::TurnTimer => crate::turn_backoff::fire(domain, env, decision, work),
         Event::InfrastructureTimer => {
             let mut out = Queue::with_capacity(infrastructure::MAX_OUT);
             infrastructure::fire(
@@ -223,7 +224,7 @@ pub(crate) fn core_out(
                 write(domain, decision, Write::Save(Record::Core(record)));
             }
             core::Request::Write(core::Write::Erase(key)) => write(domain, decision, Write::Erase(Key::Core(key))),
-            core::Request::Held(value) => core_held(domain, decision, *value, work),
+            core::Request::Held(value) => core_held(domain, env, decision, *value, work),
             core::Request::Now(value) => core_now(domain, env, *value, work),
             core::Request::Ask { connector, ask } => core_ask(domain, env, decision, connector, ask, work),
             core::Request::Decided => {}
@@ -231,7 +232,13 @@ pub(crate) fn core_out(
     }
 }
 #[expect(clippy::too_many_lines, reason = "one dispatcher preserves the full held output vocabulary")]
-fn core_held(domain: &mut Domain, decision: &mut Decision<Write, Output>, value: core::Held, work: &mut Queue<Work>) {
+fn core_held(
+    domain: &mut Domain,
+    env: &Env<Limits>,
+    decision: &mut Decision<Write, Output>,
+    value: core::Held,
+    work: &mut Queue<Work>,
+) {
     match value {
         core::Held::ApplicationDelivery { .. } => unreachable!("document assembly owns this synchronous output"),
         core::Held::ApplicationWatchEnded { watcher, connector, subject, why } => {
@@ -321,7 +328,11 @@ fn core_held(domain: &mut Domain, decision: &mut Decision<Write, Output>, value:
                 Released::Fleet(fleet::Event::TurnKept { run: Token::new(run), attempt: Token::new(attempt), turn }),
             );
         }
+        core::Held::TurnBusy { channel, run, attempt, turn } if channel == Token::new(0) => {
+            crate::turn_backoff::busy(domain, env, run, attempt, turn);
+        }
         core::Held::AcknowledgeTurn { run, attempt, turn, .. } => {
+            domain.turn_backoffs.cancel((run, attempt, turn));
             child(decision, Released::Host(host::Event::Down(host::LinkDown::TurnKept { run, attempt, turn })));
         }
         core::Held::Cancel { run, attempt, .. } => {
@@ -1401,7 +1412,7 @@ fn core_now(domain: &mut Domain, env: &Env<Limits>, value: core::Now, work: &mut
 
 #[expect(clippy::manual_map, reason = "the strict subset uses a match instead of closure-taking methods")]
 #[expect(clippy::too_many_lines, reason = "one exhaustive dispatcher translates the complete hub boundary")]
-fn host_out(
+pub(crate) fn host_out(
     domain: &mut Domain,
     env: &Env<Limits>,
     decision: &mut Decision<Write, Output>,

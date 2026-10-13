@@ -96,6 +96,8 @@ pub enum Event {
     ObservabilityTimer,
     /// One infrastructure retry deadline.
     InfrastructureTimer,
+    /// One due backoff for the engine hub's retained turn.
+    TurnTimer,
     /// A result read by the protocol layer after the fleet fenced its answer.
     ResultRead { payload: Token, end: tasks::End },
     /// A connector read decoded outside the root, with its authenticated task.
@@ -130,6 +132,8 @@ pub enum Timer {
     Observability,
     /// Infrastructure's retry deadline.
     Infrastructure,
+    /// The engine hub's retained turn backoff.
+    Turn,
 }
 
 /// The journal is the only source of root outputs.
