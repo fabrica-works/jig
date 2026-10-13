@@ -1232,6 +1232,17 @@ the file.
      the call's bytes both ways; jig 23.2 and 23.3 translate names both
      ways, 23.2 landing its other records first; jig 24.3's relay table
      holds no token.
+184. **A document's pieces are bounded by the envelope that carries it:
+     16 MiB** (2026-10-13, the coordinator's block "jig 30.2: invalid
+     Limits literal versus document piece ceiling", 2026-10-13T00:28:23Z).
+     Ruling 149 takes "at least the largest value any `Limits` literal on
+     `main` gives" a field; a literal a test builds to be refused
+     (`crates/jig-domain-client/src/tests/time.rs:270`, `document_bytes:
+     u64::MAX`, asserted `worst_case(&invalid).is_none()` at :278) does not
+     count. The valid literals give 65,536, a floor. A document crosses
+     inside `Owned.record: bytes 16777216` (30.1's sketch), so no piece of
+     it can be larger: D, the ceiling of every piece ruling 182 makes, is
+     16,777,216, within a `u32`, and jig 20's profiles must fit it.
 
 ## For the user
 
