@@ -1618,14 +1618,14 @@ the file.
      tell the owner of one "of a version its owner does not read"
      (client.md, 9), but its sketch's `Request::Dropped { keeper:
      Option<u16> }` merges jig and the request table, and the link knows no
-     table's or family's version. As proposed: \`Start\` carries the one
-     store version each keeper reads (jig's \`STORE_VERSION\`, the table's,
-     each family's), from the routing; \`Dropped\` names a typed \`Keeper {
-     Jig, Table, Family(u16) }\`; a keeper absent from that set has its
+     table's or family's version. As proposed: `Start` carries the one
+     store version each keeper reads (jig's `STORE_VERSION`, the table's,
+     each family's), from the routing; `Dropped` names a typed `Keeper {
+     Jig, Table, Family(u16) }`; a keeper absent from that set has its
      records dropped and is told. And jig's own kept record is a
-     discriminated schema type, \`enum JigRecord { place: Place, draft:
-     Draft }\` in the client wire (its version moved once), as \`ReadValue\`
-     and \`DeliveryValue\` are (rulings 208, 211), not a private byte; it
+     discriminated schema type, `enum JigRecord { place: Place, draft:
+     Draft }` in the client wire (its version moved once), as `ReadValue`
+     and `DeliveryValue` are (rulings 208, 211), not a private byte; it
      joins 32.4's Files.
 
 ## For the user
