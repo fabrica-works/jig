@@ -1652,6 +1652,18 @@ the file.
      wire record from one kit under `testing/`. The README's Rules say so.
      Unit tests in one process per crate is the user's to choose (For the
      user).
+220. **jig 25.4 gives the test root the brief an assignment carries**
+     (2026-10-13, the coordinator's block "jig 25.4: test root drops the
+     charter brief sections", 2026-10-13T05:55:39Z). A plan defect:
+     `domain/root.md`, 7 puts "its core sections" in an assignment and
+     `domain/hosts.md`, 8 renders "the brief's sections ... as smith's
+     titled sections, in order", but `jig-test-domain` discards
+     `BriefCorePlanned`'s sections, leaves `CompleteBrief` unreachable and
+     keeps no brief in its `Assignment`, so 25.4's service cannot encode
+     the charter. 25.4's Files and Scope gain the test root's brief
+     assembly: it keeps the planned core sections (bounded and priced in
+     its worst case), completes the brief, and carries the sections typed
+     in the assignment, with one regression; its Size grows by 200.
 
 ## For the user
 
