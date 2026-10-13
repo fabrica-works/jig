@@ -623,6 +623,9 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             );
         }
         Event::Started { task, attempt } => crate::run::started(domain, env, task, attempt, out),
+        Event::Refusals { task, attempt, refused, offered } => {
+            crate::admission::answer_refusals(domain, env, task, attempt, &refused, offered, out);
+        }
         Event::Activation { reply_to, task, attempt, end, saved, cause } => match cause {
             crate::Cause::Priced { cumulative } => {
                 crate::admission::activation(domain, env, reply_to, task, attempt, end, saved, cumulative, out);

@@ -1400,6 +1400,9 @@ pub enum Event {
         /// from this attempt's reserved run allowance.
         cumulative: u64,
     },
+    /// Root-validated answer refusals, kept before its activation in the same decision.
+    /// Stale attempts or names outside the offered inbox are ignored.
+    Refusals { task: u64, attempt: u64, refused: Box<[u64]>, offered: Option<u64> },
     /// Create an authorized whole batch and reservations atomically, producing `Made` or
     /// `Refused` plus bounded persistence/lifecycle outputs.
     Make {

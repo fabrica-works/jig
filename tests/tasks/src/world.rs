@@ -422,6 +422,7 @@ impl World {
             | Event::Prepare { .. }
             | Event::Claim { .. }
             | Event::Started { .. }
+            | Event::Refusals { .. }
             | Event::Activation { cause: Cause::Unpriced, .. }
             | Event::PreparationFailed { .. }
             | Event::PreparationUnread { .. }
@@ -493,6 +494,7 @@ impl World {
             | Event::Prepare { .. }
             | Event::Claim { .. }
             | Event::Started { .. }
+            | Event::Refusals { .. }
             | Event::Activation { .. }
             | Event::PreparationFailed { .. }
             | Event::PreparationUnread { .. }

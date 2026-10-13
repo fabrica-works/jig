@@ -39,6 +39,14 @@ pub(super) fn route_answer_payload(
             if invalid_saved || invalid {
                 (cumulative, tasks::End::Failed(tasks::Class::Invalid), None)
             } else {
+                if !refused.is_empty() {
+                    work.push(Event::Tasks(tasks::Event::Refusals {
+                        task: run.raw(),
+                        attempt: attempt.raw(),
+                        refused: Box::from(refused),
+                        offered: proof.offered,
+                    }));
+                }
                 (cumulative, end, saved)
             }
         }

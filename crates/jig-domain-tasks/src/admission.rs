@@ -119,6 +119,29 @@ pub(crate) fn turn(
     out.push(Request::TurnAcknowledged { reply_to: to, task: number, attempt, turn, accepted: Accepted::New });
 }
 
+pub(crate) fn answer_refusals(
+    domain: &mut Domain,
+    env: &Env<Limits>,
+    number: u64,
+    attempt: u64,
+    refused: &[u64],
+    offered: Option<u64>,
+    out: &mut Queue<Request>,
+) {
+    let Some(old) = record(domain, number) else { return };
+    if !domain.ready()
+        || refused.is_empty()
+        || refused.len() > usize::try_from(env.limits.inbox_messages).expect("u32 fits usize")
+        || attempt == 0
+        || crate::run::run_attempt(&old.phase) != Some(attempt)
+        || !crate::inbox::valid_refusals(old, offered, refused)
+    {
+        return;
+    }
+    crate::inbox::keep_refusals(&mut task_mut(domain, number).expect("current attempt").record, refused);
+    publish(domain, env, number, out);
+}
+
 #[expect(clippy::too_many_arguments, reason = "one complete admission event")]
 #[expect(clippy::too_many_lines, reason = "one charged result preflights and settles its follow-ups atomically")]
 pub(crate) fn activation(

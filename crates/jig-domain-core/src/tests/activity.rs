@@ -336,3 +336,60 @@ fn cumulative_turn_reads_admit_the_last_fence_and_refuse_earlier_names() {
         );
     }
 }
+
+fn answer_refusal_core() -> (Core, Env<Limits>) {
+    let (mut core, env) = cumulative_read_core();
+    send_task(
+        &mut core,
+        &env.limits,
+        tasks::Event::Message {
+            reply_to: ReplyTo::new(Token::new(1)),
+            project: 1,
+            task: 1,
+            release: false,
+            word: tasks::Word {
+                number: 3,
+                from: tasks::Party::Person(1),
+                kind: tasks::MessageKind::Words,
+                words: b"new word".as_slice().into(),
+                at: env.wall,
+                hits: 1,
+                eligible: true,
+            },
+        },
+    );
+    core.proofs.get_mut(&1).unwrap().offered = Some(3);
+    (core, env)
+}
+
+#[test]
+fn an_answers_refusals_are_committed_with_its_terminal() {
+    let (mut core, env) = answer_refusal_core();
+    let records = activity_decision(
+        &mut core,
+        &env,
+        Event::AnswerPayload {
+            read: Some(2),
+            refused: Box::new([3]),
+            run: Token::new(1),
+            attempt: Token::new(7),
+            payload: Token::new(13),
+            cumulative: 1,
+            end: tasks::End::Parked,
+            saved: None,
+            invalid_saved: false,
+        },
+    );
+    assert!(records.iter().any(|row| match row {
+        Record::Tasks(tasks::Stored::Live(task)) =>
+            task.refused.as_ref() == [1, 3] && task.inbox.iter().any(|word| word.number == 3),
+        _ => false,
+    }));
+    assert!(records.iter().any(|row| match row {
+        Record::Core(CoreRecord::Terminal(answer)) =>
+            answer.task == 1 && answer.attempt == 7 && answer.end == tasks::End::Parked,
+        _ => false,
+    }));
+    assert_eq!(core.tasks.task(1).unwrap().turn, 1, "no invented answer turn");
+    assert_eq!(core.tasks.task(1).unwrap().run_spent, 1, "no invented answer charge");
+}
