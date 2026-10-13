@@ -55,7 +55,7 @@ pub fn notes(range: &notes::Range) -> Box<[Range]> {
 fn encoded(key: &core::Key) -> Box<[u8]> {
     keys::encode(key, u32::MAX).expect("the domain's bounded key fits a u32 length")
 }
-fn point(key: &core::Key) -> Range {
+pub(crate) fn point(key: &core::Key) -> Range {
     let start = encoded(key);
     let end = after(&start);
     Range { start, end: Some(end) }

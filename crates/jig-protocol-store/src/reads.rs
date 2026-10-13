@@ -1,5 +1,6 @@
 //! Parties' bounded durable reads and joins (protocol/store.md, 7.3).
 mod joins;
+mod paged;
 mod point;
 use crate::{Event, Phase, Store, loads};
 use alloc::boxed::Box;
@@ -36,16 +37,17 @@ pub(crate) fn read(store: &mut Store, owner: Token, range: Range, above: &mut Qu
         Scope::Question { task, message } => point::question(store, &range, task, message, &mut spent),
         Scope::Reply { task, activity } => point::reply(store, &range, task, activity, &mut spent),
         Scope::Turn { .. } => Ok(point::turn()),
-        // Paged scopes join this path in the following increments.
+        Scope::Activity { task } => paged::activity(store, &range, task, &mut spent),
+        Scope::History { task, subtree: false } => paged::history(store, &range, task, &mut spent),
+        Scope::Spend { .. } => paged::spend(store, &range, &mut spent),
+        Scope::Notes { .. } => paged::notes(store, &range, &mut spent),
+        Scope::ScopedNotes { .. } => paged::scoped_notes(store, &range, &mut spent),
+        // Indexed scopes join in 16.4.
         Scope::EndedDelegates { .. }
-        | Scope::History { .. }
-        | Scope::Activity { .. }
+        | Scope::History { subtree: true, .. }
         | Scope::Inbox { .. }
         | Scope::Conversations
-        | Scope::Goals { .. }
-        | Scope::Notes { .. }
-        | Scope::ScopedNotes { .. }
-        | Scope::Spend { .. } => return,
+        | Scope::Goals { .. } => return,
     };
     match result {
         Ok(result) => above.push(Event::Read { owner, result }),

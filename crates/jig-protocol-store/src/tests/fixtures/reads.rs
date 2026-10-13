@@ -142,3 +142,31 @@ pub fn with_proposal_rows(record: Record, rows: &[tasks::ProposalRow]) -> Record
     row.proposal_rows = Box::from(rows);
     Record::Tasks(tasks::Stored::Ended(row))
 }
+
+pub fn activity_line(task: u64, position: u64) -> Record {
+    words_line(task, position, position, tasks::MessageKind::Words)
+}
+
+pub fn ledger_period(project: u32, period: u64, closed: bool) -> Record {
+    let row = tasks::FundingRecord {
+        period: None,
+        funder: tasks::Funder::Period { project, period },
+        parent: None,
+        numbers: tasks::Numbers { budget: 10, spent: 0, spent_below: 2, reserved: 0 },
+        made: 1,
+        closed,
+    };
+    if closed { Record::Tasks(tasks::Stored::ClosedLedger(row)) } else { Record::Tasks(tasks::Stored::Ledger(row)) }
+}
+
+pub fn notes_entry_in(scope: &jig_domain_notes::Scope, name: u64, description: &[u8]) -> (Record, Record) {
+    let mut entry = super::note_entry();
+    entry.scope = scope.clone();
+    entry.name = name;
+    entry.description = Box::from(description);
+    let mut line = super::note_line();
+    line.scope = scope.clone();
+    line.name = name;
+    line.description = Box::from(description);
+    (Record::Notes(jig_domain_notes::Record::Entry(entry)), Record::Notes(jig_domain_notes::Record::Line(line)))
+}

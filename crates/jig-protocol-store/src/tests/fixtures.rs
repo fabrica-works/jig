@@ -592,9 +592,9 @@ pub const DEPLOYMENT: [u8; 16] = [7; 16];
 mod reads;
 mod store;
 pub use reads::{
-    CHILD, GOAL, GRANDCHILD, answer_line, ended_of, escalation_decision, history_with_proposal, hold_milestone,
-    notified_line, person_proposal, proposal_decision, question_line, read, terminal, with_hold, with_links,
-    with_proposal_rows, with_question_lines,
+    CHILD, GOAL, GRANDCHILD, activity_line, answer_line, ended_of, escalation_decision, history_with_proposal,
+    hold_milestone, ledger_period, notes_entry_in, notified_line, person_proposal, proposal_decision, question_line,
+    read, terminal, with_hold, with_links, with_proposal_rows, with_question_lines,
 };
 pub use store::{
     ALICE, ENDED, LIVE, OTHER_DEPLOYMENT, PROJECT, ROOT, answer, below, call, codec_limits, commit, committed,

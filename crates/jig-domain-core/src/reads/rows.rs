@@ -307,7 +307,9 @@ pub(super) fn live_page(core: &Core, limits: &Limits, party: u64, read: &Read, d
 pub fn row_key(row: &Row) -> Option<Position> {
     let key = match &row.value {
         Record::Tasks(value) => Some(Key::Tasks(value.key())),
-        Record::Notes(notes::Record::Entry(value)) => Some(Key::Notes(notes::Key::Entry { name: value.name })),
+        Record::Notes(notes::Record::Entry(value)) => {
+            Some(Key::Notes(notes::Key::Line { scope: value.scope.clone(), name: value.name }))
+        }
         Record::Core(CoreRecord::Turn(value)) => {
             Some(Key::Core(CoreKey::Turn { task: value.task, attempt: value.attempt, turn: value.turn }))
         }
@@ -425,8 +427,15 @@ pub(super) fn from_store(
     }
     if let Some(next) = &next {
         // A continuation names the last examined row, including filtered rows.
+        let examined_notes = match next {
+            Position::Owner(Key::Notes(notes::Key::Line { .. })) => match previous.as_ref() {
+                Some(previous) => next >= previous,
+                None => true,
+            },
+            Position::Owner(_) | Position::Inbox { .. } => false,
+        };
         if !position_allowed(&range.scope, next)
-            || previous.as_ref() != Some(next)
+            || (!examined_notes && previous.as_ref() != Some(next))
             || !later(range.after.as_ref(), next, range.backwards && range.scope != Scope::Conversations)
         {
             return Answer::None(Why::Unknown);
@@ -1442,7 +1451,10 @@ pub(super) fn position_allowed(scope: &Scope, position: &Position) -> bool {
                     Key::Tasks(tasks::Key::EndedDelegate { requester, .. }) => requester == task,
                     Key::Tasks(_) | Key::Core(_) | Key::People(_) | Key::Notes(_) => false,
                 },
-                Scope::Notes { .. } | Scope::ScopedNotes { .. } => kind == KeyKind::Note,
+                Scope::Notes { .. } | Scope::ScopedNotes { .. } => match key {
+                    Key::Notes(notes::Key::Line { .. }) => true,
+                    Key::Notes(notes::Key::Entry { .. }) | Key::Tasks(_) | Key::Core(_) | Key::People(_) => false,
+                },
                 Scope::Spend { project } => kind == KeyKind::Ledger(*project),
                 Scope::Inbox { group, .. } => group.updates() && super::indexed::is_update(key),
             }

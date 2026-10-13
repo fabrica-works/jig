@@ -135,10 +135,10 @@ pub fn scoped_description_search_pages_durable_notes_after_restart() {
     let mut world = world(767);
     let scope = notes::Scope::Goal { project: 1, goal: 99 };
     for (name, scope, description) in [
-        (1, notes::Scope::Project { project: 1 }, b"warm project".as_slice()),
+        (1, scope.clone(), b"no match".as_slice()),
         (2, scope.clone(), b"no match".as_slice()),
         (3, scope.clone(), b"slow to warm up".as_slice()),
-        (4, notes::Scope::Goal { project: 1, goal: 100 }, b"warm another goal".as_slice()),
+        (4, notes::Scope::Goal { project: 1, goal: 98 }, b"warm another goal".as_slice()),
         (5, scope.clone(), b"warm cache".as_slice()),
     ] {
         let row = root::Record::Core(core::Record::Notes(notes::Record::Entry(notes::Entry {

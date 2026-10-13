@@ -41,7 +41,8 @@ fn scoped_note_search_pages_preserve_filtered_positions_and_whole_query_identity
     ]);
     let after = reads::row_key(&rows[1]).unwrap();
     let reads::Answer::Page(first) =
-        loaded_answer(&mut core, &limits, load, reads::Loaded::Page { rows, next: Some(after.clone()) }).unwrap()
+        loaded_answer(&mut core, &limits, load, reads::Loaded::Page { rows: Box::new([]), next: Some(after.clone()) })
+            .unwrap()
     else {
         panic!("bounded notes page")
     };
@@ -105,7 +106,7 @@ fn resource_note_scope_preserves_literal_segments_and_exact_or_open_end() {
         &limits,
         load,
         reads::Loaded::Page {
-            rows: Box::new([note_row(1, open, b"description"), note_row(2, scope, b"description")]),
+            rows: Box::new([note_row(2, scope, b"description"), note_row(1, open, b"description")]),
             next: None,
         },
     )

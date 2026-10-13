@@ -362,3 +362,250 @@ fn a_turn_reply_waits_for_its_transcript_evidence() {
     let result = load(&mut store, range);
     assert_eq!(one_row(&result).related, None);
 }
+
+fn page(result: reads::Loaded) -> (Box<[reads::Row]>, Option<reads::Position>) {
+    let reads::Loaded::Page { rows, next } = result else { panic!("one page: {result:?}") };
+    (rows, next)
+}
+
+fn values(rows: &[reads::Row]) -> Box<[core::Record]> {
+    let mut found = skein_lib::List::with_capacity(u32::try_from(rows.len()).expect("bounded fixture rows"));
+    for row in rows {
+        found.push(row.value.clone()).expect("counted fixture rows");
+    }
+    found.into_boxed()
+}
+
+fn activity_position(position: u64) -> reads::Position {
+    reads::Position::Owner(core::Key::Tasks(tasks::Key::Activity { task: CHILD, position }))
+}
+
+fn activity_range(after: Option<reads::Position>) -> reads::Range {
+    let mut range = fixtures::read(ALICE, reads::Scope::Activity { task: CHILD });
+    range.rows = 2;
+    range.backwards = true;
+    range.after = after;
+    range
+}
+
+fn activity_store() -> Store {
+    let mut store = fixtures::opened();
+    let core::Record::Tasks(tasks::Stored::Ended(mut owner)) = fixtures::ended_of(CHILD, tasks::Party::Person(ALICE))
+    else {
+        panic!("ended fixture");
+    };
+    owner.activity = 5;
+    fixtures::committed(
+        &mut store,
+        Box::new([
+            fixtures::header(1),
+            fixtures::save(core::Record::Tasks(tasks::Stored::Ended(owner))),
+            fixtures::save(fixtures::activity_line(CHILD, 1)),
+            fixtures::save(fixtures::activity_line(CHILD, 2)),
+        ]),
+    );
+    fixtures::committed(
+        &mut store,
+        Box::new([
+            fixtures::header(2),
+            fixtures::save(fixtures::activity_line(CHILD, 3)),
+            fixtures::save(fixtures::activity_line(CHILD, 4)),
+            fixtures::save(fixtures::activity_line(CHILD, 5)),
+        ]),
+    );
+    store
+}
+
+#[test]
+fn activity_reads_newest_first_from_the_records_last_position() {
+    let mut store = activity_store();
+    let (rows, next) = page(load(&mut store, activity_range(None)));
+    assert_eq!(values(&rows).as_ref(), [fixtures::activity_line(CHILD, 5), fixtures::activity_line(CHILD, 4)]);
+    assert_eq!(next, Some(activity_position(4)));
+}
+
+#[test]
+fn an_activity_cursor_continues_below_its_position() {
+    let mut store = activity_store();
+    let (rows, next) = page(load(&mut store, activity_range(Some(activity_position(4)))));
+    assert_eq!(values(&rows).as_ref(), [fixtures::activity_line(CHILD, 3), fixtures::activity_line(CHILD, 2)]);
+    assert_eq!(next, Some(activity_position(2)));
+}
+
+#[test]
+fn a_tasks_history_joins_history_then_milestones() {
+    let mut store = child_store();
+    fixtures::committed(
+        &mut store,
+        Box::new([
+            fixtures::header(2),
+            fixtures::save(fixtures::history(CHILD, 3)),
+            fixtures::save(fixtures::hold_milestone(CHILD, 1)),
+        ]),
+    );
+    let range = fixtures::read(ALICE, reads::Scope::History { task: CHILD, subtree: false });
+    let (rows, next) = page(load(&mut store, range));
+    assert_eq!(values(&rows).as_ref(), [fixtures::history(CHILD, 3), fixtures::hold_milestone(CHILD, 1)]);
+    for row in &rows {
+        assert_eq!(row.owner.as_ref().expect("joined owner").number, CHILD);
+    }
+    assert_eq!(next, None);
+}
+
+#[test]
+fn spend_reads_live_and_closed_periods_of_the_project() {
+    let mut store = fixtures::opened();
+    fixtures::committed(
+        &mut store,
+        Box::new([
+            fixtures::header(1),
+            fixtures::save(fixtures::ledger_period(fixtures::PROJECT, 2, false)),
+            fixtures::save(fixtures::ledger_period(fixtures::PROJECT, 1, true)),
+            fixtures::save(fixtures::ledger_period(7, 3, true)),
+        ]),
+    );
+    let range = fixtures::read(ALICE, reads::Scope::Spend { project: fixtures::PROJECT });
+    let (rows, next) = page(load(&mut store, range));
+    assert_eq!(values(&rows).as_ref(), [fixtures::ledger_period(3, 2, false), fixtures::ledger_period(3, 1, true)]);
+    assert_eq!(next, None);
+}
+
+fn project_scope() -> jig_domain_notes::Scope {
+    jig_domain_notes::Scope::Project { project: fixtures::PROJECT }
+}
+
+fn goal_scope() -> jig_domain_notes::Scope {
+    jig_domain_notes::Scope::Goal { project: fixtures::PROJECT, goal: GOAL }
+}
+
+fn commit_note(store: &mut Store, number: u64, scope: &jig_domain_notes::Scope, name: u64, description: &[u8]) {
+    let (entry, line) = fixtures::notes_entry_in(scope, name, description);
+    fixtures::committed(store, Box::new([fixtures::header(number), fixtures::save(entry), fixtures::save(line)]));
+}
+
+fn note_position(scope: &jig_domain_notes::Scope, name: u64) -> reads::Position {
+    reads::Position::Owner(core::Key::Notes(jig_domain_notes::Key::Line { scope: scope.clone(), name }))
+}
+
+fn note_entry(scope: &jig_domain_notes::Scope, name: u64, description: &[u8]) -> core::Record {
+    let (entry, _line) = fixtures::notes_entry_in(scope, name, description);
+    entry
+}
+
+fn notes_store() -> Store {
+    let mut store = fixtures::opened();
+    commit_note(&mut store, 1, &project_scope(), 2, b"match project");
+    commit_note(&mut store, 2, &goal_scope(), 1, b"other goal");
+    commit_note(&mut store, 3, &goal_scope(), 3, b"match goal");
+    store
+}
+
+fn project_notes() -> reads::Range {
+    fixtures::read(ALICE, reads::Scope::Notes { project: fixtures::PROJECT })
+}
+
+fn filtered_notes() -> reads::Range {
+    fixtures::read(
+        ALICE,
+        reads::Scope::ScopedNotes { scope: goal_scope(), description: Some(Box::from(b"match".as_slice())) },
+    )
+}
+
+#[test]
+fn project_notes_read_their_scopes_lines_with_entries() {
+    let mut store = notes_store();
+    let (rows, next) = page(load(&mut store, project_notes()));
+    assert_eq!(
+        values(&rows).as_ref(),
+        [
+            note_entry(&project_scope(), 2, b"match project"),
+            note_entry(&goal_scope(), 1, b"other goal"),
+            note_entry(&goal_scope(), 3, b"match goal"),
+        ]
+    );
+    assert_eq!(next, None);
+}
+
+#[test]
+fn scoped_notes_keep_only_matching_descriptions() {
+    let mut store = notes_store();
+    let (rows, next) = page(load(&mut store, filtered_notes()));
+    assert_eq!(values(&rows).as_ref(), [note_entry(&goal_scope(), 3, b"match goal")]);
+    assert_eq!(next, None);
+}
+
+#[test]
+fn a_notes_cursor_resumes_after_its_line() {
+    let mut store = notes_store();
+    let mut range = project_notes();
+    range.after = Some(note_position(&project_scope(), 2));
+    let (rows, next) = page(load(&mut store, range));
+    assert_eq!(
+        values(&rows).as_ref(),
+        [note_entry(&goal_scope(), 1, b"other goal"), note_entry(&goal_scope(), 3, b"match goal")]
+    );
+    assert_eq!(next, None);
+}
+
+#[test]
+fn notes_across_two_scopes_come_by_scope_then_name() {
+    let mut store = notes_store();
+    let mut range = project_notes();
+    range.rows = 2;
+    let (rows, next) = page(load(&mut store, range));
+    assert_eq!(
+        values(&rows).as_ref(),
+        [note_entry(&project_scope(), 2, b"match project"), note_entry(&goal_scope(), 1, b"other goal")]
+    );
+    assert_eq!(reads::row_key(rows.first().expect("two rows")), Some(note_position(&project_scope(), 2)));
+    assert_eq!(next, Some(note_position(&goal_scope(), 1)));
+}
+
+#[test]
+fn a_filtered_notes_page_goes_on_past_the_lines_it_skipped() {
+    let mut store = notes_store();
+    let mut range = filtered_notes();
+    range.rows = 1;
+    let (rows, next) = page(load(&mut store, range.clone()));
+    assert!(rows.is_empty());
+    assert_eq!(next, Some(note_position(&goal_scope(), 1)));
+    range.after = next;
+    let (rows, next) = page(load(&mut store, range));
+    assert_eq!(values(&rows).as_ref(), [note_entry(&goal_scope(), 3, b"match goal")]);
+    assert_eq!(next, None);
+}
+
+#[test]
+fn an_activity_window_stops_at_position_one() {
+    let mut store = activity_store();
+    let (rows, next) = page(load(&mut store, activity_range(Some(activity_position(2)))));
+    assert_eq!(values(&rows).as_ref(), [fixtures::activity_line(CHILD, 1)]);
+    assert_eq!(next, None);
+}
+
+#[test]
+fn an_encoded_activity_cut_keeps_the_newest_prefix() {
+    let mut store = activity_store();
+    store.limits.store.page.bytes = 80;
+    let (rows, next) = page(load(&mut store, activity_range(None)));
+    assert_eq!(values(&rows).as_ref(), [fixtures::activity_line(CHILD, 5)]);
+    assert_eq!(next, Some(activity_position(5)));
+}
+
+#[test]
+fn a_paged_join_cut_keeps_its_accepted_prefix() {
+    let mut store = child_store();
+    fixtures::committed(
+        &mut store,
+        Box::new([
+            fixtures::header(2),
+            fixtures::save(fixtures::history(CHILD, 1)),
+            fixtures::save(fixtures::history(CHILD, 2)),
+        ]),
+    );
+    store.limits.joins = 4;
+    let range = fixtures::read(ALICE, reads::Scope::History { task: CHILD, subtree: false });
+    let (rows, next) = page(load(&mut store, range));
+    assert_eq!(values(&rows).as_ref(), [fixtures::history(CHILD, 1)]);
+    assert_eq!(next, Some(reads::Position::Owner(core::Key::Tasks(tasks::Key::History { task: CHILD, revision: 1 }))));
+}
