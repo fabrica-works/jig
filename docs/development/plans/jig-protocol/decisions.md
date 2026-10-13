@@ -2278,6 +2278,19 @@ the file.
      refused), and a whole amendment at its full sum with fewer segments
      (and one byte past it refused). No ceiling raised, no profile
      changed.
+273. **A commit is bounded by what it can leave in the map; jig 19.s2 and
+     19.s3** (2026-10-13, the designer's answer to question.md's "jig
+     19.s1: the shipped profiles past the store's commit bound"; jig
+     `1349fa8b`, `d049f0b9`). The store priced a commit as its writes
+     times the largest row of any family, which no shipped profile fits in
+     skein-kv's `u32`. A commit writes each key once (its last write), so
+     its largest is the map's budget plus each operation's key and
+     framing; the profiles and `journal.writes` stay, and 27.3 picks the
+     budget. Core's three settled-call scalars rise to the channel's
+     1,048,576-byte bound. 19.s1 lands what it has; steps not in the
+     plan, jig 19.s2 (the scalars) and 19.s3 (the commit bound, both
+     shipped profiles admitted), follow, and 27.3 needs 19.s3. The core's
+     journal room's over-count goes to `later.md`.
 
 ## For the user
 
