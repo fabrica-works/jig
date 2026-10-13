@@ -25,3 +25,5 @@ pub mod objects;
 pub mod pages;
 
 pub mod reads;
+
+pub mod watches;

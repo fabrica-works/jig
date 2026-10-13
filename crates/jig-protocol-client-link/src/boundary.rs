@@ -18,6 +18,11 @@ pub enum Readable {
     Jig(contract::Read),
     Family(Family),
 }
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Watchable {
+    Jig(contract::Subject),
+    Family(Family),
+}
 #[derive(Debug, PartialEq, Eq)]
 pub enum Readout {
     Jig(contract::ReadResult),
@@ -30,10 +35,42 @@ pub enum Answered {
 }
 #[derive(Debug)]
 pub enum Event {
-    Send { attempt: Token, key: RequestKey, ask: Ask },
-    Read { read: Token, what: Readable },
-    Answered { exchange: Token, status: u16, body: Box<[u8]> },
-    Failed { exchange: Token },
+    Send {
+        attempt: Token,
+        key: RequestKey,
+        ask: Ask,
+    },
+    Read {
+        read: Token,
+        what: Readable,
+    },
+    Answered {
+        exchange: Token,
+        status: u16,
+        body: Box<[u8]>,
+    },
+    Failed {
+        exchange: Token,
+    },
+    Open {
+        watch: Token,
+        subject: Watchable,
+    },
+    Continue {
+        watch: Token,
+        subject: contract::Subject,
+    },
+    Close {
+        watch: Token,
+    },
+    StreamOpened {
+        status: u16,
+    },
+    /// A body piece of at most `Limits::stream_chunk` bytes.
+    StreamBytes {
+        bytes: Box<[u8]>,
+    },
+    StreamEnded,
 }
 #[derive(Debug, PartialEq, Eq)]
 pub enum Request {
@@ -51,6 +88,24 @@ pub enum Request {
         envelope: RequestEnvelope,
         answer: Option<Answered>,
     },
+    OpenStream,
+    CloseStream,
+    Watch {
+        watch: Token,
+        event: contract::WatchEvent,
+    },
+    FamilyDelivery {
+        watch: Token,
+        record: Family,
+    },
+    Ended {
+        watch: Token,
+        end: contract::WatchEnd,
+    },
+    Hello {
+        family: Option<u16>,
+        versions: contract::VersionRange,
+    },
     /// One terminal per read.
     Read {
         read: Token,
@@ -64,4 +119,6 @@ pub enum Request {
 pub enum Fact {
     UndecodableAnswer,
     UndecodableDocument,
+    UndecodableEvent,
+    StreamDropped,
 }

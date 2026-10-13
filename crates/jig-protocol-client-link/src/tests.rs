@@ -9,3 +9,5 @@ mod fixtures;
 mod pages;
 
 mod reads;
+
+mod stream;

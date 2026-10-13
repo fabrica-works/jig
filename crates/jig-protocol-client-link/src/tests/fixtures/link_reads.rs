@@ -24,8 +24,16 @@ impl Harness {
         self.link.step(Time::ZERO, Event::Read { read: READ, what }, &mut self.out);
         match self.out.iter().last().expect("one exchange") {
             Request::Exchange { exchange, .. } => *exchange,
-            other
-            @ (Request::Abandon { .. } | Request::Answer { .. } | Request::Read { .. } | Request::Fact { .. }) => {
+            other @ (Request::Abandon { .. }
+            | Request::Answer { .. }
+            | Request::Read { .. }
+            | Request::OpenStream
+            | Request::CloseStream
+            | Request::Watch { .. }
+            | Request::FamilyDelivery { .. }
+            | Request::Ended { .. }
+            | Request::Hello { .. }
+            | Request::Fact { .. }) => {
                 panic!("expected read exchange: {other:?}")
             }
         }
@@ -48,6 +56,12 @@ impl Harness {
                 | Request::Exchange { .. }
                 | Request::Abandon { .. }
                 | Request::Answer { .. }
+                | Request::OpenStream
+                | Request::CloseStream
+                | Request::Watch { .. }
+                | Request::FamilyDelivery { .. }
+                | Request::Ended { .. }
+                | Request::Hello { .. }
                 | Request::Fact { .. } => {}
             }
         }
@@ -62,6 +76,12 @@ impl Harness {
                 | Request::Exchange { .. }
                 | Request::Abandon { .. }
                 | Request::Answer { .. }
+                | Request::OpenStream
+                | Request::CloseStream
+                | Request::Watch { .. }
+                | Request::FamilyDelivery { .. }
+                | Request::Ended { .. }
+                | Request::Hello { .. }
                 | Request::Fact { .. } => {}
             }
         }

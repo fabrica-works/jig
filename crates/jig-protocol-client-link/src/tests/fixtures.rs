@@ -82,8 +82,16 @@ impl Harness {
         self.link.step(Time::ZERO, Event::Send { attempt, key, ask: Ask::Jig(Box::new(ask)) }, &mut self.out);
         match self.out.iter().next().expect("one exchange") {
             Request::Exchange { exchange, .. } => *exchange,
-            other
-            @ (Request::Abandon { .. } | Request::Answer { .. } | Request::Read { .. } | Request::Fact { .. }) => {
+            other @ (Request::Abandon { .. }
+            | Request::Answer { .. }
+            | Request::Read { .. }
+            | Request::OpenStream
+            | Request::CloseStream
+            | Request::Watch { .. }
+            | Request::FamilyDelivery { .. }
+            | Request::Ended { .. }
+            | Request::Hello { .. }
+            | Request::Fact { .. }) => {
                 panic!("expected exchange: {other:?}")
             }
         }
@@ -106,6 +114,12 @@ impl Harness {
                 | Request::Abandon { .. }
                 | Request::Answer { .. }
                 | Request::Read { .. }
+                | Request::OpenStream
+                | Request::CloseStream
+                | Request::Watch { .. }
+                | Request::FamilyDelivery { .. }
+                | Request::Ended { .. }
+                | Request::Hello { .. }
                 | Request::Fact { .. } => {}
             }
         }
@@ -124,7 +138,16 @@ impl Harness {
         for value in &self.out {
             match value {
                 Request::Answer { .. } => count = count.saturating_add(1),
-                Request::Exchange { .. } | Request::Abandon { .. } | Request::Read { .. } | Request::Fact { .. } => {}
+                Request::Exchange { .. }
+                | Request::Abandon { .. }
+                | Request::Read { .. }
+                | Request::OpenStream
+                | Request::CloseStream
+                | Request::Watch { .. }
+                | Request::FamilyDelivery { .. }
+                | Request::Ended { .. }
+                | Request::Hello { .. }
+                | Request::Fact { .. } => {}
             }
         }
         count
@@ -176,3 +199,9 @@ pub use turns::*;
 
 mod link_reads;
 pub use link_reads::*;
+
+mod link_stream;
+pub use link_stream::*;
+
+mod link_deliveries;
+pub use link_deliveries::*;

@@ -552,6 +552,7 @@ dependencies = [
  "jig-protocol-client-wire",
  "jig-protocol-transcript",
  "skein-codec",
+ "skein-http",
  "skein-lib",
 ]
 
