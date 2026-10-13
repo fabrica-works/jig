@@ -609,3 +609,5 @@ fn a_paged_join_cut_keeps_its_accepted_prefix() {
     assert_eq!(values(&rows).as_ref(), [fixtures::history(CHILD, 1)]);
     assert_eq!(next, Some(reads::Position::Owner(core::Key::Tasks(tasks::Key::History { task: CHILD, revision: 1 }))));
 }
+
+mod indexed;

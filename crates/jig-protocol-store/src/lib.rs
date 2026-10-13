@@ -132,6 +132,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(decoded.checked_mul(u64::from(limits.joins))?)?
         .checked_add(skein_lib::List::<Box<jig_domain_tasks::TaskRecord>>::worst_case(limits.joins)?)?
         .checked_add(skein_lib::List::<u64>::worst_case(limits.core.tasks.depth)?)?
+        .checked_add(skein_lib::List::<jig_domain_tasks::Edge>::worst_case(limits.core.tasks.tree_tasks)?)?
         .checked_add(skein_lib::Set::<u64>::worst_case(limits.joins)?)?
         .checked_add(u64::from(limits.store.commit))?
         .checked_add(skein_lib::List::<skein_kv::Op>::worst_case(limits.journal.writes.checked_add(1)?)?)?

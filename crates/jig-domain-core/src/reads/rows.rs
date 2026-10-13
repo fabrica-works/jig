@@ -7,6 +7,7 @@ use alloc::boxed::Box;
 use jig_domain_notes as notes;
 use jig_domain_tasks as tasks;
 use skein_lib::List;
+mod positions;
 
 fn note_project(scope: &notes::Scope) -> u32 {
     match scope {
@@ -397,6 +398,9 @@ pub(super) fn from_store(
     if raw.len() > usize::try_from(range.rows).expect("row bound fits") {
         return Answer::None(Why::Busy);
     }
+    if !positions::grouped(range, &raw) {
+        return Answer::None(Why::Unknown);
+    }
     let mut total = 0_u64;
     let mut previous = range.after.clone();
     for row in &raw {
@@ -418,28 +422,17 @@ pub(super) fn from_store(
         let Some(key) = row_key(row) else {
             return Answer::None(Why::Unknown);
         };
-        if !position_allowed(&range.scope, &key)
-            || !later(previous.as_ref(), &key, range.backwards && range.scope != Scope::Conversations)
-        {
+        if !position_allowed(&range.scope, &key) || !positions::later(range, previous.as_ref(), &key) {
             return Answer::None(Why::Unknown);
         }
         previous = Some(key);
     }
-    if let Some(next) = &next {
-        // A continuation names the last examined row, including filtered rows.
-        let examined_notes = match next {
-            Position::Owner(Key::Notes(notes::Key::Line { .. })) => match previous.as_ref() {
-                Some(previous) => next >= previous,
-                None => true,
-            },
-            Position::Owner(_) | Position::Inbox { .. } => false,
-        };
-        if !position_allowed(&range.scope, next)
-            || (!examined_notes && previous.as_ref() != Some(next))
-            || !later(range.after.as_ref(), next, range.backwards && range.scope != Scope::Conversations)
-        {
-            return Answer::None(Why::Unknown);
-        }
+    if let Some(next) = &next
+        && (!position_allowed(&range.scope, next)
+            || (!positions::examined(range, previous.as_ref(), next) && previous.as_ref() != Some(next))
+            || !positions::later(range, range.after.as_ref(), next))
+    {
+        return Answer::None(Why::Unknown);
     }
     let (before, next) = super::cursors::stored_edges(core, limits, range, &raw, next);
     if range.scope == Scope::Conversations && !range.backwards {

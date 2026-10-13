@@ -233,7 +233,7 @@ fn conversation_owner_continuations_keep_row_byte_and_last_examined_admission() 
     core.reclaim();
     limits.load_bytes = 1_000_000;
     let (token, _) = load(&mut core, &limits, start);
-    let wrong = reads::row_key(&retained(&core, 8)).expect("wrong last examined owner");
+    let wrong = reads::row_key(&retained(&core, 10)).expect("wrong last examined owner");
     let rows = Box::new([retained(&core, 9)]);
     assert_eq!(
         loaded_answer(&mut core, &limits, token, reads::Loaded::Page { rows, next: Some(wrong) }),
@@ -483,7 +483,7 @@ fn conversation_owner_reverse_pages_refuse_row_byte_and_last_examined_overruns_w
     );
     limits.load_bytes = 1_000_000;
     let token = reverse_load(&mut core, &limits, 5);
-    let wrong = reads::row_key(&oldest(&core, 7)).expect("wrong last examined");
+    let wrong = reads::row_key(&oldest(&core, 5)).expect("wrong last examined");
     let rows = oldest_rows(&core, &[6]);
     assert_eq!(
         loaded_answer(&mut core, &limits, token, reads::Loaded::Page { rows, next: Some(wrong) }),

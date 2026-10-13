@@ -305,7 +305,7 @@ fn config(seed: u64) -> Config {
     }
 }
 
-fn core() -> (Core, Limits) {
+pub(crate) fn core() -> (Core, Limits) {
     let limits = limits();
     let mut core = Core::new(config(41), &limits);
     let mut out = Queue::with_capacity(people::max_out(&limits.people));
@@ -340,7 +340,7 @@ fn core() -> (Core, Limits) {
     (core, limits)
 }
 
-fn make_task(core: &mut Core, limits: &Limits, number: u64) {
+pub(crate) fn make_task(core: &mut Core, limits: &Limits, number: u64) {
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.tasks };
     let mut out = Queue::with_capacity(tasks::max_out(&limits.tasks));
     tasks::step(&mut core.tasks, &env, tasks::Event::Restored, &mut out);
@@ -2330,7 +2330,7 @@ fn read_answer(core: &mut Core, limits: &Limits, sign_in: u64, read: reads::Read
 }
 
 #[expect(clippy::manual_map, reason = "the test helper follows the exhaustive option style")]
-fn stored_row(value: Record, owner: Option<tasks::TaskRecord>) -> reads::Row {
+pub(crate) fn stored_row(value: Record, owner: Option<tasks::TaskRecord>) -> reads::Row {
     reads::Row {
         value,
         owner: match owner {

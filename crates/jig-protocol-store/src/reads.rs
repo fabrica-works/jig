@@ -1,4 +1,5 @@
 //! Parties' bounded durable reads and joins (protocol/store.md, 7.3).
+mod indexed;
 mod joins;
 mod paged;
 mod point;
@@ -42,12 +43,11 @@ pub(crate) fn read(store: &mut Store, owner: Token, range: Range, above: &mut Qu
         Scope::Spend { .. } => paged::spend(store, &range, &mut spent),
         Scope::Notes { .. } => paged::notes(store, &range, &mut spent),
         Scope::ScopedNotes { .. } => paged::scoped_notes(store, &range, &mut spent),
-        // Indexed scopes join in 16.4.
-        Scope::EndedDelegates { .. }
-        | Scope::History { subtree: true, .. }
-        | Scope::Inbox { .. }
-        | Scope::Conversations
-        | Scope::Goals { .. } => return,
+        Scope::EndedDelegates { .. } => indexed::ended_delegates(store, &range, &mut spent),
+        Scope::History { subtree: true, .. } => indexed::subtree_history(store, &range, &mut spent),
+        Scope::Inbox { .. } => indexed::inbox(store, &range, &mut spent),
+        Scope::Conversations => indexed::conversations(store, &range, &mut spent),
+        Scope::Goals { .. } => indexed::goals(store, &range, &mut spent),
     };
     match result {
         Ok(result) => above.push(Event::Read { owner, result }),
