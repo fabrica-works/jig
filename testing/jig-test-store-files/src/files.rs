@@ -97,8 +97,8 @@ impl Files {
                 self.machine.close(handle);
                 file::Event::Closed { owner }
             }
-            file::Request::Remove { owner, root, name } => {
-                let result = self.machine.remove(opened(root), &name, false);
+            file::Request::Remove { owner, root, name, directory } => {
+                let result = self.machine.remove(opened(root), &name, directory);
                 terminal(owner, result, file::Event::Removed { owner })
             }
             file::Request::Rename { owner, root, from, to } => {

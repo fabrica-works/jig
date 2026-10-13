@@ -191,6 +191,7 @@ pub(crate) fn arrived(
                         owner: OWNER,
                         root: fd,
                         name: super::name(store.transcripts.drop.task),
+                        directory: false,
                     });
                     Some(false)
                 }

@@ -66,11 +66,11 @@ pub fn decode(limits: &Limits, bytes: &[u8]) -> Result<Turn, Undecodable> {
 }
 
 // Smith's codec reason type is intentionally not a client dependency. Obtain
-// allocation-free reference reasons through Smith's public constructors/decoder.
+// allocation-free reference reasons through Smith's public limits check/decoder.
 fn classify(problem: smith::Problem) -> Undecodable {
     let mut beyond = smith::CEILINGS;
     beyond.turn_endpoint = beyond.turn_endpoint.checked_add(1).expect("small ceiling");
-    let bound = smith::Outcome::new(&beyond, smith::Outcome::Busy).expect_err("limits exceed schema");
+    let bound = smith::check_limits(&beyond).expect_err("limits exceed schema");
     let tag = smith::Role::decode(&smith::CEILINGS, &mut Reader::new(&[255])).expect_err("unknown role tag");
     if problem.reason == bound.reason {
         Undecodable::TooLarge

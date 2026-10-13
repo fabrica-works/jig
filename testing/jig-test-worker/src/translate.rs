@@ -45,7 +45,7 @@ pub const fn operation(value: smith::Operation) -> host::Operation {
 pub const fn failure(value: smith::RunFailure) -> host::RunFailure {
     match value {
         smith::RunFailure::Transcript(_) | smith::RunFailure::Model(_) => host::RunFailure::Model,
-        smith::RunFailure::Budget(_) => host::RunFailure::Budget,
+        smith::RunFailure::Budget { exhausted: _, used: _, bound: _ } => host::RunFailure::Budget,
         smith::RunFailure::Policy(_) => host::RunFailure::Policy,
         smith::RunFailure::Cancelled => host::RunFailure::Cancelled,
         smith::RunFailure::Stale => host::RunFailure::Stale,

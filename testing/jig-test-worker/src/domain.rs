@@ -356,7 +356,7 @@ fn up(domain: &mut Domain, env: &Env<Limits>, request: smith::parent::Request, o
                 }
             }
         }
-        smith::parent::Request::Answered { client, answer } => {
+        smith::parent::Request::Answered { client, answer, detail: _ } => {
             let finish = Finish::of(&answer.result);
             domain.pending.push(Pending::Result {
                 owner: client,

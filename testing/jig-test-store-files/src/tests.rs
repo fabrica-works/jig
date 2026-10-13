@@ -66,7 +66,12 @@ fn a_removed_missing_file_answers_not_found() {
     let mut files = Files::new();
     let root = files.root();
     let event = files
-        .answer(file::Request::Remove { owner: OWNER, root: root.fd, name: Box::from(b"missing".as_slice()) })
+        .answer(file::Request::Remove {
+            owner: OWNER,
+            root: root.fd,
+            name: Box::from(b"missing".as_slice()),
+            directory: false,
+        })
         .event;
     assert_eq!(
         event,

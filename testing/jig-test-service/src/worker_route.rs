@@ -214,7 +214,7 @@ pub(super) fn process(event: smith_host_protocol::ProcessEvent) -> Option<jig_te
         ProcessEvent::Unspawned { agent, detail } => smith::process::Event::Unspawned { owner: agent, detail },
         ProcessEvent::Exited { agent, exit } => smith::process::Event::Exited { owner: agent, exit: exited(exit) },
         ProcessEvent::Reaped { agent, detail } => smith::process::Event::Reaped { owner: agent, detail },
-        ProcessEvent::Channel { agent, event } => match event {
+        ProcessEvent::Channel { agent, event } => match *event {
             OpenEvent::Opened { .. } | OpenEvent::WriteFailed => return None,
             OpenEvent::Hangup { .. } => smith::process::Event::Hangup { owner: agent },
             OpenEvent::Sent { .. } => smith::process::Event::Sent { owner: agent },
