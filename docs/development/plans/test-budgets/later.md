@@ -1,0 +1,14 @@
+# test-budgets: later
+
+What the design names, or the audit found, but this plan does not do.
+
+| Item | Design | When |
+|---|---|---|
+| A seeded cut of a pipe's receives in the simulator, as sockets have (`short_recv`), so a reader of what has arrived meets split deliveries on pipes in every world, not only in its unit tests | skein's `simulator.md`, 4 ("short receives and short sends") | when a world finds a reader that depends on where a pipe's delivery ends |
+| The terminal's keys read as they arrive, the terminal's step taking several events from one delivery | skein's `lib.md`, 7 ("a terminal's keys when each may be an event of its own"); smith's `shell.md` | when typing ahead into the terminal costs iterations that matter |
+| The fuzzy suites' cost (jig 15.7 s, smith 29 s, skein 41 to 51 s of 60 s on carbon-forge) | testing-strategy.md, 8 | when a fuzzy suite passes 54 s (90 %) in a gate on carbon-forge |
+| skein's `RequestTable` scans its `order` in every operation (`crates/skein-lib/src/requests.rs:262,308,427,588`): O(N) each, a fill and drain O(N²); nothing outside `skein-lib` uses it yet | skein's `lib.md`, 12 | before a service holds more than about 64 requests in one table |
+| skein's event-stream reader and JSON string skip handle each byte in unoptimized code, about 0.4 µs a byte (`crates/skein-http/src/sse/lines.rs:149`): a run of bytes could be found at once by the library's own search | skein's `http.md`, 4; `json.md`, 3 | when a megabyte event or document costs a real service |
+| jig's core world's observer rebuilds its snapshot from every store row at each applied commit (`tests/core/src/observations.rs:574-597`), 8 to 12 % of a story: it could apply what the commit changed, and check the whole at the end | jig's `docs/development/workflow.md`, 2 ("Checks on change") | when the core world's stories pass 0.5 s in a gate |
+| jig's fleet world formats every event into its trace whatever happens (`tests/fleet/src/world.rs:649,657,759,1296`), 17 % of its samples; its replay tests compare that trace, so typed entries would replace it | workflow.md, 2 ("Traces on failure") | when the fleet world's tests pass 0.5 s in a gate |
+| Test binaries linked without PIE: about 0.5 ms less per test process; stable cargo cannot set it for tests alone, and release binaries would lose ASLR | skein's `testing-strategy.md`, 8 | when cargo gains per-profile flags |
