@@ -2001,9 +2001,32 @@ the file.
      `ecb78e34` and lands nothing until the user chooses between a test-
      cost pass on smith's suite and another course. The closing jig and
      temper repins wait; every other step goes on.
+249. **A budget that bites is doubled for the rest of this plan; its
+     cause is worked on right after** (2026-10-13, the user: "If the
+     budget starts biting, we will double the budget temporarily
+     (probably for the rest of this plan), until we work on the root
+     cause (right after the plan ends)"). A suite bites when a gate on
+     carbon-forge fails on its global timeout with every test that ran
+     passing. Then, for the rest of this plan, its budget is twice its
+     own: 30 s focused, 120 s fuzzy. In jig and skein, the next session
+     in that repository sets the profile's `global-timeout` so, as its own
+     commit naming this ruling and "until the jig-protocol plan ends".
+     In smith, ruling 121's gate stands (the measure profile, every test
+     run and passing), and each smith landing's Proof names its focused
+     suite's total, at most 30 s. smith's focused suite bites now (ruling
+     248): smith-repin lands under ruling 121's gate, its settle times
+     (0.259 s in a full run, 0.086 s alone) and the suite's total in its
+     Proof. This reverses ruling 248's hold. After the plan, each doubled
+     suite gets a test-cost pass (the suite and the code it tests made
+     cheaper, as jig's focused suite's two passes did), then its budget
+     goes back; listed under "For the user".
 
 ## For the user
 
+- **Right after this plan ends** (the user, 2026-10-13): a test-cost pass
+  on every suite whose budget ruling 249 doubled (smith's focused suite
+  now), then its budget restored; and skein's raw reader plan, option (a)
+  of "A raw reader over io takes a byte per iteration".
 - **Unit tests in one process each crate** (the designer, 2026-10-13;
   `tests-cost.md`, "The second pass"): nextest runs every test in a
   process of its own, and jig's unit-test binaries are 2,654 of its
@@ -2108,6 +2131,8 @@ the file.
   reference machine for smith's budgets, and if so, is the suite made
   cheaper, or its budget raised? Until then, smith lands here without
   the focused suite's timeout.
+  **The user, 2026-10-13: wait; a budget that bites is doubled for the
+  rest of this plan (ruling 249), and its cause worked on right after.**
 - **Retention** (decision 13): when a deployment's store must start
   shrinking ended work.
 - **The browser's shell and wasm32** (decision 2): when, and whether jig

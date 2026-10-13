@@ -371,6 +371,15 @@ ones before it in its session. Dependencies are by capability: "skein
   version that names the old one, in any file, past rulings 114's and
   122's limits: names and every other expected value kept, no alias for
   the old version left, the files named in the commit body.
+- **A budget that bites is doubled for the rest of this plan**
+  (decisions.md, ruling 249). A gate that fails on its global timeout on
+  carbon-forge, every test that ran passing, is no retry and no question:
+  the next session in that repository doubles that profile's
+  `global-timeout` (30 s focused, 120 s fuzzy) as its own commit, naming
+  ruling 249 and "until the jig-protocol plan ends", and the gate runs
+  again; smith keeps ruling 121's gate, its focused total at most 30 s.
+  The supervisor is told in the log. A test that fails is still a
+  failure.
 - **A new test costs the suite about 12 ms before its work** (decisions.md,
   ruling 219; `tests-cost.md`, 12). In every step left, tests are one per
   behaviour, a behaviour's cases rows of one table test; fixtures are
