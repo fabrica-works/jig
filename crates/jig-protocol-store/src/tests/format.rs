@@ -1,0 +1,190 @@
+//! The format row and the sizes at start (store.md 5.3, 5.4).
+use super::fixtures;
+use crate::boundary::{Family, OpenRefusal};
+use crate::{codec, format, sizes};
+use jig_domain_core as core;
+use skein_lib::{Duration, JournalLimits};
+
+const JOURNAL: JournalLimits = JournalLimits { commits: 2, writes: 4, held: 4, now: 4, release: 4 };
+fn wanted() -> codec::component::Format {
+    format::current(fixtures::APPLICATION.version, fixtures::DEPLOYMENT)
+}
+fn store() -> skein_kv::Limits {
+    skein_kv::Limits {
+        key: 1024,
+        value: 16_777_216,
+        ops: 16,
+        commit: 134_217_728,
+        queued: 2,
+        queued_bytes: 268_435_456,
+        budget: 1_073_741_824,
+        segment: 268_435_456,
+        snapshot_after: 134_217_728,
+        chunk: 16_778_260,
+        page: skein_kv::Page { rows: 2, bytes: 16_778_240 },
+        deadline: Duration::from_nanos(1_000_000_000),
+    }
+}
+fn check(store: &skein_kv::Limits) -> Result<sizes::Sizes, sizes::SizeRefusal> {
+    sizes::check(&fixtures::CORE_LIMITS, &fixtures::APPLICATION, &JOURNAL, store)
+}
+#[test]
+fn a_format_row_of_another_tasks_version_is_refused_naming_tasks() {
+    let wanted = format::current(fixtures::APPLICATION.version, fixtures::DEPLOYMENT);
+    let mut found = wanted;
+    found.tasks = 2;
+    assert_eq!(format::check(&found, &wanted), Err(OpenRefusal::Format { family: Family::Tasks, found: 2, wanted: 1 }));
+}
+#[test]
+fn a_format_row_of_another_deployment_is_refused() {
+    let wanted = wanted();
+    let found = codec::component::Format { deployment: [9; 16], ..wanted };
+    assert_eq!(format::check(&found, &wanted), Err(OpenRefusal::Deployment));
+}
+#[test]
+fn the_current_format_row_is_accepted() {
+    assert_eq!(format::check(&wanted(), &wanted()), Ok(()));
+}
+#[test]
+fn another_family_is_refused_naming_the_first_difference() {
+    let wanted = wanted();
+    for (family, found) in [
+        (Family::Component, codec::component::Format { component: 2, core: 2, ..wanted }),
+        (Family::Core, codec::component::Format { core: 2, tasks: 2, ..wanted }),
+        (Family::People, codec::component::Format { people: 2, notes: 2, ..wanted }),
+        (Family::Notes, codec::component::Format { notes: 2, application: 2, ..wanted }),
+        (Family::Application, codec::component::Format { application: 2, deployment: [9; 16], ..wanted }),
+    ] {
+        assert_eq!(format::check(&found, &wanted), Err(OpenRefusal::Format { family, found: 2, wanted: 1 }));
+    }
+}
+#[test]
+fn a_key_limit_below_the_largest_note_line_is_refused() {
+    let mut limits = store();
+    limits.key = 111;
+    assert_eq!(check(&limits), Err(sizes::SizeRefusal::Key { needs: 112, has: 111 }));
+}
+#[test]
+fn a_value_limit_below_the_largest_task_record_is_refused() {
+    let mut limits = store();
+    limits.value = 1;
+    assert_eq!(check(&limits), Err(sizes::SizeRefusal::Value { needs: 8_388_663, has: 1 }));
+}
+#[test]
+fn a_value_limit_below_the_largest_core_turn_is_refused() {
+    let mut limits = store();
+    limits.value = 8_388_662;
+    assert_eq!(check(&limits), Err(sizes::SizeRefusal::Value { needs: 8_388_663, has: 8_388_662 }));
+}
+#[test]
+fn a_page_smaller_than_one_row_is_refused() {
+    let mut limits = store();
+    limits.page.bytes = 8_388_774;
+    assert_eq!(check(&limits), Err(sizes::SizeRefusal::Page { needs: 8_388_775, has: 8_388_774 }));
+}
+#[test]
+fn fixture_limits_fit_their_store() {
+    assert_eq!(check(&store()), Ok(sizes::Sizes { key: 112, value: 8_388_663, ops: 9, commit: 75_499_082 }));
+}
+#[test]
+fn too_few_operations_are_refused() {
+    let mut limits = store();
+    limits.ops = 8;
+    assert_eq!(check(&limits), Err(sizes::SizeRefusal::Ops { needs: 9, has: 8 }));
+}
+#[test]
+fn too_few_commit_bytes_are_refused() {
+    let mut limits = store();
+    limits.commit = 75_499_081;
+    assert_eq!(check(&limits), Err(sizes::SizeRefusal::Commit { needs: 75_499_082, has: 75_499_081 }));
+}
+#[test]
+fn too_few_in_flight_slots_are_refused() {
+    let mut limits = store();
+    limits.queued = 1;
+    assert_eq!(check(&limits), Err(sizes::SizeRefusal::Queue { needs: 2, has: 1 }));
+}
+#[test]
+fn too_few_queued_bytes_are_refused() {
+    let mut limits = store();
+    limits.queued_bytes = 150_998_163;
+    assert_eq!(check(&limits), Err(sizes::SizeRefusal::QueuedBytes { needs: 150_998_164, has: 150_998_163 }));
+}
+#[test]
+fn a_domain_limit_past_its_family_ceiling_is_refused_at_start() {
+    let mut domain = fixtures::CORE_LIMITS;
+    domain.notes.body_bytes = u32::MAX;
+    assert_eq!(sizes::check(&domain, &fixtures::APPLICATION, &JOURNAL, &store()), Err(sizes::SizeRefusal::Ceiling));
+}
+#[test]
+fn an_application_key_that_cannot_hold_its_tag_is_refused() {
+    let application = sizes::Application { key: u32::MAX, ..fixtures::APPLICATION };
+    assert_eq!(
+        sizes::check(&fixtures::CORE_LIMITS, &application, &JOURNAL, &store()),
+        Err(sizes::SizeRefusal::Ceiling)
+    );
+}
+fn codec_limits() -> codec::Limits {
+    codec::limits(&fixtures::CORE_LIMITS).expect("fixture bounds")
+}
+#[test]
+fn every_childs_record_dispatches_to_its_own_codec() {
+    let limits = codec_limits();
+    for row in [
+        core::Record::Core(core::CoreRecord::Deployment(fixtures::core_rows::deployment())),
+        core::Record::Tasks(jig_domain_tasks::Stored::Live(Box::new(fixtures::task_record()))),
+        core::Record::People(jig_domain_people::Stored::ReadResults { party: 7, through: 3 }),
+        core::Record::Notes(jig_domain_notes::Record::Entry(fixtures::note_entry())),
+    ] {
+        let bytes = codec::encode(&row, &limits).expect("record fits");
+        assert_eq!(codec::decode(&row.key(), &bytes, &limits), Some(row));
+    }
+}
+#[test]
+fn each_childs_corrupt_record_is_refused_by_dispatch() {
+    let limits = codec_limits();
+    for key in [
+        core::Key::Core(core::CoreKey::Deployment),
+        core::Key::Tasks(jig_domain_tasks::Key::Live(1)),
+        core::Key::People(jig_domain_people::Key::Person(1)),
+        core::Key::Notes(jig_domain_notes::Key::Entry { name: 1 }),
+    ] {
+        assert_eq!(codec::decode(&key, &[], &limits), None);
+    }
+}
+#[test]
+fn the_largest_note_line_key_reaches_its_calculated_bound() {
+    let mut segments = skein_lib::List::with_capacity(fixtures::NOTES_LIMITS.pattern_bytes);
+    for _ in 0..fixtures::NOTES_LIMITS.pattern_bytes {
+        segments.push(Box::<[u8]>::default()).expect("segment count fits");
+    }
+    let key = core::Key::Notes(jig_domain_notes::Key::Line {
+        scope: jig_domain_notes::Scope::Resources {
+            project: u32::MAX,
+            connector: u16::MAX,
+            pattern: jig_domain_notes::Pattern {
+                segments: segments.into_boxed(),
+                last: jig_domain_notes::Last::Exact(Box::new([0; 16])),
+            },
+        },
+        name: u64::MAX,
+    });
+    assert_eq!(crate::keys::encode(&key, 112).expect("largest line fits").len(), 112);
+    assert_eq!(crate::keys::encode(&key, 111), None);
+}
+#[test]
+fn larger_application_encodings_are_included_in_the_bounds() {
+    let application = sizes::Application { version: 1, key: 256, value: 9_000_000 };
+    assert_eq!(
+        sizes::check(&fixtures::CORE_LIMITS, &application, &JOURNAL, &store()),
+        Ok(sizes::Sizes { key: 257, value: 9_000_000, ops: 9, commit: 81_002_420 }),
+    );
+}
+#[test]
+fn a_journal_whose_operation_count_overflows_is_refused() {
+    let journal = JournalLimits { writes: u32::MAX, ..JOURNAL };
+    assert_eq!(
+        sizes::check(&fixtures::CORE_LIMITS, &fixtures::APPLICATION, &journal, &store()),
+        Err(sizes::SizeRefusal::Ceiling),
+    );
+}

@@ -780,3 +780,6 @@ pub mod calls;
 pub mod core_rows;
 
 pub mod people_outcomes;
+
+pub const APPLICATION: crate::sizes::Application = crate::sizes::Application { version: 1, key: 64, value: 128 };
+pub const DEPLOYMENT: [u8; 16] = [7; 16];

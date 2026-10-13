@@ -4,7 +4,9 @@
 extern crate alloc;
 pub mod boundary;
 pub mod codec;
+pub mod format;
 pub mod intervals;
+pub mod sizes;
 
 #[rustfmt::skip]
 #[path = "generated/component_v1.rs"]

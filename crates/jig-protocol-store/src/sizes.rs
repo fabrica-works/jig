@@ -1,0 +1,88 @@
+//! Checked store admission bounds (protocol/store.md, 5.4 and 6).
+use crate::{codec, component_v1, core_v1, notes_v1, people_v1, tasks_v1};
+use jig_domain_core as core;
+
+/// The application's largest encodings, before the component's key tag.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Application {
+    pub version: u32,
+    pub key: u32,
+    pub value: u32,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Sizes {
+    pub key: u32,
+    pub value: u32,
+    pub ops: u32,
+    pub commit: u32,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum SizeRefusal {
+    Key { needs: u32, has: u32 },
+    Value { needs: u32, has: u32 },
+    Ops { needs: u32, has: u32 },
+    Commit { needs: u32, has: u32 },
+    Page { needs: u32, has: u32 },
+    Queue { needs: u32, has: u32 },
+    QueuedBytes { needs: u64, has: u64 },
+    Ceiling,
+}
+
+pub fn check(
+    domain: &core::Limits,
+    application: &Application,
+    journal: &skein_lib::JournalLimits,
+    store: &skein_kv::Limits,
+) -> Result<Sizes, SizeRefusal> {
+    let sizes = largest(domain, application, journal).ok_or(SizeRefusal::Ceiling)?;
+    if sizes.key > store.key {
+        return Err(SizeRefusal::Key { needs: sizes.key, has: store.key });
+    }
+    if sizes.value > store.value {
+        return Err(SizeRefusal::Value { needs: sizes.value, has: store.value });
+    }
+    if sizes.ops > store.ops {
+        return Err(SizeRefusal::Ops { needs: sizes.ops, has: store.ops });
+    }
+    if sizes.commit > store.commit {
+        return Err(SizeRefusal::Commit { needs: sizes.commit, has: store.commit });
+    }
+    // skein-kv pages count the row's key and value payloads.
+    let page = sizes.key.checked_add(sizes.value).ok_or(SizeRefusal::Ceiling)?;
+    if page > store.page.bytes {
+        return Err(SizeRefusal::Page { needs: page, has: store.page.bytes });
+    }
+    if journal.commits > store.queued {
+        return Err(SizeRefusal::Queue { needs: journal.commits, has: store.queued });
+    }
+    let queued = u64::from(journal.commits).checked_mul(u64::from(sizes.commit)).ok_or(SizeRefusal::Ceiling)?;
+    if queued > store.queued_bytes {
+        return Err(SizeRefusal::QueuedBytes { needs: queued, has: store.queued_bytes });
+    }
+    Ok(sizes)
+}
+
+fn largest(domain: &core::Limits, application: &Application, journal: &skein_lib::JournalLimits) -> Option<Sizes> {
+    let limits = codec::limits(domain)?;
+    // A resources line has 32 fixed bytes, three per empty segment, and at
+    // most two per payload byte (escaped zero). Notes bounds both count and sum.
+    // The largest fixed key is a tasks update: tags plus five widened numbers.
+    let key = domain.notes.pattern_bytes.checked_mul(5)?.checked_add(32)?.max(44).max(application.key.checked_add(1)?);
+    let value = u32::try_from(
+        core_v1::Row::worst_case_bytes(&limits.core)?
+            .max(tasks_v1::Row::worst_case_bytes(&limits.tasks)?)
+            .max(people_v1::Row::worst_case_bytes(&limits.people)?)
+            .max(notes_v1::Row::worst_case_bytes(&limits.notes)?)
+            .max(component_v1::worst_case_bytes(&component_v1::CEILINGS)?)
+            .max(u64::from(application.value)),
+    )
+    .ok()?;
+    // Each journal write can produce two turn places; the first commit also
+    // inserts the format row. Each put costs a tag and two u32 lengths; a
+    // skein-kv frame costs 22 header bytes and four checksum bytes.
+    let ops = journal.writes.checked_mul(2)?.checked_add(1)?;
+    let commit = key.checked_add(value)?.checked_add(9)?.checked_mul(ops)?.checked_add(26)?;
+    Some(Sizes { key, value, ops, commit })
+}
