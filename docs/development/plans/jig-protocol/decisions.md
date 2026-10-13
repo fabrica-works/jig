@@ -1822,6 +1822,16 @@ the file.
      (`jig/31-engine-clients.md`), tags each piece `Fact::Ending` with a
      round-trip row, and jig 34 then reuses the shared helper and drops
      its own.
+234. **jig 31.s1 makes and signs in a service; removal and reissue are
+     later** (2026-10-13, the designer's answer to question.md's "jig
+     31.s1: a service's removal, and a replayed MakeService's credential";
+     jig `4092ca1b`, `ec78da12`). Removing a service and reissuing its
+     credential are owners' asks of their own, in the design and in
+     `later.md`, not in this plan; 31.s1 drops its removal. A replayed
+     `MakeService` answers its party with an empty credential, known by
+     the digest already kept, and never draws a second. A service's
+     sign-in names the identity `make_service` recorded (the deployment,
+     the service's number), which people's `signed_in` already finds.
 
 ## For the user
 
