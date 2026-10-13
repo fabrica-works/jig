@@ -560,6 +560,15 @@ Proof: skein's gate.
 Don't: change an existing encoding.
 Size: at most 80 lines of production code.
 
+### 02.s8 base64 decodes a symbol by its table, in one pass
+
+A step not in the plan, from the designer's answer on smith's settle
+test; its text is the designer's, in `smith-settle.md`, 3. 02.1's
+decoder finds each symbol by searching the alphabet and walks each piece
+twice: about 200 ms of every smith process that reads trust roots,
+unoptimized (`smith-settle.md`, 2.2).
+Needs: nothing.
+
 ## Interface sketches
 
 ```rust

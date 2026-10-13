@@ -1945,15 +1945,34 @@ the file.
   total, and improvements are evaluated when gates approach its limit
   (about 90 % of 15 s).
 
-- **smith's settle test on carbon-forge** (ruling 186): smith-repin's
-  last gate fails only smith's `smith_check_json_lists_the_effective_limits_by_name`
-  at 2.05–2.08 s against its 2,000 ms bound in the full suite; alone it
-  runs 1,558 ms now, 1,010 ms at smith's old pins. Options: (a) a step that
-  bisects skein between smith's old pin `4b61ac5` and `4130d9b`, one
-  isolated run per commit that touches code, to name the 548 ms; (b) land
-  smith's repin from smith's reliability machine, where its suite runs
-  faster (ruling 121); (c) raise the test's bound in smith. The closing jig
-  and temper repins wait on it; nothing else does.
+- **smith's settle test on carbon-forge** (ruling 186; the user chose
+  its profiling, 2026-10-13): answered by the designer
+  (`smith-settle.md`). The test's time went to its scripted person,
+  which reads the product's 24,940 bytes of output one byte per
+  iteration of the real loop, about 25,000 iterations; and to the
+  product's trust roots, whose base64 the decoder of skein 02.1 decodes
+  by searching the alphabet for each symbol, about 200 ms. Two steps
+  remove both and keep the bound: skein-02.s8, then smith-repin again
+  from smith's `main`. Measured together: 0.05–0.07 s alone, 0.15 s in
+  the full suite. The closing jig and temper repins take smith's `main`
+  after smith-repin.
+
+- **A raw reader over io takes a byte per iteration** (the designer,
+  2026-10-13; `smith-settle.md`, 6): skein's stream reads are exact
+  (`Fill`, `Scan`, `Line`; lib.md, 7), and io meets a demand in the
+  next up pass (io.md, 2), so a reader of bytes that nothing frames
+  demands `Fill(1)` and pays one iteration of its loop per byte. smith
+  reads a tool's output and a host's standard error so: a tool that
+  prints 1 MB costs about a million iterations. Options: (a)
+  `lib::stream` gains a read of what has arrived, at least one byte and
+  at most a bound, which io meets from its intake at once; every stream
+  layer meets it, and a delivery's size then depends on how the bytes
+  arrived, which the simulator already draws from its seed; (b) io meets
+  a demand its intake already holds in the pass that made it, changing
+  io.md, 2's order for every layer above; (c) readers keep `Fill(1)`,
+  and its cost. The designer recommends (a), in skein's design, for a
+  plan of its own. Nothing in this run waits on it.
+
 - **The code-graph daemon's priority** (ruling 144): on carbon-forge,
   `codebase-memory-mcp`'s daemon (pid 272, started at boot) re-indexed
   on every change at normal priority, taking about six of eight cores as

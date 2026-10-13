@@ -113,8 +113,11 @@ ones before it in its session. Dependencies are by capability: "skein
 
 ### Repins (development.md, 5.7)
 
-- **`smith-repin`:** after the last skein increment, if skein's `main`
-  moved past what smith 01 pinned; otherwise it lands nothing.
+- **`smith-repin`:** after skein 02.s8, from smith's `main`: takes
+  skein's `main`, and the scripted person's read of a piped product
+  (`smith-settle.md`, 4). smith's `main` took skein's last code commit
+  before 02.s8 on smith's own machine, so the commit `bb26b6d9` is not
+  landed.
 - **`jig-repin`:** after `smith-repin`.
 - **`temper-repin`:** after `jig-repin`. See "Repin" below.
 
