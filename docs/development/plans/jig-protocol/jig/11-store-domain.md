@@ -418,6 +418,28 @@ lacks.
 Size: at most 100 lines of production code.
 Removes: nothing.
 
+### 11.s1 A first start seeds the configured projects
+
+A step not in the plan (decisions.md, ruling 207), before jig 25.3 lands.
+`protocol/configuration.md`, 3: configuration "seeds projects, their
+policies and their parties' roles on a deployment's first start only".
+Shape: when the core's restore finds a cold store (its load answers no
+  deployment), the core commits, in one decision before the people child
+  is told it is restored, each configured project's policy snapshot and
+  its roster of parties' roles (its first owners among them), as a
+  policy change and a roles row would be saved; a restart over a store
+  that holds them seeds nothing. The roots route an empty load to it as
+  they route any load; `step`'s worlds are unchanged, and those that
+  bootstrap a store by hand (`tests/core/src/effects.rs:220`) keep doing
+  so.
+Test shape: a core world: a first start over an empty store lets the
+  configured owner sign in and read its project's policy; a restart over
+  that store seeds nothing again.
+Proof: the gate.
+Don't: seed on a restart; seed resources or homes (configuration.md, 3:
+  they come by adoption).
+Size: at most 120 lines of production code.
+
 ## Interface sketches
 
 ```rust

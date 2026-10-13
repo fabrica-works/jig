@@ -1502,6 +1502,16 @@ the file.
      (loads, a commit's acknowledgement or failure) are taken without a
      decision's room. `step` stays for the worlds, unchanged. Inside
      25.3's Files, named in its commit body.
+207. **jig 11.s1: a first start seeds the configured projects** (2026-10-13,
+     the coordinator's block "jig 25.3: first-start configured project
+     roles and policy seeding", 2026-10-13T04:10:11Z). A defect against
+     configuration.md, 3 ("seeds projects, their policies and their
+     parties' roles on a deployment's first start only"): `Core::new`
+     makes the people child with no roles rows, so after an empty load the
+     configured owner's sign-in is refused, and no initial policy is
+     saved; the core worlds bootstrap a store by hand. A step not in the
+     plan, jig 11.s1 (`jig/11-*.md`), seeds them in one commit at a first
+     start; jig 25.3 lands after it.
 
 ## For the user
 
