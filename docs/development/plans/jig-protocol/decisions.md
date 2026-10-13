@@ -2343,6 +2343,15 @@ the file.
      not in the plan: skein 03.s3 (`skein/03-files.md`, at most 60 lines)
      and jig-repin.s6 (jig-repin.s5 had already landed); jig 26.3 lands
      after them, its mid-run power-loss story as prescribed.
+279. **jig 26.6 runs its live proof once more** (2026-10-13, the
+     coordinator's block "jig 26.6: live proof once exhausted before any
+     completion", 2026-10-13T17:20:32Z). The one live run failed before
+     any request reached the provider: its 69-byte prompt passed the test
+     client's 32-byte text limit (0 completions, 94 ms). The "once" bounds
+     live calls and their cost, and none was spent. With the prompt within
+     the limit (29 bytes) and the changed crates' clippy passing, the live
+     proof runs exactly once more; if it fails after reaching the provider,
+     it is a block, not another try.
 
 ## For the user
 
