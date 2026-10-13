@@ -232,3 +232,63 @@ fn a_historical_goal_holding_keeps_its_opaque_segments() {
     let bytes = fixtures::encoded(&holding, OwnerGoalHolding::measure, OwnerGoalHolding::encode);
     assert_eq!(OwnerGoalHolding::decode(&limits, &mut Reader::new(&bytes)), Ok(holding));
 }
+
+fn small_store_family(limits: &Limits) -> Family {
+    Family::new(limits, FamilyParts { number: u16::MAX }).expect("whole small-store owner number")
+}
+
+#[test]
+fn a_kept_record_of_another_family_version_is_refused() {
+    let limits = fixtures::limits();
+    let family = small_store_family(&limits);
+    for keeper in [Keeper::Jig, Keeper::Table, Keeper::Family(family)] {
+        let kept = Kept::new(&limits, KeptParts { keeper, store_version: u16::MAX, record: Box::from([255, 0]) })
+            .expect("bounded kept record");
+        let mut bytes = fixtures::encoded(&kept, Kept::measure, Kept::encode);
+        bytes[0] = 3;
+        bytes[1] = 0;
+        assert_eq!(
+            Kept::decode(&limits, &mut Reader::new(&bytes)),
+            Err(Problem { path: Path::KeptVersion, reason: skein_codec::Reason::Version })
+        );
+    }
+}
+
+#[test]
+fn a_draft_at_its_ceiling_round_trips_unchanged() {
+    let limits = fixtures::limits();
+    let draft = Draft::new(
+        &limits,
+        DraftParts {
+            party: u64::MAX,
+            task: u64::MAX,
+            words: fixtures::ceiling_text(limits.draft_words),
+            touched: u64::MAX,
+        },
+    )
+    .expect("draft at its text ceiling");
+    let bytes = fixtures::encoded(&draft, Draft::measure, Draft::encode);
+    assert_eq!(Draft::decode(&limits, &mut Reader::new(&bytes)), Ok(draft));
+}
+
+#[test]
+fn a_table_entry_never_sent_round_trips_with_no_wall() {
+    let limits = fixtures::limits();
+    let family = small_store_family(&limits);
+    let entry = TableEntry::new(
+        &limits,
+        TableEntryParts {
+            key: [7; 16],
+            scope: u64::MAX,
+            first_sent: None,
+            owner: Owner::Family(family),
+            version: u32::MAX,
+            request: Box::from([255, 0]),
+        },
+    )
+    .expect("unsent whole request");
+    let bytes = fixtures::encoded(&entry, TableEntry::measure, TableEntry::encode);
+    let decoded = TableEntry::decode(&limits, &mut Reader::new(&bytes)).expect("whole table entry");
+    assert_eq!(decoded.first_sent(), &None);
+    assert_eq!(decoded, entry);
+}

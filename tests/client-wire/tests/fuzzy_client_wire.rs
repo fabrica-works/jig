@@ -17,6 +17,18 @@ macro_rules! check {
 mod documents;
 
 fn records_1(bytes: &[u8]) {
+    check!(Keeper, bytes);
+    check!(Kept, bytes);
+    check!(ProjectSection, bytes);
+    check!(TaskSection, bytes);
+    check!(AddressInbox, bytes);
+    check!(AddressConversations, bytes);
+    check!(AddressTask, bytes);
+    check!(AddressProject, bytes);
+    check!(Address, bytes);
+    check!(Place, bytes);
+    check!(Draft, bytes);
+    check!(TableEntry, bytes);
     check!(Family, bytes);
     check!(Owner, bytes);
     check!(Keyed, bytes);
