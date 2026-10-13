@@ -1781,6 +1781,23 @@ the file.
      is not fitting a test to the real store, which 18.3's Don't forbids:
      the design, not the component, gives the expected values. The
      README's Rules now say so.
+231. **The peers' fixture and those built on it are test-sized until the
+     real store admits them** (2026-10-13, the coordinator's block "jig
+     18.3: admitted peer journal still exceeds commit ceiling and derived
+     fixtures change bounds", 2026-10-13T06:48:04Z). Under ruling 229 the
+     peers' fixture asks 5,515 writes, and its people family's largest
+     row (1,406,719 bytes, a codec worst case of its people bounds) times
+     twice the writes is past `u32`; fixtures built on it then grow the
+     core's bounds after its journal was derived. The peers' fixture's
+     bounds may shrink to test-sized values (`people.amendment_bytes` 256,
+     and others as needed) that every test using it still exercises, and
+     each fixture that changes core bounds after building on it derives
+     its journal again through one named helper of `peers.rs` after its
+     last change, at least 2,000 writes. Every test's name and expected
+     value kept; the adapter caps nothing (ruling 215). Ruling 229's
+     finding clause is about a test that runs out of journal room, not
+     about admitting a fixture. A test whose case needs a bound the real
+     store cannot admit is a finding, raised.
 
 ## For the user
 
