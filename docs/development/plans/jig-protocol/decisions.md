@@ -1158,6 +1158,17 @@ the file.
      fleet's workers less the channels open. The world configures three
      names with two workers. The profiles gain `names` in the same
      increment (README, "A component's limits join the profiles").
+178. **jig 24.1 proves backoff alone; the proved channel's world test
+     moves to 24.2** (2026-10-13, the coordinator's block "jig 24.1:
+     proved-channel proof precedes hello translation",
+     2026-10-13T00:02:34Z). A plan defect of order: channel.md, 10.1 has a
+     channel proved once "it carried the hello and stayed open for the
+     span", but the hello's translation first lands in 24.2, outside
+     24.1's Files. 24.1 lands its opening and redial with
+     `Backoff::proved` proved by a unit test, the proving span wired but
+     unreached; 24.2, with the hello, runs the proved-channel world test
+     (backoff starting over after a proved channel) as part of its own
+     Proof.
 
 ## For the user
 
