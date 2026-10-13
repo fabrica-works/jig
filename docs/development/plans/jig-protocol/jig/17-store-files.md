@@ -389,11 +389,19 @@ Scope: store.md 8.4, 8.5 and 10.
   `Close`; a missing file is left missing. `Opened` once the last is
   synced.
 - **Dropped:** `Write::DropTranscript { task }` (jig 13's): the task's
-  `Own::Transcript` place and its `Own::Attempt` rows erased in the
-  commit; the file removed (`Remove` on its directory's descriptor;
-  missing is success) and the directory synced before the skein-kv
-  commit; places left without a file (a crash before the commit) read as
-  `Unread`.
+  `Own::Transcript` place erased in the commit; the file removed
+  (`Remove` on its directory's descriptor; missing is success) and the
+  directory synced before the skein-kv commit; places left without a
+  file (a crash before the commit) read as `Unread`. The task's
+  `Own::Attempt` rows are orphans from that commit on, read as dropped,
+  and go in the commits that follow: the component keeps a bounded queue
+  of dropped tasks with attempt rows left, and adds at most
+  `Limits::orphan_erases` of their erases to each commit it makes for
+  the root, loading the next keys from the map in the same step; at
+  open, after the cut, it queues each task whose attempt rows have no
+  `Own::Transcript` place (store.md, 6, "A commit's operations are
+  bounded"; 8.5; the designer, 2026-10-13, jig `53a7afdf`).
+  `sizes::largest` counts the orphan erases in a commit's operations.
 Needs: jig 02's `Cut`.
 Files: `crates/jig-protocol-store/src/{transcripts/{cut.rs, drop.rs}
 (new), open.rs, commits.rs}`; `src/tests/transcripts.rs`.
@@ -407,7 +415,10 @@ Test shape: `src/tests/transcripts.rs`; fixtures as above, plus
 `open_leaves_a_missing_file_missing`,
 `a_dropped_transcript_is_removed_before_its_commit`,
 `dropping_a_missing_file_is_not_a_failure`,
-`places_without_a_file_read_as_unread`. Each under 20 ms.
+`places_without_a_file_read_as_unread`,
+`a_drop_erases_the_transcript_place_and_leaves_its_attempts_as_orphans`,
+`orphan_attempts_go_a_bounded_number_per_later_commit`,
+`open_queues_attempts_whose_transcript_place_is_gone`. Each under 20 ms.
 Proof: unit,
 `transcripts::open_cuts_a_claimed_tasks_file_to_its_committed_length`,
 run once with `heavy cargo nextest run -p jig-protocol-store -E
@@ -416,7 +427,8 @@ proof's task with a committed length of 63 and a file of 120 gets `Cut {
 length: 63 }` and a sync before `Opened`; under 20 ms.
 Don't: cut a file of a task without a run proof (store.md 8.4: "An ended
 task's file was cut while its task lived, and is not touched again");
-treat a missing file as a failure.
+treat a missing file as a failure; erase more than `orphan_erases`
+orphans in one commit; make a commit of the component's own.
 Size: at most 300 lines.
 Removes: jig 15.2's `Failed` arm for `DropTranscript`.
 
