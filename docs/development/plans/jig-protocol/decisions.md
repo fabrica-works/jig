@@ -1964,6 +1964,18 @@ the file.
      runs it before 18.5 lands. Whether skein's io should sync a parent
      it makes a directory in, and whether skein's other private-root
      users share the gap, is asked of the designer.
+246. **jig 17.s1: a row says why its turn is not joined** (2026-10-13,
+     the coordinator's block "jig 17.s1: page-turn transport and identity
+     fields", 2026-10-13T08:34:04Z). The store's `reads::Row.related:
+     Option<Record>` carries a joined turn, but cannot say "too large" or
+     "unread", and the core must refuse a turn that is not its line's.
+     `Row` gains one field holding only those two cases: too large, with
+     the frame's task, attempt and turn beside its spent, read, at and
+     bytes; unread, with the line's turn. A carried turn stays in `related`
+     alone, so no state holds a turn twice. Existing `Row` literals take
+     the empty value; no schema change. The core maps the three to
+     `PageTurn` as 17.s1 says, `Missing::Unknown` when the identity is not
+     the line's.
 
 ## For the user
 
