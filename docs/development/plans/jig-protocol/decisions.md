@@ -2013,6 +2013,14 @@ the file.
   is accepted for real behaviour; the supervisor watches the suite's
   total, and improvements are evaluated when gates approach its limit
   (about 90 % of 15 s).
+- **The suites' budgets are measured on the slowest machine** (the user,
+  2026-10-13): 15 s focused and 60 s fuzzy hold on carbon-forge (an
+  i5-8265U laptop CPU, where skein's suite runs 2.5 to 3.5 times slower
+  than on smith's machine). Before a budget is raised, the suite and the
+  code it tests are searched for what can be made cheaper (algorithms,
+  allocations, limits, fixtures), as the focused suite's two passes did;
+  only when nothing more can be had without losing coverage or quality
+  is the budget raised.
 
 - **smith's settle test on carbon-forge** (ruling 186; the user chose
   its profiling, 2026-10-13): answered by the designer
@@ -2052,7 +2060,8 @@ the file.
   a demand its intake already holds in the pass that made it, changing
   io.md, 2's order for every layer above; (c) readers keep `Fill(1)`,
   and its cost. The designer recommends (a), in skein's design, for a
-  plan of its own. Nothing in this run waits on it.
+  plan of its own. Nothing in this run waits on it. **The user,
+  2026-10-13: (a), as a skein plan of its own; not started yet.**
 
 - **The code-graph daemon's priority** (ruling 144): on carbon-forge,
   `codebase-memory-mcp`'s daemon (pid 272, started at boot) re-indexed
