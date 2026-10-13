@@ -1798,6 +1798,20 @@ the file.
      finding clause is about a test that runs out of journal room, not
      about admitting a fixture. A test whose case needs a bound the real
      store cannot admit is a finding, raised.
+232. **A cursor is opaque bytes, not a text** (2026-10-13, the
+     coordinator's block "jig 03.s2: opaque cursor uses Text that now
+     requires UTF-8", 2026-10-13T06:50:26Z). The contract's `Cursor {
+     value: Text }` (`contract/reads.rs:12`) borrowed `Text` for bytes the
+     design calls "the engine's, opaque bytes the client gives back"
+     (`protocol/client.md`, 6) and the wire carries as `record Cursor {
+     value: bytes 1024 }`; with 03.s2's `Text::new` refusing non-UTF-8, the
+     joint world's cursor encoder fails. 03.s2 gives `Cursor` its own
+     bounded bytes (a constructor checking the cursor's bound, as `Text`
+     checks its length), its users moved in any file under ruling 225,
+     no schema change and no encoding of the bytes as text; its Size
+     rises from 60 to 140 lines. Any other contract field the design
+     calls bytes and the wire carries as `bytes` gets the same; a field
+     the design leaves unclear is asked.
 
 ## For the user
 

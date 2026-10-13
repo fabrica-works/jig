@@ -682,7 +682,8 @@ Test shape: a core unit test that a text cut inside "é" keeps the whole
   not UTF-8.
 Proof: the gate.
 Don't: pass a text as bytes past the wire's `text`.
-Size: at most 60 lines of production code.
+Size: at most 140 lines of production code (ruling 232: the cursor's own
+  bounded bytes).
 
 ## Interface sketches
 
