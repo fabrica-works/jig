@@ -462,7 +462,9 @@ What a chat's page leads with, and every agent task's activity
 - **The client holds no secret in its domain.** Who the party is comes
   from the frame's delivery. A sign-in's secret (a cookie, a token, a
   service's credential) is the shell's and the protocol's
-  (`../../domain/people.md`, section 3).
+  (`../../domain/people.md`, section 3). An owner who makes a service is
+  answered with the service's party in the domain, and its credential,
+  once, by the shell (`../../protocol/client.md`, section 8).
 - **Signed out:** an answer, a read or a watch saying so closes every
   watch, parks every request in the small store, and shows the sign-in
   page, which lists the application's providers. Choosing one asks to

@@ -295,9 +295,25 @@ the platform's HTTP stack, TLS                  TLS server, or plaintext on loop
   enables by configuration (`configuration.md`, section 3), and only on
   a loopback listener.
 - **A service's credential** is issued when an owner makes the service:
-  the engine's protocol layer draws it, keeps its digest, and answers the
-  owner's request with it once, never again. The service's shell holds
-  it, and sends it as a bearer token.
+  the engine's protocol layer draws it, keeps its digest in the secrets'
+  store under the service's number (`store.md`, section 9), and answers
+  the owner's request with it once, never again.
+  - *Its shape* is a sign-in secret's: the service's number beside 32
+    random bytes, as a bearer token is.
+  - *To its owner:* the answer carries it beside the service's party; the
+    client's protocol layer hands it to the shell, never to the domain
+    (`../client/domain/client.md`, section 12), and the shell shows it
+    once.
+  - *Signing in with it:* the service's shell holds it and signs in as a
+    native client does with the link's secret. It sends the credential as
+    a bearer to the deployment provider's sign-in route and takes back a
+    sign-in's secret, with which it makes every exchange. The core
+    commits that sign-in as any other, the provider the deployment and
+    the subject the service (`../domain/people.md`, section 3); it
+    expires as any, and the shell signs in again. So exchanges are checked
+    one way, by sign-in, and the credential's digest only at sign-in.
+  - *Ended* when an owner removes the service: its digest is erased and
+    its sign-ins end.
 - **Signed out:** a secret the engine does not know, or a sign-in ended or
   expired, is answered signed out on every exchange and ends the stream,
   and the client goes to sign in (`../client/domain/client.md`,
