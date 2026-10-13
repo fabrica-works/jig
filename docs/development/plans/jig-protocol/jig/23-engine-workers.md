@@ -520,7 +520,7 @@ pub const MAX_OUT_FIRE: u32 = 0;
 pub enum Unusable {
     /// Limits whose worst case or schema does not fit.
     Limits,
-    /// More workers than the limits hold, or a name past its bound, or named twice.
+    /// More configured names than `Limits::names` holds, or a name past its bound, or named twice (ruling 177).
     Workers,
 }
 

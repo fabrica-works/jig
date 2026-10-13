@@ -1143,6 +1143,21 @@ the file.
      so a step not in the plan, jig 06.s1 (`jig/06-*.md`), makes the
      core's window count so. The same answer settles jig 07.s1: a chat
      fits under its person's role, the person batch unchanged.
+177. **The workers' component bounds its configured names apart from the
+     fleet's workers** (2026-10-13, the coordinator's block "jig 23.1:
+     configured names versus concurrent worker capacity",
+     2026-10-13T00:01:10Z). A plan defect: 23.1's sketch refused "More
+     workers than the limits hold", so with names equal to the fleet's
+     workers a third worker is unauthorized, never busy, and
+     `a_third_worker_past_the_fleet_limit_is_refused_as_busy` cannot be
+     reached. channel.md, 4.1: room is "the fleet's limit on workers, less
+     the channels open"; it does not bound the configured names. So
+     `jig-protocol-engine-workers`' `Limits` gains `names: u32`, the
+     configured names its digest table holds (priced in its worst case);
+     `Unusable::Workers` refuses more names than `names`; room stays the
+     fleet's workers less the channels open. The world configures three
+     names with two workers. The profiles gain `names` in the same
+     increment (README, "A component's limits join the profiles").
 
 ## For the user
 
