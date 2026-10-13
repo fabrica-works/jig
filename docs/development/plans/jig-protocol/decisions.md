@@ -1869,6 +1869,29 @@ the file.
      counted, the 18 per-file counts in its commit body. The Size was
      underestimated, for the retrospective; ruling 196 still binds every
      other step.
+238. **The shell hands each worker its root at startup, and the agent its
+     host limits** (2026-10-13, the coordinator's block "jig 25.5: worker
+     roots and host-domain limits", 2026-10-13T07:59:02Z). As ruling 222
+     did for accounts: `startup` gains an optional `WorkerRuntime`, one
+     root descriptor per worker, prepared by the binary's shell (the
+     worlds fill it with their fakes); a worker whose runtime is absent is
+     refused, naming the agent's root path. `Agent` gains `host_limits:
+     smith_host_domain::Limits`, supplied by the caller beside its
+     protocol limits. No other public field or signature changes; no
+     descriptor shared between workers.
+239. **`jig-test-service` may name `smith-domain-run` for `Identity`
+     alone** (2026-10-13, the coordinator's block "jig 25.5: Smith
+     Identity constructor under the dependency restriction",
+     2026-10-13T07:59:02Z). `smith::Start.identity` is a
+     `smith_domain_run::Identity`, which none of the four smith crates
+     `code-organization.md` allows re-exports, at jig's smith pin or on
+     smith's `main`; a re-export in smith waits on jig's smith repin
+     (ruling 186). The crate is already in jig's graph through those four,
+     so a direct edge from `jig-test-service` to `smith-domain-run`, used
+     for `Identity::new` alone, is allowed, with its allowance in
+     `tests/boundary`'s crate-graph check naming that crate and that
+     dependency. No dummy channel `Start`; no other smith type through it.
+     It goes when one of the four exports `Identity`.
 
 ## For the user
 

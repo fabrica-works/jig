@@ -87,7 +87,9 @@ question (decisions.md, ruling 104).
   link smith; the channel's components do not.
 - **`jig-test-worker` and `jig-test-service`** may link smith's
   `smith-host-domain`, `smith-host-protocol`, `smith-protocol-channel` and
-  `smith-channel`.
+  `smith-channel`. `jig-test-service` may also link
+  `smith-domain-run`, for `Identity` alone (decisions.md, ruling 239),
+  until one of those four exports it.
 - **The client's crates** (`jig-domain-client`, `jig-view`,
   `jig-protocol-client-wire`, `jig-protocol-client-link`,
   `jig-shell-native`) depend on no engine-side crate.
