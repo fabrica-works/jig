@@ -9,8 +9,10 @@ pub(crate) const OWNER: Token = Token::new(0x004a_4947);
 pub(crate) enum Opening {
     Idle,
     StoreMade,
+    StoreSynced,
     StoreOpen,
     TranscriptsMade,
+    TranscriptsSynced,
     TranscriptsOpen,
     SecretsOpen,
     Stores,
@@ -123,9 +125,15 @@ fn directory(store: &mut Store, env: &Env<Limits>, arrived: Arrived, above: &mut
     match core::mem::replace(&mut store.directory.opening, Opening::Idle) {
         Opening::StoreMade => {
             if !made(arrived.event) {
-                refuse(store, above);
-                return;
+                return refuse(store, above);
             }
+            store.directory.opening = Opening::StoreSynced;
+            below.store.push(file::Request::SyncDirectory { owner: OWNER, root: root.fd });
+        }
+        Opening::StoreSynced => {
+            let file::Event::Synced { .. } = arrived.event else {
+                return refuse(store, above);
+            };
             store.directory.opening = Opening::StoreOpen;
             below.store.push(file::Request::OpenDirectory {
                 owner: OWNER,
@@ -136,8 +144,7 @@ fn directory(store: &mut Store, env: &Env<Limits>, arrived: Arrived, above: &mut
         }
         Opening::StoreOpen => {
             let Some(opened) = opened(arrived) else {
-                refuse(store, above);
-                return;
+                return refuse(store, above);
             };
             store.directory.store_root = Some(opened);
             store.directory.opening = Opening::TranscriptsMade;
@@ -150,9 +157,15 @@ fn directory(store: &mut Store, env: &Env<Limits>, arrived: Arrived, above: &mut
         }
         Opening::TranscriptsMade => {
             if !made(arrived.event) {
-                refuse(store, above);
-                return;
+                return refuse(store, above);
             }
+            store.directory.opening = Opening::TranscriptsSynced;
+            below.transcripts.push(file::Request::SyncDirectory { owner: OWNER, root: root.fd });
+        }
+        Opening::TranscriptsSynced => {
+            let file::Event::Synced { .. } = arrived.event else {
+                return refuse(store, above);
+            };
             store.directory.opening = Opening::TranscriptsOpen;
             below.transcripts.push(file::Request::OpenDirectory {
                 owner: OWNER,
@@ -163,8 +176,7 @@ fn directory(store: &mut Store, env: &Env<Limits>, arrived: Arrived, above: &mut
         }
         Opening::TranscriptsOpen => {
             let Some(opened) = opened(arrived) else {
-                refuse(store, above);
-                return;
+                return refuse(store, above);
             };
             store.directory.transcripts = Some(opened);
             store.directory.opening = Opening::SecretsOpen;
@@ -176,8 +188,7 @@ fn directory(store: &mut Store, env: &Env<Limits>, arrived: Arrived, above: &mut
         }
         Opening::SecretsOpen => {
             let Some(opened) = opened(arrived) else {
-                refuse(store, above);
-                return;
+                return refuse(store, above);
             };
             store.directory.opening = Opening::Stores;
             let kv_env = self::env(store, env, false);

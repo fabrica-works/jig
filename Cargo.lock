@@ -717,6 +717,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "jig-store-world"
+version = "0.0.0"
+dependencies = [
+ "jig-domain-accounts",
+ "jig-domain-authority",
+ "jig-domain-brief",
+ "jig-domain-core",
+ "jig-domain-fleet",
+ "jig-domain-notes",
+ "jig-domain-people",
+ "jig-domain-tasks",
+ "jig-domain-views",
+ "jig-protocol-store",
+ "skein-fake-machine",
+ "skein-io",
+ "skein-kv",
+ "skein-lib",
+ "skein-sim",
+]
+
+[[package]]
 name = "jig-tasks-world"
 version = "0.0.0"
 dependencies = [

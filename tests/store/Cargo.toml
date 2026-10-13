@@ -1,0 +1,40 @@
+[package]
+name = "jig-store-world"
+description = "The store component on skein's simulated crashing disk"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+jig-domain-core.workspace = true
+jig-domain-tasks.workspace = true
+jig-domain-people.workspace = true
+jig-domain-notes.workspace = true
+jig-domain-authority.workspace = true
+jig-domain-fleet.workspace = true
+jig-domain-brief.workspace = true
+jig-domain-accounts.workspace = true
+jig-domain-views.workspace = true
+jig-protocol-store.workspace = true
+skein-kv.workspace = true
+skein-lib.workspace = true
+skein-io.workspace = true
+skein-fake-machine.workspace = true
+skein-sim.workspace = true
+
+[lints.rust]
+unsafe_code = "forbid"
+elided_lifetimes_in_paths = "deny"
+unused_must_use = "deny"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+missing_panics_doc = "allow"          # the world asserts its invariants by panicking
+wildcard_enum_match_arm = "deny"      # a new variant must break the translation
+match_wildcard_for_single_variants = "deny"
+unwrap_used = "deny"
+allow_attributes = "deny"
+allow_attributes_without_reason = "deny"
+disallowed_types = "deny"
+disallowed_methods = "deny"

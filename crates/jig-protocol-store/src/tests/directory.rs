@@ -22,21 +22,21 @@ fn opened(store: &mut Store, io: u8, owner: Token) -> (Box<[Event]>, Below) {
         },
     )
 }
+fn parent_synced(store: &mut Store, mut below: Below, transcripts: bool) -> Below {
+    let request = if transcripts { below.transcripts.pop() } else { below.store.pop() };
+    let Some(file::Request::SyncDirectory { owner, root }) = request else {
+        panic!("sync the made directory's parent");
+    };
+    assert_eq!(root, fixtures::ROOT.fd);
+    let arrived = Arrived { event: file::Event::Synced { owner }, fd: None };
+    let (events, below) =
+        fixtures::answer(store, if transcripts { Io::Transcripts(arrived) } else { Io::Store(arrived) });
+    assert!(events.is_empty());
+    below
+}
 fn at_private() -> (Store, Below) {
-    let (mut store, mut below) = fixtures::directory();
-    let Some(file::Request::MakeDirectory { owner, .. }) = below.store.pop() else {
-        panic!("make store");
-    };
-    let (_, mut below) = made(&mut store, false, owner);
-    let Some(file::Request::OpenDirectory { owner, .. }) = below.store.pop() else {
-        panic!("open store");
-    };
-    let (_, mut below) = opened(&mut store, 0, owner);
-    let Some(file::Request::MakeDirectory { owner, .. }) = below.transcripts.pop() else {
-        panic!("make transcripts");
-    };
-    let arrived = Arrived { event: file::Event::Made { owner }, fd: None };
-    let (_, mut below) = fixtures::answer(&mut store, Io::Transcripts(arrived));
+    let (mut store, below) = at_parent_sync(true);
+    let mut below = parent_synced(&mut store, below, true);
     let Some(file::Request::OpenDirectory { owner, .. }) = below.transcripts.pop() else {
         panic!("open transcripts");
     };
@@ -50,8 +50,9 @@ fn opening_on_a_directory_makes_the_stores_directory_first() {
         panic!("the store's directory is made first");
     };
     assert_eq!((root, path.as_ref(), mode), (Token::new(900), b"store".as_slice(), 0o700));
-    let (events, mut below) = made(&mut store, false, owner);
+    let (events, below) = made(&mut store, false, owner);
     assert!(events.is_empty());
+    let mut below = parent_synced(&mut store, below, false);
     let Some(file::Request::OpenDirectory { name, no_follow: true, .. }) = below.store.pop() else {
         panic!("the store's directory is opened next");
     };
@@ -241,4 +242,60 @@ fn a_disk_secret_waits_for_its_own_sync() {
     assert_eq!(*owner, Token::new(9));
     assert_eq!(store.stores.secrets.last(), 1);
     assert_eq!(store.stores.store.last(), 0);
+}
+
+fn at_parent_sync(transcripts: bool) -> (Store, Below) {
+    let (mut store, mut below) = fixtures::directory();
+    let Some(file::Request::MakeDirectory { owner, .. }) = below.store.pop() else { panic!("make store") };
+    let (_, below) = made(&mut store, false, owner);
+    if !transcripts {
+        return (store, below);
+    }
+    let mut below = parent_synced(&mut store, below, false);
+    let Some(file::Request::OpenDirectory { owner, .. }) = below.store.pop() else { panic!("open store") };
+    let (_, mut below) = opened(&mut store, 0, owner);
+    let Some(file::Request::MakeDirectory { owner, .. }) = below.transcripts.pop() else { panic!("make transcripts") };
+    let arrived = Arrived { event: file::Event::Made { owner }, fd: None };
+    let (_, below) = fixtures::answer(&mut store, Io::Transcripts(arrived));
+    (store, below)
+}
+
+#[test]
+fn a_made_directory_opens_only_after_its_parent_syncs() {
+    for (label, transcripts, fails) in [
+        ("store parent synced", false, false),
+        ("transcripts parent synced", true, false),
+        ("store parent sync refused", false, true),
+        ("transcripts parent sync refused", true, true),
+    ] {
+        check_parent_sync(label, transcripts, fails);
+    }
+}
+
+fn check_parent_sync(label: &str, transcripts: bool, fails: bool) {
+    let (mut store, mut below) = at_parent_sync(transcripts);
+    let request = if transcripts { below.transcripts.pop() } else { below.store.pop() };
+    let Some(file::Request::SyncDirectory { owner, root }) = request else { panic!("{label}: parent sync first") };
+    assert_eq!(root, fixtures::ROOT.fd, "{label}");
+    let event = if fails {
+        file::Event::Failed { owner, error: Error::Permission, committed: false, residue: None }
+    } else {
+        file::Event::Synced { owner }
+    };
+    let arrived = Arrived { event, fd: None };
+    let (events, mut below) =
+        fixtures::answer(&mut store, if transcripts { Io::Transcripts(arrived) } else { Io::Store(arrived) });
+    if fails {
+        let [Event::OpenRefused { .. }] = &*events else { panic!("{label}: open refused") };
+        assert_eq!(store.phase, Phase::Stopped, "{label}");
+        assert!(below.store.is_empty() && below.transcripts.is_empty(), "{label}: no child opens");
+    } else {
+        assert!(events.is_empty(), "{label}");
+        let request = if transcripts { below.transcripts.pop() } else { below.store.pop() };
+        let Some(file::Request::OpenDirectory { root, name, no_follow: true, .. }) = request else {
+            panic!("{label}: child opens after sync")
+        };
+        assert_eq!(root, fixtures::ROOT.fd, "{label}");
+        assert_eq!(name.as_ref(), if transcripts { b"transcripts".as_slice() } else { b"store".as_slice() }, "{label}");
+    }
 }

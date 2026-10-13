@@ -66,6 +66,7 @@ members = [
     "tests/host",
     "tests/boundary",
     "tests/store-codecs",
+    "tests/store",
     "crates/jig-protocol-worker-wire",
     "tests/worker-wire",
     "crates/jig-protocol-engine-workers",
