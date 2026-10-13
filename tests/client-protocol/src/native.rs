@@ -46,6 +46,15 @@ impl Script {
         }
     }
 }
+/// Decoded facts retained outside the client domain for protocol referees.
+#[derive(Clone, Debug)]
+pub enum Received {
+    SignedIn { person: u64 },
+    Sent { attempt: skein_lib::Token, key: skein_lib::RequestKey },
+    Answer { attempt: skein_lib::Token, answer: jig_domain_client::contract::Answer },
+    Delivery(jig_domain_client::contract::Delivery),
+    Read(jig_domain_client::contract::ReadResult),
+}
 /// A native client as a process of a skein world.
 pub struct NativeClient {
     shell: Shell,
@@ -62,6 +71,7 @@ pub struct NativeClient {
     person_done: bool,
     wake: Option<Time>,
     closing: bool,
+    pub received: Vec<Received>,
     pub signed_in: u32,
     pub chats_made: u32,
 }
@@ -88,6 +98,7 @@ impl NativeClient {
             person_done: false,
             wake: None,
             closing: false,
+            received: Vec::new(),
             signed_in: 0,
             chats_made: 0,
         }
@@ -98,6 +109,25 @@ impl NativeClient {
         self.shell.sign_in(printed)
     }
     fn callback(&mut self, event: client::Event) {
+        match &event {
+            client::Event::Answer { attempt, answer: Some(client::Answered::Jig(answer)), .. } => {
+                self.received.push(Received::Answer { attempt: *attempt, answer: answer.clone() });
+            }
+            client::Event::Jig(jig_domain_client::Event::Watch {
+                event: jig_domain_client::contract::WatchEvent::Delivered(delivery),
+                ..
+            }) => self.received.push(Received::Delivery(delivery.clone())),
+            client::Event::Jig(jig_domain_client::Event::Read { result, .. }) => {
+                self.received.push(Received::Read(result.clone()));
+            }
+            client::Event::Answer { .. }
+            | client::Event::Start { .. }
+            | client::Event::Went { .. }
+            | client::Event::Act { .. }
+            | client::Event::Jig(_)
+            | client::Event::First(_)
+            | client::Event::SignedOut => {}
+        }
         if matches!(
             &event,
             client::Event::Answer {
@@ -179,6 +209,9 @@ impl NativeClient {
                 Request::SignOut => self.shell.sign_out(),
                 Request::SignIn { .. } => panic!("printed link supplied by caller"),
                 request @ (Request::Send { .. } | Request::Jig(_) | Request::First(_) | Request::Fact { .. }) => {
+                    if let Request::Send { attempt, key, .. } = &request {
+                        self.received.push(Received::Sent { attempt: *attempt, key: *key });
+                    }
                     self.side.wire(self.env.now, request);
                 }
             }
@@ -218,7 +251,8 @@ impl Host for NativeClient {
         }
         while let Some(signing) = self.shell.signing() {
             match signing {
-                Signing::SignedIn { .. } => {
+                Signing::SignedIn { party, .. } => {
+                    self.received.push(Received::SignedIn { person: party });
                     self.signed_in += 1;
                     self.side.authenticated = true;
                 }

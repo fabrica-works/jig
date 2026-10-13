@@ -121,6 +121,14 @@ impl Store {
     pub fn new() -> Self {
         Self::default()
     }
+    /// Rebuild the durable receipt view from actual recovery reads, retaining transcript bytes.
+    pub fn recovering(&mut self) {
+        self.rows.clear();
+        self.applied = 0;
+        self.lengths.clear();
+        self.files.retain(|path, _| !path.starts_with(b"store/"));
+        self.crash();
+    }
     pub fn crash(&mut self) {
         self.pending.clear();
         self.recovered.clear();

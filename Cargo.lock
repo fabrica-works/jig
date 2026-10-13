@@ -512,6 +512,9 @@ version = "0.0.0"
 dependencies = [
  "jig-channel-world",
  "jig-client-protocol-world",
+ "jig-conformance",
+ "jig-core-world",
+ "jig-domain-client",
  "jig-domain-core",
  "jig-domain-host",
  "jig-domain-notes",
@@ -543,6 +546,8 @@ dependencies = [
  "smith-agent-process-world",
  "smith-agent-service",
  "smith-agent-shell",
+ "smith-channel",
+ "smith-charter",
  "smith-domain",
  "smith-host-domain",
  "smith-host-protocol",

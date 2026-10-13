@@ -14,10 +14,7 @@ pub fn one_person_chat(words: &[u8]) -> Box<[Script]> {
     Box::new([Script::answered_chat(words, ANSWER)])
 }
 pub(crate) fn document() -> Vec<u8> {
-    let engine = String::from_utf8(channel::engine_document())
-        .expect("engine JSON")
-        .replace(r#""components":["accounts","workers"]"#, r#""components":["accounts","workers","clients"]"#)
-        .replace(r#""application":{"credential""#, r#""application":{"workers":[{"root":"agent-root"}],"credential""#);
+    let engine = engine_document();
     let worker = std::str::from_utf8(channel::WORKER_DOCUMENT).expect("worker JSON");
     let end = worker.find("],\"application\"").expect("worker array").checked_add(1).expect("array end");
     let worker = worker.get(1..end).expect("worker member");
@@ -26,6 +23,26 @@ pub(crate) fn document() -> Vec<u8> {
         .replace(r#""socket":"127.0.0.1:7200""#, r#""in_process":"workers""#)
         .into_bytes()
 }
+fn engine_document() -> String {
+    String::from_utf8(channel::engine_document())
+        .expect("engine JSON")
+        .replace(r#""components":["accounts","workers"]"#, r#""components":["accounts","workers","clients"]"#)
+        .replace(r#""application":{"credential""#, r#""application":{"workers":[{"root":"agent-root"}],"credential""#)
+        .replace(r#""people.sign_ins":1"#, r#""people.sign_ins":2"#)
+        .replace(r#""people.projects":1"#, r#""people.projects":1,"authority.projects":1"#)
+        .replace(r#""core.load_slots":1"#, r#""core.load_slots":1,"core.load_bytes":8192,"core.resume_bytes":4096,"core.run_bytes":4096,"views.text_bytes":1024"#)
+}
+pub(crate) fn store_limits() -> jig_test_service::limits::Limits {
+    let bytes = engine_document();
+    let size = u32::try_from(bytes.len()).expect("fixture document size");
+    let bounds = jig_protocol_config::DocumentLimits { bytes: size, tokens: size, depth: 32 };
+    let document = jig_protocol_config::document(bytes.as_bytes(), &bounds).expect("fixture document");
+    let mut whole = jig_protocol_config::read::Object::new(&document, 0).expect("fixture object");
+    let at = whole.member(&document, b"engine").expect("fixture engine member");
+    let engine = jig_protocol_config::engine(&document, at).expect("fixture engine");
+    jig_test_service::limits::for_profile(jig_protocol_config::Profile::Small, &engine.limits)
+}
+
 pub(crate) fn files() -> jig_test_service::Files {
     let mut engine = channel::files(false);
     let mut entries = skein_lib::List::with_capacity(6);
@@ -66,4 +83,10 @@ pub(crate) fn client_settings() -> jig_shell_native::Settings {
             retry: skein_lib::Duration::from_millis(1),
         },
     }
+}
+
+// Independent SHA-256 reference for deployment [7;16], task1, conversation1.
+pub(crate) const RUN_ID: [u8; 16] = [245, 11, 125, 102, 96, 250, 0, 253, 157, 194, 14, 99, 169, 218, 74, 33];
+pub(crate) fn agent_limits() -> smith_channel::Limits {
+    channel::agent().limits.bodies
 }

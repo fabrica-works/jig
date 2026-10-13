@@ -1,16 +1,19 @@
 //! A single Service owns both layers; the world owns its external parties and machine.
-use crate::{Script, fixtures};
+use crate::world_signals::SignalHost;
+use crate::{
+    Script, fixtures,
+    referee::{Referee as Judge, Scenario},
+};
 use jig_channel_world::{
     fixtures as channel,
     world::store::{Capture, Store},
 };
 use jig_client_protocol_world::native::NativeClient;
-use jig_domain_core as core;
-use jig_test_domain as root;
 use skein_io::kernel::{Complete, Submit};
 use skein_lib::{List, Queue, Time, Wall};
 use skein_shell::Host;
-use skein_world::{Inherited, Memory, Referee};
+use skein_world::{Inherited, Memory};
+use std::{cell::RefCell, rc::Rc};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Settings {
@@ -23,12 +26,16 @@ pub struct Outcome {
     pub chats_made: u32,
     pub runs_answered: u32,
     pub drained: bool,
+    pub restarts: u32,
     pub claims_settled_at_restart: u32,
 }
-struct ServiceHost {
-    service: jig_test_service::Service,
+pub(super) struct ServiceHost {
+    pub(super) service: jig_test_service::Service,
     capture: Capture,
-    store: Store,
+    pub(super) store: Rc<RefCell<Store>>,
+    pub(super) attached: bool,
+    pub(super) wire: crate::referee::agent::Wire,
+    pub(super) commits: Vec<jig_channel_world::world::store::Commit>,
     codec: jig_protocol_store::codec::Limits,
     connector: jig_test_connector::Limits,
 }
@@ -36,8 +43,10 @@ impl Host for ServiceHost {
     fn iterate(&mut self, now: Time, wall: Wall) {
         for complete in self.service.completions().iter() {
             self.capture.complete(complete);
+            self.wire.complete(complete);
         }
-        self.store.observe(&mut self.capture.events, &self.codec, &self.connector);
+        let commits = self.store.borrow_mut().observe(&mut self.capture.events, &self.codec, &self.connector);
+        self.commits.extend(commits);
         jig_test_service::iterate(&mut self.service, now, wall);
         for submit in self.service.submissions().iter() {
             self.capture.pending(&submit.kind);
@@ -68,11 +77,11 @@ impl Host for ServiceHost {
         self.service.operations()
     }
 }
-enum Proc {
+pub(super) enum Proc {
     Service(Box<ServiceHost>),
-    Client(Box<NativeClient>),
+    Client(Box<SignalHost<NativeClient>>),
     Agent { host: Box<skein_world::PipeHost<smith_agent_shell::Agent>> },
-    Peer(Box<skein_fake_peers::llm::Peer>),
+    Peer(Box<SignalHost<skein_fake_peers::llm::Peer>>),
 }
 impl Proc {
     fn host(&self) -> &dyn Host {
@@ -142,12 +151,15 @@ fn service(inherited: &Inherited) -> Proc {
     service.adopt_signals(inherited.signal).expect("service signals");
     let mut capture = Capture::default();
     capture.root(root);
-    let limits = channel::store_limits();
+    let limits = fixtures::store_limits();
     let codec = jig_protocol_store::codec::limits(&limits.root.core).expect("admitted fixture codecs");
     Proc::Service(Box::new(ServiceHost {
         service,
         capture,
-        store: Store::new(),
+        store: Rc::new(RefCell::new(Store::new())),
+        attached: false,
+        wire: crate::referee::agent::Wire::default(),
+        commits: Vec::new(),
         codec,
         connector: limits.root.connector,
     }))
@@ -158,120 +170,23 @@ fn agent(_spawn: &skein_io::kernel::Spawn, inherited: &Inherited) -> Proc {
     let host = smith_agent_process_world::configured(channel::agent_configuration(), fixtures::SEED, inherited, errors);
     Proc::Agent { host: Box::new(capture.host(host)) }
 }
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Scenario {
-    Answer,
-    MidRun,
-    Restart,
-}
-struct Judge {
-    handed: bool,
-    done: bool,
-    scenario: Scenario,
-    controls: Option<skein_world::Controls>,
-    restored: Option<Store>,
-}
-fn settled(store: &Store) -> u32 {
-    u32::try_from(
-        store
-            .rows
-            .values()
-            .filter(|row| {
-                matches!(row,
-                    root::Record::Core(core::Record::Core(core::CoreRecord::Terminal(terminal)))
-                    if matches!(terminal.end, jig_domain_tasks::End::Failed(jig_domain_tasks::Class::Lost))
-                )
-            })
-            .count(),
-    )
-    .expect("settled worker claims")
-}
-fn terminals(store: &Store) -> u32 {
-    u32::try_from(
-        store
-            .rows
-            .values()
-            .filter(|row| {
-                matches!(row,
-                    root::Record::Core(core::Record::Core(core::CoreRecord::Terminal(terminal)))
-                    if matches!(terminal.end, jig_domain_tasks::End::Finished { .. })
-                )
-            })
-            .count(),
-    )
-    .expect("fixture terminal count")
-}
-impl Referee<Proc> for Judge {
-    fn act(&mut self, _now: Time, procs: &mut [Proc]) {
-        let clients_done = procs
-            .iter()
-            .filter_map(|proc| match proc {
-                Proc::Client(client) => Some(client.is_empty()),
-                Proc::Service(_) | Proc::Agent { .. } | Proc::Peer(_) => None,
-            })
-            .all(|done| done);
-        let agent_started = procs.iter().any(|proc| matches!(proc, Proc::Agent { .. }));
-        let (services, other) = procs.split_at_mut(1);
-        let Proc::Service(service) = &mut services[0] else { panic!("one service process") };
-        if let Some(store) = self.restored.take() {
-            service.store = store;
-        }
-        if !self.handed
-            && let Some(link) = service.service.links().pop()
-        {
-            for proc in other.iter_mut() {
-                if let Proc::Client(client) = proc {
-                    client.sign_in(&link).expect("printed link");
-                }
-            }
-            self.handed = true;
-        }
-        let reached = match self.scenario {
-            Scenario::Answer => clients_done && terminals(&service.store) > 0,
-            Scenario::MidRun => {
-                clients_done
-                    && agent_started
-                    && service
-                        .store
-                        .rows
-                        .values()
-                        .any(|row| matches!(row, root::Record::Core(core::Record::Core(core::CoreRecord::Turn(_)))))
-            }
-            Scenario::Restart => settled(&service.store) > 0,
-        };
-        if !self.done && reached {
-            self.controls.as_ref().expect("world controls").signal(0, skein_io::kernel::ServiceSignal::Terminate);
-            self.done = true;
-        }
-        if self.done {
-            for proc in other {
-                if let Proc::Peer(peer) = proc {
-                    peer.shutdown();
-                }
-            }
-        }
-    }
-    fn observe(&mut self, _now: Time, _procs: &[Proc]) {}
-    fn next_deadline(&self) -> Option<Time> {
-        if self.done { None } else { Some(Time::from_nanos(10_000_000_000)) }
-    }
-    fn overdue(&self, now: Time) -> Option<String> {
-        if !self.done && now >= Time::from_nanos(10_000_000_000) {
-            Some("one-process answer not seen".into())
-        } else {
-            None
-        }
-    }
-    fn passed(&self) -> bool {
-        self.done
-    }
-}
 struct Machine(skein_fake_machine::Machine);
 impl skein_world::Machine for Machine {
+    fn cut(&mut self, cut: skein_world::Cut, held: &[skein_sim::Handle], seed: u64) {
+        match cut {
+            skein_world::Cut::Kill => {
+                for handle in held {
+                    self.0.close(skein_fake_machine::Opened::new(handle.raw()));
+                }
+            }
+            skein_world::Cut::PowerLoss => self.0.crash(seed),
+        }
+    }
     fn open_root(&mut self, path: &[u8]) -> Result<skein_sim::Handle, skein_io::kernel::Error> {
         let index = match path {
             b"state" => 0,
             b"agent-root" => 1,
+            b"client" => 2,
             _ => return Err(skein_io::kernel::Error::NotFound),
         };
         Ok(skein_sim::Handle::new(self.0.reopen_root(index).raw()))
@@ -285,18 +200,45 @@ impl skein_world::Machine for Machine {
 }
 #[must_use]
 pub fn run(settings: Settings, people: Box<[Script]>) -> Outcome {
-    run_phase(settings, people, machine(), Store::new(), Scenario::Answer).0
+    run_phase(settings, people, machine(), Store::new(), crate::referee::conformance(), Scenario::Answer).0
 }
 #[must_use]
 pub fn drain_mid_run(settings: Settings, restart: bool) -> Outcome {
-    let (mut outcome, machine, store) =
-        run_phase(settings, Box::new([Script::start_chat(b"Hello")]), machine(), Store::new(), Scenario::MidRun);
+    let (mut outcome, machine, store, reference) = run_phase(
+        settings,
+        Box::new([Script::start_chat(b"Hello")]),
+        machine(),
+        Store::new(),
+        crate::referee::conformance(),
+        Scenario::MidRun,
+    );
     if restart {
-        let (restarted, _, _) = run_phase(settings, Box::new([]), machine, store, Scenario::Restart);
+        let (restarted, _, _, _) = run_phase(settings, Box::new([]), machine, store, reference, Scenario::Restart);
         outcome.claims_settled_at_restart = restarted.claims_settled_at_restart;
         outcome.drained &= restarted.drained;
     }
     outcome
+}
+#[must_use]
+pub fn crash(settings: Settings, cut: skein_world::Cut, before: u32) -> Outcome {
+    run_phase(
+        settings,
+        Box::new([]),
+        machine(),
+        Store::new(),
+        crate::referee::conformance(),
+        Scenario::Fault { cut, before },
+    )
+    .0
+}
+fn client(inherited: &Inherited) -> Proc {
+    let root = inherited.roots.first().expect("client root").1;
+    let client =
+        NativeClient::new(fixtures::client_settings(), root, 1000, fixtures::SEED, Script::start_chat(b"Hello"));
+    Proc::Client(Box::new(SignalHost::new(client, Some(inherited.signal))))
+}
+fn peer(inherited: &Inherited) -> Proc {
+    Proc::Peer(Box::new(SignalHost::new(fixtures::provider(), Some(inherited.signal))))
 }
 fn machine() -> skein_fake_machine::Machine {
     let mut machine = skein_fake_machine::Machine::for_user(1000);
@@ -310,11 +252,13 @@ fn run_phase(
     people: Box<[Script]>,
     mut machine: skein_fake_machine::Machine,
     durable_observer: Store,
+    reference: Rc<RefCell<jig_conformance::referee::Referee>>,
     scenario: Scenario,
-) -> (Outcome, skein_fake_machine::Machine, Store) {
+) -> (Outcome, skein_fake_machine::Machine, Store, Rc<RefCell<jig_conformance::referee::Referee>>) {
     let client_root = machine.reopen_root(2);
+    let restarts = Rc::new(RefCell::new(0));
     let mut world = skein_world::World::new_controlled(settings.seed, settings.config, Memory::Unchecked, |controls| {
-        Judge { handed: false, done: false, scenario, controls: Some(controls), restored: Some(durable_observer) }
+        Judge::new(scenario, controls, durable_observer, reference.clone(), restarts.clone())
     })
     .with_machine(Machine(machine));
     world.host(skein_world::HostedProgram {
@@ -330,12 +274,22 @@ fn run_phase(
         ],
         service,
     );
-    for script in people {
-        world.spawn_root(skein_sim::Handle::new(client_root.raw()), |root| {
-            Proc::Client(Box::new(NativeClient::new(fixtures::client_settings(), root, 1000, settings.seed, script)))
-        });
+    if let Scenario::Fault { cut, before } = scenario {
+        world.spawn_restartable(
+            vec![skein_world::StartupRoot { name: b"private".as_slice().into(), path: b"client".as_slice().into() }],
+            client,
+        );
+        world.spawn_restartable(vec![], peer);
+        world.cut(0, before, cut);
+    } else {
+        for script in people {
+            world.spawn_root(skein_sim::Handle::new(client_root.raw()), |root| {
+                let client = NativeClient::new(fixtures::client_settings(), root, 1000, settings.seed, script);
+                Proc::Client(Box::new(SignalHost::new(client, None)))
+            });
+        }
+        world.spawn(|| Proc::Peer(Box::new(SignalHost::new(fixtures::provider(), None))));
     }
-    world.spawn(|| Proc::Peer(Box::new(fixtures::provider())));
     let mut outcome = world.run();
     let chats_made = outcome
         .procs
@@ -348,24 +302,25 @@ fn run_phase(
     let result = Outcome {
         verdict: skein_world::domain::Verdict::Passed,
         chats_made,
+        restarts: *restarts.borrow(),
         runs_answered: outcome
             .procs
             .iter()
             .find_map(|proc| match proc {
-                Proc::Service(service) => Some(terminals(&service.store)),
+                Proc::Service(service) => Some(crate::referee::terminals(&service.store.borrow())),
                 Proc::Client(_) | Proc::Agent { .. } | Proc::Peer(_) => None,
             })
             .expect("one service"),
         drained: outcome.procs.iter().all(Host::is_empty)
             && outcome.procs.iter().all(|proc| match proc {
-                Proc::Service(service) => service.store.pending.is_empty(),
+                Proc::Service(service) => service.store.borrow().pending.is_empty(),
                 Proc::Client(_) | Proc::Agent { .. } | Proc::Peer(_) => true,
             }),
         claims_settled_at_restart: outcome
             .procs
             .iter()
             .find_map(|proc| match proc {
-                Proc::Service(service) => Some(settled(&service.store)),
+                Proc::Service(service) => Some(crate::referee::settled(&service.store.borrow())),
                 Proc::Client(_) | Proc::Agent { .. } | Proc::Peer(_) => None,
             })
             .expect("one service"),
@@ -374,9 +329,9 @@ fn run_phase(
         .procs
         .iter_mut()
         .find_map(|proc| match proc {
-            Proc::Service(service) => Some(std::mem::take(&mut service.store)),
+            Proc::Service(service) => Some(std::mem::take(&mut *service.store.borrow_mut())),
             Proc::Client(_) | Proc::Agent { .. } | Proc::Peer(_) => None,
         })
         .expect("one service observer");
-    (result, std::mem::replace(&mut outcome.machine.0, skein_fake_machine::Machine::for_user(1000)), store)
+    (result, std::mem::replace(&mut outcome.machine.0, skein_fake_machine::Machine::for_user(1000)), store, reference)
 }
