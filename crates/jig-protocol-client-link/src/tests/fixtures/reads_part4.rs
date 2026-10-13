@@ -75,3 +75,7 @@ pub fn read_value_owner_inbox_page() -> c::OwnerInboxPage {
 pub fn read_value_owner_spend_page() -> c::OwnerSpendPage {
     c::OwnerSpendPage { rows: List::with_capacity(0), before: None, after: None, cut: false }
 }
+
+pub fn read_value_activity_page() -> c::ActivityPage {
+    c::ActivityPage { cut: false, rows: List::with_capacity(0), before: None, after: None }
+}

@@ -1,5 +1,5 @@
 //! Whole pages and single documents (protocol/client.md, 3 and 6).
-use super::{Limits, List, Wall, c, text, too_large, w};
+use super::{Limits, List, Wall, c, text, too_large, turn_fields, w};
 pub(crate) fn owner_message_proposal_kind_fields(
     value: &w::OwnerMessageProposalKind,
     _limits: &Limits,
@@ -177,4 +177,24 @@ pub(crate) fn owner_activity_line_fields(
         at: Wall::from_nanos(value.at()),
         line: owner_activity_fields(value.line(), limits)?,
     })
+}
+
+#[expect(clippy::manual_map, reason = "step code matches optional fields without closures")]
+pub(crate) fn archived_turn_fields(value: &w::ArchivedTurn, limits: &Limits) -> c::ArchivedTurn {
+    let opt0 = match value.read() {
+        Some(item) => Some(*item),
+        None => None,
+    };
+    c::ArchivedTurn {
+        task: value.task(),
+        name: turn_name_fields(value.name(), limits),
+        cumulative: value.cumulative(),
+        read: opt0,
+        at: Wall::from_nanos(value.at()),
+        turn: turn_fields(value.turn(), limits),
+    }
+}
+
+pub(crate) fn turn_name_fields(value: &w::TurnName, _limits: &Limits) -> c::TurnName {
+    c::TurnName { attempt: value.attempt(), number: value.number() }
 }

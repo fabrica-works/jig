@@ -208,3 +208,49 @@ fn a_single_read_one_text_byte_past_the_limit_is_refused() {
         Err(Undecodable::TooLarge)
     );
 }
+
+#[test]
+fn a_activity_page_record_becomes_its_literal_contract_value() {
+    assert_eq!(
+        translate::pages::activity_page(fixtures::read_wire_activity_page(), &fixtures::limits()),
+        Ok(fixtures::read_value_activity_page())
+    );
+}
+
+#[test]
+fn an_activity_page_decodes_each_turn() {
+    assert_eq!(
+        translate::pages::activity_page(fixtures::decoded_activity_record(), &fixtures::limits()),
+        Ok(fixtures::decoded_activity_page())
+    );
+}
+#[test]
+fn an_undecodable_turn_crosses_up_as_such() {
+    let limits = fixtures::limits();
+    for (record, expected) in fixtures::unread_pages() {
+        assert_eq!(translate::pages::activity_page(record, &limits), Ok(expected));
+    }
+}
+#[test]
+fn an_archived_turn_keeps_its_envelope_when_decoding_fails() {
+    assert_eq!(
+        translate::pages::activity_page(fixtures::archived_activity_record(), &fixtures::limits()),
+        Ok(fixtures::archived_activity_page())
+    );
+}
+#[test]
+fn a_turns_receiving_cut_stays_on_its_decoded_value() {
+    let limits = fixtures::turn_limits(2, 65536);
+    assert_eq!(
+        translate::pages::activity_page(fixtures::cut_activity_record(), &limits),
+        Ok(fixtures::cut_activity_page())
+    );
+}
+#[test]
+fn a_turn_past_its_admission_bound_is_carried_as_too_large() {
+    let limits = fixtures::turn_limits(32, 126);
+    assert_eq!(
+        translate::pages::turn_fields(fixtures::FULL_TURN, &limits),
+        c::TurnRead::Undecodable { why: c::TurnProblem::TooLarge }
+    );
+}

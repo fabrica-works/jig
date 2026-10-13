@@ -1,7 +1,8 @@
 //! Whole pages and single documents (protocol/client.md, 3 and 6).
 use super::{
-    Box, Limits, List, Wall, c, hold_fields, owner_authority_document_fields, proposed_task_piece,
-    specification_document_fields, text, too_large, w,
+    Box, Limits, List, Reader, Wall, archived_turn_fields, c, cursor_fields, hold_fields, object_key_fields,
+    owner_activity_line_fields, owner_authority_document_fields, piece_problem, proposed_task_piece, result_fields,
+    specification_document_fields, text, too_large, turn_fields, turn_name_fields, w,
 };
 
 pub(crate) fn history_change_fields(value: &w::HistoryChange, limits: &Limits) -> Result<c::HistoryChange, w::Problem> {
@@ -140,4 +141,125 @@ pub(crate) fn owner_retained_action_fields(
         },
         w::OwnerRetainedAction::Release(row) => c::OwnerRetainedAction::Release { task: row.task() },
     })
+}
+
+pub(crate) fn activity_page_fields(value: &w::ActivityPage, limits: &Limits) -> Result<c::ActivityPage, w::Problem> {
+    let opt0 = match value.before() {
+        Some(item) => Some(cursor_fields(item, limits)?),
+        None => None,
+    };
+    let opt1 = match value.after() {
+        Some(item) => Some(cursor_fields(item, limits)?),
+        None => None,
+    };
+    Ok(c::ActivityPage {
+        cut: value.cut(),
+        rows: activity_line_piece(value.rows(), limits, limits.client.rows)?,
+        before: opt0,
+        after: opt1,
+    })
+}
+
+pub(crate) fn activity_line_piece(
+    bytes: &[u8],
+    limits: &Limits,
+    bound: u32,
+) -> Result<List<c::ActivityLine>, w::Problem> {
+    let mut reader = Reader::new(bytes);
+    let mut rows = List::with_capacity(bound);
+    let mut sum = 0_u64;
+    for _ in 0..=bound {
+        let item = match skein_codec::piece::split(&mut reader) {
+            Ok(value) => value,
+            Err(reason) => return Err(piece_problem(reason)),
+        };
+        let Some(item) = item else {
+            return Ok(rows);
+        };
+        sum = sum
+            .checked_add(u64::try_from(item.len()).expect("piece fits u64"))
+            .ok_or(too_large())?
+            .checked_add(4)
+            .ok_or(too_large())?;
+        if sum > limits.client.document_bytes {
+            return Err(too_large());
+        }
+        let row = w::ActivityLine::decode(&limits.wire, &mut Reader::new(&item))?;
+        let row = activity_line_fields(&row, limits)?;
+        if rows.push(row).is_err() {
+            return Err(too_large());
+        }
+    }
+    Err(too_large())
+}
+
+pub(crate) fn activity_line_fields(value: &w::ActivityLine, limits: &Limits) -> Result<c::ActivityLine, w::Problem> {
+    Ok(c::ActivityLine {
+        position: value.position(),
+        at: Wall::from_nanos(value.at()),
+        event: activity_fields(value.event(), limits)?,
+    })
+}
+
+#[expect(clippy::manual_map, reason = "step code matches optional fields without closures")]
+pub(crate) fn activity_fields(value: &w::Activity, limits: &Limits) -> Result<c::Activity, w::Problem> {
+    Ok(match value {
+        w::Activity::Owner(row) => {
+            let opt0 = match row.decoded() {
+                Some(item) => Some(archived_turn_fields(item, limits)),
+                None => None,
+            };
+            c::Activity::Owner { source: Box::new(owner_activity_line_fields(row.source(), limits)?), decoded: opt0 }
+        }
+        w::Activity::Words(row) => c::Activity::Words {
+            by: crate::translate::answers::party(row.by(), limits)?,
+            message: row.message(),
+            words: text(row.words(), limits)?,
+        },
+        w::Activity::RunBegan(row) => c::Activity::RunBegan {
+            attempt: row.attempt(),
+            how: run_beginning_fields(row.how(), limits),
+            why: text(row.why(), limits)?,
+        },
+        w::Activity::RunEnded(row) => c::Activity::RunEnded {
+            attempt: row.attempt(),
+            how: run_ending_fields(row.how(), limits)?,
+            spent: row.spent(),
+        },
+        w::Activity::Turn(row) => {
+            c::Activity::Turn { name: turn_name_fields(row.name(), limits), turn: turn_fields(row.turn(), limits) }
+        }
+        w::Activity::Result(row) => c::Activity::Result { result: result_fields(row.result(), limits)? },
+        w::Activity::News(row) => {
+            let opt0 = match row.part() {
+                Some(item) => Some(crate::translate::facts::part(item, limits)),
+                None => None,
+            };
+            c::Activity::News { topic: row.topic(), summary: text(row.summary(), limits)?, part: opt0 }
+        }
+        w::Activity::Decision(row) => c::Activity::Decision {
+            object: object_key_fields(row.object(), limits),
+            by: crate::translate::answers::actor(row.by(), limits),
+            how: crate::translate::answers::decision(row.how(), limits)?,
+        },
+    })
+}
+
+pub(crate) fn run_ending_fields(value: &w::RunEnding, limits: &Limits) -> Result<c::RunEnding, w::Problem> {
+    Ok(match value {
+        w::RunEnding::Parked => c::RunEnding::Parked,
+        w::RunEnding::Finished => c::RunEnding::Finished,
+        w::RunEnding::Cancelled => c::RunEnding::Cancelled,
+        w::RunEnding::Failed(row) => c::RunEnding::Failed {
+            class: crate::translate::facts::failure_class(row.class(), limits),
+            reason: text(row.reason(), limits)?,
+        },
+    })
+}
+
+pub(crate) fn run_beginning_fields(value: &w::RunBeginning, _limits: &Limits) -> c::RunBeginning {
+    match value {
+        w::RunBeginning::Resumed => c::RunBeginning::Resumed,
+        w::RunBeginning::Fresh(row) => c::RunBeginning::Fresh { tail: row.tail_count() },
+    }
 }

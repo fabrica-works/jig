@@ -353,3 +353,36 @@ pub fn owner_spend_page(record: w::OwnerSpendPage, limits: &Limits) -> Result<c:
         Err(problem) => Err(classify(problem)),
     }
 }
+
+pub fn activity_page(record: w::ActivityPage, limits: &Limits) -> Result<c::ActivityPage, Undecodable> {
+    if crate::limits::worst_case(limits).is_none() || u64::from(record.measure()) > limits.client.document_bytes {
+        return Err(Undecodable::TooLarge);
+    }
+    let checked = receiving(limits)?;
+    let limits = &checked;
+    let record = match w::ActivityPage::new(&limits.wire, record.into_parts()) {
+        Ok(value) => value,
+        Err(problem) => return Err(classify(problem)),
+    };
+    match activity_page_fields(&record, limits) {
+        Ok(value) => Ok(value),
+        Err(problem) => Err(classify(problem)),
+    }
+}
+
+pub(crate) fn turn_fields(value: &[u8], limits: &Limits) -> c::TurnRead {
+    let bytes = u32::try_from(limits.client.document_bytes)
+        .expect("validated document bytes")
+        .min(limits.wire.activity_turn_turn);
+    let turn = c::TurnLimits { messages: limits.client.rows, blocks: limits.client.rows, text: limits.client.text };
+    let limits = jig_protocol_transcript::Limits::new(bytes, turn);
+    let why = match jig_protocol_transcript::decode(&limits, value) {
+        Ok(turn) => return c::TurnRead::Decoded(turn),
+        Err(jig_protocol_transcript::Undecodable::Version { found }) => c::TurnProblem::Version { found },
+        Err(jig_protocol_transcript::Undecodable::Malformed | jig_protocol_transcript::Undecodable::Unknown) => {
+            c::TurnProblem::Malformed
+        }
+        Err(jig_protocol_transcript::Undecodable::TooLarge) => c::TurnProblem::TooLarge,
+    };
+    c::TurnRead::Undecodable { why }
+}

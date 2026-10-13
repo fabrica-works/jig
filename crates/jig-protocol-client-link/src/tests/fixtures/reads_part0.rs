@@ -104,3 +104,9 @@ pub fn read_wire_proposer_task() -> w::ProposerTask {
 pub fn read_wire_proposal_action() -> w::ProposalAction {
     w::ProposalAction::Batch(read_wire_proposal_action_batch())
 }
+
+pub fn read_wire_activity_page() -> w::ActivityPage {
+    let lim = w::CEILINGS;
+    w::ActivityPage::new(&lim, w::ActivityPageParts { cut: false, rows: Box::from([]), before: None, after: None })
+        .unwrap()
+}
