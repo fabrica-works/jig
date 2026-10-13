@@ -452,7 +452,7 @@ completion is refused, naming it; under 10 s with the build warm.
 Don't: judge the configuration against the store (configuration.md, 9
 keeps removed parts open); check an agent's bounds (the fleet's, at its
 hello).
-Size: at most 550 lines of production code.
+Size: at most 1,200 lines of production code (ruling 188).
 Removes: nothing.
 
 ### 20.6 A worker's part

@@ -1276,6 +1276,16 @@ the file.
      `ops`'s root today passes `core::Held::TurnBusy` out as an output
      (`examples/ops/domain/src/route.rs:350`). A step not in the plan, jig
      05.s2 (`jig/05-hub-link.md`), gives `ops`'s root that backoff.
+188. **jig 20.5 lands at 1,170 lines; jig 20 joins the "up to twice" rule**
+     (2026-10-13, the coordinator's block "jig 20.5: production size 1170
+     versus 660 margin", 2026-10-13T01:20:12Z; the third such block in jig
+     20, after rulings 161 and 164). The strict domain vocabulary 20.5's
+     Shape asks for (projects' authority, rules, policy, roles, grants,
+     patterns, requirements; providers, owners, connectors; charters)
+     costs 1,170 net lines against 550, every file under 800. Its Size
+     becomes 1,200. From now, jig 20's later increments land without
+     asking up to twice their Size, as the README's rule for codec
+     increments says, now naming jig 20.
 
 ## For the user
 
