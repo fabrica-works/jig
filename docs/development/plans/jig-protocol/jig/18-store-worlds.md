@@ -514,6 +514,33 @@ Removes: `jig-fake-store` from `tests/conformance/Cargo.toml`; the
 conformance world's restart sort and its own page, transcript and notes
 answers.
 
+### 18.s1 A made store directory is synced into its parent
+
+A step not in the plan (decisions.md, ruling 241): a durability defect
+jig 18.5 found on the real store. `crates/jig-protocol-store/src/directory.rs`
+makes `store/` and `transcripts/` under the deployment's directory
+(`MakeDirectory`, :64 and :144) and never syncs that directory, so a crash
+after the first acknowledged commit loses their entries and the commit
+with them (18.5's crash tests at cut 0; `logs/jig-18/focused-18-5-3.log`).
+store.md, 14 promises "the last acknowledged commit, or that and one
+whole uncertain one".
+Needs: nothing; before 18.5 lands.
+Files: `crates/jig-protocol-store/src/directory.rs`,
+`src/tests/directory.rs`; `tests/store` (the store's world), one row.
+Shape: after it makes a child directory, and before it opens a store in
+it, the component syncs the deployment's directory
+(`file::Request::SyncDirectory`), as `transcripts/drop.rs:205` syncs
+after a removal; a failed sync refuses the open, as a failed make does.
+Test shape: a row in the directory unit tests that each `MakeDirectory`
+is followed by the parent's `SyncDirectory` before the store opens; a
+row in the store's world that starts from an empty deployment directory
+and, crashed at every file operation after its first acknowledged commit,
+keeps that commit.
+Proof: 18.5's crash tests at cut 0 pass on the real store; the gate.
+Don't: pre-create the directories in a fixture; change the crashing
+machine's rules.
+Size: at most 40 lines of production code.
+
 ### 18.5 The store's world on the crashing disk (W4)
 
 Scope: store.md 14 and 8.4. `tests/store` (package `jig-store-world`),

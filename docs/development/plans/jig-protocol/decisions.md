@@ -1906,6 +1906,17 @@ the file.
      client, so it is declined. Where the bytes join an activity page (the
      store's activity read, the core, or the protocol layer) is asked of
      the designer; 34.3 waits for it, and 34.4 goes on.
+241. **jig 18.s1: a made store directory is synced into its parent**
+     (2026-10-13, the coordinator's block "jig 18.5: newly created store
+     directories lost after acknowledgement", 2026-10-13T08:11:25Z). The
+     store component makes `store/` and `transcripts/` and never syncs the
+     deployment's directory, so skein's crashing machine drops them, and
+     with them an acknowledged commit; the store's own world starts with
+     them made and missed it. A step not in the plan, jig 18.s1
+     (`jig/18-store-worlds.md`), syncs the parent after each make, with a
+     unit row and a store-world row from an empty directory; jig 18 runs
+     it before 18.5 lands, and 18.5's failing world tests stay as they
+     are.
 
 ## For the user
 
