@@ -2221,6 +2221,18 @@ the file.
      link). The check binds `[dependencies]`: the component links neither
      in production; a dev dependency for a test that crosses both sides
      stays, named in the session's closing report.
+268. **jig 27.1's channel world lands at its measured cost** (2026-10-13,
+     the coordinator's block "jig 27.1: prescribed native world proof and
+     cost ceilings", 2026-10-13T12:18:52Z). On the real smith agent, the
+     channel world's 28 focused tests measure 5.98 s serial and its fuzzy
+     sweep 3.86 s (12 seeds), past 27.1's aims (0.8 s, 4.5 s together)
+     after the allowed reductions (test-sized arenas, cached scans, the
+     peer reading whole frames); more would cut the stories or need a new
+     production API. The user accepts a real component's cost for real
+     behaviour while the suite has room (2026-10-13): it lands with its
+     recorded measures, no repeat; its gate's focused total goes in the
+     report. Past 13.5 s (90 %), the budget rule of ruling 249 and an
+     improvement pass apply.
 
 ## For the user
 
