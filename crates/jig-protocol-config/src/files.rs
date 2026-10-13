@@ -1,6 +1,6 @@
 //! Startup file names and bounds; this crate performs no reads (configuration.md, 7).
 use crate::{
-    Engine, Path, Segment,
+    Engine, Path, Segment, Worker,
     llm::{Source, Transport},
 };
 use alloc::boxed::Box;
@@ -71,6 +71,20 @@ fn trust(files: &mut List<File>, transport: &Transport, at: &Path) {
             }
         }
     }
+}
+/// The worker's startup reads its secret privately and leaves agent parsing to smith.
+#[must_use]
+pub fn worker_files(worker: &Worker) -> Box<[File]> {
+    let mut files = List::with_capacity(2);
+    push(&mut files, Path::root().member(b"secret"), &worker.secret, worker.limits.link.secret.saturating_add(1), true);
+    push(
+        &mut files,
+        Path::root().member(b"agent").member(b"configuration"),
+        &worker.agent.configuration,
+        1_048_576,
+        false,
+    );
+    files.into_boxed()
 }
 pub(crate) fn push(files: &mut List<File>, at: Path, path: &[u8], max: u32, private: bool) {
     let file = File { at, path: bytes::copy_of(path), max, private };

@@ -1,0 +1,177 @@
+use super::fixtures;
+use crate::{Graces, Path, Problem, What, stop_bound};
+use skein_lib::Duration;
+
+fn worker(bytes: &[u8]) -> Result<crate::Worker, crate::Problems> {
+    let limits = crate::DocumentLimits { bytes: 8192, tokens: 128, depth: 8 };
+    let document = crate::document(bytes, &limits).expect("worker fixture JSON");
+    crate::worker(&document, 0)
+}
+fn small() -> crate::Worker {
+    worker(fixtures::WORKER_SMALL).unwrap()
+}
+fn files() -> Box<[crate::File]> {
+    crate::worker_files(&small())
+}
+fn refuses(from: &[u8], to: &[u8], path: Path, what: What) {
+    let bytes = fixtures::with(fixtures::WORKER_SMALL, from, to);
+    let problems = worker(&bytes).unwrap_err();
+    assert_eq!(problems.problems.get(0), Some(&Problem { path, what }));
+}
+fn graces() -> Graces {
+    Graces {
+        grace: Duration::from_secs(30),
+        agent_stop: Duration::from_secs(10),
+        delivery: Duration::from_secs(20),
+        save: Duration::from_secs(5),
+    }
+}
+#[test]
+fn the_stop_bound_sums_ping_silence_grace_the_longer_stop_and_a_save() {
+    let bound = stop_bound(&graces(), Duration::from_secs(5), Duration::from_secs(15));
+    assert_eq!(bound, Some(Duration::from_secs(75)));
+}
+#[test]
+fn the_stop_bound_uses_the_agents_grace_when_it_is_longer() {
+    let graces = Graces { agent_stop: Duration::from_secs(40), ..graces() };
+    assert_eq!(stop_bound(&graces, Duration::from_secs(5), Duration::from_secs(15)), Some(Duration::from_secs(95)));
+}
+#[test]
+fn a_stop_bound_past_a_duration_is_refused() {
+    let graces = Graces { save: Duration::from_nanos(u64::MAX), ..graces() };
+    assert_eq!(stop_bound(&graces, Duration::from_secs(5), Duration::from_secs(15)), None);
+}
+#[test]
+fn a_silence_under_three_pings_is_refused() {
+    refuses(
+        br#""profile": "small""#,
+        br#""profile": "small", "overrides": {"link.silence_ms": 14999}"#,
+        fixtures::path(&[b"limits", b"link.silence_ms"]),
+        What::Silence,
+    );
+}
+#[test]
+fn a_silence_of_exactly_three_pings_is_accepted() {
+    let bytes = fixtures::with(
+        fixtures::WORKER_SMALL,
+        br#""profile": "small""#,
+        br#""profile": "small", "overrides": {"link.ping_ms": 1000, "link.silence_ms": 3000}"#,
+    );
+    assert_eq!(worker(&bytes).unwrap().stop_bound, Duration::from_secs(59));
+}
+#[test]
+fn three_pings_past_a_duration_are_refused() {
+    refuses(
+        br#""profile": "small""#,
+        br#""profile": "small", "overrides": {"link.ping_ms": 9223372036854}"#,
+        fixtures::path(&[b"limits", b"link.silence_ms"]),
+        What::Silence,
+    );
+}
+#[test]
+fn a_worker_names_its_secret_file_as_private() {
+    let files = files();
+    let secret = files.first().unwrap();
+    assert_eq!(secret.at, fixtures::path(&[b"secret"]));
+    assert_eq!(secret.path.as_ref(), b"secrets/worker-a.secret");
+    assert_eq!(secret.max, 257);
+    assert!(secret.private);
+}
+#[test]
+fn the_agents_configuration_file_is_named_for_startup() {
+    let files = files();
+    let configuration = files.get(1).unwrap();
+    assert_eq!(configuration.at, fixtures::path(&[b"agent", b"configuration"]));
+    assert_eq!(configuration.path.as_ref(), b"agent.json");
+    assert_eq!(configuration.max, 1_048_576);
+    assert!(!configuration.private);
+    assert_eq!(files.len(), 2);
+}
+#[test]
+fn an_engine_at_a_public_address_is_refused() {
+    refuses(
+        br#"{"in_process": "workers"}"#,
+        br#"{"socket": "192.0.2.1:7100"}"#,
+        fixtures::path(&[b"engine"]),
+        What::Plaintext,
+    );
+}
+#[test]
+fn an_engine_at_a_loopback_address_is_accepted() {
+    let bytes = fixtures::with(fixtures::WORKER_SMALL, br#"{"in_process": "workers"}"#, br#"{"socket": "[::1]:7100"}"#);
+    worker(&bytes).unwrap();
+}
+#[test]
+fn the_small_worker_document_parses_whole() {
+    let worker = small();
+    assert_eq!(
+        worker.engine,
+        crate::Address::Addr(skein_io::Addr::InProcess(skein_io::Name::new(b"workers").unwrap()))
+    );
+    assert_eq!(worker.name.as_ref(), b"worker-a");
+    assert_eq!(worker.slots, 2);
+    assert_eq!(worker.graces, graces());
+    assert_eq!(worker.stop_bound, Duration::from_secs(75));
+    assert_eq!(worker.agent.program.as_ref(), b"jig-test");
+    assert_eq!(worker.agent.arguments.as_ref(), &[Box::from(&b"agent"[..])]);
+    assert_eq!(worker.memory, 1_073_741_824);
+}
+#[test]
+fn an_agent_without_a_program_is_refused() {
+    refuses(br#""program": "jig-test", "#, b"", fixtures::path(&[b"agent", b"program"]), What::Missing);
+}
+#[test]
+fn a_worker_name_past_the_profiles_bound_is_refused() {
+    refuses(b"worker-a", b"012345678901234567890123456789012", fixtures::path(&[b"name"]), What::Bound);
+}
+#[test]
+fn more_slots_than_the_hub_can_host_are_refused() {
+    refuses(br#""slots": 2"#, br#""slots": 3"#, fixtures::path(&[b"slots"]), What::Bound);
+}
+#[test]
+fn a_grace_past_a_duration_is_refused() {
+    refuses(
+        br#""save_ms": 5000"#,
+        br#""save_ms": 18446744073710"#,
+        fixtures::path(&[b"graces", b"save_ms"]),
+        What::Bound,
+    );
+}
+#[test]
+fn graces_whose_sum_overflows_refuse_the_start() {
+    refuses(br#""save_ms": 5000"#, br#""save_ms": 18446744073709"#, fixtures::path(&[b"graces"]), What::StopBound);
+}
+#[test]
+fn a_worker_refuses_an_unknown_grace() {
+    refuses(
+        br#""save_ms": 5000"#,
+        br#""save_ms": 5000, "unknown_ms": 10"#,
+        fixtures::path(&[b"graces", b"unknown_ms"]),
+        What::Unknown,
+    );
+}
+#[test]
+fn a_worker_refuses_an_agent_member_named_twice() {
+    refuses(
+        br#""program": "jig-test""#,
+        br#""program": "jig-test", "program": "jig-test""#,
+        fixtures::path(&[b"agent", b"program"]),
+        What::Duplicate,
+    );
+}
+#[test]
+fn an_argument_that_is_not_text_is_refused_at_its_index() {
+    refuses(
+        br#"["agent"]"#,
+        b"[17]",
+        fixtures::path(&[b"agent", b"arguments"]).child(crate::Segment::Index(0)),
+        What::Kind,
+    );
+}
+#[test]
+fn a_worker_refuses_memory_below_its_hubs_worst_case() {
+    let bytes = fixtures::with(fixtures::WORKER_SMALL, b"1073741824", b"1");
+    let problems = worker(&bytes).unwrap_err();
+    assert_eq!(problems.problems.get(0).unwrap().path, fixtures::path(&[b"memory_bytes"]));
+    assert_eq!(problems.problems.len(), 1);
+}

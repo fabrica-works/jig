@@ -7,3 +7,4 @@ mod llm;
 mod overrides;
 mod profile;
 mod read;
+mod worker;

@@ -168,3 +168,39 @@ pub(crate) fn local(address: &Address, path: &Path, problems: &mut Problems) {
         problems.push(path.clone(), What::Plaintext);
     }
 }
+
+/// The worker owns its hub and declares an end that fits the link and process.
+pub(crate) fn worker(
+    limits: &crate::Limits,
+    graces: Option<crate::Graces>,
+    memory: Option<u64>,
+    problems: &mut Problems,
+) -> Option<Duration> {
+    let path = Path::root();
+    let three_pings = limits.link.ping.as_nanos().checked_mul(3);
+    let silence_fits = match three_pings {
+        Some(minimum) => limits.link.silence.as_nanos() >= minimum,
+        None => false,
+    };
+    if !silence_fits {
+        problems.push(path.member(b"limits").member(b"link.silence_ms"), What::Silence);
+    }
+    let bound = match graces {
+        Some(graces) => crate::stop_bound(&graces, limits.link.ping, limits.link.silence),
+        None => None,
+    };
+    if graces.is_some() && bound.is_none() {
+        problems.push(path.member(b"graces"), What::StopBound);
+    }
+    if let Some(memory) = memory {
+        match jig_domain_host::worst_case(&limits.hub) {
+            Some(bytes) => {
+                if let Err(what) = crate::fits(memory, &[crate::Share { name: b"hub", bytes }]) {
+                    problems.push(path.member(b"memory_bytes"), what);
+                }
+            }
+            None => problems.push(path.member(b"limits"), What::Bound),
+        }
+    }
+    bound
+}
