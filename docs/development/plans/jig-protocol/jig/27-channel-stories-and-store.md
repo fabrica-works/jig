@@ -266,7 +266,8 @@ store's port removed. `tests/channel`'s engine on the simulator's machine
 gone from `tests/channel`.
 Needs: jig 18's test application's keys and codecs, beyond the
 session's start; the store's limits in jig 20's profiles (added here if
-jig 13 to 17 have not).
+jig 13 to 17 have not); jig 19.s1, for the real store to admit the
+shipped profiles, and its report of their largest value and commit.
 Files: `testing/jig-test-service/src/{store.rs, engine.rs, route.rs,
 startup.rs, boundary.rs, tests/engine.rs}`; `tests/channel/{Cargo.toml,
 src/world.rs, src/processes.rs}`; `crates/jig-protocol-config/src/profile*.rs`

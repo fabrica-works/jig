@@ -245,6 +245,63 @@ Don't: compute a size from fixtures' values; take it from the generated
 Size: at most 250 lines of production code.
 Removes: nothing.
 
+### 19.s1 Collections the domain bounds by bytes, as pieces; the shipped profiles admitted
+
+A step not in the plan, from the designer's answer on jig 27.3 (jig
+`2fa034fb`: `protocol/store.md`, 5.1; skein's `codec.md`, 3, "A sum
+crosses as one piece"). The domain bounds a verdict's fields by the
+result's bytes (`jig-domain-tasks/src/verdict.rs:16-30`), and an
+amendment's lists, an authority's and a policy's by
+`people.amendment_bytes` and `policy_bytes`, each member counted at its
+`size_of` (`jig-domain-people/src/amendment.rs:141-200`, admitted by
+that sum alone, `domain.rs:1106-1112`). The schemas carry them as
+counted lists, so `codec::limits` (`src/codec.rs:20`) draws each count
+from its sum and refuses both shipped profiles at fourteen ceilings, the
+same in both:
+- `tasks-v1.schema`: `Verdict.fields`, `VerdictResult.fields`,
+  `VerdictMessage.fields` (`verdict_fields`, `verdict_result_fields`,
+  `verdict_message_fields`: 512 > 256);
+- `people-v1.schema`: `Pattern.segments` (512 > 32), `Delegation.kinds`
+  (1,024 > 128), `Authority.grants` and `Authority.note_resources`
+  (170 > 32), `PolicyValue.permissions` (2,048 > 1,024),
+  `PolicyChangeRequirements.requirements` (113 > 32),
+  `PolicyChangeProjections.grants` (170 > 32),
+  `PolicyChangePermissions.mappings` (1,024 > 128), `ResourceName.path`
+  and `Adoption.options` (512 > 32), `Spec.parameters` (341 > 32).
+
+Capped at the ceilings instead, the store would refuse values the domain
+admits, and the largest rows would still be 4.7 MB (small) and 15.9 MB
+(standard) for tasks and 71 MB and 143 MB for people (measured on
+`2fa034fb`'s parent), which `sizes::check` would ask of skein-kv.
+Needs: nothing.
+Files: `crates/jig-protocol-store/schema/{tasks-v1.schema,
+  people-v1.schema}`, their generated code and goldens;
+  `src/codec/{tasks.rs, people.rs}` and the translations of the records
+  above; their tests; `tests/store-codecs` (`jig-protocol-config` a
+  dev-dependency).
+Shape: each collection above, and any other list inside their records
+  whose limit `codec::limits` draws from a byte sum, becomes one `bytes
+  N` field written and split with `skein_codec::piece::{write, split}`,
+  N its schema ceiling, its limit the domain's sum as `codec::limits`
+  derives it; decoding counts each item against that sum as the domain
+  counts it. A list the domain bounds by a count of its own stays a
+  list. Each family's version moves once; regenerated, goldens added.
+Test shape: `both_shipped_profiles_are_admitted_by_the_store` (in
+  `tests/store-codecs`): for `Profile::Small` and `Profile::Standard`,
+  `codec::limits` gives limits and `sizes::check` against skein-kv
+  limits at its own largest sizes passes, printing the largest key,
+  value and commit; per family, a value at the domain's sum (an
+  amendment of 512 empty pattern segments, a verdict of 512 one-byte
+  fields) round-trips, and one past it is refused.
+Proof: unit, `heavy cargo nextest run -p jig-protocol-store -p
+  jig-store-codecs-world` once: the profiles' test passes, and the
+  report names each profile's largest value and commit, which jig 27.3
+  takes into the profiles' store limits.
+Don't: raise a counted list's ceiling; change a profile's limits
+  (ruling 235); cap a derived count below what the domain admits.
+Size: at most 400 lines of production code, generated code excluded.
+Removes: nothing.
+
 ## Done when
 
 - Each increment's tests pass in `heavy cargo nextest run -p jig-protocol-store -p jig-store-codecs-world`.
