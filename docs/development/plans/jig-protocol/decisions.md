@@ -1512,6 +1512,15 @@ the file.
      saved; the core worlds bootstrap a store by hand. A step not in the
      plan, jig 11.s1 (`jig/11-*.md`), seeds them in one commit at a first
      start; jig 25.3 lands after it.
+208. **jig 30.s1: the client wire discriminates a read's value**
+     (2026-10-13, the coordinator's block "jig 32.2: read-value wire
+     document discriminator missing", 2026-10-13T04:11:41Z). A plan
+     defect: the client wire has `ReadAnswer::Value(Owned)` with raw bytes
+     and no `ReadValue`, though `contract::ReadValue`'s 26 variants overlap
+     on a read and jig 34.3 and 34.4 return `v1::ReadValue`. A step not in
+     the plan, jig 30.s1 (`jig/30-client-wire.md`), adds `enum ReadValue`;
+     jig's read answers carry it encoded as `Owned.record`. jig 32.2 and 34
+     use it; 32.2 lands its outgoing reads meanwhile.
 
 ## For the user
 

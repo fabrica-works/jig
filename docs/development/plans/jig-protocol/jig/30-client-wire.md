@@ -367,6 +367,24 @@ Don't: keep a secret in the small store.
 Size: at most 250 lines.
 Removes: nothing.
 
+### 30.s1 A read's value, discriminated
+
+A step not in the plan (decisions.md, ruling 208), before jig 32.2 and 34.3
+land. `contract::ReadValue` has 26 variants, several answering one read
+(`OwnerProposal` and `Historical` for `Read::Proposal`, `OwnerEnded` and
+`Ended` for `Read::Ended`); jig 34.3 and 34.4 return `v1::ReadValue`, which
+30 did not declare, and `ReadAnswer::Value(Owned)` carries raw bytes.
+Shape: the client wire's schema gains `enum ReadValue`, one variant per
+  `contract::ReadValue` variant, each holding its document's record as 30
+  declared it; jig's own read answers carry an encoded `ReadValue` as
+  `Owned.record`, an application's its own. The family's version moves
+  once; regenerated, goldens added.
+Test shape: a table test that each `ReadValue` variant round-trips
+  unchanged.
+Proof: unit, the crate's tests once.
+Don't: write a translation (34 and 35 do); change another record.
+Size: at most 80 lines of schema and Rust, generated code excluded.
+
 ## Interface sketches
 
 The schema, in skein's language (`codec.md`, section 3); records the
