@@ -321,6 +321,12 @@ ones before it in its session. Dependencies are by capability: "skein
   ruling 209): moving a test's unchanged statements into a named helper of
   the same file, to keep a function within 40 lines, does not count toward
   ruling 114's 20 lines; changed inputs and expected values still do.
+- **The vocabulary guard excepts a foreign name exactly where jig must
+  write it** (decisions.md, rulings 199 and 216): an allowance in
+  `tests/boundary`'s guard for a name another crate defines (smith, skein,
+  the standard library), fully qualified, naming the exact path, with a
+  regression that jig's own use of the word is still refused; no question.
+  jig's own names stay refused.
 
 ## Live services
 

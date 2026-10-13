@@ -1596,6 +1596,20 @@ the file.
      format tests, whose expected values for the map's largest value
      follow (ruling 122), named in its commit body; the world's journal
      bound is not capped.
+216. **The vocabulary guard excepts a foreign name exactly where jig must
+     write it** (2026-10-13, the coordinator's block "jig 31.1: native
+     core IpAddr V4/V6 variants rejected as version names",
+     2026-10-13T05:26:56Z; the second such block, after ruling 199's
+     `smith::Directory.git`). `tests/boundary/src/names.rs` takes every
+     `V` and a digit for a version name, and so refuses
+     `core::net::IpAddr::V4` and `::V6`, which an exhaustive match on a
+     standard address must name. From now to the run's end, the guard
+     allows a name another crate (smith, skein, the standard library)
+     defines, written fully qualified where jig's code must use it, each
+     allowance naming the exact path; jig's own names stay refused. 31.1
+     adds the two `IpAddr` allowances and a regression that an unqualified
+     `V4` of jig's is still refused, under ruling 114. The README's Rules
+     say so.
 
 ## For the user
 
