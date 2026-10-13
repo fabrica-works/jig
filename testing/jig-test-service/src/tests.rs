@@ -1,5 +1,6 @@
 mod engine;
 mod fixtures;
+mod stop;
 mod worker;
 use crate::tests::fixtures::{engine_document, problem, with};
 use jig_protocol_config::{Path, Problem, What};

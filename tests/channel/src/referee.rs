@@ -45,7 +45,7 @@ impl skein_world::Referee<Proc> for Referee {
                         engine,
                         &mut store,
                         &mut self.rules,
-                        matches!(self.story, crate::stories::Story::HeldCommit)
+                        matches!(self.story, crate::stories::Story::HeldCommit | crate::stories::Story::Drain)
                             && now < Time::from_nanos(1_000_000_000),
                         self.story,
                         now,
@@ -70,7 +70,6 @@ impl skein_world::Referee<Proc> for Referee {
                     }
                     if self.passed && !host.stopping {
                         host.stopping = true;
-                        host.service.shutdown();
                         host.service.shutdown();
                     }
                 }
@@ -129,6 +128,7 @@ impl skein_world::Referee<Proc> for Referee {
                     self.story,
                     crate::stories::Story::InvalidCharter
                         | crate::stories::Story::Shutdown
+                        | crate::stories::Story::Drain
                         | crate::stories::Story::BeyondGrace
                 ) || smith_agent_process_world::fake::replied(peer)
             }
@@ -154,7 +154,9 @@ impl skein_world::Referee<Proc> for Referee {
         if self.passed {
             return (!self.stopped).then_some(Time::ZERO);
         }
-        if matches!(self.story, crate::stories::Story::HeldCommit) && !self.injected {
+        if matches!(self.story, crate::stories::Story::HeldCommit) && !self.injected
+            || matches!(self.story, crate::stories::Story::Drain) && !self.store.borrow().pending.is_empty()
+        {
             Some(Time::from_nanos(1_000_000_000))
         } else {
             Some(Time::from_nanos(300_000_000_000))
@@ -357,6 +359,7 @@ impl Referee {
         if matches!(self.story, crate::stories::Story::HeldCommit) && now >= Time::from_nanos(1_000_000_000) {
             self.injected = true;
         }
+        self.drain_engine(procs);
         self.resume_runs(procs);
         self.inject_refusal(procs);
         if matches!(self.story, crate::stories::Story::Inbox) && !self.injected {
@@ -399,6 +402,7 @@ impl Referee {
             | crate::stories::Story::Replaced
             | crate::stories::Story::Reconnect
             | crate::stories::Story::Shutdown
+            | crate::stories::Story::Drain
             | crate::stories::Story::Refusals(_)
             | crate::stories::Story::Opening(_)
             | crate::stories::Story::Progress
@@ -669,6 +673,39 @@ impl Referee {
                         })
                         .collect(),
                 );
+            }
+        }
+    }
+}
+
+impl Referee {
+    fn drain_engine(&mut self, procs: &mut [Proc]) {
+        if !matches!(self.story, crate::stories::Story::Drain) {
+            return;
+        }
+        for proc in procs {
+            if let Proc::Engine(host) = proc {
+                if !self.injected && crate::world::pending_turn(&self.store.borrow()) {
+                    self.injected = true;
+                    host.service.shutdown();
+                }
+                if self.injected && !self.views.borrow().engine_drained && host.service.is_empty() {
+                    assert_eq!(host.service.end(), Some(&jig_test_service::End::Drained));
+                    let mut views = self.views.borrow_mut();
+                    views.engine_drained = true;
+                    views.commits_waiting_at_drain = self.store.borrow().pending.len();
+                    assert_eq!(views.commits_waiting_at_drain, 0);
+                    host.service = jig_test_service::startup(
+                        &crate::fixtures::engine_document(),
+                        &crate::fixtures::files(false),
+                        None,
+                        &crate::fixtures::seeds(),
+                        None,
+                        None,
+                    )
+                    .expect("restart after drained");
+                    host.revision.0 += 1_000_000;
+                }
             }
         }
     }

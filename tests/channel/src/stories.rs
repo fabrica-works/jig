@@ -14,6 +14,7 @@ pub enum Story {
     Reconnect,
     BeyondGrace,
     Shutdown,
+    Drain,
     Refusals(MessageRefusal),
     Opening(Opening),
     Progress,
@@ -38,7 +39,10 @@ pub fn run(seed: u64, story: Story) -> Outcome {
 fn script(story: Story) -> crate::world::Script {
     let mut script = fixtures::one_chat(b"Hello");
     script.story = story;
-    if matches!(story, Story::Progress | Story::Call | Story::Wait | Story::InvalidTranscript | Story::Refusals(_)) {
+    if matches!(
+        story,
+        Story::Drain | Story::Progress | Story::Call | Story::Wait | Story::InvalidTranscript | Story::Refusals(_)
+    ) {
         script.leading_turns = 1;
     }
     if matches!(story, Story::Restart { .. }) {

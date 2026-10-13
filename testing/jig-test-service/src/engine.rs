@@ -25,6 +25,7 @@ pub struct Engine {
     pub(crate) begin: bool,
     pub(crate) max_out: u32,
     pub(crate) restart_reads: Option<(u16, u32)>,
+    pub(crate) drain: Option<stop::Drain>,
     blocked: bool,
     pending: Option<Box<root::Event>>,
     ready: bool,
@@ -66,6 +67,7 @@ impl Engine {
             begin: true,
             max_out,
             restart_reads: None,
+            drain: None,
             blocked: false,
             pending: None,
             ready: true,
@@ -85,7 +87,10 @@ impl Engine {
     }
 
     pub(crate) fn room(&self) -> bool {
-        self.stores.room() >= self.max_out
+        (match &self.drain {
+            Some(drain) => drain.busy.room() >= self.max_out,
+            None => true,
+        }) && self.stores.room() >= self.max_out
             && self.outputs.room() >= self.max_out
             && self.events.room()
                 >= self
@@ -130,10 +135,12 @@ impl Engine {
                 });
             }
         }
-        for (_, deadline) in self.domain.connector_deadlines() {
-            next = wall_deadline(next, deadline, &self.env);
+        if !self.domain.stopping() {
+            for (_, deadline) in self.domain.connector_deadlines() {
+                next = wall_deadline(next, deadline, &self.env);
+            }
+            next = wall_deadline(next, self.domain.effect_deadline(), &self.env);
         }
-        next = wall_deadline(next, self.domain.effect_deadline(), &self.env);
         if let Some(accounts) = &self.accounts {
             next = crate::accounts::earliest(next, accounts.next_deadline());
         }
@@ -185,8 +192,9 @@ impl Engine {
         }
     }
     pub(crate) fn abort_if_ended(&mut self) {
-        if self.end.is_some() {
-            self.abort_components();
+        match &self.end {
+            Some(End::Aborted | End::Stopped(_)) => self.abort_components(),
+            Some(End::Drained) | None => {}
         }
     }
     pub(crate) fn abort_components(&mut self) {
@@ -223,8 +231,9 @@ pub fn iterate(engine: &mut Engine, now: Time, wall: Wall) {
     if let Some(workers) = &mut engine.workers {
         workers.iterate(now, &mut engine.events);
     }
+    stop::advance(engine);
     if engine.end.is_some() {
-        engine.abort_components();
+        engine.abort_if_ended();
         for _ in 0..engine.answers.len() {
             let _answer = engine.answers.pop().expect("late store terminal");
         }
@@ -285,6 +294,7 @@ pub fn iterate(engine: &mut Engine, now: Time, wall: Wall) {
         }
     }
     engine.domain.reclaim();
+    stop::advance(engine);
 }
 
 fn store_answer(engine: &mut Engine, answer: StoreAnswer) {
@@ -316,6 +326,9 @@ fn fire(engine: &mut Engine) {
             engine.step(root::Event::Timer(timer));
             return;
         }
+    }
+    if engine.domain.stopping() {
+        return;
     }
     for (number, deadline) in engine.domain.connector_deadlines() {
         if let Some(deadline) = deadline

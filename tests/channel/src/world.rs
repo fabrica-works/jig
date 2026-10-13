@@ -62,6 +62,8 @@ pub struct Outcome {
     pub refused_messages: Vec<jig_protocol_worker_wire::MessageRefusal>,
     pub recorded: Option<Recorded>,
     pub refusals_kept: bool,
+    pub engine_drained: bool,
+    pub commits_waiting_at_drain: usize,
 }
 
 /// Run one person's chat through the actual agent and all channel layers.
@@ -113,6 +115,8 @@ fn outcome(procs: &[Proc], store: &Store, views: &Views, reset_injected: bool, k
         })
         .collect();
     Outcome {
+        engine_drained: views.engine_drained,
+        commits_waiting_at_drain: views.commits_waiting_at_drain,
         recorded: recorded(worker),
         refusals_kept: views.refusals_kept,
         refused_messages: collect_refusals(procs),
@@ -161,6 +165,20 @@ pub(crate) fn terminal(store: &Store, task: u64, attempt: u64, scenario: crate::
         } else if matches!(scenario, crate::stories::Story::BeyondGrace | crate::stories::Story::Shutdown) { answer.end == jig_domain_tasks::End::Failed(jig_domain_tasks::Class::Agent) } else { matches!(answer.end, jig_domain_tasks::End::Finished { .. }) }
     ))
 }
+pub(crate) fn pending_turn(store: &Store) -> bool {
+    store.pending.iter().any(|pending| {
+        pending.writes.iter().any(|write| {
+            matches!(
+                write,
+                jig_fake_store::Write::Save {
+                    row: root::Record::Core(core::Record::Core(core::CoreRecord::Turn(_))),
+                    ..
+                }
+            )
+        })
+    })
+}
+
 pub(crate) fn answer_store(
     engine: &mut jig_test_service::Engine,
     store: &mut Store,
@@ -443,6 +461,8 @@ pub(crate) struct Views {
     pub(crate) text_bytes: usize,
     pub(crate) messages_ended: usize,
     pub(crate) refusals_kept: bool,
+    pub(crate) engine_drained: bool,
+    pub(crate) commits_waiting_at_drain: usize,
 }
 
 fn transcript_count(bytes: &[u8]) -> u32 {
@@ -471,7 +491,8 @@ fn make_referee(script: &Script, store: Rc<RefCell<Store>>, views: Rc<RefCell<Vi
             | crate::stories::Story::Shutdown => 0,
             crate::stories::Story::InvalidTranscript => 1,
             crate::stories::Story::Window => 7,
-            crate::stories::Story::Chat
+            crate::stories::Story::Drain
+            | crate::stories::Story::Chat
             | crate::stories::Story::Stalled
             | crate::stories::Story::Quiet
             | crate::stories::Story::Replaced

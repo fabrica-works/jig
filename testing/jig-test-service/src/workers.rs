@@ -12,14 +12,15 @@ const LISTENERS: u64 = 1_u64 << 60;
 const CONNECTIONS: u64 = 2_u64 << 60;
 #[derive(Debug)]
 pub(super) struct Workers {
-    component: kit::Component,
+    pub(super) component: kit::Component,
     out: Queue<kit::Request>,
     pub(super) io: Queue<io::Request>,
-    listeners: List<(Token, Option<Token>)>,
-    sockets: Map<Token, Token>,
+    pub(super) listeners: List<(Token, Option<Token>)>,
+    pub(super) sockets: Map<Token, Token>,
     next: u64,
     pub(super) opened: bool,
-    aborted: bool,
+    pub(super) ending: Option<crate::stop::Closing>,
+    pub(super) component_closed: bool,
     deployment: [u8; 16],
     endpoints: List<jig_protocol_charter::EndpointName>,
 }
@@ -80,7 +81,8 @@ impl Workers {
             sockets: Map::with_capacity(limits.workers.checked_add(limits.opening).expect("connections")),
             next: 1,
             opened: false,
-            aborted: false,
+            ending: None,
+            component_closed: false,
             deployment,
             endpoints,
         })
@@ -168,6 +170,7 @@ impl Workers {
                     }
                 }
                 self.opened = listeners_open(&self.listeners);
+                self.late_listener(listener);
             }
             io::Event::Accepted { socket, .. } => {
                 let connection = Token::new(CONNECTIONS.checked_add(self.next).expect("connection owner"));
@@ -185,6 +188,9 @@ impl Workers {
                 self.down(now, kit::Event::Lower { connection: owner, event: LowerEvent::Write(up) }, events);
             }
             io::Event::Closed { .. } => {
+                if self.listener_closed(owner) {
+                    return true;
+                }
                 let _socket = self.sockets.remove(&owner);
                 self.down(now, kit::Event::Gone { connection: owner }, events);
             }
@@ -241,7 +247,7 @@ impl Workers {
                 kit::Request::Lost { channel } => {
                     events.push(root::Event::Link { channel, link: root::link::Event::Lost });
                 }
-                kit::Request::Closed => {}
+                kit::Request::Closed => self.component_closed = true,
             }
         }
     }
@@ -252,8 +258,8 @@ impl Workers {
         }
     }
     pub fn abort(&mut self, now: Time, events: &mut Queue<root::Event>) {
-        if !self.aborted {
-            self.aborted = true;
+        if self.ending != Some(crate::stop::Closing::Abort) {
+            self.ending = Some(crate::stop::Closing::Abort);
             for (_, listener) in &self.listeners {
                 if let Some(listener) = listener {
                     self.io.push(io::Request::Abort { entity: *listener });

@@ -1,4 +1,5 @@
 //! The application's limits, priced with jig's in one sum (configuration.md, 6).
+use alloc::boxed::Box;
 use jig_protocol_config::{Profile, profile};
 use jig_test_connector as connector;
 use jig_test_domain as root;
@@ -92,6 +93,12 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         )?)?
         .checked_add(crate::accounts::worst_case(&limits.accounts, &limits.io, queue.checked_mul(3)?)?)?
         .checked_add(crate::tools::worst_case(&limits.root.core)?)?
+        .checked_add(Queue::<Box<root::Event>>::worst_case(
+            queue.checked_mul(jig_protocol_engine_workers::MAX_OUT_DOWN)?,
+        )?)?
+        .checked_add(
+            payload.checked_mul(u64::from(queue).checked_mul(u64::from(jig_protocol_engine_workers::MAX_OUT_DOWN))?)?,
+        )?
         .checked_add(Queue::<skein_io::Request>::worst_case(
             queue.checked_mul(jig_protocol_engine_workers::MAX_OUT_DOWN)?,
         )?)?

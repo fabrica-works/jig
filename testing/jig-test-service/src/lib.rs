@@ -181,11 +181,12 @@ impl Service {
         if self.shutdowns == 0 {
             self.shutdowns = 1;
             if let Some(engine) = &mut self.engine {
-                engine.events.push(jig_test_domain::Event::Stop);
+                stop::shutdown(engine);
             }
-            for index in 0..self.workers.len() {
-                let worker = self.workers.get_mut(index).expect("worker index");
-                worker.stop();
+            if self.engine.is_none() {
+                for index in 0..self.workers.len() {
+                    self.workers.get_mut(index).expect("worker index").stop();
+                }
             }
         } else {
             self.ended = Some(End::Aborted);
@@ -386,7 +387,7 @@ pub fn iterate(service: &mut Service, now: Time, wall: Wall) {
         worker.close_root();
         service.kernel.publish(false, &mut worker.submitted, &mut service.submissions);
     }
-    if service.engine.is_none() && service.workers_empty() {
+    if service.engine.is_none() && service.ended.is_none() && service.workers_empty() {
         service.ended = Some(End::Drained);
     }
     service.close_signals();

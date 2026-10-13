@@ -1,5 +1,5 @@
 //! Exhaustive routing of the root's journal, with values kept in their owners (service.md, 4).
-use crate::{End, Engine, PartyOutput, StoreRequest, stop};
+use crate::{Engine, PartyOutput, StoreRequest, stop};
 use jig_domain_core as core;
 use jig_test_connector as connector;
 use jig_test_domain as root;
@@ -10,7 +10,13 @@ pub(super) fn request(engine: &mut Engine, request: root::Request) {
         root::Request::Restart(step) => restart(engine, step),
         root::Request::Deliver(delivery) => deliver(engine, delivery),
         root::Request::Now(now) => immediate(engine, now),
-        root::Request::Busy { event } => engine.outputs.push(PartyOutput::Busy(event)),
+        root::Request::Busy { event } => {
+            if let Some(drain) = &mut engine.drain {
+                drain.busy.push(event);
+            } else {
+                engine.outputs.push(PartyOutput::Busy(event));
+            }
+        }
         root::Request::ReadResult { payload, outcome } => engine.events.push(crate::tools::result(payload, &outcome)),
         root::Request::Stop => stop::invalid_restore(engine),
     }
@@ -60,7 +66,23 @@ fn deliver(engine: &mut Engine, delivery: root::Delivery) {
                 workers.assignment(engine.env.now, channel, assignment, &engine.values, &mut engine.events);
             }
         }
-        root::Delivery::Message { .. } | root::Delivery::CallAnswer { .. } | root::Delivery::CallBusy { .. } => {
+        root::Delivery::CallBusy { channel, task, attempt, name } => {
+            if let Some(workers) = &mut engine.workers {
+                workers.send(
+                    engine.env.now,
+                    channel,
+                    jig_domain_host::LinkDown::Relayed {
+                        run: skein_lib::Token::new(task),
+                        attempt: skein_lib::Token::new(attempt),
+                        call: name,
+                        answer: jig_domain_host::Relayed::Busy,
+                    },
+                    &engine.values,
+                    &mut engine.events,
+                );
+            }
+        }
+        root::Delivery::Message { .. } | root::Delivery::CallAnswer { .. } => {
             stop::unavailable(engine, b"workers");
         }
     }
@@ -163,7 +185,7 @@ fn immediate(engine: &mut Engine, now: core::Now) {
 
 fn core_held(engine: &mut Engine, held: core::Held) {
     match held {
-        core::Held::Drained => engine.end = Some(End::Drained),
+        core::Held::Drained => stop::drained(engine),
         held @ (core::Held::ReadLoad { .. } | core::Held::NotesLoad { .. }) => {
             engine.stores.push(StoreRequest::Read(held));
         }

@@ -230,3 +230,14 @@ fn a_restarted_engine_keeps_a_refusal_carried_by_its_native_run() {
     assert!(outcome.refused_messages.contains(&jig_protocol_worker_wire::MessageRefusal::TooLarge));
     assert!(outcome.refusals_kept);
 }
+
+#[test]
+fn a_shutdown_mid_run_drains_with_nothing_waiting_for_a_commit() {
+    let outcome = run(Story::Drain);
+    assert_eq!(outcome.verdict, Verdict::Passed);
+    assert!(outcome.engine_drained);
+    assert_eq!(outcome.commits_waiting_at_drain, 0);
+    assert_eq!(outcome.turns_committed, 2);
+    assert_eq!(outcome.answers_acknowledged, 1);
+    assert_eq!(outcome.agent_starts, 1, "the kept turn finishes on the restarted engine");
+}
