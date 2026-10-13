@@ -1,6 +1,6 @@
 # The engine's and the worker's services
 
-Provisional, 2026-10-10, revised 2026-10-12. What an application writes
+Provisional, 2026-10-10, revised 2026-10-13. What an application writes
 around its roots to make running processes: the protocol layer that
 composes jig's components with its own, `iterate`, which carries every
 event between io, the components and the root, and `main`, which reads
@@ -248,9 +248,11 @@ down:  released and door outputs → components → io submissions
   process (section 10), the worker's agents smith's real agent
   processes, run as its own `agent` command (section 6). A native client
   on loopback signs in by the link it prints (`client.md`, section 8). Its
-  LLM endpoint is its configuration's. It is the template an application
-  copies for its own `main`, and the process and live layers of jig's
-  proofs (section 8).
+  LLM endpoint is its configuration's. Its periods are the smallest
+  source's: one open period per configured project, at the deployment's
+  first start (`configuration.md`, section 5). It is the template an
+  application copies for its own `main`, and the process and live layers
+  of jig's proofs (section 8).
 - **`ops`'s service follows them,** as the reference for an application
   with agents in the engine and no workers.
 

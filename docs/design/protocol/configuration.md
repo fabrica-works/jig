@@ -1,6 +1,6 @@
 # Configuration
 
-Provisional, 2026-10-10, revised 2026-10-12. What an engine and a worker
+Provisional, 2026-10-10, revised 2026-10-13. What an engine and a worker
 are told when they start, as far as jig defines its shape: the parts of
 `../domain/engine.md`, section 14 that are jig's, how an application's
 configuration composes them with its own, where secrets come from, and
@@ -147,6 +147,12 @@ secret, and every credential its runs need comes with their assignments
   so it is a domain's, never the protocol layer's, which only fires the
   deadline. jig's configuration names none, and `ops`'s shows one
   (`service.md`, section 7).
+- **The smallest source** is the reference service's: at a
+  deployment's first start (section 8), before the core admits a
+  party's request, its root opens one period for each configured
+  project, its budget the project's spend per period, with no next
+  start, since it keeps no calendar. A later start says none: the store
+  keeps the current period (`../domain/engine.md`, 5.4).
 
 ## 6. Limits
 
