@@ -771,3 +771,7 @@ pub use documents::*;
 #[path = "fixtures/live.rs"]
 mod live;
 pub use live::*;
+
+#[path = "fixtures/objects.rs"]
+mod objects;
+pub use objects::*;

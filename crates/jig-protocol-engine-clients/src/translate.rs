@@ -8,9 +8,11 @@ pub mod chips;
 pub mod deployment;
 pub mod inbox;
 pub mod live;
+pub mod objects;
 pub mod owner;
 pub(crate) mod refusals;
 pub mod task;
+pub use objects::document;
 
 fn problem(reason: skein_codec::Reason) -> w::Problem {
     w::Problem { path: w::Path::OwnedRecord, reason }

@@ -1,39 +1,7 @@
 use super::*;
 use skein_lib::List;
 pub fn read_wire_owner_historical() -> w::OwnerHistorical {
-    let lim = w::CEILINGS;
-    w::OwnerHistorical::new(
-        &lim,
-        w::OwnerHistoricalParts {
-            key: read_wire_object_key(),
-            value: read_wire_owner_historical_value(),
-            at: None,
-            by: None,
-        },
-    )
-    .unwrap()
-}
-
-pub fn read_wire_object_key() -> w::ObjectKey {
-    w::ObjectKey::Task(read_wire_object_key_task())
-}
-
-pub fn read_wire_object_key_task() -> w::ObjectKeyTask {
-    let lim = w::CEILINGS;
-    w::ObjectKeyTask::new(&lim, w::ObjectKeyTaskParts { value: 7 }).unwrap()
-}
-
-pub fn read_wire_owner_historical_value() -> w::OwnerHistoricalValue {
-    w::OwnerHistoricalValue::Task(read_wire_owner_historical_value_task())
-}
-
-pub fn read_wire_owner_historical_value_task() -> w::OwnerHistoricalValueTask {
-    let lim = w::CEILINGS;
-    w::OwnerHistoricalValueTask::new(
-        &lim,
-        w::OwnerHistoricalValueTaskParts { document: task_record(), result: read_wire_result() },
-    )
-    .unwrap()
+    jig_test_client_records::read_wire_owner_historical()
 }
 
 pub fn read_value_history_page() -> c::HistoryPage {

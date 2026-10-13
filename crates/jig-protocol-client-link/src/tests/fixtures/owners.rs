@@ -30,63 +30,7 @@ pub fn owner_deployment() -> c::OwnerDeployment {
     }
 }
 pub fn owner_project_record() -> w::OwnerProject {
-    let lim = limits().wire;
-    w::OwnerProject::new(
-        &lim,
-        w::OwnerProjectParts {
-            acts: Box::from([]),
-            number: 7,
-            resources: Box::from([]),
-            policy: w::OwnerProjectPolicy::new(
-                &lim,
-                w::OwnerProjectPolicyParts {
-                    ceiling: w::OwnerAuthorityDocument::new(
-                        &lim,
-                        w::OwnerAuthorityDocumentParts {
-                            authority: w::OwnerAuthority::new(
-                                &lim,
-                                w::OwnerAuthorityParts {
-                                    tools: 7,
-                                    grants: Box::from([]),
-                                    delegation: w::OwnerDelegation::new(
-                                        &lim,
-                                        w::OwnerDelegationParts { kinds: List::with_capacity(0), tasks: 7, depth: 7 },
-                                    )
-                                    .unwrap(),
-                                    spend: 7,
-                                    deadline: None,
-                                    notes: 7,
-                                    note_resources: Box::from([]),
-                                },
-                            )
-                            .unwrap(),
-                            cut: false,
-                        },
-                    )
-                    .unwrap(),
-                    period_spend: 7,
-                    escalation_role: None,
-                    projections: Box::from([]),
-                    roles: Box::from([]),
-                    requirements: Box::from([]),
-                    permissions: None,
-                    permissions_cut: false,
-                    cut: false,
-                },
-            )
-            .unwrap(),
-            members: List::with_capacity(0),
-            current_period: None,
-            pools: List::with_capacity(0),
-            configured_period: 7,
-            configured_pools: List::with_capacity(0),
-            configured_pools_cut: false,
-            spend: Box::from([]),
-            recurring: Box::from([]),
-            cut: false,
-        },
-    )
-    .unwrap()
+    jig_test_client_records::owner_project_record()
 }
 pub fn owner_project() -> c::OwnerProject {
     c::OwnerProject {

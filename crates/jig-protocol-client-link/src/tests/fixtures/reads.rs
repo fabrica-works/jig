@@ -1,12 +1,6 @@
 use super::*;
 use skein_lib::List;
-pub fn read_ending_record() -> w::Ending {
-    let lim = w::CEILINGS;
-    let row = w::Fact::Ending(
-        w::EndingRow::new(&lim, w::EndingRowParts { parent: None, value: w::EndingFields::Done }).unwrap(),
-    );
-    w::Ending::new(&lim, w::EndingParts { rows: fact_bytes(&row) }).unwrap()
-}
+
 pub fn read_hold_reason_record() -> w::HoldReason {
     let lim = w::CEILINGS;
     let row = w::Fact::HoldReason(

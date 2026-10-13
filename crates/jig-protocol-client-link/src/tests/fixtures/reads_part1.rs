@@ -48,53 +48,7 @@ pub fn read_wire_recipient_task() -> w::RecipientTask {
 }
 
 pub fn read_wire_owner_proposal() -> w::OwnerProposal {
-    let lim = w::CEILINGS;
-    w::OwnerProposal::new(
-        &lim,
-        w::OwnerProposalParts {
-            key: read_wire_proposal_key(),
-            project: 7,
-            reason: read_wire_document_text(),
-            action: read_wire_owner_proposal_action(),
-            as_holder: false,
-            waiting: read_wire_owner_proposal_waiting(),
-            funding: List::with_capacity(0),
-            acts: Box::from([]),
-        },
-    )
-    .unwrap()
-}
-
-pub fn read_wire_document_text() -> w::DocumentText {
-    let lim = w::CEILINGS;
-    w::DocumentText::new(&lim, w::DocumentTextParts { bytes: Box::from([]), cut: false }).unwrap()
-}
-
-pub fn read_wire_owner_proposal_action() -> w::OwnerProposalAction {
-    w::OwnerProposalAction::Batch(read_wire_owner_proposal_action_batch())
-}
-
-pub fn read_wire_owner_proposal_action_batch() -> w::OwnerProposalActionBatch {
-    let lim = w::CEILINGS;
-    w::OwnerProposalActionBatch::new(&lim, w::OwnerProposalActionBatchParts { value: Box::from([]) }).unwrap()
-}
-
-pub fn read_wire_owner_proposal_waiting() -> w::OwnerProposalWaiting {
-    let lim = w::CEILINGS;
-    w::OwnerProposalWaiting::new(
-        &lim,
-        w::OwnerProposalWaitingParts { holder: read_wire_owner_history_holder(), since: 7 },
-    )
-    .unwrap()
-}
-
-pub fn read_wire_owner_history_holder() -> w::OwnerHistoryHolder {
-    w::OwnerHistoryHolder::Task(read_wire_owner_history_holder_task())
-}
-
-pub fn read_wire_owner_history_holder_task() -> w::OwnerHistoryHolderTask {
-    let lim = w::CEILINGS;
-    w::OwnerHistoryHolderTask::new(&lim, w::OwnerHistoryHolderTaskParts { value: 7 }).unwrap()
+    jig_test_client_records::read_wire_owner_proposal()
 }
 
 pub fn read_wire_escalation() -> w::Escalation {

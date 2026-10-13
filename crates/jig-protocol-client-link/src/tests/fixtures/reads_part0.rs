@@ -88,17 +88,11 @@ pub fn read_wire_proposal() -> w::Proposal {
 }
 
 pub fn read_wire_proposal_key() -> w::ProposalKey {
-    let lim = w::CEILINGS;
-    w::ProposalKey::new(&lim, w::ProposalKeyParts { proposer: read_wire_proposer(), number: 7 }).unwrap()
+    jig_test_client_records::read_wire_proposal_key()
 }
 
 pub fn read_wire_proposer() -> w::Proposer {
-    w::Proposer::Task(read_wire_proposer_task())
-}
-
-pub fn read_wire_proposer_task() -> w::ProposerTask {
-    let lim = w::CEILINGS;
-    w::ProposerTask::new(&lim, w::ProposerTaskParts { value: 7 }).unwrap()
+    jig_test_client_records::read_wire_proposer()
 }
 
 pub fn read_wire_proposal_action() -> w::ProposalAction {

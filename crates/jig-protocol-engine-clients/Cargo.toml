@@ -12,6 +12,7 @@ skein-codec.workspace = true
 jig-domain-tasks.workspace = true
 jig-domain-fleet.workspace = true
 jig-domain-accounts.workspace = true
+jig-domain-authority.workspace = true
 skein-http.workspace = true
 skein-io.workspace = true
 jig-protocol-client-wire.workspace = true

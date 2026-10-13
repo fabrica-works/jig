@@ -488,7 +488,7 @@ pub fn ending(value: &d::Ending, limits: &w::Limits) -> Result<w::OwnerChipEndin
         },
     )
 }
-fn append_ending(
+pub(super) fn append_ending(
     value: &d::Ending,
     parent: Option<u32>,
     facts: &mut List<w::Fact>,
@@ -541,7 +541,7 @@ fn append_ending(
     }
     Ok(())
 }
-fn result_fields(value: &d::ResultValue, limits: &w::Limits) -> Result<w::ResultValueFields, w::Problem> {
+pub(super) fn result_fields(value: &d::ResultValue, limits: &w::Limits) -> Result<w::ResultValueFields, w::Problem> {
     Ok(match value {
         d::ResultValue::Approved { state, words } => w::ResultValueFields::Approved(w::ResultValueApprovedFields::new(
             limits,

@@ -380,3 +380,9 @@ mod live;
 pub use live::*;
 mod live_values;
 pub use live_values::*;
+
+mod objects;
+pub use objects::*;
+
+mod object_reads;
+pub use object_reads::*;

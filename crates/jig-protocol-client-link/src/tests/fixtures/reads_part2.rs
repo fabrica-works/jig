@@ -1,8 +1,7 @@
 use super::*;
 use skein_lib::List;
 pub fn read_wire_revision() -> w::Revision {
-    let lim = w::CEILINGS;
-    w::Revision::new(&lim, w::RevisionParts { value: 7 }).unwrap()
+    jig_test_client_records::read_wire_revision()
 }
 
 pub fn read_wire_phase() -> w::Phase {
@@ -30,25 +29,7 @@ pub fn read_wire_steering() -> w::Steering {
 }
 
 pub fn read_wire_specification_document() -> w::SpecificationDocument {
-    let lim = w::CEILINGS;
-    w::SpecificationDocument::new(
-        &lim,
-        w::SpecificationDocumentParts { specification: read_wire_document_specification(), cut: false },
-    )
-    .unwrap()
-}
-
-pub fn read_wire_document_specification() -> w::DocumentSpecification {
-    let lim = w::CEILINGS;
-    w::DocumentSpecification::new(
-        &lim,
-        w::DocumentSpecificationParts {
-            words: read_wire_document_text(),
-            parameters: List::with_capacity(0),
-            inputs: List::with_capacity(0),
-        },
-    )
-    .unwrap()
+    jig_test_client_records::read_wire_specification_document()
 }
 
 pub fn read_wire_owner_wake_policy() -> w::OwnerWakePolicy {
@@ -134,25 +115,11 @@ pub fn read_wire_phase_counts() -> w::PhaseCounts {
 }
 
 pub fn read_wire_owner_escalation() -> w::OwnerEscalation {
-    let lim = w::CEILINGS;
-    w::OwnerEscalation::new(&lim, w::OwnerEscalationParts { acts: Box::from([]), task: task_record() }).unwrap()
+    jig_test_client_records::read_wire_owner_escalation()
 }
 
 pub fn read_wire_question() -> w::Question {
-    let lim = w::CEILINGS;
-    w::Question::new(
-        &lim,
-        w::QuestionParts {
-            task: chip_record(),
-            from: None,
-            message: 7,
-            words: Box::from([]),
-            since: 7,
-            acts: Box::from([]),
-            ending: None,
-        },
-    )
-    .unwrap()
+    jig_test_client_records::read_wire_question()
 }
 
 pub fn read_wire_person_task() -> w::PersonTask {

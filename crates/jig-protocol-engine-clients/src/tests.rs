@@ -10,3 +10,6 @@ mod answers;
 mod documents;
 #[path = "tests/services.rs"]
 mod services;
+
+#[path = "tests/objects.rs"]
+mod objects;
