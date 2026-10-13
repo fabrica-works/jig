@@ -108,22 +108,27 @@ pub(super) fn parse(input: &[u8]) -> Result<Parsed, Problems> {
         Ok(value) => value,
         Err(found) => return Err(problem(found.path, found.what)),
     };
+    parse_in(&document)
+}
+
+fn parse_in(document: &Document) -> Result<Parsed, Problems> {
+    let length = document.text_len();
     let mut problems = Problems::empty();
     let path = Path::root();
-    let mut whole = object(&document, 0, &path)?;
-    let at = whole.required(&document, b"engine", &path, &mut problems);
-    let application = whole.required(&document, b"application", &path, &mut problems);
-    if let Some(at) = whole.member(&document, b"workers") {
-        let items = list(&document, at, document.len(), &path.member(b"workers"))?;
+    let mut whole = object(document, 0, &path)?;
+    let at = whole.required(document, b"engine", &path, &mut problems);
+    let application = whole.required(document, b"application", &path, &mut problems);
+    if let Some(at) = whole.member(document, b"workers") {
+        let items = list(document, at, document.len(), &path.member(b"workers"))?;
         drop(items);
     }
-    let (accounts, workers, clients) = components(&document, &mut whole, &mut problems)?;
-    whole.finish(&document, &path, &mut problems);
+    let (accounts, workers, clients) = components(document, &mut whole, &mut problems)?;
+    whole.finish(document, &path, &mut problems);
     if !problems.is_empty() {
         return Err(problems);
     }
     let at = at.expect("required engine checked");
-    let engine = match config::engine(&document, at) {
+    let engine = match config::engine(document, at) {
         Ok(value) => value,
         Err(found) => {
             for found in &found.problems {
@@ -133,11 +138,11 @@ pub(super) fn parse(input: &[u8]) -> Result<Parsed, Problems> {
             return Err(problems);
         }
     };
-    let mut engine_object = object(&document, at, &path.member(b"engine"))?;
-    let at = engine_object.member(&document, b"limits").expect("engine parser checked limits");
-    let mut profile = object(&document, at, &path)?;
-    let at = profile.member(&document, b"profile").expect("engine parser checked profile");
-    let profile = text(&document, at, 16, &path)?;
+    let mut engine_object = object(document, at, &path.member(b"engine"))?;
+    let at = engine_object.member(document, b"limits").expect("engine parser checked limits");
+    let mut profile = object(document, at, &path)?;
+    let at = profile.member(document, b"profile").expect("engine parser checked profile");
+    let profile = text(document, at, 16, &path)?;
     let profile = match profile.as_ref() {
         b"small" => Profile::Small,
         b"standard" => Profile::Standard,
@@ -145,27 +150,27 @@ pub(super) fn parse(input: &[u8]) -> Result<Parsed, Problems> {
     };
     let limits = limits::for_profile(profile, &engine.limits);
     let path = Path::root().member(b"application");
-    let mut application = object(&document, application.expect("required application checked"), &path)?;
-    let _workers = application.member(&document, b"workers");
-    let at = application.required(&document, b"credential", &path, &mut problems);
+    let mut application = object(document, application.expect("required application checked"), &path)?;
+    let _workers = application.member(document, b"workers");
+    let at = application.required(document, b"credential", &path, &mut problems);
     let credential = match at {
-        Some(at) => text(&document, at, length, &path.member(b"credential"))?,
+        Some(at) => text(document, at, length, &path.member(b"credential"))?,
         None => Box::default(),
     };
-    let at = application.required(&document, b"connectors", &path, &mut problems);
+    let at = application.required(document, b"connectors", &path, &mut problems);
     let items = match at {
-        Some(at) => list(&document, at, 2, &path.member(b"connectors"))?,
+        Some(at) => list(document, at, 2, &path.member(b"connectors"))?,
         None => List::with_capacity(0),
     };
     if items.len() != 2 {
         problems.push(path.member(b"connectors"), What::Bound);
     }
-    application.finish(&document, &path, &mut problems);
+    application.finish(document, &path, &mut problems);
     if !problems.is_empty() {
         return Err(problems);
     }
-    let first = connector_config(&document, *items.get(0).expect("two connectors"), 0, &limits.root.connector)?;
-    let second = connector_config(&document, *items.get(1).expect("two connectors"), 1, &limits.root.connector)?;
+    let first = connector_config(document, *items.get(0).expect("two connectors"), 0, &limits.root.connector)?;
+    let second = connector_config(document, *items.get(1).expect("two connectors"), 1, &limits.root.connector)?;
     Ok(Parsed {
         engine,
         limits,
@@ -429,40 +434,47 @@ struct WorkerSpec {
     config: config::Worker,
     root: Box<[u8]>,
 }
-fn worker_specs(input: &[u8]) -> Result<(bool, List<WorkerSpec>), Problems> {
+fn document(input: &[u8]) -> Result<Document, Problems> {
     let length = u32::try_from(input.len()).or(Err(problem(Path::root(), What::Bound)))?;
-    let document = match config::document(input, &config::DocumentLimits { bytes: length, tokens: length, depth: 32 }) {
-        Ok(document) => document,
-        Err(found) => return Err(problem(found.path, found.what)),
-    };
+    match config::document(input, &config::DocumentLimits { bytes: length, tokens: length, depth: 32 }) {
+        Ok(document) => Ok(document),
+        Err(found) => Err(problem(found.path, found.what)),
+    }
+}
+
+fn worker_specs(input: &[u8]) -> Result<(bool, List<WorkerSpec>), Problems> {
+    worker_specs_in(&document(input)?)
+}
+
+fn worker_specs_in(document: &Document) -> Result<(bool, List<WorkerSpec>), Problems> {
     let path = Path::root();
-    let mut whole = object(&document, 0, &path)?;
-    let engine_at = whole.member(&document, b"engine");
+    let mut whole = object(document, 0, &path)?;
+    let engine_at = whole.member(document, b"engine");
     let engine = engine_at.is_some();
-    let application = whole.member(&document, b"application");
-    let workers = match whole.member(&document, b"workers") {
-        Some(at) => list(&document, at, document.len(), &path.member(b"workers"))?,
+    let application = whole.member(document, b"application");
+    let workers = match whole.member(document, b"workers") {
+        Some(at) => list(document, at, document.len(), &path.member(b"workers"))?,
         None => List::with_capacity(0),
     };
     let listeners = match engine_at {
-        Some(_) if !workers.is_empty() => parse(input)?.engine.hosts.listener,
+        Some(_) if !workers.is_empty() => parse_in(document)?.engine.hosts.listener,
         Some(_) | None => Box::default(),
     };
     let mut problems = Problems::empty();
     if !engine {
-        let _service = components(&document, &mut whole, &mut problems)?;
-        whole.finish(&document, &path, &mut problems);
+        let _service = components(document, &mut whole, &mut problems)?;
+        whole.finish(document, &path, &mut problems);
     }
     let root_path = path.member(b"application").member(b"workers");
     let roots = match application {
         Some(at) => {
-            let mut fields = object(&document, at, &path.member(b"application"))?;
-            let roots = match fields.member(&document, b"workers") {
-                Some(at) => list(&document, at, workers.len(), &root_path)?,
+            let mut fields = object(document, at, &path.member(b"application"))?;
+            let roots = match fields.member(document, b"workers") {
+                Some(at) => list(document, at, workers.len(), &root_path)?,
                 None => List::with_capacity(0),
             };
             if !engine {
-                fields.finish(&document, &path.member(b"application"), &mut problems);
+                fields.finish(document, &path.member(b"application"), &mut problems);
             }
             roots
         }
@@ -480,7 +492,7 @@ fn worker_specs(input: &[u8]) -> Result<(bool, List<WorkerSpec>), Problems> {
     let mut specs = List::with_capacity(workers.len());
     for (index, at) in workers.iter().enumerate() {
         let here = indexed(&path.member(b"workers"), index);
-        let worker = match config::worker(&document, *at) {
+        let worker = match config::worker(document, *at) {
             Ok(worker) => worker,
             Err(found) => {
                 for found in &found.problems {
@@ -500,13 +512,13 @@ fn worker_specs(input: &[u8]) -> Result<(bool, List<WorkerSpec>), Problems> {
         }
         let here = indexed(&root_path, index);
         let mut fields =
-            object(&document, *roots.get(u32::try_from(index).expect("worker index")).expect("root count"), &here)?;
-        let at = fields.required(&document, b"root", &here, &mut problems);
-        fields.finish(&document, &here, &mut problems);
+            object(document, *roots.get(u32::try_from(index).expect("worker index")).expect("root count"), &here)?;
+        let at = fields.required(document, b"root", &here, &mut problems);
+        fields.finish(document, &here, &mut problems);
         if !problems.is_empty() {
             return Err(problems);
         }
-        let root = text(&document, at.expect("root checked"), 4096, &here.member(b"root"))?;
+        let root = text(document, at.expect("root checked"), 4096, &here.member(b"root"))?;
         specs.push(WorkerSpec { config: worker, root }).expect("worker count");
     }
     Ok((engine, specs))
@@ -538,9 +550,10 @@ pub fn startup(
     accounts: Option<crate::AccountsRuntime>,
     runtime: Option<crate::WorkerRuntime>,
 ) -> Result<Service, Problems> {
-    let (has_engine, specs) = worker_specs(document)?;
+    let document = self::document(document)?;
+    let (has_engine, specs) = worker_specs_in(&document)?;
     let engine = if has_engine {
-        Some(engine_startup(parse(document)?, files, agent, seeds, accounts, !specs.is_empty())?)
+        Some(engine_startup(parse_in(&document)?, files, agent, seeds, accounts, !specs.is_empty())?)
     } else {
         None
     };

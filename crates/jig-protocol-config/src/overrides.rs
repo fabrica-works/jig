@@ -549,12 +549,13 @@ fn members(
         return Ok(());
     }
     next = at.checked_add(1).ok_or(What::Bound)?;
+    let mut fits = Fits { hub: None, core: None };
     for _ in at..end {
         if next == end {
             break;
         }
         let name = document.text(document.token(next).ok_or(What::Kind)?).ok_or(What::Kind)?;
-        if !valid(limits, name) {
+        if !valid(limits, name, &mut fits) {
             problems.push(path.member(name), What::Override);
         }
         next = read::after(document, next.checked_add(1).ok_or(What::Bound)?)?;
@@ -562,17 +563,33 @@ fn members(
     Ok(())
 }
 
-fn valid(limits: &Limits, name: &[u8]) -> bool {
+/// Each family's worst case over the overridden limits, computed once when first asked.
+struct Fits {
+    hub: Option<bool>,
+    core: Option<bool>,
+}
+
+fn valid(limits: &Limits, name: &[u8], fits: &mut Fits) -> bool {
     let Some(dot) = bytes::find(name, b".") else {
         return false;
     };
     match name.get(..dot) {
-        Some(b"hub") => jig_domain_host::worst_case(&limits.hub).is_some(),
+        Some(b"hub") => {
+            if fits.hub.is_none() {
+                fits.hub = Some(jig_domain_host::worst_case(&limits.hub).is_some());
+            }
+            fits.hub.expect("hub fit checked")
+        }
         Some(b"link") => true,
         Some(
             b"core" | b"tasks" | b"people" | b"fleet" | b"authority" | b"brief" | b"accounts" | b"notes" | b"views"
             | b"documents",
-        ) => jig_domain_core::worst_case(&limits.core).is_some(),
+        ) => {
+            if fits.core.is_none() {
+                fits.core = Some(jig_domain_core::worst_case(&limits.core).is_some());
+            }
+            fits.core.expect("core fit checked")
+        }
         Some(_) | None => false,
     }
 }

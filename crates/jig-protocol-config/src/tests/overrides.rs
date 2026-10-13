@@ -36,6 +36,22 @@ fn an_override_that_breaks_a_worst_case_is_refused_naming_it() {
     );
 }
 #[test]
+fn overrides_past_a_familys_bound_are_each_reported_once() {
+    let errors =
+        parse(br#"{"profile":"small","overrides":{"tasks.tasks":0,"tasks.inbox_messages":1,"tasks.run_inbox":1}}"#)
+            .unwrap_err();
+    assert_eq!(errors.problems.len(), 3);
+    assert_eq!(errors.past, 0);
+    for (index, name) in
+        [b"tasks.tasks".as_slice(), b"tasks.inbox_messages", b"tasks.run_inbox"].into_iter().enumerate()
+    {
+        let found = errors.problems.get(u32::try_from(index).unwrap()).unwrap();
+        assert_eq!(found.what, What::Override);
+        assert_eq!(found.path, path(&[b"limits", b"overrides", name]));
+    }
+}
+
+#[test]
 fn every_limit_of_the_small_profile_has_a_name() {
     for &(name, value) in SMALL {
         let mut limits = small();
