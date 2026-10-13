@@ -121,6 +121,16 @@ the platform's HTTP stack, TLS                  TLS server, or plaintext on loop
   never cut silently (`../client/domain/client.md`, section 16). The
   wire's generated worst cases price each document at the client's
   limits.
+- **A document's nested collections cross as pieces.** The client bounds
+  a document by its bytes in all, not each list by its count times its
+  largest item. So a list whose items hold lists of their own (a page's
+  rows; the rows of a table in which a contract type that nests itself
+  is flattened, each row with its parent's index) crosses as one piece
+  bounded by the client's document limit (skein's `codec.md`, section 3,
+  "A sum crosses as one piece"). The client decodes each row as it
+  splits the piece, counting it against that limit, so a page of many
+  small rows and one of a few large ones cost what they hold. Lists of
+  flat items stay lists.
 - **Turns cross as their bytes,** smith's, inside the documents that
   carry them, and are decoded by `jig-protocol-transcript` in the
   client's protocol layer (`../client/domain/client.md`, section 10); a

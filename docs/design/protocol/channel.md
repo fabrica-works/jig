@@ -297,7 +297,8 @@ holds, and neither of its components reads them.
   7.2).
 - **A window crosses as one piece,** in smith's form: each turn's bytes
   after their length, a `u32`, as smith's channel carries a start's
-  transcript (smith's `protocol/channel.md`, section 3). The resume
+  transcript (smith's `protocol/channel.md`, section 3; skein's
+  `codec.md`, section 3, "A sum crosses as one piece"). The resume
   limit bounds the piece, each turn counted with its length, so one
   field's bound holds any window the domain may resume, many small turns
   or a few large; the domain bounds a window's bytes, not its turns, and
