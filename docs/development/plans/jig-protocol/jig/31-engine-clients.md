@@ -368,6 +368,31 @@ credential twice.
 Size: at most 400 lines of production code, generated code excepted.
 Removes: nothing.
 
+### 31.s2 A refusal's ending travels as a fact
+
+A step not in the plan (decisions.md, ruling 233): a defect jig 34 found
+in 31.3's landed `translate::refusals` (jig `a280d09b`).
+Scope: `ending` (`crates/jig-protocol-engine-clients/src/translate/refusals.rs:202-230`)
+puts a length-prefixed `w::EndingRow` in `w::Ending.rows`, a table of
+facts that the client link splits and decodes as `w::Fact`
+(`crates/jig-protocol-client-link/src/translate/facts.rs`, `decode`); a
+Done ending's piece `[0, 1]` decodes there as `Fact::Chip`. Each piece
+is a `w::Fact::Ending(row)`, measured and encoded as the fact; the
+`EndingRows` bound and every owner fact stay.
+Needs: 31.3. Run by jig 34's session while it waits on 03.s2, or by
+31.s1's before its own work; the coordinator's choice.
+Files: `crates/jig-protocol-engine-clients/src/translate/refusals.rs`,
+`src/tests/answers.rs` (or the refusals' table); in jig 34, its local
+ending helper, removed once this lands.
+Test shape: a row in the refusals' table: a keyed `Refusal::Ended`
+with a Done ending, encoded by `refusals::refusal` and decoded by the
+client link's facts' `decode`, reads back `Fact::Ending` with its
+fields. Under 20 ms.
+Proof: the gate.
+Don't: change the wire schema or the `EndingRows` bound; keep two
+ending encoders once this lands.
+Size: at most 20 lines of production code.
+
 ### 31.4 Reads and cursors
 
 Scope: `/jig/v1/read`: the `Owned` read decoded; jig's read translated

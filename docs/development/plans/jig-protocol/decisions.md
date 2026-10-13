@@ -1812,6 +1812,16 @@ the file.
      rises from 60 to 140 lines. Any other contract field the design
      calls bytes and the wire carries as `bytes` gets the same; a field
      the design leaves unclear is asked.
+233. **jig 31.s2: a refusal's ending travels as a fact** (2026-10-13, the
+     coordinator's block "jig 34.1: landed 31.3 shared Ending encodes
+     untagged row where receiver expects Fact", 2026-10-13T06:51:23Z).
+     31.3's `translate::refusals::ending` (jig `a280d09b`) encodes an
+     untagged `EndingRow` into `Ending.rows`, which the client link
+     decodes as `Fact`s, so a Done ending reads back as `Fact::Chip`; no
+     test crossed the two sides. A step not in the plan, jig 31.s2
+     (`jig/31-engine-clients.md`), tags each piece `Fact::Ending` with a
+     round-trip row, and jig 34 then reuses the shared helper and drops
+     its own.
 
 ## For the user
 
