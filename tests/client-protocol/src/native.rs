@@ -13,6 +13,13 @@ pub struct Script {
     steps: Box<[Step<client::Address>]>,
 }
 impl Script {
+    /// Start a chat and keep reading until its answer is visible.
+    #[must_use]
+    pub fn answered_chat(words: &[u8], answer: &[u8]) -> Self {
+        let mut steps = Self::start_chat(words).steps.into_vec();
+        steps.push(Step::See { find: Find::text(answer), within: Duration::from_secs(5) });
+        Self { steps: steps.into_boxed_slice() }
+    }
     #[must_use]
     pub fn start_chat(words: &[u8]) -> Self {
         Self {

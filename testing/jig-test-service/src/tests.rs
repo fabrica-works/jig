@@ -3,6 +3,7 @@ mod engine;
 mod family;
 mod first_period;
 mod fixtures;
+mod startup;
 mod stop;
 mod worker;
 use crate::tests::fixtures::{engine_document, problem, with};

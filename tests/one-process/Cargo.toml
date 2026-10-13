@@ -1,0 +1,63 @@
+[package]
+name = "jig-one-process-world"
+description = "One service, native clients and Smith agents on the simulated kernel"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+jig-channel-world = { path = "../channel" }
+jig-client-protocol-world = { path = "../client-protocol" }
+jig-shell-native = { path = "../../crates/jig-shell-native" }
+jig-test-service.workspace = true
+jig-test-domain.workspace = true
+jig-domain-core.workspace = true
+jig-domain-people.workspace = true
+jig-domain-host.workspace = true
+jig-domain-notes.workspace = true
+jig-domain-tasks.workspace = true
+jig-test-store.workspace = true
+jig-protocol-store.workspace = true
+jig-test-connector.workspace = true
+skein-kv.workspace = true
+jig-fake-parties.workspace = true
+jig-protocol-worker-wire.workspace = true
+jig-protocol-config.workspace = true
+skein-channel.workspace = true
+skein-fake-channel.workspace = true
+skein-lib.workspace = true
+skein-io.workspace = true
+skein-world.workspace = true
+skein-sim.workspace = true
+skein-fake-machine.workspace = true
+skein-fake-peers.workspace = true
+skein-llm-world.workspace = true
+skein-fake-llm-protocol.workspace = true
+skein-fake-llm-domain.workspace = true
+skein-llm.workspace = true
+skein-shell.workspace = true
+smith-agent-process-world.workspace = true
+smith-agent-shell.workspace = true
+smith-agent-service.workspace = true
+smith-protocol-channel.workspace = true
+smith-protocol-llm.workspace = true
+smith-host-domain.workspace = true
+smith-host-protocol.workspace = true
+smith-domain.workspace = true
+
+[lints.rust]
+unsafe_code = "forbid"
+elided_lifetimes_in_paths = "deny"
+unused_must_use = "deny"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+missing_panics_doc = "allow"          # the world asserts its invariants by panicking
+wildcard_enum_match_arm = "deny"      # a new variant must break the translation
+match_wildcard_for_single_variants = "deny"
+unwrap_used = "deny"
+allow_attributes = "deny"
+allow_attributes_without_reason = "deny"
+disallowed_types = "deny"
+disallowed_methods = "deny"

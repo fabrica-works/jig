@@ -437,11 +437,16 @@ fn worker_specs(input: &[u8]) -> Result<(bool, List<WorkerSpec>), Problems> {
     };
     let path = Path::root();
     let mut whole = object(&document, 0, &path)?;
-    let engine = whole.member(&document, b"engine").is_some();
+    let engine_at = whole.member(&document, b"engine");
+    let engine = engine_at.is_some();
     let application = whole.member(&document, b"application");
     let workers = match whole.member(&document, b"workers") {
         Some(at) => list(&document, at, document.len(), &path.member(b"workers"))?,
         None => List::with_capacity(0),
+    };
+    let listeners = match engine_at {
+        Some(_) if !workers.is_empty() => parse(input)?.engine.hosts.listener,
+        Some(_) | None => Box::default(),
     };
     let mut problems = Problems::empty();
     if !engine {
@@ -488,6 +493,11 @@ fn worker_specs(input: &[u8]) -> Result<(bool, List<WorkerSpec>), Problems> {
                 return Err(problems);
             }
         };
+        if let config::Address::Addr(skein_io::Addr::InProcess(_)) = &worker.engine
+            && !listeners.contains(&worker.engine)
+        {
+            return Err(problem(here.member(b"engine"), What::Refers));
+        }
         let here = indexed(&root_path, index);
         let mut fields =
             object(&document, *roots.get(u32::try_from(index).expect("worker index")).expect("root count"), &here)?;

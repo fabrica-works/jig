@@ -115,7 +115,8 @@ pub const WORKER_DOCUMENT: &[u8] = br#"{
 }],"application":{"workers":[{"root":"agent-root"}]}}
 "#;
 
-pub(crate) fn engine_document() -> Vec<u8> {
+#[must_use]
+pub fn engine_document() -> Vec<u8> {
     let mut document = b"{\"engine\":".to_vec();
     document.extend_from_slice(ENGINE);
     document.extend_from_slice(
@@ -125,7 +126,8 @@ pub(crate) fn engine_document() -> Vec<u8> {
     );
     document
 }
-pub(crate) fn files(worker: bool) -> Files {
+#[must_use]
+pub fn files(worker: bool) -> Files {
     let inputs: &[(&[u8], &[u8])] = if worker {
         &[(b"worker.secret", b"worker-secret"), (b"agent.json", b"{}")]
     } else {
@@ -142,7 +144,8 @@ pub(crate) fn files(worker: bool) -> Files {
     }
     Files { entries }
 }
-pub(crate) fn seeds() -> Seeds {
+#[must_use]
+pub fn seeds() -> Seeds {
     Seeds { deployment: [7; 16], seed: SEED, crypto: Secret::new(Box::new([7; 32])) }
 }
 pub(crate) fn endpoints() -> smith_protocol_channel::Endpoints {
@@ -152,7 +155,8 @@ pub(crate) fn endpoints() -> smith_protocol_channel::Endpoints {
         .expect("one endpoint");
     smith_protocol_channel::Endpoints::new(entries)
 }
-pub(crate) fn agent() -> jig_test_service::Agent {
+#[must_use]
+pub fn agent() -> jig_test_service::Agent {
     use skein_lib::Duration;
     let agent_limits = smith_agent_process_world::limits();
     let host_limits = smith_host_domain::Limits {
@@ -221,7 +225,8 @@ pub(crate) fn agent() -> jig_test_service::Agent {
     }
 }
 
-pub(crate) fn agent_configuration() -> smith_agent_service::Config {
+#[must_use]
+pub fn agent_configuration() -> smith_agent_service::Config {
     let mut config = smith_agent_process_world::configuration();
     config.limits.llm.accounts = 2;
     config.channel_endpoints = endpoints();
@@ -326,7 +331,8 @@ pub(crate) fn peer_hello() -> skein_channel::Frame {
     frame.finish().expect("hello frame")
 }
 
-pub(crate) fn provider_turns(script: &Script) -> Box<[skein_fake_llm_domain::api::Turn]> {
+#[must_use]
+pub fn provider_turns(script: &Script) -> Box<[skein_fake_llm_domain::api::Turn]> {
     use skein_fake_llm_domain::api::{Finish, Line, Turn};
     if matches!(script.story, crate::stories::Story::Window) {
         return vec![
@@ -417,7 +423,8 @@ pub(crate) fn engine_message_document() -> Vec<u8> {
 }
 
 /// Match the fixture's final admitted core bounds, once per engine instance.
-pub(crate) fn store_limits() -> jig_test_service::limits::Limits {
+#[must_use]
+pub fn store_limits() -> jig_test_service::limits::Limits {
     let bounds = jig_protocol_config::DocumentLimits {
         bytes: u32::try_from(ENGINE.len()).expect("fixture document size"),
         tokens: u32::try_from(ENGINE.len()).expect("fixture document size"),

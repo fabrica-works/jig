@@ -440,7 +440,7 @@ pub fn call(input: &[u8]) -> jig_domain_fleet::Call {
 
 pub const WORKER_DOCUMENT: &[u8] = br#"{
 "workers":[{
-"engine":{"in_process":"workers"},"name":"worker-a","secret":"worker.secret","slots":1,
+"engine":{"socket":"127.0.0.1:7200"},"name":"worker-a","secret":"worker.secret","slots":1,
 "graces":{"grace_ms":10000,"agent_stop_ms":5000,"delivery_ms":1000,"save_ms":1000},
 "agent":{"program":"agent-program","configuration":"agent.json","arguments":["agent"]},
 "limits":{"profile":"small","overrides":{"hub.slots":1,"hub.run_calls":1,"hub.turns":1}},
@@ -619,11 +619,12 @@ pub fn combined_document() -> Box<[u8]> {
         .expect("array end");
     let workers = &WORKER_DOCUMENT[1..at];
     let document = with(&engine_document(), b"\"service\":", &join(&[workers, b",\"service\":"]));
-    with(
+    let document = with(
         &document,
         br#""application":{"credential":"#,
         br#""application":{"workers":[{"root":"agent-root"}],"credential":"#,
-    )
+    );
+    with(&document, br#""socket":"127.0.0.1:7200""#, br#""in_process":"workers""#)
 }
 
 pub fn combined_files(document: &[u8]) -> Files {

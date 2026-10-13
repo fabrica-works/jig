@@ -30,7 +30,7 @@ fn a_secret_file_readable_by_others_refuses_the_start() {
     fs::set_permissions(&secret, fs::Permissions::from_mode(0o644)).expect("public permissions");
     let bytes = format!(
         r#"{{"workers":[{{
-        "engine":{{"in_process":"workers"}},"name":"worker-a","secret":"{}","slots":1,
+        "engine":{{"socket":"127.0.0.1:7200"}},"name":"worker-a","secret":"{}","slots":1,
         "graces":{{"grace_ms":10000,"agent_stop_ms":5000,"delivery_ms":1000,"save_ms":1000}},
         "agent":{{"program":"jig-test","configuration":"agent.json","arguments":["agent"]}},
         "limits":{{"profile":"small"}},"memory_bytes":1152921504606846976

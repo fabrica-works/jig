@@ -7,12 +7,12 @@ use skein_lib::Reader;
 use std::collections::{BTreeMap, VecDeque};
 
 #[derive(Debug)]
-pub(crate) struct Commit {
+pub struct Commit {
     pub number: u64,
     pub writes: Vec<root::Write>,
 }
 #[derive(Default)]
-pub(crate) struct Store {
+pub struct Store {
     pub rows: BTreeMap<root::Key, root::Record>,
     pub pending: VecDeque<Commit>,
     pub applied: u64,
@@ -21,14 +21,14 @@ pub(crate) struct Store {
     lengths: BTreeMap<u64, u64>,
 }
 #[derive(Debug)]
-pub(crate) enum Observed {
+pub enum Observed {
     Bytes { path: Vec<u8>, at: usize, bytes: Vec<u8> },
     Sync(Vec<u8>),
     Recovered(Vec<u8>),
     Pending(Vec<u8>),
 }
 #[derive(Default)]
-pub(crate) struct Capture {
+pub struct Capture {
     names: BTreeMap<i32, Vec<u8>>,
     pub events: Vec<Observed>,
 }
@@ -117,6 +117,7 @@ impl Capture {
     }
 }
 impl Store {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }

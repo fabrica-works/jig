@@ -479,6 +479,50 @@ dependencies = [
 ]
 
 [[package]]
+name = "jig-one-process-world"
+version = "0.0.0"
+dependencies = [
+ "jig-channel-world",
+ "jig-client-protocol-world",
+ "jig-domain-core",
+ "jig-domain-host",
+ "jig-domain-notes",
+ "jig-domain-people",
+ "jig-domain-tasks",
+ "jig-fake-parties",
+ "jig-protocol-config",
+ "jig-protocol-store",
+ "jig-protocol-worker-wire",
+ "jig-shell-native",
+ "jig-test-connector",
+ "jig-test-domain",
+ "jig-test-service",
+ "jig-test-store",
+ "skein-channel",
+ "skein-fake-channel",
+ "skein-fake-llm-domain",
+ "skein-fake-llm-protocol",
+ "skein-fake-machine",
+ "skein-fake-peers",
+ "skein-io",
+ "skein-kv",
+ "skein-lib",
+ "skein-llm",
+ "skein-llm-world",
+ "skein-shell",
+ "skein-sim",
+ "skein-world",
+ "smith-agent-process-world",
+ "smith-agent-service",
+ "smith-agent-shell",
+ "smith-domain",
+ "smith-host-domain",
+ "smith-host-protocol",
+ "smith-protocol-channel",
+ "smith-protocol-llm",
+]
+
+[[package]]
 name = "jig-ops-domain"
 version = "0.0.0"
 dependencies = [

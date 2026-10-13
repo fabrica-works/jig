@@ -13,7 +13,7 @@ use skein_lib::{Duration, ReplyTo, Token};
 use skein_world::domain::Verdict;
 use std::{cell::RefCell, rc::Rc};
 
-mod store;
+pub mod store;
 pub(crate) use store::{Capture, Store};
 
 #[derive(Clone, Copy, Debug)]

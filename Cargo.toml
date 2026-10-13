@@ -3,6 +3,7 @@
 [workspace]
 resolver = "3"
 members = [
+    "tests/one-process",
     "testing/jig-test",
     "crates/jig-shell-native",
     "tests/client-protocol",
