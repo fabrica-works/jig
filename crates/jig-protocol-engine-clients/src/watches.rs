@@ -11,7 +11,7 @@ use skein_lib::Reader;
 impl Component {
     fn stream_owner(&self, name: &[u8; 16], sign_in: u64) -> Option<Token> {
         for (owner, stream) in &self.streams {
-            if stream.name == *name && stream.sign_in == sign_in && !stream.closing {
+            if stream.name == *name && stream.sign_in == sign_in && !stream.closing() {
                 return Some(*owner);
             }
         }
@@ -94,7 +94,7 @@ impl Component {
             Route::Gone => match w::Gone::decode(&env.limits.wire, &mut reader) {
                 Ok(value) if reader.is_empty() => {
                     if let Some(owner) = self.stream_owner(value.stream(), sign_in) {
-                        self.streams.get_mut(&owner).expect("selected stream").closing = true;
+                        self.streams.get_mut(&owner).expect("selected stream").phase = stream::Phase::Closing;
                     }
                     self.respond(env, exchange, Box::new([]));
                 }
@@ -102,7 +102,14 @@ impl Component {
                     self.connections.get_mut(&owner).expect("exchange owner").respond(400, Box::new([]), &env.limits);
                 }
             },
-            Route::Stream | Route::Link | Route::Service | Route::Read | Route::Request | Route::Missing => {
+            Route::Stream
+            | Route::Link
+            | Route::Service
+            | Route::Provider(_)
+            | Route::SignOut
+            | Route::Read
+            | Route::Request
+            | Route::Missing => {
                 self.connections.get_mut(&owner).expect("exchange owner").respond(400, Box::new([]), &env.limits);
             }
         }
@@ -244,7 +251,24 @@ impl Component {
             .exchanges
             .insert(exchange, Waiting::Watch { sign_in, watcher, opening: true })
             .expect("admitted exchange");
-        out.push(request);
+        self.admit_watch(env, owner, watcher, request, out);
+    }
+    fn admit_watch(
+        &mut self,
+        env: &Env<Limits>,
+        owner: Token,
+        watcher: Token,
+        request: Request,
+        out: &mut Queue<Request>,
+    ) {
+        if self.stopping() {
+            self.streams.get_mut(&owner).expect("watch stream").watches.get_mut(&watcher).expect("new watch").unwatch =
+                true;
+            self.watch_answer(env, watcher, None);
+            self.watch_ended(env, watcher, jig_domain_views::End::Stopping);
+        } else {
+            out.push(request);
+        }
     }
     pub(super) fn active(&self, sign_in: u64) -> u32 {
         let mut count = 0_u32;
@@ -255,6 +279,8 @@ impl Component {
                 | Waiting::Read { sign_in, .. }
                 | Waiting::ApplicationRead { sign_in, .. } => Some(*sign_in),
                 Waiting::Core
+                | Waiting::Provider { .. }
+                | Waiting::SignOut { .. }
                 | Waiting::Keep { .. }
                 | Waiting::Get { .. }
                 | Waiting::Made { .. }
@@ -299,10 +325,10 @@ impl Component {
         match value {
             Ok(value) => {
                 if !stream.queue(stream::packet(value, taken), env.limits.queued_bytes) {
-                    stream.closing = true;
+                    stream.phase = stream::Phase::Closing;
                 }
             }
-            Err(_) => stream.closing = true,
+            Err(_) => stream.phase = stream::Phase::Closing,
         }
     }
     pub(super) fn delivery(&mut self, env: &Env<Limits>, watcher: Token, document: &core::documents::Document) {
@@ -381,7 +407,7 @@ impl Component {
         for _ in 0..self.streams.capacity() {
             let mut found = None;
             for (owner, stream) in &self.streams {
-                if !stream.closing && (sign_in.is_none() || sign_in == Some(stream.sign_in)) {
+                if !stream.closing() && (sign_in.is_none() || sign_in == Some(stream.sign_in)) {
                     found = Some(*owner);
                     break;
                 }
@@ -389,13 +415,13 @@ impl Component {
             let Some(owner) = found else {
                 break;
             };
-            self.streams.get_mut(&owner).expect("ending stream").closing = true;
+            self.streams.get_mut(&owner).expect("ending stream").phase = stream::Phase::Closing;
         }
     }
     pub(super) fn stream_up(&mut self, env: &Env<Limits>, out: &mut Queue<Request>) -> bool {
         let mut selected = None;
         for (owner, stream) in &self.streams {
-            if stream.ready() || self.aborting {
+            if stream.ready() || self.aborting() {
                 selected = Some(*owner);
                 break;
             }
@@ -404,7 +430,7 @@ impl Component {
             return false;
         };
         let mut stream = self.streams.remove(&owner).expect("selected stream");
-        if stream.closing {
+        if stream.closing() {
             if !stream.closed_connection {
                 stream.closed_connection = true;
                 if let Some(connection) = self.connections.get_mut(&owner) {
@@ -417,7 +443,7 @@ impl Component {
                     || watch.delivery_pending
                     || watch.text_pending
                     || watch.end.is_some()
-                    || self.aborting
+                    || self.aborting()
                 {
                     selected = Some(*watcher);
                     break;
@@ -454,37 +480,17 @@ impl Component {
             if let Some(connection) = self.connections.get_mut(&owner) {
                 connection.requests.push(http::Request::Reply(down));
             } else {
-                stream.closing = true;
+                stream.phase = stream::Phase::Closing;
             }
         } else if let Some(event) = stream.above.pop() {
             match event {
                 sse::Event::Sent => {
-                    stream.waiting = false;
-                    stream.bytes = 0;
-                    stream.deadline = env.now.saturating_add(self.settings.heartbeat);
-                    let taken = ::core::mem::replace(&mut stream.taken, Taken::None);
-                    match taken {
-                        Taken::Delivery(watcher) => {
-                            if let Some(watch) = stream.watches.get_mut(&watcher) {
-                                watch.delivery_pending = false;
-                            }
-                        }
-                        Taken::Text(watcher) => {
-                            if let Some(watch) = stream.watches.get_mut(&watcher) {
-                                watch.text_pending = false;
-                            }
-                        }
-                        Taken::None | Taken::Ended { .. } => {}
-                    }
+                    let taken = stream.sent(env, self.settings.heartbeat);
                     if let Some(event) = stream::taken(taken) {
                         out.push(Request::Core(Box::new(event)));
                     }
-                    if let Taken::Ended { watcher, signed_out } = taken {
-                        stream.watches.remove(&watcher);
-                        stream.closing = signed_out;
-                    }
                 }
-                sse::Event::Failed(_) | sse::Event::Refused(_) => stream.closing = true,
+                sse::Event::Failed(_) | sse::Event::Refused(_) => stream.phase = stream::Phase::Closing,
                 sse::Event::Closed => {}
             }
         } else if let Some(packet) = stream.next() {

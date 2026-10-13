@@ -41,6 +41,8 @@ impl Component {
                             Waiting::Get { owner, .. } => Some(*owner),
                             Waiting::Made { party, .. } => Some(SecretOwner::Service(*party)),
                             Waiting::Core
+                            | Waiting::Provider { .. }
+                            | Waiting::SignOut { .. }
                             | Waiting::Watch { .. }
                             | Waiting::Keep { .. }
                             | Waiting::Ask { .. }
@@ -79,6 +81,8 @@ impl Component {
                             self.made(env, exchange, sign_in, party, value.as_ref(), out);
                         }
                         Waiting::Core
+                        | Waiting::Provider { .. }
+                        | Waiting::SignOut { .. }
                         | Waiting::Watch { .. }
                         | Waiting::Keep { .. }
                         | Waiting::Ask { .. }
@@ -89,10 +93,14 @@ impl Component {
                 }
             }
             SecretsAnswer::Failed => self.abort(out),
-            SecretsAnswer::Erased { .. } => {}
+            SecretsAnswer::Erased { owner } => self.erased(env, owner),
         }
     }
     fn service_sign_in(&mut self, env: &Env<Limits>, exchange: Token, party: u64, out: &mut Queue<Request>) {
+        if self.stopping() {
+            self.respond(env, exchange, routes::sign_in_not_ready());
+            return;
+        }
         if self.admitted() >= env.limits.exchanges {
             self.respond(env, exchange, routes::refused(&env.limits.wire));
             return;

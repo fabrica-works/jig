@@ -22,3 +22,6 @@ mod reads;
 
 #[path = "tests/watches.rs"]
 mod watches;
+
+#[path = "tests/closing.rs"]
+mod closing;

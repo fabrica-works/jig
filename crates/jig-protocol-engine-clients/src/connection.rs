@@ -21,6 +21,7 @@ pub(crate) struct Connection {
     pub response: Box<[u8]>,
     pub offset: usize,
     pub closing: bool,
+    pub draining: bool,
     pub deadline: Time,
 }
 impl Connection {
@@ -41,6 +42,7 @@ impl Connection {
             response: Box::new([]),
             offset: 0,
             closing: false,
+            draining: false,
             deadline: now.saturating_add(limits.stall),
         }
     }
@@ -108,9 +110,17 @@ impl Connection {
             self.room(limits);
         }
     }
-    pub fn close(&mut self, out: &mut Queue<Request>) {
+    pub fn finish(&mut self, out: &mut Queue<Request>) {
         if !self.closing {
             self.closing = true;
+            self.draining = true;
+            out.push(Request::Io(skein_io::Request::Close { entity: self.socket }));
+        }
+    }
+    pub fn close(&mut self, out: &mut Queue<Request>) {
+        if !self.closing || self.draining {
+            self.closing = true;
+            self.draining = false;
             out.push(Request::Io(skein_io::Request::Abort { entity: self.socket }));
         }
     }

@@ -1,4 +1,5 @@
 //! io's stream records joined to an actual HTTP client, with scripted durability.
+mod closing;
 use crate::fixtures;
 use jig_domain_core as core;
 use jig_domain_people as people;
@@ -17,6 +18,7 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 #[derive(Debug, PartialEq, Eq)]
 enum ExchangeState {
     Active,
+    Drained,
     Cut,
 }
 #[derive(Debug)]
@@ -69,14 +71,14 @@ impl Exchange {
             method,
             target: Box::from(target),
             headers: headers.into_boxed_slice(),
-            body: if result.streaming {
+            body: if result.streaming || length == 0 {
                 http::Body::None
             } else {
                 http::Body::Length(u64::try_from(length).expect("short body"))
             },
             close: false,
         }));
-        if !result.streaming {
+        if !result.streaming && length != 0 {
             result.down(http::Request::Upload(Down::Demand {
                 read: Read::Nothing,
                 room: u32::try_from(length).expect("short body"),
@@ -135,7 +137,7 @@ impl Exchange {
         if self.pause_after.is_some_and(|limit| self.to_engine.received.len() >= limit) {
             self.paused = true;
         }
-        let up = if self.paused { None } else { self.to_engine.answer() };
+        let up = if self.paused || self.state != ExchangeState::Active { None } else { self.to_engine.answer() };
         let changed = before != self.progress();
         (up, changed)
     }
@@ -168,6 +170,13 @@ pub struct Peer {
     in_flight: BTreeSet<Token>,
     changed: BTreeMap<Token, core::documents::Document>,
     unwatching: BTreeSet<Token>,
+    providers: VecDeque<(Token, u16, jig_protocol_engine_clients::ProviderCall)>,
+    closed: usize,
+    close_counts: BTreeMap<Token, usize>,
+    hold_erases: bool,
+    hold_closes: bool,
+    closing_sockets: BTreeSet<Token>,
+    erases: VecDeque<SecretOwner>,
 }
 impl Peer {
     #[must_use]
@@ -196,6 +205,13 @@ impl Peer {
             in_flight: BTreeSet::new(),
             changed: BTreeMap::new(),
             unwatching: BTreeSet::new(),
+            providers: VecDeque::new(),
+            closed: 0,
+            close_counts: BTreeMap::new(),
+            hold_erases: false,
+            hold_closes: false,
+            closing_sockets: BTreeSet::new(),
+            erases: VecDeque::new(),
         };
         peer.pump();
         peer
@@ -255,10 +271,17 @@ impl Peer {
                         );
                     }
                     Request::Secrets(SecretsRequest::Erase { owner }) => {
-                        self.digests.remove(&owner);
+                        self.erases.push_back(owner);
+                        if !self.hold_erases {
+                            self.erase_one();
+                        }
                     }
                     Request::Link { link } => self.links.push(link),
-                    Request::Application(_) | Request::Provider { .. } | Request::Closed => {}
+                    Request::Provider { exchange, provider, call } => {
+                        self.providers.push_back((exchange, provider, call));
+                    }
+                    Request::Closed => self.closed += 1,
+                    Request::Application(_) => {}
                 }
             }
             let mut ups = Vec::new();
@@ -297,20 +320,8 @@ impl Peer {
                     exchange.to_engine.take(down);
                 }
             }
-            skein_io::Request::Close { entity } | skein_io::Request::Abort { entity } => {
-                if entity == Token::new(99) {
-                    self.component.down(
-                        &self.env,
-                        Event::Io(skein_io::Event::Closed { owner: Token::new(0) }),
-                        &mut self.out,
-                    );
-                }
-                if let Some(exchange) = self.sockets.get_mut(&entity) {
-                    exchange.state = ExchangeState::Cut;
-                    let owner = exchange.owner.expect("bound socket");
-                    self.component.down(&self.env, Event::Io(skein_io::Event::Closed { owner }), &mut self.out);
-                }
-            }
+            skein_io::Request::Close { entity } => self.close_socket(entity, ExchangeState::Drained),
+            skein_io::Request::Abort { entity } => self.close_socket(entity, ExchangeState::Cut),
             skein_io::Request::Reject { .. } => panic!("unexpected rejected socket"),
             skein_io::Request::Connect { .. }
             | skein_io::Request::Spawn { .. }

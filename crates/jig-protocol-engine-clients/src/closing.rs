@@ -1,0 +1,354 @@
+//! Signing out, providers, and component draining (protocol/client.md, 8).
+use super::{
+    Box, Component, Connection, Env, Limits, Queue, ReplyTo, Request, SecretOwner, SecretsRequest, Token, Waiting,
+    core, routes, w,
+};
+use crate::routes::Route;
+use crate::{ProviderCall, Verdict};
+use skein_lib::{Map, Reader};
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Phase {
+    Active,
+    Stopped,
+    Closing,
+    Aborting,
+    Closed,
+}
+impl Component {
+    pub(super) fn stopping(&self) -> bool {
+        self.phase != Phase::Active
+    }
+    pub(super) fn closing(&self) -> bool {
+        self.phase == Phase::Closing
+    }
+    pub(super) fn aborting(&self) -> bool {
+        self.phase == Phase::Aborting
+    }
+    pub(super) fn closed(&self) -> bool {
+        self.phase == Phase::Closed
+    }
+
+    pub(super) fn ended(&mut self, env: &Env<Limits>, sign_in: u64, out: &mut Queue<Request>) {
+        out.push(Request::Secrets(SecretsRequest::Erase { owner: SecretOwner::SignIn(sign_in) }));
+        for _ in 0..self.pending.exchanges.capacity() {
+            let mut found = None;
+            for (exchange, waiting) in &self.pending.exchanges {
+                match waiting {
+                    Waiting::SignOut { sign_in: number, committed: false }
+                    | Waiting::Watch { sign_in: number, .. }
+                    | Waiting::Keep { sign_in: number, .. }
+                    | Waiting::Get { owner: SecretOwner::SignIn(number), .. }
+                    | Waiting::Made { sign_in: number, .. }
+                    | Waiting::Checked { sign_in: number, .. }
+                    | Waiting::Read { sign_in: number, .. }
+                    | Waiting::ApplicationRead { sign_in: number, .. }
+                    | Waiting::Ask { sign_in: number, .. }
+                        if *number == sign_in =>
+                    {
+                        found = Some(*exchange);
+                        break;
+                    }
+                    Waiting::Core
+                    | Waiting::Provider { .. }
+                    | Waiting::SignOut { .. }
+                    | Waiting::Watch { .. }
+                    | Waiting::Keep { .. }
+                    | Waiting::Get { .. }
+                    | Waiting::Made { .. }
+                    | Waiting::Checked { .. }
+                    | Waiting::Read { .. }
+                    | Waiting::ApplicationRead { .. }
+                    | Waiting::Ask { .. } => {}
+                }
+            }
+            let Some(exchange) = found else {
+                break;
+            };
+            match self.pending.exchanges.remove(&exchange).expect("ended exchange") {
+                Waiting::Keep { .. } | Waiting::Made { .. } => {
+                    self.respond(env, exchange, routes::refused(&env.limits.wire));
+                }
+                Waiting::Read { .. }
+                | Waiting::ApplicationRead { .. }
+                | Waiting::Get { route: Route::Read, .. }
+                | Waiting::Checked { route: Route::Read, .. } => {
+                    self.respond(env, exchange, routes::read_none(core::reads::Why::SignedOut, &env.limits.wire));
+                }
+                Waiting::Get { route, .. } | Waiting::Checked { route, .. } => {
+                    self.denied(env, exchange, route);
+                }
+                Waiting::Ask { .. } => self.respond(env, exchange, routes::signed_out(&env.limits.wire)),
+                Waiting::Watch { opening, .. } => {
+                    let body = if opening {
+                        routes::open_answer(Some(core::WatchRefusal::SignedOut), &env.limits.wire)
+                    } else {
+                        routes::close_answer(true)
+                    };
+                    self.respond(env, exchange, body);
+                }
+                Waiting::SignOut { .. } => {
+                    self.pending
+                        .exchanges
+                        .insert(exchange, Waiting::SignOut { sign_in, committed: true })
+                        .expect("same sign-out slot");
+                }
+                Waiting::Core | Waiting::Provider { .. } => {}
+            }
+        }
+        self.end_streams(Some(sign_in));
+    }
+    pub(super) fn abort(&mut self, out: &mut Queue<Request>) {
+        if self.aborting() {
+            return;
+        }
+        self.phase = Phase::Aborting;
+        self.end_streams(None);
+        self.link = None;
+        self.pending.exchanges = Map::with_capacity(self.pending.exchanges.capacity());
+        if let Some(listener) = self.listener {
+            self.listener_closing = true;
+            out.push(Request::Io(skein_io::Request::Abort { entity: listener }));
+        }
+    }
+
+    pub(super) fn sign_out(
+        &mut self,
+        env: &Env<Limits>,
+        exchange: Token,
+        sign_in: u64,
+        body: &[u8],
+        out: &mut Queue<Request>,
+    ) {
+        if self.stopping() {
+            self.respond(env, exchange, routes::sign_out_not_ready());
+            return;
+        }
+        let mut reader = Reader::new(body);
+        if w::SignOut::decode(&env.limits.wire, &mut reader).is_err() || !reader.is_empty() {
+            if let Some(owner) = self.owner(exchange) {
+                self.connections.get_mut(&owner).expect("exchange owner").respond(400, Box::new([]), &env.limits);
+            }
+            return;
+        }
+        self.pending
+            .exchanges
+            .insert(exchange, Waiting::SignOut { sign_in, committed: false })
+            .expect("same checked slot");
+        out.push(Request::Core(Box::new(core::Event::People(jig_domain_people::Event::SignOut {
+            reply_to: ReplyTo::new(exchange),
+            sign_in,
+        }))));
+    }
+    pub(super) fn erased(&mut self, env: &Env<Limits>, owner: SecretOwner) {
+        for _ in 0..self.pending.exchanges.capacity() {
+            let mut found = None;
+            for (exchange, waiting) in &self.pending.exchanges {
+                match waiting {
+                    Waiting::SignOut { sign_in, committed: true } if owner == SecretOwner::SignIn(*sign_in) => {
+                        found = Some(*exchange);
+                        break;
+                    }
+                    Waiting::Core
+                    | Waiting::Provider { .. }
+                    | Waiting::SignOut { .. }
+                    | Waiting::Watch { .. }
+                    | Waiting::Keep { .. }
+                    | Waiting::Get { .. }
+                    | Waiting::Made { .. }
+                    | Waiting::Read { .. }
+                    | Waiting::ApplicationRead { .. }
+                    | Waiting::Ask { .. }
+                    | Waiting::Checked { .. } => {}
+                }
+            }
+            let Some(exchange) = found else { break };
+            self.pending.exchanges.remove(&exchange);
+            self.respond(env, exchange, routes::sign_out_answer());
+        }
+    }
+    pub(super) fn provider_call(
+        &mut self,
+        env: &Env<Limits>,
+        exchange: Token,
+        provider: u16,
+        connection: &mut Connection,
+        body: Box<[u8]>,
+        out: &mut Queue<Request>,
+    ) {
+        let mut configured = false;
+        for number in &self.settings.providers {
+            if *number == provider {
+                configured = true;
+            }
+        }
+        if !configured {
+            connection.respond(404, Box::new([]), &env.limits);
+            return;
+        }
+        if self.stopping() {
+            connection.respond(200, routes::sign_in_not_ready(), &env.limits);
+            return;
+        }
+        if self.admitted() >= env.limits.exchanges {
+            connection.respond(200, routes::refused(&env.limits.wire), &env.limits);
+            return;
+        }
+        self.pending.exchanges.insert(exchange, Waiting::Provider { provider }).expect("admitted provider");
+        let target = connection.call.as_ref().expect("provider call retained").target.clone();
+        out.push(Request::Provider { exchange, provider, call: ProviderCall { target, body } });
+    }
+    pub(super) fn provider(&mut self, env: &Env<Limits>, exchange: Token, verdict: Verdict, out: &mut Queue<Request>) {
+        let Some(waiting) = self.pending.exchanges.remove(&exchange) else { return };
+        match waiting {
+            Waiting::Provider { provider } => self.provider_verdict(env, exchange, provider, verdict, out),
+            Waiting::Core
+            | Waiting::SignOut { .. }
+            | Waiting::Watch { .. }
+            | Waiting::Keep { .. }
+            | Waiting::Get { .. }
+            | Waiting::Made { .. }
+            | Waiting::Read { .. }
+            | Waiting::ApplicationRead { .. }
+            | Waiting::Ask { .. }
+            | Waiting::Checked { .. } => {
+                self.pending.exchanges.insert(exchange, waiting).expect("same unrelated slot");
+            }
+        }
+    }
+    fn provider_verdict(
+        &mut self,
+        env: &Env<Limits>,
+        exchange: Token,
+        provider: u16,
+        verdict: Verdict,
+        out: &mut Queue<Request>,
+    ) {
+        if self.stopping() {
+            self.respond(env, exchange, routes::sign_in_not_ready());
+            return;
+        }
+        match verdict {
+            Verdict::Identity(identity) => {
+                let length = identity.key.subject.len().checked_add(identity.login.len());
+                let length = match length {
+                    Some(length) => length.checked_add(identity.name.len()),
+                    None => None,
+                };
+                let Some(length) = length else {
+                    self.respond(env, exchange, routes::refused(&env.limits.wire));
+                    return;
+                };
+                if identity.key.provider != provider
+                    || length > usize::try_from(env.limits.identity_bytes).expect("u32 fits")
+                {
+                    self.respond(env, exchange, routes::refused(&env.limits.wire));
+                    return;
+                }
+                self.pending.exchanges.insert(exchange, Waiting::Core).expect("same provider slot");
+                out.push(Request::Core(Box::new(core::Event::SignIn { reply_to: ReplyTo::new(exchange), identity })));
+            }
+            Verdict::Refused => self.respond(env, exchange, routes::refused(&env.limits.wire)),
+        }
+    }
+    pub(super) fn close_listener(&mut self, out: &mut Queue<Request>) {
+        if self.stopping()
+            && !self.listener_closing
+            && let Some(listener) = self.listener
+        {
+            self.listener_closing = true;
+            let request = if self.aborting() {
+                skein_io::Request::Abort { entity: listener }
+            } else {
+                skein_io::Request::Close { entity: listener }
+            };
+            out.push(Request::Io(request));
+        }
+    }
+    pub(super) fn stop(&mut self, out: &mut Queue<Request>) {
+        if self.phase == Phase::Active {
+            self.phase = Phase::Stopped;
+        }
+        self.close_listener(out);
+    }
+    pub(super) fn close(&mut self, out: &mut Queue<Request>) {
+        if !self.aborting() {
+            self.phase = Phase::Closing;
+            self.link = None;
+            self.stop(out);
+        }
+    }
+    pub(super) fn settled(&self) -> bool {
+        !self.closed()
+            && !self.listening
+            && self.listener.is_none()
+            && self.connections.is_empty()
+            && self.streams.is_empty()
+    }
+    pub(super) fn close_up(&mut self, env: &Env<Limits>, out: &mut Queue<Request>) -> bool {
+        if !self.closing() {
+            return false;
+        }
+
+        let mut unwatch = None;
+        let mut finish = None;
+        for (owner, stream) in &self.streams {
+            if stream.closing() {
+                continue;
+            }
+            for (watcher, watch) in &stream.watches {
+                if !watch.unwatch {
+                    unwatch = Some((*owner, *watcher));
+                    break;
+                }
+            }
+            if unwatch.is_some() {
+                break;
+            }
+            if stream.watches.is_empty() && !stream.waiting && !stream.finishing() {
+                finish = Some(*owner);
+                break;
+            }
+        }
+        if let Some((owner, watcher)) = unwatch {
+            self.streams
+                .get_mut(&owner)
+                .expect("closing stream")
+                .watches
+                .get_mut(&watcher)
+                .expect("closing watch")
+                .unwatch = true;
+            out.push(Request::Core(Box::new(core::Event::Unwatch { watcher })));
+            return true;
+        }
+        if let Some(owner) = finish {
+            let stream = self.streams.get_mut(&owner).expect("finishing stream");
+            stream.phase = crate::stream::Phase::Finishing;
+            stream.deadline = env.now.saturating_add(env.limits.stall);
+            skein_http::sse::writer::down(
+                &mut stream.writer,
+                &crate::stream::writer_env(env),
+                skein_http::sse::writer::Request::Finish,
+                &mut stream.above,
+                &mut stream.below,
+            );
+            return true;
+        }
+        let mut idle = None;
+        for (owner, connection) in &self.connections {
+            if connection.exchange.is_none() && !connection.closing {
+                idle = Some(*owner);
+                break;
+            }
+        }
+        if let Some(owner) = idle {
+            self.connections.get_mut(&owner).expect("idle connection").finish(out);
+            return true;
+        }
+        if self.settled() {
+            self.phase = Phase::Closed;
+            out.push(Request::Closed);
+            return true;
+        }
+        false
+    }
+}

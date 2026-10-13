@@ -34,6 +34,12 @@ pub(crate) struct Packet {
     pub event: sse::Outgoing,
     pub taken: Taken,
 }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Phase {
+    Open,
+    Finishing,
+    Closing,
+}
 #[derive(Debug)]
 pub(crate) struct Stream {
     pub name: [u8; 16],
@@ -41,7 +47,7 @@ pub(crate) struct Stream {
     pub writer: sse::Writer,
     pub watches: Map<Token, Watch>,
     pub waiting: bool,
-    pub closing: bool,
+    pub phase: Phase,
     pub closed_connection: bool,
     pub deadline: Time,
     pub above: Queue<sse::Event>,
@@ -50,6 +56,13 @@ pub(crate) struct Stream {
     pub bytes: u32,
 }
 impl Stream {
+    pub fn closing(&self) -> bool {
+        self.phase == Phase::Closing
+    }
+    pub fn finishing(&self) -> bool {
+        self.phase == Phase::Finishing
+    }
+
     pub fn new(name: [u8; 16], sign_in: u64, env: &Env<Limits>) -> Self {
         Self {
             name,
@@ -57,7 +70,7 @@ impl Stream {
             writer: sse::Writer::new(&limits(&env.limits)),
             watches: Map::with_capacity(env.limits.watches_per_stream),
             waiting: false,
-            closing: false,
+            phase: Phase::Open,
             closed_connection: false,
             deadline: env.now,
             above: Queue::with_capacity(2),
@@ -125,7 +138,7 @@ impl Stream {
         true
     }
     pub fn next(&mut self) -> Option<Packet> {
-        if self.waiting || self.closing {
+        if self.waiting || self.closing() {
             return None;
         }
         let mut selected = None;
@@ -144,8 +157,34 @@ impl Stream {
         }
         watch.ended.take()
     }
+    pub fn sent(&mut self, env: &Env<Limits>, heartbeat: skein_lib::Duration) -> Taken {
+        self.waiting = false;
+        self.bytes = 0;
+        self.deadline = env.now.saturating_add(heartbeat);
+        let taken = ::core::mem::replace(&mut self.taken, Taken::None);
+        match taken {
+            Taken::Delivery(watcher) => {
+                if let Some(watch) = self.watches.get_mut(&watcher) {
+                    watch.delivery_pending = false;
+                }
+            }
+            Taken::Text(watcher) => {
+                if let Some(watch) = self.watches.get_mut(&watcher) {
+                    watch.text_pending = false;
+                }
+            }
+            Taken::Ended { watcher, signed_out } => {
+                self.watches.remove(&watcher);
+                if signed_out {
+                    self.phase = Phase::Closing;
+                }
+            }
+            Taken::None => {}
+        }
+        taken
+    }
     pub fn ready(&self) -> bool {
-        if self.closing {
+        if self.closing() {
             if !self.closed_connection {
                 return true;
             }

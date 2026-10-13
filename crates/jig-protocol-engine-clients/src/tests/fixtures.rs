@@ -792,7 +792,9 @@ pub use pages::*;
 #[path = "fixtures/reads.rs"]
 mod reads;
 pub use reads::*;
-
 #[path = "fixtures/watches.rs"]
 mod watches;
 pub use watches::*;
+#[path = "fixtures/closing.rs"]
+mod closing;
+pub use closing::*;
