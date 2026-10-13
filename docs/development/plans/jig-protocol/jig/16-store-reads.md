@@ -86,13 +86,15 @@ live in transcripts' files, join parties' reads in jig 17.
 - **`Loaded::Busy`** is answered only when the reads waiting on
   transcripts' frames are at their limit; in this session no read waits
   (jig 17 adds the wait).
-- **Notes are served from lines, their positions the entries' keys:** a
-  page walks the scopes' lines (jig 13's intervals), joins each line's
-  entry by name, and gives the entry as the row's value, so `row_key`
-  (`reads/rows.rs:343`) and `position_allowed` admit its position as they
-  do today; a cursor naming an entry resumes at that entry's line, its
-  scope read from the entry by key. The core's notes paging is not
-  changed.
+- **Notes are served from lines, their positions the lines' keys:** a
+  page walks the scopes' lines (jig 13's intervals), by scope, then by
+  name within it, joins each line's entry by name, and gives the entry as
+  the row's value; a row's position is its line's key, and a page's
+  `next` is the last line it examined, so a filtered page goes on past
+  what it skipped (store.md, 7.3; the designer, 2026-10-13, jig
+  `4a7fda9e`). The core's notes paging changes to match: `row_key`
+  (`reads/rows.rs:343`) and `position_allowed` take the line's key for a
+  notes row, and `from_store`'s order check holds for it unchanged.
 - **Ended goals page newest first** (decision 23), from jig 12's `Goal`
   family, each row's phase counts in its `GoalRow` (decision 9).
 
@@ -284,7 +286,10 @@ bool)`, `notes_entry_in(scope, name, description)` with its line. Tests:
 `spend_reads_live_and_closed_periods_of_the_project`,
 `project_notes_read_their_scopes_lines_with_entries`,
 `scoped_notes_keep_only_matching_descriptions`,
-`a_notes_cursor_resumes_after_its_entrys_line`. Each under 20 ms.
+`a_notes_cursor_resumes_after_its_line`,
+`notes_across_two_scopes_come_by_scope_then_name`,
+`a_filtered_notes_page_goes_on_past_the_lines_it_skipped`. Each under
+20 ms.
 Proof: unit,
 `reads::activity_reads_newest_first_from_the_records_last_position`, run
 once with `heavy cargo nextest run -p jig-protocol-store -E
@@ -293,7 +298,7 @@ with positions 1 to 5 and a page of 2, the rows are 5 then 4 and the
 cursor names 4; under 20 ms.
 Don't: read activity by loading the task's activity family and
 reversing it; read notes' entries by scanning entries; change the core's
-notes paging (Choices).
+paging of any scope but notes (Choices).
 Size: at most 450 lines.
 Removes: nothing.
 
@@ -412,11 +417,10 @@ the documents (`reads.rs:387-411`, `reads/rows.rs`); the routing hands
   joined, which costs a join per row skipped; if a page then stops short
   on its joins with rows left, raise whether the row should carry the
   goal.
-- **Notes' positions** (16.3, jig 13's question): this plan keeps the
-  entries' keys as positions and resumes at the entry's line, which needs
-  one get per page; if the designer prefers positions over lines (the
-  core's `key_kind` mapping `Line` to `Note`), that is a change to the
-  core's reads, raised rather than made here.
+- **Notes' positions** (16.3, jig 13's question): settled by the
+  designer (jig `4a7fda9e`; store.md, 7.3): a notes row's position is its
+  line's key, and a page's `next` the last line examined; the core's
+  `row_key` and `position_allowed` take it for notes (Choices).
 
 ## Done when
 
