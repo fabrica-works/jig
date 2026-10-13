@@ -72,7 +72,28 @@ pub(super) fn route_turn_payload(
     cumulative: u64,
 ) -> Requests {
     assert!(core.current_proof(run.raw(), attempt.raw()), "current turn has reserved proof");
-    let offered = core.proofs.get(&run.raw()).expect("current proof").offered;
+    let proof = core.proofs.get(&run.raw()).expect("current proof");
+    let offered = proof.offered;
+    let last_read = match proof.turn {
+        Some(turn) => turn.read,
+        None => None,
+    };
+    if read < last_read {
+        let mut out = Queue::with_capacity(2);
+        out.push(Request::Now(Box::new(crate::Now::RefusedPayload {
+            request: body,
+            problem: tasks::Problem {
+                task: Some(run.raw()),
+                why: tasks::Refusal::Read,
+                blocked_by: None,
+                capacity: None,
+            },
+        })));
+        out.push(Request::Decided);
+        return Requests::Out(out);
+    }
+    // The parent retains the original fence with the accepted-turn payload.
+    let read = if read == last_read { None } else { read };
     work.push(Event::Tasks(tasks::Event::Turn {
         reply_to: ReplyTo::new(body),
         task: run.raw(),

@@ -247,3 +247,92 @@ fn a_proof_whose_window_passes_its_turn_is_refused_at_restore() {
     core.restoring_proofs.insert(1, RestoringProof { attempt: 7, turn: 1, run_spent: 0, last_answer: None }).unwrap();
     assert!(!core.restore_proof(proof, limits.tasks.result_bytes));
 }
+
+fn cumulative_read_core() -> (Core, Env<Limits>) {
+    let (mut core, limits) = tree_core();
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
+    let to = || ReplyTo::new(Token::new(1));
+    let row = new_row(&core, 1, tasks::Funder::Period { project: 1, period: 1 }, None);
+    send_task(
+        &mut core,
+        &limits,
+        tasks::Event::Make { reply_to: to(), creator: tasks::Party::Person(1), batch: Box::new([row]) },
+    );
+    activity_decision(&mut core, &env, Event::Tasks(tasks::Event::Prepare { reply_to: to(), task: 1 }));
+    core.proofs.insert(1, RunProof::claimed(1, 7, 7, None, jig_domain_fleet::HostKind::Worker)).unwrap();
+    core.claiming.insert(1, 7).unwrap();
+    activity_decision(&mut core, &env, Event::ClaimPrepared { task: 1, attempt: 7, budget: 10, writes: Box::new([]) });
+    activity_decision(&mut core, &env, Event::Tasks(tasks::Event::Started { task: 1, attempt: 7 }));
+    for number in [1, 2] {
+        send_task(
+            &mut core,
+            &limits,
+            tasks::Event::Message {
+                reply_to: to(),
+                project: 1,
+                task: 1,
+                release: false,
+                word: tasks::Word {
+                    number,
+                    from: tasks::Party::Person(1),
+                    kind: tasks::MessageKind::Words,
+                    words: b"word".as_slice().into(),
+                    at: env.wall,
+                    hits: 1,
+                    eligible: true,
+                },
+            },
+        );
+    }
+    core.proofs.get_mut(&1).unwrap().offered = Some(2);
+    activity_decision(
+        &mut core,
+        &env,
+        Event::TurnPayload {
+            refused: Box::new([1]),
+            run: Token::new(1),
+            attempt: Token::new(7),
+            turn: 1,
+            body: Token::new(11),
+            read: Some(2),
+            cumulative: 1,
+        },
+    );
+    (core, env)
+}
+
+#[test]
+fn cumulative_turn_reads_admit_the_last_fence_and_refuse_earlier_names() {
+    for (label, read, accepted) in [("same committed fence", Some(2), true), ("earlier retained word", Some(1), false)]
+    {
+        let (mut core, env) = cumulative_read_core();
+        let records = activity_decision(
+            &mut core,
+            &env,
+            Event::TurnPayload {
+                refused: Box::default(),
+                run: Token::new(1),
+                attempt: Token::new(7),
+                turn: 2,
+                body: Token::new(12),
+                read,
+                cumulative: 2,
+            },
+        );
+        assert_eq!(core.tasks.task(1).unwrap().turn, if accepted { 2 } else { 1 }, "{label}");
+        assert_eq!(
+            core.tasks.task(1).unwrap().inbox.iter().map(|word| word.number).collect::<Vec<_>>(),
+            [1],
+            "{label}"
+        );
+        assert_eq!(core.proofs.get(&1).unwrap().turn.unwrap().read, Some(2), "{label}");
+        assert_eq!(
+            records.iter().any(|row| match row {
+                Record::Core(CoreRecord::Turn(turn)) => turn.turn == 2 && turn.read == Some(2),
+                _ => false,
+            }),
+            accepted,
+            "{label}"
+        );
+    }
+}
