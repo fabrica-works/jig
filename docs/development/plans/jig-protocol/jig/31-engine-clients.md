@@ -329,7 +329,9 @@ designer's.
 Scope: an owner who makes a service is answered its credential once; the
 service signs in with it at the deployment provider's sign-in route, as
 a native client signs in with the link's secret, and makes every
-exchange with the sign-in's secret; removing the service ends both.
+exchange with the sign-in's secret. Reissuing and removing a service are
+not this step's (later.md; the designer's answer of 2026-10-13, jig
+`4092ca1b`).
 Needs: 31.3.
 Files: `crates/jig-protocol-engine-clients/src/{boundary.rs, sign_in.rs,
 component.rs, translate/answers.rs}` and its tests;
@@ -350,7 +352,15 @@ Shape:
   as a bearer, checks its digest by number in constant time, and signs
   the service in as a sign-in of provider the deployment, subject the
   service (people.md, 3); the core commits it as any other.
-- Removing a service erases its digest and ends its sign-ins.
+- A `MakeService` made again by its key is answered as people replays it,
+  `MadeService { party }` with an empty credential: the engine keeps only
+  the digest, and never draws a second for the same service
+  (`protocol/client.md`, 8, "Once"). The component knows it by the
+  digest already kept under the service's number.
+- People already finds the service's party by its identity (the
+  deployment, subject its number: `crates/jig-domain-people/src/domain.rs`,
+  `make_service` and `signed_in`), and signs out a deployment sign-in
+  naming no service; nothing in people changes.
 - The wire's `MadeService` gains `credential: secret 40`, in client v5
   (pre-release, development.md 5.1; the version this plan moved).
 - `jig-protocol-client-link` hands the credential to its root as a shell
@@ -358,7 +368,8 @@ Shape:
   alone, as the contract has it.
 Test shape: `a_made_service_answers_its_credential_once_with_its_digest_kept`,
 `a_service_signs_in_with_its_credential_and_exchanges_with_its_sign_in`,
-`a_removed_services_credential_is_refused_and_its_sign_ins_end`,
+`a_replayed_make_service_answers_its_party_without_a_credential`,
+`a_deployment_sign_in_naming_no_service_is_refused`,
 `the_client_domain_never_holds_a_service_credential`. Under 20 ms each;
 cases as rows (README, ruling 219).
 Proof: the gate.

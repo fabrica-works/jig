@@ -6,6 +6,7 @@ What the design names but this plan does not do.
 |---|---|---|
 | LLM calls in a host's own process, for `smith-inline-agent` | `protocol/llm.md`, sections 1 to 4 and 7 to 9; `domain/hosts.md`, 5.2 | when an application runs agents in its engine, or in a worker's process |
 | The browser's shell, wasm32 builds, the browser tier | `protocol/client.md`, section 12; `client/domain/view.md`, 11 to 13; skein's `lib.md`, section 2 | a plan of its own, once the native client serves |
+| A service's credential reissued, a service removed: an owner's two asks, the old sign-ins ended, the digest replaced or erased | `domain/people.md`, section 3; `protocol/client.md`, section 8 | when a deployment runs services; until then an owner who lost a credential makes another service |
 | Retention: summaries of ended tasks, transcripts dropped past a horizon, answered keys expired, chats forgotten, a forgotten chat's remains (its replies' `Update` rows among them) at the next pass | `protocol/store.md`, 7.4 and 11.1; `domain/people.md`, section 6 | before a deployment's store nears its budget |
 | `ops` on the real store, with its connectors' keys and codecs; `jig-fake-store` retired | `protocol/store.md`, 12 and 14; `examples.md` | when `ops` is developed again |
 | Delegates' historical inputs loaded by the store | `domain/engine.md`, 5.3 | when a delegate's input names an ended result |
