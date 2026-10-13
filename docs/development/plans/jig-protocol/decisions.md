@@ -2067,6 +2067,19 @@ the file.
      existing cut worlds cover, and use owner-only test-sized capacities;
      each runs under 0.5 s; no assertion weakened. The step tests keep 20
      ms.
+254. **jig-repin runs now, and jig 25.6 waits for it** (2026-10-13, the
+     coordinator's block "jig 25.6: retained Smith agent incompatible with
+     retained Skein pipe API", 2026-10-13T09:25:03Z). jig pins smith
+     `6a6b1c3e`, older than skein `b92c18a`'s `adopt_write_pipe(fd,
+     deadline)`, and skein `4130d9b`, which has it; so the real smith
+     agent 25.6 needs (`smith-agent-service`) does not compile against
+     jig's lock. smith-repin landed (`6449a197`), and the plan orders
+     jig-repin only after it: jig-repin starts now, taking smith's `main`
+     and skein's `main` (skein-03.s1 too if it has landed), adapting jig's
+     smith-facing crates to smith's host protocol, charter and transcript
+     as they stand, and moving jig's Cargo git URLs to GitHub as the
+     workspace's AGENTS.md says. 25.6 keeps its work and resumes on it.
+     No partial pin move.
 
 ## For the user
 
