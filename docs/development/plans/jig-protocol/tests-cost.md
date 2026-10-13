@@ -128,3 +128,32 @@ Proof: skein's gate; then, once, `heavy cargo clippy -p
 Don't: add an allowance; change an encoding, a golden value or a public
   type.
 Size: at most 120 lines of production code.
+
+## 8. skein-02.s6: a family's limits checked where they are made
+
+A step not in the plan (decisions.md, ruling 179), from the designer's
+answer (skein `b68a17a9`, `docs/design/codec.md`, 4 and 6: "Constructors
+and decoders check values only, never the limits ... a call costs what
+its value holds, not the family's size"); its text is the designer's.
+Shape: the generator drops `check_limits` from every `new` and `decode`
+  (`testing/skein-codegen/src/emit_codec.rs:224,332`) and makes the
+  family's check public, naming the first limit past its ceiling;
+  `limits_valid` and `check_limits` become one.
+Test shape: a generated `new` and `decode` given limits past a ceiling
+  still refuse a value past that ceiling.
+Proof: skein's gate; then, once, smith's
+  `smith_check_json_lists_the_effective_limits_by_name` near its 1,010 ms
+  on smith's `main`, within its 2,000 ms bound, with smith's families
+  regenerated (`heavy --gate cargo nextest run -p smith --profile measure
+  -E 'test(smith_check_json_lists_the_effective_limits_by_name)'` in a
+  worktree under `wt/`).
+Don't: change an encoding, a golden value, or the `min` clamp.
+Size: at most 60 lines of production code.
+
+## 9. jig-repin.s4: jig's families regenerated after skein-02.s6
+
+As jig-repin.s3 (ruling 147: cargo's move of the skein source, no smith
+entry), with skein-02.s6's commit; every family under
+`crates/*/src/generated/` regenerates, golden `.bin` files unchanged; each
+`codec::<family>::limits` still calls its family's check once. It lands
+with `scripts/check.sh`.

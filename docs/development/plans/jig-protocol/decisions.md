@@ -1169,6 +1169,19 @@ the file.
      unreached; 24.2, with the hello, runs the proved-channel world test
      (backoff starting over after a proved channel) as part of its own
      Proof.
+179. **skein 02.s6 and jig-repin.s4: limits checked where they are made**
+     (2026-10-13, the designer's answer to question.md's "skein 02.s4's
+     generated limits check doubles a smith test's time"; skein
+     `b68a17a9`, jig `795349b2`). smith's
+     `smith_check_json_lists_the_effective_limits_by_name` took 2,045 ms
+     with skein 02.s4's generated code, 878 ms with the old: each `new`
+     and `decode` checked the family's limits. The designer: generated
+     code checks values only, against `limits.min(CEILINGS)`, and the
+     family's owner checks its limits once where it makes them. Two steps
+     not in the plan (`tests-cost.md`, 8 and 9): skein 02.s6, then
+     jig-repin.s4; smith-repin then moves smith's skein source to 02.s6's
+     commit, and smith's limits' derivations call their family's check
+     where they do not already.
 
 ## For the user
 
