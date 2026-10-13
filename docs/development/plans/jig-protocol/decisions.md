@@ -1941,6 +1941,18 @@ the file.
      row, ordinary test code, and 18.5 keeps its eight crash tests'
      bodies for its own commit; 18.s1's production stays at most 40
      lines.
+244. **An activity page's turns join in the store's read: jig 17.s1 and
+     30.s3, then 34.3** (2026-10-13, the designer's answer to
+     question.md's "jig 34.3: where a turn's bytes join its activity
+     line"; jig `b375b173`, `a85e1c54`). The store's activity read walks
+     the page's turn frames backwards in one pass and joins each to its
+     line, within the page's byte bound: a turn alone past the bound comes
+     as its size, one past what is left ends the page, a frame that does
+     not read whole comes as unread. The wire's `ArchivedTurn.turn`
+     becomes `TurnBytes { carried | too_large }`, and the joint world's
+     per-turn fetch (`archive.rs`) goes. Steps not in the plan: jig 17.s1
+     (`jig/17-store-files.md`) and jig 30.s3 (`jig/30-client-wire.md`),
+     at once; 34.3 after both, amended; 34.4 goes on.
 
 ## For the user
 
