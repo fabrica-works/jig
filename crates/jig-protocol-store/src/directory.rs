@@ -15,6 +15,7 @@ pub(crate) enum Opening {
     TranscriptsSynced,
     TranscriptsOpen,
     SecretsOpen,
+    SecretsSynced(Root),
     Stores,
 }
 #[derive(Debug)]
@@ -190,31 +191,41 @@ fn directory(store: &mut Store, env: &Env<Limits>, arrived: Arrived, above: &mut
             let Some(opened) = opened(arrived) else {
                 return refuse(store, above);
             };
-            store.directory.opening = Opening::Stores;
-            let kv_env = self::env(store, env, false);
-            let mut events = Queue::with_capacity(skein_kv::MAX_OUT.above);
-            let root = store.directory.store_root.expect("the store directory is open");
-            skein_kv::down(
-                &mut store.stores.store,
-                &kv_env,
-                skein_kv::Request::Open { owner: OWNER, root: root.fd },
-                &mut events,
-                &mut below.store,
-            );
-            events_up(store, false, &mut events, above, below);
-            let kv_env = self::env(store, env, true);
-            let mut events = Queue::with_capacity(skein_kv::MAX_OUT.above);
-            skein_kv::down(
-                &mut store.stores.secrets,
-                &kv_env,
-                skein_kv::Request::Open { owner: OWNER, root: opened.fd },
-                &mut events,
-                &mut below.secrets,
-            );
-            events_up(store, true, &mut events, above, below);
+            store.directory.opening = Opening::SecretsSynced(opened);
+            below.secrets.push(file::Request::SyncDirectory { owner: OWNER, root: root.fd });
+        }
+        Opening::SecretsSynced(opened) => {
+            let file::Event::Synced { .. } = arrived.event else {
+                return refuse(store, above);
+            };
+            open_stores(store, env, opened, above, below);
         }
         Opening::Idle | Opening::Stores => refuse(store, above),
     }
+}
+fn open_stores(store: &mut Store, env: &Env<Limits>, opened: Root, above: &mut Queue<Event>, below: &mut Below) {
+    store.directory.opening = Opening::Stores;
+    let kv_env = self::env(store, env, false);
+    let mut events = Queue::with_capacity(skein_kv::MAX_OUT.above);
+    let root = store.directory.store_root.expect("the store directory is open");
+    skein_kv::down(
+        &mut store.stores.store,
+        &kv_env,
+        skein_kv::Request::Open { owner: OWNER, root: root.fd },
+        &mut events,
+        &mut below.store,
+    );
+    events_up(store, false, &mut events, above, below);
+    let kv_env = self::env(store, env, true);
+    let mut events = Queue::with_capacity(skein_kv::MAX_OUT.above);
+    skein_kv::down(
+        &mut store.stores.secrets,
+        &kv_env,
+        skein_kv::Request::Open { owner: OWNER, root: opened.fd },
+        &mut events,
+        &mut below.secrets,
+    );
+    events_up(store, true, &mut events, above, below);
 }
 pub(crate) fn up(store: &mut Store, env: &Env<Limits>, io: Io, above: &mut Queue<Event>, below: &mut Below) {
     if store.phase == Phase::Stopped {
