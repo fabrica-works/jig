@@ -2256,6 +2256,17 @@ the file.
      schema's `bytes N` ceiling large enough for it; decoding still admits
      by the domain's own count, so nothing past the domain's sum is taken.
      No item's encoding changes.
+271. **jig 33's translations land at their count, as ruling 194's do**
+     (2026-10-13, the coordinator's block "jig 33.2: complete family
+     translation exceeds Size", 2026-10-13T13:10:27Z). 33.2 translates the
+     test application's whole family: its requests, outcomes, subjects,
+     eight documents and their nested parts, 1,704 counted lines against a
+     Size of 400 (`parts.rs` 705, `facts.rs` 493), every file under 800
+     lines, proven (56 focused tests, the joint proof 176 ms). Ruling 194's
+     exception for exhaustive translations (jig 31, 32, 34, 35) extends to
+     jig 33: its translations land at their count, the per-file counts in
+     the commit body, no code compacted to fit; hand-written logic beyond
+     translation keeps ruling 196's limit.
 
 ## For the user
 
