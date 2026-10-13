@@ -1917,6 +1917,30 @@ the file.
      unit row and a store-world row from an empty directory; jig 18 runs
      it before 18.5 lands, and 18.5's failing world tests stay as they
      are.
+242. **smith's settle test: two fixes, and smith-repin again from smith's
+     `main`** (2026-10-13, the designer's answer to question.md's
+     "smith's settle test: where `smith check --json` spends its time",
+     asked at the user's request; jig `0c10d59a`, `smith-settle.md`).
+     Ruling 186's slow test is the test harness's person reading the
+     product's 24,940 bytes one io demand at a time (about 25,000 loop
+     iterations, 0.45 to 0.9 s) and skein-lib's base64 finding each
+     symbol by searching its alphabet (about 0.2 s on the system's trust
+     roots, since this run's skein 02.1). Two steps: skein-02.s8 (a symbol
+     by its table, one pass) and smith-repin started again from smith's
+     `main`, which has taken skein `7efc307` already, carrying the
+     person's read by kernel pipe reads; measured with both, the test
+     runs 0.05 s alone and 0.15 s in the full suite. The order is
+     skein-02.s8, smith-repin, jig-repin's last step, temper-repin; the
+     2 s bound stays. smith-repin's old commit `bb26b6d9` is dropped.
+     This answers ruling 186.
+243. **jig 18.s1 lands the store's world kit with its row** (2026-10-13,
+     the coordinator's block "jig 18.s1: supporting unlanded store world
+     kit for its Proof", 2026-10-13T08:14:47Z). `tests/store` is new in
+     18.5's unlanded work, so 18.s1's world row needs its kit first. As
+     proposed: 18.s1 lands the world's kit and Cargo member with its one
+     row, ordinary test code, and 18.5 keeps its eight crash tests'
+     bodies for its own commit; 18.s1's production stays at most 40
+     lines.
 
 ## For the user
 
