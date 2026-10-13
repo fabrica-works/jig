@@ -14,6 +14,8 @@ use skein_lib::{
     CryptoRng, Env, Map, Queue, ReplyTo, Time, Token,
     stream::{Read, Up},
 };
+#[path = "reads.rs"]
+mod reads;
 #[path = "services.rs"]
 mod services;
 const LISTENER: Token = Token::new(0);
@@ -112,13 +114,16 @@ impl Component {
             }
             Event::Stop => self.stopping = true,
             Event::Close | Event::Abort => self.abort(out),
-            Event::Read { .. }
-            | Event::Admitted { .. }
+            Event::Read { reply, answer } => self.read_answer(env, reply.into_token(), &answer, out),
+            Event::Application(crate::FromApplication::Read { reply, family, record }) => {
+                self.application_read(env, reply.into_token(), family, record, out);
+            }
+            Event::Admitted { .. }
             | Event::WatchRefused { .. }
             | Event::Delivery { .. }
             | Event::WatchEnded { .. }
             | Event::RunText { .. }
-            | Event::Application(crate::FromApplication::Read { .. } | crate::FromApplication::Delivery { .. })
+            | Event::Application(crate::FromApplication::Delivery { .. })
             | Event::Provider { .. } => {}
         }
     }
@@ -210,16 +215,26 @@ impl Component {
                 | Waiting::Get { .. }
                 | Waiting::Keep { .. }
                 | Waiting::Made { .. }
+                | Waiting::Read { .. }
+                | Waiting::ApplicationRead { .. }
                 | Waiting::Ask { .. } => {}
             }
         }
         if let Some(exchange) = ready {
             match self.pending.exchanges.remove(&exchange).expect("ready exchange") {
-                Waiting::Checked { sign_in, body } => self.request(env, exchange, sign_in, &body, out),
+                Waiting::Checked { sign_in, body, route } => {
+                    if route == Route::Read {
+                        self.read(env, exchange, sign_in, &body, out);
+                    } else {
+                        self.request(env, exchange, sign_in, &body, out);
+                    }
+                }
                 Waiting::Core
                 | Waiting::Get { .. }
                 | Waiting::Keep { .. }
                 | Waiting::Made { .. }
+                | Waiting::Read { .. }
+                | Waiting::ApplicationRead { .. }
                 | Waiting::Ask { .. } => {}
             }
             return true;
@@ -253,7 +268,7 @@ impl Component {
                 connection.call = Some(call);
                 match connection.route {
                     Route::Missing => connection.respond(404, Box::new([]), &env.limits),
-                    Route::Link | Route::Service | Route::Request => connection.read(&env.limits),
+                    Route::Link | Route::Service | Route::Request | Route::Read => connection.read(&env.limits),
                 }
             }
             http::Event::Body(Up::Bytes(bytes)) => {
@@ -324,11 +339,13 @@ impl Component {
                     identity: self.settings.link.as_ref().expect("link enabled").clone(),
                 })));
             }
-            Route::Service | Route::Request => {
+            Route::Service | Route::Request | Route::Read => {
                 let call = connection.call.as_ref().expect("call retained");
                 let Some((sign_in, digest)) = sign_in::bearer(call.header(b"authorization")) else {
                     let answer = if connection.route == Route::Service {
                         routes::refused(&env.limits.wire)
+                    } else if connection.route == Route::Read {
+                        routes::read_none(core::reads::Why::SignedOut, &env.limits.wire)
                     } else {
                         routes::signed_out(&env.limits.wire)
                     };
@@ -342,7 +359,7 @@ impl Component {
                 };
                 self.pending
                     .exchanges
-                    .insert(exchange, Waiting::Get { owner, digest, body })
+                    .insert(exchange, Waiting::Get { owner, digest, body, route: connection.route })
                     .expect("admitted exchange");
                 out.push(Request::Secrets(SecretsRequest::Get { owner }));
             }
@@ -406,7 +423,12 @@ impl Component {
                     self.answer(env, exchange, answer, out);
                 }
             },
-            Waiting::Keep { .. } | Waiting::Get { .. } | Waiting::Made { .. } | Waiting::Checked { .. } => {
+            Waiting::Read { .. }
+            | Waiting::ApplicationRead { .. }
+            | Waiting::Keep { .. }
+            | Waiting::Get { .. }
+            | Waiting::Made { .. }
+            | Waiting::Checked { .. } => {
                 self.pending.exchanges.insert(exchange, waiting).expect("same slot");
             }
         }
@@ -457,6 +479,8 @@ impl Component {
             | Waiting::Get { .. }
             | Waiting::Made { .. }
             | Waiting::Checked { .. }
+            | Waiting::Read { .. }
+            | Waiting::ApplicationRead { .. }
             | Waiting::Ask { .. } => {
                 self.pending.exchanges.insert(exchange, waiting).expect("same slot");
             }
@@ -472,6 +496,8 @@ impl Component {
                     | Waiting::Get { owner: SecretOwner::SignIn(number), .. }
                     | Waiting::Made { sign_in: number, .. }
                     | Waiting::Checked { sign_in: number, .. }
+                    | Waiting::Read { sign_in: number, .. }
+                    | Waiting::ApplicationRead { sign_in: number, .. }
                     | Waiting::Ask { sign_in: number, .. }
                         if *number == sign_in =>
                     {
@@ -483,6 +509,8 @@ impl Component {
                     | Waiting::Get { .. }
                     | Waiting::Made { .. }
                     | Waiting::Checked { .. }
+                    | Waiting::Read { .. }
+                    | Waiting::ApplicationRead { .. }
                     | Waiting::Ask { .. } => {}
                 }
             }
@@ -492,6 +520,12 @@ impl Component {
             match self.pending.exchanges.remove(&exchange).expect("ended exchange") {
                 Waiting::Keep { .. } | Waiting::Made { .. } => {
                     self.respond(env, exchange, routes::refused(&env.limits.wire));
+                }
+                Waiting::Read { .. }
+                | Waiting::ApplicationRead { .. }
+                | Waiting::Get { route: Route::Read, .. }
+                | Waiting::Checked { route: Route::Read, .. } => {
+                    self.respond(env, exchange, routes::read_none(core::reads::Why::SignedOut, &env.limits.wire));
                 }
                 Waiting::Get { .. } | Waiting::Checked { .. } | Waiting::Ask { .. } => {
                     self.respond(env, exchange, routes::signed_out(&env.limits.wire));
@@ -522,7 +556,12 @@ impl Component {
         let mut count = 0_u32;
         for (_, waiting) in &self.pending.exchanges {
             match waiting {
-                Waiting::Core | Waiting::Keep { .. } | Waiting::Made { .. } | Waiting::Ask { .. } => {
+                Waiting::Core
+                | Waiting::Keep { .. }
+                | Waiting::Made { .. }
+                | Waiting::Read { .. }
+                | Waiting::ApplicationRead { .. }
+                | Waiting::Ask { .. } => {
                     count = count.saturating_add(1);
                 }
                 Waiting::Get { .. } | Waiting::Checked { .. } => {}
@@ -537,12 +576,20 @@ impl Component {
         let mut active = 0_u32;
         for (_, waiting) in &self.pending.exchanges {
             match waiting {
-                Waiting::Ask { sign_in: number, .. } if *number == sign_in => active = active.saturating_add(1),
+                Waiting::Read { sign_in: number, .. }
+                | Waiting::ApplicationRead { sign_in: number, .. }
+                | Waiting::Ask { sign_in: number, .. }
+                    if *number == sign_in =>
+                {
+                    active = active.saturating_add(1);
+                }
                 Waiting::Core
                 | Waiting::Keep { .. }
                 | Waiting::Get { .. }
                 | Waiting::Ask { .. }
                 | Waiting::Made { .. }
+                | Waiting::Read { .. }
+                | Waiting::ApplicationRead { .. }
                 | Waiting::Checked { .. } => {}
             }
         }
@@ -561,13 +608,7 @@ impl Component {
             w::Owner::Jig => None,
             w::Owner::Family(value) => Some(value.number()),
         };
-        let mut served = false;
-        for range in &self.settings.served {
-            if range.family == family && range.first <= keyed.version && keyed.version <= range.last {
-                served = true;
-            }
-        }
-        if !served {
+        if !self.serves(family, keyed.version) {
             self.connections.get_mut(&owner).expect("exchange owner").respond(400, Box::new([]), &env.limits);
             return;
         }

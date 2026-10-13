@@ -25,7 +25,7 @@ pub fn limits() -> w::Limits {
         current_call_input: 32,
         current_call_tool: 32,
         call_identity_id: 32,
-        cursor_value: 32,
+        cursor_value: 64,
         owner_inbox_selection_goals: 2,
         frame_projects: 2,
         document_specification_parameters: 2,

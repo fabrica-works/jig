@@ -6,6 +6,7 @@ pub(crate) enum Route {
     Link,
     Service,
     Request,
+    Read,
     Missing,
 }
 pub(crate) fn route(call: &skein_http::server::Call) -> Route {
@@ -16,6 +17,7 @@ pub(crate) fn route(call: &skein_http::server::Call) -> Route {
         b"/jig/v1/sign-in/link" => Route::Link,
         b"/jig/v1/sign-in/deployment" => Route::Service,
         b"/jig/v1/request" => Route::Request,
+        b"/jig/v1/read" => Route::Read,
         _ => Route::Missing,
     }
 }
@@ -42,5 +44,12 @@ pub(crate) fn busy() -> Box<[u8]> {
     let answer = w::Answer::Busy;
     let mut out = skein_lib::Writer::new(1);
     answer.encode(&mut out).expect("busy fits");
+    out.finish()
+}
+
+pub(crate) fn read_none(why: jig_domain_core::reads::Why, limits: &w::Limits) -> Box<[u8]> {
+    let answer = crate::translate::reads::none(why, limits);
+    let mut out = skein_lib::Writer::new(usize::try_from(answer.measure()).expect("wire size fits"));
+    answer.encode(&mut out).expect("measured read refusal");
     out.finish()
 }

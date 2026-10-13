@@ -3,6 +3,7 @@ use super::{
     Box, Component, Env, Kept, Limits, Queue, ReplyTo, Request, SecretOwner, SecretsAnswer, SecretsRequest, Token,
     Waiting, core, people, routes, sign_in,
 };
+use crate::routes::Route;
 use crate::sign_in::Answer;
 use skein_lib::{Secret, Wall};
 impl Component {
@@ -40,9 +41,12 @@ impl Component {
                         let wanted = match waiting {
                             Waiting::Get { owner, .. } => Some(*owner),
                             Waiting::Made { party, .. } => Some(SecretOwner::Service(*party)),
-                            Waiting::Core | Waiting::Keep { .. } | Waiting::Ask { .. } | Waiting::Checked { .. } => {
-                                None
-                            }
+                            Waiting::Core
+                            | Waiting::Keep { .. }
+                            | Waiting::Ask { .. }
+                            | Waiting::Read { .. }
+                            | Waiting::ApplicationRead { .. }
+                            | Waiting::Checked { .. } => None,
                         };
                         if wanted == Some(owner) {
                             found = Some(*exchange);
@@ -51,20 +55,26 @@ impl Component {
                     }
                     let Some(exchange) = found else { break };
                     match self.pending.exchanges.remove(&exchange).expect("found get") {
-                        Waiting::Get { digest, body, .. } => {
+                        Waiting::Get { digest, body, route, .. } => {
                             if sign_in::accepted(value.as_ref(), &digest, env.wall) {
                                 match owner {
                                     SecretOwner::SignIn(sign_in) => {
                                         self.pending
                                             .exchanges
-                                            .insert(exchange, Waiting::Checked { sign_in, body })
+                                            .insert(exchange, Waiting::Checked { sign_in, body, route })
                                             .expect("same get slot");
                                     }
                                     SecretOwner::Service(party) => self.service_sign_in(env, exchange, party, out),
                                 }
                             } else {
                                 let body = match owner {
-                                    SecretOwner::SignIn(_) => routes::signed_out(&env.limits.wire),
+                                    SecretOwner::SignIn(_) => {
+                                        if route == Route::Read {
+                                            routes::read_none(core::reads::Why::SignedOut, &env.limits.wire)
+                                        } else {
+                                            routes::signed_out(&env.limits.wire)
+                                        }
+                                    }
                                     SecretOwner::Service(_) => routes::refused(&env.limits.wire),
                                 };
                                 self.respond(env, exchange, body);
@@ -73,7 +83,12 @@ impl Component {
                         Waiting::Made { sign_in, party } => {
                             self.made(env, exchange, sign_in, party, value.as_ref(), out);
                         }
-                        Waiting::Core | Waiting::Keep { .. } | Waiting::Ask { .. } | Waiting::Checked { .. } => {}
+                        Waiting::Core
+                        | Waiting::Keep { .. }
+                        | Waiting::Ask { .. }
+                        | Waiting::Read { .. }
+                        | Waiting::ApplicationRead { .. }
+                        | Waiting::Checked { .. } => {}
                     }
                 }
             }

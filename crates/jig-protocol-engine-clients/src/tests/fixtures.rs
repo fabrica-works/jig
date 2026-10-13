@@ -99,7 +99,9 @@ pub struct Exchange {
 }
 impl Exchange {
     pub fn new() -> Self {
-        let env = env();
+        Self::with_env(env())
+    }
+    pub fn with_env(env: Env<Limits>) -> Self {
         let mut out = Queue::with_capacity(8);
         let component = Component::new(settings(), &env, &mut out).expect("starts");
         out.pop();
@@ -779,3 +781,7 @@ pub use objects::*;
 #[path = "fixtures/pages.rs"]
 mod pages;
 pub use pages::*;
+
+#[path = "fixtures/reads.rs"]
+mod reads;
+pub use reads::*;

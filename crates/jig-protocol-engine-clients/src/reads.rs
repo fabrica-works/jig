@@ -1,0 +1,175 @@
+//! Read exchanges remain pending until the core's held answer is released (client.md, 6).
+use super::{Box, Component, Env, Limits, Queue, ReplyTo, Request, Token, Waiting, core, routes, w};
+use skein_lib::{Reader, Writer};
+impl Component {
+    pub(super) fn serves(&self, family: Option<u16>, version: u32) -> bool {
+        for range in &self.settings.served {
+            if range.family == family && range.first <= version && version <= range.last {
+                return true;
+            }
+        }
+        false
+    }
+    pub(super) fn read(
+        &mut self,
+        env: &Env<Limits>,
+        exchange: Token,
+        sign_in: u64,
+        body: &[u8],
+        out: &mut Queue<Request>,
+    ) {
+        let Some(owner) = self.owner(exchange) else { return };
+        let mut active = 0_u32;
+        for (_, waiting) in &self.pending.exchanges {
+            match waiting {
+                Waiting::Ask { sign_in: number, .. }
+                | Waiting::Read { sign_in: number, .. }
+                | Waiting::ApplicationRead { sign_in: number, .. }
+                    if *number == sign_in =>
+                {
+                    active = active.saturating_add(1);
+                }
+                Waiting::Core
+                | Waiting::Keep { .. }
+                | Waiting::Get { .. }
+                | Waiting::Made { .. }
+                | Waiting::Ask { .. }
+                | Waiting::Read { .. }
+                | Waiting::ApplicationRead { .. }
+                | Waiting::Checked { .. } => {}
+            }
+        }
+        if active >= env.limits.exchanges_per_client || self.admitted() >= env.limits.exchanges {
+            self.respond(env, exchange, routes::read_none(core::reads::Why::Busy, &env.limits.wire));
+            return;
+        }
+        let mut reader = Reader::new(body);
+        let record = match w::Owned::decode(&env.limits.wire, &mut reader) {
+            Ok(value) if reader.is_empty() => value.into_parts(),
+            Ok(_) | Err(_) => {
+                self.connections.get_mut(&owner).expect("exchange owner").respond(400, Box::new([]), &env.limits);
+                return;
+            }
+        };
+        let family = match &record.owner {
+            w::Owner::Jig => None,
+            w::Owner::Family(value) => Some(value.number()),
+        };
+        if !self.serves(family, record.version) {
+            self.connections.get_mut(&owner).expect("exchange owner").respond(400, Box::new([]), &env.limits);
+            return;
+        }
+        let request = match record.owner {
+            w::Owner::Jig => {
+                let Some(what) = crate::translate::reads::decode(&record.record, &env.limits.wire) else {
+                    self.respond(env, exchange, routes::read_none(core::reads::Why::Unknown, &env.limits.wire));
+                    return;
+                };
+                let request = Request::Core(Box::new(core::Event::Read {
+                    reply: ReplyTo::new(exchange),
+                    sign_in,
+                    read: what.clone(),
+                }));
+                self.pending
+                    .exchanges
+                    .insert(exchange, Waiting::Read { sign_in, what: Box::new(what) })
+                    .expect("same read slot");
+                request
+            }
+            w::Owner::Family(value) => {
+                let family = value.number();
+                self.pending
+                    .exchanges
+                    .insert(exchange, Waiting::ApplicationRead { sign_in, family, version: record.version })
+                    .expect("same read slot");
+                Request::Application(crate::ToApplication::Read {
+                    reply: ReplyTo::new(exchange),
+                    sign_in,
+                    family,
+                    version: record.version,
+                    record: record.record,
+                })
+            }
+        };
+        out.push(request);
+    }
+    pub(super) fn read_answer(
+        &mut self,
+        env: &Env<Limits>,
+        exchange: Token,
+        answer: &core::reads::Answer,
+        out: &mut Queue<Request>,
+    ) {
+        let Some(waiting) = self.pending.exchanges.remove(&exchange) else { return };
+        match waiting {
+            Waiting::Read { what, .. } => {
+                self.read_response(
+                    env,
+                    exchange,
+                    crate::translate::reads::answer(&what, answer, &env.limits.wire),
+                    out,
+                );
+            }
+            Waiting::Core
+            | Waiting::Keep { .. }
+            | Waiting::Get { .. }
+            | Waiting::Made { .. }
+            | Waiting::Ask { .. }
+            | Waiting::ApplicationRead { .. }
+            | Waiting::Checked { .. } => {
+                self.pending.exchanges.insert(exchange, waiting).expect("same unrelated slot");
+            }
+        }
+    }
+    pub(super) fn application_read(
+        &mut self,
+        env: &Env<Limits>,
+        exchange: Token,
+        family: u16,
+        record: Option<Box<[u8]>>,
+        out: &mut Queue<Request>,
+    ) {
+        let Some(waiting) = self.pending.exchanges.remove(&exchange) else { return };
+        match waiting {
+            Waiting::ApplicationRead { family: number, version, .. } if number == family => {
+                let answer = match record {
+                    Some(record) => match w::Family::new(&env.limits.wire, w::FamilyParts { number }) {
+                        Ok(family) => {
+                            crate::translate::reads::owned(w::Owner::Family(family), version, record, &env.limits.wire)
+                        }
+                        Err(problem) => Err(problem),
+                    },
+                    None => Ok(crate::translate::reads::none(core::reads::Why::Unknown, &env.limits.wire)),
+                };
+                self.read_response(env, exchange, answer, out);
+            }
+            Waiting::Core
+            | Waiting::Keep { .. }
+            | Waiting::Get { .. }
+            | Waiting::Made { .. }
+            | Waiting::Ask { .. }
+            | Waiting::Read { .. }
+            | Waiting::ApplicationRead { .. }
+            | Waiting::Checked { .. } => {
+                self.pending.exchanges.insert(exchange, waiting).expect("same unrelated slot");
+            }
+        }
+    }
+    fn read_response(
+        &mut self,
+        env: &Env<Limits>,
+        exchange: Token,
+        answer: Result<w::ReadAnswer, w::Problem>,
+        out: &mut Queue<Request>,
+    ) {
+        let Some(owner) = self.owner(exchange) else { return };
+        match answer {
+            Ok(value) => {
+                let mut bytes = Writer::new(usize::try_from(value.measure()).expect("wire measure fits"));
+                value.encode(&mut bytes).expect("measured read answer");
+                self.connections.get_mut(&owner).expect("exchange owner").respond(200, bytes.finish(), &env.limits);
+            }
+            Err(_) => self.connections.get_mut(&owner).expect("exchange owner").close(out),
+        }
+    }
+}

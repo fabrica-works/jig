@@ -33,7 +33,10 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     }
     jig_protocol_client_wire::v6::check_limits(&limits.wire).ok()?;
     let body = u32::try_from(limits.http.body).ok()?;
-    let answer = jig_protocol_client_wire::v6::Answer::worst_case_bytes(&limits.wire)?;
+    let answer = core::cmp::max(
+        jig_protocol_client_wire::v6::Answer::worst_case_bytes(&limits.wire)?,
+        jig_protocol_client_wire::v6::ReadAnswer::worst_case_bytes(&limits.wire)?,
+    );
     let each = skein_http::server::worst_case(&limits.http)?
         .checked_add(skein_lib::Intake::worst_case(body)?)?
         .checked_add(u64::from(limits.http.head))?
@@ -48,7 +51,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Map::<Token, Waiting>::worst_case(limits.exchanges.checked_add(limits.connections)?)?)?
         .checked_add(
             u64::from(limits.exchanges.checked_add(limits.connections)?)
-                .checked_mul(u64::from(body).checked_add(80)?)?,
+                .checked_mul(u64::from(body).checked_mul(64)?.checked_add(80)?)?,
         )?
         .checked_add(Queue::<Request>::worst_case(MAX_OUT_DOWN)?)?
         .checked_add(skein_lib::List::<crate::Served>::worst_case(limits.families)?)?

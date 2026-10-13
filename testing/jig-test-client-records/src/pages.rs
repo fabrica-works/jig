@@ -125,7 +125,12 @@ pub fn carried_activity_page() -> w::ActivityPage {
             before: Some(
                 w::Cursor::new(
                     &l,
-                    w::CursorParts { value: Box::from([1, 1, 11, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 7]) },
+                    w::CursorParts {
+                        value: Box::from([
+                            1, 1, 10, 7, 0, 0, 0, 0, 0, 0, 0, 1, 0, 19, 0, 0, 0, 1, 1, 11, 0, 0, 0, 0, 0, 0, 0, 7, 0,
+                            0, 0, 0, 0, 0, 0, 7,
+                        ]),
+                    },
                 )
                 .expect("literal"),
             ),

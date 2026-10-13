@@ -16,3 +16,6 @@ mod objects;
 
 #[path = "tests/pages.rs"]
 mod pages;
+
+#[path = "tests/reads.rs"]
+mod reads;
