@@ -54,7 +54,7 @@ pub(super) fn route_core(
                 }
                 core::Held::Relayed { channel, run, attempt, call: name, answer } => {
                     let delivery = crate::stopping::relayed(domain, channel, run, attempt, name, answer, true);
-                    hold(decision, delivery);
+                    hold(decision, crate::link::down(domain, delivery));
                 }
                 core::Held::MakeEffect { connector, entry } => {
                     hold(decision, Delivery::Core(core::Held::MakeEffect { connector, entry }));
@@ -63,7 +63,13 @@ pub(super) fn route_core(
                     let Some(crate::Payload::InboxWord(line)) = domain.payloads.remove(&message.words) else {
                         unreachable!("inbox word payload")
                     };
-                    hold(decision, Delivery::Message { channel, task: run.raw(), attempt: attempt.raw(), word: line });
+                    hold(
+                        decision,
+                        crate::link::down(
+                            domain,
+                            Delivery::Message { channel, task: run.raw(), attempt: attempt.raw(), word: line },
+                        ),
+                    );
                 }
                 other @ (core::Held::ReadLoad { .. }
                 | core::Held::Read { .. }
@@ -85,7 +91,7 @@ pub(super) fn route_core(
                 | core::Held::StopRun { .. }
                 | core::Held::NotesLoad { .. }
                 | core::Held::NotesWritten { .. }
-                | core::Held::NotesDeleted { .. }) => hold(decision, Delivery::Core(other)),
+                | core::Held::NotesDeleted { .. }) => hold(decision, crate::link::down(domain, Delivery::Core(other))),
             },
             core::Request::Now(now) => route_now(domain, env, decision, *now, work),
             core::Request::Ask { connector, ask } => route_ask(domain, env, decision, connector, ask, work),
@@ -331,6 +337,7 @@ fn route_now(
         core::Now::CallBusy { to } => crate::stopping::call(domain, to, work),
         core::Now::Relayed { channel, run, attempt, call: name, answer } => {
             let delivery = crate::stopping::relayed(domain, channel, run, attempt, name, answer, false);
+            let delivery = crate::link::down(domain, delivery);
             assert!(domain.journal.now(delivery).is_ok(), "reserved relay answer room");
         }
         core::Now::Undelivered { message, .. } => {
@@ -356,7 +363,7 @@ fn route_now(
                 reply_to: ReplyTo::new(Token::new(task)),
                 task,
             })));
-            domain.now.push(value);
+            domain.now.push(crate::Request::Now(value));
         }
         core::Now::BriefCorePlanned { task, .. } => {
             work.push(Work::Core(core::Event::BriefAssembled { task, ready: true }));
@@ -452,31 +459,7 @@ fn route_now(
             };
             work.push(Work::Core(core::Event::TurnPayload { run, attempt, turn, body, cumulative, read, refused }));
         }
-        core::Now::AnswerPayload { run, attempt, payload } => {
-            let body = domain.payloads.get(&payload).expect("fleet retained the answer body");
-            let (cumulative, end, read, refused) = match body {
-                crate::Payload::Answer { cumulative, end, read, refused, .. } => {
-                    (*cumulative, end.clone(), *read, refused.clone())
-                }
-                crate::Payload::Busy
-                | crate::Payload::InboxWord(_)
-                | crate::Payload::SettledCall(_)
-                | crate::Payload::Turn { .. } => {
-                    unreachable!("answer body family")
-                }
-            };
-            work.push(Work::Core(core::Event::AnswerPayload {
-                run,
-                attempt,
-                payload,
-                cumulative,
-                end,
-                saved: None,
-                invalid_saved: false,
-                read,
-                refused,
-            }));
-        }
+        core::Now::AnswerPayload { run, attempt, payload } => crate::link::answer(domain, run, attempt, payload, work),
         core::Now::AcceptedTurn { payload, task, attempt, turn, accepted } => {
             let body = domain.payloads.remove(&payload).expect("accepted turn body");
             let (cumulative, read, transcript, opens_window) = match body {
@@ -545,7 +528,7 @@ fn route_now(
         | core::Now::NotesIndexed { .. }
         | core::Now::NotesRecalled { .. }
         | core::Now::NotesRefused { .. }
-        | core::Now::NoteBusy { .. }) => domain.now.push(other),
+        | core::Now::NoteBusy { .. }) => domain.now.push(crate::Request::Now(other)),
     }
 }
 

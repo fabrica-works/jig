@@ -571,6 +571,7 @@ impl World {
                         }
                     }
                     root::Request::Deliver(delivery) => self.delivered(delivery),
+                    root::Request::ReadResult { .. } => panic!("scripted results are already typed"),
                     root::Request::Now(core::Now::StartPreparation { task, from, .. }) => {
                         self.transcript_loaded(task, from);
                     }
@@ -943,6 +944,7 @@ impl World {
             }
             root::Delivery::Core(core::Held::PeopleReply { reply, .. }) => self.people_answers.push(reply),
             root::Delivery::ApplicationDocument { .. }
+            | root::Delivery::Link { .. }
             | root::Delivery::Core(
                 core::Held::Delivery { .. }
                 | core::Held::SettledCall { .. }

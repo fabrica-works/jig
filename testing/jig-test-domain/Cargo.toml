@@ -9,6 +9,7 @@ publish.workspace = true
 [dependencies]
 skein-lib.workspace = true
 jig-domain-core.workspace = true
+jig-domain-host.workspace = true
 jig-domain-views.workspace = true
 jig-domain-authority.workspace = true
 jig-domain-tasks.workspace = true
@@ -17,6 +18,10 @@ jig-domain-fleet.workspace = true
 jig-domain-accounts.workspace = true
 jig-domain-notes.workspace = true
 jig-test-connector.workspace = true
+
+[dev-dependencies]
+jig-protocol-config.workspace = true
+jig-test-connector-world = { path = "../../tests/test-connector" }
 
 [lints]
 workspace = true

@@ -391,7 +391,9 @@ impl Observer {
                     self.observe(now, observed);
                 }
             }
-            root::Event::WatchApplication { .. }
+            root::Event::Link { .. }
+            | root::Event::ResultRead { .. }
+            | root::Event::WatchApplication { .. }
             | root::Event::ReadApplication { .. }
             | root::Event::Stop
             | root::Event::RestartBegin
@@ -921,6 +923,7 @@ impl Observer {
             | root::Delivery::ApplicationDocument { .. }
             | root::Delivery::ApplicationRead { .. }
             | root::Delivery::Projection { .. }
+            | root::Delivery::Link { .. }
             | root::Delivery::CallBusy { .. }
             | root::Delivery::System { .. } => {}
         }

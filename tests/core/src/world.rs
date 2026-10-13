@@ -501,6 +501,7 @@ impl World {
                     self.events.push_front(root::Event::Committed { number: applied, fill: 0 });
                 }
                 root::Request::Deliver(delivery) => self.delivered(delivery),
+                root::Request::ReadResult { .. } => panic!("scripted results are already typed"),
                 root::Request::Now(core::Now::Account(accounts::Request::Component(accounts::ToComponent::Want {
                     account,
                 }))) => {
@@ -785,7 +786,8 @@ impl World {
             | root::Delivery::Core(
                 core::Held::Delivery { .. } | core::Held::WatchEnded { .. } | core::Held::Grant { .. },
             ) => {}
-            other @ (root::Delivery::CallBusy { .. }
+            other @ (root::Delivery::Link { .. }
+            | root::Delivery::CallBusy { .. }
             | root::Delivery::CallAnswer { .. }
             | root::Delivery::Core(_)
             | root::Delivery::Fleet(_)

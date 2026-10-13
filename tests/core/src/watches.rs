@@ -185,6 +185,8 @@ impl Parties {
                 }
             }
             root::Event::Core(_)
+            | root::Event::Link { .. }
+            | root::Event::ResultRead { .. }
             | root::Event::Credential { .. }
             | root::Event::ReadApplication { .. }
             | root::Event::Application { .. }
@@ -363,6 +365,7 @@ impl Parties {
             | root::Delivery::Projection { .. }
             | root::Delivery::Message { .. }
             | root::Delivery::Assigned { .. }
+            | root::Delivery::Link { .. }
             | root::Delivery::CallBusy { .. }
             | root::Delivery::CallAnswer { .. }
             | root::Delivery::System { .. }

@@ -1,0 +1,479 @@
+//! Worker channels at the test root (domain/root.md, section 5).
+//! Payloads stay owned here until the fleet asks for or drops them. The
+//! protocol routing alone reads result bytes and encodes typed assignments.
+use crate::{Delivery, Domain, Limits, Payload, Request};
+use alloc::boxed::Box;
+use jig_domain_core as core;
+use jig_domain_fleet as fleet;
+use jig_domain_host as host;
+use jig_domain_tasks as tasks;
+use jig_test_connector as connector;
+use skein_lib::{Decimal, Env, List, Queue, ReplyTo, Token, Wall, Writer};
+
+/// A scripted terminal is already read; a channel terminal is opaque.
+#[derive(Debug)]
+pub(super) enum Ending {
+    Scripted(tasks::End),
+    Link(host::Ending),
+}
+
+/// The three inputs of a worker channel, in arrival order.
+#[derive(Debug)]
+pub enum Event {
+    Hello(host::Hello),
+    Up(host::LinkUp),
+    Lost,
+}
+
+/// Translate a worker's complete admission report.
+#[must_use]
+pub fn hello(channel: Token, hello: host::Hello) -> core::Event {
+    let mut models = List::with_capacity(u32::try_from(hello.bounds.models.len()).expect("bounded models"));
+    for model in hello.bounds.models {
+        models
+            .push(fleet::ModelBound { name: model.name, window: model.window, output: model.output })
+            .expect("one slot per model");
+    }
+    let mut hosting = List::with_capacity(u32::try_from(hello.hosting.len()).expect("bounded hosted runs"));
+    for run in hello.hosting {
+        hosting
+            .push(fleet::Hosted { run: run.run, attempt: run.attempt, phase: phase(run.phase) })
+            .expect("one slot per hosted run");
+    }
+    core::Event::Fleet(fleet::Event::Hello {
+        channel,
+        hello: fleet::Hello {
+            slots: hello.slots,
+            stop_bound: hello.stop_bound,
+            workstreams: hello.workstreams,
+            hosting: hosting.into_boxed(),
+            bounds: fleet::Bounds {
+                models: models.into_boxed(),
+                turns: hello.bounds.turns,
+                spend: hello.bounds.spend,
+                time: hello.bounds.time,
+                waiting: hello.bounds.waiting,
+                checks: hello.bounds.checks,
+                message_bytes: hello.bounds.message_bytes,
+                inbox: hello.bounds.inbox,
+                unacknowledged: hello.bounds.unacknowledged,
+            },
+        },
+    })
+}
+fn phase(phase: host::Phase) -> fleet::Phase {
+    match phase {
+        host::Phase::Preparing => fleet::Phase::Preparing,
+        host::Phase::Starting => fleet::Phase::Starting,
+        host::Phase::Active => fleet::Phase::Active,
+        host::Phase::Waiting => fleet::Phase::Waiting,
+        host::Phase::Ending => fleet::Phase::Ending,
+        host::Phase::Answered => fleet::Phase::Answered,
+    }
+}
+/// A channel loss goes through the fleet's grace and fences.
+#[must_use]
+pub fn lost(channel: Token) -> core::Event {
+    core::Event::Fleet(fleet::Event::Lost { channel })
+}
+/// Retain a worker's bytes and translate only their boundary metadata.
+#[must_use]
+pub fn up(domain: &mut Domain, channel: Token, up: host::LinkUp) -> core::Event {
+    let event = match up {
+        host::LinkUp::Turn { run, attempt, turn } => {
+            let number = turn.turn;
+            let body = crate::payload(
+                domain,
+                Payload::Turn {
+                    task: run.raw(),
+                    attempt: attempt.raw(),
+                    turn: number,
+                    cumulative: turn.spent,
+                    read: read_name(turn.read),
+                    transcript: turn.body,
+                    opens_window: turn.opens_window,
+                    refused: refusals(turn.refused),
+                },
+            );
+            fleet::Event::Turn { channel, run, attempt, turn: number, body }
+        }
+        host::LinkUp::Answer { run, attempt, answer } => {
+            let kind = match answer.ending {
+                host::Ending::Ended { .. } => fleet::Answer::Ended,
+                host::Ending::Parked { .. } => fleet::Answer::Parked,
+                host::Ending::Failed { .. } => fleet::Answer::Failed,
+                host::Ending::Refused(host::Refusal::Busy) => fleet::Answer::Busy,
+                host::Ending::Refused(host::Refusal::Invalid(_)) => fleet::Answer::Invalid,
+            };
+            let payload = crate::payload(
+                domain,
+                Payload::Answer {
+                    task: run.raw(),
+                    attempt: attempt.raw(),
+                    cumulative: answer.spent,
+                    read: read_name(answer.read),
+                    refused: refusals(answer.refused),
+                    end: Ending::Link(answer.ending),
+                },
+            );
+            fleet::Event::Answer { channel, run, attempt, answer: kind, payload }
+        }
+        host::LinkUp::Call { run, attempt, call, tool, writes, input, deadline } => fleet::Event::Relay {
+            channel,
+            run,
+            attempt,
+            call: fleet::Call { name: call, tool, writes, input, deadline },
+        },
+        host::LinkUp::Rejected { run, attempt, account, generation } => {
+            fleet::Event::Rejected { channel, run, attempt, account, generation }
+        }
+        host::LinkUp::Exhausted { run, attempt, account, retry_after } => {
+            fleet::Event::Exhausted { channel, run, attempt, account, retry_after }
+        }
+        host::LinkUp::Activity { run, attempt, activity } => {
+            fleet::Event::Observe { channel, run, attempt, report: report(activity) }
+        }
+    };
+    core::Event::Fleet(event)
+}
+fn read_name(name: Option<Token>) -> Option<u64> {
+    Some(name?.raw())
+}
+fn refusals(values: Box<[host::Refused]>) -> Box<[u64]> {
+    let mut names = List::with_capacity(u32::try_from(values.len()).expect("bounded refusals"));
+    for value in values {
+        names.push(value.name.raw()).expect("one slot per refusal");
+    }
+    names.into_boxed()
+}
+
+pub(super) fn receive(domain: &mut Domain, channel: Token, link: Event, work: &mut Queue<Work>) {
+    let event = match link {
+        Event::Hello(value) => {
+            // The port is routing state; the fleet owns admission and its refusal.
+            let _inserted = domain.links.insert(channel);
+            hello(channel, value)
+        }
+        Event::Up(value) => up(domain, channel, value),
+        Event::Lost => {
+            let _removed = domain.links.remove(&channel);
+            lost(channel)
+        }
+    };
+    work.push(Work::Core(event));
+}
+
+/// Translate complete channel deliveries; typed charters stay handed out.
+/// The scripted worker port continues to receive its original vocabulary.
+#[must_use]
+pub fn down(domain: &mut Domain, delivery: Delivery) -> Delivery {
+    let (channel, down) = match delivery {
+        Delivery::Message { channel, task, attempt, word } if domain.links.contains(&channel) => (
+            channel,
+            host::LinkDown::Message {
+                run: Token::new(task),
+                attempt: Token::new(attempt),
+                name: Token::new(word.number),
+                sender: sender(word.from),
+                words: inbox_words(&word),
+            },
+        ),
+        Delivery::CallBusy { channel, task, attempt, name } if domain.links.contains(&channel) => (
+            channel,
+            host::LinkDown::Relayed {
+                run: Token::new(task),
+                attempt: Token::new(attempt),
+                call: name,
+                answer: host::Relayed::Busy,
+            },
+        ),
+        Delivery::CallAnswer { channel, task, attempt, name, call, writes } if domain.links.contains(&channel) => {
+            match call.answer {
+                core::SettledAnswer::Host { error, body } => (
+                    channel,
+                    host::LinkDown::Relayed {
+                        run: Token::new(task),
+                        attempt: Token::new(attempt),
+                        call: name,
+                        answer: host::Relayed::Answer { error, text: body },
+                    },
+                ),
+                core::SettledAnswer::Delivery { .. } => {
+                    return Delivery::CallAnswer { channel, task, attempt, name, call, writes };
+                }
+            }
+        }
+        Delivery::Core(core::Held::Acknowledge { channel, run, attempt }) if domain.links.contains(&channel) => {
+            (channel, host::LinkDown::Acknowledge { run, attempt })
+        }
+        Delivery::Core(core::Held::AcknowledgeTurn { channel, run, attempt, turn })
+            if domain.links.contains(&channel) =>
+        {
+            (channel, host::LinkDown::TurnKept { run, attempt, turn })
+        }
+        Delivery::Core(core::Held::Cancel { channel, run, attempt }) if domain.links.contains(&channel) => {
+            (channel, host::LinkDown::Cancel { run, attempt })
+        }
+        Delivery::Core(core::Held::Grant { channel, run, attempt, grant }) if domain.links.contains(&channel) => (
+            channel,
+            host::LinkDown::Grant {
+                run,
+                attempt,
+                grant: host::Grant {
+                    table: match grant.table {
+                        fleet::GrantTable::Accounts => host::GrantTable::Accounts,
+                        fleet::GrantTable::Application => host::GrantTable::Application,
+                    },
+                    account: grant.account,
+                    generation: grant.generation,
+                    valid: grant.valid,
+                },
+            },
+        ),
+        Delivery::Core(core::Held::Refuse { channel }) => {
+            let _removed = domain.links.remove(&channel);
+            return Delivery::Core(core::Held::Refuse { channel });
+        }
+        other @ (Delivery::Link { .. }
+        | Delivery::Message { .. }
+        | Delivery::CallBusy { .. }
+        | Delivery::CallAnswer { .. }
+        | Delivery::Core(_)
+        | Delivery::Assigned { .. }
+        | Delivery::Fleet(_)
+        | Delivery::ApplicationDocument { .. }
+        | Delivery::ApplicationRead { .. }
+        | Delivery::Application { .. }
+        | Delivery::Projection { .. }
+        | Delivery::Restart(_)
+        | Delivery::System { .. }
+        | Delivery::LostRead { .. }
+        | Delivery::Procedure { .. }) => return other,
+    };
+    Delivery::Link { channel, down }
+}
+
+pub(super) fn answer(domain: &mut Domain, run: Token, attempt: Token, payload: Token, work: &mut Queue<Work>) {
+    let Some(Payload::Answer { task, attempt: retained, end, .. }) = domain.payloads.get(&payload) else {
+        unreachable!("fleet retained the answer body");
+    };
+    assert!(*task == run.raw() && *retained == attempt.raw(), "fenced answer identity");
+    let end = match end {
+        Ending::Link(host::Ending::Ended { outcome, .. }) => {
+            domain.now.push(Request::ReadResult { payload, outcome: outcome.clone() });
+            return;
+        }
+        Ending::Link(
+            other @ (host::Ending::Refused(_) | host::Ending::Parked { .. } | host::Ending::Failed { .. }),
+        ) => ending(other),
+        Ending::Scripted(end) => end.clone(),
+    };
+    work.push(Work::Core(result_event(domain, payload, end).expect("retained answer")));
+}
+pub(super) fn read(domain: &mut Domain, env: &Env<Limits>, payload: Token, end: tasks::End) {
+    if let Some(event) = result_event(domain, payload, end) {
+        crate::decide(domain, env, Work::Core(event));
+    }
+}
+pub(super) fn result_event(domain: &Domain, payload: Token, end: tasks::End) -> Option<core::Event> {
+    let Some(Payload::Answer { task, attempt, cumulative, read, refused, .. }) = domain.payloads.get(&payload) else {
+        return None;
+    };
+    Some(core::Event::AnswerPayload {
+        run: Token::new(*task),
+        attempt: Token::new(*attempt),
+        payload,
+        cumulative: *cumulative,
+        end,
+        saved: None,
+        invalid_saved: false,
+        read: *read,
+        refused: refused.clone(),
+    })
+}
+fn ending(ending: &host::Ending) -> tasks::End {
+    match ending {
+        host::Ending::Refused(host::Refusal::Busy) => tasks::End::Refused,
+        host::Ending::Refused(host::Refusal::Invalid(_)) => tasks::End::Failed(tasks::Class::Invalid),
+        host::Ending::Parked { .. } => tasks::End::Parked,
+        host::Ending::Failed { failure, .. } => tasks::End::Failed(match failure {
+            host::Failure::Unprepared(host::Preparation::Transient) => tasks::Class::Transient,
+            host::Failure::Unprepared(host::Preparation::Permanent { .. }) => tasks::Class::Permanent,
+            host::Failure::Run(_) => tasks::Class::Run,
+            host::Failure::Agent(_) | host::Failure::Cancelled(_) => tasks::Class::Agent,
+        }),
+        host::Ending::Ended { .. } => unreachable!("ended payloads leave for the routing"),
+    }
+}
+
+fn report(activity: host::Activity) -> fleet::Report {
+    match activity {
+        host::Activity::Phase(phase) => fleet::Report::Activity(match phase {
+            host::Phase::Preparing => fleet::Activity::Preparing,
+            host::Phase::Starting => fleet::Activity::Starting,
+            host::Phase::Active => fleet::Activity::Active,
+            host::Phase::Waiting => fleet::Activity::Waiting,
+            host::Phase::Ending | host::Phase::Answered => fleet::Activity::Ending,
+        }),
+        host::Activity::Long { operation, span } => fleet::Report::Activity(fleet::Activity::Long {
+            operation: match operation {
+                host::Operation::Checks => fleet::Operation::Checks,
+                host::Operation::Completion => fleet::Operation::Completion,
+                host::Operation::Command => fleet::Operation::Command,
+            },
+            span,
+        }),
+        host::Activity::LongDone => fleet::Report::Activity(fleet::Activity::Active),
+        host::Activity::Count { kind, elapsed, count } => fleet::Report::Count {
+            kind: match kind {
+                host::CountKind::Admitted => fleet::CountKind::Admitted,
+                host::CountKind::Ended => fleet::CountKind::Ended,
+                host::CountKind::LlmStarted => fleet::CountKind::LlmStarted,
+                host::CountKind::LlmRetried => fleet::CountKind::LlmRetried,
+                host::CountKind::LlmFinished => fleet::CountKind::LlmFinished,
+                host::CountKind::ToolStarted => fleet::CountKind::ToolStarted,
+                host::CountKind::ToolFinished => fleet::CountKind::ToolFinished,
+                host::CountKind::CheckStarted => fleet::CountKind::CheckStarted,
+                host::CountKind::CheckFinished => fleet::CountKind::CheckFinished,
+                host::CountKind::TextArrived => fleet::CountKind::TextArrived,
+            },
+            elapsed,
+            count,
+        },
+    }
+}
+
+/// Preserve the task-owned message kind when translating its opaque words.
+fn inbox_words(word: &tasks::Word) -> Box<[u8]> {
+    let (label, number) = match word.kind {
+        tasks::MessageKind::Result(_) => (
+            b"Result from task ".as_slice(),
+            match word.from {
+                tasks::Party::Task(task) => task,
+                tasks::Party::Person(person) => person,
+                tasks::Party::Deployment { .. } => 0,
+            },
+        ),
+        tasks::MessageKind::ProposalDecision { proposal, accepted } => {
+            (if accepted { b"Proposal accepted ".as_slice() } else { b"Proposal rejected ".as_slice() }, proposal)
+        }
+        tasks::MessageKind::PersonStalled { task } => (b"Person task past its waiting deadline ".as_slice(), task),
+        tasks::MessageKind::EffectNotMade { entry } => (b"Effect not made ".as_slice(), entry),
+        tasks::MessageKind::Words
+        | tasks::MessageKind::Question
+        | tasks::MessageKind::Answer { .. }
+        | tasks::MessageKind::Notice { .. }
+        | tasks::MessageKind::News { .. }
+        | tasks::MessageKind::Timer { .. }
+        | tasks::MessageKind::Amendment { .. }
+        | tasks::MessageKind::Proposal { .. }
+        | tasks::MessageKind::Escalation { .. } => return word.words.clone(),
+    };
+    let number = Decimal::of(number);
+    let bytes = label.len().checked_add(number.as_bytes().len()).expect("bounded message label");
+    let bytes = bytes.checked_add(2).expect("bounded message separator");
+    let bytes = bytes.checked_add(word.words.len()).expect("bounded message envelope");
+    let mut writer = Writer::new(bytes);
+    writer.put(label).expect("measured label");
+    writer.put(number.as_bytes()).expect("measured source");
+    writer.put(b":\n").expect("measured separator");
+    writer.put(&word.words).expect("measured words");
+    writer.finish()
+}
+
+fn sender(value: tasks::Party) -> Box<[u8]> {
+    match value {
+        tasks::Party::Task(number) | tasks::Party::Person(number) => Box::from(Decimal::of(number).as_bytes()),
+        tasks::Party::Deployment { .. } => Box::from(&b"deployment"[..]),
+    }
+}
+
+#[expect(clippy::large_enum_variant, reason = "the bounded route queue owns complete core events")]
+pub(super) enum Work {
+    Link {
+        channel: Token,
+        link: Event,
+    },
+    WatchApplication {
+        watcher: Token,
+        sign_in: u64,
+        scope: core::documents::ApplicationScope,
+        number: u16,
+        subject: connector::ClientSubject,
+        window: core::documents::Window,
+    },
+    ReadApplication {
+        reply: ReplyTo,
+        sign_in: u64,
+        scope: core::documents::ApplicationScope,
+        number: u16,
+        subject: connector::ClientSubject,
+    },
+    Application {
+        reply_to: ReplyTo,
+        sign_in: u64,
+        key: [u8; 16],
+        project: u32,
+        number: u16,
+        digest: [u8; 32],
+        value: connector::ApplicationRequest,
+    },
+    ProjectionEffect {
+        goal: u64,
+        number: u16,
+        effect: connector::Effect,
+    },
+    ConnectorFire {
+        number: u16,
+    },
+    ConnectorResume {
+        number: u16,
+    },
+    Restart(core::RestartRequest),
+    CallAnswered {
+        to: ReplyTo,
+        call: core::SettledCall,
+    },
+    AdoptRestored,
+    AdoptDone,
+    WriterRead {
+        connector: u16,
+        resource: tasks::Name,
+        event: connector::SystemEvent,
+    },
+    Timer(core::Timer),
+    Core(core::Event),
+    ResumeFleet,
+    Connector {
+        number: u16,
+        event: connector::Event,
+    },
+    EffectCall {
+        to: ReplyTo,
+        key: core::CallKey,
+        number: u16,
+        effect: connector::Effect,
+        deadline: Wall,
+        proposal: Option<Box<[u8]>>,
+    },
+    Turn {
+        channel: Token,
+        task: u64,
+        attempt: u64,
+        turn: u32,
+        cumulative: u64,
+        read: Option<u64>,
+        opens_window: bool,
+        refused: Box<[u64]>,
+        transcript: Box<[u8]>,
+    },
+    Answer {
+        channel: Token,
+        task: u64,
+        attempt: u64,
+        cumulative: u64,
+        end: tasks::End,
+        read: Option<u64>,
+        refused: Box<[u64]>,
+    },
+}

@@ -22,7 +22,7 @@ pub(super) enum Payload {
         task: u64,
         attempt: u64,
         cumulative: u64,
-        end: tasks::End,
+        end: crate::link::Ending,
         read: Option<u64>,
         refused: Box<[u64]>,
     },

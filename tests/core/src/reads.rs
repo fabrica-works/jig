@@ -77,6 +77,8 @@ impl Parties {
                 self.awaiting.get_mut(&reply).expect("admitted read").0 = self.made;
             }
             root::Event::Core(_)
+            | root::Event::Link { .. }
+            | root::Event::ResultRead { .. }
             | root::Event::Credential { .. }
             | root::Event::WatchApplication { .. }
             | root::Event::Application { .. }

@@ -714,6 +714,7 @@ impl Session {
             | root::Delivery::Projection { .. }
             | root::Delivery::Message { .. }
             | root::Delivery::Restart(_)
+            | root::Delivery::Link { .. }
             | root::Delivery::CallBusy { .. }
             | root::Delivery::CallAnswer { .. }
             | root::Delivery::Assigned { .. }

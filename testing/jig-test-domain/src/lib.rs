@@ -18,7 +18,7 @@ use jig_domain_core as core;
 use jig_domain_fleet as fleet;
 use jig_domain_tasks as tasks;
 use jig_test_connector as connector;
-use skein_lib::{Decision, Env, Journal, JournalLimits, JournalRoom, Map, Queue, ReplyTo, Time, Token, Wall};
+use skein_lib::{Decision, Env, Journal, JournalLimits, JournalRoom, Map, Queue, ReplyTo, Set, Time, Token, Wall};
 
 /// A store address owned by the core or one numbered connector.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -61,6 +61,8 @@ pub enum Write {
 /// What the journal releases after its commit, or through its read door.
 #[derive(Debug)]
 pub enum Delivery {
+    /// A typed hub record for a worker channel.
+    Link { channel: Token, down: jig_domain_host::LinkDown },
     /// The host retries this call after the engine drains.
     CallBusy { channel: Token, task: u64, attempt: u64, name: Box<[u8]> },
     /// A whole connector-owned document released after every reflected commit.
@@ -125,6 +127,8 @@ pub struct Assignment {
 /// What the root asks its surrounding world to do.
 #[derive(Debug)]
 pub enum Request {
+    /// Read a fenced opaque terminal in the protocol routing.
+    ReadResult { payload: Token, outcome: Box<[u8]> },
     /// Return a connector input to its owner during the drain.
     Busy { event: Box<Event> },
     /// First cold load, before the deployment counter is known.
@@ -143,6 +147,16 @@ pub enum Request {
 #[derive(Debug)]
 #[expect(clippy::large_enum_variant, reason = "the testing root moves admitted core events by value")]
 pub enum Event {
+    /// A channel opening, record or loss in the hub vocabulary.
+    Link {
+        channel: Token,
+        link: link::Event,
+    },
+    /// The protocol routing read a fenced result.
+    ResultRead {
+        payload: Token,
+        end: tasks::End,
+    },
     /// The service begins its drain.
     Stop,
     /// Prepare and watch the application's typed subject in the client's declared scope.
@@ -297,7 +311,8 @@ pub struct Domain {
     first: connector::Domain,
     second: connector::Domain,
     journal: Journal<Write, Delivery>,
-    now: Queue<core::Now>,
+    now: Queue<Request>,
+    links: Set<Token>,
     busy: Queue<Box<Event>>,
     assignments: Map<u64, Assignment>,
     workspace_writes: Map<u64, Box<[tasks::Name]>>,
@@ -371,6 +386,7 @@ impl Domain {
             second: connector::Domain::new(config.second, &limits.connector),
             journal: Journal::new(&limits.journal),
             now: Queue::with_capacity(limits.journal.now),
+            links: Set::with_capacity(limits.core.fleet.workers),
             busy: Queue::with_capacity(limits.routes),
             assignments: Map::with_capacity(limits.core.tasks.tasks),
             workspace_writes: Map::with_capacity(limits.core.tasks.tasks),
@@ -419,96 +435,14 @@ impl Domain {
     }
 }
 
-#[expect(clippy::large_enum_variant, reason = "the bounded route queue owns complete core events")]
-enum Work {
-    WatchApplication {
-        watcher: Token,
-        sign_in: u64,
-        scope: core::documents::ApplicationScope,
-        number: u16,
-        subject: connector::ClientSubject,
-        window: core::documents::Window,
-    },
-    ReadApplication {
-        reply: ReplyTo,
-        sign_in: u64,
-        scope: core::documents::ApplicationScope,
-        number: u16,
-        subject: connector::ClientSubject,
-    },
-    Application {
-        reply_to: ReplyTo,
-        sign_in: u64,
-        key: [u8; 16],
-        project: u32,
-        number: u16,
-        digest: [u8; 32],
-        value: connector::ApplicationRequest,
-    },
-    ProjectionEffect {
-        goal: u64,
-        number: u16,
-        effect: connector::Effect,
-    },
-    ConnectorFire {
-        number: u16,
-    },
-    ConnectorResume {
-        number: u16,
-    },
-    Restart(core::RestartRequest),
-    CallAnswered {
-        to: ReplyTo,
-        call: core::SettledCall,
-    },
-    AdoptRestored,
-    AdoptDone,
-    WriterRead {
-        connector: u16,
-        resource: tasks::Name,
-        event: connector::SystemEvent,
-    },
-    Timer(core::Timer),
-    Core(core::Event),
-    ResumeFleet,
-    Connector {
-        number: u16,
-        event: connector::Event,
-    },
-    EffectCall {
-        to: ReplyTo,
-        key: core::CallKey,
-        number: u16,
-        effect: connector::Effect,
-        deadline: Wall,
-        proposal: Option<Box<[u8]>>,
-    },
-    Turn {
-        channel: Token,
-        task: u64,
-        attempt: u64,
-        turn: u32,
-        cumulative: u64,
-        read: Option<u64>,
-        opens_window: bool,
-        refused: Box<[u64]>,
-        transcript: Box<[u8]>,
-    },
-    Answer {
-        channel: Token,
-        task: u64,
-        attempt: u64,
-        cumulative: u64,
-        end: tasks::End,
-        read: Option<u64>,
-        refused: Box<[u64]>,
-    },
-}
+use link::Work;
 
 /// Admit one input and route all synchronous continuations inside one decision.
 pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event) {
     let Ok(event) = stopping::defer(domain, event) else { return };
     match event {
+        Event::Link { channel, link } => decide(domain, env, Work::Link { channel, link }),
+        Event::ResultRead { payload, end } => link::read(domain, env, payload, end),
         Event::Stop => decide(domain, env, Work::Core(core::Event::Stopping)),
         Event::Application { reply_to, sign_in, key, project, number, digest, value } => {
             decide(domain, env, Work::Application { reply_to, sign_in, key, project, number, digest, value });
@@ -613,6 +547,7 @@ fn decide(domain: &mut Domain, env: &Env<Limits>, first: Work) {
     let core_room = match &first {
         Work::Core(event) => core::room(&env.limits.core, event),
         Work::WatchApplication { .. }
+        | Work::Link { .. }
         | Work::ReadApplication { .. }
         | Work::Application { .. }
         | Work::Restart(_)
@@ -653,6 +588,7 @@ fn decide(domain: &mut Domain, env: &Env<Limits>, first: Work) {
             continue;
         };
         match next {
+            Work::Link { channel, link } => link::receive(domain, channel, link, &mut work),
             Work::WatchApplication { watcher, sign_in, scope, number, subject, window } => {
                 let token = Token::new(domain.next_payload);
                 domain.next_payload = domain.next_payload.checked_add(1).expect("root subject token room");
@@ -809,7 +745,8 @@ fn decide(domain: &mut Domain, env: &Env<Limits>, first: Work) {
                 messages::receive(domain, &mut work, channel, body);
             }
             Work::Answer { channel, task, attempt, cumulative, end, read, refused } => {
-                let body = Payload::Answer { task, attempt, cumulative, end, read, refused };
+                let body =
+                    Payload::Answer { task, attempt, cumulative, end: link::Ending::Scripted(end), read, refused };
                 messages::receive(domain, &mut work, channel, body);
             }
         }
@@ -912,6 +849,7 @@ pub fn release(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>)
                 step(domain, env, event);
             }
             other @ (Delivery::ApplicationDocument { .. }
+            | Delivery::Link { .. }
             | Delivery::ApplicationRead { .. }
             | Delivery::Application { .. }
             | Delivery::Projection { .. }
@@ -928,7 +866,7 @@ pub fn release(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>)
     }
     for _ in 0..domain.now.len() {
         let now = domain.now.pop().expect("bounded now count");
-        out.push(Request::Now(now));
+        out.push(now);
     }
     if domain.stopping() {
         return;
@@ -996,8 +934,11 @@ fn hold(decision: &mut Decision<Write, Delivery>, value: Delivery) {
 // must make the testing application say how it crosses its root.
 mod application_facts;
 mod client_documents;
+pub mod link;
 mod messages;
 mod routes;
+#[cfg(test)]
+mod tests;
 use messages::Payload;
 mod stopping;
 use routes::{route_connector, route_core};

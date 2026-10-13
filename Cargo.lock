@@ -714,11 +714,14 @@ dependencies = [
  "jig-domain-authority",
  "jig-domain-core",
  "jig-domain-fleet",
+ "jig-domain-host",
  "jig-domain-notes",
  "jig-domain-people",
  "jig-domain-tasks",
  "jig-domain-views",
+ "jig-protocol-config",
  "jig-test-connector",
+ "jig-test-connector-world",
  "skein-lib",
 ]
 

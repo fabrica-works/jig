@@ -18,7 +18,9 @@ pub(super) fn defer(domain: &mut Domain, event: Event) -> Result<Event, ()> {
             domain.busy.push(Box::new(event));
             Err(())
         }
-        event @ (Event::Stop
+        event @ (Event::Link { .. }
+        | Event::ResultRead { .. }
+        | Event::Stop
         | Event::WatchApplication { .. }
         | Event::ReadApplication { .. }
         | Event::Application { .. }
@@ -59,7 +61,9 @@ pub(super) fn relayed(
         Payload::SettledCall(call) => {
             Delivery::CallAnswer { channel, task: run.raw(), attempt: attempt.raw(), name, call, writes }
         }
-        Payload::Turn { .. } | Payload::Answer { .. } | Payload::InboxWord(_) => unreachable!("relay answer family"),
+        Payload::Turn { .. } | Payload::Answer { .. } | Payload::InboxWord(_) => {
+            unreachable!("relay answer family")
+        }
     }
 }
 

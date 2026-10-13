@@ -398,6 +398,7 @@ impl Application for Testing {
                 }
                 root::Request::Restart(step) => Output::Deliver(Delivery::Held(root::Delivery::Restart(step))),
                 root::Request::Deliver(delivery) => Output::Deliver(Delivery::Held(delivery)),
+                root::Request::ReadResult { .. } => panic!("scripted results are already typed"),
                 root::Request::Now(now) => Output::Deliver(Delivery::Now(now)),
                 root::Request::Busy { event } => Output::Deliver(Delivery::Busy(event)),
                 root::Request::Stop => Output::Stop,
@@ -589,6 +590,7 @@ impl Application for Testing {
             | root::Delivery::ApplicationRead { .. }
             | root::Delivery::Application { .. }
             | root::Delivery::Core(_)
+            | root::Delivery::Link { .. }
             | root::Delivery::CallBusy { .. }
             | root::Delivery::CallAnswer { .. }
             | root::Delivery::Message { .. } => Vec::new(),
