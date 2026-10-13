@@ -327,6 +327,18 @@ ones before it in its session. Dependencies are by capability: "skein
   the standard library), fully qualified, naming the exact path, with a
   regression that jig's own use of the word is still refused; no question.
   jig's own names stay refused.
+- **A value the Shape makes invalid is replaced wherever a test builds it**
+  (decisions.md, ruling 225). Where an increment's Shape makes a
+  constructor refuse a value (03.s2: a `Text` of bytes that are not
+  UTF-8), each test in any file that builds such a value is the
+  increment's: the value becomes a valid one in the same role (distinct
+  where it was distinct, as long where its length matters), one constant
+  per file rather than repeated literals; an expected value that echoes
+  that input changes with it; every name and every other expected value
+  kept, no assertion loosened or removed. It does not count toward
+  rulings 114's or 122's limits; the commit body names the files. A test
+  whose subject is the refused value itself is a removed mechanism's,
+  under ruling 123.
 - **A new test costs the suite about 12 ms before its work** (decisions.md,
   ruling 219; `tests-cost.md`, 12). In every step left, tests are one per
   behaviour, a behaviour's cases rows of one table test; fixtures are

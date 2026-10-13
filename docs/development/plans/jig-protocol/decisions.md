@@ -1703,6 +1703,18 @@ the file.
      (`jig/03-people-and-tasks.md`), changes the core's cut, the client's
      `Text`, the people child's entrance and one fixture; jig 34.1 lands
      after it, its fixtures UTF-8 meanwhile.
+225. **A value the Shape makes invalid is replaced wherever a test builds
+     it** (2026-10-13, the coordinator's block "jig 03.s2: UTF-8 fixture
+     migration exceeds shared-test edit caps", 2026-10-13T06:17:07Z).
+     03.s2's Shape makes the client's `Text::new` refuse bytes that are
+     not UTF-8; about 18 client test files build texts from such bytes
+     (`conversation_merge.rs` 19 inputs and 5 expected literals that echo
+     them, beyond rulings 114 and 122). Those fixtures are 03.s2's: each
+     refused value becomes a UTF-8 one in the same role, an expected value
+     that echoes it changes with it, names and every other expected value
+     kept, past rulings 114's and 122's limits. A test whose subject is the
+     opaque bytes themselves goes under ruling 123. The README's Rules now
+     say so for any increment whose Shape makes a value invalid.
 
 ## For the user
 
