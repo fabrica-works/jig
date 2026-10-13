@@ -386,6 +386,14 @@ What a chat's page leads with, and every agent task's activity
   its tool with its input as written and its outcome summarised; what it
   used and spent. The domain holds that turn, typed and bounded, and
   links nothing of smith's.
+- **A turn that does not decode** reaches the domain as such, with why:
+  another version of smith's transcript (naming the one found),
+  malformed, or past the client's bounds
+  (`../../protocol/client.md`, section 3). Wherever a turn appears, in a
+  task's activity or an archived turn, it is one of the two, read or
+  not, so the view handles both in one place: the turn's card says it
+  could not be read and why, and the conversation around it shows as
+  ever. It is never dropped, and no other turn is read in its place.
 - **Live, then replaced.** While a run is live, the page watches it: the
   turn being written, named by its attempt, its number within it and its
   completion's retry, its text from the offset the client has, and the

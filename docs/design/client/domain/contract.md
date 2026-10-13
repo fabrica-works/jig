@@ -262,7 +262,9 @@ answer; *signed out*.
   - *an activity line:* one of a task's words, run boundaries, turns,
     results heard, news heard, decisions, in commit order (client.md,
     section 10); a turn as its bytes, within the page's byte bound, which
-    the client's protocol layer decodes, with no read of its own;
+    the client's protocol layer decodes, with no read of its own, into
+    the client's turn or into a turn that does not decode, with why
+    (client.md, section 10);
   - *a conversation's line:* one of a party's chats, for their list;
   - *a goal's line,* a project's, its policy, roles and spend, a note;
     a project's document carries its recurring tasks' lines, each saying
