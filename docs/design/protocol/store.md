@@ -249,6 +249,15 @@ skein-kv's limits are smaller (its key, value, operations and commit;
 skein's `kv.md`, section 7), so a commit the root admitted is never
 refused as too large.
 
+- **The largest commit is what it can leave in the map,** not its
+  writes times the largest row: each key a commit puts is in the map
+  once it is applied, at most skein-kv's budget in all, since a commit
+  writes each key once (section 6) and the fill keeps the map within
+  its budget (11.2). So the largest commit is the map's budget, plus,
+  for each operation the journal's writes allow, a key and its framing.
+  A deployment's commit then fits skein-kv's `u32` whenever its map's
+  budget does.
+
 ## 6. Commits
 
 - **Numbers are shared.** The journal numbers the root's commits, and
@@ -260,6 +269,10 @@ refused as too large.
   saves; a store that disagrees refuses the start.
 - **Writes become operations** in order: a save a put of its encoded key
   and record, an erase an erase, the application's bytes under its tag.
+  A key written more than once in one commit becomes one operation, its
+  last write, which leaves the map as the writes in order would:
+  skein-kv applies a commit whole (skein's `kv.md`, section 7), so
+  nothing sees the writes between.
   A turn's save becomes a frame in its task's file, written first
   (8.2), and puts of its place in the map.
 - **In order, whatever waits.** A commit with turns goes to skein-kv once
