@@ -334,7 +334,7 @@ relates to.
 | an inbox group | the index of the party's inbox, by time: what needs them oldest first, updates newest first; a group, and the filter, select within it |
 | conversations | the index of the party's conversations, newest first |
 | a project's goals | the index of the project's goals, live then ended newest first |
-| a project's notes, a scope's notes | the notes' lines of the project's scopes, or of the one scope, filtered by description, each with its entry, by name |
+| a project's notes, a scope's notes | the notes' lines of the project's scopes, or of the one scope, filtered by description, each with its entry: by scope, then by name within it, as the lines are keyed; a page's position is the last line it examined, so a filtered page goes on past what it skipped |
 | a project's spend | the funders' periods of the project |
 
 - **Joins are point reads** in the same step, priced within the read's
