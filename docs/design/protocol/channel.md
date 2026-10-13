@@ -255,7 +255,14 @@ answer, and a **notice** is not answered.
 - **Busy, sent again.** A turn answered busy is held by the worker's
   link component, which sends it again after a jittered backoff, as it
   keeps the grace's clock (10.1); the hub arms no timers
-  (`../domain/hosts.md`, 6.2). A call answered busy goes back to its
+  (`../domain/hosts.md`, 6.2). So turn busy is the fleet's word to what
+  keeps the backoff below the hub, never the hub's, and is not in the
+  link vocabulary (section 3): `jig-protocol-engine-workers` encodes it
+  from the fleet's request, beside the hub's records; the worker's link
+  takes it, and at its deadline asks its root for the hub's kept copy
+  of the turn, which goes up again as any turn. For the engine's own
+  hub, its root keeps the backoff the same way, on its protocol layer's
+  timers. A call answered busy goes back to its
   run, which asks it again after a backoff (smith's `domain/run.md`,
   5.2). An answer the engine leaves unacknowledged is sent again after
   the next hello.
