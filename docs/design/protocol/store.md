@@ -274,6 +274,16 @@ refused as too large.
   refuses (too large, the map full) would be a decision already made and
   not kept, so it stops the engine as a failure does. Section 11 keeps
   the map from filling.
+- **A commit's operations are bounded,** as skein-kv applies each commit
+  in one step (skein's `kv.md`, section 7). Where removing a record would
+  erase an unbounded number of rows (a transcript's attempts' places,
+  8.5), its commit erases the row that names the rest, so nothing reads
+  them from then on, and the rest, orphans, go in the commits that
+  follow: the component adds a bounded number of their erases to each
+  commit it makes for the root, within that commit's operations, until
+  none is left. At open it finds any a restart left by the rows they
+  name being gone. Every commit stays one decision's, numbered as the
+  root numbers it.
 
 ## 7. Loads
 
@@ -466,9 +476,12 @@ task's file was cut while its task lived, and is not touched again.
 
 ### 8.5 Dropped
 
-Retention drops a task's transcript whole (11.1): the commit erases its
-places (the task's row and its attempts'), and the component removes its
-file and syncs the directory before it submits the commit. A crash
+Retention drops a task's transcript whole (11.1): the commit erases the
+task's row of places, and the component removes its file and syncs the
+directory before it submits the commit. The task's attempts' places,
+as many as its attempts, are orphans from that commit on, read by
+nothing, and go in the commits that follow, a bounded number each
+(section 6, "A commit's operations are bounded"). A crash
 before the commit leaves places whose file is gone: a read of it answers
 as for a dropped transcript, and retention's next pass drops it again.
 Removing a missing file is not a failure.
