@@ -2378,6 +2378,17 @@ the file.
      holds, a stack that builds together, and the repin then measures
      temper's own gap as the README's Repin section says (at most about
      200 lines; else it lands nothing and records the gap).
+282. **temper-repin lands nothing; temper's gap is recorded** (2026-10-13,
+     the coordinator's block "temper repin: measured migration exceeds
+     repin scope under 281", 2026-10-13T19:30:56Z). On jig's `main` with
+     jig's smith and skein (ruling 281), temper reaches its own crates and
+     fails with 288 errors across 23 files (removed watch, account and
+     escalation routes; changed records; a rewritten host and smith
+     boundary), beyond a repin's about 200 lines, as the README's Repin
+     section expected. As it says: temper lands nothing but its
+     `docs/design/STATUS.md` gap, this plan's `later.md` gains the row, and
+     temper's reconciliation is a plan of its own. temper's Cargo URLs
+     move with that plan.
 
 ## For the user
 
