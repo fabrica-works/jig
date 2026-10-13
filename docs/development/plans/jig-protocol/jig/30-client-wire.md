@@ -225,9 +225,24 @@ Files: the schema, generated code and goldens; `src/tests.rs`,
 fuzzy_client_wire.rs}`.
 Shape: `ReadAnswer { value: Owned, none: ReadNone }` with `enum ReadNone
 { unknown, refused, gone, busy, signed_out }`; each page a record with
-`cut: bool`, `rows: list N <Row>`, `before: option Cursor`, `after:
-option Cursor`, as the contract's page has them.
+`cut: bool`, its rows, `before: option Cursor`, `after: option Cursor`,
+as the contract's page has them. A page whose rows hold lists of their
+own (a chip, an ending, a result value) carries them as one piece,
+`rows: bytes D`, each row its record after a `u32` length, and so does
+every flattened table 30.1 landed (`Chip`, `ChipPhase`, `Closing`,
+`Ending`, `HeldRuntime`, `HoldReason`, `OwnerChipDetails`,
+`OwnerChipEnding`, `ResultValue`: `rows: bytes D` in place of `list 32
+Fact`); D is the ceiling ruling 149's rule gives `document_bytes`; a
+page of flat rows keeps `rows: list N <Row>` (client.md, 3, "A
+document's nested collections cross as pieces"; skein's codec.md, 3; the
+designer, 2026-10-13, jig `3c5f607c`). Pieces are written and split
+with `skein-codec`'s piece helpers, once the supervisor's skein step
+lands them and jig's `skein-codec` pin moves; each row is decoded by
+its generated decoder as the piece is split. The family's version moves
+once, at this change (README, "Rules").
 Test shape: as 30.1. Tests: `a_page_one_row_past_its_limit_is_refused`,
+`a_page_whose_rows_do_not_split_to_its_end_is_refused_as_malformed`,
+`a_page_of_many_small_rows_and_one_of_a_few_large_rows_fit_one_bound`,
 `a_cursor_past_its_bound_is_refused`,
 `an_activity_line_carries_its_turn_bytes_unchanged`,
 `each_read_none_round_trips_unchanged`. Ceilings as 30.1.
@@ -256,8 +271,9 @@ Files: the schema, generated code and goldens; `src/tests.rs`,
 `src/tests/fixtures.rs`; `tests/client-wire/tests/drift.rs`.
 Shape: one record per contract struct, one enum per contract enum, by
 the contract's names (`Frame`, `Task`, `RunState`, …); a record whose
-contract type nests itself by a peer's choice is flattened to a list of
-rows with parent indexes, and the report says how.
+contract type nests itself by a peer's choice is flattened to a table of
+rows with parent indexes, which crosses as a piece (client.md, 3; 30.2's
+Shape), and the report says how.
 Test shape: as 30.1. Tests:
 `a_frame_at_its_ceilings_round_trips_unchanged`,
 `a_task_one_byte_past_its_text_bound_is_refused`,
@@ -405,7 +421,8 @@ pub const VERSION: u32 = 1;
   the field.
 - **A contract type that nests itself by a peer's choice** (schemas form
   a tree of fixed depth, skein's `codec.md`, section 3): report how it is
-  flattened, if any is.
+  flattened, if any is. Its table crosses as a piece bounded by the
+  client's document limit (client.md, 3; the designer, 2026-10-13).
 
 ## Done when
 

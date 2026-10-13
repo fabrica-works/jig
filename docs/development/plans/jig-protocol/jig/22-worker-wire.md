@@ -707,7 +707,10 @@ pub fn worker_cap(sizes: &Sizes) -> Option<WorkerCap> { todo!() }
   window crosses as one piece in smith's form, `transcript: bytes
   8388608`, each turn after its `u32` length; the resume limit bounds the
   piece, each turn counted with its length, and no count is kept. This
-  replaces ruling 172's `turns: list 480 bytes 8388608`.
+  replaces ruling 172's `turns: list 480 bytes 8388608`. The piece is
+  written and split with `skein-codec`'s piece helpers once the
+  supervisor's skein step lands them (skein's codec.md, 3, "A sum
+  crosses as one piece").
 - **A field jig 05, 04, 06 or 08 landed that the records lack,** or the
   reverse: raise it before the increment that carries the record lands.
 - **The link vocabulary as one pair of enumerations.** jig 05 keeps the
