@@ -441,6 +441,50 @@ Don't: answer a read before `Held::Read`.
 Size: at most 600 lines.
 Removes: 34.3's cursor stub.
 
+### 31.s3 An own watch subject's party, named by the core
+
+A step not in the plan, from the designer's answer on jig 31.5 (jig
+`d616ae9d`: `protocol/client.md`, 7, "the core names the subject's party
+from it, as it does a read's"). The core's `Event::Watch` takes a
+`documents::Subject` whose own variants (`Frame`, `Inbox`,
+`Conversations`) carry a party (`routing/vocabulary.rs:380`), which the
+engine's protocol layer does not know after a restart. The core already
+names a read's own subject from the sign-in (`reads.rs:174-186`) and
+authenticates a watch's sign-in (`routing/views.rs:195`).
+Needs: nothing.
+Files: `crates/jig-domain-core/src/{routing/vocabulary.rs,
+  routing/views.rs, documents.rs}` and the tests that build
+  `Event::Watch`; `tests/client/src/joint/wire/watches.rs` and its
+  callers; `tests/core/{src/watches.rs, tests/stories/watches.rs,
+  tests/client_peer.rs}`; `tests/ops/src/{joint/front.rs,
+  client/transport.rs}` where they build watches.
+Shape: `documents::Watched`, the subjects a watch may name
+  (`watch_subject`'s, `routing/views.rs:306-318`), its own ones with no
+  party: `Frame`, `Inbox`, `Conversations`; `Event::Watch { watcher,
+  sign_in, subject: Watched, window }`. `open` makes the `Subject` it
+  watches with the party `core.people.person(sign_in, ..)` names, before
+  admission and before it looks for a shared subject, as
+  `reads::subject` does a read's. The subjects no watch names
+  (proposals, escalations, questions, person tasks, results, projects,
+  notes) leave the event, and `watch_subject`'s `Unknown` arm with them.
+  `documents::Subject` keeps its party: two parties' frames stay two
+  subjects. The joint world's `wire::watches::subject` takes no party.
+Test shape: the core's `an_own_subject_names_the_sign_ins_party`,
+  `an_own_subject_after_a_restart_names_the_restored_sign_ins_party` (a
+  core restored from its records with a live sign-in and no sign-in
+  since: its frame's delivery is that party's),
+  `two_parties_frames_stay_two_subjects`,
+  `an_own_subject_of_an_ended_sign_in_is_refused_signed_out`; the joint
+  world's watch rows without a party.
+Proof: unit, `heavy cargo nextest run -p jig-domain-core -E
+  'test(an_own_subject_after_a_restart)'` once: the restored core admits
+  the frame's watch and delivers that party's frame; under 20 ms; and
+  `-p jig-core-world -p jig-client-world` once.
+Don't: keep a sign-in's party in the protocol layer or the secrets'
+  records; let a watch name another party's frame, inbox or
+  conversations; change `documents::Subject`.
+Size: at most 150 lines of production code.
+
 ### 31.5 Watches and the stream
 
 Scope: `/jig/v1/watch`: `Open` decoded, its subject translated
@@ -460,7 +504,9 @@ nothing more written for that stream; a heartbeat comment after
 (`skein_lib::base64`, `Alphabet::Standard`). A stream that ends ends its
 watches with `core::Event::Unwatch`; a watch ended signed out ends its
 stream.
-Needs: nothing beyond 31.4.
+Needs: 31.4; for the own subjects (the frame, the inbox,
+conversations), 31.s3, after which they translate to `Watched` with no
+party. The stream and the other subjects go on before it.
 Files: `src/{stream.rs, translate/watches.rs, routes.rs, component.rs,
 connection.rs, limits.rs}`; `src/tests/{watches.rs, fixtures.rs}`;
 `tests/engine-clients/{src/peer.rs, tests/stream.rs}`.
@@ -473,7 +519,10 @@ Test shape: `a_stream_opens_with_its_hello`,
 `a_stream_cut_mid_event_ends_its_watches`,
 `a_silent_stream_carries_a_heartbeat_comment`,
 `run_text_leaves_without_waiting_for_a_commit`,
-`a_watch_refused_in_its_step_is_answered_refused`. Under 20 ms each.
+`a_watch_refused_in_its_step_is_answered_refused`, and, with 31.s3,
+`a_frame_watched_after_a_restart_is_the_signed_in_partys` (the
+component made again over the same store and secrets, the client's
+secret kept). Under 20 ms each.
 Reference test of this kind, in full:
 
 ```rust
