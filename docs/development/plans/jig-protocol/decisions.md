@@ -1454,6 +1454,29 @@ the file.
      not in the plan, jig 03.s1 (`jig/03-*.md`), changes the contract, its
      users and the view's card first; jig 35.2 carries `TurnRead` after it,
      and lands its other pages and documents meanwhile.
+203. **jig 25.3 parses the whole engine document and activates only what it
+     builds** (2026-10-13, the coordinator's block "jig 25.3: startup
+     component availability versus mandatory engine configuration",
+     2026-10-13T03:45:51Z). A plan defect of staging: 25.3 refuses at
+     startup the workers and the components 25.4 and 25.5 bring, but jig
+     20's `engine` parser requires `clients`, `llm`, `charters` and
+     `chats`, so no document would start 25.3's service. 25.3 parses the
+     document whole with jig 20's parser; the service's own part declares
+     which components it activates; components 25.4 and 25.5 bring
+     (accounts, the workers' listener, the clients' listener) stay parsed
+     and inactive, and an activation of one not yet built is refused,
+     naming its path. jig 20's parser is unchanged.
+204. **The test root's bounds become its own public API** (2026-10-13, the
+     coordinator's block "jig 25.3: root output and memory bounds API
+     required by service startup", 2026-10-13T03:45:59Z). 25.3's service
+     must size the root from jig 20's profiles, but `jig-test-domain` has no
+     `max_out` or `worst_case`; `tests/core/src/observations.rs`'
+     `root_bound` computes them. 25.3 moves that computation into
+     `jig-test-domain` as public `max_out(&Limits)` and `worst_case(&Limits)`
+     (a module of its own), the core world calling them in place of its
+     copy; the profiles gain the two connectors' limits and the journal's
+     and routes' (README, "A component's limits join the profiles").
+     Inside 25.3's Files, named in its commit body.
 
 ## For the user
 
