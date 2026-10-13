@@ -142,6 +142,48 @@ pub fn turn_record() -> jig_protocol_worker_wire::Turn {
     )
     .expect("turn")
 }
+pub fn answer_record() -> jig_protocol_worker_wire::Answer {
+    use jig_protocol_worker_wire as wire;
+    let codec = codec();
+    let work = wire::Work::new(
+        &codec,
+        wire::WorkParts { left: Some(Box::from(b"left".as_slice())), saved: Some(Box::from(b"saved".as_slice())) },
+    )
+    .expect("work");
+    let ended = wire::Ended::new(&codec, wire::EndedParts { outcome: Box::from(b"opaque-result".as_slice()), work })
+        .expect("ended");
+    let refused = refused_messages();
+    wire::Answer::new(
+        &codec,
+        wire::AnswerParts {
+            task: 7,
+            attempt: 2,
+            turns: 3,
+            spent: 31,
+            read: Some(9),
+            refused,
+            ending: wire::Ending::Ended(ended),
+        },
+    )
+    .expect("answer")
+}
+pub fn call_record() -> jig_protocol_worker_wire::Call {
+    use jig_protocol_worker_wire as wire;
+    let codec = codec();
+    wire::Call::new(
+        &codec,
+        wire::CallParts {
+            task: 7,
+            attempt: 2,
+            name: Box::from([0, 2, 7]),
+            tool: Box::from(b"read".as_slice()),
+            writes: false,
+            input: Box::from(b"input".as_slice()),
+            deadline: Duration::from_secs(4),
+        },
+    )
+    .expect("call")
+}
 pub fn fact_record() -> jig_protocol_worker_wire::Fact {
     use jig_protocol_worker_wire as wire;
     let codec = codec();
@@ -182,4 +224,32 @@ fn refused_messages() -> skein_lib::List<jig_protocol_worker_wire::Refused> {
         )
         .expect("one refusal");
     refused
+}
+
+pub fn answer_with_resource() -> jig_protocol_worker_wire::Answer {
+    use jig_protocol_worker_wire as wire;
+    let mut fields = answer_record().into_parts();
+    let wire::Ending::Ended(ended) = fields.ending else {
+        panic!("the fixture ended");
+    };
+    let codec = codec();
+    let resource =
+        wire::Resource::new(&codec, wire::ResourceParts { resource: Some(Box::from(b"resource".as_slice())) })
+            .expect("resource");
+    let preparation = wire::PreparationValue::new(
+        &codec,
+        wire::PreparationValueParts { value: wire::Preparation::Permanent(resource) },
+    )
+    .expect("preparation");
+    let failed = wire::Failed::new(
+        &codec,
+        wire::FailedParts {
+            failure: wire::Failure::Unprepared(preparation),
+            detail: Box::from(b"detail".as_slice()),
+            work: ended.into_parts().work,
+        },
+    )
+    .expect("failed");
+    fields.ending = wire::Ending::Failed(failed);
+    wire::Answer::new(&codec, fields).expect("answer")
 }

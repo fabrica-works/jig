@@ -56,6 +56,8 @@ fn phase(value: wire::Phase) -> host::Phase {
 #[derive(Debug)]
 pub(crate) enum Up {
     Turn(wire::Turn),
+    Call(wire::Call),
+    Answer(wire::Answer),
     Fact(wire::Fact),
     Rejected(wire::Rejected),
     Exhausted(wire::Exhausted),
@@ -72,13 +74,12 @@ pub(crate) fn decode(kind: u16, body: &[u8], limits: &wire::v1::Limits) -> Optio
     let reader = &mut Reader::new(body);
     match kind {
         wire::Kind::Turn => Some(Up::Turn(wire::Turn::decode(limits, reader).ok()?)),
+        wire::Kind::Call => Some(Up::Call(wire::Call::decode(limits, reader).ok()?)),
+        wire::Kind::Answer => Some(Up::Answer(wire::Answer::decode(limits, reader).ok()?)),
         wire::Kind::Fact => Some(Up::Fact(wire::Fact::decode(limits, reader).ok()?)),
         wire::Kind::Rejected => Some(Up::Rejected(wire::Rejected::decode(limits, reader).ok()?)),
         wire::Kind::Exhausted => Some(Up::Exhausted(wire::Exhausted::decode(limits, reader).ok()?)),
-        // Call and Answer wait for the crossing vocabulary's rulings (plan ruling 183).
-        wire::Kind::Call
-        | wire::Kind::Answer
-        | wire::Kind::Hello
+        wire::Kind::Hello
         | wire::Kind::Assignment
         | wire::Kind::Message
         | wire::Kind::Relayed
@@ -89,9 +90,11 @@ pub(crate) fn decode(kind: u16, body: &[u8], limits: &wire::v1::Limits) -> Optio
         | wire::Kind::Grant => None,
     }
 }
-pub(crate) fn up(record: Up) -> host::LinkUp {
+pub(crate) fn up(record: Up, parts: &mut Parts) -> host::LinkUp {
     match record {
         Up::Turn(record) => turn(record),
+        Up::Call(record) => call(record),
+        Up::Answer(record) => answer(record, parts),
         Up::Fact(record) => fact(record),
         Up::Rejected(record) => {
             let fields = record.into_parts();
@@ -179,5 +182,138 @@ fn count_kind(kind: wire::CountKind) -> host::CountKind {
         wire::CountKind::CheckStarted => host::CountKind::CheckStarted,
         wire::CountKind::CheckFinished => host::CountKind::CheckFinished,
         wire::CountKind::TextArrived => host::CountKind::TextArrived,
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct Parts {
+    next: u64,
+    values: List<wire::Part>,
+}
+impl Parts {
+    pub fn new(next: u64) -> Self {
+        Self { next, values: List::with_capacity(3) }
+    }
+    pub fn optional(&mut self, bytes: Option<Box<[u8]>>) -> Option<Token> {
+        let bytes = bytes?;
+        let token = Token::new(self.next);
+        self.next = self.next.checked_add(1).expect("part tokens never wrap in a process life");
+        self.values.push(wire::Part { token, bytes }).expect("at most resource, left and saved work");
+        Some(token)
+    }
+    #[cfg(test)]
+    pub fn is_empty(&self) -> bool {
+        self.values.is_empty()
+    }
+    pub fn next(&self) -> u64 {
+        self.next
+    }
+    pub fn finish(self) -> Box<[wire::Part]> {
+        self.values.into_boxed()
+    }
+}
+pub(crate) fn answer(record: wire::Answer, parts: &mut Parts) -> host::LinkUp {
+    let fields = record.into_parts();
+    let ending = ending(fields.ending, parts);
+    host::LinkUp::Answer {
+        run: Token::new(fields.task),
+        attempt: Token::new(fields.attempt),
+        answer: host::Answer {
+            read: optional_token(fields.read),
+            refused: refusals(fields.refused),
+            turns: fields.turns,
+            spent: fields.spent,
+            ending,
+        },
+    }
+}
+fn ending(value: wire::Ending, parts: &mut Parts) -> host::Ending {
+    match value {
+        wire::Ending::Refused(record) => {
+            let refusal = match record.into_parts().value {
+                wire::Refusal::Busy => host::Refusal::Busy,
+                wire::Refusal::Invalid(record) => {
+                    let invalid = match record.into_parts().value {
+                        wire::Invalid::Charter => host::Invalid::Charter,
+                        wire::Invalid::Transcript => host::Invalid::Transcript,
+                        wire::Invalid::Grants => host::Invalid::Grants,
+                        wire::Invalid::Messages => host::Invalid::Messages,
+                    };
+                    host::Refusal::Invalid(invalid)
+                }
+            };
+            host::Ending::Refused(refusal)
+        }
+        wire::Ending::Ended(record) => {
+            let fields = record.into_parts();
+            host::Ending::Ended { outcome: fields.outcome, work: work(fields.work, parts) }
+        }
+        wire::Ending::Parked(record) => host::Ending::Parked { work: work(record.into_parts().work, parts) },
+        wire::Ending::Failed(record) => {
+            let fields = record.into_parts();
+            let failure = failure(fields.failure, parts);
+            host::Ending::Failed { failure, detail: fields.detail, work: work(fields.work, parts) }
+        }
+    }
+}
+fn work(value: wire::Work, parts: &mut Parts) -> host::Work {
+    let fields = value.into_parts();
+    let left = parts.optional(fields.left);
+    let saved = parts.optional(fields.saved);
+    host::Work { left, saved }
+}
+fn failure(value: wire::Failure, parts: &mut Parts) -> host::Failure {
+    match value {
+        wire::Failure::Unprepared(record) => {
+            let preparation = match record.into_parts().value {
+                wire::Preparation::Transient => host::Preparation::Transient,
+                wire::Preparation::Permanent(record) => {
+                    host::Preparation::Permanent { resource: parts.optional(record.into_parts().resource) }
+                }
+            };
+            host::Failure::Unprepared(preparation)
+        }
+        wire::Failure::Run(record) => host::Failure::Run(run_failure(record.into_parts().value)),
+        wire::Failure::Agent(record) => host::Failure::Agent(agent_failure(record.into_parts().value)),
+        wire::Failure::Cancelled(record) => {
+            let reason = match record.into_parts().value {
+                wire::CancelReason::Engine => host::Reason::Engine,
+                wire::CancelReason::Contact => host::Reason::Contact,
+                wire::CancelReason::Shutdown => host::Reason::Shutdown,
+            };
+            host::Failure::Cancelled(reason)
+        }
+    }
+}
+fn run_failure(value: wire::RunFailure) -> host::RunFailure {
+    match value {
+        wire::RunFailure::Model => host::RunFailure::Model,
+        wire::RunFailure::Budget => host::RunFailure::Budget,
+        wire::RunFailure::Policy => host::RunFailure::Policy,
+        wire::RunFailure::Cancelled => host::RunFailure::Cancelled,
+        wire::RunFailure::Stale => host::RunFailure::Stale,
+        wire::RunFailure::Exhausted => host::RunFailure::Exhausted,
+    }
+}
+fn agent_failure(value: wire::AgentFailure) -> host::AgentFailure {
+    match value {
+        wire::AgentFailure::Unstarted => host::AgentFailure::Unstarted,
+        wire::AgentFailure::Exited => host::AgentFailure::Exited,
+        wire::AgentFailure::Rules => host::AgentFailure::Rules,
+        wire::AgentFailure::NoProgress => host::AgentFailure::NoProgress,
+        wire::AgentFailure::WallTime => host::AgentFailure::WallTime,
+    }
+}
+
+pub(crate) fn call(record: wire::Call) -> host::LinkUp {
+    let fields = record.into_parts();
+    host::LinkUp::Call {
+        run: Token::new(fields.task),
+        attempt: Token::new(fields.attempt),
+        call: fields.name,
+        tool: fields.tool,
+        writes: fields.writes,
+        input: fields.input,
+        deadline: fields.deadline,
     }
 }

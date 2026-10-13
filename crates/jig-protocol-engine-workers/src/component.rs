@@ -22,6 +22,7 @@ pub struct Component {
     pub(crate) connections: Map<Token, Connection>,
     schema: skein_channel::Schema,
     next_channel: u64,
+    next_part: u64,
     stopping: bool,
 }
 impl Component {
@@ -43,7 +44,17 @@ impl Component {
             }
         }
         let connections = Map::with_capacity(limits.workers.checked_add(limits.opening).expect("checked limits"));
-        Ok(Self { limits: *limits, workers, payload, codec, connections, schema, next_channel: 1, stopping: false })
+        Ok(Self {
+            limits: *limits,
+            workers,
+            payload,
+            codec,
+            connections,
+            schema,
+            next_channel: 1,
+            next_part: 1,
+            stopping: false,
+        })
     }
     pub fn down(&mut self, now: Time, event: Event, out: &mut Queue<Request>) {
         match event {
@@ -209,8 +220,10 @@ impl Component {
             }
             Phase::Open => {
                 if let Some(record) = crate::translate::decode(kind, body, &self.codec) {
-                    let up = crate::translate::up(record);
-                    out.push(Request::Up { channel: state.channel, up, parts: Box::new([]) });
+                    let mut parts = crate::translate::Parts::new(self.next_part);
+                    let up = crate::translate::up(record, &mut parts);
+                    self.next_part = parts.next();
+                    out.push(Request::Up { channel: state.channel, up, parts: parts.finish() });
                     state.down(ChannelRequest::Read, connection, out);
                 } else {
                     self.refuse(now, connection, state, 3, Box::new([]), out);

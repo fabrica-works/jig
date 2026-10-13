@@ -56,7 +56,18 @@ mod records {
         world.connect(peer);
         world.run();
         let records = observed(&world);
-        assert_eq!(records, [Record::Hello, Record::Turn, Record::Activity, Record::Rejected, Record::Exhausted]);
+        assert_eq!(
+            records,
+            [
+                Record::Hello,
+                Record::Turn,
+                Record::Call,
+                Record::Answer,
+                Record::Activity,
+                Record::Rejected,
+                Record::Exhausted
+            ]
+        );
     }
     #[test]
     fn an_undecodable_turn_body_is_refused_as_framing() {
@@ -72,5 +83,46 @@ mod records {
             panic!("lost");
         };
         assert_eq!(channel, Token::new(1));
+    }
+    fn answering() -> skein_fake_channel::ScriptedPeer {
+        let mut peer = reporting();
+        peer.play(fixtures::answer_frame());
+        peer
+    }
+    fn application_parts(world: &World) -> Vec<(Token, Token, Vec<u8>)> {
+        let mut collected = Vec::new();
+        for request in world.root() {
+            if let Request::Up { channel, up: jig_domain_host::LinkUp::Answer { answer, .. }, parts } = request {
+                let jig_domain_host::Ending::Ended { work, .. } = &answer.ending else {
+                    panic!("the fixture ended");
+                };
+                assert_eq!(parts.len(), 2);
+                assert_eq!(work.left, Some(parts[0].token));
+                assert_eq!(work.saved, Some(parts[1].token));
+                for part in parts {
+                    collected.push((*channel, part.token, part.bytes.to_vec()));
+                }
+            }
+        }
+        collected
+    }
+    #[test]
+    fn application_part_tokens_never_repeat_when_a_worker_is_replaced() {
+        let mut world = world();
+        for _ in 0..3 {
+            world.connect(answering());
+            world.run();
+        }
+        assert_eq!(
+            application_parts(&world),
+            vec![
+                (Token::new(1), Token::new(1), b"left".to_vec()),
+                (Token::new(1), Token::new(2), b"saved".to_vec()),
+                (Token::new(2), Token::new(3), b"left".to_vec()),
+                (Token::new(2), Token::new(4), b"saved".to_vec()),
+                (Token::new(3), Token::new(5), b"left".to_vec()),
+                (Token::new(3), Token::new(6), b"saved".to_vec()),
+            ]
+        );
     }
 }

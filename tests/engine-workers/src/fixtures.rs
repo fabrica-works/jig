@@ -215,6 +215,50 @@ pub fn turn_record() -> jig_protocol_worker_wire::Turn {
     .expect("turn")
 }
 #[must_use]
+pub fn answer_record() -> jig_protocol_worker_wire::Answer {
+    use jig_protocol_worker_wire as wire;
+    let codec = codec();
+    let work = wire::Work::new(
+        &codec,
+        wire::WorkParts { left: Some(Box::from(b"left".as_slice())), saved: Some(Box::from(b"saved".as_slice())) },
+    )
+    .expect("work");
+    let ended = wire::Ended::new(&codec, wire::EndedParts { outcome: Box::from(b"opaque-result".as_slice()), work })
+        .expect("ended");
+    let refused = refused_messages();
+    wire::Answer::new(
+        &codec,
+        wire::AnswerParts {
+            task: 7,
+            attempt: 2,
+            turns: 3,
+            spent: 31,
+            read: Some(9),
+            refused,
+            ending: wire::Ending::Ended(ended),
+        },
+    )
+    .expect("answer")
+}
+#[must_use]
+pub fn call_record() -> jig_protocol_worker_wire::Call {
+    use jig_protocol_worker_wire as wire;
+    let codec = codec();
+    wire::Call::new(
+        &codec,
+        wire::CallParts {
+            task: 7,
+            attempt: 2,
+            name: Box::from([0, 2, 7]),
+            tool: Box::from(b"read".as_slice()),
+            writes: false,
+            input: Box::from(b"input".as_slice()),
+            deadline: Duration::from_secs(4),
+        },
+    )
+    .expect("call")
+}
+#[must_use]
 pub fn fact_record() -> jig_protocol_worker_wire::Fact {
     use jig_protocol_worker_wire as wire;
     let codec = codec();
@@ -270,11 +314,15 @@ fn encoded(
 }
 #[must_use]
 pub fn up_frames() -> Vec<skein_channel::Frame> {
+    let call = call_record();
+    let answer = answer_record();
     let fact = fact_record();
     let rejected = rejected_record();
     let exhausted = exhausted_record();
     vec![
         turn_frame(),
+        encoded(0x0102, call.measure(), |writer| call.encode(writer)),
+        encoded(0x0103, answer.measure(), |writer| answer.encode(writer)),
         encoded(0x0104, fact.measure(), |writer| fact.encode(writer)),
         encoded(0x0105, rejected.measure(), |writer| rejected.encode(writer)),
         encoded(0x0106, exhausted.measure(), |writer| exhausted.encode(writer)),
@@ -285,4 +333,10 @@ pub fn up_frames() -> Vec<skein_channel::Frame> {
 pub fn turn_frame() -> skein_channel::Frame {
     let turn = turn_record();
     encoded(0x0101, turn.measure(), |writer| turn.encode(writer))
+}
+
+#[must_use]
+pub fn answer_frame() -> skein_channel::Frame {
+    let answer = answer_record();
+    encoded(0x0103, answer.measure(), |writer| answer.encode(writer))
 }
