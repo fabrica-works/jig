@@ -59,6 +59,7 @@ fn configured_with_bounds(
     receiving: jig_test_domain_client::Limits,
 ) -> World<Test, Joint> {
     let (mut configuration, mut owner) = jig_core_world::peers::fixture(seed, 0);
+    configuration.core.owners = Box::new([]);
     owner.core.fleet.slots = slots;
     // Four adoption identities and their four later public client sign-ins.
     owner.core.people.sign_ins = 8;

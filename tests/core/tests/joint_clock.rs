@@ -42,8 +42,10 @@ fn supplied_joint_clocks_survive_internal_commits_and_drive_the_actual_sign_in_e
 #[test]
 fn corrected_joint_wall_is_independent_of_elapsed_time_and_is_persisted_for_a_new_sign_in() {
     let limits = world::limits();
+    let mut configuration = world::config(8452);
+    configuration.core.owners = Box::new([]);
     let mut world = World::scripted_clock(
-        world::config(8452),
+        configuration,
         limits,
         Peers::new(Vec::new(), Vec::new()),
         Time::from_nanos(17),

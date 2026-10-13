@@ -245,6 +245,10 @@ mod tests {
 
     #[test]
     fn real_driver_retires_only_protocol_routes_and_keeps_same_person_scripted_requests_independent() {
+        retire_only_protocol_routes_and_keep_same_person_scripted_requests();
+    }
+
+    fn retire_only_protocol_routes_and_keep_same_person_scripted_requests() {
         use jig_fake_parties::{self as parties, Act, Party, Role};
         use skein_lib::Token;
 
@@ -255,7 +259,7 @@ mod tests {
         let subject: Box<[u8]> = b"same identity".as_slice().into();
         driver.transport.bind(
             ClientId(0),
-            1,
+            2,
             people::Identity {
                 key: people::IdentityKey { provider: 0, subject: subject.clone() },
                 login: Box::new([]),

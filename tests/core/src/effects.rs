@@ -15,6 +15,7 @@ use jig_test_domain as root;
 use jig_test_system::{Fault, System};
 use skein_lib::{Duration, Env, List, Queue, ReplyTo, Time, Token, Wall};
 use std::collections::VecDeque;
+mod bootstrap;
 
 /// A scenario's cut around one store transaction, before application or reply.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -29,6 +30,7 @@ pub enum Cut {
 #[derive(Debug)]
 #[expect(clippy::struct_excessive_bools, reason = "independently held peer traffic and crash cuts")]
 pub struct World {
+    bootstrap_owners: Vec<people::InitialOwner>,
     pub domain: root::Domain,
     pub store: Store,
     pub systems: [System; 2],
@@ -178,6 +180,14 @@ pub fn fixture(seed: u64, requirement: bool) -> (root::Config, root::Limits) {
 }
 
 impl World {
+    /// Restore configuration into a wholly empty store without a manual bootstrap.
+    #[must_use]
+    pub fn first_start(configuration: root::Config, limits: root::Limits) -> World {
+        let mut world = Self::empty(configuration, &limits);
+        world.send(root::Event::RestartBegin);
+        world
+    }
+
     #[must_use]
     pub fn new(seed: u64, requirement: bool) -> World {
         Self::with_entries(seed, requirement, crate::world::limits().connector.entries)
@@ -228,6 +238,7 @@ impl World {
             })
             .collect();
         world.observer = crate::observations::Observer::new(&configuration);
+        world.bootstrap_owners = configuration.core.owners.to_vec();
         world.observer.durable(world.wall, &world.store);
         world.domain = root::Domain::new(configuration, &limits);
         world.send(root::Event::RestartBegin);
@@ -276,6 +287,7 @@ impl World {
         let observer = crate::observations::Observer::new(&configuration);
         let heap = crate::observations::Heap::new(limits);
         World {
+            bootstrap_owners: Vec::new(),
             domain: root::Domain::new(configuration, limits),
             store: Store::new(),
             systems: [System::new(), System::new()],
@@ -882,12 +894,13 @@ impl World {
                 self.events.push_back(root::Event::Connector { number, event: connector::Event::System(event) });
             }
             root::Delivery::Core(core::Held::PeopleReply {
-                reply: reply @ people::Reply::SignedIn { sign_in, .. },
+                reply: reply @ people::Reply::SignedIn { person, sign_in, .. },
                 ..
             }) => {
                 let initial = self.sign_in.is_none();
                 self.sign_in = Some(sign_in);
                 self.people_answers.push(reply);
+                bootstrap::signed_in(self, person);
                 if !initial {
                     return;
                 }

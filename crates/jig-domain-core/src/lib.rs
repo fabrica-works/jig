@@ -268,6 +268,7 @@ pub struct Core {
     pub projects: List<u32>,
     /// Mutable connector permission mappings approved by policy edits.
     pub permission_roles: Map<u32, Box<[people::PermissionRole]>>,
+    pub(crate) seed_owners: Box<[people::InitialOwner]>,
     /// Immutable settings for core decisions.
     pub settings: Settings,
     /// Named calls awaiting their routed decision.
@@ -525,6 +526,7 @@ impl Core {
             restart: restart::Restart::Cold,
             restart_attempts: limits.fleet.attempts,
             counters: Counters::bootstrap(config.deployment),
+            seed_owners: config.owners.clone(),
             view_subjects: Map::with_capacity(limits.views.watchers),
             view_names: skein_lib::Slab::with_capacity(limits.views.watchers),
             changed_views: skein_lib::Set::with_capacity(limits.views.watchers),

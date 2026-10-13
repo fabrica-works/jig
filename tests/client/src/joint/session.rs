@@ -1086,6 +1086,10 @@ mod tests {
 
     #[test]
     fn real_provider_invalid_identity_is_retained_after_release_and_only_an_explicit_exchange_replaces_it() {
+        invalid_identity_is_retained_until_an_explicit_exchange();
+    }
+
+    fn invalid_identity_is_retained_until_an_explicit_exchange() {
         let (mut session, now, wall) = session();
         let mut invalid = identity();
         invalid.key.subject = Box::new([]);
@@ -1112,14 +1116,14 @@ mod tests {
         assert!(session.poll(now, wall).expect("no automatic retry").is_empty());
         assert_eq!(session.driver.world.store.applied, applied);
         assert!(session.sign_in_failure(ClientId(0)).is_some());
-        // The rejected first identity consumed candidate 1 at the core door,
-        // without creating that person. The explicit next exchange gets 2.
-        session.driver.transport.replace_identity(ClientId(0), 2, identity());
+        // The explicit exchange resolves the owner seeded before sign-in,
+        // despite the rejected identity's unused candidate number.
+        session.driver.transport.replace_identity(ClientId(0), 1, identity());
         session.sign_in(ClientId(0), now, wall);
         assert!(session.driver.world.client_peer.as_ref().expect("actual external peer").delivered.iter().any(
             |(_, value)| matches!(
                 value,
-                root::Delivery::Core(core::Held::PeopleReply { reply: people::Reply::SignedIn { person: 2, .. }, .. })
+                root::Delivery::Core(core::Held::PeopleReply { reply: people::Reply::SignedIn { person: 1, .. }, .. })
             )
         ));
         assert!(session.poll(now, wall).expect("explicit admitted provider exchange").is_empty());

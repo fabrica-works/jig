@@ -25,6 +25,16 @@ pub(super) fn route_people(
     work: &mut Queue<Event>,
     event: people::Event,
 ) -> Requests {
+    if event == people::Event::Restored {
+        let stage = core.restart_step();
+        if stage == Some(crate::RestartStep::LoadCore) || stage == Some(crate::RestartStep::LoadInbox) {
+            core.counters.finish_restore();
+            if core.counters.dirty() && !core.people.ready() {
+                return super::first_start::seed(core, env, work);
+            }
+        }
+        core.seed_owners = Box::new([]);
+    }
     if let people::Event::ForgetChat { task, .. } = &event {
         drop(core.archived_chats.remove(task));
     }

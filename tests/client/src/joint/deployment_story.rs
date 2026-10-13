@@ -45,15 +45,7 @@ fn world() -> World<Test, Joint> {
             .checked_mul(owner.journal.commits)
             .expect("fixture flights"),
     );
-    let mut driver = Driver::new(config, owner, Peers::new(Vec::new(), Vec::new()), Time::ZERO, clock(Time::ZERO));
-    driver.send(
-        Time::ZERO,
-        clock(Time::ZERO),
-        jig_test_domain::Event::Core(jig_domain_core::Event::People(people::Event::Roles {
-            project: 0,
-            holdings: Box::new([]),
-        })),
-    );
+    let driver = Driver::new(config, owner, Peers::new(Vec::new(), Vec::new()), Time::ZERO, clock(Time::ZERO));
     let codec = jig_protocol_transcript::Limits {
         smith: smith_transcript::v3::CEILINGS,
         bytes: 1_048_576,
@@ -72,6 +64,10 @@ fn world() -> World<Test, Joint> {
 
 #[test]
 fn a_configured_deployment_owner_reads_capacity_account_and_connector_facts_from_the_engine() {
+    configured_deployment_owner_reads_capacity_account_and_connector_facts();
+}
+
+fn configured_deployment_owner_reads_capacity_account_and_connector_facts() {
     let mut world = world();
     let client = world.client(1, jig_test_domain_client::Address::Jig(jig_domain_client::address::Address::Deployment));
     let within = Duration::from_secs(1);

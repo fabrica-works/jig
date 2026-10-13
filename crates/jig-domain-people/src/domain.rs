@@ -349,6 +349,12 @@ impl Domain {
         }
     }
 
+    /// Drop the sign-in bootstrap owners when the core begins restore
+    /// (protocol/configuration.md, 3: owners seed the first start only).
+    pub fn forget_initial_owners(&mut self) {
+        self.owners = Box::new([]);
+    }
+
     /// Pure lookup of whether the bounded role table contains `project`, including an empty
     /// holdings set. Available during restoration so the root preserves restored roles and seeds
     /// only missing bootstrap projects; it implies neither readiness nor person membership. The

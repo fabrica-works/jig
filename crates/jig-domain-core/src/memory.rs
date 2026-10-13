@@ -251,6 +251,12 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         Queue::<Box<[u8]>>::worst_case(limits.resume_bytes)?.checked_add(u64::from(limits.resume_bytes))?,
     )?)?;
     total = total.checked_add(bytes(limits.authority.projects, limits.policy_bytes)?)?;
+    total = total.checked_add(bytes(
+        limits.people.initial_owners,
+        sizeof(size_of::<people::InitialOwner>())?.checked_add(u64::from(limits.people.identity_bytes))?,
+    )?)?;
+    total = total.checked_add(Map::<people::IdentityKey, u64>::worst_case(limits.people.initial_owners)?)?;
+    total = total.checked_add(bytes(limits.people.initial_owners, u64::from(limits.people.identity_bytes))?)?;
     total = total.checked_add(limits.policy_bytes.checked_mul(2)?)?;
     total = total.checked_add(bytes(
         task.charters,

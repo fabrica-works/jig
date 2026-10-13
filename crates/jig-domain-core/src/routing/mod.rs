@@ -45,6 +45,7 @@ pub use vocabulary::{
 pub(crate) use watch_marks::finish_watches;
 
 mod children;
+mod first_start;
 mod historical;
 #[path = "notes.rs"]
 mod note_routes;
@@ -283,6 +284,8 @@ fn route_room_checked(limits: &Limits) -> Option<u32> {
         .checked_add(brief)?
         .checked_add(limits.accounts.accounts.checked_add(2)?)?
         .checked_add(limits.people.pending.checked_mul(2)?)?
+        .checked_add(limits.authority.projects.checked_mul(2)?)?
+        .checked_add(limits.people.initial_owners)?
         .checked_add(
             limits.tasks.tasks.checked_mul(limits.tasks.tree_tasks.checked_add(limits.connectors)?.checked_add(4)?)?,
         )?
