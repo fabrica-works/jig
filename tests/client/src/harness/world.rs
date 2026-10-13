@@ -289,6 +289,7 @@ impl<A: App, F: Front<A>> World<A, F> {
         c.view = view;
         c.model = Model::default();
         c.deferred.clear();
+        c.kept = self.front.restored(id, c.kept.clone());
         let event = A::start(c.history[c.at].clone(), c.kept.clone(), 0);
         self.callback(id, Some(event));
     }
@@ -564,6 +565,7 @@ impl<A: App, F: Front<A>> World<A, F> {
                 StoreWrite::Erase(key) => c.kept.retain(|record| A::record_key(record) != key),
             }
         }
+        self.front.stored(id, &c.kept);
         for request in wires {
             if failed {
                 if let Some(event) = A::unsent(request) {

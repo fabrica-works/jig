@@ -11,3 +11,6 @@ pub mod protocol {
 }
 
 pub mod native;
+
+pub mod referee;
+pub mod stories;

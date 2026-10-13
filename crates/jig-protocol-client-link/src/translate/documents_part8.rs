@@ -32,7 +32,7 @@ pub(crate) fn owner_project_fields(value: &w::OwnerProject, limits: &Limits) -> 
         list3.push(pool_ledger_fields(item, limits)).expect("reserved supplied list");
     }
     Ok(c::OwnerProject {
-        acts: offered_piece(value.acts(), limits, limits.client.rows)?,
+        acts: offered_piece(value.acts(), limits, c::MAX_OFFERED_ACTS)?,
         number: value.number(),
         resources: owner_project_resource_piece(value.resources(), limits, limits.client.rows)?,
         policy: owner_project_policy_fields(value.policy(), limits)?,

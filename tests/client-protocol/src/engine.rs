@@ -14,14 +14,18 @@ pub(super) struct Engine {
     pub env: Env<clients::Limits>,
     pub out: Queue<Request>,
     pub link: Box<[u8]>,
+    pub rules: crate::referee::Rules,
+    pub limits: root::Limits,
+    pub seed: u64,
     secrets: BTreeMap<SecretOwner, clients::Kept>,
     replies: BTreeSet<Token>,
     truth: Truth,
     observed: Vec<Observed>,
+    ticked: Option<Time>,
 }
 impl Engine {
-    pub fn new(seed: u64) -> Self {
-        let limits = crate::fixtures::owner_limits();
+    pub fn bounded(seed: u64, limits: &root::Limits) -> Self {
+        let limits = crate::fixtures::journal(*limits);
         let driver = Driver::new(
             jig_core_world::world::config(seed),
             limits,
@@ -41,10 +45,14 @@ impl Engine {
             env,
             out,
             link: Box::new([]),
+            rules: crate::referee::Rules::default(),
+            limits,
+            seed,
             secrets: BTreeMap::new(),
             replies: BTreeSet::new(),
             truth,
             observed: Vec::new(),
+            ticked: None,
         }
     }
     pub fn clock(&mut self, now: Time, wall: Wall) {
@@ -62,6 +70,7 @@ impl Engine {
             Request::Secrets(request) => {
                 let answer = match request {
                     SecretsRequest::Keep { owner, value } => {
+                        self.rules.secret(value.digest.expose());
                         self.secrets.insert(owner, value);
                         SecretsAnswer::Kept { owner }
                     }
@@ -92,6 +101,7 @@ impl Engine {
         None
     }
     fn apply(&mut self, mut event: root::Event) {
+        self.rules.domain(&event).expect("no authentication secret in a root input");
         let to = if let root::Event::Core(
             core::Event::SignIn { reply_to, .. }
             | core::Event::People(
@@ -101,7 +111,9 @@ impl Engine {
         | root::Event::Application { reply_to, .. } = &mut event
         {
             Some(reply_to)
-        } else if let root::Event::ReadApplication { reply, .. } = &mut event {
+        } else if let root::Event::ReadApplication { reply, .. } | root::Event::Core(core::Event::Read { reply, .. }) =
+            &mut event
+        {
             Some(reply)
         } else {
             None
@@ -185,7 +197,10 @@ impl Engine {
         refused
     }
     pub fn poll(&mut self) -> bool {
-        self.driver.world.fire_due(self.env.now, self.env.wall);
+        if self.ticked != Some(self.env.now) {
+            self.ticked = Some(self.env.now);
+            self.driver.world.fire_due(self.env.now, self.env.wall);
+        }
         let peer = self.driver.world.client_peer.as_ref().expect("joint protocol peer");
         let active = !peer.delivered.is_empty() || !peer.now.is_empty();
         self.deliveries(None);

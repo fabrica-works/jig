@@ -59,3 +59,149 @@ fn a_family_place_record_round_trips_through_its_owner_s_small_store_bytes() {
         );
     }
 }
+
+#[test]
+fn a_request_whose_answer_was_lost_is_made_once() {
+    use jig_client_protocol_world::stories as bytes;
+    for &seed in bytes::SEEDS {
+        let (mut world, client) = bytes::ready(seed);
+        pending_stop(&mut world, client);
+        bytes::held(&mut world, client);
+        assert_eq!(world.front().requests_made(), 2, "lost answer seed {seed}");
+        assert!(world.front().cuts() > 0, "cut seed {seed}");
+    }
+}
+
+#[test]
+fn a_slow_reader_gets_fewer_deliveries_and_others_are_answered() {
+    use jig_client_protocol_world::stories as bytes;
+    use jig_client_world::FrontFault;
+    use skein_lib::Duration;
+    let (mut world, first) = bytes::two_clients(fixtures::SEED);
+    let second = world.client(
+        1,
+        jig_test_domain_client::Address::Jig(jig_domain_client::address::Address::Task {
+            task: 1,
+            section: jig_domain_client::address::TaskSection::Activity,
+        }),
+    );
+    world.person(
+        second,
+        fixtures::sign_in_then(vec![jig_fake_person::Step::See {
+            find: jig_fake_person::Find::exactly_named(jig_view::Role::Button, b"Write"),
+            within: Duration::from_secs(1),
+        }]),
+    );
+    bytes::finish(&mut world);
+    let now = world.now();
+    world.front().select_stream(first);
+    world.fault(FrontFault::Slow { span: Duration::from_secs(1) });
+    let before = world.front().deliveries(first);
+    let answered = world.front().answers(second);
+    let second_before = world.front().deliveries(second);
+    bytes::send_words(&mut world, second, b"Please continue");
+    bytes::finish(&mut world);
+    assert_eq!(world.front().deliveries(first), before);
+    assert!(world.now() < now.saturating_add(Duration::from_secs(1)));
+    assert!(world.front().words_reached_worker(b"Please continue"));
+    assert!(world.front().deliveries(second) > second_before);
+    world.front().check_isolation(first, second, answered);
+    assert_eq!(world.front().rules().isolated, 1);
+}
+
+#[test]
+fn a_reload_restores_a_pending_request_from_the_small_store_s_bytes() {
+    use jig_client_protocol_world::stories as bytes;
+    for &seed in bytes::SEEDS {
+        let (mut world, client) = bytes::ready(seed);
+        pending_stop(&mut world, client);
+        assert!(world.front().pending_bytes(client) > 0, "pending seed {seed}");
+        world.reload(client);
+        bytes::held(&mut world, client);
+        assert_eq!(world.front().chats_made(), 1, "reload seed {seed}");
+    }
+}
+
+#[test]
+fn signed_out_with_requests_pending_then_signed_in_again() {
+    use jig_client_protocol_world::stories as bytes;
+    use jig_fake_person::{Find, Step};
+    for &seed in bytes::SEEDS {
+        let (mut world, client) = bytes::ready(seed);
+        pending_stop(&mut world, client);
+        world.fault(jig_client_world::FrontFault::SignedOut);
+        world.person(
+            client,
+            vec![
+                Step::See {
+                    find: Find::named(jig_view::Role::Button, b"Sign in with Test"),
+                    within: skein_lib::Duration::from_secs(1),
+                },
+                Step::Press { find: Find::named(jig_view::Role::Button, b"Sign in with Test") },
+                Step::See { find: Find::text(b"Held stopped"), within: skein_lib::Duration::from_secs(5) },
+            ],
+        );
+        bytes::finish(&mut world);
+        assert_eq!(world.front().chats_made(), 1, "signed out seed {seed}");
+    }
+}
+
+#[test]
+fn a_person_s_words_reach_a_running_run_through_bytes() {
+    use jig_client_protocol_world::stories as bytes;
+    for &seed in bytes::SEEDS {
+        let (mut world, client) = bytes::ready(seed);
+        bytes::send_words(&mut world, client, b"Please continue");
+        bytes::finish(&mut world);
+        assert!(world.front().words_reached_worker(b"Please continue"), "worker seed {seed}");
+    }
+}
+
+#[test]
+fn an_engine_outside_the_client_s_versions_shows_out_of_date() {
+    use jig_client_protocol_world::stories as bytes;
+    use jig_fake_person::{Find, Step};
+    for &seed in bytes::SEEDS {
+        let (mut world, client) = bytes::ready(seed);
+        world.fault(jig_client_world::FrontFault::Versions);
+        world.person(
+            client,
+            vec![Step::See { find: Find::text(b"Out of date"), within: skein_lib::Duration::from_secs(2) }],
+        );
+        bytes::finish(&mut world);
+        assert_eq!(world.front().chats_made(), 1, "versions seed {seed}");
+    }
+}
+
+#[test]
+fn actual_busy_not_ready_restart_and_dropped_watch_retry_the_same_request() {
+    use jig_client_protocol_world::stories as bytes;
+    use jig_client_world::FrontFault;
+    use skein_lib::Duration;
+    for (label, fault) in [
+        ("busy", FrontFault::Busy),
+        ("not ready", FrontFault::NotReady),
+        ("restart", FrontFault::Restart { offline: Duration::from_millis(100) }),
+        ("dropped watch", FrontFault::DropWatch),
+    ] {
+        eprintln!("fault case {label}");
+        if matches!(&fault, FrontFault::Busy | FrontFault::NotReady) {
+            bytes::transient_request(fixtures::SEED, fault);
+            continue;
+        }
+        let (mut world, client) = bytes::ready(fixtures::SEED);
+        pending_stop(&mut world, client);
+        world.fault(fault);
+        bytes::held(&mut world, client);
+        assert_eq!(world.front().chats_made(), 1, "{label}");
+    }
+}
+
+fn pending_stop(world: &mut jig_client_protocol_world::stories::Story, client: jig_client_world::ClientId) {
+    world.fault(jig_client_world::FrontFault::NoAnswer);
+    jig_client_protocol_world::stories::submit_stop(world, client);
+    assert!(
+        world.kept(client).iter().any(|record| matches!(record, jig_test_domain_client::store::Record::Table { .. })),
+        "the request remains in the small store"
+    );
+}

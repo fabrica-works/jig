@@ -23,6 +23,21 @@ pub fn owner_limits() -> jig_test_domain::Limits {
     limits
 }
 #[must_use]
+pub fn journal(mut limits: jig_test_domain::Limits) -> jig_test_domain::Limits {
+    let room = jig_domain_core::room_max(&limits.core).expect("whole core room");
+    let connectors = jig_test_connector::MAX_OUT.checked_mul(2).expect("two connector routes");
+    limits.journal.writes =
+        limits.journal.writes.max(2000).max(room.writes.checked_add(connectors).expect("whole writes"));
+    limits.journal.held = limits.journal.held.max(2000).max(
+        room.held
+            .checked_add(connectors)
+            .expect("whole held")
+            .checked_mul(limits.journal.commits)
+            .expect("bounded flights"),
+    );
+    limits
+}
+#[must_use]
 pub fn peers() -> jig_core_world::peers::Peers {
     jig_core_world::peers::Peers::new(
         vec![jig_fake_workers::Worker::new(1, 1, vec![Box::new([jig_fake_workers::Script::Wait])])],
@@ -62,7 +77,14 @@ pub fn engine_limits() -> Limits {
         providers: 1,
         exchanges: 8,
         exchanges_per_client: 4,
-        http: skein_http::server::Limits { head: 4096, headers: 8, body: 65536, read: 1024, response: 65536, send: 32 },
+        http: skein_http::server::Limits {
+            head: 4096,
+            headers: 8,
+            body: 65536,
+            read: 1024,
+            response: 65536,
+            send: 1024,
+        },
         wire: jig_protocol_client_wire::v7::CEILINGS,
         link_span: Duration::from_secs(300),
         stall: Duration::from_secs(30),

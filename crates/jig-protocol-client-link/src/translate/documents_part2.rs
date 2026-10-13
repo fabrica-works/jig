@@ -257,7 +257,7 @@ pub(crate) fn result_fields(value: &w::ResultDocument, limits: &Limits) -> Resul
         value: opt0,
         at: opt1,
         details: opt2,
-        acts: offered_piece(value.acts(), limits, limits.client.rows)?,
+        acts: offered_piece(value.acts(), limits, c::MAX_OFFERED_ACTS)?,
     })
 }
 

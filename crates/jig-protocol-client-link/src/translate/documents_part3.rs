@@ -135,7 +135,7 @@ pub(crate) fn escalation_fields(value: &w::Escalation, limits: &Limits) -> Resul
         impact: impact_fields(value.impact(), limits),
         waiting: crate::translate::facts::recipient(value.waiting(), limits),
         trail: passed_piece(value.trail(), limits, limits.client.rows)?,
-        acts: offered_piece(value.acts(), limits, limits.client.rows)?,
+        acts: offered_piece(value.acts(), limits, c::MAX_OFFERED_ACTS)?,
     })
 }
 
@@ -399,7 +399,7 @@ pub(crate) fn task_fields(value: &w::Task, limits: &Limits) -> Result<c::Task, w
         proposals: list7,
         activity: value.activity(),
         changed: Wall::from_nanos(value.changed()),
-        acts: offered_piece(value.acts(), limits, limits.client.rows)?,
+        acts: offered_piece(value.acts(), limits, c::MAX_OFFERED_ACTS)?,
         result: opt8,
         delegates: live_delegate_piece(value.delegates(), limits, limits.client.rows)?,
         context: opt9,

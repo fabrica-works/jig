@@ -9,6 +9,8 @@ use skein_lib::{
     stream::{Down, Up},
 };
 use std::collections::BTreeMap;
+mod faults;
+mod persistence;
 pub(super) struct Side {
     pub(super) link: Link,
     connections: Connections,
@@ -19,6 +21,7 @@ pub(super) struct Side {
     callbacks: Vec<Event>,
     pub(super) authenticated: bool,
     signing_out: Option<Token>,
+    signing_link: Option<Box<[u8]>>,
     next: u64,
     routes: BTreeMap<Token, (bool, Token)>,
     watched: BTreeMap<(bool, Token), Token>,
@@ -37,6 +40,7 @@ impl Side {
             callbacks: Vec::new(),
             authenticated: false,
             signing_out: None,
+            signing_link: None,
             next: 0,
             routes: BTreeMap::new(),
             watched: BTreeMap::new(),
@@ -217,16 +221,34 @@ pub struct Protocol {
     net: Net,
     callbacks: Vec<(ClientId, Event)>,
     now: Time,
+    last_client: Option<ClientId>,
+    release: Option<Time>,
+    restart: Option<Time>,
+    versions: bool,
+    stores: BTreeMap<ClientId, persistence::Bytes>,
+    deliveries: BTreeMap<ClientId, u64>,
+    answers: BTreeMap<ClientId, u64>,
 }
 impl Protocol {
     #[must_use]
     pub fn new(seed: u64) -> Self {
+        Self::bounded(seed, &fixtures::owner_limits())
+    }
+    #[must_use]
+    pub fn bounded(seed: u64, limits: &jig_test_domain::Limits) -> Self {
         let mut value = Self {
-            engine: Engine::new(seed),
+            engine: Engine::bounded(seed, limits),
             clients: BTreeMap::new(),
-            net: Net::new(),
+            net: Net::new(seed),
             callbacks: Vec::new(),
             now: Time::ZERO,
+            last_client: None,
+            release: None,
+            restart: None,
+            versions: false,
+            stores: BTreeMap::new(),
+            deliveries: BTreeMap::new(),
+            answers: BTreeMap::new(),
         };
         value.advance(Time::ZERO, fixtures::wall(Time::ZERO));
         value
@@ -277,6 +299,8 @@ impl Protocol {
     fn advance(&mut self, now: Time, wall: Wall) {
         self.now = now;
         self.engine.clock(now, wall);
+        self.release_faults(now, wall);
+        self.net.clock(now);
         let mut quiet = 0;
         for _ in 0..100_000 {
             let mut active = self.engine.poll();
@@ -297,7 +321,11 @@ impl Protocol {
                 while let Some(request) = side.out.pop() {
                     active = true;
                     match side.callback(request) {
-                        Ok(event) => self.callbacks.push((*client, event)),
+                        Ok(event) => {
+                            self.engine.rules.domain(&event).expect("no secret in a client domain event");
+                            count(*client, &event, &mut self.deliveries, &mut self.answers);
+                            self.callbacks.push((*client, event));
+                        }
                         Err(request) => side.connections.down(now, request, &mut side.below),
                     }
                 }
@@ -308,15 +336,27 @@ impl Protocol {
                     match signing {
                         Signing::SignedIn { .. } => {
                             side.authenticated = true;
-                            side.connections.down(now, link::Request::OpenStream, &mut side.below);
+                            side.signing_link = None;
+                            if let Some(secret) = side.connections.token() {
+                                self.engine.rules.secret(secret.expose());
+                            }
                             for request in std::mem::take(&mut side.pending) {
                                 side.wire(now, request);
                             }
                         }
                         Signing::SignedOut { .. } => {
                             side.authenticated = false;
+                            side.connections.down(now, link::Request::CloseStream, &mut side.below);
+                            side.event(now, link::Event::StreamEnded);
                             side.signing_out = None;
                             self.callbacks.push((*client, Event::SignedOut));
+                        }
+                        Signing::Refused { exchange } if side.signing_out != Some(exchange) => {
+                            if side.signing_link.as_ref().is_some_and(|old| old != &self.engine.link) {
+                                side.signing_link = Some(self.engine.link.clone());
+                                side.connections.sign_in(&self.engine.link).expect("new printed link");
+                                side.connections.take(now, &mut side.up, &mut side.below);
+                            }
                         }
                         Signing::Again { exchange } | Signing::Lost { exchange } | Signing::Refused { exchange } => {
                             if side.signing_out == Some(exchange) {
@@ -333,7 +373,7 @@ impl Protocol {
                     }
                 }
             }
-            let (events, clients, changed) = self.net.advance();
+            let (events, clients, changed) = self.net.advance(&mut self.engine.rules);
             active |= changed;
             for event in events {
                 self.engine.event(jig_protocol_engine_clients::Event::Io(event));
@@ -360,6 +400,7 @@ impl Front<Test> for Protocol {
         self.callbacks.push((client, Event::SignedOut));
     }
     fn wire(&mut self, client: ClientId, now: Time, _wall: Wall, request: Request) {
+        self.last_client = Some(client);
         self.clients.get_mut(&client).expect("bound client").wire(now, request);
     }
     fn poll(&mut self, now: Time, wall: Wall) -> Vec<(ClientId, Event)> {
@@ -372,20 +413,31 @@ impl Front<Test> for Protocol {
             .filter_map(|side| side.link.next_deadline())
             .chain(self.engine.component.next_deadline())
             .chain(self.engine.driver.world.next_due())
+            .chain(self.release)
+            .chain(self.restart)
+            .chain(self.net.next_due())
             .min()
     }
     fn observed(&mut self) -> Vec<Observed> {
         self.engine.observed()
     }
-    fn fault(&mut self, _now: Time, _fault: FrontFault) {
-        panic!("faults join in 33.5");
+    fn fault(&mut self, now: Time, fault: FrontFault) {
+        self.apply_fault(now, fault);
     }
-    fn reload(&mut self, _client: ClientId, _now: Time) {
-        panic!("reload joins in 33.5");
+    fn reload(&mut self, client: ClientId, now: Time) {
+        self.reload_side(client, now);
+    }
+    fn stored(&mut self, client: ClientId, records: &[client::store::Record]) {
+        self.stores.insert(client, persistence::encode(records));
+    }
+    fn restored(&mut self, client: ClientId, _records: Vec<client::store::Record>) -> Vec<client::store::Record> {
+        persistence::decode(self.stores.get(&client).expect("kept small store"))
     }
     fn received(&mut self, _client: ClientId, _event: &Event) {}
     fn sign_in(&mut self, client: ClientId, now: Time, _wall: Wall) {
+        self.last_client = Some(client);
         let side = self.clients.get_mut(&client).expect("bound client");
+        side.signing_link = Some(self.engine.link.clone());
         side.connections.sign_in(&self.engine.link).expect("engine's actual printed link");
         side.connections.take(now, &mut side.up, &mut side.below);
     }
@@ -393,5 +445,25 @@ impl Front<Test> for Protocol {
         let side = self.clients.get_mut(&client).expect("bound client");
         side.signing_out = Some(side.connections.sign_out());
         side.connections.take(now, &mut side.up, &mut side.below);
+    }
+}
+
+fn count(
+    client: ClientId,
+    event: &Event,
+    deliveries: &mut BTreeMap<ClientId, u64>,
+    answers: &mut BTreeMap<ClientId, u64>,
+) {
+    if matches!(
+        event,
+        Event::Jig(jig_domain_client::Event::Watch {
+            event: jig_domain_client::contract::WatchEvent::Delivered(_),
+            ..
+        })
+    ) {
+        *deliveries.entry(client).or_default() += 1;
+    }
+    if matches!(event, Event::Answer { envelope: skein_lib::RequestEnvelope::Final, .. }) {
+        *answers.entry(client).or_default() += 1;
     }
 }
