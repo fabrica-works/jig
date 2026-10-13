@@ -1953,6 +1953,17 @@ the file.
      per-turn fetch (`archive.rs`) goes. Steps not in the plan: jig 17.s1
      (`jig/17-store-files.md`) and jig 30.s3 (`jig/30-client-wire.md`),
      at once; 34.3 after both, amended; 34.4 goes on.
+245. **jig 18.s2: the private secrets directory is synced into its
+     parent** (2026-10-13, the coordinator's block "jig 18.5: newly
+     created private secrets directory lost after Kept",
+     2026-10-13T08:33:25Z). After 18.s1, 18.5's empty-directory world finds
+     the same defect for `secrets/`, made by skein's `OpenPrivate`, whose
+     design leaves the new entry's durability to the caller. A step not in
+     the plan, jig 18.s2 (`jig/18-store-worlds.md`), syncs the deployment's
+     directory after `OpenPrivate`, before the secrets' store opens; jig 18
+     runs it before 18.5 lands. Whether skein's io should sync a parent
+     it makes a directory in, and whether skein's other private-root
+     users share the gap, is asked of the designer.
 
 ## For the user
 

@@ -541,6 +541,31 @@ Don't: pre-create the directories in a fixture; change the crashing
 machine's rules.
 Size: at most 40 lines of production code.
 
+### 18.s2 The private secrets directory is synced into its parent
+
+A step not in the plan (decisions.md, ruling 245), the second of 18.5's
+durability findings after 18.s1. The component opens the secrets' store
+through skein's `OpenPrivate`, which makes `secrets/` when it is absent
+(skein `io.md`, 5.3) and leaves its entry's durability to the caller
+(`SyncDirectory`, io.md 5). `crates/jig-protocol-store/src/directory.rs`
+opens the secrets' kv store without syncing the deployment's directory
+after it, so a crash after `Kept` loses the secret (18.5's
+`a_secret_kept_survives_a_crash`, seed 18; `logs/jig-18/focused-18-5-after-s1.log`).
+Needs: 18.s1; before 18.5 lands.
+Files: `crates/jig-protocol-store/src/directory.rs`,
+`src/tests/directory.rs`.
+Shape: after `OpenPrivate` answers `Opened`, and before the secrets' kv
+store opens, the component syncs the deployment's directory, keeping the
+private root it was given; a failed sync refuses the open, as 18.s1's
+does.
+Test shape: a row in 18.s1's directory table: `OpenPrivate` is followed
+by the parent's `SyncDirectory` before the secrets' store opens. 18.5's
+crash test is the world's proof.
+Proof: 18.5's `a_secret_kept_survives_a_crash` passes on the real store;
+the gate.
+Don't: pre-create `secrets/` in a fixture; change skein.
+Size: at most 25 lines of production code.
+
 ### 18.5 The store's world on the crashing disk (W4)
 
 Scope: store.md 14 and 8.4. `tests/store` (package `jig-store-world`),
