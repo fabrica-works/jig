@@ -1198,6 +1198,18 @@ the file.
      `core::Limits` field bounding it (jig 14's rule: a field no domain
      limit bounds). No signature changes, `codec::limits` and 19.5's
      sketch included; 19.2 corrects the stale comment at `stored.rs:531`.
+181. **A story finds its tasks, not their numbers** (2026-10-13, the
+     coordinator's block "jig 07.s1: seeded-crash fixture hardcodes
+     shifted task identities", 2026-10-13T00:10:48Z). jig 07.s1's period
+     and policy commits, as its Shape asks, shift task numbers in
+     `jig-ops-world`'s `p_story_survives_seeded_commit_crashes_and_random_presses`
+     (seed 537): incident 12's lead becomes task 6 and its remediation 7,
+     where the story hardcodes 5 and 6. 07.s1 changes the story to find
+     incident 12's lead and its remediation delegate and use them for
+     addresses and record matching, past ruling 114's 20 lines, keeping
+     every behavioural assertion (one restart, one acceptance, its person,
+     by, choice and kind, the procedure's phases, the incident's
+     resolution) and the seed.
 
 ## For the user
 
