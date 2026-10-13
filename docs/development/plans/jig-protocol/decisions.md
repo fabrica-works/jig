@@ -2302,6 +2302,17 @@ the file.
      as counted, with `lib.rs`, `limits.rs` and `stop.rs` in its Files
      (the store's adoption, its pricing, and 27.2's own last close
      replaced, ruling 198), the per-file counts in its commit body.
+275. **jig 33.4's world says the first period, as the application's
+     calendar would** (2026-10-13, the coordinator's block "jig 33.4:
+     first project period source for real-service native proof",
+     2026-10-13T15:19:02Z). The real service refuses a chat for want of
+     funding: no period reached the core. `service.md`, 7 gives the
+     reference binary a calendar child of its root that says each period;
+     no step builds it. 33.4's world plays that child, as a world plays its
+     application's root: a named period source in the world says the first
+     period through the engine, which the real core and store commit; its
+     proof keeps every expectation. Whether the calendar is built in this
+     plan, before jig 26's process proof, is asked of the designer.
 
 ## For the user
 
