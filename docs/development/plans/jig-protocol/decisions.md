@@ -1887,6 +1887,16 @@ the file.
   2026-10-13: not now; only when it is needed to keep the suite within
   its budget.** Steps 10 to 12 of `tests-cost.md` go on.
 
+- **Optimized tool builds and the real store's test cost** (the user,
+  2026-10-13): the `opt-level = 3` overrides of the repository's tools
+  (jig's `jig-boundary` and `skein-codegen`, tests.s4; smith's `sha2`)
+  stay, being rebuilt only occasionally and absorbed by the build cache.
+  The real store in the domain worlds costs about 1.8 ms per focused
+  world test (608 tests 3.5 s on the fake, 4.6 s on the real store) and
+  is accepted for real behaviour; the supervisor watches the suite's
+  total, and improvements are evaluated when gates approach its limit
+  (about 90 % of 15 s).
+
 - **smith's settle test on carbon-forge** (ruling 186): smith-repin's
   last gate fails only smith's `smith_check_json_lists_the_effective_limits_by_name`
   at 2.05–2.08 s against its 2,000 ms bound in the full suite; alone it
