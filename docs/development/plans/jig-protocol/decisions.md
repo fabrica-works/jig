@@ -2313,6 +2313,16 @@ the file.
      period through the engine, which the real core and store commit; its
      proof keeps every expectation. Whether the calendar is built in this
      plan, before jig 26's process proof, is asked of the designer.
+276. **jig 26.s1: the reference service opens each project's first
+     period** (2026-10-13, the designer's answer to question.md's "The
+     reference binary's period calendar: in this plan?"; jig `b4a79914`,
+     `d66ca808`). The calendar child `service.md` 7 described is `ops`'s,
+     in `later.md`. The reference service takes the smallest source: at a
+     deployment's first start, before the core admits a party's request,
+     its root opens one period per configured project, its budget the
+     policy's spend per period, with no next start; a later start says
+     none. A step not in the plan, jig 26.s1 (`jig/26-one-process.md`),
+     at most 80 lines; 26.5 and 26.6 need it.
 
 ## For the user
 
