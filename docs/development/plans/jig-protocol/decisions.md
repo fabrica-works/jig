@@ -1521,6 +1521,19 @@ the file.
      the plan, jig 30.s1 (`jig/30-client-wire.md`), adds `enum ReadValue`;
      jig's read answers carry it encoded as `Owned.record`. jig 32.2 and 34
      use it; 32.2 lands its outgoing reads meanwhile.
+209. **Moving an unchanged test body into a named helper counts for
+     nothing** (2026-10-13, the coordinator's block "jig 11.s1: first-owner
+     seed fixture fixes and required named test bodies",
+     2026-10-13T04:33:47Z). 11.s1's pre-seeded owners reach eleven client
+     tests (ruling 145): its fixes are 12 lines of inputs and one expected
+     person (2 to 1, ruling 122), but keeping two changed tests within the
+     40-line ceiling moves their unchanged assertions into named bodies,
+     and the core world's clock fixture changes 3 lines, past ruling 114's
+     20 in all. From now to the run's end, moving a test's unchanged
+     statements into a named helper of the same file, to keep a function
+     within 40 lines, does not count toward ruling 114's 20 lines; the
+     inputs and expected values changed still do. 11.s1 lands with its
+     edits, each named in its commit body. The README's Rules say so.
 
 ## For the user
 

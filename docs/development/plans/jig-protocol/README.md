@@ -317,6 +317,10 @@ ones before it in its session. Dependencies are by capability: "skein
   114's 20 lines, every test's name and expected value kept unless the
   Shape changes the behaviour, named in the commit body. Another
   session's files stay under rulings 114 and 145.
+- **Moving an unchanged test body counts for nothing** (decisions.md,
+  ruling 209): moving a test's unchanged statements into a named helper of
+  the same file, to keep a function within 40 lines, does not count toward
+  ruling 114's 20 lines; changed inputs and expected values still do.
 
 ## Live services
 
