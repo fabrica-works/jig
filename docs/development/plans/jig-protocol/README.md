@@ -353,6 +353,15 @@ ones before it in its session. Dependencies are by capability: "skein
   values become the design's, exact, quoting the design's section in the
   commit body; name and every other expected value kept. When the design
   is silent or the real component disagrees with it, it stays a finding.
+- **A test fixture on the real store asks the journal its limits admit**
+  (decisions.md, rulings 229, 231 and 235). A fixture that moves onto a
+  real store derives its journal from its final limits through one named
+  helper (at least 2,000 writes, `held` likewise) and may shrink its
+  bounds to test-sized values its tests still exercise, each changed
+  bound named old and new in the commit body; every test's name and
+  expected value kept, no question. Default and production limits stay,
+  and no adapter caps what it is given. A test whose case needs a bound
+  the real store cannot admit is a finding.
 - **A new test costs the suite about 12 ms before its work** (decisions.md,
   ruling 219; `tests-cost.md`, 12). In every step left, tests are one per
   behaviour, a behaviour's cases rows of one table test; fixtures are

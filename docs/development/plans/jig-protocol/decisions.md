@@ -1832,6 +1832,20 @@ the file.
      the digest already kept, and never draws a second. A service's
      sign-in names the identity `make_service` recorded (the deployment,
      the service's number), which people's `signed_in` already finds.
+235. **Every test fixture on the real store asks the journal its limits
+     admit** (2026-10-13, the coordinator's block "jig 18.3: remaining
+     non-peer fixtures have unadmitted 10000-write journals",
+     2026-10-13T07:01:40Z; the fifth such block of 18.3, after rulings
+     227, 229 to 231). `faults::plan_fixture` and three story fixtures
+     (`stories.rs`, `fuzzy_stories.rs`, `stories/watches.rs`) set 10,000
+     writes outside the peers' family. Rulings 229 and 231 widen to every
+     test fixture that moves onto the real store, in any session: its
+     journal comes from its final limits through the one helper (at
+     least 2,000 writes), its bounds test-sized as needed, every changed
+     bound named old and new in the commit body, every test's name and
+     expected value kept. Default and production limits
+     (`world::limits`, the profiles) are not changed, and the adapter
+     caps nothing. The README's Rules now say so.
 
 ## For the user
 
