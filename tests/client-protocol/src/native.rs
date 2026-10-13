@@ -21,6 +21,25 @@ impl Script {
         steps.push(Step::See { find: Find::text(answer), within: Duration::from_secs(5) });
         Self { steps: steps.into_boxed_slice() }
     }
+    /// Read this fixture's answer card, excluding its request and instructions.
+    #[must_use]
+    pub fn answered_report(words: &[u8], answer: &[u8], within: Duration) -> Self {
+        let mut steps = Self::start_chat(words).steps.into_vec();
+        steps.push(Step::See {
+            find: Find::named(jig_view::Role::Paragraph, answer).within(Box::new([
+                jig_fake_person::Target::ExactRole {
+                    role: jig_view::Role::Region,
+                    name: b"Historical object".as_slice().into(),
+                },
+                jig_fake_person::Target::ExactRole {
+                    role: jig_view::Role::Region,
+                    name: b"Project: 1".as_slice().into(),
+                },
+            ])),
+            within,
+        });
+        Self { steps: steps.into_boxed_slice() }
+    }
     /// Open the durable conversation and read its answer after a restart.
     #[must_use]
     pub fn found_chat(answer: &[u8]) -> Self {

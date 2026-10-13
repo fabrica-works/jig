@@ -31,3 +31,9 @@ slow-timeout = { period = "60s" }
 default-filter = "binary(=process)"
 global-timeout = "2m"
 test-threads = 1
+
+[profile.live]
+default-filter = "binary(=live)"
+global-timeout = "5m"
+test-threads = 1
+retries = 0

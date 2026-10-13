@@ -940,6 +940,7 @@ dependencies = [
  "jig-client-protocol-world",
  "jig-domain-host",
  "jig-protocol-config",
+ "jig-protocol-store",
  "jig-shell-native",
  "jig-test-service",
  "serde_json",

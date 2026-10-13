@@ -300,6 +300,7 @@ impl Referee<Process> for Judge {
     }
 }
 pub fn run(directory: &Path, script: Script, peer: Option<skein_fake_peers::llm::Peer>) -> (u32, u32) {
+    let seconds = if std::env::var("NEXTEST_PROFILE").as_deref() == Ok("live") { 280 } else { 60 };
     let clock = Clock::new();
     let mut binary = start(directory);
     let streams = binary.take_streams().expect("binary pipes");
@@ -307,8 +308,10 @@ pub fn run(directory: &Path, script: Script, peer: Option<skein_fake_peers::llm:
     let Streams::Pipes { input, output } = streams else { panic!("pipes mode") };
     let client_directory = tempfile::tempdir_in(directory).expect("fresh native client directory");
     let root = skein_shell::open_root(client_directory.path()).expect("client root");
-    let mut world =
-        real::World::new(Judge { ended: false, deadline: clock.now().now.saturating_add(Duration::from_secs(55)) });
+    let mut world = real::World::new(Judge {
+        ended: false,
+        deadline: clock.now().now.saturating_add(Duration::from_secs(seconds - 5)),
+    });
     world.spawn_with_fds(binary.descriptors(), || Process::Binary(Box::new(binary)));
     world.spawn_with_fds(fds.into_iter().chain([root]).collect(), || {
         Process::Person(Box::new(Person {
@@ -327,7 +330,7 @@ pub fn run(directory: &Path, script: Script, peer: Option<skein_fake_peers::llm:
     if let Some(peer) = peer {
         world.spawn(|| Process::Peer(Box::new(peer)));
     }
-    let outcome = world.run(&clock, Duration::from_secs(60));
+    let outcome = world.run(&clock, Duration::from_secs(seconds));
     assert!(outcome.procs.iter().all(Host::is_empty), "all real io settles");
     let Process::Person(person) = &outcome.procs[1] else { panic!("native person") };
     let client = person.client.as_ref().expect("signed-in client");
