@@ -2323,6 +2323,16 @@ the file.
      policy's spend per period, with no next start; a later start says
      none. A step not in the plan, jig 26.s1 (`jig/26-one-process.md`),
      at most 80 lines; 26.5 and 26.6 need it.
+277. **A child its owner ended may leave output unread: skein 03.s2 and
+     jig-repin.s5 before 26.2 lands** (2026-10-13, the designer's answer
+     to question.md's "skein's simulator: an aborted child's unread
+     output"; skein `b638df3c`, jig `435192f7`). io's design abandons
+     unread output on an abort and kills a closed child's group; only the
+     simulator's settlement check said otherwise. It now asks the read to
+     the end only of a child that exited with its own code. Steps not in
+     the plan: skein 03.s2 (`skein/03-files.md`, at most 20 lines) and
+     jig-repin.s5 (jig's skein source to skein's `main`); jig 26.2 lands
+     after them, its abort as written.
 
 ## For the user
 
