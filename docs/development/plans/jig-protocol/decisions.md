@@ -2122,6 +2122,18 @@ the file.
      (`jig/27-channel-stories-and-store.md`), admits a read naming the
      attempt's last committed read as reading nothing new; jig 27 runs it
      before 27.1 lands.
+259. **The engine-clients component's default watch window is the core's
+     row cap, configured** (2026-10-13, the coordinator's block "jig 31.5:
+     default watch rows and the core row cap", 2026-10-13T11:12:54Z). The
+     ported watch translation takes a default row window; the component
+     had none, and 32 (a wire chip count) passes the small profile's core
+     cap of 4, so the real core would answer even a frame busy. As
+     proposed: `Settings` gains `rows: u32`, filled by the composition
+     from the receiving core's `documents.rows`, checked nonzero at start,
+     and passed as the default window to the watch translation. No private
+     constant default. A row in the composition's tests, or the reference
+     service's, checks a frame watched with the default window opens on
+     the small profile.
 
 ## For the user
 
