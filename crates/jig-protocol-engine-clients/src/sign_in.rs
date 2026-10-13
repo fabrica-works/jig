@@ -14,6 +14,7 @@ pub(crate) struct Link {
 #[derive(Debug)]
 pub(crate) enum Waiting {
     Core,
+    Watch { sign_in: u64, watcher: Token, opening: bool },
     Keep { sign_in: u64, owner: SecretOwner, answer: Answer },
     Get { owner: SecretOwner, digest: Secret, body: Box<[u8]>, route: Route },
     Made { sign_in: u64, party: u64 },

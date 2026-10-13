@@ -20,6 +20,7 @@ pub fn settings() -> Settings {
         listener: skein_io::Addr::Ip(::core::net::SocketAddr::new(::core::net::IpAddr::from([127, 0, 0, 1]), 8080)),
         link: None,
         heartbeat: Duration::from_secs(5),
+        rows: 32,
         served,
         providers: List::with_capacity(0),
         seed: Secret::new(Box::new([7; 32])),
@@ -32,6 +33,9 @@ pub fn env() -> Env<Limits> {
         wall: Wall::EPOCH,
         limits: Limits {
             connections: 4,
+            streams: 2,
+            watches_per_stream: 4,
+            queued_bytes: 65536,
             identity_bytes: 64,
             families: 2,
             providers: 0,
@@ -114,6 +118,9 @@ impl Exchange {
         self.post_to(b"/jig/v1/request", body)
     }
     pub fn post_to(&mut self, target: &[u8], body: Box<[u8]>) -> Token {
+        self.post_to_method(target, body, skein_http::Method::Post)
+    }
+    pub fn post_to_method(&mut self, target: &[u8], body: Box<[u8]>, method: skein_http::Method) -> Token {
         let owner = self.component.name();
         let mut connection = Connection::new(owner, &self.env.limits, self.env.now);
         connection.requests.pop();
@@ -122,7 +129,7 @@ impl Exchange {
         bearer.put(b"Bearer ").expect("prefix");
         bearer.put(&encoded).expect("token");
         let call = http::Call {
-            method: skein_http::Method::Post,
+            method,
             target: Box::from(target),
             headers: Box::new([skein_http::Header {
                 name: Box::from(b"authorization".as_slice()),
@@ -785,3 +792,7 @@ pub use pages::*;
 #[path = "fixtures/reads.rs"]
 mod reads;
 pub use reads::*;
+
+#[path = "fixtures/watches.rs"]
+mod watches;
+pub use watches::*;

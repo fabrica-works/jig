@@ -134,4 +134,4 @@ pub(super) const LIMITS: Limits = Limits {
 };
 
 pub(super) const CLIENTS: jig_protocol_engine_clients::Limits =
-    jig_protocol_engine_clients::Limits { connections: 16, exchanges: 32, ..small::CLIENTS };
+    jig_protocol_engine_clients::Limits { connections: 16, streams: 8, exchanges: 32, ..small::CLIENTS };

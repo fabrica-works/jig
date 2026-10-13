@@ -13,7 +13,12 @@ use skein_lib::{
     stream::{Down, Read, Up},
 };
 use skein_world::stream::Wire;
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
+#[derive(Debug, PartialEq, Eq)]
+enum ExchangeState {
+    Active,
+    Cut,
+}
 #[derive(Debug)]
 struct Exchange {
     owner: Option<Token>,
@@ -28,9 +33,13 @@ struct Exchange {
     body: Vec<u8>,
     status: Option<u16>,
     done: bool,
+    streaming: bool,
+    paused: bool,
+    pause_after: Option<usize>,
+    state: ExchangeState,
 }
 impl Exchange {
-    fn new(target: &[u8], body: Box<[u8]>, bearer: Option<&[u8]>) -> Self {
+    fn new(method: skein_http::Method, target: &[u8], body: Box<[u8]>, bearer: Option<&[u8]>) -> Self {
         let limits = fixtures::client_limits();
         let mut headers =
             vec![skein_http::Header { name: Box::from(b"host".as_slice()), value: Box::from(b"localhost".as_slice()) }];
@@ -50,19 +59,29 @@ impl Exchange {
             body: Vec::new(),
             status: None,
             done: false,
+            streaming: method == skein_http::Method::Get,
+            paused: false,
+            pause_after: None,
+            state: ExchangeState::Active,
         };
         let length = result.upload.as_ref().expect("upload").len();
         result.down(http::Request::Call(http::Call {
-            method: skein_http::Method::Post,
+            method,
             target: Box::from(target),
             headers: headers.into_boxed_slice(),
-            body: http::Body::Length(u64::try_from(length).expect("short body")),
+            body: if result.streaming {
+                http::Body::None
+            } else {
+                http::Body::Length(u64::try_from(length).expect("short body"))
+            },
             close: false,
         }));
-        result.down(http::Request::Upload(Down::Demand {
-            read: Read::Nothing,
-            room: u32::try_from(length).expect("short body"),
-        }));
+        if !result.streaming {
+            result.down(http::Request::Upload(Down::Demand {
+                read: Read::Nothing,
+                room: u32::try_from(length).expect("short body"),
+            }));
+        }
         result
     }
     fn env() -> Env<http::Limits> {
@@ -71,7 +90,14 @@ impl Exchange {
     fn down(&mut self, request: http::Request) {
         http::down(&mut self.client, &Self::env(), request, &mut self.events, &mut self.below);
     }
-    fn advance(&mut self) -> Option<Up> {
+    fn progress(&self) -> (u32, u32, usize, usize, usize) {
+        (self.events.len(), self.below.len(), self.to_client.trace.len(), self.to_engine.trace.len(), self.body.len())
+    }
+    fn advance(&mut self) -> (Option<Up>, bool) {
+        if self.state == ExchangeState::Cut {
+            return (None, false);
+        }
+        let before = self.progress();
         if let Some(event) = self.events.pop() {
             match event {
                 http::Event::Upload(Up::Room) => {
@@ -106,10 +132,18 @@ impl Exchange {
         if let Some(up) = self.to_client.answer() {
             http::up(&mut self.client, &Self::env(), up, &mut self.events, &mut self.below);
         }
-        self.to_engine.answer()
+        if self.pause_after.is_some_and(|limit| self.to_engine.received.len() >= limit) {
+            self.paused = true;
+        }
+        let up = if self.paused { None } else { self.to_engine.answer() };
+        let changed = before != self.progress();
+        (up, changed)
     }
     fn read(&mut self) {
-        self.down(http::Request::Body(Down::Demand { read: Read::Fill(1), room: 0 }));
+        self.down(http::Request::Body(Down::Demand {
+            read: if self.streaming { Read::Line { max: 256 } } else { Read::Fill(1) },
+            room: 0,
+        }));
     }
 }
 #[derive(Debug)]
@@ -123,8 +157,17 @@ pub struct Peer {
     core: VecDeque<core::Event>,
     keep: Option<(SecretOwner, Kept)>,
     digests: BTreeMap<SecretOwner, Kept>,
+    sign_ins: BTreeMap<u64, u64>,
+    watch_sign_ins: BTreeMap<Token, u64>,
 
     last_core: Option<String>,
+    last_watch: Option<core::documents::Watched>,
+    bearer: Option<Box<[u8]>>,
+    streams: BTreeMap<[u8; 16], Token>,
+    next_watch: u64,
+    in_flight: BTreeSet<Token>,
+    changed: BTreeMap<Token, core::documents::Document>,
+    unwatching: BTreeSet<Token>,
 }
 impl Peer {
     #[must_use]
@@ -142,24 +185,64 @@ impl Peer {
             core: VecDeque::new(),
             keep: None,
             digests: BTreeMap::new(),
+            sign_ins: BTreeMap::new(),
+            watch_sign_ins: BTreeMap::new(),
 
             last_core: None,
+            last_watch: None,
+            bearer: None,
+            streams: BTreeMap::new(),
+            next_watch: 1,
+            in_flight: BTreeSet::new(),
+            changed: BTreeMap::new(),
+            unwatching: BTreeSet::new(),
         };
         peer.pump();
         peer
     }
-    fn event(&mut self, event: Event) {
+    pub fn event(&mut self, event: Event) {
         self.component.down(&self.env, event, &mut self.out);
         self.pump();
     }
     fn pump(&mut self) {
         // Every packet is tiny; this bound includes the seeded wire's harmless delays.
+        let mut quiet = 0;
         for _ in 0..512 {
+            let mut active = false;
             self.component.up(&self.env, &mut self.out);
             if let Some(request) = self.out.pop() {
+                active = true;
                 match request {
                     Request::Io(request) => self.io(request),
                     Request::Core(event) => {
+                        if let core::Event::Delivered { watcher } = event.as_ref() {
+                            self.in_flight.remove(watcher);
+                            if let Some(document) = self.changed.remove(watcher) {
+                                self.in_flight.insert(*watcher);
+                                self.component.down(
+                                    &self.env,
+                                    Event::Delivery { watcher: *watcher, document: Box::new(document) },
+                                    &mut self.out,
+                                );
+                            } else if self.unwatching.remove(watcher) {
+                                self.component.down(
+                                    &self.env,
+                                    Event::WatchEnded { watcher: *watcher, why: jig_domain_views::End::Unwatched },
+                                    &mut self.out,
+                                );
+                            }
+                        } else if let core::Event::Unwatch { watcher } = event.as_ref() {
+                            self.changed.remove(watcher);
+                            if self.in_flight.contains(watcher) {
+                                self.unwatching.insert(*watcher);
+                            } else {
+                                self.component.down(
+                                    &self.env,
+                                    Event::WatchEnded { watcher: *watcher, why: jig_domain_views::End::Unwatched },
+                                    &mut self.out,
+                                );
+                            }
+                        }
                         self.last_core = Some(format!("{event:?}"));
                         self.core.push_back(*event);
                     }
@@ -180,14 +263,21 @@ impl Peer {
             }
             let mut ups = Vec::new();
             for exchange in self.sockets.values_mut() {
-                if let Some(owner) = exchange.owner
-                    && let Some(up) = exchange.advance()
-                {
-                    ups.push((owner, up));
+                if let Some(owner) = exchange.owner {
+                    let (up, changed) = exchange.advance();
+                    active |= changed;
+                    if let Some(up) = up {
+                        active = true;
+                        ups.push((owner, up));
+                    }
                 }
             }
             for (owner, up) in ups {
                 self.component.down(&self.env, Event::Io(skein_io::Event::Stream { owner, up }), &mut self.out);
+            }
+            quiet = if active { 0 } else { quiet + 1 };
+            if quiet == 16 {
+                break;
             }
         }
     }
@@ -202,7 +292,10 @@ impl Peer {
                 self.sockets.get_mut(&socket).expect("accepted socket").owner = Some(owner);
             }
             skein_io::Request::Stream { stream, down } => {
-                self.sockets.get_mut(&stream).expect("socket stream").to_engine.take(down);
+                let exchange = self.sockets.get_mut(&stream).expect("socket stream");
+                if exchange.state == ExchangeState::Active {
+                    exchange.to_engine.take(down);
+                }
             }
             skein_io::Request::Close { entity } | skein_io::Request::Abort { entity } => {
                 if entity == Token::new(99) {
@@ -212,7 +305,8 @@ impl Peer {
                         &mut self.out,
                     );
                 }
-                if let Some(exchange) = self.sockets.get(&entity) {
+                if let Some(exchange) = self.sockets.get_mut(&entity) {
+                    exchange.state = ExchangeState::Cut;
                     let owner = exchange.owner.expect("bound socket");
                     self.component.down(&self.env, Event::Io(skein_io::Event::Closed { owner }), &mut self.out);
                 }
@@ -225,6 +319,192 @@ impl Peer {
             | skein_io::Request::Window { .. }
             | skein_io::Request::Output { .. } => panic!("unexpected io request"),
         }
+    }
+    #[must_use]
+    pub fn signed_in(settings: &Settings, sign_in: u64) -> Self {
+        let mut peer = Self::started(settings);
+        let exchange = peer.post_link(&peer.printed_link());
+        peer.answer_signed_in(sign_in, fixtures::FIRST_PERSON);
+        peer.answer_kept(sign_in);
+        let answer = peer.sign_in_answer(exchange);
+        let mut bearer = Writer::new(61);
+        bearer.put(b"Bearer ").expect("prefix");
+        base64::encode(Alphabet::Url, answer.token().expose(), &mut bearer).expect("bearer");
+        peer.bearer = Some(bearer.finish());
+        peer
+    }
+    pub fn open_stream(&mut self) -> [u8; 16] {
+        let socket = Token::new(self.next_socket);
+        self.next_socket += 1;
+        self.sockets.insert(
+            socket,
+            Exchange::new(skein_http::Method::Get, b"/jig/v1/stream", Box::new([]), self.bearer.as_deref()),
+        );
+        self.event(Event::Io(skein_io::Event::Accepted {
+            owner: Token::new(0),
+            socket,
+            peer: fixtures::settings().listener,
+        }));
+        let events = self.stream_records(socket);
+        let Some(w::StreamEvent::Hello(hello)) = events.first() else {
+            panic!("hello first: {:?}", self.sockets.get(&socket).expect("stream").body);
+        };
+        let name = *hello.stream();
+        self.streams.insert(name, socket);
+        name
+    }
+    fn stream_records(&self, socket: Token) -> Vec<w::StreamEvent> {
+        let body = &self.sockets.get(&socket).expect("stream").body;
+        let mut events = Vec::new();
+        let mut rest = body.as_slice();
+        while let Some(end) = skein_lib::bytes::find(rest, b"\n\n") {
+            let block = &rest[..end];
+            rest = &rest[end + 2..];
+            if let Some(value) = block.split(|byte| *byte == b'\n').find_map(|line| line.strip_prefix(b"data: ")) {
+                let bytes = base64::decode(Alphabet::Standard, value, 65536).expect("base64 record");
+                events.push(
+                    w::StreamEvent::decode(&self.env.limits.wire, &mut skein_lib::Reader::new(&bytes))
+                        .expect("whole wire event"),
+                );
+            }
+        }
+        events
+    }
+    #[must_use]
+    pub fn events(&self, stream: [u8; 16]) -> Vec<w::StreamEvent> {
+        self.stream_records(self.streams[&stream])
+    }
+    #[must_use]
+    pub fn stream_bytes(&self, stream: [u8; 16]) -> &[u8] {
+        &self.sockets[&self.streams[&stream]].body
+    }
+    pub fn request_watch_event(&mut self, stream: [u8; 16], subject: &w::Subject) -> (Token, core::Event) {
+        let mut record = Writer::new(usize::try_from(subject.measure()).expect("subject size"));
+        subject.encode(&mut record).expect("subject");
+        let subject = w::Owned::new(
+            &self.env.limits.wire,
+            w::OwnedParts { owner: w::Owner::Jig, version: 6, record: record.finish() },
+        )
+        .expect("subject owner");
+        let open = w::Open::new(&self.env.limits.wire, w::OpenParts { stream, watch: self.next_watch, subject })
+            .expect("open");
+        self.next_watch += 1;
+        let mut body = Writer::new(usize::try_from(open.measure()).expect("open size"));
+        open.encode(&mut body).expect("open record");
+        let bearer = self.bearer.clone().expect("signed in");
+        let exchange = self.post(b"/jig/v1/watch", body.finish(), Some(&bearer));
+        let event = self.take_core().expect("watch request");
+        (exchange, event)
+    }
+    pub fn request_watch(&mut self, stream: [u8; 16], subject: &w::Subject) -> (Token, Token) {
+        let (exchange, event) = self.request_watch_event(stream, subject);
+        self.last_watch = if let core::Event::Watch { subject, .. } = &event { Some(subject.clone()) } else { None };
+        let (core::Event::Watch { watcher, sign_in, .. } | core::Event::WatchRun { watcher, sign_in, .. }) = event
+        else {
+            panic!("watch request: {event:?}");
+        };
+        assert_eq!(sign_in, fixtures::FIRST_SIGN_IN);
+        self.watch_sign_ins.insert(watcher, sign_in);
+        (exchange, watcher)
+    }
+    pub fn open_watch(&mut self, stream: [u8; 16], subject: &w::Subject) -> Token {
+        let (exchange, watcher) = self.request_watch(stream, subject);
+        assert!(self.answered(exchange).is_none());
+        self.event(Event::Admitted { watcher });
+        assert_eq!(
+            w::OpenAnswer::decode(
+                &self.env.limits.wire,
+                &mut skein_lib::Reader::new(self.answered(exchange).expect("open answer"))
+            ),
+            Ok(w::OpenAnswer::Admitted)
+        );
+        watcher
+    }
+    pub fn refuse_watch(&mut self, watcher: Token, why: core::WatchRefusal) {
+        self.event(Event::WatchRefused { watcher, why });
+    }
+    pub fn release_delivery(&mut self, watcher: Token, document: core::documents::Document) {
+        if self.in_flight.insert(watcher) {
+            self.event(Event::Delivery { watcher, document: Box::new(document) });
+        } else {
+            self.changed.insert(watcher, document);
+        }
+    }
+    #[must_use]
+    pub fn requested_subject(&self) -> Option<&core::documents::Watched> {
+        self.last_watch.as_ref()
+    }
+    pub fn release_current_frame(&mut self, watcher: Token) {
+        let party = self.sign_ins[&self.watch_sign_ins[&watcher]];
+        let core::documents::Document::Frame(mut frame) = fixtures::frame_document(7) else {
+            panic!("frame fixture");
+        };
+        frame.party = party;
+        self.release_delivery(watcher, core::documents::Document::Frame(frame));
+    }
+    pub fn restart(&mut self, settings: &Settings) {
+        self.component.down(&self.env, Event::Abort, &mut self.out);
+        self.pump();
+        self.sockets.clear();
+        self.streams.clear();
+        self.core.clear();
+        self.watch_sign_ins.clear();
+        self.last_watch = None;
+        self.component = Component::new(settings.clone(), &self.env, &mut self.out).expect("restart");
+        self.pump();
+    }
+    pub fn release_text(&mut self, watcher: Token) {
+        self.event(Event::RunText {
+            watcher,
+            turn: jig_domain_views::TurnName { attempt: 7, turn: 7, retry: 7 },
+            from: 7,
+            to: 7,
+            text: Box::new([]),
+            cut: false,
+            call: None,
+        });
+    }
+    #[must_use]
+    pub fn taken(&self, watcher: Token) -> usize {
+        self.core
+            .iter()
+            .filter(|event| matches!(event, core::Event::Delivered {watcher: value} if *value == watcher))
+            .count()
+    }
+    #[must_use]
+    pub fn text_taken(&self, watcher: Token) -> usize {
+        self.core
+            .iter()
+            .filter(|event| matches!(event, core::Event::StreamDelivered {watcher: value} if *value == watcher))
+            .count()
+    }
+    #[must_use]
+    pub fn unwatched(&self, watcher: Token) -> bool {
+        self.core.iter().any(|event| matches!(event, core::Event::Unwatch {watcher: value} if *value == watcher))
+    }
+    pub fn stop_reading(&mut self, stream: [u8; 16]) {
+        self.sockets.get_mut(&self.streams[&stream]).expect("stream").paused = true;
+    }
+    pub fn read_all(&mut self, stream: [u8; 16]) {
+        let exchange = self.sockets.get_mut(&self.streams[&stream]).expect("stream");
+        exchange.paused = false;
+        exchange.pause_after = None;
+        self.pump();
+    }
+    pub fn read_one_piece(&mut self, stream: [u8; 16]) {
+        let exchange = self.sockets.get_mut(&self.streams[&stream]).expect("stream");
+        exchange.pause_after = Some(exchange.to_engine.received.len() + 1);
+    }
+    pub fn cut_stream(&mut self, stream: [u8; 16]) {
+        let exchange = self.sockets.get_mut(&self.streams[&stream]).expect("stream");
+        exchange.state = ExchangeState::Cut;
+        let owner = exchange.owner.expect("bound stream");
+        self.event(Event::Io(skein_io::Event::Stream { owner, up: Up::Failed(skein_lib::stream::Fault::Other) }));
+    }
+    pub fn advance_time(&mut self, span: skein_lib::Duration) {
+        self.env.now = self.env.now.saturating_add(span);
+        self.component.fire(&self.env, &mut self.out);
+        self.pump();
     }
     #[must_use]
     pub fn printed_link(&self) -> Box<[u8]> {
@@ -241,7 +521,7 @@ impl Peer {
     pub fn post(&mut self, target: &[u8], body: Box<[u8]>, bearer: Option<&[u8]>) -> Token {
         let socket = Token::new(self.next_socket);
         self.next_socket += 1;
-        self.sockets.insert(socket, Exchange::new(target, body, bearer));
+        self.sockets.insert(socket, Exchange::new(skein_http::Method::Post, target, body, bearer));
         self.event(Event::Io(skein_io::Event::Accepted {
             owner: Token::new(0),
             socket,
@@ -262,6 +542,7 @@ impl Peer {
     }
     pub fn answer_signed_in(&mut self, sign_in: u64, person: u64) {
         let to = self.take_sign_in();
+        self.sign_ins.insert(sign_in, person);
 
         self.event(Event::Reply {
             to,

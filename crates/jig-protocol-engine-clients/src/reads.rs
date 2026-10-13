@@ -22,7 +22,8 @@ impl Component {
         let mut active = 0_u32;
         for (_, waiting) in &self.pending.exchanges {
             match waiting {
-                Waiting::Ask { sign_in: number, .. }
+                Waiting::Watch { sign_in: number, .. }
+                | Waiting::Ask { sign_in: number, .. }
                 | Waiting::Read { sign_in: number, .. }
                 | Waiting::ApplicationRead { sign_in: number, .. }
                     if *number == sign_in =>
@@ -30,6 +31,7 @@ impl Component {
                     active = active.saturating_add(1);
                 }
                 Waiting::Core
+                | Waiting::Watch { .. }
                 | Waiting::Keep { .. }
                 | Waiting::Get { .. }
                 | Waiting::Made { .. }
@@ -111,6 +113,7 @@ impl Component {
                 );
             }
             Waiting::Core
+            | Waiting::Watch { .. }
             | Waiting::Keep { .. }
             | Waiting::Get { .. }
             | Waiting::Made { .. }
@@ -144,6 +147,7 @@ impl Component {
                 self.read_response(env, exchange, answer, out);
             }
             Waiting::Core
+            | Waiting::Watch { .. }
             | Waiting::Keep { .. }
             | Waiting::Get { .. }
             | Waiting::Made { .. }

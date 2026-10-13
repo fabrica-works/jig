@@ -1,6 +1,8 @@
 pub use crate::Peer;
+mod receiving;
 use jig_domain_people::{Identity, IdentityKey};
 use jig_protocol_engine_clients::{Limits, Served, Settings};
+pub use receiving::signed_small_core;
 use skein_lib::{Duration, List, Secret};
 pub const FIRST_SIGN_IN: u64 = 41;
 pub const FIRST_PERSON: u64 = 7;
@@ -21,6 +23,7 @@ pub fn settings() -> Settings {
         listener: skein_io::Addr::Ip("127.0.0.1:8080".parse().expect("loopback")),
         link: Some(first_owner()),
         heartbeat: Duration::from_secs(5),
+        rows: jig_protocol_config::profile(jig_protocol_config::Profile::Small).core.documents.rows,
         served,
         providers: List::with_capacity(0),
         seed: Secret::new(Box::new([7; 32])),
@@ -30,13 +33,16 @@ pub fn settings() -> Settings {
 #[must_use]
 pub fn limits() -> Limits {
     Limits {
-        connections: 4,
+        connections: 8,
+        streams: 2,
+        watches_per_stream: 4,
+        queued_bytes: 65536,
         identity_bytes: 1024,
         families: 32,
         providers: 32,
         exchanges: 4,
         exchanges_per_client: 2,
-        http: skein_http::server::Limits { head: 4096, headers: 32, body: 1024, read: 256, response: 1024, send: 256 },
+        http: skein_http::server::Limits { head: 4096, headers: 32, body: 1024, read: 256, response: 1024, send: 32 },
         wire: jig_protocol_client_wire::v6::CEILINGS,
         link_span: Duration::from_secs(300),
         stall: Duration::from_secs(30),
@@ -49,4 +55,28 @@ pub fn client_limits() -> skein_http::client::Limits {
 #[must_use]
 pub fn expires() -> skein_lib::Wall {
     skein_lib::Wall::from_nanos(86_400_000_000_000)
+}
+
+#[must_use]
+pub fn frame_subject() -> jig_protocol_client_wire::v6::Subject {
+    jig_protocol_client_wire::v6::Subject::Frame
+}
+#[must_use]
+pub fn frame_document(needs: u32) -> jig_domain_core::documents::Document {
+    use jig_domain_core::documents as d;
+    d::Document::Frame(d::Frame {
+        party: 7,
+        kind: jig_domain_people::Kind::Person,
+        login: d::Text { bytes: Box::new([]), cut: false },
+        name: d::Text { bytes: Box::new([]), cut: false },
+        deployment_role: None,
+        projects: List::with_capacity(0),
+        needs,
+        need_counts: jig_domain_people::Needs { questions: 7, proposals: 7, escalations: 7, person_tasks: 7 },
+        updates: d::Count::Known(7),
+        results_seen: 7,
+        retention: Duration::from_nanos(19),
+        charters: List::with_capacity(0),
+        cut: false,
+    })
 }

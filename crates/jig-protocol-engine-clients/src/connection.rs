@@ -9,6 +9,7 @@ use skein_lib::{
 #[derive(Debug)]
 pub(crate) struct Connection {
     pub socket: Token,
+    pub stream: Option<Token>,
     pub http: http::Server,
     pub events: Queue<http::Event>,
     pub requests: Queue<http::Request>,
@@ -28,6 +29,7 @@ impl Connection {
         requests.push(http::Request::Next);
         Self {
             socket,
+            stream: None,
             http: http::Server::new(&limits.http),
             events: Queue::with_capacity(8),
             requests,

@@ -3,7 +3,6 @@ use super::{
     Box, Component, Env, Kept, Limits, Queue, ReplyTo, Request, SecretOwner, SecretsAnswer, SecretsRequest, Token,
     Waiting, core, people, routes, sign_in,
 };
-use crate::routes::Route;
 use crate::sign_in::Answer;
 use skein_lib::{Secret, Wall};
 impl Component {
@@ -42,6 +41,7 @@ impl Component {
                             Waiting::Get { owner, .. } => Some(*owner),
                             Waiting::Made { party, .. } => Some(SecretOwner::Service(*party)),
                             Waiting::Core
+                            | Waiting::Watch { .. }
                             | Waiting::Keep { .. }
                             | Waiting::Ask { .. }
                             | Waiting::Read { .. }
@@ -67,23 +67,19 @@ impl Component {
                                     SecretOwner::Service(party) => self.service_sign_in(env, exchange, party, out),
                                 }
                             } else {
-                                let body = match owner {
-                                    SecretOwner::SignIn(_) => {
-                                        if route == Route::Read {
-                                            routes::read_none(core::reads::Why::SignedOut, &env.limits.wire)
-                                        } else {
-                                            routes::signed_out(&env.limits.wire)
-                                        }
+                                match owner {
+                                    SecretOwner::SignIn(_) => self.denied(env, exchange, route),
+                                    SecretOwner::Service(_) => {
+                                        self.respond(env, exchange, routes::refused(&env.limits.wire));
                                     }
-                                    SecretOwner::Service(_) => routes::refused(&env.limits.wire),
-                                };
-                                self.respond(env, exchange, body);
+                                }
                             }
                         }
                         Waiting::Made { sign_in, party } => {
                             self.made(env, exchange, sign_in, party, value.as_ref(), out);
                         }
                         Waiting::Core
+                        | Waiting::Watch { .. }
                         | Waiting::Keep { .. }
                         | Waiting::Ask { .. }
                         | Waiting::Read { .. }

@@ -19,3 +19,6 @@ mod pages;
 
 #[path = "tests/reads.rs"]
 mod reads;
+
+#[path = "tests/watches.rs"]
+mod watches;

@@ -17,6 +17,7 @@ pub mod pages;
 pub(crate) mod reads;
 pub(crate) mod refusals;
 pub mod task;
+pub(crate) mod watches;
 pub use objects::document;
 
 fn problem(reason: skein_codec::Reason) -> w::Problem {

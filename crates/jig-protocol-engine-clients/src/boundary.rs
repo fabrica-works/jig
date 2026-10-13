@@ -137,6 +137,8 @@ pub struct Settings {
     pub link: Option<people::Identity>,
     pub deployment_provider: u16,
     pub heartbeat: Duration,
+    /// Default watch window from the receiving core's document limits.
+    pub rows: u32,
     pub served: List<Served>,
     pub providers: List<u16>,
     pub seed: Secret,

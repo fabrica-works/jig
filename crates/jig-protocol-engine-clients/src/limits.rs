@@ -4,6 +4,9 @@ use skein_lib::{Duration, Map, Queue, Token};
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Limits {
     pub connections: u32,
+    pub streams: u32,
+    pub watches_per_stream: u32,
+    pub queued_bytes: u32,
     pub identity_bytes: u32,
     pub families: u32,
     pub providers: u32,
@@ -24,6 +27,10 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         || limits.wire.link_sign_in_secret < 32
         || limits.identity_bytes < 8
         || limits.connections == 0
+        || limits.streams == 0
+        || limits.watches_per_stream == 0
+        || limits.queued_bytes < 128
+        || limits.queued_bytes.checked_add(32).is_none()
         || limits.exchanges == 0
         || limits.exchanges_per_client == 0
         || limits.link_span == Duration::ZERO
@@ -62,5 +69,14 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         // their wire body; reserve the current translation and its output slots.
         .checked_add(u64::from(body).checked_mul(64)?.checked_mul(u64::from(MAX_OUT_DOWN).checked_add(1)?)?)?
         .checked_add(answer.checked_mul(2)?)?
+        .checked_add(Map::<Token, crate::stream::Stream>::worst_case(limits.streams)?)?
+        .checked_add(
+            u64::from(limits.streams).checked_mul(
+                Map::<Token, crate::stream::Watch>::worst_case(limits.watches_per_stream)?
+                    .checked_add(u64::from(limits.queued_bytes).checked_mul(3)?)?
+                    .checked_add(Queue::<skein_http::sse::writer::Event>::worst_case(2)?)?
+                    .checked_add(Queue::<skein_lib::stream::Down>::worst_case(2)?)?,
+            )?,
+        )?
         .checked_add(256)
 }

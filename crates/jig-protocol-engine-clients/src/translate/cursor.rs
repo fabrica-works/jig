@@ -11,6 +11,14 @@ pub fn encode(value: &reads::Cursor, limit: u32) -> Option<Box<[u8]>> {
     put_cursor(&mut out, value)?;
     out.bytes.meet(skein_lib::stream::Read::Fill(out.bytes.len()))
 }
+pub(crate) fn encode_tree(value: &documents::Cursor, task: u64, window: u32, limit: u32) -> Option<Box<[u8]>> {
+    let mut out = Writer { bytes: skein_lib::Intake::with_capacity(limit) };
+    out.byte(2)?;
+    out.u64(task)?;
+    out.u32(window)?;
+    put_document_cursor(&mut out, value)?;
+    out.bytes.meet(skein_lib::stream::Read::Fill(out.bytes.len()))
+}
 pub fn decode(bytes: &[u8]) -> Option<reads::Cursor> {
     if bytes.len() > usize::try_from(super::w::CEILINGS.cursor_value).ok()? {
         return None;

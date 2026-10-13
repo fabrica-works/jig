@@ -355,10 +355,15 @@ dependencies = [
 name = "jig-engine-clients-world"
 version = "0.0.0"
 dependencies = [
+ "jig-domain-authority",
  "jig-domain-core",
+ "jig-domain-fleet",
  "jig-domain-people",
+ "jig-domain-views",
  "jig-protocol-client-wire",
+ "jig-protocol-config",
  "jig-protocol-engine-clients",
+ "jig-test-client-records",
  "skein-http",
  "skein-io",
  "skein-lib",

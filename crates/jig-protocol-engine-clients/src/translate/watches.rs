@@ -1,0 +1,246 @@
+#![expect(clippy::manual_map, reason = "step code translates optional watch facts without closures")]
+//! Watches retain their whole subject and stream record (protocol/client.md, 7).
+use super::{chips, cursor, deployment, inbox, live, objects, owner, task, w};
+use alloc::boxed::Box;
+use jig_domain_core::{self as core, documents as d};
+use jig_domain_tasks as tasks;
+use jig_domain_views as views;
+use skein_lib::{List, Reader, Token, Writer};
+
+pub(crate) fn watch(watcher: Token, sign_in: u64, value: w::Subject, rows: u32) -> Option<core::Event> {
+    if let w::Subject::Run(value) = value {
+        let value = value.into_parts();
+        let turn = match value.turn {
+            Some(value) => {
+                Some(views::TurnName { attempt: value.attempt(), turn: value.number(), retry: value.retry() })
+            }
+            None => None,
+        };
+        return Some(core::Event::WatchRun { watcher, sign_in, task: value.task, turn, offset: value.offset });
+    }
+    let (subject, rows) = match value {
+        w::Subject::Frame => (d::Watched::Frame, rows),
+        w::Subject::Inbox(value) => (d::Watched::Inbox, value.window()),
+        w::Subject::Conversations => (d::Watched::Conversations, rows),
+        w::Subject::Task(value) => (d::Watched::Task { task: value.task() }, rows),
+        w::Subject::Tree(value) => (d::Watched::Tree { task: value.task() }, value.window()),
+        w::Subject::Chips(value) => (d::Watched::Chips { tasks: value.into_parts().tasks }, rows),
+        w::Subject::Goals(value) => (d::Watched::Goals { project: value.project() }, rows),
+        w::Subject::Tasks(value) => {
+            let value = value.into_parts();
+            (d::Watched::Tasks { project: value.project, filter: filter(value.project, value.filter)? }, value.window)
+        }
+        w::Subject::Deployment => (d::Watched::Deployment, rows),
+        w::Subject::Run(_) => return None,
+    };
+    Some(core::Event::Watch { watcher, sign_in, subject, window: d::Window { rows, after: None } })
+}
+fn filter(project: u32, value: w::TaskFilter) -> Option<d::TaskFilter> {
+    let value = value.into_parts();
+    let phase = match value.phase {
+        Some(value) => Some(match value {
+            w::Phase::Waiting => d::TaskPhase::Waiting,
+            w::Phase::Idle => d::TaskPhase::Idle,
+            w::Phase::Due => d::TaskPhase::Due,
+            w::Phase::Preparing => d::TaskPhase::Preparing,
+            w::Phase::Claimed => d::TaskPhase::Claimed,
+            w::Phase::Running => d::TaskPhase::Running,
+            w::Phase::BackingOff => d::TaskPhase::BackingOff,
+            w::Phase::Active => d::TaskPhase::Active,
+            w::Phase::Closing => d::TaskPhase::Closing,
+            w::Phase::Held => d::TaskPhase::Held,
+            w::Phase::Done => d::TaskPhase::Done,
+            w::Phase::Failed => d::TaskPhase::Failed,
+            w::Phase::Cancelled => d::TaskPhase::Cancelled,
+            w::Phase::Ended => d::TaskPhase::Ended,
+        }),
+        None => None,
+    };
+    let executor = match value.executor {
+        None => None,
+        Some(value) => Some(match value {
+            w::Executor::Agent(value) => tasks::Executor::Agent { charter: value.charter() },
+            w::Executor::Procedure(value) => {
+                tasks::Executor::Procedure { connector: value.connector(), code: value.kind() }
+            }
+            w::Executor::Party(value) => tasks::Executor::Person(tasks::PersonAddress::Person(value.party())),
+            w::Executor::Role(value) => {
+                if value.project() != project {
+                    return None;
+                }
+                tasks::Executor::Person(tasks::PersonAddress::Role(value.role()))
+            }
+        }),
+    };
+    Some(d::TaskFilter { phase, executor, goal: value.goal, asked_by_me: value.asked_by_me })
+}
+pub(crate) fn decode(bytes: &[u8], limits: &w::Limits) -> Option<w::Subject> {
+    let mut reader = Reader::new(bytes);
+    let value = w::Subject::decode(limits, &mut reader).ok()?;
+    if !reader.is_empty() {
+        return None;
+    }
+    Some(value)
+}
+pub(crate) fn ended(why: views::End) -> w::WatchEnd {
+    match why {
+        views::End::Unwatched => w::WatchEnd::Closed,
+        views::End::Gone => w::WatchEnd::SubjectEnded,
+        views::End::NotAllowed => w::WatchEnd::NotAllowed,
+        views::End::SignedOut => w::WatchEnd::SignedOut,
+        views::End::Stopping => w::WatchEnd::Stopping,
+    }
+}
+pub(crate) fn refused(why: core::WatchRefusal) -> w::WatchRefusal {
+    match why {
+        core::WatchRefusal::Unknown => w::WatchRefusal::Unknown,
+        core::WatchRefusal::NotAllowed => w::WatchRefusal::NotAllowed,
+        core::WatchRefusal::Busy => w::WatchRefusal::Busy,
+        core::WatchRefusal::SignedOut => w::WatchRefusal::SignedOut,
+    }
+}
+pub(crate) fn hello(
+    name: [u8; 16],
+    settings: &crate::Settings,
+    limits: &w::Limits,
+) -> Result<w::StreamEvent, w::Problem> {
+    let mut served = List::with_capacity(settings.served.len());
+    for range in &settings.served {
+        let owner = match range.family {
+            None => w::Owner::Jig,
+            Some(number) => w::Owner::Family(w::Family::new(limits, w::FamilyParts { number })?),
+        };
+        served
+            .push(w::Served::new(limits, w::ServedParts { owner, first: range.first, last: range.last })?)
+            .expect("served ranges fit");
+    }
+    Ok(w::StreamEvent::Hello(w::Hello::new(
+        limits,
+        w::HelloParts { stream: name, served, heartbeat: settings.heartbeat },
+    )?))
+}
+pub(crate) fn delivery(
+    value: &d::Document,
+    project: u32,
+    rows: u32,
+    limits: &w::Limits,
+) -> Result<w::DeliveryValue, w::Problem> {
+    Ok(match value {
+        d::Document::Frame(value) => w::DeliveryValue::Frame(owner::frame(value, limits)?),
+        d::Document::Task(value) => w::DeliveryValue::Task(Box::new(task::document(value, limits)?)),
+        d::Document::Tree(value) => {
+            let next = match &value.next {
+                Some(next) => Some(w::Cursor::new(
+                    limits,
+                    w::CursorParts {
+                        value: cursor::encode_tree(next, value.root.number, rows, limits.cursor_value)
+                            .ok_or(super::problem(skein_codec::Reason::Bound))?,
+                    },
+                )?),
+                None => None,
+            };
+            w::DeliveryValue::OwnerTree(live::tree(value, next, limits)?)
+        }
+        d::Document::Chips(value) => {
+            let mut rows = List::with_capacity(value.len());
+            for chip in value {
+                rows.push(chips::chip(chip, limits)?).expect("supplied chips fit");
+            }
+            let mut pieces = List::with_capacity(rows.len());
+            for row in rows.into_boxed() {
+                let mut bytes = Writer::new(usize::try_from(row.measure()).expect("chip measure fits"));
+                row.encode(&mut bytes).expect("measured chip");
+                pieces.push(bytes.finish()).expect("chip pieces fit");
+            }
+            let rows = super::pieces(&pieces, limits.chips_rows, w::Path::ChipsRows)?;
+            w::DeliveryValue::Chips(w::Chips::new(limits, w::ChipsParts { rows })?)
+        }
+        d::Document::Inbox(value) => w::DeliveryValue::OwnerInbox(inbox::document(value, limits)?),
+        d::Document::Goals(value) => {
+            for row in &value.lines {
+                if row.chip.details.project != project {
+                    return Err(super::problem(skein_codec::Reason::Tag));
+                }
+            }
+            w::DeliveryValue::Goals(live::goals(project, value, limits)?)
+        }
+        d::Document::Tasks(value) => w::DeliveryValue::Tasks(live::tasks(value, limits)?),
+        d::Document::Conversations(value) => {
+            let position = core::reads::conversations_cursor(value);
+            let bytes =
+                cursor::encode(&position, limits.cursor_value).ok_or(super::problem(skein_codec::Reason::Bound))?;
+            let after = w::Cursor::new(limits, w::CursorParts { value: bytes })?;
+            w::DeliveryValue::Conversations(live::conversations(value, after, limits)?)
+        }
+        d::Document::Run(value) => w::DeliveryValue::RunState(live::run(value, limits)?),
+        d::Document::Deployment(value) => w::DeliveryValue::OwnerDeployment(deployment::document(value, limits)?),
+        d::Document::Proposal(value) => w::DeliveryValue::OwnerProposal(objects::proposal(value, limits)?),
+        d::Document::Escalation(_)
+        | d::Document::Question(_)
+        | d::Document::PersonTask(_)
+        | d::Document::Result(_)
+        | d::Document::Project(_)
+        | d::Document::Note(_) => return Err(super::problem(skein_codec::Reason::Tag)),
+    })
+}
+pub(crate) fn owned(value: w::DeliveryValue, version: u32, limits: &w::Limits) -> Result<w::Owned, w::Problem> {
+    let mut record = Writer::new(usize::try_from(value.measure()).expect("wire measure fits"));
+    value.encode(&mut record).expect("measured delivery");
+    w::Owned::new(limits, w::OwnedParts { owner: w::Owner::Jig, version, record: record.finish() })
+}
+pub(crate) fn packet(value: &w::StreamEvent) -> skein_http::sse::writer::Outgoing {
+    let name: &[u8] = match value {
+        w::StreamEvent::Hello(_) => b"hello",
+        w::StreamEvent::Delivery(_) => b"delivery",
+        w::StreamEvent::Text(_) => b"text",
+        w::StreamEvent::Ended(_) => b"ended",
+    };
+    let mut record = Writer::new(usize::try_from(value.measure()).expect("wire measure fits"));
+    value.encode(&mut record).expect("measured stream record");
+    let length = skein_lib::base64::encoded_len(skein_lib::base64::Alphabet::Standard, value.measure())
+        .expect("bounded stream record");
+    let mut data = Writer::new(usize::try_from(length).expect("wire size fits"));
+    skein_lib::base64::encode(skein_lib::base64::Alphabet::Standard, &record.finish(), &mut data)
+        .expect("measured base64");
+    skein_http::sse::writer::Outgoing {
+        name: skein_lib::bytes::copy_of(name),
+        data: data.finish(),
+        id: None,
+        retry: None,
+    }
+}
+
+pub(crate) fn document_packet(
+    document: &d::Document,
+    project: u32,
+    rows: u32,
+    watch: u64,
+    version: u32,
+    limits: &w::Limits,
+) -> Result<w::StreamEvent, w::Problem> {
+    let value = delivery(document, project, rows, limits)?;
+    let document = owned(value, version, limits)?;
+    Ok(w::StreamEvent::Delivery(w::Delivery::new(limits, w::DeliveryParts { watch, document })?))
+}
+pub(crate) fn application_packet(
+    family: u16,
+    version: u32,
+    record: Box<[u8]>,
+    watch: u64,
+    limits: &w::Limits,
+) -> Result<w::StreamEvent, w::Problem> {
+    let family = w::Family::new(limits, w::FamilyParts { number: family })?;
+    let document = w::Owned::new(limits, w::OwnedParts { owner: w::Owner::Family(family), version, record })?;
+    Ok(w::StreamEvent::Delivery(w::Delivery::new(limits, w::DeliveryParts { watch, document })?))
+}
+pub(crate) fn text_packet(
+    writing: &views::Writing,
+    watch: u64,
+    limits: &w::Limits,
+) -> Result<w::StreamEvent, w::Problem> {
+    let value = live::writing(writing, limits)?;
+    Ok(w::StreamEvent::Text(w::StreamText::new(limits, w::StreamTextParts { watch, value })?))
+}
+pub(crate) fn end_packet(why: views::End, watch: u64, limits: &w::Limits) -> Result<w::StreamEvent, w::Problem> {
+    Ok(w::StreamEvent::Ended(w::Ended::new(limits, w::EndedParts { watch, why: ended(why) })?))
+}

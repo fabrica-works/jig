@@ -18,6 +18,8 @@ use skein_lib::{
 mod reads;
 #[path = "services.rs"]
 mod services;
+#[path = "watches.rs"]
+mod watches;
 const LISTENER: Token = Token::new(0);
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Unusable {
@@ -33,6 +35,7 @@ pub struct Component {
     listener: Option<Token>,
     connections: Map<Token, Connection>,
     pending: Pending,
+    streams: Map<Token, crate::stream::Stream>,
     next: u64,
     stopping: bool,
     aborting: bool,
@@ -44,7 +47,16 @@ impl Component {
         if settings.served.capacity() > env.limits.families
             || settings.providers.capacity() > env.limits.providers
             || settings.heartbeat == skein_lib::Duration::ZERO
+            || settings.rows == 0
         {
+            return Err(Unusable::Limits);
+        }
+        let Ok(hello) = crate::translate::watches::hello([0; 16], &settings, &env.limits.wire) else {
+            return Err(Unusable::Limits);
+        };
+        let length = skein_lib::base64::encoded_len(skein_lib::base64::Alphabet::Standard, hello.measure())
+            .ok_or(Unusable::Limits)?;
+        if length > env.limits.queued_bytes {
             return Err(Unusable::Limits);
         }
         if let Some(identity) = &settings.link {
@@ -72,6 +84,7 @@ impl Component {
                     env.limits.exchanges.checked_add(env.limits.connections).expect("checked pending capacity"),
                 ),
             },
+            streams: Map::with_capacity(env.limits.streams),
             next: 1,
             stopping: false,
             aborting: false,
@@ -118,13 +131,17 @@ impl Component {
             Event::Application(crate::FromApplication::Read { reply, family, record }) => {
                 self.application_read(env, reply.into_token(), family, record, out);
             }
-            Event::Admitted { .. }
-            | Event::WatchRefused { .. }
-            | Event::Delivery { .. }
-            | Event::WatchEnded { .. }
-            | Event::RunText { .. }
-            | Event::Application(crate::FromApplication::Delivery { .. })
-            | Event::Provider { .. } => {}
+            Event::Admitted { watcher } => self.watch_answer(env, watcher, None),
+            Event::WatchRefused { watcher, why } => self.watch_answer(env, watcher, Some(why)),
+            Event::Delivery { watcher, document } => self.delivery(env, watcher, &document),
+            Event::WatchEnded { watcher, why } => self.watch_ended(env, watcher, why),
+            Event::RunText { watcher, turn, from, to, text, cut, call } => {
+                self.run_text(env, watcher, jig_domain_views::Writing { turn, from, to, text, cut, call });
+            }
+            Event::Application(crate::FromApplication::Delivery { watcher, family, record }) => {
+                self.application_delivery(env, watcher, family, record);
+            }
+            Event::Provider { .. } => {}
         }
     }
     fn io(&mut self, env: &Env<Limits>, event: skein_io::Event, out: &mut Queue<Request>) {
@@ -156,6 +173,9 @@ impl Component {
                 }
             }
             skein_io::Event::Closed { owner } => {
+                if let Some(stream) = self.streams.get_mut(&owner) {
+                    stream.closing = true;
+                }
                 if owner == LISTENER {
                     self.listener = None;
                 }
@@ -186,6 +206,9 @@ impl Component {
     /// Advances one queued HTTP transition, bounding each invocation's output.
     pub fn up(&mut self, env: &Env<Limits>, out: &mut Queue<Request>) -> bool {
         if self.aborting {
+            if self.stream_up(env, out) {
+                return true;
+            }
             let mut closing = None;
             for (owner, connection) in &self.connections {
                 if !connection.closing {
@@ -197,7 +220,7 @@ impl Component {
                 self.connections.get_mut(&owner).expect("closing connection").close(out);
                 return true;
             }
-            if !self.closed && self.listener.is_none() && self.connections.is_empty() {
+            if !self.closed && self.listener.is_none() && self.connections.is_empty() && self.streams.is_empty() {
                 self.closed = true;
                 out.push(Request::Closed);
                 return true;
@@ -212,6 +235,7 @@ impl Component {
                     break;
                 }
                 Waiting::Core
+                | Waiting::Watch { .. }
                 | Waiting::Get { .. }
                 | Waiting::Keep { .. }
                 | Waiting::Made { .. }
@@ -222,14 +246,16 @@ impl Component {
         }
         if let Some(exchange) = ready {
             match self.pending.exchanges.remove(&exchange).expect("ready exchange") {
-                Waiting::Checked { sign_in, body, route } => {
-                    if route == Route::Read {
-                        self.read(env, exchange, sign_in, &body, out);
-                    } else {
-                        self.request(env, exchange, sign_in, &body, out);
+                Waiting::Checked { sign_in, body, route } => match route {
+                    Route::Read => self.read(env, exchange, sign_in, &body, out),
+                    Route::Watch | Route::Unwatch | Route::Gone | Route::Stream => {
+                        self.watch_route(env, exchange, sign_in, route, &body, out);
                     }
-                }
+                    Route::Request => self.request(env, exchange, sign_in, &body, out),
+                    Route::Link | Route::Service | Route::Missing => {}
+                },
                 Waiting::Core
+                | Waiting::Watch { .. }
                 | Waiting::Get { .. }
                 | Waiting::Keep { .. }
                 | Waiting::Made { .. }
@@ -249,7 +275,7 @@ impl Component {
             }
         }
         let Some(owner) = selected else {
-            return false;
+            return self.stream_up(env, out);
         };
         let mut connection = self.connections.remove(&owner).expect("selected connection");
         if !connection.progress(env, out)
@@ -268,7 +294,14 @@ impl Component {
                 connection.call = Some(call);
                 match connection.route {
                     Route::Missing => connection.respond(404, Box::new([]), &env.limits),
-                    Route::Link | Route::Service | Route::Request | Route::Read => connection.read(&env.limits),
+                    Route::Link
+                    | Route::Service
+                    | Route::Request
+                    | Route::Read
+                    | Route::Watch
+                    | Route::Unwatch
+                    | Route::Gone
+                    | Route::Stream => connection.read(&env.limits),
                 }
             }
             http::Event::Body(Up::Bytes(bytes)) => {
@@ -279,6 +312,17 @@ impl Component {
                 }
             }
             http::Event::Body(Up::End) => self.body(env, connection, out),
+            http::Event::Reply(up) if connection.stream.is_some() => {
+                if let Some(stream) = self.streams.get_mut(&connection.stream.expect("stream connection")) {
+                    skein_http::sse::writer::up(
+                        &mut stream.writer,
+                        &crate::stream::writer_env(env),
+                        up,
+                        &mut stream.above,
+                        &mut stream.below,
+                    );
+                }
+            }
             http::Event::Reply(Up::Room) => connection.send(&env.limits),
             http::Event::Done(reuse) => {
                 if let Some(exchange) = connection.exchange {
@@ -339,17 +383,17 @@ impl Component {
                     identity: self.settings.link.as_ref().expect("link enabled").clone(),
                 })));
             }
-            Route::Service | Route::Request | Route::Read => {
+            Route::Service
+            | Route::Request
+            | Route::Read
+            | Route::Watch
+            | Route::Unwatch
+            | Route::Gone
+            | Route::Stream => {
                 let call = connection.call.as_ref().expect("call retained");
                 let Some((sign_in, digest)) = sign_in::bearer(call.header(b"authorization")) else {
-                    let answer = if connection.route == Route::Service {
-                        routes::refused(&env.limits.wire)
-                    } else if connection.route == Route::Read {
-                        routes::read_none(core::reads::Why::SignedOut, &env.limits.wire)
-                    } else {
-                        routes::signed_out(&env.limits.wire)
-                    };
-                    connection.respond(200, answer, &env.limits);
+                    let answer = routes::unauthenticated(connection.route, &env.limits.wire);
+                    connection.respond(if connection.route == Route::Stream { 401 } else { 200 }, answer, &env.limits);
                     return;
                 };
                 let owner = if connection.route == Route::Service {
@@ -423,7 +467,8 @@ impl Component {
                     self.answer(env, exchange, answer, out);
                 }
             },
-            Waiting::Read { .. }
+            Waiting::Watch { .. }
+            | Waiting::Read { .. }
             | Waiting::ApplicationRead { .. }
             | Waiting::Keep { .. }
             | Waiting::Get { .. }
@@ -475,6 +520,7 @@ impl Component {
                 self.answer(env, exchange, answer, out);
             }
             Waiting::Core
+            | Waiting::Watch { .. }
             | Waiting::Keep { .. }
             | Waiting::Get { .. }
             | Waiting::Made { .. }
@@ -492,7 +538,8 @@ impl Component {
             let mut found = None;
             for (exchange, waiting) in &self.pending.exchanges {
                 match waiting {
-                    Waiting::Keep { sign_in: number, .. }
+                    Waiting::Watch { sign_in: number, .. }
+                    | Waiting::Keep { sign_in: number, .. }
                     | Waiting::Get { owner: SecretOwner::SignIn(number), .. }
                     | Waiting::Made { sign_in: number, .. }
                     | Waiting::Checked { sign_in: number, .. }
@@ -505,6 +552,7 @@ impl Component {
                         break;
                     }
                     Waiting::Core
+                    | Waiting::Watch { .. }
                     | Waiting::Keep { .. }
                     | Waiting::Get { .. }
                     | Waiting::Made { .. }
@@ -527,12 +575,22 @@ impl Component {
                 | Waiting::Checked { route: Route::Read, .. } => {
                     self.respond(env, exchange, routes::read_none(core::reads::Why::SignedOut, &env.limits.wire));
                 }
-                Waiting::Get { .. } | Waiting::Checked { .. } | Waiting::Ask { .. } => {
-                    self.respond(env, exchange, routes::signed_out(&env.limits.wire));
+                Waiting::Get { route, .. } | Waiting::Checked { route, .. } => {
+                    self.denied(env, exchange, route);
+                }
+                Waiting::Ask { .. } => self.respond(env, exchange, routes::signed_out(&env.limits.wire)),
+                Waiting::Watch { opening, .. } => {
+                    let body = if opening {
+                        routes::open_answer(Some(core::WatchRefusal::SignedOut), &env.limits.wire)
+                    } else {
+                        routes::close_answer(true)
+                    };
+                    self.respond(env, exchange, body);
                 }
                 Waiting::Core => {}
             }
         }
+        self.end_streams(Some(sign_in));
     }
     fn refused(&mut self, env: &Env<Limits>, exchange: Token) {
         if self.pending.exchanges.remove(&exchange).is_some() {
@@ -552,11 +610,22 @@ impl Component {
             self.connections.get_mut(&owner).expect("exchange owner").respond(200, body, &env.limits);
         }
     }
+    fn denied(&mut self, env: &Env<Limits>, exchange: Token, route: Route) {
+        if let Some(owner) = self.owner(exchange) {
+            let status = if route == Route::Stream { 401 } else { 200 };
+            self.connections.get_mut(&owner).expect("exchange owner").respond(
+                status,
+                routes::unauthenticated(route, &env.limits.wire),
+                &env.limits,
+            );
+        }
+    }
     fn admitted(&self) -> u32 {
         let mut count = 0_u32;
         for (_, waiting) in &self.pending.exchanges {
             match waiting {
                 Waiting::Core
+                | Waiting::Watch { .. }
                 | Waiting::Keep { .. }
                 | Waiting::Made { .. }
                 | Waiting::Read { .. }
@@ -573,26 +642,7 @@ impl Component {
         let Some(owner) = self.owner(exchange) else {
             return;
         };
-        let mut active = 0_u32;
-        for (_, waiting) in &self.pending.exchanges {
-            match waiting {
-                Waiting::Read { sign_in: number, .. }
-                | Waiting::ApplicationRead { sign_in: number, .. }
-                | Waiting::Ask { sign_in: number, .. }
-                    if *number == sign_in =>
-                {
-                    active = active.saturating_add(1);
-                }
-                Waiting::Core
-                | Waiting::Keep { .. }
-                | Waiting::Get { .. }
-                | Waiting::Ask { .. }
-                | Waiting::Made { .. }
-                | Waiting::Read { .. }
-                | Waiting::ApplicationRead { .. }
-                | Waiting::Checked { .. } => {}
-            }
-        }
+        let active = self.active(sign_in);
         if active >= env.limits.exchanges_per_client || self.admitted() >= env.limits.exchanges {
             self.respond(env, exchange, routes::busy());
             return;
@@ -651,6 +701,7 @@ impl Component {
     fn abort(&mut self, out: &mut Queue<Request>) {
         self.stopping = true;
         self.aborting = true;
+        self.end_streams(None);
         self.link = None;
         self.pending.exchanges = Map::with_capacity(self.pending.exchanges.capacity());
         if let Some(listener) = self.listener {
@@ -658,16 +709,25 @@ impl Component {
         }
     }
     #[must_use]
+    #[expect(clippy::manual_map, reason = "step code matches optional deadlines without closures")]
     pub fn next_deadline(&self) -> Option<Time> {
-        let mut next = None;
-        if let Some(link) = &self.link {
-            next = Some(link.until);
-        }
+        let mut next = match &self.link {
+            Some(link) => Some(link.until),
+            None => None,
+        };
         for (_, connection) in &self.connections {
-            if !connection.closing {
+            if !connection.closing && connection.stream.is_none() {
                 next = Some(match next {
                     Some(next) => next.min(connection.deadline),
                     None => connection.deadline,
+                });
+            }
+        }
+        for (_, stream) in &self.streams {
+            if !stream.closing {
+                next = Some(match next {
+                    Some(next) => next.min(stream.deadline),
+                    None => stream.deadline,
                 });
             }
         }
@@ -679,8 +739,24 @@ impl Component {
             return;
         }
         let mut due = None;
+        for (owner, stream) in &self.streams {
+            if !stream.closing && stream.deadline <= env.now {
+                due = Some(*owner);
+                break;
+            }
+        }
+        if let Some(owner) = due {
+            let stream = self.streams.get_mut(&owner).expect("due stream");
+            if stream.waiting {
+                stream.closing = true;
+            } else {
+                stream.heartbeat(env);
+            }
+            return;
+        }
+        let mut due = None;
         for (owner, connection) in &self.connections {
-            if !connection.closing && connection.deadline <= env.now {
+            if !connection.closing && connection.stream.is_none() && connection.deadline <= env.now {
                 due = Some(*owner);
                 break;
             }

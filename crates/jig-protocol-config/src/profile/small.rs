@@ -248,6 +248,9 @@ pub(super) const LIMITS: Limits = Limits {
 /// Native client HTTP: 4 sockets, 8 exchanges, 5 minute link, 30 second stall.
 pub(super) const CLIENTS: jig_protocol_engine_clients::Limits = jig_protocol_engine_clients::Limits {
     connections: 4,
+    streams: 2,
+    watches_per_stream: 4,
+    queued_bytes: 65536,
     identity_bytes: 1024,
     families: 32,
     providers: 32,
