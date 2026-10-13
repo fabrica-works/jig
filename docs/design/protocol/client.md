@@ -137,7 +137,11 @@ the platform's HTTP stack, TLS                  TLS server, or plaintext on loop
   turn that does not decode crosses up as such, never dropped.
 - **No time crosses, only walls.** Documents carry wall times, which the
   store keeps (`../client/domain/contract.md`, 5.3); durations (a
-  retention, a heartbeat) cross as durations.
+  retention, a heartbeat) cross as durations. A deadline the engine keeps
+  on its own clock (an account's next ask, a grace's end) crosses as the
+  wall it falls at, which the engine's translation makes from its clock
+  and its wall when it makes the document, so the view shows it as it
+  shows every other moment (`../client/domain/client.md`, section 13).
 
 ## 4. The connection
 
