@@ -135,6 +135,15 @@ ones before it in its session. Dependencies are by capability.
   --format='%(trailers:key=Step,valueonly)' HEAD` must print the step;
   if it prints nothing, amend the unlanded commit. A landed commit is
   never rewritten.
+- **The coordinator's check of a landed report** (ruling 104): an
+  implementer goes on after a landing (development.md, 8.6: "After a
+  landing, send the report and go on"), so its worktree may already hold
+  its next increment. Run `git -C <worktree> rev-parse --abbrev-ref HEAD`
+  first. If it prints the landed step's branch, `git status --porcelain`
+  must print nothing, as development.md, 7.3 says; if it prints another
+  branch, `git status --porcelain` is not run for that landing. The
+  other two checks of 7.3 (`merge-base --is-ancestor`, the `Step`
+  trailer) stand for every landing.
 - **smith's gate on carbon-forge** is ruling 121's (decisions.md, 10),
   with `NEXTEST_DOUBLE_SPAWN=0`, until smith 04.1: `land --gate 'cargo
   fmt --all --check && cargo clippy --workspace --all-targets -- -D

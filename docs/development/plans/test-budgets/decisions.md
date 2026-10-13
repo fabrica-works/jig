@@ -150,6 +150,16 @@ the file.
      now changes only the agent world's log line
      (`tests/agent/src/world.rs:1004`); the run world's trace goes to
      `later.md`. No kit mechanism is added.
+104. **A landed report's worktree may hold the next increment**
+     (process, skein 02's block of 2026-10-13T23:54:49Z). After skein
+     `c57966cd2` (skein-02.2) landed, its implementer went on to 02.3 on
+     `test-budgets/skein-02-3`, as development.md, 8.6 says ("After a
+     landing, send the report and go on"), and the coordinator's
+     `git status --porcelain` (7.3) printed 02.3's fourteen files.
+     skein-02.2 is accepted: `merge-base --is-ancestor` prints `on-main`
+     and its `Step` trailer reads `skein-02.2`. The README gains "The
+     coordinator's check of a landed report": the cleanliness check runs
+     only while the worktree is on the landed step's branch.
 
 ## For the user
 
