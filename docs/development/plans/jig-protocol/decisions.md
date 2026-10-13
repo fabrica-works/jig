@@ -2211,6 +2211,16 @@ the file.
      input in the same decision, the implementer's choice, kept by
      `keep_refusals` before the terminal; no invented turn. Files gain the
      tasks crate; Size 50.
+267. **jig 31's "links no smith and no client domain" is its production
+     dependencies'** (2026-10-13, the coordinator's block "jig 31.6: Done
+     when dependency scan includes dev dependencies",
+     2026-10-13T12:05:14Z). jig 31's Done when greps its `Cargo.toml` for
+     smith and the client domain; it finds `jig-domain-client` under
+     `[dev-dependencies]`, there for the round-trip test ruling 233 asked
+     of 31.s2 (an ended refusal encoded here and decoded by the client
+     link). The check binds `[dependencies]`: the component links neither
+     in production; a dev dependency for a test that crosses both sides
+     stays, named in the session's closing report.
 
 ## For the user
 
