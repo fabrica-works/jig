@@ -3,6 +3,7 @@
 [workspace]
 resolver = "3"
 members = [
+    "testing/jig-test-client-records",
     "crates/jig-protocol-engine-clients",
     "tests/engine-clients",
     "crates/jig-protocol-client-link",

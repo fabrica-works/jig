@@ -14,3 +14,6 @@ jig-protocol-client-wire = { path = "../jig-protocol-client-wire" }
 jig-protocol-transcript.workspace = true
 [lints]
 workspace = true
+
+[dev-dependencies]
+jig-test-client-records = {path = "../../testing/jig-test-client-records"}

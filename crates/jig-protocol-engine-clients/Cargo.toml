@@ -9,6 +9,7 @@ publish.workspace = true
 [dependencies]
 skein-lib.workspace = true
 skein-codec.workspace = true
+jig-domain-tasks.workspace = true
 skein-http.workspace = true
 skein-io.workspace = true
 jig-protocol-client-wire.workspace = true
@@ -22,3 +23,4 @@ workspace = true
 [dev-dependencies]
 jig-protocol-client-link = {path = "../jig-protocol-client-link"}
 jig-domain-client = {path = "../jig-domain-client"}
+jig-test-client-records = {path = "../../testing/jig-test-client-records"}

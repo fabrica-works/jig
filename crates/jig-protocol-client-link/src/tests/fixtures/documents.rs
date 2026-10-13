@@ -6,9 +6,7 @@ pub fn text(value: &[u8]) -> c::Text {
 pub fn document_text(value: &[u8]) -> c::DocumentText {
     c::DocumentText { bytes: text(value), cut: false }
 }
-pub fn wire_text(value: &[u8]) -> w::DocumentText {
-    w::DocumentText::new(&limits().wire, w::DocumentTextParts { bytes: Box::from(value), cut: false }).unwrap()
-}
+
 pub fn chip() -> c::Chip {
     c::Chip {
         task: 7,
@@ -19,63 +17,14 @@ pub fn chip() -> c::Chip {
     }
 }
 pub fn chip_record() -> w::Chip {
-    chip_phase_record(w::ChipPhaseFields::Starting)
+    jig_test_client_records::chip_record()
 }
-pub fn chip_phase_record(phase: w::ChipPhaseFields) -> w::Chip {
-    let lim = limits().wire;
 
-    let root = chip_root_fact();
-    let child =
-        w::Fact::ChipPhase(w::ChipPhaseRow::new(&lim, w::ChipPhaseRowParts { parent: Some(0), value: phase }).unwrap());
-    let first = fact_bytes(&root);
-    let second = fact_bytes(&child);
-    let mut rows = Writer::new(first.len().checked_add(second.len()).unwrap());
-    rows.put(&first).unwrap();
-    rows.put(&second).unwrap();
-    w::Chip::new(&lim, w::ChipParts { rows: rows.finish() }).unwrap()
-}
 pub fn chip_pieces(count: u32) -> Box<[u8]> {
-    let row = chip_record();
-    let mut encoded = Writer::new(usize::try_from(row.measure()).unwrap());
-    row.encode(&mut encoded).unwrap();
-    let encoded = encoded.finish();
-    let mut pieces =
-        Writer::new(encoded.len().checked_add(4).unwrap().checked_mul(usize::try_from(count).unwrap()).unwrap());
-    for _ in 0..count {
-        skein_codec::piece::write(&mut pieces, &encoded).unwrap();
-    }
-    pieces.finish()
+    jig_test_client_records::chip_pieces(count)
 }
 pub fn frame_record() -> w::Frame {
-    let lim = limits().wire;
-    w::Frame::new(
-        &lim,
-        w::FrameParts {
-            party: w::FrameParty::new(
-                &lim,
-                w::FramePartyParts {
-                    number: 7,
-                    kind: w::PartyKind::Person,
-                    login: w::DocumentText::new(&lim, w::DocumentTextParts { bytes: Box::from([]), cut: false })
-                        .unwrap(),
-                    name: w::DocumentText::new(&lim, w::DocumentTextParts { bytes: Box::from([]), cut: false })
-                        .unwrap(),
-                },
-            )
-            .unwrap(),
-            projects: List::with_capacity(0),
-            needs: w::Needs::new(&lim, w::NeedsParts { questions: 7, proposals: 7, escalations: 7, person_tasks: 7 })
-                .unwrap(),
-            needs_total: 7,
-            updates: w::Count::new(&lim, w::CountParts { value: 7, limited: false }).unwrap(),
-            results_seen: 7,
-            charters: Box::from([]),
-            cut: false,
-            retention: Duration::from_nanos(19),
-            deployment_role: None,
-        },
-    )
-    .unwrap()
+    jig_test_client_records::frame_record()
 }
 pub fn frame() -> c::Frame {
     c::Frame {
@@ -97,94 +46,7 @@ pub fn frame() -> c::Frame {
     }
 }
 pub fn task_record() -> w::Task {
-    let lim = limits().wire;
-    w::Task::new(
-        &lim,
-        w::TaskParts {
-            chip: chip_record(),
-            goal: None,
-            priority: None,
-            lineage_chips: Box::from([]),
-            inputs: Box::from([]),
-            project: 7,
-            requester: w::OwnerRequester::Task(
-                w::OwnerRequesterTask::new(&lim, w::OwnerRequesterTaskParts { value: 7 }).unwrap(),
-            ),
-            lineage: List::with_capacity(0),
-            spec: wire_specification_document(),
-            spec_revision: w::Revision::new(&lim, w::RevisionParts { value: 7 }).unwrap(),
-            person_revision: None,
-            taken_by: None,
-            instructions: None,
-            wake: w::OwnerWakePolicy::new(
-                &lim,
-                w::OwnerWakePolicyParts {
-                    words: w::WakeRule::Never,
-                    notices: w::WakeRule::Never,
-                    news: w::WakeRule::Never,
-                    results: w::ResultsWake::Never,
-                    questions: false,
-                    answers: false,
-                    timers: false,
-                },
-            )
-            .unwrap(),
-            subscriptions: w::Subscriptions::new(&lim, w::SubscriptionsParts { entries: List::with_capacity(0) })
-                .unwrap(),
-            result_contract: w::TaskContractDocument::Approval(
-                w::TaskContractDocumentApproval::new(
-                    &lim,
-                    w::TaskContractDocumentApprovalParts {
-                        state: Box::from([]),
-                        part: w::OwnerPart::new(
-                            &lim,
-                            w::OwnerPartParts {
-                                connector: 7,
-                                kind: w::OwnerPartKind::Resource,
-                                key: w::OwnerPartKey::Path(
-                                    w::OwnerPartKeyPath::new(
-                                        &lim,
-                                        w::OwnerPartKeyPathParts { value: List::with_capacity(0) },
-                                    )
-                                    .unwrap(),
-                                ),
-                            },
-                        )
-                        .unwrap(),
-                    },
-                )
-                .unwrap(),
-            ),
-            dependencies: Box::from([]),
-            references: Box::from([]),
-            cut: false,
-            resources: Box::from([]),
-            budget: w::OwnerBudget::new(
-                &lim,
-                w::OwnerBudgetParts {
-                    numbers: w::OwnerNumbers::new(
-                        &lim,
-                        w::OwnerNumbersParts { budget: 7, spent: 7, spent_below: 7, reserved: 7 },
-                    )
-                    .unwrap(),
-                    left: 7,
-                    funder: w::Funder::Task(w::FunderTask::new(&lim, w::FunderTaskParts { value: 7 }).unwrap()),
-                    deadline: None,
-                },
-            )
-            .unwrap(),
-            authority: wire_owner_authority_document(),
-            hold: None,
-            proposals: List::with_capacity(0),
-            activity: 7,
-            changed: 7,
-            acts: Box::from([]),
-            result: None,
-            delegates: Box::from([]),
-            context: None,
-        },
-    )
-    .unwrap()
+    jig_test_client_records::task_record()
 }
 pub fn task() -> c::Task {
     c::Task {
@@ -516,53 +378,6 @@ pub fn limits_for_document(bytes: u64) -> Limits {
     Limits::new(client, 4, Duration::from_secs(10)).unwrap()
 }
 
-pub fn wire_specification_document() -> w::SpecificationDocument {
-    let lim = limits().wire;
-    w::SpecificationDocument::new(
-        &lim,
-        w::SpecificationDocumentParts {
-            specification: w::DocumentSpecification::new(
-                &lim,
-                w::DocumentSpecificationParts {
-                    words: w::DocumentText::new(&lim, w::DocumentTextParts { bytes: Box::from([]), cut: false })
-                        .unwrap(),
-                    parameters: List::with_capacity(0),
-                    inputs: List::with_capacity(0),
-                },
-            )
-            .unwrap(),
-            cut: false,
-        },
-    )
-    .unwrap()
-}
-pub fn wire_owner_authority_document() -> w::OwnerAuthorityDocument {
-    let lim = limits().wire;
-    w::OwnerAuthorityDocument::new(
-        &lim,
-        w::OwnerAuthorityDocumentParts {
-            authority: w::OwnerAuthority::new(
-                &lim,
-                w::OwnerAuthorityParts {
-                    tools: 7,
-                    grants: Box::from([]),
-                    delegation: w::OwnerDelegation::new(
-                        &lim,
-                        w::OwnerDelegationParts { kinds: List::with_capacity(0), tasks: 7, depth: 7 },
-                    )
-                    .unwrap(),
-                    spend: 7,
-                    deadline: None,
-                    notes: 7,
-                    note_resources: Box::from([]),
-                },
-            )
-            .unwrap(),
-            cut: false,
-        },
-    )
-    .unwrap()
-}
 pub fn task_at_row_bound() -> w::Task {
     task_with_lineage(2)
 }

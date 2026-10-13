@@ -1,15 +1,7 @@
 use super::*;
 use skein_lib::{List, Wall};
 pub fn chip_from_rows(rows: &[w::Fact]) -> w::Chip {
-    let mut length = 0_usize;
-    for row in rows {
-        length = length.checked_add(usize::try_from(row.measure()).unwrap()).unwrap().checked_add(4).unwrap();
-    }
-    let mut bytes = Writer::new(length);
-    for row in rows {
-        bytes.put(&fact_bytes(row)).unwrap();
-    }
-    w::Chip::new(&limits().wire, w::ChipParts { rows: bytes.finish() }).unwrap()
+    jig_test_client_records::chip_from_rows(rows)
 }
 pub fn phases() -> [(w::Chip, c::Chip); 13] {
     [
@@ -552,91 +544,9 @@ pub fn phase_ended() -> (w::Chip, c::Chip) {
     (record, expected)
 }
 pub fn chip_root_fact() -> w::Fact {
-    let lim = limits().wire;
-    w::Fact::Chip(
-        w::ChipRow::new(
-            &lim,
-            w::ChipRowParts {
-                parent: None,
-                value: w::ChipFields::new(
-                    &lim,
-                    w::ChipFieldsParts {
-                        task: 7,
-                        title: wire_text(b""),
-                        executor: w::Executor::Agent(
-                            w::ExecutorAgent::new(&lim, w::ExecutorAgentParts { charter: 7 }).unwrap(),
-                        ),
-                        phase: w::Phase::Waiting,
-                        details: 1,
-                    },
-                )
-                .unwrap(),
-            },
-        )
-        .unwrap(),
-    )
+    jig_test_client_records::chip_root_fact()
 }
 
 pub fn wire_owner_chip_details_row() -> w::OwnerChipDetailsRow {
-    let lim = limits().wire;
-    w::OwnerChipDetailsRow::new(
-        &lim,
-        w::OwnerChipDetailsRowParts {
-            parent: Some(1),
-            value: w::OwnerChipDetailsFields::new(
-                &lim,
-                w::OwnerChipDetailsFieldsParts {
-                    project: 7,
-                    executor: w::OwnerExecutor::Agent(
-                        w::OwnerExecutorAgent::new(&lim, w::OwnerExecutorAgentParts { charter: 7 }).unwrap(),
-                    ),
-                    phase_since: 7,
-                    run_since: None,
-                    attempt: None,
-                    retry: None,
-                    wake: w::OwnerWakePolicy::new(
-                        &lim,
-                        w::OwnerWakePolicyParts {
-                            words: w::WakeRule::Never,
-                            notices: w::WakeRule::Never,
-                            news: w::WakeRule::Never,
-                            results: w::ResultsWake::Never,
-                            questions: false,
-                            answers: false,
-                            timers: false,
-                        },
-                    )
-                    .unwrap(),
-                    person_wait: None,
-                    hold: None,
-                    budget: w::OwnerBudget::new(
-                        &lim,
-                        w::OwnerBudgetParts {
-                            numbers: w::OwnerNumbers::new(
-                                &lim,
-                                w::OwnerNumbersParts { budget: 7, spent: 7, spent_below: 7, reserved: 7 },
-                            )
-                            .unwrap(),
-                            left: 7,
-                            funder: w::Funder::Task(w::FunderTask::new(&lim, w::FunderTaskParts { value: 7 }).unwrap()),
-                            deadline: None,
-                        },
-                    )
-                    .unwrap(),
-                    activity: 7,
-                    resources: Box::from([]),
-                    resources_cut: false,
-                    resources_observed: false,
-                    procedure: None,
-                    live_delegates: 7,
-                    closing_connectors: None,
-                    ending: None,
-                    ended_at: None,
-                    observation: None,
-                },
-            )
-            .unwrap(),
-        },
-    )
-    .unwrap()
+    jig_test_client_records::wire_owner_chip_details_row()
 }

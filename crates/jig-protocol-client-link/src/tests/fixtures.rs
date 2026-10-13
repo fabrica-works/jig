@@ -184,11 +184,7 @@ impl Harness {
 }
 
 pub fn fact_bytes(value: &w::Fact) -> Box<[u8]> {
-    let mut row = Writer::new(usize::try_from(value.measure()).unwrap());
-    value.encode(&mut row).unwrap();
-    let mut piece = Writer::new(usize::try_from(value.measure().checked_add(4).unwrap()).unwrap());
-    skein_codec::piece::write(&mut piece, &row.finish()).unwrap();
-    piece.finish()
+    jig_test_client_records::fact_bytes(value)
 }
 pub fn refusal_with_hold(rows: Box<[u8]>) -> Box<[u8]> {
     let lim = limits().wire;

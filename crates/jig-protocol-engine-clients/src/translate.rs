@@ -1,8 +1,46 @@
-//! Total client request translations (protocol/client.md, sections 3 and 5).
+//! Total translations of the core's client vocabulary (protocol/client.md, 3).
+use alloc::boxed::Box;
+use jig_protocol_client_wire::v5 as w;
+use skein_lib::{List, Writer};
 pub(crate) mod answers;
 pub(crate) mod asks;
+pub mod chips;
+pub mod owner;
 pub(crate) mod refusals;
-use jig_protocol_client_wire::v5 as w;
+pub mod task;
+
+fn problem(reason: skein_codec::Reason) -> w::Problem {
+    w::Problem { path: w::Path::OwnedRecord, reason }
+}
+fn count(value: usize) -> Result<u32, w::Problem> {
+    match u32::try_from(value) {
+        Ok(value) => Ok(value),
+        Err(_) => Err(problem(skein_codec::Reason::Bound)),
+    }
+}
+fn pieces(rows: &List<Box<[u8]>>, bound: u32, path: w::Path) -> Result<Box<[u8]>, w::Problem> {
+    let mut size = 0_u32;
+    for row in rows {
+        let len = count(row.len())?;
+        size = size
+            .checked_add(len)
+            .ok_or(w::Problem { path, reason: skein_codec::Reason::Bound })?
+            .checked_add(4)
+            .ok_or(w::Problem { path, reason: skein_codec::Reason::Bound })?;
+        if size > bound {
+            return Err(w::Problem { path, reason: skein_codec::Reason::Bound });
+        }
+    }
+    let mut out = Writer::new(usize::try_from(size).expect("u32 pieces fit usize"));
+    for row in rows {
+        match skein_codec::piece::write(&mut out, row) {
+            Ok(()) => (),
+            Err(_) => return Err(w::Problem { path, reason: skein_codec::Reason::Bound }),
+        }
+    }
+    Ok(out.finish())
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Untranslatable {
     pub path: w::Path,

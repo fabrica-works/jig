@@ -1,0 +1,172 @@
+use alloc::boxed::Box;
+use jig_domain_core::documents as d;
+use jig_domain_tasks as t;
+use jig_protocol_client_wire::v5 as w;
+use skein_lib::{Duration, List, Wall};
+pub fn wire_limits() -> w::Limits {
+    jig_test_client_records::limits()
+}
+pub fn text() -> d::Text {
+    d::Text { bytes: Box::from([]), cut: false }
+}
+pub fn frame_two_projects() -> d::Frame {
+    let mut projects = List::with_capacity(2);
+    for (project, role, chat_budget) in
+        [(3, jig_domain_people::Role::Owner, 11), (5, jig_domain_people::Role::Observer, 13)]
+    {
+        projects.push(d::FrameProjectRole { project, role, name: None, pool: None, chat_budget }).unwrap();
+    }
+    let mut goals = List::with_capacity(1);
+    goals.push(19).unwrap();
+    let mut charters = List::with_capacity(1);
+    charters.push(d::OfferedCharter { project: 3, chat: 17, goals, cut: true }).unwrap();
+    d::Frame {
+        party: 7,
+        kind: jig_domain_people::Kind::Person,
+        login: d::Text { bytes: Box::from("é".as_bytes()), cut: true },
+        name: text(),
+        deployment_role: None,
+        projects,
+        needs: 7,
+        need_counts: jig_domain_people::Needs { questions: 7, proposals: 7, escalations: 7, person_tasks: 7 },
+        updates: d::Count::Known(7),
+        results_seen: 7,
+        retention: Duration::from_nanos(19),
+        charters,
+        cut: false,
+    }
+}
+pub fn wake() -> t::WakePolicy {
+    t::WakePolicy {
+        words: t::WakeRule::Never,
+        notices: t::WakeRule::Never,
+        news: t::WakeRule::Never,
+        results: t::ResultsWake::Never,
+        questions: false,
+        answers: false,
+        timers: false,
+    }
+}
+pub fn budget() -> d::BudgetLine {
+    d::BudgetLine {
+        numbers: t::Numbers { budget: 7, spent: 7, spent_below: 7, reserved: 7 },
+        left: 7,
+        funder: t::Funder::Task(7),
+        deadline: None,
+    }
+}
+pub fn chip() -> d::Chip {
+    d::Chip {
+        number: 7,
+        title: text(),
+        executor: d::ExecutorKind::Agent,
+        phase: d::PhaseLine::Waiting { dependencies: List::with_capacity(0), more: false, holds: false },
+        details: Box::new(d::ChipDetails {
+            project: 7,
+            executor: t::Executor::Agent { charter: 7 },
+            phase_since: Wall::from_nanos(7),
+            run_since: None,
+            attempt: None,
+            retry: None,
+            wake: wake(),
+            person_wait: None,
+            hold: None,
+            budget: budget(),
+            activity: 7,
+            resources: List::with_capacity(0),
+            resources_cut: false,
+            resources_observed: false,
+            procedure: None,
+            live_delegates: 7,
+            closing_connectors: None,
+            ending: None,
+            ended_at: None,
+            observation: None,
+        }),
+    }
+}
+pub fn phases() -> [(d::PhaseLine, w::Phase); 6] {
+    [
+        (d::PhaseLine::Waiting { dependencies: List::with_capacity(0), more: false, holds: false }, w::Phase::Waiting),
+        (d::PhaseLine::Active(t::Active::Idle), w::Phase::Idle),
+        (
+            d::PhaseLine::Person {
+                address: t::PersonAddress::Role(17),
+                taken_by: Some(19),
+                since: Some(Wall::from_nanos(23)),
+            },
+            w::Phase::Active,
+        ),
+        (d::PhaseLine::Closing(t::Stage::Effects), w::Phase::Closing),
+        (d::PhaseLine::Held { reason: t::Hold::Uncertain { entry: 29 }, revision: 31 }, w::Phase::Held),
+        (d::PhaseLine::Ended, w::Phase::Ended),
+    ]
+}
+pub fn authority() -> d::AuthorityLine {
+    d::AuthorityLine {
+        tools: t::Tools(7),
+        grants: List::with_capacity(0),
+        executors: List::with_capacity(0),
+        tasks: 7,
+        depth: 7,
+        ceiling: t::Budget { spend: 7, deadline: None },
+        notes: t::Scopes(7),
+        note_resources: List::with_capacity(0),
+        cut: false,
+    }
+}
+pub fn hold() -> d::HoldLine {
+    d::HoldLine {
+        account: None,
+        source: None,
+        reason: t::Hold::Uncertain { entry: 29 },
+        revision: 31,
+        before: d::PriorPhase::Waiting,
+        escalation: None,
+        tries: t::Tries { transient: 2, permanent: 3, run: 5, agent: 7, lost: 11, invalid: 13 },
+        hold_wait_since: Some(Wall::from_nanos(17)),
+    }
+}
+pub fn task_with_hold() -> d::Task {
+    d::Task {
+        chip: chip(),
+        acts: List::with_capacity(0),
+        project: 7,
+        goal: None,
+        priority: None,
+        executor: t::Executor::Agent { charter: 7 },
+        requester: t::Party::Task(7),
+        lineage: List::with_capacity(0),
+        delegates: List::with_capacity(0),
+        changed: Wall::from_nanos(7),
+        spec_revision: 7,
+        person_revision: None,
+        taken_by: None,
+        activity: 7,
+        spec: d::SpecLine {
+            words: text(),
+            parameters: List::with_capacity(0),
+            inputs: List::with_capacity(0),
+            cut: false,
+        },
+        words: text(),
+        parameters: List::with_capacity(0),
+        instructions: None,
+        resources: List::with_capacity(0),
+        inputs: List::with_capacity(0),
+        dependencies: List::with_capacity(0),
+        references: List::with_capacity(0),
+        subscriptions: List::with_capacity(0),
+        wake: wake(),
+        contract: d::ContractLine::Approval {
+            state: Box::from([]),
+            part: t::Part { connector: 7, kind: t::PartKind::Resource, key: t::PartKey::Path(List::with_capacity(0)) },
+        },
+        result: None,
+        budget: budget(),
+        authority: authority(),
+        hold: Some(hold()),
+        proposals: List::with_capacity(0),
+        cut: false,
+    }
+}

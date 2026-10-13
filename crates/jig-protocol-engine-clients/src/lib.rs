@@ -12,4 +12,4 @@ pub use boundary::*;
 pub use component::{Component, Unusable};
 pub use limits::{Limits, MAX_OUT_DOWN, MAX_OUT_FIRE, MAX_OUT_UP, worst_case};
 
-mod translate;
+pub mod translate;

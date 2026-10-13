@@ -763,3 +763,7 @@ pub fn client_limits() -> jig_protocol_client_link::Limits {
 #[path = "fixtures/services.rs"]
 mod services;
 pub use services::*;
+
+#[path = "fixtures/documents.rs"]
+mod documents;
+pub use documents::*;

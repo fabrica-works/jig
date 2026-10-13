@@ -567,6 +567,7 @@ dependencies = [
  "jig-domain-client",
  "jig-protocol-client-wire",
  "jig-protocol-transcript",
+ "jig-test-client-records",
  "skein-codec",
  "skein-http",
  "skein-lib",
@@ -609,9 +610,11 @@ dependencies = [
  "jig-domain-client",
  "jig-domain-core",
  "jig-domain-people",
+ "jig-domain-tasks",
  "jig-domain-views",
  "jig-protocol-client-link",
  "jig-protocol-client-wire",
+ "jig-test-client-records",
  "skein-codec",
  "skein-http",
  "skein-io",
@@ -724,6 +727,15 @@ version = "0.0.0"
 dependencies = [
  "jig-test-connector",
  "jig-test-domain-client",
+ "skein-lib",
+]
+
+[[package]]
+name = "jig-test-client-records"
+version = "0.0.0"
+dependencies = [
+ "jig-protocol-client-wire",
+ "skein-codec",
  "skein-lib",
 ]
 
