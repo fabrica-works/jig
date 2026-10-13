@@ -2181,6 +2181,17 @@ the file.
      27.s2 (`jig/27-channel-stories-and-store.md`), reports the stop
      pending only when it can be taken; jig 27 runs it before 27.1
      lands.
+264. **A sign-in and a sign-out are answered not ready while the engine
+     stops** (2026-10-13, the designer's answer to question.md's "jig
+     31.6: a sign-in or sign-out while the engine stops"; jig `4af5f3d2`,
+     `d34ee277`, `53f61a95`). Both commit, so engine.md 6.1's rule takes
+     them: answered not ready, as a keyed request, nothing committed, kept
+     or erased and no link secret spent; a client takes it as again. A
+     record, not an HTTP 503, since a lost answer cannot say nothing was
+     taken. A step not in the plan, jig 30.s4 (`jig/30-client-wire.md`),
+     adds the two wire variants; 31.6 needs it and gains a test; 33.1 maps
+     them. Keyed requests not ready, reads served and a new watch ended
+     stopping stand.
 
 ## For the user
 
