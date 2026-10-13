@@ -5,7 +5,6 @@ use crate::tests::fixtures::core_rows as fixtures;
 use jig_domain_core as core;
 use jig_domain_tasks as tasks;
 
-#[test]
 fn the_deployment_header_reads_back_with_its_id() {
     core_round_trip(core::CoreRecord::Deployment(fixtures::deployment()));
 }
@@ -22,21 +21,17 @@ fn a_claim_before_its_first_turn_reads_back() {
     run.terminal = None;
     core_round_trip(core::CoreRecord::RunProof(run));
 }
-#[test]
 fn a_terminal_archive_reads_back_with_its_end() {
     core_round_trip(core::CoreRecord::Terminal(fixtures::terminal()));
 }
-#[test]
 fn a_goal_projection_reads_back_with_its_phase() {
     core_round_trip(core::CoreRecord::Projection(fixtures::goal()));
 }
-#[test]
 fn a_projection_task_reads_back_with_each_requester() {
     for requester in [tasks::Party::Task(11), tasks::Party::Person(12), tasks::Party::Deployment { project: 2 }] {
         core_round_trip(core::CoreRecord::Projection(fixtures::projection_task(requester)));
     }
 }
-#[test]
 fn a_milestone_reads_back_with_each_identity() {
     for identity in
         [core::MilestoneId::Lifecycle { task: 11, position: 3 }, core::MilestoneId::Revision { task: 11, revision: 4 }]
@@ -44,7 +39,6 @@ fn a_milestone_reads_back_with_each_identity() {
         core_round_trip(core::CoreRecord::Projection(fixtures::milestone(identity)));
     }
 }
-#[test]
 fn a_milestone_without_carried_values_reads_back() {
     let core::ProjectionRecord::Milestone { goal, mut milestone } =
         fixtures::milestone(core::MilestoneId::Revision { task: 11, revision: 4 })
@@ -55,7 +49,6 @@ fn a_milestone_without_carried_values_reads_back() {
     milestone.change = None;
     core_round_trip(core::CoreRecord::Projection(core::ProjectionRecord::Milestone { goal, milestone }));
 }
-#[test]
 fn a_turn_reads_back_with_its_bytes() {
     core_round_trip(core::CoreRecord::Turn(fixtures::turn()));
 }
@@ -76,7 +69,6 @@ fn a_turn_frame_of_another_version_is_refused() {
         skein_codec::Reason::Version
     );
 }
-#[test]
 fn both_decision_records_read_back() {
     for row in [
         core::CoreRecord::ProposalDecision(fixtures::proposal()),
@@ -85,7 +77,6 @@ fn both_decision_records_read_back() {
         core_round_trip(row);
     }
 }
-#[test]
 fn a_proposal_without_created_tasks_reads_back() {
     let mut proposal = fixtures::proposal();
     proposal.created = None;
@@ -107,7 +98,6 @@ fn a_turn_exceeding_load_bytes_still_reads_back() {
     assert_eq!(codec::read_turn(&bytes, &limits), Ok(turn));
 }
 
-#[test]
 fn run_proofs_read_back_with_their_optional_fields() {
     table([
         ("a_run_proof_with_its_terminal_reads_back", a_run_proof_with_its_terminal_reads_back),
@@ -127,4 +117,20 @@ fn table<const N: usize>(cases: [Case; N]) {
         }
     }
     assert!(passed, "{failures:?}");
+}
+
+#[test]
+fn core_rows_read_back_as_written() {
+    table([
+        ("the_deployment_header_reads_back_with_its_id", the_deployment_header_reads_back_with_its_id),
+        ("a_terminal_archive_reads_back_with_its_end", a_terminal_archive_reads_back_with_its_end),
+        ("a_goal_projection_reads_back_with_its_phase", a_goal_projection_reads_back_with_its_phase),
+        ("a_projection_task_reads_back_with_each_requester", a_projection_task_reads_back_with_each_requester),
+        ("a_milestone_reads_back_with_each_identity", a_milestone_reads_back_with_each_identity),
+        ("a_milestone_without_carried_values_reads_back", a_milestone_without_carried_values_reads_back),
+        ("a_turn_reads_back_with_its_bytes", a_turn_reads_back_with_its_bytes),
+        ("both_decision_records_read_back", both_decision_records_read_back),
+        ("a_proposal_without_created_tasks_reads_back", a_proposal_without_created_tasks_reads_back),
+        ("run_proofs_read_back_with_their_optional_fields", run_proofs_read_back_with_their_optional_fields),
+    ]);
 }

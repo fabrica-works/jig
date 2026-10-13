@@ -3,7 +3,6 @@ mod fixtures;
 use crate::*;
 use skein_lib::Reader;
 
-#[test]
 fn a_keyed_request_past_its_bound_is_refused_naming_it() {
     let limits = fixtures::limits();
     let request = fixtures::bytes(limits.keyed_request.checked_add(1).expect("small bound"));
@@ -11,7 +10,6 @@ fn a_keyed_request_past_its_bound_is_refused_naming_it() {
     assert_eq!(refused, Err(Problem { path: Path::KeyedRequest, reason: skein_codec::Reason::Bound }));
 }
 
-#[test]
 fn an_owned_record_keeps_its_owners_version() {
     let limits = fixtures::limits();
     let owned = fixtures::owned();
@@ -19,7 +17,6 @@ fn an_owned_record_keeps_its_owners_version() {
     assert_eq!(Owned::decode(&limits, &mut Reader::new(&bytes)), Ok(owned));
 }
 
-#[test]
 fn a_refusal_with_its_facts_round_trips_unchanged() {
     let limits = fixtures::limits();
     let refused = fixtures::refused_moved();
@@ -27,7 +24,6 @@ fn a_refusal_with_its_facts_round_trips_unchanged() {
     assert_eq!(Refused::decode(&limits, &mut Reader::new(&bytes)), Ok(refused));
 }
 
-#[test]
 fn each_answer_kind_round_trips_unchanged() {
     let limits = fixtures::limits();
     for answer in [Answer::FinalAnswer(fixtures::owned()), Answer::Busy, Answer::NotReady, Answer::SignedOut] {
@@ -36,7 +32,6 @@ fn each_answer_kind_round_trips_unchanged() {
     }
 }
 
-#[test]
 fn a_bearer_token_past_its_bound_is_refused() {
     let limits = fixtures::limits();
     let token = fixtures::bytes(limits.signed_in_token.checked_add(1).expect("small bound"));
@@ -46,7 +41,6 @@ fn a_bearer_token_past_its_bound_is_refused() {
     );
 }
 
-#[test]
 fn a_cursor_past_its_bound_is_refused() {
     let limits = fixtures::limits();
     let value = fixtures::bytes(limits.cursor_value.checked_add(1).expect("small bound"));
@@ -56,7 +50,6 @@ fn a_cursor_past_its_bound_is_refused() {
     );
 }
 
-#[test]
 fn each_read_none_round_trips_unchanged() {
     let limits = fixtures::limits();
     for none in [ReadNone::Unknown, ReadNone::Refused, ReadNone::Gone, ReadNone::Busy, ReadNone::SignedOut] {
@@ -66,7 +59,6 @@ fn each_read_none_round_trips_unchanged() {
     }
 }
 
-#[test]
 fn a_read_value_round_trips_with_its_owner_version() {
     let limits = fixtures::limits();
     let answer = ReadAnswer::Value(fixtures::owned());
@@ -84,7 +76,6 @@ fn a_page_one_row_past_its_limit_is_refused() {
     );
 }
 
-#[test]
 fn an_activity_line_carries_its_turn_bytes_unchanged() {
     let limits = fixtures::limits();
     let line = fixtures::activity_line(Box::from([0, 255, 1]));
@@ -115,7 +106,6 @@ fn a_page_of_many_small_rows_and_one_of_a_few_large_rows_fit_one_bound() {
     }
 }
 
-#[test]
 fn a_frame_at_its_ceilings_round_trips_unchanged() {
     let limits = fixtures::document_limits();
     let frame = fixtures::frame_at_ceilings(&limits);
@@ -134,7 +124,6 @@ fn a_task_one_byte_past_its_text_bound_is_refused() {
     assert_eq!(Task::new(&limits, task.into_parts()), expected);
 }
 
-#[test]
 fn a_run_state_without_writing_or_call_round_trips() {
     let limits = fixtures::document_limits();
     let run = fixtures::run_state(&limits);
@@ -142,7 +131,6 @@ fn a_run_state_without_writing_or_call_round_trips() {
     assert_eq!(RunState::decode(&limits, &mut Reader::new(&bytes)), Ok(run));
 }
 
-#[test]
 fn a_chip_with_each_phase_round_trips_unchanged() {
     let limits = fixtures::document_limits();
     for phase in fixtures::chip_phases(&limits) {
@@ -153,7 +141,6 @@ fn a_chip_with_each_phase_round_trips_unchanged() {
     }
 }
 
-#[test]
 fn a_hello_naming_two_owners_round_trips_unchanged() {
     let limits = fixtures::stream_limits();
     let hello = fixtures::hello(&limits);
@@ -161,7 +148,6 @@ fn a_hello_naming_two_owners_round_trips_unchanged() {
     assert_eq!(Hello::decode(&limits, &mut Reader::new(&bytes)), Ok(hello));
 }
 
-#[test]
 fn a_stream_event_at_its_ceiling_round_trips_unchanged() {
     let limits = fixtures::stream_limits();
     for event in fixtures::stream_events(&limits) {
@@ -183,7 +169,6 @@ fn an_open_for_a_tree_carries_its_window() {
     assert_eq!(decoded, open);
 }
 
-#[test]
 fn each_watch_end_but_dropped_round_trips() {
     let limits = fixtures::stream_limits();
     for why in [
@@ -254,7 +239,6 @@ fn a_kept_record_of_another_family_version_is_refused() {
     }
 }
 
-#[test]
 fn a_draft_at_its_ceiling_round_trips_unchanged() {
     let limits = fixtures::limits();
     let draft = Draft::new(
@@ -271,7 +255,6 @@ fn a_draft_at_its_ceiling_round_trips_unchanged() {
     assert_eq!(Draft::decode(&limits, &mut Reader::new(&bytes)), Ok(draft));
 }
 
-#[test]
 fn a_table_entry_never_sent_round_trips_with_no_wall() {
     let limits = fixtures::limits();
     let family = small_store_family(&limits);
@@ -293,7 +276,6 @@ fn a_table_entry_never_sent_round_trips_with_no_wall() {
     assert_eq!(decoded, entry);
 }
 
-#[test]
 fn each_read_value_variant_round_trips_unchanged() {
     let limits = fixtures::limits();
     for (name, value) in &fixtures::read_values(&limits) {
@@ -302,7 +284,6 @@ fn each_read_value_variant_round_trips_unchanged() {
     }
 }
 
-#[test]
 fn a_stream_text_event_round_trips_with_its_watch() {
     let limits = fixtures::stream_limits();
     let event = StreamEvent::Text(fixtures::stream_text(&limits, fixtures::raw_live_call(&limits)));
@@ -310,7 +291,6 @@ fn a_stream_text_event_round_trips_with_its_watch() {
     assert_eq!(StreamEvent::decode(&limits, &mut Reader::new(&bytes)), Ok(event));
 }
 
-#[test]
 fn each_delivery_value_variant_round_trips_unchanged() {
     let limits = fixtures::limits();
     for (name, value) in &fixtures::delivery_values(&limits) {
@@ -341,7 +321,6 @@ fn each_turn_bytes_variant_round_trips_with_the_carried_ceiling() {
     }
 }
 
-#[test]
 fn a_sign_in_not_ready_round_trips_unchanged() {
     let limits = fixtures::limits();
     let answer = SignInAnswer::NotReady;
@@ -349,10 +328,57 @@ fn a_sign_in_not_ready_round_trips_unchanged() {
     assert_eq!(SignInAnswer::decode(&limits, &mut Reader::new(&bytes)), Ok(answer), "sign-in not_ready");
 }
 
-#[test]
 fn a_sign_out_not_ready_round_trips_unchanged() {
     let limits = fixtures::limits();
     let answer = SignOutAnswer::NotReady;
     let bytes = fixtures::encoded(&answer, SignOutAnswer::measure, SignOutAnswer::encode);
     assert_eq!(SignOutAnswer::decode(&limits, &mut Reader::new(&bytes)), Ok(answer), "sign-out not_ready");
+}
+
+#[test]
+fn wire_values_round_trip_unchanged() {
+    table([
+        ("an_owned_record_keeps_its_owners_version", an_owned_record_keeps_its_owners_version),
+        ("a_refusal_with_its_facts_round_trips_unchanged", a_refusal_with_its_facts_round_trips_unchanged),
+        ("each_answer_kind_round_trips_unchanged", each_answer_kind_round_trips_unchanged),
+        ("each_read_none_round_trips_unchanged", each_read_none_round_trips_unchanged),
+        ("a_read_value_round_trips_with_its_owner_version", a_read_value_round_trips_with_its_owner_version),
+        ("an_activity_line_carries_its_turn_bytes_unchanged", an_activity_line_carries_its_turn_bytes_unchanged),
+        ("a_frame_at_its_ceilings_round_trips_unchanged", a_frame_at_its_ceilings_round_trips_unchanged),
+        ("a_run_state_without_writing_or_call_round_trips", a_run_state_without_writing_or_call_round_trips),
+        ("a_chip_with_each_phase_round_trips_unchanged", a_chip_with_each_phase_round_trips_unchanged),
+        ("a_hello_naming_two_owners_round_trips_unchanged", a_hello_naming_two_owners_round_trips_unchanged),
+        ("a_stream_event_at_its_ceiling_round_trips_unchanged", a_stream_event_at_its_ceiling_round_trips_unchanged),
+        ("each_watch_end_but_dropped_round_trips", each_watch_end_but_dropped_round_trips),
+        ("a_draft_at_its_ceiling_round_trips_unchanged", a_draft_at_its_ceiling_round_trips_unchanged),
+        ("a_table_entry_never_sent_round_trips_with_no_wall", a_table_entry_never_sent_round_trips_with_no_wall),
+        ("each_read_value_variant_round_trips_unchanged", each_read_value_variant_round_trips_unchanged),
+        ("a_stream_text_event_round_trips_with_its_watch", a_stream_text_event_round_trips_with_its_watch),
+        ("each_delivery_value_variant_round_trips_unchanged", each_delivery_value_variant_round_trips_unchanged),
+        ("a_sign_in_not_ready_round_trips_unchanged", a_sign_in_not_ready_round_trips_unchanged),
+        ("a_sign_out_not_ready_round_trips_unchanged", a_sign_out_not_ready_round_trips_unchanged),
+    ]);
+}
+
+#[test]
+fn wire_fields_past_their_bounds_are_refused() {
+    table([
+        ("a_keyed_request_past_its_bound_is_refused_naming_it", a_keyed_request_past_its_bound_is_refused_naming_it),
+        ("a_bearer_token_past_its_bound_is_refused", a_bearer_token_past_its_bound_is_refused),
+        ("a_cursor_past_its_bound_is_refused", a_cursor_past_its_bound_is_refused),
+    ]);
+}
+
+type Case = (&'static str, fn());
+
+fn table<const N: usize>(cases: [Case; N]) {
+    let mut failures = [None; N];
+    let mut passed = true;
+    for ((name, case), failure) in cases.into_iter().zip(&mut failures) {
+        if std::panic::catch_unwind(case).is_err() {
+            *failure = Some(name);
+            passed = false;
+        }
+    }
+    assert!(passed, "{failures:?}");
 }

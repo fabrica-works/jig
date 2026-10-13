@@ -26,7 +26,6 @@ fn a_live_task_record_reads_back_whole() {
     let row = domain::Stored::Live(Box::new(fixtures::task_record()));
     assert_eq!(saved_tasks(&row), Ok(row));
 }
-#[test]
 fn an_ended_task_with_its_result_reads_back() {
     let mut record = fixtures::task_record();
     record.phase = domain::Phase::Ended(domain::Ending::Done(domain::TaskResult::Report {
@@ -35,7 +34,6 @@ fn an_ended_task_with_its_result_reads_back() {
     let row = domain::Stored::Ended(Box::new(record));
     assert_eq!(saved_tasks(&row), Ok(row));
 }
-#[test]
 fn an_activity_line_of_each_kind_reads_back() {
     for line in [
         domain::Line::Words {
@@ -60,7 +58,6 @@ fn an_activity_line_of_each_kind_reads_back() {
         assert_eq!(saved_tasks(&row), Ok(row));
     }
 }
-#[test]
 fn each_terminal_activity_kind_reads_back() {
     for end in
         [domain::EndKind::Parked, domain::EndKind::Finished, domain::EndKind::Cancelled, domain::EndKind::Refused]
@@ -69,7 +66,6 @@ fn each_terminal_activity_kind_reads_back() {
         assert_eq!(saved_tasks(&row), Ok(row));
     }
 }
-#[test]
 fn each_index_row_reads_back() {
     for row in [
         domain::Stored::Update(domain::Update {
@@ -98,14 +94,12 @@ fn each_index_row_reads_back() {
         assert_eq!(saved_tasks(&row), Ok(row));
     }
 }
-#[test]
 fn each_stub_status_reads_back() {
     for phase in [domain::Status::Done, domain::Status::Failed, domain::Status::Cancelled] {
         let row = domain::Stored::Stub(domain::Stub { task: 17, phase, result: Token::new(19) });
         assert_eq!(saved_tasks(&row), Ok(row));
     }
 }
-#[test]
 fn each_message_kind_reads_back() {
     for kind in [
         domain::MessageKind::Escalation { task: 17, revision: 3 },
@@ -126,7 +120,6 @@ fn each_message_kind_reads_back() {
         assert_eq!(saved_tasks(&row), Ok(row));
     }
 }
-#[test]
 fn each_result_message_kind_reads_back() {
     for kind in [
         domain::ResultKind::Approved { state: Box::from(b"state".as_slice()), words_present: true },
@@ -146,7 +139,6 @@ fn each_result_message_kind_reads_back() {
         assert_eq!(saved_tasks(&row), Ok(row));
     }
 }
-#[test]
 fn each_notice_state_reads_back() {
     for state in [
         domain::NoticeState::Held,
@@ -158,14 +150,12 @@ fn each_notice_state_reads_back() {
         assert_eq!(saved_tasks(&row), Ok(row));
     }
 }
-#[test]
 fn each_news_class_reads_back() {
     for class in [domain::NewsClass::Wakes, domain::NewsClass::Kept, domain::NewsClass::Dropped] {
         let row = message_row(domain::MessageKind::News { subscription: 109, class });
         assert_eq!(saved_tasks(&row), Ok(row));
     }
 }
-#[test]
 fn each_escalation_state_reads_back() {
     for escalation in [
         domain::Escalation::Unheld { revision: 3 },
@@ -178,7 +168,6 @@ fn each_escalation_state_reads_back() {
         assert_eq!(saved_tasks(&row), Ok(row));
     }
 }
-#[test]
 fn each_escalation_holder_reads_back() {
     for holder in [
         domain::EscalationHolder::Task(19),
@@ -191,7 +180,6 @@ fn each_escalation_holder_reads_back() {
         assert_eq!(saved_tasks(&row), Ok(row));
     }
 }
-#[test]
 fn each_invalid_result_reason_reads_back() {
     for reason in [
         domain::InvalidResult::Form,
@@ -206,7 +194,6 @@ fn each_invalid_result_reason_reads_back() {
         assert_eq!(saved_tasks(&row), Ok(row));
     }
 }
-#[test]
 fn each_subscription_kind_reads_back() {
     for kind in [
         domain::SubscriptionKind::Task { target: 19, held: true, result: false },
@@ -284,7 +271,6 @@ fn record_count_limits_past_the_schema_ceilings_are_refused() {
         assert_eq!(tasks::limits(&limits), None);
     }
 }
-#[test]
 fn a_result_word_uses_the_larger_shared_word_bound() {
     let mut record = fixtures::task_record();
     let mut word = fixtures::task_word(5);
@@ -304,7 +290,6 @@ fn an_activity_words_line_past_its_own_word_bound_is_refused() {
     });
     assert_eq!(tasks::encode(&row, &tasks_limits()), Err(bound_problem(wire::Path::ActivityWordsWords)));
 }
-#[test]
 fn a_person_wait_without_a_stall_notice_reads_back() {
     let mut record = fixtures::task_record();
     record.person_wait.as_mut().expect("fixture wait").notice = None;
@@ -312,7 +297,6 @@ fn a_person_wait_without_a_stall_notice_reads_back() {
     assert_eq!(saved_tasks(&row), Ok(row));
 }
 
-#[test]
 fn live_task_records_read_back_whole() {
     table([
         ("a_live_task_record_reads_back_whole", a_live_task_record_reads_back_whole),
@@ -333,4 +317,26 @@ fn table<const N: usize>(cases: [Case; N]) {
         }
     }
     assert!(passed, "{failures:?}");
+}
+
+#[test]
+fn task_records_read_back_as_written() {
+    table([
+        ("an_ended_task_with_its_result_reads_back", an_ended_task_with_its_result_reads_back),
+        ("an_activity_line_of_each_kind_reads_back", an_activity_line_of_each_kind_reads_back),
+        ("each_terminal_activity_kind_reads_back", each_terminal_activity_kind_reads_back),
+        ("each_index_row_reads_back", each_index_row_reads_back),
+        ("each_stub_status_reads_back", each_stub_status_reads_back),
+        ("each_message_kind_reads_back", each_message_kind_reads_back),
+        ("each_result_message_kind_reads_back", each_result_message_kind_reads_back),
+        ("each_notice_state_reads_back", each_notice_state_reads_back),
+        ("each_news_class_reads_back", each_news_class_reads_back),
+        ("each_escalation_state_reads_back", each_escalation_state_reads_back),
+        ("each_escalation_holder_reads_back", each_escalation_holder_reads_back),
+        ("each_invalid_result_reason_reads_back", each_invalid_result_reason_reads_back),
+        ("each_subscription_kind_reads_back", each_subscription_kind_reads_back),
+        ("a_person_wait_without_a_stall_notice_reads_back", a_person_wait_without_a_stall_notice_reads_back),
+        ("live_task_records_read_back_whole", live_task_records_read_back_whole),
+        ("a_result_word_uses_the_larger_shared_word_bound", a_result_word_uses_the_larger_shared_word_bound),
+    ]);
 }

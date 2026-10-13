@@ -65,25 +65,21 @@ fn another_family_is_refused_naming_the_first_difference() {
         );
     }
 }
-#[test]
 fn a_key_limit_below_the_largest_note_line_is_refused() {
     let mut limits = store();
     limits.key = 111;
     assert_eq!(check(&limits), Err(sizes::SizeRefusal::Key { needs: 112, has: 111 }));
 }
-#[test]
 fn a_value_limit_below_the_largest_task_record_is_refused() {
     let mut limits = store();
     limits.value = 1;
     assert_eq!(check(&limits), Err(sizes::SizeRefusal::Value { needs: 80_949, has: 1 }));
 }
-#[test]
 fn a_value_limit_below_the_largest_core_turn_is_refused() {
     let mut limits = store();
     limits.value = 80_948;
     assert_eq!(check(&limits), Err(sizes::SizeRefusal::Value { needs: 80_949, has: 80_948 }));
 }
-#[test]
 fn a_page_smaller_than_one_row_is_refused() {
     let mut limits = store();
     limits.page.bytes = 81_060;
@@ -93,25 +89,21 @@ fn a_page_smaller_than_one_row_is_refused() {
 fn fixture_limits_fit_their_store() {
     assert_eq!(check(&store()), Ok(sizes::Sizes { key: 112, value: 80_949, ops: 9, commit: 17_499 }));
 }
-#[test]
 fn too_few_operations_are_refused() {
     let mut limits = store();
     limits.ops = 8;
     assert_eq!(check(&limits), Err(sizes::SizeRefusal::Ops { needs: 9, has: 8 }));
 }
-#[test]
 fn too_few_commit_bytes_are_refused() {
     let mut limits = store();
     limits.commit = 17_498;
     assert_eq!(check(&limits), Err(sizes::SizeRefusal::Commit { needs: 17_499, has: 17_498 }));
 }
-#[test]
 fn too_few_in_flight_slots_are_refused() {
     let mut limits = store();
     limits.queued = 1;
     assert_eq!(check(&limits), Err(sizes::SizeRefusal::Queue { needs: 2, has: 1 }));
 }
-#[test]
 fn a_journal_bound_past_the_queue_is_refused_at_start() {
     let journal = JournalLimits { commits: 3, ..JOURNAL };
     assert_eq!(
@@ -119,7 +111,6 @@ fn a_journal_bound_past_the_queue_is_refused_at_start() {
         Err(sizes::SizeRefusal::Queue { needs: 3, has: 2 }),
     );
 }
-#[test]
 fn too_few_queued_bytes_are_refused() {
     let mut limits = store();
     limits.queued_bytes = 34_997;
@@ -214,4 +205,36 @@ fn a_map_budget_past_the_commit_envelope_is_refused() {
         let limits = skein_kv::Limits { budget, commit: u32::MAX, queued_bytes: u64::MAX, ..store() };
         assert_eq!(check(&limits), expected, "{label}");
     }
+}
+
+#[test]
+fn store_limits_below_their_required_sizes_are_refused() {
+    table([
+        ("a_key_limit_below_the_largest_note_line_is_refused", a_key_limit_below_the_largest_note_line_is_refused),
+        (
+            "a_value_limit_below_the_largest_task_record_is_refused",
+            a_value_limit_below_the_largest_task_record_is_refused,
+        ),
+        ("a_value_limit_below_the_largest_core_turn_is_refused", a_value_limit_below_the_largest_core_turn_is_refused),
+        ("a_page_smaller_than_one_row_is_refused", a_page_smaller_than_one_row_is_refused),
+        ("too_few_operations_are_refused", too_few_operations_are_refused),
+        ("too_few_commit_bytes_are_refused", too_few_commit_bytes_are_refused),
+        ("too_few_in_flight_slots_are_refused", too_few_in_flight_slots_are_refused),
+        ("a_journal_bound_past_the_queue_is_refused_at_start", a_journal_bound_past_the_queue_is_refused_at_start),
+        ("too_few_queued_bytes_are_refused", too_few_queued_bytes_are_refused),
+    ]);
+}
+
+type Case = (&'static str, fn());
+
+fn table<const N: usize>(cases: [Case; N]) {
+    let mut failures = [None; N];
+    let mut passed = true;
+    for ((name, case), failure) in cases.into_iter().zip(&mut failures) {
+        if std::panic::catch_unwind(case).is_err() {
+            *failure = Some(name);
+            passed = false;
+        }
+    }
+    assert!(passed, "{failures:?}");
 }

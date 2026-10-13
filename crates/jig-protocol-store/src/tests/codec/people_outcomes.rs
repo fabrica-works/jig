@@ -3,13 +3,11 @@ use super::{fixtures, people_round_trip};
 use fixtures::people_outcomes as values;
 use jig_domain_people as domain;
 use skein_lib::Wall;
-#[test]
 fn each_again_reads_back() {
     for value in values::again_values() {
         people_round_trip(values::answered(domain::Outcome::Again(value)));
     }
 }
-#[test]
 fn each_disposal_issue_reads_back() {
     for value in values::disposal_issue_values() {
         people_round_trip(values::answered(domain::Outcome::Refused(domain::Refusal::Disposal {
@@ -18,7 +16,6 @@ fn each_disposal_issue_reads_back() {
         })));
     }
 }
-#[test]
 fn each_failure_class_reads_back() {
     for value in values::failure_class_values() {
         people_round_trip(values::answered(domain::Outcome::Refused(domain::Refusal::Moved {
@@ -26,7 +23,6 @@ fn each_failure_class_reads_back() {
         })));
     }
 }
-#[test]
 fn each_hold_reason_reads_back() {
     for value in values::hold_reason_values() {
         people_round_trip(values::answered(domain::Outcome::Refused(domain::Refusal::Moved {
@@ -34,13 +30,11 @@ fn each_hold_reason_reads_back() {
         })));
     }
 }
-#[test]
 fn each_moved_reads_back() {
     for value in values::moved_values() {
         people_round_trip(values::answered(domain::Outcome::Refused(domain::Refusal::Moved { now: value })));
     }
 }
-#[test]
 fn each_party_reads_back() {
     for value in values::party_values() {
         people_round_trip(values::answered(domain::Outcome::Refused(domain::Refusal::Ended {
@@ -48,13 +42,11 @@ fn each_party_reads_back() {
         })));
     }
 }
-#[test]
 fn each_ending_reads_back() {
     for value in values::ending_values() {
         people_round_trip(values::answered(domain::Outcome::Refused(domain::Refusal::Ended { how: value })));
     }
 }
-#[test]
 fn each_lack_reads_back() {
     for value in values::lack_values() {
         people_round_trip(values::answered(domain::Outcome::Refused(domain::Refusal::Authority {
@@ -63,19 +55,16 @@ fn each_lack_reads_back() {
         })));
     }
 }
-#[test]
 fn each_limit_kind_reads_back() {
     for value in values::limit_kind_values() {
         people_round_trip(values::answered(domain::Outcome::Refused(domain::Refusal::Limit { which: value })));
     }
 }
-#[test]
 fn each_refusal_reads_back() {
     for value in values::refusal_values() {
         people_round_trip(values::answered(domain::Outcome::Refused(value)));
     }
 }
-#[test]
 fn each_proposal_choice_reads_back() {
     for value in values::proposal_choice_values() {
         people_round_trip(values::answered(domain::Outcome::ProposalDecided {
@@ -87,7 +76,6 @@ fn each_proposal_choice_reads_back() {
         }));
     }
 }
-#[test]
 fn each_escalation_choice_reads_back() {
     for value in values::escalation_choice_values() {
         people_round_trip(values::answered(domain::Outcome::EscalationDecided {
@@ -99,34 +87,69 @@ fn each_escalation_choice_reads_back() {
         }));
     }
 }
-#[test]
 fn an_answered_key_reads_back_with_its_ask_and_outcome() {
     for value in values::outcome_values() {
         people_round_trip(values::answered(value));
     }
 }
-#[test]
 fn a_refusal_lacking_a_budget_reads_back() {
     people_round_trip(values::answered(domain::Outcome::Refused(domain::Refusal::Authority {
         lacking: domain::Lack::Budget { needs: 17, left: 11 },
         proposable: Some(true),
     })));
 }
-#[test]
 fn a_role_refusal_without_a_role_reads_back() {
     people_round_trip(values::answered(domain::Outcome::Refused(domain::Refusal::Role { held: None })));
 }
-#[test]
 fn an_authority_refusal_without_proposability_reads_back() {
     people_round_trip(values::answered(domain::Outcome::Refused(domain::Refusal::Authority {
         lacking: domain::Lack::Funding,
         proposable: None,
     })));
 }
-#[test]
 fn an_authority_refusal_prevents_a_proposal_reads_back() {
     people_round_trip(values::answered(domain::Outcome::Refused(domain::Refusal::Authority {
         lacking: domain::Lack::Funding,
         proposable: Some(false),
     })));
+}
+
+#[test]
+fn people_outcomes_read_back_as_written() {
+    table([
+        ("each_again_reads_back", each_again_reads_back),
+        ("each_disposal_issue_reads_back", each_disposal_issue_reads_back),
+        ("each_failure_class_reads_back", each_failure_class_reads_back),
+        ("each_hold_reason_reads_back", each_hold_reason_reads_back),
+        ("each_moved_reads_back", each_moved_reads_back),
+        ("each_party_reads_back", each_party_reads_back),
+        ("each_ending_reads_back", each_ending_reads_back),
+        ("each_lack_reads_back", each_lack_reads_back),
+        ("each_limit_kind_reads_back", each_limit_kind_reads_back),
+        ("each_refusal_reads_back", each_refusal_reads_back),
+        ("each_proposal_choice_reads_back", each_proposal_choice_reads_back),
+        ("each_escalation_choice_reads_back", each_escalation_choice_reads_back),
+        ("an_answered_key_reads_back_with_its_ask_and_outcome", an_answered_key_reads_back_with_its_ask_and_outcome),
+        ("a_refusal_lacking_a_budget_reads_back", a_refusal_lacking_a_budget_reads_back),
+        ("a_role_refusal_without_a_role_reads_back", a_role_refusal_without_a_role_reads_back),
+        (
+            "an_authority_refusal_without_proposability_reads_back",
+            an_authority_refusal_without_proposability_reads_back,
+        ),
+        ("an_authority_refusal_prevents_a_proposal_reads_back", an_authority_refusal_prevents_a_proposal_reads_back),
+    ]);
+}
+
+type Case = (&'static str, fn());
+
+fn table<const N: usize>(cases: [Case; N]) {
+    let mut failures = [None; N];
+    let mut passed = true;
+    for ((name, case), failure) in cases.into_iter().zip(&mut failures) {
+        if std::panic::catch_unwind(case).is_err() {
+            *failure = Some(name);
+            passed = false;
+        }
+    }
+    assert!(passed, "{failures:?}");
 }

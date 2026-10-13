@@ -10,12 +10,10 @@ fn a_held_phase_reads_back_with_its_source() {
     assert_eq!(saved_phase(&source), Ok(source));
 }
 
-#[test]
 fn a_pending_person_proposal_reads_back() {
     let row = jig_domain_tasks::Stored::PersonProposal(Box::new(fixtures::task_person_proposal()));
     assert_eq!(saved_tasks(&row), Ok(row));
 }
-#[test]
 fn a_recurring_template_reads_back_one_level_deep() {
     use crate::{codec::tasks::phase, tasks_v2::Creation};
     let mut source = fixtures::task_creation(59);
@@ -33,7 +31,6 @@ fn a_template_member_holding_a_template_is_refused() {
         Err(bound_problem(crate::tasks_v2::Path::CreationRecurring))
     );
 }
-#[test]
 fn a_milestone_reads_back_with_its_complete_phase() {
     let row = jig_domain_tasks::Stored::Milestone(jig_domain_tasks::Milestone {
         task: 17,
@@ -43,7 +40,6 @@ fn a_milestone_reads_back_with_its_complete_phase() {
     });
     assert_eq!(saved_tasks(&row), Ok(row));
 }
-#[test]
 fn a_decided_person_proposal_reads_back() {
     use jig_domain_tasks::{Party, PersonProposalState};
     for state in [
@@ -166,7 +162,6 @@ fn saved_proposal(source: &jig_domain_tasks::Proposal) -> Result<jig_domain_task
     let encoded = saved_wire(encoded, Proposal::measure, Proposal::encode, Proposal::decode);
     proposals::read_proposal(encoded, &tasks_limits())
 }
-#[test]
 fn each_proposal_action_reads_back() {
     use jig_domain_tasks::ProposalAction;
     for action in [
@@ -189,7 +184,6 @@ fn each_proposal_action_reads_back() {
         assert_eq!(saved_proposal(&source), Ok(source));
     }
 }
-#[test]
 fn each_proposal_decision_reads_back() {
     use jig_domain_tasks::{Party, ProposalHolder, ProposalKind, ProposalState};
     for state in [
@@ -208,7 +202,6 @@ fn each_proposal_decision_reads_back() {
         assert_eq!(saved_proposal(&source), Ok(source));
     }
 }
-#[test]
 fn an_amendment_without_replacements_reads_back() {
     use crate::{codec::tasks::proposals, tasks_v2::Amendment};
     let source = jig_domain_tasks::Amendment {
@@ -232,7 +225,6 @@ fn a_history_without_optional_details_reads_back() {
     let row = jig_domain_tasks::Stored::History(source);
     assert_eq!(saved_tasks(&row), Ok(row));
 }
-#[test]
 fn a_finish_grace_reads_back() {
     use crate::{codec::tasks::phase, tasks_v2::Grace};
     let source = jig_domain_tasks::Grace { by: 31, until: skein_lib::Wall::from_nanos(u64::MAX) };
@@ -240,7 +232,6 @@ fn a_finish_grace_reads_back() {
     let encoded = saved_wire(encoded, Grace::measure, Grace::encode, Grace::decode);
     assert_eq!(phase::read_grace(encoded, &tasks_limits()), Ok(source));
 }
-#[test]
 fn a_revision_set_reads_back() {
     use crate::{codec::tasks::phase, tasks_v2::Revisions};
     let source = jig_domain_tasks::Revisions { hold: 3, spec: 5, person: 7 };
@@ -248,7 +239,6 @@ fn a_revision_set_reads_back() {
     let encoded = saved_wire(encoded, Revisions::measure, Revisions::encode, Revisions::decode);
     assert_eq!(phase::read_revisions(encoded, &tasks_limits()), Ok(source));
 }
-#[test]
 fn each_retry_notice_reads_back() {
     use crate::{codec::tasks::phase, tasks_v2::RetryNotice};
     for source in [
@@ -261,7 +251,6 @@ fn each_retry_notice_reads_back() {
     }
 }
 
-#[test]
 fn history_rows_read_back() {
     table([
         ("a_history_row_with_an_amendment_reads_back", a_history_row_with_an_amendment_reads_back),
@@ -269,7 +258,6 @@ fn history_rows_read_back() {
     ]);
 }
 
-#[test]
 fn lifecycle_phases_read_back() {
     table([
         ("a_held_phase_reads_back_with_its_source", a_held_phase_reads_back_with_its_source),
@@ -279,7 +267,6 @@ fn lifecycle_phases_read_back() {
     ]);
 }
 
-#[test]
 fn results_read_back() {
     table([
         ("each_result_kind_reads_back", each_result_kind_reads_back),
@@ -299,4 +286,23 @@ fn table<const N: usize>(cases: [Case; N]) {
         }
     }
     assert!(passed, "{failures:?}");
+}
+
+#[test]
+fn task_phases_and_proposals_read_back_as_written() {
+    table([
+        ("a_pending_person_proposal_reads_back", a_pending_person_proposal_reads_back),
+        ("a_recurring_template_reads_back_one_level_deep", a_recurring_template_reads_back_one_level_deep),
+        ("a_milestone_reads_back_with_its_complete_phase", a_milestone_reads_back_with_its_complete_phase),
+        ("a_decided_person_proposal_reads_back", a_decided_person_proposal_reads_back),
+        ("each_proposal_action_reads_back", each_proposal_action_reads_back),
+        ("each_proposal_decision_reads_back", each_proposal_decision_reads_back),
+        ("an_amendment_without_replacements_reads_back", an_amendment_without_replacements_reads_back),
+        ("a_finish_grace_reads_back", a_finish_grace_reads_back),
+        ("a_revision_set_reads_back", a_revision_set_reads_back),
+        ("each_retry_notice_reads_back", each_retry_notice_reads_back),
+        ("history_rows_read_back", history_rows_read_back),
+        ("lifecycle_phases_read_back", lifecycle_phases_read_back),
+        ("results_read_back", results_read_back),
+    ]);
 }
