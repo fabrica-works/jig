@@ -869,13 +869,22 @@ The hub's `Request::CancelRelay` and `Event::RelayCancelled` name
 by its name among its attempt's relays. `ops`'s root keeps no
 delivery token (`host_calls`' `delivery` goes). `tests/host`'s
 worlds follow.
+Also, from the designer's answer on jig 23.2's `reply_to` (jig
+`e49ace7c`, `protocol/channel.md`, 3: "The link vocabulary names only
+what crosses"): `host::LinkDown::Assign` and `host::LinkUp::Answer` lose
+`reply_to`; the hub answers an assignment, its refusals included, by its
+run and attempt, and its hosted runs' states keep no `ReplyTo`; `ops`'s
+root (`route.rs:267`, `ReplyTo::new(run)`) and the test root pass none.
+If 05.s1 has landed before this reaches it, this part is a step of its
+own with the same text.
 Test shape: a hub unit test that a relayed answer naming a call
 reaches the call waiting for it, and that one naming no relayed call
-of its attempt is dropped.
+of its attempt is dropped; one that an assignment is answered, and one
+refused, by its run and attempt.
 Proof: the gate.
-Don't: put a token for a call in the link vocabulary, or keep a
-table from names to tokens in a root or a link.
-Size: at most 150 lines of production code.
+Don't: put a token for a call, or a request's reply handle, in the link
+vocabulary, or keep a table from names to tokens in a root or a link.
+Size: at most 250 lines of production code.
 
 ## Interface sketches
 
