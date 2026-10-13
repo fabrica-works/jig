@@ -161,7 +161,7 @@ pub fn down(store: &mut Store, env: &Env<Limits>, request: Request, above: &mut 
             loads::load(store, owner, range, after, rows, bytes, above);
         }
         Request::Get { owner, key } => gets::get(store, owner, key, above),
-        Request::Read { owner, range } => reads::read(store, owner, range, above),
+        Request::Read { owner, range } => reads::read(store, owner, range, above, below),
         Request::Secrets { owner, request } => secrets::secrets(store, env, owner, request, above, below),
         Request::Transcript { owner, read, rows, bytes } => {
             transcripts::read::transcript(store, owner, read, rows, bytes, above, below);

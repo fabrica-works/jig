@@ -1,11 +1,16 @@
 //! Reads bounded by durable places, walking complete frames (store.md, 8.3).
 use super::{File, Stage, frame};
-use crate::{Arrived, Below, Event, Limits, Phase, Store, TranscriptRead, codec, keys, open};
+use crate::{Arrived, Below, Event, Limits, Phase, Store, TranscriptRead, codec, keys, open, reads};
 use alloc::boxed::Box;
 use jig_domain_core::TurnRecord;
 use skein_io::file;
 use skein_lib::{List, Map, Queue, Reader, Token, Writer};
 pub(crate) const OWNER: Token = Token::new(0x5453);
+#[derive(Debug)]
+pub(crate) struct Party {
+    pub activity: Option<u64>,
+    pub bytes: u64,
+}
 #[derive(Debug)]
 enum Scan {
     Window { attempt: u64, turn: u32, after: Option<u64>, checked: bool },
@@ -30,6 +35,7 @@ pub(crate) struct Read {
     step: Step,
     turns: List<TurnRecord>,
     budget: u64,
+    party: Option<Party>,
 }
 pub(crate) fn worst_case(limits: &Limits, codec: &codec::Limits) -> Option<u64> {
     let rows = limits.store.page.rows;
@@ -60,6 +66,31 @@ pub(crate) fn transcript(
     };
     store.transcripts.reads.insert(owner, read).expect("read slot checked at admission");
     fire(store, above, below);
+}
+pub(crate) fn party(
+    store: &mut Store,
+    owner: Token,
+    request: TranscriptRead,
+    party: Party,
+    above: &mut Queue<Event>,
+    below: &mut Below,
+) -> Result<Option<jig_domain_core::reads::Loaded>, reads::Failure> {
+    assert!(!store.transcripts.reads.contains_key(&owner), "one transcript read per owner");
+    if store.transcripts.reads.len() == store.limits.reads {
+        return Ok(Some(jig_domain_core::reads::Loaded::Busy));
+    }
+    let task = match request {
+        TranscriptRead::Window { task, .. } | TranscriptRead::Turn { task, .. } | TranscriptRead::Page { task, .. } => {
+            task
+        }
+    };
+    let Some(mut read) = prepare(store, owner, request, 1, u64::from(store.limits.store.page.bytes)) else {
+        return reads::ready(reads::finish(store, task, party, None));
+    };
+    read.party = Some(party);
+    store.transcripts.reads.insert(owner, read).expect("party read slot checked at admission");
+    fire(store, above, below);
+    Ok(None)
 }
 fn prepare(store: &mut Store, owner: Token, request: TranscriptRead, rows: u32, bytes: u64) -> Option<Read> {
     match store.phase {
@@ -110,6 +141,7 @@ fn prepare(store: &mut Store, owner: Token, request: TranscriptRead, rows: u32, 
         step: Step::Waiting,
         turns: List::with_capacity(rows.min(store.limits.store.page.rows)),
         budget: bytes.min(u64::from(store.limits.store.page.bytes)),
+        party: None,
     })
 }
 pub(crate) fn fire(store: &mut Store, above: &mut Queue<Event>, below: &mut Below) {
@@ -343,6 +375,13 @@ fn settle(store: &mut Store, owner: Token, read: Read, result: Result<bool, ()>,
             store.transcripts.reads.insert(owner, read).expect("active read retains its slot");
         }
         Ok(true) => {
+            if let Some(party) = read.party {
+                store.transcripts.reading = None;
+                let turn = read.turns.into_boxed().into_iter().next();
+                let result = reads::finish(store, read.task, party, turn);
+                reads::answer(store, owner, reads::ready(result), above);
+                return;
+            }
             let end = if read.backwards { 0 } else { read.end };
             let next = match read.scan {
                 Scan::Turn { .. } => None,
@@ -363,7 +402,13 @@ fn settle(store: &mut Store, owner: Token, read: Read, result: Result<bool, ()>,
         }
         Err(()) => {
             store.transcripts.reading = None;
-            above.push(Event::Unread { owner });
+            match read.party {
+                Some(party) => {
+                    let result = reads::finish(store, read.task, party, None);
+                    reads::answer(store, owner, reads::ready(result), above);
+                }
+                None => above.push(Event::Unread { owner }),
+            }
         }
     }
 }

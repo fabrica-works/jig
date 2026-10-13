@@ -3,7 +3,7 @@ mod indexed;
 mod joins;
 mod paged;
 mod point;
-use crate::{Event, Phase, Store, loads};
+use crate::{Below, Event, Phase, Store, loads};
 use alloc::boxed::Box;
 use jig_domain_core::reads::{Loaded, Range, Scope};
 use skein_lib::{Queue, Token};
@@ -22,8 +22,9 @@ pub(crate) enum Failure {
 pub(crate) fn empty() -> Loaded {
     Loaded::Page { rows: Box::new([]), next: None }
 }
+pub(crate) use point::finish;
 
-pub(crate) fn read(store: &mut Store, owner: Token, range: Range, above: &mut Queue<Event>) {
+pub(crate) fn read(store: &mut Store, owner: Token, range: Range, above: &mut Queue<Event>, below: &mut Below) {
     if store.phase == Phase::Closed {
         loads::corrupt(store, owner, above);
         return;
@@ -36,8 +37,14 @@ pub(crate) fn read(store: &mut Store, owner: Token, range: Range, above: &mut Qu
         Scope::Proposal { proposer, proposal } => point::proposal(store, &range, proposer, proposal, &mut spent),
         Scope::Escalation { task } => point::escalation(store, &range, task, &mut spent),
         Scope::Question { task, message } => point::question(store, &range, task, message, &mut spent),
-        Scope::Reply { task, activity } => point::reply(store, &range, task, activity, &mut spent),
-        Scope::Turn { .. } => Ok(point::turn()),
+        Scope::Reply { .. } => {
+            let result = point::reply(store, owner, &range, &mut spent, above, below);
+            return answer(store, owner, result, above);
+        }
+        Scope::Turn { .. } => {
+            let result = point::turn(store, owner, &range, above, below);
+            return answer(store, owner, result, above);
+        }
         Scope::Activity { task } => paged::activity(store, &range, task, &mut spent),
         Scope::History { task, subtree: false } => paged::history(store, &range, task, &mut spent),
         Scope::Spend { .. } => paged::spend(store, &range, &mut spent),
@@ -49,8 +56,25 @@ pub(crate) fn read(store: &mut Store, owner: Token, range: Range, above: &mut Qu
         Scope::Conversations => indexed::conversations(store, &range, &mut spent),
         Scope::Goals { .. } => indexed::goals(store, &range, &mut spent),
     };
+    answer(store, owner, ready(result), above);
+}
+
+pub(crate) fn ready(result: Result<Loaded, Failure>) -> Result<Option<Loaded>, Failure> {
     match result {
-        Ok(result) => above.push(Event::Read { owner, result }),
+        Ok(result) => Ok(Some(result)),
+        Err(error) => Err(error),
+    }
+}
+
+pub(crate) fn answer(
+    store: &mut Store,
+    owner: Token,
+    result: Result<Option<Loaded>, Failure>,
+    above: &mut Queue<Event>,
+) {
+    match result {
+        Ok(Some(result)) => above.push(Event::Read { owner, result }),
+        Ok(None) => {}
         Err(Failure::Cut) => above.push(Event::Read { owner, result: empty() }),
         Err(Failure::Corrupt) => loads::corrupt(store, owner, above),
     }

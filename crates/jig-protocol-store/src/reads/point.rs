@@ -1,11 +1,11 @@
 //! Single scopes use exact keys and retained positions (store.md, 7.3).
 use super::{Failure, Spent, empty, joins};
-use crate::{Get, Row, Store, gets};
+use crate::{Below, Event, Get, Row, Store, TranscriptRead, gets, transcripts::read};
 use alloc::boxed::Box;
 use jig_domain_core::{self as core, reads};
 use jig_domain_people::Proposer;
 use jig_domain_tasks as tasks;
-use skein_lib::Token;
+use skein_lib::{Queue, Token};
 
 pub(super) fn record(store: &mut Store, key: &core::Key) -> Result<Option<core::Record>, Failure> {
     let row = gets::row(store, Token::new(0), Get::Jig(key.clone())).or(Err(Failure::Corrupt))?;
@@ -51,18 +51,8 @@ fn page(
     related: Option<core::Key>,
     spent: &mut Spent,
 ) -> Result<reads::Loaded, Failure> {
-    if spent.rows == 0 {
+    if !allowed(range, &value.key()) {
         return Ok(empty());
-    }
-    if let Some(after) = &range.after {
-        let position = reads::Position::Owner(value.key());
-        if range.backwards {
-            if position >= *after {
-                return Ok(empty());
-            }
-        } else if position <= *after {
-            return Ok(empty());
-        }
     }
     let row = joins::row(store, value, owner, related, spent)?;
     Ok(reads::Loaded::Page { rows: Box::new([row]), next: None })
@@ -138,19 +128,100 @@ pub(super) fn question(
 
 pub(super) fn reply(
     store: &mut Store,
+    token: Token,
     range: &reads::Range,
-    task: u64,
-    activity: u64,
     spent: &mut Spent,
-) -> Result<reads::Loaded, Failure> {
+    above: &mut Queue<Event>,
+    below: &mut Below,
+) -> Result<Option<reads::Loaded>, Failure> {
+    let reads::Scope::Reply { task, activity } = range.scope else { return Err(Failure::Corrupt) };
     let key = core::Key::Tasks(tasks::Key::Activity { task, position: activity });
-    let Some(value) = record(store, &key)? else { return Ok(empty()) };
-    let Some(owner) = joins::owner(store, task, spent)? else { return Ok(empty()) };
-    // A turn reply's transcript evidence joins here in jig 17.
-    page(store, range, value, Some(&owner), None, spent)
+    if !allowed(range, &key) {
+        return Ok(Some(empty()));
+    }
+    let Some(value) = record(store, &key)? else { return Ok(Some(empty())) };
+    let core::Record::Tasks(tasks::Stored::Activity(line)) = &value else { return Err(Failure::Corrupt) };
+    match line.line {
+        tasks::Line::Turn { attempt, turn, .. } => read::party(
+            store,
+            token,
+            TranscriptRead::Turn { task, attempt, turn },
+            read::Party { activity: Some(activity), bytes: range.bytes },
+            above,
+            below,
+        ),
+        tasks::Line::Words { .. }
+        | tasks::Line::Heard(_)
+        | tasks::Line::Notified { .. }
+        | tasks::Line::RunBegan { .. }
+        | tasks::Line::RunEnded { .. }
+        | tasks::Line::Decided { .. }
+        | tasks::Line::Milestone { .. } => {
+            let Some(owner) = joins::owner(store, task, spent)? else { return Ok(Some(empty())) };
+            super::ready(page(store, range, value, Some(&owner), None, spent))
+        }
+    }
 }
 
-pub(super) fn turn() -> reads::Loaded {
-    // The transcript handler replaces this empty answer in jig 17.
-    empty()
+pub(super) fn turn(
+    store: &mut Store,
+    owner: Token,
+    range: &reads::Range,
+    above: &mut Queue<Event>,
+    below: &mut Below,
+) -> Result<Option<reads::Loaded>, Failure> {
+    let reads::Scope::Turn { task, attempt, turn } = range.scope else { return Err(Failure::Corrupt) };
+    let key = core::Key::Core(core::CoreKey::Turn { task, attempt, turn });
+    if !allowed(range, &key) {
+        return Ok(Some(empty()));
+    }
+    read::party(
+        store,
+        owner,
+        TranscriptRead::Turn { task, attempt, turn },
+        read::Party { activity: None, bytes: range.bytes },
+        above,
+        below,
+    )
+}
+
+fn allowed(range: &reads::Range, key: &core::Key) -> bool {
+    if range.rows == 0 {
+        return false;
+    }
+    let Some(after) = &range.after else { return true };
+    let position = reads::Position::Owner(key.clone());
+    if range.backwards { position < *after } else { position > *after }
+}
+
+pub(crate) fn finish(
+    store: &mut Store,
+    task: u64,
+    party: read::Party,
+    turn: Option<core::TurnRecord>,
+) -> Result<reads::Loaded, Failure> {
+    let mut spent = Spent { rows: 1, bytes: u64::MAX, joins: store.limits.joins };
+    let mut related = None;
+    let value = match party.activity {
+        Some(activity) => {
+            let key = core::Key::Tasks(tasks::Key::Activity { task, position: activity });
+            let Some(value) = record(store, &key)? else { return Ok(empty()) };
+            if let Some(turn) = turn {
+                related = Some(core::Record::Core(core::CoreRecord::Turn(turn)));
+            }
+            spent.joins = spent.joins.checked_sub(1).ok_or(Failure::Cut)?;
+            value
+        }
+        None => {
+            let Some(turn) = turn else { return Ok(empty()) };
+            core::Record::Core(core::CoreRecord::Turn(turn))
+        }
+    };
+    let Some(owner) = joins::owner(store, task, &mut spent)? else { return Ok(empty()) };
+    let mut row = joins::row(store, value, Some(&owner), None, &mut spent)?;
+    row.related = related;
+    if row.owned_bytes().ok_or(Failure::Corrupt)? > party.bytes {
+        return Err(Failure::Cut);
+    }
+    Ok(reads::Loaded::Page { rows: Box::new([row]), next: None })
 }

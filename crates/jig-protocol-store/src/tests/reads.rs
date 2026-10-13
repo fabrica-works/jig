@@ -1,10 +1,11 @@
 //! Parties' reads through the memory component (protocol/store.md, 7.3).
 use super::fixtures::{self, ALICE, CHILD, GOAL, GRANDCHILD};
-use crate::{Event, Request, Store};
+use crate::{Arrived, Below, Event, Io, Request, Store};
 use alloc::boxed::Box;
 use jig_domain_core::{self as core, reads};
 use jig_domain_tasks as tasks;
-use skein_lib::Token;
+use skein_io::file;
+use skein_lib::{Queue, Token};
 
 fn child_store() -> Store {
     let mut store = fixtures::opened();
@@ -342,25 +343,168 @@ fn a_proposal_older_than_the_kept_rows_reads_as_gone() {
 
 #[test]
 fn a_turn_waits_for_its_transcript_handler() {
-    let mut store = child_store();
-    let range = fixtures::read(ALICE, reads::Scope::Turn { task: CHILD, attempt: 1, turn: 1 });
-    let result = load(&mut store, range);
-    assert_empty(&result);
+    let (mut store, disk) = party_store();
+    let below = waiting_party(&mut store, turn_range());
+    let result = read_disk(&mut store, below, &disk);
+    assert_eq!(one_row(&result).value, expected_turn());
 }
 
 #[test]
 fn a_turn_reply_waits_for_its_transcript_evidence() {
-    let mut store = child_store();
-    let value = core::Record::Tasks(tasks::Stored::Activity(tasks::ActivityLine {
+    let (mut store, disk) = party_store();
+    let below = waiting_party(&mut store, reply_range());
+    let result = read_disk(&mut store, below, &disk);
+    assert_eq!(one_row(&result).related, Some(expected_turn()));
+}
+
+fn expected_turn() -> core::Record {
+    core::Record::Core(core::CoreRecord::Turn(fixtures::turn(CHILD, 1, 2, b"two")))
+}
+
+fn turn_range() -> reads::Range {
+    fixtures::read(ALICE, reads::Scope::Turn { task: CHILD, attempt: 1, turn: 2 })
+}
+
+fn reply_range() -> reads::Range {
+    fixtures::read(ALICE, reads::Scope::Reply { task: CHILD, activity: QUESTION_POSITION })
+}
+
+fn turn_reply() -> core::Record {
+    core::Record::Tasks(tasks::Stored::Activity(tasks::ActivityLine {
         task: CHILD,
         position: QUESTION_POSITION,
         at: skein_lib::Wall::from_nanos(19),
-        line: tasks::Line::Turn { reply: 1, attempt: 1, turn: 1, read: None },
-    }));
-    fixtures::committed(&mut store, Box::new([fixtures::header(2), fixtures::save(value)]));
-    let range = fixtures::read(ALICE, reads::Scope::Reply { task: CHILD, activity: QUESTION_POSITION });
-    let result = load(&mut store, range);
-    assert_eq!(one_row(&result).related, None);
+        line: tasks::Line::Turn { reply: 1, attempt: 1, turn: 2, read: None },
+    }))
+}
+
+fn party_store() -> (Store, Box<[u8]>) {
+    let mut store = fixtures::opened();
+    fixtures::committed(
+        &mut store,
+        Box::new([
+            fixtures::header(1),
+            fixtures::save(fixtures::ended_of(CHILD, tasks::Party::Person(ALICE))),
+            fixtures::save(turn_reply()),
+        ]),
+    );
+    let turns = [fixtures::turn(CHILD, 1, 1, b"one"), fixtures::turn(CHILD, 1, 2, b"two")];
+    let mut above = Queue::with_capacity(crate::MAX_OUT_DOWN);
+    let mut below = fixtures::below();
+    crate::down(
+        &mut store,
+        &fixtures::env(),
+        fixtures::commit(
+            2,
+            Box::new([
+                fixtures::header(2),
+                fixtures::save(core::Record::Core(core::CoreRecord::Turn(turns[0].clone()))),
+                fixtures::save(core::Record::Core(core::CoreRecord::Turn(turns[1].clone()))),
+            ]),
+        ),
+        &mut above,
+        &mut below,
+    );
+    assert!(above.is_empty());
+    let disk = fixtures::written(&mut store, below, &turns);
+    (store, disk)
+}
+
+fn party_submit(store: &mut Store, owner: Token, range: reads::Range) -> (Box<[Event]>, Below) {
+    let mut above = Queue::with_capacity(crate::MAX_OUT_DOWN);
+    let mut below = fixtures::below();
+    crate::down(store, &fixtures::env(), Request::Read { owner, range }, &mut above, &mut below);
+    (fixtures::events(&mut above), below)
+}
+
+fn waiting_party(store: &mut Store, range: reads::Range) -> Below {
+    let (events, below) = party_submit(store, Token::new(7), range);
+    assert!(events.is_empty());
+    below
+}
+
+fn corrupt_disk(disk: &mut [u8]) {
+    *disk.get_mut(5).expect("frame byte") ^= 1;
+}
+
+fn read_result(events: Box<[Event]>) -> reads::Loaded {
+    let mut events = events.into_iter();
+    let Some(Event::Read { owner, result }) = events.next() else { panic!("one party read") };
+    assert_eq!(owner, Token::new(7));
+    assert!(events.next().is_none());
+    result
+}
+
+fn read_disk(store: &mut Store, mut below: Below, disk: &[u8]) -> reads::Loaded {
+    for _ in 0_u32..8 {
+        let Some(file::Request::ReadAt { owner, offset, max, .. }) = below.transcripts.pop() else {
+            panic!("one frame read request");
+        };
+        assert!(below.transcripts.is_empty());
+        let first = usize::try_from(offset).expect("fixture offset");
+        let end = first.checked_add(usize::try_from(max).expect("fixture read length")).expect("fixture interval");
+        let bytes = Box::from(disk.get(first..end).expect("read within committed disk"));
+        let (events, next) =
+            fixtures::answer(store, Io::Transcripts(Arrived { event: file::Event::Read { owner, bytes }, fd: None }));
+        below = next;
+        if !events.is_empty() {
+            assert!(below.transcripts.is_empty());
+            return read_result(events);
+        }
+    }
+    panic!("two fixture frames finish within four reads");
+}
+
+#[test]
+fn a_turn_read_answers_once_its_frame_is_read() {
+    let (mut store, disk) = party_store();
+    let below = waiting_party(&mut store, turn_range());
+    let result = read_disk(&mut store, below, &disk);
+    let row = one_row(&result);
+    assert_eq!(row.value, expected_turn());
+    assert_eq!(row.owner, Some(Box::new(task_owner())));
+    assert_eq!(row.ancestors.as_ref(), []);
+}
+
+fn task_owner() -> tasks::TaskRecord {
+    let core::Record::Tasks(tasks::Stored::Ended(row)) = fixtures::ended_of(CHILD, tasks::Party::Person(ALICE)) else {
+        panic!("ended task");
+    };
+    *row
+}
+
+#[test]
+fn a_reply_that_was_a_turn_joins_that_turn() {
+    let (mut store, disk) = party_store();
+    let below = waiting_party(&mut store, reply_range());
+    let result = read_disk(&mut store, below, &disk);
+    let row = one_row(&result);
+    assert_eq!(row.value, turn_reply());
+    assert_eq!(row.related, Some(expected_turn()));
+}
+
+#[test]
+fn a_turn_read_past_the_waiting_limit_is_busy() {
+    let (mut store, _) = party_store();
+    for owner in 1..=store.limits.reads {
+        let (events, _) = party_submit(&mut store, Token::new(u64::from(owner)), turn_range());
+        assert!(events.is_empty());
+    }
+    let (events, below) = party_submit(&mut store, Token::new(7), turn_range());
+    let result = read_result(events);
+    let reads::Loaded::Busy = result else { panic!("waiting table is full: {result:?}") };
+    assert!(below.transcripts.is_empty());
+}
+
+#[test]
+fn an_unread_frame_gives_a_reply_without_its_turn() {
+    let (mut store, mut disk) = party_store();
+    corrupt_disk(&mut disk);
+    let below = waiting_party(&mut store, reply_range());
+    let result = read_disk(&mut store, below, &disk);
+    let row = one_row(&result);
+    assert_eq!(row.value, turn_reply());
+    assert_eq!(row.related, None);
 }
 
 fn page(result: reads::Loaded) -> (Box<[reads::Row]>, Option<reads::Position>) {
@@ -611,3 +755,5 @@ fn a_paged_join_cut_keeps_its_accepted_prefix() {
 }
 
 mod indexed;
+
+mod turns;
