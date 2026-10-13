@@ -2101,6 +2101,17 @@ the file.
      31.s3 (`jig/31-engine-clients.md`), gives `Event::Watch` a `Watched`
      subject with no party for the frame, inbox and conversations; 31.5
      needs it for those three only.
+257. **A refused start is answered at most once and never acknowledged**
+     (2026-10-13, the designer's answer to question.md's "jig 27.1: is a
+     refused start acknowledged once?"; jig `332724e6`, `15a95357`). The
+     domains and the code already keep nothing of a refused start; only
+     channel.md's referee rule left refusals in. It now reads: every turn,
+     and every answer of a run the host started, reaches the engine once
+     and is acknowledged once; a refused start's answer reaches it at
+     most once and is never acknowledged, and the start ends once,
+     refused or lost. No step changes fleet or hub; 27.1's referee takes
+     the rule, with the negative test
+     `a_refused_start_acknowledged_is_caught`.
 
 ## For the user
 
