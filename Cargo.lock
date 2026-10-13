@@ -101,6 +101,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "itoa"
+version = "1.0.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
+
+[[package]]
 name = "jig-accounts-world"
 version = "0.0.0"
 dependencies = [
@@ -120,6 +126,40 @@ dependencies = [
  "jig-domain-brief",
  "skein-lib",
  "skein-world",
+]
+
+[[package]]
+name = "jig-channel-world"
+version = "0.0.0"
+dependencies = [
+ "jig-domain-core",
+ "jig-domain-host",
+ "jig-domain-notes",
+ "jig-domain-people",
+ "jig-domain-tasks",
+ "jig-fake-parties",
+ "jig-fake-store",
+ "jig-protocol-worker-wire",
+ "jig-test-domain",
+ "jig-test-service",
+ "skein-channel",
+ "skein-fake-llm-domain",
+ "skein-fake-machine",
+ "skein-fake-peers",
+ "skein-io",
+ "skein-lib",
+ "skein-llm",
+ "skein-shell",
+ "skein-sim",
+ "skein-world",
+ "smith-agent-process-world",
+ "smith-agent-service",
+ "smith-agent-shell",
+ "smith-domain",
+ "smith-host-domain",
+ "smith-host-protocol",
+ "smith-protocol-channel",
+ "smith-protocol-llm",
 ]
 
 [[package]]
@@ -971,10 +1011,34 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ce5d3ddc6d3fa000eb1536d85e147bfe31aacaba692ed6a876f95cb7c855be78"
 
 [[package]]
+name = "memchr"
+version = "2.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
+
+[[package]]
 name = "once_cell"
 version = "1.21.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
+
+[[package]]
+name = "proc-macro2"
+version = "1.0.107"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "985e7ec9bb745e6ce6535b544d84d6cd6f7ad8bd711c398938ae983b91a766d9"
+dependencies = [
+ "unicode-ident",
+]
+
+[[package]]
+name = "quote"
+version = "1.0.47"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1fbf4db142a473a8d80c26bbf18454ed458bf8d26c8219c331daecfdbd079001"
+dependencies = [
+ "proc-macro2",
+]
 
 [[package]]
 name = "ring"
@@ -1025,6 +1089,49 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde"
+version = "1.0.229"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4148590afebada386688f18773da617792bf2ef03ffc1e4cbd2b1d45b023e0ba"
+dependencies = [
+ "serde_core",
+ "serde_derive",
+]
+
+[[package]]
+name = "serde_core"
+version = "1.0.229"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "67dca2c9c51e58a4791a4b1ed58308b39c64224d349a935ab5039aa360942a48"
+dependencies = [
+ "serde_derive",
+]
+
+[[package]]
+name = "serde_derive"
+version = "1.0.229"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e7a5d71263a5a7d47b41f6b3f06ba276f10cc18b0931f1799f710578e2309348"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "serde_json"
+version = "1.0.154"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e7e9cc8b1b85264074fbcc02a88680c4096b1e47df8f739dceb03bf482f04bd6"
+dependencies = [
+ "itoa",
+ "memchr",
+ "serde",
+ "serde_core",
+ "zmij",
+]
+
+[[package]]
 name = "sha2"
 version = "0.10.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1070,6 +1177,11 @@ dependencies = [
  "skein-channel",
  "skein-lib",
 ]
+
+[[package]]
+name = "skein-fake-checkout"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/skein.git#886a7d4f2c717cae5225774c11b3c1b88cb2d4b4"
 
 [[package]]
 name = "skein-fake-llm-domain"
@@ -1182,6 +1294,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "skein-llm-connection"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/skein.git#886a7d4f2c717cae5225774c11b3c1b88cb2d4b4"
+dependencies = [
+ "skein-io",
+ "skein-lib",
+ "skein-llm",
+ "skein-tls",
+]
+
+[[package]]
+name = "skein-llm-world"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/skein.git#886a7d4f2c717cae5225774c11b3c1b88cb2d4b4"
+dependencies = [
+ "skein-fake-llm-domain",
+ "skein-fake-llm-protocol",
+ "skein-http",
+ "skein-json",
+ "skein-lib",
+ "skein-llm",
+]
+
+[[package]]
 name = "skein-oauth"
 version = "0.0.0"
 source = "git+https://github.com/forgetic/skein.git#886a7d4f2c717cae5225774c11b3c1b88cb2d4b4"
@@ -1232,6 +1368,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "skein-tls-world"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/skein.git#886a7d4f2c717cae5225774c11b3c1b88cb2d4b4"
+dependencies = [
+ "rustls",
+ "skein-heap",
+ "skein-io",
+ "skein-lib",
+ "skein-sim",
+ "skein-tls",
+]
+
+[[package]]
 name = "skein-world"
 version = "0.0.0"
 source = "git+https://github.com/forgetic/skein.git#886a7d4f2c717cae5225774c11b3c1b88cb2d4b4"
@@ -1241,6 +1390,108 @@ dependencies = [
  "skein-lib",
  "skein-shell",
  "skein-sim",
+]
+
+[[package]]
+name = "smith-agent-process-world"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+dependencies = [
+ "skein-channel",
+ "skein-fake-channel",
+ "skein-fake-llm-domain",
+ "skein-fake-llm-protocol",
+ "skein-fake-machine",
+ "skein-fake-peers",
+ "skein-io",
+ "skein-json",
+ "skein-lib",
+ "skein-llm",
+ "skein-llm-connection",
+ "skein-llm-world",
+ "skein-shell",
+ "skein-sim",
+ "skein-tls",
+ "skein-tls-world",
+ "skein-world",
+ "smith-agent-service",
+ "smith-agent-shell",
+ "smith-agent-world",
+ "smith-channel",
+ "smith-charter",
+ "smith-domain",
+ "smith-domain-run",
+ "smith-domain-session",
+ "smith-events",
+ "smith-protocol-channel",
+ "smith-protocol-llm",
+ "smith-protocol-machine",
+ "smith-transcript",
+]
+
+[[package]]
+name = "smith-agent-service"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+dependencies = [
+ "skein-channel",
+ "skein-http",
+ "skein-io",
+ "skein-lib",
+ "skein-llm",
+ "skein-llm-connection",
+ "skein-tls",
+ "smith-channel",
+ "smith-charter",
+ "smith-domain",
+ "smith-events",
+ "smith-protocol-channel",
+ "smith-protocol-llm",
+ "smith-protocol-machine",
+ "smith-transcript",
+]
+
+[[package]]
+name = "smith-agent-shell"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+dependencies = [
+ "libc",
+ "serde",
+ "serde_json",
+ "skein-channel",
+ "skein-http",
+ "skein-io",
+ "skein-lib",
+ "skein-llm",
+ "skein-llm-connection",
+ "skein-shell",
+ "skein-tls",
+ "smith-agent-service",
+ "smith-channel",
+ "smith-charter",
+ "smith-domain",
+ "smith-events",
+ "smith-protocol-channel",
+ "smith-protocol-llm",
+ "smith-protocol-machine",
+ "smith-transcript",
+]
+
+[[package]]
+name = "smith-agent-world"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+dependencies = [
+ "skein-fake-checkout",
+ "skein-fake-llm-domain",
+ "skein-lib",
+ "skein-world",
+ "smith-domain",
+ "smith-domain-tools",
+ "smith-host-domain",
+ "smith-session-world",
+ "smith-tools-world",
 ]
 
 [[package]]
@@ -1299,6 +1550,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "smith-events"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+dependencies = [
+ "skein-json",
+ "skein-lib",
+]
+
+[[package]]
 name = "smith-host-domain"
 version = "0.0.0"
 source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
@@ -1339,6 +1599,62 @@ dependencies = [
 ]
 
 [[package]]
+name = "smith-protocol-llm"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+dependencies = [
+ "skein-io",
+ "skein-json",
+ "skein-lib",
+ "skein-llm",
+ "skein-llm-connection",
+ "skein-tls",
+ "smith-domain",
+ "smith-events",
+]
+
+[[package]]
+name = "smith-protocol-machine"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+dependencies = [
+ "skein-io",
+ "skein-json",
+ "skein-lib",
+ "smith-domain",
+]
+
+[[package]]
+name = "smith-session-world"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+dependencies = [
+ "skein-fake-checkout",
+ "skein-fake-llm-domain",
+ "skein-lib",
+ "skein-llm-world",
+ "skein-world",
+ "smith-domain",
+ "smith-domain-session",
+ "smith-domain-tools",
+ "smith-protocol-llm",
+ "smith-tools-world",
+]
+
+[[package]]
+name = "smith-tools-world"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+dependencies = [
+ "skein-fake-checkout",
+ "skein-io",
+ "skein-lib",
+ "skein-world",
+ "smith-domain-tools",
+ "smith-protocol-machine",
+]
+
+[[package]]
 name = "smith-transcript"
 version = "0.0.0"
 source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
@@ -1354,10 +1670,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
+name = "syn"
+version = "3.0.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d78c8dee4c7bf0e14673097256fed6142ce9d3b85a408189d07482442145823b"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "unicode-ident",
+]
+
+[[package]]
 name = "typenum"
 version = "1.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6f5e870be6c3b371b77fe0ee0bafb859fa4964b4404c27de1d380043c4dda20"
+
+[[package]]
+name = "unicode-ident"
+version = "1.0.27"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a2c754d6c33795a1c324727428e5a7dedb5b06195f9890bdbcba760d3e246563"
 
 [[package]]
 name = "untrusted"
@@ -1455,3 +1788,9 @@ name = "zeroize"
 version = "1.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e13084392c5e4bc371903e2935a5eaeed24905a7511356b883835e18a78f6879"
+
+[[package]]
+name = "zmij"
+version = "1.0.23"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "29666d0abbfad1e3dc4dcf6144730dd3a3ab225bbbdac83319345b1b44ccfc1b"

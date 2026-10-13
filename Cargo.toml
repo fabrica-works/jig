@@ -73,6 +73,7 @@ members = [
     "tests/engine-workers",
     "crates/jig-protocol-worker-link",
     "tests/worker-link",
+    "tests/channel",
 ]
 
 [workspace.package]
@@ -82,6 +83,13 @@ rust-version = "1.95"
 publish = false
 
 [workspace.dependencies]
+smith-protocol-llm = { git = "https://github.com/forgetic/smith.git" }
+smith-agent-service = { git = "https://github.com/forgetic/smith.git" }
+smith-agent-shell = { git = "https://github.com/forgetic/smith.git" }
+smith-agent-process-world = { git = "https://github.com/forgetic/smith.git" }
+skein-fake-llm-domain = { git = "https://github.com/forgetic/skein.git" }
+skein-llm = { git = "https://github.com/forgetic/skein.git" }
+skein-shell = { git = "https://github.com/forgetic/skein.git" }
 smith-host-protocol = { git = "https://github.com/forgetic/smith.git" }
 jig-test-service = { path = "testing/jig-test-service" }
 jig-protocol-engine-clients = { path = "crates/jig-protocol-engine-clients" }
