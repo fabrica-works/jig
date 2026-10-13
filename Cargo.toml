@@ -14,6 +14,7 @@ members = [
     "crates/jig-protocol-accounts",
     "testing/jig-test-connector",
     "testing/jig-test-domain",
+    "testing/jig-test-worker",
     "testing/jig-test-domain-client",
     "testing/jig-test-client-kit",
     "testing/jig-test-view",
@@ -74,6 +75,11 @@ rust-version = "1.95"
 publish = false
 
 [workspace.dependencies]
+smith-protocol-channel = { git = "https://github.com/forgetic/smith.git" }
+smith-domain = { git = "https://github.com/forgetic/smith.git" }
+smith-domain-session = { git = "https://github.com/forgetic/smith.git" }
+smith-host-domain = { git = "https://github.com/forgetic/smith.git" }
+jig-test-worker = { path = "testing/jig-test-worker" }
 jig-protocol-engine-workers = { path = "crates/jig-protocol-engine-workers" }
 skein-sim = { git = "https://github.com/forgetic/skein.git" }
 skein-fake-oauth = { git = "https://github.com/forgetic/skein.git" }

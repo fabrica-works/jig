@@ -121,12 +121,83 @@ fn comment_end(source: &[u8], start: usize) -> usize {
     end
 }
 
+// Foreign boundary fields are allowed only at their declared construction site.
+fn foreign_fields(path: &Path, source: &str) -> Vec<usize> {
+    if !path.ends_with("testing/jig-test-worker/src/tests/fixtures.rs") {
+        return Vec::new();
+    }
+    let bytes = source.as_bytes();
+    let mut fields = Vec::new();
+    let mut index = 0;
+    let mut depth = 0_usize;
+    let mut directories = Vec::new();
+    while index < bytes.len() {
+        if let Some(end) = literal_end(source, index) {
+            index = end;
+            continue;
+        }
+        if matches!(bytes.get(index..index + 2), Some(b"//" | b"/*")) {
+            index = comment_end(bytes, index);
+            continue;
+        }
+        let named = "smith::Directory";
+        if source[index..].starts_with(named)
+            && !index
+                .checked_sub(1)
+                .and_then(|before| bytes.get(before))
+                .is_some_and(|byte| identifier_byte(*byte) || *byte == b':')
+        {
+            let mut brace = index + named.len();
+            while bytes.get(brace).is_some_and(u8::is_ascii_whitespace) {
+                brace += 1;
+            }
+            if bytes.get(brace) == Some(&b'{') {
+                directories.push(depth + 1);
+                index = brace;
+            }
+        }
+        match bytes[index] {
+            b'{' => depth += 1,
+            b'}' => {
+                if directories.last() == Some(&depth) {
+                    directories.pop();
+                }
+                depth = depth.saturating_sub(1);
+            }
+            _ => {
+                let field = [b'g', b'i', b't'];
+                if directories.last() == Some(&depth)
+                    && bytes.get(index..index + field.len()) == Some(&field)
+                    && !index
+                        .checked_sub(1)
+                        .and_then(|previous| bytes.get(previous))
+                        .is_some_and(|byte| identifier_byte(*byte))
+                {
+                    let mut colon = index + field.len();
+                    while bytes.get(colon).is_some_and(u8::is_ascii_whitespace) {
+                        colon += 1;
+                    }
+                    if bytes.get(colon) == Some(&b':') {
+                        fields.push(index);
+                    }
+                }
+            }
+        }
+        index += source[index..].chars().next().expect("source character").len_utf8();
+    }
+    fields
+}
+
 fn vocabulary_matches(path: &Path, source: &str, words: &[String]) -> Vec<String> {
     let lower = source.to_ascii_lowercase();
     let bytes = source.as_bytes();
     let mut matches = Vec::new();
+    let foreign = foreign_fields(path, source);
     for (word_index, word) in words.iter().enumerate() {
         for (at, _) in lower.match_indices(word.as_str()) {
+            if word.as_bytes() == [b'g', b'i', b't'] && foreign.contains(&at) {
+                continue;
+            }
             if !at.checked_sub(1).and_then(|before| bytes.get(before)).is_some_and(u8::is_ascii_alphanumeric)
                 && !bytes
                     .get(at + word.len())
@@ -195,4 +266,31 @@ pub(super) fn scan(path: &Path, source: &str, words: &[String], names: bool) -> 
         line += source[start..index].matches('\n').count();
     }
     failures
+}
+
+#[test]
+fn only_the_foreign_directory_field_is_allowed_at_its_named_site() {
+    let field = ["g", "it"].concat();
+    let site = Path::new("testing/jig-test-worker/src/tests/fixtures.rs");
+    let other = Path::new("testing/other/src/fixtures.rs");
+    let literal = format!("fn setup() {{ let directory = smith::Directory {{ {field}: false }}; }}");
+    let cases = [
+        ("foreign field", site, literal.clone(), 0),
+        ("elsewhere in named file", site, format!("{literal} fn {field}() {{}}"), 1),
+        ("other file", other, literal, 1),
+        ("other record", site, format!("let directory = other::Directory {{ {field}: false }};"), 1),
+        ("other qualifier", site, format!("let directory = other_smith::Directory {{ {field}: false }};"), 1),
+        (
+            "nested record",
+            site,
+            format!("let directory = smith::Directory {{ nested: Other {{ {field}: false }} }};"),
+            1,
+        ),
+        ("quoted prefix", site, format!("let text = \"smith::Directory {{ {field}: false }}\";"), 1),
+    ];
+    for (case, path, source, count) in cases {
+        let actual = vocabulary_matches(path, &source, core::slice::from_ref(&field));
+        let expected = vec![format!("{}: {field}", path.display()); count];
+        assert_eq!(actual, expected, "{case}");
+    }
 }

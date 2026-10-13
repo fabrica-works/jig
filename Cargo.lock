@@ -750,6 +750,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "jig-test-worker"
+version = "0.0.0"
+dependencies = [
+ "jig-domain-host",
+ "jig-protocol-config",
+ "skein-lib",
+ "smith-charter",
+ "smith-domain",
+ "smith-domain-run",
+ "smith-domain-session",
+ "smith-host-domain",
+ "smith-protocol-channel",
+ "smith-transcript",
+]
+
+[[package]]
 name = "jig-view"
 version = "0.0.0"
 dependencies = [
@@ -1090,11 +1106,63 @@ dependencies = [
 ]
 
 [[package]]
+name = "smith-domain"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/smith.git#6a6b1c3e9d272ea9991db34dc90abead50b0630c"
+dependencies = [
+ "skein-lib",
+ "smith-domain-run",
+ "smith-domain-session",
+ "smith-domain-tools",
+]
+
+[[package]]
 name = "smith-domain-run"
 version = "0.0.0"
 source = "git+https://github.com/forgetic/smith.git#6a6b1c3e9d272ea9991db34dc90abead50b0630c"
 dependencies = [
  "skein-lib",
+]
+
+[[package]]
+name = "smith-domain-session"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/smith.git#6a6b1c3e9d272ea9991db34dc90abead50b0630c"
+dependencies = [
+ "skein-lib",
+ "smith-domain-tools",
+]
+
+[[package]]
+name = "smith-domain-tools"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/smith.git#6a6b1c3e9d272ea9991db34dc90abead50b0630c"
+dependencies = [
+ "skein-lib",
+]
+
+[[package]]
+name = "smith-host-domain"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/smith.git#6a6b1c3e9d272ea9991db34dc90abead50b0630c"
+dependencies = [
+ "skein-lib",
+ "smith-domain",
+]
+
+[[package]]
+name = "smith-protocol-channel"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/smith.git#6a6b1c3e9d272ea9991db34dc90abead50b0630c"
+dependencies = [
+ "skein-channel",
+ "skein-lib",
+ "smith-channel",
+ "smith-charter",
+ "smith-domain",
+ "smith-domain-session",
+ "smith-domain-tools",
+ "smith-transcript",
 ]
 
 [[package]]
