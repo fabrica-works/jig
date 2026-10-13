@@ -167,6 +167,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "jig-client-protocol-world"
+version = "0.0.0"
+dependencies = [
+ "jig-client-world",
+ "jig-core-world",
+ "jig-domain-client",
+ "jig-domain-core",
+ "jig-domain-people",
+ "jig-domain-tasks",
+ "jig-domain-views",
+ "jig-fake-person",
+ "jig-fake-workers",
+ "jig-protocol-client-link",
+ "jig-protocol-client-wire",
+ "jig-protocol-engine-clients",
+ "jig-shell-native",
+ "jig-test-domain",
+ "jig-test-domain-client",
+ "jig-view",
+ "skein-http",
+ "skein-io",
+ "skein-lib",
+ "skein-world",
+]
+
+[[package]]
 name = "jig-client-wire-world"
 version = "0.0.0"
 dependencies = [
@@ -755,6 +781,17 @@ version = "0.0.0"
 dependencies = [
  "jig-domain-client",
  "skein-lib",
+]
+
+[[package]]
+name = "jig-shell-native"
+version = "0.0.0"
+dependencies = [
+ "jig-protocol-client-link",
+ "jig-protocol-client-wire",
+ "skein-http",
+ "skein-lib",
+ "skein-world",
 ]
 
 [[package]]

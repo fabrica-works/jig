@@ -327,3 +327,14 @@ fn the_store_files_kit_uses_only_the_store_and_foundation() {
     assert!(source.contains("[lints.clippy]"));
     assert!(kit_root().join("testing/jig-test-store-files/clippy.toml").is_file());
 }
+
+#[test]
+fn the_native_shell_links_only_the_clients_components_and_foundation() {
+    let shell = manifests()
+        .into_iter()
+        .find(|manifest| manifest.name.as_deref() == Some("jig-shell-native"))
+        .expect("native shell manifest");
+    let mut dependencies = shell.dependencies;
+    dependencies.sort();
+    assert_eq!(dependencies, ["jig-protocol-client-link", "jig-protocol-client-wire", "skein-http", "skein-lib"]);
+}
