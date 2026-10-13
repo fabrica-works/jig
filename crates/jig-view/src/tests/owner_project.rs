@@ -486,8 +486,11 @@ fn native_drive(domain: &mut Domain, event: jig_domain_client::Event) -> Vec<jig
     result
 }
 #[test]
-#[expect(clippy::too_many_lines, reason = "complete whole source fixture or ordered public journey proof")]
 fn owner_project_real_page_decodes_whole_role_edits_preserves_prior_channels_and_reviews_before_after_once() {
+    check_owner_project_real_page_decodes_whole_role_edits_preserves_prior_channels_and_reviews_before_after_once();
+}
+#[expect(clippy::too_many_lines, reason = "complete whole source fixture or ordered public journey proof")]
+fn check_owner_project_real_page_decodes_whole_role_edits_preserves_prior_channels_and_reviews_before_after_once() {
     use jig_domain_client::{
         Event, Request,
         action::Act,
@@ -502,7 +505,7 @@ fn owner_project_real_page_decodes_whole_role_edits_preserves_prior_channels_and
             offset: jig_domain_client::boundary::Offset { minutes: 0 },
         },
     );
-    native_drive(&mut d, Event::Hello { versions: VersionRange { first: 1, last: 1 } });
+    native_drive(&mut d, Event::Hello { versions: VersionRange { first: 4, last: 4 } });
     let f = opened
         .iter()
         .find_map(|r| match r {
@@ -535,8 +538,8 @@ fn owner_project_real_page_decodes_whole_role_edits_preserves_prior_channels_and
     let w = words(false);
     let f = view::worst_case(&limits(), w).unwrap();
     let mut bounds = capacity(f);
-    bounds.nodes += 32;
-    bounds.text_bytes += bounds.text_per_node * 32;
+    bounds.nodes = bounds.nodes.checked_add(32).unwrap();
+    bounds.text_bytes = bounds.text_bytes.checked_add(bounds.text_per_node.checked_mul(32).unwrap()).unwrap();
     let page = |d: &Domain| {
         let mut b = Builder::new(&bounds);
         let mut bindings = JigBindings::new(f.bindings, 32);
@@ -682,7 +685,7 @@ fn native_owner_at(value: OwnerProject, section: jig_domain_client::address::Pro
             offset: jig_domain_client::boundary::Offset { minutes: 0 },
         },
     );
-    native_drive(&mut domain, Event::Hello { versions: VersionRange { first: 1, last: 1 } });
+    native_drive(&mut domain, Event::Hello { versions: VersionRange { first: 4, last: 4 } });
     let watch = out
         .iter()
         .find_map(|request| match request {
@@ -1059,7 +1062,7 @@ fn native_historical_project() -> (Domain, OwnerSpendPage) {
             offset: jig_domain_client::boundary::Offset { minutes: 0 },
         },
     );
-    native_drive(&mut domain, Event::Hello { versions: VersionRange { first: 1, last: 1 } });
+    native_drive(&mut domain, Event::Hello { versions: VersionRange { first: 4, last: 4 } });
     let watch = start
         .iter()
         .find_map(|request| match request {

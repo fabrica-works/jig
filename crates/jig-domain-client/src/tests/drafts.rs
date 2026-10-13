@@ -182,6 +182,9 @@ fn custom(domain: &mut Domain, limits: Limits, now: Time, event: Event) -> Box<[
 }
 #[test]
 fn drafts_survive_pages_and_restart_evict_oldest_untouched_and_coalesce_only_current_records() {
+    check_drafts_survive_pages_and_restart_evict_oldest_untouched_and_coalesce_only_current_records();
+}
+fn check_drafts_survive_pages_and_restart_evict_oldest_untouched_and_coalesce_only_current_records() {
     let limits = Limits { drafts: 2, records: 3, heartbeat: Duration::from_secs(3600), ..LIMITS };
     let mut domain = Domain::new(&limits, 8);
     let first = custom(
@@ -195,7 +198,7 @@ fn drafts_survive_pages_and_restart_evict_oldest_untouched_and_coalesce_only_cur
         },
     );
     let Request::Open { watch, .. } = first[0] else { panic!("frame") };
-    custom(&mut domain, limits, Time::ZERO, Event::Hello { versions: VersionRange { first: 1, last: 1 } });
+    custom(&mut domain, limits, Time::ZERO, Event::Hello { versions: VersionRange { first: 4, last: 4 } });
     custom(
         &mut domain,
         limits,
@@ -238,7 +241,7 @@ fn drafts_survive_pages_and_restart_evict_oldest_untouched_and_coalesce_only_cur
     );
     assert!(restarted.fields().get(Purpose::Composer { task: 8 }).is_none());
     let Request::Open { watch, .. } = rows[0] else { panic!("frame") };
-    custom(&mut restarted, limits, Time::ZERO, Event::Hello { versions: VersionRange { first: 1, last: 1 } });
+    custom(&mut restarted, limits, Time::ZERO, Event::Hello { versions: VersionRange { first: 4, last: 4 } });
     custom(
         &mut restarted,
         limits,

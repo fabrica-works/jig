@@ -11,3 +11,8 @@ mod pages;
 mod reads;
 
 mod stream;
+
+#[test]
+fn the_client_version_matches_its_wire_version() {
+    assert_eq!(c::CLIENT_VERSION, jig_protocol_client_wire::VERSION);
+}

@@ -332,7 +332,7 @@ fn three() -> (Domain, Token, Token) {
         },
     );
     let frame_watch = open_token(&begin);
-    step_three(&mut domain, Event::Hello { versions: VersionRange { first: 1, last: 1 } });
+    step_three(&mut domain, Event::Hello { versions: VersionRange { first: 4, last: 4 } });
     let entered = step_three(
         &mut domain,
         Event::Watch { watch: frame_watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(frame(7)))) },

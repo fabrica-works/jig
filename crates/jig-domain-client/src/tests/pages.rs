@@ -1648,12 +1648,15 @@ fn assert_only_inbox_read(requests: &[Request], expected: &Read) {
     }
     assert_eq!(count, 1, "only the selected group's exact query is emitted");
 }
+#[test]
+fn inbox_group_pages_keep_orders_cursors_and_live_precedence() {
+    check_inbox_group_pages_keep_orders_cursors_and_live_precedence();
+}
 #[expect(
     clippy::too_many_lines,
     reason = "one scenario follows both independent cursor positions and watch precedence"
 )]
-#[test]
-fn inbox_group_pages_keep_orders_cursors_and_live_precedence() {
+fn check_inbox_group_pages_keep_orders_cursors_and_live_precedence() {
     use crate::{
         action::{Act, End},
         pages::conversations::{INBOX_UPDATES_WINDOW, INBOX_WINDOW},
@@ -1687,7 +1690,7 @@ fn inbox_group_pages_keep_orders_cursors_and_live_precedence() {
             offset: crate::boundary::Offset { minutes: 0 },
         },
     ));
-    send(&mut domain, Event::Hello { versions: VersionRange { first: 1, last: 1 } });
+    send(&mut domain, Event::Hello { versions: VersionRange { first: 4, last: 4 } });
     let entered =
         send(&mut domain, Event::Watch { watch: f, event: WatchEvent::Delivered(Delivery::Frame(Box::new(frame(7)))) });
     let watch = open_token(&entered);

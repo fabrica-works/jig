@@ -98,7 +98,7 @@ fn ready() -> Domain {
             _ => None,
         })
         .unwrap();
-    drive(&mut root, Event::Jig(jig_domain_client::Event::Hello { versions: VersionRange { first: 1, last: 1 } }));
+    drive(&mut root, Event::Jig(jig_domain_client::Event::Hello { versions: VersionRange { first: 4, last: 4 } }));
     // Explicit synthetic identity and empty offers, supplied independently of the party's display name.
     let frame = Frame {
         party: FrameParty {

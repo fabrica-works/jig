@@ -207,7 +207,7 @@ fn a_new_navigation_does_not_discard_a_current_epoch_engine_callback() {
             client,
             epoch: 0,
             event: Event::Jig(jig_domain_client::Event::Hello {
-                versions: jig_domain_client::contract::VersionRange { first: 1, last: 1 },
+                versions: jig_domain_client::contract::VersionRange { first: 4, last: 4 },
             }),
             navigation: None,
         },

@@ -118,7 +118,7 @@ pub fn limits() -> root::Limits {
                 text_bytes: 256,
                 chips: 32,
                 lines: 32,
-                versions: core::documents::Versions { minimum: 1, maximum: 1 },
+                versions: core::documents::Versions { minimum: 4, maximum: 4 },
             },
             connectors: 2,
             resume_bytes: 256,

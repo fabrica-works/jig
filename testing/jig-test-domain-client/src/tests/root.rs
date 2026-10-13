@@ -114,7 +114,7 @@ fn start(root: &mut Domain, kept: List<crate::store::Record>) -> Token {
         .unwrap()
 }
 fn confirm(root: &mut Domain, watch: Token, party: u64) {
-    drive(root, Event::Jig(jig_domain_client::Event::Hello { versions: VersionRange { first: 1, last: 1 } }));
+    drive(root, Event::Jig(jig_domain_client::Event::Hello { versions: VersionRange { first: 4, last: 4 } }));
     let frame = Frame {
         party: FrameParty {
             number: party,

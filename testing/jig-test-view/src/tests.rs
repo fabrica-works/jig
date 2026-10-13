@@ -113,7 +113,7 @@ fn ready() -> Domain {
             _ => None,
         })
         .unwrap();
-    drive(&mut root, Event::Jig(jig_domain_client::Event::Hello { versions: VersionRange { first: 1, last: 1 } }));
+    drive(&mut root, Event::Jig(jig_domain_client::Event::Hello { versions: VersionRange { first: 4, last: 4 } }));
     drive(
         &mut root,
         Event::Jig(jig_domain_client::Event::Watch {
@@ -544,6 +544,9 @@ fn a_family_entrance_refusal_shows_its_budget_and_keeps_the_object_present() {
 
 #[test]
 fn outbox_family_keys_keep_scope_entry_and_effect_proposal_distinct() {
+    check_outbox_family_keys_keep_scope_entry_and_effect_proposal_distinct();
+}
+fn check_outbox_family_keys_keep_scope_entry_and_effect_proposal_distinct() {
     let entry = u64::MAX;
     let subjects = [
         family::Subject { scope: family::Scope::Project(0), kind: family::Kind::Outbox(entry) },
@@ -571,7 +574,7 @@ fn outbox_family_keys_keep_scope_entry_and_effect_proposal_distinct() {
     for scope in [PartScope::Project(3), PartScope::Project(4), PartScope::Deployment] {
         parts.push(Part::Outbox { connector: jig_test_domain_client::FIRST, scope, entry }).unwrap();
     }
-    drive(&mut root, Event::Jig(jig_domain_client::Event::Hello { versions: VersionRange { first: 1, last: 1 } }));
+    drive(&mut root, Event::Jig(jig_domain_client::Event::Hello { versions: VersionRange { first: 4, last: 4 } }));
     drive(
         &mut root,
         Event::Jig(jig_domain_client::Event::Watch {
