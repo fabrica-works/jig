@@ -786,7 +786,11 @@ pub const DEPLOYMENT: [u8; 16] = [7; 16];
 
 mod reads;
 mod store;
-pub use reads::{CHILD, GOAL, GRANDCHILD, ended_of, read, terminal, with_links};
+pub use reads::{
+    CHILD, GOAL, GRANDCHILD, answer_line, ended_of, escalation_decision, history_with_proposal, hold_milestone,
+    notified_line, person_proposal, proposal_decision, question_line, read, terminal, with_hold, with_links,
+    with_proposal_rows, with_question_lines,
+};
 pub use store::{
     ALICE, ENDED, LIVE, OTHER_DEPLOYMENT, PROJECT, ROOT_FD, call, commit, committed, conversation_index, ended_task,
     format_put, get_kv, header, header_put, header_record, history, live_task, notes_entry, notes_line, opened,

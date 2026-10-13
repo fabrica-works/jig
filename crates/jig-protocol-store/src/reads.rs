@@ -31,13 +31,13 @@ pub(crate) fn read(store: &mut Store, owner: Token, range: Range, above: &mut Qu
         Scope::Task { task } | Scope::PersonTask { task } | Scope::Result { task } => {
             point::task(store, &range, task, &mut spent)
         }
-        // Other scopes join this path in the following increments.
-        Scope::Proposal { .. }
-        | Scope::Escalation { .. }
-        | Scope::Question { .. }
-        | Scope::Reply { .. }
-        | Scope::Turn { .. }
-        | Scope::EndedDelegates { .. }
+        Scope::Proposal { proposer, proposal } => point::proposal(store, &range, proposer, proposal, &mut spent),
+        Scope::Escalation { task } => point::escalation(store, &range, task, &mut spent),
+        Scope::Question { task, message } => point::question(store, &range, task, message, &mut spent),
+        Scope::Reply { task, activity } => point::reply(store, &range, task, activity, &mut spent),
+        Scope::Turn { .. } => Ok(point::turn()),
+        // Paged scopes join this path in the following increments.
+        Scope::EndedDelegates { .. }
         | Scope::History { .. }
         | Scope::Activity { .. }
         | Scope::Inbox { .. }

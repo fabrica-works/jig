@@ -40,3 +40,105 @@ pub fn with_links(record: Record, dependencies: &[u64]) -> Record {
     row.result_followups = Box::from(dependencies);
     Record::Tasks(tasks::Stored::Ended(row))
 }
+
+pub fn person_proposal(number: u64, decided: bool) -> Record {
+    let mut row = super::task_person_proposal();
+    row.number = number;
+    row.proposer = super::ALICE;
+    if decided {
+        row.state = tasks::PersonProposalState::Accepted { by: tasks::Party::Person(super::ALICE) };
+        Record::Tasks(tasks::Stored::DecidedProposal(Box::new(row)))
+    } else {
+        Record::Tasks(tasks::Stored::PersonProposal(Box::new(row)))
+    }
+}
+
+pub fn proposal_decision(party: u64, number: u64) -> Record {
+    let mut row = core_rows::proposal();
+    row.proposer = jig_domain_people::Proposer::Party(party);
+    row.proposal = number;
+    row.project = 3;
+    Record::Core(core::CoreRecord::ProposalDecision(row))
+}
+
+pub fn history_with_proposal(task: u64, revision: u64, proposal: u64) -> Record {
+    let mut row = super::task_history();
+    row.task = task;
+    row.revision = revision;
+    let mut kept = super::task_proposal();
+    kept.proposer = task;
+    kept.number = proposal;
+    row.proposal = Some(Box::new(kept));
+    Record::Tasks(tasks::Stored::History(row))
+}
+
+pub fn escalation_decision(task: u64, revision: u64) -> Record {
+    let mut row = core_rows::escalation();
+    row.task = task;
+    row.revision = revision;
+    Record::Core(core::CoreRecord::EscalationDecision(row))
+}
+
+pub fn hold_milestone(task: u64, position: u64) -> Record {
+    Record::Tasks(tasks::Stored::Milestone(tasks::Milestone {
+        task,
+        position,
+        phase: super::task_phase(),
+        at: skein_lib::Wall::from_nanos(19),
+    }))
+}
+
+fn words_line(task: u64, position: u64, message: u64, kind: tasks::MessageKind) -> Record {
+    Record::Tasks(tasks::Stored::Activity(tasks::ActivityLine {
+        task,
+        position,
+        at: skein_lib::Wall::from_nanos(19),
+        line: tasks::Line::Words {
+            message,
+            by: tasks::Party::Person(super::ALICE),
+            kind,
+            words: Box::from(b"words".as_slice()),
+        },
+    }))
+}
+
+pub fn question_line(task: u64, position: u64, message: u64) -> Record {
+    words_line(task, position, message, tasks::MessageKind::Question)
+}
+
+pub fn answer_line(task: u64, position: u64, question: u64) -> Record {
+    words_line(task, position, 7, tasks::MessageKind::Answer { question })
+}
+
+pub fn notified_line(task: u64, position: u64, person: u64) -> Record {
+    Record::Tasks(tasks::Stored::Activity(tasks::ActivityLine {
+        task,
+        position,
+        at: skein_lib::Wall::from_nanos(19),
+        line: tasks::Line::Notified { recipient: tasks::Party::Person(person), word: super::task_word(7) },
+    }))
+}
+
+fn retained_task(record: Record) -> Box<tasks::TaskRecord> {
+    let Record::Tasks(tasks::Stored::Ended(row)) = record else { panic!("ended fixture") };
+    row
+}
+
+pub fn with_question_lines(record: Record, lines: &[tasks::QuestionLine]) -> Record {
+    let mut row = retained_task(record);
+    row.question_lines = Box::from(lines);
+    Record::Tasks(tasks::Stored::Ended(row))
+}
+
+pub fn with_hold(record: Record, position: u64, revision: u64) -> Record {
+    let mut row = retained_task(record);
+    row.hold = position;
+    row.escalation = tasks::Escalation::Unheld { revision };
+    Record::Tasks(tasks::Stored::Ended(row))
+}
+
+pub fn with_proposal_rows(record: Record, rows: &[tasks::ProposalRow]) -> Record {
+    let mut row = retained_task(record);
+    row.proposal_rows = Box::from(rows);
+    Record::Tasks(tasks::Stored::Ended(row))
+}
