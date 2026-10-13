@@ -284,9 +284,14 @@ impl Phrasebook {
                 }
                 return Err(Invalid::Limit);
             }
-            for words in &language.phrases {
-                let Ok(index) = ids.binary_search(&words.id) else {
-                    return Err(Invalid::Unknown { id: words.id });
+            for (position, words) in language.phrases.iter().enumerate() {
+                let index = if ids.get(position) == Some(&words.id) {
+                    position
+                } else {
+                    let Ok(index) = ids.binary_search(&words.id) else {
+                        return Err(Invalid::Unknown { id: words.id });
+                    };
+                    index
                 };
                 let shape = shapes.get(index).expect("id table has the shapes' order");
                 check_forms(shape, words)?;

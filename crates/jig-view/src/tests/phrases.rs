@@ -67,6 +67,16 @@ fn loading_refuses_missing_phrases_wrong_holes_and_incomplete_forms() {
 }
 
 #[test]
+fn a_language_with_a_foreign_phrase_is_refused_naming_it() {
+    let foreign = PhraseId { owner: Owner::Other { child: 4 }, number: 2 };
+    let mut words = language(false);
+    words.phrases[0].id = foreign;
+    let shapes = shape();
+    assert_eq!(words.phrases.len(), shapes.len());
+    assert_eq!(Phrasebook::load(shapes, Box::new([words]), &LIMITS).unwrap_err(), Invalid::Unknown { id: foreign });
+}
+
+#[test]
 fn plural_selection_hole_values_and_longest_language_capacity_are_checked() {
     let book = Phrasebook::load(shape(), Box::new([language(false), language(true)]), &LIMITS).unwrap();
     let mut values = [
