@@ -2291,6 +2291,17 @@ the file.
      plan, jig 19.s2 (the scalars) and 19.s3 (the commit bound, both
      shipped profiles admitted), follow, and 27.3 needs 19.s3. The core's
      journal room's over-count goes to `later.md`.
+274. **jig 27.3 lands at 576 lines, with its supporting service files**
+     (2026-10-13, the coordinator's block "jig 27.3: real-store
+     integration Size and supporting service files",
+     2026-10-13T14:34:47Z). The reference service on the real store, done
+     and proven (201 focused tests, the durability proof 264 ms, clippy
+     clean), counts 576 lines against a Size of 300 (450 under ruling 196),
+     most of it the store's routing (`store.rs` +501); every file under
+     800. It is on the critical path (33.3 needs its store API), and lands
+     as counted, with `lib.rs`, `limits.rs` and `stop.rs` in its Files
+     (the store's adoption, its pricing, and 27.2's own last close
+     replaced, ruling 198), the per-file counts in its commit body.
 
 ## For the user
 
