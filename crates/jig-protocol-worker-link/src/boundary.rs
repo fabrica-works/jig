@@ -10,6 +10,8 @@ pub enum Event {
     Up { up: host::LinkUp, parts: Box<[Part]> },
     Dialled { connection: Token },
     Unreachable,
+    Stop,
+    Abort,
     Lower { connection: Token, event: LowerEvent },
     Gone { connection: Token },
     CancelRelay { run: Token, attempt: Token, call: Box<[u8]> },
@@ -28,6 +30,8 @@ pub enum Request {
         turn: u32,
     },
     Lost,
+    GracePassed,
+    Closed,
     Down {
         down: host::LinkDown,
         parts: Box<[Part]>,

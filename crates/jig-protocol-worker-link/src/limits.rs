@@ -47,7 +47,11 @@ pub fn channel_limits(limits: &Limits) -> Result<channel::Limits, Unusable> {
 }
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
-    if limits.busy == Duration::ZERO
+    if limits.ping == Duration::ZERO
+        || limits.silence < limits.ping.saturating_mul(3)
+        || limits.stall == Duration::ZERO
+        || limits.grace == Duration::ZERO
+        || limits.busy == Duration::ZERO
         || limits.backoff == Duration::ZERO
         || limits.ceiling < limits.backoff
         || limits.handshake == Duration::ZERO

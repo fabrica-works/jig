@@ -14,6 +14,7 @@ pub(crate) struct Net {
     events: VecDeque<LowerEvent>,
     pub read_room: bool,
     pub other_version: bool,
+    pub blocked: u32,
 }
 impl Net {
     pub fn new(peer: ScriptedPeer, chunk: u32) -> Self {
@@ -28,6 +29,7 @@ impl Net {
             events: VecDeque::new(),
             read_room: true,
             other_version: false,
+            blocked: 0,
         }
     }
     pub fn lower(&mut self, lower: Lower, rng: &mut Rng) {
@@ -71,6 +73,9 @@ impl Net {
         }
     }
     pub fn tick(&mut self, rng: &mut Rng) -> Option<LowerEvent> {
+        if !self.write_room && self.right.is_some() {
+            self.blocked = self.blocked.saturating_add(1);
+        }
         if let Some(event) = self.events.pop_front() {
             return Some(event);
         }

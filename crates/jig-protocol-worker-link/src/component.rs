@@ -4,6 +4,7 @@ use crate::{
     backoff::Backoff,
     busy::Busy,
     connection::{Connection, Phase},
+    grace::Grace,
     limits,
     relays::Relays,
     translate,
@@ -26,6 +27,13 @@ pub enum Unusable {
     Limits,
     Credential,
 }
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Life {
+    Active,
+    Stopping,
+    Aborting,
+    Closed,
+}
 #[derive(Debug)]
 pub struct Component {
     limits: Limits,
@@ -38,6 +46,9 @@ pub struct Component {
     dropped: u64,
     relays: Relays,
     busy: Busy,
+    grace: Grace,
+    life: Life,
+    facts: u64,
 }
 impl Component {
     pub fn new(limits: &Limits, credential: Credential, seed: u64) -> Result<Self, Unusable> {
@@ -60,10 +71,18 @@ impl Component {
             dropped: 0,
             relays: Relays::new(limits),
             busy: Busy::new(limits, seed),
+            grace: Grace::new(),
+            life: Life::Active,
+            facts: 0,
         })
     }
     pub fn down(&mut self, now: Time, event: Event, out: &mut Queue<Request>) {
+        if self.life == Life::Closed {
+            return;
+        }
         match event {
+            Event::Stop => self.end(now, false, out),
+            Event::Abort => self.end(now, true, out),
             Event::CancelRelay { run, attempt, call } => {
                 if self.relays.end(run, attempt, &call) {
                     out.push(Request::RelayCancelled { run, attempt, call });
@@ -72,6 +91,10 @@ impl Component {
             Event::Dialled { connection } => self.dialled(now, connection, out),
             Event::Unreachable => match self.phase {
                 Phase::Connecting => {
+                    if self.life != Life::Active {
+                        self.completed(out);
+                        return;
+                    }
                     let span = self.backoff.next();
                     self.phase = Phase::Idle { at: now.saturating_add(span) };
                     out.push(Request::Fact { why: Closed::Stream });
@@ -88,16 +111,28 @@ impl Component {
             }
             Event::Gone { connection } => self.gone(now, connection, out),
             Event::Hello { hello } => {
+                if self.life != Life::Active {
+                    return;
+                }
                 self.hello(now, hello, out);
                 self.pump(now, out);
             }
             Event::Up { up, parts } => {
+                if self.life != Life::Active {
+                    return;
+                }
                 self.up(now, up, &parts, out);
                 self.pump(now, out);
             }
         }
     }
     pub fn fire(&mut self, now: Time, out: &mut Queue<Request>) {
+        if self.life == Life::Closed {
+            return;
+        }
+        if self.grace.fire(now) {
+            out.push(Request::GracePassed);
+        }
         if let Some((run, attempt, turn)) = self.busy.expire(now) {
             out.push(Request::Resend { run, attempt, turn });
         }
@@ -127,7 +162,16 @@ impl Component {
                     }
                 }
             }
-            Phase::Open { proved, .. } => {
+            Phase::Open { proved, ref mut connection, .. } => {
+                if expired(connection.silence, now) || expired(connection.stall, now) {
+                    self.lose(now, Closed::Stream, out);
+                    self.pump(now, out);
+                    return;
+                }
+                if !connection.queued() && expired(connection.ping, now) {
+                    connection.ping = Some(now.saturating_add(self.limits.ping));
+                    self.command(channel::Request::Ping);
+                }
                 if let Some(at) = proved
                     && now >= at
                 {
@@ -140,24 +184,25 @@ impl Component {
             }
             Phase::Connecting => {}
         }
+        self.pump(now, out);
     }
     #[must_use]
     pub fn next_deadline(&self) -> Option<Time> {
+        if self.life == Life::Closed {
+            return None;
+        }
         let phase = match self.phase {
             Phase::Idle { at } => Some(at),
             Phase::Opening { until, .. } => Some(until),
             Phase::Closing { until, .. } => until,
-            Phase::Open { proved, .. } => proved,
+            Phase::Open { proved, ref connection, .. } => crate::connection::earlier(proved, connection.next()),
             Phase::Connecting => None,
         };
-        match (phase, self.busy.next()) {
-            (Some(a), Some(b)) => Some(a.min(b)),
-            (a, b) => a.or(b),
-        }
+        crate::connection::earlier(crate::connection::earlier(phase, self.busy.next()), self.grace.next())
     }
     #[must_use]
     pub fn dropped_facts(&self) -> u64 {
-        0
+        self.facts
     }
 
     /// Records dropped because their bounds or named parts do not fit.
@@ -179,9 +224,14 @@ impl Component {
         let channel = limits::channel_limits(&self.limits).expect("constructor checked channel limits");
         let machine = Machine::new(schema, Role::Initiator, channel).expect("constructor checked channel");
         self.phase = Phase::Opening {
-            connection: Connection { token, machine },
+            connection: Connection { token, machine, ping: None, silence: None, stall: None },
             until: now.saturating_add(self.limits.handshake),
         };
+        if self.life != Life::Active {
+            self.close_ending(now);
+            self.pump(now, out);
+            return;
+        }
         let mut writer = Writer::new(usize::try_from(self.credential.measure()).expect("checked credential fits"));
         self.credential.encode(&mut writer).expect("measured credential fits");
         self.command(channel::Request::Open { credential: writer.finish() });
@@ -191,11 +241,16 @@ impl Component {
         if self.phase.token() != Some(token) {
             return;
         }
+        if self.life != Life::Active {
+            self.completed(out);
+            return;
+        }
         let phase = mem::replace(&mut self.phase, Phase::Connecting);
         let at = match phase {
             Phase::Closing { retry, .. } => retry,
             Phase::Open { .. } => {
                 self.busy.clear();
+                self.grace.lost(now, self.limits.grace);
                 out.push(Request::Lost);
                 out.push(Request::Fact { why: Closed::Stream });
                 let span = self.backoff.next();
@@ -257,6 +312,10 @@ impl Component {
                     self.dropped = self.dropped.saturating_add(1);
                     return;
                 };
+                if frame.kind() == 0x0104 && !self.fact_fits(&frame) {
+                    self.facts = self.facts.saturating_add(1);
+                    return;
+                }
                 if let Some((run, attempt, call)) = relay
                     && !self.relays.add(run, attempt, call, &frame)
                 {
@@ -292,6 +351,28 @@ impl Component {
         }
         self.drain_lower(now, out);
         assert!(self.events.is_empty(), "one channel event cascade fits its bound");
+        if let Some(connection) = self.phase.connection() {
+            if connection.queued() {
+                if connection.stall.is_none() {
+                    connection.stall = Some(now.saturating_add(self.limits.stall));
+                }
+            } else {
+                connection.stall = None;
+            }
+        }
+        if self.life == Life::Stopping {
+            match &mut self.phase {
+                Phase::Open { connection, .. } if !connection.queued() => {
+                    self.close_ending(now);
+                    self.pump(now, out);
+                }
+                Phase::Idle { .. }
+                | Phase::Connecting
+                | Phase::Opening { .. }
+                | Phase::Open { .. }
+                | Phase::Closing { .. } => {}
+            }
+        }
     }
     fn drain_lower(&mut self, now: Time, out: &mut Queue<Request>) {
         for _ in 0..channel::MAX_DOWN.saturating_mul(3) {
@@ -321,6 +402,24 @@ impl Component {
         }
     }
     fn received(&mut self, now: Time, event: channel::Event, out: &mut Queue<Request>) {
+        match &event {
+            channel::Event::Body { .. } | channel::Event::Ping | channel::Event::Unsupported { .. } => {
+                if self.life == Life::Active
+                    && let Some(connection) = self.phase.connection()
+                {
+                    connection.silence = Some(now.saturating_add(self.limits.silence));
+                }
+            }
+            channel::Event::Ready { .. }
+            | channel::Event::Refused { .. }
+            | channel::Event::Closed { .. }
+            | channel::Event::Ended
+            | channel::Event::OutputFailed
+            | channel::Event::Unsent { .. }
+            | channel::Event::Opening { .. }
+            | channel::Event::Drained
+            | channel::Event::Sent { .. } => {}
+        }
         match event {
             channel::Event::Ready { terms, .. } => {
                 let bodies = sizes::limits(&self.limits.sizes).expect("checked sizes");
@@ -341,12 +440,26 @@ impl Component {
                         | Phase::Open { .. }
                         | Phase::Closing { .. }) => other,
                     };
+                    self.grace.clear();
+                    if let Some(connection) = self.phase.connection() {
+                        connection.live(now, &self.limits);
+                    }
                     out.push(Request::Ready);
                     self.command(channel::Request::Read);
                 }
             }
             channel::Event::Refused { reason, .. } => self.lose(now, Closed::RefusedPeer(reason), out),
             channel::Event::Closed { why } => {
+                if self.life != Life::Active {
+                    if let Some(connection) = self.phase.token() {
+                        if self.life == Life::Aborting {
+                            out.push(Request::Abort { connection });
+                        } else {
+                            out.push(Request::Close { connection });
+                        }
+                    }
+                    return;
+                }
                 let started = self.begin_loss(now, why, out);
                 if started {
                     self.command(channel::Request::Close);
@@ -356,68 +469,127 @@ impl Component {
                 }
             }
             channel::Event::Ended | channel::Event::OutputFailed => self.lose(now, Closed::Stream, out),
-            channel::Event::Body { kind, body } => {
-                let limits = sizes::limits(&self.limits.sizes).expect("checked sizes");
-                if kind == 0x0184 {
-                    let record = wire::TurnBusy::decode(&limits, &mut skein_lib::Reader::new(&body));
-                    match record {
-                        Ok(record)
-                            if self.busy.add(
-                                now,
-                                Token::new(record.task()),
-                                Token::new(record.attempt()),
-                                record.number(),
-                            ) =>
-                        {
-                            self.command(channel::Request::Read);
-                        }
-                        Ok(_) => self.lose(now, Closed::Owner, out),
-                        Err(_) => {
-                            self.command(channel::Request::Refuse { reason: 3, text: Box::new([]) });
-                            self.begin_loss(now, Closed::RefusedHere(3), out);
-                        }
-                    }
-                    return;
-                }
-                let mut parts = List::with_capacity(1);
-                match translate::down(kind, &body, &limits, now, &mut parts, &mut self.next_part, out) {
-                    Some(down) => {
-                        let forward = match &down {
-                            host::LinkDown::Relayed { run, attempt, call, .. } => self.relays.end(*run, *attempt, call),
-                            host::LinkDown::TurnKept { run, attempt, turn } => {
-                                self.busy.kept(*run, *attempt, *turn);
-                                true
-                            }
-                            host::LinkDown::Acknowledge { run, attempt } => {
-                                self.busy.acknowledged(*run, *attempt);
-                                true
-                            }
-                            host::LinkDown::Assign { .. }
-                            | host::LinkDown::Message { .. }
-                            | host::LinkDown::Cancel { .. }
-                            | host::LinkDown::Grant { .. } => true,
-                        };
-                        if forward {
-                            out.push(Request::Down { down, parts: parts.into_boxed() });
-                        }
-                        self.command(channel::Request::Read);
-                    }
-                    None => {
-                        self.command(channel::Request::Refuse { reason: 3, text: Box::new([]) });
-                        let started = self.begin_loss(now, Closed::RefusedHere(3), out);
-                        assert!(started, "a body arrives on an open channel");
-                    }
-                }
-            }
+            channel::Event::Body { kind, body } => self.body(now, kind, &body, out),
             channel::Event::Ping | channel::Event::Unsupported { .. } => {
                 self.command(channel::Request::Read);
             }
             channel::Event::Unsent { .. } => self.lose(now, Closed::Owner, out),
             channel::Event::Opening { .. } => self.lose(now, Closed::Framing, out),
-            channel::Event::Drained | channel::Event::Sent { .. } => {}
+            channel::Event::Drained => {
+                if let Some(connection) = self.phase.connection() {
+                    if self.life == Life::Active {
+                        connection.ping = Some(now.saturating_add(self.limits.ping));
+                    }
+                    connection.stall = Some(now.saturating_add(self.limits.stall));
+                }
+            }
+            channel::Event::Sent { .. } => {}
         }
     }
+    fn body(&mut self, now: Time, kind: u16, body: &[u8], out: &mut Queue<Request>) {
+        let limits = sizes::limits(&self.limits.sizes).expect("checked sizes");
+        if kind == 0x0184 {
+            let record = wire::TurnBusy::decode(&limits, &mut skein_lib::Reader::new(body));
+            match record {
+                Ok(record)
+                    if self.busy.add(now, Token::new(record.task()), Token::new(record.attempt()), record.number()) =>
+                {
+                    self.command(channel::Request::Read);
+                }
+                Ok(_) => self.lose(now, Closed::Owner, out),
+                Err(_) => {
+                    self.command(channel::Request::Refuse { reason: 3, text: Box::new([]) });
+                    self.begin_loss(now, Closed::RefusedHere(3), out);
+                }
+            }
+            return;
+        }
+        let mut parts = List::with_capacity(1);
+        match translate::down(kind, body, &limits, now, &mut parts, &mut self.next_part, out) {
+            Some(down) => {
+                let forward = match &down {
+                    host::LinkDown::Relayed { run, attempt, call, .. } => self.relays.end(*run, *attempt, call),
+                    host::LinkDown::TurnKept { run, attempt, turn } => {
+                        self.busy.kept(*run, *attempt, *turn);
+                        true
+                    }
+                    host::LinkDown::Acknowledge { run, attempt } => {
+                        self.busy.acknowledged(*run, *attempt);
+                        true
+                    }
+                    host::LinkDown::Assign { .. }
+                    | host::LinkDown::Message { .. }
+                    | host::LinkDown::Cancel { .. }
+                    | host::LinkDown::Grant { .. } => true,
+                };
+                if forward {
+                    out.push(Request::Down { down, parts: parts.into_boxed() });
+                }
+                self.command(channel::Request::Read);
+            }
+            None => {
+                self.command(channel::Request::Refuse { reason: 3, text: Box::new([]) });
+                let started = self.begin_loss(now, Closed::RefusedHere(3), out);
+                assert!(started, "a body arrives on an open channel");
+            }
+        }
+    }
+    fn fact_fits(&mut self, frame: &channel::Frame) -> bool {
+        let cap = sizes::worker_cap(&self.limits.sizes).expect("checked cap");
+        let rest = cap.cap.bytes.checked_sub(cap.facts).expect("facts included in cap");
+        let frames = cap.cap.frames.checked_sub(cap.facts.div_euclid(25)).expect("facts included in cap");
+        let Some(connection) = self.phase.connection() else { return false };
+        let room = connection.machine.room();
+        room.bytes.saturating_sub(rest) >= frame.wire_len() && room.frames > frames
+    }
+    fn end(&mut self, now: Time, abort: bool, out: &mut Queue<Request>) {
+        if self.life == Life::Closed {
+            return;
+        }
+        if self.life == Life::Aborting || (self.life == Life::Stopping && !abort) {
+            return;
+        }
+        self.life = if abort { Life::Aborting } else { Life::Stopping };
+        self.busy.clear();
+        self.grace.clear();
+        if let Some(connection) = self.phase.connection() {
+            connection.quiet();
+        }
+        match &mut self.phase {
+            Phase::Open { proved, .. } => *proved = None,
+            Phase::Idle { .. } | Phase::Connecting | Phase::Opening { .. } | Phase::Closing { .. } => {}
+        }
+        match self.phase {
+            Phase::Idle { .. } => self.completed(out),
+            Phase::Connecting => {}
+            Phase::Open { .. } if !abort => self.command(channel::Request::Finish),
+            Phase::Opening { .. } | Phase::Open { .. } | Phase::Closing { .. } => self.close_ending(now),
+        }
+        self.pump(now, out);
+    }
+    fn close_ending(&mut self, now: Time) {
+        let phase = mem::replace(&mut self.phase, Phase::Connecting);
+        self.phase = match phase {
+            Phase::Opening { connection, .. } | Phase::Open { connection, .. } | Phase::Closing { connection, .. } => {
+                Phase::Closing { connection, retry: Time::ZERO, until: Some(now.saturating_add(self.limits.stall)) }
+            }
+            other @ (Phase::Idle { .. } | Phase::Connecting) => other,
+        };
+        self.command(channel::Request::Close);
+    }
+    fn completed(&mut self, out: &mut Queue<Request>) {
+        self.phase = Phase::Idle { at: Time::ZERO };
+        self.life = Life::Closed;
+        self.grace.clear();
+        self.busy.clear();
+        out.push(Request::Closed);
+    }
     fn lose(&mut self, now: Time, why: Closed, out: &mut Queue<Request>) {
+        if self.life != Life::Active {
+            self.life = Life::Aborting;
+            self.close_ending(now);
+            return;
+        }
         if self.begin_loss(now, why, out) {
             self.command(channel::Request::Close);
         }
@@ -426,8 +598,11 @@ impl Component {
         let phase = mem::replace(&mut self.phase, Phase::Connecting);
         let mut started = false;
         self.phase = match phase {
-            Phase::Open { connection, .. } => {
+            Phase::Open { mut connection, .. } => {
                 self.busy.clear();
+                self.grace.lost(now, self.limits.grace);
+                connection.quiet();
+                connection.stall = None;
                 out.push(Request::Lost);
                 let span = self.backoff.next();
                 out.push(Request::Fact { why });
@@ -451,5 +626,12 @@ impl Component {
             other @ (Phase::Idle { .. } | Phase::Connecting | Phase::Closing { .. }) => other,
         };
         started
+    }
+}
+
+fn expired(at: Option<Time>, now: Time) -> bool {
+    match at {
+        Some(at) => now >= at,
+        None => false,
     }
 }

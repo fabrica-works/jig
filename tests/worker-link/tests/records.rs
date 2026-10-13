@@ -18,6 +18,8 @@ fn assignment(world: &World) -> &host::Assignment {
             Request::Down { down: host::LinkDown::Assign { assignment }, .. } => Some(assignment),
             Request::Down { .. }
             | Request::Ready
+            | Request::GracePassed
+            | Request::Closed
             | Request::Lost
             | Request::Value { .. }
             | Request::Dial
@@ -37,6 +39,8 @@ fn down(world: &World) -> Vec<&host::LinkDown> {
         .filter_map(|request| match request {
             Request::Down { down, .. } => Some(down),
             Request::Ready
+            | Request::GracePassed
+            | Request::Closed
             | Request::Lost
             | Request::Value { .. }
             | Request::Dial

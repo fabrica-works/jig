@@ -35,7 +35,7 @@ pub const SIZES: jig_protocol_worker_wire::sizes::Sizes = jig_protocol_worker_wi
     workstreams: 1,
     accounts: 1,
     credentials: 1,
-    facts: 16,
+    facts: 100,
 };
 
 pub const LIMITS: Limits = Limits {
@@ -378,4 +378,13 @@ pub fn turn_kept() -> skein_channel::Frame {
 pub fn acknowledge() -> skein_channel::Frame {
     let record = wire::Acknowledge::new(&codec(), wire::AcknowledgeParts { task: 7, attempt: 2 }).expect("acknowledge");
     frame(0x0185, &encoded(record.measure(), |writer| record.encode(writer)))
+}
+
+#[must_use]
+pub fn engine_accepting_with(limits: &Limits) -> skein_fake_channel::ScriptedPeer {
+    let codec = wire::sizes::limits(&limits.sizes).expect("sizes");
+    let schema = wire::schema(&codec).expect("schema");
+    let channel = jig_protocol_worker_link::channel_limits(limits).expect("channel limits");
+    skein_fake_channel::ScriptedPeer::new(schema, skein_channel::Role::Responder, channel, 1, Box::new([]))
+        .expect("engine")
 }

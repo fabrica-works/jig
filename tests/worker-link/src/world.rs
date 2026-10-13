@@ -4,6 +4,24 @@ use skein_fake_channel::ScriptedPeer;
 use skein_lib::{Duration, Queue, Rng, Time, Token};
 use std::collections::VecDeque;
 
+#[derive(Debug)]
+pub enum Trace {
+    RelayStarted(skein_lib::Token, skein_lib::Token, Box<[u8]>),
+    RelayEnded(skein_lib::Token, skein_lib::Token, Box<[u8]>),
+    Busy(skein_lib::Time, skein_lib::Token, skein_lib::Token, u32),
+    Kept(skein_lib::Token, skein_lib::Token, u32),
+    Acknowledged(skein_lib::Token, skein_lib::Token),
+    Resend(skein_lib::Time, skein_lib::Token, skein_lib::Token, u32),
+    Ready,
+    Lost,
+    GracePassed,
+    Closed,
+}
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum DialState {
+    Settled,
+    Pending,
+}
 pub struct World {
     component: Component,
     limits: Limits,
@@ -23,6 +41,10 @@ pub struct World {
     observed: Vec<Vec<skein_fake_channel::Observed>>,
     values: Vec<Request>,
     order: Vec<&'static str>,
+    trace: Vec<Trace>,
+    scripted: bool,
+    stalled: u32,
+    dial: DialState,
 }
 impl World {
     #[must_use]
@@ -46,6 +68,10 @@ impl World {
             observed: Vec::new(),
             values: Vec::new(),
             order: Vec::new(),
+            trace: Vec::new(),
+            scripted: false,
+            stalled: 0,
+            dial: DialState::Settled,
         }
     }
     pub fn engine(&mut self, peer: ScriptedPeer) {
@@ -61,6 +87,12 @@ impl World {
         self.other_version_next = true;
     }
     pub fn down(&mut self, event: Event) {
+        if matches!(event, Event::Dialled { .. } | Event::Unreachable) {
+            self.dial = DialState::Settled;
+        }
+        if let Event::Up { up: jig_domain_host::LinkUp::Call { run, attempt, call, .. }, .. } = &event {
+            self.trace.push(Trace::RelayStarted(*run, *attempt, call.clone()));
+        }
         self.component.down(self.now, event, &mut self.out);
         self.run();
     }
@@ -104,8 +136,10 @@ impl World {
     fn route(&mut self, request: Request) {
         match request {
             Request::Dial => {
+                self.dial = DialState::Pending;
                 self.dials.push(self.now);
                 if let Some(peer) = self.pending.pop_front() {
+                    self.dial = DialState::Settled;
                     if let Some(peer) = peer {
                         let mut net = Net::new(peer, self.limits.chunk);
                         net.read_room = !std::mem::take(&mut self.silence_next);
@@ -131,12 +165,58 @@ impl World {
                 self.component.down(self.now, Event::Gone { connection }, &mut self.out);
             }
             Request::Fact { why } => self.facts.push(why),
-            request @ (Request::RelayCancelled { .. } | Request::Resend { .. }) => self.root.push(request),
-            Request::Ready => self.root.push(Request::Ready),
-            Request::Lost => self.root.push(Request::Lost),
-            request @ Request::Down { .. } => {
+            Request::RelayCancelled { run, attempt, call } => {
+                self.trace.push(Trace::RelayEnded(run, attempt, call.clone()));
+                self.root.push(Request::RelayCancelled { run, attempt, call });
+            }
+            Request::Resend { run, attempt, turn } => {
+                self.trace.push(Trace::Resend(self.now, run, attempt, turn));
+                self.root.push(Request::Resend { run, attempt, turn });
+                if self.scripted {
+                    self.component.down(
+                        self.now,
+                        Event::Up { up: fixtures::turn(), parts: Box::new([]) },
+                        &mut self.out,
+                    );
+                }
+            }
+            Request::Ready => {
+                self.trace.push(Trace::Ready);
+                self.root.push(Request::Ready);
+                if self.scripted {
+                    self.component.down(self.now, Event::Hello { hello: fixtures::hello() }, &mut self.out);
+                }
+            }
+            Request::Lost => {
+                self.trace.push(Trace::Lost);
+                self.root.push(Request::Lost);
+            }
+            Request::GracePassed => {
+                self.trace.push(Trace::GracePassed);
+                self.root.push(Request::GracePassed);
+            }
+            Request::Closed => {
+                self.trace.push(Trace::Closed);
+                self.root.push(Request::Closed);
+            }
+            Request::Down { down, parts } => {
+                match &down {
+                    jig_domain_host::LinkDown::Relayed { run, attempt, call, .. } => {
+                        self.trace.push(Trace::RelayEnded(*run, *attempt, call.clone()));
+                    }
+                    jig_domain_host::LinkDown::TurnKept { run, attempt, turn } => {
+                        self.trace.push(Trace::Kept(*run, *attempt, *turn));
+                    }
+                    jig_domain_host::LinkDown::Acknowledge { run, attempt } => {
+                        self.trace.push(Trace::Acknowledged(*run, *attempt));
+                    }
+                    jig_domain_host::LinkDown::Assign { .. }
+                    | jig_domain_host::LinkDown::Message { .. }
+                    | jig_domain_host::LinkDown::Cancel { .. }
+                    | jig_domain_host::LinkDown::Grant { .. } => {}
+                }
                 self.order.push("down");
-                self.root.push(request);
+                self.root.push(Request::Down { down, parts });
             }
             request @ Request::Value { .. } => {
                 self.order.push("value");
@@ -146,6 +226,7 @@ impl World {
     }
     fn archive(&mut self) {
         if let Some(net) = self.net.take() {
+            self.stalled += net.blocked;
             self.observed.push(net.peer.observed().to_vec());
             if let Some(refused) = net.refused {
                 self.refused.push(refused);
@@ -153,6 +234,19 @@ impl World {
         }
     }
     pub fn play(&mut self, frame: skein_channel::Frame) {
+        if frame.kind() == 0x0184 {
+            let record = jig_protocol_worker_wire::TurnBusy::decode(
+                &fixtures::codec(),
+                &mut skein_lib::Reader::new(&frame.bytes()[8..]),
+            )
+            .expect("scripted busy");
+            self.trace.push(Trace::Busy(
+                self.now,
+                Token::new(record.task()),
+                Token::new(record.attempt()),
+                record.number(),
+            ));
+        }
         self.net.as_mut().expect("open channel").peer.play(frame);
         self.run();
     }
@@ -163,6 +257,51 @@ impl World {
             records.push(net.peer.observed().to_vec());
         }
         records
+    }
+    #[must_use]
+    pub fn blocked_writes(&self) -> u32 {
+        self.stalled + self.net.as_ref().map_or(0, |net| net.blocked)
+    }
+    pub fn script_root(&mut self) {
+        self.scripted = true;
+    }
+    #[must_use]
+    pub fn trace(&self) -> &[Trace] {
+        &self.trace
+    }
+    #[must_use]
+    pub fn dial_pending(&self) -> bool {
+        self.dial == DialState::Pending
+    }
+    pub fn connect_pending(&mut self) {
+        assert!(self.dial_pending(), "only the requested dial is answered");
+        let peer = self.pending.pop_front().expect("pending peer").expect("reachable");
+        self.net = Some(Net::new(peer, self.limits.chunk));
+        self.connection = Token::new(self.next);
+        self.next += 1;
+        self.down(Event::Dialled { connection: self.connection });
+    }
+    pub fn withhold_write_room(&mut self) {
+        self.net.as_mut().expect("channel").write_room = false;
+    }
+    pub fn grant_write_room(&mut self) {
+        self.net.as_mut().expect("channel").write_room = true;
+        self.run();
+    }
+    pub fn silence_engine(&mut self) {
+        self.net.as_mut().expect("channel").read_room = false;
+    }
+    #[must_use]
+    pub fn dropped_facts(&self) -> u64 {
+        self.component.dropped_facts()
+    }
+    #[must_use]
+    pub fn has_channel(&self) -> bool {
+        self.net.is_some()
+    }
+    #[must_use]
+    pub fn next_deadline(&self) -> Option<Time> {
+        self.component.next_deadline()
     }
     #[must_use]
     pub fn dropped_records(&self) -> u64 {
