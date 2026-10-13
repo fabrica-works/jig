@@ -14,6 +14,30 @@ pub struct Turn {
     pub cut: bool,
 }
 
+/// The outcome of reading a committed turn (client/domain/client.md, 10).
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum TurnRead {
+    Decoded(Turn),
+    Undecodable { why: TurnProblem },
+}
+/// Why the protocol layer could not read this turn.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum TurnProblem {
+    Version { found: u16 },
+    Malformed,
+    TooLarge,
+}
+impl TurnRead {
+    /// The supplied decoded content, when reading succeeded.
+    #[must_use]
+    pub fn decoded(&self) -> Option<&Turn> {
+        match self {
+            Self::Decoded(turn) => Some(turn),
+            Self::Undecodable { .. } => None,
+        }
+    }
+}
+
 /// What a turn consumed, in integer units.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Usage {

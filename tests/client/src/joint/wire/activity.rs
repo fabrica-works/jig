@@ -11,7 +11,6 @@ pub enum Invalid {
     Owner(owner::Invalid),
     Payload,
     Identity,
-    Archive(jig_protocol_transcript::Undecodable),
 }
 fn bounds(limits: &Limits) -> admission::Bounds {
     admission::Bounds {
@@ -192,7 +191,7 @@ pub fn line(task: u64, value: &tasks::ActivityLine, limits: &Limits) -> Result<c
     Ok(copied)
 }
 /// Attach only the actual record fetched for the exact immutable archive identity. The caller
-/// retains the original line if decoding or complete receiving admission fails.
+/// retains an undecodable outcome if decoding fails; whole admission remains bounded.
 /// # Errors
 /// Refuses mismatched source identities, invalid whole message metadata, archive decoding failures or a complete payload above the receiving bounds.
 pub fn with_archive(
@@ -218,7 +217,18 @@ pub fn with_archive(
         cumulative: archive.spent,
         read: archive.read,
         at: archive.at,
-        turn: turns::turn(&archive.transcript, codec).map_err(Invalid::Archive)?,
+        turn: match turns::turn(&archive.transcript, codec) {
+            Ok(turn) => client::TurnRead::Decoded(turn),
+            Err(problem) => client::TurnRead::Undecodable {
+                why: match problem {
+                    jig_protocol_transcript::Undecodable::Version { found } => client::TurnProblem::Version { found },
+                    jig_protocol_transcript::Undecodable::Malformed | jig_protocol_transcript::Undecodable::Unknown => {
+                        client::TurnProblem::Malformed
+                    }
+                    jig_protocol_transcript::Undecodable::TooLarge => client::TurnProblem::TooLarge,
+                },
+            },
+        },
     });
     admission::admit_activity_line(&copied, &bounds(limits)).map_err(|_| Invalid::Payload)?;
     Ok(copied)
@@ -313,8 +323,8 @@ mod tests {
     fn record() -> &'static [u8] {
         include_bytes!("../../../../../crates/jig-protocol-transcript/tests/data/record_turn_full.bin")
     }
-    #[test]
-    fn fetched_archive_content_retains_the_exact_reference_and_rejects_another_reply_or_whole_overflow() {
+    fn archive_fixture() -> (client::ActivityLine, jig_domain_core::TurnRecord, jig_protocol_transcript::Limits, Limits)
+    {
         let limits = limits();
         let codec = jig_protocol_transcript::Limits {
             smith: smith_transcript::v3::CEILINGS,
@@ -327,8 +337,6 @@ mod tests {
             &limits,
         )
         .expect("supplied archive");
-        assert!(original.event.decoded_turn().is_none());
-        assert_eq!(original.event.read_position(), Some(0));
         let archive = jig_domain_core::TurnRecord {
             opens_window: false,
             task: u64::MAX,
@@ -339,11 +347,9 @@ mod tests {
             at: Wall::from_nanos(42),
             transcript: record().into(),
         };
-        assert_eq!(
-            with_archive(&original, &jig_domain_core::TurnRecord { attempt: 8, ..archive.clone() }, &codec, &limits),
-            Err(Invalid::Identity)
-        );
-        let decoded = with_archive(&original, &archive, &codec, &limits).expect("actual fetched record");
+        (original, archive, codec, limits)
+    }
+    fn assert_archive_metadata(original: &client::ActivityLine, decoded: &client::ActivityLine) {
         let (name, turn) = decoded.event.decoded_turn().expect("decoded archive");
         assert_eq!(name, client::TurnName { attempt: u64::MAX, number: u32::MAX });
         assert_eq!(turn.read_through, None);
@@ -357,17 +363,33 @@ mod tests {
         assert_eq!(before, after);
         let metadata = archive_value.as_ref().expect("fetched metadata");
         assert_eq!((metadata.cumulative, metadata.read, metadata.at), (19, Some(1), Wall::from_nanos(42)));
-        assert_eq!(metadata.turn.spent, u64::MAX);
-        assert_eq!(metadata.turn.read_through, None);
-        assert!(with_archive(&original, &archive, &codec, &Limits { document_bytes: 1, ..limits }).is_err());
+        let decoded = metadata.turn.decoded().expect("decoded");
+        assert_eq!(decoded.spent, u64::MAX);
+        assert_eq!(decoded.read_through, None);
+    }
+    #[test]
+    fn fetched_archive_content_retains_the_exact_reference_and_rejects_another_reply_or_whole_overflow() {
+        let (original, archive, codec, limits) = archive_fixture();
+        assert!(original.event.decoded_turn().is_none());
+        assert_eq!(original.event.read_position(), Some(0));
         assert_eq!(
-            with_archive(
-                &original,
-                &jig_domain_core::TurnRecord { transcript: Box::from([255, 255]), ..archive.clone() },
-                &codec,
-                &limits
-            ),
-            Err(Invalid::Archive(jig_protocol_transcript::Undecodable::Version { found: u16::MAX }))
+            with_archive(&original, &jig_domain_core::TurnRecord { attempt: 8, ..archive.clone() }, &codec, &limits),
+            Err(Invalid::Identity)
+        );
+        let decoded = with_archive(&original, &archive, &codec, &limits).expect("actual fetched record");
+        assert_archive_metadata(&original, &decoded);
+        assert!(with_archive(&original, &archive, &codec, &Limits { document_bytes: 1, ..limits }).is_err());
+        let unread = with_archive(
+            &original,
+            &jig_domain_core::TurnRecord { transcript: Box::from([255, 255]), ..archive.clone() },
+            &codec,
+            &limits,
+        )
+        .expect("undecodable archive stays");
+        let client::Activity::Owner { decoded: Some(unread), .. } = unread.event else { panic!("archive") };
+        assert_eq!(
+            unread.turn,
+            client::TurnRead::Undecodable { why: client::TurnProblem::Version { found: u16::MAX } }
         );
         assert!(original.event.decoded_turn().is_none());
     }
@@ -396,13 +418,13 @@ mod tests {
                     cumulative: 0,
                     read: None,
                     at: Wall::EPOCH,
-                    turn: client::Turn {
+                    turn: client::TurnRead::Decoded(client::Turn {
                         messages: List::with_capacity(0),
                         used: client::Usage { input: 0, output: 0, cached: 0, cache_written: 0 },
                         spent: 0,
                         read_through: None,
                         cut: false,
-                    },
+                    }),
                 });
             }
             assert!(admission::admit_activity_line(&malformed, &bounds(&limits())).is_err());

@@ -498,6 +498,16 @@ pub fn language() -> Language {
                 Box::new([Segment::Text(copy_of(b"Turn spent: ")), Segment::Hole { index: 0, kind: HoleKind::Amount }])
             }
             JigPhrase::Provisional => Box::new([Segment::Text(copy_of(b"Provisional"))]),
+            JigPhrase::TurnUnreadVersion => Box::new([
+                Segment::Text(copy_of(b"Turn could not be read: transcript version ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
+            JigPhrase::TurnUnreadMalformed => {
+                Box::new([Segment::Text(copy_of(b"Turn could not be read: malformed transcript"))])
+            }
+            JigPhrase::TurnUnreadTooLarge => {
+                Box::new([Segment::Text(copy_of(b"Turn could not be read: exceeds client bounds"))])
+            }
             JigPhrase::TurnCut => Box::new([Segment::Text(copy_of(b"Some turn content did not fit"))]),
             JigPhrase::OpaqueDialect => Box::new([
                 Segment::Text(copy_of(b"Uninterpreted block: ")),

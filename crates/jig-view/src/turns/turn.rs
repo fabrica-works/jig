@@ -6,18 +6,31 @@ use crate::{
 };
 use jig_domain_client::{
     Domain,
-    contract::{Block, Speaker, Turn, TurnName},
+    contract::{Block, Speaker, TurnName, TurnProblem, TurnRead},
 };
 pub(super) fn turn(
     b: &mut Builder,
     client: &Domain,
     name: TurnName,
-    turn: &Turn,
+    turn: &TurnRead,
     words: &Words,
     bindings: &mut JigBindings,
 ) {
     words.text(b, JigPhrase::Attempt, &[Hole::Number(name.attempt)]);
     words.text(b, JigPhrase::TurnNumber, &[Hole::Number(u64::from(name.number))]);
+    let turn = match turn {
+        TurnRead::Decoded(turn) => turn,
+        TurnRead::Undecodable { why } => {
+            match why {
+                TurnProblem::Version { found } => {
+                    words.status(b, JigPhrase::TurnUnreadVersion, &[Hole::Number(u64::from(*found))]);
+                }
+                TurnProblem::Malformed => words.status(b, JigPhrase::TurnUnreadMalformed, &[]),
+                TurnProblem::TooLarge => words.status(b, JigPhrase::TurnUnreadTooLarge, &[]),
+            }
+            return;
+        }
+    };
     for message in &turn.messages {
         b.open(Role::Region);
         let phrase = match message.speaker {

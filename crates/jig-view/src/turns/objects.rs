@@ -2,15 +2,15 @@
 //! Task-page proposals remain beside the log unless that exact shared key
 //! already has a card in a supplied turn, live call or decision.
 use jig_domain_client::{
-    contract::{Activity, Block, LiveCall, ObjectKey, Turn},
+    contract::{Activity, ArchivedTurn, Block, LiveCall, ObjectKey, Turn, TurnRead},
     conversation::Conversation,
 };
 
 pub(crate) fn shows_object(state: &Conversation, key: ObjectKey) -> bool {
     for line in &state.lines.rows {
         match &line.event {
-            Activity::Turn { turn, .. }
-            | Activity::Owner { decoded: Some(jig_domain_client::contract::ArchivedTurn { turn, .. }), .. } => {
+            Activity::Turn { turn: TurnRead::Decoded(turn), .. }
+            | Activity::Owner { decoded: Some(ArchivedTurn { turn: TurnRead::Decoded(turn), .. }), .. } => {
                 if turn_shows(turn, key) {
                     return true;
                 }
@@ -25,7 +25,9 @@ pub(crate) fn shows_object(state: &Conversation, key: ObjectKey) -> bool {
                     return true;
                 }
             }
-            Activity::Owner { decoded: None, .. }
+            Activity::Turn { turn: TurnRead::Undecodable { .. }, .. }
+            | Activity::Owner { decoded: Some(ArchivedTurn { turn: TurnRead::Undecodable { .. }, .. }), .. }
+            | Activity::Owner { decoded: None, .. }
             | Activity::Words { .. }
             | Activity::RunBegan { .. }
             | Activity::RunEnded { .. }

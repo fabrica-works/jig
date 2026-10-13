@@ -202,7 +202,7 @@ pub fn incident_world(seed: u64) -> ClientWorld {
             at: Wall::EPOCH,
             event: Activity::Turn {
                 name: TurnName { attempt: 1, number: 1 },
-                turn: Turn {
+                turn: TurnRead::Decoded(Turn {
                     messages: list([Message {
                         speaker: Speaker::Assistant,
                         blocks: list([Block::Call(Call {
@@ -219,7 +219,7 @@ pub fn incident_world(seed: u64) -> ClientWorld {
                     spent: 1,
                     read_through: None,
                     cut: false,
-                },
+                }),
             },
         }]),
     });
@@ -398,7 +398,7 @@ pub fn environment_world(seed: u64) -> ClientWorld {
                     at: Wall::EPOCH,
                     event: Activity::Turn {
                         name: TurnName { attempt: 1, number: 1 },
-                        turn: Turn {
+                        turn: TurnRead::Decoded(Turn {
                             messages: list([Message {
                                 speaker: Speaker::Assistant,
                                 blocks: list([Block::Call(Call {
@@ -415,7 +415,7 @@ pub fn environment_world(seed: u64) -> ClientWorld {
                             spent: 1,
                             read_through: None,
                             cut: false,
-                        },
+                        }),
                     },
                 }]),
             }),

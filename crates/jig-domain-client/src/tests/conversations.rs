@@ -1,7 +1,7 @@
 use crate::{
     contract::{
         Activity, ActivityLine, ActivityPage, Block, Call, Cursor, Message, ObjectKey, ProvisionalTurnName, Read,
-        RunBeginning, RunText, Speaker, Text, Turn, TurnName, Usage,
+        RunBeginning, RunText, Speaker, Text, Turn, TurnName, TurnRead, Usage,
     },
     conversation::{CallName, Conversation, Fold},
     objects::{Objects, Source},
@@ -119,13 +119,13 @@ fn calls(position: u64, number: u32) -> ActivityLine {
         at: Wall::EPOCH,
         event: Activity::Turn {
             name: TurnName { attempt: 1, number },
-            turn: Turn {
+            turn: TurnRead::Decoded(Turn {
                 messages,
                 used: Usage { input: 1, output: 2, cached: 0, cache_written: 0 },
                 spent: 3,
                 read_through: None,
                 cut: false,
-            },
+            }),
         },
     }
 }
@@ -409,7 +409,7 @@ fn words_keep_the_submitted_snapshot_and_restore_sent_messages_until_read() {
     assert_eq!(reload.words.rows.get(0).unwrap().state, Words::Sent { message: 2 });
     assert!(reload.moved(3).is_some());
     let mut committed = calls(3, 1);
-    if let Activity::Turn { turn, .. } = &mut committed.event {
+    if let Activity::Turn { turn: TurnRead::Decoded(turn), .. } = &mut committed.event {
         turn.read_through = Some(3);
     }
     let mut rows = List::with_capacity(1);
@@ -663,7 +663,7 @@ fn changed_chip_membership(domain: &mut crate::Domain, old: skein_lib::Token) ->
     let mut rows = List::with_capacity(2);
     for position in [4_u32, 3] {
         let mut row = calls(u64::from(position), position);
-        if let Activity::Turn { turn, .. } = &mut row.event
+        if let Activity::Turn { turn: TurnRead::Decoded(turn), .. } = &mut row.event
             && let Block::Call(call) = turn.messages.get_mut(0).unwrap().blocks.get_mut(0).unwrap()
         {
             call.objects.clear();

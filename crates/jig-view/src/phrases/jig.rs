@@ -931,6 +931,9 @@ pub enum JigPhrase {
     /// Provisional.
     Provisional,
     /// Some turn content did not fit.
+    TurnUnreadVersion,
+    TurnUnreadMalformed,
+    TurnUnreadTooLarge,
     TurnCut,
     /// Uninterpreted block: (0).
     OpaqueDialect,
@@ -1592,6 +1595,9 @@ impl JigPhrase {
             Self::CacheWritten => 388,
             Self::TurnSpent => 389,
             Self::Provisional => 390,
+            Self::TurnUnreadVersion => 806,
+            Self::TurnUnreadMalformed => 807,
+            Self::TurnUnreadTooLarge => 808,
             Self::TurnCut => 391,
             Self::OpaqueDialect => 392,
             Self::OpaqueBytes => 393,
@@ -1894,6 +1900,8 @@ impl JigPhrase {
             | Self::RunFinished
             | Self::RunCancelled
             | Self::Provisional
+            | Self::TurnUnreadMalformed
+            | Self::TurnUnreadTooLarge
             | Self::TurnCut
             | Self::CallFailed
             | Self::CallCompleted
@@ -2141,7 +2149,8 @@ impl JigPhrase {
             | Self::ApprovalState
             | Self::TakenBy
             | Self::StalledOn => Box::new([HoleShape { kind: HoleKind::Name, bytes: text }]),
-            Self::FrameProjectNumber
+            Self::TurnUnreadVersion
+            | Self::FrameProjectNumber
             | Self::FrameResultsSeen
             | Self::FrameChartersCut
             | Self::PolicyEditRole
@@ -2374,7 +2383,7 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 617] = [
+pub const ALL: [JigPhrase; 620] = [
     JigPhrase::OwnerHoldRelease,
     JigPhrase::QuestionFromTask,
     JigPhrase::QuestionFromPerson,
@@ -2877,6 +2886,9 @@ pub const ALL: [JigPhrase; 617] = [
     JigPhrase::CacheWritten,
     JigPhrase::TurnSpent,
     JigPhrase::Provisional,
+    JigPhrase::TurnUnreadVersion,
+    JigPhrase::TurnUnreadMalformed,
+    JigPhrase::TurnUnreadTooLarge,
     JigPhrase::TurnCut,
     JigPhrase::OpaqueDialect,
     JigPhrase::OpaqueBytes,

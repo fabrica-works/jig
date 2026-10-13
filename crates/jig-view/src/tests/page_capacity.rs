@@ -617,8 +617,20 @@ fn fill_activity(d: &mut Domain, read: Token) {
             result: ReadResult::Value(ReadValue::Activity(Box::new(ActivityPage {
                 cut: false,
                 rows: list([
-                    row(2, Activity::Turn { name: TurnName { attempt: 1, number: 2 }, turn: full_turn() }),
-                    row(1, Activity::Turn { name: TurnName { attempt: 1, number: 1 }, turn: full_turn() }),
+                    row(
+                        2,
+                        Activity::Turn {
+                            name: TurnName { attempt: 1, number: 2 },
+                            turn: TurnRead::Decoded(full_turn()),
+                        },
+                    ),
+                    row(
+                        1,
+                        Activity::Turn {
+                            name: TurnName { attempt: 1, number: 1 },
+                            turn: TurnRead::Decoded(full_turn()),
+                        },
+                    ),
                 ]),
                 before: Some(Cursor { value: full() }),
                 after: Some(Cursor { value: full() }),

@@ -204,7 +204,7 @@ fn task_proposals_share_exact_cards_with_committed_and_live_calls_without_confla
                             at: Wall::EPOCH,
                             event: Activity::Turn {
                                 name: TurnName { attempt: 2, number: 1 },
-                                turn: turn([ObjectKey::Proposal(first)]),
+                                turn: TurnRead::Decoded(turn([ObjectKey::Proposal(first)])),
                             },
                         }]),
                         before: None,

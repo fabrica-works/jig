@@ -26,7 +26,7 @@ fn read(out: &[Request]) -> Token {
         })
         .unwrap()
 }
-fn ready() -> (Domain, Token, Token, Token) {
+pub(super) fn ready() -> (Domain, Token, Token, Token) {
     ready_task(8)
 }
 fn ready_task(task: u64) -> (Domain, Token, Token, Token) {
@@ -144,7 +144,10 @@ fn replacement(words: &Words) {
                     ActivityLine {
                         position: 2,
                         at: Wall::EPOCH,
-                        event: Activity::Turn { name: TurnName { attempt: 2, number: 1 }, turn: turn() },
+                        event: Activity::Turn {
+                            name: TurnName { attempt: 2, number: 1 },
+                            turn: TurnRead::Decoded(turn()),
+                        },
                     },
                     ActivityLine {
                         position: 1,
@@ -364,14 +367,17 @@ fn full_width_attempt_turn_keys_survive_commit_under_the_actual_task_log_scope()
                     ActivityLine {
                         position: 2,
                         at: Wall::EPOCH,
-                        event: Activity::Turn { name: TurnName { attempt: u64::MAX, number: u32::MAX }, turn: turn() },
+                        event: Activity::Turn {
+                            name: TurnName { attempt: u64::MAX, number: u32::MAX },
+                            turn: TurnRead::Decoded(turn()),
+                        },
                     },
                     ActivityLine {
                         position: 1,
                         at: Wall::EPOCH,
                         event: Activity::Turn {
                             name: TurnName { attempt: u64::MAX - 1, number: u32::MAX },
-                            turn: turn(),
+                            turn: TurnRead::Decoded(turn()),
                         },
                     },
                 ]),
@@ -893,7 +899,7 @@ fn whole_owner_activity_and_fetched_archive_keep_numeric_senders_references_and_
                             cumulative: 19,
                             read: None,
                             at: Wall::from_nanos(42),
-                            turn: turn(),
+                            turn: TurnRead::Decoded(turn()),
                         }),
                     ),
                     source(

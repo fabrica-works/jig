@@ -279,7 +279,7 @@ mod tests {
             assert_eq!(decoded.cumulative, u64::MAX);
             assert_eq!(decoded.read, Some(0));
             assert_eq!(decoded.at, Wall::EPOCH);
-            assert_eq!(decoded.turn.used.input, u64::MAX);
+            assert_eq!(decoded.turn.decoded().expect("decoded archive").used.input, u64::MAX);
         }
         assert!(transport.reply(reply).is_none());
         assert!(archives.pages.is_empty());

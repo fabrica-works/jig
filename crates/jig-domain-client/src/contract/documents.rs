@@ -5,7 +5,7 @@
 use super::{
     Actor, Amendment, Authority, Count, Cursor, Decision, DocumentText, Ending, Executor, HeldRole, Holding, Lacking,
     NoteScope, ObjectKey, Part, Party, PartyKind, Phase, Policy, PoolLedger, ProposalKey, Proposer, Refusal, Revision,
-    Text, Turn, TurnName, WakePolicy,
+    Text, TurnName, TurnRead, WakePolicy,
 };
 use alloc::boxed::Box;
 use skein_lib::{Duration, List, Wall};
@@ -937,8 +937,8 @@ pub enum Activity {
     RunBegan { attempt: u64, how: RunBeginning, why: Text },
     /// A run ended.
     RunEnded { attempt: u64, how: RunEnding, spent: u64 },
-    /// A committed decoded turn.
-    Turn { name: TurnName, turn: Turn },
+    /// A committed turn, read or undecodable.
+    Turn { name: TurnName, turn: TurnRead },
     /// A result heard.
     Result { result: Result },
     /// News heard.
@@ -954,7 +954,7 @@ pub struct ArchivedTurn {
     pub cumulative: u64,
     pub read: Option<u64>,
     pub at: Wall,
-    pub turn: Turn,
+    pub turn: TurnRead,
 }
 impl Activity {
     /// A committed archive identity, independent of whether its bytes are available.
@@ -982,10 +982,10 @@ impl Activity {
     }
     /// Actual decoded content, paired with its supplied committed identity.
     #[must_use]
-    pub fn decoded_turn(&self) -> Option<(TurnName, &Turn)> {
+    pub fn decoded_turn(&self) -> Option<(TurnName, &super::Turn)> {
         match self {
-            Self::Turn { name, turn } => Some((*name, turn)),
-            Self::Owner { decoded: Some(turn), .. } => Some((self.committed_turn()?, &turn.turn)),
+            Self::Turn { name, turn } => Some((*name, turn.decoded()?)),
+            Self::Owner { decoded: Some(turn), .. } => Some((self.committed_turn()?, turn.turn.decoded()?)),
             Self::Owner { decoded: None, .. }
             | Self::Words { .. }
             | Self::RunBegan { .. }
@@ -1022,7 +1022,7 @@ impl Activity {
     #[must_use]
     pub fn read_position(&self) -> Option<u64> {
         match self {
-            Self::Turn { turn, .. } => turn.read_through,
+            Self::Turn { turn, .. } => turn.decoded()?.read_through,
             Self::Owner { source, .. } => match source.line {
                 super::OwnerActivity::Turn { read, .. } => read,
                 super::OwnerActivity::Words { .. }

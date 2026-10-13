@@ -16,8 +16,8 @@
 use crate::{
     action::End,
     contract::{
-        Activity, ActivityLine, ActivityPage, Block, CallIdentity, Cursor, LiveCall, ObjectKey, Part,
-        ProvisionalTurnName, Read, RunState, RunText, Text, TurnName,
+        Activity, ActivityLine, ActivityPage, ArchivedTurn, Block, CallIdentity, Cursor, LiveCall, ObjectKey, Part,
+        ProvisionalTurnName, Read, RunState, RunText, Text, TurnName, TurnRead,
     },
     objects::{Objects, Source},
     windows::{Edge, Edges, TurnWindow},
@@ -456,8 +456,8 @@ impl Conversation {
         let mut parts = List::with_capacity(capacity);
         for line in &self.lines.rows {
             match &line.event {
-                Activity::Turn { turn, .. }
-                | Activity::Owner { decoded: Some(crate::contract::ArchivedTurn { turn, .. }), .. } => {
+                Activity::Turn { turn: TurnRead::Decoded(turn), .. }
+                | Activity::Owner { decoded: Some(ArchivedTurn { turn: TurnRead::Decoded(turn), .. }), .. } => {
                     for message in &turn.messages {
                         for block in &message.blocks {
                             match block {
@@ -491,7 +491,9 @@ impl Conversation {
                         }
                     }
                 }
-                Activity::Owner { decoded: None, .. }
+                Activity::Turn { turn: TurnRead::Undecodable { .. }, .. }
+                | Activity::Owner { decoded: Some(ArchivedTurn { turn: TurnRead::Undecodable { .. }, .. }), .. }
+                | Activity::Owner { decoded: None, .. }
                 | Activity::Words { .. }
                 | Activity::RunBegan { .. }
                 | Activity::RunEnded { .. }
@@ -631,8 +633,8 @@ impl Conversation {
         let mut names = List::with_capacity(capacity);
         for line in &self.lines.rows {
             match &line.event {
-                Activity::Turn { turn, .. }
-                | Activity::Owner { decoded: Some(crate::contract::ArchivedTurn { turn, .. }), .. } => {
+                Activity::Turn { turn: TurnRead::Decoded(turn), .. }
+                | Activity::Owner { decoded: Some(ArchivedTurn { turn: TurnRead::Decoded(turn), .. }), .. } => {
                     for message in &turn.messages {
                         for block in &message.blocks {
                             match block {
@@ -648,7 +650,9 @@ impl Conversation {
                 }
                 Activity::Result { result } => add_name(&mut names, ObjectKey::Result(result.task.task)),
                 Activity::Decision { object, .. } => add_name(&mut names, *object),
-                Activity::Owner { decoded: None, .. }
+                Activity::Turn { turn: TurnRead::Undecodable { .. }, .. }
+                | Activity::Owner { decoded: Some(ArchivedTurn { turn: TurnRead::Undecodable { .. }, .. }), .. }
+                | Activity::Owner { decoded: None, .. }
                 | Activity::Words { .. }
                 | Activity::RunBegan { .. }
                 | Activity::RunEnded { .. }

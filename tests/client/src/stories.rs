@@ -502,7 +502,7 @@ fn proposal_fixture(seed: u64, delegate_chip: bool) -> World<Test, Scripted> {
                 rows: jig_scripted_engine::Rows::Activity(vec![ActivityLine {
                     position: 1,
                     at: Wall::EPOCH,
-                    event: Activity::Turn { name: TurnName { attempt: 1, number: 1 }, turn },
+                    event: Activity::Turn { name: TurnName { attempt: 1, number: 1 }, turn: TurnRead::Decoded(turn) },
                 }]),
             }),
         )
@@ -876,3 +876,5 @@ fn specification(words: jig_domain_client::contract::Text) -> jig_domain_client:
 pub fn party(number: u64) -> Party {
     Party { number, kind: PartyKind::Person, name: text(b"Pat") }
 }
+
+pub mod unread_turn;

@@ -20,8 +20,8 @@ pub(super) fn activity(b: &mut Builder, client: &Domain, value: &Activity, words
                     None => words.text(b, JigPhrase::ArchiveReadAbsent, &[]),
                 }
             }
-            if let Some((name, turn)) = value.decoded_turn() {
-                super::turn::turn(b, client, name, turn, words, bindings);
+            if let Some(archive) = decoded {
+                super::turn::turn(b, client, archive.name, &archive.turn, words, bindings);
             }
             if let Some((message, _)) = value.word_message() {
                 super::word_state(b, client.conversation().words.state(message), words);

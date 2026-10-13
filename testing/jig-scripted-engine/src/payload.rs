@@ -1073,6 +1073,14 @@ impl Payload for Refusal {
     }
 }
 fields!(Turn { messages, used, spent, read_through, cut });
+impl Payload for jig_domain_client::contract::TurnRead {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        match self {
+            Self::Decoded(turn) => turn.heap(bounds),
+            Self::Undecodable { .. } => Some(0),
+        }
+    }
+}
 fields!(jig_domain_client::contract::ArchivedTurn { task, name, cumulative, read, at, turn });
 fields!(Usage { input, output, cached, cache_written });
 fields!(Message { speaker, blocks });
