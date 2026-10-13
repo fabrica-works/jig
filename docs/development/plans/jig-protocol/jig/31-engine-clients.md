@@ -320,6 +320,54 @@ Don't: answer before `Held::PeopleReply` is released.
 Size: at most 600 lines.
 Removes: nothing.
 
+### 31.s1 A service's credential
+
+A step not in the plan (decisions.md, ruling 228), from the designer's
+answer on jig 31.3 (jig `2dfb78a5`, `protocol/client.md`, 8;
+`client/domain/client.md`, 12; `ee79fa5f`, decision 36). Its text is the
+designer's.
+Scope: an owner who makes a service is answered its credential once; the
+service signs in with it at the deployment provider's sign-in route, as
+a native client signs in with the link's secret, and makes every
+exchange with the sign-in's secret; removing the service ends both.
+Needs: 31.3.
+Files: `crates/jig-protocol-engine-clients/src/{boundary.rs, sign_in.rs,
+component.rs, translate/answers.rs}` and its tests;
+`crates/jig-protocol-client-wire/schema/client-v5*.schema`, its
+generated code and goldens; `crates/jig-protocol-client-link/src/` where
+it hands an answer to its root; the test roots' secrets routing, where a
+`SecretsRequest` reaches the store (whose `SecretOwner::Service`,
+`crates/jig-protocol-store/src/secrets.rs:46`, is there already).
+Shape:
+- `jig-protocol-engine-clients`, answering `MakeService` once it is
+  committed, draws the credential (`sign_in::token` with the service's
+  number: its party, 8 bytes, beside 32 random bytes). It keeps its
+  digest in the secrets' store under the service's number, durable
+  before the answer goes, and answers `MadeService { party, credential
+  }`. `SecretsRequest`'s `Keep`, `Erase` and `Get` name whose secret
+  they are, a sign-in's or a service's.
+- The deployment provider's sign-in route takes a service's credential
+  as a bearer, checks its digest by number in constant time, and signs
+  the service in as a sign-in of provider the deployment, subject the
+  service (people.md, 3); the core commits it as any other.
+- Removing a service erases its digest and ends its sign-ins.
+- The wire's `MadeService` gains `credential: secret 40`, in client v5
+  (pre-release, development.md 5.1; the version this plan moved).
+- `jig-protocol-client-link` hands the credential to its root as a shell
+  request beside the answer; the domain sees `Made::Service { party }`
+  alone, as the contract has it.
+Test shape: `a_made_service_answers_its_credential_once_with_its_digest_kept`,
+`a_service_signs_in_with_its_credential_and_exchanges_with_its_sign_in`,
+`a_removed_services_credential_is_refused_and_its_sign_ins_end`,
+`the_client_domain_never_holds_a_service_credential`. Under 20 ms each;
+cases as rows (README, ruling 219).
+Proof: the gate.
+Don't: put the credential in a contract type, a domain state, a record of
+the main store or a log; check an exchange by the credential; answer the
+credential twice.
+Size: at most 400 lines of production code, generated code excepted.
+Removes: nothing.
+
 ### 31.4 Reads and cursors
 
 Scope: `/jig/v1/read`: the `Owned` read decoded; jig's read translated

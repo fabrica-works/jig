@@ -1743,6 +1743,15 @@ the file.
      18.3's "Don't: change an existing test's expected values to fit the
      real store" stands for anything else. The README's Rules now say so
      for any world moving to a real component.
+228. **jig 31.s1: a service's credential** (2026-10-13, the designer's
+     answer to question.md's "jig 31.3: a service's credential, its shape
+     and its step"; jig `2dfb78a5`, `ee79fa5f`). The credential is a
+     sign-in secret's shape under the service's number, its digest in the
+     secrets' store, checked once at the deployment provider's sign-in
+     route, never on an exchange; the contract's `Made::Service { party }`
+     stays (decision 36 settled) and the wire's `MadeService` gains
+     `credential: secret 40`. A step not in the plan, jig 31.s1
+     (`jig/31-engine-clients.md`), builds it after 31.3.
 
 ## For the user
 
