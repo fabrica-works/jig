@@ -461,6 +461,70 @@ Size: at most 200 lines.
 Removes: jig 16's transitional arms (16.2): `Scope::Turn`'s empty page,
 and a `Turn` reply's missing `related`.
 
+### 17.s1 A page of a task's activity joins each turn
+
+A step not in the plan (decisions.md, ruling 240), from the designer's
+answer on jig 34.3 (jig `b375b173`: `protocol/store.md`, 7.3, "A page of
+a task's activity carries its turns", and 8.3, "A page's turns"). 17.5
+joined a turn to the single reads of a turn and a reply; an activity
+page's turn lines still come without their turns, and the joint world's
+engine fetches each with a read of its own
+(`tests/client/src/joint/archive.rs:53-160`), outside the page's bound.
+Needs: 17.5.
+Files: `crates/jig-protocol-store/src/{reads.rs, reads/paged.rs,
+  transcripts/read.rs, boundary.rs}`, `src/tests/reads.rs`;
+  `crates/jig-domain-core/src/reads/{vocabulary.rs, rows.rs, cursors.rs}`
+  and the tests that build `PageRow::Activity`; `tests/client/src/joint/`
+  (`wire/pages.rs`, `wire/activity.rs`, `archive.rs` removed, its
+  callers); `tests/core/{src/stories/reads.rs, tests/reads.rs}`.
+Shape:
+  - the store: `paged::activity` (`reads/paged.rs:37-100`) reads the
+    page's lines as now; when they hold turn lines, it starts one
+    transcript read (17.3's table; `Loaded::Busy` when full) and answers
+    once its frames are read, as `point::reply` does. The read walks
+    backwards from the frame of the page's newest turn (the last frame
+    when the read has no `after`; otherwise that turn, found as
+    `Scan::Turn` finds it), one frame for each older turn line, each
+    checked to be its line's attempt and number. A turn line's row has
+    its turn as `related`. A turn whose line and bytes pass `range.bytes`
+    comes as its fields and length, its bytes not read; one that fits
+    but not what is left ends the page before its line (`next` at the
+    last row returned); a frame that fails its checksum or lengths, a
+    missing file, or a frame that is not the line's turn comes as unread
+    and ends the page after its line. Each turn is one join.
+  - the core: `PageRow::Activity` holds the line and, for a turn line,
+    `PageTurn::{Carried(TurnRecord), TooLarge { spent, read, at, bytes },
+    Unread}`; a carried or too-large turn whose task, attempt and number
+    are not its line's is `Missing::Unknown`, as a reply's is
+    (`reads/rows.rs:763-777`).
+  - the joint world: `wire::pages` maps a carried turn through
+    `activity::with_archive`, a too-large one into an `ArchivedTurn`
+    whose turn is `TurnRead::Undecodable { why: TooLarge }`, and an
+    unread one into `Activity::Turn { name, turn: Undecodable { why:
+    Malformed } }`; `archive.rs` and its fetch go, and the joint engine
+    answers an activity page as the core gives it.
+Test shape: `src/tests/reads.rs`:
+  `an_activity_page_joins_each_turn_in_one_walk` (three turn lines among
+  words, from the end: three frames read, newest first),
+  `a_later_activity_page_finds_its_newest_turn_from_its_attempt`,
+  `a_turn_alone_past_the_page_comes_as_its_size`,
+  `a_turn_past_what_is_left_ends_the_page_before_it`,
+  `an_unread_frame_ends_the_page_after_its_line`; the core's
+  `an_activity_row_keeps_its_turn` and
+  `a_turn_of_another_line_is_unknown`; the client world's stories keep
+  their turns, now from the page. Each under 20 ms.
+Proof: unit, `heavy cargo nextest run -p jig-protocol-store -E
+  'test(an_activity_page_joins_each_turn_in_one_walk)'` once: the page's
+  three turns come as their rows' `related` after three frame reads;
+  under 20 ms; and `-p jig-client-world` once, its count of tests and
+  time in the report.
+Don't: find each turn from its attempt's first turn (one walk a page);
+  read a too-large turn's bytes; read a turn in the client or the
+  protocol layer; change `Scope::Turn` or a reply's read.
+Size: at most 350 lines of production code; `archive.rs`'s 339 go.
+Removes: the joint engine's turn fetch
+  (`tests/client/src/joint/archive.rs`).
+
 ## Interface sketches
 
 jig 13's `Request::Transcript`, `TranscriptRead`, `Event::{Turns,

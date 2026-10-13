@@ -118,7 +118,11 @@ variants, with an activity line's turn bytes carried unchanged. A port of
 the joint world's `wire/pages.rs`, `wire/activity.rs`, `wire/history.rs`,
 `wire/ledger_pages.rs` and `wire/notes.rs`. Cursors are 31.4's: here a
 page's ends are the core's positions, handed to a function 31.4 writes.
-Needs: nothing beyond 34.1.
+An activity row's turn (17.s1) is its `ActivityOwner.decoded`: carried,
+as `TurnBytes::carried` with its record's fields; too large, as
+`too_large` with its size and fields; unread, as none
+(`protocol/client.md`, 3; ruling 240).
+Needs: 34.1; jig 17.s1 (the page row's turn); jig 30.s3 (`TurnBytes`).
 Files: `src/{translate/pages.rs, translate/activity.rs,
 translate/history.rs}`; `src/tests/{pages.rs, fixtures.rs}`.
 Shape: `translate::pages::page(read: &reads::Read, page: &reads::Page,
@@ -126,13 +130,15 @@ cursors: &mut Cursors, limits: &v1::Limits) -> Result<v1::ReadValue,
 v1::Problem>`, `Cursors` being 31.4's encoder, a stub of one function
 returning the position's bytes until 31.4, which replaces it.
 Test shape: `an_activity_page_carries_each_turn_s_bytes`,
+`a_turn_past_the_page_crosses_as_its_size`,
 `a_history_page_keeps_its_cut_flag`,
 `an_inbox_page_keeps_its_two_groups_apart`,
 `a_notes_page_becomes_its_record`. Under 20 ms each.
 Proof: unit, `heavy cargo nextest run -p jig-protocol-engine-clients`,
-run once: an activity page carries each turn's bytes, a history page
-keeps its cut flag, an inbox page keeps its two groups apart, and a
-notes page becomes its record (the four tests); under 0.2 s.
+run once: an activity page carries each turn's bytes, a turn past the
+page crosses as its size, a history page keeps its cut flag, an inbox
+page keeps its two groups apart, and a notes page becomes its record
+(the five tests); under 0.2 s.
 Don't: decode a turn's bytes.
 Size: at most 600 lines.
 Removes: nothing.

@@ -405,6 +405,35 @@ Proof: unit, the crate's tests once.
 Don't: write a translation; change `RunText` or another record.
 Size: at most 80 lines of schema and Rust, generated code excluded.
 
+### 30.s3 A turn's bytes, or its size past a page
+
+A step not in the plan (decisions.md, ruling 240), from the designer's
+answer on jig 34.3 (jig `b375b173`: `protocol/client.md`, 3, "An
+activity line's turn crosses beside the line's references: its bytes;
+its size, where the turn alone passes the read's byte bound; or
+unread"). `ArchivedTurn.turn` is `bytes 65536`
+(`schema/client-v5.schema:423`), below the store's and the worker wire's
+turn of 8,388,608 bytes, and cannot say that a turn passed the page.
+Shape: `record TurnCarried { bytes: bytes 8388608 }`, `record
+  TurnTooLarge { bytes: u64 }`, `enum TurnBytes { carried: TurnCarried,
+  too_large: TurnTooLarge }`; `ArchivedTurn.turn` is a `TurnBytes`;
+  `ActivityOwner` unchanged, its `decoded` none for a line that is not a
+  turn and for a turn the engine could not read. The family's version
+  moves once; regenerated, goldens added. In `jig-protocol-client-link`
+  (`translate/pages_part0.rs:183-196`): `carried` decoded as now;
+  `too_large` as `TurnRead::Undecodable { why: TooLarge }`; an owner turn
+  line with no `decoded` as `Activity::Turn { name, turn: Undecodable {
+  why: Malformed } }`. `jig-domain-client`'s `Activity::Owner` and
+  `ArchivedTurn` say the turn comes with its page, never fetched.
+Test shape: both `TurnBytes` variants round-trip, a carried one at
+  8,388,608 bytes; in the link, a too-large turn and an owner turn line
+  with no turn each become a turn that does not decode, with that why.
+Proof: unit, `-p jig-protocol-client-wire -p jig-protocol-client-link`
+  once.
+Don't: change `ActivityTurn` or another record; read a turn in the
+  client.
+Size: at most 80 lines of schema and Rust, generated code excluded.
+
 ## Interface sketches
 
 The schema, in skein's language (`codec.md`, section 3); records the

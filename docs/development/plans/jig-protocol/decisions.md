@@ -1981,6 +1981,18 @@ the file.
   the full suite. The closing jig and temper repins take smith's `main`
   after smith-repin.
 
+- **A turn too large for a page** (the designer, 2026-10-13; ruling
+  240; `protocol/store.md`, 7.3): a turn whose bytes alone pass the
+  client's page bound comes with its size, and the client shows it as a
+  turn too large to read. A smith turn holds up to 8 MiB (a tool's
+  output among them), so a client whose page bound is smaller never
+  shows such a turn's words. Options: (a) leave it: a client sets its
+  page bound high enough that such turns are rare; (b) the contract
+  gains a read of one turn, on the person's demand, with a bound of its
+  own (the engine's `Scope::Turn` serves it); the activity page still
+  makes no read of its own. The designer recommends (a) until a client
+  meets such turns. Nothing in this run waits on it.
+
 - **A raw reader over io takes a byte per iteration** (the designer,
   2026-10-13; `smith-settle.md`, 6): skein's stream reads are exact
   (`Fill`, `Scan`, `Line`; lib.md, 7), and io meets a demand in the
