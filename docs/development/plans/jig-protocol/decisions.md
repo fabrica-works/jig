@@ -1976,6 +1976,16 @@ the file.
      the empty value; no schema change. The core maps the three to
      `PageTurn` as 17.s1 says, `Missing::Unknown` when the identity is not
      the line's.
+247. **A wire version's move carries its whole sweep** (2026-10-13, the
+     coordinator's block "jig 30.s3: exact current-wire v5 to v6 imports
+     and fixtures outside Files", 2026-10-13T08:35:19Z). 30.s3 moves the
+     client wire from v5 to v6 and `CLIENT_VERSION` with it (ruling 213);
+     24 import and qualified-name lines, more than 20 fixture lines naming
+     the current version or its served range, and five expected versions
+     outside its Files follow. They are the move's, in any file, past
+     rulings 114's and 122's limits: each names the new version, names and
+     every other expected value kept, no alias for the old version left
+     behind. The README's Rules now say so for any family's version move.
 
 ## For the user
 

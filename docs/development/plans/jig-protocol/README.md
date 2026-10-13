@@ -365,6 +365,12 @@ ones before it in its session. Dependencies are by capability: "skein
   expected value kept, no question. Default and production limits stay,
   and no adapter caps what it is given. A test whose case needs a bound
   the real store cannot admit is a finding.
+- **A wire or codec version's move carries its whole sweep** (decisions.md,
+  ruling 247). An increment that moves a family's version also moves every
+  import, qualified name, version constant, served range and expected
+  version that names the old one, in any file, past rulings 114's and
+  122's limits: names and every other expected value kept, no alias for
+  the old version left, the files named in the commit body.
 - **A new test costs the suite about 12 ms before its work** (decisions.md,
   ruling 219; `tests-cost.md`, 12). In every step left, tests are one per
   behaviour, a behaviour's cases rows of one table test; fixtures are
