@@ -123,6 +123,19 @@ the file.
      golden `.bin` files stay unchanged. 02.2's Files now names the four
      families. Generated code counts toward neither the Size nor the
      20-line allowance outside Files (development.md, 8.2).
+102. **A landed commit whose trailers git cannot read stays as it
+     landed** (process, jig 02's block of 2026-10-13T23:24:06Z). jig
+     `2497c8299`'s last body paragraph mixed `Proof log:` and `Count
+     test:` lines among `Proof:`, `Plan:` and `Step:`, so git reads none of
+     them as trailers; skein `375c688` put a blank line between `Proof:`
+     and `Plan:`, so git reads its step but not its Proof. Each is accepted by its ancestry on `origin/main`, its
+     `Gate-Result` and its body; neither is rewritten (development.md, 8.4:
+     "A commit that landed without its body is never rewritten"), and no
+     commit is added to carry their trailers. The ledger records them
+     `landed`, with a note naming this ruling; `plan status` lists jig-02.1
+     as landed in the ledger but not on main, which is this ruling, not a
+     fault. The same defect twice became a standing rule in the README
+     ("A commit's last paragraph is its trailers").
 
 ## For the user
 

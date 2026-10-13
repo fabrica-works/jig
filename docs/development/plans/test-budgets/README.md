@@ -127,6 +127,14 @@ ones before it in its session. Dependencies are by capability.
 - **Each increment's report names the suite's focused time** from its
   landing's `Gate-Result` (its first `Summary`), so the supervisor's
   hourly check follows the suites toward 12 s.
+- **A commit's last paragraph is its trailers** (ruling 102): `Proof:`,
+  `Plan:` and `Step:`, then `Co-Authored-By:` if any, one per line, with
+  no blank line between them and no other line among them. Other
+  evidence (logs, counts, clippy) goes in the body above, never as a
+  `Key: value` line whose key has a space. Before `land`, `git log -1
+  --format='%(trailers:key=Step,valueonly)' HEAD` must print the step;
+  if it prints nothing, amend the unlanded commit. A landed commit is
+  never rewritten.
 - **smith's gate on carbon-forge** is ruling 121's (decisions.md, 10),
   with `NEXTEST_DOUBLE_SPAWN=0`, until smith 04.1: `land --gate 'cargo
   fmt --all --check && cargo clippy --workspace --all-targets -- -D
