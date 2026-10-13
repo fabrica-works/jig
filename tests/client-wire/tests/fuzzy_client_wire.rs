@@ -13,6 +13,9 @@ macro_rules! check {
     };
 }
 
+#[path = "fuzzy_client_wire/documents.rs"]
+mod documents;
+
 fn records_1(bytes: &[u8]) {
     check!(Family, bytes);
     check!(Owner, bytes);
@@ -624,6 +627,7 @@ fn records_15(bytes: &[u8]) {
 }
 
 fn decoders(bytes: &[u8]) {
+    documents::decoders(bytes);
     records_1(bytes);
     records_2(bytes);
     records_3(bytes);
@@ -671,6 +675,18 @@ fn mutation_seed(path: &Path) -> bool {
             "record_activity_page_",
             "record_history_page_",
             "record_owner_inbox_page_",
+            "record_owner_historical_",
+            "enum_owner_goal_holding_",
+            "record_owner_person_proposal_goal_",
+            "record_owner_project_",
+            "record_deployment_",
+            "record_owner_account_",
+            "record_owner_deployment_",
+            "record_open_",
+            "record_hello_",
+            "enum_stream_event_",
+            "record_run_state_",
+            "record_task_",
         ]
         .iter()
         .any(|prefix| name.starts_with(prefix))

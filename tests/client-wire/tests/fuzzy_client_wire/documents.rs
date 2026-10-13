@@ -1,0 +1,248 @@
+//! Decoder cases added with documents and stream exchanges.
+use super::*;
+
+fn records_1(bytes: &[u8]) {
+    check!(PoolLedger, bytes);
+    check!(FrameParty, bytes);
+    check!(Needs, bytes);
+    check!(ProjectRole, bytes);
+    check!(Charter, bytes);
+    check!(OfferedCharters, bytes);
+    check!(Frame, bytes);
+    check!(PhaseCounts, bytes);
+    check!(Impact, bytes);
+    check!(WriterSlot, bytes);
+    check!(LiveDelegate, bytes);
+    check!(Steering, bytes);
+    check!(Passed, bytes);
+    check!(Escalation, bytes);
+    check!(TaskContext, bytes);
+    check!(TaskResultDocument, bytes);
+    check!(TaskResultEnding, bytes);
+    check!(TaskResult, bytes);
+    check!(TaskResourcePart, bytes);
+    check!(TaskResourceOwner, bytes);
+    check!(TaskResource, bytes);
+    check!(TaskHoldDocument, bytes);
+    check!(TaskHoldOwner, bytes);
+    check!(TaskHold, bytes);
+    check!(SubscriptionKindTask, bytes);
+    check!(SubscriptionKindTimer, bytes);
+    check!(SubscriptionKindTopic, bytes);
+    check!(SubscriptionKind, bytes);
+    check!(Subscription, bytes);
+    check!(Subscriptions, bytes);
+    check!(Task, bytes);
+    check!(TreeNode, bytes);
+    check!(Tree, bytes);
+    check!(ReplyPosition, bytes);
+    check!(Inbox, bytes);
+    check!(Conversations, bytes);
+    check!(Goals, bytes);
+    check!(TaskFilter, bytes);
+    check!(TaskLine, bytes);
+    check!(Tasks, bytes);
+}
+
+fn records_2(bytes: &[u8]) {
+    check!(Call, bytes);
+    check!(CurrentCall, bytes);
+    check!(LiveCallDecoded, bytes);
+    check!(LiveCallRaw, bytes);
+    check!(LiveCall, bytes);
+    check!(ProvisionalTurnName, bytes);
+    check!(RunText, bytes);
+    check!(RunState, bytes);
+    check!(ProposalActionBatch, bytes);
+    check!(ProposalActionEffect, bytes);
+    check!(Authority, bytes);
+    check!(ProposalActionWiden, bytes);
+    check!(ProposalActionAmend, bytes);
+    check!(ProposalAction, bytes);
+    check!(Proposal, bytes);
+    check!(OwnerProposalActionBatch, bytes);
+    check!(OwnerProposalActionEffect, bytes);
+    check!(OwnerProposalActionProcedureEffect, bytes);
+    check!(OwnerProposalActionAmend, bytes);
+    check!(OwnerProposalActionWiden, bytes);
+    check!(OwnerProposalActionRelease, bytes);
+    check!(OwnerProposalAction, bytes);
+    check!(OwnerProposalWaiting, bytes);
+    check!(OwnerFundingOffer, bytes);
+    check!(OwnerProposal, bytes);
+    check!(OwnerEscalation, bytes);
+    check!(Question, bytes);
+    check!(OptionLine, bytes);
+    check!(PersonContractChoice, bytes);
+    check!(PersonContractApproval, bytes);
+    check!(PersonContract, bytes);
+    check!(PersonTask, bytes);
+    check!(OwnerShownResult, bytes);
+    check!(OwnerPersonTask, bytes);
+    check!(RolePolicy, bytes);
+    check!(Decider, bytes);
+    check!(Policy, bytes);
+    check!(RecurringOverlap, bytes);
+    check!(Recurring, bytes);
+    check!(Project, bytes);
+}
+
+fn records_3(bytes: &[u8]) {
+    check!(OwnerProjectResourceRole, bytes);
+    check!(OwnerProjectResource, bytes);
+    check!(OwnerProjectPolicyRole, bytes);
+    check!(OwnerProjectPolicy, bytes);
+    check!(OwnerProjectMember, bytes);
+    check!(OwnerProjectSpend, bytes);
+    check!(OwnerProject, bytes);
+    check!(OwnerHistoricalValueTask, bytes);
+    check!(OwnerHistoricalValueProposal, bytes);
+    check!(OwnerGoalHoldingWrite, bytes);
+    check!(OwnerGoalHoldingSlot, bytes);
+    check!(OwnerGoalHolding, bytes);
+    check!(OwnerPersonProposalGoal, bytes);
+    check!(OwnerPersonProposalStatePending, bytes);
+    check!(OwnerPersonProposalStateAccepted, bytes);
+    check!(OwnerPersonProposalStateRejected, bytes);
+    check!(OwnerPersonProposalState, bytes);
+    check!(OwnerPersonProposal, bytes);
+    check!(OwnerProposalDecisionCreated, bytes);
+    check!(OwnerProposalDecision, bytes);
+    check!(OwnerHistoricalValuePersonProposal, bytes);
+    check!(OwnerEscalationDecisionReject, bytes);
+    check!(OwnerEscalationDecision, bytes);
+    check!(OwnerEscalationDecisionRecord, bytes);
+    check!(OwnerHistoricalValueEscalation, bytes);
+    check!(OwnerHistoricalValueQuestion, bytes);
+    check!(OwnerHistoricalValuePersonTask, bytes);
+    check!(OwnerHistoricalValue, bytes);
+    check!(OwnerHistorical, bytes);
+    check!(OwnerTreeRow, bytes);
+    check!(OwnerTreeFold, bytes);
+    check!(OwnerTree, bytes);
+    check!(EntranceRefusal, bytes);
+    check!(SubjectTask, bytes);
+    check!(SubjectTree, bytes);
+    check!(SubjectChips, bytes);
+    check!(SubjectInbox, bytes);
+    check!(SubjectGoals, bytes);
+    check!(SubjectTasks, bytes);
+    check!(SubjectRun, bytes);
+}
+
+fn records_4(bytes: &[u8]) {
+    check!(Subject, bytes);
+    check!(Host, bytes);
+    check!(Account, bytes);
+    check!(Capacity, bytes);
+    check!(Deployment, bytes);
+    check!(StoreFill, bytes);
+    check!(OwnerCapacity, bytes);
+    check!(OwnerProjectCapacity, bytes);
+    check!(OwnerHostKind, bytes);
+    check!(OwnerAttemptState, bytes);
+    check!(OwnerRunLocationConnected, bytes);
+    check!(OwnerRunLocationAdrift, bytes);
+    check!(OwnerRunLocation, bytes);
+    check!(OwnerHostRun, bytes);
+    check!(OwnerHost, bytes);
+    check!(OwnerAgentShortfallModel, bytes);
+    check!(OwnerAgentShortfallWindow, bytes);
+    check!(OwnerAgentShortfallOutput, bytes);
+    check!(OwnerAgentShortfall, bytes);
+    check!(OwnerHelloRefusalAgent, bytes);
+    check!(OwnerHelloRefusalWorkers, bytes);
+    check!(OwnerHelloRefusalStopBound, bytes);
+    check!(OwnerHelloRefusal, bytes);
+    check!(OwnerHelloRefusalLine, bytes);
+    check!(OwnerRequestKey, bytes);
+    check!(OwnerPersonCapacityActionApplication, bytes);
+    check!(OwnerPersonCapacityActionNote, bytes);
+    check!(OwnerPersonCapacityActionPool, bytes);
+    check!(OwnerPersonCapacityActionEscalation, bytes);
+    check!(OwnerPersonCapacityActionProposal, bytes);
+    check!(OwnerPersonCapacityActionWords, bytes);
+    check!(OwnerPersonCapacityActionQuestion, bytes);
+    check!(OwnerPersonCapacityActionAmend, bytes);
+    check!(OwnerPersonCapacityActionMove, bytes);
+    check!(OwnerPersonCapacityActionTakePerson, bytes);
+    check!(OwnerPersonCapacityActionHandBackPerson, bytes);
+    check!(OwnerPersonCapacityActionAnswerPerson, bytes);
+    check!(OwnerPersonCapacityActionStop, bytes);
+    check!(OwnerPersonCapacityActionCancel, bytes);
+    check!(OwnerPersonCapacityActionRelease, bytes);
+}
+
+fn records_5(bytes: &[u8]) {
+    check!(OwnerPersonCapacityActionMarkSeen, bytes);
+    check!(OwnerPersonCapacityAction, bytes);
+    check!(OwnerPersonCapacityCauseRequests, bytes);
+    check!(OwnerPersonCapacityCausePending, bytes);
+    check!(OwnerPersonCapacityCauseWaiters, bytes);
+    check!(OwnerPersonCapacityCauseLimit, bytes);
+    check!(OwnerPersonCapacityCause, bytes);
+    check!(OwnerPersonCapacityRefusal, bytes);
+    check!(OwnerTaskCapacityActionBatch, bytes);
+    check!(OwnerTaskCapacityActionProposal, bytes);
+    check!(OwnerTaskCapacityActionPersonProposal, bytes);
+    check!(OwnerTaskCapacityActionMessage, bytes);
+    check!(OwnerTaskCapacityActionSource, bytes);
+    check!(OwnerTaskCapacityActionIntroduce, bytes);
+    check!(OwnerTaskCapacityActionSubscription, bytes);
+    check!(OwnerTaskCapacityActionEffect, bytes);
+    check!(OwnerTaskCapacityActionClaim, bytes);
+    check!(OwnerTaskCapacityAction, bytes);
+    check!(OwnerTaskCapacityCauseTasks, bytes);
+    check!(OwnerTaskCapacityCauseCreationFlights, bytes);
+    check!(OwnerTaskCapacityCauseResourceReports, bytes);
+    check!(OwnerTaskCapacityCauseProjectTasks, bytes);
+    check!(OwnerTaskCapacityCauseTree, bytes);
+    check!(OwnerTaskCapacityCauseDelegates, bytes);
+    check!(OwnerTaskCapacityCauseInbox, bytes);
+    check!(OwnerTaskCapacityCauseHoldings, bytes);
+    check!(OwnerTaskCapacityCauseHoldWaiters, bytes);
+    check!(OwnerTaskCapacityCauseProposals, bytes);
+    check!(OwnerTaskCapacityCauseReferences, bytes);
+    check!(OwnerTaskCapacityCauseSubscriptions, bytes);
+    check!(OwnerTaskCapacityCauseFunders, bytes);
+    check!(OwnerTaskCapacityCauseWriters, bytes);
+    check!(OwnerTaskCapacityCause, bytes);
+    check!(OwnerTaskCapacityRequest, bytes);
+    check!(OwnerTaskCapacityRefusal, bytes);
+    check!(WatchEnd, bytes);
+    check!(WatchRefusal, bytes);
+    check!(Open, bytes);
+    check!(OpenAnswerRefused, bytes);
+    check!(OpenAnswer, bytes);
+    check!(WatchClose, bytes);
+}
+
+fn records_6(bytes: &[u8]) {
+    check!(CloseAnswer, bytes);
+    check!(Gone, bytes);
+    check!(Served, bytes);
+    check!(Hello, bytes);
+    check!(Delivery, bytes);
+    check!(Ended, bytes);
+    check!(StreamEvent, bytes);
+}
+
+pub fn decoders(bytes: &[u8]) {
+    account_records(bytes);
+    records_1(bytes);
+    records_2(bytes);
+    records_3(bytes);
+    records_4(bytes);
+    records_5(bytes);
+    records_6(bytes);
+}
+
+fn account_records(bytes: &[u8]) {
+    check!(OwnerAccountStateLater, bytes);
+    check!(OwnerAccountPlace, bytes);
+    check!(OwnerAccountUnread, bytes);
+    check!(OwnerAccountStateUnloaded, bytes);
+    check!(OwnerAccountState, bytes);
+    check!(OwnerAccount, bytes);
+    check!(OwnerDeployment, bytes);
+}

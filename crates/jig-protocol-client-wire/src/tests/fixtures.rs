@@ -1,7 +1,9 @@
 //! Small codec limits and shared client contract records.
+mod stream;
 use crate::*;
 use alloc::boxed::Box;
 use skein_lib::{List, Overflow, Writer};
+pub use stream::*;
 
 pub fn limits() -> Limits {
     limits_with_activity_bytes(CEILINGS.activity_page_rows)

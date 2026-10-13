@@ -152,3 +152,83 @@ fn a_chip_with_each_phase_round_trips_unchanged() {
         assert_eq!(fixtures::decode_chip_facts(&limits, &bytes), rows);
     }
 }
+
+#[test]
+fn a_hello_naming_two_owners_round_trips_unchanged() {
+    let limits = fixtures::stream_limits();
+    let hello = fixtures::hello(&limits);
+    let bytes = fixtures::encoded(&hello, Hello::measure, Hello::encode);
+    assert_eq!(Hello::decode(&limits, &mut Reader::new(&bytes)), Ok(hello));
+}
+
+#[test]
+fn a_stream_event_at_its_ceiling_round_trips_unchanged() {
+    let limits = fixtures::stream_limits();
+    for event in fixtures::stream_events(&limits) {
+        let bytes = fixtures::encoded(&event, StreamEvent::measure, StreamEvent::encode);
+        assert_eq!(StreamEvent::decode(&limits, &mut Reader::new(&bytes)), Ok(event));
+    }
+}
+
+#[test]
+fn an_open_for_a_tree_carries_its_window() {
+    let limits = fixtures::stream_limits();
+    let open = fixtures::open_tree(&limits);
+    let bytes = fixtures::encoded(&open, Open::measure, Open::encode);
+    let decoded = Open::decode(&limits, &mut Reader::new(&bytes)).expect("whole open exchange");
+    assert_eq!(
+        Subject::decode(&limits, &mut Reader::new(decoded.subject().record())),
+        Ok(fixtures::tree_subject(&limits))
+    );
+    assert_eq!(decoded, open);
+}
+
+#[test]
+fn each_watch_end_but_dropped_round_trips() {
+    let limits = fixtures::stream_limits();
+    for why in [
+        WatchEnd::Closed,
+        WatchEnd::Unknown,
+        WatchEnd::NotAllowed,
+        WatchEnd::Busy,
+        WatchEnd::SubjectEnded,
+        WatchEnd::SignedOut,
+        WatchEnd::Stopping,
+    ] {
+        let ended = fixtures::ended(&limits, why);
+        let bytes = fixtures::encoded(&ended, Ended::measure, Ended::encode);
+        assert_eq!(Ended::decode(&limits, &mut Reader::new(&bytes)), Ok(ended));
+    }
+}
+
+#[test]
+fn a_deployment_document_past_its_rows_is_refused() {
+    let limits = fixtures::stream_limits();
+    let parts =
+        fixtures::deployment_parts(&limits, limits.deployment_capacity.checked_add(1).expect("small row bound"));
+    assert_eq!(
+        Deployment::new(&limits, parts),
+        Err(Problem { path: Path::DeploymentCapacity, reason: skein_codec::Reason::Bound })
+    );
+}
+
+#[test]
+fn an_account_waiting_to_ask_again_carries_the_wall_it_asks_at() {
+    let limits = fixtures::stream_limits();
+    for until in [None, Some(0), Some(u64::MAX)] {
+        let state = fixtures::waiting_account_state(&limits, until);
+        let account = fixtures::owner_account(&limits, state.clone());
+        let bytes = fixtures::encoded(&account, OwnerAccount::measure, OwnerAccount::encode);
+        let decoded = OwnerAccount::decode(&limits, &mut Reader::new(&bytes)).expect("whole account document");
+        assert_eq!(decoded.state(), &state);
+        assert_eq!(decoded, account);
+    }
+}
+
+#[test]
+fn a_historical_goal_holding_keeps_its_opaque_segments() {
+    let limits = fixtures::stream_limits();
+    let holding = fixtures::historical_goal_holding(&limits);
+    let bytes = fixtures::encoded(&holding, OwnerGoalHolding::measure, OwnerGoalHolding::encode);
+    assert_eq!(OwnerGoalHolding::decode(&limits, &mut Reader::new(&bytes)), Ok(holding));
+}
