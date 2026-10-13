@@ -78,7 +78,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     let queue = root::max_out(&limits.root).checked_mul(2)?;
     let payload = jig_domain_core::worst_case(&limits.root.core)?
         .checked_add(connector::worst_case(&limits.root.connector)?.checked_mul(2)?)?;
-    root.checked_add(crate::store::worst_case(&limits.store, root::max_out(&limits.root))?)?
+    root.checked_add(skein_lib::List::<(u32, u64)>::worst_case(limits.root.core.authority.projects)?)?
+        .checked_add(crate::store::worst_case(&limits.store, root::max_out(&limits.root))?)?
         .checked_add(skein_oauth_accounts::worst_case(&limits.accounts)?)?
         .checked_add(jig_protocol_engine_workers::worst_case(&limits.workers)?.checked_mul(2)?)?
         .checked_add(jig_protocol_accounts::table::worst_case(

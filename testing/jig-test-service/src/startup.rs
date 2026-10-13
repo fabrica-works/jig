@@ -394,7 +394,7 @@ pub(super) fn engine_startup(
             system.seed(resource, state).expect("configuration checked resource count");
         }
     }
-    let engine = Engine::new(
+    let mut engine = Engine::new(
         root,
         &parsed.limits.root,
         systems,
@@ -402,6 +402,10 @@ pub(super) fn engine_startup(
         values,
         crate::store::Store::new(&parsed.limits.root, &store_limits),
     );
+    // configuration.md, 5: the smallest source opens only an empty deployment.
+    for project in &parsed.engine.projects {
+        engine.first_periods.push((project.number, project.policy.period_spend)).expect("configured project bound");
+    }
     Ok((engine, parsed.limits.io, bytes, parsed.engine.memory))
 }
 

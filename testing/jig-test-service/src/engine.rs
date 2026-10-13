@@ -30,6 +30,7 @@ pub struct Engine {
     pub(super) blocked: bool,
     pending: Option<Box<root::Event>>,
     ready: bool,
+    pub(crate) first_periods: skein_lib::List<(u32, u64)>,
 }
 
 pub(crate) struct Children {
@@ -82,6 +83,7 @@ impl Engine {
             blocked: false,
             pending: None,
             ready: true,
+            first_periods: skein_lib::List::with_capacity(limits.core.authority.projects),
         }
     }
     pub const fn parties_in(&mut self) -> &mut Queue<core::Event> {
@@ -201,6 +203,7 @@ impl Engine {
             || !self.store.routed.is_empty()
             || (self.room()
                 && (self.begin
+                    || (!self.first_periods.is_empty() && self.domain.ready() && !self.blocked)
                     || !self.parties.is_empty()
                     || ((!self.events.is_empty() || self.pending.is_some()) && !self.blocked)
                     || self.ready
@@ -338,6 +341,11 @@ pub fn iterate(engine: &mut Engine, now: Time, wall: Wall) {
     } else if !engine.blocked && engine.pending.is_some() {
         let event = engine.pending.take().expect("held component input");
         engine.step(*event);
+    } else if !engine.blocked && engine.domain.ready() && !engine.first_periods.is_empty() {
+        let last = engine.first_periods.len().checked_sub(1).expect("configured first period");
+        let (project, budget) = *engine.first_periods.get(last).expect("configured first period");
+        engine.first_periods.truncate(last);
+        engine.step(root::Event::Core(core::Event::Period { project, period: 1, budget, next: None }));
     } else if !engine.blocked && !engine.events.is_empty() {
         let event = engine.events.pop().expect("ready component input");
         engine.step(event);
