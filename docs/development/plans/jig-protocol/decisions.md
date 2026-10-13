@@ -1380,6 +1380,17 @@ the file.
      client translations' (at their count, ruling 194) stay. The 800-line
      file limit and the 40-line test function stay rules. code-organization.md,
      section 7 says so.
+197. **An item made visible within its crate is no question** (2026-10-13,
+     the coordinator's block "jig 35.1: reuse private recursive fact
+     helpers across session Files", 2026-10-13T02:57:16Z). jig 35.1 needs
+     jig 32.1's `facts.rs` `Node`, `decode` and its non-recursive helpers,
+     private to that module; the alternative, translating the recursive
+     facts again, is forbidden. From now to the run's end, widening an
+     item's visibility within its own crate (`pub(crate)`, `pub(super)`, a
+     re-export from the module's root) so that a sibling module reuses it
+     is an implementation choice in any session's files, named in the
+     commit body, when it changes no behaviour, signature or test. Public
+     API across crates stays a question. The README's Rules say so.
 
 ## For the user
 

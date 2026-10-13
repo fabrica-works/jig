@@ -305,6 +305,12 @@ ones before it in its session. Dependencies are by capability: "skein
   ruling 195): in the crate's shared fixture module or a child of it (a
   new child where the root would pass 800 lines), with the root's
   re-exports; no question, and no landed test changed by it.
+- **An item made visible within its crate is no question** (decisions.md,
+  ruling 197): widening an item's visibility within its own crate
+  (`pub(crate)`, `pub(super)`, a module root's re-export) so that a sibling
+  module reuses it, in any session's files, named in the commit body, when
+  it changes no behaviour, signature or test. Public API across crates
+  stays a question.
 
 ## Live services
 
