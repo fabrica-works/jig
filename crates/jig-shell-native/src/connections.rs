@@ -371,6 +371,19 @@ impl Connections {
             Owner::SignIn(exchange) | Owner::SignOut(exchange) => self.signing.push_back(Signing::Lost { exchange }),
         }
     }
+    pub(crate) fn close_all(&mut self, now: Time, below: &mut Queue<(Conn, Down)>) {
+        let env = self.env(now);
+        for (conn, mut value) in std::mem::take(&mut self.exchanges) {
+            http::down(&mut value.machine, &env, http::Request::Close, &mut value.events, &mut value.below);
+            while let Some(down) = value.below.pop() {
+                below.push((conn, down));
+            }
+            below.push((conn, Down::Finish));
+        }
+        self.pending.clear();
+        self.events.clear();
+        self.signing.clear();
+    }
     fn close(&mut self, now: Time, exchange: Option<Token>, below: &mut Queue<(Conn, Down)>) {
         let conn = self.exchanges.iter().find_map(|(conn, value)| match value.owner {
             Owner::Link(token) if Some(token) == exchange => Some(*conn),

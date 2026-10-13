@@ -336,5 +336,8 @@ fn the_native_shell_links_only_the_clients_components_and_foundation() {
         .expect("native shell manifest");
     let mut dependencies = shell.dependencies;
     dependencies.sort();
-    assert_eq!(dependencies, ["jig-protocol-client-link", "jig-protocol-client-wire", "skein-http", "skein-lib"]);
+    assert_eq!(
+        dependencies,
+        ["jig-protocol-client-link", "jig-protocol-client-wire", "skein-http", "skein-io", "skein-lib"]
+    );
 }

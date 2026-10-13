@@ -9,15 +9,15 @@ use skein_lib::{
     stream::{Down, Up},
 };
 use std::collections::BTreeMap;
-struct Side {
-    link: Link,
+pub(super) struct Side {
+    pub(super) link: Link,
     connections: Connections,
-    out: Queue<link::Request>,
+    pub(super) out: Queue<link::Request>,
     up: Queue<link::Event>,
     below: Queue<(Conn, Down)>,
     pending: Vec<Request>,
     callbacks: Vec<Event>,
-    authenticated: bool,
+    pub(super) authenticated: bool,
     signing_out: Option<Token>,
     next: u64,
     routes: BTreeMap<Token, (bool, Token)>,
@@ -25,7 +25,7 @@ struct Side {
     subjects: BTreeMap<Token, client::family::Subject>,
 }
 impl Side {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         let limits = fixtures::link_limits();
         Self {
             link: Link::new(&limits).expect("bounded link"),
@@ -43,7 +43,7 @@ impl Side {
             subjects: BTreeMap::new(),
         }
     }
-    fn event(&mut self, now: Time, event: link::Event) {
+    pub(super) fn event(&mut self, now: Time, event: link::Event) {
         self.link.step(now, event, &mut self.out);
     }
     fn route(&mut self, family: bool, original: Token) -> Token {
@@ -52,7 +52,7 @@ impl Side {
         self.routes.insert(token, (family, original));
         token
     }
-    fn callback(&mut self, request: link::Request) -> Result<Event, link::Request> {
+    pub(super) fn callback(&mut self, request: link::Request) -> Result<Event, link::Request> {
         Ok(match request {
             link::Request::Answer { attempt, envelope, answer } => Event::Answer {
                 attempt,
@@ -133,7 +133,7 @@ impl Side {
             | link::Request::ServiceCredential { .. }) => return Err(ignored),
         })
     }
-    fn wire(&mut self, now: Time, request: Request) {
+    pub(super) fn wire(&mut self, now: Time, request: Request) {
         if !self.authenticated {
             self.pending.push(request);
             return;

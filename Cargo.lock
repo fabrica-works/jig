@@ -191,10 +191,14 @@ dependencies = [
  "jig-test-domain-client",
  "jig-test-protocol-client-wire",
  "jig-test-service",
+ "jig-test-view",
  "jig-view",
+ "skein-fake-machine",
  "skein-http",
  "skein-io",
  "skein-lib",
+ "skein-shell",
+ "skein-sim",
  "skein-world",
 ]
 
@@ -798,8 +802,12 @@ version = "0.0.0"
 dependencies = [
  "jig-protocol-client-link",
  "jig-protocol-client-wire",
+ "skein-fake-machine",
  "skein-http",
+ "skein-io",
  "skein-lib",
+ "skein-shell",
+ "skein-sim",
  "skein-world",
 ]
 

@@ -196,3 +196,201 @@ fn a_lost_sign_out_keeps_the_shell_token() {
         assert_eq!(peer.shell.token().expect("original token").expose(), &TOKEN, "{label}");
     }
 }
+
+#[derive(Clone, Copy)]
+enum FileCase {
+    KeepToken,
+    ReloadToken,
+    Store,
+}
+struct Disk {
+    shell: Shell,
+    case: FileCase,
+    started: bool,
+    closing: bool,
+    writes: u32,
+    failures: u32,
+    sockets: u32,
+    token: Option<Vec<u8>>,
+}
+impl Disk {
+    fn new(root: skein_io::kernel::Fd, case: FileCase) -> Self {
+        let mut shell = Shell::new(Settings {
+            engine: skein_io::Addr::Ip((std::net::Ipv4Addr::LOCALHOST, 8080).into()),
+            directory: b"private".as_slice().into(),
+            limits: limits(),
+            io: file_io_limits(),
+        });
+        shell.adopt(root, 1000, 7);
+        Self { shell, case, started: false, closing: false, writes: 0, failures: 0, sockets: 0, token: None }
+    }
+    fn start(&mut self) {
+        self.started = true;
+        match self.case {
+            FileCase::KeepToken => {
+                self.shell.connections.set_token(Some(Box::new(TOKEN)));
+                self.shell.files.credential(Box::new(TOKEN));
+                self.shell.saving_signing = Some(Signing::SignedIn { exchange: Token::new(42), party: 1 });
+            }
+            FileCase::ReloadToken => {
+                self.token = self.shell.connections.token().map(|token| token.expose().to_vec());
+                self.closing = true;
+            }
+            FileCase::Store => {
+                self.shell
+                    .down(link::Request::Write { key: b"key".as_slice().into(), record: b"pending".as_slice().into() });
+                self.shell.down(link::Request::Exchange {
+                    exchange: Token::new(42),
+                    path: b"/jig/v1/request",
+                    body: b"ask".as_slice().into(),
+                });
+            }
+        }
+    }
+}
+impl skein_shell::Host for Disk {
+    fn iterate(&mut self, now: Time, wall: skein_lib::Wall) {
+        self.shell.iterate(now, wall);
+        if !self.started && self.shell.loaded().is_some() {
+            self.start();
+        }
+        if self.shell.signing().is_some() {
+            self.closing = true;
+        }
+        while let Some(event) = self.shell.events().pop() {
+            match event {
+                link::Event::Written => self.writes += 1,
+                link::Event::WriteFailed => {
+                    self.failures += 1;
+                    self.closing = true;
+                }
+                link::Event::Failed { .. } => self.closing = true,
+                other @ (link::Event::Start { .. }
+                | link::Event::Save { .. }
+                | link::Event::Erase { .. }
+                | link::Event::Send { .. }
+                | link::Event::Read { .. }
+                | link::Event::Answered { .. }
+                | link::Event::Open { .. }
+                | link::Event::Continue { .. }
+                | link::Event::Close { .. }
+                | link::Event::StreamOpened { .. }
+                | link::Event::StreamBytes { .. }
+                | link::Event::StreamEnded) => panic!("file fixture event {other:?}"),
+            }
+        }
+        for submit in self.shell.submissions().iter() {
+            if matches!(submit.kind, skein_io::kernel::Op::Socket { .. }) {
+                assert!(self.writes > 0, "store durable before connection");
+                self.sockets += 1;
+            }
+        }
+        if self.closing {
+            self.shell.close();
+        }
+    }
+    fn completions(&mut self) -> &mut Queue<skein_io::kernel::Complete> {
+        self.shell.completions()
+    }
+    fn submissions(&mut self) -> &mut Queue<skein_io::kernel::Submit> {
+        self.shell.submissions()
+    }
+    fn work_pending(&self, now: Time) -> bool {
+        self.shell.work_pending(now)
+    }
+    fn next_deadline(&self) -> Option<Time> {
+        self.shell.next_deadline()
+    }
+    fn next_policy_deadline(&self) -> Option<Time> {
+        None
+    }
+    fn is_empty(&self) -> bool {
+        self.shell.is_empty()
+    }
+    fn worst_case(&self) -> u64 {
+        self.shell.worst_case()
+    }
+    fn operations(&self) -> u32 {
+        self.shell.operations()
+    }
+}
+struct DiskMachine(skein_fake_machine::Machine);
+impl skein_world::Machine for DiskMachine {
+    fn step(&mut self, call: skein_sim::Call, answers: &mut Queue<skein_sim::Answer>) {
+        skein_fake_machine::step(&mut self.0, call, answers);
+    }
+}
+struct DiskJudge;
+impl skein_world::Referee<Disk> for DiskJudge {
+    fn act(&mut self, _now: Time, _procs: &mut [Disk]) {}
+    fn observe(&mut self, _now: Time, _procs: &[Disk]) {}
+    fn next_deadline(&self) -> Option<Time> {
+        Some(Time::ZERO.saturating_add(skein_lib::Duration::from_secs(1)))
+    }
+    fn overdue(&self, now: Time) -> Option<String> {
+        (now >= Time::ZERO.saturating_add(skein_lib::Duration::from_secs(1)))
+            .then(|| "file fixture did not drain".to_owned())
+    }
+    fn passed(&self) -> bool {
+        true
+    }
+}
+fn file_io_limits() -> skein_io::Limits {
+    skein_io::Limits {
+        sockets: 4,
+        names: 1,
+        refusals: 1,
+        intake: 1024,
+        receive: 64,
+        output: 1024,
+        sends: 2,
+        accepts: 1,
+        backlog: 2,
+        close_timeout: skein_lib::Duration::from_secs(5),
+        retry: skein_lib::Duration::from_millis(1),
+    }
+}
+fn disk_world(
+    machine: skein_fake_machine::Machine,
+    root: skein_fake_machine::Opened,
+    case: FileCase,
+    fail: bool,
+) -> skein_world::Outcome<Disk, DiskMachine> {
+    let mut world = skein_world::World::new(7, skein_sim::Config::calm(), DiskJudge, skein_world::Memory::Unchecked)
+        .with_machine(DiskMachine(machine));
+    world.spawn_root(skein_sim::Handle::new(root.raw()), |root| Disk::new(root, case));
+    world.run_with_faults(|_, _, submissions| {
+        if fail && submissions.iter().any(|submit| matches!(submit.kind, skein_io::kernel::Op::Write { .. })) {
+            Some(skein_sim::Faults { no_space: 1000, ..skein_sim::Faults::NONE })
+        } else {
+            None
+        }
+    })
+}
+fn fresh_disk(case: FileCase, fail: bool) -> skein_world::Outcome<Disk, DiskMachine> {
+    let mut machine = skein_fake_machine::Machine::for_user(1000);
+    let root = machine.lay(&[]);
+    disk_world(machine, root, case, fail)
+}
+#[test]
+fn the_token_is_kept_and_read_back_at_start() {
+    let mut saved = fresh_disk(FileCase::KeepToken, false);
+    let mut machine = std::mem::replace(&mut saved.machine.0, skein_fake_machine::Machine::new());
+    let root = machine.reopen_root(0);
+    let loaded = disk_world(machine, root, FileCase::ReloadToken, false);
+    assert_eq!(loaded.procs[0].token.as_deref(), Some(TOKEN.as_slice()));
+}
+#[test]
+fn the_small_store_is_written_before_the_step_s_exchanges() {
+    let outcome = fresh_disk(FileCase::Store, false);
+    assert_eq!(outcome.procs[0].writes, 1);
+    assert_eq!(outcome.procs[0].sockets, 1);
+    assert_eq!(outcome.procs[0].failures, 0);
+}
+#[test]
+fn a_failed_store_write_withholds_the_exchanges() {
+    let outcome = fresh_disk(FileCase::Store, true);
+    assert_eq!(outcome.procs[0].failures, 1);
+    assert_eq!(outcome.procs[0].writes, 0);
+    assert_eq!(outcome.procs[0].sockets, 0);
+}
