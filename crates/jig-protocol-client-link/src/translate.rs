@@ -23,3 +23,5 @@ pub(crate) fn piece_problem(reason: skein_codec::Reason) -> w::Problem {
 }
 pub mod objects;
 pub mod pages;
+
+pub mod reads;

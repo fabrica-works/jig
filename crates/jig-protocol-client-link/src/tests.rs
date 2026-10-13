@@ -7,3 +7,5 @@ mod attempts;
 mod documents;
 mod fixtures;
 mod pages;
+
+mod reads;

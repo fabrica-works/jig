@@ -13,6 +13,16 @@ pub enum Ask {
     Jig(Box<contract::Ask>),
     Family(Family),
 }
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Readable {
+    Jig(contract::Read),
+    Family(Family),
+}
+#[derive(Debug, PartialEq, Eq)]
+pub enum Readout {
+    Jig(contract::ReadResult),
+    Family { family: u16, record: Option<Box<[u8]>> },
+}
 #[derive(Debug, PartialEq, Eq)]
 pub enum Answered {
     Jig(contract::Answer),
@@ -21,6 +31,7 @@ pub enum Answered {
 #[derive(Debug)]
 pub enum Event {
     Send { attempt: Token, key: RequestKey, ask: Ask },
+    Read { read: Token, what: Readable },
     Answered { exchange: Token, status: u16, body: Box<[u8]> },
     Failed { exchange: Token },
 }
@@ -40,6 +51,11 @@ pub enum Request {
         envelope: RequestEnvelope,
         answer: Option<Answered>,
     },
+    /// One terminal per read.
+    Read {
+        read: Token,
+        result: Readout,
+    },
     Fact {
         fact: Fact,
     },
@@ -47,4 +63,5 @@ pub enum Request {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Fact {
     UndecodableAnswer,
+    UndecodableDocument,
 }

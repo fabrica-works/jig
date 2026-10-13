@@ -82,7 +82,8 @@ impl Harness {
         self.link.step(Time::ZERO, Event::Send { attempt, key, ask: Ask::Jig(Box::new(ask)) }, &mut self.out);
         match self.out.iter().next().expect("one exchange") {
             Request::Exchange { exchange, .. } => *exchange,
-            other @ (Request::Abandon { .. } | Request::Answer { .. } | Request::Fact { .. }) => {
+            other
+            @ (Request::Abandon { .. } | Request::Answer { .. } | Request::Read { .. } | Request::Fact { .. }) => {
                 panic!("expected exchange: {other:?}")
             }
         }
@@ -101,7 +102,11 @@ impl Harness {
                 Request::Answer { attempt, envelope, answer } if *attempt == token => {
                     return Some((*envelope, answer.as_ref()));
                 }
-                Request::Exchange { .. } | Request::Abandon { .. } | Request::Answer { .. } | Request::Fact { .. } => {}
+                Request::Exchange { .. }
+                | Request::Abandon { .. }
+                | Request::Answer { .. }
+                | Request::Read { .. }
+                | Request::Fact { .. } => {}
             }
         }
         None
@@ -119,7 +124,7 @@ impl Harness {
         for value in &self.out {
             match value {
                 Request::Answer { .. } => count = count.saturating_add(1),
-                Request::Exchange { .. } | Request::Abandon { .. } | Request::Fact { .. } => {}
+                Request::Exchange { .. } | Request::Abandon { .. } | Request::Read { .. } | Request::Fact { .. } => {}
             }
         }
         count
@@ -168,3 +173,6 @@ pub use reads::*;
 
 mod turns;
 pub use turns::*;
+
+mod link_reads;
+pub use link_reads::*;
