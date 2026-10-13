@@ -380,6 +380,12 @@ ones before it in its session. Dependencies are by capability: "skein
   again; smith keeps ruling 121's gate, its focused total at most 30 s.
   The supervisor is told in the log. A test that fails is still a
   failure.
+- **A step's prescribed tests may grow the harness they run on**
+  (decisions.md, ruling 262). The peer, world or fixture kit a step's own
+  prescribed tests need, in any session's test files, may grow past ruling
+  114's 20 lines: test code only, every landed test's name and expected
+  value kept, no production or boundary change, named in the commit body;
+  no question.
 - **A new test costs the suite about 12 ms before its work** (decisions.md,
   ruling 219; `tests-cost.md`, 12). In every step left, tests are one per
   behaviour, a behaviour's cases rows of one table test; fixtures are

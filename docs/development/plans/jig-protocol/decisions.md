@@ -2159,6 +2159,19 @@ the file.
      confirms that an answer's refused names are validated and not kept
      (`route_answer_payload`), the failing assertion stays and the session
      raises it.
+262. **A step's prescribed tests may grow the harness they run on**
+     (2026-10-13, the coordinator's block "jig 31.6: native closing proof
+     peer harness files", 2026-10-13T11:37:15Z; the third such block, after
+     rulings 243 and 251). 31.6's six machine tests need the native peer
+     (`tests/engine-clients/src/peer.rs`, and a private `closing.rs`
+     child) to keep provider calls and `Request::Closed`, acknowledge
+     erases, see a socket close and prepare a connection before `Stop`.
+     As proposed, and for every step left: the test harness its own
+     prescribed tests run on (a peer, a world, a fixture kit), in any
+     session's test files, may grow past ruling 114's 20 lines, test code
+     only, every landed test's name and expected value kept, no
+     production or boundary change, named in the commit body. The README's
+     Rules now say so.
 
 ## For the user
 
