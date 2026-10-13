@@ -8,6 +8,8 @@ mod commits;
 pub mod format;
 pub mod intervals;
 mod open;
+mod pages;
+mod restore;
 pub mod sizes;
 use skein_lib::{Env, Queue, Time, Wall};
 
@@ -66,10 +68,25 @@ pub const MAX_OUT_DOWN: u32 = 1;
 pub fn worst_case(limits: &Limits) -> Option<u64> {
     let state = u64::try_from(size_of::<Store>()).ok()?;
     let rows = u64::from(limits.store.value).checked_add(u64::from(limits.store.key))?.checked_mul(2)?;
+    let codec = codec::limits(&limits.core)?;
+    let decoded = core_v1::Row::worst_case_heap(&codec.core)?
+        .checked_add(tasks_v1::Row::worst_case_heap(&codec.tasks)?)?
+        .checked_add(people_v1::Row::worst_case_heap(&codec.people)?)?
+        .checked_add(notes_v1::Row::worst_case_heap(&codec.notes)?)?
+        .checked_add(u64::try_from(size_of::<jig_domain_tasks::TaskRecord>()).ok()?)?
+        .checked_mul(2)?;
+    // One byte per encoded row bounds carrier counts. Count wire values and
+    // their translated records together, including the census's fetched task.
+    let page = u64::from(limits.store.page.bytes)
+        .checked_mul(decoded.checked_add(u64::from(limits.store.key))?)?
+        .checked_add(u64::from(limits.store.page.bytes))?
+        .checked_add(skein_lib::List::<pages::WalkRow>::worst_case(limits.store.page.bytes)?)?
+        .checked_add(skein_lib::List::<Row>::worst_case(limits.store.page.bytes)?)?;
     skein_kv::worst_case(&limits.store)?
         .checked_add(skein_kv::worst_case(&limits.secrets)?)?
         .checked_add(state)?
         .checked_add(rows)?
+        .checked_add(page)?
         .checked_add(u64::from(limits.store.commit))?
         .checked_add(skein_lib::List::<skein_kv::Op>::worst_case(limits.journal.writes.checked_add(1)?)?)?
         .checked_add(Queue::<skein_kv::Event>::worst_case(skein_kv::MAX_OUT.above)?)?
@@ -85,9 +102,11 @@ pub fn down(store: &mut Store, request: Request, above: &mut Queue<Event>) {
     match request {
         Request::Open { owner, root: _ } => open::open(store, owner, above),
         Request::Commit { number, writes } => commits::commit(store, number, writes, above),
+        Request::Restore { owner, range, after, rows, bytes } => {
+            restore::restore(store, owner, range, after, rows, bytes, above);
+        }
         // Each remaining handler joins in its owning increment, before routing uses it.
-        Request::Restore { .. }
-        | Request::Load { .. }
+        Request::Load { .. }
         | Request::Read { .. }
         | Request::Get { .. }
         | Request::Transcript { .. }

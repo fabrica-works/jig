@@ -786,6 +786,7 @@ pub const DEPLOYMENT: [u8; 16] = [7; 16];
 
 mod store;
 pub use store::{
-    OTHER_DEPLOYMENT, ROOT_FD, commit, format_put, get_kv, header, header_put, opened, opened_with_budget, over, plant,
-    run, save, stores,
+    ALICE, ENDED, LIVE, OTHER_DEPLOYMENT, ROOT_FD, call, commit, committed, conversation_index, ended_task, format_put,
+    get_kv, header, header_put, header_record, history, live_task, notes_entry, opened, opened_with_budget, over,
+    person, plant, result_index, run, run_proof, save, stores,
 };
