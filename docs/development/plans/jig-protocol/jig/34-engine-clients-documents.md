@@ -39,8 +39,19 @@ the core's `documents::Frame`, `Task`, `Chip` and their parts
 ledger, wake, subscriptions, holds, phases, resources) to the wire's
 records. A port of the joint world's `wire/owner.rs`, `wire/chips.rs` and
 `wire/task.rs`. Pure functions; reads and deliveries use them from 31.4
-and 31.5.
-Needs: nothing beyond 31.1.
+and 31.5. A document's texts cross as the wire's `text` fields, UTF-8
+(client/domain/contract.md, 5.3, "Texts are UTF-8"; the designer,
+2026-10-13, jig `1bc30fd0`): the engine makes no other, so a text the
+wire refuses is the engine's bug, answered as a failed translation, never
+passed as bytes.
+Needs: nothing beyond 31.1, and a step of the supervisor's first: the
+core cuts a text at a character's boundary (`documents/small.rs:9-11`),
+the client's `Text::new` refuses bytes that are not UTF-8
+(`contract/common.rs:13-18`) and the contract's "opaque" goes, a party's
+words that are not UTF-8 are refused at their request's entrance, and
+the joint world's login fixture (`tests/client/src/joint/wire/owner.rs:822,
+845`) becomes UTF-8; with a core unit test that a text cut inside "é"
+keeps the whole character out and says it was cut.
 Files: `src/{translate.rs, translate/owner.rs, translate/chips.rs,
 translate/task.rs}`; `src/tests/{documents.rs, fixtures.rs}`.
 Shape: `translate::owner::frame(value: &documents::Frame, limits:
