@@ -295,6 +295,12 @@ ones before it in its session. Dependencies are by capability: "skein
   fail only on the focused suite's timeout keeps its commit and ends its
   turn; the coordinator runs its `land` again (three attempts) after each
   test-cost step of `tests-cost.md` lands. No block is written for it.
+- **The client wire's translations land at their count** (decisions.md,
+  ruling 194). In jig 31, 32, 34 and 35, an increment whose production
+  code is only translations between the client contract's types and the
+  wire's lands without asking whatever its Size, its report giving the
+  count by file; each file under 800 lines, each test function under 40.
+  Code that is not such a translation keeps the increment's Size.
 
 ## Live services
 

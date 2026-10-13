@@ -1344,6 +1344,20 @@ the file.
      wire with its words, so 05.s3's Files gain the worker wire's schema
      and regenerated code (its version moved once) and jig 23's and 24's
      translations of it both ways; Size 140.
+194. **The client wire's translations land at their count** (2026-10-13,
+     the coordinator's block "jig 32.1: production size 2961 versus 720
+     margin", 2026-10-13T02:45:49Z). jig 32.1's exhaustive translation of
+     the client contract's asks, outcomes, refusals and the recursive
+     facts they carry (ruling 151's 359 declarations) is 2,961 net lines
+     against "at most 600", every file under 800. The plan priced the
+     client wire's translations before the recursive facts were known;
+     jig 31, 34 and 35 translate the same vocabulary. So from now to the
+     run's end, an increment of jig 31, 32, 34 or 35 whose production code
+     is only translations between the client contract's types and the
+     wire's lands at its count without asking, giving the count by file in
+     its report; each file stays under 800 lines and each test function
+     under 40; anything else in it keeps its Size. jig 32.1 lands at 2,961.
+     The README's Rules say so.
 
 ## For the user
 
