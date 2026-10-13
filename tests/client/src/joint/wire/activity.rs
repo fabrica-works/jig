@@ -1,4 +1,4 @@
-//! Immutable activity, whole admitted words and separately fetched archives
+//! Immutable activity, whole admitted words and page-carried archives
 //! (client/domain/contract.md, 5 and 7; domain/engine.md, 5.4 and 7.2).
 use super::{chips, owner, results, turns};
 use jig_domain_client::{Limits, contract as client};
@@ -190,7 +190,7 @@ pub fn line(task: u64, value: &tasks::ActivityLine, limits: &Limits) -> Result<c
     admission::admit_activity_line(&copied, &bounds(limits)).map_err(|_| Invalid::Payload)?;
     Ok(copied)
 }
-/// Attach only the actual record fetched for the exact immutable archive identity. The caller
+/// Attach the record carried beside its exact immutable archive identity. The caller
 /// retains an undecodable outcome if decoding fails; whole admission remains bounded.
 /// # Errors
 /// Refuses mismatched source identities, invalid whole message metadata, archive decoding failures or a complete payload above the receiving bounds.
@@ -234,8 +234,55 @@ pub fn with_archive(
     Ok(copied)
 }
 
+/// Translate the turn supplied by the store's page, without another read.
+/// # Errors
+/// Refuses a mismatched line or a whole payload past the client's bounds.
+pub fn page_turn(
+    task: u64,
+    source: &tasks::ActivityLine,
+    turn: Option<&jig_domain_core::reads::PageTurn>,
+    codec: &jig_protocol_transcript::Limits,
+    limits: &Limits,
+) -> Result<client::ActivityLine, Invalid> {
+    let value = line(task, source, limits)?;
+    let Some(turn) = turn else {
+        if let tasks::Line::Turn { .. } = source.line {
+            return Err(Invalid::Identity);
+        }
+        return Ok(value);
+    };
+    match turn {
+        jig_domain_core::reads::PageTurn::Carried(record) => with_archive(&value, record, codec, limits),
+        jig_domain_core::reads::PageTurn::TooLarge { spent, read, at, .. } => {
+            let tasks::Line::Turn { attempt, turn, .. } = source.line else { return Err(Invalid::Identity) };
+            let mut value = value;
+            let client::Activity::Owner { decoded, .. } = &mut value.event else { return Err(Invalid::Identity) };
+            *decoded = Some(client::ArchivedTurn {
+                task,
+                name: client::TurnName { attempt, number: turn },
+                cumulative: *spent,
+                read: *read,
+                at: *at,
+                turn: client::TurnRead::Undecodable { why: client::TurnProblem::TooLarge },
+            });
+            admission::admit_activity_line(&value, &bounds(limits)).map_err(|_| Invalid::Payload)?;
+            Ok(value)
+        }
+        jig_domain_core::reads::PageTurn::Unread => {
+            let tasks::Line::Turn { attempt, turn, .. } = source.line else { return Err(Invalid::Identity) };
+            let mut value = value;
+            value.event = client::Activity::Turn {
+                name: client::TurnName { attempt, number: turn },
+                turn: client::TurnRead::Undecodable { why: client::TurnProblem::Malformed },
+            };
+            admission::admit_activity_line(&value, &bounds(limits)).map_err(|_| Invalid::Payload)?;
+            Ok(value)
+        }
+    }
+}
+
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     const UTF8_TEXTS: [&[u8]; 2] = [b"~\0/", b"~"];
 
     use super::*;
@@ -325,14 +372,17 @@ mod tests {
     fn record() -> &'static [u8] {
         include_bytes!("../../../../../crates/jig-protocol-transcript/tests/data/record_turn_full.bin")
     }
-    fn archive_fixture() -> (client::ActivityLine, jig_domain_core::TurnRecord, jig_protocol_transcript::Limits, Limits)
-    {
-        let limits = limits();
-        let codec = jig_protocol_transcript::Limits {
+    pub(crate) fn codec() -> jig_protocol_transcript::Limits {
+        jig_protocol_transcript::Limits {
             smith: smith_transcript::v3::CEILINGS,
             bytes: 127,
             turn: client::TurnLimits { messages: 1, blocks: 1, text: 3 },
-        };
+        }
+    }
+    pub(crate) fn archive_fixture()
+    -> (client::ActivityLine, jig_domain_core::TurnRecord, jig_protocol_transcript::Limits, Limits) {
+        let limits = limits();
+        let codec = codec();
         let original = line(
             u64::MAX,
             &source(tasks::Line::Turn { reply: 9, attempt: u64::MAX, turn: u32::MAX, read: Some(0) }),

@@ -2339,6 +2339,7 @@ pub(crate) fn stored_row(value: Record, owner: Option<tasks::TaskRecord>) -> rea
         },
         ancestors: Box::new([]),
         related: None,
+        unjoined: None,
         linked: Box::new([]),
         inbox: None,
     }
@@ -2378,7 +2379,7 @@ fn stored_activity_pages_follow_committed_positions_with_exact_continuations() {
         panic!()
     };
     assert_eq!(page.rows.len(), 2);
-    let reads::PageRow::Activity(first) = page.rows.get(0).unwrap() else { panic!() };
+    let reads::PageRow::Activity { line: first, .. } = page.rows.get(0).unwrap() else { panic!() };
     assert_eq!(first.position, 3);
     core.reclaim();
     let Held::ReadLoad { load, range } =
@@ -3003,3 +3004,5 @@ mod credentials;
 mod funding_fixtures;
 mod windows;
 use funding_fixtures::set_role_authority;
+
+mod read_activity;

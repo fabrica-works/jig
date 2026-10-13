@@ -684,7 +684,7 @@ fn subtree_history(world: &mut jig_core_world::effects::World, task: u64) -> Vec
                 reads::PageRow::History(line) => rows.push((0, line.task, line.revision)),
                 reads::PageRow::Milestone(line) => rows.push((1, line.task, line.position)),
                 reads::PageRow::EndedDelegate(_)
-                | reads::PageRow::Activity(_)
+                | reads::PageRow::Activity { .. }
                 | reads::PageRow::Inbox(_)
                 | reads::PageRow::Conversation(_)
                 | reads::PageRow::Goal(_)

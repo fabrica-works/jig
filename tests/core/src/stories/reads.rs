@@ -59,7 +59,11 @@ pub fn conversation(world: &mut World, task: u64, first: u64) -> Vec<tasks::Acti
         let reads::Answer::Page(value) = latest(world) else { panic!("activity page") };
         assert!(value.rows.len() <= 2);
         for row in &value.rows {
-            let reads::PageRow::Activity(line) = row else { panic!("original activity") };
+            let reads::PageRow::Activity { line, turn: supplied } = row else { panic!("original activity") };
+            if let tasks::Line::Turn { attempt, turn, .. } = line.line {
+                let Some(reads::PageTurn::Carried(record)) = supplied else { panic!("page carries the turn") };
+                assert_eq!((record.task, record.attempt, record.turn), (task, attempt, turn));
+            }
             lines.push(line.clone());
         }
         before.clone_from(&value.next);

@@ -67,6 +67,7 @@ fn joined_row(
         owner: Some(Box::new(task.clone())),
         ancestors: ancestors.into(),
         related,
+        unjoined: None,
         linked: linked.into_values().collect(),
         inbox: None,
     }
@@ -122,6 +123,7 @@ fn candidate(store: &Store, range: &reads::Range, value: &core::Record) -> Optio
                     owner: None,
                     ancestors: Box::new([]),
                     related: None,
+                    unjoined: None,
                     linked: Box::new([]),
                     inbox: None,
                 });
@@ -150,6 +152,7 @@ fn candidate(store: &Store, range: &reads::Range, value: &core::Record) -> Optio
                 owner: None,
                 ancestors: Box::new([]),
                 related: None,
+                unjoined: None,
                 linked: Box::new([]),
                 inbox: None,
             })

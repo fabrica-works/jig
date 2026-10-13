@@ -1,7 +1,6 @@
 //! The client and actual engine share one translation boundary
 //! (client/domain/testing.md, 5). The front and real stories are added after
 //! the complete document carriers; no scripted truth stands in for core facts.
-pub mod archive;
 pub mod engine;
 mod fixture;
 pub mod front;

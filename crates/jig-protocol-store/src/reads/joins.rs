@@ -105,6 +105,7 @@ pub(super) fn row(
         owner,
         ancestors: ancestors.into_boxed(),
         related,
+        unjoined: None,
         linked: linked.into_boxed(),
         inbox: None,
     };

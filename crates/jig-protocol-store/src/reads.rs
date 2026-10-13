@@ -45,7 +45,17 @@ pub(crate) fn read(store: &mut Store, owner: Token, range: Range, above: &mut Qu
             let result = point::turn(store, owner, &range, above, below);
             return answer(store, owner, result, above);
         }
-        Scope::Activity { task } => paged::activity(store, &range, task, &mut spent),
+        Scope::Activity { task } => {
+            let result = paged::activity(store, &range, task, &mut spent);
+            let result = match result {
+                Ok(Loaded::Page { rows, next }) => {
+                    crate::transcripts::read::activity(store, owner, rows, next, &range, above, below)
+                }
+                Ok(value) => Ok(Some(value)),
+                Err(error) => Err(error),
+            };
+            return answer(store, owner, result, above);
+        }
         Scope::History { task, subtree: false } => paged::history(store, &range, task, &mut spent),
         Scope::Spend { .. } => paged::spend(store, &range, &mut spent),
         Scope::Notes { .. } => paged::notes(store, &range, &mut spent),

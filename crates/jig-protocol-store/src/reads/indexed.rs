@@ -182,6 +182,7 @@ fn joined(
             owner: Some(owner),
             ancestors: Box::new([]),
             related: None,
+            unjoined: None,
             linked: Box::new([]),
             inbox: None,
         };

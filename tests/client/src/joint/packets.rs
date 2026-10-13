@@ -352,7 +352,7 @@ pub fn people_reply(
             }
             Incoming::Callback { client, event: Event::Answer { attempt, envelope, answer } }
         }
-        Reply::Read { .. } | Reply::ApplicationRead { .. } | Reply::Archive { .. } => return Err(Invalid::OwnerRoute),
+        Reply::Read { .. } | Reply::ApplicationRead { .. } => return Err(Invalid::OwnerRoute),
     };
     transport.take_reply(to).expect("validated original reply route");
     Ok(incoming)

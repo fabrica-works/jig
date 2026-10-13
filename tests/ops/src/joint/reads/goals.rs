@@ -12,6 +12,7 @@ pub(super) fn candidate(store: &Store, project: u32, value: &core::Record) -> Op
         owner: Some(Box::new(owner.clone())),
         ancestors: Box::new([]),
         related: None,
+        unjoined: None,
         linked: Box::new([]),
         inbox: None,
     })

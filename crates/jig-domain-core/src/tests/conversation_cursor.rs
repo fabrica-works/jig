@@ -44,7 +44,7 @@ fn numbers(page: &reads::Page) -> Box<[u64]> {
             reads::PageRow::EndedDelegate(_)
             | reads::PageRow::History(_)
             | reads::PageRow::Milestone(_)
-            | reads::PageRow::Activity(_)
+            | reads::PageRow::Activity { .. }
             | reads::PageRow::Inbox(_)
             | reads::PageRow::Goal(_)
             | reads::PageRow::Note(_)

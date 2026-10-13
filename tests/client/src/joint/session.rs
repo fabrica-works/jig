@@ -1,8 +1,7 @@
 //! The real protocol loop between the engine peer and original client routes
-//! (client/domain/testing.md, 5). Authentication and archive reads use actual
+//! (client/domain/testing.md, 5). Authentication and activity reads use actual
 //! owner doors; callbacks do not acknowledge their normal document flights.
 use super::{
-    archive::{Archives, Started},
     engine::{Driver, Packet},
     packets::{self, Incoming},
     read_packets, requests,
@@ -23,7 +22,6 @@ pub enum Invalid {
     Request(requests::Invalid),
     Packet(packets::Invalid),
     Read(read_packets::Invalid),
-    Archive(super::archive::Invalid),
     InternalPacket,
 }
 
@@ -42,7 +40,6 @@ pub struct Session {
     pub driver: Driver,
     limits: Limits,
     codec: jig_protocol_transcript::Limits,
-    archives: Archives,
     truth: Truth,
     parked: BTreeMap<ClientId, Vec<Request>>,
     unsigned: BTreeSet<ClientId>,
@@ -71,7 +68,6 @@ impl Session {
             driver,
             limits,
             codec,
-            archives: Archives::default(),
             truth,
             parked: BTreeMap::new(),
             unsigned: BTreeSet::new(),
@@ -290,7 +286,6 @@ impl Session {
             self.callbacks.push((client, event));
         }
         for client in self.driver.transport.clients() {
-            self.archives.detach(client);
             self.driver.transport.detach(client);
         }
         self.driver.restart(configuration, now, wall);
@@ -326,7 +321,6 @@ impl Session {
             self.callbacks.push((client, event));
         }
         for client in self.driver.transport.clients() {
-            self.archives.detach(client);
             self.driver.transport.detach(client);
         }
         self.stopped_seen = true;
@@ -525,36 +519,14 @@ impl Session {
         now: Time,
         wall: Wall,
     ) -> Result<(), Invalid> {
-        let Some(route) = self.driver.transport.reply(to) else { return Ok(()) };
-        if matches!(route, Reply::Archive { .. }) {
-            if let Some(value) = self
-                .archives
-                .answer(&mut self.driver.transport, to, answer, &self.codec, &self.limits.jig)
-                .map_err(Invalid::Archive)?
-            {
-                self.incoming(value, now, wall)?;
-            }
-        } else if matches!(route, Reply::Read { what: client::Read::Activity { .. }, .. })
-            && let core::reads::Answer::Page(page) = answer
-        {
-            match self
-                .archives
-                .start(&mut self.driver.transport, to, page, &self.limits.jig)
-                .map_err(Invalid::Archive)?
-            {
-                Started::Complete(value) => self.incoming(value, now, wall)?,
-                Started::Fetch(events) => {
-                    for event in events {
-                        self.driver.send(now, wall, root::Event::Core(event));
-                    }
-                }
-            }
-        } else {
-            let value =
-                read_packets::read(&mut self.driver.transport, to, answer, &self.limits.jig).map_err(Invalid::Read)?;
-            super::offered_packets::read(&mut self.card_offers, answer, &value);
-            self.incoming(value, now, wall)?;
+        if self.driver.transport.reply(to).is_none() {
+            return Ok(());
         }
+        let value =
+            read_packets::read_with_codec(&mut self.driver.transport, to, answer, &self.limits.jig, &self.codec)
+                .map_err(Invalid::Read)?;
+        super::offered_packets::read(&mut self.card_offers, answer, &value);
+        self.incoming(value, now, wall)?;
         Ok(())
     }
 
@@ -910,7 +882,6 @@ impl Session {
     /// reusing their tokens. The client supplies new reads/watches after reload.
     pub fn detach(&mut self, client: ClientId, now: Time, wall: Wall) {
         self.stream_due.remove(&client);
-        self.archives.detach(client);
         self.parked.remove(&client);
         self.callbacks.retain(|(owner, _)| *owner != client);
         self.delayed.retain(|(owner, _)| *owner != client);

@@ -862,7 +862,7 @@ fn page_row(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Opt
             {
                 return Ok(None);
             }
-            Ok(Some(PageRow::Activity(line.clone())))
+            Ok(Some(super::activity::row(line, &row)?))
         }
         Scope::ScopedNotes { scope, description } => {
             let Some(value) = note(&row.value) else { return Ok(None) };

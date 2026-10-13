@@ -2,7 +2,8 @@
 use super::{File, Stage, frame};
 use crate::{Arrived, Below, Event, Limits, Phase, Store, TranscriptRead, codec, keys, open, reads};
 use alloc::boxed::Box;
-use jig_domain_core::TurnRecord;
+use jig_domain_core::{self as domain, TurnRecord};
+use jig_domain_tasks as tasks;
 use skein_io::file;
 use skein_lib::{List, Map, Queue, Reader, Token, Writer};
 pub(crate) const OWNER: Token = Token::new(0x5453);
@@ -23,6 +24,8 @@ enum Step {
     Opening,
     Evicting { task: u64 },
     Length { offset: u64, bytes: Writer },
+    Header { offset: u64, length: u32, bytes: Writer },
+    Sized { offset: u64, length: u32, turn: TurnRecord, size: u32, bytes: Writer },
     Frame { offset: u64, length: u32, bytes: Writer },
 }
 #[derive(Debug)]
@@ -36,6 +39,7 @@ pub(crate) struct Read {
     turns: List<TurnRecord>,
     budget: u64,
     party: Option<Party>,
+    activity: Option<Activity>,
 }
 pub(crate) fn worst_case(limits: &Limits, codec: &codec::Limits) -> Option<u64> {
     let rows = limits.store.page.rows;
@@ -47,7 +51,8 @@ pub(crate) fn worst_case(limits: &Limits, codec: &codec::Limits) -> Option<u64> 
                 .checked_add(turn.checked_mul(u64::from(rows))?)?
                 .checked_mul(u64::from(limits.reads))?,
         )?
-        .checked_add(frame.checked_mul(3)?)
+        .checked_add(frame.checked_mul(3)?)?
+        .checked_add(limits.core.load_bytes.checked_mul(3)?.checked_mul(u64::from(limits.reads))?)
 }
 pub(crate) fn transcript(
     store: &mut Store,
@@ -89,6 +94,101 @@ pub(crate) fn party(
     };
     read.party = Some(party);
     store.transcripts.reads.insert(owner, read).expect("party read slot checked at admission");
+    fire(store, above, below);
+    Ok(None)
+}
+/// Pending activity lines keep their original page order while one transcript walk joins them.
+#[derive(Debug)]
+struct Activity {
+    rows: Box<[domain::reads::Row]>,
+    next: Option<domain::reads::Position>,
+    bytes: u64,
+    bound: u64,
+    index: usize,
+}
+impl Activity {
+    fn identity(&self) -> Option<(u64, u64, u32)> {
+        for row in self.rows.get(self.index..).expect("page index within rows") {
+            if let domain::Record::Tasks(tasks::Stored::Activity(line)) = &row.value
+                && let tasks::Line::Turn { attempt, turn, .. } = line.line
+            {
+                return Some((line.task, attempt, turn));
+            }
+        }
+        None
+    }
+    fn charge_words(&mut self) -> Result<bool, ()> {
+        for index in self.index..self.rows.len() {
+            let row = self.rows.get(index).expect("bounded page index");
+            if let domain::Record::Tasks(tasks::Stored::Activity(line)) = &row.value
+                && let tasks::Line::Turn { .. } = line.line
+            {
+                return Ok(false);
+            }
+            self.bytes = self.bytes.checked_sub(row.owned_bytes().ok_or(())?).ok_or(())?;
+            self.index = index.checked_add(1).expect("bounded page index");
+        }
+        Ok(true)
+    }
+    fn unread(&mut self) {
+        if let Some((task, attempt, turn)) = self.identity() {
+            self.rows.get_mut(self.index).expect("pending turn row").unjoined =
+                Some(domain::reads::UnjoinedTurn::Unread { task, attempt, turn });
+            self.index = self.index.checked_add(1).expect("bounded page index");
+        }
+    }
+    fn finish(self, cut: bool) -> domain::reads::Loaded {
+        let next = if cut && self.index > 0 {
+            Some(domain::reads::Position::Owner(
+                self.rows
+                    .get(self.index.checked_sub(1).expect("accepted row"))
+                    .expect("bounded page index")
+                    .value
+                    .key(),
+            ))
+        } else {
+            self.next
+        };
+        let mut rows = List::with_capacity(u32::try_from(self.index).expect("bounded activity page"));
+        for (index, row) in self.rows.into_iter().enumerate() {
+            if index == self.index {
+                break;
+            }
+            rows.push(row).expect("accepted page prefix");
+        }
+        domain::reads::Loaded::Page { rows: rows.into_boxed(), next }
+    }
+}
+pub(crate) fn activity(
+    store: &mut Store,
+    owner: Token,
+    rows: Box<[domain::reads::Row]>,
+    next: Option<domain::reads::Position>,
+    range: &domain::reads::Range,
+    above: &mut Queue<Event>,
+    below: &mut Below,
+) -> Result<Option<domain::reads::Loaded>, reads::Failure> {
+    let mut page = Activity { rows, next, bytes: range.bytes, bound: range.bytes, index: 0 };
+    let done = page.charge_words().or(Err(reads::Failure::Corrupt))?;
+    if done {
+        return Ok(Some(page.finish(false)));
+    }
+    assert!(!store.transcripts.reads.contains_key(&owner), "one transcript read per owner");
+    if store.transcripts.reads.len() == store.limits.reads {
+        return Ok(Some(domain::reads::Loaded::Busy));
+    }
+    let (task, attempt, turn) = page.identity().expect("pending turn line");
+    let request = if range.after.is_none() {
+        TranscriptRead::Page { task, backwards: true, after: None }
+    } else {
+        TranscriptRead::Turn { task, attempt, turn }
+    };
+    let Some(mut read) = prepare(store, owner, request, 1, u64::from(store.limits.store.page.bytes)) else {
+        page.unread();
+        return Ok(Some(page.finish(true)));
+    };
+    read.activity = Some(page);
+    store.transcripts.reads.insert(owner, read).expect("activity read slot checked");
     fire(store, above, below);
     Ok(None)
 }
@@ -142,6 +242,7 @@ fn prepare(store: &mut Store, owner: Token, request: TranscriptRead, rows: u32, 
         turns: List::with_capacity(rows.min(store.limits.store.page.rows)),
         budget: bytes.min(u64::from(store.limits.store.page.bytes)),
         party: None,
+        activity: None,
     })
 }
 pub(crate) fn fire(store: &mut Store, above: &mut Queue<Event>, below: &mut Below) {
@@ -202,7 +303,7 @@ fn opening(store: &Store, read: &mut Read, below: &mut Below) {
 }
 fn next(store: &mut Store, read: &mut Read, below: &mut Below) -> Result<bool, ()> {
     if read.position == if read.backwards { 0 } else { read.end } {
-        return Ok(true);
+        return if read.activity.is_some() { Err(()) } else { Ok(true) };
     }
     let checking_window = match read.scan {
         Scan::Window { checked, .. } => !checked,
@@ -260,29 +361,43 @@ fn advance(store: &mut Store, read: &mut Read, event: Arrival, below: &mut Below
             opening(store, read, below);
             Ok(false)
         }
-        Step::Length { offset, mut bytes } => {
+        Step::Length { offset, bytes } => length(store, read, event, offset, bytes, below),
+        Step::Sized { offset, length, turn, size, mut bytes } => {
             if !append(event, &mut bytes)? {
-                let consumed = u64::try_from(bytes.written()).expect("four byte length");
-                let max = u32::try_from(bytes.room()).expect("four byte length");
-                demand(store, read, offset.checked_add(consumed).ok_or(())?, max, below)?;
-                read.step = Step::Length { offset, bytes };
+                demand(
+                    store,
+                    read,
+                    offset
+                        .checked_add(u64::from(length))
+                        .ok_or(())?
+                        .checked_sub(4)
+                        .ok_or(())?
+                        .checked_add(u64::try_from(bytes.written()).expect("length"))
+                        .ok_or(())?,
+                    u32::try_from(bytes.room()).expect("length"),
+                    below,
+                )?;
+                read.step = Step::Sized { offset, length, turn, size, bytes };
                 return Ok(false);
             }
-            let length = Reader::new(&bytes.finish()).u32().ok_or(())?;
-            let max =
-                crate::core_v1::TurnRecord::worst_case_bytes(&store.codec.core).ok_or(())?.checked_add(12).ok_or(())?;
-            if length < 12 || u64::from(length) > max {
+            if Reader::new(&bytes.finish()).u32() != Some(length) {
                 return Err(());
             }
-            let start =
-                if read.backwards { read.position.checked_sub(u64::from(length)).ok_or(())? } else { read.position };
-            if start.checked_add(u64::from(length)).ok_or(())? > read.end {
-                return Err(());
+            sized(store, read, offset, turn, size, below)
+        }
+        Step::Header { offset, length, mut bytes } => {
+            if !append(event, &mut bytes)? {
+                demand(
+                    store,
+                    read,
+                    offset.checked_add(u64::try_from(bytes.written()).expect("header")).ok_or(())?,
+                    u32::try_from(bytes.room()).expect("header"),
+                    below,
+                )?;
+                read.step = Step::Header { offset, length, bytes };
+                return Ok(false);
             }
-            read.step =
-                Step::Frame { offset: start, length, bytes: Writer::new(usize::try_from(length).expect("u32 frame")) };
-            demand(store, read, start, length, below)?;
-            Ok(false)
+            header(store, read, offset, length, bytes.finish(), below)
         }
         Step::Frame { offset, length, mut bytes } => {
             if !append(event, &mut bytes)? {
@@ -299,6 +414,156 @@ fn advance(store: &mut Store, read: &mut Read, event: Arrival, below: &mut Below
         }
         Step::Waiting => Err(()),
     }
+}
+fn length(
+    store: &mut Store,
+    read: &mut Read,
+    event: Arrival,
+    offset: u64,
+    mut bytes: Writer,
+    below: &mut Below,
+) -> Result<bool, ()> {
+    if !append(event, &mut bytes)? {
+        let consumed = u64::try_from(bytes.written()).expect("four byte length");
+        let max = u32::try_from(bytes.room()).expect("four byte length");
+        demand(store, read, offset.checked_add(consumed).ok_or(())?, max, below)?;
+        read.step = Step::Length { offset, bytes };
+        return Ok(false);
+    }
+    let length = Reader::new(&bytes.finish()).u32().ok_or(())?;
+    let max = crate::core_v1::TurnRecord::worst_case_bytes(&store.codec.core).ok_or(())?.checked_add(12).ok_or(())?;
+    if length < 12 || u64::from(length) > max {
+        return Err(());
+    }
+    let start = if read.backwards { read.position.checked_sub(u64::from(length)).ok_or(())? } else { read.position };
+    if start.checked_add(u64::from(length)).ok_or(())? > read.end {
+        return Err(());
+    }
+    if read.activity.is_some() {
+        if length < 48 {
+            return Err(());
+        }
+        read.step = Step::Header { offset: start, length, bytes: Writer::new(36) };
+        demand(store, read, start, 36, below)?;
+        return Ok(false);
+    }
+    read.step = Step::Frame { offset: start, length, bytes: Writer::new(usize::try_from(length).expect("u32 frame")) };
+    demand(store, read, start, length, below)?;
+    Ok(false)
+}
+// Read only the fixed fields and payload length before deciding whether bytes fit.
+fn header(
+    store: &mut Store,
+    read: &mut Read,
+    offset: u64,
+    length: u32,
+    bytes: Box<[u8]>,
+    below: &mut Below,
+) -> Result<bool, ()> {
+    if bytes.len() == 36 {
+        let header_size = match *bytes.get(35).ok_or(())? {
+            0 => 48_u32,
+            1 => 56_u32,
+            _ => return Err(()),
+        };
+        if length < header_size.checked_add(8).ok_or(())? {
+            return Err(());
+        }
+        let tail = header_size.checked_sub(36).expect("fixed header");
+        let mut header = Writer::new(usize::try_from(header_size).expect("fixed header"));
+        header.put(&bytes).or(Err(()))?;
+        read.step = Step::Header { offset, length, bytes: header };
+        demand(store, read, offset.checked_add(36).ok_or(())?, tail, below)?;
+        return Ok(false);
+    }
+    let mut prefix = Reader::new(&bytes);
+    if prefix.u32() != Some(length) {
+        return Err(());
+    }
+    let fields = bytes.len().checked_sub(8).ok_or(())?;
+    let mut body = Writer::new(fields.checked_add(4).ok_or(())?);
+    body.put(prefix.bytes(u32::try_from(fields).or(Err(()))?).ok_or(())?).or(Err(()))?;
+    body.put(&0_u32.to_be_bytes()).or(Err(()))?;
+    let turn = codec::core::read_turn(&body.finish(), &codec::core_limits(&store.codec)).or(Err(()))?;
+    let size = prefix.u32().ok_or(())?;
+    let expected =
+        u64::try_from(bytes.len()).or(Err(()))?.checked_add(u64::from(size)).ok_or(())?.checked_add(8).ok_or(())?;
+    if u64::from(length) != expected || size > store.codec.core.turn_record_transcript {
+        return Err(());
+    }
+    let page = read.activity.as_mut().expect("activity header only");
+    let identity = (turn.task, turn.attempt, turn.turn);
+    let sought = page.identity().ok_or(())?;
+    let selected = match read.scan {
+        Scan::Turn { attempt, turn } => {
+            if identity.0 != read.task || identity.1 != attempt || identity.2 > turn {
+                return Err(());
+            }
+            identity.2 == turn
+        }
+        Scan::Page => true,
+        Scan::Window { .. } => return Err(()),
+    };
+    if selected {
+        if sought != identity {
+            return Err(());
+        }
+        let row = page.rows.get_mut(page.index).expect("pending turn row");
+        row.related = Some(domain::Record::Core(domain::CoreRecord::Turn(turn.clone())));
+        let cost = row.owned_bytes().ok_or(())?.checked_add(u64::from(size)).ok_or(())?;
+        row.related = None;
+        if cost > page.bound {
+            if !read.backwards {
+                read.step = Step::Sized { offset, length, turn, size, bytes: Writer::new(4) };
+                demand(
+                    store,
+                    read,
+                    offset.checked_add(u64::from(length)).ok_or(())?.checked_sub(4).ok_or(())?,
+                    4,
+                    below,
+                )?;
+                return Ok(false);
+            }
+            return sized(store, read, offset, turn, size, below);
+        }
+        if cost > page.bytes {
+            return Ok(true);
+        }
+    }
+    read.step = Step::Frame { offset, length, bytes: Writer::new(usize::try_from(length).expect("bounded frame")) };
+    demand(store, read, offset, length, below)?;
+    Ok(false)
+}
+fn sized(
+    store: &mut Store,
+    read: &mut Read,
+    offset: u64,
+    turn: TurnRecord,
+    size: u32,
+    below: &mut Below,
+) -> Result<bool, ()> {
+    let page = read.activity.as_mut().expect("activity size");
+    let row = page.rows.get_mut(page.index).expect("pending turn row");
+    row.unjoined = Some(domain::reads::UnjoinedTurn::TooLarge {
+        task: turn.task,
+        attempt: turn.attempt,
+        turn: turn.turn,
+        spent: turn.spent,
+        read: turn.read,
+        at: turn.at,
+        bytes: u64::from(size),
+    });
+    page.bytes = page.bytes.checked_sub(row.owned_bytes().ok_or(())?).ok_or(())?;
+    page.index = page.index.checked_add(1).expect("bounded page index");
+    older(store, read, offset, below)
+}
+fn older(store: &mut Store, read: &mut Read, offset: u64, below: &mut Below) -> Result<bool, ()> {
+    let page = read.activity.as_mut().expect("activity walk");
+    let Ok(done) = page.charge_words() else { return Ok(true) };
+    read.position = offset;
+    read.backwards = true;
+    read.scan = Scan::Page;
+    if done { Ok(true) } else { next(store, read, below) }
 }
 fn append(event: Arrival, buffer: &mut Writer) -> Result<bool, ()> {
     let bytes = match event {
@@ -348,6 +613,21 @@ fn accept(
         }
         Scan::Page => true,
     };
+    if found && let Some(page) = &mut read.activity {
+        if page.identity() != Some((turn.task, turn.attempt, turn.turn)) {
+            return Err(());
+        }
+        let row = page.rows.get_mut(page.index).expect("pending turn row");
+        row.related = Some(domain::Record::Core(domain::CoreRecord::Turn(turn)));
+        let bytes = row.owned_bytes().ok_or(())?;
+        if bytes > page.bytes {
+            row.related = None;
+            return Ok(true);
+        }
+        page.bytes = page.bytes.checked_sub(bytes).expect("accepted turn fits");
+        page.index = page.index.checked_add(1).expect("bounded page index");
+        return older(store, read, offset, below);
+    }
     if found {
         if read.turns.room() == 0 || u64::from(length) > read.budget {
             return Ok(true);
@@ -369,7 +649,18 @@ fn accept(
         Scan::Window { .. } | Scan::Page => next(store, read, below),
     }
 }
-fn settle(store: &mut Store, owner: Token, read: Read, result: Result<bool, ()>, above: &mut Queue<Event>) {
+fn settle(store: &mut Store, owner: Token, mut read: Read, result: Result<bool, ()>, above: &mut Queue<Event>) {
+    if result != Ok(false)
+        && let Some(mut page) = read.activity.take()
+    {
+        store.transcripts.reading = None;
+        if result.is_err() {
+            page.unread();
+        }
+        let cut = result.is_err() || page.index < page.rows.len();
+        above.push(Event::Read { owner, result: page.finish(cut) });
+        return;
+    }
     match result {
         Ok(false) => {
             store.transcripts.reads.insert(owner, read).expect("active read retains its slot");

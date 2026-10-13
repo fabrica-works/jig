@@ -211,7 +211,7 @@ pub(super) fn live_before(core: &Core, env: &Env<Limits>, party: u64, before: Op
             PageRow::EndedDelegate(_)
             | PageRow::History(_)
             | PageRow::Milestone(_)
-            | PageRow::Activity(_)
+            | PageRow::Activity { .. }
             | PageRow::Inbox(_)
             | PageRow::Goal(_)
             | PageRow::Note(_)

@@ -189,6 +189,8 @@ pub struct Row {
     pub ancestors: Box<[u64]>,
     /// Related immutable evidence, such as a decision or answered question.
     pub related: Option<Record>,
+    /// A page turn whose bytes could not be carried (store.md, 7.3).
+    pub unjoined: Option<UnjoinedTurn>,
     /// Existing ancestor, dependency and ended-subtree rows requested by this query.
     pub linked: Box<[Box<tasks::TaskRecord>]>,
     /// The selected reference when an owner row has several waiting objects.
@@ -251,6 +253,20 @@ pub enum Past {
     Turn(crate::TurnRecord),
 }
 
+/// A transcript frame not carried beside its activity line (store.md, 7.3).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum UnjoinedTurn {
+    TooLarge { task: u64, attempt: u64, turn: u32, spent: u64, read: Option<u64>, at: Wall, bytes: u64 },
+    Unread { task: u64, attempt: u64, turn: u32 },
+}
+/// The turn supplied within an activity page's bounds (store.md, 7.3).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum PageTurn {
+    Carried(crate::TurnRecord),
+    TooLarge { spent: u64, read: Option<u64>, at: Wall, bytes: u64 },
+    Unread,
+}
+
 /// One semantic row of a read page.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum PageRow {
@@ -261,7 +277,7 @@ pub enum PageRow {
     /// A lifecycle transition.
     Milestone(documents::MilestoneLine),
     /// Whole original words, run boundaries and exact archive references.
-    Activity(tasks::ActivityLine),
+    Activity { line: tasks::ActivityLine, turn: Option<PageTurn> },
     /// One waiting object or unread update.
     Inbox(documents::InboxEntry),
     /// One directly requested conversation.

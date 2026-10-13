@@ -4,7 +4,6 @@ use crate::conformance::{Config, Story};
 use jig_client_world::{
     harness::{ClientId, Front, FrontFault, Observed},
     joint::{
-        archive::{Archives, Started},
         packets::{self, Incoming},
         read_packets,
         transport::{KeyedOwner, Reply, Watched},
@@ -45,7 +44,6 @@ pub struct Joint {
     pub limits: client::Limits,
     codec: jig_protocol_transcript::Limits,
     story: Story,
-    archives: Archives,
     watches: BTreeMap<Token, Watch>,
     reads: BTreeMap<Token, Read>,
     next: u64,
@@ -82,7 +80,6 @@ impl Joint {
             limits,
             codec,
             story,
-            archives: Archives::default(),
             watches: BTreeMap::new(),
             reads: BTreeMap::new(),
             next: 1 << 63,
@@ -428,7 +425,6 @@ impl Joint {
         }
     }
     fn detach(&mut self, client: ClientId) {
-        self.archives.detach(client);
         self.parked.remove(&client);
         self.callbacks.retain(|(owner, _)| *owner != client);
         self.reads.retain(|_, read| read.client != client);
@@ -482,7 +478,6 @@ impl Joint {
         self.lose_answers = 0;
         self.drop_watches();
         for client in self.engine.peers.transport.clients() {
-            self.archives.detach(client);
             self.engine.peers.transport.detach(client);
         }
         // Cold restoration can advance the engine clock beyond this front's
@@ -500,37 +495,18 @@ impl Joint {
         }
     }
     fn read_packet(&mut self, reply: Token, answer: &core::reads::Answer) {
-        let Some(route) = self.engine.peers.transport.reply(reply) else {
+        if self.engine.peers.transport.reply(reply).is_none() {
             return;
-        };
-        if matches!(route, Reply::Archive { .. }) {
-            if let Some(packet) = self
-                .archives
-                .answer(&mut self.engine.peers.transport, reply, answer, &self.codec, &self.limits.jig)
-                .expect("original whole turn decoding")
-            {
-                self.incoming(packet);
-            }
-        } else if matches!(route, Reply::Read { what: jig_domain_client::contract::Read::Activity { .. }, .. })
-            && let core::reads::Answer::Page(page) = answer
-        {
-            match self
-                .archives
-                .start(&mut self.engine.peers.transport, reply, page, &self.limits.jig)
-                .expect("original whole activity page")
-            {
-                Started::Complete(packet) => self.incoming(packet),
-                Started::Fetch(events) => {
-                    for event in events {
-                        self.send_event(root::Event::Core(event));
-                    }
-                }
-            }
-        } else {
-            let packet = read_packets::read(&mut self.engine.peers.transport, reply, answer, &self.limits.jig)
-                .expect("whole jig read uses 45 wire");
-            self.incoming(packet);
         }
+        let packet = read_packets::read_with_codec(
+            &mut self.engine.peers.transport,
+            reply,
+            answer,
+            &self.limits.jig,
+            &self.codec,
+        )
+        .expect("whole jig read uses 45 wire");
+        self.incoming(packet);
     }
     #[expect(clippy::too_many_lines, reason = "held Ops packets keep their original exhaustive client routes")]
     fn packet(&mut self, packet: root::Output) {

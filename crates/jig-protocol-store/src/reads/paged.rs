@@ -84,6 +84,15 @@ pub(super) fn activity(
             break;
         }
         let value = decode(store, item.row)?;
+        if let core::Record::Tasks(tasks::Stored::Activity(line)) = &value
+            && let tasks::Line::Turn { .. } = line.line
+        {
+            if spent.joins == 0 {
+                more = true;
+                break;
+            }
+            spent.joins = spent.joins.checked_sub(1).expect("turn join checked");
+        }
         match joins::row(store, value, Some(&owner), None, spent) {
             Ok(row) => {
                 last = Some(reads::Position::Owner(key));

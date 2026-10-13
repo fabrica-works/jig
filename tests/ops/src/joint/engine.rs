@@ -101,6 +101,7 @@ fn read_page(store: &Rows, range: &core::reads::Range, tree_tasks: u32) -> core:
             owner: Some(Box::new(owner.clone())),
             ancestors: ancestors.into(),
             related: None,
+            unjoined: None,
             linked: Box::new([]),
             inbox: None,
         };

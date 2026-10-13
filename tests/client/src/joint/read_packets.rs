@@ -24,11 +24,12 @@ pub enum Invalid {
 /// # Errors
 /// Leaves the original route intact for mismatched queries, unsupported whole
 /// carriers and values above the receiving bounds.
-pub fn read(
+pub fn read_with_codec(
     transport: &mut Transport,
     to: Token,
     answer: &reads::Answer,
     limits: &Limits,
+    codec: &jig_protocol_transcript::Limits,
 ) -> Result<Incoming, Invalid> {
     let route = transport.reply(to).ok_or(Invalid::MissingRoute)?;
     let Reply::Read { client, read, what } = route else { return Err(Invalid::OwnerRoute) };
@@ -43,7 +44,9 @@ pub fn read(
         }),
         reads::Answer::Page(value) => {
             let value = match what {
-                client::Read::Activity { task, .. } => wire::pages::activity_page(*task, value, limits),
+                client::Read::Activity { task, .. } => {
+                    wire::pages::activity_page_with_codec(*task, value, limits, codec)
+                }
                 client::Read::Notes { scope, description, .. } => {
                     wire::pages::notes_page(scope, description.as_ref(), value, limits)
                 }
@@ -148,6 +151,19 @@ fn project(what: &client::Read, value: &documents::Project, limits: &Limits) -> 
         return Err(Invalid::OwnerRoute);
     }
     Ok(client::ReadResult::Value(wire::documents::project_read(value, limits).map_err(Invalid::Document)?))
+}
+
+/// Translate a fixture read with the shared small codec.
+/// # Errors
+/// Refuses the same routes and payloads as `read_with_codec`.
+#[cfg(test)]
+pub fn read(
+    transport: &mut Transport,
+    to: Token,
+    answer: &reads::Answer,
+    limits: &Limits,
+) -> Result<Incoming, Invalid> {
+    read_with_codec(transport, to, answer, limits, &wire::activity::tests::codec())
 }
 
 #[cfg(test)]

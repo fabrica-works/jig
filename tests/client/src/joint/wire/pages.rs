@@ -153,7 +153,7 @@ pub fn history_page(
             reads::PageRow::EndedDelegate(_)
             | reads::PageRow::History(_)
             | reads::PageRow::Milestone(_)
-            | reads::PageRow::Activity(_)
+            | reads::PageRow::Activity { .. }
             | reads::PageRow::Inbox(_)
             | reads::PageRow::Conversation(_)
             | reads::PageRow::Goal(_)
@@ -173,7 +173,12 @@ pub fn history_page(
 /// # Errors
 /// Refuses another query or row identity, a cursor
 /// above its whole bound or a complete allocated envelope that cannot fit.
-pub fn activity_page(task: u64, page: &reads::Page, limits: &Limits) -> Result<client::ReadValue, Invalid> {
+pub fn activity_page_with_codec(
+    task: u64,
+    page: &reads::Page,
+    limits: &Limits,
+    codec: &jig_protocol_transcript::Limits,
+) -> Result<client::ReadValue, Invalid> {
     let before = continuation(page, &reads::Scope::Activity { task }, limits)?;
     if page.rows.capacity() > limits.rows {
         return Err(Invalid::Owner(owner::Invalid::TooLarge));
@@ -181,7 +186,9 @@ pub fn activity_page(task: u64, page: &reads::Page, limits: &Limits) -> Result<c
     let mut rows = List::with_capacity(page.rows.capacity());
     for row in &page.rows {
         let value = match row {
-            reads::PageRow::Activity(value) => activity::line(task, value, limits).map_err(Invalid::Activity)?,
+            reads::PageRow::Activity { line, turn } => {
+                activity::page_turn(task, line, turn.as_ref(), codec, limits).map_err(Invalid::Activity)?
+            }
             reads::PageRow::EndedDelegate(_)
             | reads::PageRow::History(_)
             | reads::PageRow::Milestone(_)
@@ -224,7 +231,7 @@ pub fn notes_page(
             reads::PageRow::EndedDelegate(_)
             | reads::PageRow::History(_)
             | reads::PageRow::Milestone(_)
-            | reads::PageRow::Activity(_)
+            | reads::PageRow::Activity { .. }
             | reads::PageRow::Inbox(_)
             | reads::PageRow::Conversation(_)
             | reads::PageRow::Goal(_)
@@ -235,6 +242,11 @@ pub fn notes_page(
     let value = client::ReadValue::Notes(Box::new(client::NotePage { rows, before: None, after, cut: page.cut }));
     admission::admit_read_value(&value, &bounds(limits)).map_err(|_| Invalid::Payload)?;
     Ok(value)
+}
+
+#[cfg(test)]
+fn activity_page(task: u64, page: &reads::Page, limits: &Limits) -> Result<client::ReadValue, Invalid> {
+    activity_page_with_codec(task, page, limits, &activity::tests::codec())
 }
 
 #[cfg(test)]
@@ -447,12 +459,15 @@ mod tests {
     fn source() -> reads::Page {
         let mut rows = List::with_capacity(3);
         for position in [u64::MAX, 0] {
-            rows.push(reads::PageRow::Activity(tasks::ActivityLine {
-                task: u64::MAX,
-                position,
-                at: Wall::EPOCH,
-                line: tasks::Line::Turn { reply: u64::MAX, attempt: u64::MAX, turn: u32::MAX, read: Some(0) },
-            }))
+            rows.push(reads::PageRow::Activity {
+                line: tasks::ActivityLine {
+                    task: u64::MAX,
+                    position,
+                    at: Wall::EPOCH,
+                    line: tasks::Line::Turn { reply: u64::MAX, attempt: u64::MAX, turn: u32::MAX, read: Some(0) },
+                },
+                turn: Some(reads::PageTurn::TooLarge { spent: 0, read: Some(0), at: Wall::EPOCH, bytes: 8192 }),
+            })
             .expect("source row");
         }
         reads::Page {
@@ -462,6 +477,89 @@ mod tests {
             next: Some(reads::Cursor::Store { scope: reads::Scope::Activity { task: u64::MAX }, after: None }),
             cut: false,
         }
+    }
+    #[test]
+    fn activity_pages_translate_their_supplied_turn_outcomes() {
+        let (_, archive, codec, limits) = activity::tests::archive_fixture();
+        let mut page = source();
+        for (label, turn) in [
+            ("carried", reads::PageTurn::Carried(archive)),
+            (
+                "too large",
+                reads::PageTurn::TooLarge { spent: 19, read: Some(1), at: Wall::from_nanos(42), bytes: 8192 },
+            ),
+            ("unread", reads::PageTurn::Unread),
+        ] {
+            for index in 0..page.rows.len() {
+                let reads::PageRow::Activity { turn: supplied, .. } = page.rows.get_mut(index).expect("source row")
+                else {
+                    panic!("source row")
+                };
+                *supplied = Some(turn.clone());
+            }
+            let client::ReadValue::Activity(value) =
+                activity_page_with_codec(u64::MAX, &page, &limits, &codec).expect(label)
+            else {
+                panic!("{label}")
+            };
+            for row in &value.rows {
+                assert_supplied_turn(label, &row.event);
+            }
+        }
+        if let reads::PageRow::Activity { turn, .. } = page.rows.get_mut(0).expect("source row") {
+            *turn = None;
+        }
+        assert_eq!(
+            activity_page_with_codec(u64::MAX, &page, &limits, &codec),
+            Err(Invalid::Activity(activity::Invalid::Identity)),
+            "missing turn carrier"
+        );
+    }
+    fn assert_supplied_turn(label: &str, value: &client::Activity) {
+        match value {
+            client::Activity::Owner { decoded: Some(turn), .. } => {
+                assert_eq!((turn.cumulative, turn.read, turn.at), (19, Some(1), Wall::from_nanos(42)), "{label}");
+                if label == "too large" {
+                    assert_eq!(turn.turn, client::TurnRead::Undecodable { why: client::TurnProblem::TooLarge });
+                } else {
+                    assert_eq!(label, "carried");
+                    assert_eq!(turn.turn.decoded().expect(label).spent, u64::MAX);
+                }
+            }
+            client::Activity::Turn { name, turn } => {
+                assert_eq!(label, "unread");
+                assert_eq!(*name, client::TurnName { attempt: u64::MAX, number: u32::MAX }, "{label}");
+                assert_eq!(*turn, client::TurnRead::Undecodable { why: client::TurnProblem::Malformed }, "{label}");
+            }
+            client::Activity::Owner { .. }
+            | client::Activity::Words { .. }
+            | client::Activity::RunBegan { .. }
+            | client::Activity::RunEnded { .. }
+            | client::Activity::Result { .. }
+            | client::Activity::News { .. }
+            | client::Activity::Decision { .. } => panic!("{label}: supplied turn lost"),
+        }
+    }
+    fn assert_activity_reference(row: &client::ActivityLine) {
+        let client::Activity::Owner { source, decoded } = &row.event else {
+            panic!("owner row");
+        };
+        assert_eq!(
+            decoded.as_ref(),
+            Some(&client::ArchivedTurn {
+                task: u64::MAX,
+                name: client::TurnName { attempt: u64::MAX, number: u32::MAX },
+                cumulative: 0,
+                read: Some(0),
+                at: Wall::EPOCH,
+                turn: client::TurnRead::Undecodable { why: client::TurnProblem::TooLarge },
+            })
+        );
+        assert_eq!(source.task, u64::MAX);
+        assert_eq!(
+            source.line,
+            client::OwnerActivity::Turn { reply: u64::MAX, attempt: u64::MAX, turn: u32::MAX, read: Some(0) }
+        );
     }
     #[test]
     fn whole_activity_page_keeps_allocated_rows_exact_archive_references_and_opaque_older_cursor() {
@@ -478,15 +576,7 @@ mod tests {
         assert!(value.after.is_none());
         assert_eq!(cursor::decode(value.before.as_ref().expect("older"), limits().text), page.next);
         for row in &value.rows {
-            let client::Activity::Owner { source, decoded } = &row.event else {
-                panic!("owner row");
-            };
-            assert!(decoded.is_none());
-            assert_eq!(source.task, u64::MAX);
-            assert_eq!(
-                source.line,
-                client::OwnerActivity::Turn { reply: u64::MAX, attempt: u64::MAX, turn: u32::MAX, read: Some(0) }
-            );
+            assert_activity_reference(row);
         }
         let mut ended = page.clone();
         ended.next = None;
@@ -519,7 +609,7 @@ mod tests {
         assert!(page.cut);
         assert_eq!(page.rows, original.rows);
         page = original.clone();
-        if let reads::PageRow::Activity(value) = page.rows.get_mut(0).expect("source row") {
+        if let reads::PageRow::Activity { line: value, .. } = page.rows.get_mut(0).expect("source row") {
             value.task = 0;
         }
         assert_eq!(activity_page(u64::MAX, &page, &limits()), Err(Invalid::Activity(activity::Invalid::Identity)));
@@ -550,7 +640,7 @@ mod tests {
         assert!(activity_page(u64::MAX, &page, &small).is_ok());
         small.document_bytes = refused;
         for row in &page.rows {
-            let reads::PageRow::Activity(row) = row else {
+            let reads::PageRow::Activity { line: row, .. } = row else {
                 panic!("source activity");
             };
             assert!(activity::line(u64::MAX, row, &small).is_ok(), "individual rows still fit");
@@ -633,12 +723,15 @@ mod tests {
             Err(Invalid::Payload)
         );
         let mut wrong = source.clone();
-        *wrong.rows.get_mut(0).expect("whole row") = reads::PageRow::Activity(tasks::ActivityLine {
-            task: u64::MAX,
-            position: 0,
-            at: Wall::EPOCH,
-            line: tasks::Line::Turn { reply: 0, attempt: 0, turn: 0, read: None },
-        });
+        *wrong.rows.get_mut(0).expect("whole row") = reads::PageRow::Activity {
+            line: tasks::ActivityLine {
+                task: u64::MAX,
+                position: 0,
+                at: Wall::EPOCH,
+                line: tasks::Line::Turn { reply: 0, attempt: 0, turn: 0, read: None },
+            },
+            turn: None,
+        };
         assert_eq!(notes_page(&scope, Some(&empty), &wrong, &limits()), Err(Invalid::Identity));
         assert_eq!(source, before);
     }

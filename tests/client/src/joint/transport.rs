@@ -31,7 +31,6 @@ pub enum Reply {
     Keyed { client: ClientId, attempt: Token, key: [u8; 16], owner: KeyedOwner },
     Read { client: ClientId, read: Token, what: Read },
     ApplicationRead { client: ClientId, read: Token, subject: family::Subject },
-    Archive { client: ClientId, request: Token, task: u64, attempt: u64, turn: u32 },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -115,8 +114,7 @@ impl Transport {
                 | Reply::SignOut { client: owner }
                 | Reply::Keyed { client: owner, .. }
                 | Reply::Read { client: owner, .. }
-                | Reply::ApplicationRead { client: owner, .. }
-                | Reply::Archive { client: owner, .. } => *owner != client,
+                | Reply::ApplicationRead { client: owner, .. } => *owner != client,
             }),
             "old replies are detached first"
         );
@@ -344,8 +342,7 @@ impl Transport {
             | Reply::SignOut { client: owner }
             | Reply::Keyed { client: owner, .. }
             | Reply::Read { client: owner, .. }
-            | Reply::ApplicationRead { client: owner, .. }
-            | Reply::Archive { client: owner, .. } => *owner != client,
+            | Reply::ApplicationRead { client: owner, .. } => *owner != client,
         });
         let watches: Vec<_> = self
             .watches
