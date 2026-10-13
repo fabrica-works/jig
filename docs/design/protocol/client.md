@@ -224,9 +224,13 @@ the platform's HTTP stack, TLS                  TLS server, or plaintext on loop
   follows on the stream. A subject an application's connector judges is
   admitted at the end of the step that takes it, and the connector's
   refusal, if it comes later, ends the watch with its reason
-  (`../client/domain/contract.md`, 7.2). The engine names the party from the sign-in, so
-  a subject of the party's own (their frame, their inbox, their
-  conversations) names none.
+  (`../client/domain/contract.md`, 7.2). A subject of the party's own
+  (their frame, their inbox, their conversations) names none, on the
+  wire or in the core's events: the protocol layer hands the core the
+  sign-in's number, and the core names the subject's party from it, as
+  it does a read's, from the sign-ins its people child keeps
+  (`../domain/engine.md`, 5.4). The protocol layer never keeps a
+  sign-in's party, which a restart would lose.
 - **A delivery** is one event on the stream: the watch's name, and the
   document, whole, in its owner's wire. The engine's side writes it when
   the core releases it (held until durable, `../domain/engine.md`,
