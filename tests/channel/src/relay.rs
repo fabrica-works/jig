@@ -66,6 +66,7 @@ pub(crate) struct Peer {
     refusal: Option<jig_protocol_worker_wire::MessageRefusal>,
     recorded: Option<crate::world::Recorded>,
     frame_reads: bool,
+    limits: skein_channel::Limits,
 }
 impl Peer {
     pub(crate) fn opening(case: crate::stories::Opening) -> Self {
@@ -155,6 +156,7 @@ impl Peer {
             refusal: None,
             recorded: None,
             frame_reads: false,
+            limits,
         }
     }
     pub(crate) fn shutdown(&mut self) {
@@ -212,9 +214,8 @@ impl Peer {
                 return;
             }
             if header.kind == 3 {
-                let (_, limits) = crate::fixtures::peer_bounds();
                 let control =
-                    skein_channel::decode_control(header.kind, &self.input[8..end], &limits).expect("refusal");
+                    skein_channel::decode_control(header.kind, &self.input[8..end], &self.limits).expect("refusal");
                 let skein_channel::Control::Refuse { reason, .. } = control else { panic!("refusal kind") };
                 self.refused = Some(reason);
             }
@@ -320,9 +321,9 @@ impl skein_shell::Host for Peer {
             });
         }
         if self.heartbeat.is_some_and(|at| now >= at) && !self.closing {
-            let (_, limits) = crate::fixtures::peer_bounds();
-            self.scripted
-                .play(skein_channel::control_frame(&skein_channel::Control::Ping, &limits).expect("peer heartbeat"));
+            self.scripted.play(
+                skein_channel::control_frame(&skein_channel::Control::Ping, &self.limits).expect("peer heartbeat"),
+            );
             self.heartbeats += 1;
             self.heartbeat = Some(now.saturating_add(skein_lib::Duration::from_secs(1)));
             self.demand();

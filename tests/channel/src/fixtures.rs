@@ -422,15 +422,18 @@ pub(crate) fn engine_message_document() -> Vec<u8> {
     engine_document()
 }
 
-/// Match the fixture's final admitted core bounds, once per engine instance.
+/// Match the fixture's final admitted core bounds, parsed once per test process.
 #[must_use]
 pub fn store_limits() -> jig_test_service::limits::Limits {
-    let bounds = jig_protocol_config::DocumentLimits {
-        bytes: u32::try_from(ENGINE.len()).expect("fixture document size"),
-        tokens: u32::try_from(ENGINE.len()).expect("fixture document size"),
-        depth: 32,
-    };
-    let document = jig_protocol_config::document(ENGINE, &bounds).expect("fixture document");
-    let engine = jig_protocol_config::engine(&document, 0).expect("fixture engine");
-    jig_test_service::limits::for_profile(jig_protocol_config::Profile::Small, &engine.limits)
+    static LIMITS: std::sync::OnceLock<jig_test_service::limits::Limits> = std::sync::OnceLock::new();
+    *LIMITS.get_or_init(|| {
+        let bounds = jig_protocol_config::DocumentLimits {
+            bytes: u32::try_from(ENGINE.len()).expect("fixture document size"),
+            tokens: u32::try_from(ENGINE.len()).expect("fixture document size"),
+            depth: 32,
+        };
+        let document = jig_protocol_config::document(ENGINE, &bounds).expect("fixture document");
+        let engine = jig_protocol_config::engine(&document, 0).expect("fixture engine");
+        jig_test_service::limits::for_profile(jig_protocol_config::Profile::Small, &engine.limits)
+    })
 }
