@@ -1446,6 +1446,14 @@ the file.
      `CEILINGS` (a client decodes whatever smith may have written), at
      most 8 lines, no field, behaviour or landed test changed, named in
      its commit body. The client link builds it from its own limits.
+202. **jig 03.s1: a turn that does not decode, in the client's contract**
+     (2026-10-13, the designer's answer to question.md's "jig 35.2: how a
+     turn that does not decode crosses in the client contract"; jig
+     `13153661`, `941018ab`). The contract gains `TurnRead` and
+     `TurnProblem`, which `Activity::Turn` and `ArchivedTurn` carry. A step
+     not in the plan, jig 03.s1 (`jig/03-*.md`), changes the contract, its
+     users and the view's card first; jig 35.2 carries `TurnRead` after it,
+     and lands its other pages and documents meanwhile.
 
 ## For the user
 

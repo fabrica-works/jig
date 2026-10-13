@@ -643,6 +643,26 @@ Size: at most 110 lines of production code (the lost sign-out, from the
 designer's answer of 2026-10-12, adds about 30).
 Removes: nothing.
 
+### 03.s1 A turn that does not decode, in the client's contract
+
+A step not in the plan (decisions.md, ruling 202), from the designer's
+answer on jig 35.2 (jig `13153661`: `client/domain/client.md`, 10, "A
+turn that does not decode reaches the domain as such, with why ...
+Wherever a turn appears ... it is one of the two, read or not, so the
+view handles both in one place"); its text is the designer's. Before jig
+35.2 carries turns.
+Shape: the contract (`crates/jig-domain-client/src/contract/`) gains
+  `TurnRead { Decoded(Turn), Undecodable { why: TurnProblem } }` and
+  `TurnProblem { Version { found }, Malformed, TooLarge }`;
+  `Activity::Turn` and `ArchivedTurn` carry a `TurnRead` in place of a
+  `Turn`. The joint world's translation and the domain's users follow,
+  with the view's card for an undecodable turn, its words saying why.
+Test shape: a view test of the card; a client world story in which one
+  turn does not decode and the turns around it still show.
+Proof: the gate.
+Don't: drop an undecodable turn, or show another in its place.
+Size: at most 120 lines of production code.
+
 ## Interface sketches
 
 ```rust
