@@ -88,6 +88,7 @@ pub fn client(seed: u64) -> (client::Domain, view::View) {
     let limits = limits();
     let profile = profile();
     let mut domain = client::new(&limits, seed);
+    client::configure_arrangement(&mut domain, view::arrangement()).expect("ops arrangement before start");
     client::provider(
         &mut domain,
         jig_domain_client::signin::Provider { number: 1, name: jig_client_world::stories::text(b"Ops") },

@@ -201,6 +201,7 @@ impl Application for OpsApplication {
     }
     fn cold(peers: &mut Peers, store: &Rows, clock: Clock) {
         peers.packets.clear();
+        peers.protocol.restarted();
         peers.replay_news = true;
         Ops::cold(&mut peers.conformance, store, clock);
     }

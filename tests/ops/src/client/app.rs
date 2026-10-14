@@ -157,6 +157,7 @@ impl App for Ops {
         let (jig, obs, infra) = phrasebooks(&limits);
         let bounds = fixture_profile().0;
         let mut root = domain::new(&limits, seed);
+        domain::configure_arrangement(&mut root, view::arrangement()).expect("ops arrangement before start");
         domain::provider(
             &mut root,
             jig_domain_client::signin::Provider { number: 1, name: jig_client_world::stories::text(b"Ops") },

@@ -83,6 +83,7 @@ fn drive(root: &mut Domain, event: Event) -> Vec<Request> {
 }
 fn ready() -> Domain {
     let mut root = root::new(&limits(), 5);
+    root::configure_arrangement(&mut root, crate::arrangement()).expect("ops arrangement before start");
     let rows = drive(
         &mut root,
         Event::Start {
@@ -489,6 +490,89 @@ fn task() -> Task {
         result: None,
         delegates: list([]),
     }
+}
+
+fn arranged_task_view(section: jig_domain_client::address::TaskSection) -> View {
+    let mut root = ready();
+    let requests = drive(
+        &mut root,
+        Event::Went {
+            place: root::Place::Address(Address::Jig(jig_domain_client::address::Address::Task { task: 9, section })),
+        },
+    );
+    let watch = requests
+        .iter()
+        .find_map(|request| match request {
+            Request::Jig(JigOut::Open { watch, subject: Subject::Task { task: 9 } }) => Some(*watch),
+            _ => None,
+        })
+        .expect("task watch");
+    let mut document = task();
+    document.context.as_mut().expect("task context").impact.tasks.waiting = 1;
+    drive(
+        &mut root,
+        Event::Jig(jig_domain_client::Event::Watch {
+            watch,
+            event: WatchEvent::Delivered(Delivery::Task(Box::new(document))),
+        }),
+    );
+    let (jig, obs, infra) = phrasebooks();
+    let mut bounds = Limits::of(&limits(), &jig, &obs, &infra).unwrap();
+    bounds.tree.nodes = 512;
+    bounds.tree.bindings = 512;
+    bounds.tree.slots = 64;
+    bounds.tree.patches = 2560;
+    bounds.tree.text_bytes = bounds.tree.nodes.checked_mul(bounds.tree.text_per_node).unwrap();
+    let mut view = View::new(&bounds, &limits(), jig, obs, infra, 1);
+    let mut patches = Queue::with_capacity(view.limits().tree.patches);
+    build(&mut view, &root, &mut patches);
+    view
+}
+
+#[test]
+fn an_ops_task_page_puts_budget_and_panels_in_an_aside() {
+    use jig_view::{Role, regions::JigRegion};
+    let view = arranged_task_view(jig_domain_client::address::TaskSection::Plan);
+    let (index, aside) = view.tree().nodes().iter().enumerate().find(|(_, n)| n.role == Role::Complementary).unwrap();
+    let regions: Vec<_> = view
+        .tree()
+        .nodes()
+        .iter()
+        .skip(index + 1)
+        .take(usize::try_from(aside.size - 1).unwrap())
+        .filter_map(|node| node.region)
+        .collect();
+    assert_eq!(regions, [JigRegion::TaskBudget.region(), JigRegion::TaskPanels.region()]);
+}
+
+#[test]
+fn an_ops_task_page_marks_the_addresss_own_section_current() {
+    use jig_view::regions::JigRegion;
+    let view = arranged_task_view(jig_domain_client::address::TaskSection::Plan);
+    let rows = [
+        (JigRegion::TaskOverview, &[][..]),
+        (JigRegion::TaskActivity, &[][..]),
+        (JigRegion::TaskPlan, &[jig_view::State::Current][..]),
+        (JigRegion::TaskHistory, &[][..]),
+        (JigRegion::TaskBudget, &[][..]),
+        (JigRegion::TaskPanels, &[][..]),
+    ];
+    for (region, expected) in rows {
+        let node = view.tree().nodes().iter().find(|node| node.region == Some(region.region())).unwrap();
+        assert_eq!(node.states.as_slice(), expected, "{region:?}");
+    }
+}
+
+#[test]
+fn an_ops_arranged_task_page_keeps_the_outline() {
+    let view = arranged_task_view(jig_domain_client::address::TaskSection::Plan);
+    assert_eq!(jig_view::outline::check(view.tree()), None);
+}
+
+#[test]
+fn an_ops_arranged_task_page_has_no_tabs() {
+    let view = arranged_task_view(jig_domain_client::address::TaskSection::Plan);
+    assert_eq!(view.tree().nodes().iter().filter(|node| node.role == jig_view::Role::Tabs).count(), 0);
 }
 fn proposal(key: ProposalKey) -> Proposal {
     Proposal {

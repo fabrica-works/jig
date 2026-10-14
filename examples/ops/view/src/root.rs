@@ -88,7 +88,9 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
     view.infrastructure.begin();
     let mut builder = view.render.builder();
     builder.open(Role::Page);
-    if !jig_view::jig(&mut builder, root.jig(), observability::NAV, &view.words, &mut view.jig) {
+    if let Some(task) = arranged_task(root.jig()) {
+        task_page(&mut builder, root.jig(), task, &view.words, &mut view.jig);
+    } else if !jig_view::jig(&mut builder, root.jig(), observability::NAV, &view.words, &mut view.jig) {
         builder.open(Role::Main);
         if root.observability().address().is_some() {
             observability::page(&mut builder, root.observability(), &view.observability_words, &mut view.observability);
@@ -189,6 +191,49 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
         }
     }
     view.render.finish(builder, shown, out);
+}
+
+fn arranged_task(client: &jig_domain_client::Domain) -> Option<u64> {
+    use jig_domain_client::{address::Address, pages::Page};
+    match client.page() {
+        Page::Work { address, .. } => match address {
+            Address::Task { task, .. } => Some(*task),
+            Address::Inbox { .. } | Address::Conversations { .. } | Address::Project { .. } | Address::Deployment => {
+                None
+            }
+        },
+        Page::Starting | Page::Elsewhere | Page::SigningIn | Page::Missing | Page::OutOfDate | Page::SomeoneElse => {
+            None
+        }
+    }
+}
+
+// The application's arrangement keeps jig's outline and its whole sections (pages.md, 12.3).
+fn task_page(
+    b: &mut Builder,
+    client: &jig_domain_client::Domain,
+    task: u64,
+    words: &jig_view::words::Words,
+    bindings: &mut JigBindings,
+) {
+    use jig_domain_client::{address::TaskSection, pages::Section};
+    use jig_view::phrases::{Hole, jig::JigPhrase};
+    jig_view::frame::banner(b, client, words, bindings);
+    jig_view::frame::navigation(b, client, observability::NAV, words, bindings);
+    b.open(Role::Main);
+    jig_view::pages::heading(b, words, JigPhrase::TaskPage, &[Hole::Number(task)]);
+    jig_view::sections::task::header(b, client, words, bindings);
+    for section in [TaskSection::Overview, TaskSection::Activity, TaskSection::Plan, TaskSection::History] {
+        jig_view::sections::section(b, client, words, bindings, Section::Task { task, section });
+    }
+    jig_view::pages::excess(b, client, words);
+    b.close();
+    b.open(Role::Complementary);
+    for section in [TaskSection::Budget, TaskSection::Panels] {
+        jig_view::sections::section(b, client, words, bindings, Section::Task { task, section });
+    }
+    b.close();
+    jig_view::after_page(b, client, words, bindings);
 }
 fn infrastructure_part(bindings: &JigBindings, token: skein_lib::Token) -> Option<jig_domain_client::contract::Part> {
     match bindings.part(token) {

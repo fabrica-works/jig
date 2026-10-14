@@ -1,6 +1,16 @@
 //! Keep: checked child sums and both slot passes (view.md, 10).
 //! Replace: application family and connector node bounds.
 use crate::{bindings, drawing, words::Words};
+/// Every task section is visible together (examples.md, 8).
+#[must_use]
+pub fn arrangement() -> jig_domain_client::pages::Arrangement {
+    use jig_domain_client::address::TaskSection::{Activity, Budget, History, Overview, Panels, Plan};
+    let mut task = skein_lib::List::with_capacity(6);
+    for section in [Overview, Activity, Plan, History, Budget, Panels] {
+        task.push(section).expect("six task sections fit");
+    }
+    jig_domain_client::pages::Arrangement { task, project: skein_lib::List::with_capacity(0) }
+}
 /// Bounds for the composed tree and owner bindings.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
@@ -43,14 +53,7 @@ impl Limits {
             .checked_add(jig_nodes.checked_mul(rows.checked_add(3)?)?)?
             .checked_add(jig_cards)?
             .checked_add(8)?;
-        let mut tree = jig_view::Limits::compose(
-            &domain.jig,
-            jig,
-            &jig_domain_client::pages::Arrangement::none(),
-            application_nodes,
-            slot_nodes,
-            8,
-        )?;
+        let mut tree = jig_view::Limits::compose(&domain.jig, jig, &arrangement(), application_nodes, slot_nodes, 8)?;
         tree.text_per_node = tree
             .text_per_node
             .max(observability.capacity()?.max(infrastructure.capacity()?).checked_mul(2)?.checked_add(32)?)
