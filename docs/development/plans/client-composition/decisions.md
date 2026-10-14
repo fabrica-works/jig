@@ -313,6 +313,9 @@ your best judgement").
      - 07.2: `SectionStatus` derives `Clone, Copy, Debug, PartialEq, Eq` (`missing_debug_implementations`), and `pages.rs` re-exports it, since `shown` is `pub(crate)`.
      Checked: `git grep -n 'MOST_SECTIONS' origin/main -- crates/jig-domain-client/src` prints `domain.rs:123` (`sections: List::with_capacity(crate::pages::MOST_SECTIONS)`) and `pages.rs:34` (`pub const MOST_SECTIONS: u32 = 19;`); `git grep -n -E 'refuse\(domain, Limit::' origin/main` prints `conversation/chips.rs:28` with `Limit::Objects`. The ready check compiled the sketch's event and owner under clippy; its only errors were the non-exhaustive matches 07.1's Files list.
 
+113. **jig 07.2 lands at up to 215 production lines** (plan defect, jig 07's block of 2026-10-14T15:30:33Z).
+     jig 07.2 lands at the reported size: at most 215 lines of production code, as code-organization.md 6 counts them (`git diff -M --numstat origin/main...HEAD -- <the increment's Files>`, added less removed, once), against its Size of 120 and the ask line of 180. The reason the report gives holds, and the cheaper shape it names breaks client.md 5.1 ("What a page says of itself, a section says on an application's page"): one section's refusal would show in every section, and a plan's Tree failure would mark an unrelated deployment section. The per-section status, kept for each accepted section, and the 19-bit mask over `MOST_SECTIONS` (19) stay as the report describes. Unchanged: code-organization.md 6's file limits (`domain.rs` and `pages/routing.rs` grow by at most 40 lines in session 07), the other increments' Sizes and their ask lines, and `SectionStatus`'s fields. The commit body gives the count and names this ruling.
+
 ## For the user
 
 Long-term choices the user may veto. Each was decided by the planner
