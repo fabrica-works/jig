@@ -29,6 +29,24 @@ fn p_accepts_a_restart_from_the_incidents_page_with_a_second_seed() {
     accept_restart(502);
 }
 
+#[test]
+fn p_accepts_the_restart_in_its_leads_plan_on_the_incidents_page() {
+    let mut world = stories::incident_world(503);
+    let p = world.client(7, stories::incident());
+    world.person(
+        p,
+        vec![
+            see(b"R restart checkout"),
+            see(b"Restart checkout in production"),
+            press(b"Accept"),
+            press(b"Confirm"),
+            see(b"Accepted"),
+        ],
+    );
+    assert_eq!(world.run(Until::Done).verdict, Verdict::Passed);
+    assert_eq!(world.front().engine.commits().iter().filter(|c| c.key.is_some()).count(), 1);
+}
+
 fn accept_restart(seed: u64) {
     let mut world = stories::incident_world(seed);
     world.measure_heap();
