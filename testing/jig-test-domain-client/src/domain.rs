@@ -155,3 +155,11 @@ pub fn provider(
 ) -> Result<(), jig_domain_client::signin::Provider> {
     root.jig.provider(provider)
 }
+
+/// Installs the application's arrangement before Start; jig validates it.
+pub fn configure_arrangement(
+    root: &mut Domain,
+    arrangement: jig_domain_client::pages::Arrangement,
+) -> Result<(), jig_domain_client::pages::Arrangement> {
+    root.jig.configure_arrangement(arrangement)
+}

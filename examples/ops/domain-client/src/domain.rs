@@ -194,3 +194,11 @@ pub fn configure_navigation(
 ) -> Result<(), jig_domain_client::pages::navigation::Navigation> {
     root.jig.configure_navigation(navigation)
 }
+
+/// Installs the application's arrangement before Start; jig validates it.
+pub fn configure_arrangement(
+    root: &mut Domain,
+    arrangement: jig_domain_client::pages::Arrangement,
+) -> Result<(), jig_domain_client::pages::Arrangement> {
+    root.jig.configure_arrangement(arrangement)
+}

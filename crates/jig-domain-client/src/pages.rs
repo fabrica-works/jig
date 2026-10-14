@@ -1,6 +1,10 @@
 //! One page at a time, with a generation and its watch freshness.
 //! Reads, object sources and parts belong to the current generation. See client/domain/client.md, 5 and 8.2.
-use crate::{address::Address, contract::Limit};
+use crate::{
+    address::{Address, ProjectSection, TaskSection},
+    contract::Limit,
+};
+use skein_lib::List;
 pub mod conversations;
 pub mod deployment;
 pub mod inbox;
@@ -20,14 +24,63 @@ pub enum Section {
     /// The party's chats in a project or any.
     Conversations { project: Option<u32> },
     /// One section of one task.
-    Task { task: u64, section: crate::address::TaskSection },
+    Task { task: u64, section: TaskSection },
     /// One section of one project.
-    Project { project: u32, section: crate::address::ProjectSection },
+    Project { project: u32, section: ProjectSection },
     /// The deployment's capacity and configuration.
     Deployment,
 }
 /// The most sections a page shows: 2 + 1 + 6 + 9 + 1.
 pub const MOST_SECTIONS: u32 = 19;
+
+/// Sections added beside each address's own (client/domain/client.md, 5.1).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Arrangement {
+    /// Additional sections of every task page.
+    pub task: List<TaskSection>,
+    /// Additional sections of every project page.
+    pub project: List<ProjectSection>,
+}
+impl Arrangement {
+    /// Jig's arrangement adds no sections.
+    #[must_use]
+    pub fn none() -> Self {
+        Self { task: List::with_capacity(0), project: List::with_capacity(0) }
+    }
+    pub(crate) fn valid(&self) -> bool {
+        if self.task.len() > 6 || self.project.len() > 10 {
+            return false;
+        }
+        for (i, section) in self.task.as_slice().iter().enumerate() {
+            if self.task.as_slice().get(..i).expect("prefix is within the list").contains(section) {
+                return false;
+            }
+        }
+        let settings = self.project.as_slice().contains(&ProjectSection::Settings);
+        for (i, section) in self.project.as_slice().iter().enumerate() {
+            if self.project.as_slice().get(..i).expect("prefix is within the list").contains(section) {
+                return false;
+            }
+            match section {
+                ProjectSection::Resources
+                | ProjectSection::Policy
+                | ProjectSection::Roles
+                | ProjectSection::Spend
+                | ProjectSection::Recurring => {
+                    if settings {
+                        return false;
+                    }
+                }
+                ProjectSection::Overview
+                | ProjectSection::Goals
+                | ProjectSection::Tasks
+                | ProjectSection::Notes
+                | ProjectSection::Settings => {}
+            }
+        }
+        true
+    }
+}
 
 /// The visible page, including states unrelated to work.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

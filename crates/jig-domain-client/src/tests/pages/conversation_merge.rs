@@ -506,7 +506,7 @@ fn an_owner_replay_joins_once_and_full_admission_keeps_the_current_cursor() {
     let history = drive(
         &mut domain,
         Time::ZERO,
-        Event::Went { place: Place::Jig(Address::Task { task: 42, section: crate::address::TaskSection::History }) },
+        Event::Went { place: Place::Jig(Address::Task { task: 42, section: TaskSection::History }) },
     );
     let history_read = read_named(&history, &Read::History { task: 42, subtree: false, after: None });
     drive(&mut domain, Time::ZERO, Event::Ended { watch: old_watch, end: WatchEnd::Closed });

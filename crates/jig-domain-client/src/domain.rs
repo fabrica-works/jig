@@ -20,7 +20,7 @@ use crate::{
     frame::{FrameShown, FrameState},
     limits::Limits,
     link::Link,
-    pages::{Page, Section},
+    pages::{Arrangement, Page, Section},
     store::Record,
     watches::{Following, Owner, Watch},
 };
@@ -65,6 +65,7 @@ pub struct Domain {
     pub(crate) link: Link,
     pub(crate) page: Page,
     pub(crate) sections: List<Section>,
+    pub(crate) arrangement: Arrangement,
     pub(crate) inbox: crate::pages::inbox::Inbox,
     pub(crate) project_page: crate::pages::project::ProjectPage,
     pub(crate) deployment_page: crate::pages::deployment::DeploymentPage,
@@ -118,6 +119,7 @@ impl Domain {
             link: Link::Starting,
             page: Page::Starting,
             sections: List::with_capacity(crate::pages::MOST_SECTIONS),
+            arrangement: Arrangement::none(),
             inbox: crate::pages::inbox::Inbox::new(limits.rows),
             project_page: crate::pages::project::ProjectPage::new(limits.rows),
             deployment_page: crate::pages::deployment::DeploymentPage::new(),
@@ -168,6 +170,19 @@ impl Domain {
         }
         self.navigation = navigation;
         Ok(())
+    }
+    /// Installs an application's arrangement before start (client/domain/client.md, 5.1).
+    pub fn configure_arrangement(&mut self, arrangement: Arrangement) -> Result<(), Arrangement> {
+        if self.started || !arrangement.valid() {
+            return Err(arrangement);
+        }
+        self.arrangement = arrangement;
+        Ok(())
+    }
+    /// Sections added beside each task or project address's own.
+    #[must_use]
+    pub const fn arrangement(&self) -> &Arrangement {
+        &self.arrangement
     }
     /// Inbox context, filters and historical cursors for its shared cards.
     #[must_use]

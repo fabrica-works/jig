@@ -5,11 +5,11 @@ mod task_proposals;
 use super::spine::{LIMITS, delivered, drive, frame, open_token, start};
 use crate::{
     Domain, Event, Request,
-    address::{Address, Place, ProjectSection},
+    address::{Address, Place, ProjectSection, TaskSection},
     contract::*,
     link::Link,
     pages::{
-        Page, Section,
+        Arrangement, Page, Section,
         navigation::{Destination, Navigation},
     },
 };
@@ -71,7 +71,7 @@ fn the_frame_counts_needs_exactly_and_caps_updates_on_every_page() {
         Event::Went { place: Place::Jig(Address::Project { project: 1, section: ProjectSection::Overview }) },
     );
     assert_eq!(domain.frame_summary().project, Some(1));
-    assert_eq!(Address::task(42), Address::Task { task: 42, section: crate::address::TaskSection::Overview });
+    assert_eq!(Address::task(42), Address::Task { task: 42, section: TaskSection::Overview });
 }
 fn navigation_keeps_the_application_order_and_leaves_out_inapplicable_pages() {
     let mut domain = Domain::new(&LIMITS, 2);
@@ -112,6 +112,49 @@ fn navigation_keeps_the_application_order_and_leaves_out_inapplicable_pages() {
     let mut fresh = Domain::new(&LIMITS, 3);
     assert!(fresh.configure_navigation(Navigation::new(9)).is_err());
     assert_eq!(own.place(), Place::Elsewhere);
+}
+fn arrangement(task: &[TaskSection], project: &[ProjectSection]) -> Arrangement {
+    let mut value = Arrangement { task: List::with_capacity(7), project: List::with_capacity(11) };
+    for section in task {
+        value.task.push(*section).unwrap();
+    }
+    for section in project {
+        value.project.push(*section).unwrap();
+    }
+    value
+}
+#[test]
+fn an_arrangement_given_before_the_start_is_kept() {
+    let mut domain = Domain::new(&LIMITS, 2);
+    assert_eq!(domain.arrangement(), &Arrangement::none());
+    assert_eq!(domain.arrangement().task.capacity(), 0);
+    assert_eq!(domain.arrangement().project.capacity(), 0);
+    let value = arrangement(&[TaskSection::Plan, TaskSection::History], &[ProjectSection::Goals]);
+    assert_eq!(domain.configure_arrangement(value.clone()), Ok(()));
+    start(&mut domain, List::with_capacity(0));
+    assert_eq!(domain.arrangement(), &value);
+}
+#[test]
+fn each_malformed_arrangement_is_refused() {
+    let rows = [
+        ("seven task sections", arrangement(&[TaskSection::Overview; 7], &[])),
+        ("eleven project sections", arrangement(&[], &[ProjectSection::Overview; 11])),
+        ("Plan twice", arrangement(&[TaskSection::Plan; 2], &[])),
+        ("Goals twice", arrangement(&[], &[ProjectSection::Goals; 2])),
+        ("Settings with Resources", arrangement(&[], &[ProjectSection::Settings, ProjectSection::Resources])),
+        ("Settings with Policy", arrangement(&[], &[ProjectSection::Settings, ProjectSection::Policy])),
+        ("Settings with Roles", arrangement(&[], &[ProjectSection::Settings, ProjectSection::Roles])),
+        ("Settings with Spend", arrangement(&[], &[ProjectSection::Settings, ProjectSection::Spend])),
+        ("Settings with Recurring", arrangement(&[], &[ProjectSection::Settings, ProjectSection::Recurring])),
+    ];
+    let mut domain = Domain::new(&LIMITS, 2);
+    for (label, value) in rows {
+        assert_eq!(domain.configure_arrangement(value.clone()), Err(value), "{label}");
+        assert_eq!(domain.arrangement(), &Arrangement::none(), "{label}");
+    }
+    start(&mut domain, List::with_capacity(0));
+    let value = arrangement(&[TaskSection::Plan], &[]);
+    assert_eq!(domain.configure_arrangement(value.clone()), Err(value), "after the start");
 }
 fn non_work_pages_follow_their_causes_and_missing_tasks_do_not_reveal_visibility() {
     let mut domain = Domain::new(&LIMITS, 4);
@@ -470,7 +513,7 @@ fn starting_a_chat_joins_refuses_and_opens_only_after_its_durable_answer() {
             let Page::Work { address, .. } = domain.page() else {
                 panic!("chat opened");
             };
-            assert_eq!(*address, Address::Task { task: 42, section: crate::address::TaskSection::Activity });
+            assert_eq!(*address, Address::Task { task: 42, section: TaskSection::Activity });
             assert!(domain.fields().get(crate::fields::Purpose::NewChat).unwrap().text.bytes().is_empty());
         }
         domain.reclaim();
@@ -582,7 +625,7 @@ fn task_plan_keeps_folded_held_counts_and_filters_without_losing_rows() {
     let opened = drive(
         &mut domain,
         Time::ZERO,
-        Event::Went { place: Place::Jig(Address::Task { task: 8, section: crate::address::TaskSection::Plan }) },
+        Event::Went { place: Place::Jig(Address::Task { task: 8, section: TaskSection::Plan }) },
     );
     let watch = open_token(&opened);
     let tree_open = drive(
@@ -1977,7 +2020,7 @@ fn owner_started_chat_navigates_from_the_original_request_and_keeps_late_answers
             assert_eq!(domain.page(), &Page::Elsewhere);
         } else {
             let Page::Work { address, .. } = domain.page() else { panic!("actual chat task") };
-            assert_eq!(*address, Address::Task { task: u64::MAX, section: crate::address::TaskSection::Activity });
+            assert_eq!(*address, Address::Task { task: u64::MAX, section: TaskSection::Activity });
         }
     }
 }
@@ -2347,7 +2390,7 @@ fn task_watch_replacements_keep_served_goal_identity_and_whole_contract_loss_ind
         assert_eq!(**retained, expected);
         assert!(!retained.cut, "contract loss is not aggregate task-list loss");
         let sections = crate::pages::task::offers(retained);
-        assert!(crate::pages::task::offered(&sections, crate::address::TaskSection::Overview));
+        assert!(crate::pages::task::offered(&sections, TaskSection::Overview));
     }
 }
 
@@ -2432,10 +2475,7 @@ fn task_budget_watch_replacements_keep_all_owner_numbers_funders_and_optional_de
             assert_eq!(**actual, row);
             assert_eq!(actual.budget.left, 17, "availability is supplied independently of the numbers");
             assert_eq!(actual.budget.deadline, deadline, "authority is a separate supplied fact");
-            assert!(crate::pages::task::offered(
-                &crate::pages::task::offers(actual),
-                crate::address::TaskSection::Budget
-            ));
+            assert!(crate::pages::task::offered(&crate::pages::task::offers(actual), TaskSection::Budget));
         }
     }
 }
@@ -2616,9 +2656,9 @@ fn a_task_address_shows_its_own_section_alone() {
     drive(
         &mut domain,
         Time::ZERO,
-        Event::Went { place: Place::Jig(Address::Task { task: 9, section: crate::address::TaskSection::Plan }) },
+        Event::Went { place: Place::Jig(Address::Task { task: 9, section: TaskSection::Plan }) },
     );
-    assert_eq!(domain.sections(), &[Section::Task { task: 9, section: crate::address::TaskSection::Plan }]);
+    assert_eq!(domain.sections(), &[Section::Task { task: 9, section: TaskSection::Plan }]);
 }
 #[test]
 fn a_page_not_about_the_work_shows_no_section() {

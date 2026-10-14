@@ -18,7 +18,9 @@ mod route;
 pub mod store;
 pub use address::{Address, Place};
 pub use boundary::{Action, Answered, Ask, Event, Fact, JigOut, Request};
-pub use domain::{Domain, configure_navigation, fire, new, next_deadline, provider, shown, step, take};
+pub use domain::{
+    Domain, configure_arrangement, configure_navigation, fire, new, next_deadline, provider, shown, step, take,
+};
 pub use limits::{Limits, max_out, worst_case};
 #[cfg(test)]
 mod tests;
