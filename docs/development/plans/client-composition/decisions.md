@@ -181,6 +181,48 @@ your best judgement").
 105. **jig 09.1: the shell's name in the renderer's bound, interim** (design gap, jig 09's block of 2026-10-14T13:55:46Z).
      Interim, until the designer's answer (development.md, 10.4): what bounds the shell's name in the renderer's print is a design gap (view.md 15.1: "Its output is bounded: the most lines and bytes the view's largest tree prints, counted from the view's limits"; 15.3: TITLE is "the shell's name when there is none"), and it is the designer's. jig 09.1 goes on with the work that does not rest on the answer: the role renderer (`render`, the role table of view.md 15.3, the numbers of 15.4), `src/tests/fixtures.rs`, the two goldens and the four tests, the boundary test. `render` takes the name as `&[u8]`, as the plan's Shape gives it. What rests on the answer, and waits for it: how `worst_case` and `Print::new` count the name's bytes, and any check of the name in `Settings` or `Terminal::new` (jig 10). 09.1 does not land before the answer; with its other work done, it waits for the final unblock, which says how the name is counted.
 
+106. **jig 09.1: the shell's name in the renderer's bound** (design gap, jig 09's block of 2026-10-14T13:55:46Z).
+     The designer's answer, landed in jig 346aaa4c7 (view.md 15.1) and 6e3fa0440 (jig/09-text-shell.md, jig/10-terminal.md); jig-09.1 may land once its work follows it:
+
+     # Answer
+
+     Answer to question.md's "jig 09.1: the shell's name in the renderer's
+     bound, 2026-10-14T13:55:46Z", from the designer.
+
+
+     Reading 1, the implementer's proposal, holds. The shell's name is at most
+     a node's text, `limits.text_per_node` bytes; `Terminal::new` refuses a
+     longer one; the renderer's bound stays counted from the view's limits
+     alone. No signature of jig 09 changes: `render(tree, name, print)`,
+     `worst_case(limits)`, `Print::new(limits)`.
+
+     Why: on the first line the name takes the place of a node's text, the
+     main's level-1 heading (view.md 15.3: "TITLE is the text of the main's
+     first level-1 heading, or the shell's name when there is none"), so it is
+     bounded as that text is. Reading 2 would make the bound the view's limits
+     and a second number, against 15.1's "counted from the view's limits", and
+     thread that number through `worst_case` and `Print::new` for a name of a
+     few bytes (`ops`, `jig`). Checked on jig `main` (6e3fa044):
+
+     - `crates/jig-view/src/limits.rs:16-17`: `text_per_node` is "Name, runs,
+       field value and external target together on a node."
+     - `crates/jig-view/src/limits.rs:112-115`: `text_per_node` is at least
+       twice a phrase's bytes (`phrase.checked_mul(2)?`), so jig's limits
+       leave a name far more than it needs.
+     - `crates/jig-view/src/tree.rs:328-330`: `Tree` keeps only `nodes`, no
+       `Limits`, so
+       `render` knows the name's bound only if its `Print` keeps it.
+     - `clippy.toml:87`: `core::debug_assert` is disallowed, "assertions stay
+       on in production: assert!".
+
+     The design now says so, `client/domain/view.md`, 15.1. The renderer:
+     "Its output is bounded: the most lines and bytes the view's largest tree
+     prints, counted from the view's limits. The shell's name, which the first
+     line prints when the main has no level-1 heading (15.3), is at most a
+     node's text, so the same limits count it." Its settings: "the name its
+     own lines start with (its own, and at most the bytes the view's limits
+     give a node's text: the terminal refuses a longer one)".
+
 ## For the user
 
 Long-term choices the user may veto. Each was decided by the planner
