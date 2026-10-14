@@ -140,6 +140,7 @@ fn client_step(name: &str) -> bool {
         name,
         "jig-domain-client"
             | "jig-view"
+            | "jig-shell-text"
             | "jig-protocol-transcript"
             | "jig-protocol-client-wire"
             | "jig-protocol-client-link"
@@ -175,6 +176,7 @@ fn client_and_engine_step_crates_share_no_dependencies() {
 fn client_roles_cover_step_crates_and_exclude_the_world() {
     assert!(client_step("jig-domain-client"));
     assert!(client_step("jig-view"));
+    assert!(client_step("jig-shell-text"));
     assert!(client_step("jig-protocol-transcript"));
     assert!(client_step("jig-test-domain-client"));
     assert!(client_step("jig-test-view"));
@@ -448,6 +450,7 @@ fn client_engine_breaches(manifests: &[CrateManifest]) -> Vec<String> {
             Some(
                 "jig-domain-client"
                     | "jig-view"
+                    | "jig-shell-text"
                     | "jig-protocol-client-wire"
                     | "jig-protocol-client-link"
                     | "jig-shell-native"

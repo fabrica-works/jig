@@ -889,6 +889,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "jig-shell-text"
+version = "0.0.0"
+dependencies = [
+ "jig-view",
+ "skein-lib",
+]
+
+[[package]]
 name = "jig-store-codecs-world"
 version = "0.0.0"
 dependencies = [
