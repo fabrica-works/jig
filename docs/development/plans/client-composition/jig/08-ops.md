@@ -125,9 +125,12 @@ Files: `tests/ops/src/client/app.rs:155-166` (`new`:
   `examples/ops/domain-client/src/domain.rs:198-204`
   (`configure_arrangement`, from jig 04.1); `crates/jig-view/src/pages.rs:56`
   (`excess` becomes `pub`, with a one-line doc comment);
-  `examples/ops/view/src/tests.rs`; where ruling 117's investigation
-  finds the joint world's missing acknowledgement,
-  `tests/ops/src/joint/front.rs` or `tests/client/src/joint/{referee,session}.rs`.
+  `examples/ops/view/src/tests.rs`; for the joint world's missing
+  acknowledgement (ruling 117; protocol/client.md, section 7: only a
+  restart excuses telling the core of a delivery taken),
+  `tests/client/src/joint/referee.rs` (`Referee::restarted`, and its
+  unit test) and `tests/ops/src/joint/engine.rs:202-206` (`cold` calls
+  `peers.protocol.restarted()`).
 Shape: `jig_ops_view::arrangement()` is `Arrangement { task: [Overview,
   Activity, Plan, History, Budget, Panels], project: [] }`; the client
   constructor gives it to `configure_arrangement`, and `ops`'s
@@ -149,7 +152,10 @@ Test shape: `examples/ops/view/src/tests.rs`:
   complementary holds the regions `jig-task-budget` and
   `jig-task-panels`; `outline::check` is `None`) and
   `an_ops_task_page_marks_the_addresss_own_section_current`. Each under
-  20 ms.
+  20 ms. `tests/client/src/joint/referee.rs`:
+  `only_a_restart_excuses_a_taken_delivery` (a consumed delivery fails
+  `check` until `acknowledged`; another fails it until `restarted`,
+  after which `acknowledgements()` is still 1), under 5 ms.
 Proof: world, `heavy cargo nextest run -p jig-ops-world` once: `ops`'s
   stories that visit a task's plan and panels pass on the arranged page,
   the referee holding it to the outline.
