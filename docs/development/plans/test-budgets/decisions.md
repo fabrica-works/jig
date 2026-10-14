@@ -219,7 +219,8 @@ the file.
      unclipped length varies with elapsed time, yet both failures show
      exactly 85 = 80 + `Again`. The fix is the test's: the person waits
      for the line's end (`smith/02.s1-window-echo.md`). No product
-     change. Ruling 108's retry ends when 02.s1 lands.
+     change. Ruling 108's retry ends when 02.s1 lands: it landed as smith
+     `15a37563`, and the README's rule was removed.
 110. **skein-02.s1 moves a golden table's cases out of its test
      function** (step not in the plan; smith 01's block of
      2026-10-14T00:39:27Z, cross-session scope). skein 02.2's golden
