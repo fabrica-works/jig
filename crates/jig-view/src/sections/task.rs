@@ -304,7 +304,7 @@ fn activity(b: &mut Builder, client: &Domain, doc: &Task, words: &Words, binding
                 | ChipPhase::Ended { .. } => {}
             }
             if let Some(context) = &doc.context {
-                crate::pages::conversations::runtime(b, client, &context.runtime, words, bindings);
+                super::conversations::runtime(b, client, &context.runtime, words, bindings);
             }
             crate::turns::conversation(b, client, words, bindings);
             for proposal in &client.task_page().proposals {

@@ -6,17 +6,22 @@ use crate::{
 };
 use jig_domain_client::Domain;
 /// Show the admitted deployment document and its connector-owned parts.
-pub fn deployment(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
-    super::heading(b, words, JigPhrase::Deployment, &[]);
+pub(crate) fn section(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) -> bool {
+    if !client.shows(jig_domain_client::pages::Section::Deployment) {
+        return false;
+    }
+    crate::pages::work::section(b, words, JigPhrase::Deployment, crate::regions::JigRegion::Deployment);
     if let Some(doc) = &client.deployment_page().owner {
         crate::owner_deployment::render(b, client, doc, words, bindings);
-        super::excess(b, client, words);
-        return;
+        b.close();
+        return true;
     }
     let Some(doc) = &client.deployment_page().document else {
         words.status(b, JigPhrase::LoadingObject, &[]);
-        return;
+        b.close();
+        return true;
     };
+    region(b, words, crate::regions::JigRegion::Hosts, crate::owner_deployment_words::DeploymentPhrase::Hosts);
     b.open(Role::List);
     b.name(&words.say(JigPhrase::Deployment, &[]));
     for host in &doc.hosts {
@@ -40,6 +45,8 @@ pub fn deployment(b: &mut Builder, client: &Domain, words: &Words, bindings: &mu
         b.close();
     }
     b.close();
+    b.close();
+    region(b, words, crate::regions::JigRegion::Accounts, crate::owner_deployment_words::DeploymentPhrase::Accounts);
     b.open(Role::List);
     for account in &doc.accounts {
         b.open(Role::Item);
@@ -62,7 +69,8 @@ pub fn deployment(b: &mut Builder, client: &Domain, words: &Words, bindings: &mu
         b.close();
     }
     b.close();
-    super::work::section(b, words, JigPhrase::Capacity, crate::regions::JigRegion::Capacity);
+    b.close();
+    crate::pages::work::section(b, words, JigPhrase::Capacity, crate::regions::JigRegion::Capacity);
     for cap in &doc.capacity {
         match cap.project {
             Some(project) => words.text(b, JigPhrase::ContextProject, &[Hole::Number(u64::from(project))]),
@@ -76,8 +84,27 @@ pub fn deployment(b: &mut Builder, client: &Domain, words: &Words, bindings: &mu
         words.refusal(b, why);
     }
     b.close();
+    region(
+        b,
+        words,
+        crate::regions::JigRegion::Connectors,
+        crate::owner_deployment_words::DeploymentPhrase::Connectors,
+    );
     for part in &doc.parts {
         cards::common::part(b, part, words, bindings);
     }
-    super::excess(b, client, words);
+    b.close();
+    b.close();
+    true
+}
+
+fn region(
+    b: &mut Builder,
+    words: &Words,
+    region: crate::regions::JigRegion,
+    phrase: crate::owner_deployment_words::DeploymentPhrase,
+) {
+    b.open(Role::Region);
+    b.region(region.region());
+    b.name(&words.book.say(words.language, phrase.id(), &[]).expect("deployment region phrase checked").text);
 }

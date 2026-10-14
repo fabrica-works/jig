@@ -6,8 +6,17 @@ use crate::{
 };
 use jig_domain_client::{Domain, action::Act, contract::Runtime, fields::Purpose};
 /// Render committed chat facts, window edges and the projects' offered chat forms.
-pub fn conversations(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
-    super::heading(b, words, JigPhrase::Conversations, &[]);
+pub(crate) fn section(
+    b: &mut Builder,
+    client: &Domain,
+    words: &Words,
+    bindings: &mut JigBindings,
+    project: Option<u32>,
+) -> bool {
+    if !client.shows(jig_domain_client::pages::Section::Conversations { project }) {
+        return false;
+    }
+    crate::pages::work::section(b, words, JigPhrase::Conversations, crate::regions::JigRegion::Conversations);
     b.open(Role::List);
     for row in &client.conversation_rows().rows {
         b.open(Role::Item);
@@ -65,8 +74,8 @@ pub fn conversations(b: &mut Builder, client: &Domain, words: &Words, bindings: 
         b.close();
     }
     b.close();
-    super::cut(b, words, client.conversation_rows().cut);
-    super::edges(
+    crate::pages::cut(b, words, client.conversation_rows().cut);
+    crate::pages::edges(
         b,
         words,
         bindings,
@@ -87,7 +96,8 @@ pub fn conversations(b: &mut Builder, client: &Domain, words: &Words, bindings: 
         words.refusal(b, refusal);
     }
     forms(b, client, words, bindings);
-    super::excess(b, client, words);
+    b.close();
+    true
 }
 fn forms(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
     let mut field_built = false;
@@ -105,6 +115,9 @@ fn forms(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBind
             };
             if !offers.chats.is_empty() {
                 if !field_built {
+                    b.open(Role::Form);
+                    b.region(crate::regions::JigRegion::NewChat.region());
+                    b.name(&words.say(JigPhrase::NewChat, &[]));
                     cards::common::field(b, client, Purpose::NewChat, JigPhrase::NewChat, words, bindings);
                     field_built = true;
                 }
@@ -128,6 +141,9 @@ fn forms(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBind
                 b.close();
             }
         }
+    }
+    if field_built {
+        b.close();
     }
 }
 pub(crate) fn runtime(b: &mut Builder, client: &Domain, runtime: &Runtime, words: &Words, bindings: &mut JigBindings) {

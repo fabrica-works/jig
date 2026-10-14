@@ -23,9 +23,7 @@ pub(super) fn build(d: &Domain, kind: u8, words: &crate::words::Words) -> (Tree,
     let mut bindings = JigBindings::new(512, CLIENT.text);
     b.open(Role::Page);
     match kind {
-        0 => crate::pages::inbox(&mut b, d, words, &mut bindings),
-        1 => crate::pages::conversations(&mut b, d, words, &mut bindings),
-        3 => {
+        0 | 1 | 3 => {
             crate::pages::main(&mut b, d, words, &mut bindings);
         }
         _ => {
@@ -251,7 +249,7 @@ fn inbox_committed_read_position(words: &crate::words::Words) {
     }));
 }
 
-fn conversations_form(words: &crate::words::Words) {
+fn conversations_domain() -> Domain {
     let (mut d, f) = start();
     let mut frame = document();
     frame.charters.get_mut(0).unwrap().chats = List::with_capacity(1);
@@ -265,6 +263,10 @@ fn conversations_form(words: &crate::words::Words) {
     frame.projects.get_mut(0).unwrap().chat_budget = 20;
     deliver(&mut d, f, Delivery::Frame(Box::new(frame)));
     drive(&mut d, Event::Went { place: Place::Jig(Address::Conversations { project: Some(4) }) });
+    d
+}
+fn conversations_form(words: &crate::words::Words) {
+    let mut d = conversations_domain();
     let (tree, mut bindings) = build(&d, 1, words);
     for label in [b"Conversations".as_slice(), b"First words", b"Charter 2", b"Budget 20", b"End of the list"] {
         assert!(contains(&tree, label) || tree.nodes().iter().any(|n| n.name.as_deref() == Some(label)));
@@ -569,4 +571,69 @@ fn the_owed_cards_sit_in_their_aside_after_the_main() {
     assert_eq!(main + usize::try_from(tree.nodes()[main].size).unwrap(), owed);
     assert!(tree.nodes()[owed].size > 1);
     assert_eq!(crate::outline::check(&tree), None);
+}
+
+#[test]
+fn the_inbox_header_shows_with_either_group() {
+    let (d, _) = super::work_pages::entered(Address::Inbox { project: None });
+    for group in [InboxReadGroup::Needs, InboxReadGroup::Updates] {
+        let mut b = Builder::new(&super::cards::limits());
+        let mut bindings = JigBindings::new(64, CLIENT.text);
+        b.open(Role::Page);
+        assert!(crate::sections::inbox::header(&mut b, &d, words(), &mut bindings));
+        assert!(crate::sections::section(
+            &mut b,
+            &d,
+            words(),
+            &mut bindings,
+            jig_domain_client::pages::Section::Inbox { group, project: None }
+        ));
+        b.close();
+        let tree = b.finish();
+        assert_eq!(
+            tree.nodes().iter().filter(|n| n.region == Some(crate::regions::JigRegion::InboxHeader.region())).count(),
+            1,
+            "{group:?}"
+        );
+        assert!(contains(&tree, b"0 need you"), "{group:?}");
+    }
+    let (other, _) = super::work_pages::entered(Address::Conversations { project: None });
+    let mut b = Builder::new(&super::cards::limits());
+    let mut bindings = JigBindings::new(64, CLIENT.text);
+    assert!(!crate::sections::inbox::header(&mut b, &other, words(), &mut bindings));
+    assert_eq!(b.tree.len(), 0);
+}
+#[test]
+fn the_new_chat_form_is_a_form_inside_the_conversations() {
+    let d = conversations_domain();
+    let (tree, _) = build(&d, 1, words());
+    let nodes = tree.nodes();
+    let section =
+        nodes.iter().position(|n| n.region == Some(crate::regions::JigRegion::Conversations.region())).unwrap();
+    let form = nodes.iter().position(|n| n.region == Some(crate::regions::JigRegion::NewChat.region())).unwrap();
+    assert_eq!(nodes[form].role, Role::Form);
+    assert!(form > section && form < section + usize::try_from(nodes[section].size).unwrap());
+    let field =
+        nodes.iter().position(|n| n.role == Role::TextArea && n.name.as_deref() == Some(b"First words")).unwrap();
+    assert!(field > form && field < form + usize::try_from(nodes[form].size).unwrap());
+}
+#[test]
+fn the_deployment_section_holds_its_four_named_regions() {
+    use crate::regions::JigRegion;
+    let d = super::work_pages::deployment_domain();
+    let (tree, _) = build(&d, 3, words());
+    let nodes = tree.nodes();
+    let section = nodes.iter().position(|n| n.region == Some(JigRegion::Deployment.region())).unwrap();
+    for (region, name) in [
+        (JigRegion::Hosts, b"jig-hosts".as_slice()),
+        (JigRegion::Accounts, b"jig-accounts".as_slice()),
+        (JigRegion::Connectors, b"jig-connectors".as_slice()),
+        (JigRegion::Capacity, b"jig-capacity".as_slice()),
+    ] {
+        let index = nodes.iter().position(|n| n.region == Some(region.region())).unwrap();
+        assert_eq!(nodes[index].role, Role::Region, "{name:?}");
+        assert_eq!(region.name(), name);
+        assert!(index > section && index < section + usize::try_from(nodes[section].size).unwrap());
+        assert!(nodes[index].name.as_ref().is_some_and(|name| !name.is_empty()));
+    }
 }

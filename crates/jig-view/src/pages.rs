@@ -8,15 +8,9 @@ use jig_domain_client::{
     windows::{Edge, Edges},
 };
 use skein_lib::Token;
-pub(crate) mod conversations;
-mod deployment;
-mod inbox;
 mod not_the_work;
 pub mod project;
 pub(crate) mod work;
-pub use conversations::conversations;
-pub use deployment::deployment;
-pub use inbox::inbox;
 pub use not_the_work::not_the_work;
 pub use project::project;
 
@@ -105,8 +99,22 @@ pub fn main(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigB
         Page::Work { address, .. } => {
             b.open(Role::Main);
             match address {
-                Address::Inbox { .. } => inbox(b, client, words, bindings),
-                Address::Conversations { .. } => conversations(b, client, words, bindings),
+                Address::Inbox { .. } => {
+                    heading(b, words, JigPhrase::Inbox, &[]);
+                    crate::sections::inbox::header(b, client, words, bindings);
+                    for section in client.sections() {
+                        crate::sections::section(b, client, words, bindings, *section);
+                    }
+                    crate::sections::inbox::status(b, client, words);
+                    excess(b, client, words);
+                }
+                Address::Conversations { .. } => {
+                    heading(b, words, JigPhrase::Conversations, &[]);
+                    for section in client.sections() {
+                        crate::sections::section(b, client, words, bindings, *section);
+                    }
+                    excess(b, client, words);
+                }
                 Address::Task { task, .. } => {
                     heading(b, words, JigPhrase::TaskPage, &[Hole::Number(*task)]);
                     crate::sections::task::header(b, client, words, bindings);
@@ -117,7 +125,13 @@ pub fn main(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigB
                     excess(b, client, words);
                 }
                 Address::Project { .. } => project(b, client, words, bindings),
-                Address::Deployment => deployment(b, client, words, bindings),
+                Address::Deployment => {
+                    heading(b, words, JigPhrase::Deployment, &[]);
+                    for section in client.sections() {
+                        crate::sections::section(b, client, words, bindings, *section);
+                    }
+                    excess(b, client, words);
+                }
             }
             b.close();
         }

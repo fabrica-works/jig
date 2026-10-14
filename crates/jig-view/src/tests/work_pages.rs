@@ -508,7 +508,7 @@ fn goal_form(words: &Words) {
         .is_none()
     );
 }
-fn deployment(words: &Words) {
+pub(super) fn deployment_domain() -> Domain {
     let (mut d, out) = entered(Address::Deployment);
     let watch = out
         .iter()
@@ -546,6 +546,10 @@ fn deployment(words: &Words) {
         parts: list([part()]),
     };
     deliver(&mut d, watch, Delivery::Deployment(Box::new(value)));
+    d
+}
+fn deployment(words: &Words) {
+    let d = deployment_domain();
     let (tree, bindings) = build(&d, 3, words);
     for label in [
         b"Connected".as_slice(),

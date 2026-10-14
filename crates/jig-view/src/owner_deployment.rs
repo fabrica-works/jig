@@ -548,14 +548,21 @@ pub fn render(b: &mut Builder, client: &Domain, value: &OwnerDeployment, words: 
     region(b, words, P::Deployment, &[], None);
     field_number(b, words, P::StoreBytes, value.store.bytes);
     field_number(b, words, P::StoreMark, value.store.mark);
+    region(b, words, P::Hosts, &[], None);
+    b.region(crate::regions::JigRegion::Hosts.region());
     render_hosts(b, client, value, words, bindings);
+    b.close();
     list(b, words, P::Attempts);
     for value in &value.attempts {
         run(b, client, words, value, bindings);
     }
     b.close();
+    region(b, words, P::Accounts, &[], None);
+    b.region(crate::regions::JigRegion::Accounts.region());
     render_accounts(b, client, value, words, bindings);
+    b.close();
     region(b, words, P::Capacity, &[], None);
+    b.region(crate::regions::JigRegion::Capacity.region());
     capacity(b, words, P::TasksCapacity, &value.tasks);
     capacity(b, words, P::WorkersCapacity, &value.workers);
     capacity(b, words, P::AttemptsCapacity, &value.attempts_capacity);
@@ -618,6 +625,7 @@ pub fn render(b: &mut Builder, client: &Domain, value: &OwnerDeployment, words: 
     b.close();
     field_number(b, words, P::TaskForgotten, value.task_room_refusals_forgotten);
     region(b, words, P::Connectors, &[], None);
+    b.region(crate::regions::JigRegion::Connectors.region());
     for connector in &value.connectors {
         crate::cards::common::part(
             b,
@@ -650,7 +658,7 @@ pub fn max_nodes(l: &Limits) -> Option<u32> {
         .checked_add(accounts)?
         .checked_add(l.rows.checked_mul(80)?)?
         .checked_add(l.rows)?
-        .checked_add(44)
+        .checked_add(46)
 }
 /// Finite selected-language storage, including opaque fixed-width request keys.
 #[must_use]

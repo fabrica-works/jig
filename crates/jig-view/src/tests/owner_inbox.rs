@@ -100,7 +100,7 @@ fn build(client: &Domain, w: &Words) -> Tree {
     let mut b = Builder::new(&limits);
     let mut bindings = JigBindings::new(limits.bindings, CLIENT.text);
     b.open(Role::Page);
-    crate::pages::inbox(&mut b, client, w, &mut bindings);
+    crate::pages::main(&mut b, client, w, &mut bindings);
     b.close();
     let tree = b.finish();
     assert!(tree.len() <= limits.nodes);

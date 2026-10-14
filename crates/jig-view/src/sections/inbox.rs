@@ -13,9 +13,19 @@ use jig_domain_client::{
     },
     pages::inbox::{Filter, needs},
 };
-/// Render the bounded, already ordered inbox, filters and both window edges.
-pub fn inbox(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
-    super::heading(b, words, JigPhrase::Inbox, &[]);
+/// The inbox's filters and counts while either group is shown.
+pub fn header(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) -> bool {
+    let Some(project) = client.shown_inbox() else {
+        return false;
+    };
+    if !client.shows(jig_domain_client::pages::Section::Inbox { group: InboxReadGroup::Needs, project })
+        && !client.shows(jig_domain_client::pages::Section::Inbox { group: InboxReadGroup::Updates, project })
+    {
+        return false;
+    }
+    b.open(Role::Region);
+    b.region(crate::regions::JigRegion::InboxHeader.region());
+    b.name(&words.say(JigPhrase::Inbox, &[]));
     filters(b, client, words, bindings);
     let page = client.inbox();
     let (count, updates) = match &page.document {
@@ -37,29 +47,47 @@ pub fn inbox(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut Jig
         if updates.limited { JigPhrase::MoreUpdates } else { JigPhrase::Updates },
         &[Hole::Number(u64::from(updates.value))],
     );
-    for group in [true, false] {
-        b.open(Role::Region);
-        let title = words.say(if group { JigPhrase::NeedsYou } else { JigPhrase::InboxUpdates }, &[]);
-        b.name(&title);
-        b.open(Role::Heading { level: 2 });
-        b.text(Run::Plain, &title);
-        b.close();
-        b.open(Role::List);
-        for entry in &page.rows {
-            if needs(entry.group()) == group {
-                b.open(Role::Item);
-                match entry {
-                    InboxRow::Entry(entry) => supplied_entry(b, client, words, bindings, entry, group),
-                    InboxRow::Owner(entry) => owner_entry(b, client, words, bindings, entry, group),
-                }
-                b.close();
-            }
-        }
-        b.close();
-        let parent = if group { InboxReadGroup::Needs } else { InboxReadGroup::Updates };
-        window(b, client, words, bindings, parent);
-        b.close();
+    b.close();
+    true
+}
+pub(crate) fn group(
+    b: &mut Builder,
+    client: &Domain,
+    words: &Words,
+    bindings: &mut JigBindings,
+    parent: InboxReadGroup,
+    project: Option<u32>,
+) -> bool {
+    if !client.shows(jig_domain_client::pages::Section::Inbox { group: parent, project }) {
+        return false;
     }
+    let group = parent == InboxReadGroup::Needs;
+    crate::pages::work::section(
+        b,
+        words,
+        if group { JigPhrase::NeedsYou } else { JigPhrase::InboxUpdates },
+        if group { crate::regions::JigRegion::InboxNeeds } else { crate::regions::JigRegion::InboxUpdates },
+    );
+    let page = client.inbox();
+    b.open(Role::List);
+    for entry in &page.rows {
+        if needs(entry.group()) == group {
+            b.open(Role::Item);
+            match entry {
+                InboxRow::Entry(entry) => supplied_entry(b, client, words, bindings, entry, group),
+                InboxRow::Owner(entry) => owner_entry(b, client, words, bindings, entry, group),
+            }
+            b.close();
+        }
+    }
+    b.close();
+
+    window(b, client, words, bindings, parent);
+    b.close();
+    true
+}
+pub(crate) fn status(b: &mut Builder, client: &Domain, words: &Words) {
+    let page = client.inbox();
     if page.goal_context_pending {
         owner_text(b, words, crate::owner_inbox_words::InboxPhrase::GoalContextPending, &[]);
     }
@@ -69,7 +97,6 @@ pub fn inbox(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut Jig
     if let Some(refusal) = &page.refusal {
         words.refusal(b, refusal);
     }
-    super::excess(b, client, words);
 }
 fn window(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings, parent: InboxReadGroup) {
     let page = client.inbox();
@@ -79,7 +106,7 @@ fn window(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBin
         return;
     }
     let window = page.window(parent);
-    super::cut(b, words, window.cut);
+    crate::pages::cut(b, words, window.cut);
     if window.reading.is_some() {
         words.status(b, JigPhrase::Looking, &[]);
     }
@@ -198,7 +225,7 @@ fn supplied_entry(
     entry: &jig_domain_client::contract::InboxEntry,
     group: bool,
 ) {
-    b.key(super::object_key(entry.object));
+    b.key(crate::pages::object_key(entry.object));
     if group {
         words.waiting(b, client.wall(), entry.at);
     } else if unread(entry, client.inbox().results_seen) {
