@@ -50,8 +50,8 @@ pub fn card(
     if let Some(taker) = &document.task.taken_by {
         words.text(b, JigPhrase::TakenByNumber, &[Hole::Number(*taker)]);
     }
-    crate::pages::task::overview(b, client, &document.task, words, bindings);
-    crate::pages::task::budget(b, &document.task, words, bindings);
+    crate::sections::task::overview(b, client, &document.task, words, bindings);
+    crate::sections::task::budget(b, &document.task, words, bindings);
     super::common::answer(b, facts, words);
     super::common::acts(b, &facts.card, &document.acts, object, words, bindings);
     super::close(b);

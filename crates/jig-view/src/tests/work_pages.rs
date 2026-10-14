@@ -695,3 +695,68 @@ fn procedure_goal_choices_render_whole_numeric_pairs_without_frame_charters() {
     assert!(contains(&tree, b"procedure words"));
     assert!(!contains(&tree, b"Charter 65535"));
 }
+
+#[test]
+fn a_task_section_not_shown_builds_nothing() {
+    let (d, _) = task(TaskSection::Overview, Executor::Agent { charter: 2 });
+    let mut b = crate::Builder::new(&super::cards::limits());
+    let mut bindings = JigBindings::new(64, super::cards::CLIENT.text);
+    b.open(Role::Page);
+    let before = b.tree.len();
+    assert!(!crate::sections::section(
+        &mut b,
+        &d,
+        words(),
+        &mut bindings,
+        jig_domain_client::pages::Section::Task { task: 9, section: TaskSection::Overview }
+    ));
+    assert_eq!(b.tree.len(), before);
+    b.close();
+    assert_eq!(b.finish().len(), 1);
+}
+#[test]
+fn the_tabs_mark_the_addresss_own_section_current() {
+    let (d, _) = task(TaskSection::Plan, Executor::Agent { charter: 2 });
+    let (tree, mut bindings) = build(&d, 3, words());
+    let tabs: Vec<_> = tree.nodes().iter().filter(|n| n.role == Role::Tab).collect();
+    assert_eq!(tabs.len(), 6);
+    for (tab, section) in tabs.iter().zip([
+        TaskSection::Overview,
+        TaskSection::Activity,
+        TaskSection::Plan,
+        TaskSection::History,
+        TaskSection::Budget,
+        TaskSection::Panels,
+    ]) {
+        assert_eq!(
+            tab.states.as_slice(),
+            if section == TaskSection::Plan { &[crate::State::Current][..] } else { &[] },
+            "{section:?}"
+        );
+        assert_eq!(
+            crate::decode(&mut bindings, tab.binding.unwrap().token, crate::Act::Press),
+            Some(Act::Go { address: Address::Task { task: 8, section } }),
+            "{section:?}"
+        );
+    }
+}
+#[test]
+fn each_task_section_carries_its_region_name() {
+    use crate::regions::JigRegion;
+    for (section, region, name) in [
+        (TaskSection::Overview, JigRegion::TaskOverview, b"jig-task-overview".as_slice()),
+        (TaskSection::Activity, JigRegion::TaskActivity, b"jig-task-activity".as_slice()),
+        (TaskSection::Plan, JigRegion::TaskPlan, b"jig-task-plan".as_slice()),
+        (TaskSection::History, JigRegion::TaskHistory, b"jig-task-history".as_slice()),
+        (TaskSection::Budget, JigRegion::TaskBudget, b"jig-task-budget".as_slice()),
+        (TaskSection::Panels, JigRegion::TaskPanels, b"jig-task-panels".as_slice()),
+    ] {
+        let (d, _) = task(section, Executor::Agent { charter: 2 });
+        let (tree, _) = build(&d, 3, words());
+        let node = tree.nodes().iter().find(|n| n.region == Some(region.region())).unwrap();
+        assert_eq!(node.role, Role::Region, "{section:?}");
+        assert_eq!(region.name(), name);
+        let index = tree.nodes().iter().position(|n| core::ptr::eq(n, node)).unwrap();
+        assert_eq!(tree.nodes()[index + 1].role, Role::Heading { level: 2 });
+    }
+}

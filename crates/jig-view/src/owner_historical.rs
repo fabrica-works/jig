@@ -131,8 +131,8 @@ fn proposal_decision(b: &mut Builder, value: &OwnerProposalDecision, words: &Wor
 fn task(b: &mut Builder, client: &Domain, value: &Task, words: &Words, bindings: &mut JigBindings) {
     number(b, words, P::Project, u64::from(value.project));
     crate::cards::chip::chip(b, client, &value.chip, words, bindings);
-    crate::pages::task::overview(b, client, value, words, bindings);
-    crate::pages::task::budget(b, value, words, bindings);
+    crate::sections::task::overview(b, client, value, words, bindings);
+    crate::sections::task::budget(b, value, words, bindings);
 }
 fn outer(b: &mut Builder, value: &OwnerHistorical, words: &Words) {
     match value.at {

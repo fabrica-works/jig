@@ -62,7 +62,7 @@ pub fn deployment(b: &mut Builder, client: &Domain, words: &Words, bindings: &mu
         b.close();
     }
     b.close();
-    super::work::section(b, words, JigPhrase::Capacity);
+    super::work::section(b, words, JigPhrase::Capacity, crate::regions::JigRegion::Capacity);
     for cap in &doc.capacity {
         match cap.project {
             Some(project) => words.text(b, JigPhrase::ContextProject, &[Hole::Number(u64::from(project))]),

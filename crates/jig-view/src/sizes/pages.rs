@@ -116,7 +116,7 @@ fn task_in(l: &Limits, card: u32, chip: u32, slot_nodes: u32) -> Option<u32> {
         .checked_add(l.rows.checked_add(20)?.checked_mul(l.rows)?)?;
     let section =
         plan_in(l, card, chip)?.max(overview_in(l, card, chip)?).max(history(l)?).max(budget).max(activity).max(panels);
-    card.checked_add(chip.checked_mul(l.rows)?)?.checked_add(section)?.checked_add(35)?.checked_add(slot_nodes)
+    card.checked_add(chip.checked_mul(l.rows)?)?.checked_add(section)?.checked_add(36)?.checked_add(slot_nodes)
 }
 fn goals_in(l: &Limits, card: u32, chip: u32) -> Option<u32> {
     let board = card

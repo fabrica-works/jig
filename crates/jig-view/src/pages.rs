@@ -8,19 +8,17 @@ use jig_domain_client::{
     windows::{Edge, Edges},
 };
 use skein_lib::Token;
-mod conversations;
+pub(crate) mod conversations;
 mod deployment;
 mod inbox;
 mod not_the_work;
 pub mod project;
-pub(crate) mod task;
-mod work;
+pub(crate) mod work;
 pub use conversations::conversations;
 pub use deployment::deployment;
 pub use inbox::inbox;
 pub use not_the_work::not_the_work;
 pub use project::project;
-pub use task::task;
 
 pub fn heading(b: &mut Builder, words: &Words, phrase: JigPhrase, holes: &[Hole]) {
     b.open(Role::Heading { level: 1 });
@@ -35,7 +33,7 @@ pub(crate) fn cut(b: &mut Builder, words: &Words, cut: bool) {
     }
 }
 
-pub(super) fn edges(b: &mut Builder, words: &Words, bindings: &mut JigBindings, edges: &Edges, window: u64) {
+pub(crate) fn edges(b: &mut Builder, words: &Words, bindings: &mut JigBindings, edges: &Edges, window: u64) {
     edge(b, words, bindings, &edges.before, window, End::Before);
     edge(b, words, bindings, &edges.after, window, End::After);
 }
@@ -63,7 +61,7 @@ fn edge(b: &mut Builder, words: &Words, bindings: &mut JigBindings, edge: &Edge,
         ),
     }
 }
-pub(super) fn excess(b: &mut Builder, client: &Domain, words: &Words) {
+pub(crate) fn excess(b: &mut Builder, client: &Domain, words: &Words) {
     match client.page() {
         jig_domain_client::pages::Page::Work { excess, refused, .. } => {
             if *excess > 0 {
@@ -82,7 +80,7 @@ pub(super) fn excess(b: &mut Builder, client: &Domain, words: &Words) {
     }
 }
 
-pub(super) fn object_key(object: jig_domain_client::contract::ObjectKey) -> crate::Key {
+pub(crate) fn object_key(object: jig_domain_client::contract::ObjectKey) -> crate::Key {
     use jig_domain_client::contract::ObjectKey;
     let (kind, a, b) = match object {
         ObjectKey::Task(task) => (0, task, 0),
@@ -109,7 +107,15 @@ pub fn main(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigB
             match address {
                 Address::Inbox { .. } => inbox(b, client, words, bindings),
                 Address::Conversations { .. } => conversations(b, client, words, bindings),
-                Address::Task { .. } => task(b, client, words, bindings),
+                Address::Task { task, .. } => {
+                    heading(b, words, JigPhrase::TaskPage, &[Hole::Number(*task)]);
+                    crate::sections::task::header(b, client, words, bindings);
+                    crate::sections::task::tabs(b, client, words, bindings);
+                    for section in client.sections() {
+                        crate::sections::section(b, client, words, bindings, *section);
+                    }
+                    excess(b, client, words);
+                }
                 Address::Project { .. } => project(b, client, words, bindings),
                 Address::Deployment => deployment(b, client, words, bindings),
             }
@@ -218,7 +224,7 @@ pub fn after_page(b: &mut Builder, client: &Domain, words: &Words, bindings: &mu
 }
 
 pub(crate) fn scratch(limits: &crate::Limits) -> Option<u64> {
-    task::scratch(limits.depth)?
+    crate::sections::task::scratch(limits.depth)?
         .checked_add(skein_lib::List::<jig_domain_client::contract::Part>::worst_case(limits.slots)?)?
         .checked_add(u64::from(limits.slots).checked_mul(u64::from(limits.text_per_node))?.checked_mul(2)?)?
         .checked_add(skein_lib::List::<u8>::worst_case(limits.text_per_node)?)

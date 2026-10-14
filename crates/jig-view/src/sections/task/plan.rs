@@ -23,12 +23,12 @@ pub(super) fn plan(b: &mut Builder, client: &Domain, words: &Words, bindings: &m
         (PlanFilter::Held, JigPhrase::HeldPlan),
         (PlanFilter::Live, JigPhrase::LivePlan),
     ] {
-        super::super::work::control(b, words, bindings, phrase, Act::FilterPlan { filter }, plan.filter == filter);
+        crate::pages::work::control(b, words, bindings, phrase, Act::FilterPlan { filter }, plan.filter == filter);
     }
     if let Some(owner) = &plan.owner {
         crate::owner_tree::render(b, owner, plan, client, words, bindings);
-        super::super::cut(b, words, client.task_page().ended_cut);
-        super::super::work::cursors(
+        crate::pages::cut(b, words, client.task_page().ended_cut);
+        crate::pages::work::cursors(
             b,
             words,
             bindings,
@@ -88,10 +88,10 @@ pub(super) fn plan(b: &mut Builder, client: &Domain, words: &Words, bindings: &m
     }
     assert!(stack.is_empty(), "every emitted tree item closes");
     b.close();
-    super::super::work::counts(b, plan.folded, words);
+    crate::pages::work::counts(b, plan.folded, words);
     words.text(b, JigPhrase::HeldBelow, &[Hole::Number(u64::from(plan.held_below))]);
-    super::super::cut(b, words, client.task_page().ended_cut);
-    super::super::work::cursors(
+    crate::pages::cut(b, words, client.task_page().ended_cut);
+    crate::pages::work::cursors(
         b,
         words,
         bindings,
@@ -103,7 +103,7 @@ pub(super) fn plan(b: &mut Builder, client: &Domain, words: &Words, bindings: &m
 }
 fn item(b: &mut Builder, client: &Domain, node: &TreeNode, expanded: bool, words: &Words, bindings: &mut JigBindings) {
     b.open(Role::TreeItem);
-    b.key(super::super::object_key(ObjectKey::Task(node.chip.task)));
+    b.key(crate::pages::object_key(ObjectKey::Task(node.chip.task)));
     b.name(
         &words.say(JigPhrase::ChipNumber, &[Hole::Number(node.chip.task), crate::words::name(node.chip.title.bytes())]),
     );
@@ -112,10 +112,10 @@ fn item(b: &mut Builder, client: &Domain, node: &TreeNode, expanded: bool, words
     }
     cards::chip::chip(b, client, &node.chip, words, bindings);
     words.amount(b, node.spend);
-    super::super::work::counts(b, node.folded, words);
+    crate::pages::work::counts(b, node.folded, words);
     words.text(b, JigPhrase::HeldBelow, &[Hole::Number(u64::from(node.held_below))]);
     if let Some(id) = client.objects().find(ObjectKey::Task(node.chip.task)) {
-        super::super::work::control(
+        crate::pages::work::control(
             b,
             words,
             bindings,

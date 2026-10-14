@@ -338,7 +338,7 @@ fn drift_holds_a_task_and_the_person_is_told_why() {
         person,
         vec![
             Step::See { find: Find::text(b"Held drift"), within },
-            Step::Press { find: Find::exactly_named(Role::Button, b"Overview") },
+            Step::Press { find: Find::exactly_named(Role::Tab, b"Overview") },
             Step::See { find: Find::text(b"Hold account"), within },
             Step::See { find: Find::text(b"Observed resource state: 11"), within },
             Step::See { find: Find::text(b"Owned resource"), within },

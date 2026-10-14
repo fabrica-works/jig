@@ -92,7 +92,7 @@ fn build(d: &Domain) -> Tree {
     let mut b = Builder::new(&limits);
     let mut bindings = JigBindings::new(nodes, CLIENT.text);
     b.open(Role::Page);
-    crate::pages::task(&mut b, d, w, &mut bindings);
+    crate::pages::main(&mut b, d, w, &mut bindings);
     crate::pages::after_page(&mut b, d, w, &mut bindings);
     b.close();
     let tree = b.finish();

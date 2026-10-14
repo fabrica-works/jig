@@ -117,7 +117,7 @@ impl Limits {
             nodes,
             // Page, card/input result, verdict proposal, and its deepest
             // Markdown list path. Dependency regions are siblings, not nested.
-            depth: client.rows.checked_add(32)?.checked_add(slot_depth)?,
+            depth: client.rows.checked_add(33)?.checked_add(slot_depth)?,
             text_per_node,
             text_bytes: nodes.checked_mul(text_per_node)?,
             drawing_bytes: 0,

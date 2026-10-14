@@ -61,7 +61,7 @@ fn a_held_chat_is_released() {
                 Step::Press { find: Find::named(Role::Button, b"Release") },
                 Step::See { find: Find::text(b"Being decided"), within: WITHIN },
                 Step::Press { find: Find::named(Role::Button, b"Confirm") },
-                Step::Press { find: Find::named(Role::Button, b"Overview") },
+                Step::Press { find: Find::named(Role::Tab, b"Overview") },
                 Step::See { find: Find::text(b"Starting"), within: WITHIN },
             ],
         );

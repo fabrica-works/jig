@@ -11,7 +11,7 @@ use jig_domain_client::{
 };
 pub(super) fn history(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
     for (subtree, phrase) in [(false, JigPhrase::OwnHistory), (true, JigPhrase::SubtreeHistory)] {
-        super::super::work::control(
+        crate::pages::work::control(
             b,
             words,
             bindings,
@@ -39,8 +39,8 @@ pub(super) fn history(b: &mut Builder, client: &Domain, words: &Words, bindings:
         b.close();
     }
     b.close();
-    super::super::cut(b, words, client.history_rows().cut);
-    super::super::edges(
+    crate::pages::cut(b, words, client.history_rows().cut);
+    crate::pages::edges(
         b,
         words,
         bindings,

@@ -11,8 +11,17 @@ pub(super) fn check(tree: &Tree) {
     for (index, node) in tree.nodes().iter().enumerate() {
         if node.binding.is_some() || node.link.is_some() || node.external.is_some() {
             assert!(
-                [Role::Button, Role::Link, Role::TextField, Role::TextArea, Role::Choice, Role::Check, Role::MenuItem]
-                    .contains(&node.role)
+                [
+                    Role::Button,
+                    Role::Link,
+                    Role::TextField,
+                    Role::TextArea,
+                    Role::Choice,
+                    Role::Check,
+                    Role::MenuItem,
+                    Role::Tab
+                ]
+                .contains(&node.role)
             );
             assert!(node.name.as_ref().is_some_and(|name| !name.is_empty()), "action at {index} has a name");
             assert!(!node.states.as_slice().contains(&State::Disabled), "disabled nodes have no action");

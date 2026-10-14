@@ -8,16 +8,35 @@ use jig_domain_client::{
     action::Act,
     contract::{Budget, PhaseCounts},
 };
-pub(super) fn section(b: &mut Builder, words: &Words, phrase: JigPhrase) {
+pub(crate) fn section(b: &mut Builder, words: &Words, phrase: JigPhrase, region: crate::regions::JigRegion) {
     let title = words.say(phrase, &[]);
     b.open(Role::Region);
+    b.region(region.region());
     b.name(&title);
     b.open(Role::Heading { level: 2 });
     b.name(&title);
     b.text(Run::Plain, &title);
     b.close();
 }
-pub(super) fn control(
+pub(crate) fn tab(
+    b: &mut Builder,
+    words: &Words,
+    bindings: &mut JigBindings,
+    phrase: JigPhrase,
+    action: Act,
+    current: bool,
+) {
+    let label = words.say(phrase, &[]);
+    b.open(Role::Tab);
+    b.name(&label);
+    b.text(Run::Plain, &label);
+    if current {
+        b.state(State::Current);
+    }
+    b.bind(bindings.insert(crate::JigMeaning::Action(action)));
+    b.close();
+}
+pub(crate) fn control(
     b: &mut Builder,
     words: &Words,
     bindings: &mut JigBindings,
@@ -35,7 +54,7 @@ pub(super) fn control(
     b.bind(bindings.insert(crate::JigMeaning::Action(action)));
     b.close();
 }
-pub(super) fn budget(b: &mut Builder, value: &Budget, words: &Words) {
+pub(crate) fn budget(b: &mut Builder, value: &Budget, words: &Words) {
     for (phrase, amount) in [
         (JigPhrase::TotalBudget, value.total),
         (JigPhrase::OwnBudget, value.own),
@@ -47,7 +66,7 @@ pub(super) fn budget(b: &mut Builder, value: &Budget, words: &Words) {
     }
     words.actor(b, value.funder);
 }
-pub(super) fn counts(b: &mut Builder, counts: PhaseCounts, words: &Words) {
+pub(crate) fn counts(b: &mut Builder, counts: PhaseCounts, words: &Words) {
     for (phrase, count) in [
         (JigPhrase::TasksWaiting, counts.waiting),
         (JigPhrase::TasksRunning, counts.running),
@@ -63,7 +82,7 @@ pub(super) fn counts(b: &mut Builder, counts: PhaseCounts, words: &Words) {
         }
     }
 }
-pub(super) fn cursors(
+pub(crate) fn cursors(
     b: &mut Builder,
     words: &Words,
     bindings: &mut JigBindings,
@@ -91,7 +110,7 @@ pub(super) fn cursors(
 }
 
 // Supplied stage counts stay distinct from the locally folded PhaseCounts.
-pub(super) fn owner_counts(b: &mut Builder, counts: jig_domain_client::contract::OwnerPhaseCounts, words: &Words) {
+pub(crate) fn owner_counts(b: &mut Builder, counts: jig_domain_client::contract::OwnerPhaseCounts, words: &Words) {
     for (phrase, count) in [
         (JigPhrase::TasksWaiting, counts.waiting),
         (JigPhrase::TasksIdle, counts.idle),

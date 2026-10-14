@@ -20,6 +20,7 @@ pub fn conversation(b: &mut Builder, client: &Domain, words: &Words, bindings: &
     b.open(Role::Item);
     b.key(Key { owner: Owner::Jig, kind: 28, a: state.task, b: 0 });
     b.open(Role::Log);
+    b.region(crate::regions::JigRegion::Conversation.region());
     b.name(&words.say(JigPhrase::ConversationLog, &[]));
     if state.reading.is_some() {
         b.state(crate::State::Busy);

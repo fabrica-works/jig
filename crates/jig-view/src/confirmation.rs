@@ -228,7 +228,11 @@ fn action(
             words.text(b, JigPhrase::WillWrite, &[]);
             match object.key {
                 ObjectKey::Task(task) => {
+                    b.open(Role::Region);
+                    b.region(crate::regions::JigRegion::Composer.region());
+                    b.name(&words.say(JigPhrase::AnswerField, &[]));
                     common::field(b, client, Purpose::Composer { task }, JigPhrase::AnswerField, words, bindings);
+                    b.close();
                 }
                 ObjectKey::Proposal(_)
                 | ObjectKey::Escalation(_)

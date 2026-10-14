@@ -72,7 +72,7 @@ pub fn project(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut J
         );
     }
     b.close();
-    super::work::section(b, words, phrase(selected));
+    super::work::section(b, words, phrase(selected), region(selected));
     match selected {
         ProjectSection::Overview => {
             inbox_cards(b, client, words, bindings);
@@ -93,7 +93,7 @@ pub fn project(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut J
                 ProjectSection::Spend,
                 ProjectSection::Recurring,
             ] {
-                super::work::section(b, words, phrase(section));
+                super::work::section(b, words, phrase(section), region(section));
                 settings(b, client, doc, section, words, bindings);
                 b.close();
             }
@@ -296,7 +296,7 @@ fn genuine(
         );
     }
     b.close();
-    super::work::section(b, words, phrase(selected));
+    super::work::section(b, words, phrase(selected), region(selected));
     owner::section(b, doc, selected, client, words, bindings);
     b.close();
     super::excess(b, client, words);
@@ -321,4 +321,20 @@ fn historical_spend(b: &mut Builder, client: &Domain, words: &Words, bindings: &
         page.spend_after.as_ref(),
         jig_domain_client::pages::project::SPEND_WINDOW,
     );
+}
+
+pub(crate) const fn region(section: ProjectSection) -> crate::regions::JigRegion {
+    use crate::regions::JigRegion;
+    match section {
+        ProjectSection::Overview => JigRegion::ProjectOverview,
+        ProjectSection::Goals => JigRegion::ProjectGoals,
+        ProjectSection::Tasks => JigRegion::ProjectTasks,
+        ProjectSection::Notes => JigRegion::ProjectNotes,
+        ProjectSection::Settings => JigRegion::ProjectSettings,
+        ProjectSection::Resources => JigRegion::ProjectResources,
+        ProjectSection::Policy => JigRegion::ProjectPolicy,
+        ProjectSection::Roles => JigRegion::ProjectRoles,
+        ProjectSection::Spend => JigRegion::ProjectSpend,
+        ProjectSection::Recurring => JigRegion::ProjectRecurring,
+    }
 }

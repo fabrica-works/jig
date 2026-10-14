@@ -130,7 +130,7 @@ fn forms(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBind
         }
     }
 }
-pub(super) fn runtime(b: &mut Builder, client: &Domain, runtime: &Runtime, words: &Words, bindings: &mut JigBindings) {
+pub(crate) fn runtime(b: &mut Builder, client: &Domain, runtime: &Runtime, words: &Words, bindings: &mut JigBindings) {
     match runtime {
         Runtime::Active(value) => crate::runtime::active(b, value, words),
         Runtime::Waiting { dependencies, hold } => {

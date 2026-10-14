@@ -428,7 +428,7 @@ fn historical_public_plan_keeps_owner_tree_early_return_and_companion_ended_read
     let cap = Limits::of_words(&CLIENT, &w).unwrap();
     let mut b = Builder::new(&cap);
     let mut bindings = JigBindings::new(cap.bindings, CLIENT.text);
-    crate::pages::task(&mut b, &client, &w, &mut bindings);
+    crate::pages::main(&mut b, &client, &w, &mut bindings);
     let rendered = b.finish();
     assert!(has(&rendered, b"companion actual cause"));
     caption(&rendered, &w, P::EndedDelegates, &[]);

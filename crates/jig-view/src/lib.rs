@@ -25,6 +25,7 @@ pub mod owner_words;
 pub mod pages;
 pub mod proposed_task;
 pub mod proposed_task_words;
+pub mod sections;
 pub mod specification;
 pub mod styles;
 mod task_result;
