@@ -1,0 +1,175 @@
+# client-composition: decisions
+
+The decisions this plan rests on, numbered; the supervisor's rulings
+during the run follow them, from 101; the choices left to the user close
+the file. The user delegated every decision of the planning to the
+planner (2026-10-14: "The user is away and has delegated decisions to
+your best judgement").
+
+## The plan's own
+
+1. **Scope: jig only, the rows that name client-composition.** The rows
+   of jig's `docs/design/STATUS.md` that name client-composition:
+   `client/domain/README.md` 2 and 5, `client.md` 3, 4.1, 5.1, 9, 14 and
+   17, `contract.md` 1, 3.3, 5.3, 6, 7.1 and 7.2, `pages.md` 2, 9 and 12,
+   `root.md` 2, 6, 7, 9 and 15, `testing.md` 2, 4, 6, 8 and 9,
+   `view.md` 3, 3.1, 4, 4.1, 5, 10 to 13 and 15; and, since they name the
+   same items from the application's side and the same plan,
+   `README.md` 10 and 15 and `examples.md` 8 (`ops`'s owners,
+   arrangement, section slot and terminal client in its worlds). The
+   designer found nothing needed upstream, and the planning found
+   nothing either: skein at jig's pin (`74b7fdaf3`) has
+   `Io::adopt_read_pipe` and `Io::adopt_write_pipe`
+   (`crates/skein-io/src/layer.rs:158,167`), `skein_shell::drive`
+   (`crates/skein-shell/src/drive.rs:53`), `open_termination_signals`
+   (`crates/skein-shell/src/ring.rs:97`, exported by `skein_shell`) and
+   skein-sim's inherited pipes (`Sim::open_inherited_read`,
+   `Sim::open_inherited_write`, `crates/skein-sim/src/sim/processes.rs:268,273`).
+   smith is not touched.
+2. **No repin step.** jig's only downstream repository holds its pins for
+   a run active on another machine, whose "Done when" keeps them
+   unchanged until it ends; and its repin onto this plan's jig would
+   need more than a repin may change (development.md, 5.7: at most about
+   200 lines, no change of design): the owners' new names, the decoders'
+   new arms, its own pages inside a main landmark, its stories scoped by
+   landmarks. The user takes care of the downstream side (2026-10-14).
+   The README says it as a rule for the coordinator: "This plan runs no
+   repin step; its run ends when the last jig session lands."
+3. **Owners first, whole, in one increment** (jig 01.1). `Owner::Side`
+   and `Owner::Other` become `Owner::Application { number }` with every
+   user in the same increment: no alias, no transitional constructor,
+   since every user is in jig.
+4. **The domain's sections before the view's, at jig's addresses first.**
+   jig 03 makes a page its sections with one section per address, which
+   changes no tree: the client's world (the real domain and view, the
+   scripted engine) and the joint world (the real engine's domain) run
+   it against both sides at every landing, as the meeting-point story
+   (development.md, 5.3). jig 04 then adds the arrangement and an
+   application's sections, which jig 05 and 06 show; jig 06 lands the
+   arranged story, the first that runs them together.
+5. **Names kept** (the designer's narrowing, extended): `jig-domain-client`'s
+   `Part` keeps its field `connector`, `ops` keeps
+   `jig-ops-domain-connectors`, and `jig-protocol-client-link` keeps
+   `family: u16` in its exchanges. Each carries an owner number: for
+   every application today the owner number is the connector's
+   (`root.md`, 15: "A connector's owner number is the number the
+   engine's root gives that connector"), and the test application's
+   family `1` is its connector `FIRST`
+   (`testing/jig-test-domain-client/src/owner.rs:3`). Renaming them
+   would touch about 190 references and the wire for no change of
+   behaviour. later.md keeps the item.
+6. **The text shell's pages wait for the sections in the view.** Its
+   renderer and command reader are tested on hand-built trees, so jig 09.1
+   and 09.2 start once jig 02 has landed the outline. Its golden pages
+   are built by jig's test view root from fixture states (`view.md`,
+   15.6), so jig 09.3 waits for jig 06 and 07.3, which rebuild the pages
+   from sections and region names; written earlier, every golden page
+   would be edited by hand again.
+7. **The outline is checked on change.** The referee runs
+   `jig_view::outline::check` on each tree a person sees when it differs
+   from the last one judged for that client (the view emitted patches),
+   not at every callback (workflow.md, 2: "Checks on change").
+8. **Test time** (findings/measurements.md): the focused suite's median
+   at the base is 8.49 s and the fuzzy suite's 13.96 s on carbon-forge.
+   The plan's new tests may add at most about 3.5 s to the focused
+   suite's median (to about 12 s, the user's standing aim) and 6 s to
+   the fuzzy suite's; the README gives each session its share, as a
+   guide. A suite's budget, slow period or a test's ceiling is never
+   raised; a share missed is made up by cheaper fixtures, built once.
+9. **Golden text in two places,** each changed only by hand (`view.md`,
+   15.6): the hand-built trees' (every role and state; unsafe bytes) in
+   `crates/jig-shell-text/tests/golden/`, read by the crate's own tests;
+   jig's pages' in `tests/client/tests/golden/`, read by a test of the
+   client's world, which builds the fixture states with jig's test view
+   root, as 15.6 asks, without the text shell's crate depending on the
+   worlds. Each file is read with `include_bytes!`; no test writes one,
+   and no environment variable regenerates one.
+10. **One fixture module per crate,** as development.md, 5.2 says
+    (code-organization.md, 4); the text shell's,
+    `crates/jig-shell-text/src/tests/fixtures.rs`, made by jig 09.1.
+11. **The limits of sections shown together** (`client.md`, 14). The
+    domain keeps one state per subject (one task's, one project's, the
+    inbox's, the deployment's), and a page names at most one of each
+    (`client.md`, 5.1), so its state is counted once already. What a
+    page with more sections adds is counted: the list of sections
+    (`MOST_SECTIONS`, jig 03.1) and each section's statuses (jig 07.2)
+    in the domain's worst case, and the sections' nodes summed in the
+    view's limits (jig 06.2). A page whose sections need more watches or
+    reads than the configured counts is refused what it asked, on the
+    page or in the section, as a page is today; `Domain::new` does not
+    refuse such limits, since it checks them before any arrangement is
+    given (findings/domain.md, 6).
+12. **`Limits::of` and `Limits::compose` take the arrangement;**
+    `Limits::of_words` keeps jig's (none beside the address's own), as
+    `view.md`, 10 names only the two (jig 06.2).
+13. **Region names on a log, a dialog and tabs, and around the
+    composer** (`pages.md`, 12.1 and 12.2). The conversation's log
+    carries `jig-conversation` itself, the confirmation's dialog
+    `jig-confirmation`, and the tabs `jig-task-tabs` and
+    `jig-project-tabs`, so the builder accepts a region name on a log, a
+    dialog and tabs beside landmarks and regions (jig 01.3), where
+    `view.md`, 3 says "on a landmark or a region". `jig-composer` is the region around the
+    composer's field, where the code builds it today: in the
+    confirmation's dialog that "Write" opens
+    (`crates/jig-view/src/confirmation.rs:226-260`), not inside the
+    activity's section, where pages.md 12.2 lists it. This plan does not
+    move the composer: no section of the design this plan builds asks
+    it (`pages.md`, 4 and 5 are not among its rows).
+14. **The text shell is one crate under the step code's lints,**
+    terminal included; the terminal owns its own `skein_io::Io` and
+    tags its operations' tokens with bit 62, as the native shell's files
+    tag theirs with bit 63 (`crates/jig-shell-native/src/files.rs:9`),
+    so a host routes its completions by `Terminal::owns`. Nothing
+    changes in `jig-shell-native` or in skein.
+15. **Tabs are tabs:** a task's and a project's tabs become `Role::Tab`
+    (in the `Role::Tabs` they sit in), built by a new `work::tab` while
+    `work::control` keeps building the filters' buttons, the address's
+    own marked `State::Current`, as `pages.md`, 12.3 has them lead to each
+    section's address with the address's own marked current. The stories
+    that pressed them as buttons press them as tabs (jig 05.1).
+16. **The test family's item names a second task** (`Item.second`,
+    jig 07.3), so that client.md 17's story can show a second task's
+    section not shown. It is the smallest change that lets the test
+    family name two tasks; every literal of `Item` sets `None` but the
+    story's.
+17. **Sessions:** ten, each of three or four increments, cut so that an
+    implementer stays under its 200,000-token handover; the domain's
+    sections (jig 03, 04) and jig 01 start at once; the view's sections
+    wait for both sides (jig 05 needs 02.3 and 03.2).
+
+## Rulings
+
+(The supervisor's, from 101, during the run.)
+
+## For the user
+
+Long-term choices the user may veto. Each was decided by the planner
+under the user's delegation.
+
+- **The shortcut's modifier is `Modifier::{Plain, Primary, Alt}`** and
+  its key a byte `a`–`z` or `0`–`9` (`Shortcut { key: u8, modifier }`),
+  checked by the builder. It is part of the tree every application and
+  shell writes against; renaming it later breaks each of them. The
+  alternative was 36 named keys, an enum longer than what it carries.
+- **Region names in the tree are an owner and a `u16`**
+  (`Region { owner, number }`), jig's numbered by `JigRegion`'s
+  declaration order, and a shell maps a number to its name through its
+  owner (`JigRegion::of(number)`, `JigRegion::name`). A stylesheet and a
+  browser's shell will depend on the names, never the numbers, which may
+  change before a release (formats are pre-release, development.md,
+  5.1).
+- **Owner numbers keep two older field names:** `Part.connector` in
+  `jig-domain-client` and `family` in `jig-protocol-client-link`'s
+  exchanges carry an owner number (decisions.md, 5). Every application
+  writes against them; renaming them later breaks each application's
+  roots and its wire. The alternative was renaming them now (about 190
+  references and the client link's wire).
+- **The terminal's interface:** `Terminal::{new, adopt, owns,
+  completions, submissions, say, iterate, commands, close, closed,
+  work_pending, next_deadline}`,
+  with its operations tagged by bit 62 (decisions.md, 14). An
+  application's terminal client is written against it (`ops`
+  standalone, later); changing it later changes each such host. The
+  alternative was the terminal speaking io's requests through a host's
+  shared io, which needs the native shell to expose its io.
+
