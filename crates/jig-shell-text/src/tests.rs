@@ -1,5 +1,6 @@
 use crate::{Print, render};
 use jig_view::{Role, Run};
+mod command;
 mod fixtures;
 
 #[test]
