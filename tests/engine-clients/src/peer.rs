@@ -143,7 +143,11 @@ impl Exchange {
     }
     fn read(&mut self) {
         self.down(http::Request::Body(Down::Demand {
-            read: if self.streaming { Read::Line { max: 256 } } else { Read::Fill(1) },
+            read: if self.streaming {
+                Read::Line { max: 256 }
+            } else {
+                Read::Arrived { max: fixtures::client_limits().read }
+            },
             room: 0,
         }));
     }

@@ -45,6 +45,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         jig_protocol_client_wire::v7::ReadAnswer::worst_case_bytes(&limits.wire)?,
     );
     let each = skein_http::server::worst_case(&limits.http)?
+        .checked_add(u64::from(limits.http.read))?
         .checked_add(skein_lib::Intake::worst_case(body)?)?
         .checked_add(u64::from(limits.http.head))?
         .checked_add(skein_lib::List::<skein_http::Header>::worst_case(limits.http.headers)?)?

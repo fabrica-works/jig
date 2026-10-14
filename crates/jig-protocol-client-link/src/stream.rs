@@ -99,7 +99,7 @@ impl Stream {
         Ok((record, heartbeat))
     }
     fn data(&mut self) {
-        self.demand(sse::Request::Data(Down::Demand { read: Read::Fill(1), room: 0 }));
+        self.demand(sse::Request::Data(Down::Demand { read: Read::Arrived { max: self.env.limits.chunk }, room: 0 }));
     }
     fn demand(&mut self, request: sse::Request) {
         self.clear_demands();
@@ -124,6 +124,7 @@ pub(crate) fn bounds(limits: &Limits) -> Option<(u32, sse::Limits)> {
 pub(crate) fn worst_case(limits: &Limits) -> Option<u64> {
     let (decoded, framing) = bounds(limits)?;
     sse::worst_case(&framing)?
+        .checked_add(u64::from(framing.chunk))?
         .checked_add(u64::from(decoded).checked_mul(2)?)?
         .checked_add(Queue::<sse::Event>::worst_case(2)?)?
         .checked_add(Queue::<Down>::worst_case(2)?)

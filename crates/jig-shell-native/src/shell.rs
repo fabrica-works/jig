@@ -354,6 +354,7 @@ impl Shell {
                     + u64::from(self.env.limits.output)
                     + u64::from(self.body_bytes)
                     + 1024)
+            + u64::from(self.max) * u64::from(self.env.limits.intake)
     }
 }
 fn signing_token(signing: &Signing) -> Token {

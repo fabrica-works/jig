@@ -62,15 +62,17 @@ impl Connection {
         false
     }
     pub fn read(&mut self, limits: &Limits) {
-        let length = match self.call.as_ref().expect("reading a call").body {
-            http::Body::Length(length) => u32::try_from(length)
-                .expect("checked HTTP body")
-                .saturating_sub(self.body.len())
-                .min(limits.http.read)
-                .max(1),
-            http::Body::None | http::Body::Chunked => 1,
+        let read = match self.call.as_ref().expect("reading a call").body {
+            http::Body::Length(length) => Read::Fill(
+                u32::try_from(length)
+                    .expect("checked HTTP body")
+                    .saturating_sub(self.body.len())
+                    .min(limits.http.read)
+                    .max(1),
+            ),
+            http::Body::None | http::Body::Chunked => Read::Arrived { max: limits.http.read },
         };
-        self.requests.push(http::Request::Body(Down::Demand { read: Read::Fill(length), room: 0 }));
+        self.requests.push(http::Request::Body(Down::Demand { read, room: 0 }));
     }
 
     pub fn respond(&mut self, status: u16, body: Box<[u8]>, limits: &Limits) {

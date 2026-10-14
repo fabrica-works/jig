@@ -85,6 +85,22 @@ fn an_exchange_carries_the_bearer_token() {
     );
 }
 #[test]
+fn a_body_of_unknown_length_read_as_it_arrives_is_the_same_whatever_its_cuts() {
+    let response = b"HTTP/1.1 200 OK\r\nConnection: close\r\n\r\nwhole body";
+    for size in [response.len(), 1] {
+        let mut peer = Peer::new();
+        peer.exchange();
+        for piece in response.chunks(size) {
+            peer.respond(piece);
+        }
+        peer.wire.eof = true;
+        peer.drive();
+        assert!(matches!(peer.up.pop(), Some(link::Event::Answered { exchange, status: 200, body })
+            if exchange == Token::new(42) && body.as_ref() == b"whole body"));
+        assert!(peer.up.is_empty());
+    }
+}
+#[test]
 fn a_connection_cut_mid_body_fails_the_exchange() {
     let mut peer = Peer::new();
     peer.exchange();

@@ -21,6 +21,20 @@ fn the_stream_s_body_cut_at_each_byte_reads_the_same_events() {
     }
 }
 #[test]
+fn an_events_data_read_as_it_arrives_decodes_the_same_whatever_its_cuts() {
+    let bytes = fixtures::whole_stream();
+    for size in [bytes.len(), 1] {
+        let mut harness = fixtures::Harness::new(&fixtures::limits());
+        harness.open(fixtures::WATCH, fixtures::family_subject());
+        for piece in bytes.chunks(size) {
+            harness.stream_bytes(piece);
+        }
+        harness.expected_family();
+        assert_eq!(harness.ended(fixtures::WATCH), Some(c::WatchEnd::Closed));
+        assert_eq!(harness.closed_count(), 1);
+    }
+}
+#[test]
 fn a_delivery_before_its_opening_s_answer_admits_it() {
     let mut harness = fixtures::Harness::streaming(fixtures::family_subject());
     let (exchange, name) = harness.opening();

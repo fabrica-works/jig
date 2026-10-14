@@ -350,11 +350,10 @@ impl Connections {
         let read = if matches!(value.owner, Owner::Stream) {
             Read::Line { max: env.limits.read.min(1024) }
         } else {
-            Read::Fill(
-                value
-                    .remaining
-                    .map_or(1, |n| u32::try_from(n.max(1).min(u64::from(env.limits.read))).expect("bounded read")),
-            )
+            match value.remaining {
+                Some(n) => Read::Fill(u32::try_from(n.max(1).min(u64::from(env.limits.read))).expect("bounded read")),
+                None => Read::Arrived { max: env.limits.read },
+            }
         };
         http::down(
             &mut value.machine,
