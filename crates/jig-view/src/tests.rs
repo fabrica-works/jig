@@ -2,6 +2,7 @@ mod binding;
 mod diff;
 mod markdown;
 mod phrases;
+mod regions;
 mod slots;
 mod tree;
 

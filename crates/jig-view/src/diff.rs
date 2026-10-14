@@ -7,7 +7,7 @@
 //! Each node has at most one structural patch and three attribute patches.
 //! Bindings stay in the view: the shell sees only their presence and node ids.
 
-use crate::{Drawing, Limits, Node, NodeId, Role, State, Style, TextRun, Tree, Value};
+use crate::{Drawing, Limits, Node, NodeId, Picture, Region, Role, Shortcut, State, Style, TextRun, Tree, Value};
 use alloc::boxed::Box;
 use skein_lib::{List, Queue, Stack};
 
@@ -18,6 +18,9 @@ pub struct Attribute {
     pub name: Option<Box<[u8]>>,
     pub states: List<State>,
     pub styles: List<Style>,
+    pub region: Option<Region>,
+    pub shortcut: Option<Shortcut>,
+    pub picture: Option<Picture>,
     /// The shell asks the view root for this node's address when this is set.
     pub linked: bool,
     pub external: Option<Box<[u8]>>,
@@ -32,6 +35,9 @@ impl Attribute {
             name: node.name.clone(),
             states: node.states.clone(),
             styles: node.styles.clone(),
+            region: node.region,
+            shortcut: node.shortcut,
+            picture: node.picture,
             linked: node.link.is_some(),
             external: node.external.clone(),
             bound: node.binding.is_some() || node.link.is_some(),
@@ -249,6 +255,9 @@ fn attributes(old: &Node, new: &Node, out: &mut Queue<Patch>) {
         || old.name != new.name
         || old.states != new.states
         || old.styles != new.styles
+        || old.region != new.region
+        || old.shortcut != new.shortcut
+        || old.picture != new.picture
         || old.link != new.link
         || old.external != new.external
         || was_bound != bound

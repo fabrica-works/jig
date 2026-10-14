@@ -36,6 +36,7 @@ mod frame_facts;
 mod limits;
 pub mod markdown;
 pub mod phrases;
+pub mod regions;
 mod render;
 mod runtime;
 mod sizes;
@@ -55,7 +56,8 @@ pub use sizes::{
     task_nodes,
 };
 pub use tree::{
-    Drawing, DrawingKind, Key, Node, NodeId, Owner, Role, Run, SlotRef, State, Style, TextRun, Tree, Value,
+    Drawing, DrawingKind, Key, Modifier, Node, NodeId, Owner, Picture, Region, Role, Run, Shortcut, SlotRef, State,
+    Style, TextRun, Tree, Value,
 };
 pub use turns::conversation;
 

@@ -5,7 +5,10 @@
 //! page nodes, fallback children and fragment nodes.
 
 use crate::tree::length;
-use crate::{Binding, Drawing, DrawingKind, Key, Limits, Node, Role, Run, SlotRef, State, Style, TextRun, Tree, Value};
+use crate::{
+    Binding, Drawing, DrawingKind, Key, Limits, Node, Picture, Region, Role, Run, Shortcut, SlotRef, State, Style,
+    TextRun, Tree, Value,
+};
 use alloc::boxed::Box;
 use core::mem::replace;
 use skein_lib::{List, Stack, bytes::copy_of};
@@ -164,6 +167,39 @@ impl Builder {
         if !self.node().styles.as_slice().contains(&style) {
             self.node_mut().styles.push(style).expect("styles fit their capacity");
         }
+    }
+
+    pub fn region(&mut self, region: Region) {
+        assert!(
+            [
+                Role::Banner,
+                Role::Navigation,
+                Role::Main,
+                Role::Complementary,
+                Role::ContentInfo,
+                Role::Form,
+                Role::Search,
+                Role::Region,
+                Role::Dialog,
+                Role::Tabs,
+                Role::Log
+            ]
+            .contains(&self.node().role),
+            "region names belong to landmarks, regions, dialogs, tabs or logs"
+        );
+        self.node_mut().region = Some(region);
+    }
+    pub fn shortcut(&mut self, shortcut: Shortcut) {
+        assert!(
+            shortcut.key.is_ascii_lowercase() || shortcut.key.is_ascii_digit(),
+            "shortcut keys are letters or digits"
+        );
+        assert!(self.node().binding.is_some() || self.node().link.is_some(), "shortcut nodes are bound");
+        self.node_mut().shortcut = Some(shortcut);
+    }
+    pub fn picture(&mut self, picture: Picture) {
+        assert!(self.node().role == Role::Image, "pictures belong to images");
+        self.node_mut().picture = Some(picture);
     }
 
     /// Identify a list item by its object.

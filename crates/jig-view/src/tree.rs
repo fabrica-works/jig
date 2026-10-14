@@ -148,6 +148,32 @@ pub struct Style {
     pub token: u16,
 }
 
+/// A region's language-free name from its owner's closed set (view.md, 3).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Region {
+    pub owner: Owner,
+    pub number: u16,
+}
+/// One of an owner's pictures, supplied when a shell is built (view.md, 3).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Picture {
+    pub owner: Owner,
+    pub number: u16,
+}
+/// A key a bound node answers to as a press (view.md, 5).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Shortcut {
+    pub key: u8,
+    pub modifier: Modifier,
+}
+/// The modifier pressed with a shortcut's key.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Modifier {
+    Plain,
+    Primary,
+    Alt,
+}
+
 /// The meaning of a span of text.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Run {
@@ -216,6 +242,9 @@ pub struct Node {
     pub name: Option<Box<[u8]>>,
     pub states: List<State>,
     pub styles: List<Style>,
+    pub region: Option<Region>,
+    pub shortcut: Option<Shortcut>,
+    pub picture: Option<Picture>,
     pub text: List<TextRun>,
     pub value: Option<Value>,
     pub link: Option<crate::Binding>,
@@ -236,6 +265,9 @@ impl Node {
             name: None,
             states: List::with_capacity(0),
             styles: List::with_capacity(0),
+            region: None,
+            shortcut: None,
+            picture: None,
             text: List::with_capacity(0),
             value: None,
             link: None,
@@ -255,6 +287,9 @@ impl Node {
             name: None,
             states: List::with_capacity(9),
             styles: List::with_capacity(limits.styles_per_node),
+            region: None,
+            shortcut: None,
+            picture: None,
             text: List::with_capacity(runs),
             value: None,
             link: None,

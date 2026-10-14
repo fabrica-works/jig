@@ -51,6 +51,8 @@ fn a_fields_own_write_count_and_semantic_attributes_are_kept() {
     builder.style(Style { owner: Owner::Application { number: 3 }, token: 2 });
     let binding = Binding { owner: Owner::Application { number: 8 }, token: Token::new(5) };
     builder.bind(binding);
+    let shortcut = crate::Shortcut { key: b'a', modifier: crate::Modifier::Primary };
+    builder.shortcut(shortcut);
     builder.close();
     let tree = builder.finish();
     let node = tree.get(0).expect("field exists");
@@ -59,6 +61,7 @@ fn a_fields_own_write_count_and_semantic_attributes_are_kept() {
     assert_eq!(value.text.as_ref(), b"42");
     assert_eq!(node.states.as_slice(), [State::Invalid]);
     assert_eq!(node.binding, Some(binding));
+    assert_eq!(node.shortcut, Some(shortcut));
 }
 
 #[test]
@@ -175,4 +178,26 @@ fn a_built_text_leaf_reserves_one_run() {
     let tree = builder.finish();
     let node = tree.get(0).expect("text node exists");
     assert_eq!(node.text.capacity(), 1);
+}
+
+#[test]
+#[should_panic(expected = "shortcut keys are letters or digits")]
+fn a_shortcut_on_a_key_outside_letters_and_digits_is_refused() {
+    let mut builder = Builder::new(&LIMITS);
+    builder.open(Role::Button);
+    builder.bind(Binding { owner: Owner::Jig, token: Token::new(1) });
+    builder.shortcut(crate::Shortcut { key: b'!', modifier: crate::Modifier::Plain });
+}
+
+#[test]
+fn an_image_keeps_its_owners_picture() {
+    let mut builder = Builder::new(&LIMITS);
+    builder.open(Role::Image);
+    builder.name(b"A mark");
+    let picture = crate::Picture { owner: Owner::Application { number: 3 }, number: 7 };
+    builder.picture(picture);
+    builder.close();
+    let tree = builder.finish();
+    assert_eq!(tree.get(0).unwrap().picture, Some(picture));
+    assert_eq!(crate::Made::of(tree.get(0).unwrap()).attribute.picture, Some(picture));
 }
