@@ -87,16 +87,25 @@ Scope: client.md, 4.1, 5.1 ("At an application's address", "One subject
   each"); root.md, 7.
 Needs: jig 03 (`Section`, `open_section`); jig 04.3.
 Files: `crates/jig-domain-client/src/boundary.rs:49-52` (the event);
-  `crates/jig-domain-client/src/domain.rs:583-584,628-629` (ignored
+  `crates/jig-domain-client/src/domain.rs:615-616,660-661` (ignored
   before the start; dispatched); `crates/jig-domain-client/src/watches.rs:19-26`;
-  a new `crates/jig-domain-client/src/pages/shown.rs` (the handling, as
-  `application.rs` handles objects); the arms for the new owner
-  (findings/domain.md, 3): `domain.rs:494-502` (`close_page`),
-  `:509-536` (`page_behind`), `:848-884` (`watch_event`), `:962-965`
-  (`retry`), `:1046-1061,1070-1075,1083-1109` (`terminal_watch`),
-  `:1179-1182` (`fire`'s silence); `application.rs:72-80` (`close`
-  leaves `Sections` watches); the open-once checks,
-  `pages/task.rs:417,548` and `pages/project.rs:267`; the tests that
+  `crates/jig-domain-client/src/pages/shown.rs`, extended (146 lines
+  today, from jig 03.2 and 04.2; its `mod` is `pub(crate)`, `pages.rs:16`)
+  with the handling, as `application.rs` handles objects; the arms for
+  the new owner (findings/domain.md, 3; lines at origin/main after jig 06):
+  `domain.rs:526-534` (`close_page`), `:541-568` (`page_behind`),
+  `:876-912` (`watch_event`), `:990-993` (`retry`),
+  `:1074-1089,1098-1103,1111-1129` (`terminal_watch`), `:1203-1206`
+  (`fire`'s silence); `application.rs:72-80` (`close` leaves `Sections`
+  watches); the open-once checks, `pages/task.rs:417` and
+  `pages/project.rs:247`; the opens and sources with `Owner::Page`
+  written in, which open or source under the section's owner instead
+  (`Sections { generation }` on an application's page, `Page` at jig's
+  addresses): `pages/task.rs:562-568` (`routing::open_once`,
+  `pages/routing.rs:47-71`, for the plan's `Subject::Tree`, `:526`, and
+  `Run`, `:538`), `pages/project.rs:138-140` (the project's `open`),
+  `conversation/chips.rs:71` (the chips) and `pages/replies.rs:18`
+  (`source`, which reads only `Page` watches); the tests that
   list `Event`'s variants (`crates/jig-domain-client/src/tests/spine.rs:70`,
   `tests/time.rs:33`, `crates/jig-view/src/tests/cards.rs:96`); the
   client's world's exhaustive match on `jig_domain_client::Event`,
@@ -104,7 +113,12 @@ Files: `crates/jig-domain-client/src/boundary.rs:49-52` (the event);
 Shape: `Event::ShowSections { sections: List<Section> }`. At
   `Page::Elsewhere`, with a confirmed party and a live link: the
   domain's list of sections becomes the event's, but those naming a
-  second task, project or inbox filter (Choices); `open_section`
+  second task, project or inbox filter (Choices), and its first
+  `MOST_SECTIONS` (19, `pages.rs:34`; `domain.sections`' capacity,
+  `domain.rs:123`): a longer list is refused with
+  `crate::pages::routing::refuse(domain, Limit::Objects)`, as
+  `conversation/chips.rs:28` refuses a list past its limit, and keeps its
+  first 19; `open_section`
   (jig 03.4) opens, under `Owner::Sections { generation }`, what a
   section new to the list needs and no `Sections` watch already holds
   (`open_section`'s `owner` parameter, jig 03.4); the watches of the
@@ -129,7 +143,9 @@ Removes: nothing.
 Scope: client.md, 5.1 ("What a page says of itself, a section says on an
   application's page").
 Needs: 07.1.
-Files: `crates/jig-domain-client/src/pages/shown.rs` (the statuses);
+Files: `crates/jig-domain-client/src/pages/shown.rs` (the statuses;
+  `crates/jig-domain-client/src/pages.rs` re-exports them, `pub use
+  shown::SectionStatus;`, since `shown` is `pub(crate)`, `pages.rs:16`);
   `crates/jig-domain-client/src/pages/routing.rs:31-46` (`refuse`,
   `excess` on an application's page); `crates/jig-domain-client/src/application.rs:148-155`
   (a read answered none on an application's page); `domain.rs:509-536`
@@ -258,6 +274,7 @@ pub enum Owner {
 
 // crates/jig-domain-client/src/pages/shown.rs
 /// What a section of jig's says of itself on an application's page.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SectionStatus { pub behind: bool, pub excess: u32, pub refused: Option<Limit>, pub missing: bool }
 impl Domain {
     pub fn section_status(&self, section: Section) -> Option<SectionStatus>;
