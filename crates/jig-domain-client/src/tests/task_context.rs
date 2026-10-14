@@ -62,7 +62,7 @@ fn supplied_task_context_routes_only_its_whole_parts_and_impact_without_recreati
         if !present {
             row.context = None;
         }
-        let sections = crate::pages::task::sections(&row);
+        let sections = crate::pages::task::offers(&row);
         assert_eq!(crate::pages::task::offered(&sections, TaskSection::Plan), present);
         assert_eq!(crate::pages::task::offered(&sections, TaskSection::Panels), present);
         let exact = row.clone();

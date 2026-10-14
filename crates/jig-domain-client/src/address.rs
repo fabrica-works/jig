@@ -1,7 +1,7 @@
 //! Jig addresses as typed places, never platform address text.
 //! Navigation is owned by the client; see client/domain/client.md, 5.
 /// The section of a project at an address.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum ProjectSection {
     /// Project overview.
     Overview,
@@ -26,7 +26,7 @@ pub enum ProjectSection {
 }
 
 /// The section of a task at an address.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum TaskSection {
     /// Task overview.
     Overview,

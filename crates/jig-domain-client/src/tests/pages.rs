@@ -9,7 +9,7 @@ use crate::{
     contract::*,
     link::Link,
     pages::{
-        Page,
+        Page, Section,
         navigation::{Destination, Navigation},
     },
 };
@@ -487,7 +487,7 @@ fn task_sections_and_activity_sources_follow_the_executor() {
     ] {
         let mut document = super::confirmation::task();
         document.chip.executor = executor;
-        let sections = task::sections(&document);
+        let sections = task::offers(&document);
         for section in [TaskSection::Overview, TaskSection::Activity, TaskSection::History, TaskSection::Budget] {
             assert!(task::offered(&sections, section));
         }
@@ -2346,7 +2346,7 @@ fn task_watch_replacements_keep_served_goal_identity_and_whole_contract_loss_ind
         };
         assert_eq!(**retained, expected);
         assert!(!retained.cut, "contract loss is not aggregate task-list loss");
-        let sections = crate::pages::task::sections(retained);
+        let sections = crate::pages::task::offers(retained);
         assert!(crate::pages::task::offered(&sections, crate::address::TaskSection::Overview));
     }
 }
@@ -2433,7 +2433,7 @@ fn task_budget_watch_replacements_keep_all_owner_numbers_funders_and_optional_de
             assert_eq!(actual.budget.left, 17, "availability is supplied independently of the numbers");
             assert_eq!(actual.budget.deadline, deadline, "authority is a separate supplied fact");
             assert!(crate::pages::task::offered(
-                &crate::pages::task::sections(actual),
+                &crate::pages::task::offers(actual),
                 crate::address::TaskSection::Budget
             ));
         }
@@ -2590,3 +2590,44 @@ fn conversation_delivery(rows: List<ConversationLine>, more: bool) -> Delivery {
 }
 
 const UTF8_TEXTS: [&[u8]; 2] = [b"~\0whole", b"~\0opaque-row"];
+
+#[test]
+fn the_inbox_shows_both_groups_of_its_filter() {
+    let mut domain = Domain::new(&LIMITS, 2);
+    let f = start(&mut domain, List::with_capacity(0));
+    delivered(&mut domain, Time::ZERO, f, frame(7));
+    for project in [None, Some(3)] {
+        drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::Inbox { project }) });
+        assert_eq!(
+            domain.sections(),
+            &[
+                Section::Inbox { group: InboxReadGroup::Needs, project },
+                Section::Inbox { group: InboxReadGroup::Updates, project },
+            ],
+            "{project:?}"
+        );
+    }
+}
+#[test]
+fn a_task_address_shows_its_own_section_alone() {
+    let mut domain = Domain::new(&LIMITS, 2);
+    let f = start(&mut domain, List::with_capacity(0));
+    delivered(&mut domain, Time::ZERO, f, frame(7));
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Went { place: Place::Jig(Address::Task { task: 9, section: crate::address::TaskSection::Plan }) },
+    );
+    assert_eq!(domain.sections(), &[Section::Task { task: 9, section: crate::address::TaskSection::Plan }]);
+}
+#[test]
+fn a_page_not_about_the_work_shows_no_section() {
+    let mut domain = Domain::new(&LIMITS, 2);
+    assert_eq!(domain.sections(), &[]);
+    let f = start(&mut domain, List::with_capacity(0));
+    delivered(&mut domain, Time::ZERO, f, frame(7));
+    for place in [Place::Elsewhere, Place::Missing] {
+        drive(&mut domain, Time::ZERO, Event::Went { place });
+        assert_eq!(domain.sections(), &[], "{place:?}");
+    }
+}

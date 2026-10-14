@@ -30,9 +30,9 @@ pub enum PlanFilter {
     /// Rows whose work has not ended.
     Live,
 }
-/// Sections whose current task document has something to show.
+/// Offered whose current task document has something to show.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Sections {
+pub struct Offered {
     pub offered: List<TaskSection>,
 }
 /// Bounded plan context, preserving counts of every held task beyond the window.
@@ -116,7 +116,7 @@ fn counts() -> PhaseCounts {
 }
 /// Whether a section has content for this executor and its current facts.
 #[must_use]
-pub fn sections(task: &Task) -> Sections {
+pub fn offers(task: &Task) -> Offered {
     let (impact, panels) = match &task.context {
         Some(context) => (
             context.impact.tasks.waiting > 0
@@ -169,11 +169,11 @@ pub fn sections(task: &Task) -> Sections {
             offered.push(section).expect("at most six sections");
         }
     }
-    Sections { offered }
+    Offered { offered }
 }
 /// Whether a section should be offered, without interpreting acts or authority.
 #[must_use]
-pub fn offered(sections: &Sections, section: TaskSection) -> bool {
+pub fn offered(sections: &Offered, section: TaskSection) -> bool {
     sections.offered.as_slice().contains(&section)
 }
 /// Retains a whole bounded tree, folding additional rows by phase and preserving

@@ -73,7 +73,7 @@ pub fn task(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigB
     for chip in &doc.lineage_chips {
         cards::chip::chip(b, client, chip, words, bindings);
     }
-    let sections = jig_domain_client::pages::task::sections(doc);
+    let sections = jig_domain_client::pages::task::offers(doc);
     b.open(Role::Tabs);
     b.name(&words.say(JigPhrase::TaskPage, &[Hole::Number(number)]));
     for offered in &sections.offered {

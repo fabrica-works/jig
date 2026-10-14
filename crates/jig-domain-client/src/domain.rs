@@ -20,7 +20,7 @@ use crate::{
     frame::{FrameShown, FrameState},
     limits::Limits,
     link::Link,
-    pages::Page,
+    pages::{Page, Section},
     store::Record,
     watches::{Following, Owner, Watch},
 };
@@ -64,6 +64,7 @@ pub struct Domain {
     pub(crate) frame: FrameState,
     pub(crate) link: Link,
     pub(crate) page: Page,
+    pub(crate) sections: List<Section>,
     pub(crate) inbox: crate::pages::inbox::Inbox,
     pub(crate) project_page: crate::pages::project::ProjectPage,
     pub(crate) deployment_page: crate::pages::deployment::DeploymentPage,
@@ -116,6 +117,7 @@ impl Domain {
             frame: FrameState { document: None },
             link: Link::Starting,
             page: Page::Starting,
+            sections: List::with_capacity(crate::pages::MOST_SECTIONS),
             inbox: crate::pages::inbox::Inbox::new(limits.rows),
             project_page: crate::pages::project::ProjectPage::new(limits.rows),
             deployment_page: crate::pages::deployment::DeploymentPage::new(),
@@ -141,6 +143,19 @@ impl Domain {
             conversation_rows: crate::windows::ConversationWindow::new(limits.rows),
             conversation,
             history_rows: crate::windows::HistoryWindow::new(limits.rows),
+        }
+    }
+    /// The page's sections in their display order (client/domain/client.md, 5.1).
+    #[must_use]
+    pub fn sections(&self) -> &[Section] {
+        match self.page {
+            Page::Work { .. } => self.sections.as_slice(),
+            Page::Starting
+            | Page::Elsewhere
+            | Page::SigningIn
+            | Page::Missing
+            | Page::OutOfDate
+            | Page::SomeoneElse => &[],
         }
     }
     /// Installs ordered navigation and its home before start; capacities are checked.

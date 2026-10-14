@@ -7,7 +7,7 @@ use crate::{
     contract::{self, Delivery, Limit, ObjectKey, Part, PartyKind, Read, ReadResult, ReadValue, Subject},
     facts::Fact,
     objects::{Body, Source},
-    pages::Page,
+    pages::{Page, Section},
     watches::{Owner, Watch},
     windows::{Edge, Edges},
 };
@@ -79,6 +79,7 @@ pub(crate) fn navigate(
     domain.close_page(out);
     domain.reads.abandon(domain.generation);
     out.push(Request::PartsLeft { generation: domain.generation });
+    domain.sections.clear();
     domain.objects.clear();
     domain.task_page.clear();
     domain.project_page.clear();
@@ -127,6 +128,7 @@ pub(crate) fn navigate(
 }
 /// Opens only what the selected work page shows; services have no page.
 pub(crate) fn enter(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Queue<Request>) {
+    domain.sections.clear();
     let hidden = match domain.confirmed {
         Some(party) => crate::domain::foreign_kept_requests(domain, party),
         None => true,
@@ -159,6 +161,20 @@ pub(crate) fn enter(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Que
     }
     domain.page =
         Page::Work { address: domain.address, generation: domain.generation, behind: false, excess: 0, refused: None };
+    let section = match domain.address {
+        Address::Inbox { project } => {
+            domain
+                .sections
+                .push(Section::Inbox { group: contract::InboxReadGroup::Needs, project })
+                .expect("page sections fit their fixed bound");
+            Section::Inbox { group: contract::InboxReadGroup::Updates, project }
+        }
+        Address::Conversations { project } => Section::Conversations { project },
+        Address::Task { task, section } => Section::Task { task, section },
+        Address::Project { project, section } => Section::Project { project, section },
+        Address::Deployment => Section::Deployment,
+    };
+    domain.sections.push(section).expect("page sections fit their fixed bound");
     domain.changed();
     match domain.address {
         Address::Inbox { project } => {

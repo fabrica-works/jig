@@ -20,7 +20,7 @@ impl Cursor {
 }
 
 /// One inbox query order; the two groups carry independent opaque cursors.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum InboxReadGroup {
     /// Work waiting on the party, oldest first.
     Needs,
