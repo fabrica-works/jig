@@ -108,7 +108,10 @@ fn bodies(b: &mut Builder) {
     b.close();
     leaf(b, Role::Cell, b"outside");
     leaf(b, Role::Term, b"Term");
-    leaf(b, Role::Description, b"Description");
+    b.open(Role::Description);
+    b.text(Run::Plain, b"Description");
+    b.text(Run::Plain, b"Another line");
+    b.close();
 }
 fn controls(b: &mut Builder) {
     for role in [Role::Button, Role::Tab, Role::MenuItem, Role::Link] {

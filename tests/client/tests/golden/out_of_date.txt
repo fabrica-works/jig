@@ -1,0 +1,32 @@
+== Client out of date: update or reload this client to continue; pending requests are kept == Offline
+Work:
+  What needs you:
+    Questions: 0; proposals: 0; escalations: 0; person tasks: 0
+    Results read through 0
+    [1] 0 updates not read
+    [2] 0 need you
+  Who is signed in:
+    * Signed in as Pat
+    Person
+    Login: fixture-login
+    [3] Sign out
+  Projects:
+    [4] Project: First
+    Held policy role 1
+    Ledger source:
+      Budget: 100
+      Spent directly: 0
+      Settled spend below: 0
+      Reserved for funded work: 0
+      Left: 100
+      Ledger source
+      Funded by pool in project 1, person 7, period 1
+      Ledger is open
+  Go to a task:
+    [5] Go to task number: (empty) (enter sends)
+Navigation:
+  [6] Family
+Client out of date: update or reload this client to continue; pending requests are kept:
+Notices:
+  * Offline
+  [7] Dismiss

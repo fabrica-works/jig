@@ -25,7 +25,14 @@ impl Limits {
             family::PART_NODES.max(owner.nodes.checked_add(16)?).max(domain.first.rows.checked_add(2)?);
         let cards = domain.first.rows.checked_add(1)?;
         let application_nodes = fragment_nodes.checked_add(cards.checked_mul(3)?)?.checked_add(9)?;
-        let mut tree = jig_view::Limits::of_words(&domain.jig, jig)?;
+        let mut tree = jig_view::Limits::envelope(
+            &domain.jig,
+            jig.book.jig_capacity()?,
+            &jig_domain_client::pages::Arrangement::none(),
+            0,
+            0,
+            0,
+        )?;
         let jig_nodes = tree.nodes;
         let sections = jig_view::task_section_nodes(&domain.jig, jig_domain_client::address::TaskSection::Plan)?
             .checked_add(4)?

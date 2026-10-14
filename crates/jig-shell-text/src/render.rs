@@ -155,6 +155,7 @@ fn node(tree: &Tree, at: u32, indent: u32, print: &mut Print) -> Option<u32> {
                 Some(indent)
             }
         }
+        Role::Description => Some(indent.saturating_add(2)),
         Role::Item | Role::TreeItem => {
             start(&mut print.text, indent);
             raw(&mut print.text, b"- ");
@@ -205,7 +206,6 @@ fn node(tree: &Tree, at: u32, indent: u32, print: &mut Print) -> Option<u32> {
         | Role::Time
         | Role::Cell
         | Role::Term
-        | Role::Description
         | Role::Status
         | Role::Alert
         | Role::Progress
@@ -242,9 +242,6 @@ fn control(tree: &Tree, at: u32, indent: u32, print: &mut Print) {
 }
 fn line(tree: &Tree, at: u32, mut indent: u32, out: &mut List<u8>) {
     let n = tree.get(at).expect("line node exists");
-    if n.role == Role::Description {
-        indent = indent.saturating_add(2);
-    }
     if n.role == Role::Code {
         indent = indent.saturating_add(4);
     }

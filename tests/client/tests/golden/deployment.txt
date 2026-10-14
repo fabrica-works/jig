@@ -1,0 +1,119 @@
+== Deployment == Live
+Work:
+  What needs you:
+    Questions: 0; proposals: 0; escalations: 0; person tasks: 0
+    Results read through 0
+    [1] 0 updates not read
+    [2] 0 need you
+  Who is signed in:
+    * Signed in as Pat
+    Person
+    Login: fixture-login
+    [3] Sign out
+  Projects:
+    [4] Project: First
+    Held policy role 1
+    Ledger source:
+      Budget: 100
+      Spent directly: 0
+      Settled spend below: 0
+      Reserved for funded work: 0
+      Left: 100
+      Ledger source
+      Funded by pool in project 1, person 7, period 1
+      Ledger is open
+  Go to a task:
+    [5] Go to task number: (empty) (enter sends)
+Navigation:
+  [6] Family
+Deployment:
+  ## Deployment
+  Hosts:
+    Deployment:
+      - Host 1
+        * Lost
+        Grace holds until 0
+        Slots used: 1
+        Slots free: 1
+        Task 9: Chat nine:
+          [7] Task 9: Chat nine
+          Agent
+          * Cannot show this part
+        Task 9: Chat nine:
+          [8] Task 9: Chat nine
+          Agent
+          * Cannot show this part
+        Refused
+        hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
+      - Host 2
+        * Lost
+        Grace holds until 0
+        Slots used: 1
+        Slots free: 1
+        Task 9: Chat nine:
+          [9] Task 9: Chat nine
+          Agent
+          * Cannot show this part
+        Task 9: Chat nine:
+          [10] Task 9: Chat nine
+          Agent
+          * Cannot show this part
+        Refused
+        hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
+  LLM accounts:
+    - LLM account 1
+      Unavailable
+      aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      Task 9: Chat nine:
+        [11] Task 9: Chat nine
+        Agent
+        * Cannot show this part
+      Task 9: Chat nine:
+        [12] Task 9: Chat nine
+        Agent
+        * Cannot show this part
+      Tasks waiting for this account
+      Task 9: Chat nine:
+        [13] Task 9: Chat nine
+        Agent
+        * Cannot show this part
+      Task 9: Chat nine:
+        [14] Task 9: Chat nine
+        Agent
+        * Cannot show this part
+    - LLM account 2
+      Unavailable
+      aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      Task 9: Chat nine:
+        [15] Task 9: Chat nine
+        Agent
+        * Cannot show this part
+      Task 9: Chat nine:
+        [16] Task 9: Chat nine
+        Agent
+        * Cannot show this part
+      Tasks waiting for this account
+      Task 9: Chat nine:
+        [17] Task 9: Chat nine
+        Agent
+        * Cannot show this part
+      Task 9: Chat nine:
+        [18] Task 9: Chat nine
+        Agent
+        * Cannot show this part
+  Capacity:
+    ## Capacity
+    Deployment
+    Live tasks: 1
+    Task limit: 2
+    In project 1
+    Live tasks: 1
+    Task limit: 2
+    Pending proposals: 2
+    Working set limit reached
+    Read limit reached
+  Configured connectors:
+    - Family item:
+        * Unknown family object
+        * Unknown family object
+    * Cannot show this part

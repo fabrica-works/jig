@@ -43,6 +43,7 @@ left | right
 outside
 Term:
   Description
+  Another line
 [1] Act
 [2] Act
 [3] Act

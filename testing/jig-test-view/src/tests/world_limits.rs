@@ -95,6 +95,31 @@ fn bounded_world_storage_survives_complete_composition_text_overflow() {
 }
 
 #[test]
+fn bounded_world_storage_survives_the_jig_envelopes_text_overflow() {
+    let mut domain = world_domain();
+    domain.jig.rows = 4;
+    domain.jig.objects = 8;
+    domain.jig.watches = 16;
+    domain.jig.document_bytes = 8192;
+    let jig = super::words();
+    let first = super::family_words();
+    let envelope = jig_view::Limits::envelope(
+        &domain.jig,
+        jig.book.jig_capacity().unwrap(),
+        &jig_domain_client::pages::Arrangement::none(),
+        0,
+        0,
+        0,
+    )
+    .unwrap();
+    assert!(u64::from(envelope.nodes) * u64::from(envelope.text_per_node) > u64::from(u32::MAX));
+    assert!(jig_view::Limits::of_words(&domain.jig, jig).is_none());
+    let limits = Limits::for_world(&domain, jig, first, 1024, 256).unwrap();
+    assert_eq!(limits.tree.nodes, 1024);
+    assert_eq!(limits.tree.text_bytes, 1024 * limits.tree.text_per_node);
+}
+
+#[test]
 fn bounded_storage_keeps_every_attribute_of_a_finite_complete_envelope() {
     let mut domain = world_domain();
     domain.jig.rows = 0;

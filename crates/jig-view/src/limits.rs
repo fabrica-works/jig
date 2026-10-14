@@ -101,6 +101,23 @@ impl Limits {
         slot_nodes: u32,
         slot_depth: u32,
     ) -> Option<Self> {
+        let mut limits = Self::envelope(client, phrase, arrangement, application_nodes, slot_nodes, slot_depth)?;
+        limits.text_bytes = limits.nodes.checked_mul(limits.text_per_node)?;
+        limits.patches = limits.nodes.checked_mul(5)?;
+        Some(limits)
+    }
+
+    /// Node and attribute envelope before storage products. A bounded world
+    /// supplies its own node, binding, slot, text and patch capacities.
+    #[must_use]
+    pub fn envelope(
+        client: &jig_domain_client::Limits,
+        phrase: u32,
+        arrangement: &jig_domain_client::pages::Arrangement,
+        application_nodes: u32,
+        slot_nodes: u32,
+        slot_depth: u32,
+    ) -> Option<Self> {
         let nodes = crate::arranged_nodes(client, 0, arrangement)?
             .max(application_nodes)
             .checked_add(crate::banner_nodes(client)?)?
@@ -121,12 +138,12 @@ impl Limits {
             // Markdown list path. Dependency regions are siblings, not nested.
             depth: client.rows.checked_add(33)?.checked_add(slot_depth)?,
             text_per_node,
-            text_bytes: nodes.checked_mul(text_per_node)?,
+            text_bytes: 0,
             drawing_bytes: 0,
             styles_per_node: 2,
             // At most one remove per old node and one structural plus three
             // attribute edits per new node (diff.rs).
-            patches: nodes.checked_mul(5)?,
+            patches: 0,
             // Each actionable node or part slot issues at most one meaning.
             bindings: nodes,
             slots: nodes,

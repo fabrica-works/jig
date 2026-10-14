@@ -7,6 +7,7 @@ use jig_test_domain_client::Address as RootAddress;
 use skein_lib::{Duration, Wall};
 pub mod client_construction;
 pub mod person_confirmation;
+pub mod text_pages;
 /// Creates a bounded fixture word sequence.
 #[must_use]
 pub fn text(bytes: &[u8]) -> Text {

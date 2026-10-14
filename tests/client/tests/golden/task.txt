@@ -1,0 +1,84 @@
+== Task 9 == Live
+Work:
+  What needs you:
+    Questions: 0; proposals: 0; escalations: 0; person tasks: 0
+    Results read through 0
+    [1] 0 updates not read
+    [2] 0 need you
+  Who is signed in:
+    * Signed in as Pat
+    Person
+    Login: fixture-login
+    [3] Sign out
+  Projects:
+    [4] Project: First (current)
+    Held policy role 1
+    Ledger source:
+      Budget: 100
+      Spent directly: 0
+      Settled spend below: 0
+      Reserved for funded work: 0
+      Left: 100
+      Ledger source
+      Funded by pool in project 1, person 7, period 1
+      Ledger is open
+  Go to a task:
+    [5] Go to task number: (empty) (enter sends)
+Navigation:
+  [6] Family
+Task 9:
+  - Task 9: Chat nine:
+      ## Task 9: Chat nine
+      * Open
+      Task 9: Chat nine:
+        [7] Task 9: Chat nine
+        Agent
+        * Cannot show this part
+      [8] Write
+  In project 1
+  Priority 1
+Task 9:
+  [9] Overview
+  [10] Activity (current)
+  [11] History
+  [12] Budget and authority
+Activity:
+  ## Activity
+  Waiting for news
+  Parked; your words resume it
+  - Conversation:
+      - Conversation:
+          At 0
+          Attempt 1
+          Turn 1
+          Agent:
+            Agent
+            delegate:
+              Call 1
+              Using tool delegate
+              Call completed
+              Delegate ten
+              [13] Open input and result for delegate
+              - Proposal:
+                  ## Proposal
+                  * Open
+                  By task 10
+                  Waiting 1000010022702 min
+                  Why this is proposed
+                  Resolve the incident
+                  Effect
+                  * Cannot show this part
+                  Budget 1
+                  Delegation depth 1
+                  Tasks allowed 1
+                  Funds 1; 1 left now, 0 after
+                  By party 7
+                  Waiting for party 7
+                  [14] Accept
+          Input tokens: 1
+          Output tokens: 1
+          Cache tokens read: 0
+          Cache tokens written: 0
+          Turn spent: 1
+  Start of the list
+  End of the list

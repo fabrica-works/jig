@@ -1,0 +1,199 @@
+== Project == Live
+Work:
+  What needs you:
+    Questions: 0; proposals: 0; escalations: 0; person tasks: 0
+    Results read through 0
+    [1] 0 updates not read
+    [2] 0 need you
+  Who is signed in:
+    * Signed in as Pat
+    Person
+    Login: fixture-login
+    [3] Sign out
+  Projects:
+    [4] Project: First (current)
+    Held policy role 1
+    Ledger source:
+      Budget: 100
+      Spent directly: 0
+      Settled spend below: 0
+      Reserved for funded work: 0
+      Left: 100
+      Ledger source
+      Funded by pool in project 1, person 7, period 1
+      Ledger is open
+  Go to a task:
+    [5] Go to task number: (empty) (enter sends)
+Navigation:
+  [6] Family
+Project:
+  In project 1
+  pppppppppppppppppppppppppppppppp
+pppppppppppppppppppppppppppppppp:
+  [7] Overview
+  [8] Goals
+  [9] Tasks
+  [10] Notes
+  [11] Settings (current)
+  [12] Resources
+  [13] Policy
+  [14] Roles and services
+  [15] Spend
+  [16] Recurring tasks
+Settings:
+  ## Settings
+  Resources:
+    ## Resources
+  Policy:
+    ## Policy
+    Budget 1
+    Delegation depth 1
+    Tasks allowed 1
+    Period 3
+    Spend per period: 20
+    Role 1
+    Allotment: 10
+    Budget 1
+    Delegation depth 1
+    Tasks allowed 1
+    Decides kind 1
+    Decides kind 2
+    Role 2
+    Allotment: 10
+    Budget 1
+    Delegation depth 1
+    Tasks allowed 1
+    Decides kind 1
+    Decides kind 2
+    Decides kind 1
+    Role 1
+    Decides kind 2
+    Role 2
+  Roles and services:
+    ## Roles and services
+    Party 7
+    Held policy role 1
+    Party 7
+    Held policy role 2
+    ssssssssssssssssssssssssssssssss
+    Party 1
+    ssssssssssssssssssssssssssssssss
+    Party 2
+  Spend:
+    ## Spend
+    Period 3
+    Total budget: 1
+    Own spend: 0
+    Ended delegate spend: 0
+    Reserved: 0
+    Left: 1
+    By party 7
+    Party 7
+    Total budget: 1
+    Own spend: 0
+    Ended delegate spend: 0
+    Reserved: 0
+    Left: 1
+    By party 7
+    Party 8
+    Total budget: 1
+    Own spend: 0
+    Ended delegate spend: 0
+    Reserved: 0
+    Left: 1
+    By party 7
+    Task 9: Chat nine:
+      [17] Task 9: Chat nine
+      Agent
+      * Cannot show this part
+    6
+    Task 9: Chat nine:
+      [18] Task 9: Chat nine
+      Agent
+      * Cannot show this part
+    5
+    Start of the list
+    End of the list
+  Recurring tasks:
+    ## Recurring tasks
+    Chat nine:
+      Task 9: Chat nine:
+        [19] Task 9: Chat nine
+        Agent
+        * Cannot show this part
+      Recurring template 1
+      - Proposed task 1
+        rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
+        Agent charter 1
+        Report word byte limit 32
+          Tool bits: 0
+          Delegate tasks: 1
+          Delegate depth: 1
+          Spend ceiling: 10
+          Note scope bits: 0
+          Grants
+          Allowed delegation executors
+          Note resources
+        Budget 10
+        Funded by project period 1, period 3
+        Wake policy:
+          Words
+          Does not wake
+          Notices
+          Does not wake
+          News
+          Does not wake
+          Delegate results do not wake
+          Questions do not wake
+          Answers do not wake
+          Timers do not wake
+      Budget 10
+      If the preceding batch is still live, skip this period
+      Current period 3
+      Period began at 0
+      Next runs at 0
+      Last batch period 2
+      [20] Task 8
+      [21] Task 9
+    Chat nine:
+      Task 9: Chat nine:
+        [22] Task 9: Chat nine
+        Agent
+        * Cannot show this part
+      Recurring template 2
+      - Proposed task 1
+        rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
+        Agent charter 1
+        Report word byte limit 32
+          Tool bits: 0
+          Delegate tasks: 1
+          Delegate depth: 1
+          Spend ceiling: 10
+          Note scope bits: 0
+          Grants
+          Allowed delegation executors
+          Note resources
+        Budget 10
+        Funded by project period 1, period 3
+        Wake policy:
+          Words
+          Does not wake
+          Notices
+          Does not wake
+          News
+          Does not wake
+          Delegate results do not wake
+          Questions do not wake
+          Answers do not wake
+          Timers do not wake
+      Budget 10
+      If the preceding batch is still live, skip this period
+      Current period 3
+      Period began at 0
+      Next runs at 0
+      Last batch period 2
+      [23] Task 8
+      [24] Task 9
+  - Family item:
+      * Unknown family object
+      * Unknown family object

@@ -1,0 +1,162 @@
+== Inbox == Live
+Work:
+  What needs you:
+    Questions: 1; proposals: 1; escalations: 1; person tasks: 1
+    Results read through 0
+    [1] 2 updates not read
+    [2] 4 need you
+  Who is signed in:
+    * Signed in as Pat
+    Person
+    Login: fixture-login
+    [3] Sign out
+  Projects:
+    [4] Project: First
+    Held policy role 1
+    Ledger source:
+      Budget: 100
+      Spent directly: 0
+      Settled spend below: 0
+      Reserved for funded work: 0
+      Left: 100
+      Ledger source
+      Funded by pool in project 1, person 7, period 1
+      Ledger is open
+  Go to a task:
+    [5] Go to task number: (empty) (enter sends)
+Navigation:
+  [6] Family
+Inbox:
+  [7] All projects
+  [8] Project: First
+  [9] All kinds
+  [10] Question
+  [11] Proposal
+  [12] Escalation
+  [13] Person task
+  [14] Result
+  [15] Reply
+  [16] All goals
+  4 need you
+  2 updates not read
+Needs you:
+  ## Needs you
+  - Waiting 1000012957843 min
+    - Proposal:
+        ## Proposal
+        In project 1
+        * Open
+        By task 10
+        Waiting 1000012957843 min
+        Why this is proposed
+        Resolve the incident
+        Effect
+        * Cannot show this part
+        Budget 1
+        Delegation depth 1
+        Tasks allowed 1
+        Funds 1; 1 left now, 0 after
+        By party 7
+        Waiting for party 7
+        [17] Accept
+  - Waiting 1000012957843 min
+    - Escalation:
+        ## Escalation
+        In project 1
+        * Open
+        Task 9: Chat nine:
+          [18] Task 9: Chat nine
+          Agent
+          Held: stopped by Pat at 0
+          Since 0
+        spec
+        instructions
+        Result expected
+        Report word byte limit 32
+        Requested by person 7
+        Wake policy:
+          Words
+          Does not wake
+          Notices
+          Does not wake
+          News
+          Does not wake
+          Delegate results do not wake
+          Questions do not wake
+          Answers do not wake
+          Timers do not wake
+        Subscriptions:
+        Charter 1
+        Budget: 1:
+          Budget: 1
+          Spent directly: 0
+          Settled spend below: 0
+          Reserved for funded work: 0
+          Left: 1
+          Funded by
+          Funded by pool in project 1, person 7, period 3
+          Tool bits: 0
+          Delegate tasks: 1
+          Delegate depth: 1
+          Spend ceiling: 1
+          Note scope bits: 0
+          Grants
+          Allowed delegation executors
+          Note resources
+        [19] Release
+  - Waiting 1000012957843 min
+    - Question:
+        ## Question
+        In project 1
+        * Open
+        Task 9: Chat nine:
+          [20] Task 9: Chat nine
+          Agent
+          * Cannot show this part
+        Question from person 7
+        Which option?
+        Waiting 1000012957843 min
+  - Waiting 1000012957843 min
+    - Person task:
+        ## Person task
+        In project 1
+        * Open
+        Task 10: Chat nine:
+          [21] Task 10: Chat nine
+          Person
+          * Cannot show this part
+        By party 7
+        spec
+        Waiting for party 7
+        Since 0
+  Start of the list
+  End of the list
+Updates:
+  ## Updates
+  - New
+    - Reply:
+        ## Reply
+        In project 1
+        * Open
+        Task 9: Chat nine:
+          [22] Task 9: Chat nine
+          Agent
+          * Cannot show this part
+        Hello
+        [23] Open at first reply not read: 1
+  - New
+    - Result:
+        ## Result
+        In project 1
+        * Open
+        Task 11: Chat nine:
+          Task 11: Chat nine:
+            [24] Task 11: Chat nine
+            Agent
+            * Cannot show this part
+          Completed
+          At 0
+          Finished
+  Start of the list
+  End of the list
+* More entries are available
