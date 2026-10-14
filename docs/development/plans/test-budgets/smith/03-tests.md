@@ -131,7 +131,9 @@ Files: `tests/agent-process/src/lib.rs:150` (`limits()`, called per
   (a verdict formatted whatever happens);
   the test modules of `crates/smith-agent-service/src/sinks.rs`
   (`:1316`, `:1432`) and `crates/smith-agent-service/src/calls.rs`
-  (`:489-492`).
+  (`:489-492`); `tests/local-process/tests/fuzzy_store.rs`
+  (`configured` `:206`: one line that obtains `lower_configuration()`
+  before the world's metered processes start, ruling 113).
 Shape: `limits()` and `lower_configuration()` each computed once per
   process (`OnceLock`) and cloned where a caller changes its copy; the
   verdict formatted on failure only; the sinks' tests whose loops run

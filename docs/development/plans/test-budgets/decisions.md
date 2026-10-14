@@ -254,6 +254,15 @@ the file.
      shortest text shown only once the new chat has answered, whatever
      that order; the assertions stay. The person's scheduling is not bent
      to keep the old order (smith/01-arrived.md, 01.3, jig `669f3ff80`).
+113. **smith 03.4 primes the cached configuration outside the heap
+     meter** (plan defect, smith 03's block of 2026-10-14T01:17:27Z).
+     03.4's Shape computes `lower_configuration` once per process
+     (`OnceLock`); `fuzzy_store`'s first metered process initialized it,
+     and its heap check counted the 3,528 retained bytes against the
+     process (seed 80, `logs/20261014T011543-87.log`). `configured`
+     (`tests/local-process/tests/fuzzy_store.rs:206`) obtains it once
+     before the world's metered processes start; the focused worlds
+     already do. Every name, expected value and heap check stays.
 
 ## For the user
 
