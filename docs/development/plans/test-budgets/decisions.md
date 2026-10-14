@@ -195,6 +195,19 @@ the file.
      `Read::Arrived { max: 256 }`, every known-length row is unchanged,
      and a zero-room row expecting `Read::Arrived { max: 1 }` is added.
      01.3's Shape names it.
+108. **smith's window story is retried once, until it is fixed**
+     (cross-session scope, smith 03's block of 2026-10-14T00:24:49Z and
+     smith 02's of 00:25:26Z). `a_window_size_change_reaches_the_status_line`
+     saw `[85, 20]` against `[80, 20]` in two smith gates in a row
+     (`logs/20261014T002211-199.log`, `logs/20261014T002321-200.log`,
+     each started at a load of 11 to 13 on 8 cores), after passing in
+     the 12 runs logged before them, smith 02.1's six among them. smith
+     02.1's fix (the terminal sized before the product starts) did not
+     remove the race, and no code changed between the passing and the
+     failing runs. Until a step not in the plan fixes it, a smith gate that
+     fails only on this test with these widths lands again once without
+     asking (README, "smith's window story may be landed again once").
+     That step follows once its cause is found.
 
 ## For the user
 

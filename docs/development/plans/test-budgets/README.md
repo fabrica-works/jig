@@ -144,6 +144,13 @@ ones before it in its session. Dependencies are by capability.
   branch, `git status --porcelain` is not run for that landing. The
   other two checks of 7.3 (`merge-base --is-ancestor`, the `Step`
   trailer) stand for every landing.
+- **smith's window story may be landed again once** (ruling 108), until
+  the step that fixes it lands: when a smith gate fails only on
+  `smith::end_to_end a_window_size_change_reaches_the_status_line`, with
+  widths `[85, 20]` against `[80, 20]`, `land` again once without
+  asking, as development.md, 8.5 allows for a timeout, and name the
+  failed gate's log in the commit body. A second failure on the same
+  tree, or any other failure, is a question as 8.5 says.
 - **smith's gate on carbon-forge** is ruling 121's (decisions.md, 10),
   with `NEXTEST_DOUBLE_SPAWN=0`, until smith 04.1: `land --gate 'cargo
   fmt --all --check && cargo clippy --workspace --all-targets -- -D
