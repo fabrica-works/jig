@@ -614,7 +614,11 @@ impl<A: App, F: Front<A>> World<A, F> {
             if let Some(node) = old_nodes.into_iter().find(|node| A::tree(&c.view).find(*node).is_none()) {
                 self.last_removed = Some((id, node));
             }
-            Some(A::seen(A::tree(&c.view)))
+            let mut seen = A::seen(A::tree(&c.view));
+            if let Some(fault) = jig_view::outline::check(A::tree(&c.view)) {
+                seen.push(super::Seen::Outline { fault });
+            }
+            Some(seen)
         } else {
             None
         };

@@ -20,7 +20,7 @@ enum Event {
 struct Wire;
 const KEY: Key = Key { owner: Owner::Jig, kind: 1, a: 1, b: 1 };
 const LIMITS: jig_view::Limits = jig_view::Limits {
-    nodes: 16,
+    nodes: 24,
     depth: 4,
     text_per_node: 64,
     text_bytes: 1024,
@@ -68,6 +68,18 @@ impl<const BAD: u8> App for Broken<BAD> {
     fn build(view: &mut View, root: &Root, out: &mut Queue<Patch>) {
         let mut b = view.builder();
         b.open(Role::Page);
+        b.open(Role::Banner);
+        for region in [
+            jig_view::regions::JigRegion::Link,
+            jig_view::regions::JigRegion::Needs,
+            jig_view::regions::JigRegion::Party,
+        ] {
+            b.open(Role::Region);
+            b.region(region.region());
+            b.close();
+        }
+        b.close();
+        b.open(Role::Main);
         b.open(Role::Status);
         b.name(if BAD == 9 { b"Offline" } else { b"Online" });
         b.close();
@@ -90,6 +102,7 @@ impl<const BAD: u8> App for Broken<BAD> {
             b.text(Run::Plain, b"Words");
             b.close();
         }
+        b.close();
         b.close();
         view.finish(b, root.shown, out);
     }
@@ -425,4 +438,32 @@ fn a_business_frame_cannot_unpark_an_out_of_date_stream_before_the_client_restar
         &mut out,
     );
     assert_eq!(referee.verdict(), skein_world::domain::Verdict::Passed);
+}
+
+#[test]
+fn a_tree_breaking_the_outline_fails_the_referee() {
+    let mut referee = skein_world::domain::Referee::new(referee::Rules::new(
+        Duration::from_millis(10),
+        Duration::from_millis(10),
+        Duration::from_millis(10),
+    ));
+    let mut out = Vec::new();
+    referee.observe(
+        Time::ZERO,
+        Observation::Shown {
+            client: ClientId(0),
+            seen: vec![Seen::Outline {
+                fault: jig_view::outline::Fault { rule: jig_view::outline::Rule::BannerFirst, node: 1 },
+            }],
+        },
+        &mut out,
+    );
+    assert_eq!(
+        referee.verdict(),
+        skein_world::domain::Verdict::Failed(skein_world::domain::Failure {
+            at: Time::ZERO,
+            why: "the page's outline: a tree broke view.md 3.1".to_owned(),
+            pending: vec![],
+        })
+    );
 }

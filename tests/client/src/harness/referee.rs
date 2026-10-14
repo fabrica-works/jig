@@ -268,6 +268,7 @@ impl Rules {
                         self.promised.insert((task, message), words);
                     }
                 }
+                Seen::Outline { .. } => judge.check(false, "the page's outline: a tree broke view.md 3.1"),
                 Seen::HiddenPage => {}
                 Seen::Link { live } => {
                     judge.meet(&if live { Deadline::Online(client) } else { Deadline::Offline(client) });
