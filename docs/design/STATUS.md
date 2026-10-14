@@ -113,4 +113,6 @@ smith, and builds what section 2's rows name it for.
 
 ## 4. Drafts
 
-None.
+| Draft | About | Next |
+|---|---|---|
+| `client-composition.md` | an application's own client: jig's pages as a library, layout as semantics, the closed sets completed, owners not connectors, the text shell jig's; what waits | discuss; its section 5 goes into `client/domain/` before the first application's first release on jig's client, and before the browser's shell is planned |
