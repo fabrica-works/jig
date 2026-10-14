@@ -44,7 +44,14 @@ fn llm(value: run::charter::Llm, names: &[EndpointName], limits: &wire::Limits) 
     .ok()?;
     wire::Llm::new(
         limits,
-        wire::LlmParts { endpoint: name, model: value.model, window: value.window, output: value.output, prices },
+        wire::LlmParts {
+            endpoint: name,
+            model: value.model,
+            effort: value.effort,
+            window: value.window,
+            output: value.output,
+            prices,
+        },
     )
     .ok()
 }

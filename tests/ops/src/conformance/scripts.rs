@@ -492,6 +492,8 @@ fn turn(agent: &Agent, texts: &[Vec<u8>], step: &Step) -> Box<[u8]> {
     let value = transcript::Turn::new(
         &limits,
         transcript::TurnParts {
+            model: b"model".as_slice().into(),
+            effort: None,
             kind: transcript::TurnKind::Ordinary,
             affinity: None,
             endpoint: b"fake".as_slice().into(),

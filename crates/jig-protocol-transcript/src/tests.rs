@@ -42,6 +42,8 @@ fn source(messages: &[smith::Message]) -> smith::Turn {
     smith::Turn::new(
         &CEILINGS,
         TurnParts {
+            model: b"model".as_slice().into(),
+            effort: None,
             kind: smith::TurnKind::Ordinary,
             affinity: None,
             endpoint: Box::from(&b"endpoint"[..]),
@@ -425,7 +427,7 @@ fn receiving_limits_cut_without_growing_or_losing_call_outcomes() {
 #[expect(clippy::disallowed_macros, reason = "fixed wire fixtures belong to decoder unit tests")]
 fn smith_smallest_golden_decodes_at_its_whole_length() {
     let bytes = include_bytes!("../tests/data/record_turn_smallest.bin");
-    assert_eq!(bytes.len(), 33);
+    assert_eq!(bytes.len(), 38);
     let value = decode(&limits(), bytes).unwrap();
     assert_eq!(
         value,
@@ -443,7 +445,7 @@ fn smith_smallest_golden_decodes_at_its_whole_length() {
 #[expect(clippy::disallowed_macros, reason = "fixed wire fixtures belong to decoder unit tests")]
 fn smith_full_golden_preserves_maximum_usage_at_its_whole_length() {
     let bytes = include_bytes!("../tests/data/record_turn_full.bin");
-    assert_eq!(bytes.len(), 127);
+    assert_eq!(bytes.len(), 142);
     let mut blocks = List::with_capacity(1);
     blocks.push(Block::Text(Text::new(Box::from(&b"abc"[..]), 3).unwrap())).unwrap();
     let mut messages = List::with_capacity(1);

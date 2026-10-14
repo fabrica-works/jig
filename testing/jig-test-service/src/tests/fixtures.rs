@@ -568,6 +568,8 @@ pub fn worker_assignment() -> jig_domain_host::LinkDown {
 pub fn concrete_turn() -> smith_host_domain::Turn {
     use smith_domain_session::{llm, record};
     let value = record::Turn {
+        model: b"model".as_slice().into(),
+        effort: None,
         version: record::VERSION,
         endpoint: llm::Endpoint(1),
         dialect: 0,

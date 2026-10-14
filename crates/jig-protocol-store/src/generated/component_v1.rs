@@ -333,30 +333,32 @@ impl Format {
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
         if check_limits(limits).is_err() { return None; }
+        Self::worst_case_bytes_within(limits)
+    }
+
+    pub(crate) fn worst_case_bytes_within(_limits: &Limits) -> Option<u64> {
         let mut size = 2_u64;
-        size = size.checked_add(2_u64)?;
-        size = size.checked_add(2_u64)?;
-        size = size.checked_add(2_u64)?;
-        size = size.checked_add(2_u64)?;
-        size = size.checked_add(2_u64)?;
-        size = size.checked_add(4_u64)?;
+        size = size.checked_add(2_u64)?.checked_add(2_u64)?;
+        size = size.checked_add(2_u64)?.checked_add(2_u64)?;
+        size = size.checked_add(2_u64)?.checked_add(4_u64)?;
         size = size.checked_add(u64::from(16_u32))?;
-        Some(size)
+        size.checked_add(0)
     }
 
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
         if check_limits(limits).is_err() { return None; }
+        Self::worst_case_heap_within(limits)
+    }
+
+    pub(crate) fn worst_case_heap_within(_limits: &Limits) -> Option<u64> {
         let mut heap = 0_u64;
+        heap = heap.checked_add(0_u64)?.checked_add(0_u64)?;
+        heap = heap.checked_add(0_u64)?.checked_add(0_u64)?;
+        heap = heap.checked_add(0_u64)?.checked_add(0_u64)?;
         heap = heap.checked_add(0_u64)?;
-        heap = heap.checked_add(0_u64)?;
-        heap = heap.checked_add(0_u64)?;
-        heap = heap.checked_add(0_u64)?;
-        heap = heap.checked_add(0_u64)?;
-        heap = heap.checked_add(0_u64)?;
-        heap = heap.checked_add(0_u64)?;
-        Some(heap)
+        heap.checked_add(0)
     }
 }
 
@@ -365,20 +367,26 @@ impl Transcript {
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
         if check_limits(limits).is_err() { return None; }
+        Self::worst_case_bytes_within(limits)
+    }
+
+    pub(crate) fn worst_case_bytes_within(_limits: &Limits) -> Option<u64> {
         let mut size = 2_u64;
-        size = size.checked_add(8_u64)?;
-        size = size.checked_add(8_u64)?;
-        Some(size)
+        size = size.checked_add(8_u64)?.checked_add(8_u64)?;
+        size.checked_add(0)
     }
 
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
         if check_limits(limits).is_err() { return None; }
+        Self::worst_case_heap_within(limits)
+    }
+
+    pub(crate) fn worst_case_heap_within(_limits: &Limits) -> Option<u64> {
         let mut heap = 0_u64;
-        heap = heap.checked_add(0_u64)?;
-        heap = heap.checked_add(0_u64)?;
-        Some(heap)
+        heap = heap.checked_add(0_u64)?.checked_add(0_u64)?;
+        heap.checked_add(0)
     }
 }
 
@@ -387,18 +395,26 @@ impl Attempt {
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
         if check_limits(limits).is_err() { return None; }
+        Self::worst_case_bytes_within(limits)
+    }
+
+    pub(crate) fn worst_case_bytes_within(_limits: &Limits) -> Option<u64> {
         let mut size = 2_u64;
         size = size.checked_add(8_u64)?;
-        Some(size)
+        size.checked_add(0)
     }
 
     /// Maximum heap held by one decoded value under these limits.
     #[must_use]
     pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
         if check_limits(limits).is_err() { return None; }
+        Self::worst_case_heap_within(limits)
+    }
+
+    pub(crate) fn worst_case_heap_within(_limits: &Limits) -> Option<u64> {
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?;
-        Some(heap)
+        heap.checked_add(0)
     }
 }
 
@@ -407,9 +423,9 @@ impl Attempt {
 pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
     if check_limits(limits).is_err() { return None; }
     let mut biggest = 0_u64;
-    biggest = biggest.max(Format::worst_case_bytes(limits)?);
-    biggest = biggest.max(Transcript::worst_case_bytes(limits)?);
-    biggest = biggest.max(Attempt::worst_case_bytes(limits)?);
+    biggest = biggest.max(Format::worst_case_bytes_within(limits)?);
+    biggest = biggest.max(Transcript::worst_case_bytes_within(limits)?);
+    biggest = biggest.max(Attempt::worst_case_bytes_within(limits)?);
     Some(biggest)
 }
 
@@ -418,9 +434,9 @@ pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
 pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
     if check_limits(limits).is_err() { return None; }
     let mut biggest = 0_u64;
-    biggest = biggest.max(Format::worst_case_heap(limits)?);
-    biggest = biggest.max(Transcript::worst_case_heap(limits)?);
-    biggest = biggest.max(Attempt::worst_case_heap(limits)?);
+    biggest = biggest.max(Format::worst_case_heap_within(limits)?);
+    biggest = biggest.max(Transcript::worst_case_heap_within(limits)?);
+    biggest = biggest.max(Attempt::worst_case_heap_within(limits)?);
     Some(biggest)
 }
 
@@ -432,10 +448,10 @@ mod golden_tests {
 
     type Case = (&'static str, fn() -> bool);
 
-    pub(super) fn table<const N: usize>(cases: [Case; N]) {
+    pub(super) fn table<const N: usize>(cases: &[Case; N]) {
         let mut failures = [None; N];
         let mut passed = true;
-        for ((name, case), failure) in cases.into_iter().zip(&mut failures) {
+        for ((name, case), failure) in cases.iter().zip(&mut failures) {
             if !case() {
                 *failure = Some(name);
                 passed = false;
@@ -461,17 +477,18 @@ mod golden_tests {
         encoded && decoded
     }
 
-    #[test]
-    fn golden_0() {
-        const CASES: [Case; 6] = [
+    static GOLDEN_0: [Case; 6] = [
         ("record_format_smallest", || { let value = Format::new(&CEILINGS, FormatParts { component: 0_u16, core: 0_u16, tasks: 0_u16, people: 0_u16, notes: 0_u16, application: 0_u32, deployment: [0_u8; 16] }); let bytes: &[u8] = &[0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Format::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_format_full", || { let value = Format::new(&CEILINGS, FormatParts { component: u16::MAX, core: u16::MAX, tasks: u16::MAX, people: u16::MAX, notes: u16::MAX, application: u32::MAX, deployment: [165_u8; 16] }); let bytes: &[u8] = &[0, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Format::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_transcript_smallest", || { let value = Transcript::new(&CEILINGS, TranscriptParts { length: 0_u64, window: 0_u64 }); let bytes: &[u8] = &[0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Transcript::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_transcript_full", || { let value = Transcript::new(&CEILINGS, TranscriptParts { length: u64::MAX, window: u64::MAX }); let bytes: &[u8] = &[0, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Transcript::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_attempt_smallest", || { let value = Attempt::new(&CEILINGS, AttemptParts { first: 0_u64 }); let bytes: &[u8] = &[0, 1, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Attempt::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_attempt_full", || { let value = Attempt::new(&CEILINGS, AttemptParts { first: u64::MAX }); let bytes: &[u8] = &[0, 1, 255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Attempt::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ];
-        table(CASES);
+    ];
+
+    #[test]
+    fn golden_0() {
+        table(&GOLDEN_0);
     }
 
 }

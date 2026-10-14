@@ -239,7 +239,6 @@ pub fn agent_configuration() -> smith_agent_service::Config {
             account: 1,
             connect: Duration::from_secs(1),
             handshake: Duration::from_secs(1),
-            reasoning_effort: None,
             identity: smith_protocol_llm::IdentityProfile::Plain,
             models: Box::default(),
         }]),

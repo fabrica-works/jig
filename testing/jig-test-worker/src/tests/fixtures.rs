@@ -59,11 +59,11 @@ pub fn limits() -> Limits {
 }
 
 // Smith's smallest v2 golden, used by its agent-process world's charter fixture.
-const SMALLEST: [u8; 118] = [
+const SMALLEST: [u8; 119] = [
     0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0,
+    0, 0, 0, 0, 0,
 ];
 
 pub fn charter_bytes() -> Box<[u8]> {
@@ -169,6 +169,8 @@ pub fn start(source: host::Start) -> smith::Start {
 pub fn turn() -> smith::Turn {
     use smith_domain_session::{llm, record};
     let body = record::Turn {
+        model: b"model".as_slice().into(),
+        effort: None,
         version: record::VERSION,
         kind: record::Kind::Ordinary,
         endpoint: llm::Endpoint(0),

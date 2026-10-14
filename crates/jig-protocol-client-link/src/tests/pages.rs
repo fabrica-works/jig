@@ -227,7 +227,7 @@ fn a_turns_receiving_cut_stays_on_its_decoded_value() {
 }
 #[test]
 fn a_turn_past_its_admission_bound_is_carried_as_too_large() {
-    let limits = fixtures::turn_limits(32, 126);
+    let limits = fixtures::turn_limits(32, 141);
     assert_eq!(
         translate::pages::turn_fields(fixtures::FULL_TURN, &limits),
         c::TurnRead::Undecodable { why: c::TurnProblem::TooLarge }

@@ -34,6 +34,8 @@ pub(super) fn turn() -> Box<[u8]> {
     let value = source::Turn::new(
         &limits,
         source::TurnParts {
+            model: b"model".as_slice().into(),
+            effort: None,
             kind: source::TurnKind::Ordinary,
             affinity: None,
             endpoint: b"fixture".as_slice().into(),
