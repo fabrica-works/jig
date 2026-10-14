@@ -53,7 +53,9 @@ and plays the worlds at the text shell.
   in `crates/jig-shell-text/tests/golden/`, read by the crate's tests;
   jig's pages' in `tests/client/tests/golden/`, read by a test of the
   client's world, which builds the fixture states with jig's test view
-  root. Each read with `include_bytes!`.
+  root. Each read with `include_bytes!`, under `#[expect(clippy::disallowed_macros,
+  reason = "…")]` (`clippy.toml:93` denies it), as
+  `crates/jig-view/src/tests/markdown.rs:2` does.
 - **A refusal** is typed, `Refusal::{NoNumber, Gone, TakesNoWords,
   NoPage, TooLong, Unknown}`, and `refusal_line(name, refusal, n)` makes
   its line; `NoNumber` and `Gone` also ask for the page again.
@@ -78,13 +80,17 @@ Files: new `crates/jig-shell-text/` (`Cargo.toml` with `jig-view` and
   `tests/golden/bytes.txt`); the workspace's `Cargo.toml` (member and
   `[workspace.dependencies]`, beside `jig-view` at `:135`);
   `tests/boundary/src/tests/graph.rs:448-455` (the client crates that
-  link no engine crate: add `jig-shell-text`) and
+  link no engine crate: add `jig-shell-text`), `:138-151` (`client_step`:
+  add `jig-shell-text`, step code under the workspace's lints) with an
+  `assert!(client_step("jig-shell-text"))` beside `:177`, and
   `tests/boundary/src/tests.rs:340-352` (a test beside the native
   shell's).
 Shape: `pub fn render(tree: &Tree, name: &[u8], print: &mut Print)`;
   `pub fn worst_case(limits: &jig_view::Limits) -> Option<(u32, u64)>`
-  (lines, bytes); `pub struct Print { pub text: List<u8>, pub numbers:
-  List<NodeId> }` with `Print::new`. TITLE is the text of the main's
+  (lines, bytes); `#[derive(Debug)] pub struct Print { pub text: List<u8>, pub numbers:
+  List<NodeId> }` with `Print::new`. A node is bound when its `binding`
+  or its `link` is set: `render` reads those fields, not `Tree::bound`,
+  which gives nothing for `NodeId(0)` (`crates/jig-view/src/tree.rs:362-368`). TITLE is the text of the main's
   first level-1 heading, or `name`; LINK is the text of the node whose
   region is `JigRegion::Link.region()`. The role table of 15.3, one arm
   per `Role`, no `_` arm.
@@ -111,8 +117,13 @@ Test shape: `crates/jig-shell-text/src/tests.rs`, with
   }
   ```
   (`fixtures::LIMITS`, `fixtures::page` and `fixtures::button` are what
-  this increment puts in `src/tests/fixtures.rs`: `page` builds a page
-  with the banner jig's outline needs and its closure's nodes in a main,
+  this increment puts in `src/tests/fixtures.rs`: `page(main:
+  fn(&mut Builder)) -> Tree` builds a page with the banner jig's outline
+  needs and `main`'s nodes in a main, then gives the nodes their ids with
+  `jig_view::diff` from an empty tree, as the view does (so that 09.2's
+  commands find them by `Tree::bound`); `main` is a fn pointer, which the
+  reference's closure, capturing nothing, coerces to: `clippy.toml:63-65`
+  disallows `Fn`, `FnMut` and `FnOnce`;
   `button(b, name, enabled)` a bound button, disabled when not enabled; with no link text the first line
   ends `== `: write the expected text from view.md 15.3 when the fixture
   is written.) Each under 20 ms.
@@ -202,6 +213,7 @@ Removes: nothing.
 ```rust
 // crates/jig-shell-text/src/render.rs
 /// One print: its text, lines ended by `\n`, and its numbers' nodes, `[1]` first.
+#[derive(Debug)]
 pub struct Print { pub text: List<u8>, pub numbers: List<NodeId> }
 impl Print {
     pub fn new(limits: &jig_view::Limits) -> Option<Print>;

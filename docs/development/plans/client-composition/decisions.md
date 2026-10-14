@@ -169,6 +169,15 @@ your best judgement").
      - Ranges: `confirmation.rs:227-239` (the field at `:231`), `pages/task.rs:90-101`, `lib.rs:107`.
      Checked: at 98c6e80dc, `sizes/pages.rs:119` ends `.checked_add(35)?.checked_add(slot_nodes)`; `sizes.rs:247` is `.checked_add(66)` in `confirmation_nodes`; `page_capacity.rs:849` is `fn each_page_bound_keeps_its_value_at_the_client_limits`; `pages/task.rs:28` is `super::heading(b, words, JigPhrase::TaskPage, &[Hole::Number(number)])`; `confirmation.rs:231` builds `Purpose::Composer { task }` with `JigPhrase::AnswerField`; `pages/work.rs:11-19`'s `section` names its region with its title. The ready check compiled a trial move of `pages/task` under clippy, which showed the paths above.
 
+104. **jig 09's Shapes against main** (ready check of jig-09.1).
+     jig/09-text-shell.md amended against origin/main, for 09.1 (the ready check of jig-09.1):
+     - `fixtures::page(main: fn(&mut Builder)) -> Tree`: a fn pointer, which the reference's closure coerces to, since `clippy.toml:63-65` disallows `Fn`, `FnMut` and `FnOnce`; it gives the nodes their ids with `jig_view::diff` from an empty tree, so that 09.2's commands find them by `Tree::bound`.
+     - `render` judges a node bound by its `binding` or `link` field, not `Tree::bound`, which gives nothing for `NodeId(0)` (`tree.rs:362-368`).
+     - `Print` derives `Debug` (`missing_debug_implementations`).
+     - Each golden read by `include_bytes!` carries `#[expect(clippy::disallowed_macros, reason = "…")]` (`clippy.toml:93`), as `crates/jig-view/src/tests/markdown.rs:2` does.
+     - 09.1's Files add `tests/boundary/src/tests/graph.rs:138-151` (`client_step` names `jig-shell-text`) and an `assert!(client_step("jig-shell-text"))` beside `:177`.
+     Checked: `git show origin/main:clippy.toml | sed -n 93p` prints `{ path = "core::include_bytes", reason = "data comes in events and limits" },`; `tree.rs:362-368`'s `bound` returns `None` when `id == NodeId(0)`; `graph.rs:138-151`'s `client_step` lists ten crates, no `jig-shell-text`; `diff.rs:334` is `pub fn diff(old: &Tree, new: &mut Tree, limits: &Limits, next_id: &mut u32, out: &mut Queue<Patch>)`. The ready check built 09.1's skeleton, fixtures and reference test with the fn-pointer fixture, and `heavy cargo clippy -p jig-shell-text --all-targets` was clean.
+
 ## For the user
 
 Long-term choices the user may veto. Each was decided by the planner
