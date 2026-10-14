@@ -106,7 +106,7 @@ impl Limits {
             .checked_add(crate::confirmation_nodes(client)?)?
             .checked_add(crate::notices_nodes(client)?)?
             .checked_add(slot_nodes)?
-            .checked_add(1)?;
+            .checked_add(3)?;
         // A field carries a saying as its name and the full domain value.
         // Markdown links may carry both label and external target.
         let text_per_node = phrase

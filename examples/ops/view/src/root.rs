@@ -89,6 +89,7 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
     let mut builder = view.render.builder();
     builder.open(Role::Page);
     if !jig_view::jig(&mut builder, root.jig(), observability::NAV, &view.words, &mut view.jig) {
+        builder.open(Role::Main);
         if root.observability().address().is_some() {
             observability::page(&mut builder, root.observability(), &view.observability_words, &mut view.observability);
         } else {
@@ -100,6 +101,7 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
                 &mut view.infrastructure,
             );
         }
+        builder.close();
         jig_view::after_page(&mut builder, root.jig(), &view.words, &mut view.jig);
     }
     builder.close();

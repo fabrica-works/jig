@@ -73,6 +73,7 @@ pub fn confirmation(b: &mut Builder, client: &Domain, words: &Words, bindings: &
 }
 fn begin(b: &mut Builder, words: &Words, act: JigPhrase) {
     b.open(Role::Dialog);
+    b.region(crate::regions::JigRegion::Confirmation.region());
     b.name(&words.say(JigPhrase::Confirmation, &[]));
     words.text(b, act, &[]);
 }

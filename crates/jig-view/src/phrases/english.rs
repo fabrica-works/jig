@@ -768,6 +768,7 @@ pub fn language() -> Language {
             JigPhrase::PartyPart => Box::new([Segment::Text(copy_of(b"Who is signed in"))]),
             JigPhrase::ProjectsPart => Box::new([Segment::Text(copy_of(b"Projects"))]),
             JigPhrase::GoToTaskPart => Box::new([Segment::Text(copy_of(b"Go to a task"))]),
+            JigPhrase::NoticesPart => Box::new([Segment::Text(copy_of(b"Notices"))]),
             JigPhrase::Frame => Box::new([Segment::Text(copy_of(b"Work"))]),
             JigPhrase::Navigation => Box::new([Segment::Text(copy_of(b"Navigation"))]),
             JigPhrase::Project => {

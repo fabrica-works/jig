@@ -120,7 +120,7 @@ fn build(domain: &Domain, words: &Words) -> (Tree, JigBindings) {
     let mut bindings = JigBindings::new(limits.bindings, client.text);
     let mut b = Builder::new(&limits);
     b.open(Role::Page);
-    crate::pages::page(&mut b, domain, words, &mut bindings);
+    crate::pages::main(&mut b, domain, words, &mut bindings);
     b.close();
     let tree = b.finish();
     assert!(tree.len() <= limits.nodes);

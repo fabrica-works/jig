@@ -6,6 +6,7 @@ use skein_lib::List;
 /// Each sentence jig says, independent of language word order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum JigPhrase {
+    NoticesPart,
     NothingKnown,
     LinkPart,
     NeedsPart,
@@ -1098,6 +1099,7 @@ impl JigPhrase {
     pub const fn id(self) -> PhraseId {
         let number = match self {
             Self::OwnerHoldRelease => 673,
+            Self::NoticesPart => 680,
             Self::NothingKnown => 674,
             Self::LinkPart => 675,
             Self::NeedsPart => 676,
@@ -1953,6 +1955,7 @@ impl JigPhrase {
             | Self::PartyPart
             | Self::ProjectsPart
             | Self::GoToTaskPart
+            | Self::NoticesPart
             | Self::SignedOut
             | Self::Frame
             | Self::Navigation
@@ -2403,7 +2406,8 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 626] = [
+pub const ALL: [JigPhrase; 627] = [
+    JigPhrase::NoticesPart,
     JigPhrase::NothingKnown,
     JigPhrase::LinkPart,
     JigPhrase::NeedsPart,

@@ -26,9 +26,11 @@ pub(super) fn build(d: &Domain, kind: u8, words: &crate::words::Words) -> (Tree,
         0 => crate::pages::inbox(&mut b, d, words, &mut bindings),
         1 => crate::pages::conversations(&mut b, d, words, &mut bindings),
         3 => {
-            crate::pages::page(&mut b, d, words, &mut bindings);
+            crate::pages::main(&mut b, d, words, &mut bindings);
         }
-        _ => crate::pages::not_the_work(&mut b, d, words, &mut bindings),
+        _ => {
+            crate::pages::not_the_work(&mut b, d, words, &mut bindings);
+        }
     }
     b.close();
     (b.finish(), bindings)
@@ -472,4 +474,99 @@ fn inbox_group_controls_decode_independent_windows() {
     assert_eq!(reads[0].0, InboxReadGroup::Updates);
     assert_eq!(reads[0].1.value.bytes(), b"updates");
     assert_eq!(d.inbox().needs_window.after.as_ref().unwrap().value.bytes(), b"needs");
+}
+
+fn whole_page(d: &Domain) -> Tree {
+    let mut limits = super::cards::limits();
+    limits.nodes = 2000;
+    limits.text_bytes = 200_000;
+    limits.bindings = 512;
+    let mut b = Builder::new(&limits);
+    let mut bindings = JigBindings::new(limits.bindings, CLIENT.text);
+    b.open(Role::Page);
+    assert!(crate::jig(
+        &mut b,
+        d,
+        crate::SlotRef { owner: crate::Owner::Application { number: 1 }, token: Token::new(1) },
+        words(),
+        &mut bindings
+    ));
+    b.close();
+    b.finish()
+}
+
+#[test]
+fn each_of_jigs_pages_keeps_the_outline() {
+    use jig_domain_client::address::{ProjectSection, TaskSection};
+    let rows = [
+        ("inbox", Place::Jig(Address::Inbox { project: None })),
+        ("conversations", Place::Jig(Address::Conversations { project: None })),
+        ("task overview", Place::Jig(Address::Task { task: 8, section: TaskSection::Overview })),
+        ("project overview", Place::Jig(Address::Project { project: 4, section: ProjectSection::Overview })),
+        ("deployment", Place::Jig(Address::Deployment)),
+        ("page missing", Place::Missing),
+    ];
+    let (mut d, watch) = start();
+    assert_eq!(crate::outline::check(&whole_page(&d)), None, "starting");
+    deliver(&mut d, watch, Delivery::Frame(Box::new(document())));
+    for (label, place) in rows {
+        let out = drive(&mut d, Event::Went { place });
+        for request in out {
+            if let Request::Open { watch, subject: Subject::Task { .. } } = request {
+                deliver(&mut d, watch, Delivery::Task(Box::new(super::cards_objects::task_doc(&[]))));
+            }
+        }
+        assert_eq!(crate::outline::check(&whole_page(&d)), None, "{label}");
+    }
+    drive(&mut d, Event::SignedOut);
+    assert_eq!(crate::outline::check(&whole_page(&d)), None, "signing in");
+}
+
+fn domain_with_an_owed_card() -> Domain {
+    let (mut d, watch) = start();
+    deliver(&mut d, watch, Delivery::Frame(Box::new(document())));
+    let mut objects = List::with_capacity(1);
+    objects.push(ObjectKey::Task(8)).unwrap();
+    let out = drive(&mut d, Event::ShowObjects { objects });
+    for request in out {
+        if let Request::Read { read, what: Read::Task { .. } } = request {
+            drive(
+                &mut d,
+                Event::Read {
+                    read,
+                    result: ReadResult::Value(ReadValue::Task(Box::new(super::cards_objects::task_doc(&[
+                        ActKind::Cancel,
+                    ])))),
+                },
+            );
+        }
+    }
+    let id = d.objects().find(ObjectKey::Task(8)).unwrap();
+    drive(
+        &mut d,
+        Event::Act { act: jig_domain_client::action::Act::Intend { object: id.token(), act: ActKind::Cancel } },
+    );
+    assert_eq!(
+        d.objects().get(id).unwrap().card,
+        jig_domain_client::objects::Card::Deciding {
+            request: None,
+            progress: jig_domain_client::intents::Progress::Confirming
+        }
+    );
+    drive(&mut d, Event::Act { act: jig_domain_client::action::Act::Confirm });
+    drive(&mut d, Event::ObjectsLeft);
+    d
+}
+
+#[test]
+fn the_owed_cards_sit_in_their_aside_after_the_main() {
+    let d = domain_with_an_owed_card();
+    let tree = whole_page(&d);
+    let main = tree.nodes().iter().position(|node| node.role == Role::Main).unwrap();
+    let owed =
+        tree.nodes().iter().position(|node| node.region == Some(crate::regions::JigRegion::Owed.region())).unwrap();
+    assert_eq!(tree.nodes()[owed].role, Role::Complementary);
+    assert_eq!(main + usize::try_from(tree.nodes()[main].size).unwrap(), owed);
+    assert!(tree.nodes()[owed].size > 1);
+    assert_eq!(crate::outline::check(&tree), None);
 }

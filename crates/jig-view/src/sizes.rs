@@ -249,7 +249,7 @@ pub fn confirmation_nodes(limits: &Limits) -> Option<u32> {
 /// Full visible notices and the oldest notice's dismissal control.
 #[must_use]
 pub fn notices_nodes(limits: &Limits) -> Option<u32> {
-    outcome(limits)?.checked_add(4)?.checked_mul(limits.notices)?.checked_add(2)
+    outcome(limits)?.checked_add(4)?.checked_mul(limits.notices)?.checked_add(3)
 }
 
 mod pages;

@@ -523,7 +523,7 @@ fn capacity_composes_siblings_fragments_and_application_pages_with_checked_overf
             .unwrap()
             .checked_add(crate::notices_nodes(&CLIENT).unwrap())
             .unwrap()
-            .checked_add(1)
+            .checked_add(3)
             .unwrap()
     );
     let extra = crate::Limits::compose(&CLIENT, words, largest.checked_add(7).unwrap(), 9, 2).unwrap();
@@ -549,8 +549,10 @@ fn capacity_composes_siblings_fragments_and_application_pages_with_checked_overf
         words,
         &mut bindings
     ));
+    b.open(Role::Main);
     b.open(Role::Heading { level: 1 });
     b.text(crate::Run::Plain, b"Application page");
+    b.close();
     b.close();
     crate::after_page(&mut b, &d, words, &mut bindings);
     b.close();
@@ -851,6 +853,6 @@ fn each_page_bound_keeps_its_value_at_the_client_limits() {
     assert_eq!(crate::task_nodes(&CLIENT, 0), Some(1_166_880));
     assert_eq!(crate::project_nodes(&CLIENT, 0), Some(506_352));
     assert_eq!(crate::deployment_nodes(&CLIENT, 0), Some(2724));
-    assert_eq!(crate::not_the_work_nodes(&CLIENT, 0), Some(28));
+    assert_eq!(crate::not_the_work_nodes(&CLIENT, 0), Some(29));
     assert_eq!(crate::page_nodes(&CLIENT, 0), Some(1_166_880));
 }

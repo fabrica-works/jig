@@ -14,6 +14,12 @@ use jig_domain_client::{
 };
 /// Build each visible notice as a named status, with one oldest-notice dismissal.
 pub fn notices(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
+    if client.notices().ids().is_empty() {
+        return;
+    }
+    b.open(Role::Region);
+    b.region(crate::regions::JigRegion::Notices.region());
+    b.name(&words.say(JigPhrase::NoticesPart, &[]));
     for (id, ()) in client.notices().ids() {
         if let Some(notice) = client.notices().get(*id) {
             facts(b, &notice.kind, words);
@@ -25,6 +31,7 @@ pub fn notices(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut J
     {
         crate::frame::control(b, words, bindings, Role::Button, JigPhrase::Dismiss, &[], Act::Dismiss);
     }
+    b.close();
 }
 /// Whole notice facts, shared by the status renderer and vocabulary tests.
 pub fn facts(b: &mut Builder, kind: &Kind, words: &Words) {

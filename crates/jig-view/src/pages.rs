@@ -22,7 +22,7 @@ pub use not_the_work::not_the_work;
 pub use project::project;
 pub use task::task;
 
-pub(super) fn heading(b: &mut Builder, words: &Words, phrase: JigPhrase, holes: &[Hole]) {
+pub fn heading(b: &mut Builder, words: &Words, phrase: JigPhrase, holes: &[Hole]) {
     b.open(Role::Heading { level: 1 });
     let title = words.say(phrase, holes);
     b.name(&title);
@@ -100,19 +100,23 @@ pub(super) fn object_key(object: jig_domain_client::contract::ObjectKey) -> crat
 }
 
 /// Build the current jig page; an application's own page returns false.
-pub fn page(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) -> bool {
+pub fn main(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) -> bool {
     use jig_domain_client::{address::Address, pages::Page};
     match client.page() {
         Page::Elsewhere => return false,
-        Page::Work { address, .. } => match address {
-            Address::Inbox { .. } => inbox(b, client, words, bindings),
-            Address::Conversations { .. } => conversations(b, client, words, bindings),
-            Address::Task { .. } => task(b, client, words, bindings),
-            Address::Project { .. } => project(b, client, words, bindings),
-            Address::Deployment => deployment(b, client, words, bindings),
-        },
+        Page::Work { address, .. } => {
+            b.open(Role::Main);
+            match address {
+                Address::Inbox { .. } => inbox(b, client, words, bindings),
+                Address::Conversations { .. } => conversations(b, client, words, bindings),
+                Address::Task { .. } => task(b, client, words, bindings),
+                Address::Project { .. } => project(b, client, words, bindings),
+                Address::Deployment => deployment(b, client, words, bindings),
+            }
+            b.close();
+        }
         Page::Starting | Page::SigningIn | Page::Missing | Page::OutOfDate | Page::SomeoneElse => {
-            not_the_work(b, client, words, bindings);
+            return not_the_work(b, client, words, bindings);
         }
     }
     true
@@ -125,7 +129,7 @@ pub use crate::turns::conversation;
 pub fn jig(b: &mut Builder, client: &Domain, nav: crate::SlotRef, words: &Words, bindings: &mut JigBindings) -> bool {
     crate::frame::banner(b, client, words, bindings);
     crate::frame::navigation(b, client, nav, words, bindings);
-    let built = page(b, client, words, bindings);
+    let built = main(b, client, words, bindings);
     if built {
         after_page(b, client, words, bindings);
     }
@@ -169,6 +173,7 @@ fn retained_outside_plan(client: &Domain, object: &jig_domain_client::objects::O
 pub fn after_page(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
     // A source can stop naming a card before its terminal facts arrive. The
     // owner retains it on this page until the pending answer or linger ends.
+    let mut owed = false;
     match client.page() {
         jig_domain_client::pages::Page::Work { .. } | jig_domain_client::pages::Page::Elsewhere => {
             for (_, id) in client.objects().ids() {
@@ -186,6 +191,11 @@ pub fn after_page(b: &mut Builder, client: &Domain, words: &Words, bindings: &mu
                                 }
                             }
                             if !present {
+                                if !owed {
+                                    b.open(Role::Complementary);
+                                    b.region(crate::regions::JigRegion::Owed.region());
+                                    owed = true;
+                                }
                                 crate::cards::card(b, client, *id, &crate::cards::Place::Elsewhere, words, bindings);
                             }
                         }
@@ -199,6 +209,9 @@ pub fn after_page(b: &mut Builder, client: &Domain, words: &Words, bindings: &mu
         | jig_domain_client::pages::Page::Missing
         | jig_domain_client::pages::Page::OutOfDate
         | jig_domain_client::pages::Page::SomeoneElse => {}
+    }
+    if owed {
+        b.close();
     }
     crate::confirmation::confirmation(b, client, words, bindings);
     crate::notices::notices(b, client, words, bindings);

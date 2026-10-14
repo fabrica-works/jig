@@ -204,7 +204,7 @@ fn deployment_in(l: &Limits, chip: u32, slot_nodes: u32) -> Option<u32> {
 /// Starting, providers, missing, out of date and someone else's work.
 #[must_use]
 pub fn not_the_work_nodes(l: &Limits, slot_nodes: u32) -> Option<u32> {
-    l.providers.checked_mul(2)?.checked_add(24)?.checked_add(slot_nodes)
+    l.providers.checked_mul(2)?.checked_add(25)?.checked_add(slot_nodes)
 }
 /// The largest jig page with every window and text at its bound.
 #[must_use]

@@ -56,7 +56,9 @@ pub fn build(view: &mut View<'_>, root: &Domain, out: &mut Queue<Patch>) {
     let mut b = view.render.builder();
     b.open(Role::Page);
     if !jig_view::jig(&mut b, root.jig(), family::NAV, view.words, &mut view.jig) {
+        b.open(Role::Main);
         family::page(&mut b, root.first(), view.first_words, view.words, &mut view.first);
+        b.close();
         jig_view::after_page(&mut b, root.jig(), view.words, &mut view.jig);
     }
     b.close();
