@@ -60,7 +60,7 @@ ones before it in its session. Dependencies are by capability.
 
 | File | Session | Needs at start | Increments that need more |
 |---|---|---|---|
-| `smith/01-arrived.md` | smith 01: smith reads what has arrived | skein 01's read and readers (01.1, 01.3); skein 02's generated worst cases (02.2); smith 02.1 (the failures here) | |
+| `smith/01-arrived.md` | smith 01: smith reads what has arrived | skein 01's read and readers (01.1, 01.3); skein 02's generated worst cases (02.2) and table items (02.s1, ruling 110); smith 02.1 (the failures here) | |
 | `smith/02-gate.md` | smith 02: smith's gate passes here, its real tier in parallel | nothing | 02.2 to 02.4: 02.1 |
 | `smith/03-tests.md` | smith 03: smith's costliest tests and fixtures | smith 02.1 (the failures here) | |
 | `smith/04-budget.md` | smith 04: smith's 15 s timeout back, here | smith 01, 02, 03 and `smith-repin`; skein 02.1 (`heavy`) | |
@@ -73,7 +73,7 @@ ones before it in its session. Dependencies are by capability.
 | `jig/02-channel.md` | jig 02: the channel world | nothing | |
 | `jig/03-client.md` | jig 03: the client's worlds and the view | nothing | |
 | `jig/04-rows.md` | jig 04: cases as rows, and the walks over the tree | nothing | |
-| `jig/05-arrived.md` | jig 05: jig takes skein's and smith's changes, and reads what has arrived | smith 01.1; skein 02.2 | |
+| `jig/05-arrived.md` | jig 05: jig takes skein's and smith's changes, and reads what has arrived | smith 01.1; skein 02.2 and 02.s1 (ruling 110) | |
 | `jig/06-budget.md` | jig 06: jig's 15 s timeout back | jig 01 to 05 and `jig-repin`; skein 02.1 (`heavy`) | |
 
 ### Repins (development.md, 5.7)

@@ -220,6 +220,16 @@ the file.
      exactly 85 = 80 + `Again`. The fix is the test's: the person waits
      for the line's end (`smith/02.s1-window-echo.md`). No product
      change. Ruling 108's retry ends when 02.s1 lands.
+110. **skein-02.s1 moves a golden table's cases out of its test
+     function** (step not in the plan; smith 01's block of
+     2026-10-14T00:39:27Z, cross-session scope). skein 02.2's golden
+     tables of up to 1,024 cases put one line per case inside the test
+     function, so smith's regenerated `golden_0` is 233 and 445 lines,
+     past clippy's `too_many_lines` (100); smith 01.1 may neither edit
+     generated code nor add a lint exception (code-organization.md, 4).
+     The generator emits each chunk's cases as a module item and its test
+     as one call (`skein/02.s1-golden-items.md`), keeping 1,024 per
+     golden table. smith 01.1 and jig 05.1 take it before regenerating.
 
 ## For the user
 
