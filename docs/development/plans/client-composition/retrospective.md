@@ -754,15 +754,22 @@ For jig's `tech-debt.md`. skein's rows are for the designer.
 
 ## 10. Decisions
 
+2026-10-14. The user adopted proposals 2, 6, 7 and 10 before jig's
+browser design is planned, since they shape how a plan is written,
+keeping only what has long-term consequences that would be hard to
+change, which none of the four has. They are applied in skein
+`f80521b`. The others concern the run, and stay open until the next run
+starts.
+
 | Proposal | Decision | Where |
 |---|---|---|
 | 1 | open | |
-| 2 | open | |
+| 2 | adopted | development.md, 5.3 (the increment whose Needs land first leads its session, and gives the README's "Needs at start") and 5.4 (the consistency review checks it) |
 | 3 | open | |
 | 4 | open | |
 | 5 | open | |
-| 6 | open | |
-| 7 | open | |
+| 6 | adopted | development.md, 5.2 (a session file's "Read first" names the sections of `programming-model.md` and `testing-strategy.md`) and 7.2 (a successor's prompt); implementer.md, 8.1 (reading, and reading after a handover) and 8.3 (a heavy command starts with the longest wait) |
+| 7 | adopted | development.md, 2.1 and 2.2 |
 | 8 | open | |
 | 9 | open | |
-| 10 | open | |
+| 10 | adopted | development.md, 5.6 |
