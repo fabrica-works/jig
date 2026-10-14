@@ -274,6 +274,17 @@ the file.
      move from 127 to 142, as smith's own change moved its golden
      (development.md, 5.7: tests "adapted the way the upstream commit
      adapted its own"). No byte is edited by hand.
+115. **jig 05.1 refreshes both copied goldens and every literal derived
+     from their sizes** (plan defect, jig 05's block of
+     2026-10-14T01:44:13Z; it widens ruling 114). Ruling 114 named the
+     three literals equal to 127, and missed the bounds one below and one
+     above the fixture (`turns.rs:57`, 126; `:60`, 128) and the smallest
+     golden, 33 bytes in jig and 38 in smith. jig's own
+     `crates/jig-protocol-transcript/tests/data/README.md` says "When jig
+     repins smith, refresh changed fixtures and their expectations
+     together". Both goldens are copied again with that README's revision
+     line, and the six literals move by their fixture's growth (+15, +5).
+     The same holds for `jig-repin`.
 
 ## For the user
 

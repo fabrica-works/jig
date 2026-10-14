@@ -88,9 +88,17 @@ Files: `Cargo.lock`: `heavy cargo update -p smith-charter` (one package
   127 bytes, which smith `47e99f6e` grew to 142
   (`crates/smith-transcript/golden/v3/record_turn_full.bin`): it is
   copied again from smith's revision in jig's lock, byte for byte, and
-  the three sizes that name it (`crates/jig-protocol-transcript/src/tests.rs:446`,
-  `tests/client/src/joint/wire/turns.rs:24`, `activity.rs:378`) move
-  from 127 to 142 (ruling 114).
+  the sizes that name it move with it (ruling 114, widened by ruling
+  115): both copied goldens in `crates/jig-protocol-transcript/tests/data/`
+  are refreshed from smith's revision in jig's lock, as that directory's
+  `README.md` says ("When jig repins smith, refresh changed fixtures and
+  their expectations together"), its revision line included:
+  `record_turn_full.bin` 127 to 142 bytes and `record_turn_smallest.bin`
+  33 to 38; every literal derived from their sizes moves by the same
+  amount: `crates/jig-protocol-transcript/src/tests.rs:428` (33 to 38)
+  and `:446` (127 to 142), `tests/client/src/joint/wire/turns.rs:24`
+  (127 to 142), `:57` (126 to 141), `:60` (128 to 143),
+  `activity.rs:378` (127 to 142).
 Shape: no hand edit of generated code; the drift tests pass with
   `SKEIN_CODEGEN_WRITE` unset.
 Test shape: none new; the drift tests, unchanged, and the golden files,
