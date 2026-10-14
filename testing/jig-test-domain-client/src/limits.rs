@@ -14,7 +14,7 @@ pub fn max_out(limits: &Limits) -> u32 {
 }
 fn checked_max_out(limits: &Limits) -> Option<u32> {
     jig_domain_client::max_out(&limits.jig)
-        .checked_mul(4)?
+        .checked_mul(5)?
         .checked_add(first::checked_max_out(&limits.first)?)?
         .checked_add(limits.table.out)?
         .checked_add(16)
@@ -44,7 +44,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     total = total.checked_add(u64::from(jig_out).checked_mul(limits.jig.document_bytes)?.checked_mul(3)?)?;
     total = total.checked_add(u64::from(root_out).checked_mul(limits.jig.document_bytes)?)?;
     let family_payload =
-        skein_lib::List::<jig_domain_client::contract::ObjectKey>::worst_case(limits.first.rows.checked_add(1)?)?;
+        skein_lib::List::<jig_domain_client::contract::ObjectKey>::worst_case(limits.first.rows.checked_add(1)?)?
+            .max(skein_lib::List::<jig_domain_client::pages::Section>::worst_case(2)?);
     total = total.checked_add(u64::from(first::max_out(&limits.first)).checked_mul(family_payload)?.checked_mul(3)?)?;
     total.checked_add(Queue::<Request>::worst_case(root_out)?)
 }

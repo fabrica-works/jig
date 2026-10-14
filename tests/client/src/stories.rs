@@ -874,6 +874,7 @@ pub fn incident_world(seed: u64) -> World<Test, Scripted> {
             state: f::ItemState::Ready,
             value: 1,
             task: 9,
+            second: None,
             proposals: list([]),
             touchable: false,
         }),

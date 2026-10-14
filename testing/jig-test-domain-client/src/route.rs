@@ -191,6 +191,9 @@ pub(crate) fn route_first(
             first::Request::ShowObjects { objects } => {
                 jig(root, env, jig_domain_client::Event::ShowObjects { objects }, out);
             }
+            first::Request::ShowSections { sections } => {
+                jig(root, env, jig_domain_client::Event::ShowSections { sections }, out);
+            }
             first::Request::ObjectsLeft => jig(root, env, jig_domain_client::Event::ObjectsLeft, out),
         }
     }

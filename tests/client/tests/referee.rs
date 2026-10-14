@@ -330,6 +330,7 @@ fn the_test_clients_family_revision_and_durable_outcome_are_observed() {
             state: family::ItemState::Ready,
             value: 1,
             task: 9,
+            second: None,
             proposals: jig_client_world::test::list([]),
             touchable: true,
         }),

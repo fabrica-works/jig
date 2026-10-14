@@ -35,6 +35,7 @@ fn load(root: &mut Domain, proposal: OwnerProposal) -> Vec<Request> {
                 state: family::ItemState::Ready,
                 value: 1,
                 task: 9,
+                second: None,
                 proposals: list([proposal.key]),
                 touchable: false,
             })),

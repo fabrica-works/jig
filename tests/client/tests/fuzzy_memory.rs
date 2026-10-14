@@ -200,6 +200,7 @@ fn full_world() -> jig_client_world::World<jig_client_world::Test, jig_client_wo
             state: jig_test_domain_client::family::ItemState::Ready,
             value: 1,
             task: 9,
+            second: None,
             proposals: jig_client_world::test::list([]),
             touchable: true,
         }),

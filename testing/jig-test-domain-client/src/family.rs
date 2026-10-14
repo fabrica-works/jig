@@ -41,6 +41,7 @@ pub struct Item {
     pub state: ItemState,
     pub value: u64,
     pub task: u64,
+    pub second: Option<u64>,
     pub proposals: List<ProposalKey>,
     pub touchable: bool,
 }
@@ -94,6 +95,24 @@ impl Document {
             // Rows alone cannot admit the owner's nested paths and allocation.
             Self::Connector(_) => false,
         }
+    }
+    #[must_use]
+    pub fn sections(&self) -> List<jig_domain_client::pages::Section> {
+        let mut sections = List::with_capacity(2);
+        match self {
+            Self::Item(item) => {
+                for task in [Some(item.task), item.second].into_iter().flatten() {
+                    sections
+                        .push(jig_domain_client::pages::Section::Task {
+                            task,
+                            section: jig_domain_client::address::TaskSection::Plan,
+                        })
+                        .expect("two section names fit");
+                }
+            }
+            Self::Part(_) | Self::Connector(_) => {}
+        }
+        sections
     }
     #[must_use]
     pub fn objects(&self, capacity: u32) -> List<ObjectKey> {

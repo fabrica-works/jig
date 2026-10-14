@@ -322,6 +322,7 @@ fn item(revision: u64) -> crate::family::Document {
         state: crate::family::ItemState::Ready,
         value: 13,
         task: 9,
+        second: None,
         proposals,
         touchable: true,
     })

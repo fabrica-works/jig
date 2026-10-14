@@ -24,10 +24,15 @@ impl Limits {
         let fragment_nodes =
             family::PART_NODES.max(owner.nodes.checked_add(16)?).max(domain.first.rows.checked_add(2)?);
         let cards = domain.first.rows.checked_add(1)?;
-        let application_nodes = fragment_nodes.checked_add(cards.checked_mul(3)?)?.checked_add(3)?;
+        let application_nodes = fragment_nodes.checked_add(cards.checked_mul(3)?)?.checked_add(9)?;
         let mut tree = jig_view::Limits::of_words(&domain.jig, jig)?;
         let jig_nodes = tree.nodes;
-        let jig_cards = u64::from(jig_view::card_nodes(&domain.jig)?).checked_mul(u64::from(cards))?;
+        let sections = jig_view::task_section_nodes(&domain.jig, jig_domain_client::address::TaskSection::Plan)?
+            .checked_add(4)?
+            .checked_mul(2)?;
+        let jig_cards = u64::from(jig_view::card_nodes(&domain.jig)?)
+            .checked_mul(u64::from(cards))?
+            .checked_add(u64::from(sections))?;
         // The complete node ceiling is checked without constructing its storage.
         // Only the world's declared counts need text and patch capacities in u32.
         let slot_nodes = u64::from(jig_nodes)
@@ -68,11 +73,14 @@ impl Limits {
         let fragment_nodes =
             family::PART_NODES.max(owner.nodes.checked_add(16)?).max(domain.first.rows.checked_add(2)?);
         let cards = domain.first.rows.checked_add(1)?;
-        let application_nodes = fragment_nodes.checked_add(cards.checked_mul(3)?)?.checked_add(3)?;
+        let application_nodes = fragment_nodes.checked_add(cards.checked_mul(3)?)?.checked_add(9)?;
         // All nodes bound the possible slots in the public jig envelope.
         // This conservative bound also covers duplicate references to one part.
         let jig_nodes = jig_view::Limits::of_words(&domain.jig, jig)?.nodes;
-        let jig_cards = jig_view::card_nodes(&domain.jig)?.checked_mul(cards)?;
+        let sections = jig_view::task_section_nodes(&domain.jig, jig_domain_client::address::TaskSection::Plan)?
+            .checked_add(4)?
+            .checked_mul(2)?;
+        let jig_cards = jig_view::card_nodes(&domain.jig)?.checked_mul(cards)?.checked_add(sections)?;
         let part_nodes = jig_nodes.checked_add(jig_cards)?.checked_mul(fragment_nodes)?;
         let slot_nodes = part_nodes.checked_add(jig_cards)?.checked_add(family::NAV_NODES)?;
         let mut tree = jig_view::Limits::compose(

@@ -38,10 +38,14 @@ pub fn page(b: &mut Builder, side: &first::Side, words: &Words, jig: &jig_view::
     object(b, side, id, words, jig, bindings);
     let object = side.object(id).expect("page object is named");
     match &object.value {
-        Value::Known(Document::Item(item)) => {
+        Value::Known(document @ Document::Item(item)) => {
             jig_slot(b, ObjectKey::Task(item.task), words, bindings);
             for proposal in &item.proposals {
                 jig_slot(b, ObjectKey::Proposal(*proposal), words, bindings);
+            }
+            for section in document.sections().into_boxed() {
+                let binding = bindings.insert(Meaning::Section(section));
+                b.slot(SlotRef { owner: Owner::Jig, token: binding.token }, &words.say(Word::Loading, &[]));
             }
         }
         Value::Known(Document::Part(_) | Document::Connector(_))

@@ -69,6 +69,7 @@ pub enum Request {
     Send { request: Token, scope: u64, ask: Ask },
     Out(Out),
     ShowObjects { objects: List<jig_domain_client::contract::ObjectKey> },
+    ShowSections { sections: List<jig_domain_client::pages::Section> },
     ObjectsLeft,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -305,6 +306,7 @@ pub fn step(side: &mut Side, env: &Env<Limits>, event: Event, out: &mut Queue<Re
         Event::Left => {
             side.address = None;
             out.push(Request::ObjectsLeft);
+            out.push(Request::ShowSections { sections: List::with_capacity(0) });
             prune(side, out);
             side.changed();
         }
@@ -497,7 +499,10 @@ fn received(side: &mut Side, env: &Env<Limits>, subject: Subject, document: Docu
     if side.page() == Some(id) {
         let object = side.objects.get(id).expect("page object exists");
         match &object.value {
-            Value::Known(document) => out.push(Request::ShowObjects { objects: document.objects(env.limits.rows) }),
+            Value::Known(document) => {
+                out.push(Request::ShowObjects { objects: document.objects(env.limits.rows) });
+                out.push(Request::ShowSections { sections: document.sections() });
+            }
             Value::Loading | Value::Unknown | Value::Unsupported => {}
         }
     }

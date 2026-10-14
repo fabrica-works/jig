@@ -172,6 +172,9 @@ fn family_read(rows: &[Request]) -> Token {
         .unwrap()
 }
 fn family_document(root: &mut Domain, proposal_count: u64) -> Vec<Request> {
+    family_document_with_second(root, proposal_count, None)
+}
+fn family_document_with_second(root: &mut Domain, proposal_count: u64, second: Option<u64>) -> Vec<Request> {
     let rows =
         drive(root, Event::Went { place: Place::Address(Address::First(first::Address { project: 3, item: 5 })) });
     let proposals = list(
@@ -189,6 +192,7 @@ fn family_document(root: &mut Domain, proposal_count: u64) -> Vec<Request> {
                 state: family::ItemState::Ready,
                 value: u64::MAX,
                 task: 9,
+                second,
                 proposals,
                 touchable: true,
             })),
@@ -850,4 +854,64 @@ fn a_slot_of_a_number_no_owner_has_is_unshowable() {
         node.role == Role::Status && node.name.as_deref() == Some(b"Cannot show this part".as_slice())
     }));
     assert_eq!(tree.nodes().iter().filter(|node| node.role == Role::Status).count(), 1);
+}
+
+fn family_with_plan(second: Option<u64>) -> Domain {
+    let mut root = ready();
+    let rows = family_document_with_second(&mut root, 0, second);
+    let watch = rows
+        .iter()
+        .find_map(|row| match row {
+            Request::Jig(JigOut::Open { watch, subject: Subject::Task { task: 9 } }) => Some(*watch),
+            _ => None,
+        })
+        .unwrap();
+    let mut document = task();
+    document.context.as_mut().unwrap().impact.tasks.waiting = 1;
+    drive(
+        &mut root,
+        Event::Jig(jig_domain_client::Event::Watch {
+            watch,
+            event: WatchEvent::Delivered(Delivery::Task(Box::new(document))),
+        }),
+    );
+    root
+}
+#[test]
+fn the_family_page_fills_its_tasks_plan_in_a_section_slot() {
+    let root = family_with_plan(None);
+    let mut view = view();
+    patches(&mut view, &root);
+    let plans: Vec<_> = view
+        .tree()
+        .nodes()
+        .iter()
+        .filter(|node| node.region == Some(jig_view::regions::JigRegion::TaskPlan.region()))
+        .collect();
+    assert_eq!(plans.len(), 1);
+    assert_eq!(plans[0].name.as_deref(), Some(b"Plan".as_slice()));
+}
+#[test]
+fn a_second_tasks_section_slot_says_it_cannot_be_shown() {
+    let root = family_with_plan(Some(10));
+    let mut view = view();
+    patches(&mut view, &root);
+    let section =
+        jig_domain_client::pages::Section::Task { task: 10, section: jig_domain_client::address::TaskSection::Plan };
+    let (index, slot) = view
+        .tree()
+        .nodes()
+        .iter()
+        .enumerate()
+        .find(|(_, node)| {
+            node.slot.is_some_and(|reference| {
+                reference.owner == Owner::Jig && view.first.section(reference.token) == Some(section)
+            })
+        })
+        .unwrap();
+    let status = &view.tree().nodes()[index + 1];
+    assert_eq!(
+        (slot.size, status.role, status.name.as_deref()),
+        (2, Role::Status, Some(b"Cannot show this part".as_slice()))
+    );
 }

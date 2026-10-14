@@ -26,6 +26,7 @@ fn denied_and_ended_family_values_have_distinct_public_captions_without_mutation
             state: family::ItemState::Ready,
             value: u64::MAX,
             task: 9,
+            second: None,
             proposals: list([]),
             touchable: true,
         });
@@ -87,6 +88,7 @@ fn every_family_departure_fits_the_public_view_and_checked_selected_words() {
             state: family::ItemState::Ready,
             value: u64::MAX,
             task: 9,
+            second: None,
             proposals: list([
                 ProposalKey { proposer: Proposer::Task(9), number: 1 },
                 ProposalKey { proposer: Proposer::Task(9), number: 2 },

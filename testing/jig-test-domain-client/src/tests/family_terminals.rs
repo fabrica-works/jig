@@ -86,6 +86,7 @@ fn item() -> Document {
         state: ItemState::Ready,
         value: u64::MAX,
         task: u64::MAX,
+        second: None,
         proposals,
         touchable: true,
     })

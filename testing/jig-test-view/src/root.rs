@@ -13,7 +13,7 @@ pub struct View<'a> {
     words: &'a jig_view::words::Words,
     first_words: &'a words::Words,
     jig: JigBindings,
-    first: Bindings,
+    pub(crate) first: Bindings,
     limits: Limits,
     navigation: first::Address,
 }
@@ -82,7 +82,12 @@ pub(crate) fn slots(view: &mut View<'_>, root: &Domain, b: &mut Builder) {
                         ),
                         None => false,
                     },
-                    None => false,
+                    None => match view.first.section(slot.reference.token) {
+                        Some(section) => {
+                            jig_view::sections::section(&mut fragment, root.jig(), view.words, &mut view.jig, section)
+                        }
+                        None => false,
+                    },
                 },
                 Owner::Application { number } => match Connector::of(number) {
                     Some(Connector::First) => {
