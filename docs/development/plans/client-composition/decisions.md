@@ -151,6 +151,15 @@ your best judgement").
      - Ranges: `pages.rs:123-132`, `lib.rs:52-56`; the grep for "Work" and "Navigation" also prints `english.rs:765-766`.
      Checked: `git show origin/main:crates/jig-view/src/tests/cards_access.rs | grep -n 'Role::Region | Role::Dialog'` prints `21: Role::Region | Role::Dialog | Role::Status | Role::ChoiceGroup => {`; `grep -n -E 'Self::\w+ => (67[4-9]|68[0-9]),' jig.rs` prints nothing, and `:1093` is `Self::OwnerHoldRelease => 673`; `grep -c` of each new phrase's text and variant name in `english.rs` and `jig.rs` prints 0; `clippy.toml:63-65` disallow `core::ops::Fn`, `FnMut`, `FnOnce`. The ready check compiled 02.1's reference test in this form under clippy, and it passed with node 6.
 
+102. **jig 04's Shapes against main** (ready check of jig-04.1).
+     jig/04-arrangement.md amended against origin/main 982110898, for 04.1 (the ready check of jig-04.1), with one name in 04.2:
+     - `domain.rs` ranges after jig 03.1's `sections()`: the struct `:48-93`, `new` `:95-147`, `configure_navigation` `:161-171` (also in findings/domain.md:124).
+     - `pages.rs` imports `TaskSection` and `ProjectSection`, and `Section`'s two qualified paths at `:23` and `:25` lose theirs (`unused_qualifications`).
+     - `configure_arrangement` keeps client.md 5.1's refusals ("refuses a list longer than its kind's sections, naming one twice, or naming `Settings` with one of its five"), checking the length first; the lints refuse `matches!`, `Iterator::any` and `filter`, `Option::is_some_and`, slicing that may panic and `as` casts, and `list.get(..i)` with `contains` and an exhaustive `match` passed.
+     - `Arrangement::none()` and `Domain::arrangement()` carry `#[must_use]`.
+     - Each new test of 04.1 and 04.2 is its own `#[test]`, outside the group at `tests/pages.rs:1262`, so that the Done-when filter `test(/arrange/)` names it; 04.2's third test is `an_arranged_task_section_its_document_does_not_offer_is_not_shown`.
+     Checked: `git show origin/main:crates/jig-domain-client/src/domain.rs | grep -n -E '^pub struct Domain|^    pub fn new|^    pub fn configure_navigation'` prints 48, 97, 162; `pages.rs` lines 23 and 25 read `section: crate::address::TaskSection` and `section: crate::address::ProjectSection`; `tests/pages.rs:1262` is `#[test] fn frame_navigation_and_non_work_pages_follow_owner_facts`, which calls the plain fn at `:76`. The ready check built 04.1's sketch with these fixes under `heavy cargo clippy ... -- -D warnings`, and its two tests passed at 2 ms each.
+
 ## For the user
 
 Long-term choices the user may veto. Each was decided by the planner

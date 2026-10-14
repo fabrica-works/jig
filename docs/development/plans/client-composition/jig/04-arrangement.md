@@ -42,7 +42,7 @@ A path in this file that names no crate (`pages/task.rs:662`) is under
 
 - `Arrangement::none()` is jig's: both lists empty, capacity 0 (skein's `List` has no `Default`, so the type derives none).
   `configure_arrangement` returns the arrangement it refuses, as
-  `configure_navigation` returns the navigation (`domain.rs:147-156`).
+  `configure_navigation` returns the navigation (`domain.rs:161-171`).
 - The task's offered sections filter in `Domain::shows`, not in
   `sections()`: the list is fixed when the page is entered, before the
   task's document comes; `shows` reads the document each time. Until the
@@ -64,9 +64,12 @@ A path in this file that names no crate (`pages/task.rs:662`) is under
 ### 04.1 The arrangement, given before the start
 Scope: client.md, 5.1 (`pages::Arrangement`, `configure_arrangement`).
 Needs: nothing outside jig 03 (the session's start).
-Files: `crates/jig-domain-client/src/pages.rs` (`Arrangement`);
-  `crates/jig-domain-client/src/domain.rs:48-91` (a field), `:96-145`
-  (`new`), beside `:147-156` (`configure_arrangement`, and an accessor
+Files: `crates/jig-domain-client/src/pages.rs` (`Arrangement`; it
+  imports `TaskSection` and `ProjectSection`, so `Section`'s
+  `crate::address::TaskSection` and `crate::address::ProjectSection` at
+  `:23` and `:25` lose their path: `unused_qualifications`);
+  `crates/jig-domain-client/src/domain.rs:48-93` (a field), `:95-147`
+  (`new`), beside `:161-171` (`configure_arrangement`, and an accessor
   `arrangement()`); the roots' pass-throughs:
   `testing/jig-test-domain-client/src/domain.rs:151-157` (beside
   `provider`) and its `lib.rs` exports;
@@ -78,14 +81,20 @@ Shape: `pub struct Arrangement { pub task: List<TaskSection>, pub project:
   Result<(), Arrangement>`, which refuses when `started`, when `task`
   holds more than 6 or `project` more than 10, when either names a
   section twice, or when `project` holds `Settings` and any of
-  `Resources`, `Policy`, `Roles`, `Spend`, `Recurring`; `pub const fn
-  arrangement(&self) -> &Arrangement`. Each root:
+  `Resources`, `Policy`, `Roles`, `Spend`, `Recurring`, checking the
+  length first; `pub const fn
+  arrangement(&self) -> &Arrangement`. The checks use `list.get(..i)`
+  and `contains`, and an exhaustive `match` for `Settings` and its five:
+  the lints refuse `matches!`, `Iterator::any` and `filter`,
+  `Option::is_some_and`, slicing that may panic and `as` casts. Each root:
   `pub fn configure_arrangement(root: &mut Domain, arrangement:
   jig_domain_client::pages::Arrangement) -> Result<(),
   jig_domain_client::pages::Arrangement>`, passing it to `root.jig`.
 Test shape: `crates/jig-domain-client/src/tests/pages.rs`, beside
   `navigation_keeps_the_application_order_and_leaves_out_inapplicable_pages`
-  (`:76`): `an_arrangement_given_before_the_start_is_kept`, and
+  (`:76`), each its own `#[test]` (not in the group at `:1262`, so that
+  the Done-when filter `test(/arrange/)` names it):
+  `an_arrangement_given_before_the_start_is_kept`, and
   `each_malformed_arrangement_is_refused`, a table test: an array of
   `(label, arrangement)` rows looped, each assertion's message naming
   its row's label ("seven task sections", "Plan twice", "Settings with
@@ -118,8 +127,8 @@ Shape: at `Address::Task { task, section }`, the list is `Task { task,
 Test shape: `crates/jig-domain-client/src/tests/pages.rs`:
   `an_arranged_task_page_lists_every_section_in_order`,
   `settings_stand_for_its_five_on_an_arranged_project_page`,
-  `a_task_section_its_document_does_not_offer_is_not_shown`. Each under
-  20 ms.
+  `an_arranged_task_section_its_document_does_not_offer_is_not_shown`,
+  each its own `#[test]`, as 04.1's. Each under 20 ms.
 Proof: unit; jig 06 builds the arranged page and proves it in the
   client's world.
 Don't: change the address's own section, or the address shown.
@@ -170,12 +179,14 @@ pub struct Arrangement {
 }
 impl Arrangement {
     /// jig's arrangement: no section beside the address's own.
+    #[must_use]
     pub fn none() -> Arrangement;
 }
 
 // crates/jig-domain-client/src/domain.rs
 impl Domain {
     pub fn configure_arrangement(&mut self, arrangement: Arrangement) -> Result<(), Arrangement>;
+    #[must_use]
     pub const fn arrangement(&self) -> &Arrangement;
 }
 

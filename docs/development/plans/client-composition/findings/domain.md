@@ -121,7 +121,7 @@ Read 23 is both the spend's and the final task's.
 - jig hears "went elsewhere" before the family hears its own `Went`
   (`examples/ops/domain-client/src/route.rs:133-142`;
   `testing/jig-test-domain-client/src/route.rs:94-97`).
-- `configure_navigation` (`domain.rs:147-156`): refuses after the start
+- `configure_navigation` (`domain.rs:161-171`): refuses after the start
   or past its capacity, then replaces the field. `ops` passes it through
   (`examples/ops/domain-client/src/domain.rs:190-196`); the test root has
   no pass-through.
