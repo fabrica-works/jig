@@ -311,6 +311,18 @@ the file.
      and 115 listed literals found by searching for the value 127; a
      ruling on a fixture names its copies and its derived bounds by
      searching for its name and its users.
+118. **jig 05.1 refreshes the charter golden's copy; the inventory is
+     complete** (plan defect, jig 05's block of 2026-10-14T01:57:28Z).
+     `SMALLEST` (`testing/jig-test-worker/src/tests/fixtures.rs:62`) is
+     smith's `crates/smith-charter/golden/v2/record_charter_smallest.bin`,
+     118 bytes at jig's pin (smith `dfc0fe57`), 119 on smith's `main`;
+     three `jig-test-worker` tests fail to decode it
+     (`logs/20261014T015445-86.log`). It is rewritten by a script, length
+     119. A search of every non-generated `.rs` file on jig's `main` for
+     each of smith's 720 goldens at `dfc0fe57` written as a byte array,
+     and of every `.bin` outside a `golden/` directory, finds four copies
+     in all: the two transcript `.bin` files, `FULL_TURN` and `SMALLEST`.
+     `jig-repin` refreshes those four as rulings 114 to 118 say.
 
 ## For the user
 

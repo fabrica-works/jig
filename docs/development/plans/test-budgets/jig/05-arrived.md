@@ -106,7 +106,11 @@ Files: `Cargo.lock`: `heavy cargo update -p smith-charter` (one package
   of these two goldens, or literal equal to a size of one or one either
   side of it, that the gate finds stale is refreshed the same way
   without asking, and listed in the commit body; any other failure is a
-  question.
+  question; and smith's charter golden `record_charter_smallest.bin`
+  (118 to 119 bytes), copied as `SMALLEST`
+  (`testing/jig-test-worker/src/tests/fixtures.rs:62`), rewritten by a
+  script, its length 118 to 119 (ruling 118). These four (two `.bin`
+  files, two byte literals) are every copy of a smith golden in jig.
 Shape: no hand edit of generated code; the drift tests pass with
   `SKEIN_CODEGEN_WRITE` unset.
 Test shape: none new; the drift tests, unchanged, and the golden files,
