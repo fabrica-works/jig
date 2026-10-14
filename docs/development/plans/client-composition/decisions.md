@@ -316,6 +316,10 @@ your best judgement").
 113. **jig 07.2 lands at up to 215 production lines** (plan defect, jig 07's block of 2026-10-14T15:30:33Z).
      jig 07.2 lands at the reported size: at most 215 lines of production code, as code-organization.md 6 counts them (`git diff -M --numstat origin/main...HEAD -- <the increment's Files>`, added less removed, once), against its Size of 120 and the ask line of 180. The reason the report gives holds, and the cheaper shape it names breaks client.md 5.1 ("What a page says of itself, a section says on an application's page"): one section's refusal would show in every section, and a plan's Tree failure would mark an unrelated deployment section. The per-section status, kept for each accepted section, and the 19-bit mask over `MOST_SECTIONS` (19) stay as the report describes. Unchanged: code-organization.md 6's file limits (`domain.rs` and `pages/routing.rs` grow by at most 40 lines in session 07), the other increments' Sizes and their ask lines, and `SectionStatus`'s fields. The commit body gives the count and names this ruling.
 
+114. **jig 08 starts at 08.2** (steer of the check of 2026-10-14T15:33Z).
+     Plan order, from the check of 2026-10-14T15:33Z: jig 08 starts at 08.2 once its ready check has set it ready, in the lane's free slot, while jig 07 runs; the same session takes 08.1 when 08.2 and jig 07.3 have both landed (its own Needs, "jig 07.1 and 07.3"), after its own ready check, then 08.3. jig/08-ops.md gives 08.2 "Needs: jig 06.1 and 06.2", both landed (cdfce095a, c6339177b); the README's "jig 08 once 07 has" holds for 08.1 only. Unchanged: each increment's Needs, Shape and Proof; jig 07's order; 09.3 waits for 07.3, 10.4 for 08.3.
+     Ruling 113's "`domain.rs` and `pages/routing.rs` grow by at most 40 lines in session 07" reads, for `domain.rs`, as jig/07-section-slots.md:77 gives it: at most 80 lines.
+
 ## For the user
 
 Long-term choices the user may veto. Each was decided by the planner
