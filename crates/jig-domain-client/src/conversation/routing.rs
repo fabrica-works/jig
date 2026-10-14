@@ -27,13 +27,10 @@ fn ask(domain: &mut Domain, what: Option<Read>, out: &mut Queue<Request>) {
 }
 /// A task document moves only the activity belonging to the current conversation.
 pub(crate) fn document(domain: &mut Domain, task: &Task, out: &mut Queue<Request>) {
-    match domain.address {
-        crate::address::Address::Task { section: crate::address::TaskSection::Activity, .. } => {}
-        crate::address::Address::Task { .. }
-        | crate::address::Address::Inbox { .. }
-        | crate::address::Address::Conversations { .. }
-        | crate::address::Address::Project { .. }
-        | crate::address::Address::Deployment => return,
+    if !domain
+        .shows(crate::pages::Section::Task { task: task.chip.task, section: crate::address::TaskSection::Activity })
+    {
+        return;
     }
     if domain.conversation.task != task.chip.task {
         return;

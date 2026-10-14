@@ -137,19 +137,13 @@ fn retained_outside_plan(client: &Domain, object: &jig_domain_client::objects::O
     if object.sources.is_empty() {
         return true;
     }
-    match client.page() {
-        jig_domain_client::pages::Page::Work {
-            address:
-                jig_domain_client::address::Address::Task { section: jig_domain_client::address::TaskSection::Plan, .. },
-            ..
-        } => {}
-        jig_domain_client::pages::Page::Work { .. }
-        | jig_domain_client::pages::Page::Elsewhere
-        | jig_domain_client::pages::Page::Starting
-        | jig_domain_client::pages::Page::SigningIn
-        | jig_domain_client::pages::Page::Missing
-        | jig_domain_client::pages::Page::OutOfDate
-        | jig_domain_client::pages::Page::SomeoneElse => return false,
+    let Some(task) = client.shown_task() else {
+        return false;
+    };
+    if !client
+        .shows(jig_domain_client::pages::Section::Task { task, section: jig_domain_client::address::TaskSection::Plan })
+    {
+        return false;
     }
     let key = match object.key {
         jig_domain_client::contract::ObjectKey::Proposal(key) => key,

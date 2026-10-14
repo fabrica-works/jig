@@ -2631,3 +2631,14 @@ fn a_page_not_about_the_work_shows_no_section() {
         assert_eq!(domain.sections(), &[], "{place:?}");
     }
 }
+
+#[test]
+fn an_application_page_shows_no_task_after_a_task_page() {
+    let mut domain = Domain::new(&LIMITS, 2);
+    let f = start(&mut domain, List::with_capacity(0));
+    delivered(&mut domain, Time::ZERO, f, frame(7));
+    drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::task(9)) });
+    assert_eq!(domain.shown_task(), Some(9));
+    drive(&mut domain, Time::ZERO, Event::Went { place: Place::Elsewhere });
+    assert_eq!(domain.shown_task(), None);
+}

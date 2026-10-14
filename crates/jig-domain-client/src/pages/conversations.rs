@@ -20,7 +20,7 @@ use crate::{
     fields::Purpose,
     intents::Origin,
     objects::{Body, Source},
-    pages::{IntentPurpose, Page, inbox::Filter},
+    pages::{IntentPurpose, inbox::Filter},
     windows::{Edge, Edges},
 };
 use alloc::boxed::Box;
@@ -216,9 +216,11 @@ fn seen(domain: &mut Domain, value: Seen, out: &mut Queue<Request>) -> bool {
         .is_some()
 }
 pub(crate) fn open_updates(domain: &mut Domain, out: &mut Queue<Request>) {
-    match domain.address {
-        Address::Inbox { .. } => {}
-        Address::Conversations { .. } | Address::Task { .. } | Address::Project { .. } | Address::Deployment => return,
+    let Some(project) = domain.shown_inbox() else {
+        return;
+    };
+    if !domain.shows(crate::pages::Section::Inbox { group: InboxReadGroup::Updates, project }) {
+        return;
     }
     domain.inbox.opening_updates = true;
     mark_results(domain, out);
@@ -271,15 +273,8 @@ pub(crate) fn open_chat(domain: &mut Domain, env: &Env<crate::Limits>, task: u64
     );
 }
 pub(crate) fn filter_inbox(domain: &mut Domain, filter: Filter, out: &mut Queue<Request>) {
-    match domain.page {
-        Page::Work { address: Address::Inbox { .. }, .. } => {}
-        Page::Work { .. }
-        | Page::Starting
-        | Page::Elsewhere
-        | Page::SigningIn
-        | Page::Missing
-        | Page::OutOfDate
-        | Page::SomeoneElse => return,
+    if domain.shown_inbox().is_none() {
+        return;
     }
     if domain.inbox.filter == filter
         && (domain.inbox.needs_window.reading.is_some() || domain.inbox.updates_window.reading.is_some())
@@ -391,11 +386,8 @@ pub(crate) fn more(domain: &mut Domain, window: Token, end: End, out: &mut Queue
         };
         match edge {
             Edge::More(cursor) => {
-                match domain.address {
-                    Address::Conversations { .. } => {}
-                    Address::Inbox { .. } | Address::Task { .. } | Address::Project { .. } | Address::Deployment => {
-                        return;
-                    }
+                if domain.shown_conversations().is_none() {
+                    return;
                 }
                 let number = match end {
                     End::Before => CONVERSATIONS_BEFORE,

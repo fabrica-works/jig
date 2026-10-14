@@ -13,7 +13,7 @@
 //! | any | leave | empty | handled by generation routing |
 use crate::{
     Domain, Request,
-    address::{Address, TaskSection},
+    address::TaskSection,
     contract::{self, Executor, Limit, ObjectKey, Part, Phase, PhaseCounts, ProposalKey, Read, Task, Tree, TreeNode},
     objects::{Body, Object, Source},
     watches::Owner,
@@ -461,9 +461,8 @@ fn proposal_cards(
 }
 /// After the task document reveals its executor, opens only that activity owner.
 pub(crate) fn document(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Queue<Request>) {
-    let (number, section) = match domain.address {
-        Address::Task { task, section } => (task, section),
-        Address::Inbox { .. } | Address::Conversations { .. } | Address::Project { .. } | Address::Deployment => return,
+    let Some(number) = domain.shown_task() else {
+        return;
     };
     let Some(id) = domain.objects.find(ObjectKey::Task(number)) else {
         return;
@@ -491,7 +490,23 @@ pub(crate) fn document(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut 
     let phase = task.chip.phase;
     let proposals = task.proposals.clone();
     let activity = task.activity;
-    let values = parts(task, section, env.limits.parts.saturating_add(1));
+    let mut values = List::with_capacity(env.limits.parts.saturating_add(1));
+    for section in [
+        TaskSection::Overview,
+        TaskSection::Activity,
+        TaskSection::Plan,
+        TaskSection::History,
+        TaskSection::Budget,
+        TaskSection::Panels,
+    ] {
+        if domain.shows(crate::pages::Section::Task { task: number, section }) {
+            for part in parts(task, section, env.limits.parts.saturating_add(1)).into_boxed() {
+                if values.push(part).is_err() {
+                    break;
+                }
+            }
+        }
+    }
     proposal_cards(domain, env, number, proposals, activity, out);
     let mut emitted = 0_u32;
     for part in values.into_boxed() {
@@ -503,16 +518,15 @@ pub(crate) fn document(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut 
         let scope = crate::application::owner_scope(&part, contract::PartScope::Project(project));
         out.push(Request::ShowPart { part, generation: domain.generation, scope });
     }
-    if section == TaskSection::Plan {
+    if domain.shows(crate::pages::Section::Task { task: number, section: TaskSection::Plan }) {
         if crate::pages::conversations::live(phase) {
             open_once(domain, env, contract::Subject::Tree { task: number, window: env.limits.rows }, out);
         } else {
             domain.task_page.ended_task = Some(number);
             read(domain, 16, Read::Ended { task: number, after: None }, out);
         }
-        return;
     }
-    if section != TaskSection::Activity {
+    if !domain.shows(crate::pages::Section::Task { task: number, section: TaskSection::Activity }) {
         return;
     }
     match executor {
@@ -569,13 +583,11 @@ fn read(domain: &mut Domain, number: u16, what: Read, out: &mut Queue<Request>) 
 }
 /// Fold presentation belongs to this page and never changes committed work.
 pub(crate) fn fold(domain: &mut Domain, object: Token, open: bool) {
-    match domain.address {
-        Address::Task { section: TaskSection::Plan, .. } => {}
-        Address::Task { .. }
-        | Address::Inbox { .. }
-        | Address::Conversations { .. }
-        | Address::Project { .. }
-        | Address::Deployment => return,
+    let Some(shown) = domain.shown_task() else {
+        return;
+    };
+    if !domain.shows(crate::pages::Section::Task { task: shown, section: TaskSection::Plan }) {
+        return;
     }
     let Some(object) = domain.objects.get(Id::from_token(object)) else {
         return;
@@ -616,9 +628,8 @@ pub(crate) fn filter(domain: &mut Domain, filter: PlanFilter) {
 }
 /// Chooses task-only or subtree history and starts its first page.
 pub(crate) fn history(domain: &mut Domain, subtree: bool, out: &mut Queue<Request>) {
-    let task = match domain.address {
-        Address::Task { task, .. } => task,
-        Address::Inbox { .. } | Address::Conversations { .. } | Address::Project { .. } | Address::Deployment => return,
+    let Some(task) = domain.shown_task() else {
+        return;
     };
     domain.task_page.subtree_history = subtree;
     domain.history_rows.rows.clear();
@@ -628,13 +639,11 @@ pub(crate) fn history(domain: &mut Domain, subtree: bool, out: &mut Queue<Reques
 }
 /// Opens one ended subtree, whose results name shared cards.
 pub(crate) fn open_ended(domain: &mut Domain, task: u64, out: &mut Queue<Request>) {
-    match domain.address {
-        Address::Task { section: TaskSection::Plan, .. } => {}
-        Address::Task { .. }
-        | Address::Inbox { .. }
-        | Address::Conversations { .. }
-        | Address::Project { .. }
-        | Address::Deployment => return,
+    let Some(shown) = domain.shown_task() else {
+        return;
+    };
+    if !domain.shows(crate::pages::Section::Task { task: shown, section: TaskSection::Plan }) {
+        return;
     }
     let mut found = false;
     if let Some(owner) = &domain.task_page.plan.owner {
@@ -673,12 +682,8 @@ pub(crate) fn more(domain: &mut Domain, window: Token, end: crate::action::End, 
             crate::windows::Edge::End => None,
         };
         if let Some(cursor) = cursor {
-            let task = match domain.address {
-                Address::Task { task, .. } => task,
-                Address::Inbox { .. }
-                | Address::Conversations { .. }
-                | Address::Project { .. }
-                | Address::Deployment => return,
+            let Some(task) = domain.shown_task() else {
+                return;
             };
             read(
                 domain,

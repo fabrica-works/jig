@@ -20,7 +20,7 @@ impl DeploymentPage {
     }
 }
 pub(crate) fn document(domain: &mut Domain, env: &Env<crate::Limits>, doc: Box<Deployment>, out: &mut Queue<Request>) {
-    if domain.address != crate::address::Address::Deployment {
+    if !domain.shows(crate::pages::Section::Deployment) {
         return;
     }
     let mut parts = List::<Part>::with_capacity(env.limits.parts.saturating_add(1));
@@ -48,7 +48,7 @@ pub(crate) fn owner_document(
     doc: Box<OwnerDeployment>,
     out: &mut Queue<Request>,
 ) {
-    if domain.address != crate::address::Address::Deployment {
+    if !domain.shows(crate::pages::Section::Deployment) {
         return;
     }
     let mut parts = List::with_capacity(env.limits.parts.saturating_add(1));

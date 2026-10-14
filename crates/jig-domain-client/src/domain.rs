@@ -709,11 +709,7 @@ fn act_event(domain: &mut Domain, env: &Env<Limits>, act: Act, out: &mut Queue<R
         Act::HistoryScope { subtree } => crate::pages::task::history(domain, subtree, out),
         Act::OpenEnded { task } => crate::pages::task::open_ended(domain, task, out),
         Act::Submit { field: crate::fields::Purpose::NewChat } => {
-            let project = match domain.address {
-                Address::Conversations { project } | Address::Inbox { project } => project,
-                Address::Project { project, .. } => Some(project),
-                Address::Task { .. } | Address::Deployment => None,
-            };
+            let project = domain.shown_conversations().or(domain.shown_inbox()).unwrap_or(domain.shown_project());
             if let Some(project) = project {
                 crate::pages::conversations::start(domain, env, project, out);
             }
@@ -1099,25 +1095,19 @@ fn terminal_watch(domain: &mut Domain, id: Id<Watch>, end: WatchEnd, out: &mut Q
         Owner::Frame => domain.set_link(Link::Offline, out),
         Owner::Application { .. } => {}
         Owner::Page { generation } => {
-            if generation == domain.generation && task_subject {
-                match domain.address {
-                    Address::Task { .. } => match end {
-                        WatchEnd::NotAllowed => {
-                            domain.page = Page::Missing;
-                            domain.changed();
-                        }
-                        WatchEnd::Unknown
-                        | WatchEnd::SubjectEnded
-                        | WatchEnd::Closed
-                        | WatchEnd::Dropped
-                        | WatchEnd::Busy
-                        | WatchEnd::Stopping
-                        | WatchEnd::SignedOut => {}
-                    },
-                    Address::Inbox { .. }
-                    | Address::Conversations { .. }
-                    | Address::Project { .. }
-                    | Address::Deployment => {}
+            if generation == domain.generation && task_subject && domain.shown_task().is_some() {
+                match end {
+                    WatchEnd::NotAllowed => {
+                        domain.page = Page::Missing;
+                        domain.changed();
+                    }
+                    WatchEnd::Unknown
+                    | WatchEnd::SubjectEnded
+                    | WatchEnd::Closed
+                    | WatchEnd::Dropped
+                    | WatchEnd::Busy
+                    | WatchEnd::Stopping
+                    | WatchEnd::SignedOut => {}
                 }
             }
         }

@@ -512,12 +512,13 @@ pub(crate) fn scope(domain: &Domain, part: &Part) -> Option<contract::PartScope>
     }
 }
 fn current_project(domain: &Domain) -> Option<u32> {
-    match domain.address {
-        crate::address::Address::Project { project, .. } => Some(project),
-        crate::address::Address::Task { task, .. } => object_project(domain, ObjectKey::Task(task)),
-        crate::address::Address::Inbox { project } | crate::address::Address::Conversations { project } => project,
-        crate::address::Address::Deployment => None,
+    if let Some(project) = domain.shown_project() {
+        return Some(project);
     }
+    if let Some(task) = domain.shown_task() {
+        return object_project(domain, ObjectKey::Task(task));
+    }
+    domain.shown_inbox().or(domain.shown_conversations()).flatten()
 }
 
 pub(crate) fn worst_case(limits: &crate::Limits) -> Option<u64> {

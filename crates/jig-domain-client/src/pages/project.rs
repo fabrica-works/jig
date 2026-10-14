@@ -13,7 +13,7 @@
 use crate::{
     Domain, Request,
     action::End,
-    address::{Address, ProjectSection},
+    address::ProjectSection,
     contract::{self, Cursor, GoalLine, NoteScope, Part, Project, Read, TaskFilter, TaskLine, Text},
     objects::{Object, Source},
     watches::Owner,
@@ -132,38 +132,50 @@ impl ProjectPage {
 }
 /// Number of the currently shown project, never inferred from another page.
 #[must_use]
-pub(crate) const fn number(domain: &Domain) -> Option<u32> {
-    match domain.address {
-        Address::Project { project, .. } => Some(project),
-        Address::Inbox { .. } | Address::Conversations { .. } | Address::Task { .. } | Address::Deployment => None,
-    }
+pub(crate) fn number(domain: &Domain) -> Option<u32> {
+    domain.shown_project()
 }
 /// Begins exactly the selected project's sources.
 pub(crate) fn enter(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Queue<Request>) {
-    let (project, section) = match domain.address {
-        Address::Project { project, section } => (project, section),
-        Address::Inbox { .. } | Address::Conversations { .. } | Address::Task { .. } | Address::Deployment => return,
+    let Some(project) = number(domain) else {
+        return;
     };
-    match section {
-        ProjectSection::Overview => {
-            open(domain, env, contract::Subject::Goals { project }, out);
-            open(domain, env, contract::Subject::Inbox { window: env.limits.rows }, out);
-            domain.inbox.filter = crate::pages::inbox::Filter { project: Some(project), kind: None, goal: None };
+    for section in [
+        ProjectSection::Overview,
+        ProjectSection::Goals,
+        ProjectSection::Tasks,
+        ProjectSection::Notes,
+        ProjectSection::Settings,
+        ProjectSection::Resources,
+        ProjectSection::Policy,
+        ProjectSection::Roles,
+        ProjectSection::Spend,
+        ProjectSection::Recurring,
+    ] {
+        if !domain.shows(crate::pages::Section::Project { project, section }) {
+            continue;
         }
-        ProjectSection::Goals => {
-            open(domain, env, contract::Subject::Goals { project }, out);
-            ask(domain, 20, Read::Goals { project, after: None }, out);
+        match section {
+            ProjectSection::Overview => {
+                open(domain, env, contract::Subject::Goals { project }, out);
+                open(domain, env, contract::Subject::Inbox { window: env.limits.rows }, out);
+                domain.inbox.filter = crate::pages::inbox::Filter { project: Some(project), kind: None, goal: None };
+            }
+            ProjectSection::Goals => {
+                open(domain, env, contract::Subject::Goals { project }, out);
+                ask(domain, 20, Read::Goals { project, after: None }, out);
+            }
+            ProjectSection::Tasks => tasks(domain, env, domain.project_page.task_filter, out),
+            ProjectSection::Notes => {
+                notes::filter(domain, NoteFilter { scope: NoteScope::Project(project), description: None }, out);
+            }
+            ProjectSection::Spend => ask(domain, 23, Read::Spend { project, after: None }, out),
+            ProjectSection::Settings
+            | ProjectSection::Resources
+            | ProjectSection::Policy
+            | ProjectSection::Roles
+            | ProjectSection::Recurring => {}
         }
-        ProjectSection::Tasks => tasks(domain, env, domain.project_page.task_filter, out),
-        ProjectSection::Notes => {
-            notes::filter(domain, NoteFilter { scope: NoteScope::Project(project), description: None }, out);
-        }
-        ProjectSection::Spend => ask(domain, 23, Read::Spend { project, after: None }, out),
-        ProjectSection::Settings
-        | ProjectSection::Resources
-        | ProjectSection::Policy
-        | ProjectSection::Roles
-        | ProjectSection::Recurring => {}
     }
     ask(domain, 0, Read::Project { project }, out);
 }
@@ -198,13 +210,29 @@ pub(crate) fn document(
     domain.project_page.owner = None;
     domain.project_page.document = Some(document);
     goals::sync(domain);
-    let section = match domain.address {
-        Address::Project { section, .. } => section,
-        Address::Inbox { .. } | Address::Conversations { .. } | Address::Task { .. } | Address::Deployment => return,
-    };
     let doc = domain.project_page.document.as_ref().expect("stored above");
-    let parts = parts(doc, section, env.limits.parts.saturating_add(1));
-    show(domain, env, parts, out);
+    let mut parts_shown = List::with_capacity(env.limits.parts.saturating_add(1));
+    for section in [
+        ProjectSection::Overview,
+        ProjectSection::Goals,
+        ProjectSection::Tasks,
+        ProjectSection::Notes,
+        ProjectSection::Settings,
+        ProjectSection::Resources,
+        ProjectSection::Policy,
+        ProjectSection::Roles,
+        ProjectSection::Spend,
+        ProjectSection::Recurring,
+    ] {
+        if domain.shows(crate::pages::Section::Project { project: doc.number, section }) {
+            for part in parts(doc, section, env.limits.parts.saturating_add(1)).into_boxed() {
+                if parts_shown.push(part).is_err() {
+                    break;
+                }
+            }
+        }
+    }
+    show(domain, env, parts_shown, out);
     domain.changed();
 }
 /// Resources, requirements and connector panels are facts, never connector values.
@@ -243,11 +271,9 @@ pub(crate) fn show(domain: &mut Domain, env: &Env<crate::Limits>, parts: List<Pa
             crate::pages::routing::refuse(domain, contract::Limit::Objects);
             break;
         }
-        let scope = match domain.address {
-            Address::Project { project, .. } => contract::PartScope::Project(project),
-            Address::Inbox { .. } | Address::Conversations { .. } | Address::Task { .. } | Address::Deployment => {
-                contract::PartScope::Deployment
-            }
+        let scope = match domain.shown_project() {
+            Some(project) => contract::PartScope::Project(project),
+            None => contract::PartScope::Deployment,
         };
         let scope = crate::application::owner_scope(&part, scope);
         out.push(Request::ShowPart { part, generation: domain.generation, scope });

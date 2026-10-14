@@ -11,7 +11,6 @@
 //! | words refused/unknown, or later edit | retained | none |
 use crate::{
     Domain, Request,
-    address::Address,
     contract::{Answer, Ask, Limit, Text},
     fields::Purpose,
     store::{Record, STORE_VERSION, StoreKey},
@@ -212,16 +211,7 @@ pub(crate) fn sync(domain: &mut Domain, out: &mut Queue<Request>) {
     if domain.drafts.scope != domain.confirmed {
         restore(domain, out);
     }
-    let active = if domain.confirmed.is_some() {
-        match domain.address {
-            Address::Task { task, .. } => Some(task),
-            Address::Inbox { .. } | Address::Conversations { .. } | Address::Project { .. } | Address::Deployment => {
-                None
-            }
-        }
-    } else {
-        None
-    };
+    let active = if domain.confirmed.is_some() { domain.shown_task() } else { None };
     if domain.drafts.active != active {
         if let Some(previous) = domain.drafts.active
             && domain.drafts.get(previous).is_none()
