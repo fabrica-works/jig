@@ -768,3 +768,54 @@ listed for the designer.
 **Workspace:** temper's pins are 264, 788 and 1,481 commits behind
 skein's, smith's and jig's `main`. That is outside this plan (decision
 12), and a plan of its own.
+
+## 10. Decisions
+
+2026-10-14. The user asked for a review of jig-protocol's and
+test-budgets' costs: where the tokens went, and whether the supervisor's
+xhigh effort paid. The review found that each role's cost is its
+requests times the context each re-reads, not its effort: the
+supervisor's thinking was about 3% of its cost at list prices, and the
+rulings later reversed came from turns that thought as much as those
+that held. The user adopted the review's suggestions, and the designer
+applied them in skein `479f836`: development.md, its two cards
+(`implementer.md`, `supervisor.md`), the kit and the workspace's
+`AGENTS.md`. They cover the proposals below that read "adopted". The
+others were not part of that review, and stay open: `plan check` refuses
+the next plan until each is decided here.
+
+| Proposal | Decision | Where |
+|---|---|---|
+| 1 | adopted | development.md, 6 and 15.1; `plan check` reads this section |
+| 2 | adopted | development.md, 5.4 (the planner's search); supervisor.md, 3 (rulings) and 5 (the ready check of each session file against `main`, jig-protocol's proposal 2) |
+| 3 | open | |
+| 4 | open | `land` now builds and lints in the build lane before the gate (development.md, 9.1), which shortens each gate but does not lock |
+| 5 | adopted | `heavy --gate` refuses a tree with changes; `land`'s build-lane pass; implementer.md, 8.3 |
+| 6 | adopted | implementer.md, 8.1 and 8.3; development.md, 7.2's prompts; the workspace `AGENTS.md` names each repository's code-graph project, and overrides each machine's `~/.codex/AGENTS.md`, which is not the kit's |
+| 7 | open | implementer.md, 8.4 says the trailers' shape; `land` does not check it |
+| 8 | open | |
+| 9 | open | Its first half is applied: implementers log their reports with `plan log`, and the coordinator types them nowhere (development.md, 7.3 and 10.2; implementer.md, 8.6). Its second, the coordinator's handover at about 250K, waits for the user |
+| 10 | adopted | supervisor.md, 7; development.md, 2.5 and 10.5; `plan watch` prints the supervisor's context, and `plan handover supervisor` starts its successor |
+| 11 | adopted | development.md, 15.2: the planner's session by its `Planner-Session:` trailer, escalations once each, Proof layers against `### NN.M`, suites by repository, `land`'s gates apart; and each Claude Code message once across sessions, with `cost_claude` at list prices |
+| 12 | open | |
+| 13 | open | |
+| 14 | adopted by the user with decision 9, 2026-10-14 | not applied yet: smith's `workflow.md`, 5, and `benchmarks.md`, 4.2, for the designer |
+
+**The same adoption, beyond these proposals:**
+- the supervisor's card, and its hourly check run by a sub-agent
+  (supervisor.md, 6);
+- a fresh designer from a brief past 150K tokens or an hour idle, and no
+  second wake of a designer at work (development.md, 10.4), which is
+  jig-protocol's proposal 1, its second half;
+- rulings written once, landed by `plan ruling` (development.md, 10.3);
+- an idle coordinator ends its turn, `plan idle`, and the doorbell starts
+  the next (development.md, 7.4), for jig-protocol proposal 10's `plan
+  wait`;
+- jig-protocol's general rules on edits outside Files in the implementer's
+  card (implementer.md, 8.2), its proposal 5;
+- planning in a fresh session, with one question for each audit
+  (development.md, 2.2 and 5.4);
+- the pulse's cost by role (development.md, 14.2), jig-protocol's
+  proposal 15.
+
+**Not changed:** each role's model and effort.
