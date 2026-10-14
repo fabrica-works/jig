@@ -189,8 +189,15 @@ Proof: world, `heavy --gate cargo nextest run -p smith-local-process-world
   alone at this plan's base, `findings/measurements.md`, 5)
   and `smith_check_json_lists_the_effective_limits_by_name`'s time, in
   the report; `smoke-tools` once before `land`.
-Don't: change the person's script, its cues or its bounds; read the
-  terminal's own keys differently.
+  One cue may change (ruling 112):
+  `slash_new_starts_a_chat_and_slash_resume_reopens_it`'s
+  (`tests/local-process/tests/simulation.rs:289`), whose text spans two
+  output pieces whose order depends on the reads' sizes; it becomes the
+  shortest text shown only once the new chat has answered, whatever that
+  order, with every assertion unchanged.
+Don't: change the person's script, its other cues or its bounds; change
+  the person's scheduling to keep a cue's order; read the terminal's own
+  keys differently.
 Size: test kit only: at most 60 lines changed; it removes more than it
   adds.
 Removes: `PIPED_OUTPUT` and `piped_complete`.
