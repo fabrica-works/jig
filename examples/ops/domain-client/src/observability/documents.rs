@@ -162,6 +162,32 @@ impl Document {
             None => false,
         }
     }
+    /// The incident's lead's plan, as jig's whole section (examples.md, 8).
+    #[must_use]
+    pub fn sections(&self) -> List<jig_domain_client::pages::Section> {
+        let lead = match self {
+            Self::Incident(incident) => incident.lead,
+            Self::Native(document) => match &document.value {
+                super::native::Value::Incident { incident, .. } => incident.lead,
+                super::native::Value::Service { .. }
+                | super::native::Value::Alert { .. }
+                | super::native::Value::Outbox { .. }
+                | super::native::Value::Deployment { .. }
+                | super::native::Value::Project { .. } => None,
+            },
+            Self::Incidents { .. } | Self::Part(_) => None,
+        };
+        let mut sections = List::with_capacity(1);
+        if let Some(task) = lead {
+            sections
+                .push(jig_domain_client::pages::Section::Task {
+                    task,
+                    section: jig_domain_client::address::TaskSection::Plan,
+                })
+                .expect("one lead section fits");
+        }
+        sections
+    }
     /// jig objects supplied by the incident owner, never guessed from its watch.
     #[must_use]
     pub fn objects(&self, rows: u32) -> List<ObjectKey> {

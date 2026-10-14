@@ -150,6 +150,17 @@ fn view() -> View {
     View::new(&v, &limits(), jig, obs, infra, 1)
 }
 
+fn small_view() -> View {
+    let (jig, obs, infra) = phrasebooks();
+    let mut bounds = Limits::of(&limits(), &jig, &obs, &infra).unwrap();
+    bounds.tree.nodes = 512;
+    bounds.tree.bindings = 512;
+    bounds.tree.slots = 64;
+    bounds.tree.patches = 2560;
+    bounds.tree.text_bytes = bounds.tree.nodes.checked_mul(bounds.tree.text_per_node).unwrap();
+    View::new(&bounds, &limits(), jig, obs, infra, 1)
+}
+
 fn incident() -> observability::documents::Incident {
     use observability::documents::*;
     let mut timeline = List::with_capacity(2);
@@ -516,14 +527,7 @@ fn arranged_task_view(section: jig_domain_client::address::TaskSection) -> View 
             event: WatchEvent::Delivered(Delivery::Task(Box::new(document))),
         }),
     );
-    let (jig, obs, infra) = phrasebooks();
-    let mut bounds = Limits::of(&limits(), &jig, &obs, &infra).unwrap();
-    bounds.tree.nodes = 512;
-    bounds.tree.bindings = 512;
-    bounds.tree.slots = 64;
-    bounds.tree.patches = 2560;
-    bounds.tree.text_bytes = bounds.tree.nodes.checked_mul(bounds.tree.text_per_node).unwrap();
-    let mut view = View::new(&bounds, &limits(), jig, obs, infra, 1);
+    let mut view = small_view();
     let mut patches = Queue::with_capacity(view.limits().tree.patches);
     build(&mut view, &root, &mut patches);
     view
@@ -573,6 +577,97 @@ fn an_ops_arranged_task_page_keeps_the_outline() {
 fn an_ops_arranged_task_page_has_no_tabs() {
     let view = arranged_task_view(jig_domain_client::address::TaskSection::Plan);
     assert_eq!(view.tree().nodes().iter().filter(|node| node.role == jig_view::Role::Tabs).count(), 0);
+}
+
+fn incident_plan_page(native: bool) -> Domain {
+    let mut root = ready();
+    let requests = drive(
+        &mut root,
+        Event::Went {
+            place: root::Place::Address(Address::Observability(observability::Address::Incident {
+                project: 1,
+                incident: 12,
+            })),
+        },
+    );
+    let read = requests
+        .iter()
+        .find_map(|request| match request {
+            Request::Observability(observability::Out::Read { read, .. }) => Some(*read),
+            _ => None,
+        })
+        .unwrap();
+    let mut facts = incident();
+    facts.lead = Some(9);
+    let document = if native {
+        use observability::native as n;
+        observability::Document::Native(Box::new(n::Document {
+            subject: observability::Subject {
+                scope: observability::Scope::Project(1),
+                kind: observability::Kind::Incident(12),
+            },
+            value: n::Value::Incident {
+                incident: n::Incident {
+                    project: 1,
+                    number: 12,
+                    watch: facts.watch,
+                    lead: facts.lead,
+                    alerts: Box::from([]),
+                    raised: facts.raised,
+                    service: facts.service,
+                    severity: facts.severity,
+                    state: facts.state,
+                    timeline: List::with_capacity(0),
+                    cut: false,
+                },
+                fact: None,
+            },
+        }))
+    } else {
+        observability::Document::Incident(facts)
+    };
+    let requests = drive(
+        &mut root,
+        Event::Observability(observability::Event::Read {
+            read,
+            result: observability::ReadResult::Value(Box::new(document)),
+        }),
+    );
+    let watch = requests
+        .iter()
+        .find_map(|request| match request {
+            Request::Jig(JigOut::Open { watch, subject: Subject::Task { task: 9 } }) => Some(*watch),
+            _ => None,
+        })
+        .expect("lead's section opens its task watch");
+    let mut document = task();
+    document.context.as_mut().unwrap().impact.tasks.waiting = 1;
+    drive(
+        &mut root,
+        Event::Jig(jig_domain_client::Event::Watch {
+            watch,
+            event: WatchEvent::Delivered(Delivery::Task(Box::new(document))),
+        }),
+    );
+    root
+}
+
+#[test]
+fn the_incident_page_fills_its_leads_plan_in_a_section_slot() {
+    for native in [false, true] {
+        let root = incident_plan_page(native);
+        let mut view = small_view();
+        let mut patches = Queue::with_capacity(view.limits().tree.patches);
+        build(&mut view, &root, &mut patches);
+        let plans: Vec<_> = view
+            .tree()
+            .nodes()
+            .iter()
+            .filter(|node| node.region == Some(jig_view::regions::JigRegion::TaskPlan.region()))
+            .collect();
+        assert_eq!(plans.len(), 1, "native={native}");
+        assert_eq!(plans[0].name.as_deref(), Some(b"Plan".as_slice()), "native={native}");
+    }
 }
 fn proposal(key: ProposalKey) -> Proposal {
     Proposal {

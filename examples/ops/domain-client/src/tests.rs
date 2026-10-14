@@ -842,6 +842,61 @@ fn incident_facts_keep_cuts_and_unknown_health_and_never_turn_a_watch_into_a_lea
     );
     assert_eq!(root.observability().object(id).unwrap().value, observability::Value::Known(Box::new(resolved)));
 }
+
+fn incidents_naming_sections(lead: Option<u64>) -> [crate::observability::Document; 2] {
+    use crate::observability::{documents::*, native};
+    let incident = Incident {
+        project: 3,
+        number: 8,
+        revision: contract::Revision { value: 2 },
+        watch: 99,
+        raised: Wall::EPOCH,
+        service: Service { environment: Box::from(*b"prod"), name: Box::from(*b"api") },
+        severity: 1,
+        state: State::Alerting,
+        timeline: List::with_capacity(0),
+        cut: false,
+        health: None,
+        lead,
+        proposals: List::with_capacity(0),
+    };
+    let native = native::Document {
+        subject: Subject { scope: Scope::Project(3), kind: Kind::Incident(8) },
+        value: native::Value::Incident {
+            incident: native::Incident {
+                project: 3,
+                number: 8,
+                watch: 99,
+                lead,
+                alerts: Box::from([]),
+                raised: Wall::EPOCH,
+                service: incident.service.clone(),
+                severity: 1,
+                state: State::Alerting,
+                timeline: List::with_capacity(0),
+                cut: false,
+            },
+            fact: None,
+        },
+    };
+    [Document::Incident(incident), Document::Native(Box::new(native))]
+}
+
+#[test]
+fn an_incident_with_a_lead_names_its_plan_section() {
+    let expected =
+        [jig_domain_client::pages::Section::Task { task: 9, section: jig_domain_client::address::TaskSection::Plan }];
+    for (name, document) in ["incident", "native"].into_iter().zip(incidents_naming_sections(Some(9))) {
+        assert_eq!(document.sections().as_slice(), expected, "{name}");
+    }
+}
+
+#[test]
+fn an_incident_without_a_lead_names_no_sections() {
+    for (name, document) in ["incident", "native"].into_iter().zip(incidents_naming_sections(None)) {
+        assert_eq!(document.sections().as_slice(), [], "{name}");
+    }
+}
 #[test]
 fn application_navigation_is_forwarded_before_start_and_retains_order() {
     use jig_domain_client::pages::navigation::{Destination, Navigation};

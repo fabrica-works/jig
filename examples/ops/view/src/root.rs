@@ -128,7 +128,16 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
                             ),
                             None => false,
                         },
-                        None => false,
+                        None => match view.observability.section(slot.reference.token) {
+                            Some(section) => jig_view::sections::section(
+                                &mut fragment,
+                                root.jig(),
+                                &view.words,
+                                &mut view.jig,
+                                section,
+                            ),
+                            None => false,
+                        },
                     }
                 }
                 Owner::Application { number } => match jig_ops_domain_connectors::connector(number) {

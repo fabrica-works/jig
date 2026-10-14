@@ -286,6 +286,9 @@ pub(crate) fn route_observability(
                 jig(root, env, jig_domain_client::Event::ShowObjects { objects }, out);
             }
             observability::Request::ObjectsLeft => jig(root, env, jig_domain_client::Event::ObjectsLeft, out),
+            observability::Request::ShowSections { sections } => {
+                jig(root, env, jig_domain_client::Event::ShowSections { sections }, out);
+            }
         }
     }
 }

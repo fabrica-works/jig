@@ -5,7 +5,7 @@
 //! Entry points: step handles one event; fire retries dropped watches; reclaim frees terminals.
 //! | Event | State change | Requests |
 //! | Went/Show | acquire scoped demand | Read, Open |
-//! | Read/Delivered | validate whole document, retain newest revision | `ShowObjects` |
+//! | Read/Delivered | validate whole document, retain newest revision | `ShowObjects`, `ShowSections` |
 //! | Left/PartsLeft | release demand, retain close obligation | Close |
 //! | Dropped | schedule bounded retry | later Open |
 //! | Closed/Unknown | retire watch; unknown hides supplied facts | replacement Read/Open |
@@ -83,6 +83,7 @@ pub enum Request {
     Save { record: Record },
     Out(Out),
     ShowObjects { objects: List<jig_domain_client::contract::ObjectKey> },
+    ShowSections { sections: List<jig_domain_client::pages::Section> },
     ObjectsLeft,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -271,6 +272,7 @@ pub fn step(side: &mut Side, env: &Env<Limits>, event: Event, out: &mut Queue<Re
         Event::Left => {
             side.address = None;
             out.push(Request::ObjectsLeft);
+            out.push(Request::ShowSections { sections: List::with_capacity(0) });
             prune(side, out);
             side.changed();
         }
@@ -395,7 +397,10 @@ fn received(side: &mut Side, env: &Env<Limits>, subject: Subject, document: Docu
     if side.page() == Some(id) {
         let object = side.objects.get(id).expect("page object exists");
         match &object.value {
-            Value::Known(document) => out.push(Request::ShowObjects { objects: document.objects(env.limits.rows) }),
+            Value::Known(document) => {
+                out.push(Request::ShowObjects { objects: document.objects(env.limits.rows) });
+                out.push(Request::ShowSections { sections: document.sections() });
+            }
             Value::Loading | Value::Unknown => {}
         }
     }

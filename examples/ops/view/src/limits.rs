@@ -47,7 +47,9 @@ impl Limits {
             .checked_mul(domain.jig.objects.checked_add(1)?.checked_pow(2)?)?
             .checked_mul(8)?;
         let jig_nodes = jig_view::Limits::of_words(&domain.jig, jig)?.nodes;
-        let jig_cards = jig_view::card_nodes(&domain.jig)?.checked_mul(rows.checked_add(1)?)?;
+        let jig_cards = jig_view::card_nodes(&domain.jig)?.checked_mul(rows.checked_add(1)?)?.checked_add(
+            jig_view::task_section_nodes(&domain.jig, jig_domain_client::address::TaskSection::Plan)?.checked_add(4)?,
+        )?;
         let slot_nodes = documents
             .checked_mul(part)?
             .checked_add(jig_nodes.checked_mul(rows.checked_add(3)?)?)?

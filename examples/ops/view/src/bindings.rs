@@ -10,6 +10,7 @@ pub enum Meaning {
     Until { object: Token, revision: Revision },
     NativeUntil { object: Token, revision: Revision },
     Object(ObjectKey),
+    Section(jig_domain_client::pages::Section),
 }
 #[derive(Debug)]
 struct Entry {
@@ -44,7 +45,23 @@ impl Bindings {
             if e.token == token {
                 return match &e.meaning {
                     Meaning::Object(key) => Some(*key),
-                    Meaning::Action(_) | Meaning::Until { .. } | Meaning::NativeUntil { .. } => None,
+                    Meaning::Action(_) | Meaning::Until { .. } | Meaning::NativeUntil { .. } | Meaning::Section(_) => {
+                        None
+                    }
+                };
+            }
+        }
+        None
+    }
+    #[must_use]
+    pub fn section(&self, token: Token) -> Option<jig_domain_client::pages::Section> {
+        for entry in &self.entries {
+            if entry.token == token {
+                return match &entry.meaning {
+                    Meaning::Section(section) => Some(*section),
+                    Meaning::Action(_) | Meaning::Until { .. } | Meaning::NativeUntil { .. } | Meaning::Object(_) => {
+                        None
+                    }
                 };
             }
         }
@@ -86,7 +103,7 @@ pub fn decode(bindings: &Bindings, token: Token, act: Act) -> Option<Action> {
                     }
                     Act::Press | Act::Toggle | Act::Submit | Act::Drawing { .. } => None,
                 },
-                Meaning::Object(_) => None,
+                Meaning::Object(_) | Meaning::Section(_) => None,
             };
         }
     }

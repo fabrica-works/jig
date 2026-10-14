@@ -16,7 +16,7 @@ pub fn max_out(limits: &Limits) -> u32 {
 }
 fn checked_max_out(limits: &Limits) -> Option<u32> {
     jig_domain_client::max_out(&limits.jig)
-        .checked_mul(4)?
+        .checked_mul(5)?
         .checked_add(infrastructure::checked_max_out(&limits.infrastructure)?)?
         .checked_add(crate::observability::checked_max_out(&limits.observability)?)?
         .checked_add(limits.table.out)?
@@ -58,7 +58,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     )?;
     let observability_payload = skein_lib::List::<jig_domain_client::contract::ObjectKey>::worst_case(
         limits.observability.rows.checked_add(1)?,
-    )?;
+    )?
+    .max(skein_lib::List::<jig_domain_client::pages::Section>::worst_case(1)?);
     total = total.checked_add(
         u64::from(crate::observability::max_out(&limits.observability))
             .checked_mul(observability_payload)?

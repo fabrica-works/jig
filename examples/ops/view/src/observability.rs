@@ -58,6 +58,12 @@ pub fn page(builder: &mut Builder, side: &observability::Side, words: &Words, bi
     }
     builder.close();
 }
+fn plan_slot(builder: &mut Builder, task: u64, words: &Words, bindings: &mut Bindings) {
+    let section =
+        jig_domain_client::pages::Section::Task { task, section: jig_domain_client::address::TaskSection::Plan };
+    let binding = bindings.insert(Meaning::Section(section));
+    builder.slot(SlotRef { owner: Owner::Jig, token: binding.token }, &words.say(Word::Loading, &[]));
+}
 fn jig_slot(builder: &mut Builder, key: ObjectKey, words: &Words, bindings: &mut Bindings) {
     let binding = bindings.insert(Meaning::Object(key));
     builder.slot(SlotRef { owner: Owner::Jig, token: binding.token }, &words.say(Word::Loading, &[]));
@@ -85,6 +91,7 @@ pub fn show_incident(builder: &mut Builder, incident: &Incident, words: &Words, 
             words.text(builder, Word::Lead, &[Hole::Number(lead)]);
             if slots {
                 jig_slot(builder, ObjectKey::Task(lead), words, bindings);
+                plan_slot(builder, lead, words, bindings);
             }
         }
         None => words.status(builder, Word::NoLead, &[]),
@@ -428,6 +435,7 @@ fn native_incident(
             words.text(builder, Word::Lead, &[Hole::Number(lead)]);
             if slots {
                 jig_slot(builder, ObjectKey::Task(lead), words, bindings);
+                plan_slot(builder, lead, words, bindings);
             }
         }
         None => words.status(builder, Word::NoLead, &[]),
