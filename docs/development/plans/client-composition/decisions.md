@@ -223,6 +223,14 @@ your best judgement").
      own lines start with (its own, and at most the bytes the view's limits
      give a node's text: the terminal refuses a longer one)".
 
+107. **jig 10's Shapes against main** (ready check of jig-10.1).
+     jig/10-terminal.md amended against origin/main, for 10.1 and 10.2 (the ready check of jig-10.1):
+     - 10.1's tests drive a raw `skein_sim::Sim`, as skein-sim's own tests do (`processes.rs:1237-1262` at jig's skein pin): `skein_world::World` keeps its `sim` private (`world.rs:65-67`) and opens no inherited pipe; the dev-dependencies are `skein-sim` alone.
+     - 10.1's Files add `mod terminal;` in `crates/jig-shell-text/src/tests.rs`; `Settings` and `Terminal` derive `Debug`, and `Settings.interval` is a `skein_lib::Duration` (`clippy.toml:74` disallows `core::time::Duration`).
+     - 10.2's Files add `"jig-shell-text"` to the allowlist of `client_world_joins_only_the_client_and_test_roles` (`tests/boundary/src/tests/graph.rs:296-337`), and `fn view_limits(view: &Self::View) -> jig_view::Limits` in `App` (`tests/client/src/harness/mod.rs`, beside `patch_limit`), implemented at `tests/client/src/test.rs:138`, `tests/client/tests/referee.rs:34`, `tests/ops/src/client/app.rs:143` and `tests/ops/src/joint/fixture.rs:185`, so that the world can make a `Print`.
+     - 10.2's read-back check goes in `walk_people`, at `world.rs:692`, where the person's act is chosen and `person.at()` names the step, not in `act` (`:327`), which the faults at `:353-362` also call.
+     Checked: on origin/main, `world.rs:692` is `Next::Do(Doing::Act { node, act }) => self.act(id, node, act),` inside `fn walk_people` (`:648`); `:358` is `Fault::StalePress { client, node } => self.act(client, node, Act::Press)`; `harness/mod.rs:13` is `pub trait App: Sized {` and `:37` `fn patch_limit(view: &Self::View) -> u32;`; the four `impl … App for` lines are at the lines above; `graph.rs:296` is `fn client_world_joins_only_the_client_and_test_roles`; `crates/jig-shell-text/src/tests.rs` holds `mod command;` and `mod fixtures;` only; `clippy.toml:74` is `{ path = "core::time::Duration", reason = "skein_lib::Duration" }`. The ready check compiled 10.1's sketch with `skein-io` under clippy, and 10.2's `render` and `command` calls with `view_limits` in a stub.
+
 ## For the user
 
 Long-term choices the user may veto. Each was decided by the planner

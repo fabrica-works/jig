@@ -85,9 +85,9 @@ shell's first consumer.
 Scope: view.md, 15.1 (the terminal, its settings), 15.2, 15.5.
 Needs: jig 09.1 and 09.2.
 Files: `crates/jig-shell-text/src/terminal.rs`, `src/lib.rs`,
-  `crates/jig-shell-text/Cargo.toml` (`skein-io`; dev: `skein-sim`,
-  `skein-shell`, `skein-world`, as `crates/jig-shell-native/Cargo.toml`);
-  `crates/jig-shell-text/src/tests/terminal.rs`;
+  `crates/jig-shell-text/Cargo.toml` (`skein-io`; dev: `skein-sim`);
+  `crates/jig-shell-text/src/tests/terminal.rs`, with `mod terminal;`
+  beside `mod command; mod fixtures;` in `crates/jig-shell-text/src/tests.rs`;
   `tests/boundary/src/tests.rs` (the dependency list of 09.1's test
   gains `skein-io`).
 Shape: as the sketch. `new` returns `None` when `settings.name` is
@@ -111,10 +111,15 @@ Shape: as the sketch. `new` returns `None` when `settings.name` is
   (the host heard a termination signal), `q` and the input's end close
   it: it starts no new print, writes what it began, and writes
   `NAME: closed`.
-Test shape: `crates/jig-shell-text/src/tests/terminal.rs`, a simulated
-  machine as `crates/jig-shell-native/src/tests.rs` builds one, its
-  pipes from skein-sim's `Sim::open_inherited_read` and
-  `open_inherited_write` (skein `crates/skein-sim/src/sim/processes.rs:268,273`):
+Test shape: `crates/jig-shell-text/src/tests/terminal.rs`, on a raw
+  `skein_sim::Sim`, as skein-sim's own tests drive one
+  (`crates/skein-sim/src/sim/processes.rs:1237-1262` at jig's skein
+  pin): `spawn_process`, its pipes from `Sim::open_inherited_read` and
+  `open_inherited_write` (`processes.rs:268,273`), `submit` and `reap`,
+  `peer_feed`, `peer_drain` and `peer_close`, and `advance_to` for the
+  pacing tests. Not `skein_world::World`, as `crates/jig-shell-native/src/tests.rs`
+  uses: its `sim` is private (`testing/skein-world/src/world.rs:65-67`)
+  and no `spawn_*` of it opens inherited pipes:
   `a_line_split_across_reads_is_one_command`,
   `two_lines_in_one_read_are_two_commands`,
   `a_line_past_the_longest_is_refused_through_its_newline`,
@@ -135,10 +140,21 @@ Removes: nothing.
 ### 10.2 The client's world at the text shell
 Scope: testing.md, 4 ("At the text shell"), 9.
 Needs: 10.1 is not needed; jig 09.2.
-Files: `tests/client/src/harness/world.rs:327-338` (`act`, where a
-  person's act reaches the view) and a setting that marks a client as
+Files: `tests/client/src/harness/world.rs:692` (in `walk_people`, where the
+  person's act is chosen and `person.at()` names the step: the check
+  goes there, not in `act`, `:327`, which the faults at `:353-362` also
+  call) and a setting that marks a client as
   played at the text shell (`Settings`, `:21-40`, or a `World` method
-  beside `client_with`); `tests/client/Cargo.toml` (`jig-shell-text`);
+  beside `client_with`); `tests/client/Cargo.toml` (`jig-shell-text`),
+  with `"jig-shell-text"` added to the allowlist of
+  `client_world_joins_only_the_client_and_test_roles`
+  (`tests/boundary/src/tests/graph.rs:296-337`); the view's limits for
+  `Print::new`: `fn view_limits(view: &Self::View) -> jig_view::Limits`
+  in `App` (`tests/client/src/harness/mod.rs:13-45`, beside
+  `patch_limit`, `:37`), implemented by each `App`:
+  `tests/client/src/test.rs:138` (`view.limits().tree`),
+  `tests/client/tests/referee.rs:34` (its `LIMITS`),
+  `tests/ops/src/client/app.rs:143` and `tests/ops/src/joint/fixture.rs:185`;
   `tests/client/tests/stories.rs` (the two stories at the text shell).
 Shape: `pub fn at_text_shell(&mut self, client: ClientId)`: from then on,
   each act the person makes on that client is checked as Choices says,
@@ -218,15 +234,17 @@ Removes: nothing.
 ```rust
 // crates/jig-shell-text/src/terminal.rs
 /// What the application gives the terminal, whole, with no defaults.
+#[derive(Debug)]
 pub struct Settings {
     /// The name its own lines start with: at most the view's `text_per_node` bytes.
     pub name: Box<[u8]>,
     /// The longest line it reads, in bytes.
     pub longest: u32,
     /// How often a changed tree is printed, at most (a guide).
-    pub interval: Duration,
+    pub interval: skein_lib::Duration,
 }
 /// jig's terminal: lines in, pages out, on its own io, tagged.
+#[derive(Debug)]
 pub struct Terminal { /* io, line buffer, last print, pacing, queues */ }
 impl Terminal {
     /// None, among its other refusals, for a name longer than `view.text_per_node` bytes.
