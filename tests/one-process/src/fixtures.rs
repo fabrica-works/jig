@@ -57,6 +57,8 @@ pub(crate) fn files() -> jig_test_service::Files {
 }
 pub(crate) fn provider() -> skein_fake_peers::llm::Peer {
     let mut script = channel::one_chat(b"Hello");
+    // Keep the worker alive beyond its first committed turn for the mid-run cuts.
+    script.leading_turns = 1;
     script.result = br#"{"form":"report","text":"World answer","fields":{}}"#.as_slice().into();
     smith_agent_process_world::fake::configured(
         Box::new([skein_fake_llm_domain::api::Script { cue: Box::default(), turns: channel::provider_turns(&script) }]),
