@@ -343,6 +343,7 @@ fn a_sweep_presses_every_bound_node_and_reaches_fields_composers_and_history() {
                             submitted.insert(node);
                             assert!(control.states.as_slice().contains(&State::SubmitsOnEnter));
                         }
+                        Act::Drawing { .. } => panic!("the random person never makes drawing acts"),
                         Act::Toggle => {
                             toggled.insert(node);
                             assert_eq!(control.role, Role::Check);

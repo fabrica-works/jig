@@ -22,6 +22,8 @@ pub enum Act {
     Submit,
     /// Toggle a choice or check.
     Toggle,
+    /// Bytes of the drawing's owner, reported by its drawing code in a shell.
+    Drawing { data: Box<[u8]> },
 }
 
 /// An act resolved to the owner that decodes it into a typed domain action.
@@ -238,7 +240,7 @@ pub fn decode(view: &mut JigBindings, token: Token, act: Act) -> Option<jig_doma
                             budget: number(&value)?,
                         },
                     )),
-                    Act::Press | Act::Submit | Act::Toggle => None,
+                    Act::Press | Act::Submit | Act::Toggle | Act::Drawing { .. } => None,
                 },
                 JigMeaning::ProjectServiceName { project, role } => match act {
                     Act::Input { value } => Some(jig_domain_client::pages::project::owner_form::action(
@@ -248,15 +250,15 @@ pub fn decode(view: &mut JigBindings, token: Token, act: Act) -> Option<jig_doma
                             name: jig_domain_client::contract::Text::new(value, view.text_limit).ok()?,
                         },
                     )),
-                    Act::Press | Act::Submit | Act::Toggle => None,
+                    Act::Press | Act::Submit | Act::Toggle | Act::Drawing { .. } => None,
                 },
                 JigMeaning::ProjectSetting { ask, field } => match act {
                     Act::Input { value } => crate::owner_project::edit(ask, *field, value, view.text_limit),
-                    Act::Press | Act::Submit | Act::Toggle => None,
+                    Act::Press | Act::Submit | Act::Toggle | Act::Drawing { .. } => None,
                 },
                 JigMeaning::GoalField { form, field } => match act {
                     Act::Input { value } => crate::pages::project::goals::edit(*form, *field, &value),
-                    Act::Press | Act::Submit | Act::Toggle => None,
+                    Act::Press | Act::Submit | Act::Toggle | Act::Drawing { .. } => None,
                 },
                 JigMeaning::NoteSearch { filter } => match act {
                     Act::Input { value } => Some(jig_domain_client::action::Act::FilterNotes {
@@ -269,23 +271,23 @@ pub fn decode(view: &mut JigBindings, token: Token, act: Act) -> Option<jig_doma
                             },
                         },
                     }),
-                    Act::Press | Act::Submit | Act::Toggle => None,
+                    Act::Press | Act::Submit | Act::Toggle | Act::Drawing { .. } => None,
                 },
                 JigMeaning::Priority => match act {
                     Act::Input { value } => Some(jig_domain_client::action::Act::Priority {
                         priority: u32::try_from(number(&value)?).ok()?,
                     }),
-                    Act::Press | Act::Submit | Act::Toggle => None,
+                    Act::Press | Act::Submit | Act::Toggle | Act::Drawing { .. } => None,
                 },
                 JigMeaning::Amendment { before, change, field } => match act {
                     Act::Input { value } => {
                         crate::confirmation::amendment::edit(before, change, *field, value, view.text_limit)
                     }
-                    Act::Press | Act::Submit | Act::Toggle => None,
+                    Act::Press | Act::Submit | Act::Toggle | Act::Drawing { .. } => None,
                 },
                 JigMeaning::Action(action) => match act {
                     Act::Press | Act::Submit | Act::Toggle => Some(action.clone()),
-                    Act::Input { .. } => None,
+                    Act::Input { .. } | Act::Drawing { .. } => None,
                 },
                 JigMeaning::Field(field) => match act {
                     Act::Input { value } => {
@@ -293,7 +295,7 @@ pub fn decode(view: &mut JigBindings, token: Token, act: Act) -> Option<jig_doma
                         Some(jig_domain_client::action::Act::Edit { field: *field, text })
                     }
                     Act::Submit => Some(jig_domain_client::action::Act::Submit { field: *field }),
-                    Act::Press | Act::Toggle => None,
+                    Act::Press | Act::Toggle | Act::Drawing { .. } => None,
                 },
                 JigMeaning::TaskNumber => match act {
                     Act::Input { value } => {
@@ -303,7 +305,7 @@ pub fn decode(view: &mut JigBindings, token: Token, act: Act) -> Option<jig_doma
                     Act::Submit => Some(jig_domain_client::action::Act::Go {
                         address: jig_domain_client::address::Address::task(view.task?),
                     }),
-                    Act::Press | Act::Toggle => None,
+                    Act::Press | Act::Toggle | Act::Drawing { .. } => None,
                 },
             };
         }

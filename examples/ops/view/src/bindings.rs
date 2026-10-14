@@ -58,7 +58,7 @@ pub fn decode(bindings: &Bindings, token: Token, act: Act) -> Option<Action> {
             return match &e.meaning {
                 Meaning::Action(action) => match act {
                     Act::Press | Act::Toggle | Act::Submit => Some(action.clone()),
-                    Act::Input { .. } => None,
+                    Act::Input { .. } | Act::Drawing { .. } => None,
                 },
                 Meaning::Until { object, revision } => match act {
                     Act::Input { value } => {
@@ -71,7 +71,7 @@ pub fn decode(bindings: &Bindings, token: Token, act: Act) -> Option<Action> {
                             value: crate::time::wall(jig_view::number(&value)?)?,
                         }))
                     }
-                    Act::Press | Act::Toggle | Act::Submit => None,
+                    Act::Press | Act::Toggle | Act::Submit | Act::Drawing { .. } => None,
                 },
                 Meaning::NativeUntil { object, revision } => match act {
                     Act::Input { value } => {
@@ -84,7 +84,7 @@ pub fn decode(bindings: &Bindings, token: Token, act: Act) -> Option<Action> {
                             value: jig_view::number(&value)?,
                         }))
                     }
-                    Act::Press | Act::Toggle | Act::Submit => None,
+                    Act::Press | Act::Toggle | Act::Submit | Act::Drawing { .. } => None,
                 },
                 Meaning::Object(_) => None,
             };

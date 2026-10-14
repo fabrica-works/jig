@@ -51,3 +51,39 @@ fn numeric_input_is_checked_digits_only() {
         assert!(number(bytes).is_none(), "non-digits or overflow are refused");
     }
 }
+
+#[test]
+fn an_act_on_a_drawing_past_its_bytes_is_dropped() {
+    let mut view = crate::View::new(&LIMITS);
+    let mut builder = view.builder();
+    // Exercise admission through an ordinary binding: drawings remain unbound.
+    builder.open(Role::Button);
+    let binding = Binding { owner: Owner::Application { number: 2 }, token: Token::new(1) };
+    builder.bind(binding);
+    builder.close();
+    let mut out = skein_lib::Queue::with_capacity(LIMITS.patches);
+    view.finish(builder, 1, &mut out);
+    let id = view.tree().get(0).unwrap().id;
+    let data = Box::from(*b"12345678");
+    assert_eq!(
+        view.act(id, Act::Drawing { data }),
+        Some(BoundAct { binding, act: Act::Drawing { data: Box::from(*b"12345678") } })
+    );
+    assert_eq!(view.act(id, Act::Drawing { data: Box::from(*b"123456789") }), None);
+}
+
+#[test]
+fn jigs_view_decodes_an_act_on_a_drawing_into_nothing() {
+    let mut bindings = crate::JigBindings::new(4, 16);
+    for meaning in [
+        crate::JigMeaning::TaskNumber,
+        crate::JigMeaning::Priority,
+        crate::JigMeaning::Action(jig_domain_client::action::Act::Go {
+            address: jig_domain_client::address::Address::Inbox { project: None },
+        }),
+        crate::JigMeaning::ProjectPoolBudget { project: 1, party: 2 },
+    ] {
+        let binding = bindings.insert(meaning);
+        assert_eq!(crate::decode(&mut bindings, binding.token, Act::Drawing { data: Box::from(*b"a") }), None);
+    }
+}

@@ -54,7 +54,7 @@ pub fn decode(bindings: &Bindings, token: Token, act: Act) -> Option<first::Act>
             return match &entry.meaning {
                 Meaning::Action(action) => match act {
                     Act::Press | Act::Submit | Act::Toggle => Some(action.clone()),
-                    Act::Input { .. } => None,
+                    Act::Input { .. } | Act::Drawing { .. } => None,
                 },
                 Meaning::Parameters { object, revision } => match act {
                     Act::Input { value } => {
@@ -67,7 +67,7 @@ pub fn decode(bindings: &Bindings, token: Token, act: Act) -> Option<first::Act>
                             value: jig_view::number(&value)?,
                         })
                     }
-                    Act::Press | Act::Submit | Act::Toggle => None,
+                    Act::Press | Act::Submit | Act::Toggle | Act::Drawing { .. } => None,
                 },
                 Meaning::Object(_) => None,
             };

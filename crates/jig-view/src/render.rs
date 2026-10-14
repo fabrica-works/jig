@@ -73,6 +73,14 @@ impl View {
     /// Resolve a shell act in the last displayed tree.
     #[must_use]
     pub fn act(&self, node: NodeId, act: Act) -> Option<BoundAct> {
+        match &act {
+            Act::Drawing { data } => {
+                if data.len() > usize::try_from(self.limits.drawing_bytes).expect("drawing limit fits usize") {
+                    return None;
+                }
+            }
+            Act::Press | Act::Input { .. } | Act::Submit | Act::Toggle => {}
+        }
         self.tree().act(node, act)
     }
     /// A checked external target the shell may show without an owner translation.

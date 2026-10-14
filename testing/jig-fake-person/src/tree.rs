@@ -107,6 +107,7 @@ impl Face for TreeFace<'_> {
         }
         match act {
             Act::Press | Act::Toggle => true,
+            Act::Drawing { .. } => node.role == Role::Drawing,
             Act::Input { .. } => node.role == Role::TextField || node.role == Role::TextArea,
             Act::Submit => node.states.as_slice().contains(&State::SubmitsOnEnter),
         }
