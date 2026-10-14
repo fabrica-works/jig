@@ -214,6 +214,7 @@ dependencies = [
  "jig-protocol-client-wire",
  "jig-protocol-engine-clients",
  "jig-shell-native",
+ "jig-shell-text",
  "jig-test-connector",
  "jig-test-domain",
  "jig-test-domain-client",

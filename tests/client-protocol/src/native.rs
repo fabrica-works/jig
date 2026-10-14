@@ -77,6 +77,10 @@ pub enum Received {
 /// A native client as a process of a skein world.
 pub struct NativeClient {
     shell: Shell,
+    terminal: Option<jig_shell_text::Terminal>,
+    #[expect(clippy::disallowed_types, reason = "scenario input hands inherited pipes to the host between iterations")]
+    pipes: core::cell::Cell<Option<(Fd, Fd)>>,
+    complete: Queue<Complete>,
     side: Side,
     root: client::Domain,
     view: jig_test_view::View<'static>,
@@ -102,7 +106,11 @@ impl NativeClient {
         let limits = jig_client_world::test::limits();
         let (root, view) = Test::new(seed);
         let patches = Queue::with_capacity(Test::patch_limit(&view));
+        let complete = Queue::with_capacity(shell.operations() + 10);
         Self {
+            terminal: None,
+            pipes: None.into(),
+            complete,
             shell,
             side: Side::new(),
             root,
@@ -246,11 +254,49 @@ impl NativeClient {
             }
         }
     }
+    fn text_step(&mut self, now: Time, changed: bool) {
+        if let Some(mut terminal) = self.terminal.take() {
+            terminal.iterate(now, Test::tree(&self.view), changed);
+            while let Some(command) = terminal.commands().pop() {
+                match command {
+                    jig_shell_text::Command::Act { node, first, submit } => {
+                        let event = Test::act(&mut self.view, node, first).expect("terminal act");
+                        self.callback(event);
+                        if submit {
+                            let event =
+                                Test::act(&mut self.view, node, jig_view::Act::Submit).expect("terminal submit");
+                            self.callback(event);
+                        }
+                    }
+                    jig_shell_text::Command::Print
+                    | jig_shell_text::Command::Close
+                    | jig_shell_text::Command::Nothing
+                    | jig_shell_text::Command::Refused { .. } => unreachable!("terminal queues acts only"),
+                }
+            }
+            while let Some(submit) = terminal.submissions().pop() {
+                self.shell.submissions().push(submit);
+            }
+            self.person_done = terminal.closed();
+            self.terminal = Some(terminal);
+        }
+    }
 }
 impl Host for NativeClient {
     fn iterate(&mut self, now: Time, wall: Wall) {
         self.env.now = now;
         self.env.wall = wall;
+        let mut changed = false;
+        if let Some((input, output)) = self.pipes.take() {
+            self.terminal.as_mut().expect("terminal supplied").adopt(input, output).expect("pipe room");
+        }
+        while let Some(complete) = self.complete.pop() {
+            if jig_shell_text::Terminal::owns(complete.op) {
+                self.terminal.as_mut().expect("terminal operation").completions().push(complete);
+            } else {
+                self.shell.completions().push(complete);
+            }
+        }
         self.shell.iterate(now, wall);
         if let Some(kept) = self.shell.loaded() {
             self.side.event(
@@ -296,47 +342,61 @@ impl Host for NativeClient {
             self.side.link.fire(now, &mut self.side.out);
             self.outputs();
             Test::build(&mut self.view, &self.root, &mut self.patches);
+            changed = !self.patches.is_empty();
             while self.patches.pop().is_some() {}
-            self.wake = None;
-            let before = self.person.at();
-            match self.person.next(&mut TreeFace::new(Test::tree(&self.view)), now) {
-                Next::Do(Doing::Act { node, act }) => {
-                    let event = Test::act(&mut self.view, node, act).expect("offered person action");
-                    self.callback(event);
+            if self.terminal.is_none() {
+                self.wake = None;
+                let before = self.person.at();
+                match self.person.next(&mut TreeFace::new(Test::tree(&self.view)), now) {
+                    Next::Do(Doing::Act { node, act }) => {
+                        let event = Test::act(&mut self.view, node, act).expect("offered person action");
+                        self.callback(event);
+                    }
+                    Next::Do(Doing::Go { address }) => {
+                        self.address = address;
+                        self.callback(Test::went(address));
+                    }
+                    Next::Do(Doing::Reload) => panic!("this native script has no reload"),
+                    Next::Wait { until } => self.wake = until,
+                    Next::Done => self.person_done = true,
+                    Next::Failed { step, why } => panic!("native person step {step}: {why:?}"),
                 }
-                Next::Do(Doing::Go { address }) => {
-                    self.address = address;
-                    self.callback(Test::went(address));
+                if self.person.at() != before {
+                    self.wake = Some(now);
                 }
-                Next::Do(Doing::Reload) => panic!("this native script has no reload"),
-                Next::Wait { until } => self.wake = until,
-                Next::Done => self.person_done = true,
-                Next::Failed { step, why } => panic!("native person step {step}: {why:?}"),
-            }
-            if self.person.at() != before {
-                self.wake = Some(now);
             }
             self.outputs();
-            if self.person_done && self.root.jig().chats().starting.is_none() {
-                self.closing = true;
-                self.shell.close();
-            }
+        }
+        self.text_step(now, changed);
+        if !self.closing && self.person_done && self.root.jig().chats().starting.is_none() {
+            self.closing = true;
+            self.shell.close();
         }
     }
     fn completions(&mut self) -> &mut Queue<Complete> {
-        self.shell.completions()
+        &mut self.complete
     }
     fn submissions(&mut self) -> &mut Queue<Submit> {
         self.shell.submissions()
     }
     fn work_pending(&self, now: Time) -> bool {
         self.shell.work_pending(now)
+            || !self.complete.is_empty()
+            || self.pipes.get().is_some()
+            || self.terminal.as_ref().is_some_and(|terminal| terminal.work_pending(now))
             || !self.out.is_empty()
             || !self.side.out.is_empty()
             || (!self.closing && self.started && self.wake.is_some_and(|at| at <= now))
     }
     fn next_deadline(&self) -> Option<Time> {
-        [self.shell.next_deadline(), self.next_policy_deadline()].into_iter().flatten().min()
+        [
+            self.shell.next_deadline(),
+            self.next_policy_deadline(),
+            self.terminal.as_ref().and_then(jig_shell_text::Terminal::next_deadline),
+        ]
+        .into_iter()
+        .flatten()
+        .min()
     }
     fn next_policy_deadline(&self) -> Option<Time> {
         if self.closing {
@@ -346,15 +406,15 @@ impl Host for NativeClient {
         }
     }
     fn is_empty(&self) -> bool {
-        self.closing && self.shell.is_empty()
+        self.closing && self.shell.is_empty() && self.terminal.as_ref().is_none_or(jig_shell_text::Terminal::closed)
     }
     fn worst_case(&self) -> u64 {
         self.shell.worst_case() + Test::worst_case(&self.env.limits) + 8 * 1024 * 1024
     }
     fn operations(&self) -> u32 {
-        self.shell.operations()
+        self.shell.operations() + if self.terminal.is_some() { 10 } else { 0 }
     }
 }
 
 mod world;
-pub use world::{Outcome, run};
+pub use world::{Outcome, run, run_terminal};

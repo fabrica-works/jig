@@ -1,6 +1,7 @@
 //! One actual reference service and native client, joined by simulated sockets.
 use super::{NativeClient, Script};
 use crate::fixtures;
+use jig_client_world::App;
 use skein_io::kernel::{Complete, Submit};
 use skein_lib::{Duration, Queue, Secret, Time, Wall};
 use skein_shell::Host;
@@ -197,6 +198,14 @@ pub fn settings() -> jig_shell_native::Settings {
 }
 #[must_use]
 pub fn run(seed: u64, script: Script) -> Outcome {
+    run_mode(seed, script, false).0
+}
+/// Start the chat by the terminal's printed numbers, then close its input.
+#[must_use]
+pub fn run_terminal(seed: u64) -> (Outcome, Box<[u8]>) {
+    run_mode(seed, Script::start_chat(b"Hello"), true)
+}
+fn run_mode(seed: u64, script: Script, terminal: bool) -> (Outcome, Box<[u8]>) {
     let mut machine = skein_fake_machine::Machine::for_user(1000);
     let engine_root = machine.lay(&[]);
     let client_root = machine.lay(&[]);
@@ -216,13 +225,71 @@ pub fn run(seed: u64, script: Script) -> Outcome {
         Process::Service(Box::new(Service(service)))
     });
     world.spawn_root(skein_sim::Handle::new(client_root.raw()), |root| {
-        Process::Client(Box::new(NativeClient::new(settings(), root, 1000, seed, script)))
+        let mut client = NativeClient::new(settings(), root, 1000, seed, script);
+        if terminal {
+            client.terminal = Some(
+                jig_shell_text::Terminal::new(
+                    jig_shell_text::Settings {
+                        name: b"jig".as_slice().into(),
+                        longest: 1024,
+                        interval: Duration::from_millis(1),
+                    },
+                    &super::Test::view_limits(&client.view),
+                )
+                .expect("terminal bounds"),
+            );
+        }
+        Process::Client(Box::new(client))
     });
-    let outcome = world.run();
+    let mut pipes = None;
+    let mut pages = Vec::new();
+    let mut sent = false;
+    let mut ended = false;
+    let outcome = world.run_with_inputs(|sim, pids, processes| {
+        if !terminal {
+            return;
+        }
+        let Process::Client(client) = &processes[1] else { panic!("native client") };
+        let (input, output) = *pipes.get_or_insert_with(|| {
+            let pair = (sim.open_inherited_read(pids[1]), sim.open_inherited_write(pids[1]));
+            client.pipes.set(Some(pair));
+            pair
+        });
+        pages.extend(sim.peer_drain(pids[1], output, 65536));
+        if client.is_empty() {
+            sim.assert_no_open_fds(pids[1]);
+        }
+        if !sent
+            && let (Some(field), Some(button)) =
+                (number(&pages, "First words:"), number(&pages, "Start a conversation"))
+        {
+            let line = format!("{field} Hello\n{button}\n");
+            assert_eq!(sim.peer_feed(pids[1], input, line.as_bytes()), line.len());
+            sent = true;
+        }
+        if !ended && client.chats_made == 1 && String::from_utf8_lossy(&pages).contains("Task 1") {
+            sim.peer_close(pids[1], input);
+            ended = true;
+        }
+    });
     let Process::Client(client) = &outcome.procs[1] else { panic!("native client") };
-    Outcome {
-        signed_in: client.signed_in,
-        chats_made: client.chats_made,
-        drained: outcome.procs.iter().all(Host::is_empty),
+    (
+        Outcome {
+            signed_in: client.signed_in,
+            chats_made: client.chats_made,
+            drained: outcome.procs.iter().all(Host::is_empty),
+        },
+        pages.into_boxed_slice(),
+    )
+}
+fn number(page: &[u8], label: &str) -> Option<u32> {
+    for line in std::str::from_utf8(page).expect("terminal prints UTF-8").lines().rev() {
+        let line = line.trim_start();
+        if line.contains(label)
+            && let Some(end) = line.find(']')
+        {
+            return line.strip_prefix('[')?.get(..end - 1)?.parse().ok();
+        }
     }
+    None
 }
