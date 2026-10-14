@@ -241,6 +241,18 @@ the file.
      fails the same way. A conditional fallback in a step's Shape is
      written as the rule instead, when the step's own gate cannot reach
      the condition.
+112. **smith 01.3 changes one story's cue** (cross-session scope,
+     smith 01's block of 2026-10-14T01:16:31Z). With the person reading
+     what has arrived, `slash_new_starts_a_chat_and_slash_resume_reopens_it`
+     (seed 55) shows the new chat's `tool finish` before its "Waiting for
+     a message" notice, so its cue `First answerWaiting for a
+     message\n\ntool finish` (`tests/local-process/tests/simulation.rs:289`)
+     never appears and the story waits out its 60 s
+     (`logs/smith-01/01.3-proof-failed.log`). The cue tested the order of
+     two output pieces, which no assertion asks for. It becomes the
+     shortest text shown only once the new chat has answered, whatever
+     that order; the assertions stay. The person's scheduling is not bent
+     to keep the old order (smith/01-arrived.md, 01.3, jig `669f3ff80`).
 
 ## For the user
 
