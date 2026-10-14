@@ -1,6 +1,6 @@
 # The core
 
-Provisional, 2026-10-07, revised 2026-10-13. What jig's core is, as a
+Provisional, 2026-10-07, revised 2026-10-14. What jig's core is, as a
 domain layer inside an application's engine: its parts and how they fit,
 what crosses between it and the application's root, how a decision
 reaches the store before anything leaves the engine, how it restarts,
@@ -735,7 +735,12 @@ contract (`../client/domain/contract.md`, sections 5 to 7).
   connector through the root. A watch has one delivery in flight; a
   change meanwhile marks it, and the next delivery, once the watcher has
   taken the last, is made from the state as it is then. Changes in
-  between are coalesced, never queued.
+  between are coalesced, never queued. A watch ended with a delivery in
+  flight ends once that delivery is taken or dropped
+  (`../protocol/client.md`, section 7).
+- **Watches are never stored.** A restart (section 6) starts with none,
+  and is told nothing of the deliveries made before it; each client
+  opens its watches again (`../protocol/client.md`, section 4).
 - **A slow watcher never holds the engine up,** and is never told it
   missed anything: it sees fewer deliveries. What the views child keeps
   per watch is its subject, its window, and two marks: a delivery in

@@ -153,6 +153,11 @@ the engine's store), never a client's state. Its rules:
   view with no such act, and no such reason, is a fault.
 - **The link is told:** while the engine was unreachable past a
   heartbeat, the person was shown offline.
+- **A delivery taken is told:** whenever the engine has no input left
+  to take, each delivery a client took has reached the engine's core as
+  taken (`../../protocol/client.md`, section 7), whatever ended the
+  delivery's watch meanwhile. Only the engine's restart in between
+  excuses it: the restarted core holds no watch to tell.
 - **The page's outline:** every tree a person saw keeps view.md's
   outline (3.1): the banner first, with jig's link, what needs the
   party and who is signed in; one main; `after_page`'s parts last; no shortcut twice. The

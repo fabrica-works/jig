@@ -1,6 +1,6 @@
 # The client's protocol
 
-Provisional, 2026-10-10, revised 2026-10-13. What carries the contract
+Provisional, 2026-10-10, revised 2026-10-14. What carries the contract
 between a party's client and the engine (`../client/domain/contract.md`)
 as bytes: the wire's records and their versions, the one connection a
 client keeps, its exchanges and its stream, how a keyed request's answer
@@ -242,6 +242,16 @@ the platform's HTTP stack, TLS                  TLS server, or plaintext on loop
   (`../client/domain/contract.md`, 7.2); or closing it by an exchange,
   answered once the engine has ended it. A stream that ends ends its
   watches.
+- **Each delivery is settled once, while the engine runs.** The core
+  makes a watch's next delivery, or ends the watch, only once the
+  engine's side has told it of the last one: taken, once its event has
+  gone to the connection; or dropped, when its stream ended first. So a
+  watch's end, by the client, by the engine or with its stream, never
+  excuses telling the core of a delivery the client took. A restart
+  does: the core restarted cold holds no watch (`../domain/engine.md`,
+  section 11), and is told nothing of deliveries made before it; the
+  client watches again (section 4), and its first delivery is the
+  document whole.
 - **A run's text** is a watch of the run: its deliveries carry the turn's
   name, the text after the offset the client has, and the offset it ends
   at (`../client/domain/contract.md`, 7.3). A watch opened, or opened
