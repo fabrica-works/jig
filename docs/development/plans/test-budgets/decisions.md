@@ -323,6 +323,21 @@ the file.
      and of every `.bin` outside a `golden/` directory, finds four copies
      in all: the two transcript `.bin` files, `FULL_TURN` and `SMALLEST`.
      `jig-repin` refreshes those four as rulings 114 to 118 say.
+119. **jig-repin moves the one-process world's cuts back to mid-run**
+     (plan defect, jig-repin's block of 2026-10-14T02:20:27Z). Taking
+     smith `29fa97c9`, three one-process tests (`tests/one-process/tests/one_process.rs`)
+     see the run finish before their cut: the power loss is placed by a
+     count of effects (`crash(Cut::PowerLoss, 130)`, `world.cut(0, before,
+     cut)`, `tests/one-process/src/world.rs:282`), the signal once a `Turn`
+     row exists (`tests/one-process/src/referee.rs:272-281`). A run that
+     takes fewer deliveries, this plan's aim, moves where such cuts fall.
+     The repin moves each cut so that it lands mid-run again, by an event
+     where it can and by a recounted number where it must, as development.md,
+     5.7 allows ("the downstream tests that an upstream change of behaviour
+     breaks"); every assertion and expected outcome stays. If the cause is
+     a change of what smith does rather than of how many steps it takes,
+     or a cut cannot land mid-run without changing an assertion, the repin
+     stops and asks.
 
 ## For the user
 
