@@ -5,6 +5,7 @@ pub mod conversations;
 pub mod deployment;
 pub mod inbox;
 pub mod navigation;
+pub(crate) mod opening;
 pub mod project;
 pub(crate) mod replies;
 pub(crate) mod routing;

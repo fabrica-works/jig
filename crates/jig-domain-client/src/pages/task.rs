@@ -562,16 +562,7 @@ fn open_once(
     subject: contract::Subject,
     out: &mut Queue<Request>,
 ) -> bool {
-    for (id, ()) in &domain.watch_ids {
-        let watch = domain.watches.get(*id).expect("registered watch exists");
-        if watch.owner == (Owner::Page { generation: domain.generation }) && watch.subject == subject {
-            return false;
-        }
-    }
-    if domain.open(env, subject, Owner::Page { generation: domain.generation }, out).is_none() {
-        crate::pages::routing::refuse(domain, Limit::Watches);
-    }
-    true
+    super::routing::open_once(domain, env, subject, Owner::Page { generation: domain.generation }, out)
 }
 
 fn read(domain: &mut Domain, number: u16, what: Read, out: &mut Queue<Request>) {

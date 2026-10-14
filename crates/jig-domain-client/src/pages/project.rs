@@ -135,54 +135,8 @@ impl ProjectPage {
 pub(crate) fn number(domain: &Domain) -> Option<u32> {
     domain.shown_project()
 }
-/// Begins exactly the selected project's sources.
-pub(crate) fn enter(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Queue<Request>) {
-    let Some(project) = number(domain) else {
-        return;
-    };
-    for section in [
-        ProjectSection::Overview,
-        ProjectSection::Goals,
-        ProjectSection::Tasks,
-        ProjectSection::Notes,
-        ProjectSection::Settings,
-        ProjectSection::Resources,
-        ProjectSection::Policy,
-        ProjectSection::Roles,
-        ProjectSection::Spend,
-        ProjectSection::Recurring,
-    ] {
-        if !domain.shows(crate::pages::Section::Project { project, section }) {
-            continue;
-        }
-        match section {
-            ProjectSection::Overview => {
-                open(domain, env, contract::Subject::Goals { project }, out);
-                open(domain, env, contract::Subject::Inbox { window: env.limits.rows }, out);
-                domain.inbox.filter = crate::pages::inbox::Filter { project: Some(project), kind: None, goal: None };
-            }
-            ProjectSection::Goals => {
-                open(domain, env, contract::Subject::Goals { project }, out);
-                ask(domain, GOALS_READ, Read::Goals { project, after: None }, out);
-            }
-            ProjectSection::Tasks => tasks(domain, env, domain.project_page.task_filter, out),
-            ProjectSection::Notes => {
-                notes::filter(domain, NoteFilter { scope: NoteScope::Project(project), description: None }, out);
-            }
-            ProjectSection::Spend => ask(domain, SPEND_READ, Read::Spend { project, after: None }, out),
-            ProjectSection::Settings
-            | ProjectSection::Resources
-            | ProjectSection::Policy
-            | ProjectSection::Roles
-            | ProjectSection::Recurring => {}
-        }
-    }
-    ask(domain, PROJECT_READ, Read::Project { project }, out);
-}
 fn open(domain: &mut Domain, env: &Env<crate::Limits>, subject: contract::Subject, out: &mut Queue<Request>) {
-    if domain.open(env, subject, Owner::Page { generation: domain.generation }, out).is_none() {
-        crate::pages::routing::refuse(domain, contract::Limit::Watches);
-    }
+    super::routing::open_once(domain, env, subject, Owner::Page { generation: domain.generation }, out);
 }
 pub(crate) fn ask(domain: &mut Domain, number: u16, what: Read, out: &mut Queue<Request>) {
     if domain.reads.pending(&what) {

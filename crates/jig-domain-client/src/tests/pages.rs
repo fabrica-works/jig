@@ -2686,3 +2686,18 @@ fn no_two_reads_of_a_page_share_a_number() {
         assert_ne!(pair[0], pair[1], "{numbers:?}");
     }
 }
+
+#[test]
+fn the_inbox_opens_its_watch_once_for_both_groups() {
+    let mut domain = Domain::new(&LIMITS, 2);
+    let f = start(&mut domain, List::with_capacity(0));
+    delivered(&mut domain, Time::ZERO, f, frame(7));
+    let requests = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::Inbox { project: None }) });
+    let mut inbox_watches = 0_u32;
+    for request in &requests {
+        if let Request::Open { subject: Subject::Inbox { .. }, .. } = request {
+            inbox_watches += 1;
+        }
+    }
+    assert_eq!(inbox_watches, 1);
+}

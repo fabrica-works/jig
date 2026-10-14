@@ -3,7 +3,7 @@
 use crate::{
     Domain, Request,
     action::End,
-    address::{Address, Place, TaskSection},
+    address::{Address, Place},
     contract::{self, Delivery, Limit, ObjectKey, Part, PartyKind, Read, ReadResult, ReadValue, Subject},
     facts::Fact,
     objects::{Body, Source},
@@ -44,13 +44,35 @@ pub(crate) fn excess(domain: &mut Domain, count: u32) {
     }
     domain.changed();
 }
-fn open(domain: &mut Domain, env: &Env<crate::Limits>, subject: Subject, out: &mut Queue<Request>) {
-    match domain.open(env, subject, Owner::Page { generation: domain.generation }, out) {
-        Some(_) => {}
-        None => refuse(domain, Limit::Watches),
+pub(crate) fn open_once(
+    domain: &mut Domain,
+    env: &Env<crate::Limits>,
+    subject: Subject,
+    owner: Owner,
+    out: &mut Queue<Request>,
+) -> bool {
+    for (id, ()) in &domain.watch_ids {
+        let watch = domain.watches.get(*id).expect("registered watch exists");
+        match watch.state {
+            crate::watches::Following::Closing | crate::watches::Following::Closed => {}
+            crate::watches::Following::Opening { .. }
+            | crate::watches::Following::Live
+            | crate::watches::Following::Reopening { .. } => {
+                if watch.owner == owner && watch.subject == subject {
+                    return false;
+                }
+            }
+        }
     }
+    if domain.open(env, subject, owner, out).is_none() {
+        refuse(domain, Limit::Watches);
+    }
+    true
 }
-fn read(domain: &mut Domain, number: u16, what: Read, out: &mut Queue<Request>) {
+pub(crate) fn read(domain: &mut Domain, number: u16, what: Read, out: &mut Queue<Request>) {
+    if domain.reads.pending(&what) {
+        return;
+    }
     let source = Source::Window { generation: domain.generation, number };
     match domain.reads.ask(domain.generation, source, what, out) {
         Some(_) => {}
@@ -176,33 +198,21 @@ pub(crate) fn enter(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Que
     };
     domain.sections.push(section).expect("page sections fit their fixed bound");
     domain.changed();
-    match domain.address {
-        Address::Inbox { project } => {
-            domain.inbox.filter = crate::pages::inbox::Filter { project, kind: None, goal: None };
-            open(domain, env, Subject::Inbox { window: env.limits.rows }, out);
-            super::conversations::start_inbox(domain, out);
-        }
-        Address::Conversations { .. } => {
-            open(domain, env, Subject::Conversations, out);
-            read(domain, super::conversations::CONVERSATIONS_READ, Read::Conversations { after: None }, out);
-        }
-        Address::Task { task, section } => {
-            domain.conversation.task = task;
-            open(domain, env, Subject::Task { task }, out);
-            match section {
-                TaskSection::Overview
-                | TaskSection::Budget
-                | TaskSection::Panels
-                | TaskSection::Activity
-                | TaskSection::Plan => {}
-                TaskSection::History => {
-                    read(domain, super::task::HISTORY_READ, Read::History { task, subtree: false, after: None }, out);
-                }
-            }
-        }
-        Address::Project { .. } => crate::pages::project::enter(domain, env, out),
-        Address::Deployment => open(domain, env, Subject::Deployment, out),
+    let owner = Owner::Page { generation: domain.generation };
+    for index in 0..domain.sections().len() {
+        let section = *domain.sections().get(index).expect("section index is in the page");
+        open_section(domain, env, section, owner, out);
     }
+}
+/// Opens the sources one section needs (client/domain/client.md, 5.1).
+pub(crate) fn open_section(
+    domain: &mut Domain,
+    env: &Env<crate::Limits>,
+    section: Section,
+    owner: Owner,
+    out: &mut Queue<Request>,
+) {
+    super::opening::section(domain, env, section, owner, out);
 }
 pub(crate) fn document_read(key: ObjectKey) -> Read {
     match key {

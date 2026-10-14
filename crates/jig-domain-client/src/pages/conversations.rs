@@ -286,20 +286,23 @@ pub(crate) fn filter_inbox(domain: &mut Domain, filter: Filter, out: &mut Queue<
     domain.changed();
 }
 pub(crate) fn start_inbox(domain: &mut Domain, out: &mut Queue<Request>) {
-    let filter = domain.inbox.filter;
     for group in [InboxReadGroup::Needs, InboxReadGroup::Updates] {
-        if let Some(kind) = filter.kind
-            && InboxReadGroup::of(kind) != group
-        {
-            continue;
-        }
-        ask_read(
-            domain,
-            inbox_number(group),
-            Read::Inbox { group, project: filter.project, kind: filter.kind, goal: filter.goal, after: None },
-            out,
-        );
+        start_group(domain, group, out);
     }
+}
+pub(crate) fn start_group(domain: &mut Domain, group: InboxReadGroup, out: &mut Queue<Request>) {
+    let filter = domain.inbox.filter;
+    if let Some(kind) = filter.kind
+        && InboxReadGroup::of(kind) != group
+    {
+        return;
+    }
+    ask_read(
+        domain,
+        inbox_number(group),
+        Read::Inbox { group, project: filter.project, kind: filter.kind, goal: filter.goal, after: None },
+        out,
+    );
 }
 const fn inbox_number(group: InboxReadGroup) -> u16 {
     match group {
