@@ -568,6 +568,7 @@ fn open_once(
 }
 
 fn read(domain: &mut Domain, number: u16, what: Read, out: &mut Queue<Request>) {
+    crate::pages::shown::context_read(domain, &what);
     if domain.reads.pending(&what) {
         return;
     }

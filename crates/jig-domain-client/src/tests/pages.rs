@@ -3086,3 +3086,67 @@ fn leaving_an_application_page_closes_its_sections() {
         &[Request::Close { watch: open_token(&opened) }, Request::PartsLeft { generation: 1 }]
     );
 }
+
+#[test]
+fn a_section_whose_task_is_not_allowed_says_it_is_missing() {
+    let mut domain = application_page();
+    let section = Section::Task { task: 8, section: TaskSection::Plan };
+    let opened = show_sections(&mut domain, &[section]);
+    drive(&mut domain, Time::ZERO, Event::Ended { watch: open_token(&opened), end: WatchEnd::NotAllowed });
+    assert_eq!(
+        domain.section_status(section),
+        Some(crate::pages::SectionStatus { behind: false, excess: 0, refused: None, missing: true })
+    );
+    assert_eq!(domain.page(), &Page::Elsewhere);
+}
+#[test]
+fn a_sections_dropped_watch_shows_that_section_behind() {
+    let mut domain = application_page();
+    let section = Section::Task { task: 8, section: TaskSection::Plan };
+    let opened = show_sections(&mut domain, &[section, Section::Deployment]);
+    drive(&mut domain, Time::ZERO, Event::Ended { watch: open_token(&opened), end: WatchEnd::Dropped });
+    let clear = crate::pages::SectionStatus { behind: false, excess: 0, refused: None, missing: false };
+    assert_eq!(domain.section_status(section), Some(crate::pages::SectionStatus { behind: true, ..clear }));
+    assert_eq!(domain.section_status(Section::Deployment), Some(clear));
+}
+#[test]
+fn a_sections_missing_read_keeps_the_application_page() {
+    let mut domain = application_page();
+    let section = Section::Project { project: 1, section: ProjectSection::Goals };
+    let opened = show_sections(&mut domain, &[section]);
+    let mut project_read = None;
+    for request in &opened {
+        if let Request::Read { read, what: Read::Project { .. } } = request {
+            project_read = Some(*read);
+        }
+    }
+    let read = project_read.unwrap();
+    drive(&mut domain, Time::ZERO, Event::Read { read, result: ReadResult::None(ReadNone::Unknown) });
+    assert_eq!(
+        domain.section_status(section),
+        Some(crate::pages::SectionStatus { behind: false, excess: 0, refused: None, missing: true })
+    );
+    assert_eq!(domain.page(), &Page::Elsewhere);
+}
+
+fn section_with_an_unrelated_section() -> (Domain, Section) {
+    let mut domain = application_page();
+    let section = Section::Task { task: 8, section: TaskSection::Plan };
+    show_sections(&mut domain, &[section, Section::Deployment]);
+    crate::pages::shown::context_subject(&mut domain, &Subject::Tree { task: 8, window: LIMITS.rows });
+    (domain, section)
+}
+#[test]
+fn a_sections_limit_refusal_stays_with_that_section() {
+    let (mut domain, section) = section_with_an_unrelated_section();
+    crate::pages::routing::refuse(&mut domain, Limit::Reads);
+    assert_eq!(domain.section_status(section).unwrap().refused, Some(Limit::Reads));
+    assert_eq!(domain.section_status(Section::Deployment).unwrap().refused, None);
+}
+#[test]
+fn a_sections_excess_rows_stay_with_that_section() {
+    let (mut domain, section) = section_with_an_unrelated_section();
+    crate::pages::routing::excess(&mut domain, 3);
+    assert_eq!(domain.section_status(section).unwrap().excess, 3);
+    assert_eq!(domain.section_status(Section::Deployment).unwrap().excess, 0);
+}

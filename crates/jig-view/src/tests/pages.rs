@@ -637,3 +637,30 @@ fn the_deployment_section_holds_its_four_named_regions() {
         assert!(nodes[index].name.as_ref().is_some_and(|name| !name.is_empty()));
     }
 }
+
+#[test]
+fn a_missing_section_says_so_in_its_own_region() {
+    let (mut domain, frame) = start();
+    deliver(&mut domain, frame, Delivery::Frame(Box::new(document())));
+    drive(&mut domain, Event::Went { place: Place::Elsewhere });
+    let section =
+        jig_domain_client::pages::Section::Task { task: 8, section: jig_domain_client::address::TaskSection::Plan };
+    let mut sections = List::with_capacity(1);
+    sections.push(section).unwrap();
+    let opened = drive(&mut domain, Event::ShowSections { sections });
+    let watch = opened
+        .iter()
+        .find_map(|r| match r {
+            Request::Open { watch, .. } => Some(*watch),
+            _ => None,
+        })
+        .unwrap();
+    drive(&mut domain, Event::Ended { watch, end: WatchEnd::NotAllowed });
+    let mut builder = Builder::new(&super::cards::limits());
+    let mut bindings = JigBindings::new(256, CLIENT.text);
+    assert!(crate::sections::section(&mut builder, &domain, words(), &mut bindings, section));
+    let tree = builder.finish();
+    assert_eq!(tree.nodes()[0].region, Some(crate::regions::JigRegion::TaskPlan.region()));
+    assert_eq!(tree.nodes()[0].size, tree.len());
+    assert!(contains(&tree, b"Page missing"));
+}

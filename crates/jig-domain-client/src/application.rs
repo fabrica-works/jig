@@ -151,7 +151,10 @@ pub(crate) fn read_result(
             | contract::ReadNone::Gone
             | contract::ReadNone::Refused
             | contract::ReadNone::Busy
-            | contract::ReadNone::Unreachable => crate::pages::routing::refuse(domain, contract::Limit::Reads),
+            | contract::ReadNone::Unreachable => {
+                crate::pages::shown::status(domain, None, None, true);
+                crate::pages::routing::refuse(domain, contract::Limit::Reads);
+            }
         },
         ReadResult::Value(value) => {
             let stored = match value {

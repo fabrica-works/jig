@@ -17,6 +17,7 @@ pub(crate) fn section(
         return false;
     }
     crate::pages::work::section(b, words, JigPhrase::Conversations, crate::regions::JigRegion::Conversations);
+    super::status(b, client, words, jig_domain_client::pages::Section::Conversations { project });
     b.open(Role::List);
     for row in &client.conversation_rows().rows {
         b.open(Role::Item);

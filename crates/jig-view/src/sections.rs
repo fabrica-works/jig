@@ -19,3 +19,21 @@ pub fn section(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut J
         Section::Deployment => deployment::section(b, client, words, bindings),
     }
 }
+
+fn status(b: &mut Builder, client: &Domain, words: &Words, section: Section) {
+    use crate::phrases::jig::JigPhrase;
+    if let Some(status) = client.section_status(section) {
+        if status.behind {
+            words.status(b, JigPhrase::Behind, &[]);
+        }
+        if status.excess > 0 {
+            words.status(b, JigPhrase::MoreRows, &[]);
+        }
+        if let Some(which) = status.refused {
+            words.refusal(b, &jig_domain_client::contract::Refusal::Limit { which });
+        }
+        if status.missing {
+            words.status(b, JigPhrase::MissingPage, &[]);
+        }
+    }
+}

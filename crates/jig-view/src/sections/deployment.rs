@@ -11,6 +11,7 @@ pub(crate) fn section(b: &mut Builder, client: &Domain, words: &Words, bindings:
         return false;
     }
     crate::pages::work::section(b, words, JigPhrase::Deployment, crate::regions::JigRegion::Deployment);
+    super::status(b, client, words, jig_domain_client::pages::Section::Deployment);
     if let Some(doc) = &client.deployment_page().owner {
         crate::owner_deployment::render(b, client, doc, words, bindings);
         b.close();

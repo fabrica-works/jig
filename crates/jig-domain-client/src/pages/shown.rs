@@ -166,9 +166,7 @@ pub(crate) fn show(
     if domain.page != super::Page::Elsewhere || domain.confirmed.is_none() || domain.link != crate::link::Link::Live {
         return;
     }
-    if sections.len() > super::MOST_SECTIONS {
-        super::routing::refuse(domain, crate::contract::Limit::Objects);
-    }
+    let overlong = sections.len() > super::MOST_SECTIONS;
     let sections = sections
         .as_slice()
         .get(..usize::try_from(sections.len().min(super::MOST_SECTIONS)).expect("bounded section count"))
@@ -209,6 +207,21 @@ pub(crate) fn show(
         }
     }
 
+    let previous_statuses =
+        core::mem::replace(&mut domain.section_statuses, skein_lib::List::with_capacity(super::MOST_SECTIONS));
+    for section in &domain.sections {
+        let mut status = SectionStatus { behind: false, excess: 0, refused: None, missing: false };
+        for (index, old) in previous.as_slice().iter().enumerate() {
+            if old == section {
+                status = *previous_statuses.as_slice().get(index).expect("section status exists");
+            }
+        }
+        domain.section_statuses.push(status).expect("section statuses fit");
+    }
+    if overlong {
+        domain.section_context = u32::MAX;
+        super::routing::refuse(domain, crate::contract::Limit::Objects);
+    }
     let owner = owner(domain);
     for (id, ()) in &domain.watch_ids {
         let watch = domain.watches.get(*id).expect("registered watch exists");
@@ -220,35 +233,185 @@ pub(crate) fn show(
     for index in 0..domain.sections.len() {
         let section = *domain.sections.get(index).expect("section index exists");
         if !previous.as_slice().contains(&section) {
+            context_section(domain, section);
             super::routing::open_section(domain, env, section, owner, out);
+            domain.section_context = u32::MAX;
         }
     }
     if previous != domain.sections {
+        if let Some(task) = domain.shown_task() {
+            context_subject(domain, &crate::contract::Subject::Task { task });
+        }
         super::task::document(domain, env, out);
+        domain.section_context = u32::MAX;
         domain.changed();
     }
 }
 
 pub(crate) fn needed(domain: &Domain, subject: &crate::contract::Subject) -> bool {
+    for section in domain.sections() {
+        if uses(*section, subject) {
+            return true;
+        }
+    }
+    false
+}
+fn uses(section: Section, subject: &crate::contract::Subject) -> bool {
     use crate::contract::Subject;
     match subject {
         Subject::Frame => false,
-        Subject::Task { task } => domain.shown_task() == Some(*task),
-        Subject::Tree { task, .. } => domain.shows(Section::Task { task: *task, section: TaskSection::Plan }),
-        Subject::Run { task, .. } => domain.shows(Section::Task { task: *task, section: TaskSection::Activity }),
-        Subject::Chips { .. } => {
-            domain.conversation.task != 0
-                && domain.shows(Section::Task { task: domain.conversation.task, section: TaskSection::Activity })
-        }
-        Subject::Inbox { .. } => domain.shown_inbox().is_some(),
-        Subject::Conversations => domain.shown_conversations().is_some(),
+        Subject::Task { task } => match section {
+            Section::Task { task: named, .. } => named == *task,
+            Section::Inbox { .. } | Section::Conversations { .. } | Section::Project { .. } | Section::Deployment => {
+                false
+            }
+        },
+        Subject::Tree { task, .. } => section == Section::Task { task: *task, section: TaskSection::Plan },
+        Subject::Run { task, .. } => section == Section::Task { task: *task, section: TaskSection::Activity },
+        Subject::Chips { .. } => match section {
+            Section::Task { section: TaskSection::Activity, .. } => true,
+            Section::Task { .. }
+            | Section::Inbox { .. }
+            | Section::Conversations { .. }
+            | Section::Project { .. }
+            | Section::Deployment => false,
+        },
+        Subject::Inbox { .. } => match section {
+            Section::Inbox { .. } | Section::Project { section: ProjectSection::Overview, .. } => true,
+            Section::Conversations { .. } | Section::Task { .. } | Section::Project { .. } | Section::Deployment => {
+                false
+            }
+        },
+        Subject::Conversations => match section {
+            Section::Conversations { .. } => true,
+            Section::Inbox { .. } | Section::Task { .. } | Section::Project { .. } | Section::Deployment => false,
+        },
         Subject::Goals { project } => {
-            domain.shows(Section::Project { project: *project, section: ProjectSection::Overview })
-                || domain.shows(Section::Project { project: *project, section: ProjectSection::Goals })
+            section == Section::Project { project: *project, section: ProjectSection::Overview }
+                || section == Section::Project { project: *project, section: ProjectSection::Goals }
         }
         Subject::Tasks { project, .. } => {
-            domain.shows(Section::Project { project: *project, section: ProjectSection::Tasks })
+            section == Section::Project { project: *project, section: ProjectSection::Tasks }
         }
-        Subject::Deployment => domain.shows(Section::Deployment),
+        Subject::Deployment => section == Section::Deployment,
+    }
+}
+
+/// What a section says about its sources on an application's page (client.md, 5.1).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SectionStatus {
+    pub behind: bool,
+    pub excess: u32,
+    pub refused: Option<crate::contract::Limit>,
+    pub missing: bool,
+}
+impl Domain {
+    #[must_use]
+    pub fn section_status(&self, section: Section) -> Option<SectionStatus> {
+        if self.page != super::Page::Elsewhere || !self.shows(section) {
+            return None;
+        }
+        let mut found = None;
+        for (index, value) in self.sections().iter().enumerate() {
+            if *value == section {
+                found = Some(index);
+            }
+        }
+        let index = found?;
+        let mut status = *self.section_statuses.as_slice().get(index)?;
+        for (id, ()) in &self.watch_ids {
+            let watch = self.watches.get(*id).expect("registered watch exists");
+            if watch.owner == owner(self) && uses(section, &watch.subject) && watch.behind {
+                status.behind = true;
+            }
+        }
+        Some(status)
+    }
+}
+pub(crate) fn context_subject(domain: &mut Domain, subject: &crate::contract::Subject) {
+    domain.section_context = 0;
+    for (index, section) in domain.sections.as_slice().iter().enumerate() {
+        if uses(*section, subject) {
+            domain.section_context |=
+                1_u32.checked_shl(u32::try_from(index).expect("bounded index")).expect("nineteen sections fit");
+        }
+    }
+}
+fn context_section(domain: &mut Domain, section: Section) {
+    domain.section_context = 0;
+    for (index, value) in domain.sections.as_slice().iter().enumerate() {
+        if *value == section {
+            domain.section_context |=
+                1_u32.checked_shl(u32::try_from(index).expect("bounded index")).expect("nineteen sections fit");
+        }
+    }
+}
+pub(crate) fn status(domain: &mut Domain, refused: Option<crate::contract::Limit>, excess: Option<u32>, missing: bool) {
+    for index in 0..domain.section_statuses.len() {
+        let value = domain.section_statuses.get_mut(index).expect("section status exists");
+        if domain.section_context & 1_u32.checked_shl(index).expect("nineteen sections fit") != 0 {
+            if let Some(which) = refused {
+                value.refused = Some(which);
+            }
+            if let Some(count) = excess {
+                value.excess = count;
+            }
+            value.missing |= missing;
+        }
+    }
+}
+
+pub(crate) fn context_read(domain: &mut Domain, what: &crate::contract::Read) {
+    use crate::contract::{Read, Subject};
+    let section = match what {
+        Read::Task { task } => {
+            context_subject(domain, &Subject::Task { task: *task });
+            return;
+        }
+        Read::History { task, .. } => Some(Section::Task { task: *task, section: TaskSection::History }),
+        Read::Activity { task, .. } | Read::PersonTask { task } => {
+            Some(Section::Task { task: *task, section: TaskSection::Activity })
+        }
+        Read::Ended { task, .. } => Some(Section::Task { task: *task, section: TaskSection::Plan }),
+        Read::Inbox { group, project, .. } => Some(Section::Inbox { group: *group, project: *project }),
+        Read::Conversations { .. } => {
+            let Some(project) = domain.shown_conversations() else {
+                domain.section_context = 0;
+                return;
+            };
+            Some(Section::Conversations { project })
+        }
+        Read::Goals { project, .. } => Some(Section::Project { project: *project, section: ProjectSection::Goals }),
+        Read::Spend { project, .. } => Some(Section::Project { project: *project, section: ProjectSection::Spend }),
+        Read::Notes { .. } => {
+            let Some(project) = domain.shown_project() else {
+                domain.section_context = 0;
+                return;
+            };
+            Some(Section::Project { project, section: ProjectSection::Notes })
+        }
+        Read::Project { .. } => {
+            domain.section_context = 0;
+            for index in 0..domain.sections.len() {
+                match *domain.sections.get(index).expect("section exists") {
+                    Section::Project { .. } => {
+                        domain.section_context |= 1_u32.checked_shl(index).expect("nineteen sections fit");
+                    }
+                    Section::Inbox { .. }
+                    | Section::Conversations { .. }
+                    | Section::Task { .. }
+                    | Section::Deployment => {}
+                }
+            }
+            return;
+        }
+        Read::Deployment => Some(Section::Deployment),
+        Read::Frame | Read::Proposal { .. } | Read::Escalation { .. } | Read::Question { .. } | Read::Result { .. } => {
+            None
+        }
+    };
+    domain.section_context = 0;
+    if let Some(section) = section {
+        context_section(domain, section);
     }
 }

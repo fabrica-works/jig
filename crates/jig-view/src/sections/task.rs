@@ -151,6 +151,7 @@ pub(crate) fn section(
     }
     crate::pages::work::section(b, words, section_phrase(section), region(section));
     crate::pages::mark_current(b, client, Address::Task { task, section });
+    super::status(b, client, words, jig_domain_client::pages::Section::Task { task, section });
     if let Some(doc) = document(client, task) {
         match section {
             TaskSection::Overview => overview(b, client, doc, words, bindings),

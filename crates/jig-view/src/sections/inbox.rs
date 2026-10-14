@@ -69,6 +69,7 @@ pub(crate) fn group(
         if group { crate::regions::JigRegion::InboxNeeds } else { crate::regions::JigRegion::InboxUpdates },
     );
     let page = client.inbox();
+    super::status(b, client, words, jig_domain_client::pages::Section::Inbox { group: parent, project });
     b.open(Role::List);
     for entry in &page.rows {
         if needs(entry.group()) == group {

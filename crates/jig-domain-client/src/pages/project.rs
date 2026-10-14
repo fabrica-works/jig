@@ -138,6 +138,7 @@ fn open(domain: &mut Domain, env: &Env<crate::Limits>, subject: contract::Subjec
     super::routing::open_once(domain, env, subject, crate::pages::shown::owner(domain), out);
 }
 pub(crate) fn ask(domain: &mut Domain, number: u16, what: Read, out: &mut Queue<Request>) {
+    crate::pages::shown::context_read(domain, &what);
     if domain.reads.pending(&what) {
         return;
     }

@@ -67,6 +67,8 @@ pub struct Domain {
     pub(crate) link: Link,
     pub(crate) page: Page,
     pub(crate) sections: List<Section>,
+    pub(crate) section_statuses: List<crate::pages::SectionStatus>,
+    pub(crate) section_context: u32,
     pub(crate) arrangement: Arrangement,
     pub(crate) inbox: crate::pages::inbox::Inbox,
     pub(crate) project_page: crate::pages::project::ProjectPage,
@@ -121,6 +123,8 @@ impl Domain {
             link: Link::Starting,
             page: Page::Starting,
             sections: List::with_capacity(crate::pages::MOST_SECTIONS),
+            section_statuses: List::with_capacity(crate::pages::MOST_SECTIONS),
+            section_context: u32::MAX,
             arrangement: Arrangement::none(),
             inbox: crate::pages::inbox::Inbox::new(limits.rows),
             project_page: crate::pages::project::ProjectPage::new(limits.rows),
@@ -666,6 +670,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             }
         }
     }
+    domain.section_context = u32::MAX;
     crate::drafts::sync(domain, out);
     crate::confirm::sync(domain);
     crate::signin::returned(domain, env, out);
@@ -830,6 +835,7 @@ fn watch_event(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, event: Wat
         return;
     }
     let owner = watch.owner;
+    let subject = watch.subject.clone();
     match event {
         WatchEvent::Opened | WatchEvent::Alive => {}
         WatchEvent::Delivered(delivery) => {
@@ -898,6 +904,7 @@ fn watch_event(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, event: Wat
                 },
                 Owner::Page { generation } | Owner::Sections { generation } => {
                     if generation == domain.generation {
+                        crate::pages::shown::context_subject(domain, &subject);
                         let contexts = crate::objects::contexts(
                             &delivery,
                             env.limits.rows.checked_mul(2).expect("two whole Inbox groups fit"),
@@ -1058,6 +1065,7 @@ fn terminal_watch(domain: &mut Domain, id: Id<Watch>, end: WatchEnd, out: &mut Q
         return;
     };
     let owner = watch.owner;
+    let subject = watch.subject.clone();
     let task_subject = match &watch.subject {
         Subject::Task { .. } => true,
         Subject::Frame
@@ -1104,6 +1112,10 @@ fn terminal_watch(domain: &mut Domain, id: Id<Watch>, end: WatchEnd, out: &mut Q
     };
     if preserve {
         crate::objects::ending_source(domain, id);
+    }
+    if end == WatchEnd::NotAllowed && owner == (Owner::Sections { generation: domain.generation }) {
+        crate::pages::shown::context_subject(domain, &subject);
+        crate::pages::shown::status(domain, None, None, true);
     }
     domain.retire(id);
     if preserve {

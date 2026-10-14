@@ -31,6 +31,9 @@ fn page_edges(before: Option<contract::Cursor>, after: Option<contract::Cursor>)
 pub(crate) fn refuse(domain: &mut Domain, which: Limit) {
     match &mut domain.page {
         Page::Work { refused, .. } => *refused = Some(which),
+        Page::Elsewhere if !domain.sections.is_empty() && domain.section_context != 0 => {
+            super::shown::status(domain, Some(which), None, false);
+        }
         Page::Starting | Page::Elsewhere | Page::SigningIn | Page::Missing | Page::OutOfDate | Page::SomeoneElse => {
             crate::notices::show(domain, crate::notices::Kind::Refused(which));
         }
@@ -40,7 +43,8 @@ pub(crate) fn refuse(domain: &mut Domain, which: Limit) {
 pub(crate) fn excess(domain: &mut Domain, count: u32) {
     match &mut domain.page {
         Page::Work { excess, .. } => *excess = count,
-        Page::Starting | Page::Elsewhere | Page::SigningIn | Page::Missing | Page::OutOfDate | Page::SomeoneElse => {}
+        Page::Elsewhere => super::shown::status(domain, None, Some(count), false),
+        Page::Starting | Page::SigningIn | Page::Missing | Page::OutOfDate | Page::SomeoneElse => {}
     }
     domain.changed();
 }
@@ -70,6 +74,7 @@ pub(crate) fn open_once(
     true
 }
 pub(crate) fn read(domain: &mut Domain, number: u16, what: Read, out: &mut Queue<Request>) {
+    crate::pages::shown::context_read(domain, &what);
     if domain.reads.pending(&what) {
         return;
     }
@@ -436,6 +441,7 @@ pub(crate) fn read_result(
     if receipt.abandoned || receipt.generation != domain.generation {
         return;
     }
+    super::shown::context_read(domain, &receipt.what);
     match receipt.source {
         Source::Window { number: crate::application::WINDOW, .. } => {
             crate::application::read_result(domain, env, receipt.what, result, out);
@@ -496,6 +502,9 @@ pub(crate) fn read_result(
     }
     match result {
         ReadResult::None(why) => {
+            if domain.page == Page::Elsewhere {
+                super::shown::status(domain, None, None, true);
+            }
             match receipt.source {
                 Source::Window { number: crate::conversation::routing::ACTIVITY_READ, .. } => {
                     domain.conversation.failed();
@@ -504,7 +513,9 @@ pub(crate) fn read_result(
             }
             match why {
                 contract::ReadNone::Unknown | contract::ReadNone::Gone | contract::ReadNone::Refused => {
-                    domain.page = Page::Missing;
+                    if domain.page != Page::Elsewhere {
+                        domain.page = Page::Missing;
+                    }
                     domain.changed();
                 }
                 contract::ReadNone::Busy | contract::ReadNone::Unreachable => {

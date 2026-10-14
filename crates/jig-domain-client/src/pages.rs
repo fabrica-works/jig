@@ -14,6 +14,7 @@ pub mod project;
 pub(crate) mod replies;
 pub(crate) mod routing;
 pub(crate) mod shown;
+pub use shown::SectionStatus;
 pub mod task;
 
 /// One section naming its subject (client/domain/client.md, 5.1; pages.md, 12.2).

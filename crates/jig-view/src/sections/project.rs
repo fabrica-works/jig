@@ -112,6 +112,7 @@ pub(crate) fn section(
     }
     crate::pages::work::section(b, words, phrase(selected), region(selected));
     crate::pages::mark_current(b, client, Address::Project { project, section: selected });
+    super::status(b, client, words, jig_domain_client::pages::Section::Project { project, section: selected });
     if let Some(doc) = &client.project_page().owner {
         owner::section(b, doc, selected, client, words, bindings);
         b.close();
