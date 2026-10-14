@@ -178,6 +178,9 @@ your best judgement").
      - 09.1's Files add `tests/boundary/src/tests/graph.rs:138-151` (`client_step` names `jig-shell-text`) and an `assert!(client_step("jig-shell-text"))` beside `:177`.
      Checked: `git show origin/main:clippy.toml | sed -n 93p` prints `{ path = "core::include_bytes", reason = "data comes in events and limits" },`; `tree.rs:362-368`'s `bound` returns `None` when `id == NodeId(0)`; `graph.rs:138-151`'s `client_step` lists ten crates, no `jig-shell-text`; `diff.rs:334` is `pub fn diff(old: &Tree, new: &mut Tree, limits: &Limits, next_id: &mut u32, out: &mut Queue<Patch>)`. The ready check built 09.1's skeleton, fixtures and reference test with the fn-pointer fixture, and `heavy cargo clippy -p jig-shell-text --all-targets` was clean.
 
+105. **jig 09.1: the shell's name in the renderer's bound, interim** (design gap, jig 09's block of 2026-10-14T13:55:46Z).
+     Interim, until the designer's answer (development.md, 10.4): what bounds the shell's name in the renderer's print is a design gap (view.md 15.1: "Its output is bounded: the most lines and bytes the view's largest tree prints, counted from the view's limits"; 15.3: TITLE is "the shell's name when there is none"), and it is the designer's. jig 09.1 goes on with the work that does not rest on the answer: the role renderer (`render`, the role table of view.md 15.3, the numbers of 15.4), `src/tests/fixtures.rs`, the two goldens and the four tests, the boundary test. `render` takes the name as `&[u8]`, as the plan's Shape gives it. What rests on the answer, and waits for it: how `worst_case` and `Print::new` count the name's bytes, and any check of the name in `Settings` or `Terminal::new` (jig 10). 09.1 does not land before the answer; with its other work done, it waits for the final unblock, which says how the name is counted.
+
 ## For the user
 
 Long-term choices the user may veto. Each was decided by the planner
