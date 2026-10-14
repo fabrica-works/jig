@@ -52,7 +52,7 @@ domain.
   `pages/work.rs` and `pages/not_the_work.rs` stay. `pages.rs` keeps
   `heading`, `main`, `not_the_work`, `after_page` and `jig`, public, and
   the four helpers the sections share, `cut`, `edges`, `excess` and
-  `object_key`, made `pub(crate)`. `lib.rs:104`'s alias
+  `object_key`, made `pub(crate)`. `lib.rs:107`'s alias
   `pub use pages::project::owner as owner_project` follows the move.
 - **A section's region is `work::section`'s** (`pages/work.rs:11-19`):
   it takes the region name as a parameter, and each of its callers
@@ -71,11 +71,22 @@ domain.
 ## Rules that bind it
 
 - **A story keeps its steps:** a step that presses a tab by
-  `Find::named(Role::Button, …)` becomes `Find::named(Role::Tab, …)`, and
-  nothing else in a story changes. The literal bounds of
-  `crates/jig-view/src/tests/page_capacity.rs:845-853` change only by
-  the nodes an increment adds (a header's region: 1 each), named in the
-  commit body.
+  `Find::named(Role::Button, …)` or `Find::exactly_named(Role::Button, …)`
+  becomes the same call with `Role::Tab`, and nothing else in a story
+  changes. The literal bounds of
+  `crates/jig-view/src/tests/page_capacity.rs:849-858` change only by
+  the nodes an increment adds (a header's region, the composer's region:
+  1 each), named in the commit body; so do the size companions' literals
+  and the depth bound (`limits.rs:120`, `rows + 32 + slot_depth`) when a
+  region nests a level deeper.
+- **Every `Role::Region` this session opens has a non-empty name:**
+  `crates/jig-view/src/tests/cards_access.rs:21-23` asserts it. A region
+  takes the phrase of the heading or the field it frames: a header's
+  region its page's level-1 heading's phrase and holes
+  (`JigPhrase::TaskPage` with the task's number for a task's), the
+  composer's region `JigPhrase::AnswerField`; `work::section`'s regions
+  keep their title. A region with neither names, in the commit body, the
+  existing phrase it takes.
 - No new phrase; no phrase removed.
 - `pages/project/owner.rs` (1,167 lines) moves whole and grows by at
   most 40 lines; it is not split by this plan (code-organization.md, 6).
@@ -98,22 +109,45 @@ Files: `git mv crates/jig-view/src/pages/task.rs crates/jig-view/src/sections/ta
   `pages/project.rs:75,96,299`, `pages/deployment.rs:65`) and a new
   `work::tab` beside `control` (`:20-37`, unchanged), called by the
   task's tabs (`pages/task.rs:77-89`);
+  what the move forces in `crates/jig-view/src/pages.rs`: the alias at
+  `:16` points at `crate::sections::task::scratch` (`task.rs:298`'s
+  `scratch` becomes `pub(crate)`); `mod work` (`:17`) and
+  `work::{section, control, counts, cursors}` become `pub(crate)`
+  (called at `task.rs:80,91`, `task/history.rs:14`,
+  `task/plan.rs:26,31,91,94,118`); `mod conversations` (`:11`) and
+  `conversations.rs:133`'s `runtime` become `pub(crate)` until 05.2
+  (called at `task.rs:248`); the moved files' `super::` paths become
+  `crate::pages::…`;
+  the other users of `crate::pages::task::{overview, budget}`, pointed at
+  `crate::sections::task::`: `crates/jig-view/src/cards/owner_escalation.rs:53-54`
+  and `crates/jig-view/src/owner_historical.rs:134-135`;
+  the counts: `crates/jig-view/src/sizes/pages.rs:119` (`task_in`'s
+  `checked_add(35)` becomes 36: the header's region) and
+  `crates/jig-view/src/sizes.rs:247` (`confirmation_nodes`'
+  `checked_add(66)` becomes 67: the composer's region);
   `crates/jig-view/src/turns.rs:22` (the conversation's log carries
-  `JigRegion::Conversation`); `crates/jig-view/src/confirmation.rs:226-260`
-  (the composer's field, `Purpose::Composer`, inside a `Role::Region`
+  `JigRegion::Conversation`); `crates/jig-view/src/confirmation.rs:227-239`
+  (the Write arm: the composer's field at `:231`, `Purpose::Composer`, inside a `Role::Region`
   with `JigRegion::Composer`: decisions.md, 13);
   the tests that call `crate::pages::task`:
   `crates/jig-view/src/tests/{historical_pages.rs:431,task_proposals.rs:95}`;
   every test or story that finds a task's tab as a button: `git grep -n
   -E 'Role::Button, b"(Overview|Activity|Plan|History|Budget and authority|Connectors)"'
-  -- '*.rs'` (at the base: `tests/client/src/joint/{deployment_story,engine_stories,stories}.rs`,
-  `tests/client/tests/stories.rs`; with `tests/ops` if it lists any).
+  -- '*.rs'` (at 98c6e80dc, the task's tabs are pressed at
+  `tests/client/src/joint/engine_stories.rs:341`, by
+  `Find::exactly_named`, and `tests/client/tests/stories.rs:64`; the
+  grep also prints `tests/client/src/joint/stories.rs:279-280`, the
+  project's "Overview", a button until 05.3);
+  a fault story whose expected value changes because the harness's faults
+  at `tests/client/src/harness/world.rs:398` and `:432` pick the first
+  bound `Role::Button`, and a tab is no longer one, is named in the
+  commit body with the value.
 Shape: `sections/task.rs`: `pub fn header(b, client, words, bindings) ->
   bool` (today's `:29-75`, inside a region with `JigRegion::TaskHeader`),
   `pub fn tabs(b, client, words, bindings) -> bool` (`:77-89`, its
   `Role::Tabs` with `JigRegion::TaskTabs`), and `pub(crate) fn
   section(b, client, words, bindings, task: u64, section: TaskSection)
-  -> bool` (`:90-102`'s match, the region named
+  -> bool` (`:90-101`'s match, the region named
   `JigRegion::Task<Section>`). Each returns false and builds nothing
   when `client.shows(..)` holds no section of the task.
   `sections.rs`: `pub fn section(b: &mut Builder, client: &Domain, words:
@@ -187,12 +221,15 @@ Needs: 05.1 (`work::section` with a region name, `sections.rs`).
 Files: `git mv crates/jig-view/src/pages/project.rs crates/jig-view/src/sections/project.rs`
   and `pages/project/` to `sections/project/` (`goals.rs`, `notes.rs`,
   `owner.rs`, `owner_goals.rs`, `recurring.rs`, `tasks.rs`);
-  `crates/jig-view/src/lib.rs:104` (the `owner_project` alias);
+  `crates/jig-view/src/lib.rs:107` (the `owner_project` alias);
   `crates/jig-view/src/sections.rs`; `crates/jig-view/src/pages.rs`
   (`main`'s project arm); every user of jig-view's project page by
   path, `git grep -n -E 'crate::pages::project|crate::owner_project|jig_view::owner_project'
   -- '*.rs'` (at the base: `crates/jig-view/src/{binding.rs:55,75,254,258,sizes/pages.rs:186}`,
-  `crates/jig-view/src/tests/owner_project.rs:546,721,911-916,1141`).
+  `crates/jig-view/src/tests/owner_project.rs:546,721,911-916,1141`);
+  the project's tabs pressed as buttons, which become `Role::Tab`:
+  `tests/client/src/joint/stories.rs:273-281` and
+  `tests/client/src/joint/deployment_story.rs:86-89` at 98c6e80dc.
 Shape: `sections/project.rs`: `pub fn header(..) -> bool` (the
   project's name, `pages/project.rs:33-43`, in a region with
   `JigRegion::ProjectHeader`), `pub fn tabs(..) -> bool` (`:44-74`, its
