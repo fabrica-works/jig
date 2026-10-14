@@ -85,9 +85,12 @@ what is adopted.
     - empty polls;
     - a coordinator re-typing its reports, then compacting;
     - metrics that miscount.
-- **Thirteen proposals** (section 8).
+- **Fourteen proposals** (section 8).
   - The first makes the next run wait for the user's decision on them.
   - The next four target the plan defects and the gate lane.
+  - The last is the user's own request after the run: smith's rule
+    names an improvement a model cannot see, proven by a counting test
+    instead of a probe.
 
 ## 2. Outcome
 
@@ -497,12 +500,17 @@ Rulings 101 to 121 and four steers. The supervisor marked each in
 
 **Decided by the user during the run:** nothing; nothing was asked.
 
-**Still with the user** (`decisions.md`, "For the user"):
-- decision 9, the veto on a benchmark probe for smith's readers;
-- decision 11, smith's suite here against the reliability run there. The
-  planner and the supervisor (01:59Z) recommend option (a): the
-  reliability run holds smith's focused suite to about 7 s on its
-  machine.
+**Decided by the user after the run:** decision 9, no veto (jig
+`386e2373e`; `supervision.md`, 2026-10-14T07:18:48Z).
+- smith 01 stays proven by its counting stories and its `smoke-tools`
+  runs.
+- The user asks that smith's rule say so for the next such case. The
+  supervisor drafted the text, and it is proposal 14.
+
+**Still with the user** (`decisions.md`, "For the user"): decision 11,
+smith's suite here against the reliability run there. The planner and
+the supervisor (01:59Z) recommend option (a): the reliability run holds
+smith's focused suite to about 7 s on its machine.
 
 ## 7. The proposals adopted after the last retrospective
 
@@ -542,7 +550,8 @@ Where each proposal's metric stands, though it was not adopted:
 ## 8. Proposals
 
 Each gives a rule in one sentence, its evidence, the document it changes,
-and the metric it should move. They are ordered by expected effect.
+and the metric it should move. Proposals 1 to 13 are ordered by expected
+effect. Proposal 14 was added after the user answered decision 9.
 
 1. **A plan's run starts only once the user has decided each proposal of
    the last retrospective, with the decisions written into that
@@ -679,6 +688,34 @@ and the metric it should move. They are ordered by expected effect.
       (section 5, item 9).
     - **Changes:** development.md, 5.5.
     - **Moves:** `steps_added` down.
+14. **An improvement to smith whose effect does not depend on a model is
+    proven by a deterministic test that counts what it saves, not by a
+    benchmark probe.** The user asked for this after the run, in
+    answering decision 9. The supervisor drafted the text
+    (`supervision.md`, 2026-10-14T07:18:48Z), and the designer applies
+    it:
+    - **smith's `docs/development/workflow.md`, 5,** a bullet after "An
+      improvement": "**An improvement whose effect does not depend on a
+      model** (fewer loop iterations, allocations or copies, a cheaper
+      read, with what the model is sent and returns unchanged) is proven
+      by a deterministic test that counts what it saves (iterations,
+      deliveries, bytes) and fails on the parent. The gate runs it, and
+      `smoke-tools` runs as for every landing. No probe is wanted: a
+      probe sees only what a model does, and here the model's side does
+      not change."
+    - **smith's `docs/design/benchmarks.md`, 4.2,** after "Every
+      improvement names the probe that guards it": "…except one whose
+      effect does not depend on a model (`workflow.md`, section 5), which
+      names its counting test instead."
+    - **Evidence:**
+      - Decision 9, which the plan had to list for the user's veto,
+        because workflow.md, 5 asks every improvement for a probe.
+      - smith 01's `a_megabyte_of_output_takes_few_deliveries`, which
+        proves the read of what has arrived by counting deliveries.
+    - **Changes:** smith's workflow.md, 5, and benchmarks.md, 4.2.
+    - **Moves:** questions for the user over a step's kind of proof stay
+      at zero for such changes, and no plan writes a probe for a change a
+      model cannot see.
 
 ## 9. Debts left in the code
 
