@@ -1113,11 +1113,13 @@ fn terminal_watch(domain: &mut Domain, id: Id<Watch>, end: WatchEnd, out: &mut Q
         }
     }
 }
+/// The final task document read source after its watch ends.
+pub(crate) const FINAL_TASK_READ: u16 = 24;
 // A watch terminal ends its obligation, while its final task remains readable.
 fn read_final_task(domain: &mut Domain, watch: Id<Watch>, task: u64, generation: u32, out: &mut Queue<Request>) {
     let key = crate::contract::ObjectKey::Task(task);
     let what = crate::contract::Read::Task { task };
-    let source = crate::objects::Source::Window { generation, number: 23 };
+    let source = crate::objects::Source::Window { generation, number: FINAL_TASK_READ };
     // Transfer this source's slot, including at a one-source limit.
     if let Some(id) = domain.objects.find(key) {
         domain.objects.get_mut(id).expect("named task exists").sources.remove(&crate::objects::Source::Watch(watch));

@@ -184,7 +184,7 @@ pub(crate) fn enter(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Que
         }
         Address::Conversations { .. } => {
             open(domain, env, Subject::Conversations, out);
-            read(domain, 11, Read::Conversations { after: None }, out);
+            read(domain, super::conversations::CONVERSATIONS_READ, Read::Conversations { after: None }, out);
         }
         Address::Task { task, section } => {
             domain.conversation.task = task;
@@ -195,7 +195,9 @@ pub(crate) fn enter(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Que
                 | TaskSection::Panels
                 | TaskSection::Activity
                 | TaskSection::Plan => {}
-                TaskSection::History => read(domain, 2, Read::History { task, subtree: false, after: None }, out),
+                TaskSection::History => {
+                    read(domain, super::task::HISTORY_READ, Read::History { task, subtree: false, after: None }, out);
+                }
             }
         }
         Address::Project { .. } => crate::pages::project::enter(domain, env, out),
@@ -484,7 +486,9 @@ pub(crate) fn read_result(
     match result {
         ReadResult::None(why) => {
             match receipt.source {
-                Source::Window { number: 1, .. } => domain.conversation.failed(),
+                Source::Window { number: crate::conversation::routing::ACTIVITY_READ, .. } => {
+                    domain.conversation.failed();
+                }
                 Source::Window { .. } | Source::Watch(_) | Source::Card(_) => {}
             }
             match why {
@@ -972,7 +976,7 @@ fn historical_read_valid(domain: &Domain, env: &Env<crate::Limits>, token: Token
                 | Read::Deployment => return false,
             };
             let source = match read.source {
-                Source::Window { number: 16, .. } => true,
+                Source::Window { number: super::task::ENDED_READ, .. } => true,
                 Source::Window { .. } | Source::Watch(_) | Source::Card(_) => false,
             };
             source
@@ -1001,7 +1005,7 @@ fn historical_read_valid(domain: &Domain, env: &Env<crate::Limits>, token: Token
                 | Read::Deployment => return false,
             };
             let source = match read.source {
-                Source::Window { number: 23, .. } => true,
+                Source::Window { number: super::project::SPEND_READ, .. } => true,
                 Source::Window { .. } | Source::Watch(_) | Source::Card(_) => false,
             };
             if !source

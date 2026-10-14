@@ -303,14 +303,14 @@ pub(crate) fn start_inbox(domain: &mut Domain, out: &mut Queue<Request>) {
 }
 const fn inbox_number(group: InboxReadGroup) -> u16 {
     match group {
-        InboxReadGroup::Needs => 10,
-        InboxReadGroup::Updates => 12,
+        InboxReadGroup::Needs => INBOX_NEEDS_READ,
+        InboxReadGroup::Updates => INBOX_UPDATES_READ,
     }
 }
 pub(crate) const fn inbox_group(number: u16) -> Option<InboxReadGroup> {
     match number {
-        10 => Some(InboxReadGroup::Needs),
-        12 => Some(InboxReadGroup::Updates),
+        INBOX_NEEDS_READ => Some(InboxReadGroup::Needs),
+        INBOX_UPDATES_READ => Some(InboxReadGroup::Updates),
         _ => None,
     }
 }
@@ -335,25 +335,31 @@ fn ask_read(domain: &mut Domain, number: u16, what: Read, out: &mut Queue<Reques
 }
 /// The Needs window's binding number.
 pub const INBOX_WINDOW: u64 = 10;
+/// The needs read source.
+pub(crate) const INBOX_NEEDS_READ: u16 = 10;
 /// The Updates window's independent binding number.
 pub const INBOX_UPDATES_WINDOW: u64 = 12;
+/// The updates read source.
+pub(crate) const INBOX_UPDATES_READ: u16 = 12;
 /// The conversations window's binding number.
 pub const CONVERSATIONS_WINDOW: u64 = 11;
+/// The conversations read source.
+pub(crate) const CONVERSATIONS_READ: u16 = 11;
 /// The read source for the conversations window's reverse edge.
-pub(crate) const CONVERSATIONS_BEFORE: u16 = 14;
+pub(crate) const CONVERSATIONS_BEFORE_READ: u16 = 14;
 /// Captures an original read of the supplied watch continuation, even if a
 /// newer snapshot arrives before its terminal. Public action bindings stay 11.
-pub(crate) const CONVERSATIONS_REPLAY: u16 = 17;
+pub(crate) const REPLAY_READ: u16 = 17;
 pub(crate) const fn is_replay(source: Source) -> bool {
     match source {
-        Source::Window { number: CONVERSATIONS_REPLAY, .. } => true,
+        Source::Window { number: REPLAY_READ, .. } => true,
         Source::Window { .. } | Source::Watch(_) | Source::Card(_) => false,
     }
 }
 /// Recovers the requested sliding end from this domain's read source.
 pub(crate) const fn read_end(source: Source) -> End {
     match source {
-        Source::Window { number: CONVERSATIONS_BEFORE, .. } => End::Before,
+        Source::Window { number: CONVERSATIONS_BEFORE_READ, .. } => End::Before,
         Source::Window { .. } | Source::Watch(_) | Source::Card(_) => End::After,
     }
 }
@@ -390,10 +396,10 @@ pub(crate) fn more(domain: &mut Domain, window: Token, end: End, out: &mut Queue
                     return;
                 }
                 let number = match end {
-                    End::Before => CONVERSATIONS_BEFORE,
+                    End::Before => CONVERSATIONS_BEFORE_READ,
                     End::After => match &domain.conversation_rows.owner_after {
-                        Some(owner) if owner == cursor => CONVERSATIONS_REPLAY,
-                        Some(_) | None => 11,
+                        Some(owner) if owner == cursor => REPLAY_READ,
+                        Some(_) | None => CONVERSATIONS_READ,
                     },
                 };
                 ask_read(domain, number, Read::Conversations { after: Some(cursor.clone()) }, out);

@@ -12,6 +12,8 @@ use crate::{
 use skein_lib::{Env, Id, Queue, Token};
 /// The activity window binding, independent of a watch's slab token.
 pub const ACTIVITY_WINDOW: u64 = 1;
+/// The activity read source.
+pub(crate) const ACTIVITY_READ: u16 = 1;
 fn ask(domain: &mut Domain, what: Option<Read>, out: &mut Queue<Request>) {
     let Some(what) = what else {
         return;
@@ -19,7 +21,7 @@ fn ask(domain: &mut Domain, what: Option<Read>, out: &mut Queue<Request>) {
     if domain.reads.pending(&what) {
         return;
     }
-    let source = Source::Window { generation: domain.generation, number: 1 };
+    let source = Source::Window { generation: domain.generation, number: ACTIVITY_READ };
     if domain.reads.ask(domain.generation, source, what, out).is_none() {
         domain.conversation.failed();
         crate::pages::routing::refuse(domain, Limit::Reads);
@@ -91,7 +93,7 @@ pub(crate) fn page(domain: &mut Domain, env: &Env<crate::Limits>, page: Activity
 }
 fn working_set(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Queue<Request>) {
     let keys = domain.conversation.names(env.limits.objects);
-    let source = Source::Window { generation: domain.generation, number: 1 };
+    let source = Source::Window { generation: domain.generation, number: ACTIVITY_READ };
     crate::pages::routing::names(domain, env, source, keys, out);
     // Immutable turns still refer to mutable decisions. A new activity snapshot
     // refreshes those documents without deriving an outcome from the call text.

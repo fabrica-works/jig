@@ -2642,3 +2642,47 @@ fn an_application_page_shows_no_task_after_a_task_page() {
     drive(&mut domain, Time::ZERO, Event::Went { place: Place::Elsewhere });
     assert_eq!(domain.shown_task(), None);
 }
+
+#[test]
+fn no_two_windows_of_a_page_share_a_token() {
+    use crate::pages::{conversations::*, project::*, task::*};
+    let mut numbers = [
+        crate::conversation::routing::ACTIVITY_WINDOW,
+        INBOX_WINDOW,
+        INBOX_UPDATES_WINDOW,
+        CONVERSATIONS_WINDOW,
+        HISTORY_WINDOW,
+        ENDED_WINDOW,
+        GOALS_WINDOW,
+        NOTES_WINDOW,
+        SPEND_WINDOW,
+    ];
+    numbers.sort_unstable();
+    for pair in numbers.windows(2) {
+        assert_ne!(pair[0], pair[1], "{numbers:?}");
+    }
+}
+#[test]
+fn no_two_reads_of_a_page_share_a_number() {
+    use crate::pages::{conversations::*, project::*, task::*};
+    let mut numbers = [
+        crate::conversation::routing::ACTIVITY_READ,
+        INBOX_NEEDS_READ,
+        INBOX_UPDATES_READ,
+        CONVERSATIONS_READ,
+        CONVERSATIONS_BEFORE_READ,
+        REPLAY_READ,
+        HISTORY_READ,
+        ENDED_READ,
+        PERSON_TASK_READ,
+        GOALS_READ,
+        NOTES_READ,
+        SPEND_READ,
+        PROJECT_READ,
+        crate::domain::FINAL_TASK_READ,
+    ];
+    numbers.sort_unstable();
+    for pair in numbers.windows(2) {
+        assert_ne!(pair[0], pair[1], "{numbers:?}");
+    }
+}

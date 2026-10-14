@@ -523,7 +523,7 @@ pub(crate) fn document(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut 
             open_once(domain, env, contract::Subject::Tree { task: number, window: env.limits.rows }, out);
         } else {
             domain.task_page.ended_task = Some(number);
-            read(domain, 16, Read::Ended { task: number, after: None }, out);
+            read(domain, ENDED_READ, Read::Ended { task: number, after: None }, out);
         }
     }
     if !domain.shows(crate::pages::Section::Task { task: number, section: TaskSection::Activity }) {
@@ -533,20 +533,25 @@ pub(crate) fn document(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut 
         Executor::Agent { .. } => {
             let subject = contract::Subject::Run { task: number, turn: None, offset: 0 };
             if open_once(domain, env, subject, out) {
-                read(domain, 1, Read::Activity { task: number, before: None }, out);
+                read(
+                    domain,
+                    crate::conversation::routing::ACTIVITY_READ,
+                    Read::Activity { task: number, before: None },
+                    out,
+                );
             }
         }
         Executor::Procedure { .. } => {}
         Executor::Party { .. } | Executor::Role { .. } => {
             let key = ObjectKey::PersonTask(number);
-            let source = Source::Window { generation: domain.generation, number: 15 };
+            let source = Source::Window { generation: domain.generation, number: PERSON_TASK_READ };
             if domain.objects.name(key, source).is_none() {
                 crate::pages::routing::refuse(domain, Limit::Objects);
                 return;
             }
             let object = domain.objects.find(key).expect("person task named above");
             if domain.objects.get(object).expect("named person task exists").body.is_none() {
-                read(domain, 15, Read::PersonTask { task: number }, out);
+                read(domain, PERSON_TASK_READ, Read::PersonTask { task: number }, out);
             }
         }
     }
@@ -634,7 +639,7 @@ pub(crate) fn history(domain: &mut Domain, subtree: bool, out: &mut Queue<Reques
     domain.task_page.subtree_history = subtree;
     domain.history_rows.rows.clear();
     domain.history_rows.cut = false;
-    read(domain, 2, Read::History { task, subtree, after: None }, out);
+    read(domain, HISTORY_READ, Read::History { task, subtree, after: None }, out);
     domain.changed();
 }
 /// Opens one ended subtree, whose results name shared cards.
@@ -665,12 +670,18 @@ pub(crate) fn open_ended(domain: &mut Domain, task: u64, out: &mut Queue<Request
     domain.task_page.ended_cut = false;
     domain.task_page.ended_after = None;
     domain.task_page.ended_before = None;
-    read(domain, 16, Read::Ended { task, after: None }, out);
+    read(domain, ENDED_READ, Read::Ended { task, after: None }, out);
 }
 /// The history window's binding number.
-pub const HISTORY_WINDOW: u64 = 12;
+pub const HISTORY_WINDOW: u64 = 14;
+/// The history read source.
+pub(crate) const HISTORY_READ: u16 = 2;
 /// Ended delegates in the opened subtree.
 pub const ENDED_WINDOW: u64 = 13;
+/// The ended subtree read source.
+pub(crate) const ENDED_READ: u16 = 16;
+/// The person task read source.
+pub(crate) const PERSON_TASK_READ: u16 = 15;
 pub(crate) fn more(domain: &mut Domain, window: Token, end: crate::action::End, out: &mut Queue<Request>) {
     if window == Token::new(HISTORY_WINDOW) {
         let edge = match end {
@@ -687,7 +698,7 @@ pub(crate) fn more(domain: &mut Domain, window: Token, end: crate::action::End, 
             };
             read(
                 domain,
-                2,
+                HISTORY_READ,
                 Read::History { task, subtree: domain.task_page.subtree_history, after: Some(cursor) },
                 out,
             );
@@ -700,7 +711,7 @@ pub(crate) fn more(domain: &mut Domain, window: Token, end: crate::action::End, 
         if let Some(task) = domain.task_page.ended_task
             && let Some(cursor) = cursor
         {
-            read(domain, 16, Read::Ended { task, after: Some(cursor) }, out);
+            read(domain, ENDED_READ, Read::Ended { task, after: Some(cursor) }, out);
         }
     }
 }

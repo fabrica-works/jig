@@ -163,13 +163,13 @@ pub(crate) fn enter(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Que
             }
             ProjectSection::Goals => {
                 open(domain, env, contract::Subject::Goals { project }, out);
-                ask(domain, 20, Read::Goals { project, after: None }, out);
+                ask(domain, GOALS_READ, Read::Goals { project, after: None }, out);
             }
             ProjectSection::Tasks => tasks(domain, env, domain.project_page.task_filter, out),
             ProjectSection::Notes => {
                 notes::filter(domain, NoteFilter { scope: NoteScope::Project(project), description: None }, out);
             }
-            ProjectSection::Spend => ask(domain, 23, Read::Spend { project, after: None }, out),
+            ProjectSection::Spend => ask(domain, SPEND_READ, Read::Spend { project, after: None }, out),
             ProjectSection::Settings
             | ProjectSection::Resources
             | ProjectSection::Policy
@@ -177,7 +177,7 @@ pub(crate) fn enter(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Que
             | ProjectSection::Recurring => {}
         }
     }
-    ask(domain, 0, Read::Project { project }, out);
+    ask(domain, PROJECT_READ, Read::Project { project }, out);
 }
 fn open(domain: &mut Domain, env: &Env<crate::Limits>, subject: contract::Subject, out: &mut Queue<Request>) {
     if domain.open(env, subject, Owner::Page { generation: domain.generation }, out).is_none() {
@@ -316,10 +316,18 @@ pub(crate) fn tasks(domain: &mut Domain, env: &Env<crate::Limits>, filter: TaskF
 }
 /// Opaque windows exposed by the board, notes and spend views.
 pub const GOALS_WINDOW: u64 = 20;
+/// The goals read source.
+pub(crate) const GOALS_READ: u16 = 20;
 /// Scoped notes window.
 pub const NOTES_WINDOW: u64 = 21;
+/// The notes read source.
+pub(crate) const NOTES_READ: u16 = 3;
 /// Past spend periods window.
 pub const SPEND_WINDOW: u64 = 22;
+/// The spend read source.
+pub(crate) const SPEND_READ: u16 = 23;
+/// The project document read source.
+pub(crate) const PROJECT_READ: u16 = 0;
 pub(crate) fn more(domain: &mut Domain, window: Token, end: End, out: &mut Queue<Request>) {
     let Some(project) = number(domain) else {
         return;
@@ -330,7 +338,7 @@ pub(crate) fn more(domain: &mut Domain, window: Token, end: End, out: &mut Queue
             End::After => domain.project_page.ended_after.clone(),
         };
         if let Some(cursor) = cursor {
-            ask(domain, 20, Read::Goals { project, after: Some(cursor) }, out);
+            ask(domain, GOALS_READ, Read::Goals { project, after: Some(cursor) }, out);
         }
     } else if window == Token::new(NOTES_WINDOW) {
         let cursor = match end {
@@ -342,7 +350,7 @@ pub(crate) fn more(domain: &mut Domain, window: Token, end: End, out: &mut Queue
         {
             ask(
                 domain,
-                3,
+                NOTES_READ,
                 Read::Notes { scope: filter.scope, description: filter.description, after: Some(cursor) },
                 out,
             );
@@ -353,7 +361,7 @@ pub(crate) fn more(domain: &mut Domain, window: Token, end: End, out: &mut Queue
             End::After => domain.project_page.spend_after.clone(),
         };
         if let Some(cursor) = cursor {
-            ask(domain, 23, Read::Spend { project, after: Some(cursor) }, out);
+            ask(domain, SPEND_READ, Read::Spend { project, after: Some(cursor) }, out);
         }
     }
 }

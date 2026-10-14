@@ -17,7 +17,12 @@ pub(crate) fn filter(domain: &mut Domain, filter: super::NoteFilter, out: &mut Q
     domain.project_page.notes_cut = false;
     domain.project_page.notes_before = None;
     domain.project_page.notes_after = None;
-    super::ask(domain, 3, Read::Notes { scope: filter.scope, description: filter.description, after: None }, out);
+    super::ask(
+        domain,
+        super::NOTES_READ,
+        Read::Notes { scope: filter.scope, description: filter.description, after: None },
+        out,
+    );
     domain.changed();
 }
 pub(crate) fn page(domain: &mut Domain, source: Source, page: crate::contract::NotePage) {
