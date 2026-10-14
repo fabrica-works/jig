@@ -64,19 +64,31 @@ Needs: jig 07.1 and 07.3 (the shapes it copies).
 Files: `examples/ops/domain-client/src/observability.rs:85-86` (the
   request), `:273` (`ObjectsLeft` on `Left`: an empty `ShowSections`
   beside it) and `:398` (`ShowObjects`: `ShowSections` beside it), the
-  incident's document's `sections` beside its `objects`;
-  `examples/ops/domain-client/src/route.rs:246-249,285-288` (forwarded);
+  incident's document's `sections` beside its `objects`, a native
+  `Value::Incident` as `objects` names its lead
+  (`examples/ops/domain-client/src/observability/documents.rs:186-190`);
+  `examples/ops/domain-client/src/route.rs:285-288` (observability's arm
+  forwards it; infrastructure's, `:246-249`, is unchanged);
+  `examples/ops/domain-client/src/limits.rs:18-19` (`max_out(..)
+  .checked_mul(4)` becomes `checked_mul(5)`, the further `ShowSections`
+  handoff, as jig 07.3 did at 2954c546c) and `:59-61`
+  (`observability_payload` takes `.max(List::<jig_domain_client::pages::Section>::worst_case(1)?)`);
   `examples/ops/view/src/bindings.rs` (`Meaning::Section`, a
-  `section(token)` lookup); `examples/ops/view/src/observability.rs:61-95`
-  (`jig_slot`; a section slot after the lead's chip, `:87`);
+  `section(token)` lookup); `examples/ops/view/src/observability.rs:84-89`
+  (`show_incident`: a section slot after the lead's chip, `:87`) and
+  `:426-431` (`native_incident`: the same, after `:430`);
   `examples/ops/view/src/root.rs:106-190` (the slot pass fills a
   section's token by `jig_view::sections::section`, unshowable when it
-  returns false); `examples/ops/view/src/limits.rs:39-46` (the section
-  slot counted as a task's plan's bound); `examples/ops/domain-client/src/tests.rs`
+  returns false); `examples/ops/view/src/limits.rs:40` (the section
+  slot counted as a task's plan's bound: `task_section_nodes(..,
+  TaskSection::Plan)? + 4` added to `jig_cards`); `examples/ops/domain-client/src/tests.rs`
   and `examples/ops/view/src/tests.rs` for their tests.
 Shape: `observability::Request::ShowSections { sections:
   List<Section> }`; the incident's sections are `[Section::Task { task:
-  lead, section: TaskSection::Plan }]` when it has a lead, else empty;
+  lead, section: TaskSection::Plan }]` when it has a lead, else empty,
+  for a `Document::Incident` and a native `Value::Incident` alike (its
+  match names each native `Value` variant: no `_` arm, clippy's
+  `wildcard_enum_match_arm`);
   pushed wherever `ShowObjects` is, and an empty list where
   `ObjectsLeft` is; `route.rs` forwards it as
   `jig_domain_client::Event::ShowSections`. The view as jig 07.3's test
@@ -100,21 +112,33 @@ Files: `tests/ops/src/client/app.rs:155-166` (`new`:
   `configure_arrangement`), `:114-126` (`view_bounds`: its 1,024 nodes
   become 2,048 if the arranged page needs them; the builder's capacity
   assertion says so, and the report gives the number);
+  `tests/ops/src/joint/fixture.rs:87-100` (`client()`, the joint
+  world's second ops client: `client::configure_arrangement(&mut domain,
+  view::arrangement())` after `:95`; its bounds at `:65-78` as
+  `app.rs`'s `view_bounds`);
   `examples/ops/view/src/root.rs:80-104` (`build`: at a task's address,
-  its own main and aside); `examples/ops/view/src/limits.rs:39-46`
-  (`compose` with `ops`'s arrangement) and a new `pub fn arrangement()
-  -> Arrangement` there; `examples/ops/domain-client/src/domain.rs:190-196`
-  (`configure_arrangement`, from jig 04.1); `examples/ops/view/src/tests.rs`.
+  its own main and aside); `examples/ops/view/src/limits.rs:46-53`
+  (`compose` with `ops`'s arrangement in place of `Arrangement::none()`
+  at `:49`) and a new `pub fn arrangement() -> Arrangement` there,
+  re-exported at `examples/ops/view/src/lib.rs:16` (`pub use
+  limits::{Limits, arrangement, worst_case};`);
+  `examples/ops/domain-client/src/domain.rs:198-204`
+  (`configure_arrangement`, from jig 04.1); `crates/jig-view/src/pages.rs:56`
+  (`excess` becomes `pub`, with a one-line doc comment);
+  `examples/ops/view/src/tests.rs`.
 Shape: `jig_ops_view::arrangement()` is `Arrangement { task: [Overview,
   Activity, Plan, History, Budget, Panels], project: [] }`; the client
   constructor gives it to `configure_arrangement`, and `ops`'s
   `Limits::of` passes it to `jig_view::Limits::compose`. `build`, when the
   domain's page is `Page::Work { address: Address::Task { task, .. } }`:
   `b.open(Role::Page)`; `jig_view::frame::banner`;
-  `jig_view::frame::navigation`; `b.open(Role::Main)`;
+  `jig_view::frame::navigation` with `observability::NAV`, as `build`'s
+  `jig_view::jig` call passes it (`root.rs:91`); `b.open(Role::Main)`;
   `jig_view::pages::heading(.., JigPhrase::TaskPage, &[Hole::Number(task)])`;
   `jig_view::sections::task::header`; `jig_view::sections::section` for
-  the overview, activity, plan and history; `b.close()`;
+  the overview, activity, plan and history; `jig_view::pages::excess`,
+  as jig's task page calls it (`crates/jig-view/src/pages.rs:121`);
+  `b.close()`;
   `b.open(Role::Complementary)`; `sections::section` for the budget and
   the panels; `b.close()`; `jig_view::after_page`; `b.close()`. Every
   other page: `jig_view::jig`, as today.
