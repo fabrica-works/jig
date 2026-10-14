@@ -259,6 +259,7 @@ dependencies = [
  "jig-fake-workers",
  "jig-protocol-transcript",
  "jig-scripted-engine",
+ "jig-shell-text",
  "jig-test-client-kit",
  "jig-test-connector",
  "jig-test-domain",

@@ -122,6 +122,9 @@ impl<const BAD: u8> App for Broken<BAD> {
     fn max_out((): &()) -> u32 {
         1
     }
+    fn view_limits(_: &View) -> jig_view::Limits {
+        LIMITS
+    }
     fn patch_limit(_: &View) -> u32 {
         LIMITS.patches
     }

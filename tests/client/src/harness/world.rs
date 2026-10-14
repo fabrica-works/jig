@@ -76,6 +76,10 @@ pub struct Outcome {
     pub heap_peak: u64,
     pub heap_bound: u64,
 }
+struct TextShell {
+    print: jig_shell_text::Print,
+    held: Option<(NodeId, Box<[u8]>)>,
+}
 struct Client<A: App> {
     constructor: ClientConstructor<A>,
     limits: A::Limits,
@@ -92,6 +96,7 @@ struct Client<A: App> {
     epoch: u64,
     navigation: u64,
     acted_card: Option<CardKey>,
+    text_shell: Option<TextShell>,
 }
 enum PersonKind<A: App> {
     Script(Person<A::Address>),
@@ -192,6 +197,13 @@ impl<A: App, F: Front<A>> World<A, F> {
         let heap_bound = A::worst_case(&limits).min(self.settings.heap_bytes_per_client);
         self.make_client(party, address, Vec::new(), limits, constructor, heap_bound)
     }
+    /// Play this client's subsequent person acts through the printed numbers.
+    pub fn at_text_shell(&mut self, client: ClientId) {
+        self.clients[client.0].text_shell = Some(TextShell {
+            print: jig_shell_text::Print::new(&A::view_limits(&self.clients[client.0].view)).expect("print bounds fit"),
+            held: None,
+        });
+    }
     fn make_client(
         &mut self,
         party: u64,
@@ -223,6 +235,7 @@ impl<A: App, F: Front<A>> World<A, F> {
             epoch: 0,
             navigation: 0,
             acted_card: None,
+            text_shell: None,
         });
         self.observe(Observation::Client { client: id });
         self.front.bind(id, party);
@@ -645,6 +658,59 @@ impl<A: App, F: Front<A>> World<A, F> {
             .try_fold(0_u64, |sum, client| sum.checked_add(client.heap_bound))
             .expect("world heap bound fits")
     }
+    fn text_act(&mut self, id: ClientId, node: NodeId, act: Act, step: u32) {
+        let client = &mut self.clients[id.0];
+        let Some(TextShell { print, held }) = &mut client.text_shell else {
+            self.act(id, node, act);
+            return;
+        };
+        let tree = A::tree(&client.view);
+        let pending = held.take();
+        let paired = pending.is_some();
+        let first = if let Some((field, words)) = pending {
+            assert_eq!(
+                (&act, node),
+                (&Act::Submit, field),
+                "step {step}: typed without sending: not played at the text shell"
+            );
+            Act::Input { value: words }
+        } else {
+            jig_shell_text::render(tree, b"jig", print);
+            if tree.find(node).is_some_and(|n| n.states.as_slice().contains(&jig_view::State::SubmitsOnEnter))
+                && let Act::Input { value } = act
+            {
+                *held = Some((node, value));
+                return;
+            }
+            act
+        };
+        let number = print
+            .numbers
+            .as_slice()
+            .iter()
+            .position(|id| *id == node)
+            .unwrap_or_else(|| panic!("step {step}: acted node {node:?} has no printed number"))
+            + 1;
+        let mut line = number.to_string().into_bytes();
+        if let Act::Input { value } = &first {
+            line.push(b' ');
+            line.extend_from_slice(value);
+        }
+        let read = jig_shell_text::command(&line, Some(print.numbers.as_slice()), tree, u32::MAX);
+        assert_eq!(&read, &jig_shell_text::Command::Act { node, first, submit: paired }, "step {step}: text shell act");
+        match read {
+            jig_shell_text::Command::Act { node, first, submit } => {
+                self.act(id, node, first);
+                if submit {
+                    self.act(id, node, Act::Submit);
+                }
+            }
+            jig_shell_text::Command::Print
+            | jig_shell_text::Command::Close
+            | jig_shell_text::Command::Nothing
+            | jig_shell_text::Command::Refused { .. } => unreachable!("the reader gave the asserted act"),
+        }
+    }
     fn walk_people(&mut self) -> bool {
         let mut progress = false;
         for index in 0..self.people.len() {
@@ -689,11 +755,23 @@ impl<A: App, F: Front<A>> World<A, F> {
                 }
             };
             match next {
-                Next::Do(Doing::Act { node, act }) => self.act(id, node, act),
+                Next::Do(Doing::Act { node, act }) => {
+                    let step = match &self.people[index].person {
+                        PersonKind::Script(p) => p.at(),
+                        PersonKind::Random { .. } => 0,
+                    };
+                    self.text_act(id, node, act, step);
+                }
                 Next::Do(Doing::Go { address }) => self.go(id, address),
                 Next::Do(Doing::Reload) => self.reload(id),
                 Next::Wait { until } => self.people[index].wake = until,
-                Next::Done => self.people[index].done = true,
+                Next::Done => {
+                    assert!(
+                        self.clients[id.0].text_shell.as_ref().is_none_or(|text| text.held.is_none()),
+                        "typed without sending: not played at the text shell"
+                    );
+                    self.people[index].done = true;
+                }
                 Next::Failed { step, why } => panic!(
                     "seed {} client {} step {step}: {why}; tree {:?}; all trees {:?}",
                     self.settings.seed,

@@ -283,3 +283,42 @@ fn a_procedure_only_goal_form_confirms_and_sends_the_supplied_executor_once() {
         ));
     }
 }
+
+#[test]
+fn starting_a_chat_at_the_text_shell() {
+    let mut w = stories::chat_world(1);
+    let c = w.client(7, stories::conversation());
+    w.at_text_shell(c);
+    w.person(
+        c,
+        vec![
+            Step::See { find: Find::named(Role::TextArea, b"First words"), within: WITHIN },
+            Step::Type { find: Find::named(Role::TextArea, b"First words"), words: Box::from(*b"Hello") },
+            Step::Press { find: Find::named(Role::Button, b"Start a conversation") },
+            Step::See { find: Find::text(b"Chat nine"), within: WITHIN },
+        ],
+    );
+    let outcome = w.run(Until::Done);
+    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
+    assert_eq!(w.front().engine.commits().iter().filter(|commit| commit.key.is_some()).count(), 1);
+}
+#[test]
+fn a_held_chat_is_released_at_the_text_shell() {
+    let mut w = stories::held_chat(11);
+    let c = w.client(7, stories::chat());
+    w.at_text_shell(c);
+    w.person(
+        c,
+        vec![
+            Step::See { find: Find::named(Role::Button, b"Release"), within: WITHIN },
+            Step::Press { find: Find::named(Role::Button, b"Release") },
+            Step::See { find: Find::text(b"Being decided"), within: WITHIN },
+            Step::Press { find: Find::named(Role::Button, b"Confirm") },
+            Step::Press { find: Find::named(Role::Tab, b"Overview") },
+            Step::See { find: Find::text(b"Starting"), within: WITHIN },
+        ],
+    );
+    let outcome = w.run(Until::Done);
+    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
+    assert_eq!(w.front().engine.commits().iter().filter(|commit| commit.key.is_some()).count(), 1);
+}

@@ -233,6 +233,9 @@ impl App for Test {
     fn max_out(limits: &Self::Limits) -> u32 {
         domain::max_out(limits)
     }
+    fn view_limits(view: &Self::View) -> jig_view::Limits {
+        view.limits().tree
+    }
     fn patch_limit(view: &Self::View) -> u32 {
         view.limits().tree.patches
     }

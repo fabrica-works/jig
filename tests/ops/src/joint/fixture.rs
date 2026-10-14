@@ -249,6 +249,9 @@ impl jig_client_world::harness::App for Client {
     fn max_out(limits: &Self::Limits) -> u32 {
         Ops::max_out(limits)
     }
+    fn view_limits(view: &Self::View) -> jig_view::Limits {
+        Ops::view_limits(view)
+    }
     fn patch_limit(view: &Self::View) -> u32 {
         Ops::patch_limit(view)
     }

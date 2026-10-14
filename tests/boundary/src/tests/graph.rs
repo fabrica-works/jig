@@ -306,6 +306,7 @@ fn client_world_joins_only_the_client_and_test_roles() {
                 "jig-protocol-transcript",
                 "smith-transcript",
                 "jig-view",
+                "jig-shell-text",
                 "jig-test-domain-client",
                 "jig-test-view",
                 "jig-fake-person",

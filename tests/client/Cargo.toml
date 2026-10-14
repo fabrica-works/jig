@@ -11,6 +11,7 @@ skein-lib.workspace = true
 jig-domain-client.workspace = true
 jig-protocol-transcript.workspace = true
 jig-view.workspace = true
+jig-shell-text.workspace = true
 jig-test-domain-client.workspace = true
 jig-test-view.workspace = true
 jig-fake-person.workspace = true
