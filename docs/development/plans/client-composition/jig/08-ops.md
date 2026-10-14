@@ -77,9 +77,9 @@ Files: `examples/ops/domain-client/src/observability.rs:85-86` (the
   `section(token)` lookup); `examples/ops/view/src/observability.rs:84-89`
   (`show_incident`: a section slot after the lead's chip, `:87`) and
   `:426-431` (`native_incident`: the same, after `:430`);
-  `examples/ops/view/src/root.rs:106-190` (the slot pass fills a
+  `examples/ops/view/src/root.rs:108-192` (the slot pass fills a
   section's token by `jig_view::sections::section`, unshowable when it
-  returns false); `examples/ops/view/src/limits.rs:40` (the section
+  returns false); `examples/ops/view/src/limits.rs:50` (the section
   slot counted as a task's plan's bound: `task_section_nodes(..,
   TaskSection::Plan)? + 4` added to `jig_cards`); `examples/ops/domain-client/src/tests.rs`
   and `examples/ops/view/src/tests.rs` for their tests.

@@ -428,6 +428,9 @@ your best judgement").
      - `heavy cargo nextest run -p jig-ops-world --profile fuzzy`: "22 tests
        run: 22 passed" (log `logs/20261014T162912-86.log`).
 
+119. **jig 08.1's Shapes against main** (ready check of jig-08.1).
+     jig/08-ops.md, 08.1, against origin/main after 08.2 landed (0f84d8fad), the ready check of jig-08.1 (its Shape otherwise as ruling 116 checked it): 08.2 moved two of 08.1's lines and no other. The slot pass is `examples/ops/view/src/root.rs:108-192` (was `:106-190`: `git show origin/main:examples/ops/view/src/root.rs | grep -n 'for slot in builder.slots'` → `111`), and `jig_cards` is `examples/ops/view/src/limits.rs:50` (was `:40`: `grep -n jig_cards` → `50: let jig_cards = jig_view::card_nodes(&domain.jig)?...`), `compose` now taking `&arrangement()`. 0f84d8fad changes none of 08.1's other Files (`git show --stat 0f84d8fad`: ops view `lib.rs`, `limits.rs`, `root.rs`, `tests.rs`; jig-view `pages.rs`; the joint world's `referee.rs`, `engine.rs`, `fixture.rs`; `tests/ops/src/client/app.rs`).
+
 ## For the user
 
 Long-term choices the user may veto. Each was decided by the planner
