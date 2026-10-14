@@ -194,8 +194,15 @@ Files: new `tests/client/tests/text_pages.rs` and
   signing in, as `signing_in_and_starting_a_chat` starts
   (`tests/client/tests/stories.rs:7`); missing, at a missing address;
   out of date and someone else's work, as `tests/client/tests/faults.rs`
-  reaches them. A page no world state reaches is the question below).
-Shape: no production code. Each test runs its world to `Until::Done`,
+  reaches them. A page no world state reaches is the question below);
+  new `tests/client/src/stories/text_pages.rs` (the inbox's six-kind
+  fixture, a `pub mod` of `stories.rs`); `testing/jig-test-view/src/limits.rs`
+  (`for_world` without the complete envelope's text product, ruling
+  115) and `src/tests/world_limits.rs`; if `for_world` cannot reach the
+  envelope's fields otherwise, `crates/jig-view/src/limits.rs` (one
+  function that `with_phrase_bytes` itself uses).
+Shape: no production code but ruling 115's, at most 25 lines in
+  `crates/jig-view/src/limits.rs`. Each test runs its world to `Until::Done`,
   renders `w.tree(c)` with `jig_shell_text::render` and the name
   `b"jig"`, and compares the print's text with its golden file.
 Test shape: `tests/client/tests/text_pages.rs`:
@@ -214,8 +221,9 @@ Don't: generate a golden file by a test or a script. Each file is
   lines is then checked against view.md 15.3's table and the fixture's
   state; the commit body says so (code-organization.md, 5, the golden
   files' exception).
-Size: no production code; at most 120 lines of test code besides the
-  golden files.
+Size: at most 200 lines of test kit code (the fixture and `for_world`'s
+  fix together; ruling 115), counted as code-organization.md 6 counts
+  them: not the tests or the golden files; past 200 it asks.
 Removes: nothing.
 
 ## Interface sketches
