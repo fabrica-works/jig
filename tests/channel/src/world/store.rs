@@ -89,7 +89,7 @@ impl Capture {
         if let Op::Write { fd, bytes, from: 0, .. } = op
             && self.path(*fd).is_some_and(|path| path.starts_with(b"store/"))
         {
-            let frames = frames(bytes);
+            let frames = frames(bytes, 0);
             let turn = frames.iter().any(|(_, ops)| {
                 ops.iter().any(|op| match op {
                     skein_kv::Op::Put { key, .. } => {
@@ -148,7 +148,7 @@ impl Store {
                     file[at..at + bytes.len()].copy_from_slice(&bytes);
                 }
                 Observed::Pending(bytes) => {
-                    self.pending = frames(&bytes)
+                    self.pending = frames(&bytes, self.applied)
                         .into_iter()
                         .filter(|(number, _)| *number > self.applied)
                         .map(|(number, ops)| self.commit(number, ops, limits, connector))
@@ -156,7 +156,7 @@ impl Store {
                 }
                 Observed::Recovered(path) => {
                     if let Some(bytes) = self.files.get(&path) {
-                        self.recovered.extend(frames(bytes).into_iter().map(|(number, _)| number));
+                        self.recovered.extend(frames(bytes, 0).into_iter().map(|(number, _)| number));
                     }
                     committed.extend(self.durable(&path, limits, connector));
                 }
@@ -171,7 +171,7 @@ impl Store {
     fn durable(&mut self, path: &[u8], limits: &codec::Limits, connector: &jig_test_connector::Limits) -> Vec<Commit> {
         let mut committed = Vec::new();
         let Some(bytes) = self.files.get(path) else { return committed };
-        let frames = frames(bytes);
+        let frames = frames(bytes, self.applied);
         for (number, ops) in frames {
             if number <= self.applied {
                 continue;
@@ -248,7 +248,8 @@ impl Store {
         Commit { number, writes }
     }
 }
-fn frames(bytes: &[u8]) -> Vec<(u64, Box<[skein_kv::Op]>)> {
+/// Applied frames have already been checked; skip their bodies and checksums.
+fn frames(bytes: &[u8], after: u64) -> Vec<(u64, Box<[skein_kv::Op]>)> {
     let mut reader = Reader::new(bytes);
     let mut frames = Vec::new();
     while reader.remaining() >= 26 {
@@ -260,6 +261,10 @@ fn frames(bytes: &[u8]) -> Vec<(u64, Box<[skein_kv::Op]>)> {
         let body = reader.u32().expect("frame body length");
         if reader.remaining() < body + 4 {
             break;
+        }
+        if number <= after {
+            reader.skip(body + 4).expect("applied frame body and checksum");
+            continue;
         }
         let end = (bytes.len() - reader.remaining() as usize) + body as usize;
         let mut ops = Vec::new();

@@ -58,3 +58,31 @@ fn a_checked_frame_with_no_record_is_unread() {
     let bytes = [0, 0, 0, 12, 0, 0, 0, 0, 0, 0, 0, 12];
     assert_eq!(frame::decode(&bytes, &fixtures::codec_limits()), Err(Unread::Record));
 }
+
+fn bitwise_crc32c(bytes: &[u8]) -> u32 {
+    let mut crc = !0_u32;
+    for byte in bytes {
+        crc ^= u32::from(*byte);
+        for _ in 0_u8..8 {
+            crc = if crc & 1 == 0 { crc >> 1_u32 } else { (crc >> 1_u32) ^ 0x82f6_3b78 };
+        }
+    }
+    !crc
+}
+
+#[test]
+fn crc32c_by_table_matches_the_bitwise_loop() {
+    for byte in 0_u8..=255 {
+        assert_eq!(frame::crc32c(&[byte]), bitwise_crc32c(&[byte]), "one-byte input {byte}");
+    }
+    let mut rng = skein_lib::Rng::new(0x5701_e016);
+    let mut bytes = [0_u8; 1_000];
+    for case in 0_u8..64 {
+        let length = usize::try_from(rng.below(1_001)).expect("input length fits usize");
+        let input = bytes.get_mut(..length).expect("at most 1,000 bytes");
+        for byte in &mut *input {
+            *byte = u8::try_from(rng.below(256)).expect("one byte");
+        }
+        assert_eq!(frame::crc32c(input), bitwise_crc32c(input), "seeded input {case}, {length} bytes");
+    }
+}
