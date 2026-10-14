@@ -2846,3 +2846,135 @@ fn an_arranged_task_section_its_document_does_not_offer_is_not_shown() {
         }
     }
 }
+
+fn source_requests(requests: &[Request]) -> (List<Subject>, List<Read>) {
+    let mut watches = List::with_capacity(LIMITS.watches);
+    let mut reads = List::with_capacity(LIMITS.reads);
+    for request in requests {
+        if let Request::Open { subject, .. } = request {
+            watches.push(subject.clone()).unwrap();
+        }
+        if let Request::Read { what, .. } = request {
+            reads.push(what.clone()).unwrap();
+        }
+    }
+    (watches, reads)
+}
+fn arranged_task() -> (Domain, Box<[Request]>) {
+    let mut domain = Domain::new(&LIMITS, 2);
+    domain
+        .configure_arrangement(arrangement(
+            &[
+                TaskSection::Overview,
+                TaskSection::Activity,
+                TaskSection::Plan,
+                TaskSection::History,
+                TaskSection::Budget,
+                TaskSection::Panels,
+            ],
+            &[],
+        ))
+        .unwrap();
+    let f = start(&mut domain, List::with_capacity(0));
+    let initial = delivered(&mut domain, Time::ZERO, f, frame(7));
+    finish_initial_inbox_reads(&mut domain, &initial);
+    let opened = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::task(8)) });
+    for request in &opened {
+        if let Request::Close { watch } = request {
+            drive(&mut domain, Time::ZERO, Event::Ended { watch: *watch, end: WatchEnd::Closed });
+        }
+    }
+    domain.reclaim();
+    (domain, opened)
+}
+#[test]
+fn an_arranged_task_page_opens_its_watch_once() {
+    let rows: [(Executor, Phase, &[Subject], &[Read]); 3] = [
+        (
+            Executor::Agent { charter: 1 },
+            Phase::Running,
+            &[Subject::Tree { task: 8, window: LIMITS.rows }, Subject::Run { task: 8, turn: None, offset: 0 }],
+            &[Read::Activity { task: 8, before: None }],
+        ),
+        (
+            Executor::Party { party: 7 },
+            Phase::Held,
+            &[Subject::Tree { task: 8, window: LIMITS.rows }],
+            &[Read::PersonTask { task: 8 }],
+        ),
+        (
+            Executor::Party { party: 7 },
+            Phase::Done,
+            &[],
+            &[Read::Ended { task: 8, after: None }, Read::PersonTask { task: 8 }],
+        ),
+    ];
+    for (executor, phase, watches, reads) in rows {
+        let (mut domain, opened) = arranged_task();
+        let (actual_watches, actual_reads) = source_requests(&opened);
+        assert_eq!(actual_watches.as_slice(), &[Subject::Task { task: 8 }], "{executor:?}");
+        assert_eq!(actual_reads.as_slice(), &[Read::History { task: 8, subtree: false, after: None }], "{executor:?}");
+        let mut document = super::confirmation::task();
+        document.chip.executor = executor;
+        document.chip.phase = phase;
+        document.context.as_mut().unwrap().impact.tasks.waiting = 1;
+        let delivery = Event::Watch {
+            watch: open_token(&opened),
+            event: WatchEvent::Delivered(Delivery::Task(Box::new(document))),
+        };
+        let requests = drive(&mut domain, Time::ZERO, delivery.clone());
+        let (actual_watches, actual_reads) = source_requests(&requests);
+        assert_eq!(actual_watches.as_slice(), watches, "{executor:?}");
+        assert_eq!(actual_reads.as_slice(), reads, "{executor:?}");
+        let again = drive(&mut domain, Time::ZERO, delivery);
+        let (actual_watches, actual_reads) = source_requests(&again);
+        assert_eq!(actual_watches.as_slice(), &[], "{executor:?}: repeated delivery");
+        assert_eq!(actual_reads.as_slice(), &[], "{executor:?}: repeated delivery");
+    }
+}
+#[test]
+fn an_arranged_project_page_opens_the_goals_watch_once() {
+    let mut domain = Domain::new(&LIMITS, 2);
+    domain.configure_arrangement(arrangement(&[], &[ProjectSection::Goals, ProjectSection::Overview])).unwrap();
+    let f = start(&mut domain, List::with_capacity(0));
+    let initial = delivered(&mut domain, Time::ZERO, f, frame(7));
+    finish_initial_inbox_reads(&mut domain, &initial);
+    let requests = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Went { place: Place::Jig(Address::Project { project: 1, section: ProjectSection::Overview }) },
+    );
+    let (watches, reads) = source_requests(&requests);
+    assert_eq!(watches.as_slice(), &[Subject::Goals { project: 1 }, Subject::Inbox { window: LIMITS.rows }]);
+    assert_eq!(reads.as_slice(), &[Read::Project { project: 1 }, Read::Goals { project: 1, after: None }]);
+}
+#[test]
+fn an_arranged_task_document_opens_its_parts_once() {
+    let (mut domain, opened) = arranged_task();
+    let mut document = super::confirmation::task();
+    let resource = Part::Resource { connector: 2, path: resource_path(b"resource") };
+    let panel = Part::Panel { connector: 3, task: 8 };
+    document.resources = List::with_capacity(1);
+    document.resources.push(TaskResource::Part(resource.clone())).unwrap();
+    let context = document.context.as_mut().unwrap();
+    context.parts = List::with_capacity(1);
+    context.parts.push(panel.clone()).unwrap();
+    let requests = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch { watch: open_token(&opened), event: WatchEvent::Delivered(Delivery::Task(Box::new(document))) },
+    );
+    let mut parts = List::with_capacity(LIMITS.parts);
+    for request in &requests {
+        if let Request::ShowPart { .. } = request {
+            parts.push(request.clone()).unwrap();
+        }
+    }
+    assert_eq!(
+        parts.as_slice(),
+        &[
+            Request::ShowPart { part: resource, generation: 1, scope: PartScope::Project(1) },
+            Request::ShowPart { part: panel, generation: 1, scope: PartScope::Project(1) },
+        ]
+    );
+}

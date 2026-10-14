@@ -501,6 +501,9 @@ pub(crate) fn document(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut 
     ] {
         if domain.shows(crate::pages::Section::Task { task: number, section }) {
             for part in parts(task, section, env.limits.parts.saturating_add(1)).into_boxed() {
+                if values.as_slice().contains(&part) {
+                    continue;
+                }
                 if values.push(part).is_err() {
                     break;
                 }
