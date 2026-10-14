@@ -263,6 +263,17 @@ the file.
      (`tests/local-process/tests/fuzzy_store.rs:206`) obtains it once
      before the world's metered processes start; the focused worlds
      already do. Every name, expected value and heap check stays.
+114. **jig 05.1 copies smith's full-turn golden again** (plan defect,
+     jig 05's block of 2026-10-14T01:35:46Z). jig keeps a copy of
+     smith's transcript golden `record_turn_full.bin` (127 bytes at jig's
+     pin); smith `47e99f6e` ("Record activation models and effort")
+     grew it to 142, the `model` and `effort` 05.1 already names, and
+     jig's gate failed on the old copy
+     (`logs/20261014T013335-88.log`). It is copied again, byte for byte,
+     from smith's revision in jig's lock; the three sizes that name it
+     move from 127 to 142, as smith's own change moved its golden
+     (development.md, 5.7: tests "adapted the way the upstream commit
+     adapted its own"). No byte is edited by hand.
 
 ## For the user
 
