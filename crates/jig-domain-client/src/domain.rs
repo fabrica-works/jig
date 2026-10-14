@@ -153,13 +153,8 @@ impl Domain {
     #[must_use]
     pub fn sections(&self) -> &[Section] {
         match self.page {
-            Page::Work { .. } => self.sections.as_slice(),
-            Page::Starting
-            | Page::Elsewhere
-            | Page::SigningIn
-            | Page::Missing
-            | Page::OutOfDate
-            | Page::SomeoneElse => &[],
+            Page::Work { .. } | Page::Elsewhere => self.sections.as_slice(),
+            Page::Starting | Page::SigningIn | Page::Missing | Page::OutOfDate | Page::SomeoneElse => &[],
         }
     }
     /// Installs ordered navigation and its home before start; capacities are checked.
@@ -528,7 +523,9 @@ impl Domain {
             let watch = self.watches.get_mut(*id).expect("registered watch exists");
             match watch.owner {
                 Owner::Frame => {}
-                Owner::Page { .. } | Owner::Application { .. } => close_watch(watch, *id, &mut self.timers, out),
+                Owner::Page { .. } | Owner::Application { .. } | Owner::Sections { .. } => {
+                    close_watch(watch, *id, &mut self.timers, out);
+                }
             }
         }
     }
@@ -543,7 +540,7 @@ impl Domain {
         for (id, ()) in &self.watch_ids {
             let watch = self.watches.get(*id).expect("registered watch exists");
             match watch.owner {
-                Owner::Frame | Owner::Application { .. } => {}
+                Owner::Frame | Owner::Application { .. } | Owner::Sections { .. } => {}
                 Owner::Page { generation } => {
                     if generation == self.generation && watch.behind {
                         behind = true;
@@ -613,6 +610,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             | Event::SignOutLost
             | Event::SignedOut
             | Event::ShowObjects { .. }
+            | Event::ShowSections { .. }
             | Event::ObjectsLeft
             | Event::Frame { .. }
             | Event::Kept { .. }
@@ -657,6 +655,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::Answered { request, answer } => crate::intents::answered(domain, env, request, answer, out),
         Event::SignOutLost => crate::signin::sign_out_lost(domain),
         Event::SignedOut => signed_out(domain, out),
+        Event::ShowSections { sections } => crate::pages::shown::show(domain, env, sections, out),
         Event::ShowObjects { objects } => crate::application::show(domain, env, objects, out),
         Event::ObjectsLeft => crate::application::left(domain, out),
         Event::Read { read, result } => {
@@ -897,7 +896,7 @@ fn watch_event(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, event: Wat
                     | Delivery::Deployment(_)
                     | Delivery::OwnerDeployment(_) => {}
                 },
-                Owner::Page { generation } => {
+                Owner::Page { generation } | Owner::Sections { generation } => {
                     if generation == domain.generation {
                         let contexts = crate::objects::contexts(
                             &delivery,
@@ -989,7 +988,7 @@ fn retry(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, out: &mut Queue<
     watch.behind = true;
     let frame = match watch.owner {
         Owner::Frame => true,
-        Owner::Page { .. } | Owner::Application { .. } => false,
+        Owner::Page { .. } | Owner::Application { .. } | Owner::Sections { .. } => false,
     };
     domain.timers.cancel(Timer::Silent(id));
     let span = backoff(&mut domain.rng, &env.limits, attempt);
@@ -1072,7 +1071,9 @@ fn terminal_watch(domain: &mut Domain, id: Id<Watch>, end: WatchEnd, out: &mut Q
         | Subject::Deployment => false,
     };
     let final_task = match (&watch.subject, owner) {
-        (Subject::Task { task }, Owner::Page { generation }) => Some((*task, generation)),
+        (Subject::Task { task }, Owner::Page { generation } | Owner::Sections { generation }) => {
+            Some((*task, generation))
+        }
         (Subject::Task { .. }, Owner::Frame | Owner::Application { .. })
         | (
             Subject::Frame
@@ -1096,7 +1097,7 @@ fn terminal_watch(domain: &mut Domain, id: Id<Watch>, end: WatchEnd, out: &mut Q
         read_final_task(domain, id, task, generation, out);
     }
     let preserve = match owner {
-        Owner::Page { generation } | Owner::Application { generation } => {
+        Owner::Page { generation } | Owner::Application { generation } | Owner::Sections { generation } => {
             generation == domain.generation && (end == WatchEnd::SubjectEnded || end == WatchEnd::Unknown)
         }
         Owner::Frame => false,
@@ -1110,7 +1111,7 @@ fn terminal_watch(domain: &mut Domain, id: Id<Watch>, end: WatchEnd, out: &mut Q
     }
     match owner {
         Owner::Frame => domain.set_link(Link::Offline, out),
-        Owner::Application { .. } => {}
+        Owner::Application { .. } | Owner::Sections { .. } => {}
         Owner::Page { generation } => {
             if generation == domain.generation && task_subject && domain.shown_task().is_some() {
                 match end {
@@ -1202,7 +1203,7 @@ pub fn fire(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
             watch.behind = true;
             let frame = match watch.owner {
                 Owner::Frame => true,
-                Owner::Page { .. } | Owner::Application { .. } => false,
+                Owner::Page { .. } | Owner::Application { .. } | Owner::Sections { .. } => false,
             };
             out.push(Request::Close { watch: id.token() });
             if frame {

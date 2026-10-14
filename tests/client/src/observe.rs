@@ -226,6 +226,7 @@ pub fn jig_received(event: &jig_domain_client::Event) -> Vec<Receipt> {
         | jig_domain_client::Event::Watch { .. }
         | jig_domain_client::Event::Ended { .. }
         | jig_domain_client::Event::ShowObjects { .. }
+        | jig_domain_client::Event::ShowSections { .. }
         | jig_domain_client::Event::ObjectsLeft
         | jig_domain_client::Event::Frame { .. } => vec![],
     }

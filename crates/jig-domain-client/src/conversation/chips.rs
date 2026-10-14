@@ -3,7 +3,6 @@
 use crate::{
     Domain, Request,
     contract::{Limit, ObjectKey, Subject},
-    watches::Owner,
 };
 use skein_lib::{Env, List, Queue};
 
@@ -12,8 +11,15 @@ use skein_lib::{Env, List, Queue};
 pub(crate) fn sync(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Queue<Request>) {
     match domain.page {
         crate::pages::Page::Work { .. } => {}
+        crate::pages::Page::Elsewhere => {
+            if !domain.shows(crate::pages::Section::Task {
+                task: domain.conversation.task,
+                section: crate::address::TaskSection::Activity,
+            }) {
+                return;
+            }
+        }
         crate::pages::Page::Starting
-        | crate::pages::Page::Elsewhere
         | crate::pages::Page::SigningIn
         | crate::pages::Page::Missing
         | crate::pages::Page::OutOfDate
@@ -68,7 +74,7 @@ pub(crate) fn sync(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Queu
         return;
     }
     let subject = Subject::Chips { tasks: domain.conversation.chips.clone() };
-    let owner = Owner::Page { generation: domain.generation };
+    let owner = crate::pages::shown::owner(domain);
     if let Some(id) = domain.open(env, subject, owner, out) {
         domain.conversation.chips_watch = Some(id);
         domain.conversation.chips_pending = false;

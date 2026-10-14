@@ -23,6 +23,8 @@ pub enum Owner {
     Page { generation: u32 },
     /// Jig objects held for an application page.
     Application { generation: u32 },
+    /// Jig sections held for an application page.
+    Sections { generation: u32 },
 }
 
 /// One watch's explicit lifecycle, including the old attempt's terminal.

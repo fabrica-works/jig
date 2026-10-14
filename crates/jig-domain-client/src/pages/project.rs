@@ -16,7 +16,6 @@ use crate::{
     address::ProjectSection,
     contract::{self, Cursor, GoalLine, NoteScope, Part, Project, Read, TaskFilter, TaskLine, Text},
     objects::{Object, Source},
-    watches::Owner,
 };
 use alloc::boxed::Box;
 use skein_lib::{Env, Id, List, Queue, Token};
@@ -136,7 +135,7 @@ pub(crate) fn number(domain: &Domain) -> Option<u32> {
     domain.shown_project()
 }
 fn open(domain: &mut Domain, env: &Env<crate::Limits>, subject: contract::Subject, out: &mut Queue<Request>) {
-    super::routing::open_once(domain, env, subject, Owner::Page { generation: domain.generation }, out);
+    super::routing::open_once(domain, env, subject, crate::pages::shown::owner(domain), out);
 }
 pub(crate) fn ask(domain: &mut Domain, number: u16, what: Read, out: &mut Queue<Request>) {
     if domain.reads.pending(&what) {
@@ -244,7 +243,7 @@ pub(crate) fn tasks(domain: &mut Domain, env: &Env<crate::Limits>, filter: TaskF
         let watch = domain.watches.get(*id).expect("registered watch");
         match watch.subject {
             contract::Subject::Tasks { .. } => {
-                if watch.owner == (Owner::Page { generation: domain.generation }) {
+                if watch.owner == (crate::pages::shown::owner(domain)) {
                     old.push(*id).expect("watch IDs fit");
                 }
             }

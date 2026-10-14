@@ -144,3 +144,111 @@ pub(crate) fn arrange(domain: &mut Domain) {
         Address::Inbox { .. } | Address::Conversations { .. } | Address::Deployment => {}
     }
 }
+
+pub(crate) fn owner(domain: &Domain) -> crate::watches::Owner {
+    match domain.page {
+        super::Page::Elsewhere => crate::watches::Owner::Sections { generation: domain.generation },
+        super::Page::Starting
+        | super::Page::Work { .. }
+        | super::Page::SigningIn
+        | super::Page::Missing
+        | super::Page::OutOfDate
+        | super::Page::SomeoneElse => crate::watches::Owner::Page { generation: domain.generation },
+    }
+}
+
+pub(crate) fn show(
+    domain: &mut Domain,
+    env: &skein_lib::Env<crate::Limits>,
+    sections: skein_lib::List<Section>,
+    out: &mut skein_lib::Queue<crate::Request>,
+) {
+    if domain.page != super::Page::Elsewhere || domain.confirmed.is_none() || domain.link != crate::link::Link::Live {
+        return;
+    }
+    if sections.len() > super::MOST_SECTIONS {
+        super::routing::refuse(domain, crate::contract::Limit::Objects);
+    }
+    let sections = sections
+        .as_slice()
+        .get(..usize::try_from(sections.len().min(super::MOST_SECTIONS)).expect("bounded section count"))
+        .expect("bounded prefix");
+    let previous = domain.sections.clone();
+    domain.sections.clear();
+    for section in sections {
+        let fits = match *section {
+            Section::Task { task, .. } => domain.shown_task().is_none() || domain.shown_task() == Some(task),
+            Section::Project { project, section } => {
+                let covered = match section {
+                    ProjectSection::Resources
+                    | ProjectSection::Policy
+                    | ProjectSection::Roles
+                    | ProjectSection::Spend
+                    | ProjectSection::Recurring => {
+                        sections.contains(&Section::Project { project, section: ProjectSection::Settings })
+                    }
+                    ProjectSection::Overview
+                    | ProjectSection::Goals
+                    | ProjectSection::Tasks
+                    | ProjectSection::Notes
+                    | ProjectSection::Settings => false,
+                };
+                !covered
+                    && (domain.shown_project().is_none() || domain.shown_project() == Some(project))
+                    && (section != ProjectSection::Overview
+                        || (domain.shown_inbox().is_none() || domain.shown_inbox() == Some(Some(project))))
+            }
+            Section::Inbox { project, .. } => domain.shown_inbox().is_none() || domain.shown_inbox() == Some(project),
+            Section::Conversations { project } => {
+                domain.shown_conversations().is_none() || domain.shown_conversations() == Some(project)
+            }
+            Section::Deployment => true,
+        };
+        if fits && !domain.sections.as_slice().contains(section) {
+            domain.sections.push(*section).expect("section count checked");
+        }
+    }
+
+    let owner = owner(domain);
+    for (id, ()) in &domain.watch_ids {
+        let watch = domain.watches.get(*id).expect("registered watch exists");
+        if watch.owner == owner && !needed(domain, &watch.subject) {
+            let watch = domain.watches.get_mut(*id).expect("registered watch exists");
+            crate::domain::close_watch(watch, *id, &mut domain.timers, out);
+        }
+    }
+    for index in 0..domain.sections.len() {
+        let section = *domain.sections.get(index).expect("section index exists");
+        if !previous.as_slice().contains(&section) {
+            super::routing::open_section(domain, env, section, owner, out);
+        }
+    }
+    if previous != domain.sections {
+        super::task::document(domain, env, out);
+        domain.changed();
+    }
+}
+
+pub(crate) fn needed(domain: &Domain, subject: &crate::contract::Subject) -> bool {
+    use crate::contract::Subject;
+    match subject {
+        Subject::Frame => false,
+        Subject::Task { task } => domain.shown_task() == Some(*task),
+        Subject::Tree { task, .. } => domain.shows(Section::Task { task: *task, section: TaskSection::Plan }),
+        Subject::Run { task, .. } => domain.shows(Section::Task { task: *task, section: TaskSection::Activity }),
+        Subject::Chips { .. } => {
+            domain.conversation.task != 0
+                && domain.shows(Section::Task { task: domain.conversation.task, section: TaskSection::Activity })
+        }
+        Subject::Inbox { .. } => domain.shown_inbox().is_some(),
+        Subject::Conversations => domain.shown_conversations().is_some(),
+        Subject::Goals { project } => {
+            domain.shows(Section::Project { project: *project, section: ProjectSection::Overview })
+                || domain.shows(Section::Project { project: *project, section: ProjectSection::Goals })
+        }
+        Subject::Tasks { project, .. } => {
+            domain.shows(Section::Project { project: *project, section: ProjectSection::Tasks })
+        }
+        Subject::Deployment => domain.shows(Section::Deployment),
+    }
+}

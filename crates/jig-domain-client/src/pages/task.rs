@@ -16,7 +16,6 @@ use crate::{
     address::TaskSection,
     contract::{self, Executor, Limit, ObjectKey, Part, Phase, PhaseCounts, ProposalKey, Read, Task, Tree, TreeNode},
     objects::{Body, Object, Source},
-    watches::Owner,
 };
 use alloc::boxed::Box;
 use skein_lib::{Env, Id, List, Map, Queue, Token};
@@ -414,7 +413,7 @@ fn proposal_cards(
     let mut source = None;
     for (id, ()) in &domain.watch_ids {
         let watch = domain.watches.get(*id).expect("registered watch exists");
-        if watch.owner == (Owner::Page { generation: domain.generation })
+        if watch.owner == (crate::pages::shown::owner(domain))
             && watch.subject == (contract::Subject::Task { task: number })
         {
             source = Some(Source::Watch(*id));
@@ -565,7 +564,7 @@ fn open_once(
     subject: contract::Subject,
     out: &mut Queue<Request>,
 ) -> bool {
-    super::routing::open_once(domain, env, subject, Owner::Page { generation: domain.generation }, out)
+    super::routing::open_once(domain, env, subject, crate::pages::shown::owner(domain), out)
 }
 
 fn read(domain: &mut Domain, number: u16, what: Read, out: &mut Queue<Request>) {

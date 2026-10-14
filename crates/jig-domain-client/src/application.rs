@@ -74,7 +74,7 @@ fn close(domain: &mut Domain, out: &mut Queue<Request>) {
         let watch = domain.watches.get_mut(*id).expect("registered watch exists");
         match watch.owner {
             Owner::Application { .. } => crate::domain::close_watch(watch, *id, &mut domain.timers, out),
-            Owner::Page { .. } | Owner::Frame => {}
+            Owner::Page { .. } | Owner::Sections { .. } | Owner::Frame => {}
         }
     }
 }

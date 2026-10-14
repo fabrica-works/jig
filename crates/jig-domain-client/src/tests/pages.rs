@@ -2989,3 +2989,100 @@ fn an_object_no_source_names_is_owed_while_deciding() {
     domain.objects.replace(source, &[]);
     assert!(domain.owes(id));
 }
+
+fn application_page() -> Domain {
+    let mut domain = Domain::new(&LIMITS, 1);
+    let f = start(&mut domain, List::with_capacity(0));
+    let initial = delivered(&mut domain, Time::ZERO, f, frame(7));
+    finish_initial_inbox_reads(&mut domain, &initial);
+    let left = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Elsewhere });
+    for request in &left {
+        if let Request::Close { watch } = request {
+            drive(&mut domain, Time::ZERO, Event::Ended { watch: *watch, end: WatchEnd::Closed });
+        }
+    }
+    domain.reclaim();
+    domain
+}
+fn show_sections(domain: &mut Domain, values: &[Section]) -> Box<[Request]> {
+    let mut sections = List::with_capacity(u32::try_from(values.len()).unwrap());
+    for section in values {
+        sections.push(*section).unwrap();
+    }
+    drive(domain, Time::ZERO, Event::ShowSections { sections })
+}
+#[test]
+fn an_application_page_naming_a_tasks_plan_opens_its_watch() {
+    let mut domain = application_page();
+    let opened = show_sections(&mut domain, &[Section::Task { task: 8, section: TaskSection::Plan }]);
+    let (watches, reads) = source_requests(&opened);
+    assert_eq!(watches.as_slice(), &[Subject::Task { task: 8 }]);
+    assert_eq!(reads.as_slice(), &[]);
+    let id = skein_lib::Id::from_token(open_token(&opened));
+    assert_eq!(domain.watches.get(id).unwrap().owner, crate::watches::Owner::Sections { generation: 1 });
+}
+#[test]
+fn naming_objects_anew_never_closes_a_sections_watch() {
+    let mut domain = application_page();
+    let opened = show_sections(&mut domain, &[Section::Task { task: 8, section: TaskSection::Plan }]);
+    let watch = open_token(&opened);
+    for keys in [&[ObjectKey::Task(8)][..], &[][..]] {
+        let mut objects = List::with_capacity(u32::try_from(keys.len()).unwrap());
+        for key in keys {
+            objects.push(*key).unwrap();
+        }
+        let requests = drive(&mut domain, Time::ZERO, Event::ShowObjects { objects });
+        assert!(!requests.contains(&Request::Close { watch }));
+    }
+    assert!(!drive(&mut domain, Time::ZERO, Event::ObjectsLeft).contains(&Request::Close { watch }));
+}
+#[test]
+fn a_section_naming_a_second_task_is_not_shown() {
+    let mut domain = application_page();
+    let first = Section::Task { task: 8, section: TaskSection::Plan };
+    let second = Section::Task { task: 9, section: TaskSection::Plan };
+    show_sections(&mut domain, &[first, second]);
+    assert_eq!(domain.sections(), &[first]);
+    assert!(!domain.shows(second));
+}
+#[test]
+fn an_empty_list_closes_every_sections_watch() {
+    let mut domain = application_page();
+    let opened = show_sections(&mut domain, &[Section::Task { task: 8, section: TaskSection::Plan }]);
+    assert_eq!(show_sections(&mut domain, &[]).as_ref(), &[Request::Close { watch: open_token(&opened) }]);
+}
+
+#[test]
+fn naming_sections_anew_never_closes_an_objects_watch() {
+    let mut domain = application_page();
+    let mut objects = List::with_capacity(1);
+    objects.push(ObjectKey::Task(8)).unwrap();
+    let opened = drive(&mut domain, Time::ZERO, Event::ShowObjects { objects });
+    let watch = open_token(&opened);
+    show_sections(&mut domain, &[Section::Task { task: 8, section: TaskSection::Plan }]);
+    assert!(!show_sections(&mut domain, &[]).contains(&Request::Close { watch }));
+}
+#[test]
+fn replacing_sections_keeps_their_shared_subject_watch() {
+    let mut domain = application_page();
+    show_sections(&mut domain, &[Section::Task { task: 8, section: TaskSection::Overview }]);
+    let requests = show_sections(&mut domain, &[Section::Task { task: 8, section: TaskSection::Plan }]);
+    assert_eq!(requests.as_ref(), &[]);
+}
+#[test]
+fn naming_the_same_sections_opens_nothing_again() {
+    let mut domain = application_page();
+    let sections = [Section::Task { task: 8, section: TaskSection::Plan }];
+    show_sections(&mut domain, &sections);
+    assert_eq!(show_sections(&mut domain, &sections).as_ref(), &[]);
+}
+#[test]
+fn leaving_an_application_page_closes_its_sections() {
+    let mut domain = application_page();
+    let opened = show_sections(&mut domain, &[Section::Task { task: 8, section: TaskSection::Plan }]);
+    let requests = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Elsewhere });
+    assert_eq!(
+        requests.as_ref(),
+        &[Request::Close { watch: open_token(&opened) }, Request::PartsLeft { generation: 1 }]
+    );
+}

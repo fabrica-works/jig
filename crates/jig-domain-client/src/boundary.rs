@@ -48,6 +48,8 @@ pub enum Event {
     Ended { watch: Token, end: WatchEnd },
     /// An application page names jig objects for the current page generation.
     ShowObjects { objects: List<crate::contract::ObjectKey> },
+    /// An application page names jig sections for the current generation.
+    ShowSections { sections: List<crate::pages::Section> },
     /// The application page stopped naming jig objects.
     ObjectsLeft,
     /// The sign-out exchange ended lost (protocol/client.md, 4):

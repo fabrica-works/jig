@@ -6,7 +6,6 @@ use crate::{
     Domain, Request,
     contract::{ConversationLine, InboxGroup, Limit, ObjectKey, Subject},
     objects::{Body, Context, Source},
-    watches::Owner,
 };
 use skein_lib::{Env, List, Queue};
 
@@ -15,7 +14,7 @@ use skein_lib::{Env, List, Queue};
 fn source(domain: &Domain, fallback: Source, conversations: bool) -> Source {
     for (id, ()) in &domain.watch_ids {
         let watch = domain.watches.get(*id).expect("registered watch exists");
-        if watch.owner != (Owner::Page { generation: domain.generation }) {
+        if watch.owner != (crate::pages::shown::owner(domain)) {
             continue;
         }
         let matches = match watch.subject {
