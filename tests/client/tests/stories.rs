@@ -344,3 +344,17 @@ fn a_proposal_accepted_in_an_arranged_plan_leaves_while_its_chat_shows() {
     w.run(Until::Done);
     assert_eq!(w.front().engine.commits().iter().filter(|c| c.key.is_some()).count(), 1);
 }
+
+#[test]
+fn a_family_page_shows_its_tasks_plan_and_not_a_second_one() {
+    let mut w = stories::two_plans_world(16);
+    let c = w.client(7, stories::incident());
+    w.person(
+        c,
+        vec![
+            Step::See { find: Find::named(Role::Region, b"Plan"), within: WITHIN },
+            Step::See { find: Find::text(b"Cannot show this part"), within: WITHIN },
+        ],
+    );
+    w.run(Until::Done);
+}

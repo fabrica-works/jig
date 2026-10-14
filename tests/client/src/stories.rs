@@ -816,6 +816,14 @@ fn incident_delegate() -> Task {
 /// Lead task, delegate and connector parts behind the incident journey.
 #[must_use]
 pub fn incident_world(seed: u64) -> World<Test, Scripted> {
+    incident_world_with_second(seed, None)
+}
+/// An incident naming the plans of its lead task and a second task.
+#[must_use]
+pub fn two_plans_world(seed: u64) -> World<Test, Scripted> {
+    incident_world_with_second(seed, Some(10))
+}
+fn incident_world_with_second(seed: u64, second: Option<u64>) -> World<Test, Scripted> {
     use jig_test_domain_client::family as f;
     let mut world = proposal_fixture(seed, true);
     let delegate = incident_delegate();
@@ -874,7 +882,7 @@ pub fn incident_world(seed: u64) -> World<Test, Scripted> {
             state: f::ItemState::Ready,
             value: 1,
             task: 9,
-            second: None,
+            second,
             proposals: list([]),
             touchable: false,
         }),
