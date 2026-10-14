@@ -71,19 +71,33 @@ a task's page arranged with every section together.
 Scope: pages.md, 12.3 ("More sections together", "The tabs"); view.md,
   4.1 (`pages::main`).
 Needs: jig 05 (`sections::*`); jig 04.2 (an arranged page's sections).
-Files: `crates/jig-view/src/pages.rs` (`main`);
+Files: `crates/jig-view/src/pages.rs` (`main`; it already builds
+  `sections::section` for each of `client.sections()`, `:120-122,129-131`);
   `crates/jig-view/src/sections/task.rs` and `sections/project.rs`
-  (`tabs`); tests in `crates/jig-view/src/tests/work_pages.rs`.
+  (`tabs`, `section`); tests in `crates/jig-view/src/tests/work_pages.rs`,
+  and a start given an `Arrangement` beside `start` in
+  `crates/jig-view/src/tests/cards.rs:165-183` (`configure_arrangement`
+  between `Domain::new(&CLIENT, 1)` and `Event::Start`), for
+  `work_pages.rs`'s `entered` and `task` (`:38,65`); its `task()` fixture
+  already offers the six sections (`:722-746`).
 Shape: `main` builds, at a task's or a project's address: `heading`,
   `header`, `tabs` unless every section the tabs would list is shown
-  (for a task, every section `pages::task::offers`; for a project, every
-  section its tabs list, `sections/project.rs`'s `tabs`), then
+  (for a task, every section `pages::task::offers`; for a project,
+  `Overview`, `Goals`, `Tasks` and `Notes`, each in `client.sections()`,
+  and `Settings` or each of its five: `Settings` holds its five,
+  client.md 5.1, "Each section once", and `arrange` keeps it whole,
+  `crates/jig-domain-client/src/pages/shown.rs:114-143`, so the ten its
+  tabs list are never all in the list), then
   `sections::section` for each of `client.sections()`. `tabs` marks the
   address's own section current, as in jig 05.1; when the page shows
-  more than one section of its subject, `sections::section` also marks
-  the address's own section's region `State::Current` (pages.md, 12.3:
-  "The address's section is the one marked current"), so it stays
-  marked when the tabs are left out.
+  more than one section of its subject, the address's own section's
+  region is marked `State::Current` (pages.md, 12.3: "The address's
+  section is the one marked current"), so it stays marked when the tabs
+  are left out. `sections::section` only dispatches; the mark goes after
+  `pages::work::section` returns, at the three sites that open the
+  region: `sections/task.rs:138`, `sections/project.rs:88`, and the
+  Settings loop at `sections/project.rs:119` (an address at one of the
+  five, with `Settings` arranged).
 Test shape: `crates/jig-view/src/tests/work_pages.rs`, with a domain given
   `configure_arrangement` (every `TaskSection`) before `start`:
   `an_arranged_task_page_shows_its_six_sections_in_order` and
@@ -103,7 +117,7 @@ Files: `crates/jig-view/src/limits.rs:60-133` (`of`, `compose`,
   `:117-119`, `project_nodes` `:180-188`, `page_nodes` `:211-221`), with a
   companion per section and header (`sections::*`'s `_nodes`
   functions, in `sizes/`); the callers of `jig_view::Limits::of` (3:
-  `crates/jig-view/src/tests/cards_sizes.rs:472,480,483`) and of
+  `crates/jig-view/src/tests/cards_sizes.rs:481,489,492`) and of
   `jig_view::Limits::compose` (6: `git grep -n 'Limits::compose(' --
   '*.rs'` lists them; findings/view.md, 6, names those that pin the
   formula: `crates/jig-view/src/tests/page_capacity.rs:511-531`,
@@ -144,12 +158,18 @@ Removes: nothing.
 ### 06.3 The owed cards, from the domain
 Scope: view.md, 4.1 (`after_page`); pages.md, 12.1 (the owed cards).
 Needs: jig 05 (the sections' card sites moved to `sections/`).
-Files: `crates/jig-view/src/pages.rs:136-210` (`retained_outside_plan`,
-  `after_page`'s scan `:187-193`); `crates/jig-domain-client/src/domain.rs`
-  (`owes`); the sections' card sites (findings/view.md, 5, at their
-  paths after jig 05: `sections/task.rs` (`:167,195,268` at the base),
-  `sections/project.rs` (`:233,241`), `sections/inbox.rs` (`:214,275`),
-  `sections/conversations.rs` (`:33-35`)); tests in
+Files: `crates/jig-view/src/pages.rs:164-244` (`retained_outside_plan`
+  `:164-197`, `after_page` `:199-244`, its scan `:213-219`);
+  `crates/jig-domain-client/src/domain.rs` (`owes`); the sections' card
+  sites (findings/view.md, 5, at their paths after jig 05):
+  `sections/task.rs:226-227,254-255,326-327` and its skip of a proposal
+  with no source `:310-320`, `sections/project.rs:256-257,264-265`,
+  `sections/inbox.rs:241-242,302-303`, `sections/conversations.rs:42-44`;
+  the conversation's card sites, `crates/jig-view/src/turns/call.rs:58-59`
+  and `turns/activity.rs:60-61,76-77` (through `turns::shows_object`,
+  `turns/objects.rs:9`), as the designer's answer to the question of
+  the ready check of jig-06.1 says: 06.3 starts only after that answer's
+  ruling; tests in
   `crates/jig-view/src/tests/{pages.rs,task_proposals.rs}`.
 Shape: `pub fn owes(&self, id: Id<Object>) -> bool` on `Domain`: the
   object is shown, its card is `Deciding`, `Leaving` or `Unknown`, and
@@ -166,7 +186,10 @@ Test shape: `crates/jig-view/src/tests/task_proposals.rs`:
   `crates/jig-view/src/tests/page_capacity.rs`:
   `the_most_owed_cards_fit_the_pages_bound` (at `CLIENT`, as many
   objects deciding with no source as `CLIENT.objects`: the tree fits
-  `Limits::of(&CLIENT, &Arrangement::none())`). Each under 20 ms.
+  `Limits::of(&CLIENT)`, as `limits.rs:67` takes it at the base; 06.2,
+  if it lands first, gives it `&Arrangement::none()` with its other
+  callers). Each under 20 ms. A test over the objects is a `for` loop:
+  the lints refuse `.iter().any(..)` ("no closures: a for loop").
 Proof: world, `heavy cargo nextest run -p jig-client-world -p
   jig-ops-world` once: the stories where a card leaves after its
   source stopped naming it (a proposal accepted in the inbox leaving its
