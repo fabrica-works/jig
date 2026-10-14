@@ -102,7 +102,7 @@ impl Face for TreeFace<'_> {
         let Some(node) = self.tree.find(id) else {
             return false;
         };
-        if self.tree.bound(id).is_none() || node.states.as_slice().contains(&State::Disabled) {
+        if self.tree.bound(id).is_none() || node.states.as_slice().contains(&State::Disabled) || passive(node.role) {
             return false;
         }
         match act {
@@ -116,6 +116,18 @@ impl Face for TreeFace<'_> {
 pub(crate) fn role_name(role: Role) -> &'static str {
     match role {
         Role::Page => "page",
+        Role::Banner => "banner",
+        Role::Navigation => "navigation",
+        Role::Main => "main",
+        Role::Complementary => "complementary",
+        Role::ContentInfo => "content info",
+        Role::Form => "form",
+        Role::Search => "search",
+        Role::Menu => "menu",
+        Role::MenuItem => "menu item",
+        Role::Disclosure => "disclosure",
+        Role::Image => "image",
+
         Role::Region => "region",
         Role::Heading { .. } => "heading",
         Role::Paragraph => "paragraph",
@@ -151,4 +163,20 @@ pub(crate) fn role_name(role: Role) -> &'static str {
         Role::Slot => "slot",
         Role::Drawing => "drawing",
     }
+}
+
+pub(crate) fn passive(role: Role) -> bool {
+    [
+        Role::Banner,
+        Role::Navigation,
+        Role::Main,
+        Role::Complementary,
+        Role::ContentInfo,
+        Role::Form,
+        Role::Search,
+        Role::Menu,
+        Role::Disclosure,
+        Role::Image,
+    ]
+    .contains(&role)
 }

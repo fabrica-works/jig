@@ -71,7 +71,8 @@ impl RandomPerson {
 }
 
 fn available(node: &Node) -> bool {
-    node.id != NodeId(0)
+    !crate::tree::passive(node.role)
+        && node.id != NodeId(0)
         && (node.binding.is_some() || node.link.is_some())
         && !node.states.as_slice().contains(&State::Disabled)
 }
@@ -80,6 +81,17 @@ fn field(role: Role) -> bool {
     match role {
         Role::TextField | Role::TextArea => true,
         Role::Page
+        | Role::Banner
+        | Role::Navigation
+        | Role::Main
+        | Role::Complementary
+        | Role::ContentInfo
+        | Role::Form
+        | Role::Search
+        | Role::Menu
+        | Role::MenuItem
+        | Role::Disclosure
+        | Role::Image
         | Role::Region
         | Role::Heading { .. }
         | Role::Paragraph
@@ -118,6 +130,17 @@ fn choice(role: Role) -> bool {
     match role {
         Role::Choice | Role::Check => true,
         Role::Page
+        | Role::Banner
+        | Role::Navigation
+        | Role::Main
+        | Role::Complementary
+        | Role::ContentInfo
+        | Role::Form
+        | Role::Search
+        | Role::Menu
+        | Role::MenuItem
+        | Role::Disclosure
+        | Role::Image
         | Role::Region
         | Role::Heading { .. }
         | Role::Paragraph

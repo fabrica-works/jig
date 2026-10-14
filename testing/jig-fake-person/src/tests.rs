@@ -493,3 +493,80 @@ fn exact_names_distinguish_release_from_amend_and_release_without_escaping_subtr
     assert_eq!(outside.find(&Find::exactly_named(Role::Button, b"Con")), Found::Absent);
     assert_eq!(format!("{}", Find::exactly_named(Role::Button, b"Release")), "button named exactly Release");
 }
+
+#[test]
+fn a_menu_item_inside_a_named_menu_is_found_and_pressable() {
+    let view = build(|b| {
+        b.open(Role::Page);
+        b.open(Role::Menu);
+        b.name(b"More");
+        b.open(Role::MenuItem);
+        b.name(b"Archive");
+        b.bind(binding(1));
+        b.close();
+        b.close();
+        b.close();
+    });
+    let mut face = TreeFace::new(view.tree());
+    let menu = Target::Role { role: Role::Menu, name: Box::from(*b"More") };
+    let Found::Node(item) = face.find(&Find::named(Role::MenuItem, b"Archive").within(Box::from([menu]))) else {
+        panic!("the menu item is found inside its menu");
+    };
+    assert!(face.allows(item, &Act::Press));
+}
+
+#[test]
+fn a_disclosures_content_is_found_by_its_text() {
+    let view = build(|b| {
+        b.open(Role::Page);
+        b.open(Role::Disclosure);
+        b.name(b"Details");
+        b.text(Run::Plain, b"Waiting for an answer");
+        b.close();
+        b.close();
+    });
+    let mut face = TreeFace::new(view.tree());
+    let disclosure = Target::Role { role: Role::Disclosure, name: Box::from(*b"Details") };
+    let found = face.find(&Find::text(b"Waiting for an answer").within(Box::from([disclosure])));
+    let Found::Node(node) = found else { panic!("the folded content remains readable") };
+    assert_eq!(view.tree().find(node).unwrap().role, Role::Text);
+}
+
+#[test]
+fn the_random_person_never_acts_on_a_landmark() {
+    let view = build(|b| {
+        b.open(Role::Page);
+        for role in [
+            Role::Banner,
+            Role::Navigation,
+            Role::Main,
+            Role::Complementary,
+            Role::ContentInfo,
+            Role::Form,
+            Role::Search,
+        ] {
+            b.open(role);
+            b.bind(binding(1));
+            b.close();
+        }
+        b.open(Role::Button);
+        b.name(b"Continue");
+        b.bind(binding(2));
+        b.close();
+        b.close();
+    });
+    let mut person = RandomPerson::new(7, 4);
+    let mut acted = 0;
+    let face = TreeFace::new(view.tree());
+    for _ in 0..128 {
+        match person.next(view.tree()) {
+            Some(RandomDoing::Act { node, act }) => {
+                assert_eq!(view.tree().find(node).unwrap().role, Role::Button);
+                assert!(face.allows(node, &act));
+                acted += 1;
+            }
+            Some(RandomDoing::Back | RandomDoing::Reload) | None => {}
+        }
+    }
+    assert!(acted > 0);
+}

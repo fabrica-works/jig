@@ -24,6 +24,21 @@ pub enum Owner {
 pub enum Role {
     /// A page node.
     Page,
+    /// The banner landmark.
+    Banner,
+    /// The navigation landmark.
+    Navigation,
+    /// The main landmark.
+    Main,
+    /// The complementary landmark.
+    Complementary,
+    /// The content information landmark.
+    ContentInfo,
+    /// The form landmark.
+    Form,
+    /// The search landmark.
+    Search,
+
     /// A region node.
     Region,
     /// A heading at a semantic level.
@@ -86,6 +101,15 @@ pub enum Role {
     Quote,
     /// A separator node.
     Separator,
+    /// A named group of additional acts.
+    Menu,
+    /// A bound act inside a menu.
+    MenuItem,
+    /// A region a shell may fold.
+    Disclosure,
+    /// A named picture from its owner.
+    Image,
+
     /// A figure node.
     Figure,
     /// A slot node.

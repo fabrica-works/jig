@@ -5,9 +5,9 @@ use skein_lib::Token;
 
 #[test]
 fn each_shell_act_resolves_by_node_identity_and_links_name_their_owner_address() {
-    let mut builder = Builder::new(&Limits { bindings: 5, ..LIMITS });
+    let mut builder = Builder::new(&Limits { bindings: 6, ..LIMITS });
     builder.open(Role::Page);
-    for role in [Role::Button, Role::TextField, Role::TextArea, Role::Check, Role::Link] {
+    for role in [Role::Button, Role::TextField, Role::TextArea, Role::Check, Role::Link, Role::MenuItem] {
         builder.open(role);
         let binding = Binding { owner: Owner::Application { number: 2 }, token: Token::new(7) };
         if role == Role::Link {
@@ -31,6 +31,7 @@ fn each_shell_act_resolves_by_node_identity_and_links_name_their_owner_address()
     assert_eq!(tree.act(NodeId(4), Act::Submit), Some(BoundAct { binding, act: Act::Submit }));
     assert_eq!(tree.act(NodeId(5), Act::Toggle), Some(BoundAct { binding, act: Act::Toggle }));
     assert_eq!(tree.act(NodeId(6), Act::Press), Some(BoundAct { binding, act: Act::Press }));
+    assert_eq!(tree.act(NodeId(7), Act::Press), Some(BoundAct { binding, act: Act::Press }));
     assert_eq!(tree.address(NodeId(6)), Some(binding));
     assert!(tree.address(NodeId(2)).is_none());
     assert!(tree.act(NodeId(1), Act::Press).is_none());
