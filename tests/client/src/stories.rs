@@ -423,6 +423,51 @@ pub fn proposal() -> Proposal {
 pub fn proposal_world(seed: u64) -> World<Test, Scripted> {
     proposal_fixture(seed, false)
 }
+/// A proposal in the task's plan and in the committed call that made it.
+#[must_use]
+pub fn arranged_proposal_world(seed: u64) -> World<Test, Scripted> {
+    let mut world = proposal_world(seed);
+    let mut lead = task();
+    lead.proposals = list([proposal().key]);
+    let context = lead.context.as_mut().expect("task fixture supplies context");
+    context.impact.tasks.running = 1;
+    context.parts = list([Part::Panel { connector: jig_test_domain_client::FIRST, task: 9 }]);
+    world
+        .front()
+        .engine
+        .act(
+            skein_lib::Time::ZERO,
+            Wall::EPOCH,
+            jig_scripted_engine::Change::Object {
+                project: 1,
+                key: ObjectKey::Task(9),
+                value: ReadValue::Task(Box::new(lead)),
+            },
+        )
+        .expect("arranged task fits");
+    let empty = PhaseCounts { ended: 0, waiting: 0, running: 0, held: 0, closing: 0, done: 0, failed: 0, cancelled: 0 };
+    let tree = Tree {
+        task: 9,
+        nodes: list([TreeNode {
+            chip: task().chip,
+            parent: None,
+            dependencies: list([]),
+            proposals: list([proposal().key]),
+            spend: 0,
+            folded: empty,
+            held_below: 0,
+        }]),
+        folded: empty,
+        held_below: 0,
+    };
+    world
+        .front()
+        .engine
+        .act(skein_lib::Time::ZERO, Wall::EPOCH, jig_scripted_engine::Change::Tree(tree))
+        .expect("arranged plan fits");
+    accepted_proposal(&mut world, &proposal());
+    world
+}
 fn proposal_fixture(seed: u64, delegate_chip: bool) -> World<Test, Scripted> {
     let mut world = chat_ready(seed);
     let p = proposal();
@@ -546,6 +591,37 @@ fn accepted_proposal(world: &mut World<Test, Scripted>, p: &Proposal) {
             },
         });
     }
+    let mut changes = vec![
+        jig_scripted_engine::Change::Object {
+            project: 1,
+            key: ObjectKey::Proposal(p.key),
+            value: ReadValue::Proposal(Box::new(decided)),
+        },
+        jig_scripted_engine::Change::Object {
+            project: 1,
+            key: ObjectKey::Task(9),
+            value: ReadValue::Task(Box::new(lead)),
+        },
+        jig_scripted_engine::Change::Source(after),
+        jig_scripted_engine::Change::Source(jig_scripted_engine::Source {
+            party: 7,
+            read: Read::Inbox {
+                group: jig_domain_client::contract::InboxReadGroup::Needs,
+                project: None,
+                kind: None,
+                goal: None,
+                after: None,
+            },
+            rows: jig_scripted_engine::Rows::Inbox(vec![]),
+        }),
+    ];
+    if let Some(tree) = world.front().engine.truth().trees.get(&9) {
+        let mut tree = tree.clone();
+        for index in 0..tree.nodes.len() {
+            tree.nodes.get_mut(index).expect("bounded tree row exists").proposals.clear();
+        }
+        changes.push(jig_scripted_engine::Change::Tree(tree));
+    }
     world
         .front()
         .engine
@@ -553,30 +629,7 @@ fn accepted_proposal(world: &mut World<Test, Scripted>, p: &Proposal) {
             party: Some(7),
             ask: Ask::DecideProposal { project: 1, proposal: p.key, decision: Decision::Accepted },
             answer: Answer::Done(Outcome::Decided { by: Actor::Party(7), how: Decision::Accepted, at: Wall::EPOCH }),
-            changes: vec![
-                jig_scripted_engine::Change::Object {
-                    project: 1,
-                    key: ObjectKey::Proposal(p.key),
-                    value: ReadValue::Proposal(Box::new(decided)),
-                },
-                jig_scripted_engine::Change::Object {
-                    project: 1,
-                    key: ObjectKey::Task(9),
-                    value: ReadValue::Task(Box::new(lead)),
-                },
-                jig_scripted_engine::Change::Source(after),
-                jig_scripted_engine::Change::Source(jig_scripted_engine::Source {
-                    party: 7,
-                    read: Read::Inbox {
-                        group: jig_domain_client::contract::InboxReadGroup::Needs,
-                        project: None,
-                        kind: None,
-                        goal: None,
-                        after: None,
-                    },
-                    rows: jig_scripted_engine::Rows::Inbox(vec![]),
-                }),
-            ],
+            changes,
         })
         .expect("accepted activity rule fits");
 }

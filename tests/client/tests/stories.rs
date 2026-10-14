@@ -1,5 +1,5 @@
-use jig_client_world::{Until, stories};
-use jig_fake_person::{Find, Step};
+use jig_client_world::{Until, stories, test};
+use jig_fake_person::{Find, Step, Target};
 use jig_view::Role;
 use skein_lib::Duration;
 const WITHIN: Duration = Duration::from_secs(1);
@@ -321,4 +321,26 @@ fn a_held_chat_is_released_at_the_text_shell() {
     let outcome = w.run(Until::Done);
     assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
     assert_eq!(w.front().engine.commits().iter().filter(|commit| commit.key.is_some()).count(), 1);
+}
+
+fn plan() -> Target {
+    Target::Role { role: Role::Region, name: Box::from(*b"Plan") }
+}
+#[test]
+fn a_proposal_accepted_in_an_arranged_plan_leaves_while_its_chat_shows() {
+    let mut w = stories::arranged_proposal_world(15);
+    let c = w.client_with(7, stories::chat(), test::limits(), test::arranged);
+    w.run(Until::Time(w.now().saturating_add(Duration::from_millis(80))));
+    w.person(
+        c,
+        vec![
+            Step::See { find: Find::named(Role::Log, b"Conversation"), within: WITHIN },
+            Step::Press { find: Find::named(Role::Button, b"Accept").within(Box::new([plan()])) },
+            Step::Press { find: Find::named(Role::Button, b"Confirm") },
+            Step::Gone { find: Find::named(Role::Button, b"Accept").within(Box::new([plan()])), within: WITHIN },
+            Step::See { find: Find::named(Role::Log, b"Conversation"), within: WITHIN },
+        ],
+    );
+    w.run(Until::Done);
+    assert_eq!(w.front().engine.commits().iter().filter(|c| c.key.is_some()).count(), 1);
 }

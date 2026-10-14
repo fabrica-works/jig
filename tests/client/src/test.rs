@@ -106,24 +106,35 @@ struct Fixture {
     worst_case: u64,
 }
 fn fixture(limits: &domain::Limits) -> &'static Fixture {
-    static FIXTURES: OnceLock<Mutex<Vec<(domain::Limits, &'static Fixture)>>> = OnceLock::new();
+    fixture_with(limits, false)
+}
+type Fixtures = Vec<(domain::Limits, bool, &'static Fixture)>;
+fn fixture_with(limits: &domain::Limits, arranged: bool) -> &'static Fixture {
+    static FIXTURES: OnceLock<Mutex<Fixtures>> = OnceLock::new();
     let mut fixtures = FIXTURES.get_or_init(|| Mutex::new(Vec::new())).lock().expect("fixture envelopes lock");
-    if let Some((_, fixture)) = fixtures.iter().find(|(key, _)| key == limits) {
+    if let Some((_, _, fixture)) = fixtures.iter().find(|(key, mode, _)| key == limits && *mode == arranged) {
         return fixture;
     }
     let books = phrasebooks(limits);
-    let bounds = view::Limits::for_world(limits, &books.0, &books.1, 1024, 256).expect("view bounds fit");
+    let bounds = view::Limits::for_world(limits, &books.0, &books.1, if arranged { 2048 } else { 1024 }, 256)
+        .expect("view bounds fit");
     let worst_case = domain::worst_case(limits).expect("root worst case")
         // The shell model is bounded by another renderer envelope.
         + 2 * view::worst_case(&bounds, limits, &books.0, &books.1).expect("view worst case");
     let fixture = Box::leak(Box::new(Fixture { books, bounds, worst_case }));
-    fixtures.push((*limits, fixture));
+    fixtures.push((*limits, arranged, fixture));
     fixture
 }
 /// Constructs the test application's root and view with one declared bound.
 #[must_use]
 pub fn new(limits: &domain::Limits, seed: u64) -> (domain::Domain, view::View<'static>) {
-    let fixture = fixture(limits);
+    from_fixture(limits, seed, fixture(limits))
+}
+fn from_fixture(
+    limits: &domain::Limits,
+    seed: u64,
+    fixture: &'static Fixture,
+) -> (domain::Domain, view::View<'static>) {
     let (words, family) = fixture.books;
     let mut root = domain::new(limits, seed);
     domain::provider(&mut root, jig_domain_client::signin::Provider { number: 1, name: crate::stories::text(b"Test") })
@@ -134,6 +145,29 @@ pub fn new(limits: &domain::Limits, seed: u64) -> (domain::Domain, view::View<'s
     )
     .expect("second provider fits");
     (root, view::View::new(&fixture.bounds, limits, words, family, first::Address { project: 1, item: 1 }))
+}
+/// Constructs the one arranged client used by the all-sections story.
+#[must_use]
+pub fn arranged(seed: u64) -> (domain::Domain, view::View<'static>) {
+    use jig_domain_client::{address::TaskSection, pages::Arrangement};
+    let limits = limits();
+    let (mut root, view) = from_fixture(&limits, seed, fixture_with(&limits, true));
+    domain::configure_arrangement(
+        &mut root,
+        Arrangement {
+            task: list([
+                TaskSection::Overview,
+                TaskSection::Activity,
+                TaskSection::Plan,
+                TaskSection::History,
+                TaskSection::Budget,
+                TaskSection::Panels,
+            ]),
+            project: list([]),
+        },
+    )
+    .expect("arrangement is valid before start");
+    (root, view)
 }
 impl App for Test {
     type Root = domain::Domain;
