@@ -18,8 +18,8 @@ listed in section 10.
   on an application's arrangement of the same sections.
 - **One person, every tier.** The person is a script that asks its face to
   find and act, so a scenario written once runs on the tree face in every
-  world, and on a browser's accessibility tree once the browser tier
-  exists.
+  world, and on a browser's accessibility tree through the browser's
+  face, in the browser tier (section 3).
 - **The client's world comes first.** The real domain and view, a scripted
   engine that keeps the contract (contract.md), the shell played by the
   world, and every fault of section 7. Most of the client's tests live
@@ -37,19 +37,22 @@ listed in section 10.
 
 | Tier | Real | Faked |
 |---|---|---|
-| step tests | one step function of the domain or the view; the diff; the Markdown reader; words; the page's outline on each of jig's pages; the text shell's renderer and command reader, by golden text (view.md, 15.6) | its events, by hand |
+| step tests | one step function of the domain or the view; the diff; the Markdown reader; words; the page's outline on each of jig's pages; the text shell's renderer and command reader, by golden text (view.md, 15.6); drawing code, by golden scenes (view.md, 17.5) | its events, by hand |
 | the client's world | the client root, its domain and its view, for jig's test application or a real one | the engine, scripted; the shell, played by the world; the person |
 | the joint world | the client root, domain and view, and the engine's domain, root and all | the store, hosts and systems, as the engine's worlds fake them; the shell; the person |
-| the protocol world, the real loop, the browser | with the client's protocol layer and shells; the text shell's terminal in front of the native one, on skein's simulated machine | |
+| the protocol world, the real loop | with the client's protocol layer and shells; the text shell's terminal in front of the native one, on skein's simulated machine | |
+| the browser tier | the application's binary and its bundle in Chromium, the person through the browser's face (section 3) | what the binary's configuration fakes |
 
 Every world runs on skein's world harness: one loop, one seed, the
 referee in the loop, the heap counted at every iteration
-(testing-strategy.md, sections 6 and 7).
+(testing-strategy.md, sections 6 and 7). The browser tier is no world:
+its engine and its Chromium are real processes, children of the
+harness's one loop (section 3).
 
 ## 3. The person
 
 `testing/jig-fake-person`, ordinary Rust like jig's other kits, shaped as
-a step machine so that a browser's loop can run it later.
+a step machine so that the browser tier's loop runs it too.
 
 - **What it looks for:** a target by role and words in its name, or by
   its text, within regions named outermost first: "the button named
@@ -64,11 +67,29 @@ a step machine so that a browser's loop can run it later.
   way an accessibility tree is searched, and turns its acts into the
   acts the shell would report. It reads a drawing by its name and its
   fallback, as a screen reader does (view.md, section 3).
-- **A random person,** for the fuzzy suite, presses any bound node and
-  types any words drawn from the seed, so a sweep reaches what no script
-  names.
-- **The browser's face** comes with the browser tier, over skein's
-  browser kit (skein's `browser.md`), as a crate of its own.
+- **A random person,** for the fuzzy suite, presses any bound node but
+  a drawing (view.md, 17.3) and types any words drawn from the seed, so
+  a sweep reaches what no script names.
+- **The browser's face,** `jig-fake-person-browser`, a kit of its own,
+  ordinary Rust: the person's face over skein's browser kit (skein's
+  `browser.md`). It answers the person's queries on the browser's
+  accessibility tree, roles through the browser's mapping of the tree
+  (`../../protocol/browser.md`, section 6), names by words in them or
+  exactly, text by words within one text run,
+  pending while the kit answers; its acts are a press, typing (the field
+  cleared, then the words), Enter for a send, a navigation to an
+  address's path, and a reload. A browser's accessibility tree makes
+  each run of a node's text (emphasis, strong, code, a link) a text of
+  its own, so a story that runs in the browser tier finds text by words
+  within one run; the tree face matches a node's whole text.
+- **Its harness,** in the same kit, runs the application's binary and
+  Chromium as children of one loop, opens the link the binary prints in
+  a person's page, and fails a test on any trouble the story did not
+  expect. The person has no press at a point: a story's press on a
+  drawing's mark is the harness's act, the kit's press at a point on
+  the drawing's figure, after which the person sees what follows. The
+  harness offers that act to an application's stories too
+  (`../../protocol/browser.md`, section 15).
 
 ## 4. The client's world
 
@@ -93,7 +114,11 @@ a step machine so that a browser's loop can run it later.
   application in the engine's worlds (`../../domain/testing.md`,
   section 7). It takes jig's arrangement of every page, but in
   client.md 17's story of a task's page arranged with every section,
-  whose client gives an arrangement naming every `TaskSection`.
+  whose client gives an arrangement naming every `TaskSection`. Its
+  test family's drawing has drawing code, golden scenes and an act, with
+  an ordinary node beside it doing the same (view.md, section 17), for
+  the browser tier's story of a drawing
+  (`../../protocol/browser.md`, section 15).
 - **Its stories** are client.md's, section 17, and pages.md's, section 10,
   each written once in a person's terms.
 - **At the text shell.** A client of the world may be played as the text
@@ -191,6 +216,10 @@ Drawn from the seed:
 - its arrangement of jig's pages, held to the page's outline by the same
   referee;
 - its stories at the text shell, where it has a terminal client;
+- its drawing code's golden scenes, where it draws (view.md, section 17);
+- its browser tier, with its binary and its bundle, over jig's harness
+  and face: its pages, its drawings, its signing in
+  (`../../protocol/browser.md`, section 15);
 - its own shells' tiers, if it writes shells.
 
 ## 9. Budgets
@@ -201,13 +230,14 @@ a few seeds per story and each fault once, the fuzzy suite sweeps random
 people over random stories. At the text shell, the focused suite runs
 each story once, on one seed: in jig's client world, two stories,
 starting a chat and a held chat released; in an application's, those
-its terminal client names. The browser tier, when it comes, is a suite
-of its own, run by the gate.
+its terminal client names. The browser tier is a suite of its own,
+nextest's `--profile browser`, run by jig's gate after it builds jig's
+test bundle, within a minute on the slowest machine (a rule: its
+profile's global timeout, in `../../../development/workflow.md`).
 
 ## 10. Open questions
 
 - **The joint world's cost:** whether every conformance scenario should
   also run with people in front, or only the stories about people.
-- **The browser tier's budget,** set when its first tests are built.
 - **Coverage of the roots' arms,** as for the engine's root
   (`../../domain/testing.md`, section 10).

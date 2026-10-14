@@ -468,7 +468,9 @@ the journal's door (`../../README.md`, 6.3), marked provisional, and
 show marked so (view.md, section 3). It adds a kind of subject to the
 application's own and a use of the journal's door, with no change to
 7.1's subjects or 7.2's rules, and waits for an application whose
-people follow its data as it comes.
+people follow its data as it comes. The browser's shell carries such a
+stream as any watch, with no change of its own
+(`../../protocol/browser.md`, section 16).
 
 ## 8. Versions
 
@@ -553,7 +555,8 @@ which the client's protocol designs (`../../protocol/client.md`):
   by `jig-protocol-transcript` in the client's protocol layer.
 - **Sign-in exchanges** are each provider's, in the engine's protocol
   layer and the client's shell.
-- **The browser's client is served by the engine,** from its one origin.
+- **The browser's client is served by the engine,** from its one origin
+  (`../../protocol/browser.md`, section 12).
 
 ## 11. Open questions
 

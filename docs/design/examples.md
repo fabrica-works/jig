@@ -331,6 +331,10 @@ section 12):
   provision tasks, its words for a proposed restart, its account of
   drift ("deleted by hand"); both connectors' resources and kinds in
   words (`client/domain/root.md`, section 6).
+- **Its drawing:** an incident's error rate, on the incident's page, a
+  drawing of observability's with its fallback in words. Its drawing
+  code, in `jig-ops-view`, draws it as a scene (`client/domain/view.md`,
+  section 17), tested by golden scenes.
 - **A person in the worlds** is jig's fake person, reading the view tree:
   P accepting a restart from an incident's page
   (`client/domain/pages.md`, section 10); Q asking for an environment in
@@ -341,6 +345,9 @@ section 12):
   section 4): P accepts the restart from the incident's page, typing
   the numbers the page printed. Its loop over a real terminal comes with
   `ops` standalone (9.1), which gives it an engine to reach.
+- **Its browser client:** its browser crate, `jig-ops-shell-web`, over
+  jig's browser's shell (`protocol/browser.md`, section 3), comes with
+  `ops` standalone too (9.1), whose engine serves its bundle.
 
 ## 9. Its systems
 

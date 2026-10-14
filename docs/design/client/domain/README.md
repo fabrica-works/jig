@@ -27,7 +27,7 @@ engine's domain is `../../domain/`. The mechanics are those of skein's
    engine's domain owes the client.
 6. **view.md:** the view: a semantic tree and the page's outline, the
    parts and sections as functions, bindings, the diff, words, Markdown,
-   conversations, shells, and the text shell.
+   conversations, shells, the text shell, and scenes.
 7. **testing.md:** the fake person, the client's world, the joint world
    with the engine's domain, and their referee.
 
@@ -43,6 +43,7 @@ an application's client
 └── <connector>…                each connector's client side: its parts, its families and their pages
 <application>-view              the view root: jig's view and the application's, its slots filled (view.md)
 └── jig-view                    jig's view: the tree, the builder, the diff, words, jig's pages and cards
+<application>-shell-web         its browser crate: its client host behind jig's browser shell, its look (../../protocol/browser.md, section 3)
 
 skein-lib's request table       keyed requests: the client root's only way out for them (root.md, section 4)
 
@@ -50,12 +51,14 @@ below the domain, with the client's protocol layer
 jig-protocol-client-wire        jig's documents, encoded, for both ends (contract.md, section 10)
 jig-protocol-client-link        the connection to the engine: exchanges, the stream, envelopes (../../protocol/client.md)
 jig-protocol-transcript         turns decoded with smith's transcript crate (client.md, section 10)
-jig-shell-web                   the browser's shell (view.md, section 11)
+jig-shell-web                   the browser's shell, every application's (../../protocol/browser.md)
 jig-shell-native                a shell on skein's HTTP client, for Linux and the worlds
 jig-shell-text                  the text shell: the tree as lines, a line as an act (view.md, section 15)
+jig-bundle                      the bundler, a tool: the bundle a browser loads (../../protocol/browser.md, section 4)
 
 for tests
 testing/jig-fake-person         the person: reads the view tree, acts on it (testing.md, section 3)
+testing/jig-fake-person-browser the person's face in a browser, and the harness (../../protocol/browser.md, section 15)
 testing/jig-scripted-engine     the engine as the client's world plays it (testing.md, section 4)
 tests/client                    the client's world, and the joint world (testing.md, sections 4 and 5)
 ```
@@ -69,7 +72,8 @@ tests/client                    the client's world, and the joint world (testing
   it owns the engine's (root.md). Nothing in jig's client knows an
   application's types.
 - **The wire, the protocol layer and the shells** are the client's
-  protocol's (`../../protocol/client.md`), beside the engine's. This
+  protocol's (`../../protocol/client.md`; the browser's shell,
+  `../../protocol/browser.md`), beside the engine's. This
   design says what they owe the domain, and no more, but for the text
   shell, which it designs whole (view.md, section 15). A shell is the one
   impure part of a client, ordinary Rust as skein's shell is, not step
@@ -121,6 +125,8 @@ tests/client                    the client's world, and the joint world (testing
 | part | a value of an application's that a jig document names by reference: a connector's name, a resource, a kind, a panel, an effect's description (root.md, section 6) |
 | slot | the place a jig page or card leaves for a part, or an application's page for one of jig's cards or sections, filled by its owner |
 | shortcut | a key a bound node answers to, as a press (view.md, section 5) |
+| scene | a drawing as its owner's drawing code draws it: a bounded list of marks in whole pixels, which each shell that draws maps onto its platform (view.md, section 17) |
+| client host | an application's client root, view root and `jig-protocol-client-link`, with the routing between them: one step machine, shared by its shells (`../../protocol/browser.md`, 3.2) |
 | text shell | jig's shell for a terminal or a pipe: the tree printed as lines, a typed line read as an act (view.md, section 15) |
 | document | a typed value the engine gives a client about one subject, its owner's alone (contract.md, section 5) |
 | revision | the state of one thing a party decides about (a hold, a task's spec, a person task, a note), which the decision names (contract.md, 5.2) |
@@ -213,10 +219,17 @@ where each is answered:
   section 3).
 - **Words come from a phrasebook,** one per language: jig ships English,
   and an application may give its own as data (view.md, section 7).
-- **An application may draw:** its own kinds of node (a chart, a map),
-  whose data its view writes and whose drawing code its shells take,
-  each with a fallback in words that every shell, a screen reader and the
-  fake person can read (view.md, sections 3 and 11).
+- **An application may draw:** its own kinds of drawing (a chart, a
+  map), whose data its view writes. Its drawing code, the owner's step
+  code, gives a scene, which every shell that draws maps onto its
+  platform; each drawing has a fallback in words that every shell, a
+  screen reader and the fake person can read (view.md, sections 3 and
+  17).
+- **The browser's layer is every application's,** written once by jig:
+  the shell, the bundler, the engine's serving and signing in by cookie,
+  jig's paths, scenes as SVG, jig's stylesheet, and the browser tier's
+  face and harness. An application writes one small crate and a
+  stylesheet, and gives pictures (`../../protocol/browser.md`).
 - **Home and navigation are the application's choice,** among jig's pages
   and its own (pages.md, section 2).
 - **A service uses jig's client domain without a view** (root.md,
@@ -243,9 +256,10 @@ where each is answered:
   place them without depending on the order of nodes; the tree still
   says where nothing goes (view.md, section 3).
 - **The tree's closed sets, completed:** landmarks, a menu, a
-  disclosure and an image among the roles; a shortcut a binding answers
-  to; the place of an act on a drawing, built with the first drawing
-  that needs it (view.md, sections 3, 5 and 16).
+  disclosure, an image, and a dense table's column and row headers among
+  the roles; a shortcut a binding answers to; the place of an act on a
+  drawing, built with the browser's shell (view.md, sections 3, 5 and
+  17.3).
 - **Owners, not connectors.** Everything that names an application's
   owner, as root.md, section 15, lists (parts, the view's slots,
   bindings, styles, drawings and region names, requests, reads and

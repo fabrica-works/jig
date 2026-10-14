@@ -1,6 +1,6 @@
 # The engine's and the worker's services
 
-Provisional, 2026-10-10, revised 2026-10-13. What an application writes
+Provisional, 2026-10-10, revised 2026-10-14. What an application writes
 around its roots to make running processes: the protocol layer that
 composes jig's components with its own, `iterate`, which carries every
 event between io, the components and the root, and `main`, which reads
@@ -247,7 +247,11 @@ down:  released and door outputs → components → io submissions
   store on a directory, and runs the engine and one test worker in one
   process (section 10), the worker's agents smith's real agent
   processes, run as its own `agent` command (section 6). A native client
-  on loopback signs in by the link it prints (`client.md`, section 8). Its
+  on loopback signs in by the link it prints (`client.md`, section 8). When
+  its configuration names a bundle's directory, it reads the bundle at
+  start and serves jig's test application's browser client from it
+  (`browser.md`, section 12), which the browser tier opens (`browser.md`,
+  section 15). Its
   LLM endpoint is its configuration's. Its periods are the smallest
   source's: one open period per configured project, at the deployment's
   first start (`configuration.md`, section 5). It is the template an
@@ -313,6 +317,10 @@ Each within jig's suites' budgets (`../../development/workflow.md`).
 - **The live layer:** `jig-test` with a real LLM account handed in
   (`llm.md`, 5.4), a native client signing in by the printed link, and a
   request answered by a real model, within a bound on calls.
+- **The browser tier:** `jig-test` serving jig's test bundle, and
+  Chromium, children of the harness's loop, a person in a page
+  (`browser.md`, section 15); a suite of its own, outside the default and
+  fuzzy suites.
 
 ## 9. Open questions
 

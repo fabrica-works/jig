@@ -49,8 +49,9 @@ in section 15.
   range shows that it is out of date and keeps what is pending.
 - **The small store is the wire's records,** per owner, versioned, written
   by the shell before any request of the same step leaves.
-- **Shells are small:** a browser's, the client compiled to WebAssembly
-  over the platform's fetch; a native one over skein's HTTP client and
+- **Shells are small:** the browser's, every application's: the client
+  compiled to WebAssembly over the platform's fetch, served by the
+  engine (`browser.md`); a native one over skein's HTTP client and
   server-sent events reader. Each maps its platform onto the same
   component.
 - **On one person's machine** (`README.md`, section 4) the browser reaches
@@ -278,7 +279,9 @@ the platform's HTTP stack, TLS                  TLS server, or plaintext on loop
   the engine's sign-in route for the provider, the component sends the
   person to its server, and the server's redirect comes back to the
   engine, where the component reads who the party is and drops what the
-  exchange returned (`../domain/people.md`, section 3).
+  exchange returned (`../domain/people.md`, section 3); the engine then
+  sets the cookie and sends the browser back to where the person was
+  (`browser.md`, section 11).
 - **The sign-in,** then: the core hears the identity and commits the
   sign-in, which gives it its number; the engine's side keeps the digest
   of a fresh secret under that number, in the store's secrets' records;
@@ -290,10 +293,14 @@ the platform's HTTP stack, TLS                  TLS server, or plaintext on loop
   expires, and the component erases its digest then.
 - **A browser's secret** is a cookie the engine sets on its origin:
   HTTP-only, secure, same-site strict, scoped to the client's routes. The
-  client's domain and its WebAssembly never see it. Every exchange and
-  the stream carry it; a state-changing exchange also carries a header
-  only the client's own code sets, so a page of another origin cannot
-  make one.
+  client's domain and its WebAssembly never see it: a browser's sign-in
+  is answered with the secret in the cookie and none in the body. Every
+  exchange and the stream carry it; every exchange also carries a header
+  only the client's own code sets, and one the cookie authenticates
+  without it is refused with nothing done, so a page of another origin
+  cannot make one. The cookie's details, the printed link opened in a
+  browser, and providers reached by navigation are `browser.md`,
+  section 11.
 - **A native client's secret** is a bearer token, which its shell keeps
   where its platform keeps secrets, and sends with each exchange. It
   signs in by a device's flow, or by a browser's on the same machine,
@@ -304,7 +311,7 @@ the platform's HTTP stack, TLS                  TLS server, or plaintext on loop
   deployment's first owner, and spends the secret. One link is live at a
   time: when a browser reaches the link provider's sign-in route
   without a live link's secret, the engine prints a fresh one, and the
-  page it answers says to find it in the engine's output. A native
+  client's sign-in page says to open the one the engine printed. A native
   client on the same machine signs in by the same link: it sends the
   link's secret to the sign-in route in an exchange, and takes back its
   bearer token in the answer. It is jig's
@@ -389,10 +396,10 @@ the platform's HTTP stack, TLS                  TLS server, or plaintext on loop
   owner does not read is dropped, and its owner told, so a request kept
   across an update that changed its record's version is lost, not sent
   wrong. Pre-release, nothing is translated.
-- **Where:** a browser tab's session storage, as text the shell encodes; a
-  file a native client writes whole and syncs; a service's, a file it
-  syncs before its requests leave (`../client/domain/root.md`,
-  section 11).
+- **Where:** a browser tab's session storage, as text the shell encodes
+  (`browser.md`, section 10); a file a native client writes whole and
+  syncs; a service's, a file it syncs before its requests leave
+  (`../client/domain/root.md`, section 11).
 
 ## 11. An application's documents and requests
 
@@ -414,19 +421,27 @@ the platform's HTTP stack, TLS                  TLS server, or plaintext on loop
 
 ## 12. Shells
 
-- **The browser's** (`jig-shell-web`): the client root, its view and this
-  component compiled to WebAssembly, with only the glue the toolchain
-  makes; exchanges and the stream over the platform's fetch, the stream
-  read as server-sent events by skein's reader in the component; session
-  storage for the small store; the tree mapped to HTML elements with their
-  roles (`../client/domain/view.md`, section 11).
-- **Served by the engine:** the engine's protocol layer serves the client's
-  files (its HTML, its WebAssembly, its glue, the application's
-  drawings) from its origin, under a strict content security policy:
-  scripts from the origin only, no inline script, WebAssembly compiled
-  only from the module the origin serves (`'wasm-unsafe-eval'`, which
-  compiling it needs), connections to the
-  origin only.
+- **The browser's** (`jig-shell-web`, `browser.md`): every application's,
+  written once by jig, to which an application gives a small crate of its
+  own: its client host and its look. The client root, its view and this
+  component compiled to WebAssembly (`wasm32-unknown-unknown`, stable
+  Rust), with only the glue `wasm-bindgen` generates, which jig's bundler
+  makes beside a starter of two statements, and no other build tool;
+  exchanges and the stream over the platform's fetch, the stream read as
+  server-sent events by skein's reader in the component; session storage
+  for the small store; the tree mapped to HTML elements with their roles,
+  and drawings' scenes to SVG (`../client/domain/view.md`, section 11).
+- **Served by the engine:** the engine's protocol layer serves the
+  client's bundle (its page, its starter, its glue, its module, jig's
+  stylesheet and the application's, the pictures of both) from its one
+  origin, read at start from the directory its configuration names, or
+  none (`configuration.md`, section 3), and answers the page at every
+  path outside `/jig/` and at the link's route. It serves under a strict
+  content security policy: scripts from the origin only, no inline
+  script, WebAssembly compiled only from the module the origin serves
+  (`'wasm-unsafe-eval'`, which compiling it needs), connections to the
+  origin only; and it answers only requests naming its own host
+  (`browser.md`, section 12).
 - **The native one** (`jig-shell-native`): skein's HTTP client on
   skein's io, handing the stream's body to the component, whose reader
   cuts it into events, for Linux and for the worlds
@@ -463,14 +478,17 @@ Each within jig's suites' budgets (`../../development/workflow.md`).
   in-memory streams cut at random. Its referee is the joint world's, and
   adds: every record crossed decodes to what was encoded; no secret
   reaches a domain; a slow stream never holds the engine up.
-- **The browser tier:** the browser's shell over skein's browser kit
-  (skein's `browser.md`), a person reading the page by role and name,
-  against an engine in the same loop.
+- **The browser tier:** the browser's shell in Chromium, against the
+  application's binary (for jig, `jig-test`), both children of the
+  harness's one loop, a person reading the page by role, name and text
+  through the browser's face over skein's browser kit (skein's
+  `browser.md`; `browser.md`, section 15).
 
 ## 15. Open questions
 
-- **Several tabs:** each tab a client with its own stream; whether tabs of
-  one person share one stream through the platform's means.
+- **Several tabs:** each tab a client with its own stream, which a hidden
+  tab lets go (`browser.md`, section 10); whether tabs of one person
+  share one stream through the platform's means.
 - **Bundling parts** in a jig read's answer (`../client/domain/contract.md`,
   section 11).
 - **A binary stream:** a streamed response body of the wire's bytes in
@@ -502,6 +520,11 @@ Each within jig's suites' budgets (`../../development/workflow.md`).
 - **The engine's domain** is owed nothing new: sign-ins numbered by their
   commit, and a party ending theirs (`../domain/people.md`, section 3),
   watches and reads as `../domain/engine.md`, section 11 has them.
-- **skein owes** nothing for one person's machine: its HTTP server and
-  client, server-sent events reader and writer, and browser kit serve as
-  they are; between hosts, TLS's server side (`README.md`, section 10).
+- **skein owes,** for one person's machine: skein-lib, skein-codec and
+  skein-http built for `wasm32-unknown-unknown` (skein's `lib.md`,
+  section 2); its browser kit's query matching a name by words, and its
+  press at a point within a node's box (skein's `browser.md`, sections 5
+  and 6); a client compiled to WebAssembly in its model
+  (`programming-model.md`, 2.1). Its HTTP server and client and its
+  server-sent events reader and writer serve as they are. Between hosts,
+  TLS's server side (`README.md`, section 10).

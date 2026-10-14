@@ -7,9 +7,9 @@ optional: a service has none. It says what the tree is and the outline
 every page keeps, how the frame's parts, the sections, jig's pages and
 the cards are built, how an application arranges them and how its
 slots are filled, bindings, the diff, words and their languages,
-Markdown, conversations, what a shell does, and jig's text shell
-(section 15). What is still open is listed in section 14, and what
-waits in section 16.
+Markdown, conversations, what a shell does, jig's text shell
+(section 15), and the scenes drawings are drawn as (section 17). What
+is still open is listed in section 14, and what waits in section 16.
 
 ## 1. In one page
 
@@ -28,6 +28,11 @@ waits in section 16.
   accessibility tree does, never how it looks. Each shell maps it onto
   its platform: HTML with its roles in a browser, a platform's widgets, or
   text.
+- **Drawings drawn once.** A drawing is drawn by its owner's drawing
+  code, step code, as a scene: a bounded list of marks in whole pixels,
+  which every shell that draws maps onto its platform, SVG in a browser.
+  A shell that does not draw, a screen reader and the fake person read
+  its fallback (section 17).
 - **Layout as semantics.** Every page keeps one outline of landmarks (a
   banner, navigation, the main, asides), and each of jig's regions
   carries a stable region name, so a shell and a stylesheet place them
@@ -77,6 +82,7 @@ jig-view/src/
 ├── binding.rs      bindings: an owner and a token; the shell's acts; decoding jig's
 ├── diff.rs         matching, ids, patches
 ├── render.rs       building when what is shown moved, diffing, keeping the last tree
+├── scene.rs        scenes: their marks and bounds; jig's draw (section 17)
 ├── phrases.rs      jig's phrases, their holes, the phrasebook's shape, English
 ├── words.rs        phases, holds, executors, amounts, spans, times, in phrases
 ├── markdown.rs     the Markdown subset, read into nodes
@@ -101,10 +107,11 @@ and on its families' views.
   - a role, from a closed set: page; the landmarks banner, navigation,
     main, complementary, content info, form and search (section 3.1);
     region, heading (with a level), paragraph, text, list, item, table,
-    row, cell, term and description, button, link, text field, text
-    area, choice, choice group, check, menu, menu item, disclosure,
-    dialog, status, alert, log, tree, tree item, tabs, tab, progress,
-    time, code, quote, separator, figure, image, slot, and drawing;
+    row, cell, column header, row header, term and description, button,
+    link, text field, text area, choice, choice group, check, menu, menu
+    item, disclosure, dialog, status, alert, log, tree, tree item, tabs,
+    tab, progress, time, code, quote, separator, figure, image, slot,
+    and drawing;
   - a name, where its text does not give it;
   - states: disabled, expanded, busy, current, invalid, pressed,
     selected, provisional, submits on enter;
@@ -115,7 +122,7 @@ and on its families' views.
     link;
   - a value, on fields, with the domain's count of its own writes;
   - an address, on links, which the shell turns into what its platform
-    shows;
+    shows (section 5);
   - a key, on items of a list, saying which object it is, so lists diff
     by object;
   - a binding, on what a person acts on, and a shortcut a binding may
@@ -150,15 +157,16 @@ and on its families' views.
   A drawing node carries:
   - its kind: its owner and a number from the owner's closed set;
   - its data, as bytes its owner's view writes, within a bound the owner
-    declares, which only the owner's drawing code reads;
+    declares, which only the owner's drawing code reads (section 17);
   - a name, and a fallback: ordinary nodes saying what it shows in words
     and numbers ("error rate 30 % since 10:02, 2 % before"), which a
     shell without the drawing shows, a screen reader reads, and the fake
     person finds.
 
-  A drawing is shown, not acted on, until drawings acted on are built
-  (section 16): what a person does about it is an ordinary node beside
-  it. Its data is compared whole by the diff, and a change is one patch.
+  A drawing a person acts on is bound by its owner, and its scene names
+  the acts (section 17); every act on it has an ordinary node beside it
+  doing the same. Its data is compared whole by the diff, and a change is
+  one patch.
 - **No layout.** Where things go on a screen is the shell's and its
   styles', from landmarks, region names, roles, order and tokens. The
   tree never says where a region goes; it says what each region is. A
@@ -312,14 +320,19 @@ most nodes it may build (section 10).
   view root finds the node in its last tree, and hands the token to its
   owner's view, which decodes it into its owner's action, wrapped for
   the domain's root.
+- **A link's address, for a shell.** A link node's binding resolves,
+  without acting, to the address it leads to: the view root asks the
+  binding's owner's view, as it does to decode. The application's client
+  host prints it as a path, which the browser's shell gives the link as
+  its `href`. An address that changes needs no patch (section 6): the
+  shell asks again (`../../protocol/browser.md`, section 9).
 - **The act on a drawing** carries bytes of the drawing's owner, at most
   the view's limit on a drawing's bytes (section 10), past which the
   view drops it. Only the owner's view decodes them, into its action or
   nothing, as typed input is made below. It is `Act::Drawing { data }`
   in the shell's acts, beside `Press`, `Input`, `Submit` and `Toggle`,
-  and every owner's view matches it: jig's decodes it into nothing. No
-  drawing is bound until drawings acted on (section 16), so until then
-  no shell reports it.
+  and every owner's view matches it: jig's decodes it into nothing. A
+  shell that draws reports it from a scene's acts (section 17).
 - **A shortcut.** A bound node may name a key it answers to: a letter
   `a` to `z` or a digit `0` to `9`, with no modifier, with the
   platform's primary one (Control; Command on macOS), or with Alt
@@ -374,6 +387,10 @@ most nodes it may build (section 10).
   platform, or as the person chose it.
 - **Names are copied in,** never translated: a task's title, a party's
   name, a resource's words.
+- **A shell's own words** are jig's phrases too, in the person's
+  language: the browser's, a credential shown once and the client
+  failed (`../../protocol/browser.md`, section 5). The text shell's
+  states and refusals are English words, an open question (section 14).
 - **No formatting:** a text is written into a bounded buffer, with
   skein-lib's decimal for numbers; its capacity is the longest its
   phrase can make in any language given, checked when the phrasebook is
@@ -413,8 +430,9 @@ by a bounded reader of the view's own:
 
 The view's limits (the most nodes a tree may have, the patches a diff may
 make, the depth of nesting, of Markdown's nesting, the bindings each
-owner keeps, and a drawing's bytes, which also bound an act on a
-drawing) are derived from the domain's: each of jig's parts,
+owner keeps, a node's style tokens, which also bound a mark's, a
+drawing's bytes, which also bound an act on a drawing, and a scene's
+marks and bytes) are derived from the domain's: each of jig's parts,
 sections and pages has a companion that counts the most nodes it may
 build with every window full and every text at its most bytes, and the
 largest page is the tree's capacity. A page showing sections together
@@ -425,7 +443,9 @@ Markdown text builds at most a fixed number of nodes per byte. The
 application's view root counts its own arrangement from the same
 companions: the parts and sections it builds, its families' pages and
 its slots' nodes, a section slot counting as the section it may hold
-(`Limits::compose`).
+(`Limits::compose`). A scene's limits are counted the same way: the
+most marks and bytes any owner's drawing code draws for data within
+its bound, in a box of any size (section 17).
 
 ## 11. Shells
 
@@ -435,10 +455,11 @@ its slots' nodes, a section slot counting as the section it may hold
 - **One callback, one step.** Each thing the platform reports (an act on
   a node, an answer, a delivery, a timer, the place changing) is one
   event. The shell runs the step, then does what it asked, in order: the
-  small store written, then requests sent, then patches applied.
+  small store written, then requests sent, then the address shown, then
+  patches applied.
 - **Time and the seed are inputs,** read by the shell.
-- **The addresses** are the platform's: a URL in a browser, arguments on a
-  command line.
+- **The addresses** are the platform's: a URL's path in a browser
+  (`../../protocol/browser.md`, section 9), arguments on a command line.
 - **A panic is fail-stop:** the shell restarts the client, as a supervisor
   restarts a process, and its small store and its keys make what was
   pending safe to send again.
@@ -447,7 +468,7 @@ its slots' nodes, a section slot counting as the section it may hold
     WebAssembly, with only the glue the toolchain generates; the tree
     mapped to HTML elements with their roles; session storage as the
     small store; served by the engine from its one origin under a strict
-    content security policy;
+    content security policy (`../../protocol/browser.md`);
   - *the native one* (`jig-shell-native`): skein's HTTP client and
     its server-sent events reader, for Linux and for the worlds that make
     bytes real; with no view, it is a service's shell;
@@ -458,42 +479,54 @@ its slots' nodes, a section slot counting as the section it may hold
   3.1): a browser's header, nav, main, aside and footer elements; the
   text shell prints them in the tree's order. A stylesheet places
   regions by their region names.
-- **Drawings are drawn by the application's code in the shell.** A shell
-  is ordinary Rust, so it takes, when it is built, the application's
-  drawing code for each kind of drawing it shows, which reads the
-  drawing's data and draws it on the platform (a canvas or vector
-  graphics in a browser). A kind a shell has no code for shows its
-  fallback.
+- **Drawings are drawn by their owner's drawing code,** its step code,
+  once for every shell (section 17). A shell that draws takes it, when
+  it is built, and maps the scenes it draws onto its platform: the
+  browser's, as inline SVG (`../../protocol/browser.md`, section 8). A
+  kind or data its code does not draw, and a scene refused, show the
+  drawing's fallback, as every drawing does in the text shell.
 - **Pictures are the application's files in the shell.** A shell takes,
-  when it is built, each owner's pictures: the browser's will have them
-  from the engine's origin, beside the application's drawings, when it
-  is built (section 16). A picture a shell does not have shows as its
-  image's name.
+  when it is built, each owner's pictures: the browser's has them in its
+  bundle, served from the engine's origin (`../../protocol/browser.md`,
+  4.2). A picture a shell does not have shows as its image's name.
 - **An application's shell:** a phone's or a desktop's, mapping the same
   tree onto its widgets, is the application's to write over the same
-  domain and view.
+  domain and view; so is one for graphics beyond a scene (a canvas of
+  hundreds of thousands of points, three dimensions, video), which are
+  not jig's.
 
 ## 12. Accessibility
 
 - Every node a person acts on has a role and a name; cards are named
   regions; buttons are named by their words; a conversation is a log; a
   plan is a tree whose items say whether they are open; the link's state
-  and notices are statuses; a confirmation is a named dialog.
+  and notices are statuses; a confirmation is a named dialog; a table's
+  header cells, column headers and row headers, name its columns and
+  its rows.
 - The frame is a banner, jig's navigation a navigation landmark, the page
   a main, an aside complementary (section 3.1); a menu's items and a
   disclosure's content are in the tree whether shown or folded; every
   image's name is its text alternative.
-- The browser's shell maps roles to the platform's own, so a screen
-  reader reads what the fake person reads.
+- The browser's shell maps roles to the platform's own
+  (`../../protocol/browser.md`, section 6), so a screen reader reads what
+  the fake person reads.
 
 ## 13. Styles
 
 - **Style tokens** are a closed set per owner: jig's (a card, a chip, a
   tone: muted, warning, danger, success; a button's weight; a dense
   list), and each family's own.
-- **How tokens look** is the shell's: the browser's stylesheet, which jig
-  ships with its tokens and the application extends with its own and may
-  restyle; a native shell's theme.
+- **Names for a stylesheet.** Each style token and each region name has
+  a name: jig's start with `jig-` (`jig-card`, `jig-chip`, `jig-muted`,
+  `jig-warning`, `jig-danger`, `jig-success`, `jig-button-weight`,
+  `jig-dense-list`; its regions' as pages.md, 12.4 lists them); an
+  application's start with its name and a hyphen, and its view root
+  gives them in its look, what the application gives its shells when
+  they are built (`../../protocol/browser.md`, 3.3).
+- **How tokens look** is the shell's: in a browser, jig's stylesheet,
+  which styles jig's tokens and places jig's regions, and the
+  application's after it, which styles its own and may restyle jig's
+  (`../../protocol/browser.md`, section 13); a native shell's theme.
 - **No style is a fact.** Nothing a person must know is said by style
   alone: a danger is also in words.
 - **Region names are not styles.** A region name says which region a
@@ -588,7 +621,7 @@ composed with it, and whatever the application prints of its own.
   | item, tree item | `- ` before its first line, its other lines indented |
   | table | one line per row |
   | row | its cells' texts joined by ` \| ` |
-  | cell | its text, as its row joins it; a cell outside a row, its text on a line of its own |
+  | cell, column header, row header | its text, as its row joins it; a cell outside a row, its text on a line of its own |
   | term | its text, then `:` |
   | description | its text, indented |
   | button, tab, menu item | `[n] NAME` |
@@ -704,20 +737,107 @@ composed with it, and whatever the application prints of its own.
 ## 16. Later
 
 Each waits for the application that needs it, and adds without changing
-what sections 3 to 5 and 15 settle.
+what sections 3 to 5, 15 and 17 settle.
 
-- **Drawings acted on:** a drawing bound by its owner, its drawing code
-  in a shell reporting `Act::Drawing` with the owner's bytes, and the
-  owner's view decoding them (section 5). Every act on a drawing has an
-  ordinary node beside it doing the same, which the fake person, a
-  screen reader and the text shell act on. It adds no act, role or
-  attribute. Waits for the first drawing a person acts on: zooming a
-  chart, choosing a point on a map.
-- **The browser's shell** (`jig-shell-web`, section 11), on the tree this
-  document settles: landmarks to HTML's elements, region names to
-  attributes jig's stylesheet places by, shortcuts to the platform's
-  keys, menus and disclosures to their elements, pictures to files the
-  engine serves from its origin beside the application's drawings
-  (`../../protocol/client.md`, section 12). Its plan
-  follows the one that builds sections 3.1, 4.1, 5 and 15, so the tree it
-  maps does not change under it.
+- **jig's own drawing kinds:** a chart every application shares, drawn
+  by jig's `draw` (section 17). A kind moves into jig, as jig's, when a
+  second application draws the same.
+
+## 17. Scenes
+
+A drawing (section 3) is drawn once, by its owner's drawing code, for
+every shell that draws: as a scene, which each such shell maps onto its
+platform. `jig_view::scene` is step code under the subset
+(programming-model.md, section 10), as the rest of the view is.
+
+### 17.1 Drawing code
+
+- **The owner's step code:** `draw(kind, data, width, height, scene) ->
+  bool`, from a drawing's kind (the owner's number), its data, and its
+  box's size in whole pixels as the shell measured it, to a scene. It
+  returns false for a kind or data it does not draw, whose fallback then
+  shows.
+- **Routed by owner.** The view root's `draw` routes each drawing by its
+  kind's owner, exhaustively, as it routes slots (section 4). jig's view
+  draws no kind of its own yet: its `draw` returns false (section 16).
+- **Of its inputs alone:** the same kind, data and size give the same
+  scene.
+- **Taken when a shell is built,** with the application's look: a shell
+  that draws calls the view root's `draw` for each drawing it shows
+  (section 11).
+
+### 17.2 The scene
+
+- **A bounded list of marks in preorder,** in whole pixels from the
+  box's top left, each coordinate and length an unsigned 16-bit integer.
+  A group's marks follow it, and a later mark is drawn over an earlier
+  one.
+
+  | Mark | Its fields |
+  |---|---|
+  | group | the marks it holds, and an offset added to their points |
+  | line | two points |
+  | polyline | its points |
+  | path | its commands: move, line, quadratic, cubic and close |
+  | rectangle | a corner, a size and a corner radius |
+  | circle | a centre and a radius |
+  | text | a point, an anchor (start, middle or end) and its bytes |
+
+- **Every mark** carries as well: style tokens, the drawing's owner's or
+  jig's, at most the view's limit on a node's tokens; a hint, text a
+  platform shows on hover, never needed to decide, since the fallback
+  says what the drawing shows; and an act, on a drawing acted on (17.3).
+- **Its words come in its data.** Words a scene shows in the person's
+  language, in its texts and hints, are in the drawing's data, written
+  by its owner's view with its phrasebook (section 7): drawing code
+  prints numbers and the data's words, and takes no phrasebook.
+  Everything a person must read is in the fallback.
+- **No colour.** Colours, widths and fonts are the stylesheet's, by the
+  marks' tokens: a scene says none. jig's stylesheet gives every mark a
+  default, and a palette of series colours an application's stylesheet
+  uses (section 13).
+- **Bounded** by the view's limits (section 10): marks and bytes per
+  scene, and a node's tokens per mark. A mark past them is refused, and
+  its scene with it: a scene refused draws as its drawing's fallback,
+  never cut silently.
+
+### 17.3 Drawings acted on
+
+- **Bound by its owner,** as any node a person acts on is (section 5).
+  Its scene names the acts: a mark may carry an act, its owner's bytes;
+  the scene may carry one for a press anywhere else in it, to which the
+  shell appends the press's point, in whole pixels from the box's top
+  left, x then y, each an unsigned 16-bit little-endian integer.
+- **The act a press takes,** in this order: the act of the topmost mark
+  under the press's point that carries one, such a mark taking presses
+  over its whole area, filled or not; else, of the groups holding the
+  topmost mark under the point, the act of the nearest that carries
+  one; else the scene's act, with the point appended; else none.
+- **Reported as `Act::Drawing { data }`** on the drawing's node, within
+  the view's limit on a drawing's bytes, and decoded by its owner's view
+  (section 5): the only act a drawing takes.
+- **Never the only way.** Every act on a drawing has an ordinary node
+  beside it doing the same, which the fake person, a screen reader and
+  the text shell use: none of them acts on the drawing itself, and the
+  text shell does not number it (15.4). Drawings acted on add no act,
+  role or attribute to the tree.
+
+### 17.4 In each shell
+
+- **Drawn again** when the drawing's data changes, which is one patch
+  (section 6), or its box's size changes, which is the shell's alone,
+  with no step.
+
+  | Shell | A scene |
+  |---|---|
+  | the browser's | inline SVG of the box's size: each mark an SVG element, its tokens as classes, its hint as `<title>`; the SVG hidden from assistive technology, and the fallback from sight while the scene is drawn (`../../protocol/browser.md`, section 8) |
+  | the text shell, the fake person's tree face | not drawn: they read the fallback, unchanged (15.3; testing.md, section 3) |
+  | an application's own shell (section 11) | its platform's drawing of the same scene |
+
+### 17.5 Its tests
+
+- **Golden scenes** fix drawing code, on the host: scenes printed as
+  lines, kept as files beside the tests and changed only by hand, as the
+  text shell's golden text is (15.6).
+- **A scene as SVG** is the browser's shell's to test, on the host
+  (`../../protocol/browser.md`, section 15).

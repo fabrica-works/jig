@@ -92,12 +92,13 @@ Deployment       hosts, accounts, connectors, capacity
   every page in jig's.
 - **Home and navigation are the application's choice.** The application
   says which of jig's pages its frame shows, in what order, and which
-  is home; the inbox by default. jig's navigation shows its own entries
-  after them (12.1); an application that wants them among jig's builds
-  its own navigation. `ops` makes the inbox
-  home, and puts Incidents after it. A page that cannot apply is not
-  shown: Conversations without a charter for chats, the Deployment page
-  to a party without a role on the deployment.
+  is home; the inbox by default. In a browser, home is the path `/`
+  (`../../protocol/browser.md`, section 9). jig's navigation shows its
+  own entries after them (12.1); an application that wants them among
+  jig's builds its own navigation. `ops` makes the inbox home, and puts
+  Incidents after it. A page that cannot apply is not shown:
+  Conversations without a charter for chats, the Deployment page to a
+  party without a role on the deployment.
 - **Links are by number.** Every task, wherever it is named (a chip, an
   entry, a history line, a turn), links to its page; its number is its
   address, never reused (`../../domain/tasks.md`, section 3). So does

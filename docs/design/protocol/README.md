@@ -1,6 +1,6 @@
 # jig's protocol layer
 
-Provisional, 2026-10-10, revised 2026-10-12. The design of what lies
+Provisional, 2026-10-10, revised 2026-10-14. The design of what lies
 between jig's domains and bytes: the components an application's protocol
 layers own to carry jig's vocabularies to the store, to workers, to LLM
 providers and to clients; what an application writes around them; their
@@ -73,6 +73,10 @@ section 4. What is still open is listed in section 14.
    requests, reads, watches, signing in, the small store, shells.
 7. **store.md:** the store: skein-kv in the engine, keys and records,
    commits and loads, transcripts, secrets, growth.
+8. **browser.md:** the browser's shell, every application's, on
+   client.md's protocol: what an application writes, the toolchain and
+   the bundle, the tree as elements, scenes as SVG, paths, serving,
+   signing in, and the browser tier.
 
 ## 3. Names
 
@@ -146,10 +150,10 @@ An application that mixes the last two has both.
 | `jig-protocol-config` | parsing | engine, worker | jig's part of a configuration, parsed and checked (`configuration.md`) |
 | `jig-protocol-store` | component, codecs | engine | jig's records and the application's on skein-kv, transcripts' files, the secrets' store (`store.md`) |
 | `jig-protocol-client-wire` | codecs | engine, client | the client's records: requests, answers, reads, subjects, documents, the small store's (`client.md`, section 3) |
-| `jig-protocol-engine-clients` | component | engine | clients' connections: exchanges, streams, sign-ins, translation to and from the core's vocabulary (`client.md`) |
-| `jig-protocol-client-link` | component | client | the connection to the engine: attempts, the stream, envelopes, the small store's records (`client.md`) |
+| `jig-protocol-engine-clients` | component | engine | clients' connections: exchanges, streams, sign-ins, translation to and from the core's vocabulary (`client.md`); the browser's bundle and page served under the policy, and a browser's sign-in by cookie (`browser.md`, sections 11 and 12) |
+| `jig-protocol-client-link` | component | client | the connection to the engine: attempts, the stream, envelopes, the small store's records (`client.md`); jig's paths, parsed and printed by its `address` module (`browser.md`, section 9) |
 | `jig-protocol-transcript` | decoding | client | turns' bytes into the client's vocabulary (`../client/domain/client.md`, section 10) |
-| `jig-shell-web`, `jig-shell-native` | shells | client | the browser's and the native shells (`client.md`, section 12) |
+| `jig-shell-web`, `jig-shell-native` | shells | client | the browser's shell, every application's (`browser.md`), and the native one (`client.md`, section 12) |
 
 Beside them, smith's components, by the agent capability:
 `smith-protocol-llm`, over skein's `skein-llm-connection`, in a process
@@ -158,8 +162,10 @@ worker (`llm.md`); `smith-host-protocol` on a worker with agent
 processes (smith's `protocol/hosts.md`, sections 2 and 3).
 
 - **Each crate is step code** under the subset (programming-model.md,
-  section 10), as every crate of jig's is but its test kits and the
-  client's shells.
+  section 10), as every crate of jig's is but its test kits, the client's
+  shells and `jig-bundle`, the bundler: a tool run at build, which makes
+  the bundle the engine serves, not a component (`browser.md`,
+  section 4).
 - **Each depends** on skein-lib, io's vocabulary, the skein components it
   drives, its codec crate, and the domain vocabulary it translates: the
   hub's for the channel's sides, the core's (or a child's) for the
@@ -187,10 +193,13 @@ processes (smith's `protocol/hosts.md`, sections 2 and 3).
 | the worker's root, with its choice of agent capability, its workspace and its io | the worker | its own (`../domain/hosts.md`, section 7) |
 | its store's families: keys' encoders, codecs, its store version, its indexes | the engine | its own, by `store.md`, section 12 |
 | its documents' and requests' wire, its sign-in providers' exchanges | engine and client | the client's protocol |
+| its browser crate, `<application>-shell-web`: its client host behind the browser's shell, and its look | the client | copied from jig's test application's (`browser.md`, sections 3.1 and 3.2) |
+| its stylesheet and its pictures | the client's bundle | its own (`browser.md`, 3.4) |
 
 It writes no codec of jig's records, none of the channel's rules, none of
 the core's tools' decoding, no OAuth exchange of an LLM account, no agent,
-and none of `smith-inline-agent`'s runs' LLM calls.
+none of `smith-inline-agent`'s runs' LLM calls, and no JavaScript or
+HTML.
 
 ## 7. Versions
 
@@ -311,10 +320,19 @@ Each is generic, and says nothing about jig.
   section 4).
 - **For the client's WebAssembly and its records:** skein-lib, skein-codec
   and skein-http's machines built for `wasm32-unknown-unknown`, checked by
-  skein's gate; skein-lib's bounded `base64`, for records in server-sent
-  events (`client.md`, section 1); and skein-lib's `Secret`, the
-  generator's `secret` type, whose `Debug` shows its length only, for
-  credentials' values (section 8; skein's `codec.md`, section 3).
+  skein's gate (skein's `lib.md`, section 2); skein-lib's bounded
+  `base64`, for records in server-sent events (`client.md`, section 1);
+  and skein-lib's `Secret`, the generator's `secret` type, whose `Debug`
+  shows its length only, for credentials' values (section 8; skein's
+  `codec.md`, section 3).
+- **For the browser's shell** (`browser.md`): skein's browser kit
+  matching a name by words as well as exactly, and pressing at a point
+  within a node's box, for the browser tier's face (skein's
+  `browser.md`, sections 5 and 6); and `programming-model.md`, section
+  2.1, on a client compiled to WebAssembly: its shell's platform calls go
+  through the glue crates, `wasm-bindgen`, `js-sys` and `web-sys`,
+  pinned, which with their dependencies are the only `unsafe`
+  such a client runs; the shell's own crate forbids it.
 - **What it has, as it is:** the framed channel, codecs and their
   generator, the JSON reader and writer, the key-value store, the LLM
   client and connection component and their fake peer, OAuth's client and
@@ -339,6 +357,10 @@ Each is generic, and says nothing about jig.
   of grants, and its machine component; and smith's codecs between bytes
   and smith's values: `smith-protocol-channel`'s functions, and
   `smith-channel`'s records for a call's name and a fact (section 13).
+- **`smith-transcript` built for `wasm32-unknown-unknown`,** as it is:
+  the browser's module decodes turns with it, through
+  `jig-protocol-transcript`, whose build for that target jig's gate
+  checks (`browser.md`, section 15).
 - **Not asked: a completion's result contract.** A protocol layer that
   runs `smith-inline-agent` keeps each slot's beside smith's LLM
   component, as smith's own local host does (`llm.md`, section 3).
@@ -460,6 +482,10 @@ reads) is `store.md`, section 15.
   `jig-view`, `jig-shell-*` (`../README.md`, section 15).
 - **On one person's machine, a browser on loopback** signs in by a link
   the engine prints at start (`client.md`, section 8).
+- **The browser's shell is jig's, every application's:** written once,
+  with its bundler, the engine's serving of the bundle and jig's paths;
+  an application writes one small crate and a stylesheet, and gives
+  pictures (`browser.md`).
 - **Configuration as strict JSON,** read once before the loop, composed
   per child, secrets in private files, limits by profile
   (`configuration.md`).

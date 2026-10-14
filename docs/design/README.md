@@ -500,8 +500,9 @@ and the conformance world crashes the application at every commit.
     cards, which jig's pages arrange and an application may arrange
     otherwise, under one outline of landmarks with stable region names
     (`client/domain/pages.md`, section 12);
-  - shells: the browser's, a native one on skein's HTTP client for
-    Linux and the worlds, and a text shell for a terminal;
+  - shells: the browser's, every application's, written once
+    (`protocol/browser.md`); a native one on skein's HTTP client for
+    Linux and the worlds; and a text shell for a terminal;
   - the fake person, who reads the view tree by role, name and text.
 - **The application's part:**
   - its own kinds of object, families, as children of its client root,
@@ -564,6 +565,8 @@ and the conformance world crashes the application at every commit.
 | agents' hosts: the hub, the charter's translation / the worker's root, kinds of workspace, `main` (none without agents) | jig / the application |
 | the agent and its capabilities, `smith-host-domain` and `smith-inline-agent` / its charters | smith / the application |
 | the client domain, views, wire and shells / its families and its client and view roots | jig / the application |
+| the browser's client: the shell, the bundler, jig's stylesheet, the browser tier's harness and face / its browser crate, with its client host behind `Client` and its look; its stylesheet and its pictures | jig / the application (`protocol/browser.md`, section 3) |
+| the client host: its client root, its view root and the link, and the routing between them, one machine shared by its shells | the application, copied from jig's test application's (`protocol/browser.md`, 3.2) |
 | the request table | skein (skein-lib) |
 | the conformance world, the referee, scripted workers and people, the fake person / its worlds and its systems' fakes | jig / the application |
 
@@ -593,7 +596,8 @@ application as its first user.
 - **`protocol/`:** jig's protocol layer: the components an application's
   protocol layers own, the engine's and the worker's services, the
   workers' channel, LLM accounts and LLM calls in a host's own process,
-  configuration, and the client's protocol. Its `README.md` gives the
+  configuration, the client's protocol, and the browser's shell. Its
+  `README.md` gives the
   reading order, the names, what jig needs from skein and smith, and what
   the domain owes, and `store.md` the store.
 - **`draft/`:** drafts, not contract: ideas and inputs gathered for a
@@ -636,7 +640,8 @@ section 5). What remains here:
   - test kits keep their kind as their prefix (`jig-test-`, `jig-fake-`,
     `jig-scripted-`, `jig-conformance`), and worlds end in `-world`.
 - **An application follows the same rule** for its own crates, under its
-  own name: `jig-ops-domain-*`, `jig-ops-protocol-*`, `jig-ops-view`. Its
+  own name: `jig-ops-domain-*`, `jig-ops-protocol-*`, `jig-ops-view`; its
+  browser crate is `<application>-shell-web`, `jig-ops-shell-web`. Its
   service (its `iterate` and its protocol layer's routing) and its binary
   carry its name alone: `jig-ops-service`, `jig-ops`.
 - **jig's crates,** by layer, and where each is designed:
@@ -646,9 +651,11 @@ section 5). What remains here:
 | a domain's step code | the core, `jig-domain-core`, and its children `jig-domain-accounts`, `-authority`, `-brief`, `-fleet`, `-notes`, `-people`, `-tasks`, `-views` (`domain/engine.md`, section 3); the hub, `jig-domain-host` (`domain/hosts.md`, section 6); the client's domain, `jig-domain-client` (`client/domain/client.md`) |
 | the protocol layer's | `jig-protocol-charter`, `jig-protocol-transcript`, and the codecs, components and parsing `protocol/README.md`, section 5 lists |
 | the client's view | `jig-view` (`client/domain/view.md`) |
-| the client's shells | `jig-shell-native`, `jig-shell-web` (`protocol/client.md`, section 12); `jig-shell-text` (`client/domain/view.md`, section 15) |
+| the client's shells | `jig-shell-native` (`protocol/client.md`, section 12); `jig-shell-web` (`protocol/browser.md`); `jig-shell-text` (`client/domain/view.md`, section 15) |
 
 - **Outside the layers,** a crate is named by its kind: the test kits
-  (`jig-test-domain`, `jig-test-domain-client`, `jig-test-view` and the
-  rest), the worlds, the reference root's test application, and
-  `jig-boundary`, the check of the crate graph.
+  (`jig-test-domain`, `jig-test-domain-client`, `jig-test-view`,
+  `jig-fake-person-browser` and the rest), the worlds, the reference
+  root's test application, `jig-boundary`, the check of the crate graph,
+  and `jig-bundle`, the bundler, a tool that makes the bundle a browser
+  loads (`protocol/browser.md`, section 4).

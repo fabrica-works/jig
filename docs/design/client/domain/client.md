@@ -283,7 +283,7 @@ the act is the application's own request, made from a form in a slot
   there says it in its own region, where at an address of jig's the
   page says it (section 8.2; pages.md, section 8).
 
-## 6. Keyed requests## 6. Keyed requests
+## 6. Keyed requests
 
 What this domain does with a request; the request table, which keys it,
 keeps it and sends it, is the root's (root.md, section 4).
@@ -533,9 +533,9 @@ What a chat's page leads with, and every agent task's activity
   leaves that page when no other party's count is left.
 - **Its platform's limits:** a browser tab's session storage goes with
   the tab, so the shell warns before a tab with requests pending is
-  closed; a tab duplicated copies it, and both send the same keys, which
-  the engine makes once, while each draws new keys from a seed of its
-  own.
+  closed (`../../protocol/browser.md`, section 10); a tab duplicated
+  copies it, and both send the same keys, which the engine makes once,
+  while each draws new keys from a seed of its own.
 - **It is never the truth.** A request it kept is answered by the engine
   by its key, made once whatever the client did before.
 
@@ -551,12 +551,13 @@ What a chat's page leads with, and every agent task's activity
   watch, parks every request in the small store, and shows the sign-in
   page, which lists the application's providers. Choosing one asks to
   sign in, coming back to where the person was; the exchange (a
-  browser's navigation, a device code for a terminal) is the shell's.
+  browser's navigation, a device code for a terminal) is the shell's; a
+  browser's is `../../protocol/browser.md`, section 11.
 - **Signing out,** from the frame, is the shell's exchange too: it ends
   the sign-in on the engine (`../../domain/people.md`, section 3), and the
   client then shows the sign-in page, as when signed out.
 - **A sign-out that does not reach the engine** (lost,
-  `../../protocol/client.md`, section 4, or answered not ready while the
+  `../../protocol/client.md`, section 5, or answered not ready while the
   engine stops, section 8 there) leaves the person signed in, as
   they still are: the sign-in's secret still works wherever its shell
   keeps it, and a browser's cookie only the engine clears. The frame says
@@ -638,11 +639,13 @@ the client's protocol designs (`../../protocol/client.md`):
   (section 10).
 - **Watches kept alive,** a delivery at a time, with a heartbeat when
   nothing changes.
-- **Addresses** to and from what the platform shows: a browser's URL, a
-  command line's arguments.
+- **Addresses** to and from what the platform shows: a browser's path
+  (`../../protocol/browser.md`, section 9), a command line's arguments.
 - **The small store,** encoded, written before requests leave in each
   step's outputs, and read at start.
-- **Signing in:** each provider's exchange; the secret kept by the shell.
+- **Signing in:** each provider's exchange; the secret kept by the
+  shell, or in a browser as a cookie the module never sees
+  (`../../protocol/browser.md`, section 11).
 
 ## 17. The world
 

@@ -202,7 +202,10 @@ with a lifecycle, as a queue is. Its design is a section of skein's
   children's: jig's (the inbox, a task, a project's section) and each
   family's (an incident, an environment). A place gone to is routed to
   its owner, which opens its page, and every other child is told it left
-  whatever page it had (client.md, section 5).
+  whatever page it had (client.md, section 5). Below the domain, each
+  owner's addresses are printed and parsed as paths: jig's by
+  `jig-protocol-client-link`'s `address` module, the application's by
+  its client host (`../../protocol/browser.md`, section 9).
 - **Acts by owner.** The view decodes a person's act into the root's
   action, already wrapped with the owner of the node acted on
   (view.md, section 5); the root hands it to that child.
@@ -349,7 +352,12 @@ The view root (view.md, section 4) mirrors the domain's root:
 - it fills each slot from the slot's owner's view: a part from its
   owner's, a card or a section of jig's from jig's;
 - it decodes an act on a node through the node owner's bindings, wrapped
-  with its owner, for the domain's root to route.
+  with its owner, for the domain's root to route;
+- it resolves a link node's address, without acting, through its
+  binding's owner's view (view.md, section 5);
+- it routes `draw` by a drawing kind's owner, exhaustively, and gives
+  its owners' names for styles and regions, for the look its shells take
+  (view.md, sections 13 and 17.1).
 
 ## 10. What a root never does
 
@@ -403,7 +411,11 @@ part of this document:
 Its view root, `<application>-view`, has the same shape for the
 view (view.md, section 4). A new application copies both, replaces
 `ops`'s connectors' sides with its own, and lets the compiler list the
-arms to fill.
+arms to fill. The client host around them, which routes between both
+roots and `jig-protocol-client-link` for every shell, is copied from
+jig's test application's, as its binary and its service are
+(`../../protocol/browser.md`, 3.2; `../../protocol/service.md`,
+section 1).
 
 ## 13. The world
 
