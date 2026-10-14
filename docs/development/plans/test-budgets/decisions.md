@@ -285,6 +285,17 @@ the file.
      together". Both goldens are copied again with that README's revision
      line, and the six literals move by their fixture's growth (+15, +5).
      The same holds for `jig-repin`.
+116. **A measurement that failed on a dirty tree is not a measurement**
+     (process, smith 04's block of 2026-10-14T01:47:03Z). smith 04.1's
+     first run stopped after 14 of 1,995 tests: smith-bench's
+     `a_replay_arm_runs_through_the_probe_command_and_prints_one_line`
+     refuses a dirty source ("source repository is dirty"), and the
+     workflow edit was not yet committed
+     (`logs/smith-04/proof-1-failed.log`). It is discarded; 04.1's three
+     runs are made on the committed, clean branch, as its Proof says, and
+     are not extra measurements. Every timing run of a smith suite is
+     made from a clean worktree (`git status --porcelain` printing
+     nothing), as steer 2026-10-14T00:18:42Z asked of `smoke-tools`.
 
 ## For the user
 
