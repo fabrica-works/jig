@@ -101,7 +101,8 @@ impl Limits {
     ) -> Option<Self> {
         let nodes = crate::page_nodes(client, 0)?
             .max(application_nodes)
-            .checked_add(crate::frame_nodes(client)?)?
+            .checked_add(crate::banner_nodes(client)?)?
+            .checked_add(crate::navigation_nodes(client)?)?
             .checked_add(crate::confirmation_nodes(client)?)?
             .checked_add(crate::notices_nodes(client)?)?
             .checked_add(slot_nodes)?

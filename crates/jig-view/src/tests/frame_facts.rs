@@ -8,11 +8,17 @@ fn tree(domain: &Domain) -> Tree {
 }
 fn frame_tree(domain: &Domain, words: &crate::words::Words) -> Tree {
     let mut sized = limits();
-    sized.nodes = crate::frame_nodes(&CLIENT).unwrap().checked_add(1).unwrap();
+    sized.nodes = crate::banner_nodes(&CLIENT)
+        .unwrap()
+        .checked_add(crate::navigation_nodes(&CLIENT).unwrap())
+        .unwrap()
+        .checked_add(1)
+        .unwrap();
     let mut builder = Builder::new(&sized);
     let mut bindings = JigBindings::new(sized.bindings, CLIENT.text);
     builder.open(Role::Page);
-    crate::frame::frame(
+    crate::frame::banner(&mut builder, domain, words, &mut bindings);
+    crate::frame::navigation(
         &mut builder,
         domain,
         SlotRef { owner: Owner::Application { number: 1 }, token: Token::new(1) },
@@ -182,8 +188,15 @@ fn sign_out_frame(kind: PartyKind) -> Frame {
     source.updates = Count { value: 0, limited: false };
     source
 }
-const SIGN_OUT_PHRASES: [JigPhrase; 14] = [
+const SIGN_OUT_PHRASES: [JigPhrase; 21] = [
     JigPhrase::Frame,
+    JigPhrase::NothingKnown,
+    JigPhrase::LinkPart,
+    JigPhrase::NeedsPart,
+    JigPhrase::PartyPart,
+    JigPhrase::ProjectsPart,
+    JigPhrase::GoToTaskPart,
+    JigPhrase::Starting,
     JigPhrase::Live,
     JigPhrase::SignedIn,
     JigPhrase::FramePerson,
@@ -231,4 +244,52 @@ fn sign_out_words() -> crate::words::Words {
     )
     .unwrap();
     crate::words::Words { book, language: 0, offset_minutes: 60 }
+}
+
+#[test]
+fn the_banner_holds_link_needs_party_projects_and_task_in_order() {
+    let shown = tree(&ready(document()));
+    assert_eq!(shown.get(1).unwrap().role, Role::Banner);
+    let mut regions = List::with_capacity(5);
+    let mut at = 2;
+    let end = shown.get(1).unwrap().size + 1;
+    while at < end {
+        let node = shown.get(at).unwrap();
+        assert_eq!(node.role, Role::Region);
+        let region = node.region.unwrap();
+        assert_eq!(region.owner, Owner::Jig);
+        regions.push(crate::regions::JigRegion::of(region.number).unwrap().name()).unwrap();
+        at += node.size;
+    }
+    assert_eq!(
+        regions.as_slice(),
+        [b"jig-link".as_slice(), b"jig-needs", b"jig-party", b"jig-projects", b"jig-go-to-task"]
+    );
+}
+
+#[test]
+fn the_navigation_landmark_ends_with_the_applications_slot() {
+    let shown = tree(&ready(document()));
+    let navigation = shown.nodes().iter().position(|node| node.role == Role::Navigation).unwrap();
+    let node = &shown.nodes()[navigation];
+    assert_eq!(node.region, Some(crate::regions::JigRegion::Navigation.region()));
+    let mut at = navigation + 1;
+    let end = navigation + usize::try_from(node.size).unwrap();
+    let mut last = &shown.nodes()[at];
+    while at < end {
+        last = &shown.nodes()[at];
+        at += usize::try_from(last.size).unwrap();
+    }
+    assert_eq!(last.role, Role::Slot);
+    assert_eq!(last.slot, Some(SlotRef { owner: Owner::Application { number: 1 }, token: Token::new(1) }));
+}
+
+#[test]
+fn the_needs_part_says_nothing_is_known_before_the_frame() {
+    let (domain, _) = start();
+    let shown = tree(&domain);
+    let at =
+        shown.nodes().iter().position(|node| node.region == Some(crate::regions::JigRegion::Needs.region())).unwrap();
+    assert_eq!(shown.nodes()[at + 1].role, Role::Status);
+    assert_eq!(shown.nodes()[at + 1].name.as_deref(), Some(b"Nothing known yet".as_slice()));
 }

@@ -31,12 +31,12 @@ fn view(current: Option<&[u8]>, retained: &[u8]) -> View {
     builder.close();
     if let Some(current) = current {
         builder.open(Role::Region);
-        builder.name(b"Work");
+        builder.region(jig_view::regions::JigRegion::Link.region());
         status(&mut builder, current);
-        builder.open(Role::Region);
+        builder.close();
+        builder.open(Role::Navigation);
         builder.name(b"Navigation");
         status(&mut builder, retained);
-        builder.close();
         builder.close();
     }
     builder.open(Role::Status);

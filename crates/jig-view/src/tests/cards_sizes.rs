@@ -376,7 +376,8 @@ fn full_frame_notices(words: &crate::words::Words, sized: &Limits) {
     let mut bindings = JigBindings::new(sized.bindings, CLIENT.text);
     let mut b = Builder::new(sized);
     b.open(Role::Page);
-    crate::frame::frame(
+    crate::frame::banner(&mut b, &d, words, &mut bindings);
+    crate::frame::navigation(
         &mut b,
         &d,
         SlotRef { owner: Owner::Application { number: 1 }, token: Token::new(1) },
@@ -385,7 +386,15 @@ fn full_frame_notices(words: &crate::words::Words, sized: &Limits) {
     );
     b.close();
     let tree = b.finish();
-    assert!(tree.len() <= crate::frame_nodes(&CLIENT).unwrap().checked_add(1).unwrap());
+    assert!(
+        tree.len()
+            <= crate::banner_nodes(&CLIENT)
+                .unwrap()
+                .checked_add(crate::navigation_nodes(&CLIENT).unwrap())
+                .unwrap()
+                .checked_add(1)
+                .unwrap()
+    );
     assert_eq!(tree.nodes().iter().filter(|node| node.role == Role::Link).count(), 10);
     super::super::cards_access::check(&tree);
     let inbox = out

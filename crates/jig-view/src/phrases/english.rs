@@ -762,6 +762,12 @@ pub fn language() -> Language {
             JigPhrase::SignOutLost => Box::new([Segment::Text(copy_of(b"Not signed out: the engine was not reached"))]),
             JigPhrase::SignOut => Box::new([Segment::Text(copy_of(b"Sign out"))]),
             JigPhrase::SignedOut => Box::new([Segment::Text(copy_of(b"Signed out"))]),
+            JigPhrase::NothingKnown => Box::new([Segment::Text(copy_of(b"Nothing known yet"))]),
+            JigPhrase::LinkPart => Box::new([Segment::Text(copy_of(b"Connection"))]),
+            JigPhrase::NeedsPart => Box::new([Segment::Text(copy_of(b"What needs you"))]),
+            JigPhrase::PartyPart => Box::new([Segment::Text(copy_of(b"Who is signed in"))]),
+            JigPhrase::ProjectsPart => Box::new([Segment::Text(copy_of(b"Projects"))]),
+            JigPhrase::GoToTaskPart => Box::new([Segment::Text(copy_of(b"Go to a task"))]),
             JigPhrase::Frame => Box::new([Segment::Text(copy_of(b"Work"))]),
             JigPhrase::Navigation => Box::new([Segment::Text(copy_of(b"Navigation"))]),
             JigPhrase::Project => {

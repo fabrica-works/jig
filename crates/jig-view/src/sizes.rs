@@ -186,17 +186,45 @@ pub fn card_nodes(limits: &Limits) -> Option<u32> {
             ),
     )
 }
-/// Full frame, behind status, project switching, navigation and its fallback.
+/// Connection region, including a behind status.
 #[must_use]
-pub fn frame_nodes(limits: &Limits) -> Option<u32> {
-    // One membership button, optional local name loss, exact role and whole
-    // retained ledger; separate offers may each carry their goal-list loss.
-    limits
-        .projects
-        .max(limits.rows)
-        .checked_mul(19)?
-        .checked_add(limits.navigation_entries.checked_mul(2)?)?
-        .checked_add(24)
+pub fn link_nodes(_limits: &Limits) -> Option<u32> {
+    Some(5)
+}
+/// Needs, updates, exact counts and charter-list loss facts.
+#[must_use]
+pub fn needs_nodes(limits: &Limits) -> Option<u32> {
+    limits.projects.max(limits.rows).checked_add(8)
+}
+/// Signed-in identity, independent text losses and sign out.
+#[must_use]
+pub fn party_nodes(_limits: &Limits) -> Option<u32> {
+    Some(9)
+}
+/// Membership buttons, names, roles and whole retained ledgers.
+#[must_use]
+pub fn projects_nodes(limits: &Limits) -> Option<u32> {
+    limits.projects.max(limits.rows).checked_mul(18)?.checked_add(1)
+}
+/// Task-number field in its region.
+#[must_use]
+pub fn go_to_task_nodes(_limits: &Limits) -> Option<u32> {
+    Some(2)
+}
+/// Navigation links and the application's slot.
+#[must_use]
+pub fn navigation_nodes(limits: &Limits) -> Option<u32> {
+    limits.navigation_entries.checked_mul(2)?.checked_add(3)
+}
+/// The banner landmark and its five parts.
+#[must_use]
+pub fn banner_nodes(limits: &Limits) -> Option<u32> {
+    link_nodes(limits)?
+        .checked_add(needs_nodes(limits)?)?
+        .checked_add(party_nodes(limits)?)?
+        .checked_add(projects_nodes(limits)?)?
+        .checked_add(go_to_task_nodes(limits)?)?
+        .checked_add(1)
 }
 /// One object or goal dialog, with every delegate and amendment field.
 #[must_use]

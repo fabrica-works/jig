@@ -302,11 +302,9 @@ pub fn jig_seen(tree: &Tree) -> Vec<Seen> {
     visible(tree, false)
 }
 fn frame_link(tree: &Tree) -> Option<bool> {
-    let (at, frame) = tree
-        .nodes()
-        .iter()
-        .enumerate()
-        .find(|(_, node)| node.role == Role::Region && node.name.as_deref() == Some(b"Work"))?;
+    let (at, frame) = tree.nodes().iter().enumerate().find(|(_, node)| {
+        node.role == Role::Region && node.region == Some(jig_view::regions::JigRegion::Link.region())
+    })?;
     let end = at + usize::try_from(frame.size).expect("frame subtree");
     let mut child = at + 1;
     // The frame's own status is current; notices and navigation slots can

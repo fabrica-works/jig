@@ -6,6 +6,13 @@ use skein_lib::List;
 /// Each sentence jig says, independent of language word order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum JigPhrase {
+    NothingKnown,
+    LinkPart,
+    NeedsPart,
+    PartyPart,
+    ProjectsPart,
+    GoToTaskPart,
+
     OwnerHoldRelease,
     QuestionFromTask,
     QuestionFromPerson,
@@ -1091,6 +1098,13 @@ impl JigPhrase {
     pub const fn id(self) -> PhraseId {
         let number = match self {
             Self::OwnerHoldRelease => 673,
+            Self::NothingKnown => 674,
+            Self::LinkPart => 675,
+            Self::NeedsPart => 676,
+            Self::PartyPart => 677,
+            Self::ProjectsPart => 678,
+            Self::GoToTaskPart => 679,
+
             Self::QuestionFromTask => 670,
             Self::QuestionFromPerson => 671,
             Self::QuestionFromDeployment => 672,
@@ -1933,6 +1947,12 @@ impl JigPhrase {
             | Self::Behind
             | Self::SignOut
             | Self::SignOutLost
+            | Self::NothingKnown
+            | Self::LinkPart
+            | Self::NeedsPart
+            | Self::PartyPart
+            | Self::ProjectsPart
+            | Self::GoToTaskPart
             | Self::SignedOut
             | Self::Frame
             | Self::Navigation
@@ -2383,7 +2403,13 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 620] = [
+pub const ALL: [JigPhrase; 626] = [
+    JigPhrase::NothingKnown,
+    JigPhrase::LinkPart,
+    JigPhrase::NeedsPart,
+    JigPhrase::PartyPart,
+    JigPhrase::ProjectsPart,
+    JigPhrase::GoToTaskPart,
     JigPhrase::OwnerHoldRelease,
     JigPhrase::QuestionFromTask,
     JigPhrase::QuestionFromPerson,

@@ -515,7 +515,9 @@ fn capacity_composes_siblings_fragments_and_application_pages_with_checked_overf
     assert_eq!(
         limits.nodes,
         largest
-            .checked_add(crate::frame_nodes(&CLIENT).unwrap())
+            .checked_add(
+                crate::banner_nodes(&CLIENT).unwrap().checked_add(crate::navigation_nodes(&CLIENT).unwrap()).unwrap()
+            )
             .unwrap()
             .checked_add(crate::confirmation_nodes(&CLIENT).unwrap())
             .unwrap()

@@ -202,7 +202,8 @@ fn frame_builds_statuses_counts_navigation_and_number_submission_in_every_link_s
         bindings.begin();
         let mut b = Builder::new(&limits());
         b.open(Role::Page);
-        crate::frame::frame(
+        crate::frame::banner(&mut b, &d, words, &mut bindings);
+        crate::frame::navigation(
             &mut b,
             &d,
             SlotRef { owner: Owner::Application { number: 1 }, token: Token::new(1) },

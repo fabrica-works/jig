@@ -123,7 +123,8 @@ pub use crate::turns::conversation;
 /// Compose jig's frame and current page under the root's open page node.
 /// When false, the root builds its application's page, then calls `after_page`.
 pub fn jig(b: &mut Builder, client: &Domain, nav: crate::SlotRef, words: &Words, bindings: &mut JigBindings) -> bool {
-    crate::frame::frame(b, client, nav, words, bindings);
+    crate::frame::banner(b, client, words, bindings);
+    crate::frame::navigation(b, client, nav, words, bindings);
     let built = page(b, client, words, bindings);
     if built {
         after_page(b, client, words, bindings);
