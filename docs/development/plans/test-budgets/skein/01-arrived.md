@@ -289,7 +289,11 @@ Shape: each `Fill(1)` above becomes `Read::Arrived { max }`, with `max`
   `standard_client_bound_excludes_per_item_replay_capacity`, whose
   `fixed` and `removed` move by 16,385 (`error_bytes` + 1) for each
   provider, and any such test under `tests/oauth-accounts/`, by the
-  token response's `max`. No other expected value changes.
+  token response's `max`. A test that expects a `Fill(1)` that this
+  Shape makes `Read::Arrived { max }` expects the new read
+  (`testing/skein-fake-llm-protocol/src/provider.rs`'s
+  `length_framed_body_demands_bounded_batches_and_probes_actual_end`,
+  its unknown-length row; ruling 107). No other expected value changes.
 Test shape: in each crate's tests, one test per reader that a response
   delivered in one piece and the same delivered a byte at a time give
   the same result: `an_error_body_read_as_it_arrives_is_the_same_whatever_its_cuts`

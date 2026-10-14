@@ -184,6 +184,17 @@ the file.
      body's `max`. These are the sizes code-organization.md, 4 allows a
      session file to name; 01.3's Shape now names them, and any such
      test under `tests/oauth-accounts/`, by the token response's `max`.
+107. **skein 01.3's read-shape expectations change with its Shape**
+     (plan defect, skein 01's block of 2026-10-14T00:24:21Z; it narrows
+     ruling 106). Ruling 106's unblock said "Any other expected value
+     that changes is a question", but 01.3's Shape itself turns
+     `body_read`'s unknown-length `Fill(1)` into `Read::Arrived { max }`
+     (the room, or 1 where it is 0), and
+     `length_framed_body_demands_bounded_batches_and_probes_actual_end`'s
+     `(None, 256, 1)` row expects that `Fill(1)`. The row now expects
+     `Read::Arrived { max: 256 }`, every known-length row is unchanged,
+     and a zero-room row expecting `Read::Arrived { max: 1 }` is added.
+     01.3's Shape names it.
 
 ## For the user
 
