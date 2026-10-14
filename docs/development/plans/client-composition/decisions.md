@@ -299,6 +299,9 @@ your best judgement").
      its object or a line deciding it (section 9), stays there, on a page
      that shows the plan beside it too, and is never owed."
 
+110. **jig-06.1 landed at cdfce095a without parsed Step and Plan trailers** (process, jig 06's block of 2026-10-14T14:42:10Z).
+     jig-06.1 is landed at cdfce095a, and nobody rewrites it (implementer's card 8.4: a landed commit missing its body is never rewritten). Its last paragraph's lines were joined by a literal `\n`, so git parses one trailer, `Proof: unit, test(arranged), three arranged page tests passed\nPlan: client-composition\nStep: jig-06.1`, and no `Plan` or `Step` key; its `Gate-Tree` and `Gate-Result` trailers parse. For this commit only, the coordinator's landed check (development.md, 7.3, step 2) takes `git log -1 --format=%B cdfce095a | grep -c 'Step: jig-06.1'` printing 1 in place of the `%(trailers:key=Step,valueonly)` check; the other two checks stand. This ruling records cdfce095a as the commit of the plan client-composition's step jig-06.1, for the metrics (development.md, 15.2) that count steps by their `Plan` and `Step` trailers. From now on, a commit's paragraphs and trailers are written with real newlines: `git commit -F <file>`, or one `-m` per paragraph; a `\n` inside one `-m` stays two characters.
+
 ## For the user
 
 Long-term choices the user may veto. Each was decided by the planner
