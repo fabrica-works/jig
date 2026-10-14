@@ -243,7 +243,8 @@ fn contains(tree: &Tree, start: usize, end: usize, role: Role, name: &[u8]) -> b
             at < end
                 && !tree.nodes()[start + 1..=at].iter().enumerate().any(|(offset, n)| {
                     (n.key.is_some_and(card_key)
-                        || (n.role == Role::Item && n.key.is_some_and(|key| matches!(key.owner, Owner::Side { .. }))))
+                        || (n.role == Role::Item
+                            && n.key.is_some_and(|key| matches!(key.owner, Owner::Application { .. }))))
                         && start + 1 + offset + usize::try_from(n.size).expect("subtree") > at
                 })
         }
@@ -266,10 +267,9 @@ fn explained(tree: &Tree, start: usize, end: usize) -> bool {
 fn card_key(k: Key) -> bool {
     match k.owner {
         Owner::Jig => k.kind <= 6 || k.kind == 29,
-        Owner::Side { connector } => {
+        Owner::Application { number: connector } => {
             connector == domain::FIRST && ((10..=16).contains(&k.kind) || k.kind == 19 || k.kind == 20)
         }
-        Owner::Other { .. } => false,
     }
 }
 #[must_use]
@@ -467,7 +467,7 @@ mod tests {
         builder.open(Role::Item);
         builder.key(card);
         builder.open(Role::Item);
-        builder.key(Key { owner: Owner::Side { connector: 77 }, kind: 2, a: 1, b: 5 });
+        builder.key(Key { owner: Owner::Application { number: 77 }, kind: 2, a: 1, b: 5 });
         builder.open(Role::Status);
         builder.name(b"Gone");
         builder.close();

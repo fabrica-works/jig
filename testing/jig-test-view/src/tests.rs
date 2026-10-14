@@ -832,3 +832,22 @@ fn unsupported_individual_deployment_parts_say_cannot_show_without_a_project_or_
     assert!(!tree.nodes().iter().any(|node| node.role == Role::TextField));
     assert!(tree.nodes().iter().filter_map(|node| node.key).all(|key| key.kind != 10 || key.a != 0));
 }
+
+#[test]
+fn a_slot_of_a_number_no_owner_has_is_unshowable() {
+    let root = ready();
+    let mut view = view();
+    let mut builder = jig_view::Builder::new(&view.limits().tree);
+    builder.open(Role::Page);
+    builder.slot(
+        jig_view::SlotRef { owner: Owner::Application { number: 9 }, token: Token::new(1) },
+        &words().say(jig_view::phrases::jig::JigPhrase::LoadingPart, &[]),
+    );
+    builder.close();
+    crate::root::slots(&mut view, &root, &mut builder);
+    let tree = builder.finish();
+    assert!(tree.nodes().iter().any(|node| {
+        node.role == Role::Status && node.name.as_deref() == Some(b"Cannot show this part".as_slice())
+    }));
+    assert_eq!(tree.nodes().iter().filter(|node| node.role == Role::Status).count(), 1);
+}

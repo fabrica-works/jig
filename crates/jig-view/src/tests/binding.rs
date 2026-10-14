@@ -9,7 +9,7 @@ fn each_shell_act_resolves_by_node_identity_and_links_name_their_owner_address()
     builder.open(Role::Page);
     for role in [Role::Button, Role::TextField, Role::TextArea, Role::Check, Role::Link] {
         builder.open(role);
-        let binding = Binding { owner: Owner::Side { connector: 2 }, token: Token::new(7) };
+        let binding = Binding { owner: Owner::Application { number: 2 }, token: Token::new(7) };
         if role == Role::Link {
             builder.link(binding);
         } else {
@@ -22,7 +22,7 @@ fn each_shell_act_resolves_by_node_identity_and_links_name_their_owner_address()
     for index in 0..tree.len() {
         tree.nodes.get_mut(index).expect("displayed node").id = NodeId(index.checked_add(1).expect("small tree"));
     }
-    let binding = Binding { owner: Owner::Side { connector: 2 }, token: Token::new(7) };
+    let binding = Binding { owner: Owner::Application { number: 2 }, token: Token::new(7) };
     assert_eq!(tree.act(NodeId(2), Act::Press), Some(BoundAct { binding, act: Act::Press }));
     assert_eq!(
         tree.act(NodeId(3), Act::Input { value: Box::from(b"42".as_slice()) }),

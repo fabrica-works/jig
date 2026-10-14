@@ -127,7 +127,7 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
                         None => false,
                     }
                 }
-                Owner::Side { connector } => match jig_ops_domain_connectors::connector(connector) {
+                Owner::Application { number } => match jig_ops_domain_connectors::connector(number) {
                     Some(Connector::Observability) => {
                         if slot.reference == observability::NAV {
                             observability::navigation(
@@ -178,7 +178,6 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
                     },
                     None => false,
                 },
-                Owner::Other { .. } => false,
             };
             if filled {
                 builder.splice(slot.id, fragment);
@@ -207,11 +206,10 @@ pub fn decode(view: &mut View, node: NodeId, act: Act) -> Option<Action> {
             Some(value) => Some(Action::Jig(value)),
             None => None,
         },
-        Owner::Side { connector } => match jig_ops_domain_connectors::connector(connector) {
+        Owner::Application { number } => match jig_ops_domain_connectors::connector(number) {
             Some(Connector::Observability) => bindings::decode(&view.observability, bound.binding.token, bound.act),
             Some(Connector::Infrastructure) => bindings::decode(&view.infrastructure, bound.binding.token, bound.act),
             None => None,
         },
-        Owner::Other { .. } => None,
     }
 }

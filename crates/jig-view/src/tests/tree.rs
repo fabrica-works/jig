@@ -48,8 +48,8 @@ fn a_fields_own_write_count_and_semantic_attributes_are_kept() {
     builder.value(b"42", 19);
     builder.state(State::Invalid);
     builder.state(State::Invalid);
-    builder.style(Style { owner: Owner::Other { child: 3 }, token: 2 });
-    let binding = Binding { owner: Owner::Side { connector: 8 }, token: Token::new(5) };
+    builder.style(Style { owner: Owner::Application { number: 3 }, token: 2 });
+    let binding = Binding { owner: Owner::Application { number: 8 }, token: Token::new(5) };
     builder.bind(binding);
     builder.close();
     let tree = builder.finish();
@@ -64,7 +64,7 @@ fn a_fields_own_write_count_and_semantic_attributes_are_kept() {
 #[test]
 fn a_drawing_keeps_opaque_data_and_readable_fallback() {
     let mut builder = Builder::new(&LIMITS);
-    let kind = DrawingKind { owner: Owner::Other { child: 2 }, kind: 1 };
+    let kind = DrawingKind { owner: Owner::Application { number: 2 }, kind: 1 };
     builder.drawing(kind, b"Activity", b"1234", 4);
     builder.text(Run::Strong, b"four changes");
     builder.close();
@@ -156,7 +156,7 @@ fn spare_node_storage_is_reused_and_replaced_bytes_are_recounted() {
 fn runs_and_link_addresses_keep_their_owner_tokens() {
     let mut builder = Builder::new(&LIMITS);
     builder.open(Role::Link);
-    let link = Binding { owner: Owner::Side { connector: 1 }, token: Token::new(77) };
+    let link = Binding { owner: Owner::Application { number: 1 }, token: Token::new(77) };
     builder.link(link);
     builder.open(Role::Text);
     builder.run(Run::Plain, b"read ");

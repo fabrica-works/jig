@@ -12,7 +12,7 @@ use jig_test_domain_client::{
 use jig_view::{Builder, Key, Owner, Role, SlotRef, State, phrases::Hole};
 use skein_lib::{Decimal, Id, Token};
 pub const NAV: SlotRef =
-    SlotRef { owner: Owner::Side { connector: jig_test_domain_client::FIRST }, token: Token::new(0) };
+    SlotRef { owner: Owner::Application { number: jig_test_domain_client::FIRST }, token: Token::new(0) };
 /// A fragment includes a document heading, drawing fallback, card status and form.
 pub const PART_NODES: u32 = 39;
 pub const NAV_NODES: u32 = 2;

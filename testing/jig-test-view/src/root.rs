@@ -60,6 +60,10 @@ pub fn build(view: &mut View<'_>, root: &Domain, out: &mut Queue<Patch>) {
         jig_view::after_page(&mut b, root.jig(), view.words, &mut view.jig);
     }
     b.close();
+    slots(view, root, &mut b);
+    view.render.finish(b, shown, out);
+}
+pub(crate) fn slots(view: &mut View<'_>, root: &Domain, b: &mut Builder) {
     for pass in 0..2 {
         for slot in b.slots(pass) {
             let mut fragment = Builder::new(&view.limits.tree);
@@ -78,7 +82,7 @@ pub fn build(view: &mut View<'_>, root: &Domain, out: &mut Queue<Patch>) {
                     },
                     None => false,
                 },
-                Owner::Side { connector } => match Connector::of(connector) {
+                Owner::Application { number } => match Connector::of(number) {
                     Some(Connector::First) => {
                         if slot.reference == family::NAV {
                             family::navigation(&mut fragment, view.navigation, view.first_words, &mut view.first);
@@ -133,7 +137,6 @@ pub fn build(view: &mut View<'_>, root: &Domain, out: &mut Queue<Patch>) {
                     },
                     None => false,
                 },
-                Owner::Other { .. } => false,
             };
             if filled {
                 b.splice(slot.id, fragment);
@@ -142,7 +145,6 @@ pub fn build(view: &mut View<'_>, root: &Domain, out: &mut Queue<Patch>) {
             }
         }
     }
-    view.render.finish(b, shown, out);
 }
 fn second(
     b: &mut Builder,
@@ -185,13 +187,12 @@ pub fn decode(view: &mut View<'_>, node: NodeId, act: Act) -> Option<Action> {
             Some(action) => Some(Action::Jig(action)),
             None => None,
         },
-        Owner::Side { connector } => match Connector::of(connector) {
+        Owner::Application { number } => match Connector::of(number) {
             Some(Connector::First) => match bindings::decode(&view.first, bound.binding.token, bound.act) {
                 Some(action) => Some(Action::First(action)),
                 None => None,
             },
             Some(Connector::Second) | None => None,
         },
-        Owner::Other { .. } => None,
     }
 }

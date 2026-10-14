@@ -101,13 +101,9 @@ impl CardKey {
         let mut bytes = Vec::new();
         match key.owner {
             jig_view::Owner::Jig => bytes.extend_from_slice(&[0, 0, 0]),
-            jig_view::Owner::Side { connector } => {
+            jig_view::Owner::Application { number: connector } => {
                 bytes.push(1);
                 bytes.extend_from_slice(&connector.to_le_bytes());
-            }
-            jig_view::Owner::Other { child } => {
-                bytes.push(2);
-                bytes.extend_from_slice(&child.to_le_bytes());
             }
         }
         bytes.extend_from_slice(&key.kind.to_le_bytes());

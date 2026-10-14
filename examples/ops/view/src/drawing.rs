@@ -27,7 +27,7 @@ fn open_rate(b: &mut Builder, words: &Words, percent: u8, observed: skein_lib::W
     data.put(&[0; 23]).expect("fixed drawing capacity");
     let data = data.finish();
     b.drawing(
-        DrawingKind { owner: Owner::Side { connector: words.connector }, kind: 1 },
+        DrawingKind { owner: Owner::Application { number: words.connector }, kind: 1 },
         &words.say(Word::ErrorRate, &[]),
         &data,
         BYTES,

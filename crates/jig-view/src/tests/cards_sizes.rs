@@ -379,7 +379,7 @@ fn full_frame_notices(words: &crate::words::Words, sized: &Limits) {
     crate::frame::frame(
         &mut b,
         &d,
-        SlotRef { owner: Owner::Other { child: 1 }, token: Token::new(1) },
+        SlotRef { owner: Owner::Application { number: 1 }, token: Token::new(1) },
         words,
         &mut bindings,
     );

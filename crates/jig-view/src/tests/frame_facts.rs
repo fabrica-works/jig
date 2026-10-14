@@ -15,7 +15,7 @@ fn frame_tree(domain: &Domain, words: &crate::words::Words) -> Tree {
     crate::frame::frame(
         &mut builder,
         domain,
-        SlotRef { owner: Owner::Other { child: 1 }, token: Token::new(1) },
+        SlotRef { owner: Owner::Application { number: 1 }, token: Token::new(1) },
         words,
         &mut bindings,
     );

@@ -84,7 +84,7 @@ fn fixture() -> View {
         b.bind(binding(4));
         b.state(State::Disabled);
         b.close();
-        b.drawing(DrawingKind { owner: Owner::Other { child: 1 }, kind: 1 }, b"Error rate", b"secret data", 32);
+        b.drawing(DrawingKind { owner: Owner::Application { number: 1 }, kind: 1 }, b"Error rate", b"secret data", 32);
         b.text(Run::Plain, b"30 % since 10:02");
         b.close();
         b.close();

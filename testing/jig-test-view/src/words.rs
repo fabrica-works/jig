@@ -105,7 +105,7 @@ impl Word {
             Self::WatchBusy => 7802,
             Self::WatchStopping => 7803,
         };
-        PhraseId { owner: Owner::Side { connector: jig_test_domain_client::FIRST }, number }
+        PhraseId { owner: Owner::Application { number: jig_test_domain_client::FIRST }, number }
     }
 }
 #[derive(Clone, Debug)]

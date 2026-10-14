@@ -107,7 +107,7 @@ fn exact_part_slots_keep_separate_literal_segments_all_owner_kinds_and_numeric_k
             proposed_task::part(&mut b, &reference, words, &mut bindings);
             let tree = finish(b);
             let slot = tree.nodes().iter().find_map(|node| node.slot).unwrap();
-            assert_eq!(slot.owner, crate::Owner::Side { connector: u16::MAX });
+            assert_eq!(slot.owner, crate::Owner::Application { number: u16::MAX });
             assert_eq!(bindings.owner_part(slot.token), Some(&reference));
             assert_eq!(bindings.part(slot.token), None);
             assert_eq!(crate::decode(&mut bindings, slot.token, crate::Act::Press), None);

@@ -36,7 +36,7 @@ impl Bindings {
         self.next = self.next.checked_add(1).expect("binding token fits");
         let token = Token::new(self.next);
         self.entries.push(Entry { token, meaning }).expect("binding capacity");
-        Binding { owner: Owner::Side { connector: self.connector }, token }
+        Binding { owner: Owner::Application { number: self.connector }, token }
     }
     #[must_use]
     pub fn object(&self, token: Token) -> Option<ObjectKey> {

@@ -226,7 +226,7 @@ fn fields_keep_typing_and_binding_changes_are_private_while_drawings_change_whol
     }
     let mut model = Vec::new();
     let mut view = View::new(&LIMITS);
-    let kind = DrawingKind { owner: Owner::Other { child: 1 }, kind: 1 };
+    let kind = DrawingKind { owner: Owner::Application { number: 1 }, kind: 1 };
     for data in [b"123".as_slice(), b"456"] {
         let mut builder = view.builder();
         builder.drawing(kind, b"Count", data, 3);

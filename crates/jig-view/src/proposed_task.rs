@@ -95,7 +95,7 @@ pub fn part(b: &mut Builder, value: &OwnerPart, words: &Words, bindings: &mut Ji
     }
     let token = bindings.insert(JigMeaning::OwnerPart(value.clone())).token;
     b.slot(
-        SlotRef { owner: Owner::Side { connector: value.connector }, token },
+        SlotRef { owner: Owner::Application { number: value.connector }, token },
         &words.say(JigPhrase::LoadingPart, &[]),
     );
     b.close();

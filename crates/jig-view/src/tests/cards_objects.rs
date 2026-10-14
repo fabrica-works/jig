@@ -1329,7 +1329,7 @@ fn closing_connectors_use_their_owners_words(words: &crate::words::Words) {
             Part::Connector { connector } => *connector,
             _ => panic!("a name-only connector part"),
         };
-        assert_eq!(slot.reference.owner, crate::Owner::Side { connector });
+        assert_eq!(slot.reference.owner, crate::Owner::Application { number: connector });
         let mut own = Builder::new(&limits());
         own.open(Role::Region);
         own.text(crate::Run::Plain, if connector == 7 { b"amber" } else { b"blue" });
@@ -1931,7 +1931,7 @@ fn connector_effect_slots_keep_raw_numbers_separate_from_jig_proposal_makers() {
         builder.close();
         let tree = builder.finish();
         let slot = tree.nodes().iter().find_map(|node| node.slot).unwrap();
-        assert_eq!(slot.owner, crate::Owner::Side { connector });
+        assert_eq!(slot.owner, crate::Owner::Application { number: connector });
         assert_eq!(bindings.part(slot.token), Some(&native));
         for proposer in [Proposer::Task(proposal), Proposer::Party(proposal)] {
             let maker_effect = Part::Effect { connector, proposal: ProposalKey { proposer, number: proposal } };

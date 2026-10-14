@@ -16,8 +16,8 @@ use jig_ops_domain_client::{
 use jig_view::{Builder, Key, Owner, Role, Run, SlotRef, phrases::Hole};
 use skein_lib::Token;
 pub const NAV: SlotRef = SlotRef {
-    owner: Owner::Side {
-        connector: jig_ops_domain_connectors::number(jig_ops_domain_connectors::Connector::Observability),
+    owner: Owner::Application {
+        number: jig_ops_domain_connectors::number(jig_ops_domain_connectors::Connector::Observability),
     },
     token: Token::new(0),
 };

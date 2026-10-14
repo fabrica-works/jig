@@ -32,7 +32,7 @@ impl Bindings {
         self.next = self.next.checked_add(1).expect("family tokens fit");
         let token = Token::new(self.next);
         self.entries.push(Entry { token, meaning }).expect("family meanings fit");
-        Binding { owner: Owner::Side { connector: jig_test_domain_client::FIRST }, token }
+        Binding { owner: Owner::Application { number: jig_test_domain_client::FIRST }, token }
     }
     #[must_use]
     pub fn object(&self, token: Token) -> Option<ObjectKey> {

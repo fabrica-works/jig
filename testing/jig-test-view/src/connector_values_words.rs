@@ -311,7 +311,7 @@ impl Word {
             Self::SystemRequestBudgetNotKept => 6695,
             Self::LastSystemResponseNotKept => 6696,
         };
-        PhraseId { owner: Owner::Side { connector: jig_test_domain_client::FIRST }, number }
+        PhraseId { owner: Owner::Application { number: jig_test_domain_client::FIRST }, number }
     }
     fn data(self) -> (&'static [u8], Option<HoleKind>) {
         match self {

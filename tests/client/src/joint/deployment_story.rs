@@ -103,8 +103,8 @@ fn configured_deployment_owner_reads_capacity_account_and_connector_facts() {
         .take(region.size as usize - 1)
         .filter_map(|node| node.slot)
         .map(|slot| match slot.owner {
-            jig_view::Owner::Side { connector } => connector,
-            other @ (jig_view::Owner::Jig | jig_view::Owner::Other { .. }) => {
+            jig_view::Owner::Application { number: connector } => connector,
+            other @ jig_view::Owner::Jig => {
                 panic!("connector catalogue slot has its actual side owner: {other:?}")
             }
         })

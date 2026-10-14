@@ -38,7 +38,7 @@ pub(super) fn seen(tree: &ViewTree) -> Vec<Seen> {
     let mut seen = observe::jig_seen(tree);
     for (at, node) in tree.nodes().iter().enumerate() {
         let Some(key) = node.key else { continue };
-        if key.owner != (Owner::Side { connector: number(Connector::Infrastructure) })
+        if key.owner != (Owner::Application { number: number(Connector::Infrastructure) })
             || !matches!(key.kind, 2 | 12)
             || node.role != Role::Item
         {
