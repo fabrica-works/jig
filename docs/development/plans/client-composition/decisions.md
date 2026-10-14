@@ -141,6 +141,16 @@ your best judgement").
 
 (The supervisor's, from 101, during the run.)
 
+101. **jig 02's Shapes against main** (ready check of jig-02.1).
+     jig/02-outline.md amended against origin/main fdfb3a0bd, for 02.1 and 02.2 (the ready check of jig-02.1):
+     - Every `Role::Region` the session opens has a name, since `crates/jig-view/src/tests/cards_access.rs:21-23` asserts it: the frame's five parts take five new phrases, `LinkPart` ("Connection"), `NeedsPart` ("What needs you"), `PartyPart` ("Who is signed in"), `ProjectsPart` ("Projects"), `GoToTaskPart` ("Go to a task"); 02.3's notices' region takes `NoticesPart` ("Notices"), and a page not about the work names its region with its level-1 heading's phrase. A further unnamed region takes a new phrase at the next free id, listed in the commit body. This replaces "One phrase is added".
+     - Phrase ids: `NothingKnown` and the five parts' names are 674 to 679 (621 is `ChipDependenciesCut`, `jig.rs:1113`); `NoticesPart` is 680; `ALL` goes from 620 entries to 626 in 02.2, 627 in 02.3.
+     - 02.2 changes none of `page_capacity.rs:845-853`'s literals; at `:518`, `banner_nodes + navigation_nodes` is `frame_nodes`' value plus 5, and `Limits.nodes` grows by 5.
+     - A part keeps view.md 4.1's signature, and names a parameter it does not read with a leading underscore (`_bindings` in `link`, `_client` in `go_to_task`).
+     - 02.1's test helpers take no closure (`clippy.toml:63-65`): `fn page() -> Builder` and `fn finish(b: Builder) -> Tree`; `Fault` and `Rule` derive `Clone, Copy, PartialEq, Eq, Debug`; the sketch's doc comments quote `after_page` in backticks.
+     - Ranges: `pages.rs:123-132`, `lib.rs:52-56`; the grep for "Work" and "Navigation" also prints `english.rs:765-766`.
+     Checked: `git show origin/main:crates/jig-view/src/tests/cards_access.rs | grep -n 'Role::Region | Role::Dialog'` prints `21: Role::Region | Role::Dialog | Role::Status | Role::ChoiceGroup => {`; `grep -n -E 'Self::\w+ => (67[4-9]|68[0-9]),' jig.rs` prints nothing, and `:1093` is `Self::OwnerHoldRelease => 673`; `grep -c` of each new phrase's text and variant name in `english.rs` and `jig.rs` prints 0; `clippy.toml:63-65` disallow `core::ops::Fn`, `FnMut`, `FnOnce`. The ready check compiled 02.1's reference test in this form under clippy, and it passed with node 6.
+
 ## For the user
 
 Long-term choices the user may veto. Each was decided by the planner

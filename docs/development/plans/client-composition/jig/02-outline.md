@@ -43,11 +43,16 @@ and 06 rebuild them from sections.
 ## Choices this plan makes
 
 - The banner keeps the frame's name today, `JigPhrase::Frame`; the
-  navigation landmark keeps `JigPhrase::Navigation`. One phrase is
-  added, `JigPhrase::NothingKnown` ("Nothing known yet"), which the
-  needs' part shows before the frame's first delivery (pages.md, 12.1);
-  the party's part shows `JigPhrase::SignedOut` there, as the frame does
-  today. No phrase is removed.
+  navigation landmark keeps `JigPhrase::Navigation`. Six phrases are
+  added in 02.2, at the ids 674 to 679, in this order:
+  `JigPhrase::NothingKnown` ("Nothing known yet"), which the needs' part
+  shows before the frame's first delivery (pages.md, 12.1), and the
+  names of the five parts' regions, `LinkPart` ("Connection"),
+  `NeedsPart` ("What needs you"), `PartyPart` ("Who is signed in"),
+  `ProjectsPart` ("Projects") and `GoToTaskPart` ("Go to a task"). The
+  party's part shows `JigPhrase::SignedOut` before the first delivery,
+  as the frame does today. 02.3 adds `JigPhrase::NoticesPart`
+  ("Notices"), at the id 680. No phrase is removed.
 - `Fault { rule: Rule, node: u32 }`, `node` the index in preorder of the
   node that breaks `rule` (the page node, index 0, when what is missing
   has no node). The check stops at the first fault in preorder.
@@ -64,9 +69,16 @@ and 06 rebuild them from sections.
 
 - The literal bounds of `crates/jig-view/src/tests/page_capacity.rs:845-853`
   (`each_page_bound_keeps_its_value_at_the_client_limits`) change in
-  02.2 and 02.3 only by the nodes those increments add, named in the
-  commit body (code-organization.md, 4, "Literal bounds"); no other
-  expected value changes.
+  02.3 only by the nodes it adds, named in the commit body
+  (code-organization.md, 4, "Literal bounds"); 02.2 changes none of
+  them; no other expected value changes.
+- Every `Role::Region` this session opens has a non-empty name:
+  `crates/jig-view/src/tests/cards_access.rs:21-23` asserts it on the
+  trees of jig-view's scenario tests. The frame's parts take the names
+  of "Choices this plan makes"; in 02.3, a page not about the work names
+  its region with its level-1 heading's phrase, and the notices' region
+  takes `JigPhrase::NoticesPart`. A further region with no name takes a
+  new phrase at the next free id, listed in the commit body.
 - A story keeps its steps: only a scope (`within`) that named the old
   frame's regions changes, to the banner or the navigation landmark.
 - Aim for the session's tests to add at most 0.3 s to the focused
@@ -103,21 +115,22 @@ Test shape: `crates/jig-view/src/tests/outline.rs`, trees built by hand
   ```rust
   #[test]
   fn a_page_with_two_mains_is_a_fault() {
-      let tree = page(|b| {
-          banner(b);
-          b.open(Role::Main);
-          b.close();
-          b.open(Role::Main);
-          b.close();
-      });
-      assert_eq!(check(&tree), Some(Fault { rule: Rule::OneMain, node: 6 }));
+      let mut b = page();
+      banner(&mut b);
+      b.open(Role::Main);
+      b.close();
+      b.open(Role::Main);
+      b.close();
+      assert_eq!(check(&finish(b)), Some(Fault { rule: Rule::OneMain, node: 6 }));
   }
   ```
-  (`page` opens and closes the page node around its closure and
-  finishes the tree; `banner` builds the banner with the link, needs and
-  party regions, one node each: the page is node 0, the banner and its
-  regions nodes 1 to 4, the mains nodes 5 and 6.
-  Both helpers go in this test file.) Each under 20 ms.
+  (`fn page() -> Builder` opens the page node; `fn finish(b: Builder) ->
+  Tree` closes it and finishes the tree; `banner` builds the banner with
+  the link, needs and party regions, one node each: the page is node 0,
+  the banner and its regions nodes 1 to 4, the mains nodes 5 and 6. The
+  three helpers go in this test file, and take no closure:
+  `clippy.toml:63-65` disallows `Fn`, `FnMut` and `FnOnce`.) Each under
+  20 ms.
 Proof: unit; 02.3 runs it on jig's pages and 02.4 in the referee.
 Don't: read names or words; read anything but roles, region names and
   shortcuts.
@@ -128,28 +141,38 @@ Removes: nothing.
 Scope: view.md, 4.1 ("The frame's parts"); pages.md, 12.1.
 Needs: 02.1 is not needed; jig 01.2 and 01.3.
 Files: `crates/jig-view/src/frame.rs:13-96` (`frame`, split; `control`
-  `:98-117` and `membership` `:119-143` stay); `crates/jig-view/src/pages.rs:121-131`
+  `:98-117` and `membership` `:119-143` stay); `crates/jig-view/src/pages.rs:123-132`
   (`jig`); `crates/jig-view/src/sizes.rs:189-199` (`frame_nodes`) and
-  `crates/jig-view/src/lib.rs:51-56` (exports); `crates/jig-view/src/limits.rs:102-108`.
+  `crates/jig-view/src/lib.rs:52-56` (exports); `crates/jig-view/src/limits.rs:102-108`.
   The callers of `frame::frame` and `frame_nodes` (findings/view.md, 3):
   `crates/jig-view/src/tests/frame_facts.rs:9-27` and its phrase list
   `:186-199`, `tests/cards.rs:205`, `tests/cards_sizes.rs:379-388`,
-  `tests/page_capacity.rs:518` and `:845-853` (the bounds, if the parts'
-  regions add nodes). The observer: `tests/client/src/observe.rs:304-326`
+  `tests/page_capacity.rs:518`, where `banner_nodes` plus
+  `navigation_nodes` take `frame_nodes`' place and count 5 more: a
+  banner, five regions and a navigation landmark replace two regions,
+  and `Limits.nodes` grows by 5 (`:845-853` counts no frame, and stays).
+  The observer: `tests/client/src/observe.rs:304-326`
   (`frame_link`) and `tests/client/src/observe/link_tests.rs:26-46`.
   Any story or test whose `within` names the region "Work" or
   "Navigation": `git grep -n -E 'b"Work"|b"Navigation"' -- tests testing
-  examples crates` lists them (at the base, `observe.rs:309` and
-  `link_tests.rs:34,37` only). The new phrase:
-  `crates/jig-view/src/phrases/jig.rs` (the enum, its id 621 beside
-  `:1112`, its arm in `shape` (`:1723`) beside `SignedOut`'s (`:1936`), and
-  `ALL`, `:2386`, 620 entries becoming 621) and
-  `crates/jig-view/src/phrases/english.rs` (beside `:765`).
+  examples crates` lists them (at the base, `observe.rs:309`,
+  `link_tests.rs:34,37` and the phrases themselves,
+  `crates/jig-view/src/phrases/english.rs:765-766`). The six new phrases:
+  `crates/jig-view/src/phrases/jig.rs` (the enum, the ids 674 to 679
+  beside `OwnerHoldRelease => 673` (`:1093`), their arms in `shape`
+  (`:1723`) beside `SignedOut`'s (`:1936`), and `ALL`, `:2386`, 620
+  entries becoming 626) and `crates/jig-view/src/phrases/english.rs`
+  (beside `:765`).
 Shape: in `frame.rs`, each `pub fn x(b: &mut Builder, client: &Domain,
   words: &Words, bindings: &mut JigBindings)` for `link`, `needs`,
   `party`, `projects`, `go_to_task`, each opening a `Role::Region` with
-  `b.region(JigRegion::X.region())` and building what findings/view.md,
-  3 lists for it; without a frame's document, `needs` shows
+  `b.region(JigRegion::X.region())`, naming it with its phrase of
+  "Choices this plan makes" (`b.name(&words.say(JigPhrase::LinkPart,
+  &[]))`), and building what findings/view.md, 3 lists for it; a
+  parameter a part does not read keeps its place in view.md 4.1's
+  signature, named with a leading underscore (`_bindings` in `link`,
+  `_client` in `go_to_task`: `scripts/check.sh` denies warnings);
+  without a frame's document, `needs` shows
   `JigPhrase::NothingKnown` and `party` shows `JigPhrase::SignedOut`
   (`frame.rs:51` today);
   `pub fn navigation(b, client, nav: SlotRef, words, bindings)`, a
@@ -191,7 +214,10 @@ Files: `crates/jig-view/src/pages.rs:103-133` (`page` becomes `main`;
   `crates/jig-view/src/tests/pages.rs:26-31`;
   `crates/jig-view/src/pages/not_the_work.rs`,
   `crates/jig-view/src/confirmation.rs:20` (the dialog's region name),
-  `crates/jig-view/src/notices.rs:16-27` (the notices inside a region);
+  `crates/jig-view/src/notices.rs:16-27` (the notices inside a region,
+  named `JigPhrase::NoticesPart`: `crates/jig-view/src/phrases/jig.rs`,
+  the id 680, `ALL`'s 626 entries becoming 627, and
+  `crates/jig-view/src/phrases/english.rs`);
   the counts: the main is counted once in `Limits` (`limits.rs:102-108`,
   beside the page node's `1`: 2 nodes), and so is the owed cards'
   aside (1 more); `notices_nodes` gains its region (1); the page
@@ -271,8 +297,10 @@ Removes: nothing.
 ```rust
 // crates/jig-view/src/outline.rs
 /// The first node, in preorder, that breaks view.md 3.1, and the rule it breaks.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Fault { pub rule: Rule, pub node: u32 }
 /// One rule of the page's outline.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Rule {
     /// The page node's first child is not the banner.
     BannerFirst,
@@ -282,9 +310,9 @@ pub enum Rule {
     OneMain,
     /// A second content info.
     OneContentInfo,
-    /// A child of the page that is no landmark and none of after_page's parts.
+    /// A child of the page that is no landmark and none of `after_page`'s parts.
     InsideLandmark,
-    /// A landmark after one of after_page's parts, or those parts out of order.
+    /// A landmark after one of `after_page`'s parts, or those parts out of order.
     AfterPageLast,
     /// A shortcut that a node before it names too.
     ShortcutOnce,
@@ -292,11 +320,11 @@ pub enum Rule {
 pub fn check(tree: &Tree) -> Option<Fault>;
 
 // crates/jig-view/src/frame.rs
-pub fn link(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings);
+pub fn link(b: &mut Builder, client: &Domain, words: &Words, _bindings: &mut JigBindings);
 pub fn needs(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings);
 pub fn party(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings);
 pub fn projects(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings);
-pub fn go_to_task(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings);
+pub fn go_to_task(b: &mut Builder, _client: &Domain, words: &Words, bindings: &mut JigBindings);
 pub fn navigation(b: &mut Builder, client: &Domain, nav: SlotRef, words: &Words, bindings: &mut JigBindings);
 pub fn banner(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings);
 
