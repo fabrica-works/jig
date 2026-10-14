@@ -64,9 +64,9 @@ impl Limits {
     /// fragments and application pages use `compose`. Custom
     /// languages use `of_words` to include their checked saying capacities.
     #[must_use]
-    pub fn of(client: &jig_domain_client::Limits) -> Option<Self> {
+    pub fn of(client: &jig_domain_client::Limits, arrangement: &jig_domain_client::pages::Arrangement) -> Option<Self> {
         let phrase = client.text.max(64).checked_mul(3)?.checked_add(256)?;
-        Self::with_phrase_bytes(client, phrase, 0, 0, 0)
+        Self::with_phrase_bytes(client, phrase, arrangement, 0, 0, 0)
     }
 
     /// The same renderer envelope using the largest checked saying across
@@ -74,7 +74,7 @@ impl Limits {
     #[must_use]
     pub fn of_words(client: &jig_domain_client::Limits, words: &crate::words::Words) -> Option<Self> {
         let phrase = words.book.jig_capacity()?;
-        Self::with_phrase_bytes(client, phrase, 0, 0, 0)
+        Self::with_phrase_bytes(client, phrase, &jig_domain_client::pages::Arrangement::none(), 0, 0, 0)
     }
 
     /// Compose shared siblings around the larger jig or application page.
@@ -85,21 +85,23 @@ impl Limits {
     pub fn compose(
         client: &jig_domain_client::Limits,
         words: &crate::words::Words,
+        arrangement: &jig_domain_client::pages::Arrangement,
         application_nodes: u32,
         slot_nodes: u32,
         slot_depth: u32,
     ) -> Option<Self> {
         let phrase = words.book.jig_capacity()?;
-        Self::with_phrase_bytes(client, phrase, application_nodes, slot_nodes, slot_depth)
+        Self::with_phrase_bytes(client, phrase, arrangement, application_nodes, slot_nodes, slot_depth)
     }
     fn with_phrase_bytes(
         client: &jig_domain_client::Limits,
         phrase: u32,
+        arrangement: &jig_domain_client::pages::Arrangement,
         application_nodes: u32,
         slot_nodes: u32,
         slot_depth: u32,
     ) -> Option<Self> {
-        let nodes = crate::page_nodes(client, 0)?
+        let nodes = crate::arranged_nodes(client, 0, arrangement)?
             .max(application_nodes)
             .checked_add(crate::banner_nodes(client)?)?
             .checked_add(crate::navigation_nodes(client)?)?

@@ -478,7 +478,7 @@ fn full_replies_notices(d: &mut Domain, inbox: Token, words: &crate::words::Word
     super::super::cards_access::check(&tree);
 }
 pub(super) fn scenario(words: &crate::words::Words) {
-    let default = Limits::of(&CLIENT).unwrap();
+    let default = Limits::of(&CLIENT, &jig_domain_client::pages::Arrangement::none()).unwrap();
     let localized = Limits::of_words(&CLIENT, words).unwrap();
     assert!(default.text_per_node >= localized.text_per_node);
     assert!(crate::worst_case(&localized).is_some());
@@ -486,10 +486,10 @@ pub(super) fn scenario(words: &crate::words::Words) {
     let mut excessive = CLIENT;
     excessive.rows = u32::MAX;
     assert!(crate::card_nodes(&excessive).is_none());
-    assert!(Limits::of(&excessive).is_none());
+    assert!(Limits::of(&excessive, &jig_domain_client::pages::Arrangement::none()).is_none());
     excessive = CLIENT;
     excessive.text = u32::MAX;
-    assert!(Limits::of(&excessive).is_none());
+    assert!(Limits::of(&excessive, &jig_domain_client::pages::Arrangement::none()).is_none());
     full_cards(words, &localized);
     full_frame_notices(words, &localized);
 }

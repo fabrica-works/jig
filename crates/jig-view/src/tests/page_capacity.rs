@@ -526,11 +526,22 @@ fn capacity_composes_siblings_fragments_and_application_pages_with_checked_overf
             .checked_add(3)
             .unwrap()
     );
-    let extra = crate::Limits::compose(&CLIENT, words, largest.checked_add(7).unwrap(), 9, 2).unwrap();
+    let extra = crate::Limits::compose(
+        &CLIENT,
+        words,
+        &jig_domain_client::pages::Arrangement::none(),
+        largest.checked_add(7).unwrap(),
+        9,
+        2,
+    )
+    .unwrap();
     assert_eq!(extra.nodes, limits.nodes.checked_add(16).unwrap());
     assert_eq!(extra.depth, limits.depth.checked_add(2).unwrap());
     assert_eq!(crate::page_nodes(&CLIENT, 9), largest.checked_add(9));
-    assert!(crate::Limits::compose(&CLIENT, words, u32::MAX, 0, 0).is_none());
+    assert!(
+        crate::Limits::compose(&CLIENT, words, &jig_domain_client::pages::Arrangement::none(), u32::MAX, 0, 0)
+            .is_none()
+    );
     assert!(crate::page_nodes(&CLIENT, u32::MAX).is_none());
     let mut huge = CLIENT;
     huge.rows = u32::MAX;
@@ -855,4 +866,33 @@ fn each_page_bound_keeps_its_value_at_the_client_limits() {
     assert_eq!(crate::deployment_nodes(&CLIENT, 0), Some(2729));
     assert_eq!(crate::not_the_work_nodes(&CLIENT, 0), Some(29));
     assert_eq!(crate::page_nodes(&CLIENT, 0), Some(1_166_881));
+}
+
+#[test]
+fn an_arranged_task_page_counts_the_sum_of_its_sections() {
+    let sections = [
+        TaskSection::Overview,
+        TaskSection::Activity,
+        TaskSection::Plan,
+        TaskSection::History,
+        TaskSection::Budget,
+        TaskSection::Panels,
+    ];
+    let counts = sections.map(|s| crate::task_section_nodes(&CLIENT, s).unwrap());
+    assert_eq!(
+        (crate::task_header_nodes(&CLIENT).unwrap(), counts),
+        (42_352, [182_751, 1_124_529, 311_099, 13_778, 60, 94])
+    );
+    let arrangement = jig_domain_client::pages::Arrangement { task: list(sections), project: list([]) };
+    assert_eq!(
+        crate::arranged_nodes(&CLIENT, 0, &arrangement),
+        Some(42_352 + 182_751 + 1_124_529 + 311_099 + 13_778 + 60 + 94)
+    );
+}
+#[test]
+fn no_arrangement_keeps_each_page_bound() {
+    each_page_bound_keeps_its_value_at_the_client_limits();
+    let arrangement = jig_domain_client::pages::Arrangement::none();
+    assert_eq!(crate::arranged_nodes(&CLIENT, 0, &arrangement), Some(1_166_881));
+    assert_eq!(crate::arranged_nodes(&CLIENT, 9, &arrangement), Some(1_166_890));
 }

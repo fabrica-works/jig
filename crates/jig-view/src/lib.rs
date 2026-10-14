@@ -52,10 +52,11 @@ pub use limits::{Limits, worst_case};
 pub use pages::{after_page, jig};
 pub use render::View;
 pub use sizes::{
-    banner_nodes, card_nodes, chip_nodes, confirmation_nodes, conversation_nodes, conversations_nodes,
+    arranged_nodes, banner_nodes, card_nodes, chip_nodes, confirmation_nodes, conversation_nodes, conversations_nodes,
     deployment_nodes, escalation_nodes, go_to_task_nodes, inbox_nodes, link_nodes, navigation_nodes, needs_nodes,
-    not_the_work_nodes, notices_nodes, offered_nodes, page_nodes, party_nodes, person_task_nodes, project_nodes,
-    projects_nodes, proposal_nodes, question_nodes, refusal_nodes, reply_nodes, result_nodes, task_nodes,
+    not_the_work_nodes, notices_nodes, offered_nodes, page_nodes, party_nodes, person_task_nodes, project_header_nodes,
+    project_nodes, project_section_nodes, projects_nodes, proposal_nodes, question_nodes, refusal_nodes, reply_nodes,
+    result_nodes, task_header_nodes, task_nodes, task_section_nodes,
 };
 pub use tree::{
     Drawing, DrawingKind, Key, Modifier, Node, NodeId, Owner, Picture, Region, Role, Run, Shortcut, SlotRef, State,

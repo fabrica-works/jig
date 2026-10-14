@@ -43,7 +43,14 @@ impl Limits {
             .checked_add(jig_nodes.checked_mul(rows.checked_add(3)?)?)?
             .checked_add(jig_cards)?
             .checked_add(8)?;
-        let mut tree = jig_view::Limits::compose(&domain.jig, jig, application_nodes, slot_nodes, 8)?;
+        let mut tree = jig_view::Limits::compose(
+            &domain.jig,
+            jig,
+            &jig_domain_client::pages::Arrangement::none(),
+            application_nodes,
+            slot_nodes,
+            8,
+        )?;
         tree.text_per_node = tree
             .text_per_node
             .max(observability.capacity()?.max(infrastructure.capacity()?).checked_mul(2)?.checked_add(32)?)

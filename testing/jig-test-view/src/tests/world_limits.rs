@@ -63,8 +63,15 @@ fn bounded_world_storage_survives_complete_composition_text_overflow() {
     let jig_cards = u64::from(jig_view::card_nodes(&domain.jig).unwrap()) * cards;
     let slots = (u64::from(native.nodes) + jig_cards) * fragment + jig_cards + u64::from(crate::family::NAV_NODES);
     let application = fragment + cards * 3 + 3;
-    let base =
-        jig_view::Limits::compose(&domain.jig, jig, u32::try_from(application).unwrap(), 0, owner.depth + 4).unwrap();
+    let base = jig_view::Limits::compose(
+        &domain.jig,
+        jig,
+        &jig_domain_client::pages::Arrangement::none(),
+        u32::try_from(application).unwrap(),
+        0,
+        owner.depth + 4,
+    )
+    .unwrap();
     let full_nodes = u64::from(base.nodes) + slots;
     u32::try_from(full_nodes).unwrap();
     assert!(full_nodes * u64::from(base.text_per_node) > u64::from(u32::MAX));
@@ -72,6 +79,7 @@ fn bounded_world_storage_survives_complete_composition_text_overflow() {
         jig_view::Limits::compose(
             &domain.jig,
             jig,
+            &jig_domain_client::pages::Arrangement::none(),
             u32::try_from(application).unwrap(),
             u32::try_from(slots).unwrap(),
             owner.depth + 4,

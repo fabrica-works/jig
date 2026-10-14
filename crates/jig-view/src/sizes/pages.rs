@@ -2,7 +2,11 @@
 //! Counts include the shared cards and loading slot fallbacks. `slot_nodes`
 //! is the sum of the owners' fragment bounds for the page, including navigation.
 use super::{authority, card_nodes, chip_nodes, markdown};
-use jig_domain_client::Limits;
+use jig_domain_client::{
+    Limits,
+    address::{ProjectSection, TaskSection},
+    pages::Arrangement,
+};
 fn runtime_in(l: &Limits, chip: u32) -> Option<u32> {
     chip.checked_mul(l.rows)?.checked_add(l.rows.checked_mul(5)?)?.checked_add(24)
 }
@@ -96,28 +100,61 @@ fn history(l: &Limits) -> Option<u32> {
 pub fn task_nodes(l: &Limits, slot_nodes: u32) -> Option<u32> {
     task_in(l, card_nodes(l)?, chip_nodes(l)?, slot_nodes)
 }
-fn task_in(l: &Limits, card: u32, chip: u32, slot_nodes: u32) -> Option<u32> {
-    let budget = crate::owner_authority::document_nodes(l.rows)?
-        .checked_add(crate::owner_budget::budget_nodes())?
-        .checked_add(l.rows.checked_mul(4)?)?
-        .checked_add(4)?;
-    let activity = conversation_in(l, card, 0)?
-        .checked_add(runtime_in(l, chip)?)?
-        .checked_add(card.checked_mul(2)?)?
-        // The Task owner keeps departing cards alongside each fresh bounded
-        // source, so the shared working-set capacity bounds their union.
-        .checked_add(super::proposal_nodes(l)?.checked_mul(l.objects)?)?
-        .checked_add(crate::owner_chip::observation_nodes())?;
-    let panels = l
-        .rows
-        .checked_mul(4)?
-        .checked_add(2)?
-        .checked_mul(5)?
-        .checked_add(l.rows.checked_add(20)?.checked_mul(l.rows)?)?;
-    let section =
-        plan_in(l, card, chip)?.max(overview_in(l, card, chip)?).max(history(l)?).max(budget).max(activity).max(panels);
-    card.checked_add(chip.checked_mul(l.rows)?)?.checked_add(section)?.checked_add(36)?.checked_add(slot_nodes)
+fn task_in(l: &Limits, _card: u32, _chip: u32, slot_nodes: u32) -> Option<u32> {
+    arranged_task(l, slot_nodes, &Arrangement::none())
 }
+fn arranged_task(l: &Limits, slot_nodes: u32, arrangement: &Arrangement) -> Option<u32> {
+    let mut sum = 0_u32;
+    let mut largest = 0_u32;
+    for section in [
+        TaskSection::Overview,
+        TaskSection::Activity,
+        TaskSection::Plan,
+        TaskSection::History,
+        TaskSection::Budget,
+        TaskSection::Panels,
+    ] {
+        let nodes = task_section_nodes(l, section)?;
+        if arrangement.task.as_slice().contains(&section) {
+            sum = sum.checked_add(nodes)?;
+        } else {
+            largest = largest.max(nodes);
+        }
+    }
+    task_header_nodes(l)?.checked_add(sum)?.checked_add(largest)?.checked_add(slot_nodes)
+}
+/// Heading, task card, lineage and tabs, shared by every task section.
+#[must_use]
+pub fn task_header_nodes(l: &Limits) -> Option<u32> {
+    card_nodes(l)?.checked_add(chip_nodes(l)?.checked_mul(l.rows)?)?.checked_add(36)
+}
+/// One whole task section, without its shared header or application fragments.
+#[must_use]
+pub fn task_section_nodes(l: &Limits, section: TaskSection) -> Option<u32> {
+    let card = card_nodes(l)?;
+    let chip = chip_nodes(l)?;
+    match section {
+        TaskSection::Overview => overview_in(l, card, chip),
+        TaskSection::Plan => plan_in(l, card, chip),
+        TaskSection::History => history(l),
+        TaskSection::Budget => crate::owner_authority::document_nodes(l.rows)?
+            .checked_add(crate::owner_budget::budget_nodes())?
+            .checked_add(l.rows.checked_mul(4)?)?
+            .checked_add(4),
+        TaskSection::Activity => conversation_in(l, card, 0)?
+            .checked_add(runtime_in(l, chip)?)?
+            .checked_add(card.checked_mul(2)?)?
+            .checked_add(super::proposal_nodes(l)?.checked_mul(l.objects)?)?
+            .checked_add(crate::owner_chip::observation_nodes()),
+        TaskSection::Panels => l
+            .rows
+            .checked_mul(4)?
+            .checked_add(2)?
+            .checked_mul(5)?
+            .checked_add(l.rows.checked_add(20)?.checked_mul(l.rows)?),
+    }
+}
+
 fn goals_in(l: &Limits, card: u32, chip: u32) -> Option<u32> {
     let board = card
         .checked_add(chip)?
@@ -176,16 +213,67 @@ fn settings_in(l: &Limits, card: u32, chip: u32) -> Option<u32> {
 pub fn project_nodes(l: &Limits, slot_nodes: u32) -> Option<u32> {
     project_in(l, card_nodes(l)?, chip_nodes(l)?, slot_nodes)
 }
-fn project_in(l: &Limits, card: u32, chip: u32, slot_nodes: u32) -> Option<u32> {
-    let overview = goals_in(l, card, chip)?.checked_add(inbox_in(l, card, chip, 0)?)?;
-    overview
-        .max(goals_in(l, card, chip)?)
-        .max(tasks_in(l, card, chip)?)
-        .max(notes_in(l, card)?)
-        .max(settings_in(l, card, chip)?)
-        .max(crate::owner_project::max_nodes(l)?)
-        .checked_add(35)?
-        .checked_add(slot_nodes)
+fn project_in(l: &Limits, _card: u32, _chip: u32, slot_nodes: u32) -> Option<u32> {
+    arranged_project(l, slot_nodes, &Arrangement::none())
+}
+/// Heading, project identity and tabs shared by every project section.
+#[must_use]
+pub const fn project_header_nodes(_l: &Limits) -> Option<u32> {
+    Some(35)
+}
+/// One whole project section, including either document vocabulary.
+#[must_use]
+pub fn project_section_nodes(l: &Limits, section: ProjectSection) -> Option<u32> {
+    let card = card_nodes(l)?;
+    let chip = chip_nodes(l)?;
+    let nodes = match section {
+        ProjectSection::Overview => goals_in(l, card, chip)?.checked_add(inbox_in(l, card, chip, 0)?)?,
+        ProjectSection::Goals => goals_in(l, card, chip)?,
+        ProjectSection::Tasks => tasks_in(l, card, chip)?,
+        ProjectSection::Notes => notes_in(l, card)?,
+        ProjectSection::Settings
+        | ProjectSection::Resources
+        | ProjectSection::Policy
+        | ProjectSection::Roles
+        | ProjectSection::Spend
+        | ProjectSection::Recurring => settings_in(l, card, chip)?,
+    };
+    Some(nodes.max(crate::owner_project::max_nodes(l)?))
+}
+fn arranged_project(l: &Limits, slot_nodes: u32, arrangement: &Arrangement) -> Option<u32> {
+    let mut sum = 0_u32;
+    let mut largest = 0_u32;
+    for section in [
+        ProjectSection::Overview,
+        ProjectSection::Goals,
+        ProjectSection::Tasks,
+        ProjectSection::Notes,
+        ProjectSection::Settings,
+        ProjectSection::Resources,
+        ProjectSection::Policy,
+        ProjectSection::Roles,
+        ProjectSection::Spend,
+        ProjectSection::Recurring,
+    ] {
+        let nodes = project_section_nodes(l, section)?;
+        if arrangement.project.as_slice().contains(&section) {
+            sum = sum.checked_add(nodes)?;
+        } else if !arrangement.project.as_slice().contains(&ProjectSection::Settings) || outside_settings(section) {
+            largest = largest.max(nodes);
+        }
+    }
+    project_header_nodes(l)?.checked_add(sum)?.checked_add(largest)?.checked_add(slot_nodes)
+}
+const fn outside_settings(section: ProjectSection) -> bool {
+    match section {
+        ProjectSection::Overview | ProjectSection::Goals | ProjectSection::Tasks | ProjectSection::Notes => true,
+        ProjectSection::Settings
+        | ProjectSection::Resources
+        | ProjectSection::Policy
+        | ProjectSection::Roles
+        | ProjectSection::Spend
+        | ProjectSection::Recurring => false,
+    }
 }
 /// Hosts, accounts, project capacity, refusals and deployment parts.
 #[must_use]
@@ -209,12 +297,17 @@ pub fn not_the_work_nodes(l: &Limits, slot_nodes: u32) -> Option<u32> {
 /// The largest jig page with every window and text at its bound.
 #[must_use]
 pub fn page_nodes(l: &Limits, slot_nodes: u32) -> Option<u32> {
+    arranged_nodes(l, slot_nodes, &Arrangement::none())
+}
+/// The largest page with the arrangement's sections beside its address's own.
+#[must_use]
+pub fn arranged_nodes(l: &Limits, slot_nodes: u32, arrangement: &Arrangement) -> Option<u32> {
     let card = card_nodes(l)?;
     let chip = chip_nodes(l)?;
     inbox_in(l, card, chip, 0)?
         .max(conversations_in(l, card, chip, 0)?)
-        .max(task_in(l, card, chip, 0)?)
-        .max(project_in(l, card, chip, 0)?)
+        .max(arranged_task(l, 0, arrangement)?)
+        .max(arranged_project(l, 0, arrangement)?)
         .max(deployment_in(l, chip, 0)?)
         .max(not_the_work_nodes(l, 0)?)
         .checked_add(slot_nodes)

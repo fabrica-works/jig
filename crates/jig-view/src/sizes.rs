@@ -254,8 +254,9 @@ pub fn notices_nodes(limits: &Limits) -> Option<u32> {
 
 mod pages;
 pub use pages::{
-    conversation_nodes, conversations_nodes, deployment_nodes, inbox_nodes, not_the_work_nodes, page_nodes,
-    project_nodes, task_nodes,
+    arranged_nodes, conversation_nodes, conversations_nodes, deployment_nodes, inbox_nodes, not_the_work_nodes,
+    page_nodes, project_header_nodes, project_nodes, project_section_nodes, task_header_nodes, task_nodes,
+    task_section_nodes,
 };
 
 /// Whole held-task escalation, including bounded input-result and person cards.

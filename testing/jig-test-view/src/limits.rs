@@ -78,6 +78,7 @@ impl Limits {
         let mut tree = jig_view::Limits::compose(
             &domain.jig,
             jig,
+            &jig_domain_client::pages::Arrangement::none(),
             application_nodes,
             slot_nodes,
             owner.depth.checked_add(4)?.max(8),
