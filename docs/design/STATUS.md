@@ -8,7 +8,7 @@ development.md, section 3.3).
 
 | Plan | State | Takes the design to | Where |
 |---|---|---|---|
-| test-budgets | active on carbon-forge since 2026-10-13 | no section of jig's design: the focused suite back within its 15 s budget (`docs/development/workflow.md`, 2; skein's `testing-strategy.md`, 8), and skein's read of what has arrived in jig's readers of unframed bytes (skein's `lib.md`, 7) | `docs/development/plans/test-budgets/` |
+| test-budgets | done 2026-10-14 | no section of jig's design: the focused suite back within its 15 s budget (`docs/development/workflow.md`, 2; skein's `testing-strategy.md`, 8), and skein's read of what has arrived in jig's readers of unframed bytes (skein's `lib.md`, 7) | `docs/development/plans/test-budgets/` |
 | jig-protocol | done 2026-10-13 | `README.md` 15 (the crates' new names); `protocol/` but `llm.md`'s calls in a host's own process and `client.md` 12's browser; the `domain/` and `client/domain/` sections that section 2 names as owed to the protocol layer, but retention (`protocol/store.md`, 11.1) | `docs/development/plans/jig-protocol/` |
 | jig-client-implementation | done 2026-10-11 | `client/domain/` above the protocol line; `client/domain/contract.md` 9 (the engine's changes); `examples.md` 8 (`ops`'s client) | `~/src/rust/plans/jig-client-implementation/` (not versioned) |
 | jig-protocol-design | done 2026-10-10 | a design pass, with no code: `protocol/`, `draft/store.md` | `~/src/rust/plans/jig-protocol-design/` (not versioned) |
