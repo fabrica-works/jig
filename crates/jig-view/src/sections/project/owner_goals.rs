@@ -41,6 +41,9 @@ pub(super) fn offer_fits(value: &Admission, limits: &jig_domain_client::Limits) 
 }
 
 pub(super) fn form(b: &mut Builder, client: &Domain, doc: &OwnerProject, words: &Words, bindings: &mut JigBindings) {
+    b.open(Role::Form);
+    b.region(crate::regions::JigRegion::NewGoal.region());
+    b.name(&words.say(JigPhrase::GoalWords, &[]));
     let mut offer = None;
     for row in &doc.acts {
         if row.act == ActKind::SetGoal {
@@ -113,6 +116,7 @@ pub(super) fn form(b: &mut Builder, client: &Domain, doc: &OwnerProject, words: 
     if let Some(answer) = &state.answer {
         words.outcome(b, answer);
     }
+    b.close();
 }
 
 fn choices(
@@ -212,7 +216,7 @@ fn inputs(
         Admission::Refused(why) => words.refusal(b, &why),
         Admission::Allowed | Admission::Bounded { .. } => {}
     }
-    super::super::work::control(
+    crate::pages::work::control(
         b,
         words,
         bindings,

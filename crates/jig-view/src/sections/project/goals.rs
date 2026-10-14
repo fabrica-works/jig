@@ -44,8 +44,8 @@ pub(super) fn goals(b: &mut Builder, client: &Domain, doc: &Project, words: &Wor
     if client.project_page().goals_more {
         words.status(b, JigPhrase::MoreRows, &[]);
     }
-    super::super::cut(b, words, client.project_page().ended_cut);
-    super::super::work::cursors(
+    crate::pages::cut(b, words, client.project_page().ended_cut);
+    crate::pages::work::cursors(
         b,
         words,
         bindings,
@@ -56,6 +56,9 @@ pub(super) fn goals(b: &mut Builder, client: &Domain, doc: &Project, words: &Wor
     form(b, client, doc, words, bindings);
 }
 fn form(b: &mut Builder, client: &Domain, doc: &Project, words: &Words, bindings: &mut JigBindings) {
+    b.open(Role::Form);
+    b.region(crate::regions::JigRegion::NewGoal.region());
+    b.name(&words.say(JigPhrase::GoalWords, &[]));
     let state = &client.project_page().form;
     let mut pool_left = None;
     let mut bounds = None;
@@ -119,6 +122,7 @@ fn form(b: &mut Builder, client: &Domain, doc: &Project, words: &Words, bindings
     if let Some(answer) = &state.answer {
         words.outcome(b, answer);
     }
+    b.close();
 }
 /// Bounds supply the whole choice list; Frame supplies only actual charter names.
 fn choices(
@@ -286,7 +290,7 @@ fn inputs(b: &mut Builder, client: &Domain, doc: &Project, words: &Words, bindin
                 }
             }
         }
-        super::super::work::control(
+        crate::pages::work::control(
             b,
             words,
             bindings,
@@ -298,13 +302,13 @@ fn inputs(b: &mut Builder, client: &Domain, doc: &Project, words: &Words, bindin
 }
 pub(super) fn line(b: &mut Builder, client: &Domain, goal: &GoalLine, words: &Words, bindings: &mut JigBindings) {
     b.open(Role::Item);
-    b.key(super::super::object_key(ObjectKey::Task(goal.chip.task)));
+    b.key(crate::pages::object_key(ObjectKey::Task(goal.chip.task)));
     cards::chip::chip(b, client, &goal.chip, words, bindings);
     if let Some(id) = client.objects().find(ObjectKey::Task(goal.chip.task)) {
         cards::card(b, client, id, &cards::Place::Elsewhere, words, bindings);
     }
     words.text(b, JigPhrase::Priority, &[Hole::Number(u64::from(goal.priority))]);
-    super::super::work::owner_counts(b, goal.progress, words);
+    crate::pages::work::owner_counts(b, goal.progress, words);
     words.text(b, JigPhrase::HeldBelow, &[Hole::Number(u64::from(goal.held_below))]);
     crate::owner_budget::render(b, &goal.budget, words);
     b.close();

@@ -851,7 +851,7 @@ fn each_page_bound_keeps_its_value_at_the_client_limits() {
     assert_eq!(crate::conversations_nodes(&CLIENT, 0), Some(85_194));
     assert_eq!(crate::conversation_nodes(&CLIENT, 0), Some(1_010_760));
     assert_eq!(crate::task_nodes(&CLIENT, 0), Some(1_166_881));
-    assert_eq!(crate::project_nodes(&CLIENT, 0), Some(506_353));
+    assert_eq!(crate::project_nodes(&CLIENT, 0), Some(506_365));
     assert_eq!(crate::deployment_nodes(&CLIENT, 0), Some(2729));
     assert_eq!(crate::not_the_work_nodes(&CLIENT, 0), Some(29));
     assert_eq!(crate::page_nodes(&CLIENT, 0), Some(1_166_881));

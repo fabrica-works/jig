@@ -85,7 +85,7 @@ fn configured_deployment_owner_reads_capacity_account_and_connector_facts() {
             Step::Pause { span: Duration::from_millis(100) },
             Step::See { find: Find::named(Role::Button, b"Project 1"), within },
             Step::Press { find: Find::named(Role::Button, b"Project 1") },
-            Step::See { find: Find::named(Role::Button, b"Settings"), within },
+            Step::See { find: Find::named(Role::Tab, b"Settings"), within },
         ],
     );
     world.run(Until::Time(Time::from_nanos(10_000_000)));

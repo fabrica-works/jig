@@ -74,7 +74,10 @@ pub enum JigMeaning {
         field: crate::confirmation::amendment::Field,
     },
     /// A typed project goal form field.
-    GoalField { form: jig_domain_client::pages::project::goals::GoalForm, field: crate::pages::project::goals::Field },
+    GoalField {
+        form: jig_domain_client::pages::project::goals::GoalForm,
+        field: crate::sections::project::goals::Field,
+    },
     /// Description search changes the current note scope only.
     NoteSearch { filter: jig_domain_client::pages::project::NoteFilter },
     /// A connector-owned part referred to by a slot, never an actionable node.
@@ -257,7 +260,7 @@ pub fn decode(view: &mut JigBindings, token: Token, act: Act) -> Option<jig_doma
                     Act::Press | Act::Submit | Act::Toggle | Act::Drawing { .. } => None,
                 },
                 JigMeaning::GoalField { form, field } => match act {
-                    Act::Input { value } => crate::pages::project::goals::edit(*form, *field, &value),
+                    Act::Input { value } => crate::sections::project::goals::edit(*form, *field, &value),
                     Act::Press | Act::Submit | Act::Toggle | Act::Drawing { .. } => None,
                 },
                 JigMeaning::NoteSearch { filter } => match act {

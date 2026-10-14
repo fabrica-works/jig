@@ -9,10 +9,8 @@ use jig_domain_client::{
 };
 use skein_lib::Token;
 mod not_the_work;
-pub mod project;
 pub(crate) mod work;
 pub use not_the_work::not_the_work;
-pub use project::project;
 
 pub fn heading(b: &mut Builder, words: &Words, phrase: JigPhrase, holes: &[Hole]) {
     b.open(Role::Heading { level: 1 });
@@ -124,7 +122,15 @@ pub fn main(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigB
                     }
                     excess(b, client, words);
                 }
-                Address::Project { .. } => project(b, client, words, bindings),
+                Address::Project { .. } => {
+                    heading(b, words, JigPhrase::ProjectPage, &[]);
+                    crate::sections::project::header(b, client, words, bindings);
+                    crate::sections::project::tabs(b, client, words, bindings);
+                    for section in client.sections() {
+                        crate::sections::section(b, client, words, bindings, *section);
+                    }
+                    excess(b, client, words);
+                }
                 Address::Deployment => {
                     heading(b, words, JigPhrase::Deployment, &[]);
                     for section in client.sections() {

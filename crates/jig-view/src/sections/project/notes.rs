@@ -12,6 +12,9 @@ use jig_domain_client::{
     pages::project::NoteFilter,
 };
 pub(super) fn notes(b: &mut Builder, client: &Domain, project: u32, words: &Words, bindings: &mut JigBindings) {
+    b.open(Role::Search);
+    b.region(crate::regions::JigRegion::NotesSearch.region());
+    b.name(&words.say(JigPhrase::NoteSearch, &[]));
     let filter = client
         .project_page()
         .note_filter
@@ -59,13 +62,14 @@ pub(super) fn notes(b: &mut Builder, client: &Domain, project: u32, words: &Word
     for goal in &client.project_page().goals {
         scope_choice(b, words, bindings, &filter, NoteScope::Goal { project, goal: goal.chip.task });
     }
+    b.close();
     b.open(Role::List);
     for note in &client.project_page().notes {
         cards::card(b, client, *note, &cards::Place::Elsewhere, words, bindings);
     }
     b.close();
-    super::super::cut(b, words, client.project_page().notes_cut);
-    super::super::work::cursors(
+    crate::pages::cut(b, words, client.project_page().notes_cut);
+    crate::pages::work::cursors(
         b,
         words,
         bindings,

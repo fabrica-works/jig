@@ -16,70 +16,93 @@ pub mod owner;
 mod owner_goals;
 mod recurring;
 mod tasks;
-/// Show the project document and its selected bounded section.
-pub fn project(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
-    let (number, selected) = match client.page() {
-        jig_domain_client::pages::Page::Work { address: Address::Project { project, section }, .. } => {
-            (*project, *section)
-        }
-        jig_domain_client::pages::Page::Work { .. }
-        | jig_domain_client::pages::Page::Starting
-        | jig_domain_client::pages::Page::Elsewhere
-        | jig_domain_client::pages::Page::SigningIn
-        | jig_domain_client::pages::Page::Missing
-        | jig_domain_client::pages::Page::OutOfDate
-        | jig_domain_client::pages::Page::SomeoneElse => return,
+/// The project's shared identity while any of its sections is shown.
+pub fn header(b: &mut Builder, client: &Domain, words: &Words, _bindings: &mut JigBindings) -> bool {
+    let Some(number) = client.shown_project() else {
+        return false;
     };
-    super::heading(b, words, JigPhrase::ProjectPage, &[]);
+    b.open(Role::Region);
+    b.region(crate::regions::JigRegion::ProjectHeader.region());
+    b.name(&words.say(JigPhrase::ProjectPage, &[]));
     words.text(b, JigPhrase::ContextProject, &[Hole::Number(u64::from(number))]);
-    if let Some(doc) = &client.project_page().owner {
-        genuine(b, client, doc, number, selected, words, bindings);
-        return;
-    }
-    let Some(doc) = &client.project_page().document else {
+    if let Some(doc) = &client.project_page().document {
+        b.text(Run::Plain, doc.name.bytes());
+    } else if client.project_page().owner.is_none() {
         words.status(b, JigPhrase::LoadingObject, &[]);
-        return;
+    }
+    b.close();
+    true
+}
+/// Every section linked to its address, with the address's own marked current.
+pub fn tabs(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) -> bool {
+    let Some(number) = client.shown_project() else {
+        return false;
     };
-    b.text(Run::Plain, doc.name.bytes());
+    if client.project_page().document.is_none() && client.project_page().owner.is_none() {
+        return false;
+    }
     b.open(Role::Tabs);
-    b.name(doc.name.bytes());
+    b.region(crate::regions::JigRegion::ProjectTabs.region());
+    match &client.project_page().document {
+        Some(doc) => b.name(doc.name.bytes()),
+        None => b.name(&words.say(JigPhrase::ContextProject, &[Hole::Number(u64::from(number))])),
+    }
     for section in [
         ProjectSection::Overview,
         ProjectSection::Goals,
         ProjectSection::Tasks,
         ProjectSection::Notes,
         ProjectSection::Settings,
+        ProjectSection::Resources,
+        ProjectSection::Policy,
+        ProjectSection::Roles,
+        ProjectSection::Spend,
+        ProjectSection::Recurring,
     ] {
-        let highlighted = match selected {
-            ProjectSection::Resources
-            | ProjectSection::Policy
-            | ProjectSection::Roles
-            | ProjectSection::Spend
-            | ProjectSection::Recurring => section == ProjectSection::Settings,
-            ProjectSection::Overview
-            | ProjectSection::Goals
-            | ProjectSection::Tasks
-            | ProjectSection::Notes
-            | ProjectSection::Settings => selected == section,
+        let address = Address::Project { project: number, section };
+        let current = match client.page() {
+            jig_domain_client::pages::Page::Work { address: own, .. } => own == &address,
+            jig_domain_client::pages::Page::Starting
+            | jig_domain_client::pages::Page::SigningIn
+            | jig_domain_client::pages::Page::Elsewhere
+            | jig_domain_client::pages::Page::Missing
+            | jig_domain_client::pages::Page::OutOfDate
+            | jig_domain_client::pages::Page::SomeoneElse => false,
         };
-        super::work::control(
-            b,
-            words,
-            bindings,
-            phrase(section),
-            Act::Go { address: Address::Project { project: number, section } },
-            highlighted,
-        );
+        crate::pages::work::tab(b, words, bindings, phrase(section), Act::Go { address }, current);
     }
     b.close();
-    super::work::section(b, words, phrase(selected), region(selected));
+    true
+}
+pub(crate) fn section(
+    b: &mut Builder,
+    client: &Domain,
+    words: &Words,
+    bindings: &mut JigBindings,
+    project: u32,
+    selected: ProjectSection,
+) -> bool {
+    if !client.shows(jig_domain_client::pages::Section::Project { project, section: selected }) {
+        return false;
+    }
+    crate::pages::work::section(b, words, phrase(selected), region(selected));
+    if let Some(doc) = &client.project_page().owner {
+        owner::section(b, doc, selected, client, words, bindings);
+        b.close();
+        return true;
+    }
+    let Some(doc) = &client.project_page().document else {
+        b.close();
+        return true;
+    };
+    let number = project;
     match selected {
         ProjectSection::Overview => {
             inbox_cards(b, client, words, bindings);
             for goal in &client.project_page().goals {
                 goals::line(b, client, goal, words, bindings);
             }
-            super::work::budget(b, &doc.spend, words);
+            crate::pages::work::budget(b, &doc.spend, words);
             slots(b, doc, selected, words, bindings);
         }
         ProjectSection::Goals => goals::goals(b, client, doc, words, bindings),
@@ -93,7 +116,7 @@ pub fn project(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut J
                 ProjectSection::Spend,
                 ProjectSection::Recurring,
             ] {
-                super::work::section(b, words, phrase(section), region(section));
+                crate::pages::work::section(b, words, phrase(section), region(section));
                 settings(b, client, doc, section, words, bindings);
                 b.close();
             }
@@ -109,7 +132,7 @@ pub fn project(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut J
         }
     }
     b.close();
-    super::excess(b, client, words);
+    true
 }
 const fn phrase(section: ProjectSection) -> JigPhrase {
     match section {
@@ -183,8 +206,8 @@ fn settings(
                 period(b, past.period, &past.budget, &past.pools, words);
                 task_spend(b, client, &past.tasks, words, bindings);
             }
-            super::cut(b, words, client.project_page().spend_cut);
-            super::work::cursors(
+            crate::pages::cut(b, words, client.project_page().spend_cut);
+            crate::pages::work::cursors(
                 b,
                 words,
                 bindings,
@@ -214,10 +237,10 @@ fn period(
     words: &Words,
 ) {
     words.text(b, JigPhrase::Period, &[Hole::Number(number)]);
-    super::work::budget(b, budget, words);
+    crate::pages::work::budget(b, budget, words);
     for pool in pools {
         words.text(b, JigPhrase::PartyNumber, &[Hole::Number(pool.party)]);
-        super::work::budget(b, &pool.budget, words);
+        crate::pages::work::budget(b, &pool.budget, words);
     }
 }
 fn task_spend(
@@ -256,52 +279,6 @@ fn inbox_cards(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut J
     }
 }
 
-fn genuine(
-    b: &mut Builder,
-    client: &Domain,
-    doc: &jig_domain_client::contract::OwnerProject,
-    number: u32,
-    selected: ProjectSection,
-    words: &Words,
-    bindings: &mut JigBindings,
-) {
-    b.open(Role::Tabs);
-    b.name(&words.say(JigPhrase::ContextProject, &[Hole::Number(u64::from(number))]));
-    for section in [
-        ProjectSection::Overview,
-        ProjectSection::Goals,
-        ProjectSection::Tasks,
-        ProjectSection::Notes,
-        ProjectSection::Settings,
-    ] {
-        let highlighted = match selected {
-            ProjectSection::Resources
-            | ProjectSection::Policy
-            | ProjectSection::Roles
-            | ProjectSection::Spend
-            | ProjectSection::Recurring => section == ProjectSection::Settings,
-            ProjectSection::Overview
-            | ProjectSection::Goals
-            | ProjectSection::Tasks
-            | ProjectSection::Notes
-            | ProjectSection::Settings => selected == section,
-        };
-        super::work::control(
-            b,
-            words,
-            bindings,
-            phrase(section),
-            Act::Go { address: Address::Project { project: number, section } },
-            highlighted,
-        );
-    }
-    b.close();
-    super::work::section(b, words, phrase(selected), region(selected));
-    owner::section(b, doc, selected, client, words, bindings);
-    b.close();
-    super::excess(b, client, words);
-}
-
 /// Retained funding and earlier period rows preserve the original spend window.
 fn historical_spend(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
     let page = client.project_page();
@@ -312,8 +289,8 @@ fn historical_spend(b: &mut Builder, client: &Domain, words: &Words, bindings: &
         period(b, past.period, &past.budget, &past.pools, words);
         task_spend(b, client, &past.tasks, words, bindings);
     }
-    super::cut(b, words, page.spend_cut);
-    super::work::cursors(
+    crate::pages::cut(b, words, page.spend_cut);
+    crate::pages::work::cursors(
         b,
         words,
         bindings,

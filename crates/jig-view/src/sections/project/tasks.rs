@@ -11,7 +11,7 @@ use jig_domain_client::{
 };
 pub(super) fn tasks(b: &mut Builder, client: &Domain, doc: &Project, words: &Words, bindings: &mut JigBindings) {
     let filter = client.project_page().task_filter;
-    super::super::work::control(
+    crate::pages::work::control(
         b,
         words,
         bindings,
@@ -26,7 +26,7 @@ pub(super) fn tasks(b: &mut Builder, client: &Domain, doc: &Project, words: &Wor
         },
         filter.phase.is_none() && filter.executor.is_none() && filter.goal.is_none() && !filter.asked_by_me,
     );
-    super::super::work::control(
+    crate::pages::work::control(
         b,
         words,
         bindings,
@@ -52,7 +52,7 @@ pub(super) fn tasks(b: &mut Builder, client: &Domain, doc: &Project, words: &Wor
         Phase::Failed,
         Phase::Cancelled,
     ] {
-        super::super::work::control(
+        crate::pages::work::control(
             b,
             words,
             bindings,
@@ -68,7 +68,7 @@ pub(super) fn tasks(b: &mut Builder, client: &Domain, doc: &Project, words: &Wor
             Executor::Party { .. } => JigPhrase::Person,
             Executor::Role { .. } => JigPhrase::RoleExecutor,
         };
-        super::super::work::control(
+        crate::pages::work::control(
             b,
             words,
             bindings,
@@ -82,7 +82,7 @@ pub(super) fn tasks(b: &mut Builder, client: &Domain, doc: &Project, words: &Wor
     b.open(Role::List);
     for row in &client.project_page().tasks {
         b.open(Role::Item);
-        b.key(super::super::object_key(ObjectKey::Task(row.chip.task)));
+        b.key(crate::pages::object_key(ObjectKey::Task(row.chip.task)));
         cards::chip::chip(b, client, &row.chip, words, bindings);
         if let Some(id) = client.objects().find(ObjectKey::Task(row.chip.task)) {
             cards::card(b, client, id, &cards::Place::Elsewhere, words, bindings);

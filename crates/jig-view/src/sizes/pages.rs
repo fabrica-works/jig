@@ -132,13 +132,13 @@ fn goals_in(l: &Limits, card: u32, chip: u32) -> Option<u32> {
         .checked_add(l.rows.checked_mul(3)?)?
         .checked_add(32)?
         .checked_mul(l.projects.max(l.rows))?;
-    board.checked_add(form)?.checked_add(34)
+    board.checked_add(form)?.checked_add(35)
 }
 fn tasks_in(l: &Limits, card: u32, chip: u32) -> Option<u32> {
     card.checked_add(chip)?.checked_add(6)?.checked_mul(l.rows)?.checked_add(l.rows.checked_mul(2)?)?.checked_add(40)
 }
 fn notes_in(l: &Limits, card: u32) -> Option<u32> {
-    card.checked_add(l.rows.checked_add(8)?)?.checked_mul(l.rows)?.checked_add(26)
+    card.checked_add(l.rows.checked_add(8)?)?.checked_mul(l.rows)?.checked_add(27)
 }
 fn spend_in(l: &Limits, card: u32, chip: u32) -> Option<u32> {
     // Each past period has pools and task lines, each at the row bound.
@@ -184,7 +184,7 @@ fn project_in(l: &Limits, card: u32, chip: u32, slot_nodes: u32) -> Option<u32> 
         .max(notes_in(l, card)?)
         .max(settings_in(l, card, chip)?)
         .max(crate::owner_project::max_nodes(l)?)
-        .checked_add(24)?
+        .checked_add(35)?
         .checked_add(slot_nodes)
 }
 /// Hosts, accounts, project capacity, refusals and deployment parts.

@@ -116,7 +116,7 @@ pub fn max_nodes(l: &Limits) -> Option<u32> {
         .checked_add(l.rows.checked_mul(6)?)?
         .checked_add(crate::sizes::refusal_nodes(l)?.checked_mul(3)?)?
         .checked_add(20)?
-        .checked_add(113)?
+        .checked_add(128)?
         .checked_add(historical_nodes(l)?)
 }
 // Earlier period rows include their task chips/cards and pool budgets. The
@@ -143,7 +143,7 @@ pub fn worst_case(l: &Limits, words: &Words) -> Option<ProjectFragment> {
         nodes,
         text_bytes: nodes.checked_mul(text_per_node)?,
         text_per_node,
-        depth: l.rows.checked_add(32)?,
+        depth: l.rows.checked_add(33)?,
         bindings: nodes,
         slots: nodes,
     })
@@ -320,13 +320,48 @@ fn effect(b: &mut Builder, connector: u16, kind: u16, words: &Words) {
 /// Render all source facts in order, with connector resource slots left raw.
 pub fn render(b: &mut Builder, value: &OwnerProject, client: &Domain, words: &Words, bindings: &mut JigBindings) {
     region(b, words, P::Project, &[Hole::Number(u64::from(value.number))]);
+    crate::pages::work::section(
+        b,
+        words,
+        JigPhrase::Resources,
+        super::region(jig_domain_client::address::ProjectSection::Resources),
+    );
     resources(b, value, client, words, bindings);
+    b.close();
+    crate::pages::work::section(
+        b,
+        words,
+        JigPhrase::Policy,
+        super::region(jig_domain_client::address::ProjectSection::Policy),
+    );
     policy_section(b, value, client, words, bindings);
+    b.close();
+    crate::pages::work::section(
+        b,
+        words,
+        JigPhrase::Roles,
+        super::region(jig_domain_client::address::ProjectSection::Roles),
+    );
     members(b, value, client, words, bindings);
+    b.close();
+    crate::pages::work::section(
+        b,
+        words,
+        JigPhrase::Spend,
+        super::region(jig_domain_client::address::ProjectSection::Spend),
+    );
     ledgers(b, value, client, words, bindings);
     configured_ledgers(b, value, words);
     spend(b, value, client, words, bindings);
+    b.close();
+    crate::pages::work::section(
+        b,
+        words,
+        JigPhrase::Recurring,
+        super::region(jig_domain_client::address::ProjectSection::Recurring),
+    );
     recurring(b, value, client, words, bindings);
+    b.close();
     if value.cut {
         text(b, words, P::ProjectCut, &[]);
     }
@@ -527,8 +562,8 @@ pub(super) fn section(
             if client.project_page().goals_more {
                 words.status(b, JigPhrase::MoreRows, &[]);
             }
-            super::super::cut(b, words, client.project_page().ended_cut);
-            super::super::work::cursors(
+            crate::pages::cut(b, words, client.project_page().ended_cut);
+            crate::pages::work::cursors(
                 b,
                 words,
                 bindings,

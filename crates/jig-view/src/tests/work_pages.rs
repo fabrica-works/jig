@@ -764,3 +764,5 @@ fn each_task_section_carries_its_region_name() {
         assert_eq!(tree.nodes()[index + 1].role, Role::Heading { level: 2 });
     }
 }
+
+mod sections;

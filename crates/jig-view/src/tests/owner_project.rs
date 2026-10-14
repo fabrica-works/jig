@@ -394,7 +394,11 @@ fn owner_project_raw_role_permissions_requirement_guards_and_spend_recurring_sou
         .nodes()
         .iter()
         .enumerate()
-        .filter(|(_, node)| node.role == Role::Region && node.name.as_deref() == Some(b"Spend".as_slice()))
+        .filter(|(index, node)| {
+            node.role == Role::Region
+                && node.name.as_deref() == Some(b"Spend".as_slice())
+                && index.checked_sub(1).is_some_and(|parent| tree.nodes()[parent].role == Role::Item)
+        })
         .map(|(index, node)| {
             tree.nodes()[index..index + usize::try_from(node.size).unwrap()]
                 .iter()
@@ -543,7 +547,7 @@ fn check_owner_project_real_page_decodes_whole_role_edits_preserves_prior_channe
     let page = |d: &Domain| {
         let mut b = Builder::new(&bounds);
         let mut bindings = JigBindings::new(f.bindings, 32);
-        crate::pages::project::project(&mut b, d, w, &mut bindings);
+        crate::pages::main(&mut b, d, w, &mut bindings);
         let tree = b.finish();
         super::cards_access::check(&tree);
         (tree, bindings)
@@ -718,7 +722,7 @@ fn owner_page(domain: &Domain) -> (Tree, JigBindings) {
     bound.text_bytes = bound.text_bytes.checked_add(32_u32.checked_mul(bound.text_per_node).unwrap()).unwrap();
     let mut b = Builder::new(&bound);
     let mut bindings = JigBindings::new(f.bindings, 32);
-    crate::pages::project::project(&mut b, domain, w, &mut bindings);
+    crate::pages::main(&mut b, domain, w, &mut bindings);
     let tree = b.finish();
     super::cards_access::check(&tree);
     (tree, bindings)
@@ -908,12 +912,12 @@ fn owner_project_public_goal_form_decodes_whole_bounded_procedure_and_keeps_prop
     });
     native_drive(&mut domain, Event::Act { act });
     for (field, amount) in [
-        (crate::pages::project::goals::Field::Budget, b"23".as_slice()),
-        (crate::pages::project::goals::Field::Priority, b"4294967295".as_slice()),
+        (crate::sections::project::goals::Field::Budget, b"23".as_slice()),
+        (crate::sections::project::goals::Field::Priority, b"4294967295".as_slice()),
     ] {
         let (tree, mut bindings) = owner_page(&domain);
         let form = domain.project_page().form.form.unwrap();
-        let edited = crate::pages::project::goals::edit(form, field, amount).unwrap();
+        let edited = crate::sections::project::goals::edit(form, field, amount).unwrap();
         let decoded = tree
             .nodes()
             .iter()
@@ -1138,7 +1142,7 @@ fn native_historical_project() -> (Domain, OwnerSpendPage) {
 fn historical_project_tree(domain: &Domain, w: &Words, bound: crate::Limits) -> (Tree, JigBindings) {
     let mut b = Builder::new(&bound);
     let mut bindings = JigBindings::new(bound.bindings, 32);
-    crate::pages::project::project(&mut b, domain, w, &mut bindings);
+    crate::pages::main(&mut b, domain, w, &mut bindings);
     (b.finish(), bindings)
 }
 fn historical_project_bound(w: &Words) -> crate::Limits {
@@ -1231,3 +1235,9 @@ fn owner_project_historical_companion_prices_whole_languages_and_refuses_one_und
 }
 
 const UTF8_TEXTS: [&[u8]; 6] = [b"~\0/!", b"~\0\x01", b"!\0\x02", b"~\0!", b"!\0~", &[b'~'; 32]];
+
+pub(super) fn settings_tree() -> Tree {
+    let mut value = source();
+    value.number = 4;
+    owner_page(&native_owner(value)).0
+}
