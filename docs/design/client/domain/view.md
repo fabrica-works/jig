@@ -289,8 +289,12 @@ most nodes it may build (section 10).
   and 6) and no section of the page and no card slot of the
   application's page shows it: its object named by none of the page's
   sources, or a proposal that left the plan's rows while the page shows
-  that plan (client.md, section 5). It is decided from the domain, never
-  from the tree built so far, since slots are filled after it.
+  that plan (client.md, section 5) and no conversation the page shows
+  names it. A card a shown conversation holds, at the call that made its
+  object or a line deciding it (section 9), stays there, on a page that
+  shows the plan beside it too, and is never owed. It is decided from
+  the domain, never from the tree built so far, since slots are filled
+  after it.
 - **`jig(b, client, nav, words, bindings) -> bool`:** jig's whole
   arrangement, as above.
 - **Cards** (`cards::card`): one function per card, wherever it
