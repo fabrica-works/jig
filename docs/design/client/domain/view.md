@@ -526,7 +526,9 @@ composed with it, and whatever the application prints of its own.
   alone, the page's lines (15.3) and the last print's numbers (15.4). A
   pure function, step code under the subset, with no io and no clock.
   Its output is bounded: the most lines and bytes the view's largest
-  tree prints, counted from the view's limits.
+  tree prints, counted from the view's limits. The shell's name, which
+  the first line prints when the main has no level-1 heading (15.3), is
+  at most a node's text, so the same limits count it.
 - **The command reader,** `jig_shell_text::command`: from one line, the
   last print's numbers and the view's last tree, one command (15.4): acts
   on a node (a press, a toggle, or a field's input followed, when it
@@ -541,9 +543,11 @@ composed with it, and whatever the application prints of its own.
   the application prints of its own, and takes each command from it.
 - **Its settings,** `jig_shell_text::Settings`, which the application
   gives whole, with no defaults: the name its own lines start with (its
-  own), the longest line it reads (at least the longest words a person
-  may write, with a number and a space before them), and its print
-  interval (a guide; `ops`'s is one second).
+  own, and at most the bytes the view's limits give a node's text: the
+  terminal refuses a longer one), the longest line it reads (at least
+  the longest words a person may write, with a number and a space
+  before them), and its print interval (a guide; `ops`'s is one
+  second).
 
 ### 15.2 When it prints
 
