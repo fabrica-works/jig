@@ -338,6 +338,23 @@ the file.
      a change of what smith does rather than of how many steps it takes,
      or a cut cannot land mid-run without changing an assertion, the repin
      stops and asks.
+120. **The one-process fixture keeps its worker alive past a committed
+     turn** (jig-repin's block of 2026-10-14T02:32:50Z, filed as a design
+     gap; ruled a fixture defect). The traced run
+     (`logs/jig-repin/traced-run.log`): the worker child spawns at service
+     submission 93, its output ends at 111 and 113, its `Turn` is durable
+     at 132 and `Finished` at 136. Reading what has arrived, the child is
+     done before anything of its run is committed, so no cut finds a
+     committed run with a live worker, which these three stories need;
+     at 100 nothing is claimed yet, at 130 the worker has exited. The
+     fixture (`tests/one-process/src/fixtures.rs`, `provider()` and what
+     it scripts) makes the worker outlive its first committed `Turn`, by
+     the smallest change the fake peers already allow (a second turn, or
+     a reply that waits), and the cuts are placed inside that window; every
+     assertion stays. What the recovery records after a power loss
+     between a worker's clean exit and its `Finished` commit (`Refused`
+     at 130) is a different state from these stories', and goes to
+     `later.md`, unchecked against jig's design.
 
 ## For the user
 
