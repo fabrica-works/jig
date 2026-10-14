@@ -1,6 +1,6 @@
 # The example application
 
-Provisional, 2026-10-06, revised 2026-10-12. This is jig's example
+Provisional, 2026-10-06, revised 2026-10-14. This is jig's example
 application, `ops`: a small system for running services in production,
 on two connectors, with its agents inside its engine. It exists to be
 tested and to be copied.
@@ -313,10 +313,20 @@ section 12):
   inbox, with the inbox as home, plus two families of its own:
   - incidents: their state, their timeline, the service's health, and
     their lead, the task observability recorded for it (7.1), shown by
-    jig's own documents as its chip, its report, its plan and its
-    proposals, as jig's cards; an incident with no lead yet says so;
+    jig's own documents: its chip, its report and its proposals as jig's
+    cards, and its plan as jig's plan section, in a section slot
+    (`client/domain/root.md`, section 7); an incident with no lead yet
+    says so;
   - environments: their pool, their cost, their end, and a request to
     move the end, keyed like jig's.
+- **Its arrangement:** jig's frame and jig's arrangement of every page
+  but a task's, which shows every section together, the address's own
+  marked current: its view root builds the main from the task's header
+  and its overview, activity, plan and history, and puts its budget and
+  its connectors' panels in an aside (`client/domain/pages.md`, 12.3).
+- **Its owners:** its two connectors' client sides, numbered as its
+  connectors are, in `jig-ops-domain-connectors`, which both its roots
+  share (`client/domain/root.md`, section 15).
 - **Its parts in jig's slots:** infrastructure's panels for remediate and
   provision tasks, its words for a proposed restart, its account of
   drift ("deleted by hand"); both connectors' resources and kinds in
@@ -325,8 +335,12 @@ section 12):
   P accepting a restart from an incident's page
   (`client/domain/pages.md`, section 10); Q asking for an environment in
   a chat, and accepting what it costs.
-- **A terminal client** later, to show a client that is not a browser
-  (`README.md`, section 10).
+- **Its terminal client:** jig's text shell in front of its client and
+  view roots (`client/domain/view.md`, section 15), the text shell's
+  first consumer. Its client world plays it (`client/domain/testing.md`,
+  section 4): P accepts the restart from the incident's page, typing
+  the numbers the page printed. Its loop over a real terminal comes with
+  `ops` standalone (9.1), which gives it an engine to reach.
 
 ## 9. Its systems
 

@@ -1,13 +1,13 @@
 # The client and the engine
 
-Provisional, 2026-10-09, revised 2026-10-13. What crosses between a
+Provisional, 2026-10-09, revised 2026-10-14. What crosses between a
 party's client and the engine, at the level of the two domains: who the
 party is, the keyed requests and their answers, the documents the engine
 gives, the reads and watches that bring them, and versions. It is to
 clients what `../../domain/hosts.md`, section 2 is to hosts: the
 contract both sides keep, whatever carries it. Section 9 lists what the
 engine's domain owes the client, as changes to its documents. What is
-still open is listed in section 11.
+still open is listed in section 11; what waits, in 7.4.
 
 ## 1. In one page
 
@@ -41,8 +41,9 @@ still open is listed in section 11.
   fewer deliveries. A run's live text is the one stream, read from the
   offset the client has (section 7).
 - **An application's requests and documents** cross on the same terms and
-  the same connection, kept by the people child by key like jig's,
-  routed by the engine's root to the connector they concern.
+  the same connection, kept by the people child by key like jig's, each
+  naming its owner by its number (root.md, section 15), and routed by the
+  engine's root to that owner: the connector they concern.
 
 ## 2. Parties and signing in
 
@@ -181,12 +182,12 @@ this environment) is the application's (`../../domain/people.md`, 5.1):
   connector. The client root routes that answer, by the request's owner,
   to the family that asked, which shows it as a refusal, never as its
   object gone;
-- **routed by the engine's root** to the connector it concerns, which
-  decides it within the same decision. What it asks of the core on the
-  party's behalf (an amendment, a task, a release) is judged as the
-  party's own request would be, against their role and authority; what
-  it changes of its own is the connector's to allow, by its policy's
-  roles;
+- **routed by the engine's root,** by the owner it names, to the
+  connector it concerns, which decides it within the same decision.
+  What it asks of the core on the party's behalf (an amendment, a task,
+  a release) is judged as the party's own request would be, against
+  their role and authority; what it changes of its own is the
+  connector's to allow, by its policy's roles;
 - **answered once durable,** once admitted, with an outcome of the
   connector's own: only an admitted request is the connector's to
   decide. The people child keeps the key and a token; the connector
@@ -312,9 +313,12 @@ answer; *signed out*.
   (3.2). The client offers what the document says, and the engine judges
   again when the act comes.
 - **Parts.** Where a jig document names an application's value, it
-  carries the part's reference (root.md, section 6): its kind, its
-  connector, and jig's key (a resource's path, a kind's number, a task's
-  or a proposal's number). The value is in the application's own
+  carries the part's reference (root.md, section 6): its kind, its owner,
+  and jig's key (a resource's path, a kind's number, a task's or a
+  proposal's number). Its owner is the connector whose value it is:
+  every part jig's documents name is a connector's, so the number a part
+  carries (`connector`, in `jig-domain-client`'s `Part`) is its owner
+  number (root.md, section 15). The value is in the application's own
   documents.
 - **Times are wall times,** which the store keeps, so a document means the
   same after a restart.
@@ -352,7 +356,7 @@ party reads is therefore never lost by a crash.
 | a project's goals, live then ended, a page | live state, then the store |
 | a project; its notes, a page | live state; the notes child |
 | the deployment | live state |
-| an application's read, in the scope it names (7.2) | its connector, through the engine's root |
+| an application's read, naming its owner and the scope (7.2) | its owner, the connector, through the engine's root |
 
 - **Pages** are within a row and a byte limit, and carry a cursor for the
   next, or say there is none (`../../domain/engine.md`, 5.3).
@@ -376,7 +380,7 @@ party reads is therefore never lost by a crash.
 | a party's conversations | their live chats | the party |
 | a run | a task's live run: its attempt, its provisional text and current call (7.3) | a party who may see the task |
 | the deployment | hosts, accounts, capacity | a party with a deployment role |
-| an application's subject, in the scope it names | the application's document | a party with a role in that scope; what of it they may see, as the application's connector says (7.2) |
+| an application's subject, naming its owner and the scope | the application's document | a party with a role in that scope; what of it they may see, as its owner, the application's connector, says (7.2) |
 
 The objects a card shows apart from these (a proposal, an escalation, a
 question, a person task, a result, a project, a note) are read
@@ -405,8 +409,9 @@ moved (objects.md, section 2).
 - **Admitted** against the party's sign-in and what they may see, and the
   watches the engine allows per party and in all; past them, refused as
   busy.
-- **An application's subject names its scope,** as an application's read
-  does: a project, or the deployment. The core cannot read a connector's
+- **An application's subject names its owner and its scope,** as an
+  application's read does: its owner by its number, the scope a project
+  or the deployment. The core cannot read a connector's
   subject, so it admits on what it holds: the party's sign-in, their role
   in that scope, and the views' limits, as for jig's subjects. The
   connector, asked for the document, judges that the subject is in that
@@ -451,6 +456,19 @@ commit, so they leave through the journal's door (`../../README.md`,
   making come from hosts that hand them up (`../../domain/hosts.md`,
   6.5): a run in an agent process gives neither, and its document holds
   no text and no call, while its turns reach the client as they commit.
+
+### 7.4 Later: an application's streams
+
+An application's data that its people follow as it comes (a log
+followed, a metric's latest points) is a stream of the application's:
+a subject naming its owner and its scope, read from an offset within a
+window, as a run's text is (7.3). Its deliveries decide nothing and are
+never a document of the engine's committed state: they leave through
+the journal's door (`../../README.md`, 6.3), marked provisional, and
+show marked so (view.md, section 3). It adds a kind of subject to the
+application's own and a use of the journal's door, with no change to
+7.1's subjects or 7.2's rules, and waits for an application whose
+people follow its data as it comes.
 
 ## 8. Versions
 

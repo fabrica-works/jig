@@ -1,6 +1,6 @@
 # jig's design
 
-Provisional, 2026-10-06, revised 2026-10-12. What jig is, how an
+Provisional, 2026-10-06, revised 2026-10-14. What jig is, how an
 application is built around it, and what keeps the application's wiring
 from breaking what jig promises. This document comes first. The documents
 it lists in section 12 go deeper into each part. The mechanics are those
@@ -496,12 +496,20 @@ and the conformance world crashes the application at every commit.
   - their views, conversations among them, whose turns are decoded with
     smith's transcript crate below the domain, the client's only use of
     smith;
-  - shells: the browser's, and a native one on skein's HTTP client for
-    Linux and the worlds;
+  - its pages as a library: the frame's parts, the sections and the
+    cards, which jig's pages arrange and an application may arrange
+    otherwise, under one outline of landmarks with stable region names
+    (`client/domain/pages.md`, section 12);
+  - shells: the browser's, a native one on skein's HTTP client for
+    Linux and the worlds, and a text shell for a terminal;
   - the fake person, who reads the view tree by role, name and text.
 - **The application's part:**
-  - its own kinds of object, families, as children of its client root;
-  - their wire documents and their views.
+  - its own kinds of object, families, as children of its client root,
+    each owned by one of its owners, numbered alike in both its roots
+    (`client/domain/root.md`, section 15);
+  - their wire documents and their views;
+  - its arrangement of jig's pages, and its own pages, which show jig's
+    cards and sections in slots.
 
   The client root composes these with jig's client domain, under the
   same rule as the engine's: the root routes, and never decides or
@@ -531,9 +539,9 @@ and the conformance world crashes the application at every commit.
     HTTP client, whose io is Linux's. Each shell is small.
   - **The view is optional.** The view tree is semantic, shaped as an
     accessibility tree, and each shell maps it onto its platform. A
-    command-line tool may want a text view of its own. A service may use
-    the domain and the protocol only: keyed requests sent again until
-    durable, watches and paging.
+    terminal has jig's text shell (`client/domain/view.md`, section 15).
+    A service may use the domain and the protocol only: keyed requests
+    sent again until durable, watches and paging.
 - **Clients that are not people.** Every party today is a person who
   signed in, with a role in a project. A service acting through a client
   needs an identity and a role too: a service is a party of its own kind
@@ -638,7 +646,7 @@ section 5). What remains here:
 | a domain's step code | the core, `jig-domain-core`, and its children `jig-domain-accounts`, `-authority`, `-brief`, `-fleet`, `-notes`, `-people`, `-tasks`, `-views` (`domain/engine.md`, section 3); the hub, `jig-domain-host` (`domain/hosts.md`, section 6); the client's domain, `jig-domain-client` (`client/domain/client.md`) |
 | the protocol layer's | `jig-protocol-charter`, `jig-protocol-transcript`, and the codecs, components and parsing `protocol/README.md`, section 5 lists |
 | the client's view | `jig-view` (`client/domain/view.md`) |
-| the client's shells | `jig-shell-native`, `jig-shell-web` (`protocol/client.md`, section 12) |
+| the client's shells | `jig-shell-native`, `jig-shell-web` (`protocol/client.md`, section 12); `jig-shell-text` (`client/domain/view.md`, section 15) |
 
 - **Outside the layers,** a crate is named by its kind: the test kits
   (`jig-test-domain`, `jig-test-domain-client`, `jig-test-view` and the

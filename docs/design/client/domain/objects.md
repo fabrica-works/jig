@@ -1,6 +1,6 @@
 # Objects and cards
 
-Provisional, 2026-10-09, revised 2026-10-12. The objects jig's client
+Provisional, 2026-10-09, revised 2026-10-14. The objects jig's client
 shows, each as one card wherever it appears: tasks as chips, proposals,
 escalations, questions, person tasks, results, refusals, the
 conversation; and the requests a party makes about them, each saying
@@ -42,6 +42,13 @@ is still open is listed in section 13.
   application's page) changes its line of context only: in the inbox,
   its project and its task's lineage; in a conversation, nothing more.
   Never its actions.
+- **Whole, wherever it shows.** A card is where jig's promises show: its
+  state, its acts, its refusals, its confirmation. An application
+  chooses where a card goes, restyles it and fills its slots, but never
+  rebuilds it or leaves part of it out: its nodes are built only by
+  jig's card function (view.md, section 4), in jig's sections or in an
+  application's slot. The referee checks what a card promises wherever
+  it shows (testing.md, section 6).
 - **Its revisions.** An act that decides about something that changes
   names that thing's revision as the card showed it: a release, its
   hold's; an amendment, the spec's; an answer, the person task's. One

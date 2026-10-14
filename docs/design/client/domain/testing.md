@@ -1,19 +1,21 @@
 # Testing the client
 
-Provisional, 2026-10-09. How jig's client domain and view are tested, and
-how they test an application's client: the person who acts on the view,
-the client's world with a scripted engine, the joint world with the
-engine's domain, their referee and their faults. It applies skein's
-`testing-strategy.md` as `../../domain/testing.md` does for the engine;
-the tiers below the domain come with the client's protocol layer. What is
-still open is listed in section 10.
+Provisional, 2026-10-09, revised 2026-10-14. How jig's client domain
+and view are tested, and how they test an application's client: the
+person who acts on the view, the client's world with a scripted engine,
+the joint world with the engine's domain, their referee and their
+faults. It applies skein's `testing-strategy.md` as
+`../../domain/testing.md` does for the engine; the tiers below the
+domain come with the client's protocol layer. What is still open is
+listed in section 10.
 
 ## 1. In one page
 
 - **The person acts on the view,** as a person does: finds nodes in the
   tree by role, name and text, presses them, types into them, and waits
-  to see what follows. Never by style, by position, or through the
-  client's state.
+  to see what follows. Never by style, by position, by region name, or
+  through the client's state. So a story written for jig's pages runs
+  on an application's arrangement of the same sections.
 - **One person, every tier.** The person is a script that asks its face to
   find and act, so a scenario written once runs on the tree face in every
   world, and on a browser's accessibility tree once the browser tier
@@ -35,10 +37,10 @@ still open is listed in section 10.
 
 | Tier | Real | Faked |
 |---|---|---|
-| step tests | one step function of the domain or the view; the diff; the Markdown reader; words | its events, by hand |
+| step tests | one step function of the domain or the view; the diff; the Markdown reader; words; the page's outline on each of jig's pages; the text shell's renderer and command reader, by golden text (view.md, 15.6) | its events, by hand |
 | the client's world | the client root, its domain and its view, for jig's test application or a real one | the engine, scripted; the shell, played by the world; the person |
 | the joint world | the client root, domain and view, and the engine's domain, root and all | the store, hosts and systems, as the engine's worlds fake them; the shell; the person |
-| the protocol world, the real loop, the browser | with the client's protocol layer and shells | |
+| the protocol world, the real loop, the browser | with the client's protocol layer and shells; the text shell's terminal in front of the native one, on skein's simulated machine | |
 
 Every world runs on skein's world harness: one loop, one seed, the
 referee in the loop, the heap counted at every iteration
@@ -86,10 +88,25 @@ a step machine so that a browser's loop can run it later.
   scripted engine's hooks, which are ordinary Rust.
 - **jig's test application:** jig's own client world runs a client root of
   jig's own, with one test family whose parts fill every kind of slot,
-  as the test connector stands in for an application in the engine's
-  worlds (`../../domain/testing.md`, section 7).
+  and whose page fills both of an application's: a card's, and a
+  section's (a task's plan), as the test connector stands in for an
+  application in the engine's worlds (`../../domain/testing.md`,
+  section 7). It takes jig's arrangement of every page, but in
+  client.md 17's story of a task's page arranged with every section,
+  whose client gives an arrangement naming every `TaskSection`.
 - **Its stories** are client.md's, section 17, and pages.md's, section 10,
   each written once in a person's terms.
+- **At the text shell.** A client of the world may be played as the text
+  shell is (view.md, section 15): each tree it shows printed by the
+  renderer, and each act the person makes typed as the line a person
+  would type for it, from the print's numbers, then read back by the
+  command reader, which must give that act on that node. A person's
+  typing followed by sending is one line, `n WORDS`; typing alone into a
+  field that does not submit on enter is `n WORDS` too; a story that
+  types into a field that submits on enter without sending is not
+  played so. The world signs its clients in, as a terminal's host does
+  (view.md, 15.5). A story run so checks that a terminal can make every
+  act it makes.
 
 ## 5. The joint world
 
@@ -136,6 +153,11 @@ the engine's store), never a client's state. Its rules:
   view with no such act, and no such reason, is a fault.
 - **The link is told:** while the engine was unreachable past a
   heartbeat, the person was shown offline.
+- **The page's outline:** every tree a person saw keeps view.md's
+  outline (3.1): the banner first, with jig's link, what needs the
+  party and who is signed in; one main; `after_page`'s parts last; no shortcut twice. The
+  referee runs `jig_view::outline::check` on it, so an application's
+  arrangement is held to it as jig's is.
 - **Bounded:** the client and the view within their limits, the heap
   within their worst case.
 
@@ -161,6 +183,9 @@ Drawn from the seed:
 - its client and view roots, in its client world and in its joint world
   on its conformance world;
 - its stories, written in its people's terms;
+- its arrangement of jig's pages, held to the page's outline by the same
+  referee;
+- its stories at the text shell, where it has a terminal client;
 - its own shells' tiers, if it writes shells.
 
 ## 9. Budgets
@@ -168,7 +193,10 @@ Drawn from the seed:
 The client's tests fit the suites' budgets (testing-strategy.md,
 section 8; `../../domain/testing.md`, section 9): the focused suite runs
 a few seeds per story and each fault once, the fuzzy suite sweeps random
-people over random stories. The browser tier, when it comes, is a suite
+people over random stories. At the text shell, the focused suite runs
+each story once, on one seed: in jig's client world, two stories,
+starting a chat and a held chat released; in an application's, those
+its terminal client names. The browser tier, when it comes, is a suite
 of its own, run by the gate.
 
 ## 10. Open questions

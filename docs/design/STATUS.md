@@ -1,6 +1,6 @@
 # Status
 
-Updated 2026-10-13. How far jig's code is from its design, and which
+Updated 2026-10-14. How far jig's code is from its design, and which
 plans take it there. The designer keeps this file (skein's
 development.md, section 3.3).
 
@@ -24,7 +24,7 @@ smith, and builds what section 2's rows name it for.
 
 | Document | Built | Left |
 |---|---|---|
-| `README.md` | partly | 8: the store; 9: agents on workers over the workers' channel, smith's payloads by hand-out; 10: the client's wire and the native shell (jig-protocol); 9: `smith-inline-agent` in the engine; 10: the browser's shell; 14: versioning, open: not planned |
+| `README.md` | partly | 8: the store; 9: agents on workers over the workers' channel, smith's payloads by hand-out; 10: the client's wire and the native shell (jig-protocol); 10, 15: jig's pages as a library, owners, the text shell (client-composition); 9: `smith-inline-agent` in the engine; 10: the browser's shell; 14: versioning, open: not planned |
 | `domain/README.md` | partly | 5: a task's proposal that nobody may accept, refused to its proposer (jig-protocol) |
 | `domain/core.md` | partly | 6.1: a project's homes, named at adoption: not planned; 12: open questions only |
 | `domain/tasks.md` | partly | 5.5: a budget held for its reserve and one most costly completion; 8.2, 8.3: the start carries the inbox, a message refused or left unread stays and wakes the task again; 9: a task's proposal that nobody may accept, refused (jig-protocol) |
@@ -35,14 +35,14 @@ smith, and builds what section 2's rows name it for.
 | `domain/people.md` | partly | 3: a reply naming its own sign-in; 5.1: a decision on an escalation no longer waiting, refused as not waiting; words within the run's bound (jig-protocol); 6: a chat forgotten once ended and read: not planned (retention); 3: a service's credential reissued, a service removed: not planned |
 | `domain/root.md` | partly | 5, 6: smith's payloads handed out to the protocol layer; 11, 12: host tools' calls, a call's key and a run's result decoded outside the root (jig-protocol) |
 | `domain/testing.md` | partly | 7: the real store on skein-kv's in-memory mode in jig's worlds (jig-protocol); in `ops`'s worlds: not planned |
-| `client/domain/README.md` | partly | 2: the client's wire, link and native shell (jig-protocol); the browser's shell: not planned |
-| `client/domain/client.md` | partly | 12: signing out from the frame; 16: the protocol layer below the domain (jig-protocol) |
-| `client/domain/contract.md` | partly | 5.1: a turn's bytes in its activity line; 6: reads refused as signed out; 8: a range of versions served; 10: the wire, one connection per client (jig-protocol); 10: the browser's client served by the engine: not planned |
+| `client/domain/README.md` | partly | 2: the client's wire, link and native shell (jig-protocol); 2, 5: jig's pages as a library, layout as semantics, the closed sets, owners, the text shell (client-composition); 2: the browser's shell; 6: several applications in one client: not planned |
+| `client/domain/client.md` | partly | 12: signing out from the frame; 16: the protocol layer below the domain (jig-protocol); 3, 4.1, 5.1, 14: a page's sections, the arrangement, the sections an application's page names, limits counted for them; 9: folds the domain keeps; 17: the arranged and the section-slot stories (client-composition) |
+| `client/domain/contract.md` | partly | 5.1: a turn's bytes in its activity line; 6: reads refused as signed out; 8: a range of versions served; 10: the wire, one connection per client (jig-protocol); 1, 3.3, 5.3, 6, 7.1, 7.2: owners in parts, requests, reads and subjects (client-composition); 7.4: an application's streams; 10: the browser's client served by the engine: not planned |
 | `client/domain/objects.md` | yes | 13: open questions only |
-| `client/domain/pages.md` | partly | 7: a connector's request budget, and what its system last said: not planned |
-| `client/domain/root.md` | partly | 11: a service's root, its small store in a file, its world: not planned |
-| `client/domain/testing.md` | partly | 2: the protocol world, the real loop (jig-protocol); 2, 3: the browser tier, the fake person's browser face: not planned |
-| `client/domain/view.md` | partly | 11: the native shell (jig-protocol); 11–13: the browser's shell, drawings in a shell, roles mapped by the browser, its stylesheet: not planned |
+| `client/domain/pages.md` | partly | 2, 9, 12: the frame's parts, the sections, their region names, arrangements, an application's arrangement and jig's sections on its pages (client-composition); 7: a connector's request budget, and what its system last said: not planned |
+| `client/domain/root.md` | partly | 2, 6, 7, 9, 15: owners, numbered alike; the section slot (client-composition); 11: a service's root, its small store in a file, its world; 15.1: an application's own child domains: not planned |
+| `client/domain/testing.md` | partly | 2: the protocol world, the real loop (jig-protocol); 2, 4, 6, 8, 9: the page's outline in the referee, the text shell's tiers and stories, the section slot in jig's test application (client-composition); 2, 3: the browser tier, the fake person's browser face: not planned |
+| `client/domain/view.md` | partly | 11: the native shell (jig-protocol); 3, 3.1, 4, 4.1, 5, 10–13, 15: the outline and its check, landmarks, menus, disclosures, images, region names, shortcuts, the drawing act's place, owners, the parts and sections as functions, the text shell (client-composition); 16: drawings acted on, the browser's shell, its stylesheet: not planned |
 | `protocol/README.md` | partly | 5: the components but the charter's translation and turns' decoding; 7: versions; 8: the secrets' tables; 9: the store; 12: what the domain owes (jig-protocol) |
 | `protocol/channel.md` | no | All: the workers' wire, the engine's and the worker's sides, grants, its world (jig-protocol); 6.4: text from agent processes: not planned |
 | `protocol/client.md` | no | All but section 12's browser: the client's wire, the engine's and the client's sides, sign-ins, the native shell, its world (jig-protocol); 12: the browser's shell, wasm32 builds, the browser tier: not planned |
@@ -50,7 +50,7 @@ smith, and builds what section 2's rows name it for.
 | `protocol/llm.md` | no | 5, 6: accounts on skein's driver, handed-in accounts, grants to workers (jig-protocol); 1–4, 7–9: LLM calls in a host's own process, for `smith-inline-agent`: not planned |
 | `protocol/service.md` | no | All: the engine's and a worker's services, `iterate`, start and end, the reference service and binary (`jig-test-service`, `jig-test`), its world, one process with agents as child processes (jig-protocol) |
 | `protocol/store.md` | no | All but retention: jig's store component on skein-kv, keys and intervals, codecs and the format row, commits, loads and parties' reads, transcripts' files, the secrets' store, fill, the real store in jig's worlds and the store's world; 15: what the domain owes it (jig-protocol); 11.1: retention: not planned |
-| `examples.md` | partly | 4: `ops`'s agent, `smith-inline-agent` (its world scripts its runs' agents); 7.3: a queue for the pool, policy narrowed, a month of alerts (no world found, not confirmed); the conformance world crashes three stories, not all; 8: a terminal client; 9.1: `ops` standalone: not planned |
+| `examples.md` | partly | 8: `ops`'s arrangement, its section slot, its owners in its view, its terminal client in its worlds (client-composition); 4: `ops`'s agent, `smith-inline-agent` (its world scripts its runs' agents); 7.3: a queue for the pool, policy narrowed, a month of alerts (no world found, not confirmed); the conformance world crashes three stories, not all; 8: its terminal over a real terminal; 9.1: `ops` standalone: not planned |
 
 ## 3. Not planned
 
@@ -72,7 +72,9 @@ smith, and builds what section 2's rows name it for.
   LLM component. Waits for a smith design and plan.
 - **`ops` standalone** (`examples.md`, 9.1; `protocol/service.md`,
   section 7): its systems' APIs, its connectors' protocols, its service
-  and its binary. Waits for the protocol layer, then a plan of its own.
+  and its binary, and its terminal client's loop over a real terminal
+  (`examples.md`, section 8). Waits for the protocol layer, then a plan
+  of its own.
 - **An application's own binary and real loop** (`protocol/service.md`,
   sections 3 and 8): jig's reference binary, `jig-test`, is
   jig-protocol's; an application's waits for that application.
@@ -88,16 +90,33 @@ smith, and builds what section 2's rows name it for.
   waits for a service that acts as a party.
 - **The browser's shell and the client's wasm32 builds**
   (`protocol/client.md`, section 12; `client/domain/view.md`, sections 11
-  to 13; `client/domain/testing.md`, the browser tier; skein's `lib.md`,
-  section 2): jig-protocol proves the client's protocol through the native
-  shell only, by the user's choice (2026-10-12). Waits for a plan of its
-  own, once the native client serves.
+  to 13 and 16; `client/domain/testing.md`, the browser tier; skein's
+  `lib.md`, section 2): jig-protocol proves the client's protocol through
+  the native shell only, by the user's choice (2026-10-12). It maps the
+  tree client-composition settles, landmarks and region names among it,
+  so its plan follows that one. Waits for a plan of its own, once the
+  native client serves.
 - **Several people on one deployment** (`client/domain/README.md`,
   sections 5 and 6): who may see what, a role's entries shared and taken.
   The client is built for one person first. Waits for such a deployment.
-- **`ops`'s remaining stories** (`examples.md`, 7.3 and 8): a queue for
-  the pool, policy narrowed, a month of alerts, every story crashed at
-  every commit, a terminal client. Waits for a plan.
+- **`ops`'s remaining stories** (`examples.md`, 7.3): a queue for the
+  pool, policy narrowed, a month of alerts, every story crashed at every
+  commit. Waits for a plan.
+- **An application's own child domains** (`client/domain/root.md`,
+  15.1): families that belong to no connector, their owners numbered as
+  connectors are, routed by the engine's root to a child that is not a
+  connector. Waits for an application with such a domain.
+- **An application's streams** (`client/domain/contract.md`, 7.4): its
+  data followed from an offset within a window, provisional, never
+  committed state. Waits for an application whose people follow its data
+  as it comes.
+- **Drawings acted on** (`client/domain/view.md`, section 16): a drawing
+  bound by its owner, its act reported by its drawing code and decoded by
+  its owner's view, in the place `Act::Drawing` keeps. Waits for the
+  first drawing a person acts on.
+- **Several applications in one client** (`client/domain/README.md`,
+  section 6): one person's inbox across applications that share their
+  people. Waits for such applications.
 - **LLM accounts' later work** (`protocol/llm.md`, section 10): signing
   in through a client, API keys. Waits for a decision.
 - **Versioning** (`README.md`, section 14): how jig is released and
@@ -115,4 +134,3 @@ smith, and builds what section 2's rows name it for.
 
 | Draft | About | Next |
 |---|---|---|
-| `client-composition.md` | an application's own client: jig's pages as a library, layout as semantics, the closed sets completed, owners not connectors, the text shell jig's; what waits | discuss; its section 5 goes into `client/domain/` before the first application's first release on jig's client, and before the browser's shell is planned |

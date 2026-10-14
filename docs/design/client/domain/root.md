@@ -1,12 +1,14 @@
 # The application's client root
 
-Provisional, 2026-10-09. What an application's client root is and does:
-the top-level domain of every client of an application on jig, which
-composes jig's client domain with the application's own kinds of object.
-It says what the root carries, its one shape, what jig asks of
-skein-lib's request table, how the root routes, how jig's pages show an
-application's values and an application's pages show jig's objects, and
-what a root must never do. It is the client's counterpart of the engine's
+Provisional, 2026-10-09, revised 2026-10-14. What an application's
+client root is and does: the top-level domain of every client of an
+application on jig, which composes jig's client domain with the
+application's own kinds of object. It says what the root carries, its
+one shape, what jig asks of skein-lib's request table, how the root
+routes, how jig's pages show an application's values and an
+application's pages show jig's objects and sections, what a root must
+never do, and the owners every value and request is routed by
+(section 15). It is the client's counterpart of the engine's
 root (`../../domain/root.md`), and follows the same rule: the root routes
 and translates; it never decides or orders. What is still open is listed
 in section 14.
@@ -42,8 +44,13 @@ in section 14.
   and watches it through the application's own documents, and whose view
   fills the slot.
 - **Both ways.** An application's page shows jig's objects (an
-  incident's proposals, its task's chip) through slots of the same kind,
-  which `jig-domain-client` and jig's view fill (section 7).
+  incident's proposals, its task's chip) and jig's sections (its lead
+  task's plan) through slots, which `jig-domain-client` and jig's view
+  fill (section 7).
+- **Owners, numbered alike.** Each child that keeps values is an owner:
+  `jig-domain-client`, and the application's, which it numbers in one
+  enum both its roots share. A connector's client side is one kind of
+  owner, numbered as its connector is (section 15).
 - **Copied, not invented.** `ops`'s client root is the reference every
   client root is copied from (section 12).
 
@@ -52,7 +59,7 @@ in section 14.
 ```
 <application>-domain-client     the client root: the request table, routing, translation
 ├── jig-domain-client           jig's client domain (client.md)
-├── <connector>…                the client's side of each connector: its parts, its families and their pages
+├── <connector>…                the client's side of each connector, an owner: its parts, its families and their pages
 └── …                           anything else of the application's, such as a settings page of its own
 ```
 
@@ -67,18 +74,19 @@ in section 14.
   4.5). The application's children know nothing of `jig-domain-client`,
   and `jig-domain-client` knows them only as parts' owners and as
   elsewhere.
-- **One child per connector.** Each connector of the engine's root has
-  one child in the client root, its client side: it shows the
+- **One child per owner.** Each connector of the engine's root has one
+  child in the client root, its client side, an owner: it shows the
   connector's parts, and holds the families of objects that are the
   connector's (for `ops`, infrastructure's side holds environments). A
   family that spans connectors (`ops`'s incidents, an observability
   matter led by a task) belongs to the one whose objects it lists, and
   shows the others' values through their parts.
-- **Connectors are named alike at both ends.** A part names a connector by
-  the number the engine's root gives it. Both of the application's roots
-  share one typed enum of its connectors with their numbers, so the
-  client root's match from a part to its child is exhaustive, and a new
-  connector breaks the client's build where it must be shown.
+- **Owners are numbered alike at both ends.** A part names its owner by
+  the owner's number, which for a connector is the number the engine's
+  root gives it. Both of the application's roots share one typed enum of
+  its owners with their numbers, so the client root's match from a part
+  to its child is exhaustive, and a new owner breaks the client's build
+  where it must be shown (section 15).
 
 - **No root above it.** A client and an engine in one process (a
   desktop application that runs its own engine, a test) keep their own
@@ -91,7 +99,7 @@ in section 14.
 ```
 step(root, event):
     route the event to its child, by its owner                         (section 5)
-    while a child asks for a hand-off (a part to show, an object to show),
+    while a child asks for a hand-off (a part, an object or a section to show),
         route it to the child that owns it, and its answer back         (sections 6 and 7)
     every keyed request any child asks for       → table.ask(owner, ask)  (section 4)
     every read, watch, address, sign-in          → out, wrapped
@@ -214,8 +222,10 @@ with a lifecycle, as a queue is. Its design is a section of skein's
 How jig's pages show an application's values.
 
 - **A part** is a value of an application's that a jig document names by
-  reference. Its reference is jig's: what kind of part it is, the
-  connector whose it is, and the key jig knows it by. The kinds:
+  reference. Its reference is jig's: what kind of part it is, its owner
+  (the connector whose value it is, for every part jig's documents name,
+  by its owner number: section 15), and the key jig knows it by. The
+  kinds:
 
   | Part | Named by | What it shows, for `ops` |
   |---|---|---|
@@ -232,12 +242,14 @@ How jig's pages show an application's values.
 
 - **A slot** is where one of jig's pages or cards shows a part. The page
   or card names it, and jig's view leaves an empty node for it
-  (view.md, section 4).
+  (view.md, section 4). It is one of three kinds of slot: an
+  application's page leaves the other two for jig's cards and sections
+  (section 7).
 - **Showing a part.** When a page of `jig-domain-client` shows a part,
   it asks the root, with the page's generation and the part's scope: the
   project it shows in, or the deployment. The root routes it to the
-  client side of the part's connector, which holds it in its own working
-  set, reads or watches its value through the application's own
+  part's owner, the client side of its connector, which holds it in its
+  own working set, reads or watches its value through the application's own
   documents, naming that scope (contract.md, section 5 and 7.2), and
   forgets it when told the page's parts have left. A connector, a
   resource or a kind needs no document: its words are the owner's
@@ -262,15 +274,15 @@ How jig's pages show an application's values.
   changes in the core is a request of jig's, made by the engine's root on
   the party's behalf (`../../domain/people.md`, 5.1). No request of
   `jig-domain-client`'s carries an application's value.
-- **A connector not shown is a build error.** The root's match on a
-  part's connector is exhaustive, as the engine's root's match on
-  connectors is (`../../README.md`, section 4).
+- **An owner not shown is a build error.** The root's match on a part's
+  owner is exhaustive, as the engine's root's match on connectors is
+  (`../../README.md`, section 4).
 
 ## 7. The application's families
 
 - **A family** is an application's kind of object: for `ops`, incidents
-  and environments; for temper, changes and findings. Each belongs to the
-  client side of one connector, with:
+  and environments. Each belongs to one owner, the client side of one
+  connector (section 15), with:
   - its objects, held once in its own working set, with revisions and
     card states as jig's are (client.md, section 5);
   - its cards, one per kind of object, shown on its pages and in jig's
@@ -284,11 +296,24 @@ How jig's pages show an application's values.
     (contract.md, 7.2).
 - **An application's page shows jig's objects** through slots of the
   same kind, the other way round. An incident's page shows its task's
-  chip, the proposals waiting in its subtree and its plan: it names each
+  chip and the proposals waiting in its subtree: it names each
   by jig's key, the root routes the request to `jig-domain-client`,
   which holds the object in its working set as shown elsewhere and
   watches it, and jig's view fills the slot with jig's card. One object,
   one card, wherever it shows (objects.md, section 2).
+- **An application's page shows jig's sections** through slots of the
+  third kind. Its child names each by value, a `Section` of
+  `jig-domain-client`'s (an incident's lead task's plan or activity, the
+  inbox's needs, the conversations), and the root hands the page's whole
+  list to `jig-domain-client` (`ShowSections`), as it hands the objects
+  the page names. `jig-domain-client` opens what the sections need for
+  the page's generation (client.md, 5.1), and the view root fills each
+  slot with jig's section, whole (`jig_view::sections::section`). Both
+  kinds of slot hold a reference whose owner is jig and whose token is
+  the family's: the family's binding table says whether it means one of
+  jig's objects or one of jig's sections. A section the domain does not
+  show (a second task's) builds nothing, and
+  its slot says it cannot be shown.
 - **A family follows jig's rules for what it shows:** nothing shown done
   before its answer is durable; acts naming the revision they saw;
   provisional values marked. Its world checks it, with jig's referee
@@ -318,9 +343,11 @@ How jig's pages show an application's values.
 
 The view root (view.md, section 4) mirrors the domain's root:
 
-- it builds the frame and the page at the address, from the page's
-  owner's view;
-- it fills each slot from the slot's owner's view;
+- it builds the banner, the navigation, the main and `after_page`, from
+  jig's parts and sections, its own nodes, and the page's owner's view
+  (view.md, section 4);
+- it fills each slot from the slot's owner's view: a part from its
+  owner's, a card or a section of jig's from jig's;
 - it decodes an act on a node through the node owner's bindings, wrapped
   with its owner, for the domain's root to route.
 
@@ -367,7 +394,7 @@ part of this document:
 ├── address.rs      the root's addresses: jig's and each connector side's
 ├── domain.rs       Domain, step, fire, iterate's part: the one shape (section 3)
 ├── route.rs        which child each event, act and hand-off goes to (section 5)
-├── parts.rs        parts to their connectors' sides, jig's objects to jig-domain-client (sections 6 and 7)
+├── parts.rs        parts to their owners' sides, jig's objects and sections to jig-domain-client (sections 6 and 7)
 ├── store.rs        the small store's records, the children's wrapped (section 8)
 ├── limits.rs       the children's limits and the table's, and their sum
 └── tests.rs
@@ -393,3 +420,53 @@ the root kept every promise above.
   wrapping, which have one shape, are best copied, as now, or generated
   from a short description, as for the engine's root
   (`../../domain/root.md`, section 14).
+
+## 15. Owners
+
+- **An owner** is a child of the client root that keeps values, names
+  nodes of the view, or asks for keyed requests: `jig-domain-client`, or
+  one of the application's. Each of the application's is a connector's
+  client side, or another child of the client root (a settings page of
+  its own), which sends no request, read or subject to the engine: one
+  that does is an own child domain's client side, which waits for the
+  application that needs it (15.1).
+- **jig is never numbered.** The view names it `Owner::Jig`, and the
+  wire names jig's records as jig's.
+- **The application numbers its owners,** each by a `u16`, in one typed
+  enum both its roots share, with the function that gives an owner's
+  number and the one that gives the owner of a number, or none. An
+  application whose owners are all its connectors' client sides shares
+  the enum of its connectors, as `ops` shares `jig-ops-domain-connectors`'s
+  `Connector`; one with another owner adds it to that enum. A connector's owner number
+  is the number the engine's root gives that connector in the core's
+  configuration (`../../domain/root.md`, section 6); any other owner has
+  a number no connector has.
+- **One number, everywhere the client names the owner:** a part's owner
+  (contract.md, 5.3); the owner of a view's key, style token, region
+  name, binding, slot, drawing, picture and phrase
+  (`jig_view::Owner::Application { number }`, view.md, section 3); an
+  application's keyed requests, reads and subjects (contract.md, 3.3, 6
+  and 7.1), which the wire tags with that number
+  (`../../protocol/client.md`, section 11); and the small store's
+  records of the owner (client.md, section 11).
+- **Never reused.** A number given to an owner is never given to
+  another, since the small store keeps it across the client's updates,
+  and a request sent under it may be answered after one.
+- **Matched whole.** Each root's match on an owner is exhaustive, with no
+  `_` arm, so a new owner breaks the build where it must be routed and
+  shown; a number that names no owner is a fact, never a guess.
+
+### 15.1 Later: an application's own child domains
+
+An application's own child domain in the engine (`../../README.md`,
+section 4), whose families belong to no connector (a laboratory's
+evidence and verdicts), is an owner like a connector: numbered in the
+same enum, with a number no connector has; its client side a child of
+the client root; its families' requests, reads and subjects naming its
+number, which the engine's root routes to that child domain as it routes
+a connector's. Nothing in parts, slots, bindings, styles, drawings or
+region names changes for it, and nothing in what an application already
+writes. It waits for an application with such a domain: the engine's
+root's routing of an application's requests, reads and subjects to a
+child that is not a connector, and the people child's admission of them
+(`../../domain/people.md`, 5.1), are designed then.

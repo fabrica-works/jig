@@ -1,10 +1,12 @@
 # Pages
 
-Provisional, 2026-10-09, revised 2026-10-12. jig's pages: how a client is
+Provisional, 2026-10-09, revised 2026-10-14. jig's pages: how a client is
 organised, what a party finds where, and what they do there. They are
 jig's, as the primitives they show are, and every application's client
 has them, around its own. This document says what each page shows and
-offers, never how it looks: no layout and no style. The cards that every
+offers, never how it looks: no layout and no style. Section 12 says what
+a page is made of (the frame's parts and the sections, each with its
+region name) and how an application arranges them. The cards that every
 page reuses are objects.md; what each page reads and watches is
 contract.md. What is still open is listed in section 11.
 
@@ -14,6 +16,17 @@ contract.md. What is still open is listed in section 11.
   **decide** what waits for them (section 3), and **watch and steer** the
   work (sections 5 and 6). jig's pages are organised around these, not
   around jig's parts.
+- **A page is an arrangement.** jig's pages are made of the frame's
+  parts, sections and cards. What jig promises is kept below them: by
+  `jig-domain-client`, which holds each object once (client.md,
+  section 5); by the request table, which keeps each request until its
+  answer is durable (root.md, section 4); and by the card that shows each
+  object, its state, its acts and its refusals, wherever it shows
+  (objects.md, section 2). No promise depends on where a section or a
+  card is, next to what, or in what order, so jig's pages are its
+  reference arrangements: an application takes them as they are, shows
+  more sections together, or arranges its own from the same parts and
+  sections (section 12).
 - **The task page is the one universal page.** Every task, whatever its
   executor (an agent, a procedure, a person), has a page of the same
   shape: what was asked, where it stands, what it did, what it spent,
@@ -63,7 +76,7 @@ Deployment       hosts, accounts, connectors, capacity
 … the application's pages: for ops, Incidents and Environments
 ```
 
-- **The frame** is on every page:
+- **The frame** is made of parts (section 12.1):
   - what needs the party, as a count, and updates not yet read, as a
     quieter one;
   - the project they are in, and a way to switch;
@@ -71,9 +84,17 @@ Deployment       hosts, accounts, connectors, capacity
   - whether the client is live, behind or offline (client.md, 8.2), and
     who is signed in, with a way to sign out (client.md, section 12);
   - the navigation: jig's pages and the application's.
+
+  What needs the party and the link's state are on every page, since a
+  person must always know both, and so is who is signed in, since a
+  person must always be able to sign out (client.md, section 12). The
+  other parts are where the application's arrangement puts them, on
+  every page in jig's.
 - **Home and navigation are the application's choice.** The application
-  says which of jig's pages its frame shows, in what order among its
-  own, and which is home; the inbox by default. `ops` makes the inbox
+  says which of jig's pages its frame shows, in what order, and which
+  is home; the inbox by default. jig's navigation shows its own entries
+  after them (12.1); an application that wants them among jig's builds
+  its own navigation. `ops` makes the inbox
   home, and puts Incidents after it. A page that cannot apply is not
   shown: Conversations without a charter for chats, the Deployment page
   to a party without a role on the deployment.
@@ -360,10 +381,15 @@ restarts, they start empty.
 - **Its parts in jig's slots:** panels, results, effects' descriptions,
   holds' details, resources and kinds in words (root.md, section 6).
 - **Its cards on jig's pages,** through those slots, and jig's cards on its
-  pages: an incident's page shows its lead task's chip, the proposals
-  waiting in its subtree, and its plan, as jig's cards (root.md,
-  section 7).
+  pages: an incident's page shows its lead task's chip and the proposals
+  waiting in its subtree as jig's cards, and its plan as jig's plan
+  section (root.md, section 7).
 - **Its navigation and its home** (section 2).
+- **Its arrangement** of jig's pages: the sections a task's page and a
+  project's show together, and where each part and section goes
+  (section 12.3).
+- **jig's sections on its pages,** through slots: a task's plan or
+  activity, the inbox's needs, the conversations (root.md, section 7).
 
 ## 10. An incident, as the client shows it
 
@@ -394,3 +420,129 @@ inbox, withdrawn, with R's result saying why.
 - **Naming a chat:** by its person, or proposed by the chat; today it is
   its first words.
 - **A board across projects,** for a party with several.
+
+## 12. Parts, sections and arrangements
+
+What a page is made of, and how an application arranges it. Each part
+and section is a function of `jig-view` (view.md, 4.1) and carries a
+region name (12.4); what the domain opens for each section is
+client.md, 5.1.
+
+### 12.1 The frame's parts
+
+| Part | What it shows | Function | Region name | On every page |
+|---|---|---|---|---|
+| the link | whether the client is live, behind or offline (client.md, 8.2) | `frame::link` | `jig-link` | yes |
+| what needs the party | what needs them, counted exactly, and updates unread, up to a limit, each leading to the inbox; before the frame's first delivery, that nothing is known yet | `frame::needs` | `jig-needs` | yes |
+| who is signed in | the party, and signing out (client.md, section 12) | `frame::party` | `jig-party` | yes |
+| the projects | the projects the party holds roles in, the one they are in marked current, each leading to its page | `frame::projects` | `jig-projects` | |
+| going to a task | a field taking a task's number | `frame::go_to_task` | `jig-go-to-task` | |
+| the navigation | jig's pages the application offers, in its order, then its own entries in a slot (section 2) | `frame::navigation` | `jig-navigation` | |
+
+- **jig's banner** (`frame::banner`) is the banner landmark with the
+  first five, in that order. The navigation is a landmark of its own.
+- **After the page,** `after_page` builds, on every page:
+
+  | Part | What it shows | Region name |
+  |---|---|---|
+  | the owed cards | each card the page's working set holds deciding, leaving, or unknown whether made (client.md, sections 5 and 6), that no section of the page and no card slot of the application's page shows (view.md, 4.1) | `jig-owed` |
+  | the confirmation | the one open (client.md, section 9) | `jig-confirmation` |
+  | the notices | the notices, and dismissing them (client.md, section 13) | `jig-notices` |
+
+### 12.2 Sections
+
+Each section is a value of `jig-domain-client`'s `Section` (client.md,
+5.1), built by `jig_view::sections::section` as a region with its
+level-2 heading. A header goes with its page's sections and needs
+nothing of its own.
+
+| Page | Section | `Section`, or its header's function | Region name |
+|---|---|---|---|
+| the inbox (section 3) | its header: what needs the party, counted, and the filters | `sections::inbox::header` | `jig-inbox-header` |
+| | needs you | `Inbox { group: Needs, project }` | `jig-inbox-needs` |
+| | updates | `Inbox { group: Updates, project }` | `jig-inbox-updates` |
+| conversations (section 4) | the list, and starting a chat | `Conversations { project }` | `jig-conversations` |
+| a task (section 5) | its header (5.1) | `sections::task::header` | `jig-task-header` |
+| | its sections, one at a time | `sections::task::tabs` | `jig-task-tabs` |
+| | overview | `Task { task, section: Overview }` | `jig-task-overview` |
+| | activity | `Task { task, section: Activity }` | `jig-task-activity` |
+| | plan | `Task { task, section: Plan }` | `jig-task-plan` |
+| | history | `Task { task, section: History }` | `jig-task-history` |
+| | budget and authority | `Task { task, section: Budget }` | `jig-task-budget` |
+| | connectors' panels | `Task { task, section: Panels }` | `jig-task-panels` |
+| a project (section 6) | its header: its name | `sections::project::header` | `jig-project-header` |
+| | its sections, one at a time | `sections::project::tabs` | `jig-project-tabs` |
+| | its page (6.1) | `Project { project, section: Overview }` | `jig-project-overview` |
+| | goals (6.2) | `Project { project, section: Goals }` | `jig-project-goals` |
+| | tasks (6.3) | `Project { project, section: Tasks }` | `jig-project-tasks` |
+| | notes (6.4) | `Project { project, section: Notes }` | `jig-project-notes` |
+| | settings (6.5): the five below, each a region nested in it | `Project { project, section: Settings }` | `jig-project-settings` |
+| | resources; policy; roles and services; spend; recurring tasks | `Project { project, section: Resources }`, and `Policy`, `Roles`, `Spend`, `Recurring` | `jig-project-resources`, `jig-project-policy`, `jig-project-roles`, `jig-project-spend`, `jig-project-recurring` |
+| the deployment (section 7) | hosts, LLM accounts, connectors, capacity | `Deployment` | `jig-deployment` |
+
+Regions named inside sections, so a stylesheet places them too:
+
+| Inside | Region | Region name |
+|---|---|---|
+| an agent's activity | the conversation, a log | `jig-conversation` |
+| | its composer | `jig-composer` |
+| conversations | starting a chat, a form | `jig-new-chat` |
+| goals | setting a goal, a form | `jig-new-goal` |
+| notes | searching them, a search | `jig-notes-search` |
+| the deployment | hosts; LLM accounts; connectors; capacity | `jig-hosts`, `jig-accounts`, `jig-connectors`, `jig-capacity` |
+
+The pages not about the work (section 8) are jig's whole, each in the
+main (`pages::not_the_work`): `jig-starting`, `jig-signing-in`,
+`jig-missing`, `jig-out-of-date`, `jig-someone-else`.
+
+### 12.3 Arrangements
+
+- **jig's arrangement** of every page (`jig_view::jig`): the banner, with
+  the link, what needs the party, who is signed in, the projects and
+  going to a task, in that order; the navigation; the main, with the
+  page's heading, its header, its tabs, and its sections; then the owed
+  cards, the confirmation and the notices. A task's page and a project's show the address's own
+  section, one at a time (a task's plan at its own address); the inbox
+  shows its header and both groups; conversations and the deployment
+  their one section.
+- **More sections together.** An application may have every task's page,
+  or every project's, show sections beside the address's own: its
+  arrangement names them (client.md, 5.1), every section of a task on
+  one page for instance. The address's section is the one marked
+  current, and jig's main shows them all in 12.2's order.
+- **The tabs** list every section the task or the project offers, each
+  leading to its address, the address's own marked current; jig's main
+  leaves them out when the page shows every section its subject
+  offers.
+- **Its own arrangement.** At an address of jig's, an application's view
+  root may build the main and any asides itself, from the page's
+  heading, headers and sections and its own nodes (the budget in an
+  aside; the composer pinned below the thread, by its stylesheet), and
+  its banner from jig's frame's parts and its own (a brand, its own
+  entries; the projects part only where its parties hold roles in more
+  than one project).
+- **What every arrangement keeps:**
+  - the page's outline (view.md, 3.1): the link, what needs the party
+    and who is signed in, in the banner, and `after_page` last, which
+    `jig_view::outline::check` checks;
+  - jig's objects only through their cards, whole (objects.md,
+    section 2), which the referee's rules check wherever a card shows
+    (testing.md, section 6);
+  - a section only where the domain shows it on the page: elsewhere, its
+    function builds nothing;
+  - the pages not about the work, jig's whole, in the main.
+- **On its own pages,** an application shows jig's sections and cards
+  through slots (root.md, section 7), under the same frame and the same
+  `after_page`.
+
+### 12.4 Region names
+
+- **Language-free and stable.** Every region of 12.1 and 12.2 carries its
+  region name, which a shell and a stylesheet place it by, never by the
+  order of nodes or by its words. A name changes only by a change to
+  this design.
+- **Owned.** jig's start with `jig-`. An application names its own
+  regions from a closed set of its own, starting with its own name and a
+  hyphen, so one stylesheet holds both. In the tree a region name is its
+  owner and a number; `jig_view::regions::JigRegion` holds jig's, each
+  with its name.

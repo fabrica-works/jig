@@ -1,6 +1,6 @@
 # The client domain
 
-Provisional, 2026-10-09, revised 2026-10-13. `jig-domain-client`: what a
+Provisional, 2026-10-09, revised 2026-10-14. `jig-domain-client`: what a
 party's client knows of the engine's work, and what it does with it. It
 is the client's counterpart of the engine's core: a child of the
 application's client root, holding jig's part of the client: the frame
@@ -26,6 +26,10 @@ What is still open is listed in section 18.
   its own state and names the objects it shows by handle; the objects are
   a working set held once, so a decision changes every place it shows
   (section 5).
+- **A page is its sections.** What a page reads and watches is what its
+  sections need: the address's own and those the application's
+  arrangement adds beside it, or those an application's page names.
+  Where a section shows on the screen is the view's (section 5.1).
 - **Requests outlive pages.** A party's request is keyed, kept in the
   small store before it is sent, sent again with the same key until its
   answer is durable, and shown as asked until then, never as done. The
@@ -83,8 +87,10 @@ person ⇄ shell ⇄ view ┐                          ┌ protocol ⇄ engine
   they hold roles in, what needs them, the engine's versions and the
   retention of its answers, the charters it offers for chats and goals,
   and the link (section 8);
-- **the page** at the address, with its own state: filters, folds,
-  windows, its lead (section 5);
+- **the page** at the address, with its own state: its sections,
+  filters, folds, windows, its lead (section 5);
+- **the navigation and the arrangement,** the application's, given
+  before the start (pages.md, section 2; 5.1);
 - **the working set:** the objects the page shows, by key, each with its
   revision and its card's state (section 5);
 - **intents:** the requests this domain asked the root to send, by
@@ -117,6 +123,10 @@ retired only once its terminal has come.
 - **An ask:** a program's intent, by value rather than by a card's
   handle: how a service's client, which has no view, asks (root.md,
   section 11).
+- **Objects and sections shown:** an application's page names jig's
+  objects, and jig's sections, for the page's generation, each the whole
+  list each time (`ShowObjects`, `ShowSections`; 5.1; root.md,
+  section 7).
 - **A request's progress:** for each request it asked the root to send,
   that it is in flight, retrying, or parked; then its one terminal, the
   answer: done or refused, durably (section 6).
@@ -167,8 +177,9 @@ the act is the application's own request, made from a form in a slot
 - **One page at a time.** The page at the address is one of jig's (the
   inbox, conversations, a task, a project and its sections, the
   deployment; pages.md) or one of the application's, which this domain
-  knows only as elsewhere. Pages that are not about the work (starting,
-  signing in, a page missing, a client too old) are pages too.
+  knows only as elsewhere, and by the sections of jig's it names (5.1).
+  Pages that are not about the work (starting, signing in, a page
+  missing, a client too old) are pages too.
 - **Going to a page** numbers a new generation; closes the old page's
   watches; abandons its reads, whose terminals are dropped when they
   come; tells the root its parts have left; clears the working set; then
@@ -206,7 +217,73 @@ the act is the application's own request, made from a form in a slot
   than the working set holds keeps what fits in its order, and the page
   says how many more there are. Nothing grows.
 
-## 6. Keyed requests
+### 5.1 Sections
+
+- **A page is made of sections,** each a value of this domain's,
+  `pages::Section`, naming its subject (pages.md, 12.2):
+
+  ```
+  Section::Inbox { group, project }     group: contract::InboxReadGroup, Needs or Updates;
+                                        project: the inbox's filter, or none for every project
+  Section::Conversations { project }    the party's chats, and starting one, in that project or any
+  Section::Task { task, section }       section: an address's TaskSection
+  Section::Project { project, section } section: an address's ProjectSection
+  Section::Deployment
+  ```
+
+  `Domain::sections()` lists the page's sections, in pages.md 12.2's
+  order. Each section reads its subject from itself, never from the
+  address, and the view builds it from this domain's state for that
+  subject.
+- **What a page opens is what its sections need,** each watch and read
+  opened once for the page's generation however many sections need it
+  (a task's watch, for each of its sections), and closed with the
+  generation. The working set is their union, each object held once
+  whichever sections show it.
+- **Each section's windows are its own:** every window a page holds
+  has a number no other window of the page has, so reading more in one
+  section never reads another's, and a read's terminal goes to the
+  window that asked.
+- **One subject each.** A page's sections name at most one task, one
+  project and one inbox filter; a project's overview shows the inbox's
+  needs of its project, so it names that filter too. They share this
+  domain's state for that subject (one task's header, plan, history and
+  conversation; one project's; the inbox's; the deployment's), as its
+  objects share the working set. A section naming a second one is not
+  shown, and the view's slot for it says it cannot be shown (view.md,
+  section 4).
+- **Each section once.** A project's `Settings` holds its five
+  (`Resources`, `Policy`, `Roles`, `Spend`, `Recurring`): a page that
+  would show `Settings` and one of the five shows `Settings` alone.
+- **At an address of jig's,** the page shows the address's own sections
+  (the inbox's two groups, with the address's filter; a task's or a
+  project's section at the address; the conversations or the
+  deployment) and, beside them, those the application's arrangement
+  adds. `pages::Arrangement` holds two lists, of `TaskSection` and of
+  `ProjectSection`: the sections every task's page, and every project's,
+  shows beside the address's own. The application gives it before the
+  start, as it gives the navigation, with
+  `Domain::configure_arrangement(arrangement)`, which refuses it after
+  the start, and refuses a list longer than its kind's sections, naming
+  one twice, or naming `Settings` with one of its five. jig's own
+  arrangement adds none: one section per address. A task's section its
+  document does not offer (`pages::task::offered`) is not shown,
+  wherever it was named.
+- **At an application's address,** the page shows the sections the
+  application's page names, through its root (`ShowSections`, root.md,
+  section 7). Each list replaces the last for the page's generation,
+  and an empty one names none. This domain opens and closes what the
+  difference needs, under an owner of their own, so naming objects anew
+  (`ShowObjects`) never closes a section's watch, nor naming sections an
+  object's.
+- **What a page says of itself, a section says on an application's
+  page:** that its watches are behind, that rows past its window were
+  left out, that a limit refused what it asked, and that its subject is
+  missing (one the party may not see, or none). Each section of jig's
+  there says it in its own region, where at an address of jig's the
+  page says it (section 8.2; pages.md, section 8).
+
+## 6. Keyed requests## 6. Keyed requests
 
 What this domain does with a request; the request table, which keys it,
 keeps it and sends it, is the root's (root.md, section 4).
@@ -366,6 +443,11 @@ And, beside the link, the page's own state:
   confirmation says what it will now be: made, proposed, or refused.
 - **A confirmation's fields** are cleared when it closes, confirmed or
   dismissed.
+- **Folds this domain keeps** leave what they fold out of the tree: a
+  plan's level folded into counts, a call folded to its line. They are
+  this domain's because opening one changes what is read or built. A
+  disclosure, whose content is always in the tree, is the shell's to
+  fold, and this domain never knows it (view.md, section 3).
 
 ## 10. Conversations
 
@@ -509,6 +591,11 @@ Each is configured and part of the worst case:
 - objects in a page's working set; rows per window; turns a
   conversation's window holds; nodes of a plan held;
 - intents kept, reads in flight, watches open (the frame's included);
+- these, and the objects and windows above, counted for the most
+  sections a page may show together: at an address of jig's, its own
+  with the arrangement's beside them; on an application's page, every
+  section of one task, one project and one inbox filter, with the
+  conversations and the deployment (5.1);
 - drafts kept; notices; the scopes of kept work counted, no fewer than
   the requests the table holds;
 - bytes a person may write (the engine's own bound on words); bytes of
@@ -567,7 +654,11 @@ accepted in the inbox while its chat shows it; two tabs deciding one
 thing; a reload with requests pending; the engine restarting under a
 pending request; a watch dropped and the page behind; a page left with
 reads in flight; a draft kept across a reload; a goal beyond the
-person's allotment, proposed as the confirmation said it would be.
+person's allotment, proposed as the confirmation said it would be; a
+task's page arranged with every section together, a proposal accepted
+in its plan while its conversation shows it; an application's page
+showing a task's plan in a section slot, and a second task's not
+shown, its slot saying so.
 
 Its referee: nothing is shown as done before the engine made it durable;
 every request the person made is made once, whatever the faults; no word

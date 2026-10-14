@@ -1,6 +1,6 @@
 # jig's client domain
 
-Provisional, 2026-10-09, revised 2026-10-10. The design of jig's client:
+Provisional, 2026-10-09, revised 2026-10-14. The design of jig's client:
 the domain a party's client runs, the pages and cards it shows of jig's
 primitives, how an application composes it with its own kinds of object,
 what it asks of the engine, its view, and how all of it is tested. jig as
@@ -15,17 +15,19 @@ engine's domain is `../../domain/`. The mechanics are those of skein's
    the link, drafts, the small store, signing in. Read it first.
 2. **root.md:** what an application's client root does: the one shape,
    the request table, routing, parts and slots, the application's own
-   objects and pages, and a service's root.
+   objects and pages, a service's root, and owners.
 3. **pages.md:** jig's pages: the frame, the inbox, conversations, the
-   task page, a project, the deployment; what an application adds.
+   task page, a project, the deployment; what an application adds; the
+   frame's parts, the sections, their region names, and arrangements.
 4. **objects.md:** jig's objects and their cards: chips, proposals,
    escalations, questions, person tasks, results, refusals, the
    conversation, and the requests that steer a task.
 5. **contract.md:** what crosses between a client and the engine: keyed
    requests, documents, reads and watches, versions, and what the
    engine's domain owes the client.
-6. **view.md:** the view: a semantic tree, bindings, the diff, words,
-   Markdown, conversations, shells.
+6. **view.md:** the view: a semantic tree and the page's outline, the
+   parts and sections as functions, bindings, the diff, words, Markdown,
+   conversations, shells, and the text shell.
 7. **testing.md:** the fake person, the client's world, the joint world
    with the engine's domain, and their referee.
 
@@ -50,6 +52,7 @@ jig-protocol-client-link        the connection to the engine: exchanges, the str
 jig-protocol-transcript         turns decoded with smith's transcript crate (client.md, section 10)
 jig-shell-web                   the browser's shell (view.md, section 11)
 jig-shell-native                a shell on skein's HTTP client, for Linux and the worlds
+jig-shell-text                  the text shell: the tree as lines, a line as an act (view.md, section 15)
 
 for tests
 testing/jig-fake-person         the person: reads the view tree, acts on it (testing.md, section 3)
@@ -67,7 +70,8 @@ tests/client                    the client's world, and the joint world (testing
   application's types.
 - **The wire, the protocol layer and the shells** are the client's
   protocol's (`../../protocol/client.md`), beside the engine's. This
-  design says what they owe the domain, and no more. A shell is the one
+  design says what they owe the domain, and no more, but for the text
+  shell, which it designs whole (view.md, section 15). A shell is the one
   impure part of a client, ordinary Rust as skein's shell is, not step
   code.
 
@@ -99,16 +103,25 @@ tests/client                    the client's world, and the joint world (testing
 | view root | the application's top-level view: jig's view and its own (view.md, section 4) |
 | shell | the platform's code, the only impure part of a client (view.md, section 11) |
 | view | the client domain's state as a tree a shell shows, and a person's acts coming back (view.md) |
-| frame | what every page shows: who is signed in, where they are, what needs them, the link (pages.md, section 2) |
-| page | a place with an address: the inbox, a task, a project's goals, an application's own |
+| frame | the parts a page shows around its main: the link, what needs the party, who is signed in, the projects, going to a task, the navigation (pages.md, 12.1) |
+| frame's part | one of the frame's, a function of jig's view with a region name; the link, what needs the party and who is signed in are on every page |
+| page | a place with an address: the inbox, a task, a project's goals, an application's own; made of sections, arranged |
+| section | one part of one of jig's pages, which the domain opens what for and the view builds whole: a task's plan, the inbox's needs (client.md, 5.1; pages.md, 12.2) |
+| arrangement | how a page places the frame's parts, its sections and an application's own nodes; jig's pages are jig's arrangements, and an application's may show more sections together (pages.md, 12.3) |
+| outline | the landmarks every page's tree keeps: the banner first, one main, `after_page`'s parts last (view.md, 3.1) |
+| landmark | a role saying which part of a page a node is: banner, navigation, main, complementary, content info, form, search |
+| region name | a region's language-free, stable name, which a stylesheet places it by (pages.md, 12.4) |
 | object | something a card shows, held once in a page's working set: a task, a proposal, an escalation… (objects.md) |
 | card | how one object shows, wherever it appears |
 | chip | a task named in passing: its number, its title, its phase, kept live |
 | client side | the child of the client root that shows one connector's values, and holds its families (root.md, section 2) |
 | family | an application's kind of object, with its own card and pages (root.md, section 7) |
-| owner | the child that keeps a value, or that asked for a keyed request: `jig-domain-client`, or a connector's client side; never a project's role, which is always "a project's owner" |
+| owner | the child that keeps a value, or that asked for a keyed request: `jig-domain-client`, or one of the application's, numbered (root.md, section 15): a connector's client side; never a project's role, which is always "a project's owner" |
+| owner number | the number an application gives one of its owners, shared by both its roots, the wire and the small store; a connector's is its connector's (root.md, section 15) |
 | part | a value of an application's that a jig document names by reference: a connector's name, a resource, a kind, a panel, an effect's description (root.md, section 6) |
-| slot | the place a jig page or card leaves for a part, filled by its owner |
+| slot | the place a jig page or card leaves for a part, or an application's page for one of jig's cards or sections, filled by its owner |
+| shortcut | a key a bound node answers to, as a press (view.md, section 5) |
+| text shell | jig's shell for a terminal or a pipe: the tree printed as lines, a typed line read as an act (view.md, section 15) |
 | document | a typed value the engine gives a client about one subject, its owner's alone (contract.md, section 5) |
 | revision | the state of one thing a party decides about (a hold, a task's spec, a person task, a note), which the decision names (contract.md, 5.2) |
 | read | a request for a document, or a page of a list; one answer |
@@ -215,6 +228,32 @@ where each is answered:
   a deployment.
 - **A client outside the engine's versions says so,** and keeps what is
   pending until it is updated (contract.md, section 8).
+- **What jig promises is kept below the page:** by `jig-domain-client`,
+  the request table and the card that shows each object, never by a
+  page's shape (pages.md, section 1).
+- **jig's pages are a library.** The frame's parts, the sections and the
+  cards are functions of jig's view, and jig's pages are its reference
+  arrangements of them, which an application takes as they are, shows
+  more sections of together, or arranges itself; an application's page
+  shows jig's sections in slots, as it shows jig's cards (pages.md,
+  section 12; root.md, section 7). What a page opens is what its sections
+  need (client.md, 5.1).
+- **Layout as semantics.** The tree keeps one outline of landmarks, and
+  jig's regions carry stable region names, so a shell and a stylesheet
+  place them without depending on the order of nodes; the tree still
+  says where nothing goes (view.md, section 3).
+- **The tree's closed sets, completed:** landmarks, a menu, a
+  disclosure and an image among the roles; a shortcut a binding answers
+  to; the place of an act on a drawing, built with the first drawing
+  that needs it (view.md, sections 3, 5 and 16).
+- **Owners, not connectors.** Everything that names an application's
+  owner, as root.md, section 15, lists (parts, the view's slots,
+  bindings, styles, drawings and region names, requests, reads and
+  subjects), names it by a number the application's roots share, a
+  connector's being its connector's, so a family that belongs to no
+  connector needs no change of what an application writes.
+- **The text shell is jig's:** printing a tree and reading a line decide
+  nothing of an application's (view.md, section 15).
 
 ## 6. What is open
 
@@ -223,8 +262,13 @@ Each document lists its own; the ones that reach across:
 - **Who may see what** among the parties of a project, deferred while
   the client is built for one person (`../../domain/people.md`,
   section 12);
-- **a text shell** for terminals, from the same tree (view.md,
-  section 14);
+- **several applications in one client:** one person's inbox across
+  applications that share their people. Shaped so that it adds: several
+  applications' clients side by side in one shell, each its own client
+  root, view, tree, link and owners, with no root above them (root.md,
+  section 2), the shell showing their trees together; nothing in one
+  application's contract changes. It waits for applications that share
+  their people;
 - **bundling** an application's parts into the answer of the jig read
   that names them, to save a round trip (contract.md, section 11);
 - **search** over tasks, results, notes and transcripts;
