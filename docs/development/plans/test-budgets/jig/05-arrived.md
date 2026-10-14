@@ -98,7 +98,15 @@ Files: `Cargo.lock`: `heavy cargo update -p smith-charter` (one package
   amount: `crates/jig-protocol-transcript/src/tests.rs:428` (33 to 38)
   and `:446` (127 to 142), `tests/client/src/joint/wire/turns.rs:24`
   (127 to 142), `:57` (126 to 141), `:60` (128 to 143),
-  `activity.rs:378` (127 to 142).
+  `activity.rs:378` (127 to 142); the same golden's byte literal
+  `FULL_TURN` (`testing/jig-test-client-records/src/activity_reads.rs:4`),
+  rewritten by a script from the golden's bytes in its present shape,
+  and `crates/jig-protocol-client-link/src/tests/pages.rs:230`
+  (`turn_limits(32, 126)`, 126 to 141) (ruling 117). Any further copy
+  of these two goldens, or literal equal to a size of one or one either
+  side of it, that the gate finds stale is refreshed the same way
+  without asking, and listed in the commit body; any other failure is a
+  question.
 Shape: no hand edit of generated code; the drift tests pass with
   `SKEIN_CODEGEN_WRITE` unset.
 Test shape: none new; the drift tests, unchanged, and the golden files,

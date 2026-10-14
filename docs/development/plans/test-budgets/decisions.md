@@ -296,6 +296,21 @@ the file.
      are not extra measurements. Every timing run of a smith suite is
      made from a clean worktree (`git status --porcelain` printing
      nothing), as steer 2026-10-14T00:18:42Z asked of `smoke-tools`.
+117. **jig 05.1 refreshes every copy of smith's turn goldens, found or
+     to be found** (plan defect, jig 05's block of
+     2026-10-14T01:50:37Z; the third block on it, after rulings 114 and
+     115). Besides the two `.bin` copies, jig holds the full golden as a
+     byte literal, `FULL_TURN` (`testing/jig-test-client-records/src/activity_reads.rs:4`),
+     and a bound one below its size (`crates/jig-protocol-client-link/src/tests/pages.rs:230`,
+     126); three `jig-protocol-client-link` page tests decode the old
+     bytes as `Malformed` (`logs/20261014T014712-86.log`). Both are
+     refreshed, the literal by a script from the golden's bytes. To end
+     the round trips, any further stale copy of these two goldens, or
+     literal equal to a size or one either side of it, is refreshed the
+     same way without asking and listed in the commit body. Rulings 114
+     and 115 listed literals found by searching for the value 127; a
+     ruling on a fixture names its copies and its derived bounds by
+     searching for its name and its users.
 
 ## For the user
 
