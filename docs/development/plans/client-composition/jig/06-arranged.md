@@ -30,9 +30,12 @@ a task's page arranged with every section together.
 - A card is owed while it is deciding, leaving, or unknown whether made,
   and no section of the page and no card slot of the application's page
   shows it: its object named by none of the page's sources, or a
-  proposal that left the plan's rows while the page shows that plan. It
-  is decided from the domain, never from the tree built so far (view.md,
-  4.1).
+  proposal that left the plan's rows while the page shows that plan and
+  no conversation the page shows names it. "A card a shown conversation
+  holds, at the call that made its object or a line deciding it
+  (section 9), stays there, on a page that shows the plan beside it
+  too, and is never owed." It is decided from the domain, never from the
+  tree built so far (view.md, 4.1).
 - The story: a task's page arranged with every section together, a
   proposal accepted in its plan while its conversation shows it
   (client.md, 17), its client given an arrangement naming every
@@ -51,6 +54,12 @@ a task's page arranged with every section together.
 - `retained_outside_plan` moves into `jig-domain-client` as
   `Domain::owes(id) -> bool`, which also checks the card's state; the
   view asks it.
+- `turns::shows_object` (`crates/jig-view/src/turns/objects.rs`, the
+  whole file) moves into `jig-domain-client` as `Conversation::shows(&self,
+  key: ObjectKey) -> bool`, beside `Conversation::names`
+  (`conversation.rs:632`), which lists the same lines' objects: `owes`
+  and the view ask the one function, so the domain owes no card the
+  conversation builds.
 
 ## Rules that bind it
 
@@ -60,6 +69,9 @@ a task's page arranged with every section together.
 - A card shows once on a page: where a section builds a card by key, it
   skips an object the domain owes, as `sections/task.rs` does for a
   proposal with no source today (`pages/task.rs:257-261` at the base).
+  The conversation's card sites are the exception: they build their
+  cards as today, with no `owes` check, since an object a shown
+  conversation names is never owed (view.md, 4.1).
 - Aim for the session's tests to add at most 0.4 s to the focused
   suite's median (a guide: README, "Test time");
   an arranged client's tree is larger, so only 06.4 builds one in a
@@ -165,23 +177,39 @@ Files: `crates/jig-view/src/pages.rs:164-244` (`retained_outside_plan`
   `sections/task.rs:226-227,254-255,326-327` and its skip of a proposal
   with no source `:310-320`, `sections/project.rs:256-257,264-265`,
   `sections/inbox.rs:241-242,302-303`, `sections/conversations.rs:42-44`;
-  the conversation's card sites, `crates/jig-view/src/turns/call.rs:58-59`
-  and `turns/activity.rs:60-61,76-77` (through `turns::shows_object`,
-  `turns/objects.rs:9`), as the designer's answer to the question of
-  the ready check of jig-06.1 says: 06.3 starts only after that answer's
-  ruling; tests in
-  `crates/jig-view/src/tests/{pages.rs,task_proposals.rs}`.
+  `turns::shows_object`, the whole of `crates/jig-view/src/turns/objects.rs`
+  (64 lines), with its `mod objects;` and `pub(crate) use` at
+  `turns.rs:13,15`, which move to
+  `crates/jig-domain-client/src/conversation.rs` as `Conversation::shows`;
+  its one caller, `sections/task.rs:313`; tests in
+  `crates/jig-view/src/tests/{pages.rs,task_proposals.rs}`. The
+  conversation's card sites, `turns/call.rs:58-59` and
+  `turns/activity.rs:60-61,76-77`, do not change (view.md 4.1: a card a
+  shown conversation holds "stays there … and is never owed").
 Shape: `pub fn owes(&self, id: Id<Object>) -> bool` on `Domain`: the
-  object is shown, its card is `Deciding`, `Leaving` or `Unknown`, and
-  either no source names it, or it is a proposal the shown plan's rows
-  no longer list while `shows(Section::Task { task, section: Plan })`
-  for the shown task (today's `retained_outside_plan`). `after_page`
-  builds a card for each object the domain owes, with no look at the
-  tree. Each card site above builds no card for an object
-  `client.owes(id)`.
+  object is shown; its card is `Deciding`, `Leaving` or `Unknown`; no
+  conversation the page shows names it (`self.conversation().shows(key)`
+  is false, or `shows(Section::Task { task, section: Activity })` is
+  false for the shown task); and either no source names it, or it is a
+  proposal the shown plan's rows no longer list while
+  `shows(Section::Task { task, section: Plan })` for the shown task
+  (today's `retained_outside_plan`). `after_page` builds a card for
+  each object the domain owes, with no look at the tree. Each card site
+  of `sections/` above builds no card for an object `client.owes(id)`.
+  `pub fn shows(&self, key: ObjectKey) -> bool` on `Conversation`: today's
+  `shows_object`, unchanged but for its receiver; `sections/task.rs:313`
+  calls `client.conversation().shows(key)`.
 Test shape: `crates/jig-view/src/tests/task_proposals.rs`:
-  `a_proposal_leaving_the_plan_is_owed_once` (the card appears once,
-  in `jig-owed`); `crates/jig-domain-client/src/tests/pages.rs`:
+  `a_proposal_leaving_the_plan_is_owed_once` (its chat naming nothing:
+  the card appears once, in `jig-owed`), and
+  `a_proposal_its_chat_names_stays_in_the_chat_when_it_leaves_the_plan`
+  (a domain given an arrangement of `Plan` and `Activity`, as 06.1's
+  start beside `tests/cards.rs:165-183` gives one; the proposal's call
+  in a committed turn, `turn(…)` at `:129`; accepted, so `Deciding`,
+  and gone from the plan's rows:
+  `client.owes(id)` is false, `cards(&tree, key)` (`:105`) is 1, and
+  no node's `region` is `JigRegion::Owed.region()`);
+  `crates/jig-domain-client/src/tests/pages.rs`:
   `an_object_no_source_names_is_owed_while_deciding`;
   `crates/jig-view/src/tests/page_capacity.rs`:
   `the_most_owed_cards_fit_the_pages_bound` (at `CLIENT`, as many
@@ -195,10 +223,13 @@ Proof: world, `heavy cargo nextest run -p jig-client-world -p
   source stopped naming it (a proposal accepted in the inbox leaving its
   chat; two tabs deciding one thing) pass, each card seen once by the
   referee.
-Don't: read the tree in `after_page`; change when a card leaves.
-Size: at most 80 lines of production code.
+Don't: read the tree in `after_page`; change when a card leaves; give
+  the conversation's card sites an `owes` check.
+Size: at most 80 lines of production code, besides the 64 lines of
+  `turns/objects.rs` that move.
 Removes: `retained_outside_plan` in `jig-view`; the scan of
-  `b.tree.nodes()` in `after_page`.
+  `b.tree.nodes()` in `after_page`; `crates/jig-view/src/turns/objects.rs`
+  (moved).
 
 ### 06.4 The arranged story
 Scope: client.md, 17 ("a task's page arranged with every section
@@ -222,7 +253,11 @@ Shape: `pub fn arranged(seed: u64) -> (domain::Domain,
   call (`test.rs:115`) with twice its 1,024 nodes, as an arranged task
   page shows six sections at once; the builder's capacity assertion
   fails the story if it is still too small, and the report gives the
-  number that fits. The story's client is
+  number that fits. Once accepted, the proposal's card stays in the
+  conversation, whose call made it, never in `jig-owed` (view.md 4.1;
+  06.3's
+  `a_proposal_its_chat_names_stays_in_the_chat_when_it_leaves_the_plan`
+  checks where): the story's steps do not change. The story's client is
   made with `w.client_with(7, address, test::limits(), test::arranged)`
   (`world.rs:185-193`).
 Test shape: `tests/client/tests/stories.rs`:
@@ -250,7 +285,10 @@ Test shape: `tests/client/tests/stories.rs`:
   (`plan()` is `Target::Role { role: Role::Region, name: Box::from(*b"Plan") }`;
   `arranged_proposal_world` is the world this increment adds to
   `stories.rs`, from `proposal_world`, its task an agent's with a
-  conversation and a proposal in its plan; "Conversation", "Accept" and
+  conversation and a proposal in its plan, made by a call of a committed
+  turn of that conversation, as `proposal_fixture`'s turn already makes
+  it (`stories.rs:480-484`; client.md 17: "while its conversation shows
+  it"); "Conversation", "Accept" and
   "Confirm" are the English phrasebook's, `english.rs:470,1164,1258`.)
   Under 0.5 s.
 Proof: world, `heavy cargo nextest run -p jig-client-world -E
@@ -280,6 +318,13 @@ impl Limits {
 impl Domain {
     /// Whether the page still owes this object's card (view.md, 4.1).
     pub fn owes(&self, id: Id<Object>) -> bool;
+}
+
+// crates/jig-domain-client/src/conversation.rs
+impl Conversation {
+    /// Whether a line of the window or a live call shows this object's card
+    /// (today's `jig_view::turns::shows_object`, moved).
+    pub fn shows(&self, key: ObjectKey) -> bool;
 }
 ```
 
