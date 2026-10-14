@@ -334,6 +334,19 @@ your best judgement").
      - 08.1: `examples/ops/domain-client/src/limits.rs` joins its Files, as at jig 07.3 (2954c546c): `:18-19` `checked_mul(4)` becomes `checked_mul(5)`, and `:59-61` `observability_payload` takes `List::<Section>::worst_case(1)`. `route.rs` changes at `:285-288` only. The lead's plan shows on both incident pages, as the lead's chip does (examples.md 8: "its chip, its report and its proposals as jig's cards, and its plan as jig's plan section, in a section slot"): after `show_incident`'s chip (`observability.rs:87`) and `native_incident`'s (`:430`); the domain's `sections` names a native `Value::Incident`'s lead as `objects` does (`observability/documents.rs:186-190`), its match naming each `Value` variant. The section slot counts at `examples/ops/view/src/limits.rs:40`.
      - Both sketches, so corrected, pass `heavy cargo clippy -p jig-ops-domain-client -p jig-ops-view -p jig-ops-world --all-targets -- -D warnings`, and the three packages' 94 tests pass at the 1,024-node world bound. temper uses none of ops's crates. A further user found of a changed name is listed in the commit body.
 
+117. **jig 08.2 finds and fixes the joint world's missing acknowledgement** (cross-session scope, jig 08's block of 2026-10-14T16:17:55Z).
+     jig 08 finds and fixes the joint world's missing acknowledgement within 08.2, and keeps ruling 116's arrangement in the joint client (`tests/ops/src/joint/fixture.rs`). On main, the fuzzy suite passed in each gate before 08.2 (the last, 09.3's: "109 tests / 15.527 s"); with 08.2's arrangement, `p_acceptance_survives_its_durable_decision_commit` fails at `tests/ops/src/joint/front.rs:855`, where `protocol.check()` runs after `engine.drain()` and before the crash count is read (`:856-861`). So the failure is 08.2's to explain. In order, each once, logged under `logs/jig-08/`:
+     1. Run the failing test alone on the branch, then with the joint fixture's `configure_arrangement` line removed (uncommitted, restored after): the report says whether the arrangement alone triggers it.
+     2. Name the delivery behind `Token(9223372036854775817)`: which watch the shell consumed (`front.rs:933` or `:984`), which root input would have acknowledged it, and whether the engine's crash count changed in the same drain.
+     3. Then, by what step 2 shows:
+        - the acknowledgement is lost in a defect of the front, the session or the ops client: fix it at its cause, with one test at the cause's layer that fails without the fix;
+        - the acknowledgement is lost only because the engine crashed in that drain: a change to what the referee checks across a crash (the check's order, an exemption, a reset at the disconnect) is made only if design text says that the obligation does not hold across a crash, quoted in the report and the commit body; without such text, report it as a question (it goes to the designer), and change nothing;
+        - the cause is in a jig crate under `crates/`: report it before changing it.
+     - The fix counts apart from 08.2's Size: at most 40 lines; past 40, it asks. The commit body names the cause and this ruling, ruling 117.
+     - Never: remove or weaken `protocol.check()`; drop the arrangement from the joint client; change the test's seed, script or name; move it, or raise a ceiling.
+     - Time: about 40 minutes from this answer to the fix or a report; past that, report what steps 1 and 2 found.
+     - Unchanged: 08.2's Shape and Proof; 08.1 waits for 08.2, then its ready check (ruling 116); 08.3 and 10.4 as planned.
+
 ## For the user
 
 Long-term choices the user may veto. Each was decided by the planner

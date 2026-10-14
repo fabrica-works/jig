@@ -125,7 +125,9 @@ Files: `tests/ops/src/client/app.rs:155-166` (`new`:
   `examples/ops/domain-client/src/domain.rs:198-204`
   (`configure_arrangement`, from jig 04.1); `crates/jig-view/src/pages.rs:56`
   (`excess` becomes `pub`, with a one-line doc comment);
-  `examples/ops/view/src/tests.rs`.
+  `examples/ops/view/src/tests.rs`; where ruling 117's investigation
+  finds the joint world's missing acknowledgement,
+  `tests/ops/src/joint/front.rs` or `tests/client/src/joint/{referee,session}.rs`.
 Shape: `jig_ops_view::arrangement()` is `Arrangement { task: [Overview,
   Activity, Plan, History, Budget, Panels], project: [] }`; the client
   constructor gives it to `configure_arrangement`, and `ops`'s
