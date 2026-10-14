@@ -371,6 +371,15 @@ the file.
   stories that count deliveries. Veto, and smith 01 gains a probe (which
   `benchmarks.md` would first have to design).
 
+  **Answered by the user, 2026-10-14: no veto.** smith 01 stays proven
+  by its counting stories and its three `smoke-tools` runs. The user
+  asks that smith's rule say so for the next such case: smith's
+  `docs/development/workflow.md`, 5 ("An improvement ... is proven by its
+  benchmark probe") and `docs/design/benchmarks.md`, 4.2 ("Every
+  improvement names the probe that guards it") to name an improvement
+  whose effect does not depend on a model, proven by a deterministic
+  test that counts what it saves. The designer's to apply.
+
 - **smith's suite here and the reliability run there** (decision 11):
   after smith 04.1 restores smith's 15 s timeout on carbon-forge, the
   reliability run's landings, gated on debian-16gb-hel1-1, can carry the
