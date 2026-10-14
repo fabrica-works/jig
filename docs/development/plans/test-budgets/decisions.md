@@ -230,6 +230,17 @@ the file.
      The generator emits each chunk's cases as a module item and its test
      as one call (`skein/02.s1-golden-items.md`), keeping 1,024 per
      golden table. smith 01.1 and jig 05.1 take it before regenerating.
+111. **skein-02.s2 makes the table items `static`** (step not in the
+     plan; jig 05's block of 2026-10-14T01:10:27Z, cross-session scope).
+     skein-02.s1 emitted `const` items, as its Shape said; ruling 110's
+     "if clippy objects ... emit a `static`" could not fire in skein,
+     whose tables are under 100 cases, and jig's tables of 512 to 1,024
+     cases fail `clippy::large_const_arrays`. Every table item becomes a
+     `static`, borrowed by its test (`skein/02.s1-golden-items.md`,
+     02.s2). jig 05.1 waits for it; smith 01.1 takes it if its own clippy
+     fails the same way. A conditional fallback in a step's Shape is
+     written as the rule instead, when the step's own gate cannot reach
+     the condition.
 
 ## For the user
 
