@@ -238,6 +238,67 @@ your best judgement").
      - 06.3: the Files' lines at main (`pages.rs:164-244`, the card sites in `sections/`), the conversation's card sites `turns/call.rs:58-59` and `turns/activity.rs:60-61,76-77`, and `Limits::of(&CLIENT)` in its test (06.2's callers are `cards_sizes.rs:481,489,492`). Whether a card the shown activity's chat names is owed went to the designer (question.md of this check); 06.3 starts only after the answer's ruling. 06.1 and 06.2 do not rest on it.
      Checked: on origin/main, `sections/task.rs:138`, `sections/project.rs:88` and `:119` each call `crate::pages::work::section(b, words, …, region(…))`; `tests/cards.rs:165-166` are `pub(super) fn start() -> (Domain, Token) {` and `let mut d = Domain::new(&CLIENT, 1);`; `limits.rs:67` is `pub fn of(client: &jig_domain_client::Limits) -> Option<Self> {`; `pages.rs:199` is `pub fn after_page(…)`; `turns/objects.rs:9` is `pub(crate) fn shows_object(state: &Conversation, key: ObjectKey) -> bool {`. The ready check compiled `Domain::owes` and an `after_page` without the scan under clippy; jig-view's 332 tests and the two worlds' 384 passed, none of their stories showing a plan and its chat together.
 
+109. **jig 06.3: a card a shown chat holds is not owed** (design gap, the ready check of jig-06.1, question of 2026-10-14T14:31:25Z).
+     The designer's answer, landed in jig 38c0a1c7 (view.md 4.1) and f90bf452 (jig/06-arranged.md); 06.3 may start once 06.2 has landed, and follows it:
+
+     # Answer
+
+     Answer to question.md's "jig 06.3: an owed card that the shown
+     activity's chat also shows, 2026-10-14T14:31:25Z", from the designer.
+
+
+     Reading 1, the ready check's proposal, holds: the card is not owed.
+     The shown conversation is a section that shows it, so it stays in the
+     chat, once. An owed card is one that has nowhere else to show (view.md
+     4.1: "no section of the page and no card slot of the application's page
+     shows it"). The colon's second case was written for jig's own
+     arrangement, one section per address, where a page showing the plan
+     shows no conversation. `Domain::owes` is false while a conversation the
+     page shows names the object. `turns::shows_object` moves into
+     `jig-domain-client` as `Conversation::shows(key)`, which `owes` and the
+     view both call. The conversation's card sites keep building their cards
+     as they do today, with no `owes` check.
+
+     Why not reading 2: moving the card from the chat to `jig-owed` would
+     take it away from the call that made it, against view.md 9 ("Calls to
+     the engine show as the cards of what they made, live"). It would also
+     leave the chat with no card at that call.
+
+     Checked on jig `main` (f90bf452):
+
+     - `crates/jig-domain-client/src/conversation/routing.rs:94-96`: the
+       conversation's window is already a source of what it names:
+       `let keys = domain.conversation.names(env.limits.objects);` and
+       `let source = Source::Window { generation: domain.generation, number:
+       ACTIVITY_READ };`. `Conversation::names` (`conversation.rs:630`, "Names
+       cards produced by calls and heard results, deduplicated by object
+       key") reads the same lines as `turns::shows_object`
+       (`crates/jig-view/src/turns/objects.rs:9-48`). That function uses
+       only `jig_domain_client` types, so it moves whole.
+     - `crates/jig-view/src/turns/call.rs:57-59` and
+       `turns/activity.rs:59-61,73-77`: the chat builds a card for each object
+       a call, result or decision names that the working set holds, with no
+       check of where else it shows.
+     - `crates/jig-view/src/pages.rs:164`: "A proposal's own watch can still
+       name it after the plan stops listing it". That is why the second case
+       exists: the proposal keeps a source after it leaves the plan's rows.
+     - `crates/jig-view/src/sections/task.rs:310-321`: the activity's
+       proposals beside the log already skip one the conversation shows
+       (`!crate::turns::shows_object(client.conversation(), key)`).
+     - `tests/client/src/stories.rs:480-484`: `proposal_fixture`'s committed
+       turn has a call naming the proposal (`list([ObjectKey::Proposal(p.key)])`),
+       so 06.4's story is this case.
+
+     The design now says so, in `client/domain/view.md`, 4.1, `after_page`:
+     "A card is owed while it is deciding, leaving, or unknown whether made
+     (client.md, sections 5 and 6) and no section of the page and no card
+     slot of the application's page shows it: its object named by none of
+     the page's sources, or a proposal that left the plan's rows while the
+     page shows that plan (client.md, section 5) and no conversation the page
+     shows names it. A card a shown conversation holds, at the call that made
+     its object or a line deciding it (section 9), stays there, on a page
+     that shows the plan beside it too, and is never owed."
+
 ## For the user
 
 Long-term choices the user may veto. Each was decided by the planner
