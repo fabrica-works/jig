@@ -81,6 +81,11 @@ fn tree(root: u64) -> OwnerTree {
         next: Some(Cursor::new(Box::from(UTF8_TEXT), 32).unwrap()),
     }
 }
+fn plan_task() -> Task {
+    let mut doc = super::confirmation::task();
+    doc.context.as_mut().unwrap().impact.tasks.waiting = 1;
+    doc
+}
 fn opened(root: u64) -> (Domain, Token) {
     let mut d = Domain::new(&limits(), 32);
     let f = start(&mut d, List::with_capacity(0));
@@ -94,7 +99,7 @@ fn opened(root: u64) -> (Domain, Token) {
             _ => None,
         })
         .unwrap();
-    let mut doc = super::confirmation::task();
+    let mut doc = plan_task();
     doc.chip.task = root;
     let asks = drive(&mut d, Event::Watch { watch: task, event: WatchEvent::Delivered(Delivery::Task(Box::new(doc))) });
     let tree = asks
@@ -184,10 +189,7 @@ fn owner_tree_departed_same_task_watch_and_clear_are_fenced_and_older_replacemen
         .unwrap();
     let asks = drive(
         &mut d,
-        Event::Watch {
-            watch: task,
-            event: WatchEvent::Delivered(Delivery::Task(Box::new(super::confirmation::task()))),
-        },
+        Event::Watch { watch: task, event: WatchEvent::Delivered(Delivery::Task(Box::new(plan_task()))) },
     );
     let current = asks
         .iter()

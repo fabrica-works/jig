@@ -197,6 +197,7 @@ pub(crate) fn enter(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Que
         Address::Deployment => Section::Deployment,
     };
     domain.sections.push(section).expect("page sections fit their fixed bound");
+    super::shown::arrange(domain);
     domain.changed();
     let owner = Owner::Page { generation: domain.generation };
     for index in 0..domain.sections().len() {

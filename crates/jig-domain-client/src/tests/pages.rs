@@ -628,10 +628,12 @@ fn task_plan_keeps_folded_held_counts_and_filters_without_losing_rows() {
         Event::Went { place: Place::Jig(Address::Task { task: 8, section: TaskSection::Plan }) },
     );
     let watch = open_token(&opened);
+    let mut document = super::confirmation::task();
+    document.context.as_mut().unwrap().impact.tasks.waiting = 1;
     let tree_open = drive(
         &mut domain,
         Time::ZERO,
-        Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(super::confirmation::task()))) },
+        Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(document))) },
     );
     let tree_watch = open_token(&tree_open);
     let mut nodes = List::with_capacity(1);
@@ -2740,4 +2742,107 @@ fn the_inbox_opens_its_watch_once_for_both_groups() {
         }
     }
     assert_eq!(inbox_watches, 1);
+}
+
+#[test]
+fn an_arranged_task_page_lists_every_section_in_order() {
+    let mut domain = Domain::new(&LIMITS, 2);
+    domain
+        .configure_arrangement(arrangement(
+            &[
+                TaskSection::Panels,
+                TaskSection::History,
+                TaskSection::Budget,
+                TaskSection::Plan,
+                TaskSection::Overview,
+                TaskSection::Activity,
+            ],
+            &[],
+        ))
+        .unwrap();
+    let f = start(&mut domain, List::with_capacity(0));
+    delivered(&mut domain, Time::ZERO, f, frame(7));
+    let address = Address::Task { task: 8, section: TaskSection::Plan };
+    drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(address) });
+    assert_eq!(domain.address, address);
+    assert_eq!(
+        domain.sections(),
+        &[
+            Section::Task { task: 8, section: TaskSection::Overview },
+            Section::Task { task: 8, section: TaskSection::Activity },
+            Section::Task { task: 8, section: TaskSection::Plan },
+            Section::Task { task: 8, section: TaskSection::History },
+            Section::Task { task: 8, section: TaskSection::Budget },
+            Section::Task { task: 8, section: TaskSection::Panels },
+        ]
+    );
+}
+#[test]
+fn settings_stand_for_its_five_on_an_arranged_project_page() {
+    let rows: [(&str, ProjectSection, &[ProjectSection]); 2] = [
+        (
+            "address Settings",
+            ProjectSection::Settings,
+            &[
+                ProjectSection::Recurring,
+                ProjectSection::Spend,
+                ProjectSection::Roles,
+                ProjectSection::Policy,
+                ProjectSection::Resources,
+            ],
+        ),
+        ("arranged Settings", ProjectSection::Policy, &[ProjectSection::Settings]),
+    ];
+    for (label, own, sections) in rows {
+        let mut domain = Domain::new(&LIMITS, 2);
+        let mut value = arrangement(&[], sections);
+        value.project.push(ProjectSection::Goals).unwrap();
+        value.project.push(ProjectSection::Overview).unwrap();
+        domain.configure_arrangement(value).unwrap();
+        let f = start(&mut domain, List::with_capacity(0));
+        delivered(&mut domain, Time::ZERO, f, frame(7));
+        let address = Address::Project { project: 1, section: own };
+        drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(address) });
+        assert_eq!(domain.address, address, "{label}");
+        assert_eq!(
+            domain.sections(),
+            &[
+                Section::Project { project: 1, section: ProjectSection::Overview },
+                Section::Project { project: 1, section: ProjectSection::Goals },
+                Section::Project { project: 1, section: ProjectSection::Settings },
+            ],
+            "{label}"
+        );
+    }
+}
+#[test]
+fn an_arranged_task_section_its_document_does_not_offer_is_not_shown() {
+    for section in [TaskSection::Plan, TaskSection::Budget, TaskSection::Panels] {
+        for own in [TaskSection::Overview, section] {
+            let mut domain = Domain::new(&LIMITS, 2);
+            domain.configure_arrangement(arrangement(&[section], &[])).unwrap();
+            let f = start(&mut domain, List::with_capacity(0));
+            delivered(&mut domain, Time::ZERO, f, frame(7));
+            let opened = drive(
+                &mut domain,
+                Time::ZERO,
+                Event::Went { place: Place::Jig(Address::Task { task: 8, section: own }) },
+            );
+            let value = Section::Task { task: 8, section };
+            assert!(domain.shows(value), "{own:?}, {section:?}: loading");
+            let mut document = super::confirmation::task();
+            document.chip.executor = Executor::Party { party: 7 };
+            document.budget.numbers = OwnerNumbers { budget: 0, spent: 0, spent_below: 0, reserved: 0 };
+            drive(
+                &mut domain,
+                Time::ZERO,
+                Event::Watch {
+                    watch: open_token(&opened),
+                    event: WatchEvent::Delivered(Delivery::Task(Box::new(document))),
+                },
+            );
+            assert!(domain.sections().contains(&value), "{own:?}, {section:?}: fixed list");
+            assert!(!domain.shows(value), "{own:?}, {section:?}: document received");
+        }
+    }
 }

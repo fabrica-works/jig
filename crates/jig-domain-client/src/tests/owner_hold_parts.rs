@@ -119,7 +119,10 @@ fn native_hold_account_is_shown_once_by_whole_task_reads_in_every_section_and_le
         let watch = task_watch(&mut domain, section);
         let request = drive(&mut domain, Time::ZERO, Event::Ended { watch, end: WatchEnd::Unknown });
         let token = read(&request, Read::Task { task: 8 });
-        let exact = task(Some(account()));
+        let mut exact = task(Some(account()));
+        let context = exact.context.as_mut().unwrap();
+        context.impact.tasks.waiting = 1;
+        context.parts = list([part()]);
         let shown = drive(
             &mut domain,
             Time::ZERO,
