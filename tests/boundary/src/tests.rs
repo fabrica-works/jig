@@ -18,7 +18,7 @@ pub(super) fn kit_root() -> PathBuf {
 }
 
 fn walk_directory(name: &str, at_root: bool) -> bool {
-    !(name.starts_with('.') || (at_root && name == "target"))
+    !(name.starts_with('.') || name == "golden" || (at_root && name.starts_with("target")))
 }
 
 fn source_files(dir: &Path, at_root: bool, suffixes: &[&str], out: &mut Vec<PathBuf>) {
@@ -200,11 +200,20 @@ fn workspace_fixture_checks_dependencies_without_a_package() {
 
 #[test]
 fn walk_fixture_skips_build_and_hidden_directories() {
-    assert!(!walk_directory("target", true));
-    assert!(!walk_directory(&[".", "g", "it"].concat(), true));
-    assert!(!walk_directory(".config", false));
-    assert!(walk_directory("tests", true));
-    assert!(walk_directory("target", false));
+    for (name, at_root, expected) in [
+        ("target", true, false),
+        (&[".", "g", "it"].concat(), true, false),
+        (".config", false, false),
+        ("tests", true, true),
+        ("target", false, true),
+        ("golden", true, false),
+        ("golden", false, false),
+        ("target-x", true, false),
+        ("target-x", false, true),
+        ("targets", false, true),
+    ] {
+        assert_eq!(walk_directory(name, at_root), expected, "{name}, at_root {at_root}");
+    }
 }
 
 #[test]
