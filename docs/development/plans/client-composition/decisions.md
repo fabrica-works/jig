@@ -431,6 +431,9 @@ your best judgement").
 119. **jig 08.1's Shapes against main** (ready check of jig-08.1).
      jig/08-ops.md, 08.1, against origin/main after 08.2 landed (0f84d8fad), the ready check of jig-08.1 (its Shape otherwise as ruling 116 checked it): 08.2 moved two of 08.1's lines and no other. The slot pass is `examples/ops/view/src/root.rs:108-192` (was `:106-190`: `git show origin/main:examples/ops/view/src/root.rs | grep -n 'for slot in builder.slots'` → `111`), and `jig_cards` is `examples/ops/view/src/limits.rs:50` (was `:40`: `grep -n jig_cards` → `50: let jig_cards = jig_view::card_nodes(&domain.jig)?...`), `compose` now taking `&arrangement()`. 0f84d8fad changes none of 08.1's other Files (`git show --stat 0f84d8fad`: ops view `lib.rs`, `limits.rs`, `root.rs`, `tests.rs`; jig-view `pages.rs`; the joint world's `referee.rs`, `engine.rs`, `fixture.rs`; `tests/ops/src/client/app.rs`).
 
+120. **The downstream scratch worktree is removed for the release** (process, the run's block of 2026-10-14T16:51:48Z).
+     The supervisor removed `wt/temper-downstream`, the detached scratch worktree of temper that `plan downstream` builds against jig's main: its only change was the `Cargo.lock` that the downstream check regenerates each time, and nothing in it is kept. The coordinator runs `plan release` again, once.
+
 ## For the user
 
 Long-term choices the user may veto. Each was decided by the planner
