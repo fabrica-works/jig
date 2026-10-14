@@ -48,7 +48,9 @@ and plays the worlds at the text shell.
   layer); a need outside it is a question, not a lint exception.
 - **A print** is `Print { text: List<u8>, numbers: List<NodeId> }`, made
   once with `Print::new(limits: &jig_view::Limits) -> Option<Print>`
-  from `render::worst_case`, and filled again by each `render`.
+  from `render::worst_case`, and filled again by each `render`. It also
+  keeps, private, the longest name `render` takes: `limits.text_per_node`
+  (view.md 15.1).
 - **Golden files in two places** (decisions.md, 9): the hand-built trees'
   in `crates/jig-shell-text/tests/golden/`, read by the crate's tests;
   jig's pages' in `tests/client/tests/golden/`, read by a test of the
@@ -88,7 +90,15 @@ Files: new `crates/jig-shell-text/` (`Cargo.toml` with `jig-view` and
 Shape: `pub fn render(tree: &Tree, name: &[u8], print: &mut Print)`;
   `pub fn worst_case(limits: &jig_view::Limits) -> Option<(u32, u64)>`
   (lines, bytes); `#[derive(Debug)] pub struct Print { pub text: List<u8>, pub numbers:
-  List<NodeId> }` with `Print::new`. A node is bound when its `binding`
+  List<NodeId> }` with `Print::new`. `name` is at most
+  `limits.text_per_node` bytes (view.md 15.1: the shell's name "is at
+  most a node's text, so the same limits count it"): `worst_case` adds
+  one node's text to the first line for TITLE, counted as it counts any
+  node's text, whether TITLE is the main's heading or `name`;
+  `Print::new` keeps `limits.text_per_node` in a private field of
+  `Print`, and `render` checks `name.len()` against it with `assert!`
+  (`clippy.toml:87`: "assertions stay on in production"); `Terminal::new`
+  refuses a longer name (jig 10.1). A node is bound when its `binding`
   or its `link` is set: `render` reads those fields, not `Tree::bound`,
   which gives nothing for `NodeId(0)` (`crates/jig-view/src/tree.rs:362-368`). TITLE is the text of the main's
   first level-1 heading, or `name`; LINK is the text of the node whose
@@ -214,12 +224,15 @@ Removes: nothing.
 // crates/jig-shell-text/src/render.rs
 /// One print: its text, lines ended by `\n`, and its numbers' nodes, `[1]` first.
 #[derive(Debug)]
-pub struct Print { pub text: List<u8>, pub numbers: List<NodeId> }
+pub struct Print { pub text: List<u8>, pub numbers: List<NodeId>, name_bytes: u32 }
 impl Print {
+    /// `name_bytes` is `limits.text_per_node`: the longest name `render` takes.
     pub fn new(limits: &jig_view::Limits) -> Option<Print>;
 }
+/// `name` is at most the print's `name_bytes` (an `assert!`).
 pub fn render(tree: &Tree, name: &[u8], print: &mut Print);
-/// The most lines and bytes a tree within these limits prints.
+/// The most lines and bytes a tree within these limits prints, TITLE
+/// counted as one node's text more.
 pub fn worst_case(limits: &jig_view::Limits) -> Option<(u32, u64)>;
 
 // crates/jig-shell-text/src/command.rs

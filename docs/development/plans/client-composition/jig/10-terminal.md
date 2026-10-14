@@ -29,8 +29,9 @@ shell's first consumer.
   pipe. The application's host routes the terminal's io completions to
   it, gives it each tree the view builds and the lines the application
   prints of its own, and takes each command from it (15.1).
-- `jig_shell_text::Settings`, given whole: the shell's name, the longest
-  line it reads, its print interval (15.1).
+- `jig_shell_text::Settings`, given whole: the shell's name (at most the
+  bytes the view's limits give a node's text: the terminal refuses a
+  longer one), the longest line it reads, its print interval (15.1).
 - When it prints: the whole page; when the tree changed, at most once
   per print interval, a change within it printed when it ends; at once
   after the person's own command, once the steps that took it have built
@@ -89,8 +90,11 @@ Files: `crates/jig-shell-text/src/terminal.rs`, `src/lib.rs`,
   `crates/jig-shell-text/src/tests/terminal.rs`;
   `tests/boundary/src/tests.rs` (the dependency list of 09.1's test
   gains `skein-io`).
-Shape: as the sketch. `adopt` takes the input and output descriptors
-  with `Io::adopt_read_pipe` and `Io::adopt_write_pipe(fd, None)`
+Shape: as the sketch. `new` returns `None` when `settings.name` is
+  longer than `view.text_per_node` bytes (view.md 15.1, its settings:
+  "the terminal refuses a longer one"), so that no terminal reaches
+  jig 09.1's `assert!` in `render`. `adopt` takes the input and output
+  descriptors with `Io::adopt_read_pipe` and `Io::adopt_write_pipe(fd, None)`
   (skein `crates/skein-io/src/layer.rs:158,167` at jig's pin; no write
   timeout: a print waits on its reader, and the next waits for it,
   view.md 15.2). `iterate`
@@ -117,7 +121,10 @@ Test shape: `crates/jig-shell-text/src/tests/terminal.rs`, a simulated
   `changes_within_the_interval_print_once_when_it_ends`,
   `a_print_waits_for_the_last_to_be_written`,
   `the_applications_line_comes_before_the_next_print`,
-  `the_inputs_end_closes_without_a_new_print`. Each under 0.5 s.
+  `the_inputs_end_closes_without_a_new_print`, and
+  `a_name_longer_than_a_nodes_text_is_refused` (`Terminal::new` with a
+  name of `text_per_node + 1` bytes gives `None`, and with one of
+  `text_per_node` bytes a terminal). Each under 0.5 s.
 Proof: world, on skein's simulated machine: the tests above, once,
   `heavy cargo nextest run -p jig-shell-text`; 10.3 runs it in front of
   the real native client.
@@ -212,7 +219,7 @@ Removes: nothing.
 // crates/jig-shell-text/src/terminal.rs
 /// What the application gives the terminal, whole, with no defaults.
 pub struct Settings {
-    /// The name its own lines start with.
+    /// The name its own lines start with: at most the view's `text_per_node` bytes.
     pub name: Box<[u8]>,
     /// The longest line it reads, in bytes.
     pub longest: u32,
@@ -222,6 +229,7 @@ pub struct Settings {
 /// jig's terminal: lines in, pages out, on its own io, tagged.
 pub struct Terminal { /* io, line buffer, last print, pacing, queues */ }
 impl Terminal {
+    /// None, among its other refusals, for a name longer than `view.text_per_node` bytes.
     pub fn new(settings: Settings, view: &jig_view::Limits) -> Option<Terminal>;
     /// Adopts the input and output pipes; a full io returns the descriptor.
     pub fn adopt(&mut self, input: Fd, output: Fd) -> Result<(), Fd>;
