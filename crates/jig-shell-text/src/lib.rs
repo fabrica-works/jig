@@ -6,5 +6,7 @@ mod command;
 pub use command::{Command, Refusal, command, refusal_line};
 mod render;
 pub use render::{Print, render, worst_case};
+mod terminal;
+pub use terminal::{Settings, Terminal};
 #[cfg(test)]
 mod tests;

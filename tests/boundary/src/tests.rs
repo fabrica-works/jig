@@ -359,5 +359,5 @@ fn the_text_shell_links_only_the_view_and_foundation() {
         .expect("text shell manifest");
     let mut dependencies = shell.dependencies;
     dependencies.sort();
-    assert_eq!(dependencies, ["jig-view", "skein-lib"]);
+    assert_eq!(dependencies, ["jig-view", "skein-io", "skein-lib"]);
 }

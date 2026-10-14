@@ -51,3 +51,5 @@ fn the_first_line_is_the_main_heading_and_the_link() {
     render(&tree, b"ops", &mut print);
     assert_eq!(print.text.as_slice(), b"== Inbox == Connected; Behind\n# Again\n");
 }
+
+mod terminal;

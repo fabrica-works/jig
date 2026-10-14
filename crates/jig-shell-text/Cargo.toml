@@ -9,6 +9,10 @@ publish.workspace = true
 [dependencies]
 jig-view.workspace = true
 skein-lib.workspace = true
+skein-io.workspace = true
+
+[dev-dependencies]
+skein-sim.workspace = true
 
 [lints]
 workspace = true
