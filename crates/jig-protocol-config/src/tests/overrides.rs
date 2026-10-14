@@ -20,14 +20,12 @@ fn an_override_replaces_one_limit_of_the_profile() {
     expected.core.tasks.inbox_messages = 9;
     assert_eq!(parse(br#"{"profile":"small","overrides":{"tasks.inbox_messages":9}}"#), Ok(expected));
 }
-#[test]
 fn an_override_of_an_unknown_name_is_refused() {
     assert_eq!(overrides::apply(&mut small(), b"tasks.absent", 1), Err(What::Override));
 }
 fn an_override_past_its_type_is_refused() {
     assert_eq!(overrides::apply(&mut small(), b"hub.slots", 4_294_967_296), Err(What::Override));
 }
-#[test]
 fn an_override_that_breaks_a_worst_case_is_refused_naming_it() {
     problem(
         br#"{"profile":"small","overrides":{"tasks.tasks":0}}"#,
@@ -74,7 +72,6 @@ fn a_limit_with_a_u64_type_keeps_its_width() {
     assert_eq!(overrides::apply(&mut limits, b"core.fill_mark", u64::MAX), Ok(()));
     assert_eq!(limits.core.fill_mark, u64::MAX);
 }
-#[test]
 fn an_unknown_profile_is_refused_naming_it() {
     problem(br#"{"profile":"other"}"#, &[b"limits", b"profile"], What::Override);
 }
@@ -82,15 +79,12 @@ fn an_unknown_profile_is_refused_naming_it() {
 fn the_standard_profile_can_be_selected() {
     assert_eq!(parse(br#"{"profile":"standard"}"#), Ok(profile(Profile::Standard)));
 }
-#[test]
 fn a_missing_profile_is_refused_naming_it() {
     problem(b"{}", &[b"limits", b"profile"], What::Missing);
 }
-#[test]
 fn an_unknown_limits_member_is_refused_naming_it() {
     problem(br#"{"profile":"small","absent":1}"#, &[b"limits", b"absent"], What::Unknown);
 }
-#[test]
 fn an_override_named_twice_is_refused_naming_it() {
     problem(
         br#"{"profile":"small","overrides":{"hub.slots":2,"hub.slots":3}}"#,
@@ -109,7 +103,6 @@ fn overrides_are_checked_together() {
         Ok(expected)
     );
 }
-#[test]
 fn a_non_integer_override_is_refused_naming_it() {
     problem(
         br#"{"profile":"small","overrides":{"hub.slots":{}}}"#,
@@ -118,7 +111,6 @@ fn a_non_integer_override_is_refused_naming_it() {
     );
 }
 
-#[test]
 fn a_whole_compound_limit_is_refused() {
     assert_eq!(overrides::apply(&mut small(), b"tasks.retries", 1), Err(What::Override));
 }
@@ -128,7 +120,6 @@ fn a_compound_member_override_replaces_only_that_member() {
     expected.core.tasks.retries.transient.retries = 4;
     assert_eq!(parse(br#"{"profile":"small","overrides":{"tasks.retries.transient.retries":4}}"#), Ok(expected));
 }
-#[test]
 fn an_invalid_compound_member_is_refused_naming_it() {
     problem(
         br#"{"profile":"small","overrides":{"documents.versions.minimum":2}}"#,
@@ -321,7 +312,6 @@ const SMALL: &[(&[u8], u64)] = &[
     (b"documents.versions.maximum", 1),
 ];
 
-#[test]
 fn overrides_past_their_types_are_refused() {
     table([
         ("an_override_past_its_type_is_refused", an_override_past_its_type_is_refused),
@@ -341,4 +331,29 @@ fn table<const N: usize>(cases: [Case; N]) {
         }
     }
     assert!(passed, "{failures:?}");
+}
+
+#[test]
+fn override_document_problems_name_the_invalid_fields() {
+    table([
+        (
+            "an_override_that_breaks_a_worst_case_is_refused_naming_it",
+            an_override_that_breaks_a_worst_case_is_refused_naming_it,
+        ),
+        ("an_unknown_profile_is_refused_naming_it", an_unknown_profile_is_refused_naming_it),
+        ("a_missing_profile_is_refused_naming_it", a_missing_profile_is_refused_naming_it),
+        ("an_unknown_limits_member_is_refused_naming_it", an_unknown_limits_member_is_refused_naming_it),
+        ("an_override_named_twice_is_refused_naming_it", an_override_named_twice_is_refused_naming_it),
+        ("a_non_integer_override_is_refused_naming_it", a_non_integer_override_is_refused_naming_it),
+        ("an_invalid_compound_member_is_refused_naming_it", an_invalid_compound_member_is_refused_naming_it),
+    ]);
+}
+
+#[test]
+fn invalid_override_names_and_values_are_refused() {
+    table([
+        ("an_override_of_an_unknown_name_is_refused", an_override_of_an_unknown_name_is_refused),
+        ("a_whole_compound_limit_is_refused", a_whole_compound_limit_is_refused),
+        ("overrides_past_their_types_are_refused", overrides_past_their_types_are_refused),
+    ]);
 }

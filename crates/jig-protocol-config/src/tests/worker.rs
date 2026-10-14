@@ -41,7 +41,6 @@ fn a_stop_bound_past_a_duration_is_refused() {
     let graces = Graces { save: Duration::from_nanos(u64::MAX), ..graces() };
     assert_eq!(stop_bound(&graces, Duration::from_secs(5), Duration::from_secs(15)), None);
 }
-#[test]
 fn a_silence_under_three_pings_is_refused() {
     refuses(
         br#""profile": "small""#,
@@ -59,7 +58,6 @@ fn a_silence_of_exactly_three_pings_is_accepted() {
     );
     assert_eq!(worker(&bytes).unwrap().stop_bound, Duration::from_secs(59));
 }
-#[test]
 fn three_pings_past_a_duration_are_refused() {
     refuses(
         br#""profile": "small""#,
@@ -87,7 +85,6 @@ fn the_agents_configuration_file_is_named_for_startup() {
     assert!(!configuration.private);
     assert_eq!(files.len(), 2);
 }
-#[test]
 fn an_engine_at_a_public_address_is_refused() {
     refuses(
         br#"{"in_process": "workers"}"#,
@@ -116,19 +113,15 @@ fn the_small_worker_document_parses_whole() {
     assert_eq!(worker.agent.arguments.as_ref(), &[Box::from(&b"agent"[..])]);
     assert_eq!(worker.memory, 1_073_741_824);
 }
-#[test]
 fn an_agent_without_a_program_is_refused() {
     refuses(br#""program": "jig-test", "#, b"", fixtures::path(&[b"agent", b"program"]), What::Missing);
 }
-#[test]
 fn a_worker_name_past_the_profiles_bound_is_refused() {
     refuses(b"worker-a", b"012345678901234567890123456789012", fixtures::path(&[b"name"]), What::Bound);
 }
-#[test]
 fn more_slots_than_the_hub_can_host_are_refused() {
     refuses(br#""slots": 2"#, br#""slots": 3"#, fixtures::path(&[b"slots"]), What::Bound);
 }
-#[test]
 fn a_grace_past_a_duration_is_refused() {
     refuses(
         br#""save_ms": 5000"#,
@@ -137,11 +130,9 @@ fn a_grace_past_a_duration_is_refused() {
         What::Bound,
     );
 }
-#[test]
 fn graces_whose_sum_overflows_refuse_the_start() {
     refuses(br#""save_ms": 5000"#, br#""save_ms": 18446744073709"#, fixtures::path(&[b"graces"]), What::StopBound);
 }
-#[test]
 fn a_worker_refuses_an_unknown_grace() {
     refuses(
         br#""save_ms": 5000"#,
@@ -150,7 +141,6 @@ fn a_worker_refuses_an_unknown_grace() {
         What::Unknown,
     );
 }
-#[test]
 fn a_worker_refuses_an_agent_member_named_twice() {
     refuses(
         br#""program": "jig-test""#,
@@ -159,7 +149,6 @@ fn a_worker_refuses_an_agent_member_named_twice() {
         What::Duplicate,
     );
 }
-#[test]
 fn an_argument_that_is_not_text_is_refused_at_its_index() {
     refuses(
         br#"["agent"]"#,
@@ -174,4 +163,35 @@ fn a_worker_refuses_memory_below_its_hubs_worst_case() {
     let problems = worker(&bytes).unwrap_err();
     assert_eq!(problems.problems.get(0).unwrap().path, fixtures::path(&[b"memory_bytes"]));
     assert_eq!(problems.problems.len(), 1);
+}
+
+#[test]
+fn worker_configuration_problems_name_the_invalid_fields() {
+    table([
+        ("a_silence_under_three_pings_is_refused", a_silence_under_three_pings_is_refused),
+        ("three_pings_past_a_duration_are_refused", three_pings_past_a_duration_are_refused),
+        ("an_engine_at_a_public_address_is_refused", an_engine_at_a_public_address_is_refused),
+        ("an_agent_without_a_program_is_refused", an_agent_without_a_program_is_refused),
+        ("a_worker_name_past_the_profiles_bound_is_refused", a_worker_name_past_the_profiles_bound_is_refused),
+        ("more_slots_than_the_hub_can_host_are_refused", more_slots_than_the_hub_can_host_are_refused),
+        ("a_grace_past_a_duration_is_refused", a_grace_past_a_duration_is_refused),
+        ("graces_whose_sum_overflows_refuse_the_start", graces_whose_sum_overflows_refuse_the_start),
+        ("a_worker_refuses_an_unknown_grace", a_worker_refuses_an_unknown_grace),
+        ("a_worker_refuses_an_agent_member_named_twice", a_worker_refuses_an_agent_member_named_twice),
+        ("an_argument_that_is_not_text_is_refused_at_its_index", an_argument_that_is_not_text_is_refused_at_its_index),
+    ]);
+}
+
+type Case = (&'static str, fn());
+
+fn table<const N: usize>(cases: [Case; N]) {
+    let mut failures = [None; N];
+    let mut passed = true;
+    for ((name, case), failure) in cases.into_iter().zip(&mut failures) {
+        if std::panic::catch_unwind(case).is_err() {
+            *failure = Some(name);
+            passed = false;
+        }
+    }
+    assert!(passed, "{failures:?}");
 }

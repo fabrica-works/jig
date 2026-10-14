@@ -6,7 +6,6 @@ fn worker_path(index: u32, name: &[u8]) -> crate::Path {
 fn files() -> Box<[crate::File]> {
     crate::files(&fixtures::engine(fixtures::ENGINE_SMALL).unwrap())
 }
-#[test]
 fn a_workers_listener_on_a_public_address_is_refused() {
     fixtures::refuses(
         br#"{"in_process": "workers"}"#,
@@ -15,11 +14,9 @@ fn a_workers_listener_on_a_public_address_is_refused() {
         What::Plaintext,
     );
 }
-#[test]
 fn a_worker_named_twice_is_refused() {
     fixtures::refuses(br#""name": "worker-b""#, br#""name": "worker-a""#, worker_path(1, b"name"), What::Unique);
 }
-#[test]
 fn an_engine_member_under_hosts_is_refused_as_unknown() {
     fixtures::refuses(
         br#""hosts": {"#,
@@ -53,7 +50,6 @@ fn a_handed_in_file_reads_its_token_and_lapse() {
     assert_eq!(record.lapses, skein_lib::Wall::from_nanos(2_000_000_000));
     assert_eq!(record.account_id.as_deref(), Some(&b"person"[..]));
 }
-#[test]
 fn a_clients_listener_on_a_public_address_is_refused() {
     fixtures::refuses(
         b"127.0.0.1:7100",
@@ -66,4 +62,28 @@ fn a_clients_listener_on_a_public_address_is_refused() {
 fn a_handed_in_file_refuses_an_unknown_member() {
     let problems = handed_in(br#"{"access_token":"secret","expires_at":2,"absent":1}"#).unwrap_err();
     assert_eq!(problems.problems.get(0).unwrap().what, What::Unknown);
+}
+
+#[test]
+fn hosts_configuration_problems_name_the_invalid_fields() {
+    table([
+        ("a_workers_listener_on_a_public_address_is_refused", a_workers_listener_on_a_public_address_is_refused),
+        ("a_worker_named_twice_is_refused", a_worker_named_twice_is_refused),
+        ("an_engine_member_under_hosts_is_refused_as_unknown", an_engine_member_under_hosts_is_refused_as_unknown),
+        ("a_clients_listener_on_a_public_address_is_refused", a_clients_listener_on_a_public_address_is_refused),
+    ]);
+}
+
+type Case = (&'static str, fn());
+
+fn table<const N: usize>(cases: [Case; N]) {
+    let mut failures = [None; N];
+    let mut passed = true;
+    for ((name, case), failure) in cases.into_iter().zip(&mut failures) {
+        if std::panic::catch_unwind(case).is_err() {
+            *failure = Some(name);
+            passed = false;
+        }
+    }
+    assert!(passed, "{failures:?}");
 }

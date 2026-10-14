@@ -103,35 +103,27 @@ fn a_project_numbered_twice_is_refused() {
     let problems = fixtures::engine(&two_projects(b'1')).expect_err("duplicate project");
     assert_eq!(problems.problems.get(0).unwrap().what, What::Unique);
 }
-#[test]
 fn an_owner_naming_an_unknown_provider_is_refused() {
     refuses(br#""provider": 1"#, br#""provider": 3"#, What::Refers);
 }
-#[test]
 fn a_message_bound_below_a_partys_words_is_refused() {
     refuses(br#""profile": "small""#, br#""profile": "small", "overrides": {"people.words": 4097}"#, What::Message);
 }
-#[test]
 fn a_retention_member_is_refused_as_unknown() {
     refuses(br#""directory": "state""#, br#""directory": "state", "retention": {}"#, What::Unknown);
 }
-#[test]
 fn a_projects_resources_member_is_refused_as_unknown() {
     refuses(br#""projects": [{"number": 1"#, br#""projects": [{"number": 1, "resources": []"#, What::Unknown);
 }
-#[test]
 fn a_projects_homes_member_is_refused_as_unknown() {
     refuses(br#""projects": [{"number": 1"#, br#""projects": [{"number": 1, "homes": []"#, What::Unknown);
 }
-#[test]
 fn two_deployment_providers_are_refused() {
     refuses(br#""kind": "link""#, br#""kind": "deployment""#, What::Unique);
 }
-#[test]
 fn a_deployment_provider_is_required() {
     refuses(br#""kind": "deployment""#, br#""kind": "application""#, What::Missing);
 }
-#[test]
 fn a_connector_numbered_as_the_cores_own_is_refused() {
     refuses(br#""connectors": [1]"#, br#""connectors": [65535]"#, What::Bound);
 }
@@ -144,11 +136,9 @@ fn each_owner_owns_every_seeded_project() {
     assert_eq!(engine.owners[0].identity.subject.as_ref(), b"owner-a");
     assert_eq!(engine.owners[1].identity.subject.as_ref(), b"owner-a");
 }
-#[test]
 fn a_permission_naming_an_unknown_role_is_refused() {
     refuses(br#""permission": 1, "role": 1"#, br#""permission": 1, "role": 9"#, What::Refers);
 }
-#[test]
 fn a_project_policy_past_the_deployment_ceiling_is_refused() {
     refuses(
         br#""escalation_role": 1, "period_spend": 100"#,
@@ -165,7 +155,6 @@ fn charter_instruction_files_are_named_with_the_available_policy_bytes() {
     assert_eq!(file.at, fixtures::path(&[b"charters"]).child(crate::Segment::Index(0)).member(b"instructions"));
     assert!(file.max < engine.limits.core.run_bytes);
 }
-#[test]
 fn a_message_bound_below_a_delegate_result_is_refused() {
     refuses(
         br#""profile": "small""#,
@@ -209,11 +198,48 @@ fn a_requirement_reads_its_judge_and_freshness() {
         jig_domain_authority::Guard::Observed { freshness: skein_lib::Duration::from_secs(5) }
     );
 }
-#[test]
 fn an_implication_table_not_transitively_closed_is_refused() {
     refuses(
         br#""implies": []"#,
         br#""implies": [{"connector":1,"kind":1,"implies":2},{"connector":1,"kind":2,"implies":3}]"#,
         What::Bound,
     );
+}
+
+#[test]
+fn domain_configuration_problems_name_the_invalid_fields() {
+    table([
+        ("an_owner_naming_an_unknown_provider_is_refused", an_owner_naming_an_unknown_provider_is_refused),
+        ("a_message_bound_below_a_partys_words_is_refused", a_message_bound_below_a_partys_words_is_refused),
+        ("a_retention_member_is_refused_as_unknown", a_retention_member_is_refused_as_unknown),
+        ("a_projects_resources_member_is_refused_as_unknown", a_projects_resources_member_is_refused_as_unknown),
+        ("a_projects_homes_member_is_refused_as_unknown", a_projects_homes_member_is_refused_as_unknown),
+        ("two_deployment_providers_are_refused", two_deployment_providers_are_refused),
+        ("a_deployment_provider_is_required", a_deployment_provider_is_required),
+        ("a_connector_numbered_as_the_cores_own_is_refused", a_connector_numbered_as_the_cores_own_is_refused),
+        ("a_permission_naming_an_unknown_role_is_refused", a_permission_naming_an_unknown_role_is_refused),
+        (
+            "a_project_policy_past_the_deployment_ceiling_is_refused",
+            a_project_policy_past_the_deployment_ceiling_is_refused,
+        ),
+        ("a_message_bound_below_a_delegate_result_is_refused", a_message_bound_below_a_delegate_result_is_refused),
+        (
+            "an_implication_table_not_transitively_closed_is_refused",
+            an_implication_table_not_transitively_closed_is_refused,
+        ),
+    ]);
+}
+
+type Case = (&'static str, fn());
+
+fn table<const N: usize>(cases: [Case; N]) {
+    let mut failures = [None; N];
+    let mut passed = true;
+    for ((name, case), failure) in cases.into_iter().zip(&mut failures) {
+        if std::panic::catch_unwind(case).is_err() {
+            *failure = Some(name);
+            passed = false;
+        }
+    }
+    assert!(passed, "{failures:?}");
 }

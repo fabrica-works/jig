@@ -1,7 +1,6 @@
 use super::fixtures;
 use crate::translate;
 use jig_protocol_client_wire::v7 as w;
-#[test]
 fn a_frame_with_two_projects_becomes_its_record() {
     let limits = fixtures::wire_limits();
     assert_eq!(
@@ -9,7 +8,6 @@ fn a_frame_with_two_projects_becomes_its_record() {
         Ok(jig_test_client_records::frame_two_projects_record())
     );
 }
-#[test]
 fn a_task_with_a_hold_becomes_its_record() {
     let limits = fixtures::wire_limits();
     assert_eq!(
@@ -17,7 +15,6 @@ fn a_task_with_a_hold_becomes_its_record() {
         Ok(jig_test_client_records::task_with_hold_record())
     );
 }
-#[test]
 fn a_chip_in_each_phase_becomes_its_record() {
     let limits = fixtures::wire_limits();
     let phases = fixtures::phases();
@@ -58,18 +55,15 @@ fn a_non_utf8_document_text_fails_translation() {
     }
 }
 
-#[test]
 fn a_run_writing_with_a_call_becomes_its_run_state() {
     let limits = fixtures::wire_limits();
     let source = fixtures::run_writing();
     assert_eq!(translate::live::run(&source, &limits), Ok(jig_test_client_records::run_writing_record()));
 }
-#[test]
 fn a_run_text_keeps_its_turn_retry_and_offsets() {
     let limits = fixtures::wire_limits();
     assert_eq!(translate::live::writing(&fixtures::writing(), &limits), Ok(jig_test_client_records::writing_record()));
 }
-#[test]
 fn an_inbox_with_both_groups_becomes_its_record() {
     let limits = fixtures::wire_limits();
     assert_eq!(
@@ -77,7 +71,6 @@ fn an_inbox_with_both_groups_becomes_its_record() {
         Ok(jig_test_client_records::inbox_both_groups_record())
     );
 }
-#[test]
 fn a_deployment_document_becomes_its_record() {
     let limits = fixtures::wire_limits();
     assert_eq!(
@@ -85,7 +78,6 @@ fn a_deployment_document_becomes_its_record() {
         Ok(jig_test_client_records::deployment_rows_record())
     );
 }
-#[test]
 fn conversations_keep_their_rows_more_and_opaque_cursor() {
     let limits = fixtures::wire_limits();
     assert_eq!(
@@ -97,7 +89,6 @@ fn conversations_keep_their_rows_more_and_opaque_cursor() {
         Ok(jig_test_client_records::conversations_rows_record())
     );
 }
-#[test]
 fn goals_keep_all_ten_phase_counts_and_budget() {
     let limits = fixtures::wire_limits();
     assert_eq!(
@@ -105,7 +96,6 @@ fn goals_keep_all_ten_phase_counts_and_budget() {
         Ok(jig_test_client_records::goals_rows_record())
     );
 }
-#[test]
 fn tasks_keep_the_filter_requester_goal_and_changed_wall() {
     let limits = fixtures::wire_limits();
     assert_eq!(
@@ -113,7 +103,6 @@ fn tasks_keep_the_filter_requester_goal_and_changed_wall() {
         Ok(jig_test_client_records::tasks_rows_record())
     );
 }
-#[test]
 fn a_tree_keeps_its_rows_folds_dependencies_and_opaque_cursor() {
     let limits = fixtures::wire_limits();
     assert_eq!(
@@ -140,4 +129,41 @@ fn live_nested_pieces_past_the_wire_bounds_are_refused_naming_them() {
             "{label}"
         );
     }
+}
+
+#[test]
+fn documents_become_their_literal_records() {
+    table([
+        ("a_frame_with_two_projects_becomes_its_record", a_frame_with_two_projects_becomes_its_record),
+        ("a_task_with_a_hold_becomes_its_record", a_task_with_a_hold_becomes_its_record),
+        ("a_chip_in_each_phase_becomes_its_record", a_chip_in_each_phase_becomes_its_record),
+        ("a_run_writing_with_a_call_becomes_its_run_state", a_run_writing_with_a_call_becomes_its_run_state),
+        ("a_run_text_keeps_its_turn_retry_and_offsets", a_run_text_keeps_its_turn_retry_and_offsets),
+        ("an_inbox_with_both_groups_becomes_its_record", an_inbox_with_both_groups_becomes_its_record),
+        ("a_deployment_document_becomes_its_record", a_deployment_document_becomes_its_record),
+        ("conversations_keep_their_rows_more_and_opaque_cursor", conversations_keep_their_rows_more_and_opaque_cursor),
+        ("goals_keep_all_ten_phase_counts_and_budget", goals_keep_all_ten_phase_counts_and_budget),
+        (
+            "tasks_keep_the_filter_requester_goal_and_changed_wall",
+            tasks_keep_the_filter_requester_goal_and_changed_wall,
+        ),
+        (
+            "a_tree_keeps_its_rows_folds_dependencies_and_opaque_cursor",
+            a_tree_keeps_its_rows_folds_dependencies_and_opaque_cursor,
+        ),
+    ]);
+}
+
+type Case = (&'static str, fn());
+
+fn table<const N: usize>(cases: [Case; N]) {
+    let mut failures = [None; N];
+    let mut passed = true;
+    for ((name, case), failure) in cases.into_iter().zip(&mut failures) {
+        if std::panic::catch_unwind(case).is_err() {
+            *failure = Some(name);
+            passed = false;
+        }
+    }
+    assert!(passed, "{failures:?}");
 }

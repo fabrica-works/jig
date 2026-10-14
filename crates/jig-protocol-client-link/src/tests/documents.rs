@@ -20,17 +20,14 @@ fn a_chip_in_each_phase_becomes_the_contract_s_chip() {
     }
 }
 
-#[test]
 fn a_task_keeps_every_supplied_field() {
     assert_eq!(documents::task(fixtures::task_record(), &fixtures::limits()), Ok(fixtures::task()));
 }
 
-#[test]
 fn a_tree_keeps_every_supplied_field() {
     assert_eq!(documents::tree(fixtures::tree_record(), &fixtures::limits()), Ok(fixtures::tree()));
 }
 
-#[test]
 fn a_conversations_keeps_every_supplied_field() {
     assert_eq!(
         documents::conversations(fixtures::conversations_record(), &fixtures::limits()),
@@ -38,27 +35,22 @@ fn a_conversations_keeps_every_supplied_field() {
     );
 }
 
-#[test]
 fn a_inbox_keeps_every_supplied_field() {
     assert_eq!(documents::inbox(fixtures::inbox_record(), &fixtures::limits()), Ok(fixtures::inbox()));
 }
 
-#[test]
 fn a_goals_keeps_every_supplied_field() {
     assert_eq!(documents::goals(fixtures::goals_record(), &fixtures::limits()), Ok(fixtures::goals()));
 }
 
-#[test]
 fn a_tasks_keeps_every_supplied_field() {
     assert_eq!(documents::tasks(fixtures::tasks_record(), &fixtures::limits()), Ok(fixtures::tasks()));
 }
 
-#[test]
 fn a_deployment_keeps_every_supplied_field() {
     assert_eq!(documents::deployment(fixtures::deployment_record(), &fixtures::limits()), Ok(fixtures::deployment()));
 }
 
-#[test]
 fn a_owner_deployment_keeps_every_supplied_field() {
     assert_eq!(
         documents::owner_deployment(fixtures::owner_deployment_record(), &fixtures::limits()),
@@ -66,7 +58,6 @@ fn a_owner_deployment_keeps_every_supplied_field() {
     );
 }
 
-#[test]
 fn a_owner_project_keeps_every_supplied_field() {
     assert_eq!(
         documents::owner_project(fixtures::owner_project_record(), &fixtures::limits()),
@@ -74,12 +65,10 @@ fn a_owner_project_keeps_every_supplied_field() {
     );
 }
 
-#[test]
 fn a_run_state_keeps_every_supplied_field() {
     assert_eq!(live::run_state(fixtures::run_state_record(), &fixtures::limits()), Ok(fixtures::run_state()));
 }
 
-#[test]
 fn a_current_call_keeps_every_supplied_field() {
     assert_eq!(live::current_call(fixtures::current_call_record(), &fixtures::limits()), Ok(fixtures::current_call()));
 }
@@ -181,4 +170,21 @@ fn table<const N: usize>(cases: [Case; N]) {
         }
     }
     assert!(passed, "{failures:?}");
+}
+
+#[test]
+fn documents_keep_every_supplied_field() {
+    table([
+        ("a_task_keeps_every_supplied_field", a_task_keeps_every_supplied_field),
+        ("a_tree_keeps_every_supplied_field", a_tree_keeps_every_supplied_field),
+        ("a_conversations_keeps_every_supplied_field", a_conversations_keeps_every_supplied_field),
+        ("a_inbox_keeps_every_supplied_field", a_inbox_keeps_every_supplied_field),
+        ("a_goals_keeps_every_supplied_field", a_goals_keeps_every_supplied_field),
+        ("a_tasks_keeps_every_supplied_field", a_tasks_keeps_every_supplied_field),
+        ("a_deployment_keeps_every_supplied_field", a_deployment_keeps_every_supplied_field),
+        ("a_owner_deployment_keeps_every_supplied_field", a_owner_deployment_keeps_every_supplied_field),
+        ("a_owner_project_keeps_every_supplied_field", a_owner_project_keeps_every_supplied_field),
+        ("a_run_state_keeps_every_supplied_field", a_run_state_keeps_every_supplied_field),
+        ("a_current_call_keeps_every_supplied_field", a_current_call_keeps_every_supplied_field),
+    ]);
 }

@@ -1,139 +1,119 @@
 use super::*;
 
-#[test]
 fn a_history_page_record_becomes_its_literal_contract_value() {
     assert_eq!(
         translate::pages::history_page(fixtures::read_wire_history_page(), &fixtures::limits()),
         Ok(fixtures::read_value_history_page())
     );
 }
-#[test]
 fn a_inbox_page_record_becomes_its_literal_contract_value() {
     assert_eq!(
         translate::pages::inbox_page(fixtures::read_wire_inbox_page(), &fixtures::limits()),
         Ok(fixtures::read_value_inbox_page())
     );
 }
-#[test]
 fn a_conversation_page_record_becomes_its_literal_contract_value() {
     assert_eq!(
         translate::pages::conversation_page(fixtures::read_wire_conversation_page(), &fixtures::limits()),
         Ok(fixtures::read_value_conversation_page())
     );
 }
-#[test]
 fn a_goal_page_record_becomes_its_literal_contract_value() {
     assert_eq!(
         translate::pages::goal_page(fixtures::read_wire_goal_page(), &fixtures::limits()),
         Ok(fixtures::read_value_goal_page())
     );
 }
-#[test]
 fn a_spend_page_record_becomes_its_literal_contract_value() {
     assert_eq!(
         translate::pages::spend_page(fixtures::read_wire_spend_page(), &fixtures::limits()),
         Ok(fixtures::read_value_spend_page())
     );
 }
-#[test]
 fn a_note_page_record_becomes_its_literal_contract_value() {
     assert_eq!(
         translate::pages::note_page(fixtures::read_wire_note_page(), &fixtures::limits()),
         Ok(fixtures::read_value_note_page())
     );
 }
-#[test]
 fn a_object_page_record_becomes_its_literal_contract_value() {
     assert_eq!(
         translate::pages::object_page(fixtures::read_wire_object_page(), &fixtures::limits()),
         Ok(fixtures::read_value_object_page())
     );
 }
-#[test]
 fn a_owner_ended_page_record_becomes_its_literal_contract_value() {
     assert_eq!(
         translate::pages::owner_ended_page(fixtures::read_wire_owner_ended_page(), &fixtures::limits()),
         Ok(fixtures::read_value_owner_ended_page())
     );
 }
-#[test]
 fn a_owner_inbox_page_record_becomes_its_literal_contract_value() {
     assert_eq!(
         translate::pages::owner_inbox_page(fixtures::read_wire_owner_inbox_page(), &fixtures::limits()),
         Ok(fixtures::read_value_owner_inbox_page())
     );
 }
-#[test]
 fn a_owner_spend_page_record_becomes_its_literal_contract_value() {
     assert_eq!(
         translate::pages::owner_spend_page(fixtures::read_wire_owner_spend_page(), &fixtures::limits()),
         Ok(fixtures::read_value_owner_spend_page())
     );
 }
-#[test]
 fn a_proposal_record_becomes_its_literal_contract_value() {
     assert_eq!(
         translate::objects::proposal(fixtures::read_wire_proposal(), &fixtures::limits()),
         Ok(fixtures::read_value_proposal())
     );
 }
-#[test]
 fn a_owner_proposal_record_becomes_its_literal_contract_value() {
     assert_eq!(
         translate::objects::owner_proposal(fixtures::read_wire_owner_proposal(), &fixtures::limits()),
         Ok(fixtures::read_value_owner_proposal())
     );
 }
-#[test]
 fn a_escalation_record_becomes_its_literal_contract_value() {
     assert_eq!(
         translate::objects::escalation(fixtures::read_wire_escalation(), &fixtures::limits()),
         Ok(fixtures::read_value_escalation())
     );
 }
-#[test]
 fn a_owner_escalation_record_becomes_its_literal_contract_value() {
     assert_eq!(
         translate::objects::owner_escalation(fixtures::read_wire_owner_escalation(), &fixtures::limits()),
         Ok(fixtures::read_value_owner_escalation())
     );
 }
-#[test]
 fn a_question_record_becomes_its_literal_contract_value() {
     assert_eq!(
         translate::objects::question(fixtures::read_wire_question(), &fixtures::limits()),
         Ok(fixtures::read_value_question())
     );
 }
-#[test]
 fn a_person_task_record_becomes_its_literal_contract_value() {
     assert_eq!(
         translate::objects::person_task(fixtures::read_wire_person_task(), &fixtures::limits()),
         Ok(fixtures::read_value_person_task())
     );
 }
-#[test]
 fn a_owner_person_task_record_becomes_its_literal_contract_value() {
     assert_eq!(
         translate::objects::owner_person_task(fixtures::read_wire_owner_person_task(), &fixtures::limits()),
         Ok(fixtures::read_value_owner_person_task())
     );
 }
-#[test]
 fn a_result_record_becomes_its_literal_contract_value() {
     assert_eq!(
         translate::objects::result(fixtures::read_wire_result(), &fixtures::limits()),
         Ok(fixtures::read_value_result())
     );
 }
-#[test]
 fn a_project_record_becomes_its_literal_contract_value() {
     assert_eq!(
         translate::objects::project(fixtures::read_wire_project(), &fixtures::limits()),
         Ok(fixtures::read_value_project())
     );
 }
-#[test]
 fn a_owner_historical_record_becomes_its_literal_contract_value() {
     assert_eq!(
         translate::objects::owner_historical(fixtures::read_wire_owner_historical(), &fixtures::limits()),
@@ -209,7 +189,6 @@ fn a_single_read_one_text_byte_past_the_limit_is_refused() {
     );
 }
 
-#[test]
 fn a_activity_page_record_becomes_its_literal_contract_value() {
     assert_eq!(
         translate::pages::activity_page(fixtures::read_wire_activity_page(), &fixtures::limits()),
@@ -261,4 +240,96 @@ fn an_owner_turn_without_carried_bytes_crosses_up_with_its_problem() {
     for (name, record, expected) in fixtures::owner_turn_pages() {
         assert_eq!(translate::pages::activity_page(record, &limits), Ok(expected), "{name}");
     }
+}
+
+#[test]
+fn page_and_object_records_become_their_literal_contract_values() {
+    table([
+        (
+            "a_history_page_record_becomes_its_literal_contract_value",
+            a_history_page_record_becomes_its_literal_contract_value,
+        ),
+        (
+            "a_inbox_page_record_becomes_its_literal_contract_value",
+            a_inbox_page_record_becomes_its_literal_contract_value,
+        ),
+        (
+            "a_conversation_page_record_becomes_its_literal_contract_value",
+            a_conversation_page_record_becomes_its_literal_contract_value,
+        ),
+        (
+            "a_goal_page_record_becomes_its_literal_contract_value",
+            a_goal_page_record_becomes_its_literal_contract_value,
+        ),
+        (
+            "a_spend_page_record_becomes_its_literal_contract_value",
+            a_spend_page_record_becomes_its_literal_contract_value,
+        ),
+        (
+            "a_note_page_record_becomes_its_literal_contract_value",
+            a_note_page_record_becomes_its_literal_contract_value,
+        ),
+        (
+            "a_object_page_record_becomes_its_literal_contract_value",
+            a_object_page_record_becomes_its_literal_contract_value,
+        ),
+        (
+            "a_owner_ended_page_record_becomes_its_literal_contract_value",
+            a_owner_ended_page_record_becomes_its_literal_contract_value,
+        ),
+        (
+            "a_owner_inbox_page_record_becomes_its_literal_contract_value",
+            a_owner_inbox_page_record_becomes_its_literal_contract_value,
+        ),
+        (
+            "a_owner_spend_page_record_becomes_its_literal_contract_value",
+            a_owner_spend_page_record_becomes_its_literal_contract_value,
+        ),
+        ("a_proposal_record_becomes_its_literal_contract_value", a_proposal_record_becomes_its_literal_contract_value),
+        (
+            "a_owner_proposal_record_becomes_its_literal_contract_value",
+            a_owner_proposal_record_becomes_its_literal_contract_value,
+        ),
+        (
+            "a_escalation_record_becomes_its_literal_contract_value",
+            a_escalation_record_becomes_its_literal_contract_value,
+        ),
+        (
+            "a_owner_escalation_record_becomes_its_literal_contract_value",
+            a_owner_escalation_record_becomes_its_literal_contract_value,
+        ),
+        ("a_question_record_becomes_its_literal_contract_value", a_question_record_becomes_its_literal_contract_value),
+        (
+            "a_person_task_record_becomes_its_literal_contract_value",
+            a_person_task_record_becomes_its_literal_contract_value,
+        ),
+        (
+            "a_owner_person_task_record_becomes_its_literal_contract_value",
+            a_owner_person_task_record_becomes_its_literal_contract_value,
+        ),
+        ("a_result_record_becomes_its_literal_contract_value", a_result_record_becomes_its_literal_contract_value),
+        ("a_project_record_becomes_its_literal_contract_value", a_project_record_becomes_its_literal_contract_value),
+        (
+            "a_owner_historical_record_becomes_its_literal_contract_value",
+            a_owner_historical_record_becomes_its_literal_contract_value,
+        ),
+        (
+            "a_activity_page_record_becomes_its_literal_contract_value",
+            a_activity_page_record_becomes_its_literal_contract_value,
+        ),
+    ]);
+}
+
+type Case = (&'static str, fn());
+
+fn table<const N: usize>(cases: [Case; N]) {
+    let mut failures = [None; N];
+    let mut passed = true;
+    for ((name, case), failure) in cases.into_iter().zip(&mut failures) {
+        if std::panic::catch_unwind(case).is_err() {
+            *failure = Some(name);
+            passed = false;
+        }
+    }
+    assert!(passed, "{failures:?}");
 }

@@ -21,18 +21,15 @@ fn named_file<'a>(files: &'a [crate::File], name: &[u8]) -> &'a crate::File {
     }
     panic!("expected configured file {name:?}")
 }
-#[test]
 fn a_model_naming_an_unknown_endpoint_is_refused() {
     fixtures::refuses(br#""endpoint": "fake""#, br#""endpoint": "nowhere""#, model_path(b"endpoint"), What::Refers);
 }
-#[test]
 fn an_endpoint_naming_an_unknown_account_is_refused() {
     fixtures::refuses(br#""account": 1"#, br#""account": 2"#, endpoint_path(b"account"), What::Refers);
 }
-#[test]
 fn two_endpoints_with_one_name_are_refused() {
     let endpoint = br#"{"name":"fake","number":2,"dialect":0,"account":1,"provider":"fake","address":{"socket":"127.0.0.1:7102"},"transport":"plaintext","headers":[],"connect_ms":10000,"handshake_ms":10000}"#;
-    let mut writer = skein_lib::Writer::new(endpoint.len() + 4);
+    let mut writer = skein_lib::Writer::new(endpoint.len().checked_add(4).expect("small endpoint fixture"));
     writer.put(b"},").unwrap();
     writer.put(endpoint).unwrap();
     writer.put(b"],").unwrap();
@@ -44,7 +41,6 @@ fn two_endpoints_with_one_name_are_refused() {
         What::Unique,
     );
 }
-#[test]
 fn plaintext_to_a_public_address_is_refused() {
     fixtures::refuses(b"127.0.0.1:7101", b"192.0.2.1:7101", endpoint_path(b"address"), What::Plaintext);
 }
@@ -88,7 +84,6 @@ fn a_sign_in_account_names_its_private_client_secret() {
     let files = files(&signed_engine(SIGN_IN));
     assert!(named_file(&files, b"secrets/client").private);
 }
-#[test]
 fn a_sign_in_plaintext_refusal_names_its_endpoint() {
     let source = fixtures::with(SIGN_IN, b"127.0.0.1:7102", b"192.0.2.1:7102");
     fixtures::refuses(
@@ -112,7 +107,6 @@ fn a_tls_endpoint_names_its_trust_file() {
     let files = files(&fixtures::engine(&bytes).unwrap());
     assert!(!named_file(&files, b"certs/trust.der").private);
 }
-#[test]
 fn an_in_process_llm_endpoint_is_refused() {
     fixtures::refuses(
         br#"{"socket": "127.0.0.1:7101"}"#,
@@ -131,4 +125,30 @@ fn endpoint_headers_are_retained() {
     let engine = fixtures::engine(&bytes).unwrap();
     let header = engine.llm.endpoints.first().unwrap().headers.first().unwrap();
     assert_eq!((header.name.as_ref(), header.value.as_ref()), (&b"x-client"[..], &b"test"[..]));
+}
+
+#[test]
+fn llm_configuration_problems_name_the_invalid_fields() {
+    table([
+        ("a_model_naming_an_unknown_endpoint_is_refused", a_model_naming_an_unknown_endpoint_is_refused),
+        ("an_endpoint_naming_an_unknown_account_is_refused", an_endpoint_naming_an_unknown_account_is_refused),
+        ("two_endpoints_with_one_name_are_refused", two_endpoints_with_one_name_are_refused),
+        ("plaintext_to_a_public_address_is_refused", plaintext_to_a_public_address_is_refused),
+        ("a_sign_in_plaintext_refusal_names_its_endpoint", a_sign_in_plaintext_refusal_names_its_endpoint),
+        ("an_in_process_llm_endpoint_is_refused", an_in_process_llm_endpoint_is_refused),
+    ]);
+}
+
+type Case = (&'static str, fn());
+
+fn table<const N: usize>(cases: [Case; N]) {
+    let mut failures = [None; N];
+    let mut passed = true;
+    for ((name, case), failure) in cases.into_iter().zip(&mut failures) {
+        if std::panic::catch_unwind(case).is_err() {
+            *failure = Some(name);
+            passed = false;
+        }
+    }
+    assert!(passed, "{failures:?}");
 }
