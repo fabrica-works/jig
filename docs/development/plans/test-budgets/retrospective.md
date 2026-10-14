@@ -780,26 +780,32 @@ rulings later reversed came from turns that thought as much as those
 that held. The user adopted the review's suggestions, and the designer
 applied them in skein `479f836`: development.md, its two cards
 (`implementer.md`, `supervisor.md`), the kit and the workspace's
-`AGENTS.md`. They cover the proposals below that read "adopted". The
-others were not part of that review, and stay open: `plan check` refuses
-the next plan until each is decided here.
+`AGENTS.md`. They covered the proposals below that read "adopted" in
+skein 479f836. Later that day the user delegated the others, keeping
+only what has long-term consequences that would be hard to change, which
+none has, and the designer decided them as the rows say. Their kit
+changes wait until after smith's parity run, as smith abe6ec2e decided
+for the reliability run's: no change to the kit right before an
+unattended run. They are implemented and tested on skein's branch
+`kit-after-parity`, for the designer to rebase once that run's
+retrospective has landed.
 
 | Proposal | Decision | Where |
 |---|---|---|
 | 1 | adopted | development.md, 6 and 15.1; `plan check` reads this section |
 | 2 | adopted | development.md, 5.4 (the planner's search); supervisor.md, 3 (rulings) and 5 (the ready check of each session file against `main`, jig-protocol's proposal 2) |
-| 3 | open | |
-| 4 | open | `land` now builds and lints in the build lane before the gate (development.md, 9.1), which shortens each gate but does not lock |
+| 3 | adopted | development.md, 5.5: generated code proves itself downstream, by a command the planner writes and runs at the plan's base (skein 63fff2d) |
+| 4 | adopted; applied after smith's parity run | `land` holds its repository's turn on the machine from rebase to push: skein's branch `kit-after-parity` |
 | 5 | adopted | `heavy --gate` refuses a tree with changes; `land`'s build-lane pass; implementer.md, 8.3 |
 | 6 | adopted | implementer.md, 8.1 and 8.3; development.md, 7.2's prompts; the workspace `AGENTS.md` names each repository's code-graph project, and overrides each machine's `~/.codex/AGENTS.md`, which is not the kit's |
-| 7 | open | implementer.md, 8.4 says the trailers' shape; `land` does not check it |
-| 8 | open | |
-| 9 | open | Its first half is applied: implementers log their reports with `plan log`, and the coordinator types them nowhere (development.md, 7.3 and 10.2; implementer.md, 8.6). Its second, the coordinator's handover at about 250K, waits for the user |
+| 7 | adopted; applied after smith's parity run | implementer.md, 8.4 says the trailers' shape (skein 479f836); `land`'s refusal of a `Plan:`, `Step:` or `Proof:` line git does not read: skein's branch `kit-after-parity` |
+| 8 | adopted | development.md, 7.3, step 2 (skein 7f4b0e8, the reliability run's proposal 15) |
+| 9 | adopted in part: implementers log their reports with `plan log`, and the coordinator types them nowhere. The coordinator's handover is rejected: its sessions are its thread's sub-agents, which another thread can neither message nor wait on, so a handover would restart every running session; with reports no longer typed again its context grows about half as fast, and Codex's compaction bounds it | development.md, 7.3 and 10.2; implementer.md, 8.6 (skein 479f836) |
 | 10 | adopted | supervisor.md, 7; development.md, 2.5 and 10.5; `plan watch` prints the supervisor's context, and `plan handover supervisor` starts its successor |
 | 11 | adopted | development.md, 15.2: the planner's session by its `Planner-Session:` trailer, escalations once each, Proof layers against `### NN.M`, suites by repository, `land`'s gates apart; and each Claude Code message once across sessions, with `cost_claude` at list prices |
-| 12 | open | |
-| 13 | open | |
-| 14 | adopted by the user with decision 9, 2026-10-14 | not applied yet: smith's `workflow.md`, 5, and `benchmarks.md`, 4.2, for the designer |
+| 12 | adopted | development.md, 10.4; supervisor.md, 4 (skein 63fff2d) |
+| 13 | adopted | development.md, 5.4 (skein 63fff2d) |
+| 14 | adopted by the user with decision 9, 2026-10-14 | smith's `workflow.md`, 5, and `benchmarks.md`, 4.2 (smith b7da2b25) |
 
 **The same adoption, beyond these proposals:**
 - the supervisor's card, and its hourly check run by a sub-agent
