@@ -74,6 +74,31 @@ pub fn tabs(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigB
     b.close();
     true
 }
+pub(crate) fn all_shown(client: &Domain) -> bool {
+    let Some(project) = client.shown_project() else {
+        return false;
+    };
+    for section in [ProjectSection::Overview, ProjectSection::Goals, ProjectSection::Tasks, ProjectSection::Notes] {
+        if !client.shows(jig_domain_client::pages::Section::Project { project, section }) {
+            return false;
+        }
+    }
+    if client.shows(jig_domain_client::pages::Section::Project { project, section: ProjectSection::Settings }) {
+        return true;
+    }
+    for section in [
+        ProjectSection::Resources,
+        ProjectSection::Policy,
+        ProjectSection::Roles,
+        ProjectSection::Spend,
+        ProjectSection::Recurring,
+    ] {
+        if !client.shows(jig_domain_client::pages::Section::Project { project, section }) {
+            return false;
+        }
+    }
+    true
+}
 pub(crate) fn section(
     b: &mut Builder,
     client: &Domain,
@@ -86,6 +111,7 @@ pub(crate) fn section(
         return false;
     }
     crate::pages::work::section(b, words, phrase(selected), region(selected));
+    crate::pages::mark_current(b, client, Address::Project { project, section: selected });
     if let Some(doc) = &client.project_page().owner {
         owner::section(b, doc, selected, client, words, bindings);
         b.close();
@@ -117,6 +143,7 @@ pub(crate) fn section(
                 ProjectSection::Recurring,
             ] {
                 crate::pages::work::section(b, words, phrase(section), region(section));
+                crate::pages::mark_current(b, client, Address::Project { project, section });
                 settings(b, client, doc, section, words, bindings);
                 b.close();
             }

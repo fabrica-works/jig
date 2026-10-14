@@ -36,7 +36,10 @@ pub(super) fn chip(task: u64) -> Chip {
     chip
 }
 pub(super) fn entered(address: Address) -> (Domain, Vec<Request>) {
-    let (mut d, f) = start();
+    entered_arranged(address, jig_domain_client::pages::Arrangement::none())
+}
+fn entered_arranged(address: Address, arrangement: jig_domain_client::pages::Arrangement) -> (Domain, Vec<Request>) {
+    let (mut d, f) = super::cards::start_arranged(arrangement);
     let mut frame = document();
     frame.charters.get_mut(0).unwrap().goals =
         list([Charter { number: 2, name: Some(DocumentText::complete(text(b"Guide"))) }]);
@@ -63,7 +66,14 @@ pub(super) fn entered(address: Address) -> (Domain, Vec<Request>) {
     (d, out)
 }
 pub(super) fn task(section: TaskSection, executor: Executor) -> (Domain, Vec<Request>) {
-    let (mut d, out) = entered(Address::Task { task: 8, section });
+    task_arranged(section, executor, jig_domain_client::pages::Arrangement::none())
+}
+fn task_arranged(
+    section: TaskSection,
+    executor: Executor,
+    arrangement: jig_domain_client::pages::Arrangement,
+) -> (Domain, Vec<Request>) {
+    let (mut d, out) = entered_arranged(Address::Task { task: 8, section }, arrangement);
     let watch = out
         .iter()
         .find_map(|r| match r {
@@ -766,3 +776,64 @@ fn each_task_section_carries_its_region_name() {
 }
 
 mod sections;
+
+fn arranged_task() -> Domain {
+    task_arranged(
+        TaskSection::Plan,
+        Executor::Agent { charter: 2 },
+        jig_domain_client::pages::Arrangement {
+            task: list([
+                TaskSection::Overview,
+                TaskSection::Activity,
+                TaskSection::Plan,
+                TaskSection::History,
+                TaskSection::Budget,
+                TaskSection::Panels,
+            ]),
+            project: list([]),
+        },
+    )
+    .0
+}
+#[test]
+fn an_arranged_task_page_shows_its_six_sections_in_order() {
+    use crate::regions::JigRegion;
+    let (tree, _) = build(&arranged_task(), 3, words());
+    let regions: Vec<_> =
+        tree.nodes().iter().filter_map(|n| n.region).filter(|r| *r != JigRegion::TaskHeader.region()).collect();
+    let sections = [
+        JigRegion::TaskOverview,
+        JigRegion::TaskActivity,
+        JigRegion::TaskPlan,
+        JigRegion::TaskHistory,
+        JigRegion::TaskBudget,
+        JigRegion::TaskPanels,
+    ];
+    let shown: Vec<_> = regions.into_iter().filter(|r| sections.iter().any(|s| s.region() == *r)).collect();
+    assert_eq!(shown, sections.map(JigRegion::region));
+}
+#[test]
+fn an_arranged_task_page_showing_every_section_has_no_tabs() {
+    let (tree, _) = build(&arranged_task(), 3, words());
+    assert_eq!(tree.nodes().iter().filter(|n| n.role == Role::Tabs).count(), 0);
+}
+#[test]
+fn the_addresss_own_section_is_marked_current_on_an_arranged_page() {
+    use crate::regions::JigRegion;
+    let (tree, _) = build(&arranged_task(), 3, words());
+    for region in [
+        JigRegion::TaskOverview,
+        JigRegion::TaskActivity,
+        JigRegion::TaskPlan,
+        JigRegion::TaskHistory,
+        JigRegion::TaskBudget,
+        JigRegion::TaskPanels,
+    ] {
+        let node = tree.nodes().iter().find(|n| n.region == Some(region.region())).unwrap();
+        assert_eq!(
+            node.states.as_slice(),
+            if region == JigRegion::TaskPlan { &[crate::State::Current][..] } else { &[] },
+            "{region:?}"
+        );
+    }
+}

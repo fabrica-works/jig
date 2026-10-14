@@ -163,7 +163,11 @@ pub(super) fn document() -> Frame {
     }
 }
 pub(super) fn start() -> (Domain, Token) {
+    start_arranged(jig_domain_client::pages::Arrangement::none())
+}
+pub(super) fn start_arranged(arrangement: jig_domain_client::pages::Arrangement) -> (Domain, Token) {
     let mut d = Domain::new(&CLIENT, 1);
+    d.configure_arrangement(arrangement).unwrap();
     let out = drive(
         &mut d,
         Event::Start {

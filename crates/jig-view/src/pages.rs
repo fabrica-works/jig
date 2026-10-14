@@ -116,7 +116,9 @@ pub fn main(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigB
                 Address::Task { task, .. } => {
                     heading(b, words, JigPhrase::TaskPage, &[Hole::Number(*task)]);
                     crate::sections::task::header(b, client, words, bindings);
-                    crate::sections::task::tabs(b, client, words, bindings);
+                    if !crate::sections::task::all_shown(client) {
+                        crate::sections::task::tabs(b, client, words, bindings);
+                    }
                     for section in client.sections() {
                         crate::sections::section(b, client, words, bindings, *section);
                     }
@@ -125,7 +127,9 @@ pub fn main(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigB
                 Address::Project { .. } => {
                     heading(b, words, JigPhrase::ProjectPage, &[]);
                     crate::sections::project::header(b, client, words, bindings);
-                    crate::sections::project::tabs(b, client, words, bindings);
+                    if !crate::sections::project::all_shown(client) {
+                        crate::sections::project::tabs(b, client, words, bindings);
+                    }
                     for section in client.sections() {
                         crate::sections::section(b, client, words, bindings, *section);
                     }
@@ -248,4 +252,20 @@ pub(crate) fn scratch(limits: &crate::Limits) -> Option<u64> {
         .checked_add(skein_lib::List::<jig_domain_client::contract::Part>::worst_case(limits.slots)?)?
         .checked_add(u64::from(limits.slots).checked_mul(u64::from(limits.text_per_node))?.checked_mul(2)?)?
         .checked_add(skein_lib::List::<u8>::worst_case(limits.text_per_node)?)
+}
+
+pub(crate) fn mark_current(b: &mut Builder, client: &Domain, address: jig_domain_client::address::Address) {
+    match client.page() {
+        jig_domain_client::pages::Page::Work { address: own, .. } => {
+            if client.sections().len() > 1 && own == &address {
+                b.state(crate::State::Current);
+            }
+        }
+        jig_domain_client::pages::Page::Starting
+        | jig_domain_client::pages::Page::SigningIn
+        | jig_domain_client::pages::Page::Elsewhere
+        | jig_domain_client::pages::Page::Missing
+        | jig_domain_client::pages::Page::OutOfDate
+        | jig_domain_client::pages::Page::SomeoneElse => {}
+    }
 }

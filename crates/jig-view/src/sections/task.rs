@@ -124,6 +124,20 @@ pub fn tabs(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigB
     b.close();
     true
 }
+pub(crate) fn all_shown(client: &Domain) -> bool {
+    let Some(number) = shown(client) else {
+        return false;
+    };
+    let Some(doc) = document(client, number) else {
+        return false;
+    };
+    for section in &jig_domain_client::pages::task::offers(doc).offered {
+        if !client.shows(jig_domain_client::pages::Section::Task { task: number, section: *section }) {
+            return false;
+        }
+    }
+    true
+}
 pub(crate) fn section(
     b: &mut Builder,
     client: &Domain,
@@ -136,6 +150,7 @@ pub(crate) fn section(
         return false;
     }
     crate::pages::work::section(b, words, section_phrase(section), region(section));
+    crate::pages::mark_current(b, client, Address::Task { task, section });
     if let Some(doc) = document(client, task) {
         match section {
             TaskSection::Overview => overview(b, client, doc, words, bindings),
