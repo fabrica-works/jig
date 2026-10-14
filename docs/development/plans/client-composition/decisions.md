@@ -347,6 +347,87 @@ your best judgement").
      - Time: about 40 minutes from this answer to the fix or a report; past that, report what steps 1 and 2 found.
      - Unchanged: 08.2's Shape and Proof; 08.1 waits for 08.2, then its ready check (ruling 116); 08.3 and 10.4 as planned.
 
+118. **jig 08.2: only the engine's restart excuses a taken delivery** (design gap, jig 08's block of 2026-10-14T16:23:54Z).
+     The designer's answer, landed in jig 74bce1ac2 (protocol/client.md 7, domain/engine.md 11, client/domain/testing.md 6) and 6dd741350 (jig/08-ops.md, 08.2); jig 08 applies its Instructions, then gates and lands 08.2:
+
+     # Answer
+
+     Answer to question.md's "jig 08.2: acknowledgement obligation across a
+     crashed stream, 2026-10-14T16:23:54Z", from the designer.
+
+
+     The restart ends the obligation; the world never keeps or replays an
+     acknowledgement across it. A stream's end, or any other end of a watch,
+     does not end it. So the referee forgets its consumptions when the engine
+     restarts, not when a stream disconnects, and `protocol.check()` stays
+     where it is (`tests/ops/src/joint/front.rs:855`).
+
+     Why: telling the core a delivery was taken is the core's pacing. The
+     core is told so that it can make the watch's next delivery, or end the
+     watch. While the engine runs, a watch ended with its delivery in flight
+     waits for that delivery to be settled. Checked on jig `main` (dcbfa3a88):
+
+     - `crates/jig-domain-core/src/routing/views.rs:10`: "| Unwatch | child
+       closes after outstanding terminals | held watch ending |".
+     - `crates/jig-domain-views/src/watch.rs:160`: closing a watch while it
+       is sending gives `State::ClosingDelivery { end: why }`, and `:148`
+       finishes it only at the delivery's `Delivered`.
+     - `crates/jig-protocol-engine-clients/src/watches.rs:456-460`: a closing
+       stream sends `Unwatch`, then `Delivered` for a delivery still pending.
+       The engine's own side settles every delivery when a stream ends.
+
+     So the supervisor's reading, "a watch ended by its stream's end owes
+     nothing more", would excuse what the real engine still does. The
+     restart is what ends the obligation: the core restarted cold holds no
+     watch. engine.md 5.4 lists what the store keeps of the core, and names
+     no watch. `watch.rs:135` ignores a `Delivered` that names a watch the
+     views child does not hold. Replaying one would tell the new core
+     nothing.
+
+     The design now says so:
+
+     - `protocol/client.md`, section 7, a new bullet: "**Each delivery is
+       settled once, while the engine runs.** The core makes a watch's next
+       delivery, or ends the watch, only once the engine's side has told it
+       of the last one: taken, once its event has gone to the connection; or
+       dropped, when its stream ended first. So a watch's end, by the client,
+       by the engine or with its stream, never excuses telling the core of a
+       delivery the client took. A restart does: the core restarted cold
+       holds no watch (`../domain/engine.md`, section 11), and is told
+       nothing of deliveries made before it; the client watches again
+       (section 4), and its first delivery is the document whole."
+     - `domain/engine.md`, section 11: "A watch ended with a delivery in
+       flight ends once that delivery is taken or dropped", and a new bullet,
+       "**Watches are never stored.** A restart (section 6) starts with none,
+       and is told nothing of the deliveries made before it; each client
+       opens its watches again".
+     - `client/domain/testing.md`, section 6, a referee rule: "**A delivery
+       taken is told:** whenever the engine has no input left to take, each
+       delivery a client took has reached the engine's core as taken
+       (`../../protocol/client.md`, section 7), whatever ended the delivery's
+       watch meanwhile. Only the engine's restart in between excuses it: the
+       restarted core holds no watch to tell."
+
+     Both of the ops joint world's crash paths reach one place, the `cold`
+     hook of its peers (`tests/ops/src/joint/engine.rs:202-206`, which
+     already clears `peers.packets`):
+
+     - the crash drawn inside `drain`: `testing/jig-conformance/src/harness.rs:388`
+       calls `self.crash()`, which calls `A::cold` at `:303`;
+     - `FrontFault::Restart`: `front.rs:899` calls `engine.crash()`, which is
+       the same function.
+
+     The referee forgets there.
+
+     Checked once, on a scratch copy of be4741f95 (removed since), with
+     `Referee::restarted` clearing `consumed` and `cold` calling it (6 lines):
+
+     - `heavy cargo nextest run -p jig-ops-world --profile fuzzy
+       p_acceptance_survives_its_durable_decision_commit`: "PASS [ 0.711s]"
+       (log `logs/20261014T162902-86.log`);
+     - `heavy cargo nextest run -p jig-ops-world --profile fuzzy`: "22 tests
+       run: 22 passed" (log `logs/20261014T162912-86.log`).
+
 ## For the user
 
 Long-term choices the user may veto. Each was decided by the planner
