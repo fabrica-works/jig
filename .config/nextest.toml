@@ -6,7 +6,7 @@
 
 [profile.default]
 default-filter = "not binary(/^fuzzy_/) & not binary(/^(process|live)$/)"
-global-timeout = "30s"
+global-timeout = "15s"
 slow-timeout = { period = "500ms" }
 
 # The worlds' tests first, the longest, then the many short unit tests behind
