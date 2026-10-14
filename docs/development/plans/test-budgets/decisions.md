@@ -208,6 +208,18 @@ the file.
      fails only on this test with these widths lands again once without
      asking (README, "smith's window story may be landed again once").
      That step follows once its cause is found.
+109. **smith-02.s1 fixes the window story's echo race** (step not in
+     the plan, after ruling 108). A read-only look at the code: the
+     product reads its first window size synchronously long before its
+     first status line, so the line is clipped at 80; but the person
+     sends `Again\n` as soon as the line's prefix is shown
+     (`tests/end-to-end/end_to_end.rs:43-44`), and the pty echoes input
+     (cooked mode, smith's `shell.md`, 308-310), so `Again` can land
+     before the line's newline. A clipped line is always 80 long, and its
+     unclipped length varies with elapsed time, yet both failures show
+     exactly 85 = 80 + `Again`. The fix is the test's: the person waits
+     for the line's end (`smith/02.s1-window-echo.md`). No product
+     change. Ruling 108's retry ends when 02.s1 lands.
 
 ## For the user
 
