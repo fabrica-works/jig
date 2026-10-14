@@ -1,6 +1,7 @@
 mod binding;
 mod diff;
 mod markdown;
+mod outline;
 mod phrases;
 mod regions;
 mod slots;

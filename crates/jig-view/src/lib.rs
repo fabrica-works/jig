@@ -18,6 +18,7 @@ mod instructions;
 pub mod literal_segment;
 pub mod live_call_words;
 pub mod notices;
+pub mod outline;
 pub mod owner_wake;
 pub mod owner_wake_words;
 pub mod owner_words;
