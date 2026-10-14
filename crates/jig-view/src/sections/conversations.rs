@@ -40,6 +40,7 @@ pub(crate) fn section(
             match value {
                 Runtime::Held { .. } => {
                     if let Some(id) = client.objects().find(jig_domain_client::contract::ObjectKey::Task(row.chip.task))
+                        && !client.owes(id)
                     {
                         cards::card(b, client, id, &cards::Place::Conversation, words, bindings);
                     }

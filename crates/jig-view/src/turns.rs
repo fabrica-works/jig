@@ -10,9 +10,7 @@ use jig_domain_client::{
 };
 mod activity;
 mod call;
-mod objects;
 mod turn;
-pub(crate) use objects::shows_object;
 /// Show an agent task's activity in its page's already opened section.
 pub fn conversation(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
     let state = client.conversation();

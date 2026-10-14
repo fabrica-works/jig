@@ -38,7 +38,10 @@ pub(super) fn chip(task: u64) -> Chip {
 pub(super) fn entered(address: Address) -> (Domain, Vec<Request>) {
     entered_arranged(address, jig_domain_client::pages::Arrangement::none())
 }
-fn entered_arranged(address: Address, arrangement: jig_domain_client::pages::Arrangement) -> (Domain, Vec<Request>) {
+pub(super) fn entered_arranged(
+    address: Address,
+    arrangement: jig_domain_client::pages::Arrangement,
+) -> (Domain, Vec<Request>) {
     let (mut d, f) = super::cards::start_arranged(arrangement);
     let mut frame = document();
     frame.charters.get_mut(0).unwrap().goals =

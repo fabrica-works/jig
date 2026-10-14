@@ -896,3 +896,50 @@ fn no_arrangement_keeps_each_page_bound() {
     assert_eq!(crate::arranged_nodes(&CLIENT, 0, &arrangement), Some(1_166_881));
     assert_eq!(crate::arranged_nodes(&CLIENT, 9, &arrangement), Some(1_166_890));
 }
+
+fn most_owed_cards() -> Domain {
+    let (mut d, watch) = start();
+    deliver(&mut d, watch, Delivery::Frame(Box::new(document())));
+    let objects = list((1..=CLIENT.objects).map(|n| ObjectKey::Task(u64::from(n))));
+    let out = drive(&mut d, Event::ShowObjects { objects });
+    for request in out {
+        if let Request::Read { read, what: Read::Task { task } } = request {
+            let mut doc = super::cards_objects::task_doc(&[ActKind::Cancel]);
+            doc.chip.task = task;
+            drive(&mut d, Event::Read { read, result: ReadResult::Value(ReadValue::Task(Box::new(doc))) });
+        }
+    }
+    for number in 1..=CLIENT.objects {
+        let id = d.objects().find(ObjectKey::Task(u64::from(number))).unwrap();
+        drive(&mut d, Event::Act { act: Act::Intend { object: id.token(), act: ActKind::Cancel } });
+        drive(
+            &mut d,
+            Event::Act {
+                act: Act::Edit {
+                    field: jig_domain_client::fields::Purpose::Reason,
+                    text: super::cards::text(b"cancel"),
+                },
+            },
+        );
+        if number < CLIENT.objects {
+            drive(&mut d, Event::Act { act: Act::Confirm });
+        }
+    }
+    drive(&mut d, Event::ObjectsLeft);
+    d
+}
+#[test]
+fn the_most_owed_cards_fit_the_pages_bound() {
+    let d = most_owed_cards();
+    for (_, id) in d.objects().ids() {
+        assert!(d.owes(*id));
+    }
+    assert_eq!(d.objects().len(), CLIENT.objects);
+    let limits = crate::Limits::of(&CLIENT, &jig_domain_client::pages::Arrangement::none()).unwrap();
+    let mut b = Builder::new(&limits);
+    let mut bindings = JigBindings::new(limits.bindings, CLIENT.text);
+    b.open(Role::Page);
+    crate::pages::after_page(&mut b, &d, words(), &mut bindings);
+    b.close();
+    assert!(b.finish().len() <= limits.nodes);
+}

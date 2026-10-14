@@ -238,7 +238,9 @@ fn supplied_entry(
         Some(Recipient::Role { .. } | Recipient::Roles { .. }) => words.text(b, JigPhrase::OnCall, &[]),
         Some(Recipient::Party(_) | Recipient::Task(_)) | None => {}
     }
-    if let Some(id) = client.objects().find(entry.object) {
+    if let Some(id) = client.objects().find(entry.object)
+        && !client.owes(id)
+    {
         cards::card(b, client, id, &cards::Place::Inbox { lineage: entry.lineage.clone() }, words, bindings);
     }
 }
@@ -299,7 +301,9 @@ fn owner_entry(
         owner_text(b, words, InboxPhrase::Activity, &[Hole::Number(activity)]);
     }
     crate::owner_result::link(b, client, &entry.task, words, bindings);
-    if let Some(id) = client.objects().find(entry.card_key()) {
+    if let Some(id) = client.objects().find(entry.card_key())
+        && !client.owes(id)
+    {
         cards::card(b, client, id, &cards::Place::Elsewhere, words, bindings);
     }
 }

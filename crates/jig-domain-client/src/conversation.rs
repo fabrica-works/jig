@@ -26,6 +26,7 @@ use skein_lib::{List, Map, Wall, Writer};
 pub(crate) mod chips;
 pub(crate) mod routing;
 pub(crate) mod sending;
+mod shown;
 pub mod words;
 pub use routing::ACTIVITY_WINDOW;
 pub use words::{KeptWords, Sent, Words};

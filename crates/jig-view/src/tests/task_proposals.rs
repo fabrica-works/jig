@@ -74,6 +74,11 @@ fn receive(d: &mut Domain, out: &[Request], value: Proposal) {
     );
 }
 fn build(d: &Domain) -> Tree {
+    let tree = build_tree(d);
+    super::cards_access::check(&tree);
+    tree
+}
+fn build_tree(d: &Domain) -> Tree {
     let w = words();
     let nodes = crate::task_nodes(&CLIENT, 0)
         .unwrap()
@@ -99,7 +104,6 @@ fn build(d: &Domain) -> Tree {
     assert!(tree.len() <= nodes);
     assert!(crate::worst_case(&limits).is_some());
     assert!(crate::jig_bindings_worst_case(nodes, &CLIENT).is_some());
-    super::cards_access::check(&tree);
     tree
 }
 fn cards(tree: &Tree, key: ProposalKey) -> usize {
@@ -266,4 +270,99 @@ fn a_task_activity_renders_the_native_whole_pending_proposal_with_its_supplied_f
     assert!(contains(&tree, b"250"));
     assert!(contains(&tree, b"100"));
     assert!(contains(&tree, b"Accept"));
+}
+
+fn leaving_plan(with_chat: bool) -> (Domain, ProposalKey) {
+    let k = key(Proposer::Task(8));
+    let (mut d, opened) = super::work_pages::entered_arranged(
+        Address::Task { task: 8, section: TaskSection::Plan },
+        jig_domain_client::pages::Arrangement { task: list([TaskSection::Activity]), project: list([]) },
+    );
+    let watch = opened
+        .iter()
+        .find_map(|r| match r {
+            Request::Open { watch, subject: Subject::Task { .. } } => Some(*watch),
+            _ => None,
+        })
+        .unwrap();
+    let out = deliver(&mut d, watch, Delivery::Task(Box::new(task(&[k], 11))));
+    receive(&mut d, &out, proposal(k));
+    if with_chat {
+        committed_proposal(&mut d, &out, k);
+    }
+    let id = d.objects().find(ObjectKey::Proposal(k)).unwrap();
+    drive(
+        &mut d,
+        Event::Act { act: jig_domain_client::action::Act::Intend { object: id.token(), act: ActKind::Accept } },
+    );
+    drive(&mut d, Event::Act { act: jig_domain_client::action::Act::Confirm });
+    let tree = opened
+        .iter()
+        .chain(out.iter())
+        .find_map(|r| match r {
+            Request::Open { watch, subject: Subject::Tree { .. } } => Some(*watch),
+            _ => None,
+        })
+        .unwrap();
+    deliver(
+        &mut d,
+        tree,
+        Delivery::OwnerTree(Box::new(OwnerTree {
+            root: super::work_pages::chip(8),
+            rows: list([]),
+            folded: list([]),
+            held_below: 0,
+            next: None,
+        })),
+    );
+    (d, k)
+}
+fn committed_proposal(d: &mut Domain, out: &[Request], k: ProposalKey) {
+    let read = out
+        .iter()
+        .find_map(|r| match r {
+            Request::Read { read, what: Read::Activity { .. } } => Some(*read),
+            _ => None,
+        })
+        .unwrap();
+    drive(
+        d,
+        Event::Read {
+            read,
+            result: ReadResult::Value(ReadValue::Activity(Box::new(ActivityPage {
+                cut: false,
+                rows: list([ActivityLine {
+                    position: 11,
+                    at: Wall::EPOCH,
+                    event: Activity::Turn {
+                        name: TurnName { attempt: 2, number: 1 },
+                        turn: TurnRead::Decoded(turn([ObjectKey::Proposal(k)])),
+                    },
+                }]),
+                before: None,
+                after: None,
+            }))),
+        },
+    );
+}
+#[test]
+fn a_proposal_leaving_the_plan_is_owed_once() {
+    let (d, k) = leaving_plan(false);
+    let tree = build_tree(&d);
+    assert_eq!(cards(&tree, k), 1);
+    let owed = tree.nodes().iter().position(|n| n.region == Some(crate::regions::JigRegion::Owed.region())).unwrap();
+    let card =
+        tree.nodes().iter().position(|n| n.key == Some(crate::pages::object_key(ObjectKey::Proposal(k)))).unwrap();
+    assert!(card > owed && card < owed + usize::try_from(tree.nodes()[owed].size).unwrap());
+}
+#[test]
+fn a_proposal_its_chat_names_stays_in_the_chat_when_it_leaves_the_plan() {
+    let (d, k) = leaving_plan(true);
+    let id = d.objects().find(ObjectKey::Proposal(k)).unwrap();
+    assert!(!d.owes(id));
+    let tree = build_tree(&d);
+    assert_eq!(cards(&tree, k), 1);
+    for node in tree.nodes() {
+        assert_ne!(node.region, Some(crate::regions::JigRegion::Owed.region()));
+    }
 }

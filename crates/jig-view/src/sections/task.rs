@@ -238,7 +238,9 @@ pub(crate) fn overview(b: &mut Builder, client: &Domain, doc: &Task, words: &Wor
     }
     for link in &doc.inputs {
         task_link(b, client, link, words, bindings);
-        if let Some(id) = client.objects().find(ObjectKey::Result(link.number())) {
+        if let Some(id) = client.objects().find(ObjectKey::Result(link.number()))
+            && !client.owes(id)
+        {
             cards::card(b, client, id, &cards::Place::TaskPage, words, bindings);
         }
     }
@@ -266,7 +268,9 @@ pub(crate) fn overview(b: &mut Builder, client: &Domain, doc: &Task, words: &Wor
     match doc.chip.executor {
         Executor::Agent { charter } => words.text(b, JigPhrase::Charter, &[Hole::Number(u64::from(charter))]),
         Executor::Party { .. } | Executor::Role { .. } => {
-            if let Some(id) = client.objects().find(ObjectKey::PersonTask(doc.chip.task)) {
+            if let Some(id) = client.objects().find(ObjectKey::PersonTask(doc.chip.task))
+                && !client.owes(id)
+            {
                 cards::card(b, client, id, &cards::Place::TaskPage, words, bindings);
             }
         }
@@ -325,20 +329,18 @@ fn activity(b: &mut Builder, client: &Domain, doc: &Task, words: &Words, binding
             for proposal in &client.task_page().proposals {
                 let key = ObjectKey::Proposal(*proposal);
                 if let Some(id) = client.objects().find(key)
-                    && !crate::turns::shows_object(client.conversation(), key)
+                    && !client.conversation().shows(key)
+                    && !client.owes(id)
                 {
-                    let object = client.objects().get(id).expect("shared proposal exists");
-                    // Source-less cards use the common after-page departure
-                    // region, including its final read and supplied ending.
-                    if !object.sources.is_empty() {
-                        cards::card(b, client, id, &cards::Place::TaskPage, words, bindings);
-                    }
+                    cards::card(b, client, id, &cards::Place::TaskPage, words, bindings);
                 }
             }
         }
         Executor::Procedure { .. } => slots(b, doc, TaskSection::Activity, words, bindings),
         Executor::Party { .. } | Executor::Role { .. } => {
-            if let Some(id) = client.objects().find(ObjectKey::PersonTask(doc.chip.task)) {
+            if let Some(id) = client.objects().find(ObjectKey::PersonTask(doc.chip.task))
+                && !client.owes(id)
+            {
                 cards::card(b, client, id, &cards::Place::TaskPage, words, bindings);
             }
             if let Some(result) = &doc.result {

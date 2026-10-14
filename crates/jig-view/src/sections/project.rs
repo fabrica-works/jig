@@ -280,7 +280,9 @@ fn task_spend(
     for task in tasks {
         cards::chip::chip(b, client, &task.chip, words, bindings);
         words.amount(b, task.spent);
-        if let Some(id) = client.objects().find(ObjectKey::Task(task.chip.task)) {
+        if let Some(id) = client.objects().find(ObjectKey::Task(task.chip.task))
+            && !client.owes(id)
+        {
             cards::card(b, client, id, &cards::Place::Elsewhere, words, bindings);
         }
     }
@@ -288,7 +290,9 @@ fn task_spend(
 
 fn inbox_cards(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
     for entry in &client.inbox().rows {
-        if let Some(id) = client.objects().find(entry.card_key()) {
+        if let Some(id) = client.objects().find(entry.card_key())
+            && !client.owes(id)
+        {
             cards::card(
                 b,
                 client,

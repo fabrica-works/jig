@@ -2978,3 +2978,14 @@ fn an_arranged_task_document_opens_its_parts_once() {
         ]
     );
 }
+
+#[test]
+fn an_object_no_source_names_is_owed_while_deciding() {
+    let mut domain = Domain::new(&LIMITS, 1);
+    let source = crate::objects::Source::Window { generation: 0, number: 0 };
+    let id = domain.objects.name(ObjectKey::Task(8), source).unwrap();
+    domain.objects.get_mut(id).unwrap().card =
+        crate::objects::Card::Deciding { request: None, progress: crate::intents::Progress::Confirming };
+    domain.objects.replace(source, &[]);
+    assert!(domain.owes(id));
+}
