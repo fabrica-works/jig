@@ -355,6 +355,13 @@ the file.
      between a worker's clean exit and its `Finished` commit (`Refused`
      at 130) is a different state from these stories', and goes to
      `later.md`, unchecked against jig's design.
+121. **jig-repin traces the fault topology once more** (process,
+     jig-repin's block of 2026-10-14T02:38:02Z). With ruling 120's fixture
+     (`leading_turns=1`), both signal stories pass; the power-loss cut was
+     placed from a trace of the answer topology (window 145 to 154, cut
+     148), but the fault topology's service finishes at 143, so the cut
+     never fired. One trace of the fault topology places it; the three
+     stories run once more. Nothing else changes.
 
 ## For the user
 
