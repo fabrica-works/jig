@@ -282,7 +282,14 @@ Shape: each `Fill(1)` above becomes `Read::Arrived { max }`, with `max`
   `crates/skein-oauth-accounts/src/`'s `worst_case` functions) gain one
   delivery of their reader's `max` each, and their memory tests
   (`tests/llm/tests/memory.rs`, `tests/oauth-accounts/tests/`) keep
-  passing.
+  passing. A test that asserts one of these worst cases as a literal
+  moves by exactly that delivery, written as a new literal, and the
+  commit body names each with the delivery's size (ruling 106):
+  `tests/llm/tests/replay_total.rs`'s
+  `standard_client_bound_excludes_per_item_replay_capacity`, whose
+  `fixed` and `removed` move by 16,385 (`error_bytes` + 1) for each
+  provider, and any such test under `tests/oauth-accounts/`, by the
+  token response's `max`. No other expected value changes.
 Test shape: in each crate's tests, one test per reader that a response
   delivered in one piece and the same delivered a byte at a time give
   the same result: `an_error_body_read_as_it_arrives_is_the_same_whatever_its_cuts`

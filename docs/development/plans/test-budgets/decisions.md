@@ -172,6 +172,18 @@ the file.
      formatted as before. Two runs that differ only inside a large
      payload's middle are no longer told apart by the trace; the
      transcript's content is fixed by its story. No dependency is added.
+106. **skein 01.3's worst-case tests move by one delivery** (plan
+     defect, skein 01's block of 2026-10-14T00:04:36Z). 01.3's Shape
+     asked the LLM client's and the token exchange's worst cases to
+     "gain one delivery of their reader's `max` each", but named only
+     their memory tests; `tests/llm/tests/replay_total.rs` asserts the
+     client's worst case as a literal, outside Files. Its `fixed` moves
+     53,113,764 to 53,130,149 (OpenAI Codex) and 53,112,204 to 53,128,589
+     (Anthropic), and `removed` 53,501,856 to 53,485,471 and 53,501,040
+     to 53,484,655: each by 16,385, `error_bytes` (16,384) + 1, the error
+     body's `max`. These are the sizes code-organization.md, 4 allows a
+     session file to name; 01.3's Shape now names them, and any such
+     test under `tests/oauth-accounts/`, by the token response's `max`.
 
 ## For the user
 
