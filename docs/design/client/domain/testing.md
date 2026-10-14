@@ -73,12 +73,13 @@ a step machine so that the browser tier's loop runs it too.
 - **The browser's face,** `jig-fake-person-browser`, a kit of its own,
   ordinary Rust: the person's face over skein's browser kit (skein's
   `browser.md`). It answers the person's queries on the browser's
-  accessibility tree, roles through the browser's mapping of the tree
-  (`../../protocol/browser.md`, section 6), names by words in them or
-  exactly, text by words within one text run,
-  pending while the kit answers; its acts are a press, typing (the field
-  cleared, then the words), Enter for a send, a navigation to an
-  address's path, and a reload. A browser's accessibility tree makes
+  accessibility tree, roles through jig's default mapping of the tree,
+  which an application's elements and widgets keep
+  (`../../protocol/browser.md`, sections 6 and 6.1), names by words in
+  them or exactly, text by words within one text run, pending while the
+  kit answers; its acts are a press, typing (the field cleared, then the
+  words), Enter for a send, a navigation to an address's path, and a
+  reload. A browser's accessibility tree makes
   each run of a node's text (emphasis, strong, code, a link) a text of
   its own, so a story that runs in the browser tier finds text by words
   within one run; the tree face matches a node's whole text.
@@ -90,6 +91,19 @@ a step machine so that the browser tier's loop runs it too.
   the drawing's figure, after which the person sees what follows. The
   harness offers that act to an application's stories too
   (`../../protocol/browser.md`, section 15).
+- **jig's stories for a browser shell,** offered by the harness as
+  functions an application's browser tier calls with its own binary, its
+  bundle and its codec, where its pages include jig's, each a person's
+  story through the face: a reload keeps a pending request, which the
+  engine makes once; typing while a delivery patches the page keeps the
+  field's focus, caret and words; back and forward move between pages,
+  and an address opened directly shows its page; the engine killed and
+  restarted shows offline, then live; a spent link is refused, and the
+  sign-in page says to open the new one.
+  An application's browser shell runs its own loop over jig's parts, so
+  they check its wiring: the order its loop keeps, and, where it drives
+  fetch and the small store without jig's transport, the rule it then
+  takes on itself (`../../protocol/browser.md`, 5.3 and section 15).
 
 ## 4. The client's world
 
@@ -118,7 +132,13 @@ a step machine so that the browser tier's loop runs it too.
   test family's drawing has drawing code, golden scenes and an act, with
   an ordinary node beside it doing the same (view.md, section 17), for
   the browser tier's story of a drawing
-  (`../../protocol/browser.md`, section 15).
+  (`../../protocol/browser.md`, section 15). Its browser shell,
+  `jig-test-shell-web`, the reference shell, takes steps an application
+  may take past it, once each: an element override; a widget for a kind
+  of its test family, calling one function of a JavaScript snippet of
+  its own; its own page or the bundler's (the plan's choice); a prefix
+  on jig's codec in one story; and a policy addition refused at start,
+  in a host test (`../../protocol/browser.md`, 3.5 and section 15).
 - **Its stories** are client.md's, section 17, and pages.md's, section 10,
   each written once in a person's terms.
 - **At the text shell.** A client of the world may be played as the text
@@ -218,8 +238,10 @@ Drawn from the seed:
 - its stories at the text shell, where it has a terminal client;
 - its drawing code's golden scenes, where it draws (view.md, section 17);
 - its browser tier, with its binary and its bundle, over jig's harness
-  and face: its pages, its drawings, its signing in
-  (`../../protocol/browser.md`, section 15);
+  and face: jig's stories for a browser shell, called with its own
+  binary and bundle (section 3), and its pages, its drawings, its
+  elements and widgets, its signing in (`../../protocol/browser.md`,
+  section 15);
 - its own shells' tiers, if it writes shells.
 
 ## 9. Budgets

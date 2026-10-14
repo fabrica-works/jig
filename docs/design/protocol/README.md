@@ -73,10 +73,12 @@ section 4. What is still open is listed in section 14.
    requests, reads, watches, signing in, the small store, shells.
 7. **store.md:** the store: skein-kv in the engine, keys and records,
    commits and loads, transcripts, secrets, growth.
-8. **browser.md:** the browser's shell, every application's, on
-   client.md's protocol: what an application writes, the toolchain and
-   the bundle, the tree as elements, scenes as SVG, paths, serving,
-   signing in, and the browser tier.
+8. **browser.md:** jig's browser parts, a kit on client.md's protocol,
+   and the reference shell an application copies: what an application
+   writes and what it may change, the toolchain and the bundle, the
+   application's loop over the parts, the tree as elements, scenes as
+   SVG, paths, serving behind the front door, signing in, and the
+   browser tier.
 
 ## 3. Names
 
@@ -150,10 +152,10 @@ An application that mixes the last two has both.
 | `jig-protocol-config` | parsing | engine, worker | jig's part of a configuration, parsed and checked (`configuration.md`) |
 | `jig-protocol-store` | component, codecs | engine | jig's records and the application's on skein-kv, transcripts' files, the secrets' store (`store.md`) |
 | `jig-protocol-client-wire` | codecs | engine, client | the client's records: requests, answers, reads, subjects, documents, the small store's (`client.md`, section 3) |
-| `jig-protocol-engine-clients` | component | engine | clients' connections: exchanges, streams, sign-ins, translation to and from the core's vocabulary (`client.md`); the browser's bundle and page served under the policy, and a browser's sign-in by cookie (`browser.md`, sections 11 and 12) |
-| `jig-protocol-client-link` | component | client | the connection to the engine: attempts, the stream, envelopes, the small store's records (`client.md`); jig's paths, parsed and printed by its `address` module (`browser.md`, section 9) |
+| `jig-protocol-engine-clients` | component | engine | clients' connections: exchanges, streams, sign-ins, translation to and from the core's vocabulary (`client.md`); the browser's files, page, root files and the policy's additions, data the application's startup gives, served behind a fixed front door, and a browser's sign-in by cookie (`browser.md`, sections 11, 12 and 12.1) |
+| `jig-protocol-client-link` | component | client | the connection to the engine: attempts, the stream, envelopes, the small store's records (`client.md`); jig's default codec for jig's places, its `address` module, which an application's client host uses as is, under a prefix, renamed, or replaces (`browser.md`, section 9) |
 | `jig-protocol-transcript` | decoding | client | turns' bytes into the client's vocabulary (`../client/domain/client.md`, section 10) |
-| `jig-shell-web`, `jig-shell-native` | shells | client | the browser's shell, every application's (`browser.md`), and the native one (`client.md`, section 12) |
+| `jig-shell-web`, `jig-shell-native` | shells' parts, a shell | client | jig's browser parts, a kit an application's browser shell runs its loop over (`browser.md`, 5.1), and the native shell (`client.md`, section 12) |
 
 Beside them, smith's components, by the agent capability:
 `smith-protocol-llm`, over skein's `skein-llm-connection`, in a process
@@ -163,9 +165,9 @@ processes (smith's `protocol/hosts.md`, sections 2 and 3).
 
 - **Each crate is step code** under the subset (programming-model.md,
   section 10), as every crate of jig's is but its test kits, the client's
-  shells and `jig-bundle`, the bundler: a tool run at build, which makes
-  the bundle the engine serves, not a component (`browser.md`,
-  section 4).
+  shells and their parts, and `jig-bundle`, the bundler: a tool run at
+  build, which makes the bundle the engine serves, not a component
+  (`browser.md`, section 4).
 - **Each depends** on skein-lib, io's vocabulary, the skein components it
   drives, its codec crate, and the domain vocabulary it translates: the
   hub's for the channel's sides, the core's (or a child's) for the
@@ -193,13 +195,17 @@ processes (smith's `protocol/hosts.md`, sections 2 and 3).
 | the worker's root, with its choice of agent capability, its workspace and its io | the worker | its own (`../domain/hosts.md`, section 7) |
 | its store's families: keys' encoders, codecs, its store version, its indexes | the engine | its own, by `store.md`, section 12 |
 | its documents' and requests' wire, its sign-in providers' exchanges | engine and client | the client's protocol |
-| its browser crate, `<application>-shell-web`: its client host behind the browser's shell, and its look | the client | copied from jig's test application's (`browser.md`, sections 3.1 and 3.2) |
+| its browser shell, `<application>-shell-web`: its start and its loop over jig's browser parts and its client host, and its look, plain data the parts take | the client | copied from the reference shell, `jig-test-shell-web` (`browser.md`, 3.1 to 3.3 and section 5) |
+| its paths, every one but those under `/jig/`, the engine's own: jig's default codec for jig's places as is, under a prefix of its own, renamed, or replaced, its families' places, and which place `/` is | the client host | its own (`browser.md`, section 9) |
 | its stylesheet and its pictures | the client's bundle | its own (`browser.md`, 3.4) |
+| what the engine serves of its browser: the bundle's files, the page, its root files, the policy's additions, as data | the engine's startup | copied from the reference, which reads the bundle's directory its configuration names (`browser.md`, section 12) |
+| what it changes beyond the reference shell, a step at a time, each needing the ones before only where it says so: its page, its files, its elements and widgets, its own JavaScript from the origin, additions to the policy, a part replaced or left out | the client, the engine's startup | its own, as `browser.md`, 3.5 allows; never the engine's front door (`browser.md`, section 12) |
 
 It writes no codec of jig's records, none of the channel's rules, none of
 the core's tools' decoding, no OAuth exchange of an LLM account, no agent,
-none of `smith-inline-agent`'s runs' LLM calls, and no JavaScript or
-HTML.
+and none of `smith-inline-agent`'s runs' LLM calls. Its browser needs no
+HTML and no JavaScript of its own: its own page and its own JavaScript
+are steps it may take (`browser.md`, 3.5).
 
 ## 7. Versions
 
@@ -325,14 +331,14 @@ Each is generic, and says nothing about jig.
   and skein-lib's `Secret`, the generator's `secret` type, whose `Debug`
   shows its length only, for credentials' values (section 8; skein's
   `codec.md`, section 3).
-- **For the browser's shell** (`browser.md`): skein's browser kit
+- **For jig's browser parts** (`browser.md`): skein's browser kit
   matching a name by words as well as exactly, and pressing at a point
   within a node's box, for the browser tier's face (skein's
   `browser.md`, sections 5 and 6); and `programming-model.md`, section
   2.1, on a client compiled to WebAssembly: its shell's platform calls go
   through the glue crates, `wasm-bindgen`, `js-sys` and `web-sys`,
   pinned, which with their dependencies are the only `unsafe`
-  such a client runs; the shell's own crate forbids it.
+  such a client runs; `jig-shell-web` forbids it in its own code.
 - **What it has, as it is:** the framed channel, codecs and their
   generator, the JSON reader and writer, the key-value store, the LLM
   client and connection component and their fake peer, OAuth's client and
@@ -482,10 +488,16 @@ reads) is `store.md`, section 15.
   `jig-view`, `jig-shell-*` (`../README.md`, section 15).
 - **On one person's machine, a browser on loopback** signs in by a link
   the engine prints at start (`client.md`, section 8).
-- **The browser's shell is jig's, every application's:** written once,
-  with its bundler, the engine's serving of the bundle and jig's paths;
-  an application writes one small crate and a stylesheet, and gives
-  pictures (`browser.md`).
+- **jig's browser layer is a kit; the loop is the application's.** jig
+  writes its browser parts, each usable alone, the bundler, the engine's
+  serving behind a fixed front door, and its default codec for its
+  places. An application's browser shell, copied from jig's reference
+  shell, runs its own loop over the parts and its client host, whose
+  codec parses and prints its paths, and gives its look as data; past
+  the reference, it changes more a step at a time, any part but the
+  front door. The parts hold the invariants that protect requests, so
+  no order of its loop breaks them (`browser.md`, 3.5, 5.3 and section
+  19; `../README.md`, section 6).
 - **Configuration as strict JSON,** read once before the loop, composed
   per child, secrets in private files, limits by profile
   (`configuration.md`).

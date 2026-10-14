@@ -30,9 +30,11 @@ is still open is listed in section 14, and what waits in section 16.
   text.
 - **Drawings drawn once.** A drawing is drawn by its owner's drawing
   code, step code, as a scene: a bounded list of marks in whole pixels,
-  which every shell that draws maps onto its platform, SVG in a browser.
-  A shell that does not draw, a screen reader and the fake person read
-  its fallback (section 17).
+  which every shell that draws maps onto its platform, SVG in a browser
+  by default. A scene is one way to draw: in a browser, an application
+  may draw a kind of its own with a widget of its own instead
+  (`../../protocol/browser.md`, 6.1). A shell that does not draw, a
+  screen reader and the fake person read its fallback (section 17).
 - **Layout as semantics.** Every page keeps one outline of landmarks (a
   banner, navigation, the main, asides), and each of jig's regions
   carries a stable region name, so a shell and a stylesheet place them
@@ -323,9 +325,11 @@ most nodes it may build (section 10).
 - **A link's address, for a shell.** A link node's binding resolves,
   without acting, to the address it leads to: the view root asks the
   binding's owner's view, as it does to decode. The application's client
-  host prints it as a path, which the browser's shell gives the link as
-  its `href`. An address that changes needs no patch (section 6): the
-  shell asks again (`../../protocol/browser.md`, section 9).
+  host prints it as a path with its codec, which the application's
+  browser shell gives the link as its `href`, through jig's page part.
+  An address that changes needs no patch (section 6): the shell asks
+  again after each build (`../../protocol/browser.md`, 5.2 and
+  section 9).
 - **The act on a drawing** carries bytes of the drawing's owner, at most
   the view's limit on a drawing's bytes (section 10), past which the
   view drops it. Only the owner's view decodes them, into its action or
@@ -388,8 +392,8 @@ most nodes it may build (section 10).
 - **Names are copied in,** never translated: a task's title, a party's
   name, a resource's words.
 - **A shell's own words** are jig's phrases too, in the person's
-  language: the browser's, a credential shown once and the client
-  failed (`../../protocol/browser.md`, section 5). The text shell's
+  language: jig's browser parts', a credential shown once and the
+  client failed (`../../protocol/browser.md`, section 5). The text shell's
   states and refusals are English words, an open question (section 14).
 - **No formatting:** a text is written into a bounded buffer, with
   skein-lib's decimal for numbers; its capacity is the longest its
@@ -454,21 +458,32 @@ its bound, in a box of any size (section 17).
   The callbacks a platform needs are the shell's, never step code's.
 - **One callback, one step.** Each thing the platform reports (an act on
   a node, an answer, a delivery, a timer, the place changing) is one
-  event. The shell runs the step, then does what it asked, in order: the
-  small store written, then requests sent, then the address shown, then
-  patches applied.
+  event. The host, the application's loop over its shell's parts (a
+  terminal's, 15.1; a browser's, `../../protocol/browser.md`, section
+  5), runs one step for each, then does what it asked, in order: the
+  small store written, then requests sent, then the address shown; once
+  no report waits, it builds and applies the patches. The shell's parts
+  hold the order that protects requests, so no order of the loop breaks
+  it: the native shell and a browser's transport part hold a step's
+  requests until its small store's writes are done; a browser's inbox
+  never calls the turn while one runs; its page part applies patches only to
+  the tree they are diffed from (`../../protocol/browser.md`, 5.3).
 - **Time and the seed are inputs,** read by the shell.
-- **The addresses** are the platform's: a URL's path in a browser
+- **The addresses** are the platform's: a URL's path in a browser, which
+  the application's client host parses and prints with its codec
   (`../../protocol/browser.md`, section 9), arguments on a command line.
 - **A panic is fail-stop:** the shell restarts the client, as a supervisor
   restarts a process, and its small store and its keys make what was
   pending safe to send again.
-- **jig's shells:**
-  - *the browser's* (`jig-shell-web`): the client compiled to
-    WebAssembly, with only the glue the toolchain generates; the tree
-    mapped to HTML elements with their roles; session storage as the
-    small store; served by the engine from its one origin under a strict
-    content security policy (`../../protocol/browser.md`);
+- **jig's shells and parts:**
+  - *jig's browser parts* (`jig-shell-web`): a kit over which an
+    application's browser shell, copied from jig's reference shell, runs
+    its loop; the client compiled to WebAssembly, with only the glue the
+    toolchain generates; the tree mapped to HTML elements with their
+    roles, by a default an application may override with its own
+    elements and widgets; session storage as the small store; served by
+    the engine from its one origin under a strict content security
+    policy (`../../protocol/browser.md`, sections 3, 5, 6 and 12);
   - *the native one* (`jig-shell-native`): skein's HTTP client and
     its server-sent events reader, for Linux and for the worlds that make
     bytes real; with no view, it is a service's shell;
@@ -480,20 +495,25 @@ its bound, in a box of any size (section 17).
   text shell prints them in the tree's order. A stylesheet places
   regions by their region names.
 - **Drawings are drawn by their owner's drawing code,** its step code,
-  once for every shell (section 17). A shell that draws takes it, when
-  it is built, and maps the scenes it draws onto its platform: the
-  browser's, as inline SVG (`../../protocol/browser.md`, section 8). A
-  kind or data its code does not draw, and a scene refused, show the
-  drawing's fallback, as every drawing does in the text shell.
+  once for every shell (section 17). A shell that draws takes it with
+  the look, at start, and maps the scenes it draws onto its platform:
+  in a browser, jig's page part, as inline SVG by default
+  (`../../protocol/browser.md`, section 8). A kind the application maps
+  to a widget of its own is drawn by the widget instead, as the
+  application likes, its fallback kept (`../../protocol/browser.md`,
+  6.1). A kind or data its code does not draw, and a scene refused, show
+  the drawing's fallback, as every drawing does in the text shell.
 - **Pictures are the application's files in the shell.** A shell takes,
-  when it is built, each owner's pictures: the browser's has them in its
-  bundle, served from the engine's origin (`../../protocol/browser.md`,
-  4.2). A picture a shell does not have shows as its image's name.
+  when it is built, each owner's pictures: a browser shell has them in
+  its bundle, served from the engine's origin, their paths given to
+  jig's page part (`../../protocol/browser.md`, 3.3 and 4.2). A picture
+  a shell does not have shows as its image's name.
 - **An application's shell:** a phone's or a desktop's, mapping the same
   tree onto its widgets, is the application's to write over the same
-  domain and view; so is one for graphics beyond a scene (a canvas of
-  hundreds of thousands of points, three dimensions, video), which are
-  not jig's.
+  domain and view. Graphics beyond a scene (a canvas of hundreds of
+  thousands of points, three dimensions, video) are not jig's: in a
+  browser, a widget of the application's draws them, over jig's other
+  parts (`../../protocol/browser.md`, 6.1); elsewhere, its own shell.
 
 ## 12. Accessibility
 
@@ -507,9 +527,10 @@ its bound, in a box of any size (section 17).
   a main, an aside complementary (section 3.1); a menu's items and a
   disclosure's content are in the tree whether shown or folded; every
   image's name is its text alternative.
-- The browser's shell maps roles to the platform's own
-  (`../../protocol/browser.md`, section 6), so a screen reader reads what
-  the fake person reads.
+- jig's page part maps roles to the platform's own, and an
+  application's element or widget keeps its node's role and name
+  (`../../protocol/browser.md`, sections 6 and 6.1), so a screen reader
+  reads what the fake person reads.
 
 ## 13. Styles
 
@@ -521,8 +542,8 @@ its bound, in a box of any size (section 17).
   `jig-warning`, `jig-danger`, `jig-success`, `jig-button-weight`,
   `jig-dense-list`; its regions' as pages.md, 12.4 lists them); an
   application's start with its name and a hyphen, and its view root
-  gives them in its look, what the application gives its shells when
-  they are built (`../../protocol/browser.md`, 3.3).
+  gives them in its look, plain data the application's shells give
+  their parts (`../../protocol/browser.md`, 3.3).
 - **How tokens look** is the shell's: in a browser, jig's stylesheet,
   which styles jig's tokens and places jig's regions, and the
   application's after it, which styles its own and may restyle jig's
@@ -762,9 +783,11 @@ platform. `jig_view::scene` is step code under the subset
   draws no kind of its own yet: its `draw` returns false (section 16).
 - **Of its inputs alone:** the same kind, data and size give the same
   scene.
-- **Taken when a shell is built,** with the application's look: a shell
-  that draws calls the view root's `draw` for each drawing it shows
-  (section 11).
+- **Given to a shell's parts** with the application's look, as a
+  function: a shell that draws calls the view root's `draw` for each
+  drawing it shows (section 11); in a browser, jig's page part does,
+  for every kind the application has not mapped to a widget of its own
+  (`../../protocol/browser.md`, 3.3 and 6.1).
 
 ### 17.2 The scene
 
@@ -830,7 +853,7 @@ platform. `jig_view::scene` is step code under the subset
 
   | Shell | A scene |
   |---|---|
-  | the browser's | inline SVG of the box's size: each mark an SVG element, its tokens as classes, its hint as `<title>`; the SVG hidden from assistive technology, and the fallback from sight while the scene is drawn (`../../protocol/browser.md`, section 8) |
+  | a browser's, through jig's page part | by default, inline SVG of the box's size: each mark an SVG element, its tokens as classes, its hint as `<title>`; the SVG hidden from assistive technology, and the fallback from sight while the scene is drawn (`../../protocol/browser.md`, section 8); a kind the application maps to a widget of its own, not drawn as a scene: the widget draws the drawing's data as it likes, and the fallback stays for assistive technology and the fake person (`../../protocol/browser.md`, 6.1) |
   | the text shell, the fake person's tree face | not drawn: they read the fallback, unchanged (15.3; testing.md, section 3) |
   | an application's own shell (section 11) | its platform's drawing of the same scene |
 
@@ -839,5 +862,5 @@ platform. `jig_view::scene` is step code under the subset
 - **Golden scenes** fix drawing code, on the host: scenes printed as
   lines, kept as files beside the tests and changed only by hand, as the
   text shell's golden text is (15.6).
-- **A scene as SVG** is the browser's shell's to test, on the host
+- **A scene as SVG** is jig's browser parts' to test, on the host
   (`../../protocol/browser.md`, section 15).

@@ -248,15 +248,17 @@ down:  released and door outputs → components → io submissions
   process (section 10), the worker's agents smith's real agent
   processes, run as its own `agent` command (section 6). A native client
   on loopback signs in by the link it prints (`client.md`, section 8). When
-  its configuration names a bundle's directory, it reads the bundle at
-  start and serves jig's test application's browser client from it
-  (`browser.md`, section 12), which the browser tier opens (`browser.md`,
-  section 15). Its
-  LLM endpoint is its configuration's. Its periods are the smallest
-  source's: one open period per configured project, at the deployment's
-  first start (`configuration.md`, section 5). It is the template an
-  application copies for its own `main`, and the process and live layers
-  of jig's proofs (section 8).
+  its configuration names a bundle's directory, its startup reads the
+  bundle there and gives it, its page included, to
+  `jig-protocol-engine-clients` as data, which serves jig's test
+  application's browser client, built from the reference shell,
+  `jig-test-shell-web` (`browser.md`, 3.1 and section 12); the browser
+  tier opens it (`browser.md`, section 15). Its LLM endpoint is its
+  configuration's. Its periods are the smallest source's: one open
+  period per configured project, at the deployment's first start
+  (`configuration.md`, section 5). It is the template an application
+  copies for its own `main`, and the process and live layers of jig's
+  proofs (section 8).
 - **`ops`'s service follows them,** as the reference for an application
   with agents in the engine and no workers.
 

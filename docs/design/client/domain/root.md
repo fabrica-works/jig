@@ -202,10 +202,13 @@ with a lifecycle, as a queue is. Its design is a section of skein's
   children's: jig's (the inbox, a task, a project's section) and each
   family's (an incident, an environment). A place gone to is routed to
   its owner, which opens its page, and every other child is told it left
-  whatever page it had (client.md, section 5). Below the domain, each
-  owner's addresses are printed and parsed as paths: jig's by
-  `jig-protocol-client-link`'s `address` module, the application's by
-  its client host (`../../protocol/browser.md`, section 9).
+  whatever page it had (client.md, section 5). Below the domain, the
+  application's client host prints and parses every owner's addresses
+  as paths, with its own codec: for jig's, jig's default codec,
+  `jig-protocol-client-link`'s `address` module, as is, under a prefix,
+  renamed, or replaced; for its families', its own. Every path is the
+  application's but those under `/jig/`, the engine's own
+  (`../../protocol/browser.md`, section 9).
 - **Acts by owner.** The view decodes a person's act into the root's
   action, already wrapped with the owner of the node acted on
   (view.md, section 5); the root hands it to that child.
@@ -356,8 +359,8 @@ The view root (view.md, section 4) mirrors the domain's root:
 - it resolves a link node's address, without acting, through its
   binding's owner's view (view.md, section 5);
 - it routes `draw` by a drawing kind's owner, exhaustively, and gives
-  its owners' names for styles and regions, for the look its shells take
-  (view.md, sections 13 and 17.1).
+  its owners' names for styles and regions, for the look, plain data its
+  shells give their parts (view.md, sections 13 and 17.1).
 
 ## 10. What a root never does
 
@@ -415,7 +418,9 @@ arms to fill. The client host around them, which routes between both
 roots and `jig-protocol-client-link` for every shell, is copied from
 jig's test application's, as its binary and its service are
 (`../../protocol/browser.md`, 3.2; `../../protocol/service.md`,
-section 1).
+section 7); so is its browser shell, its start and its loop over jig's
+browser parts, from the reference shell, `jig-test-shell-web`
+(`../../protocol/browser.md`, 3.1).
 
 ## 13. The world
 

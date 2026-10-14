@@ -345,9 +345,13 @@ section 12):
   section 4): P accepts the restart from the incident's page, typing
   the numbers the page printed. Its loop over a real terminal comes with
   `ops` standalone (9.1), which gives it an engine to reach.
-- **Its browser client:** its browser crate, `jig-ops-shell-web`, over
-  jig's browser's shell (`protocol/browser.md`, section 3), comes with
-  `ops` standalone too (9.1), whose engine serves its bundle.
+- **Its browser client:** its browser shell, `jig-ops-shell-web`, copied
+  from jig's reference shell: its start and its loop over jig's browser
+  parts and its client host, which takes jig's default codec for jig's
+  places at the root and parses and prints incidents' and environments'
+  paths with its own (`protocol/browser.md`, sections 3 and 9). It comes
+  with `ops` standalone too (9.1), whose startup gives its engine the
+  bundle to serve.
 
 ## 9. Its systems
 

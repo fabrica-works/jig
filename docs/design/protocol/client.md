@@ -49,11 +49,11 @@ in section 15.
   range shows that it is out of date and keeps what is pending.
 - **The small store is the wire's records,** per owner, versioned, written
   by the shell before any request of the same step leaves.
-- **Shells are small:** the browser's, every application's: the client
-  compiled to WebAssembly over the platform's fetch, served by the
-  engine (`browser.md`); a native one over skein's HTTP client and
-  server-sent events reader. Each maps its platform onto the same
-  component.
+- **Shells are small:** an application's browser shell, its loop over
+  jig's browser parts: the client compiled to WebAssembly over the
+  platform's fetch, served by the engine (`browser.md`); a native one
+  over skein's HTTP client and server-sent events reader. Each maps its
+  platform onto the same component.
 - **On one person's machine** (`README.md`, section 4) the browser reaches
   the engine on a loopback address, in plaintext, and the person signs in
   by a link the engine prints at start (section 8).
@@ -421,27 +421,37 @@ the platform's HTTP stack, TLS                  TLS server, or plaintext on loop
 
 ## 12. Shells
 
-- **The browser's** (`jig-shell-web`, `browser.md`): every application's,
-  written once by jig, to which an application gives a small crate of its
-  own: its client host and its look. The client root, its view and this
-  component compiled to WebAssembly (`wasm32-unknown-unknown`, stable
-  Rust), with only the glue `wasm-bindgen` generates, which jig's bundler
-  makes beside a starter of two statements, and no other build tool;
-  exchanges and the stream over the platform's fetch, the stream read as
-  server-sent events by skein's reader in the component; session storage
-  for the small store; the tree mapped to HTML elements with their roles,
-  and drawings' scenes to SVG (`../client/domain/view.md`, section 11).
-- **Served by the engine:** the engine's protocol layer serves the
-  client's bundle (its page, its starter, its glue, its module, jig's
-  stylesheet and the application's, the pictures of both) from its one
-  origin, read at start from the directory its configuration names, or
-  none (`configuration.md`, section 3), and answers the page at every
-  path outside `/jig/` and at the link's route. It serves under a strict
-  content security policy: scripts from the origin only, no inline
-  script, WebAssembly compiled only from the module the origin serves
-  (`'wasm-unsafe-eval'`, which compiling it needs), connections to the
-  origin only; and it answers only requests naming its own host
-  (`browser.md`, section 12).
+- **The browser's** (`browser.md`): the application's browser shell,
+  `<application>-shell-web`, its start and its loop over jig's browser
+  parts (`jig-shell-web`) and its client host, copied from jig's
+  reference shell. The client root, its view and this component
+  compiled to WebAssembly (`wasm32-unknown-unknown`, stable Rust), with
+  only the glue `wasm-bindgen` generates, which jig's bundler makes
+  beside a starter of two statements, and no other build tool (an
+  application's own page and JavaScript, from the origin only, are
+  steps it may take: `browser.md`, 3.5); exchanges and the stream over
+  the platform's fetch, the stream read as server-sent events by
+  skein's reader in the component; session storage for the small store,
+  written before a step's exchanges leave by jig's transport part
+  (`browser.md`, 5.3); the tree mapped to HTML elements with their
+  roles, and drawings' scenes to SVG, by jig's defaults, which an
+  application may override for its own nodes (`browser.md`, 6.1;
+  `../client/domain/view.md`, section 11).
+- **Served by the engine:** the engine's protocol layer serves what the
+  application's startup gives it at start, as data: the client's bundle
+  (its page, its starter, its glue, its module, jig's stylesheet and the
+  application's, the pictures of both, the application's own files),
+  its root files and the policy's additions, or none, which serves no
+  browser; jig's reference reads the bundle from the directory its
+  configuration names (`configuration.md`, section 3). It answers the
+  page at every path outside `/jig/` but the root files the startup
+  names, and at the link's route. Whatever it serves, its front door
+  stays. It serves under a strict content security policy: scripts from
+  the origin only, no inline script, WebAssembly compiled only by the
+  origin's code (`'wasm-unsafe-eval'`, which compiling the module
+  needs), connections to the origin and the origins the application
+  names; and it answers only requests naming its own host (`browser.md`,
+  sections 12 and 12.1).
 - **The native one** (`jig-shell-native`): skein's HTTP client on
   skein's io, handing the stream's body to the component, whose reader
   cuts it into events, for Linux and for the worlds
@@ -478,10 +488,11 @@ Each within jig's suites' budgets (`../../development/workflow.md`).
   in-memory streams cut at random. Its referee is the joint world's, and
   adds: every record crossed decodes to what was encoded; no secret
   reaches a domain; a slow stream never holds the engine up.
-- **The browser tier:** the browser's shell in Chromium, against the
-  application's binary (for jig, `jig-test`), both children of the
-  harness's one loop, a person reading the page by role, name and text
-  through the browser's face over skein's browser kit (skein's
+- **The browser tier:** the application's browser shell in Chromium,
+  against the application's binary (for jig, `jig-test`), both children
+  of the harness's one loop, a person reading the page by role, name and
+  text through the browser's face over skein's browser kit, in jig's
+  stories for a browser shell and the application's own (skein's
   `browser.md`; `browser.md`, section 15).
 
 ## 15. Open questions
