@@ -189,7 +189,19 @@ Files: `tests/client-protocol/src/native.rs` (a `NativeClient` that, when
   spawns the client with `world.spawn_root`; the client process's two
   inherited pipes, from `Sim::open_inherited_read`/`open_inherited_write`,
   as smith's `tests/local-process/tests/terminal.rs:13` opens one, read
-  only as a model);
+  only as a model). `run` calls `World::run_with_inputs` in place of
+  `world.run()` (skein `testing/skein-world/src/world.rs:369` at jig's
+  pin: its closure gets `&mut Sim`, the pids and the processes on each
+  iteration, before the processes' turns): there it opens the client's
+  two pipes once, hands them to the client through a
+  `Cell<Option<(Fd, Fd)>>` field the client takes on its next iterate
+  and gives to `Terminal::adopt` (the field carries
+  `#[expect(clippy::disallowed_types, reason = "…")]`: `clippy.toml:35`
+  refuses `Cell`), and feeds and drains them with `Sim::peer_feed`,
+  `peer_drain` and `peer_close` (skein-sim `processes.rs:296,306,316`).
+  The client's `next_deadline` includes `Terminal::next_deadline`, since
+  an idle world with nothing due fails, and the client closes both
+  descriptors before it settles (the world's `assert_no_open_fds`);
   `tests/client-protocol/src/stories.rs` or `native.rs`'s `Script` (the
   lines typed); `tests/client-protocol/tests/native.rs`;
   `tests/client-protocol/Cargo.toml` (`jig-shell-text`).
