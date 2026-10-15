@@ -455,6 +455,137 @@ None yet; they start at 101.
 121. **skein 13's Shapes against main** (ready check of skein-13.1).
      skein 13's session file corrected against skein `9098df1` (skein 02.5 and 03.2 landed) and jig `81744cca6`: no story reads the harness's snapshot, written only on a failure and printing no focus: the harness gains its own steps `Title(words)` (13.1, the page's root named by the title), `Focused(find)` (13.3), `Taller { find }` (13.5, a box from a query with `boxes: true`), beside `Key` and `PressAt`, each through a method of `BrowserFace`; `Key` is `skein_browser::boundary::Key` and `PressAt`'s point `skein_browser::boundary::Point`; 13.1 names skein-ui-web's `lib.rs`, `tests.rs`, web-sys features and `Look` fixture, the view's `address` and `styles_per_node` 1, and keeps the shell's landed `href`s; 13.2 names `tests/ui-web/Cargo.toml`, the view's node count, goldens and `bindings`, and the face choosing an option by the kit's keys, as 14.1's fact test does, since a closed select's option has no box to press; 13.3 grows `bindings`; 13.4 drops the page part's press in a scene, landed with 09.5, and names the view's `draw` module and its scene limits (0 today), and the face; 13.5 names the shell's `Look` literal, `Dom::new` constructors and web-sys `HtmlElement`, and the fixture; `size.txt` records the cargo `web` module's bytes. A further limit, golden or node count these Files miss: change it in the same increment, and list it in the commit body.
 
+122. **what a story sees before it looks for something absent** (the designer's answer of 2026-10-15T14:21Z, no step blocked).
+     The designer's answer to the question of 2026-10-15T14:15:41Z (when a write-refused story may see `absent` gone), landed as skein `1ff0531` (ui-web.md 14.2 and 14.3; examples.md 9.2 and 9.4) and jig `20a050caa` (skein/14-stories.md 14.3, 14.4 and the sketch; skein/12-transport.md 12.4), follows.
+
+
+     **Decision: the supervisor's reading.** The story takes a fourth `Find`,
+     `loaded`: what a page shows once it holds its server's state. The
+     second person sees it with a `See` step, and only then plays `Gone` on
+     `absent`. Two more decisions go with it:
+
+     - **Typing while a patch arrives takes `loaded` too.** Its first person
+       sees `loaded` before it composes, so that its `Gone` on `arrives` (my
+       answer of 14:14Z) means something. That answer said "the page that
+       showed the field shows no patch yet". That reason is wrong: the
+       example's form shows before its list is read.
+     - **For the example, `loaded` is its status saying Live.** examples.md
+       9.2 now defines when the status says it: from the list's answer, read
+       after the stream opened, until the stream ends.
+
+     Why:
+
+     - **Not a `Gone` held for a time.** That is a fixed wait, which 14.2's
+       bullet refuses.
+     - **Not the kit's load event** (`browser.rs:1292`). It comes before the
+       list's exchange is answered.
+     - **Not the example's "No notes yet."** On main the list page says it
+       from the start, before any read:
+       - `state.rs:48` starts with no notes;
+       - `view.rs:61-63` writes phrase 3, "No notes yet.", when the notes
+         are empty.
+
+       Its meaning would also depend on the server holding no notes.
+     - **Why Live works.** A page that says Live has read the list after its
+       stream opened. In the story, the second person's page starts again
+       after the first person's script has ended, and the refused step's
+       exchange, had it left, went in that step's turn. So the list read
+       after it holds the note, and the status says Live only once that read
+       is answered.
+
+     ### Landed
+
+     - skein `1ff0531`, "Name what a browser story sees before it looks for
+       something absent":
+       - ui-web.md 14.2: two rows of the table, and the bullet;
+       - ui-web.md 14.3;
+       - examples.md 9.2 and 9.4.
+     - jig `20a050caa`, "skein-ui: `loaded` through skein 14.3 and 14.4, and
+       12.4's live status": `skein/14-stories.md` (14.3, 14.4, the sketch)
+       and `skein/12-transport.md` (12.4's Shape and Test shape).
+     - Nothing deferred: no `later.md` row.
+
+     ### The text it rests on (skein `1ff0531`)
+
+     - ui-web.md 14.2, line 876: "| a write refused | … | an address at
+       which its small store is bounded below a step's write, as its test
+       build allows; a script making that step there; what the step would
+       have made, which no page then shows; and what a page shows once it
+       holds its server's state |". Line 873, typing, ends the same way: "…
+       which the page does not show before it; and what a page shows once it
+       holds its server's state |".
+     - The bullet, from line 882: "A story looks for something absent only
+       once its page shows that it holds its server's state, which the
+       application names too: what a page has not read yet is absent as
+       well, and the page's load, which the kit sees, comes before its first
+       read is answered."
+     - examples.md 9.2, from line 536: "The page is live from the list's
+       answer, read after the stream opened, until the stream ends: the
+       banner's status says Live then, and Offline otherwise; an add's
+       exchange failing leaves it as it is. A page that says Live holds the
+       server's notes as of its read, and each made since, which skein's
+       stories see before they look for a note that is not there (9.4)."
+     - examples.md 9.4, line 619, and ui-web.md 14.3, line 906: the example
+       gives "the stories that look for something absent" its status saying
+       Live.
+
+     ### What each step does
+
+     - **12.4:**
+       - **Shape:** the view is live from the list's answer, read after the
+         stream opened, until the stream ends. The status says `Live` then
+         and `Offline` otherwise. An add's failed exchange leaves it as it
+         is: today `state.rs:70`, `Report::Failed { .. } => self.live =
+         false`, ends it on any failure.
+       - **Test shape:** a view test,
+         `live_from_the_lists_answer_until_the_stream_ends`.
+     - **14.3:**
+       - **Signature:** `write_refused(setup, address, script, absent,
+         loaded)`.
+       - **Order:** the second person, after the first person's flag, goes
+         to `/`. It sees `loaded` with a `See` step within 5 s, then
+         `absent` gone with a `Gone` step within 1 s.
+       - **Needs:** skein 12.4 as well as 12.3, for the live status. This is
+         an order change that follows from the answer. 14.3 already waits on
+         14.2, which waits on 14.1 and skein 02.5.
+       - **Unchanged:** the Test shape, the Proof and the Don't.
+     - **14.4:**
+       - **Signature:** `typing_while_patched(setup, field, second, arrives,
+         loaded)`.
+       - **Order:** the first person sees `loaded` within 5 s, composes in
+         `field`, sees `arrives` gone, then sets the flag. The rest is
+         unchanged.
+     - **The example's tier:** it gives both stories `Find::text(b"Live")`.
+       `Live` is phrase 1 of the view's phrasebook (`view.rs:12`).
+
+     ### Checked against main
+
+     - skein `83a0cec`, before the landing:
+       - `examples/ui/view/src/state.rs:48`: `State { notes, place:
+         places::parse(path), live: false, … }`;
+       - `state.rs:70`: `Report::Failed { .. } => self.live = false,`;
+       - `view.rs:12`: `[b"Notes", b"Live", b"Offline", b"No notes yet.",
+         …]`;
+       - `view.rs:61-63`: `fn list` writes `phrase(state, 3)` when the notes
+         are empty;
+       - `testing/skein-fake-person/src/lib.rs:233`: `Step::Gone { .. } =>
+         found == Found::Absent`;
+       - `testing/skein-browser/src/browser.rs:1292`: `b"Page.loadEventFired"
+         | b"Page.navigatedWithinDocument"`.
+     - jig `20a050caa`, `skein/14-stories.md`:
+       - line 198: `pub fn typing_while_patched(setup: &Setup<'_>, field:
+         Find, second: &mut dyn Play, arrives: Find, loaded: Find) ->
+         Outcome;`
+       - line 204: `pub fn write_refused(setup: &Setup<'_>, address: &[u8],
+         script: &mut dyn Play, absent: Find, loaded: Find) -> Outcome;`
+     - Commands:
+       - `grep -n 'Report::Failed { .. } => self.live = false\|fn
+         list\|phrase(state, 3)\|live: false' examples/ui/view/src/state.rs
+         examples/ui/view/src/view.rs`
+       - `grep -n 'b"No notes yet."' examples/ui/view/src/view.rs`
+       - `git show origin/main:docs/development/plans/skein-ui/skein/14-stories.md
+         | grep -n 'pub fn typing_while_patched\|pub fn write_refused'`
+
 ## For the user
 
 Long-term choices the user may veto; each default holds unless the user
