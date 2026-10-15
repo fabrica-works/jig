@@ -70,8 +70,14 @@ holds Escape, menus and a select's choice put back (7).
 Scope: ui-web.md 5.1 (the inbox), 5.3 (no re-entry), 13.
 Needs: skein 01.3 (the moved crates; nothing in skein-ui changes
   between skein 01.1 and 01.3).
-Files: new `crates/skein-ui-web/{Cargo.toml, src/lib.rs, src/inbox.rs,
-  src/tests.rs, src/tests/fixtures.rs}`; skein's `Cargo.toml`
+Files: new `crates/skein-ui-web/{Cargo.toml, clippy.toml, src/lib.rs,
+  src/inbox.rs, src/tests.rs, src/tests/fixtures.rs}`: the crate is
+  ordinary Rust (ui-web.md, 2), so its `clippy.toml` is a copy of
+  `crates/skein-ui-bundle/clippy.toml`, and its `Cargo.toml` has its own
+  `[lints.rust]` and `[lints.clippy]` tables, as
+  `crates/skein-ui-bundle/Cargo.toml:15-24` has, not `[lints] workspace
+  = true` (under the root `clippy.toml` the inbox fails 53 times);
+  `Cargo.lock`; skein's `Cargo.toml`
   (`[workspace.dependencies]` `skein-ui-web`, and `wasm-bindgen =
   "=0.2.126"`, `js-sys = "=0.3.103"`, `web-sys = "=0.3.103"` with no
   features yet; findings/toolchain.md, 1).
@@ -111,8 +117,9 @@ Removes: nothing.
 ### 09.2 The document model, and scenes as SVG
 Scope: ui-web.md 8; ui.md 11.4.
 Needs: skein 04.1 (`skein_ui::scene`) and skein 03.1 (the look's names).
-Files: `crates/skein-ui-web/src/{dom.rs, svg.rs, look.rs}`; new
-  `src/tests/golden/scene.svg`; `src/tests/svg.rs`.
+Files: `crates/skein-ui-web/src/{dom.rs, svg.rs, look.rs, lib.rs
+  (`pub mod dom`, `pub mod svg`, `pub use look::Look`), tests.rs (`mod
+  svg;`)}`; new `src/tests/golden/scene.svg`; `src/tests/svg.rs`.
 Shape: `dom::{Element, Child, print}`; `svg::draw(scene: &Scene, names:
   &[Names<'_>], width: u16, height: u16) -> Element`: an `<svg
   aria-hidden="true" width height viewBox>`, one element per mark
@@ -130,8 +137,10 @@ Removes: nothing.
 
 ### 09.3 The mapping
 Scope: ui-web.md 6 (the table and the attributes); ui.md 16.1.
-Needs: skein 03.1 (the look's names).
-Files: `crates/skein-ui-web/src/mapping.rs`; `src/tests/mapping.rs`;
+Needs: 09.2 (`Look`, `dom::Element`, `dom::print`) and skein 03.1 (the
+  look's names).
+Files: `crates/skein-ui-web/src/mapping.rs`; `src/lib.rs` (`pub mod
+  mapping`); `src/tests.rs` (`mod mapping;`); `src/tests/mapping.rs`;
   new `src/tests/golden/mapping.html`.
 Shape: `mapping::element(made: &Made, look: &Look<'_>, prefix: &[u8])
   -> Element` (`made` as the diff gives a node; `prefix` the digest
@@ -159,9 +168,12 @@ Scope: ui-web.md 7 (patches applied in place, the focus, a removal
   taking the focus), 5.3 (a patch naming no held node is a panic), 8
   (a drawing's scene and fallback).
 Needs: 09.2, 09.3.
-Files: `crates/skein-ui-web/src/page.rs`; `src/tests/page.rs`; new
+Files: `crates/skein-ui-web/src/page.rs`; `src/lib.rs` (`pub mod
+  page`); `src/tests.rs` (`mod page;`); `src/tests/page.rs`; new
   goldens in `src/tests/golden/`.
-Shape: `Page::new(look, prefix)`; `Page::apply(&mut self, patches:
+Shape: `Page::new(look, limits, prefix)`, the page holding one `Scene`
+  made at the view's limits (skein 04.1's `Scene::new(&Limits)`), which
+  `look.draw` writes into; `Page::apply(&mut self, patches:
   &[Patch], ops: &mut Vec<Op>)`: insert, remove, move, text, attribute
   and value applied to its model, keyed by node id, emitting the `Op`s
   the platform half replays; a drawing drawn through `look.draw` and
@@ -259,7 +271,7 @@ pub enum Op {
 }
 pub struct Page<'a> { /* the model, by node id */ }
 impl<'a> Page<'a> {
-    pub fn new(look: Look<'a>, prefix: &'a [u8]) -> Page<'a>;
+    pub fn new(look: Look<'a>, limits: &Limits, prefix: &'a [u8]) -> Page<'a>;
     pub fn apply(&mut self, patches: &[Patch], ops: &mut Vec<Op>);
     pub fn resized(&mut self, node: NodeId, width: u16, height: u16, ops: &mut Vec<Op>);
     pub fn act(&mut self, event: Event, ops: &mut Vec<Op>) -> Option<(NodeId, Act)>;
