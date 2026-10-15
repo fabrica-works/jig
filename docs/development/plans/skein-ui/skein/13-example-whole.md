@@ -29,7 +29,11 @@ bundler's (4, this plan's choice), an element override and a component
 shows is a new entry or replaces the current one; back and forward a
 place gone to, then the entry's scroll (ui-web.md, 9). The title is the
 main's first level-1 heading, ` · `, the name (ui-web.md, 7). A
-component reports only its node's role's acts (ui-web.md, 6.1).
+component reports only its node's role's acts (ui-web.md, 6.1). The
+closing warning is the window's `onbeforeunload`, set only while closing
+loses requests (ui-web.md, 5.1); a go accepts it and reports `Warned`,
+and the kit dismisses any other native dialog as `Trouble` (browser.md,
+6 and 7).
 
 ## Choices this plan makes
 
@@ -43,6 +47,9 @@ component reports only its node's role's acts (ui-web.md, 6.1).
 - **The harness's own steps** (skein 11.2's `harness::Step`):
   `Title(words)` in 13.1, the kit's query of the page's root
   (Chromium's `RootWebArea`) named exactly by the document's title;
+  `Warned(bool)` in 13.1, whether the person's last go met its page's
+  closing warning, which the face records from the kit's
+  `Event::Warned` of that go (skein `506b940`, browser.md 6);
   `Focused(find)` in 13.3, the found node's `Seen.states.focused`
   (`testing/skein-browser/src/boundary.rs:129`); `Key(skein_browser::
   boundary::Key)` in 13.3 (`boundary.rs:71`; the crate's `lib.rs:16`
@@ -77,9 +84,14 @@ component reports only its node's role's acts (ui-web.md, 6.1).
 ## Increments
 
 ### 13.1 History, the timer, the title, and a note's page
-Scope: ui-web.md 5.1 (history, the timer, title and closing), 6.1 (an
-  element of its own), 7 (going to another page; the title), 9;
-  examples.md 9.1 (a note's page).
+Scope: ui-web.md 5.1 (history, the timer, title and closing, the
+  closing warning), 6.1 (an element of its own), 7 (going to another
+  page; the title), 9, 14.2 (the face's go, the harness's check of the
+  warning); browser.md 6 (a go answers its page's closing warning) and
+  7 (a native dialog dismissed as trouble); examples.md 9.1 (a note's
+  page), 9.2 (the warning while an add is pending), 9.5. Skein
+  `506b940` added the warning's and the dialogs' text, answering 13.1's
+  question of 2026-10-15T14:56:13Z.
 Needs: skein 12.3 (notes made by an add).
 Files: new `crates/skein-ui-web/src/{history.rs, history/web.rs,
   timer.rs, timer/web.rs, title.rs, title/web.rs}`;
@@ -98,7 +110,15 @@ Files: new `crates/skein-ui-web/src/{history.rs, history/web.rs,
   `src/limits.rs` (`styles_per_node` 0 to 1, line 12, else the
   `notes-card` style panics at skein-ui's `builder.rs:233`);
   `testing/skein-fake-person-browser/src/{harness.rs, face.rs}`
-  (`Step::Title`).
+  (`Step::Title`, `Step::Warned`, the face's record of its last go);
+  the kit: `testing/skein-browser/src/{boundary.rs (`Event::Warned {
+  op }` beside `Done`, 52; `Trouble::Dialog`, 160-165), browser.rs
+  (`Page.javascriptDialogOpening` in `notification`, 1281; the answer
+  through `queue_page`, 384), params.rs (`Params::Dialog { accept }`)}`;
+  its tests: `tests/browser/src/{tests.rs, referee.rs (`Warned` before
+  its go's terminal, 39-48), serve.rs (a page `/leave`, 25-36)}`,
+  `tests/browser/tests/{support/real.rs (two scenarios, 128-139, and
+  their `Trouble` arms, 595-608), browser_real.rs}`.
 Shape: `history::History` (shows a path new or in place, keeps the
   scroll in the entry's state, reports a place gone to); `timer::Timer`
   (one deadline); `title::set(heading, name, language, loses)`;
@@ -107,6 +127,23 @@ Shape: `history::History` (shows a path new or in place, keeps the
   `<article role="region">`, named; links' `href`s set after each
   apply from `State::address`, as the shell already does
   (`examples/ui/shell-web/src/lib.rs:121-124`): kept, not added.
+  The closing warning: `title/web.rs` calls
+  `window.set_onbeforeunload(Some(..))` while `loses` (the view's
+  `State::closing_loses`, `state.rs:208`) and `set_onbeforeunload(None)`
+  otherwise (web-sys `gen_Window.rs:1839`); its handler asks the
+  browser to warn as the WIP's listener does, now as the window's one
+  handler. The kit, on
+  `Page.javascriptDialogOpening` for a page: when its `type` is
+  `beforeunload` and the page has a go in flight (at most one,
+  `admit_op`, 583-591), it sends `Page.handleJavaScriptDialog` with
+  `accept: true` and pushes `Event::Warned { op }` of that go; for any
+  other dialog it sends `accept: false` and reports
+  `Trouble::Dialog`, its text `<type>: <message>`, cut to
+  `Limits::text`. The answer is a page command like any other, counted
+  in flight; its reply is dropped. The face sets its record to `false`
+  at each `Doing::Go` and `Doing::Reload`, and to `true` on `Warned` of
+  its acting go; `Step::Warned(expected)` fails the story, naming both,
+  when the record differs.
 Test shape: host: `src/tests/history.rs`:
   `a_place_gone_to_is_reported_as_a_path`; `src/tests/mapping.rs`:
   `an_override_keeps_the_nodes_role_and_name`; view:
@@ -114,12 +151,50 @@ Test shape: host: `src/tests/history.rs`:
   `an_unknown_note_says_there_is_none`; story
   `a_person_opens_a_note_and_comes_back_by_its_link` (on the note's
   page, the document's title reads `<the note's title> · Notes`, by
-  the harness's `Title` step). Step tests
-  under 20 ms; the story about 3 s.
-Proof: live, `heavy --gate scripts/check.sh` once: the story passes.
-  Bound: 15 minutes.
-Don't: navigate the page on a plain press of a link (ui-web.md, 7).
-Size: about 450 lines.
+  the harness's `Title` step). The warning, in
+  `tests/ui-web/tests/browser_example.rs`, beside
+  `a_reload_keeps_a_pending_add_made_once` and with its `Setup`:
+  - `a_reload_with_an_add_pending_meets_the_closing_warning`: see the
+    `Title` field; `StopServer`; type `Groceries`; press `Add`; pause
+    100 ms; `StartServer`; `Reload`; `Warned(true)`;
+  - `a_reload_once_the_add_is_made_meets_no_closing_warning`, with the
+    example's default `Setup`: see the `Title` field; type
+    `Groceries`; press `Add`; see the link `Groceries`, the add made and
+    nothing pending (`add_answered`, `state.rs:256-272`, clears the
+    pending slot in the step that accepts the note); `Reload`;
+    `Warned(false)`. The press on `Add` is the input Chromium asks
+    before it shows a warning (browser.md 6).
+
+  The kit's, in `tests/browser/src/tests.rs`, each event given as
+  `trouble_is_reported_without_judgment` gives its own (221-253):
+  `a_go_accepts_its_pages_closing_warning` (a reload, a
+  `beforeunload` dialog: the answer `accept: true`, `Warned` then
+  `Done`); `a_dialog_outside_a_go_is_dismissed_as_trouble` (a confirm,
+  and a `beforeunload` with no go: each `accept: false` and a
+  `Trouble::Dialog`, `confirm: Delete it?` the first's text). In
+  `browser_real.rs`, on `/leave` (a button `Hold` setting
+  `onbeforeunload` and a heading `Held`; a button `Ask` writing
+  `Answer: ` and `confirm('Delete it?')`'s answer into the heading):
+  `chromium_accepts_the_closing_warning_on_a_reload` (press `Hold`,
+  see `Held`, reload: `Warned`, `Done`, the heading back; press `Hold`
+  again, close the page: `Closed`, and no `Warned` or `Trouble`);
+  `chromium_dismisses_a_confirm_as_trouble` (press `Ask`: the press
+  `Done`, a `Trouble::Dialog` naming `confirm: Delete it?`, the heading
+  `Answer: false`). Step tests under 20 ms; each story about 3 s; each
+  real test about 2 s.
+Proof: live, `heavy --gate scripts/check.sh` once: the stories and the
+  kit's tests pass, `a_reload_keeps_a_pending_add_made_once` among
+  them, unchanged. Bound: 15 minutes.
+Don't: navigate the page on a plain press of a link (ui-web.md, 7);
+  add a request that answers a dialog, or accept any dialog but a
+  `beforeunload` during a go of its page (later.md); close a page by
+  `Page.close`, which runs `beforeunload` (the kit's `Target.closeTarget`
+  stays, 767); register the warning by `addEventListener`, which the
+  restart part's `set_onbeforeunload(None)` (14.2) would not clear;
+  change `a_reload_keeps_a_pending_add_made_once`; teach the fake
+  browser in `tests/browser/src/world.rs` dialogs: the step tests give
+  the events, and the fake's scenarios open none.
+Size: about 700 lines.
 Removes: nothing.
 
 ### 13.2 The form whole

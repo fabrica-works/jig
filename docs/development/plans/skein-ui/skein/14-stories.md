@@ -23,7 +23,8 @@ chosen by the kit's keys, checked on fixed pages a small server on
 skein's HTTP serves in the test's loop (ui-web.md, 14.1). A panic
 reloads within three in a minute, counted under `skein-ui-restarts`,
 and past it the page says the application failed and starts nothing
-(5). The four stories: typing while a patch arrives; back and forward;
+(5); before either, the restart part clears the closing warning, the
+window's `onbeforeunload` (5 and 5.1, skein `506b940`). The four stories: typing while a patch arrives; back and forward;
 a panic; a write refused (14.2's table). Each takes what the table's
 third column names, and nothing else; what it must see on a person's
 page is a `Find` the application gives, awaited, never a fixed time,
@@ -117,16 +118,24 @@ Files: new `crates/skein-ui-web/src/{restart.rs, restart/web.rs}`;
   14.s1's, not 14.2's (ruling 126).
 Shape: `restart::Restart::new(limit: 3, within: 60 s, key:
   "skein-ui-restarts", words)`; its pure half decides from the dates
-  kept whether to reload or to say the words; `stories::panic(setup,
+  kept whether to reload or to say the words; the hook's platform half
+  first calls `window.set_onbeforeunload(None)` (web-sys
+  `gen_Window.rs:1839`, feature `Window`, already in skein-ui-web's
+  `Cargo.toml:16`), then reloads or says the words; `stories::panic(setup,
   address, failed: Find)`, `failed` the application's words for "the
   application failed", which the story sees past the limit.
 Test shape: host: `src/tests/restart.rs`:
   `a_fourth_panic_in_a_minute_says_the_application_failed`,
   `a_panic_past_the_minute_reloads_again`; story `a_panic_reloads_then_says_it_failed`.
   Step tests under 20 ms; the story about 3 s.
-Proof: live, `heavy --gate scripts/check.sh` once: the story passes.
-  Bound: 15 minutes.
-Don't: keep the restarts' count in the small store's prefix; give
+Proof: live, `heavy --gate scripts/check.sh` once: the story passes;
+  and `grep -c 'set_onbeforeunload(None)'
+  crates/skein-ui-web/src/restart/web.rs` prints 1, once. No story
+  checks the cleared warning: the example's test address panics at
+  start, before any turn sets one. Bound: 15 minutes.
+Don't: keep the restarts' count in the small store's prefix; reach the
+  title and closing part from the restart part (the window's one handler
+  is the contract, ui-web.md 5.1); give
   `Restart` or the story words of skein's own: `words` and `failed`
   are the application's (ui-web.md, 5.1 and 14.2).
 Size: about 150 lines.
