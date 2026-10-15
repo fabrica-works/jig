@@ -2,7 +2,7 @@
 //! A person keeps a script, its position, the first time of the current wait,
 //! and a terminal failure. It knows no client or engine state. A face searches
 //! the current tree or answers Pending while a browser query is outstanding.
-//! `next` consumes at most one step (client/domain/testing.md, section 3).
+//! `next` consumes at most one step (skein's ui.md, section 17.1).
 //!
 //! | Step/event | Next state | Reports |
 //! |---|---|---|

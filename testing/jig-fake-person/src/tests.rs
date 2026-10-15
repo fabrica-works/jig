@@ -1,14 +1,13 @@
 use super::*;
-use jig_view::Owner;
 use jig_view::ui::Binding;
 use jig_view::ui::Limits;
-use jig_view::ui::{Builder, DrawingKind, Role, Run, State, View};
+use jig_view::ui::{Builder, DrawingKind, Owner, Role, Run, State, View};
 
 use skein_lib::{Queue, Token};
 
 // Keep each scenario's fresh fixture and assertions, while sharing the test
-// process startup cost within the kits' serial budget (client/domain/testing.md,
-// sections 3 and 9).
+// process startup cost within the kits' serial budget (skein's ui.md,
+// section 17.1).
 #[test]
 fn tree_queries_find_regions_words_and_drawing_fallbacks() {
     finds_nested_regions_and_does_not_escape_their_subtrees();
@@ -53,7 +52,7 @@ fn build(fill: impl FnOnce(&mut Builder)) -> View {
     view
 }
 fn binding(n: u64) -> Binding {
-    Binding { owner: Owner::Jig.opaque(), token: Token::new(n) }
+    Binding { owner: Owner { number: 1 }, token: Token::new(n) }
 }
 fn region(name: &[u8]) -> Target {
     Target::Role { role: Role::Region, name: Box::from(name) }
@@ -88,12 +87,7 @@ fn fixture() -> View {
         b.bind(binding(4));
         b.state(State::Disabled);
         b.close();
-        b.drawing(
-            DrawingKind { owner: (Owner::Application { number: 1 }).opaque(), kind: 1 },
-            b"Error rate",
-            b"secret data",
-            32,
-        );
+        b.drawing(DrawingKind { owner: Owner { number: 1 }, kind: 1 }, b"Error rate", b"secret data", 32);
         b.text(Run::Plain, b"30 % since 10:02");
         b.close();
         b.close();

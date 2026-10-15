@@ -1,4 +1,4 @@
-//! Seeded shell acts on the currently visible tree (client/domain/testing.md, 3).
+//! Seeded shell acts on the currently visible tree (skein's ui.md, section 17.1).
 //! Only the seed and word bound are kept. Every selection scans bounded tree
 //! nodes, and input bytes come from a small alphabet that includes Markdown.
 use alloc::boxed::Box;

@@ -1,5 +1,5 @@
 //! Immediate accessibility queries, never drawing data or style tokens.
-//! The preorder subtree sizes scope queries (client/domain/view.md, section 3).
+//! The preorder subtree sizes scope queries (skein's ui.md, section 17.1).
 use crate::{Face, Find, Found, Target};
 use alloc::vec::Vec;
 use jig_view::ui::Act;
