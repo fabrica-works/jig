@@ -55,7 +55,7 @@ component reports only its node's role's acts (ui-web.md, 6.1).
   taller than when the step began. Each is a step of a `Script`, inside
   a `run`, reaching the kit through a method of `BrowserFace`, whose
   page, requests and token are private (`face.rs:17-47`). The harness
-  writes its snapshot only on a failure (`harness.rs:501`), and the
+  writes its snapshot only on a failure (its `snapshot`, `harness.rs:180`), and the
   snapshot prints no focus (`browser.rs:926-947`): no story reads it.
 - **The module's size** is kept in `examples/ui/shell-web/size.txt`,
   one line, the `web` build's bytes:
@@ -94,8 +94,8 @@ Files: new `crates/skein-ui-web/src/{history.rs, history/web.rs,
   beside 53-56), `Cargo.toml` (web-sys `History`, `PopStateEvent`,
   `BeforeUnloadEvent`, line 16), `src/tests/fixtures.rs` (its `Look`
   literal, 101, gains `elements`); the view's `src/state.rs` (`address`,
-  95-105, maps only notes' bindings: the link back gets its place) and
-  `src/limits.rs` (`styles_per_node` 0 to 1, line 11, else the
+  145, maps only notes' bindings: the link back gets its place) and
+  `src/limits.rs` (`styles_per_node` 0 to 1, line 12, else the
   `notes-card` style panics at skein-ui's `builder.rs:233`);
   `testing/skein-fake-person-browser/src/{harness.rs, face.rs}`
   (`Step::Title`).
@@ -106,7 +106,7 @@ Shape: `history::History` (shows a path new or in place, keeps the
   `Role::Region` node carrying the style token `notes-card` is an
   `<article role="region">`, named; links' `href`s set after each
   apply from `State::address`, as the shell already does
-  (`examples/ui/shell-web/src/lib.rs:94-102`): kept, not added.
+  (`examples/ui/shell-web/src/lib.rs:121-124`): kept, not added.
 Test shape: host: `src/tests/history.rs`:
   `a_place_gone_to_is_reported_as_a_path`; `src/tests/mapping.rs`:
   `an_override_keeps_the_nodes_role_and_name`; view:
@@ -134,8 +134,8 @@ Files: `examples/ui/view/src/{state.rs, view.rs}` (body, due date,
   `tests/ui-web/golden/{list.html, note.html}`;
   `tests/ui-web/Cargo.toml` (skein-ui-web, for `Page::html`,
   `page.rs:184`); the view's `src/tests.rs` (the tree's length, line
-  79), `src/tests/golden/{empty,list}.txt` (read at `text.rs:16-30`)
-  and `src/limits.rs` (`bindings`, line 13, for the form's fields);
+  87, 461 nodes at skein `890b1a1`), `src/tests/golden/{empty,list}.txt` (read at `text.rs:16-30`)
+  and `src/limits.rs` (`bindings`, 66, line 14, for the form's fields);
   `testing/skein-fake-person-browser/src/face.rs` (a `Press` on an
   option of a `<select>` becomes the kit's keys, as 14.1's
   `chromium_chooses_an_option_by_the_kits_keys` chooses one: the kit
@@ -196,10 +196,10 @@ Files: new `examples/ui/view/src/draw.rs` and golden
   `examples/ui/shell-web/src/lib.rs` (the look's `draw`);
   `examples/ui/shell-web/notes.css` (`notes-bar`); the view's
   `src/lib.rs` (`pub mod draw;`), `src/limits.rs` (`drawing_bytes`,
-  `scene_marks` and `scene_bytes` are 0, lines 10, 16, 17, so no scene
+  `scene_marks` and `scene_bytes` are 0, lines 11, 17, 18, so no scene
   holds a mark: 64, 6 and 256 drew the check's sketch with the worst
   case under 100 MB; size them by the view's worst-case test),
-  `src/tests.rs` (line 79) and the empty and list goldens;
+  `src/tests.rs` (line 87) and the empty and list goldens;
   `testing/skein-fake-person-browser/src/{harness.rs, face.rs}`
   (`Step::PressAt`; the face refuses a person's `Act::Drawing`,
   `face.rs:163`, so the harness presses through a face method);
@@ -235,8 +235,8 @@ Files: `crates/skein-ui-web/src/{look.rs (Look.components), page.rs and
   `Cargo.toml` (`[profile.web]`: inherits `release`, `opt-level = "s"`,
   `lto = "fat"`, `codegen-units = 1`, `panic = "abort"`,
   `overflow-checks = true`, `strip = true`);
-  `examples/ui/shell-web/src/lib.rs` (its `Look` literal, 43, gains
-  `components`; `mod grow;`; the constructors given to `Dom::new`, 48)
+  `examples/ui/shell-web/src/lib.rs` (its `Look` literal, 56, gains
+  `components`; `mod grow;`; the constructors given to `Dom::new`, 61)
   and `Cargo.toml` (web-sys `HtmlElement`, beside `Window`, `Document`,
   `Location`); skein-ui-web's `src/tests/fixtures.rs` (101);
   `testing/skein-fake-person-browser/src/{harness.rs, face.rs}`

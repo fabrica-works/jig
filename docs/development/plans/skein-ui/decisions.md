@@ -586,6 +586,9 @@ None yet; they start at 101.
        - `git show origin/main:docs/development/plans/skein-ui/skein/14-stories.md
          | grep -n 'pub fn typing_while_patched\|pub fn write_refused'`
 
+123. **skein 13 against 12.3** (re-check of skein-13.1 after skein-12.3).
+     skein 13's session file re-checked after skein 12.3 (`890b1a1`): the lines it cites moved: the view's `address` at `state.rs:145`, its limits at `limits.rs:11-18` (`bindings` now 66), its node count at `tests.rs:87` (461), the shell's `Look` literal at 56, `Dom::new` at 61 and its `href`s at 121-124; nothing else ruling 121 names changed.
+
 ## For the user
 
 Long-term choices the user may veto; each default holds unless the user
