@@ -15,7 +15,7 @@ use jig_domain_people as people;
 use jig_test_domain as root;
 use jig_test_domain_client::{Event, Limits, Request};
 use skein_lib::{Duration, Time, Wall};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Invalid {
@@ -46,6 +46,7 @@ pub struct Session {
     sign_in_again: BTreeMap<ClientId, people::Again>,
     sign_in_failures: BTreeMap<ClientId, packets::SignInFailure>,
     callbacks: Vec<(ClientId, Event)>,
+    sign_outs: BTreeMap<ClientId, VecDeque<u64>>,
     delayed: Vec<(ClientId, Event)>,
     delay_until: Option<Time>,
     lost_answers: BTreeSet<(ClientId, skein_lib::Token)>,
@@ -74,6 +75,7 @@ impl Session {
             sign_in_again: BTreeMap::new(),
             sign_in_failures: BTreeMap::new(),
             callbacks: Vec::new(),
+            sign_outs: BTreeMap::new(),
             delayed: Vec::new(),
             delay_until: None,
             lost_answers: BTreeSet::new(),
@@ -214,7 +216,7 @@ impl Session {
             return;
         }
         let Some(sign_in) = self.driver.transport.sign_in(client) else { return };
-        let reply_to = self.driver.transport.reply_to(Reply::SignOut { client });
+        let reply_to = self.driver.transport.reply_to(Reply::SignOut { client, sign_in });
         self.source(now, wall, root::Event::Core(core::Event::People(people::Event::SignOut { reply_to, sign_in })));
     }
 
@@ -457,6 +459,10 @@ impl Session {
                 } else {
                     self.callbacks.push((client, event));
                 }
+            }
+            Incoming::SignedOut { client, sign_in } => {
+                self.sign_outs.entry(client).or_default().push_back(sign_in);
+                self.incoming(Incoming::Callback { client, event: Event::SignedOut }, now, wall)?;
             }
             Incoming::SignInAgain { client, why } => {
                 self.sign_in_again.insert(client, why);
@@ -878,10 +884,21 @@ impl Session {
         }
     }
 
+    /// A sign-out answer belongs only to the session whose secret it carried.
+    pub(super) fn delivers_sign_out(&mut self, client: ClientId) -> bool {
+        let sign_in = self
+            .sign_outs
+            .get_mut(&client)
+            .and_then(VecDeque::pop_front)
+            .expect("sign-out callback retains its exchange");
+        self.driver.transport.sign_in(client).is_none_or(|current| current == sign_in)
+    }
+
     /// Detach old routes without acknowledging their pending documents or
     /// reusing their tokens. The client supplies new reads/watches after reload.
     pub fn detach(&mut self, client: ClientId, now: Time, wall: Wall) {
         self.stream_due.remove(&client);
+        self.sign_outs.remove(&client);
         self.parked.remove(&client);
         self.callbacks.retain(|(owner, _)| *owner != client);
         self.delayed.retain(|(owner, _)| *owner != client);
@@ -1118,7 +1135,7 @@ mod tests {
         session
             .immediate(core::Now::SignInRefused { to: skein_lib::ReplyTo::new(to) }, now, wall)
             .expect("late terminal is already retired");
-        let other = session.driver.transport.reply_to(Reply::SignOut { client: ClientId(0) }).into_token();
+        let other = session.driver.transport.reply_to(Reply::SignOut { client: ClientId(0), sign_in: 1 }).into_token();
         assert_eq!(
             session.immediate(core::Now::SignInRefused { to: skein_lib::ReplyTo::new(other) }, now, wall),
             Err(Invalid::InternalPacket)

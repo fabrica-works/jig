@@ -27,7 +27,7 @@ pub enum KeyedOwner {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Reply {
     SignIn { client: ClientId },
-    SignOut { client: ClientId },
+    SignOut { client: ClientId, sign_in: u64 },
     Keyed { client: ClientId, attempt: Token, key: [u8; 16], owner: KeyedOwner },
     Read { client: ClientId, read: Token, what: Read },
     ApplicationRead { client: ClientId, read: Token, subject: family::Subject },
@@ -111,7 +111,7 @@ impl Transport {
         assert!(
             self.replies.values().all(|reply| match reply {
                 Reply::SignIn { client: owner }
-                | Reply::SignOut { client: owner }
+                | Reply::SignOut { client: owner, .. }
                 | Reply::Keyed { client: owner, .. }
                 | Reply::Read { client: owner, .. }
                 | Reply::ApplicationRead { client: owner, .. } => *owner != client,
@@ -339,7 +339,7 @@ impl Transport {
     pub fn detach(&mut self, client: ClientId) -> Vec<Token> {
         self.replies.retain(|_, reply| match reply {
             Reply::SignIn { client: owner }
-            | Reply::SignOut { client: owner }
+            | Reply::SignOut { client: owner, .. }
             | Reply::Keyed { client: owner, .. }
             | Reply::Read { client: owner, .. }
             | Reply::ApplicationRead { client: owner, .. } => *owner != client,

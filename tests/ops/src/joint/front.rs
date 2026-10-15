@@ -145,6 +145,9 @@ impl Joint {
                 };
                 self.callbacks.push((client, event));
             }
+            Incoming::SignedOut { client, .. } => {
+                self.callbacks.push((client, client::Event::SignedOut));
+            }
             Incoming::Authenticated { client, .. } => {
                 for value in self.parked.remove(&client).unwrap_or_default() {
                     self.request(client, value);
@@ -957,7 +960,7 @@ impl Front<super::fixture::Client> for Joint {
             return;
         }
         let Some(sign_in) = self.engine.peers.transport.sign_in(client) else { return };
-        let reply_to = self.engine.peers.transport.reply_to(Reply::SignOut { client });
+        let reply_to = self.engine.peers.transport.reply_to(Reply::SignOut { client, sign_in });
         self.send_event(root::Event::Core(core::Event::People(people::Event::SignOut { reply_to, sign_in })));
     }
     fn sign_in(&mut self, client: ClientId, now: Time, _wall: Wall) {

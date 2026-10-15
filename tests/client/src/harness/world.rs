@@ -812,6 +812,22 @@ impl<A: App, F: Front<A>> World<A, F> {
         .flatten()
         .min()
     }
+    fn deliver(&mut self, due: Due<A>) {
+        let c = &self.clients[due.client.0];
+        if due.epoch == c.epoch
+            && due.navigation.is_none_or(|generation| generation == c.navigation)
+            && self.front.delivers(due.client, &due.event)
+        {
+            if due.navigation.is_some() {
+                self.observe(Observation::LeftPage { client: due.client });
+                self.clients[due.client.0].acted_card = None;
+            }
+            self.front.received(due.client, &due.event);
+            self.callback(due.client, Some(due.event));
+        } else {
+            self.dropped += 1;
+        }
+    }
     pub fn run(&mut self, until: Until) -> Outcome {
         let mut iterations = 0;
         for _ in 0..self.settings.iterations {
@@ -836,17 +852,7 @@ impl<A: App, F: Front<A>> World<A, F> {
             self.referee.fire(self.now, &mut Vec::new());
             self.referee.assert_holding(self.settings.seed);
             while let Some(due) = self.schedule.next(self.now) {
-                let c = &self.clients[due.client.0];
-                if due.epoch == c.epoch && due.navigation.is_none_or(|generation| generation == c.navigation) {
-                    if due.navigation.is_some() {
-                        self.observe(Observation::LeftPage { client: due.client });
-                        self.clients[due.client.0].acted_card = None;
-                    }
-                    self.front.received(due.client, &due.event);
-                    self.callback(due.client, Some(due.event));
-                } else {
-                    self.dropped += 1;
-                }
+                self.deliver(due);
             }
             for index in 0..self.clients.len() {
                 if A::next_deadline(&self.clients[index].root).is_some_and(|at| at <= self.now) {

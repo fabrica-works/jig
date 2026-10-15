@@ -215,6 +215,9 @@ impl Front<Test> for Joint {
         self.wall = (self.clock)(now);
         self.session.reload(client, now, self.wall);
     }
+    fn delivers(&mut self, client: ClientId, event: &Event) -> bool {
+        !matches!(event, Event::SignedOut) || self.session.delivers_sign_out(client)
+    }
     fn received(&mut self, client: ClientId, event: &Event) {
         self.session.received(client, self.now, self.wall, event);
     }
@@ -268,6 +271,58 @@ mod tests {
             name: b"Person".as_slice().into(),
         };
         Joint::new(Session::new(driver, limits, codec), BTreeMap::from([(1, identity)]), clock)
+    }
+
+    fn answered_sign_out() -> (Joint, u64) {
+        let mut front = front();
+        let client = ClientId(0);
+        Front::<Test>::bind(&mut front, client, 1);
+        Front::<Test>::poll(&mut front, Time::ZERO, clock(Time::ZERO));
+        let first = front.session.driver.transport.sign_in(client).expect("bound session");
+        Front::<Test>::sign_out(&mut front, client, Time::ZERO, clock(Time::ZERO));
+        for _ in 0..20 {
+            let now = Front::<Test>::next_due(&front).unwrap_or(Time::ZERO);
+            let callbacks = Front::<Test>::poll(&mut front, now, clock(now));
+            if callbacks.iter().any(|(owner, event)| *owner == client && matches!(event, Event::SignedOut)) {
+                return (front, first);
+            }
+        }
+        panic!("the real sign-out must answer");
+    }
+
+    #[test]
+    fn a_sign_out_answered_after_a_newer_sign_in_is_not_delivered() {
+        let (mut front, first) = answered_sign_out();
+        let client = ClientId(0);
+        let now = front.now;
+        Front::<Test>::sign_in(&mut front, client, now, clock(now));
+        for _ in 0..20 {
+            let now = Front::<Test>::next_due(&front).unwrap_or(now);
+            Front::<Test>::poll(&mut front, now, clock(now));
+            if front.session.driver.transport.sign_in(client).is_some_and(|sign_in| sign_in != first) {
+                break;
+            }
+        }
+        assert_eq!(
+            (
+                Front::<Test>::delivers(&mut front, client, &Event::SignedOut),
+                front.session.driver.transport.sign_in(client)
+            ),
+            (false, Some(2)),
+        );
+    }
+
+    #[test]
+    fn a_sign_out_answered_with_no_newer_sign_in_is_delivered() {
+        let (mut front, _) = answered_sign_out();
+        let client = ClientId(0);
+        assert_eq!(
+            (
+                Front::<Test>::delivers(&mut front, client, &Event::SignedOut),
+                front.session.driver.transport.sign_in(client)
+            ),
+            (true, None),
+        );
     }
 
     #[test]

@@ -75,6 +75,9 @@ pub trait Front<A: App> {
     fn fault(&mut self, now: Time, fault: FrontFault);
     fn reload(&mut self, client: ClientId, now: Time);
     fn received(&mut self, client: ClientId, event: &A::Event);
+    fn delivers(&mut self, _client: ClientId, _event: &A::Event) -> bool {
+        true
+    }
     fn stored(&mut self, _client: ClientId, _records: &[A::Record]) {}
     fn restored(&mut self, _client: ClientId, records: Vec<A::Record>) -> Vec<A::Record> {
         records

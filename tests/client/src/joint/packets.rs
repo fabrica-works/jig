@@ -36,6 +36,7 @@ pub enum Incoming {
     SignInAgain { client: ClientId, why: people::Again },
     SignInFailed { client: ClientId, failure: SignInFailure },
     Callback { client: ClientId, event: Event },
+    SignedOut { client: ClientId, sign_in: u64 },
 }
 fn bounds(limits: &Limits) -> admission::Bounds {
     admission::Bounds {
@@ -321,12 +322,14 @@ pub fn people_reply(
                 return Err(Invalid::OwnerRoute);
             }
         },
-        Reply::SignOut { client } => {
+        Reply::SignOut { client, sign_in } => {
             if translated != wire::answers::Reply::SignedOut {
                 return Err(Invalid::OwnerRoute);
             }
-            transport.signed_out(client);
-            Incoming::Callback { client, event: Event::SignedOut }
+            if transport.sign_in(client) == Some(sign_in) {
+                transport.signed_out(client);
+            }
+            Incoming::SignedOut { client, sign_in }
         }
         Reply::Keyed { client, attempt, owner, .. } => {
             let (envelope, body) = wire::answers::keyed(translated).map_err(|_| Invalid::OwnerRoute)?;
