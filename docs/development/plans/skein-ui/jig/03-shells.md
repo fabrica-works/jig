@@ -44,13 +44,21 @@ does not list is the owner's bug, which the builder asserts (ui.md, 6).
 ### 03.1 The builder asserts the roles a binding may take
 Scope: ui.md 6 (the act table).
 Needs: jig 01.3.
-Files: `crates/jig-view/src/ui/builder.rs` (`bind`, 251); the fake
-  person's test that binds seven landmarks
-  (`testing/jig-fake-person/src/tests.rs:549-550`), which binds buttons
-  in their place.
+Files: `crates/jig-view/src/ui/builder.rs` (`bind`, 252); the fake
+  person's test that binds seven landmarks,
+  `the_random_person_never_acts_on_a_landmark`
+  (`testing/jig-fake-person/src/tests.rs:544`, its bind at 557), which
+  opens a button inside each landmark and binds that; the test's limits
+  (24 nodes, 8 bindings) still fit.
 Shape: `bind` asserts the innermost open node's role is a text field, a
   text area, a check, a choice, a button, a link, a tab or a menu item
-  (an option comes with skein 02.4, a drawing with skein 03.2).
+  (an option comes with skein 02.4, a drawing with skein 03.2), through
+  `fn acted_on(role: Role) -> bool`, a `match` with an arm for each of
+  `Role`'s variants: `clippy.toml` disallows `matches!`, and wildcard
+  arms are denied. The drawing's assertion (`builder.rs:253`, "a
+  drawing is shown and never bound") stays first, so that
+  `ui/tests/tree.rs:87-88`, `a_drawing_cannot_be_bound`, keeps its
+  message.
 Test shape: `ui/tests/tree.rs` (moved there by jig 01.3): a table test
   `bind_takes_only_the_roles_a_person_acts_on`, a row per role with its
   expected outcome as a literal, using `std::panic::catch_unwind` per
@@ -59,18 +67,22 @@ Proof: world. `heavy cargo nextest run -p jig-client-world -p
   jig-ops-world -p jig-client-protocol-world` passes once: no view of
   jig's or of its examples binds another role. Bound: 4 minutes.
 Don't: refuse acts in `View::act` (skein 03.2).
-Size: about 20 lines.
+Size: about 50 lines, and a test of a row per role.
 Removes: nothing.
 
 ### 03.2 The status region, a setting
 Scope: ui-text.md 3 and 5; view.md 15.3.
 Needs: jig 01.3 (`jig_view::ui`).
 Files: `crates/jig-shell-text/src/{terminal.rs (Settings 14-20, 240),
-  render.rs (2, 43-86)}`, `src/tests.rs:43`,
-  `src/tests/fixtures.rs` (its owners at 17, 176, 181 and 198 become
-  `ui::Owner { number: 1 }`, as 03.3 does for the person); the users that make `Settings`
-  (`tests/client/src/harness/world.rs`,
-  `tests/client-protocol/src/native.rs`).
+  render.rs (3, 45-86, 88)}`, `src/tests.rs:43`,
+  `src/tests/fixtures.rs` (its owners at 19, 178, 183 and 193 become
+  `ui::Owner { number: 1 }`, as 03.3 does for the person); the users
+  that make `Settings` (`tests/client-protocol/src/native/world.rs:232`,
+  `crates/jig-shell-text/src/tests/terminal.rs:17`); the callers of
+  `render` (`tests/client/src/harness/world.rs:679`,
+  `tests/client/tests/text_pages.rs:12`,
+  `crates/jig-shell-text/src/tests/command.rs:11,159`,
+  `src/tests.rs:11,25,35,51`).
 Shape: `Settings { name, longest, interval, status: Option<Region> }`;
   `render(tree: &Tree, name: &[u8], status: Option<Region>, print: &mut
   Print)`; jig's users pass `Some(JigRegion::Link.region())`.
@@ -78,9 +90,12 @@ Test shape: the goldens unchanged (`tests/golden/roles.txt:1` and
   `bytes.txt:1` print `== TITLE == `); `src/tests.rs`'s status test
   takes its region from the fixture; one new
   `no_status_region_ends_the_first_line_after_its_space`.
-Proof: world. `heavy cargo nextest run -p jig-client-world -E
-  'binary(text_pages) | test(/at_the_text_shell/)'` passes once: jig's
-  pages print their link's state from the setting. Bound: 2 minutes.
+Proof: world. `heavy cargo nextest run -p jig-client-world -p
+  jig-client-protocol-world -E 'binary(text_pages) |
+  test(/at_the_text_shell/) |
+  test(a_terminal_in_front_of_the_native_client_starts_a_chat)'` passes
+  once: jig's pages print their link's state from the setting, and the
+  native client's terminal is built with it. Bound: 2 minutes.
 Don't: change any other line the renderer prints.
 Size: about 30 lines.
 Removes: `JigRegion` from the crate.
@@ -88,8 +103,10 @@ Removes: `JigRegion` from the crate.
 ### 03.3 The fake person names only `jig_view::ui`
 Scope: ui.md 17.1.
 Needs: jig 01.3.
-Files: `testing/jig-fake-person/src/*.rs`, `src/tests.rs:52, 87`.
-Shape: imports from `jig_view::ui`; its tests' owners
+Files: `testing/jig-fake-person/src/*.rs`, `src/tests.rs:54, 90`.
+Shape: imports from `jig_view::ui` of what jig 01.3 moved there (`Act`,
+  `Binding` and `Limits` come with jig 02.1 and 02.2, which change these
+  imports); its tests' owners
   `ui::Owner { number: 1 }`; doc comments cite skein's `ui.md`, 17.1.
 Test shape: the crate's tests, unchanged but for paths.
 Proof: world. `heavy cargo nextest run -p jig-client-world -p
