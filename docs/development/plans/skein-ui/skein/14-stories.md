@@ -24,10 +24,13 @@ skein's HTTP serves in the test's loop (ui-web.md, 14.1). A panic
 reloads within three in a minute, counted under `skein-ui-restarts`,
 and past it the page says the application failed and starts nothing
 (5). The four stories: typing while a patch arrives; back and forward;
-a panic; a write refused (14.2's table). In the test build alone, the
-example gives an address that panics at start and one that bounds its
-small store below an add's record (examples.md, 9.4: "those addresses
-are the plan's").
+a panic; a write refused (14.2's table). Each takes what the table's
+third column names, and nothing else; what it must see on a person's
+page is a `Find` the application gives, awaited, never a fixed time,
+and never skein's words where the page shows the application's (14.2,
+skein `7c5a482`). In the test build alone, the example gives an
+address that panics at start and one that bounds its small store below
+an add's record (examples.md, 9.4: "those addresses are the plan's").
 
 ## Choices this plan makes
 
@@ -115,7 +118,9 @@ Test shape: host: `src/tests/restart.rs`:
   Step tests under 20 ms; the story about 3 s.
 Proof: live, `heavy --gate scripts/check.sh` once: the story passes.
   Bound: 15 minutes.
-Don't: keep the restarts' count in the small store's prefix.
+Don't: keep the restarts' count in the small store's prefix; give
+  `Restart` or the story words of skein's own: `words` and `failed`
+  are the application's (ui-web.md, 5.1 and 14.2).
 Size: about 150 lines.
 Removes: nothing.
 
@@ -154,11 +159,15 @@ Files: `testing/skein-fake-person-browser/src/stories.rs`
   `Step::Forward`, the kit's `Compose`, `Type` and `Go::Back`,
   `Go::Forward`) and `src/face.rs` (`perform`, 135-145, which takes an
   act, `Go` and a reload alone); `tests/ui-web/tests/browser_stories.rs`.
-Shape: `stories::typing_while_patched(setup, field, second)`: the first
-  person composes in the field while the second's act patches its page;
-  the field keeps its focus, its caret and its words (the harness's
+Shape: `stories::typing_while_patched(setup, field, second, arrives)`:
+  the first person composes in `field`, sees `arrives` gone (a `Gone`
+  step: the page that showed the field shows no patch yet), and sets a
+  flag the second person's `Play` waits on, as 14.3's second person
+  does; the second's act then patches the first's page, and the first
+  sees `arrives` (a `See` step within 5 s) before it types again; the
+  field keeps its focus, its caret and its words (the harness's
   `Compose`, then its `Type`, the kit's `Type` inserting at the caret,
-  which the person's `Input`, a whole value, cannot show); `stories::back_and_forward(setup, pages)`:
+  which the person's `Input`, a whole value, cannot show); `stories::back_and_forward(setup, first, second)`:
   two addresses and what each shows, back and forward between them, and
   each opened directly.
 Test shape: stories `typing_in_the_title_survives_a_note_arriving`
@@ -180,7 +189,7 @@ Removes: nothing.
 pub struct Shown<'a> { pub address: &'a [u8], pub sees: Find }
 // Each story returns `#[must_use]` (pedantic clippy's `must_use_candidate`).
 #[must_use]
-pub fn typing_while_patched(setup: &Setup<'_>, field: Find, second: &mut dyn Play) -> Outcome;
+pub fn typing_while_patched(setup: &Setup<'_>, field: Find, second: &mut dyn Play, arrives: Find) -> Outcome;
 #[must_use]
 pub fn back_and_forward(setup: &Setup<'_>, first: Shown<'_>, second: Shown<'_>) -> Outcome;
 #[must_use]
