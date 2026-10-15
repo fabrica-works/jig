@@ -36,9 +36,10 @@ figure's inline SVG shape pressed at a point (browser.md, 9).
   increment's end), and puts the words' comparison and the point's
   check in a new module, `testing/skein-browser/src/find.rs`. Pulse
   lists `browser.rs` as over the limit; that line is expected.
-- **The kit sends no script** (browser.md, 4): `rg -n
-  'Runtime\.(evaluate|callFunctionOn)' testing/skein-browser` prints
-  nothing.
+- **The kit sends no script but the expression `document`** (browser.md,
+  4): `rg -n 'Runtime\.callFunctionOn' testing/skein-browser` prints
+  nothing, and `rg -n 'b"expression"' testing/skein-browser/src` prints
+  one line, `Params::Document`'s in `params.rs`.
 - **The browser suite's budget,** two minutes for the kit's tests and
   the UI example's tier together (testing.md, 7): 07.3 adds two
   scenarios of about 1 s each.

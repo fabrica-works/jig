@@ -294,8 +294,9 @@ Proof: live, `heavy --gate scripts/check.sh` once: the story, the
   golden pages and the facts pass. Bound: 15 minutes.
 Don't: check a field's words in the shell (the view's, ui.md 6); set a
   field's value by a page call (`Runtime.evaluate`,
-  `DOM.setAttributeValue`): the kit runs no script in the page
-  (browser.md 1 and 4), and a person's entry sets no attribute; add
+  `DOM.setAttributeValue`): the one script the kit runs in the page is
+  the expression `document`, a find's root (browser.md 1 and 4), and a
+  person's entry sets no attribute; add
   `--lang` to the kit's command, whose environment already fixes the
   locale (browser.md 3); type any other field by keys: `type` still
   inserts.
