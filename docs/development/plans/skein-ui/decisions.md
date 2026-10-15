@@ -1387,6 +1387,9 @@ None yet; they start at 101.
          Their output is quoted above, and 14.s2's real test replaces the
          scoped one.
 
+132. **skein 13.5: Taller types its words between its two looks** (plan defect, skein 13's block of 2026-10-15T16:57:21Z).
+     A plan defect, not a design gap: `Taller` is the plan's harness step (skein 13's session file, the harness's steps: "`Taller { find }` in 13.5, … taller than when the step began"); the design asks only for "the body's text area that grows" (ui-web.md 14.3, step 6). The implementer's proposal holds: `Step::Taller { find, words }`, beside `Type` in `testing/skein-fake-person-browser/src/harness/script.rs` (18). The face finds `find` with `boxes: true` and keeps its box's height; types `words` as `Step::Type` types them (the kit's `Type`, at the caret); then looks at the box again at the poll's rate until it is taller, and fails the step past 1 s, naming both heights. The story `the_body_grows_with_its_words_and_reports_them` gives `Taller` its three lines as `words`, with no `Type` of them before it. No separate baseline step, and `Type` is unchanged. The rule of skein 13's stories holds: awaited, never a fixed sleep. A further user of `Step` that a new variant breaks (an exhaustive `match`): change it in the same increment, and list it in the commit body.
+
 ## For the user
 
 Long-term choices the user may veto; each default holds unless the user

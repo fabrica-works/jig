@@ -59,9 +59,12 @@ kit's locale, `en-US` (ui-web.md 14.2; browser.md 3 and 6).
   on the page; `PressAt { find, at: skein_browser::boundary::Point }`
   in 13.4 (`u32`s, `boundary.rs:101`, not the scene's `u16` point), the
   face finding the drawing's figure and the kit pressing at the point
-  (skein 07.2); `Taller { find }` in 13.5, the found node's box from a
-  query with `boxes: true` (the face asks with `false`, `face.rs:70`),
-  taller than when the step began. Each is a step of a `Script`, inside
+  (skein 07.2); `Taller { find, words }` in 13.5 (ruling 132), beside
+  `Type` (`harness/script.rs:18`): the found node's box from a query
+  with `boxes: true` (the face asks with `false`, `face.rs:151`), its
+  height kept, then `words` typed as `Type` types them, then the box
+  looked at again at the poll's rate until it is taller, the step
+  failing past 1 s with both heights. Each is a step of a `Script`, inside
   a `run`, reaching the kit through a method of `BrowserFace`, whose
   page, requests and token are private (`face.rs:17-47`). The harness
   writes its snapshot only on a failure (its `snapshot`, `harness.rs:180`), and the
@@ -386,7 +389,8 @@ Files: `crates/skein-ui-web/src/{look.rs (Look.components), page.rs and
   and `Cargo.toml` (web-sys `HtmlElement`, beside `Window`, `Document`,
   `Location`); skein-ui-web's `src/tests/fixtures.rs` (101);
   `testing/skein-fake-person-browser/src/{harness.rs, face.rs}`
-  (`Step::Taller`); `tests/ui-web/tests/browser_example.rs`.
+  and `harness/script.rs` (`Step::Taller { find, words }`, ruling 132);
+  `tests/ui-web/tests/browser_example.rs`.
 Shape: `Look.components: &[(Owner, Role, Style)]` on every target,
   which nodes the page part gives a host; on wasm32 only, the shell's
   table of constructors in the same order, `&[fn() -> Box<dyn
@@ -398,7 +402,8 @@ Shape: `Look.components: &[(Owner, Role, Style)]` on every target,
 Test shape: host: `src/tests/page.rs`:
   `a_component_node_keeps_its_host_and_data_node` (the pure half's
   model); story `the_body_grows_with_its_words_and_reports_them` (the
-  text area's box taller after three lines, by the harness's `Taller`; the
+  text area's box taller after three lines, by the harness's `Taller`
+  typing them; the
   note added with the body's words). Step tests under 20 ms; the story
   about 3 s.
 Proof: live, `heavy --gate scripts/check.sh` once: the story passes;
