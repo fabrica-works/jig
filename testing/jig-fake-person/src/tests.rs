@@ -555,7 +555,9 @@ fn the_random_person_never_acts_on_a_landmark() {
             Role::Search,
         ] {
             b.open(role);
+            b.open(Role::Button);
             b.bind(binding(1));
+            b.close();
             b.close();
         }
         b.open(Role::Button);

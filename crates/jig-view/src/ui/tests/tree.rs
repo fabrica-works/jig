@@ -92,6 +92,67 @@ fn a_drawing_cannot_be_bound() {
     builder.bind(Binding { owner: Owner { number: 65_536 }, token: Token::new(1) });
 }
 
+const BINDING_ROLES: &[(Role, bool)] = &[
+    (Role::Page, false),
+    (Role::Banner, false),
+    (Role::Navigation, false),
+    (Role::Main, false),
+    (Role::Complementary, false),
+    (Role::ContentInfo, false),
+    (Role::Form, false),
+    (Role::Search, false),
+    (Role::Region, false),
+    (Role::Heading { level: 1 }, false),
+    (Role::Paragraph, false),
+    (Role::Text, false),
+    (Role::List, false),
+    (Role::Item, false),
+    (Role::Table, false),
+    (Role::Row, false),
+    (Role::Cell, false),
+    (Role::Term, false),
+    (Role::Description, false),
+    (Role::Button, true),
+    (Role::Link, true),
+    (Role::TextField, true),
+    (Role::TextArea, true),
+    (Role::Choice, true),
+    (Role::ChoiceGroup, false),
+    (Role::Check, true),
+    (Role::Dialog, false),
+    (Role::Status, false),
+    (Role::Alert, false),
+    (Role::Log, false),
+    (Role::Tree, false),
+    (Role::TreeItem, false),
+    (Role::Tabs, false),
+    (Role::Tab, true),
+    (Role::Progress, false),
+    (Role::Time, false),
+    (Role::Code, false),
+    (Role::Quote, false),
+    (Role::Separator, false),
+    (Role::Menu, false),
+    (Role::MenuItem, true),
+    (Role::Disclosure, false),
+    (Role::Image, false),
+    (Role::Figure, false),
+    (Role::Slot, false),
+    (Role::Drawing, false),
+];
+
+#[test]
+fn bind_takes_only_the_roles_a_person_acts_on() {
+    for &(role, allowed) in BINDING_ROLES {
+        let outcome = std::panic::catch_unwind(|| {
+            let mut builder = Builder::new(&LIMITS);
+            builder.open(role);
+            builder.bind(Binding { owner: Owner { number: 1 }, token: Token::new(1) });
+        });
+        assert_eq!(outcome.is_ok(), allowed, "{role:?}");
+    }
+}
+
 #[test]
 #[should_panic(expected = "tree fits its node capacity")]
 fn building_past_node_capacity_asserts() {

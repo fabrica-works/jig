@@ -252,6 +252,7 @@ impl Builder {
     /// Bind an actable node to its owner's token.
     pub fn bind(&mut self, binding: Binding) {
         assert!(self.node().role != Role::Drawing, "a drawing is shown and never bound");
+        assert!(acted_on(self.node().role), "a binding belongs to a role a person acts on");
         if self.node().binding.is_none() && self.node().link.is_none() {
             self.reserve_binding();
         }
@@ -446,4 +447,56 @@ fn resized(value: u32, removed: u32, added: u32) -> u32 {
         .expect("old subtree includes removed children")
         .checked_add(added)
         .expect("spliced index fits u32")
+}
+
+// skein's ui.md, section 6: every bound node is one a person acts on.
+fn acted_on(role: Role) -> bool {
+    match role {
+        Role::Button
+        | Role::Link
+        | Role::TextField
+        | Role::TextArea
+        | Role::Choice
+        | Role::Check
+        | Role::Tab
+        | Role::MenuItem => true,
+        Role::Page
+        | Role::Banner
+        | Role::Navigation
+        | Role::Main
+        | Role::Complementary
+        | Role::ContentInfo
+        | Role::Form
+        | Role::Search
+        | Role::Region
+        | Role::Heading { .. }
+        | Role::Paragraph
+        | Role::Text
+        | Role::List
+        | Role::Item
+        | Role::Table
+        | Role::Row
+        | Role::Cell
+        | Role::Term
+        | Role::Description
+        | Role::ChoiceGroup
+        | Role::Dialog
+        | Role::Status
+        | Role::Alert
+        | Role::Log
+        | Role::Tree
+        | Role::TreeItem
+        | Role::Tabs
+        | Role::Progress
+        | Role::Time
+        | Role::Code
+        | Role::Quote
+        | Role::Separator
+        | Role::Menu
+        | Role::Disclosure
+        | Role::Image
+        | Role::Figure
+        | Role::Slot
+        | Role::Drawing => false,
+    }
 }
