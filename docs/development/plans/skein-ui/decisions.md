@@ -620,6 +620,212 @@ None yet; they start at 101.
 
      Unchanged: no test accepts `Crash`; the panic story's `Setup.expected` holds `Uncaught` alone; the restart part reloads the page (ui-web.md 5). skein 13.1's open question (a `beforeunload` prompt during a go) also touches `browser.rs`: whichever of the two lands second rebases on the first, and keeps both.
 
+127. **skein 13.1: a go's closing warning, and other native dialogs** (design gap, skein 13's block of 2026-10-15T14:56:13Z).
+     The designer's answer, landed as skein `506b940` and jig `c6982e600`, follows word for word.
+
+
+     ### skein 13.1: a `beforeunload` prompt during the kit's go, 2026-10-15T14:56:13Z
+
+     **Decision: the implementer's proposal, with a report and a default for
+     everything else.**
+
+     1. **The kit accepts the prompt as part of the go.** It accepts a
+        `beforeunload` prompt that opens on a page while a go of that page
+        is in flight (`Page.handleJavaScriptDialog`, `accept: true`). The
+        go then goes on to its `Done`. No request answers a dialog, and no
+        test answers one: a person who navigates, reloads or moves through
+        the history has chosen to leave.
+     2. **The go reports it.** It reports `Event::Warned { op }` before its
+        `Done`, at most once, and `Warned` is not terminal. `Done` itself
+        is unchanged, since a press, typing and a key share it. The face
+        records whether its last go was warned. A new harness step,
+        `Warned(bool)`, checks that record. Two stories in 13.1 check
+        "registered only while it would" from both sides.
+     3. **Any other native dialog is dismissed and reported as trouble.**
+        This covers an alert, a confirm, a prompt, and a `beforeunload`
+        with no go of its page in flight. The kit sends `accept: false` at
+        once and reports `Trouble::Dialog`, whose text is `<type>:
+        <message>`. The harness already fails a story on trouble it did not
+        expect. A page close sends `Target.closeTarget`, which runs no
+        `beforeunload` handler, so a close is never warned. The real suite
+        checks this.
+     4. **One more decision goes with it: the restart part clears the
+        warning.** The warning is the window's `onbeforeunload`. Before the
+        panic hook reloads, or says the application failed, it clears that
+        handler. Without this, a page that panicked with an add pending
+        would hit rule 3 on its own reload. A real person would be asked to
+        stay on a page that can send nothing more.
+
+     Why:
+
+     - **Not a request that answers the prompt.** No story needs a person
+       who stays. Staying is the browser's behaviour, not the
+       application's. With a request, every go of a warning page would
+       take two requests.
+     - **Not a field on `Done`.** It would mean nothing for a press, typing
+       or a key.
+     - **Dismiss outside a go, rather than accept or leave the dialog
+       open.** A dismissal commits the page to nothing: a confirm answers
+       no, a prompt gives nothing, and the page stays where it is. A
+       dialog left open would hold every operation on the page until its
+       deadline. That is this proof's step 6, `Reload` refused `Timeout`.
+     - **Not `Trouble` for the accepted prompt.** Trouble is something
+       gone wrong. The warning during a go is the design working.
+     - **Chromium shows the prompt only on a page with input since it
+       loaded.** This is why 12.3's second reload meets no prompt and
+       proves nothing about "only while". The story that looks for no
+       warning has its person press `Add` on that page first.
+
+     ### Landed
+
+     - skein `506b940`, "Answer a go's closing warning, and dismiss other
+       native dialogs":
+       - browser.md 1, 5, 6, 7 and 9;
+       - ui-web.md 5, 5.1, 14.2 and 14.3;
+       - examples.md 9.2 and 9.5;
+       - STATUS.md, the rows of browser.md and of jig's skein-ui plan.
+     - jig `c6982e600`, "skein-ui: the closing warning and native dialogs
+       through skein 13.1 and 14.2":
+       - `skein/13-example-whole.md`: What the design asks; the harness's
+         steps; 13.1's Scope, Files, Shape, Test shape, Proof, Don't and
+         Size;
+       - `skein/14-stories.md`: What the design asks; 14.2's Shape, Proof
+         and Don't;
+       - `later.md`: one row.
+     - Deferred: a test answering a native dialog itself (staying on a page
+       that warns, answering a confirm yes, giving a prompt words). Its row
+       is in `later.md`.
+
+     ### The text it rests on (skein `506b940`)
+
+     - browser.md 6, the go row (line 226): "navigate, reload, or move
+       through the history; the page's `beforeunload` prompt, if it opens
+       meanwhile, accepted, and `Warned`; `Done` once the navigation
+       commits: …".
+     - browser.md 6, the bullet (from line 253): "**A go answers its page's
+       closing warning.** A person who navigates, reloads or moves back or
+       forward has chosen to leave the document. So the kit accepts a
+       `beforeunload` prompt that opens on the page while a go of it is in
+       flight (CDP's `Page.javascriptDialogOpening`, answered by
+       `Page.handleJavaScriptDialog`), and reports `Warned` before the go's
+       `Done`." Its sub-bullets: "Chromium shows the prompt only on a page
+       that has had a person's input since it loaded. A test that looks for
+       no warning acts on the page first."; "Closing a page closes its
+       target, which runs no `beforeunload` handler, so a close is never
+       warned."; "No request answers a dialog."
+     - browser.md 5 (line 215): "`Warned` is not terminal: a go reports it
+       at most once, before its terminal (section 6)."
+     - browser.md 7 (from line 284): "a native dialog, other than the
+       closing warning a go accepts (section 6): an alert, a confirm, a
+       prompt, or a `beforeunload` prompt with no go of its page in flight.
+       The kit dismisses it at once. Its text is the dialog's type, `: `,
+       and its message (`confirm: Delete it?`)."
+     - ui-web.md 5 (line 298): "Before either, the restart part clears the
+       closing warning (5.1)."
+     - ui-web.md 5.1, the table (lines 322 and 323): "`beforeunload`
+       registered only while it would, as the window's `onbeforeunload`"
+       and "the panic hook: the window's `onbeforeunload` cleared; a reload
+       within the limit; …". The bullet at line 335: "**The closing
+       warning** is the window's `onbeforeunload` handler. …"
+     - ui-web.md 14.2:
+       - line 861: "A go and a reload accept the page's closing warning, as
+         a person who chose to go answers it";
+       - line 870: the harness fails on "a policy violation, an exception
+         or a native dialog";
+       - line 880: it "**checks whether the person's last go met its page's
+         closing warning**".
+     - examples.md 9.2 (line 534): "Closing loses requests while an add is
+       pending, so the page holds its closing warning then, and only then
+       (ui-web.md, 5.1)."
+
+     ### What each step does
+
+     - **13.1** (jig `c6982e600`, `skein/13-example-whole.md`, 86-198):
+       - **The warning:** `title/web.rs` sets
+         `window.set_onbeforeunload(Some(..))` while `loses`, and
+         `set_onbeforeunload(None)` otherwise. It never uses
+         `addEventListener`.
+       - **The kit:** `Page.javascriptDialogOpening` goes into
+         `notification`. A `beforeunload` with the page's go in flight
+         gets `accept: true` and `Event::Warned { op }`. Any other dialog
+         gets `accept: false` and `Trouble::Dialog`. The new param is
+         `Params::Dialog { accept }`. The reply is dropped.
+       - **The face and the harness:** the face's record is reset at each
+         `Doing::Go` and `Doing::Reload` and set by `Warned`.
+         `harness::Step::Warned(bool)` checks it.
+       - **Stories:**
+         - `a_reload_with_an_add_pending_meets_the_closing_warning`, with
+           12.3's `Setup`: StopServer, type, Add, 100 ms, StartServer,
+           Reload, `Warned(true)`;
+         - `a_reload_once_the_add_is_made_meets_no_closing_warning`: type,
+           Add, see the link, Reload, `Warned(false)`.
+       - **Kit step tests** in `tests/browser/src/tests.rs`:
+         `a_go_accepts_its_pages_closing_warning` and
+         `a_dialog_outside_a_go_is_dismissed_as_trouble`.
+       - **Real tests** in `browser_real.rs`, on a page `/leave`:
+         `chromium_accepts_the_closing_warning_on_a_reload` (and a close
+         that meets none) and `chromium_dismisses_a_confirm_as_trouble`.
+       - **Size:** about 700 lines, up from about 450.
+       - **Unchanged:** `a_reload_keeps_a_pending_add_made_once`, which
+         passes once the kit accepts its step 6. The fake browser opens no
+         dialogs.
+     - **14.2** (`skein/14-stories.md`, 122-136): the hook first calls
+       `window.set_onbeforeunload(None)`, then reloads or says the words.
+       The proof adds one `grep -c 'set_onbeforeunload(None)'
+       crates/skein-ui-web/src/restart/web.rs`, which must print 1. No
+       story checks this: the example's test address panics at start,
+       before any turn sets a warning. The restart part must not reach the
+       title and closing part.
+     - **14.s1 and the rest:** unchanged. Ruling 126's note stands: 13.1
+       and 14.s1 both change `browser.rs`, so whichever lands second
+       rebases on the first.
+
+     ### Checked against main
+
+     - skein `22ea6c5`, before the landing:
+       - `testing/skein-browser/src/browser.rs`:
+         - 583-591: `admit_op` refuses a second go on a page, so a page has
+           at most one go in flight;
+         - 1281: `fn notification`;
+         - 384: `fn queue_page`;
+         - 767: a page's close sends `b"Target.closeTarget"`;
+         - no `dialog` or `beforeunload` anywhere in `src`.
+       - `boundary.rs`: `Done { op: Token }` at 52; `enum Trouble {
+         Exception, Console, Log, Crash }` at 160-165.
+       - `testing/skein-fake-person-browser/src/harness.rs:392-400`: any
+         `Trouble` whose text no `Setup.expected` entry contains fails the
+         story. `face.rs:139-145`: `Doing::Go` and `Doing::Reload` become
+         `Request::Go`.
+       - `examples/ui/view/src/state.rs`:
+         - 208: `pub fn closing_loses`, true while a pending slot holds an
+           add;
+         - 256-272: `add_answered` takes the slot in the step that accepts
+           the note;
+         - 134-143: pending adds are sent again only on the first `Due`
+           after a start.
+
+         So 12.3's first reload meets the warning, and its second, on a
+         page with no input, meets none.
+       - `tests/ui-web/tests/browser_example.rs:21-48`:
+         `a_reload_keeps_a_pending_add_made_once` presses `Add` before its
+         first `Reload`, step 6.
+       - web-sys `0.3.103`, `gen_Window.rs:1839`: `pub fn
+         set_onbeforeunload(this: &Window, value: Option<&::js_sys::Function>)`.
+         The `Window` feature is already in `crates/skein-ui-web/Cargo.toml:16`.
+     - No native dialogs on any main: `git grep -n -E
+       '\b(alert|confirm|prompt)\(|beforeunload' origin/main -- '*.js'
+       '*.html' '*.rs'` in temper (`8d27a682`), jig and skein finds only
+       Rust functions of those names.
+     - Commands:
+       - `git grep -n -i 'dialog\|beforeunload' origin/main --
+         testing/skein-browser/src` (prints nothing);
+       - `grep -n 'fn notification\|fn queue_page\|OpKind::Go'
+         testing/skein-browser/src/browser.rs`;
+       - `git show origin/main:examples/ui/view/src/state.rs | grep -n 'fn
+         add_answered\|fn closing_loses\|if self.starting'`;
+       - `grep -n 'pub fn set_onbeforeunload'
+         ~/.cargo/registry/src/*/web-sys-0.3.103/src/features/gen_Window.rs`.
+
 ## For the user
 
 Long-term choices the user may veto; each default holds unless the user
