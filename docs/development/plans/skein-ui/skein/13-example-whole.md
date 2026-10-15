@@ -41,13 +41,28 @@ component reports only its node's role's acts (ui-web.md, 6.1).
   function `grow(element)` setting the element's height from its
   `scrollHeight`, imported with `#[wasm_bindgen(module = "/grow.js")]`.
 - **The harness's own steps** (skein 11.2's `harness::Step`):
-  `Key(skein_browser::Key)` in 13.3, the kit's key on the page;
-  `PressAt { find, at: Point }` in 13.4, the face finding the drawing's
-  figure and the kit pressing at the point (skein 07.2). Both are steps
-  of a `Script`, inside a `run`.
+  `Title(words)` in 13.1, the kit's query of the page's root
+  (Chromium's `RootWebArea`) named exactly by the document's title;
+  `Focused(find)` in 13.3, the found node's `Seen.states.focused`
+  (`testing/skein-browser/src/boundary.rs:129`); `Key(skein_browser::
+  boundary::Key)` in 13.3 (`boundary.rs:71`; the crate's `lib.rs:16`
+  re-exports only `Below`, `Down`, `Event`, `Request`), the kit's key
+  on the page; `PressAt { find, at: skein_browser::boundary::Point }`
+  in 13.4 (`u32`s, `boundary.rs:101`, not the scene's `u16` point), the
+  face finding the drawing's figure and the kit pressing at the point
+  (skein 07.2); `Taller { find }` in 13.5, the found node's box from a
+  query with `boxes: true` (the face asks with `false`, `face.rs:70`),
+  taller than when the step began. Each is a step of a `Script`, inside
+  a `run`, reaching the kit through a method of `BrowserFace`, whose
+  page, requests and token are private (`face.rs:17-47`). The harness
+  writes its snapshot only on a failure (`harness.rs:501`), and the
+  snapshot prints no focus (`browser.rs:926-947`): no story reads it.
 - **The module's size** is kept in `examples/ui/shell-web/size.txt`,
-  one line, the `web` build's bytes; nothing in the gate reads it (a
-  guide, ui-web.md 4.2).
+  one line, the `web` build's bytes:
+  `target/wasm32-unknown-unknown/web/skein_ui_example_shell_web.wasm`
+  as 13.5's Proof builds it (950,464 bytes at skein `9098df1`), not the
+  bundle's `_bg.wasm`; nothing in the gate reads it (a guide, ui-web.md
+  4.2).
 
 ## Rules that bind it
 
@@ -73,22 +88,33 @@ Files: new `crates/skein-ui-web/src/{history.rs, history/web.rs,
   `examples/ui/view/src/{view.rs, places.rs}` (the note's page, its
   `notes-card` region, the link back, the missing page);
   `examples/ui/shell-web/{src/lib.rs, notes.css}`; `scripts/check.sh`
-  (`--stylesheet`); `tests/ui-web/tests/browser_example.rs`.
+  (`--stylesheet`); `tests/ui-web/tests/browser_example.rs`;
+  `crates/skein-ui-web/src/lib.rs` (`pub mod history; pub mod timer;
+  pub mod title;`, beside 18-21), `src/tests.rs` (`mod history;`,
+  beside 53-56), `Cargo.toml` (web-sys `History`, `PopStateEvent`,
+  `BeforeUnloadEvent`, line 16), `src/tests/fixtures.rs` (its `Look`
+  literal, 101, gains `elements`); the view's `src/state.rs` (`address`,
+  95-105, maps only notes' bindings: the link back gets its place) and
+  `src/limits.rs` (`styles_per_node` 0 to 1, line 11, else the
+  `notes-card` style panics at skein-ui's `builder.rs:233`);
+  `testing/skein-fake-person-browser/src/{harness.rs, face.rs}`
+  (`Step::Title`).
 Shape: `history::History` (shows a path new or in place, keeps the
   scroll in the entry's state, reports a place gone to); `timer::Timer`
   (one deadline); `title::set(heading, name, language, loses)`;
   `Look.elements: &[(Owner, Role, Style, &'static str)]`: a
   `Role::Region` node carrying the style token `notes-card` is an
-  `<article role="region">`, named; links' `href`s set
-  after each apply from `State::address`.
+  `<article role="region">`, named; links' `href`s set after each
+  apply from `State::address`, as the shell already does
+  (`examples/ui/shell-web/src/lib.rs:94-102`): kept, not added.
 Test shape: host: `src/tests/history.rs`:
   `a_place_gone_to_is_reported_as_a_path`; `src/tests/mapping.rs`:
   `an_override_keeps_the_nodes_role_and_name`; view:
   `a_notes_page_shows_its_title_as_the_heading`,
   `an_unknown_note_says_there_is_none`; story
   `a_person_opens_a_note_and_comes_back_by_its_link` (on the note's
-  page, the document's title reads `<the note's title> · Notes`, from
-  the snapshot). Step tests
+  page, the document's title reads `<the note's title> · Notes`, by
+  the harness's `Title` step). Step tests
   under 20 ms; the story about 3 s.
 Proof: live, `heavy --gate scripts/check.sh` once: the story passes.
   Bound: 15 minutes.
@@ -106,6 +132,16 @@ Files: `examples/ui/view/src/{state.rs, view.rs}` (body, due date,
   invalid fields with their descriptions); `examples/ui/server/src/lib.rs`
   (a note's fields); new `tests/ui-web/tests/pages.rs` and goldens
   `tests/ui-web/golden/{list.html, note.html}`;
+  `tests/ui-web/Cargo.toml` (skein-ui-web, for `Page::html`,
+  `page.rs:184`); the view's `src/tests.rs` (the tree's length, line
+  79), `src/tests/golden/{empty,list}.txt` (read at `text.rs:16-30`)
+  and `src/limits.rs` (`bindings`, line 13, for the form's fields);
+  `testing/skein-fake-person-browser/src/face.rs` (a `Press` on an
+  option of a `<select>` becomes the kit's keys, as 14.1's
+  `chromium_chooses_an_option_by_the_kits_keys` chooses one: the kit
+  presses through `DOM.getContentQuads`, `browser.rs:1577`, which a
+  closed select's option has none of; ui-web.md 14.2: "an option
+  chosen with the kit's keys, as a keyboard chooses one");
   `tests/ui-web/tests/browser_example.rs`.
 Shape: minutes read by `skein_ui::number`, invalid when not one; the
   due date `YYYY-MM-DD`, invalid otherwise; an empty title refused in
@@ -126,8 +162,11 @@ Removes: nothing.
 Scope: examples.md 9.1 (the dialog; the focus after an add or a
   discard); ui.md 6.1 (Escape); ui-web.md 7 (Escape, a focus request).
 Needs: 13.2; skein 02.1 (a focus request), 02.3 (Escape).
-Files: `examples/ui/view/src/{state.rs, view.rs}`;
-  `testing/skein-fake-person-browser/src/harness.rs` (`Step::Key`);
+Files: `examples/ui/view/src/{state.rs, view.rs}`; the view's
+  `src/limits.rs` (`bindings`, for `Discard` and `Keep`), `src/tests.rs`
+  and its goldens where the page's nodes move;
+  `testing/skein-fake-person-browser/src/{harness.rs, face.rs}`
+  (`Step::Key`, `Step::Focused`);
   `tests/ui-web/tests/browser_example.rs`.
 Shape: clearing a form holding words opens a dialog with `Discard` and
   `Keep`, `Keep` naming `Shortcut::ESCAPE`; an add or a discard moves
@@ -135,8 +174,8 @@ Shape: clearing a form holding words opens a dialog with `Discard` and
 Test shape: view: `clearing_words_asks_in_a_dialog`,
   `an_add_moves_the_focus_to_the_title`; story
   `escape_in_the_dialog_keeps_the_draft` (the kit's `Key::Escape`; the
-  dialog gone, the words still in the title, the focus on it, from the
-  snapshot's focused state). Step tests under 20 ms; the story about
+  dialog gone, the words still in the title, the focus on it, by the
+  harness's `Focused` step). Step tests under 20 ms; the story about
   3 s.
 Proof: live, `heavy --gate scripts/check.sh` once: the story passes.
   Bound: 15 minutes.
@@ -155,14 +194,20 @@ Files: new `examples/ui/view/src/draw.rs` and golden
   `examples/ui/view/src/view.rs` (the drawing, its fallback list, the
   choice group: all notes or one label's);
   `examples/ui/shell-web/src/lib.rs` (the look's `draw`);
-  `examples/ui/shell-web/notes.css` (`notes-bar`);
-  `crates/skein-ui-web/src/{page.rs, page/web.rs}` (a press in a
-  scene: `Event::Scene { drawing, under, point }` to `Act::Drawing`
-  through `Scene::act_at`; the platform half keeps each drawing's mark
-  elements in order and maps `elementsFromPoint`'s elements to their
-  indices); `testing/skein-fake-person-browser/src/harness.rs`
-  (`Step::PressAt`);
-  `tests/ui-web/tests/browser_example.rs`.
+  `examples/ui/shell-web/notes.css` (`notes-bar`); the view's
+  `src/lib.rs` (`pub mod draw;`), `src/limits.rs` (`drawing_bytes`,
+  `scene_marks` and `scene_bytes` are 0, lines 10, 16, 17, so no scene
+  holds a mark: 64, 6 and 256 drew the check's sketch with the worst
+  case under 100 MB; size them by the view's worst-case test),
+  `src/tests.rs` (line 79) and the empty and list goldens;
+  `testing/skein-fake-person-browser/src/{harness.rs, face.rs}`
+  (`Step::PressAt`; the face refuses a person's `Act::Drawing`,
+  `face.rs:163`, so the harness presses through a face method);
+  `tests/ui-web/tests/browser_example.rs`. The page part's press in a
+  scene has landed with 09.5: `Event::Drawing { node, under, x, y }`
+  (`crates/skein-ui-web/src/page.rs:494`) to `Act::Drawing` through
+  `Scene::act_at` (577-590), the marks and `elementsFromPoint` at
+  `page/web.rs:702-726`; 13.4 changes neither.
 Shape: `draw::draw(kind, data, width, height, scene) -> bool`: a
   `rect` and a `text` per label, `notes-bar`, each bar's act its
   label's number; the data the three counts and their words.
@@ -190,7 +235,12 @@ Files: `crates/skein-ui-web/src/{look.rs (Look.components), page.rs and
   `Cargo.toml` (`[profile.web]`: inherits `release`, `opt-level = "s"`,
   `lto = "fat"`, `codegen-units = 1`, `panic = "abort"`,
   `overflow-checks = true`, `strip = true`);
-  `tests/ui-web/tests/browser_example.rs`.
+  `examples/ui/shell-web/src/lib.rs` (its `Look` literal, 43, gains
+  `components`; `mod grow;`; the constructors given to `Dom::new`, 48)
+  and `Cargo.toml` (web-sys `HtmlElement`, beside `Window`, `Document`,
+  `Location`); skein-ui-web's `src/tests/fixtures.rs` (101);
+  `testing/skein-fake-person-browser/src/{harness.rs, face.rs}`
+  (`Step::Taller`); `tests/ui-web/tests/browser_example.rs`.
 Shape: `Look.components: &[(Owner, Role, Style)]` on every target,
   which nodes the page part gives a host; on wasm32 only, the shell's
   table of constructors in the same order, `&[fn() -> Box<dyn
@@ -202,7 +252,7 @@ Shape: `Look.components: &[(Owner, Role, Style)]` on every target,
 Test shape: host: `src/tests/page.rs`:
   `a_component_node_keeps_its_host_and_data_node` (the pure half's
   model); story `the_body_grows_with_its_words_and_reports_them` (the
-  text area's box taller after three lines, from the kit's boxes; the
+  text area's box taller after three lines, by the harness's `Taller`; the
   note added with the body's words). Step tests under 20 ms; the story
   about 3 s.
 Proof: live, `heavy --gate scripts/check.sh` once: the story passes;

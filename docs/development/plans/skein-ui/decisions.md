@@ -452,6 +452,9 @@ None yet; they start at 101.
          | grep -n 'pub fn typing_while_patched\|pub fn panic\|pub fn
          write_refused'`
 
+121. **skein 13's Shapes against main** (ready check of skein-13.1).
+     skein 13's session file corrected against skein `9098df1` (skein 02.5 and 03.2 landed) and jig `81744cca6`: no story reads the harness's snapshot, written only on a failure and printing no focus: the harness gains its own steps `Title(words)` (13.1, the page's root named by the title), `Focused(find)` (13.3), `Taller { find }` (13.5, a box from a query with `boxes: true`), beside `Key` and `PressAt`, each through a method of `BrowserFace`; `Key` is `skein_browser::boundary::Key` and `PressAt`'s point `skein_browser::boundary::Point`; 13.1 names skein-ui-web's `lib.rs`, `tests.rs`, web-sys features and `Look` fixture, the view's `address` and `styles_per_node` 1, and keeps the shell's landed `href`s; 13.2 names `tests/ui-web/Cargo.toml`, the view's node count, goldens and `bindings`, and the face choosing an option by the kit's keys, as 14.1's fact test does, since a closed select's option has no box to press; 13.3 grows `bindings`; 13.4 drops the page part's press in a scene, landed with 09.5, and names the view's `draw` module and its scene limits (0 today), and the face; 13.5 names the shell's `Look` literal, `Dom::new` constructors and web-sys `HtmlElement`, and the fixture; `size.txt` records the cargo `web` module's bytes. A further limit, golden or node count these Files miss: change it in the same increment, and list it in the commit body.
+
 ## For the user
 
 Long-term choices the user may veto; each default holds unless the user

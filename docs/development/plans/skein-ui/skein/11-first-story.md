@@ -258,7 +258,7 @@ pub trait Play {
     fn next(&mut self, face: &mut BrowserFace<'_>, now: Time) -> Next<Box<[u8]>>;
 }
 /// A person's steps, or the harness's own (ui-web.md, 14.2), which later
-/// increments add: `Key` (13.3), `PressAt` (13.4), `Compose`, `Back`,
+/// increments add: `StopServer`, `StartServer` (12.3), `Title` (13.1), `Key`, `Focused` (13.3), `PressAt` (13.4), `Taller` (13.5), `Compose`, `Type`, `Back`,
 /// `Forward` (14.4).
 pub enum Step { Person(skein_fake_person::Step<Box<[u8]>>) }
 /// A script of steps; it implements `Play`.
