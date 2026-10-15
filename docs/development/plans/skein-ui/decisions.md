@@ -829,6 +829,14 @@ None yet; they start at 101.
 128. **browser.rs past its allowance, by rulings 126 and 127** (check of 2026-10-15T15:23Z).
      skein's `testing/skein-browser/src/browser.rs` grows past the README's allowance by rulings 126 and 127: 1,920 lines on skein's `main` after skein-14.s1 (`git show origin/main:testing/skein-browser/src/browser.rs | wc -l` → `1920`), and 13.1 adds the closing warning and native dialogs. The README's "Files over the plan's limit" now names both as expected, and its split is a `later.md` row: this plan does not split it.
 
+129. **skein 13.2: a press inside a select's shadow tree** (kit defect, skein 13's block of 2026-10-15T15:56:05Z).
+     Two parts, decided apart.
+
+     1. **The select: a kit defect, fixed in 13.2.** A press on a native `<select>` hits its user-agent shadow child (`-internal-select-inner-element`, `13.2-diagnosis.md`), and the kit's `DOM.describeNode` of the select, asked without `pierce`, lists no shadow tree's descendants, so `subtree_has` (`browser.rs:939`) misses the hit and refuses `Covered`. browser.md 6 already says what holds: "`Covered` unless the hit test at that point lands on the node or inside it": a node's own shadow tree is inside it. The fix: `Params::Describe` (`params.rs:173`) also writes `"pierce": true`; nothing else in the press changes, and `Covered` stays for anything over the node that is not inside it. Its fact: `chromium_presses_a_select_inside_its_shadow_tree` in `tests/browser/tests/browser_facts.rs`, beside 14.1's (a select pressed at its centre, not `Covered`; and `chromium_rejects_a_covered_button`, `browser_real.rs:24`, still passes). About 5 lines of production code; the fact about 25.
+     2. **The date field: a design question, to the designer now** (`question.md`): how the face types an `Input`'s whole value into an `<input type="date">` (and `time`), which `Input.insertText` leaves empty. Until its answer: do part 1, and the rest of 13.2 that does not type a date; change nothing in the kit's type, and keep the story's date step as the plan has it. Then wait, with the WIP committed; the answer comes as its own unblock.
+
+     Unchanged: the face's select press through the kit's keys (13.2's Files, 14.1's `chromium_chooses_an_option_by_the_kits_keys`); the kit's hit test (`includeUserAgentShadowDOM: true`, `params.rs:109-110`). A further caller of `Params::Describe` that the pierce changes: name it in the commit body.
+
 ## For the user
 
 Long-term choices the user may veto; each default holds unless the user

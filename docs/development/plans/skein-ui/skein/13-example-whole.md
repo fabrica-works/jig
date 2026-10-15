@@ -217,7 +217,13 @@ Files: `examples/ui/view/src/{state.rs, view.rs}` (body, due date,
   presses through `DOM.getContentQuads`, `browser.rs:1577`, which a
   closed select's option has none of; ui-web.md 14.2: "an option
   chosen with the kit's keys, as a keyboard chooses one");
-  `tests/ui-web/tests/browser_example.rs`.
+  `tests/ui-web/tests/browser_example.rs`; ruling 129: the kit's
+  `testing/skein-browser/src/params.rs` (`Params::Describe` asks
+  `pierce: true`, so that a hit in a node's user-agent shadow tree is
+  inside the node) and the fact
+  `chromium_presses_a_select_inside_its_shadow_tree` in
+  `tests/browser/tests/browser_facts.rs`; the date field's typing waits
+  for the designer's answer to the question of 15:56.
 Shape: minutes read by `skein_ui::number`, invalid when not one; the
   due date `YYYY-MM-DD`, invalid otherwise; an empty title refused in
   words (the field invalid, its description saying why).
