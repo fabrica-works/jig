@@ -26,7 +26,9 @@ jig's view on skein-ui (jig's `client/domain/view.md`, 2), at skein's
   skein-lib`, never smith; a `cargo check` failing inside a smith crate
   stops the increment with a question.
 - **A repin's size:** at most 200 lines besides `Cargo.lock` (`git diff
-  --shortstat origin/main -- . ':!Cargo.lock'`), and no change of design
+  --shortstat $(git merge-base HEAD origin/main) -- . ':!Cargo.lock'`:
+  the merge base, so that rulings landing meanwhile do not count), and
+  no change of design
   (development.md, 5.7). More stops the increment with a question: it
   lands nothing, and the supervisor lands the gap's lines in jig's
   `STATUS.md` under "Not planned" and in `later.md`.
@@ -44,11 +46,14 @@ Files: `Cargo.lock` (the repin commit, alone, first); then each file
   `heavy cargo check --workspace --all-targets` names. Expected, from
   the searches at the base:
   - each literal of skein-ui's `Limits` in jig, given `scene_marks` and
-    `scene_bytes` from jig's own constructors (`rg -n 'Limits \{'
-    crates/jig-view examples/ops/view testing/jig-test-view
-    tests/client tests/client-protocol --type rust`), with jig's
-    numbers: no scene in jig's pages, so both 0 (jig draws no scene
-    until later.md's "jig's own drawing code");
+    `scene_bytes` from jig's own constructors (`rg -n 'markdown_depth'
+    --type rust`: 33 literals in 30 files at jig `6c7c2dcf3`, three of
+    them in `crates/jig-view/src/` (`limits.rs`, `owner_deployment.rs`,
+    `owner_result.rs`), one in `tests/ops/src/joint/fixture.rs`; not
+    `Limits \{`, which also matches `PhraseLimits` and jig's own
+    `Limits`), with jig's numbers: no scene in jig's pages, so both 0
+    (jig draws no scene until later.md's "jig's own drawing code");
+    the ready check's count: 66 lines;
   - `Node.picture` read in jig, now `Node.source` (none at the base
     outside the moved crates: `rg -n '\.picture\b' --type rust`);
   - a test acting on a disabled node or with an act its role does not
@@ -70,6 +75,21 @@ Removes: nothing.
 
 - A break that needs more than 200 lines or a change of design
   (development.md, 5.7): the increment lands nothing and asks.
+- **Known from the ready check (ruling 133):** after the repin and the
+  `Limits` repair, the fuzzy profile fails
+  `random_people_with_crash_commits_and_reload`
+  (`tests/client/tests/fuzzy_joint.rs:65`) on seed 4503, `Online(ClientId(0))
+  was not met by 1.211353973s`; it passes at the old pin. The random
+  person presses "Sign out", then "Sign in with Test" 1.1 ms later; the
+  page ends signed out, while the referee's sign-in receipt armed the
+  Online deadline (`tests/client/src/harness/referee.rs:194`). The
+  repin brings skein-fake-person's new draws (`83a0cec`, `561d1ae`).
+  Reproduce it with that seed, at most 3 runs through `heavy`, find
+  which side is wrong (jig's client losing a sign-in pressed while its
+  sign-out is in flight, or the referee arming Online for a sign-in the
+  page then lost), and raise it as a question with the trace. Do not
+  re-seed it, and change neither the referee nor jig's client in
+  05.1.
 
 ## Done when
 
