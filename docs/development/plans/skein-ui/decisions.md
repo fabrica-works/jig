@@ -139,6 +139,9 @@ None yet; they start at 101.
 104. **skein 10's Shapes against main** (ready check of skein-10.1).
      skein 10's session file corrected against skein `a37b22a` (skein 01.1 and 01.2 landed): the list's record is `Notes`, since skein-codegen reserves `List`; 10.1's Files add the drift test's `golden/v1/`, take `skein-codec` by path, and write the drift copy's switch without `is_some_and`, which the step-code `clippy.toml` disallows; the sketch's `Duties` holds `skein_lib::Queue`s, not `Vec`s; 10.2's Files add the server's `clippy.toml` and `[lints]` tables, copied from the echo shell's, and cite `tests/browser/src/serve.rs:118-238`. skein 12's `Requests` mirrors `Duties`: its own ready check settles its types. A further use of a reserved record name or a disallowed type or method the copy trips: fix it in the same increment, and list it in the commit body.
 
+105. **A gate's single flaky world-test failure is retried once** (process, skein 01's block of 2026-10-15T11:39:20Z).
+     skein 01.3 runs `land` once more on its unchanged tree (commit 70f09d1 rebased as `land` does). The failed test, `terminal_is_controlling_and_the_persons_interrupt_reaches_only_the_child` (skein's `tests/world/tests/end_to_end.rs:158`), is a world test of skein's terminal that the move does not reach, and it passed in 81 of the 82 gate logs of this machine's runs. For the rest of this run, a gate whose only failure is this test is retried once on the unchanged tree, without a block, and the retry is named in the commit body; a second failure of it in a row blocks, kind process. Its diagnosis is deferred: `later.md` has its row.
+
 ## For the user
 
 Long-term choices the user may veto; each default holds unless the user

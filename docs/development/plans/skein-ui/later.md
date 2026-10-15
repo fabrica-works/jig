@@ -24,3 +24,4 @@ of jig's boundary with applications, which may change them.
 | Parts for a phone or a desktop | skein's `ui.md`, 16 and 18 | an application shipping on that platform |
 | The native shell split into parts (`jig-shell-native` stays one crate, carrying jig's link, not the tree) | jig's `STATUS.md`, "jig on skein-ui" | the user's decision, default later |
 | Repinning the repository downstream of jig onto this plan's jig, which renames the tree's types it uses and drops `State::Provisional` (decisions.md, 3) | development.md, 5.7 | that repository's next plan, after its own active run |
+| The flaky `terminal_is_controlling_and_the_persons_interrupt_reaches_only_the_child` (skein's `tests/world/tests/end_to_end.rs:158`): its first read can miss `ready` (1 failure in 82 gate logs on carbon-forge, skein 01.3's of 2026-10-15) | skein's `testing.md` (a world test passes or fails alike on each run) | a plan that touches skein's world tests, or a second failure in this run |
