@@ -1401,6 +1401,9 @@ None yet; they start at 101.
 
      The repin is not deferred. Unchanged: ruling 133's rules for 05.1 (no re-seed; no change to jig's client in 05.1).
 
+135. **skein-13.s1: the chart test's bad data written as escapes** (steer of 2026-10-15T17:31:22Z).
+     **A step `skein-13.s1`: the chart test's bad data written as escapes** (the check of 17:23, Taste; the handover of 17:29). skein 13.4's `examples/ui/view/src/tests/chart.rs:110` holds raw NUL and 0x04 bytes in `BAD_DATA`'s byte strings, so git, the pulse and grep read the file as binary (`git show 2f8f471 --numstat` prints `-	-` for it); no other `.rs` file of skein or jig holds raw control bytes (`git grep -lP '[\x00-\x08\x0b\x0c\x0e-\x1f]' origin/main -- '*.rs'`, in each). The step, with its session file `skein/13.s1-chart-bytes-escaped.md`, writes the same bytes as escapes (`b"\0\x04idea"`, `b"A\0\0\0\0\0"`, `b"\0\0\0\0\0\0x"`), in a fresh skein implementer, and lands before jig 05.1, so that 05.1's repin takes it and jig pins skein's last landing of this plan (Done when 4). 05.1 still waits for the designer's answer (ruling 134, part 2); if it resumes before skein-13.s1 has landed, it waits for that landing, then repins to skein's `origin/main` (`heavy cargo update -p skein-lib`) before its gate. Unchanged: ruling 133's and 134's rules for 05.1, and jig-05.s1.
+
 ## For the user
 
 Long-term choices the user may veto; each default holds unless the user
