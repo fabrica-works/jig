@@ -50,11 +50,20 @@ hole (ui.md, 9; view.md, 7).
 Scope: ui.md 6.
 Needs: jig 01.3 (`jig_view::ui`).
 Files: `crates/jig-view/src/binding.rs` (generic 7-51 to
-  `ui/binding.rs`); `crates/jig-view/src/tests/binding.rs` (6-73 to
-  `ui/tests/binding.rs`, 75-89 stay); `ui/mod.rs`; `lib.rs`; users of
-  `jig_view::{Act, Binding, BoundAct, number}` (`rg -l
-  'jig_view::.*\b(Act|Binding|BoundAct|number)\b'`), among them
-  `crates/jig-shell-text/src/command.rs:47`.
+  `ui/binding.rs`); `crates/jig-view/src/tests/binding.rs` (8-75 to
+  `ui/tests/binding.rs`, 77-91 stay); `ui.rs`; the test modules' lists
+  in `tests.rs` and `ui/tests.rs`; `lib.rs`; users of
+  `jig_view::{Act, Binding, BoundAct, number}` (`rg -lU
+  'jig_view::(\{[^}]*)?\b(Act|Binding|BoundAct|number)\b'`), among
+  them `crates/jig-shell-text/src/command.rs:3,48`; and users of
+  `crate::{Act, Binding, BoundAct, number}` inside jig-view (`rg -lU
+  'crate::(\{[^}]*)?\b(Act|Binding|BoundAct|number)\b'
+  crates/jig-view/src`: 20 files at `d2a7a714e`, among them
+  `confirmation/amendment.rs`, `ui/tree.rs`, `ui/builder.rs`,
+  `tests/turns.rs` and `tests/work_pages/sections.rs`). The moved tests
+  name the tree's owner as `ui::Owner { number: N }`, not jig's `Owner`
+  (`Owner::Jig` is `ui::Owner { number: 65_536 }`, `owner.rs:18`), so
+  that 02.5's test passes.
 Shape: `ui/binding.rs`: `Binding { owner: ui::Owner, token: Token }`,
   `Act`, `BoundAct`, `number`, as at the base. `binding.rs` keeps
   `JigMeaning`, `Entry`, `JigBindings`, `decode`,
@@ -71,25 +80,38 @@ Removes: nothing.
 Scope: ui.md 15; view.md 10.
 Needs: jig 01.3.
 Files: `crates/jig-view/src/limits.rs` (11-59 to `ui/limits.rs`, but
-  line 58); `crates/jig-view/src/pages.rs:200-205` (`scratch`); every
-  caller of `worst_case` (`rg -n 'worst_case\(' crates/jig-view
+  line 58); `crates/jig-view/src/pages.rs:208-213` (`scratch`); `lib.rs`
+  (`mod limits` becomes `pub mod limits`); the test modules' lists;
+  every caller of `worst_case` (`rg -n 'worst_case\(' crates/jig-view
   testing tests examples --type rust`), among them
-  `ui/tests/tree.rs:155`.
+  `ui/tests/tree.rs:146`; every user of the moved type (`rg -lU
+  'jig_view::(\{[^}]*)?\bLimits\b' --type rust`: 18 files outside
+  jig-view at `d2a7a714e`, among them
+  `crates/jig-shell-text/src/{render,terminal,tests/fixtures}.rs`,
+  `tests/client/src/{model,observe,test}.rs` and
+  `tests/ops/src/{client/app,joint/fixture}.rs`, and `crate::Limits`
+  inside jig-view); every caller of `Limits::{of, of_words, compose,
+  envelope}` (`rg -n 'Limits::(of|of_words|compose|envelope)\b'
+  --type rust`), among them `examples/ops/view/src/limits.rs:49,58`,
+  `testing/jig-test-view/src/limits.rs` and
+  `testing/jig-test-view/src/tests/world_limits.rs`.
 Shape: `ui::Limits` (fields as at the base) and `ui::worst_case(&Limits)
-  -> Option<usize>` counting skein-ui's own containers only; jig's
+  -> Option<u64>` counting skein-ui's own containers only; jig's
   `limits.rs` keeps `impl Limits` 61-153 as free functions or an
   extension the same increment names (`limits::of`, `limits::of_words`,
   `limits::compose`, `limits::with_phrase_bytes`, `limits::envelope`,
   each taking `ui::Limits` where it took `self`), and a new
-  `limits::jig_worst_case(&ui::Limits) -> Option<usize>` =
+  `limits::jig_worst_case(&ui::Limits) -> Option<u64>` =
   `ui::worst_case` plus `pages::scratch`; jig's callers that checked
   the whole call `jig_worst_case`.
 Test shape: `crates/jig-view/src/tests/limits.rs` (new):
   `jig_worst_case_adds_the_page_scratch_to_skein_uis` with literal
   limits from `ui/tests/fixtures.rs`; the moved tests.
 Proof: world. `heavy cargo nextest run -p jig-client-world -E
-  'binary(memory)'` passes once (its two tests): the client's world checks the
-  most each part held against `jig_worst_case`. Bound: 2 minutes.
+  'binary(memory)'` passes once (its two tests), and `heavy cargo
+  nextest run --profile fuzzy -p jig-client-world -E
+  'binary(fuzzy_memory)'` passes once: the client's world checks the
+  most each part held against `jig_worst_case`. Bound: 2 minutes each.
 Don't: add the scene limits (skein 04); change a number.
 Size: about 60 lines, plus paths.
 Removes: `impl Limits` from the generic type.
@@ -99,10 +121,17 @@ Scope: ui.md 14; view.md 3.1.
 Needs: jig 01.3.
 Files: `crates/jig-view/src/outline.rs` to `ui/outline.rs`;
   `crates/jig-view/src/tests/outline.rs` (its tests of jig's rules,
-  35-41, 42-55, 76-86, go; the others move, `banner()` 16-24 replaced
-  by a banner node of the fixture's); `tests/client/tests/referee.rs:
-  447-473` (its sample fault becomes `OneMain`, a page with two mains);
-  the referee's call (`rg -n 'outline::check' tests`).
+  35-41, 42-55, 76-86, go; the others move; its `page()` and `finish()`,
+  7-15, move to `ui/tests/fixtures.rs` as the fixture's builder, which
+  01.3 did not add, with a one-node banner in place of `banner()` 16-24,
+  so the kept tests' nodes renumber: 64 and 74 from 6 to 3, 102 from 7
+  to 4); `tests/client/tests/referee.rs:449-475` (its sample fault, line
+  462, becomes `OneMain`, a page with two mains); the test modules'
+  lists; every user of the `outline` path (`rg -n
+  'outline::(check|Rule|Fault)' --type rust`), among them
+  `tests/client/src/harness/{world.rs:632,observation.rs:25}`,
+  `examples/ops/view/src/tests.rs:576` and
+  `crates/jig-view/src/tests/pages.rs:513,522,525,574`.
 Shape: `ui::outline::{check(&Tree) -> Option<Fault>, Fault { rule:
   Rule, node: u32 }, Rule}` with `Rule::{PageRoot, InsideLandmark,
   OneMain, OneBanner, OneContentInfo, ShortcutOnce}` (Escape added by
@@ -126,22 +155,27 @@ Removes: `Rule::{BannerFirst, BannerHolds, AfterPageLast}` and their
 
 ### 02.4 The phrasebook's machinery apart from jig's tables
 Scope: ui.md 9; view.md 7.
-Needs: jig 02.1 (`PhraseId`'s owner is `ui::Owner`).
+Needs: jig 01.3 (`PhraseId`'s owner is `ui::Owner` since 01.1).
 Files: `crates/jig-view/src/phrases.rs` (generic items to
-  `ui/phrases.rs`; jig's: `pub mod english; pub mod jig;`, the
-  `jig_capacity` field 199 and its setting 325-326, `jig_capacity()`
-  342-347, `normal_capacity` 429-435 stay in `phrases.rs`);
-  `crates/jig-view/src/tests/phrases.rs`;
-  `crates/jig-view/src/tests/owner_history.rs:547`; users of
+  `ui/phrases.rs`; jig's `pub mod english; pub mod jig;` stay; the
+  `jig_capacity` field 198 and its setting 324-325 go with
+  `Phrasebook`; the method `jig_capacity()` 341-346 and
+  `normal_capacity` 428-434 become jig's free function, below, in
+  `phrases.rs`); `crates/jig-view/src/tests/phrases.rs` (its jig
+  assertion at 210, `book.jig_capacity()` is `None` for partial words,
+  stays in jig's tests, calling the free function);
+  `crates/jig-view/src/tests/owner_history.rs:549`; the test modules'
+  lists; users of
   `ChipSpan`, `Hole::Chip`, `HoleKind::Chip`, `Saying.chips`,
   `jig_capacity` (19 files) and `phrases::{…}` machinery.
 Shape: `ui::phrases::{PhraseId, HoleKind, Hole, …, Phrasebook, Saying,
   load, say, capacity, worst_case}`; the reference hole as in "Choices"
-  above; jig's `phrases::jig_capacity(&Phrasebook) -> usize` computed
-  from `jig::ALL`, kept beside jig's tables, where the field was.
-Test shape: the moved tests, the chip's renamed; one new
-  `a_reference_hole_keeps_its_span_and_number` in
-  `ui/tests/phrases.rs`.
+  above, the chip's `title` renamed `name` as well as `task` →
+  `number` (`phrases.rs:50`); jig's `phrases::jig_capacity(&Phrasebook)
+  -> Option<u32>` computed from `jig::ALL` as `normal_capacity` does
+  today (`None` for a partial book), kept beside jig's tables.
+Test shape: the moved tests, the chip's renamed: the span test at
+  `tests/phrases.rs:92` becomes the reference hole's, so no new test.
 Proof: world. `heavy cargo nextest run -p jig-client-world -E
   'test(/stories/)'` passes once: every page says its phrases through
   the split machinery. Bound: 2 minutes.
@@ -152,8 +186,10 @@ Removes: the chip hole's names.
 ### 02.5 `jig_view::ui` names nothing outside itself
 Scope: decisions.md 5.
 Needs: 02.1 to 02.4.
-Files: a new `crates/jig-view/src/tests/ui_boundary.rs`; any `ui/` file
-  the test finds naming outside.
+Files: a new `crates/jig-view/src/tests/ui_boundary.rs`; `tests.rs`'s
+  list; any `ui/` file the test finds naming outside, among them the
+  tests 01.3 moved (`ui/tests/{tree,diff}.rs` name `crate::Binding`,
+  `crate::Limits`, `crate::worst_case`).
 Shape: no production change but what the test finds.
 Test shape: one test, `the_ui_module_names_only_itself_and_skein_lib`:
   for each file under `src/ui/` (listed by `include_str!`, one per

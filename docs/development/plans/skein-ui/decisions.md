@@ -125,6 +125,11 @@ the file. The user accepted every default the designer proposed
 
 None yet; they start at 101.
 
+## Rulings
+
+101. **jig 02's Shapes against main** (ready check of jig-02.1).
+     jig 02's session file corrected against jig `d2a7a714e` (01.3 landed): line numbers moved by 01.1 and 01.3; the Files of 02.1, 02.2 and 02.3 name the `crate::` users inside jig-view, the 18 users of `jig_view::Limits` outside it, the callers of `Limits::{of, of_words, compose, envelope}`, every user of the `outline` path, and the test modules' lists; moved tests name `ui::Owner { number: N }`; `worst_case` and `jig_worst_case` return `Option<u64>`, `jig_capacity` `Option<u32>`; the `jig_capacity` field goes with `Phrasebook`, its method becoming jig's free function; the chip's `title` becomes `name`; 02.4's new test is dropped (the span test at `tests/phrases.rs:92` becomes the reference hole's) and it needs 01.3, not 02.1; 02.3 moves `page()` and `finish()` into `ui/tests/fixtures.rs` as the fixture's builder, with the kept tests' nodes renumbered; 02.2's proof adds `binary(fuzzy_memory)` under the fuzzy profile. A further user of a moved or renamed item that these Files miss: change it in the same increment, and list it in the commit body.
+
 ## For the user
 
 Long-term choices the user may veto; each default holds unless the user
