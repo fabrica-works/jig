@@ -117,13 +117,11 @@ fn authority_document_cut_is_separate_from_whole_payload_and_keeps_exact_codes()
 
 #[test]
 fn saturated_owner_authority_renderer_and_words_fit_composed_heap_envelopes() {
+    use jig_view::owner_authority as view;
+    use jig_view::owner_authority_words::{self as words, OwnerAuthorityWords};
     use jig_view::ui::Builder;
     use jig_view::ui::Limits;
-    use jig_view::{
-        owner_authority as view,
-        owner_authority_words::{self as words, OwnerAuthorityWords},
-        phrases::PhraseLimits,
-    };
+    use jig_view::ui::phrases::PhraseLimits;
 
     let language_limits =
         PhraseLimits { languages: 1, phrases: 18, holes: 1, segments: 40, text_bytes: 4096, hole_bytes: 0 };

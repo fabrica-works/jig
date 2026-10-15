@@ -504,7 +504,7 @@ fn historical_task_all_three_supplied_presences_keep_repetition_and_whole_source
 }
 #[test]
 fn historical_selected_language_uses_checked_native_captions_and_preserves_opaque_goal_values() {
-    use crate::phrases::{PhraseLimits, Phrasebook, Segment};
+    use crate::ui::phrases::{PhraseLimits, Phrasebook, Segment};
     let english = crate::phrases::english::language();
     let mut selected = english.clone();
     for phrase in &mut selected.phrases {

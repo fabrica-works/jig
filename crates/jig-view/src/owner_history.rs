@@ -1,7 +1,10 @@
 //! Immutable semantic history (client/domain/objects.md, 11; domain/tasks.md, 7;
 //! view.md, 7 and 10). Stored overrides are not historical effective defaults.
+use crate::JigBindings;
+use crate::owner_history_words::HistoryPhrase as P;
+use crate::ui::phrases::Hole;
 use crate::ui::{Builder, Role, Run};
-use crate::{JigBindings, owner_history_words::HistoryPhrase as P, phrases::Hole, words::Words};
+use crate::words::Words;
 
 use jig_domain_client::{
     Limits,
@@ -170,7 +173,7 @@ pub fn max_nodes(limits: &Limits) -> Option<u32> {
 #[must_use]
 pub fn worst_case(limits: &Limits, words: &Words) -> Option<HistoryFragment> {
     let nodes = max_nodes(limits)?;
-    let phrase = words.book.jig_capacity()?;
+    let phrase = crate::phrases::jig_capacity(&words.book)?;
     let text_per_node = crate::literal_segment::max_bytes(limits.text)?.max(phrase).checked_mul(2)?;
     let bindings = limits.rows.checked_mul(limits.rows.checked_add(1)?)?.max(1);
     Some(HistoryFragment {

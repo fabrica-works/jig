@@ -1,10 +1,9 @@
 //! Inbox groups reuse the same cards and their context (client/domain/pages.md, 3).
+use crate::phrases::jig::JigPhrase;
+use crate::ui::phrases::Hole;
 use crate::ui::{Builder, Role, Run};
-use crate::{
-    JigBindings, cards,
-    phrases::{Hole, jig::JigPhrase},
-    words::Words,
-};
+use crate::words::Words;
+use crate::{JigBindings, cards};
 
 use jig_domain_client::{
     Domain,

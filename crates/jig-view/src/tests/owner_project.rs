@@ -5,12 +5,10 @@
     clippy::wildcard_enum_match_arm,
     reason = "ordinary public proofs inspect complete accessible trees, raw slots and decoded actions"
 )]
+use crate::ui::phrases::{PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat};
 use crate::ui::{Builder, Role, Tree};
-use crate::{
-    JigBindings, owner_project as view,
-    phrases::{PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat},
-    words::Words,
-};
+use crate::words::Words;
+use crate::{JigBindings, owner_project as view};
 
 use jig_domain_client::{Domain, contract::*};
 use skein_lib::{
@@ -416,7 +414,7 @@ fn owner_project_raw_role_permissions_requirement_guards_and_spend_recurring_sou
     assert_eq!(value.spend.iter().map(|s| s.chip.task).collect::<Vec<_>>(), [9, 0, u64::MAX, 9]);
     assert_eq!(value.recurring.get(0).unwrap().batch.iter().map(|t| t.number).collect::<Vec<_>>(), [u64::MAX, 0]);
     let region_name = words(false)
-        .say(crate::phrases::jig::JigPhrase::RecurringKey, &[crate::phrases::Hole::Number(u64::from(u32::MAX))]);
+        .say(crate::phrases::jig::JigPhrase::RecurringKey, &[crate::ui::phrases::Hole::Number(u64::from(u32::MAX))]);
     let (index, recurring) = tree
         .nodes()
         .iter()
@@ -430,7 +428,7 @@ fn owner_project_raw_role_permissions_requirement_guards_and_spend_recurring_sou
                 && node.name.as_deref().is_some_and(|name| {
                     [0, u64::MAX].into_iter().any(|task| {
                         name == words(false)
-                            .say(crate::phrases::jig::JigPhrase::TaskPage, &[crate::phrases::Hole::Number(task)])
+                            .say(crate::phrases::jig::JigPhrase::TaskPage, &[crate::ui::phrases::Hole::Number(task)])
                             .as_ref()
                     })
                 })

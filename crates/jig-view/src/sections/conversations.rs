@@ -1,10 +1,9 @@
 //! Conversations and the offered first-words form (client/domain/pages.md, 4).
+use crate::phrases::jig::JigPhrase;
+use crate::ui::phrases::Hole;
 use crate::ui::{Builder, Key, Role, Run, State};
-use crate::{
-    JigBindings, Owner, cards,
-    phrases::{Hole, jig::JigPhrase},
-    words::Words,
-};
+use crate::words::Words;
+use crate::{JigBindings, Owner, cards};
 
 use jig_domain_client::{Domain, action::Act, contract::Runtime, fields::Purpose};
 /// Render committed chat facts, window edges and the projects' offered chat forms.

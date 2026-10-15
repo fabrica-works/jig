@@ -6,11 +6,10 @@ use jig_test_domain_client::{
     connector_values::*,
     family::{Kind, Scope, Subject},
 };
+use jig_view::phrases::jig::JigPhrase;
+use jig_view::ui::phrases::{Form as PhraseForm, HoleKind, PhraseLimits, Phrasebook, PluralClass, Segment};
 use jig_view::ui::{Builder, Role, Tree};
-use jig_view::{
-    Owner,
-    phrases::{self, Form as PhraseForm, HoleKind, PhraseLimits, Phrasebook, PluralClass, Segment, jig::JigPhrase},
-};
+use jig_view::{Owner, phrases};
 
 use skein_lib::{List, Wall, bytes::copy_of};
 fn list<T>(capacity: u32, values: impl IntoIterator<Item = T>) -> List<T> {
@@ -498,21 +497,24 @@ fn connector_values_composed_whole_languages_admit_exact_segments_and_refuse_one
     };
     let mut short = limits;
     short.segments = short.segments.checked_sub(1).unwrap();
-    assert_eq!(Phrasebook::load(shapes.clone(), languages.clone(), &short).unwrap_err(), phrases::Invalid::Limit);
+    assert_eq!(
+        Phrasebook::load(shapes.clone(), languages.clone(), &short).unwrap_err(),
+        jig_view::ui::phrases::Invalid::Limit
+    );
     for admitted in [limits.segments, limits.segments.checked_add(1).unwrap()] {
         let mut capacity = limits;
         capacity.segments = admitted;
         let book = Phrasebook::load(shapes.clone(), languages.clone(), &capacity).unwrap();
         for language in 0..2 {
             assert_eq!(
-                book.say(language, Word::Value.id(), &[phrases::Hole::Number(3)]).unwrap().text.as_ref(),
+                book.say(language, Word::Value.id(), &[jig_view::ui::phrases::Hole::Number(3)]).unwrap().text.as_ref(),
                 b"Value: 3"
             );
         }
     }
     let mut short_holes = limits;
     short_holes.holes = 3;
-    assert_eq!(Phrasebook::load(shapes, languages, &short_holes).unwrap_err(), phrases::Invalid::Limit);
+    assert_eq!(Phrasebook::load(shapes, languages, &short_holes).unwrap_err(), jig_view::ui::phrases::Invalid::Limit);
 }
 #[test]
 fn connector_values_view_the_capacity_envelope_covers_full_rows_paths_and_escaped_segments() {

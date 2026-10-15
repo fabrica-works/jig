@@ -1,12 +1,11 @@
 //! Presentation of committed owner results (client/domain/contract.md, 4;
 //! client/domain/view.md, 7). Reads supplied facts only: no request, current
 //! object, name lookup or explanation is used to fill a missing fact.
+use crate::owner_outcome_words;
+use crate::owner_outcome_words::OutcomePhrase as P;
+use crate::ui::phrases::Hole;
 use crate::ui::{Builder, Role, Run};
-use crate::{
-    owner_outcome_words::{self, OutcomePhrase as P},
-    phrases::Hole,
-    words::Words,
-};
+use crate::words::Words;
 
 use jig_domain_client::contract::{
     OwnerEscalationChoice, OwnerOutcome, OwnerProposalChoice, ProposalKey, Proposer, Revision, Seen,

@@ -54,9 +54,7 @@ fn profile() -> &'static Profile {
         };
         let obs = view::words::Words::english(1, limits.observability.text).expect("Obs English fits");
         let infra = view::words::Words::english(2, limits.infrastructure.text).expect("Infra English fits");
-        let text_per_node = jig
-            .book
-            .jig_capacity()
+        let text_per_node = jig_view::phrases::jig_capacity(&jig.book)
             .expect("jig saying bound")
             .max(obs.capacity().expect("Obs saying bound"))
             .max(infra.capacity().expect("Infra saying bound"))

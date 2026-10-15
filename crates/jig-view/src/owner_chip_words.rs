@@ -1,13 +1,11 @@
 //! Checked chip metadata sayings (client/domain/view.md, 7).
 //! IDs 7000..7098 are coordinated append-only owner sayings.
-use crate::{
-    Owner,
-    phrases::{
-        Form, HoleKind, HoleShape, Invalid, Language, Phrase, PhraseId, PhraseLimits, PhraseShape, Phrasebook,
-        PluralClass, PluralRule, Segment, SpanUnit, WallFormat,
-    },
-    words::Words,
+use crate::Owner;
+use crate::ui::phrases::{
+    Form, HoleKind, HoleShape, Invalid, Language, Phrase, PhraseId, PhraseLimits, PhraseShape, Phrasebook, PluralClass,
+    PluralRule, Segment, SpanUnit, WallFormat,
 };
+use crate::words::Words;
 use alloc::boxed::Box;
 use skein_lib::{List, bytes::copy_of};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

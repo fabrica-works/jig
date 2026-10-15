@@ -3,12 +3,10 @@
     clippy::wildcard_enum_match_arm,
     reason = "ordinary proofs query checked source trees and select public action requests"
 )]
+use crate::ui::phrases::{Hole, PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat};
 use crate::ui::{Builder, Tree};
-use crate::{
-    JigBindings, owner_proposal as view,
-    phrases::{Hole, PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat},
-    words::Words,
-};
+use crate::words::Words;
+use crate::{JigBindings, owner_proposal as view};
 
 use jig_domain_client::{Domain, contract::*};
 use skein_lib::{
@@ -112,7 +110,7 @@ fn words(selected: bool) -> Words {
     let mut first = crate::phrases::english::language();
     first.wall = WallFormat::Nanos;
     first.span_unit = SpanUnit::Nanos;
-    let languages: Box<[crate::phrases::Language]> = if selected {
+    let languages: Box<[crate::ui::phrases::Language]> = if selected {
         let mut second = first.clone();
         for p in &mut second.phrases {
             for f in &mut p.forms {
@@ -411,7 +409,7 @@ fn owner_proposal_exact_checked_envelopes_keep_selected_language_whole_loss_and_
     assert!(view::max_nodes(&jig_domain_client::Limits { rows: u32::MAX, ..limits() }).is_none());
     assert!(view::worst_case(&jig_domain_client::Limits { text: u32::MAX, ..limits() }, &w).is_none());
     let id = crate::owner_proposal_words::ProposalPhrase::Attempt.id();
-    assert_eq!(w.book.say(1, id, &[Hole::Wall(Wall::EPOCH)]).unwrap_err(), crate::phrases::Invalid::Values { id });
+    assert_eq!(w.book.say(1, id, &[Hole::Wall(Wall::EPOCH)]).unwrap_err(), crate::ui::phrases::Invalid::Values { id });
     assert_eq!(w.book.say(1, id, &[Hole::Number(u64::MAX)]).unwrap().text.as_ref(), b"second 18446744073709551615");
     let short = crate::ui::Limits { nodes: tree.len() - 1, ..capacity(f) };
     let _refusal = std::panic::catch_unwind(|| {

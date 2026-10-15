@@ -13,8 +13,9 @@ use jig_ops_domain_client::{
         documents::{Document, Incident, Kind, Scope, State, Subject},
     },
 };
+use jig_view::Owner;
+use jig_view::ui::phrases::Hole;
 use jig_view::ui::{Builder, Key, Role, Run, SlotRef};
-use jig_view::{Owner, phrases::Hole};
 
 use skein_lib::Token;
 pub const NAV: SlotRef = SlotRef {

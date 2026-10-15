@@ -1,8 +1,11 @@
 //! Passive whole historical objects (client/domain/client.md, 5;
 //! contract.md, 6 and view.md, 7, 10). Original identities and independent
 //! sources are retained without acquiring current offers or manufacturing context.
+use crate::JigBindings;
+use crate::owner_historical_words::HistoricalPhrase as P;
+use crate::ui::phrases::Hole;
 use crate::ui::{Builder, Role, Run};
-use crate::{JigBindings, owner_historical_words::HistoricalPhrase as P, phrases::Hole, words::Words};
+use crate::words::Words;
 
 use alloc::boxed::Box;
 use jig_domain_client::{
@@ -319,7 +322,8 @@ pub fn max_nodes(l: &Limits) -> Option<u32> {
 #[must_use]
 pub fn worst_case(l: &Limits, words: &Words) -> Option<HistoricalFragment> {
     let nodes = max_nodes(l)?;
-    let text_per_node = words.book.jig_capacity()?.max(crate::literal_segment::max_bytes(l.text)?).checked_mul(2)?;
+    let text_per_node =
+        crate::phrases::jig_capacity(&words.book)?.max(crate::literal_segment::max_bytes(l.text)?).checked_mul(2)?;
     Some(HistoricalFragment {
         nodes,
         text_bytes: nodes.checked_mul(text_per_node)?,

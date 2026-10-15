@@ -5,16 +5,13 @@
     reason = "ordinary tests collect text, query trees and select scripted requests"
 )]
 
+use crate::phrases::english;
+use crate::phrases::jig::{JigPhrase, shapes};
 use crate::ui::Act;
+use crate::ui::phrases::{Hole, PhraseLimits, Phrasebook};
 use crate::ui::{Builder, Role, SlotRef, Tree};
-use crate::{
-    JigBindings, JigMeaning, Owner, decode,
-    phrases::{
-        Hole, PhraseLimits, Phrasebook, english,
-        jig::{JigPhrase, shapes},
-    },
-    words::Words,
-};
+use crate::words::Words;
+use crate::{JigBindings, JigMeaning, Owner, decode};
 use jig_domain_client::{
     Domain, Event, Request,
     action::Act as Action,
@@ -437,7 +434,7 @@ fn jig_phrasebook_requires_every_sentence_and_says_wall_times_in_person_offset()
             }
         )
         .unwrap_err(),
-        crate::phrases::Invalid::Missing { id: missing }
+        crate::ui::phrases::Invalid::Missing { id: missing }
     );
     let words = words();
     let mut b = Builder::new(&limits());

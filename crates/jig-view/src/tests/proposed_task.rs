@@ -232,8 +232,9 @@ fn normal_words_adjust_extreme_public_offsets_by_saturating_the_wall_instant() {
     assert_eq!(words.adjusted_wall(skein_lib::Wall::from_nanos(7_200_000_000_000)).as_nanos(), 3_600_000_000_000);
 }
 
-fn selected_owner_language() -> crate::phrases::Language {
-    use crate::phrases::{Segment, english};
+fn selected_owner_language() -> crate::ui::phrases::Language {
+    use crate::phrases::english;
+    use crate::ui::phrases::Segment;
     let mut selected = english::language();
     for phrase in &mut selected.phrases {
         if phrase.id.number >= 3000 {
@@ -255,7 +256,9 @@ fn selected_owner_language() -> crate::phrases::Language {
 }
 #[test]
 fn normal_phrasebooks_require_and_render_exact_owner_words_in_the_selected_language() {
-    use crate::phrases::{PhraseLimits, Phrasebook, english, jig::shapes};
+    use crate::phrases::english;
+    use crate::phrases::jig::shapes;
+    use crate::ui::phrases::{PhraseLimits, Phrasebook};
     let selected = selected_owner_language();
     let limits = PhraseLimits {
         languages: 2,

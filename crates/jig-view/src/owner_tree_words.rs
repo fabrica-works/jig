@@ -1,10 +1,8 @@
 //! Checked subtree sayings (client/domain/view.md, 7). IDs8300–8321.
-use crate::{
-    Owner,
-    phrases::{
-        Form, HoleKind, HoleShape, Language, Phrase, PhraseId, PhraseShape, PluralClass, PluralRule, Segment, SpanUnit,
-        WallFormat,
-    },
+use crate::Owner;
+use crate::ui::phrases::{
+    Form, HoleKind, HoleShape, Language, Phrase, PhraseId, PhraseShape, PluralClass, PluralRule, Segment, SpanUnit,
+    WallFormat,
 };
 use alloc::boxed::Box;
 use skein_lib::{List, bytes::copy_of};

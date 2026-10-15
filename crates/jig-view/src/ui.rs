@@ -5,6 +5,7 @@ pub(crate) mod diff;
 mod limits;
 pub mod markdown;
 pub mod outline;
+pub mod phrases;
 pub(crate) mod tree;
 mod view;
 

@@ -1,12 +1,10 @@
 #![expect(clippy::disallowed_methods, reason = "ordinary proofs inspect public checked languages and trees")]
+use crate::owner_history_words::{self as data, HistoryPhrase as P};
 use crate::ui::Limits;
+use crate::ui::phrases::{Hole, Invalid, PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat};
 use crate::ui::{Builder, Tree};
-use crate::{
-    JigBindings, owner_history as view,
-    owner_history_words::{self as data, HistoryPhrase as P},
-    phrases::{Hole, Invalid, PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat},
-    words::Words,
-};
+use crate::words::Words;
+use crate::{JigBindings, owner_history as view};
 
 use jig_domain_client::contract::*;
 use skein_lib::{Duration, List, Wall, bytes::copy_of};
@@ -177,7 +175,7 @@ pub(super) fn words(selected: bool) -> Words {
     let mut english = crate::phrases::english::language();
     english.wall = WallFormat::Nanos;
     english.span_unit = SpanUnit::Nanos;
-    let languages: Box<[crate::phrases::Language]> = if selected {
+    let languages: Box<[crate::ui::phrases::Language]> = if selected {
         let mut translated = english.clone();
         for phrase in &mut translated.phrases {
             for form in &mut phrase.forms {
@@ -542,12 +540,12 @@ fn owner_history_normal_selected_language_checks_all_holes_and_nested_tree_bindi
         let mut holes = List::with_capacity(1);
         for hole in &shape.holes {
             let value = match hole.kind {
-                crate::phrases::HoleKind::Number => Hole::Number(u64::MAX),
-                crate::phrases::HoleKind::Wall => Hole::Wall(Wall::from_nanos(u64::MAX)),
-                crate::phrases::HoleKind::Amount
-                | crate::phrases::HoleKind::Span
-                | crate::phrases::HoleKind::Name
-                | crate::phrases::HoleKind::Chip => unreachable!(),
+                crate::ui::phrases::HoleKind::Number => Hole::Number(u64::MAX),
+                crate::ui::phrases::HoleKind::Wall => Hole::Wall(Wall::from_nanos(u64::MAX)),
+                crate::ui::phrases::HoleKind::Amount
+                | crate::ui::phrases::HoleKind::Span
+                | crate::ui::phrases::HoleKind::Name
+                | crate::ui::phrases::HoleKind::Reference => unreachable!(),
             };
             holes.push(value).unwrap();
         }

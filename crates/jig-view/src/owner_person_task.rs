@@ -1,12 +1,11 @@
 //! Pending person work, supplied contracts and shown results
 //! (client/domain/objects.md, 7; view.md, 7 and 10).
+use crate::owner_person_task_words::PersonPhrase as P;
+use crate::phrases::jig::JigPhrase;
+use crate::ui::phrases::Hole;
 use crate::ui::{Builder, Role, Run, State};
-use crate::{
-    JigBindings, JigMeaning,
-    owner_person_task_words::PersonPhrase as P,
-    phrases::{Hole, jig::JigPhrase},
-    words::Words,
-};
+use crate::words::Words;
+use crate::{JigBindings, JigMeaning};
 
 use alloc::boxed::Box;
 use jig_domain_client::{
@@ -55,7 +54,7 @@ pub(crate) fn controls_nodes(l: &Limits) -> Option<u32> {
 #[must_use]
 pub fn worst_case(l: &Limits, words: &Words) -> Option<PersonFragment> {
     let nodes = max_nodes(l)?;
-    let phrase = words.book.jig_capacity()?;
+    let phrase = crate::phrases::jig_capacity(&words.book)?;
     let text_per_node = phrase.max(crate::literal_segment::max_bytes(l.text)?).checked_mul(2)?;
     Some(PersonFragment {
         nodes,

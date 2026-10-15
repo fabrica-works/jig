@@ -1,10 +1,8 @@
 use crate::ui::Limits;
+use crate::ui::phrases::{Hole, Invalid, PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat};
 use crate::ui::{Builder, Tree};
-use crate::{
-    JigBindings, owner_milestone as view,
-    phrases::{Hole, Invalid, PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat},
-    words::Words,
-};
+use crate::words::Words;
+use crate::{JigBindings, owner_milestone as view};
 
 use jig_domain_client::{Domain, contract::*};
 use skein_lib::{
@@ -33,7 +31,7 @@ fn words(selected: bool) -> Words {
     let mut english = crate::phrases::english::language();
     english.wall = WallFormat::Nanos;
     english.span_unit = SpanUnit::Nanos;
-    let languages: Box<[crate::phrases::Language]> = if selected {
+    let languages: Box<[crate::ui::phrases::Language]> = if selected {
         let mut second = english.clone();
         for phrase in &mut second.phrases {
             for form in &mut phrase.forms {

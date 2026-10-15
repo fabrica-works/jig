@@ -7,15 +7,12 @@ use super::{
     cards::{CLIENT, contains, text, words},
     cards_objects::{loaded, question, render},
 };
+use crate::JigBindings;
+use crate::phrases::english;
+use crate::phrases::jig::{JigPhrase, shapes};
+use crate::ui::phrases::{HoleKind, PhraseLimits, Phrasebook, Segment, WallFormat};
 use crate::ui::{Builder, Tree};
-use crate::{
-    JigBindings,
-    phrases::{
-        HoleKind, PhraseLimits, Phrasebook, Segment, WallFormat, english,
-        jig::{JigPhrase, shapes},
-    },
-    words::Words,
-};
+use crate::words::Words;
 use jig_domain_client::{
     Domain,
     contract::*,
@@ -212,10 +209,10 @@ fn question_sender_maximum_card_has_finite_bounds_and_retains_independent_older_
     for phrase in [JigPhrase::QuestionFromTask, JigPhrase::QuestionFromPerson, JigPhrase::QuestionFromDeployment] {
         assert_eq!(
             phrase.shape(CLIENT.text).holes.as_ref(),
-            &[crate::phrases::HoleShape { kind: HoleKind::Number, bytes: 0 }]
+            &[crate::ui::phrases::HoleShape { kind: HoleKind::Number, bytes: 0 }]
         );
         assert!(
-            w.say(phrase, &[crate::phrases::Hole::Number(u64::MAX)]).len()
+            w.say(phrase, &[crate::ui::phrases::Hole::Number(u64::MAX)]).len()
                 <= usize::try_from(w.book.capacity(phrase.id()).unwrap()).unwrap()
         );
     }

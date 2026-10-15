@@ -1,12 +1,11 @@
 //! Whole authentic Project presentation and supported settings forms; pages.md, 6.
 //! Source order, independent loss and optional ledgers remain the owner's facts.
+use crate::owner_project_words::ProjectPhrase as P;
+use crate::phrases::jig::JigPhrase;
+use crate::ui::phrases::Hole;
 use crate::ui::{Builder, Role, Run};
-use crate::{
-    JigBindings, JigMeaning, cards,
-    owner_project_words::ProjectPhrase as P,
-    phrases::{Hole, jig::JigPhrase},
-    words::Words,
-};
+use crate::words::Words;
+use crate::{JigBindings, JigMeaning, cards};
 
 use alloc::boxed::Box;
 use jig_domain_client::{
@@ -139,7 +138,7 @@ fn historical_nodes(l: &Limits) -> Option<u32> {
 #[must_use]
 pub fn worst_case(l: &Limits, words: &Words) -> Option<ProjectFragment> {
     let nodes = max_nodes(l)?;
-    let saying = words.book.jig_capacity()?;
+    let saying = crate::phrases::jig_capacity(&words.book)?;
     let text_per_node = saying.max(crate::literal_segment::max_bytes(l.text)?).checked_mul(2)?;
     Some(ProjectFragment {
         nodes,

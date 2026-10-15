@@ -1,11 +1,10 @@
 //! Bounded typed amendment fields; no authority judgment (client.md, 9).
+use crate::cards::proposal;
+use crate::phrases::jig::JigPhrase;
+use crate::ui::phrases::Hole;
 use crate::ui::{Builder, Role};
-use crate::{
-    JigBindings, JigMeaning,
-    cards::proposal,
-    phrases::{Hole, jig::JigPhrase},
-    words::Words,
-};
+use crate::words::Words;
+use crate::{JigBindings, JigMeaning};
 
 use alloc::boxed::Box;
 use jig_domain_client::{

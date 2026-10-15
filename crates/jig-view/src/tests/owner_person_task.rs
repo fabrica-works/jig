@@ -5,14 +5,12 @@
     reason = "ordinary proofs inspect public trees, source data and checked language selection"
 )]
 use super::cards::{CLIENT, drive, words};
+use crate::owner_person_task_words::PersonPhrase;
 use crate::ui::Limits;
+use crate::ui::phrases::{Invalid, PhraseLimits, Phrasebook, Segment};
 use crate::ui::{Builder, Role, State, Tree};
-use crate::{
-    JigBindings, owner_person_task as view,
-    owner_person_task_words::{self, PersonPhrase},
-    phrases::{Invalid, PhraseLimits, Phrasebook, Segment},
-    words::Words,
-};
+use crate::words::Words;
+use crate::{JigBindings, owner_person_task as view, owner_person_task_words};
 
 use jig_domain_client::{Domain, Event, action::Act, contract::*, fields::Purpose};
 use skein_lib::{Duration, List, Wall, bytes::copy_of};

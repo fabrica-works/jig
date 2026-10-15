@@ -2,8 +2,9 @@
 //! Replace: observability's error-rate drawing.
 use crate::words::{Word, Words};
 use jig_ops_domain_client::observability::documents::Incident;
+use jig_view::Owner;
+use jig_view::ui::phrases::Hole;
 use jig_view::ui::{Builder, DrawingKind, Run};
-use jig_view::{Owner, phrases::Hole};
 
 pub const BYTES: u32 = 32;
 pub fn rate(b: &mut Builder, words: &Words, incident: &Incident) {

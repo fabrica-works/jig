@@ -1465,7 +1465,7 @@ fn unknown_deployment_parts_keep_missing_owner_facts_without_not_kept_captions()
 
 #[test]
 fn deferred_connector_diagnostic_words_select_bounded_checked_language_without_holes() {
-    use jig_view::phrases::{
+    use jig_view::ui::phrases::{
         Form, Language, Phrase, PhraseLimits, PhraseShape, Phrasebook, PluralClass, PluralRule, Segment, SpanUnit,
         WallFormat,
     };

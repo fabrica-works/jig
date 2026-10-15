@@ -1,9 +1,8 @@
 //! Whole specification presentation (client/domain/contract.md, 5.2; view.md, 10).
+use crate::phrases::jig::JigPhrase;
+use crate::ui::phrases::Hole;
 use crate::ui::{Builder, Run};
-use crate::{
-    phrases::{Hole, jig::JigPhrase},
-    words::Words,
-};
+use crate::words::Words;
 
 use jig_domain_client::{
     Limits,

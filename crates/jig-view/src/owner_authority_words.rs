@@ -1,11 +1,9 @@
 //! Checked authority words and selected language (client/domain/view.md, 7).
 //! Phrase IDs 3000..3017 are reserved for the owner authority vocabulary.
-use crate::{
-    Owner,
-    phrases::{
-        Form, Hole, HoleKind, HoleShape, Invalid, Language, Phrase, PhraseId, PhraseLimits, PhraseShape, Phrasebook,
-        PluralClass, PluralRule, Segment, SpanUnit, WallFormat,
-    },
+use crate::Owner;
+use crate::ui::phrases::{
+    Form, Hole, HoleKind, HoleShape, Invalid, Language, Phrase, PhraseId, PhraseLimits, PhraseShape, Phrasebook,
+    PluralClass, PluralRule, Segment, SpanUnit, WallFormat,
 };
 use alloc::boxed::Box;
 use skein_lib::{List, Wall, bytes::copy_of};
@@ -203,5 +201,5 @@ impl OwnerAuthorityWords {
 /// The shared phrasebook model includes its shapes, languages and capacities.
 #[must_use]
 pub fn worst_case(limits: &PhraseLimits) -> Option<u64> {
-    crate::phrases::worst_case(limits)
+    crate::ui::phrases::worst_case(limits)
 }

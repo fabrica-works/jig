@@ -1,14 +1,12 @@
 //! Checked committed-outcome phrases (client/domain/view.md, 7).
 //! IDs 6400..6460 belong to this owner vocabulary. Language data is
 //! composed into the caller's checked Words; no language is chosen here.
-use crate::{
-    Owner,
-    phrases::{
-        Form, Hole, HoleKind, HoleShape, Language, Phrase, PhraseId, PhraseShape, PluralClass, PluralRule, Segment,
-        SpanUnit, WallFormat,
-    },
-    words::Words,
+use crate::Owner;
+use crate::ui::phrases::{
+    Form, Hole, HoleKind, HoleShape, Language, Phrase, PhraseId, PhraseShape, PluralClass, PluralRule, Segment,
+    SpanUnit, WallFormat,
 };
+use crate::words::Words;
 use alloc::boxed::Box;
 use skein_lib::{List, bytes::copy_of};
 

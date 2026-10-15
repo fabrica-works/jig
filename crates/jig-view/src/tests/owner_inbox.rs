@@ -4,12 +4,10 @@
     reason = "ordinary public proofs inspect checked trees and scripted requests"
 )]
 use super::cards::{CLIENT, contains, document, drive, start};
+use crate::JigBindings;
+use crate::ui::phrases::{Hole, Invalid, PhraseLimits, Phrasebook, Segment};
 use crate::ui::{Builder, Role, Tree};
-use crate::{
-    JigBindings,
-    phrases::{Hole, Invalid, PhraseLimits, Phrasebook, Segment},
-    words::Words,
-};
+use crate::words::Words;
 
 use jig_domain_client::{Domain, Event, Request, contract::*};
 use skein_lib::{List, bytes::copy_of};

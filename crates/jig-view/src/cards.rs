@@ -1,12 +1,11 @@
 //! One shared card frame in every place (client/domain/objects.md, section 2).
 //! The place changes context only. Card state and terminal facts are owned by
 //! the domain; this module neither changes them nor judges offered acts.
+use crate::JigBindings;
+use crate::phrases::jig::JigPhrase;
+use crate::ui::phrases::Hole;
 use crate::ui::{Builder, Role};
-use crate::{
-    JigBindings,
-    phrases::{Hole, jig::JigPhrase},
-    words::Words,
-};
+use crate::words::Words;
 
 use jig_domain_client::{
     Domain,

@@ -19,12 +19,12 @@ fn words() -> &'static Words {
     static WORDS: std::sync::OnceLock<Words> = std::sync::OnceLock::new();
     WORDS.get_or_init(|| {
         let mut language = crate::phrases::english::language();
-        language.wall = crate::phrases::WallFormat::Nanos;
+        language.wall = crate::ui::phrases::WallFormat::Nanos;
         Words {
-            book: crate::phrases::Phrasebook::load(
+            book: crate::ui::phrases::Phrasebook::load(
                 crate::phrases::jig::shapes(CLIENT.text),
                 Box::new([language]),
-                &crate::phrases::PhraseLimits {
+                &crate::ui::phrases::PhraseLimits {
                     languages: 1,
                     phrases: crate::owner_words::phrase_count(),
                     holes: 4,
@@ -43,12 +43,12 @@ fn selected() -> &'static Words {
     static WORDS: std::sync::OnceLock<Words> = std::sync::OnceLock::new();
     WORDS.get_or_init(|| {
         let mut language = crate::phrases::english::language();
-        language.wall = crate::phrases::WallFormat::Nanos;
+        language.wall = crate::ui::phrases::WallFormat::Nanos;
         for phrase in &mut language.phrases {
             if [P::Starting.id(), P::Writing.id(), P::Tool.id()].contains(&phrase.id) {
                 for form in &mut phrase.forms {
                     for segment in &mut form.segments {
-                        if let crate::phrases::Segment::Text(bytes) = segment {
+                        if let crate::ui::phrases::Segment::Text(bytes) = segment {
                             *bytes = copy_of(b"Selected work report");
                         }
                     }
@@ -56,10 +56,10 @@ fn selected() -> &'static Words {
             }
         }
         Words {
-            book: crate::phrases::Phrasebook::load(
+            book: crate::ui::phrases::Phrasebook::load(
                 crate::phrases::jig::shapes(CLIENT.text),
                 Box::new([crate::phrases::english::language(), language]),
-                &crate::phrases::PhraseLimits {
+                &crate::ui::phrases::PhraseLimits {
                     languages: 2,
                     phrases: crate::owner_words::phrase_count(),
                     holes: 4,
@@ -149,7 +149,7 @@ fn owner_work_activity_without_synthetic_context_shows_all_seven_reports_and_ind
             assert!(contains(&tree, b"Work reported at: 47"));
             assert_eq!(contains(&tree, b"Actual run start unavailable"), started.is_none());
             if let Some(at) = started {
-                let caption = words().book.say(0, P::Started.id(), &[crate::phrases::Hole::Wall(at)]).unwrap();
+                let caption = words().book.say(0, P::Started.id(), &[crate::ui::phrases::Hole::Wall(at)]).unwrap();
                 assert!(contains(&tree, &caption.text));
             }
             match work {

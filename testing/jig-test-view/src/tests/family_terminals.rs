@@ -117,7 +117,7 @@ fn every_family_departure_fits_the_public_view_and_checked_selected_words() {
     ] {
         assert_eq!(
             word.id(),
-            jig_view::phrases::PhraseId {
+            jig_view::ui::phrases::PhraseId {
                 owner: (Owner::Application { number: jig_test_domain_client::FIRST }).opaque(),
                 number
             }
@@ -150,7 +150,7 @@ fn read_not_allowed_unknown_and_unsupported_keep_separate_public_captions() {
     }
 }
 fn selected_words() -> words::Words {
-    use jig_view::phrases::{
+    use jig_view::ui::phrases::{
         Form, HoleKind, HoleShape, Language, Phrase, PhraseLimits, PhraseShape, Phrasebook, PluralClass, PluralRule,
         Segment, SpanUnit, WallFormat,
     };

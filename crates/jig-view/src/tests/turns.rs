@@ -638,10 +638,9 @@ fn maximum_raw_live_calls_fit_whole_page_and_escaped_phrase_capacities() {
 #[test]
 fn raw_live_call_controls_use_selected_normal_language_and_checked_capacity() {
     use super::cards::CLIENT;
-    use crate::{
-        live_call_words::LiveCallPhrase,
-        phrases::{Form, PhraseLimits, Phrasebook, PluralClass, Segment, english},
-    };
+    use crate::live_call_words::LiveCallPhrase;
+    use crate::phrases::english;
+    use crate::ui::phrases::{Form, PhraseLimits, Phrasebook, PluralClass, Segment};
 
     let first = english::language();
     let mut selected = english::language();

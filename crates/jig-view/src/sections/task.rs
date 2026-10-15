@@ -1,10 +1,9 @@
 //! The universal task page and executor sections (client/domain/pages.md, 5).
+use crate::phrases::jig::JigPhrase;
+use crate::ui::phrases::Hole;
 use crate::ui::{Builder, Role};
-use crate::{
-    JigBindings, cards,
-    phrases::{Hole, jig::JigPhrase},
-    words::Words,
-};
+use crate::words::Words;
+use crate::{JigBindings, cards};
 
 use jig_domain_client::{
     Domain,

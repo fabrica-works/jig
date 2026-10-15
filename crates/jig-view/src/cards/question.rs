@@ -35,7 +35,7 @@ pub fn question(
             OwnerRequester::Person(number) => (JigPhrase::QuestionFromPerson, number),
             OwnerRequester::Deployment { project } => (JigPhrase::QuestionFromDeployment, u64::from(project)),
         };
-        words.text(b, phrase, &[crate::phrases::Hole::Number(number)]);
+        words.text(b, phrase, &[crate::ui::phrases::Hole::Number(number)]);
     }
     crate::ui::markdown::read(document.words.bytes(), 2, b);
     words.waiting(b, client.wall(), document.since);

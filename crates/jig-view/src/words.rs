@@ -4,7 +4,8 @@
 mod held;
 mod lacking;
 mod refusals;
-use crate::phrases::{Hole, Phrasebook, jig::JigPhrase};
+use crate::phrases::jig::JigPhrase;
+use crate::ui::phrases::{Hole, Phrasebook};
 use crate::ui::{Builder, Role, Run};
 use alloc::boxed::Box;
 use jig_domain_client::{

@@ -218,7 +218,7 @@ fn sign_out_tree(domain: &Domain) -> Tree {
     frame_tree(domain, &sign_out_words())
 }
 fn sign_out_words() -> crate::words::Words {
-    use crate::phrases::{PhraseLimits, Phrasebook};
+    use crate::ui::phrases::{PhraseLimits, Phrasebook};
     let count = u32::try_from(SIGN_OUT_PHRASES.len()).unwrap();
     let mut shapes = List::with_capacity(count);
     for phrase in SIGN_OUT_PHRASES {

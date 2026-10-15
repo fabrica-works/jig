@@ -1,7 +1,10 @@
 //! Standalone lifecycle milestones (client/domain/objects.md, 11; view.md, 7).
 //! Domain is borrowed only by existing admitted result follow-up fragments.
+use crate::JigBindings;
+use crate::owner_milestone_words::MilestonePhrase as P;
+use crate::ui::phrases::Hole;
 use crate::ui::{Builder, Role, Run};
-use crate::{JigBindings, owner_milestone_words::MilestonePhrase as P, phrases::Hole, words::Words};
+use crate::words::Words;
 
 use jig_domain_client::{
     Domain, Limits,
@@ -70,7 +73,7 @@ pub fn required(value: &OwnerMilestoneLine, limits: &Limits, words: &Words) -> O
 #[must_use]
 pub fn worst_case(limits: &Limits, words: &Words) -> Option<MilestoneFragment> {
     let nodes = max_nodes(limits)?;
-    let phrase = words.book.jig_capacity()?;
+    let phrase = crate::phrases::jig_capacity(&words.book)?;
     let text_per_node = crate::literal_segment::max_bytes(limits.text)?.max(phrase).checked_mul(2)?;
     Some(MilestoneFragment {
         nodes,

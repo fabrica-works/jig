@@ -2,13 +2,12 @@
 //! Reads the committed frame and page summary, never computes roles or authority.
 //! All interactive nodes use the last tree's token table; application navigation
 //! remains in its owner slot. Build under an already open page.
+use crate::phrases::jig::JigPhrase;
+use crate::regions::JigRegion;
+use crate::ui::phrases::Hole;
 use crate::ui::{Builder, Role, Run, SlotRef, State};
-use crate::{
-    JigBindings, JigMeaning,
-    phrases::{Hole, jig::JigPhrase},
-    regions::JigRegion,
-    words::Words,
-};
+use crate::words::Words;
+use crate::{JigBindings, JigMeaning};
 
 use jig_domain_client::{Domain, action::Act, address::Address, pages::navigation::Destination};
 

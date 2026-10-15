@@ -1,10 +1,9 @@
 //! Calls fold only input/result detail; made objects stay live as cards (view.md, 9).
+use crate::phrases::jig::JigPhrase;
+use crate::ui::phrases::Hole;
 use crate::ui::{Builder, Role, Run, State};
-use crate::{
-    JigBindings, cards,
-    phrases::{Hole, jig::JigPhrase},
-    words::Words,
-};
+use crate::words::Words;
+use crate::{JigBindings, cards};
 
 use jig_domain_client::{
     Domain,

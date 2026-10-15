@@ -1,8 +1,11 @@
 //! Source-faithful standalone chip metadata (client/domain/objects.md, 3;
 //! view.md, 7 and 10). Borrowed normal Words supply every label; opaque
 //! channel identity is retained by the contract and never turned into a number.
+use crate::JigBindings;
+use crate::owner_chip_words::ChipPhrase as P;
+use crate::ui::phrases::Hole;
 use crate::ui::{Builder, Role, Run};
-use crate::{JigBindings, owner_chip_words::ChipPhrase as P, phrases::Hole, words::Words};
+use crate::words::Words;
 
 use jig_domain_client::{
     Domain, Limits,
@@ -190,7 +193,7 @@ pub fn required(value: &OwnerChipDetails, limits: &Limits, words: &Words) -> Opt
             }
         }
     }
-    let phrase_bytes = words.book.jig_capacity()?;
+    let phrase_bytes = crate::phrases::jig_capacity(&words.book)?;
     // A card node can carry a title and text together; each literal byte can
     // need four escaped display bytes. Both costs are included, never narrowed.
     let text_per_node = crate::literal_segment::max_bytes(limits.text)?.max(phrase_bytes).checked_mul(2)?;

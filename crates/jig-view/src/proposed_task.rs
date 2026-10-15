@@ -1,11 +1,10 @@
 //! Exact batch member contracts, funding and connector references (objects.md, 4).
+use crate::phrases::jig::JigPhrase;
+use crate::proposed_task_words::ProposedPhrase;
+use crate::ui::phrases::Hole;
 use crate::ui::{Builder, Role, SlotRef};
-use crate::{
-    JigBindings, JigMeaning, Owner,
-    phrases::{Hole, jig::JigPhrase},
-    proposed_task_words::ProposedPhrase,
-    words::Words,
-};
+use crate::words::Words;
+use crate::{JigBindings, JigMeaning, Owner};
 
 use jig_domain_client::{
     Limits,

@@ -1,12 +1,10 @@
 #![expect(clippy::disallowed_methods, reason = "ordinary proofs inspect public checked languages and exact trees")]
+use crate::owner_activity as view;
+use crate::owner_activity_words::{self as data, ActivityPhrase as P};
 use crate::ui::Limits;
+use crate::ui::phrases::{Invalid, PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat};
 use crate::ui::{Builder, Tree};
-use crate::{
-    owner_activity as view,
-    owner_activity_words::{self as data, ActivityPhrase as P},
-    phrases::{Invalid, PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat},
-    words::Words,
-};
+use crate::words::Words;
 
 use jig_domain_client::contract::*;
 use skein_lib::{List, Wall, bytes::copy_of};
@@ -54,7 +52,7 @@ fn words(selected: bool) -> Words {
     let mut english = crate::phrases::english::language();
     english.wall = WallFormat::Nanos;
     english.span_unit = SpanUnit::Nanos;
-    let languages: Box<[crate::phrases::Language]> = if selected {
+    let languages: Box<[crate::ui::phrases::Language]> = if selected {
         let mut translated = english.clone();
         for phrase in &mut translated.phrases {
             for form in &mut phrase.forms {

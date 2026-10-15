@@ -1,5 +1,6 @@
 use super::*;
-use crate::phrases::{Hole, jig::JigPhrase};
+use crate::phrases::jig::JigPhrase;
+use crate::ui::phrases::Hole;
 use jig_domain_client::address::{Address, TaskSection};
 
 #[test]

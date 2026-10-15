@@ -1,7 +1,10 @@
 //! Whole pending proposal presentation (client/domain/objects.md, 2 and 4;
 //! view.md, 7 and 10). Funding and proposed contexts are supplied facts.
+use crate::JigBindings;
+use crate::owner_proposal_words::ProposalPhrase as P;
+use crate::ui::phrases::Hole;
 use crate::ui::{Builder, Role, Run};
-use crate::{JigBindings, owner_proposal_words::ProposalPhrase as P, phrases::Hole, words::Words};
+use crate::words::Words;
 
 use jig_domain_client::{
     Domain, Limits,
@@ -128,7 +131,7 @@ pub fn max_nodes(limits: &Limits) -> Option<u32> {
 #[must_use]
 pub fn worst_case(limits: &Limits, words: &Words) -> Option<ProposalFragment> {
     let nodes = max_nodes(limits)?;
-    let phrase = words.book.jig_capacity()?;
+    let phrase = crate::phrases::jig_capacity(&words.book)?;
     let text_per_node = phrase.max(crate::literal_segment::max_bytes(limits.text)?).checked_mul(2)?;
     Some(ProposalFragment {
         nodes,

@@ -1,13 +1,12 @@
 //! Whole supplied tree presentation (client/domain/pages.md, 5.2; view.md, 10).
 //! Local folds and filters hide presentation only. Source depth, parentage,
 //! count folds and continuation are never reconstructed from displayed rows.
+use crate::JigBindings;
+use crate::owner_tree_words::TreePhrase as P;
+use crate::phrases::jig::JigPhrase;
+use crate::ui::phrases::Hole;
 use crate::ui::{Builder, Role, Run, State};
-use crate::{
-    JigBindings,
-    owner_tree_words::TreePhrase as P,
-    phrases::{Hole, jig::JigPhrase},
-    words::Words,
-};
+use crate::words::Words;
 
 use jig_domain_client::{
     Domain, Limits,
@@ -53,7 +52,7 @@ pub fn max_nodes(l: &Limits) -> Option<u32> {
 #[must_use]
 pub fn worst_case(l: &Limits, words: &Words) -> Option<TreeFragment> {
     let nodes = max_nodes(l)?;
-    let phrase = words.book.jig_capacity()?;
+    let phrase = crate::phrases::jig_capacity(&words.book)?;
     let text_per_node = phrase.max(crate::literal_segment::max_bytes(l.text)?).checked_mul(2)?;
     Some(TreeFragment {
         nodes,

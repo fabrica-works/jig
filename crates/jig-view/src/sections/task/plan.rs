@@ -1,10 +1,9 @@
 //! Bounded iterative tree presentation, with held counts on folds (pages.md, 5.2).
+use crate::phrases::jig::JigPhrase;
+use crate::ui::phrases::Hole;
 use crate::ui::{Builder, Role, State};
-use crate::{
-    JigBindings, cards,
-    phrases::{Hole, jig::JigPhrase},
-    words::Words,
-};
+use crate::words::Words;
+use crate::{JigBindings, cards};
 
 use jig_domain_client::{
     Domain,

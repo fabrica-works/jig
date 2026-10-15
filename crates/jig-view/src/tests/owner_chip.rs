@@ -1,12 +1,10 @@
 #![expect(clippy::disallowed_methods, reason = "ordinary tests inspect public trees and checked language data")]
+use crate::owner_chip_words::{self as data, ChipPhrase, OwnerChipWords};
 use crate::ui::Limits;
+use crate::ui::phrases::{Invalid, PhraseLimits, Segment};
 use crate::ui::{Builder, Tree};
-use crate::{
-    JigBindings, owner_chip as view,
-    owner_chip_words::{self as data, ChipPhrase, OwnerChipWords},
-    phrases::{Invalid, PhraseLimits, Segment},
-    words::Words,
-};
+use crate::words::Words;
+use crate::{JigBindings, owner_chip as view};
 
 use jig_domain_client::{Domain, contract::*};
 use skein_lib::{Duration, List, Token, Wall, bytes::copy_of};
@@ -85,10 +83,10 @@ fn words() -> &'static Words {
     static WORDS: std::sync::OnceLock<Words> = std::sync::OnceLock::new();
     WORDS.get_or_init(|| {
         let mut language = crate::phrases::english::language();
-        language.wall = crate::phrases::WallFormat::Nanos;
-        language.span_unit = crate::phrases::SpanUnit::Nanos;
+        language.wall = crate::ui::phrases::WallFormat::Nanos;
+        language.span_unit = crate::ui::phrases::SpanUnit::Nanos;
         Words {
-            book: crate::phrases::Phrasebook::load(
+            book: crate::ui::phrases::Phrasebook::load(
                 crate::phrases::jig::shapes(256),
                 Box::new([language]),
                 &phrase_limits(),
@@ -578,7 +576,7 @@ fn maximum_chip_fragment_checks_selected_language_storage_raw_slots_loss_and_ari
     let mut language = data::language();
     language.phrases[0].id = ChipPhrase::PhaseSince.id();
     assert_eq!(
-        crate::phrases::Phrasebook::load(data::shapes(), Box::new([language]), &phrase_limits()).err(),
+        crate::ui::phrases::Phrasebook::load(data::shapes(), Box::new([language]), &phrase_limits()).err(),
         Some(Invalid::Duplicate { id: ChipPhrase::PhaseSince.id() })
     );
     assert_eq!(
@@ -718,9 +716,9 @@ fn owner_retry_borrows_selected_checked_six_class_words_and_both_count_holes() {
         if phrase.id == crate::phrases::jig::JigPhrase::RunRetryFailed.id() {
             phrase.forms[0].segments = Box::new([
                 Segment::Text(copy_of(b"chosen count ")),
-                Segment::Hole { index: 0, kind: crate::phrases::HoleKind::Number },
+                Segment::Hole { index: 0, kind: crate::ui::phrases::HoleKind::Number },
                 Segment::Text(copy_of(b" versus ")),
-                Segment::Hole { index: 1, kind: crate::phrases::HoleKind::Number },
+                Segment::Hole { index: 1, kind: crate::ui::phrases::HoleKind::Number },
             ]);
         }
     }

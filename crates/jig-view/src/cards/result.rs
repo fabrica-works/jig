@@ -1,10 +1,9 @@
 //! Result contracts and unread replies (client/domain/objects.md, section 8).
+use crate::JigBindings;
+use crate::phrases::jig::JigPhrase;
+use crate::ui::phrases::Hole;
 use crate::ui::{Builder, Role, Run};
-use crate::{
-    JigBindings,
-    phrases::{Hole, jig::JigPhrase},
-    words::{Words, name},
-};
+use crate::words::{Words, name};
 
 use jig_domain_client::{
     Domain,

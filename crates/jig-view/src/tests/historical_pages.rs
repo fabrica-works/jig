@@ -3,14 +3,12 @@
     reason = "ordinary proofs inspect complete public trees and checked language data"
 )]
 use super::cards::CLIENT;
+use crate::historical_pages_words::{self as sayings, HistoricalPhrase as P};
 use crate::ui::Limits;
+use crate::ui::phrases::{Hole, Invalid, PhraseLimits, Phrasebook, Segment};
 use crate::ui::{Builder, Tree};
-use crate::{
-    JigBindings, historical_pages as view,
-    historical_pages_words::{self as sayings, HistoricalPhrase as P},
-    phrases::{Hole, Invalid, PhraseLimits, Phrasebook, Segment},
-    words::Words,
-};
+use crate::words::Words;
+use crate::{JigBindings, historical_pages as view};
 
 use jig_domain_client::{Domain, contract::*};
 use skein_lib::{List, Wall, bytes::copy_of};
@@ -19,7 +17,7 @@ fn doc(bytes: &[u8], cut: bool) -> DocumentText {
 }
 fn words() -> Words {
     let mut language = crate::phrases::english::language();
-    language.wall = crate::phrases::WallFormat::Nanos;
+    language.wall = crate::ui::phrases::WallFormat::Nanos;
     Words {
         book: Phrasebook::load(crate::phrases::jig::shapes(CLIENT.text), Box::new([language]), &phrase_limits())
             .unwrap(),

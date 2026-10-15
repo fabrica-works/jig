@@ -1,8 +1,10 @@
 //! Standalone immutable activity facts (client/domain/objects.md, 10;
 //! contract.md, 5 and 7). Archive references stay references; no decoded turn,
 //! sender name, fresh tail or run failure explanation is synthesized.
+use crate::owner_activity_words::ActivityPhrase as P;
+use crate::ui::phrases::Hole;
 use crate::ui::{Builder, Role, Run};
-use crate::{owner_activity_words::ActivityPhrase as P, phrases::Hole, words::Words};
+use crate::words::Words;
 
 use jig_domain_client::{
     Limits,
@@ -94,7 +96,7 @@ pub fn required(value: &OwnerActivityLine, limits: &Limits, words: &Words) -> Op
 #[must_use]
 pub fn worst_case(limits: &Limits, words: &Words) -> Option<ActivityFragment> {
     let nodes = 100_u32.checked_add(limits.rows.checked_mul(4)?)?;
-    let saying = words.book.jig_capacity()?;
+    let saying = crate::phrases::jig_capacity(&words.book)?;
     let text_per_node = crate::literal_segment::max_bytes(limits.text)?.max(saying);
     Some(ActivityFragment {
         nodes,

@@ -1,7 +1,9 @@
 //! Standalone amendment settings (client/domain/objects.md, 4 and 11;
 //! view.md, 7 and 10). Context comes from the enclosing owner document.
+use crate::owner_amendment_words::AmendmentPhrase as P;
+use crate::ui::phrases::Hole;
 use crate::ui::{Builder, Role, Run};
-use crate::{owner_amendment_words::AmendmentPhrase as P, phrases::Hole, words::Words};
+use crate::words::Words;
 
 use jig_domain_client::{
     Limits,
@@ -95,7 +97,7 @@ pub fn max_nodes(limits: &Limits) -> Option<u32> {
 #[must_use]
 pub fn worst_case(limits: &Limits, words: &Words) -> Option<AmendmentFragment> {
     let nodes = max_nodes(limits)?;
-    let phrase_bytes = words.book.jig_capacity()?;
+    let phrase_bytes = crate::phrases::jig_capacity(&words.book)?;
     let text_per_node = crate::literal_segment::max_bytes(limits.text)?.max(phrase_bytes).checked_mul(2)?;
     Some(AmendmentFragment {
         nodes,

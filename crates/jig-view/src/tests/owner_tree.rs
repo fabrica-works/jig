@@ -4,12 +4,10 @@
     reason = "ordinary tests inspect checked sayings and public tree events"
 )]
 use super::cards::{CLIENT, contains, document, drive, start, words};
+use crate::ui::phrases::{PhraseLimits, Phrasebook, Segment};
 use crate::ui::{Builder, Role, Tree};
-use crate::{
-    JigBindings, owner_tree as view,
-    phrases::{PhraseLimits, Phrasebook, Segment},
-    words::Words,
-};
+use crate::words::Words;
+use crate::{JigBindings, owner_tree as view};
 
 use jig_domain_client::{
     Domain, Event, Request,

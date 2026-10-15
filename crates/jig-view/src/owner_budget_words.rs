@@ -1,14 +1,11 @@
 //! Closed owner budget/ledger sayings (client/domain/view.md, section 7).
 //! IDs 6000..6012 are independent of the shared Funder sayings.
-use crate::{
-    Owner,
-    phrases::{
-        Form, HoleKind, HoleShape, Invalid, Language, Phrase, PhraseId, PhraseLimits, PhraseShape, Phrasebook,
-        PluralClass, PluralRule, Segment, SpanUnit, WallFormat,
-    },
-    proposed_task_words,
-    words::Words,
+use crate::ui::phrases::{
+    Form, HoleKind, HoleShape, Invalid, Language, Phrase, PhraseId, PhraseLimits, PhraseShape, Phrasebook, PluralClass,
+    PluralRule, Segment, SpanUnit, WallFormat,
 };
+use crate::words::Words;
+use crate::{Owner, proposed_task_words};
 use alloc::boxed::Box;
 use skein_lib::{List, bytes::copy_of};
 
@@ -193,5 +190,5 @@ impl OwnerBudgetWords {
 /// Shared checked phrasebook allocation envelope, including its temporary saying.
 #[must_use]
 pub fn worst_case(limits: &PhraseLimits) -> Option<u64> {
-    crate::phrases::worst_case(limits)
+    crate::ui::phrases::worst_case(limits)
 }

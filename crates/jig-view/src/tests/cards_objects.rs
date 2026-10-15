@@ -1974,7 +1974,7 @@ fn moved_effect_facts_say_the_supplied_connector_proposal_without_inventing_a_ma
         builder.close();
         let tree = builder.finish();
         let expected =
-            words.say(crate::phrases::jig::JigPhrase::PartOwnerProposal, &[crate::phrases::Hole::Number(proposal)]);
+            words.say(crate::phrases::jig::JigPhrase::PartOwnerProposal, &[crate::ui::phrases::Hole::Number(proposal)]);
         assert!(contains(&tree, b"Connector 65535"));
         assert!(contains(&tree, &expected));
         assert!(!contains(&tree, b"by task"));

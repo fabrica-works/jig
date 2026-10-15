@@ -10,8 +10,9 @@ use jig_test_domain_client::{
     },
     family::Scope,
 };
+use jig_view::ui::phrases::Hole;
 use jig_view::ui::{Builder, Role, Run};
-use jig_view::{phrases::Hole, words::Words};
+use jig_view::words::Words;
 
 use skein_lib::{List, Wall};
 
@@ -354,6 +355,6 @@ pub fn requirements(limits: &ConnectorLimits, words: &Words) -> Option<jig_view:
 #[must_use]
 pub fn worst_case(limits: &ConnectorLimits, words: &Words) -> Option<u64> {
     jig_view::limits::jig_worst_case(&requirements(limits, words)?)?
-        .checked_add(jig_view::phrases::worst_case(words.book.limits())?)?
+        .checked_add(jig_view::ui::phrases::worst_case(words.book.limits())?)?
         .checked_add(u64::from(jig_view::literal_segment::max_bytes(limits.segment_bytes)?))
 }

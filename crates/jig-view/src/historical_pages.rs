@@ -2,8 +2,11 @@
 //! 7 and 10). The source owns row order, optional clocks and all counters.
 //! Brief delegate identity does not manufacture a Result card; a funding
 //! record does not supply pools, task rows or an amount left.
+use crate::JigBindings;
+use crate::historical_pages_words::HistoricalPhrase as P;
+use crate::ui::phrases::Hole;
 use crate::ui::{Builder, Role, Run};
-use crate::{JigBindings, historical_pages_words::HistoricalPhrase as P, phrases::Hole, words::Words};
+use crate::words::Words;
 
 use alloc::boxed::Box;
 use jig_domain_client::{
@@ -37,7 +40,7 @@ pub fn spend_nodes(l: &Limits) -> Option<u32> {
     l.rows.checked_mul(18)?.checked_add(2)
 }
 fn envelope(nodes: u32, l: &Limits, words: &Words) -> Option<HistoricalFragment> {
-    let phrase = words.book.jig_capacity()?;
+    let phrase = crate::phrases::jig_capacity(&words.book)?;
     let text_per_node = phrase.max(crate::literal_segment::max_bytes(l.text)?).checked_mul(2)?;
     Some(HistoricalFragment {
         nodes,

@@ -1,6 +1,6 @@
 //! English is checked data (client/domain/view.md, section 7).
 use super::jig::{ALL, JigPhrase, shapes};
-use super::{
+use crate::ui::phrases::{
     Form, HoleKind, Invalid, Language, Phrase, PhraseLimits, Phrasebook, PluralClass, PluralRule, Segment, SpanUnit,
     WallFormat,
 };

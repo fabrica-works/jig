@@ -165,7 +165,7 @@ fn second(
     jig: &jig_view::words::Words,
 ) {
     use jig_domain_client::contract::Part;
-    use jig_view::phrases::Hole;
+    use jig_view::ui::phrases::Hole;
     if !root.second().contains(part) {
         words.status(b, words::Word::Unshowable, &[]);
         return;

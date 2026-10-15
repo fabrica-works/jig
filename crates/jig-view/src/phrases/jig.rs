@@ -1,6 +1,6 @@
 //! Jig's closed words and typed holes (client/domain/view.md, section 7).
-use super::{HoleKind, HoleShape, PhraseId, PhraseShape};
 use crate::Owner;
+use crate::ui::phrases::{HoleKind, HoleShape, PhraseId, PhraseShape};
 use alloc::boxed::Box;
 use skein_lib::List;
 /// Each sentence jig says, independent of language word order.

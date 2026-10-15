@@ -1,13 +1,11 @@
 //! Deployment facts and bounded live diagnostics (pages.md, 7; view.md, 7).
 //! Supplied clocks, loss counters and identities stay independent.
 mod hello;
+use crate::owner_deployment_words::{AccountPhrase as A, DeploymentPhrase as P};
+use crate::ui::phrases::Hole;
 use crate::ui::{Builder, Key, Role, Run};
-use crate::{
-    JigBindings, Owner,
-    owner_deployment_words::{AccountPhrase as A, DeploymentPhrase as P},
-    phrases::Hole,
-    words::Words,
-};
+use crate::words::Words;
+use crate::{JigBindings, Owner};
 
 use hello::hello;
 use jig_domain_client::{
@@ -671,7 +669,7 @@ pub fn max_nodes(l: &Limits) -> Option<u32> {
 #[must_use]
 pub fn limits(l: &Limits, words: &Words) -> Option<crate::ui::Limits> {
     let nodes = max_nodes(l)?;
-    let phrase = words.book.jig_capacity()?;
+    let phrase = crate::phrases::jig_capacity(&words.book)?;
     let text_per_node = phrase.max(crate::literal_segment::max_bytes(l.text)?).max(64).checked_mul(2)?;
     Some(crate::ui::Limits {
         nodes,

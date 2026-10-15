@@ -1,10 +1,9 @@
 //! Scope/search and note cards retain the revision read (pages.md, 6.4).
+use crate::phrases::jig::JigPhrase;
+use crate::ui::phrases::Hole;
 use crate::ui::{Builder, Role, State};
-use crate::{
-    JigBindings, JigMeaning, cards,
-    phrases::{Hole, jig::JigPhrase},
-    words::Words,
-};
+use crate::words::Words;
+use crate::{JigBindings, JigMeaning, cards};
 
 use alloc::boxed::Box;
 use jig_domain_client::{

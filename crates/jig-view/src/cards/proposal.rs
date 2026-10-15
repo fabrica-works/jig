@@ -1,10 +1,9 @@
 //! Proposal action, funding and history in words (client/domain/objects.md, section 4).
+use crate::JigBindings;
+use crate::phrases::jig::JigPhrase;
+use crate::ui::phrases::Hole;
 use crate::ui::{Builder, Role};
-use crate::{
-    JigBindings,
-    phrases::{Hole, jig::JigPhrase},
-    words::Words,
-};
+use crate::words::Words;
 
 use jig_domain_client::{
     Domain,

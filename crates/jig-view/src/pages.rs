@@ -1,6 +1,7 @@
 //! Page composition over domain-owned ordering and windows (client/domain/pages.md).
 //! Objects stay in their shared cards; connector values stay in owner slots.
-use crate::phrases::{Hole, jig::JigPhrase};
+use crate::phrases::jig::JigPhrase;
+use crate::ui::phrases::Hole;
 use crate::ui::{Builder, Role, Run};
 use crate::{JigBindings, words::Words};
 

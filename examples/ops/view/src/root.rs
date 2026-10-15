@@ -230,7 +230,8 @@ fn task_page(
     bindings: &mut JigBindings,
 ) {
     use jig_domain_client::{address::TaskSection, pages::Section};
-    use jig_view::phrases::{Hole, jig::JigPhrase};
+    use jig_view::phrases::jig::JigPhrase;
+    use jig_view::ui::phrases::Hole;
     jig_view::frame::banner(b, client, words, bindings);
     jig_view::frame::navigation(b, client, observability::NAV, words, bindings);
     b.open(Role::Main);

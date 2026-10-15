@@ -1,10 +1,9 @@
 //! Historical pages retain before/after facts and opaque edges (pages.md, 5.2).
+use crate::JigBindings;
+use crate::phrases::jig::JigPhrase;
+use crate::ui::phrases::Hole;
 use crate::ui::{Builder, Role, Run};
-use crate::{
-    JigBindings,
-    phrases::{Hole, jig::JigPhrase},
-    words::Words,
-};
+use crate::words::Words;
 
 use jig_domain_client::{
     Domain,

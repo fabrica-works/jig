@@ -1,5 +1,5 @@
 //! The agent capability that refused a hello (engine.md, section 8).
-use crate::phrases::HoleKind;
+use crate::ui::phrases::HoleKind;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AgentPhrase {
     Model,

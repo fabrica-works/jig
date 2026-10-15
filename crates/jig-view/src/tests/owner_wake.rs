@@ -1,13 +1,10 @@
 #![expect(clippy::disallowed_methods, reason = "ordinary tests inspect complete semantic trees")]
-use crate::ui::{Builder, Role, Tree};
-use crate::{
-    owner_wake,
-    owner_wake_words::{self, WakePhrase},
-    phrases::{
-        Form, HoleKind, Language, Phrase, PhraseLimits, Phrasebook, PluralClass, PluralRule, Segment, SpanUnit,
-        WallFormat,
-    },
+use crate::owner_wake_words::WakePhrase;
+use crate::ui::phrases::{
+    Form, HoleKind, Language, Phrase, PhraseLimits, Phrasebook, PluralClass, PluralRule, Segment, SpanUnit, WallFormat,
 };
+use crate::ui::{Builder, Role, Tree};
+use crate::{owner_wake, owner_wake_words};
 
 use jig_domain_client::contract::{
     OwnerWakePolicy, ResultsWake, Subscription, SubscriptionKind, Subscriptions, WakeRule,
@@ -172,6 +169,6 @@ fn owner_wake_renderer_uses_checked_selected_language_with_reordered_holes() {
             &PhraseLimits { languages: 1, phrases: 27, holes: 2, segments: 100, text_bytes: 2000, hole_bytes: 0 }
         )
         .unwrap_err(),
-        crate::phrases::Invalid::Missing { id: WakePhrase::Policy.id() }
+        crate::ui::phrases::Invalid::Missing { id: WakePhrase::Policy.id() }
     );
 }
