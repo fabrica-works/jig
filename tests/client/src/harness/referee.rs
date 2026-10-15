@@ -33,6 +33,7 @@ pub struct Rules {
     clients: BTreeSet<ClientId>,
     reachable: Option<bool>,
     parked: BTreeSet<ClientId>,
+    ended_watches: BTreeSet<(ClientId, Token)>,
     out_of_date: BTreeSet<ClientId>,
     durable: BTreeSet<u64>,
     made: BTreeMap<RequestKey, u64>,
@@ -59,6 +60,7 @@ impl Rules {
             clients: BTreeSet::new(),
             reachable: None,
             parked: BTreeSet::new(),
+            ended_watches: BTreeSet::new(),
             out_of_date: BTreeSet::new(),
             durable: BTreeSet::from([0]),
             made: BTreeMap::new(),
@@ -189,7 +191,10 @@ impl Rules {
                     }
                 }
             }
-            Receipt::Party { party } => {
+            Receipt::Party { party, watch } => {
+                if watch.is_some_and(|watch| self.ended_watches.contains(&(client, watch))) {
+                    return;
+                }
                 if !self.out_of_date.contains(&client) && self.parked.remove(&client) && self.reachable == Some(true) {
                     judge.rearm(Deadline::Online(client), self.link_within);
                 }
@@ -199,7 +204,11 @@ impl Rules {
                     }
                 }
             }
+            Receipt::WatchEnded { watch } => {
+                self.ended_watches.insert((client, watch));
+            }
             Receipt::Started => {
+                self.ended_watches.retain(|(owner, _)| *owner != client);
                 self.out_of_date.remove(&client);
             }
             Receipt::OutOfDate => {

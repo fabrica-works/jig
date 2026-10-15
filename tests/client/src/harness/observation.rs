@@ -48,8 +48,10 @@ pub enum Receipt {
     Card { key: CardKey, revisions: Vec<(u16, u64)> },
     /// A wire attempt ended; only final answers meet the request deadline.
     Answer { attempt: Token, final_answer: bool, words: Option<(u64, u64)> },
-    /// The frame confirms the party of this sign-in.
-    Party { party: u64 },
+    /// The frame confirms the party; a read has no watch identity.
+    Party { party: u64, watch: Option<Token> },
+    /// No later delivery on this watch can confirm a party.
+    WatchEnded { watch: Token },
     /// A newly started client can receive a fresh protocol hello.
     Started,
     /// The stream hello requires updating this client; business Frames cannot lift it.

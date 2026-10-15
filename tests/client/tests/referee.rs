@@ -425,7 +425,11 @@ fn a_business_frame_cannot_unpark_an_out_of_date_stream_before_the_client_restar
     referee.observe(Time::ZERO, Observation::Client { client }, &mut out);
     referee.observe(Time::ZERO, Observation::Truth(Observed::Reachable { live: true }), &mut out);
     referee.observe(Time::ZERO, Observation::Delivered { client, receipt: Receipt::OutOfDate }, &mut out);
-    referee.observe(Time::ZERO, Observation::Delivered { client, receipt: Receipt::Party { party: 7 } }, &mut out);
+    referee.observe(
+        Time::ZERO,
+        Observation::Delivered { client, receipt: Receipt::Party { party: 7, watch: Some(Token::new(1)) } },
+        &mut out,
+    );
     referee.fire(Time::from_nanos(20_000_000), &mut out);
     assert_eq!(referee.verdict(), skein_world::domain::Verdict::Passed);
     referee.observe(
@@ -435,7 +439,7 @@ fn a_business_frame_cannot_unpark_an_out_of_date_stream_before_the_client_restar
     );
     referee.observe(
         Time::from_nanos(20_000_000),
-        Observation::Delivered { client, receipt: Receipt::Party { party: 7 } },
+        Observation::Delivered { client, receipt: Receipt::Party { party: 7, watch: Some(Token::new(1)) } },
         &mut out,
     );
     assert_eq!(referee.next_deadline(), Some(Time::from_nanos(30_000_000)));
@@ -473,4 +477,46 @@ fn a_tree_breaking_the_outline_fails_the_referee() {
             pending: vec![],
         })
     );
+}
+
+const WATCH_ENDS: &[jig_domain_client::contract::WatchEnd] = &[
+    jig_domain_client::contract::WatchEnd::Closed,
+    jig_domain_client::contract::WatchEnd::Dropped,
+    jig_domain_client::contract::WatchEnd::Busy,
+    jig_domain_client::contract::WatchEnd::Stopping,
+    jig_domain_client::contract::WatchEnd::Unknown,
+    jig_domain_client::contract::WatchEnd::NotAllowed,
+    jig_domain_client::contract::WatchEnd::SubjectEnded,
+    jig_domain_client::contract::WatchEnd::SignedOut,
+];
+#[test]
+fn a_frame_after_its_watchs_end_is_no_evidence() {
+    use jig_client_world::observe::jig_received;
+    use jig_domain_client::{
+        Event,
+        contract::{Delivery, WatchEvent},
+    };
+    const WATCH: Token = Token::new(1);
+    for end in WATCH_ENDS {
+        let span = Duration::from_millis(10);
+        let mut referee = skein_world::domain::Referee::new(referee::Rules::new(span, span, span));
+        let client = ClientId(0);
+        let mut out = Vec::new();
+        referee.observe(Time::ZERO, Observation::Client { client }, &mut out);
+        referee.observe(Time::ZERO, Observation::Truth(Observed::Reachable { live: true }), &mut out);
+        referee.observe(Time::ZERO, Observation::Delivered { client, receipt: Receipt::Parked }, &mut out);
+        for event in [
+            Event::Ended { watch: WATCH, end: *end },
+            Event::Watch {
+                watch: WATCH,
+                event: WatchEvent::Delivered(Delivery::Frame(Box::new(jig_client_world::stories::frame(7)))),
+            },
+        ] {
+            for receipt in jig_received(&event) {
+                referee.observe(Time::ZERO, Observation::Delivered { client, receipt }, &mut out);
+            }
+        }
+        referee.fire(Time::from_nanos(20_000_000), &mut out);
+        assert_eq!(referee.verdict(), skein_world::domain::Verdict::Passed, "{end:?}");
+    }
 }

@@ -5,7 +5,7 @@ use jig_domain_client::contract::*;
 use jig_test_domain_client::{self as domain, Event, Request, family};
 use jig_view::Owner;
 use skein_fake_person::{Face, Find, Found, TreeFace};
-use skein_lib::RequestEnvelope;
+use skein_lib::{RequestEnvelope, Token};
 use skein_ui::{Key, NodeId, Role, Tree};
 
 #[must_use]
@@ -96,7 +96,7 @@ fn task(t: &Task) -> Receipt {
 fn read(v: &ReadValue) -> Vec<Receipt> {
     match v {
         ReadValue::Task(t) => vec![task(t)],
-        ReadValue::Frame(f) => frame(f),
+        ReadValue::Frame(f) => frame(f, None),
         ReadValue::Escalation(e) => vec![Receipt::Card {
             key: key(ObjectKey::Escalation(e.task.task)),
             revisions: vec![(1, e.steering.revision.value), (2, e.hold.revision.value)],
@@ -148,8 +148,8 @@ fn read(v: &ReadValue) -> Vec<Receipt> {
         | ReadValue::OwnerDeployment(_) => vec![],
     }
 }
-fn frame(frame: &Frame) -> Vec<Receipt> {
-    vec![Receipt::Party { party: frame.party.number }]
+fn frame(frame: &Frame, watch: Option<Token>) -> Vec<Receipt> {
+    vec![Receipt::Party { party: frame.party.number, watch }]
 }
 fn family(doc: &family::Document) -> Receipt {
     let revision = match doc {
@@ -211,10 +211,18 @@ pub fn jig_received(event: &jig_domain_client::Event) -> Vec<Receipt> {
         jig_domain_client::Event::Watch { event: WatchEvent::Delivered(Delivery::Task(value)), .. } => {
             vec![task(value)]
         }
-        jig_domain_client::Event::Watch { event: WatchEvent::Delivered(Delivery::Frame(value)), .. } => frame(value),
+        jig_domain_client::Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Frame(value)) } => {
+            frame(value, Some(*watch))
+        }
+        jig_domain_client::Event::Ended { watch, end } => {
+            let mut receipts = vec![Receipt::WatchEnded { watch: *watch }];
+            if *end == WatchEnd::SignedOut {
+                receipts.push(Receipt::Parked);
+            }
+            receipts
+        }
         jig_domain_client::Event::SignedOut
-        | jig_domain_client::Event::Read { result: ReadResult::None(ReadNone::SignedOut), .. }
-        | jig_domain_client::Event::Ended { end: WatchEnd::SignedOut, .. } => vec![Receipt::Parked],
+        | jig_domain_client::Event::Read { result: ReadResult::None(ReadNone::SignedOut), .. } => vec![Receipt::Parked],
         jig_domain_client::Event::SignOutLost
         | jig_domain_client::Event::Kept { .. }
         | jig_domain_client::Event::KeptGone { .. }
@@ -225,7 +233,6 @@ pub fn jig_received(event: &jig_domain_client::Event) -> Vec<Receipt> {
         | jig_domain_client::Event::Answered { .. }
         | jig_domain_client::Event::Read { .. }
         | jig_domain_client::Event::Watch { .. }
-        | jig_domain_client::Event::Ended { .. }
         | jig_domain_client::Event::ShowObjects { .. }
         | jig_domain_client::Event::ShowSections { .. }
         | jig_domain_client::Event::ObjectsLeft
