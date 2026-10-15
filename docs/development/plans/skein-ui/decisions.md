@@ -615,6 +615,11 @@ None yet; they start at 101.
 
      Unchanged: the panic story's `Setup.expected` holds `Uncaught` and nothing else; no story or harness accepts `Crash`; the restart part reloads the page; ruling 124's rule on the scratch: logging and reduction edits leave the worktree once the runs are done, but for the test the first outcome keeps. The proof runs once, after the fix. A further caller of `queue_page` that reads the page while a navigation is in flight: hold it too, and list it in the commit body.
 
+126. **skein 14.s1: the kit's finds across a page's own navigation** (process, skein 14's block of 2026-10-15T15:04:14Z).
+     Ruling 125's run 4 named the cause: a find's root read before the page reloaded itself reached the renderer after the new load, and the renderer crashed (`logs/skein-14/14.2-ruling-125-diagnosis.md`: "The DOM root response from before navigation was used to construct the AX query during navigation"). The kit's fix is a kit defect of its own, not 14.2's restart part: it becomes step `skein-14.s1`, "the kit's finds across a page's own navigation", in skein 14's session, before 14.2, with its session file `skein/14.s1-finds-across-navigation.md`. Its start is the WIP's kit part (116 lines in `browser.rs`, one in `limits.rs`) and `chromium_survives_a_page_that_reloads_itself`, split from 14.2's WIP into its own commit. Its diagnosis first: at most 4 `heavy` commands and 25 minutes, each running the gate's browser line (`scripts/check.sh:31`) 5 times after the gate's build lines, with run 4's buffered trace, counting the crashes. Its proof: the browser line 5 times without a `Crash`, then the gate once. Its bound: aim for at most 160 lines of production code; past 220, stop and report the shape. A find that no longer asks CDP for the role and the name (browser.md 6: "exactly, both asked of CDP") is the designer's: stop. 14.2 then lands the restart part and the panic story on top of it, its proof unchanged.
+
+     Unchanged: no test accepts `Crash`; the panic story's `Setup.expected` holds `Uncaught` alone; the restart part reloads the page (ui-web.md 5). skein 13.1's open question (a `beforeunload` prompt during a go) also touches `browser.rs`: whichever of the two lands second rebases on the first, and keeps both.
+
 ## For the user
 
 Long-term choices the user may veto; each default holds unless the user

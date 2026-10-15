@@ -94,7 +94,8 @@ Removes: nothing.
 
 ### 14.2 The restart part, and the panic story
 Scope: ui-web.md 5 (a panic), 5.1 (restart), 14.2 (a panic).
-Needs: 14.1.
+Needs: 14.1; 14.s1 (ruling 126: the kit's finds across a page's own
+  navigation, `14.s1-finds-across-navigation.md`).
 Files: new `crates/skein-ui-web/src/{restart.rs, restart/web.rs}`;
   `crates/skein-ui-web/src/lib.rs` (`pub mod restart;`) and
   `src/tests.rs` (`mod restart;`);
@@ -111,11 +112,9 @@ Files: new `crates/skein-ui-web/src/{restart.rs, restart/web.rs}`;
   `testing/skein-browser/src/command.rs` (the flag, in its list at
   47-59, and its test, `chromium_pipe_command`, 91) and
   `tests/browser/tests/browser_facts.rs` (the reduction, as a fact).
-  If ruling 125's diagnosis finds that a command of the kit's, sent
-  during the page's own reload, crashes it: `testing/skein-browser/src/
-  browser.rs` (the kit holds that command until the reload's load
-  event) and `tests/browser/tests/browser_real.rs` (the reduction, as
-  `chromium_survives_a_page_that_reloads_itself`).
+  The kit's part that ruling 125 found (its finds across a page's own
+  reload, and `chromium_survives_a_page_that_reloads_itself`) is
+  14.s1's, not 14.2's (ruling 126).
 Shape: `restart::Restart::new(limit: 3, within: 60 s, key:
   "skein-ui-restarts", words)`; its pure half decides from the dates
   kept whether to reload or to say the words; `stories::panic(setup,
