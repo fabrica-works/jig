@@ -602,6 +602,19 @@ None yet; they start at 101.
 
      Unchanged: the panic story's `Setup.expected` holds `Uncaught` and nothing else; no story or harness accepts `Crash`; the restart part reloads the page; the logging flags of step 2 leave the worktree once step 2 is done. A further copy of the kit's argument list that a flag would change (a test asserting the list): change it in the same commit, and list it in the commit body.
 
+125. **skein 14.2's crash: the kit's queries during a page's own reload** (process, skein 14's block of 2026-10-15T14:52:32Z).
+     Ruling 124's diagnosis narrowed the crash to a page's own reload under the kit: the JavaScript reduction crashes with no Wasm, hook, glue or bundle, while the kit's own reload of the example's page passes on `main` (`a_reload_keeps_a_pending_add_made_once`). Its reduction asks the kit, as soon as the page opens, to await the heading `Reloaded` (`14.2-reduction-rig.patch`: `Request::Await … within: Duration::from_secs(2)`), so the kit queries the page while the page's reload is in flight; a renderer crash from a query during a navigation is the cause this ruling looks for first. A second bounded diagnosis, by skein 14, in the same scratch: 20 minutes, and at most 4 runs through `heavy`, counted apart from the proof's.
+
+     1. **The commands sent, one run.** The JavaScript reduction, with a scratch `eprintln!` in `queue_page` (`testing/skein-browser/src/browser.rs:384`) of each method it sends and the time, and one in the handler of `Inspector.targetCrashed` (1331). What counts: the methods sent in the 300 ms before the crash, quoted in the report.
+     2. **No query during the reload, one run.** The same reduction, its Rig asking for nothing until 1 s after the page opened (a `std::thread::sleep` in the scratch Rig alone: this is a diagnosis, not a test), then the same `Await`. Crash, or `Reloaded` seen?
+     3. **The control, one run.** The reduction with neither trap nor throw, the `setTimeout(() => location.reload(), 0)` alone, the `Await` at once as in ruling 124. Crash?
+     4. **What follows:**
+        - Run 2 passes (the queries during the reload are the cause): the kit holds its page commands that read the page (the `Accessibility.*` and `DOM.*` ones of `queue_page`'s callers) from a navigation the page starts until that navigation's `Page.loadEventFired` (browser.rs:1292), then sends them; an `Await` keeps its deadline. In 14.2, with a test `chromium_survives_a_page_that_reloads_itself` in `tests/browser/tests/browser_real.rs`, the reduction kept, both variants, and the story unchanged. Aim for at most 80 lines of production code; past 120, stop and report the shape, and this becomes a step of its own.
+        - Run 2 crashes too, with the commands of run 1 none in the 300 ms before it: stop, with a question quoting runs 1 to 3. The supervisor takes it to the designer: ui-web.md, 5, says "the restart part reloads the page".
+        - Any other result: stop, with a question quoting runs 1 to 3.
+
+     Unchanged: the panic story's `Setup.expected` holds `Uncaught` and nothing else; no story or harness accepts `Crash`; the restart part reloads the page; ruling 124's rule on the scratch: logging and reduction edits leave the worktree once the runs are done, but for the test the first outcome keeps. The proof runs once, after the fix. A further caller of `queue_page` that reads the page while a navigation is in flight: hold it too, and list it in the commit body.
+
 ## For the user
 
 Long-term choices the user may veto; each default holds unless the user
