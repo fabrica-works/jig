@@ -826,6 +826,9 @@ None yet; they start at 101.
        - `grep -n 'pub fn set_onbeforeunload'
          ~/.cargo/registry/src/*/web-sys-0.3.103/src/features/gen_Window.rs`.
 
+128. **browser.rs past its allowance, by rulings 126 and 127** (check of 2026-10-15T15:23Z).
+     skein's `testing/skein-browser/src/browser.rs` grows past the README's allowance by rulings 126 and 127: 1,920 lines on skein's `main` after skein-14.s1 (`git show origin/main:testing/skein-browser/src/browser.rs | wc -l` → `1920`), and 13.1 adds the closing warning and native dialogs. The README's "Files over the plan's limit" now names both as expected, and its split is a `later.md` row: this plan does not split it.
+
 ## For the user
 
 Long-term choices the user may veto; each default holds unless the user

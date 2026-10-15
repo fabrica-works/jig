@@ -163,9 +163,12 @@ capability.
   and `examples/ops/view/src/root.rs` (jig 01.1, 01.3, 04.1).
 - **Files over the plan's limit at the base** are not split by this
   plan: skein's `testing/skein-browser/src/browser.rs` (1,774 lines),
-  to which skein 07 adds at most 60 lines. The pulse lists it while
-  skein 07 runs; the supervisor reads that line as expected, and as a
-  finding for any other file.
+  to which skein 07 adds at most 60 lines, and skein-14.s1 (ruling
+  126, 137 lines: 1,920 at its landing) and 13.1 (ruling 127: the
+  closing warning and native dialogs) add what their rulings name; its
+  split is a `later.md` row. The pulse lists it; the supervisor reads
+  that line as expected for these three, and as a finding for any
+  other file.
 
 ## Prerequisites the run checks at its start
 
