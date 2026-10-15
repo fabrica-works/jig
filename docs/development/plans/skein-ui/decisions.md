@@ -163,6 +163,138 @@ None yet; they start at 101.
 112. **skein 09.3 goes on without the primary shortcut (interim)** (design gap, skein 09's block of 2026-10-15T12:34:37Z).
      Interim ruling 112, until the designer's answer to the run's `question.md` (sent 2026-10-15T12:36:14Z): the question is a design gap, so the designer decides it (development.md, 10.4). Meanwhile skein 09.3 goes on with the work that does not rest on the answer: every row of `each_role_maps_to_its_element` and `each_state_and_property_maps_to_its_attribute`, and the golden page, except a shortcut with `Modifier::Primary`; `Plain`, `Alt` and Escape are written as ui-web.md, 6, says ("`Alt+K`, `K`, `Escape`"). It keeps the Shape's `mapping::element(made: &Made, look: &Look<'_>, prefix: &[u8]) -> Element`, adds no entry point, no field of `Look` and no convention type, and writes no `Control+K` or `Meta+K`. It commits nothing of 09.3 and does not land it until the answer's unblock, which says how the primary modifier reaches the mapping; then 09.3 adds the primary row and lands. Nothing else of the plan changes.
 
+113. **the primary modifier, a fact of the platform** (design gap, skein 09's block of 2026-10-15T12:34:37Z).
+     Ruling 113 lifts ruling 112's hold: the designer's answer, landed as skein `1b49e88` (the design) and jig `041267fd8` (the session files), follows.
+
+
+     **Decision: the supervisor's third reading.** The primary modifier is
+     one of the platform's facts. The shell reads it once, at start, and
+     passes it to `Page::new`, as it passes `limits` and `prefix`. The page
+     passes it to `mapping::element`, and `Page::act` matches keys by it. It
+     is not part of `Look`. The mapping gets no second entry point and no
+     default. It never writes both forms.
+
+     - **Why not the look:** the look is the application's data, the same on
+       every platform (ui-web.md, 3.2). The primary modifier belongs to the
+       platform.
+     - **Why not a second entry point that defaults to Control:** a shell
+       that called the default would write `Control+K` on a Mac and nothing
+       would flag it. With one entry point, every caller has to pass the
+       modifier.
+     - **Why not both forms:** ui.md 6.1 gives each platform one primary
+       modifier. Writing both would tell a screen reader about a shortcut
+       that does nothing there: on a Mac, Control+K in a field is the
+       platform's kill to the end of the line. And 09.5 would still need the
+       input to match keys.
+
+     ### Landed
+
+     - skein `1b49e88`, "Name the primary modifier a fact of the platform":
+       ui.md 6.1; ui-web.md 5.1, 6, 7 and 14.
+     - jig `041267fd8`, "skein-ui: the primary modifier through skein 09
+       and 11.3": `skein/09-page.md` (09.3, 09.4, 09.5, the sketch) and
+       `skein/11-first-story.md` (11.3).
+     - Nothing deferred: no `later.md` row.
+
+     ### The text it rests on (skein `1b49e88`)
+
+     - ui.md 6.1: "**The primary modifier is a fact of the platform,** which
+       a shell reads from its platform once, at start, and maps and matches
+       shortcuts by: not the look's, which is the application's and the same
+       on every platform, and not both modifiers, since each platform has
+       one." And: "A key presses only with its shortcut's modifier held and
+       no other: none, the primary one alone, or Alt alone. Any other set,
+       Shift held among it, or Control on Apple's platforms, is no shortcut."
+     - ui-web.md 5.1, the table: the page now takes "…, the primary
+       modifier; patches and the tree", and the platform's facts now give
+       "…, the person's offset and languages, the primary modifier". Below
+       the table: "**The primary modifier** (ui.md, 6.1) is Meta, a
+       browser's name for Command, when `navigator.platform` names one of
+       Apple's platforms (it starts with `Mac`, `iPhone`, `iPad` or `iPod`),
+       and Control otherwise, an unreadable platform among it. The shell
+       reads it once, at start, and gives it to the page part when it makes
+       it; the page part writes shortcuts (section 6) and matches keys
+       (section 7) by it, its pure half reading no platform."
+     - ui-web.md 6: "*a shortcut* is `aria-keyshortcuts`, in ARIA's form
+       (`Alt+K`, `K`, `Escape`), a primary one by the primary modifier the
+       page part was given (5.1): `Control+K`, or `Meta+K`, never both."
+     - ui-web.md 7, "Shortcuts": "The page part's platform half gives each
+       `keydown` as the event holds it, and its pure half decides: *the
+       modifier,* from the event's `ctrlKey`, `metaKey`, `altKey` and
+       `shiftKey`, by the primary modifier (5.1): none held, none; the
+       primary one alone, the primary; Alt alone, Alt; any other set, no
+       shortcut; *the key,* the event's `key`, lowercased, when it is a
+       letter `a` to `z` or a digit; else the letter or digit its `code`
+       names (`KeyK`, `Digit5`), as when Alt on macOS composes another
+       character, or a layout gives other letters; *a key that presses a
+       node* has its default prevented, so that the browser does not act on
+       it as well."
+
+     The key's `code` fallback and the prevented default answer points the
+     question did not ask. They change the same `Event::Key` that 09.5 has
+     not started, and Chromium on Linux never exercises them: Option+K gives
+     `key` `˚` on macOS, so an Alt shortcut read from `key` would never fire
+     there.
+
+     ### What each step does
+
+     - **09.3,** once ruling 112's hold lifts: `mapping::element(made:
+       &Made, look: &Look<'_>, prefix: &[u8], primary: Primary) -> Element`,
+       with `pub enum Primary { Control, Meta }` in `mapping.rs`. In
+       `each_state_and_property_maps_to_its_attribute`, add a row for a
+       primary `k` under `Primary::Control` (`Control+K`) and one under
+       `Primary::Meta` (`Meta+K`). Every other row and the golden page run
+       under `Primary::Control`, and the golden page includes one primary
+       shortcut. Don't put the modifier in `Look`, add a second entry point
+       or give a default.
+     - **09.4:** `Page::new(look, limits, prefix, primary)`. The page keeps
+       `primary` for the mapping and for 09.5's keys.
+     - **09.5:** `Event::Key { key: Box<[u8]>, code: Box<[u8]>, control:
+       bool, meta: bool, alt: bool, shift: bool, in_field: bool }`.
+       `page::web::Dom` copies the `keydown`'s fields unchanged and prevents
+       its default when `act` gives an act. `each_event_gives_its_act` gets
+       key rows under each `Primary`:
+       - the primary modifier with `k` presses the node that names a
+         primary `k`;
+       - the other modifier gives none;
+       - Shift on top, or Control with Alt, gives none;
+       - Alt with `key` `˚` and `code` `KeyK` presses the node that names
+         Alt `k`.
+
+       The four flags must not go into a struct: skein-ui-web runs pedantic
+       clippy, and `struct_excessive_bools` refuses a struct of four
+       `bool`s.
+     - **11.3:** `Facts { now, wall, seed, offset, languages, primary }`.
+       `primary` comes from `navigator.platform` through a pure
+       `platform::primary(platform: Option<&str>) -> mapping::Primary`,
+       tested on the host by
+       `the_primary_modifier_is_meta_on_apples_platforms_alone`: `MacIntel`,
+       `iPhone` and `iPad` give `Meta`; `Linux x86_64`, `Win32`, the empty
+       text and `None` give `Control`. The shell passes `facts.primary` to
+       `Page::new`.
+     - **Unchanged:** skein 11's face finds nodes through
+       `mapping::accessible`, which no shortcut touches. skein 14.1 serves
+       the golden page, now under `Control`, and compares computed roles,
+       which `aria-keyshortcuts` does not change. skein 02's additions call
+       the new signature as they find it.
+
+     ### Checked against main
+
+     - skein `cb07925`, `crates/skein-ui/src/tree.rs:166`: `pub enum
+       Modifier { Plain, Primary, Alt }`. `crates/skein-ui-web/src/look.rs:6`:
+       `Look { names, pictures, draw }`. `crates/skein-ui-web/Cargo.toml:23`:
+       `pedantic = { level = "warn", priority = -1 }`.
+     - web-sys `=0.3.103` (skein's `Cargo.toml:64`), with feature
+       `Navigator`, has `gen_Navigator.rs:306`: `pub fn platform(this:
+       &Navigator) -> Result<String, JsValue>`. This is stable, unlike
+       `user_agent_data`, which needs `web_sys_unstable_apis`.
+       `gen_KeyboardEvent.rs` has `alt_key` (41), `ctrl_key` (48),
+       `shift_key` (55), `meta_key` (62), `key` (90) and `code` (97).
+     - Commands: `grep -n 'pub enum Modifier'
+       crates/skein-ui/src/tree.rs`; `grep -n 'pedantic'
+       crates/skein-ui-web/Cargo.toml`; `grep -n 'pub fn platform\|pub fn
+       user_agent_data' ~/.cargo/registry/src/*/web-sys-0.3.103/src/features/gen_Navigator.rs`.
+
 ## For the user
 
 Long-term choices the user may veto; each default holds unless the user
