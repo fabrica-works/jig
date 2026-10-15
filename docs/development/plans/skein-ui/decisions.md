@@ -142,6 +142,9 @@ None yet; they start at 101.
 105. **A gate's single flaky world-test failure is retried once** (process, skein 01's block of 2026-10-15T11:39:20Z).
      skein 01.3 runs `land` once more on its unchanged tree (commit 70f09d1 rebased as `land` does). The failed test, `terminal_is_controlling_and_the_persons_interrupt_reaches_only_the_child` (skein's `tests/world/tests/end_to_end.rs:158`), is a world test of skein's terminal that the move does not reach, and it passed in 81 of the 82 gate logs of this machine's runs. For the rest of this run, a gate whose only failure is this test is retried once on the unchanged tree, without a block, and the retry is named in the commit body; a second failure of it in a row blocks, kind process. Its diagnosis is deferred: `later.md` has its row.
 
+106. **skein 03's Shapes against main** (ready check of skein-03.1).
+     skein 03's session file corrected against skein `a37b22a` (skein 01.1 and 01.2 landed): it cites skein-ui's lines, not jig's; the rule's `rg` searches `crates testing`; 03.1 adds `mod look;` to `src/tests.rs`, its reference test holds a `&[Names]` per row, and the sketch derives `Debug` on `Names`, `Clone, Copy, PartialEq, Eq, Debug` on `Fault`, with `#[must_use]` on `check`, `style`, `region` and `takes`; 03.2 flips `src/tests/tree.rs:142`'s drawing row to `true` and removes `a_drawing_cannot_be_bound`, gives `src/tests/binding.rs`'s text area `State::SubmitsOnEnter` and moves its drawing test to `src/tests/view.rs` on a bound drawing, and adds `Tree::disabled`, the one copy of the rule that an option of a disabled select is disabled, which skein 05.2, 06.2 and 06.3 call. The text shell needs no change in 03.2: a drawing is never numbered. A further test or copy of a rule these Files miss: change it in the same increment, and list it in the commit body.
+
 ## For the user
 
 Long-term choices the user may veto; each default holds unless the user

@@ -5,8 +5,8 @@ parts take (ui.md, 8); and the view refuses an act on a disabled node,
 on an option of a disabled select, or one its node's role does not
 take (ui.md, 6), with the drawing bound as any node a person acts on.
 `View::address` and `View::external` (ui.md, 6.2) and `number` (ui.md,
-6) exist at the base (jig's `render.rs:88-95`, `binding.rs:36-51`), and
-stay as they are.
+6) exist at the base (skein's `crates/skein-ui/src/view.rs:91`,
+`binding.rs:37`, as skein 01.1 copied them), and stay as they are.
 
 ## Read first
 
@@ -40,9 +40,8 @@ stay as they are.
 ## Rules that bind it
 
 - **One table:** no copy of ui.md 6's table outside `binding::takes`:
-  `rg -n 'fn takes\b' crates/skein-ui crates/skein-ui-text
-  crates/skein-ui-web testing/skein-fake-person` prints one line at the
-  session's end.
+  `rg -n 'fn takes\b' crates testing` prints one line at the session's
+  end.
 - **A refusal gives nothing, never an error** (ui.md, 6): `View::act`
   keeps its signature, `Option<BoundAct>`.
 
@@ -53,7 +52,7 @@ Scope: ui.md 8.
 Needs: skein 01.3 (nothing in skein-ui changes between skein 01.1 and
   01.3).
 Files: new `crates/skein-ui/src/look.rs`; `crates/skein-ui/src/lib.rs`;
-  new `src/tests/look.rs`.
+  new `src/tests/look.rs`, and `mod look;` in `src/tests.rs`.
 Shape: as the sketch below. `check` refuses, in this order: a prefix
   that is empty or holds a byte outside `a-z`, `0-9`; two owners with
   one prefix; a name not starting with its owner's prefix and `-`, or
@@ -67,19 +66,21 @@ Test shape: `src/tests/look.rs`, a table test
   `Prefix` row (prefix `b"Notes"`) and a `SamePrefix` row (two owners
   of prefix `b"notes"`), each row holding its own `&[Names]`, the
   expected `look::Fault` a literal; and
-  `a_style_finds_its_name_by_number`. Reference, its first three rows:
+  `a_style_finds_its_name_by_number`. Reference, its first three rows,
+  each row its own `&[Names]` so that the `Prefix` and `SamePrefix`
+  rows fit (`SamePrefix` names the second owner):
   ```rust
   #[test]
   fn each_fault_of_the_look_is_named() {
       let owner = Owner { number: 1 };
-      let rows: [(&[&[u8]], Option<Fault>); 3] = [
-          (&[b"notes-bar"], None),
-          (&[b"bar"], Some(Fault::OffPrefix { owner, index: 0 })),
-          (&[b"notes-bar", b"notes-bar"], Some(Fault::Twice { owner, index: 1 })),
+      let one = |styles| Names { owner, prefix: b"notes", styles, regions: &[] };
+      let rows: [(&[Names<'_>], Option<Fault>); 3] = [
+          (&[one(&[b"notes-bar"])], None),
+          (&[one(&[b"bar"])], Some(Fault::OffPrefix { owner, index: 0 })),
+          (&[one(&[b"notes-bar", b"notes-bar"])], Some(Fault::Twice { owner, index: 1 })),
       ];
-      for (styles, expected) in rows {
-          let names = [Names { owner, prefix: b"notes", styles, regions: &[] }];
-          assert_eq!(check(&names), expected, "{styles:?}");
+      for (names, expected) in rows {
+          assert_eq!(check(names), expected, "{names:?}");
       }
   }
   ```
@@ -97,20 +98,30 @@ Scope: ui.md 6 (the table and the refusals), 11.3 (a drawing bound).
 Needs: skein 02.4 (`Role::Select` and `Role::Option`, whose rows the
   table holds).
 Files: `crates/skein-ui/src/{binding.rs (takes), view.rs (View::act,
-  jig's render.rs:75-86), builder.rs (bind, jig's builder.rs:251-257;
-  its role list from jig 03.1), tree.rs (Tree::act, jig's
-  tree.rs:372-375)}`; `src/tests/tree.rs` (jig 03.1's table test
-  `bind_takes_only_the_roles_a_person_acts_on` gains the drawing's
-  row); new `src/tests/view.rs` rows. Users of `View::act` in skein:
-  `rg -n '\.act\(' crates/skein-ui-text testing/skein-fake-person`
-  (none expected to change: the text shell's commands act as each role
-  takes, ui-text.md 6).
+  78-88), builder.rs (bind, 253-260; its role list, `acted_on`, 453,
+  gains `Drawing`), tree.rs (Tree::act, 367)}`; `src/tests/tree.rs`
+  (the table test `bind_takes_only_the_roles_a_person_acts_on`: its row
+  `(Role::Drawing, false)`, 142, becomes `true`; `a_drawing_cannot_be_bound`,
+  89-95, goes with the assertion); `src/tests/binding.rs` (the loop at
+  13-22 gives the text area `State::SubmitsOnEnter`, so that the
+  `Submit` at 34 is one its role takes; `an_act_on_a_drawing_past_its_bytes_is_dropped`,
+  59, binds a drawing, not a button, and moves to `src/tests/view.rs`
+  as `drawing_data_past_its_bound_is_dropped`); new `src/tests/view.rs`
+  and `mod view;` in `src/tests.rs`. The text shell needs no change: it
+  calls no `View::act`, and its `command.rs` never meets a drawing,
+  since a drawing is never numbered (ui-text.md 5; `render.rs:148`
+  prints it as a container).
 Shape: `binding::takes(role: Role, submits_on_enter: bool, act: &Act)
   -> bool`, ui.md 6's table, matched whole over `Role` and `Act`;
   `View::act` gives `None` when the node is gone or unbound, disabled,
   an option whose nearest select ancestor is disabled, `takes` is
   false, or a `Drawing`'s data is past `drawing_bytes`; `bind` takes a
-  drawing (its "never bound" assertion goes).
+  drawing (its "never bound" assertion goes). The disabled rule is one
+  function, `Tree::disabled(&self, id: NodeId) -> bool`: the node
+  disabled, or an option whose nearest select ancestor is disabled,
+  found by a scan back in preorder over each node's `size`. `View::act`,
+  the text shell's numbers and commands (skein 05.2) and the fake
+  person (skein 06.2, 06.3) call it: no copy of the rule elsewhere.
 Test shape: `src/tests/view.rs`: a table test
   `each_role_takes_only_its_acts`, one row per bound role and act with
   the expected outcome as a literal (`Some` or `None`), built on one
@@ -119,12 +130,14 @@ Test shape: `src/tests/view.rs`: a table test
   `drawing_data_past_its_bound_is_dropped`. Each under 20 ms.
 Proof: unit, `heavy cargo nextest run -p skein-ui -p skein-ui-text -p
   skein-fake-person` once: the view refuses as ui.md 6 says, and the
-  text shell's command tests, which act through it, still pass. The
-  first shell that reports acts to it in a browser is skein 11's.
+  text shell's and the fake person's tests, over the builder's new
+  `bind`, still pass. The first shell that reports acts to it in a
+  browser is skein 11's.
 Don't: refuse in the builder what the view refuses (a disabled node
   stays bindable); change `BoundAct`.
 Size: about 80 lines.
-Removes: the builder's assertion that a drawing is never bound.
+Removes: the builder's assertion that a drawing is never bound, and
+  its test `a_drawing_cannot_be_bound`.
 
 ## Interface sketch
 
@@ -133,6 +146,7 @@ Removes: the builder's assertion that a drawing is never bound.
 // application owns the data; the shells' parts borrow it.
 
 /// One owner's names: its prefix, its tokens' and its region names'.
+#[derive(Clone, Copy, Debug)]
 pub struct Names<'a> {
     pub owner: Owner,
     pub prefix: &'a [u8],
@@ -143,19 +157,24 @@ pub struct Names<'a> {
 }
 /// The first fault of a look's names; `index` counts the owner's styles,
 /// then its regions.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Fault {
     Prefix { owner: Owner },
     SamePrefix { owner: Owner },
     OffPrefix { owner: Owner, index: u32 },
     Twice { owner: Owner, index: u32 },
 }
+#[must_use]
 pub fn check(names: &[Names<'_>]) -> Option<Fault>;
 impl Names<'_> {
+    #[must_use]
     pub fn style(&self, style: Style) -> Option<&[u8]>;
+    #[must_use]
     pub fn region(&self, region: Region) -> Option<&[u8]>;
 }
 
 // crates/skein-ui/src/binding.rs: ui.md 6's table, the one copy.
+#[must_use]
 pub fn takes(role: Role, submits_on_enter: bool, act: &Act) -> bool;
 ```
 
