@@ -18,7 +18,12 @@ sees changes.
   4): `heavy cargo update -p skein-lib --precise "$(git -C ~/src/skein
   log origin/main --grep='^Plan: skein-ui$' --grep='^Step: skein-01.3$'
   --all-match --format=%H -1)"` (`Step: skein-01.3` alone also matches
-  another plan's step, skein `4f77de8`), never
+  another plan's step, skein `4f77de8`), rerun after each skein
+  dependency an increment adds (`skein-ui` in 04.1, `skein-ui-text` in
+  04.2, `skein-fake-person` in 04.3), since adding one moves every skein
+  entry of `Cargo.lock` to skein's newest `main`: then `grep -o
+  'skein.git#[0-9a-f]*' Cargo.lock | sort -u` prints one commit, skein
+  01.3's; never
   smith; a `cargo check` failing inside a smith crate stops the
   increment with a question. The pin is that commit, not skein's newest
   `main`: skein's later changes to skein-ui (skein 02 to 06) are jig
@@ -88,7 +93,7 @@ Proof: world. `heavy cargo nextest run -p jig-client-world -p
   test(/at_the_text_shell|terminal/)'` passes once: jig's pages print
   through skein's shell as before. Bound: 2 minutes.
 Don't: copy a skein-ui-text test back into jig.
-Size: about 10 lines, plus paths.
+Size: about 10 lines, plus paths; `cargo fmt` after the renames.
 Removes: `jig-shell-text`.
 
 ### 04.3 jig's worlds on skein-fake-person
@@ -106,7 +111,7 @@ Proof: world. `heavy cargo nextest run -p jig-client-world -p
   fuzzy suite's client sweeps: `heavy cargo nextest run -p
   jig-client-world --profile fuzzy`. Bound: 5 minutes.
 Don't: change a story.
-Size: paths only.
+Size: paths only; `cargo fmt` after the renames.
 Removes: `jig-fake-person`.
 
 ## Done when

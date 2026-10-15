@@ -157,6 +157,9 @@ None yet; they start at 101.
 110. **jig 04's Shapes against main** (ready check of jig-04.1).
      jig 04's session file corrected against jig `dcf493fc0` and skein `a37b22a`: the repin's `git log` matches `Plan: skein-ui` and `Step: skein-01.3` together (`--all-match`); 04.1 removes `src/ui.rs`, `pub mod ui;` and `ui_boundary` with `src/ui/`, rewrites `crate::{…, ui}` imports too, swaps `jig-view` for `skein-ui` in jig-shell-text and jig-fake-person, and lets `tests/boundary` allow `skein-ui`; its Shape is no change of behaviour, with jig-view's tests no longer reaching what skein-ui keeps private (`Node::text_bytes` a test helper, `Builder.tree`, `Tree.nodes`, the `ui` fixture's `LIMITS`); 04.2 and 04.3 name their `tests/boundary` edits. A further user of `jig_view::ui`, a private item of skein-ui or a boundary test these Files miss: change it in the same increment, and list it in the commit body.
 
+111. **jig 04's pin held through each dependency** (ready check of jig-04.2 and jig-04.3).
+     jig 04.2 and 04.3 checked against skein `dc71a49` (skein 01.3): adding a skein dependency moves every skein entry of jig's `Cargo.lock` to skein's newest `main`, whose skein-ui has skein 04.1's `Limits` fields, so each of 04.1, 04.2 and 04.3 reruns the rule's `cargo update -p skein-lib --precise` after adding its dependency, until `grep -o 'skein.git#[0-9a-f]*' Cargo.lock | sort -u` prints skein 01.3's commit alone; 04.2 and 04.3 run `cargo fmt` after their renames. The downstream repository's users of `jig_fake_person` join its `later.md` row. A further dependency or rename these Files miss: the same, listed in the commit body.
+
 ## For the user
 
 Long-term choices the user may veto; each default holds unless the user
