@@ -133,19 +133,30 @@ Files: new `crates/skein-ui-web/src/{fetch.rs, fetch/web.rs,
   platform.rs, platform/web.rs}`; new `examples/ui/shell-web/{Cargo.toml
   (cdylib, wasm32 only, its code under `#![cfg(target_arch =
   "wasm32")]`), src/lib.rs}`; `examples/ui/view/src/lib.rs` (the
-  answered list as a report); skein's `Cargo.toml` (member).
+  answered list as a report); skein's `Cargo.toml` (member); new
+  `crates/skein-ui-web/src/tests/platform.rs`, `src/tests.rs` (`mod
+  platform;`).
 Shape: `fetch::Fetch` (pure: the exchanges in flight by id, each
   answer's body bound; platform: `window.fetch` with an
   `AbortController`, same-origin credentials); `platform::facts() ->
-  Facts { now, wall, seed, offset, languages }`; the shell's
+  Facts { now, wall, seed, offset, languages, primary }`, `primary`
+  from `navigator.platform` through the pure `platform::primary(platform:
+  Option<&str>) -> mapping::Primary` (ui-web.md, 5.1: `Meta` when it
+  starts with `Mac`, `iPhone`, `iPad` or `iPod`, else `Control`, an
+  unreadable one, `None`, among it); the shell's
   `#[wasm_bindgen(start)]`: finds `#app`, makes the inbox, the page part
-  with the look, fetch; starts the state from the facts and the path;
-  its turn as ui-web.md 5.2's listing, but history, the small store,
-  the timer, title and closing (skein 12, 13); commented to be copied.
+  with the look and `facts.primary`, fetch; starts the state from the
+  facts and the path; its turn as ui-web.md 5.2's listing, but history,
+  the small store, the timer, title and closing (skein 12, 13);
+  commented to be copied.
 Test shape: `crates/skein-ui-web/src/tests/fetch.rs`:
   `an_answer_past_its_bound_fails_the_exchange`,
-  `an_abandoned_exchange_reports_nothing`. Each under 20 ms. The shell
-  has no host test: it is built for wasm32 only.
+  `an_abandoned_exchange_reports_nothing`;
+  `crates/skein-ui-web/src/tests/platform.rs`:
+  `the_primary_modifier_is_meta_on_apples_platforms_alone` (a table:
+  `MacIntel`, `iPhone`, `iPad` give `Meta`; `Linux x86_64`, `Win32`,
+  the empty text and `None` give `Control`). Each under 20 ms. The
+  shell has no host test: it is built for wasm32 only.
 Proof: the wasm32 build with the lints: `heavy cargo clippy -p
   skein-ui-example-shell-web -p skein-ui-web --target
   wasm32-unknown-unknown -- -D warnings` once; 11.4 runs it.

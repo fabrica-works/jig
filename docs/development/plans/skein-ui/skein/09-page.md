@@ -142,24 +142,32 @@ Needs: 09.2 (`Look`, `dom::Element`, `dom::print`) and skein 03.1 (the
 Files: `crates/skein-ui-web/src/mapping.rs`; `src/lib.rs` (`pub mod
   mapping`); `src/tests.rs` (`mod mapping;`); `src/tests/mapping.rs`;
   new `src/tests/golden/mapping.html`.
-Shape: `mapping::element(made: &Made, look: &Look<'_>, prefix: &[u8])
-  -> Element` (`made` as the diff gives a node; `prefix` the digest
-  directory's path for pictures), matched whole over `Role` and
-  `State` as skein 01 moved them; `mapping::accessible(Role)`, the
+Shape: `mapping::element(made: &Made, look: &Look<'_>, prefix: &[u8],
+  primary: Primary) -> Element` (`made` as the diff gives a node;
+  `prefix` the digest directory's path for pictures; `primary` the
+  platform's primary modifier, `pub enum Primary { Control, Meta }` in
+  `mapping.rs`, ui-web.md 5.1), matched whole over `Role` and `State`
+  as skein 01 moved them; a `Modifier::Primary` shortcut's
+  `aria-keyshortcuts` is `Control+K` or `Meta+K` by `primary`, never
+  both (ui-web.md, 6); `mapping::accessible(Role)`, the
   accessible roles Chromium computes for each role's elements
   (`textbox` for a text field, …; `spinbutton`, a number's, comes with
   skein 02.1's entry kinds).
 Test shape: `src/tests/mapping.rs`: a table test
   `each_role_maps_to_its_element`, one row per role, its expected HTML
   as a literal, each failing row named; the same for
-  `each_state_and_property_maps_to_its_attribute`; one golden page
+  `each_state_and_property_maps_to_its_attribute`, with a primary `k`
+  under `Primary::Control` (`Control+K`) and under `Primary::Meta`
+  (`Meta+K`), every other row under `Primary::Control`; one golden page
   `every_node_maps_as_the_golden_page` printing a tree with every role,
-  state and property (`golden/mapping.html`, by hand). Each under 20 ms.
+  state and property, a primary shortcut among them, under
+  `Primary::Control` (`golden/mapping.html`, by hand). Each under 20 ms.
 Proof: unit; the face finds by `accessible` in skein 11.1, and skein
   14.1 checks it against Chromium. Nothing above the mapping runs until
   09.4 applies patches through it.
 Don't: give an element an id but the parts' own `skein-ui-…`
-  (ui-web.md, 6).
+  (ui-web.md, 6); put the primary modifier in `Look`, or give
+  `mapping::element` a second entry point or a default modifier.
 Size: about 300 lines.
 Removes: nothing.
 
@@ -171,7 +179,8 @@ Needs: 09.2, 09.3.
 Files: `crates/skein-ui-web/src/page.rs`; `src/lib.rs` (`pub mod
   page`); `src/tests.rs` (`mod page;`); `src/tests/page.rs`; new
   goldens in `src/tests/golden/`.
-Shape: `Page::new(look, limits, prefix)`, the page holding one `Scene`
+Shape: `Page::new(look, limits, prefix, primary)`, `primary` kept for
+  the mapping and for 09.5's keys, the page holding one `Scene`
   made at the view's limits (skein 04.1's `Scene::new(&Limits)`), which
   `look.draw` writes into; `Page::apply(&mut self, patches:
   &[Patch], ops: &mut Vec<Op>)`: insert, remove, move, text, attribute
@@ -209,23 +218,36 @@ Files: `crates/skein-ui-web/src/page.rs` (`Page::act`), new
 Shape: `Page::act(&mut self, event: Event, ops: &mut Vec<Op>) ->
   Option<(NodeId, Act)>`: `Event::{Click { node, modifier }, Input {
   node, value, composing }, Enter { node, shift, composing }, Change {
-  node } (a check's or a choice's: `Toggle`), Cancel { dialog }, Key { key, modifier, in_field }}` to
-  ui-web.md 7's acts (a plain click on a link a `Press`; a dialog's
-  cancel no act, its closing prevented; a shortcut the first bound,
-  enabled node in preorder naming the key);
+  node } (a check's or a choice's: `Toggle`), Cancel { dialog }, Key {
+  key: Box<[u8]>, code: Box<[u8]>, control: bool, meta: bool, alt:
+  bool, shift: bool, in_field: bool }}` to ui-web.md 7's acts (a plain
+  click on a link a `Press`; a dialog's cancel no act, its closing
+  prevented; a shortcut the first bound, enabled node in preorder
+  naming the key, its modifier and key made by ui-web.md 7's
+  "Shortcuts" from the page's `primary`);
   `page::web::Dom` executes `Op`s with web-sys and turns the mount
-  element's listeners into `Event`s, reporting acts to the inbox
-  through the application's wrapping function.
+  element's listeners into `Event`s, a `keydown`'s `key`, `code`,
+  `ctrlKey`, `metaKey`, `altKey` and `shiftKey` copied as they are,
+  reporting acts to the inbox through the application's wrapping
+  function, and preventing a `keydown`'s default when `act` gives an
+  act.
 Test shape: `src/tests/page.rs`: a table test `each_event_gives_its_act`
   (rows per ui-web.md 7's bullet, expected `Option<(NodeId, Act)>`
-  literal); `a_dialogs_cancel_keeps_it_open`;
+  literal), its key rows under `Primary::Meta` and `Primary::Control`:
+  the primary one with `k` presses the node naming a primary `k`, the
+  other one gives none; Shift besides, or Control with Alt, gives none;
+  Alt with `key` `˚` and `code` `KeyK` presses the node naming Alt `k`;
+  `a_dialogs_cancel_keeps_it_open`;
   `a_shortcut_with_no_modifier_gives_none_while_a_field_has_focus`. Each
   under 20 ms.
 Proof: unit on the host, and the wasm32 build with the lints:
   `heavy cargo clippy -p skein-ui-web --target wasm32-unknown-unknown
   -- -D warnings` once. Its first run in a browser is skein 11.4's
   story, which connects it.
-Don't: write `unsafe` or a `js_sys::eval`; set `innerHTML`.
+Don't: write `unsafe` or a `js_sys::eval`; set `innerHTML`; decide a
+  shortcut's modifier or key in the platform half; gather the four
+  modifiers into a struct of four `bool`s, which pedantic clippy's
+  `struct_excessive_bools` refuses.
 Size: about 400 lines.
 Removes: nothing.
 
@@ -271,7 +293,7 @@ pub enum Op {
 }
 pub struct Page<'a> { /* the model, by node id */ }
 impl<'a> Page<'a> {
-    pub fn new(look: Look<'a>, limits: &Limits, prefix: &'a [u8]) -> Page<'a>;
+    pub fn new(look: Look<'a>, limits: &Limits, prefix: &'a [u8], primary: Primary) -> Page<'a>;
     pub fn apply(&mut self, patches: &[Patch], ops: &mut Vec<Op>);
     pub fn resized(&mut self, node: NodeId, width: u16, height: u16, ops: &mut Vec<Op>);
     pub fn act(&mut self, event: Event, ops: &mut Vec<Op>) -> Option<(NodeId, Act)>;
