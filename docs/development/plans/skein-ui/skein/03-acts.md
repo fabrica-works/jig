@@ -97,7 +97,8 @@ Removes: nothing.
 Scope: ui.md 6 (the table and the refusals), 11.3 (a drawing bound).
 Needs: skein 02.4 (`Role::Select` and `Role::Option`, whose rows the
   table holds).
-Files: `crates/skein-ui/src/{binding.rs (takes), view.rs (View::act,
+Files: `crates/skein-ui/src/{binding.rs (takes), lib.rs (17: `takes`
+  re-exported beside `Act`, as skein 06 calls it), view.rs (View::act,
   78-88), builder.rs (bind, 253-260; its role list, `acted_on`, 453,
   gains `Drawing`), tree.rs (Tree::act, 367)}`; `src/tests/tree.rs`
   (the table test `bind_takes_only_the_roles_a_person_acts_on`: its row

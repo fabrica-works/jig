@@ -151,6 +151,9 @@ None yet; they start at 101.
 108. **skein 09's Shapes against main** (ready check of skein-09.1).
      skein 09's session file corrected against skein `a37b22a`: skein-ui-web, ordinary Rust (ui-web.md, 2), takes its own `clippy.toml` and `[lints]` tables, copied from skein-ui-bundle's, not the workspace's, and 09.1 names `Cargo.lock`; 09.2 to 09.4 name their module lines in `src/lib.rs` and `src/tests.rs`; 09.3 needs 09.2 (`Look`, `dom::Element`); `Page::new` takes the view's `Limits`, for the one `Scene` the page holds. A further lint, module line or caller of `Page::new` these Files miss: change it in the same increment, and list it in the commit body.
 
+109. **skein 06's Shapes against main** (ready check of skein-06.1).
+     skein 06's session file corrected against skein `dc71a49` (skein 01.3 landed): it cites skein-fake-person's lines; the face and the random person call `skein_ui::takes`, which skein 03.2 re-exports at skein-ui's `lib.rs:17`; 06.1's reference test reads the tree of a `View` fixture; 06.2 chooses the random person's act by `takes` (a toggle, else a press, else a submit or an input), drops `field` and `choice`, and turns the sweep at `tests.rs:308-370` into one that every bound node is acted on; `passive` holds no select, since the builder binds no passive role since jig 03.1; 06.3 takes `Tree::disabled` and replaces `passive` and 06.1's match with `takes`, the rule's `rg` checking that no copy of the table is left. skein 02.4's Files add the fake person's `passive`, `field` and `choice`, whose matches over `Role` take its four roles. A further copy of ui.md 6's table or caller these Files miss: change it in the same increment, and list it in the commit body.
+
 ## For the user
 
 Long-term choices the user may veto; each default holds unless the user

@@ -24,8 +24,11 @@ Its names for roles, one per role, are what its failures print.
 
 ## Rules that bind it
 
-- **One act table:** the face calls `skein_ui::binding::takes` (skein
-  03.2); it keeps no copy of ui.md 6's table.
+- **One act table:** the face and the random person call
+  `skein_ui::takes` (skein 03.2, re-exported at skein-ui's `lib.rs:17`
+  beside `Act`); from 06.3 on, the crate keeps no copy of ui.md 6's
+  table: `rg -n 'fn (passive|field|choice)\b'
+  testing/skein-fake-person` prints nothing at the session's end.
 - **The person stays a step machine:** `Person::next` consumes at most
   one step (jig's `lib.rs:1-14` at the base), and nothing here adds a
   clock or a thread.
@@ -36,28 +39,31 @@ Its names for roles, one per role, are what its failures print.
 Scope: ui.md 17.1.
 Needs: skein 01.3 (`skein-fake-person` in skein).
 Files: `testing/skein-fake-person/src/lib.rs` (the act of a press,
-  jig's lib.rs:202 at the base: `Step::Press` always `Act::Press`);
-  `src/tests.rs`.
+  203: `Step::Press` always `Act::Press`); `src/tests.rs`.
 Shape: `Person::next` asks the face for the found node's role through a
   new `Face::role(&self, NodeId) -> Option<Role>` (the tree face reads
   its tree; a face that cannot tell gives `None`, and the press stays a
   `Press`); a press on a check or a choice gives `Act::Toggle`.
 Test shape: `src/tests.rs`: `a_press_on_a_check_is_a_toggle`,
-  `a_press_on_a_choice_is_a_toggle`, `a_press_on_a_button_stays_a_press`.
-  Reference test:
+  `a_press_on_a_choice_is_a_toggle`, `a_press_on_a_button_stays_a_press`
+  (as `#[test]`s, or as scenarios of the crate's grouped tests,
+  `tests.rs:8-10`, under these names). Reference test:
   ```rust
   #[test]
   fn a_press_on_a_check_is_a_toggle() {
-      let tree = fixtures::page_with_check(b"Notify me");
+      let view = fixtures::page_with_check(b"Notify me");
       let mut person: Person<u8> = Person::new(Box::new([Step::Press {
           find: Find::named(Role::Check, b"Notify"),
       }]));
-      let next = person.next(&mut TreeFace::new(&tree), Time::ZERO);
+      let next = person.next(&mut TreeFace::new(view.tree()), Time::ZERO);
       assert_eq!(next, Next::Do(Doing::Act { node: fixtures::CHECK, act: Act::Toggle }));
   }
   ```
-  (`page_with_check` and `CHECK` added to the crate's fixtures, in
-  `src/tests.rs` or a new `src/tests/fixtures.rs`). Each under 20 ms.
+  (`page_with_check` returns a `View`, as `build` does, `tests.rs:46`:
+  a `Tree` is not `Clone`; it and `CHECK`, `NodeId(2)`, are added to the
+  crate's fixtures, in `src/tests.rs` or a new `src/tests/fixtures.rs`).
+  Each under 20 ms. 06.3 replaces the check-or-choice match with
+  `takes`.
 Proof: unit, `heavy cargo nextest run -p skein-fake-person` once. Unit
   is the highest layer until skein 13.4, whose view tests toggle the
   example's choice group through the tree face (13.4 needs skein 06.3).
@@ -69,35 +75,46 @@ Removes: nothing.
 Scope: ui.md 17.1 (the random person; names for roles).
 Needs: skein 03.2 (a drawing bound; it needs skein 02.4's
   `Role::Select` and `Role::Option`).
-Files: `testing/skein-fake-person/src/random.rs` (`available`, jig's
-  random.rs:73-78; `choice`, 129-130), `src/tree.rs` (`role_name`,
-  jig's tree.rs:117-167; `passive`, 169-183); `src/tests.rs`.
-Shape: the random person acts on any bound, enabled node but a drawing;
-  on an option it presses; on a check or a choice it toggles; `passive`
-  holds the select (its options take the press).
+Files: `testing/skein-fake-person/src/random.rs` (`available`, 74-79;
+  `RandomPerson::next`'s act, 53-58; `field`, 81-129, and `choice`,
+  130-178, which go), `src/tree.rs` (`role_name`, 118); `src/tests.rs`
+  (the sweep `a_sweep_presses_every_bound_node_and_reaches_fields_composers_and_history`,
+  308-370, whose line 362 asserts every bound node pressed).
+Shape: the random person acts on any bound node but a drawing that
+  `Tree::disabled` (skein 03.2) does not call disabled; its act is the
+  first its node's role takes, by `skein_ui::takes`: a `Toggle`, else a
+  `Press`, else, at random, a `Submit` on a field that submits on Enter
+  or an `Input`; so an option is pressed, a check or a choice toggled.
+  `passive` stays until 06.3: the builder binds no passive role since
+  jig 03.1.
 Test shape: a table test `each_role_has_its_own_name`: one row per
   `Role` with its name as a literal, the rows checked whole and each
   failing row named; `the_random_person_never_acts_on_a_drawing` (a page
   of one bound drawing and one button, 200 draws, every act on the
-  button); `the_random_person_presses_an_option`. Each under 20 ms.
+  button); `the_random_person_presses_an_option`; the sweep, renamed
+  `a_sweep_acts_on_every_bound_node_and_reaches_fields_composers_and_history`,
+  asserts that the nodes pressed, written, submitted and toggled
+  together are the bound set. Each under 20 ms.
 Proof: unit, `heavy cargo nextest run -p skein-fake-person` once. Unit
   is the highest layer: no fuzzy world in skein runs the random person;
   an application's does.
 Don't: give a drawing a random act.
 Size: about 30 lines.
-Removes: nothing.
+Removes: `field` and `choice`.
 
 ### 06.3 The tree face fails an act its node's role does not take
 Scope: ui.md 6 (the table), 17.1 (the face's failures).
-Needs: skein 03.2 (`skein_ui::binding::takes`; a drawing bound).
+Needs: skein 03.2 (`skein_ui::takes`, `Tree::disabled`; a drawing
+  bound).
 Files: `testing/skein-fake-person/src/tree.rs` (`TreeFace::allows`,
-  jig's tree.rs:98-114 at the base); `src/random.rs` (`available`, jig's
-  random.rs:73-78, which calls `passive`); `src/tests.rs`.
-Shape: `allows` is: the node is in the face's subtree, bound, enabled,
-  not an option of a disabled select, and `binding::takes(role,
-  submits_on_enter, act)`; `passive` goes, the table covering it: the
-  random person's `available` asks `takes` for the act it would make
-  (a `Press`, a `Toggle` or an `Input` by the node's role).
+  99-116; `passive`, 170); `src/random.rs` (`available`, 74-79, which
+  calls `passive`); `src/lib.rs` (06.1's press on a check or a choice,
+  at 203); `src/tests.rs`.
+Shape: `allows` is: the node is in the face's subtree, bound, not
+  `Tree::disabled`, and `skein_ui::takes(role, submits_on_enter, act)`;
+  `passive` goes, the table covering it: `available` keeps a node that
+  takes some act; a press is a `Toggle` where the role takes `Toggle`
+  and not `Press` (`takes`), in place of 06.1's match.
 Test shape: `typing_into_a_button_fails_as_unexpected`,
   `pressing_an_option_of_a_disabled_select_fails`,
   `a_drawing_takes_only_its_drawing_act`. Each under 20 ms.
@@ -105,7 +122,7 @@ Proof: unit, `heavy cargo nextest run -p skein-fake-person` once; skein
   13.4's view tests run the face over the example's choices.
 Don't: refuse what the view takes, or take what it refuses: one table.
 Size: about 20 lines.
-Removes: `passive`.
+Removes: `passive`, and 06.1's match on a check or a choice.
 
 ## Interface sketch
 

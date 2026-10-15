@@ -193,8 +193,9 @@ Files: `crates/skein-ui/src/{tree.rs (Role, Sort, Node.sort),
   act); `crates/skein-ui-text/src/tests/fixtures.rs` (a select of
   three options, one selected; a table with a column header carrying a
   sort and a row header) and `src/tests/golden/roles.txt`;
-  `testing/skein-fake-person/src/tree.rs` (`role_name`, jig's
-  tree.rs:117-167); `crates/skein-ui-web/src/{mapping.rs (rows,
+  `testing/skein-fake-person/src/tree.rs` (`role_name`, 118; `passive`,
+  170) and `src/random.rs` (`field`, 81, and `choice`, 130: their
+  matches over `Role` take the four roles); `crates/skein-ui-web/src/{mapping.rs (rows,
   `accessible`), page.rs (a select's change)}` and their tests.
 Shape: `Role::{Select, Option, ColumnHeader, RowHeader}`; `Node.sort:
   Option<Sort>` on a column header, in `Attribute`; builder
