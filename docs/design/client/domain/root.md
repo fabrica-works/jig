@@ -1,6 +1,6 @@
 # The application's client root
 
-Provisional, 2026-10-09, revised 2026-10-14. What an application's
+Provisional, 2026-10-09, revised 2026-10-15. What an application's
 client root is and does: the top-level domain of every client of an
 application on jig, which composes jig's client domain with the
 application's own kinds of object. It says what the root carries, its
@@ -293,7 +293,8 @@ How jig's pages show an application's values.
     card states as jig's are (client.md, section 5);
   - its cards, one per kind of object, shown on its pages and in jig's
     slots;
-  - its pages, at its own addresses, under jig's frame;
+  - its pages, at its own addresses, with jig's frame's parts where it
+    places them;
   - its requests: keyed, through the table, routed by the engine's root
     to the connector they concern (`../../domain/people.md`, 5.1);
   - its reads and watches, of the application's own documents, each
@@ -306,7 +307,10 @@ How jig's pages show an application's values.
   by jig's key, the root routes the request to `jig-domain-client`,
   which holds the object in its working set as shown elsewhere and
   watches it, and jig's view fills the slot with jig's card. One object,
-  one card, wherever it shows (objects.md, section 2).
+  one card, wherever it shows (objects.md, section 2). A family that
+  presents one of jig's objects itself names it the same way, and builds
+  its own nodes from the object `jig-domain-client` holds, bound through
+  jig's binding constructors (view.md, sections 4 and 5).
 - **An application's page shows jig's sections** through slots of the
   third kind. Its child names each by value, a `Section` of
   `jig-domain-client`'s (an incident's lead task's plan or activity, the
@@ -349,9 +353,9 @@ How jig's pages show an application's values.
 
 The view root (view.md, section 4) mirrors the domain's root:
 
-- it builds the banner, the navigation, the main and `after_page`, from
-  jig's parts and sections, its own nodes, and the page's owner's view
-  (view.md, section 4);
+- it builds the page's tree in the arrangement it chooses, jig's default
+  or its own, from jig's primitives, its own nodes, and the page's
+  owner's view (view.md, section 4);
 - it fills each slot from the slot's owner's view: a part from its
   owner's, a card or a section of jig's from jig's;
 - it decodes an act on a node through the node owner's bindings, wrapped
@@ -447,8 +451,8 @@ the root kept every promise above.
   its own), which sends no request, read or subject to the engine: one
   that does is an own child domain's client side, which waits for the
   application that needs it (15.1).
-- **jig is never numbered.** The view names it `Owner::Jig`, and the
-  wire names jig's records as jig's.
+- **jig takes no application number.** The view names it `Owner::Jig`,
+  and the wire names jig's records as jig's.
 - **The application numbers its owners,** each by a `u16`, in one typed
   enum both its roots share, with the function that gives an owner's
   number and the one that gives the owner of a number, or none. An
@@ -472,6 +476,16 @@ the root kept every promise above.
 - **Matched whole.** Each root's match on an owner is exhaustive, with no
   `_` arm, so a new owner breaks the build where it must be routed and
   shown; a number that names no owner is a fact, never a guess.
+- **Onto skein-ui's owner.** skein-ui's owner is an opaque number,
+  `skein_ui::Owner { number: u32 }`, which it compares, orders and
+  hashes and never interprets (skein's `ui.md`, 3.3). jig's typed owner
+  maps onto it by a total function: `Application { number }` to the
+  same number, and `Jig` to 65536, one past every `u16`, so jig's and
+  an application's never meet; and back by a partial one, which gives
+  none for a number that names no owner (view.md, section 3). The view
+  root routes what skein-ui hands back by an owner (an act's binding, a
+  slot, a drawing's kind) through that partial function, then matches
+  the typed owner whole.
 
 ### 15.1 Later: an application's own child domains
 

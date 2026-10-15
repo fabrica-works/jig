@@ -1,14 +1,15 @@
 # Pages
 
-Provisional, 2026-10-09, revised 2026-10-14. jig's pages: how a client is
+Provisional, 2026-10-09, revised 2026-10-15. jig's pages: how a client is
 organised, what a party finds where, and what they do there. They are
-jig's, as the primitives they show are, and every application's client
-has them, around its own. This document says what each page shows and
-offers, never how it looks: no layout and no style. Section 12 says what
-a page is made of (the frame's parts and the sections, each with its
-region name) and how an application arranges them. The cards that every
-page reuses are objects.md; what each page reads and watches is
-contract.md. What is still open is listed in section 11.
+jig's default arrangement of jig's primitives, which an application
+uses as they are, rearranges, or composes into a tree of its own, around
+its own pages. This document says what each page shows and offers,
+never how it looks: no layout and no style. Section 12 says what a page
+is made of (the frame's parts, the sections and `after_page`'s parts,
+each with its region name) and how an application arranges them. The
+cards that every page reuses are objects.md; what each page reads and
+watches is contract.md. What is still open is listed in section 11.
 
 ## 1. In one page
 
@@ -19,14 +20,15 @@ contract.md. What is still open is listed in section 11.
 - **A page is an arrangement.** jig's pages are made of the frame's
   parts, sections and cards. What jig promises is kept below them: by
   `jig-domain-client`, which holds each object once (client.md,
-  section 5); by the request table, which keeps each request until its
-  answer is durable (root.md, section 4); and by the card that shows each
-  object, its state, its acts and its refusals, wherever it shows
-  (objects.md, section 2). No promise depends on where a section or a
-  card is, next to what, or in what order, so jig's pages are its
-  reference arrangements: an application takes them as they are, shows
-  more sections together, or arranges its own from the same parts and
-  sections (section 12).
+  section 5) and opens a confirmation for every decision (client.md,
+  section 9); by the request table, which keeps each request until its
+  answer is durable (root.md, section 4); and by the revision each
+  decision names, whatever node it was made on (objects.md, section 2).
+  No promise depends on where a section or a card is, next to what, or
+  in what order, so jig's pages are its default arrangement: an
+  application takes them as they are, shows more sections together,
+  arranges its own from the same primitives, or presents jig's objects
+  itself (section 12).
 - **The task page is the one universal page.** Every task, whatever its
   executor (an agent, a procedure, a person), has a page of the same
   shape: what was asked, where it stands, what it did, what it spent,
@@ -85,11 +87,20 @@ Deployment       hosts, accounts, connectors, capacity
     who is signed in, with a way to sign out (client.md, section 12);
   - the navigation: jig's pages and the application's.
 
-  What needs the party and the link's state are on every page, since a
-  person must always know both, and so is who is signed in, since a
-  person must always be able to sign out (client.md, section 12). The
-  other parts are where the application's arrangement puts them, on
-  every page in jig's.
+  In jig's default arrangement what needs the party and the link's
+  state are on every page, since a person must always know both, and so
+  is who is signed in, since a person must always be able to sign out
+  (client.md, section 12); so are the other parts. Each is a primitive
+  an application places where it likes, or omits (12.1); omitting one
+  is the application's choice, and takes from the person what it shows:
+  - *the link part* omitted, with no presentation of the link's state of
+    its own, leaves the person not knowing whether what they see is
+    live, behind or offline (client.md, 8.2);
+  - *the party part* omitted, with no sign-out of its own, leaves the
+    person no way to sign out, nor to learn that a sign-out did not reach
+    the engine (client.md, section 12);
+  - *what needs the party* omitted leaves them no count of what waits
+    for them outside the inbox.
 - **Home and navigation are the application's choice.** The application
   says which of jig's pages its frame shows, in what order, and which
   is home; the inbox by default. In a browser, the application's codec
@@ -375,17 +386,18 @@ restarts, they start empty.
 
 ## 9. What an application adds
 
-- **Its pages,** one family's or several's, at its own addresses, under
-  jig's frame: for `ops`, Incidents (open, then resolved, with each
-  one's service, severity, lead task and timeline; an incident with no
-  lead yet says so) and Environments (each pool, its slots, each
-  environment's cost and end).
+- **Its pages,** one family's or several's, at its own addresses, with
+  jig's frame's parts where it places them: for `ops`, Incidents (open,
+  then resolved, with each one's service, severity, lead task and
+  timeline; an incident with no lead yet says so) and Environments (each
+  pool, its slots, each environment's cost and end).
 - **Its parts in jig's slots:** panels, results, effects' descriptions,
   holds' details, resources and kinds in words (root.md, section 6).
 - **Its cards on jig's pages,** through those slots, and jig's cards on its
   pages: an incident's page shows its lead task's chip and the proposals
   waiting in its subtree as jig's cards, and its plan as jig's plan
-  section (root.md, section 7).
+  section (root.md, section 7); or its own presentation of jig's objects,
+  from jig's domain data (objects.md, section 2).
 - **Its navigation and its home** (section 2).
 - **Its arrangement** of jig's pages: the sections a task's page and a
   project's show together, and where each part and section goes
@@ -426,30 +438,49 @@ inbox, withdrawn, with R's result saying why.
 ## 12. Parts, sections and arrangements
 
 What a page is made of, and how an application arranges it. Each part
-and section is a function of `jig-view` (view.md, 4.1) and carries a
-region name (12.4); what the domain opens for each section is
-client.md, 5.1.
+and section is a primitive, a function of `jig-view` (view.md, 4.1) an
+application calls where it likes or not at all, and carries a region
+name (12.4); what the domain opens for each section is client.md, 5.1.
+jig mandates nothing in an application's tree but skein-ui's outline
+(view.md, 3.1).
 
 ### 12.1 The frame's parts
 
-| Part | What it shows | Function | Region name | On every page |
+| Part | What it shows | Function | Region name | In jig's default |
 |---|---|---|---|---|
-| the link | whether the client is live, behind or offline (client.md, 8.2) | `frame::link` | `jig-link` | yes |
-| what needs the party | what needs them, counted exactly, and updates unread, up to a limit, each leading to the inbox; before the frame's first delivery, that nothing is known yet | `frame::needs` | `jig-needs` | yes |
-| who is signed in | the party, and signing out (client.md, section 12) | `frame::party` | `jig-party` | yes |
-| the projects | the projects the party holds roles in, the one they are in marked current, each leading to its page | `frame::projects` | `jig-projects` | |
-| going to a task | a field taking a task's number | `frame::go_to_task` | `jig-go-to-task` | |
-| the navigation | jig's pages the application offers, in its order, then its own entries in a slot (section 2) | `frame::navigation` | `jig-navigation` | |
+| the link | whether the client is live, behind or offline (client.md, 8.2) | `frame::link` | `jig-link` | in jig's banner |
+| what needs the party | what needs them, counted exactly, and updates unread, up to a limit, each leading to the inbox; before the frame's first delivery, that nothing is known yet | `frame::needs` | `jig-needs` | in jig's banner |
+| who is signed in | the party, and signing out (client.md, section 12) | `frame::party` | `jig-party` | in jig's banner |
+| the projects | the projects the party holds roles in, the one they are in marked current, each leading to its page | `frame::projects` | `jig-projects` | in jig's banner |
+| going to a task | a field taking a task's number | `frame::go_to_task` | `jig-go-to-task` | in jig's banner |
+| the navigation | jig's pages the application offers, in its order, then its own entries in a slot (section 2) | `frame::navigation` | `jig-navigation` | a landmark of its own |
 
-- **jig's banner** (`frame::banner`) is the banner landmark with the
-  first five, in that order. The navigation is a landmark of its own.
-- **After the page,** `after_page` builds, on every page:
+- **jig's banner** (`frame::banner`) is jig's default banner: the banner
+  landmark with the first five, in that order, on every page. An
+  application may place each part in a banner of its own, another
+  landmark, or nowhere (section 2 says what a person loses).
+- **After the page,** three primitives, each building nothing when it
+  has nothing to show; `after_page` is jig's default, calling the three
+  last, on every page:
 
-  | Part | What it shows | Region name |
-  |---|---|---|
-  | the owed cards | each card the page's working set holds deciding, leaving, or unknown whether made (client.md, sections 5 and 6), that no section of the page and no card slot of the application's page shows (view.md, 4.1) | `jig-owed` |
-  | the confirmation | the one open (client.md, section 9) | `jig-confirmation` |
-  | the notices | the notices, and dismissing them (client.md, section 13) | `jig-notices` |
+  | Part | What it shows | Function | Region name |
+  |---|---|---|---|
+  | the owed cards | each card the page's working set holds deciding, leaving, or unknown whether made (client.md, sections 5 and 6), that no section of the page and no card the application's page names shows (view.md, 4.1) | `pages::owed` | `jig-owed` |
+  | the confirmation | the one open (client.md, section 9) | `confirmation::confirmation` | `jig-confirmation` |
+  | the notices | the notices, and dismissing them (client.md, section 13) | `notices::notices` | `jig-notices` |
+
+  Omitting one, with no presentation of its own, takes from the person
+  what it shows:
+  - *the confirmation* omitted leaves every decision unconfirmable: the
+    domain decides nothing until its confirmation is confirmed
+    (client.md, section 9);
+  - *the owed cards* omitted leave a request the person made, still
+    deciding, leaving or unknown whether made, shown nowhere on a page
+    that does not show its object;
+  - *the notices* omitted leave the person unaware of what has no card:
+    a request answered for an object the page does not show, a refusal
+    with nothing to show it on, the link going and coming back
+    (client.md, section 13).
 
 ### 12.2 Sections
 
@@ -493,20 +524,21 @@ Regions named inside sections, so a stylesheet places them too:
 | notes | searching them, a search | `jig-notes-search` |
 | the deployment | hosts; LLM accounts; connectors; capacity | `jig-hosts`, `jig-accounts`, `jig-connectors`, `jig-capacity` |
 
-The pages not about the work (section 8) are jig's whole, each in the
+The pages not about the work (section 8) are jig's default, each in the
 main (`pages::not_the_work`): `jig-starting`, `jig-signing-in`,
-`jig-missing`, `jig-out-of-date`, `jig-someone-else`.
+`jig-missing`, `jig-out-of-date`, `jig-someone-else`. An application may
+build its own from the domain's page (client.md, section 5).
 
 ### 12.3 Arrangements
 
-- **jig's arrangement** of every page (`jig_view::jig`): the banner, with
-  the link, what needs the party, who is signed in, the projects and
-  going to a task, in that order; the navigation; the main, with the
-  page's heading, its header, its tabs, and its sections; then the owed
-  cards, the confirmation and the notices. A task's page and a project's show the address's own
-  section, one at a time (a task's plan at its own address); the inbox
-  shows its header and both groups; conversations and the deployment
-  their one section.
+- **jig's default arrangement** of every page (`jig_view::jig`): the
+  banner, with the link, what needs the party, who is signed in, the
+  projects and going to a task, in that order; the navigation; the main,
+  with the page's heading, its header, its tabs, and its sections; then
+  the owed cards, the confirmation and the notices. A task's page and a
+  project's show the address's own section, one at a time (a task's
+  plan at its own address); the inbox shows its header and both groups;
+  conversations and the deployment their one section.
 - **More sections together.** An application may have every task's page,
   or every project's, show sections beside the address's own: its
   arrangement names them (client.md, 5.1), every section of a task on
@@ -523,19 +555,29 @@ main (`pages::not_the_work`): `jig-starting`, `jig-signing-in`,
   its banner from jig's frame's parts and its own (a brand, its own
   entries; the projects part only where its parties hold roles in more
   than one project).
-- **What every arrangement keeps:**
-  - the page's outline (view.md, 3.1): the link, what needs the party
-    and who is signed in, in the banner, and `after_page` last, which
-    `jig_view::outline::check` checks;
-  - jig's objects only through their cards, whole (objects.md,
-    section 2), which the referee's rules check wherever a card shows
-    (testing.md, section 6);
+- **What every tree keeps:** skein-ui's outline (view.md, 3.1), which
+  the referee checks on every tree a person sees (testing.md, section 6).
+  jig adds no rule to it.
+- **What jig's default keeps,** which jig-view's tests check on each of
+  jig's pages: the link, what needs the party and who is signed in, in
+  the banner, first; `after_page`'s parts last; jig's objects through
+  their cards, whole (objects.md, section 2); the pages not about the
+  work, in the main.
+- **What jig's primitives and checks offer an application:**
   - a section only where the domain shows it on the page: elsewhere, its
-    function builds nothing;
-  - the pages not about the work, jig's whole, in the main.
+    function builds nothing, whoever calls it;
+  - jig's objects, through jig's cards or presented by the application
+    itself from jig's domain data and bound through jig's binding
+    constructors (objects.md, section 2), with `jig_view::facts` for
+    what a card shows and `jig_view::check`, which its worlds run
+    through the referee on every tree a person acted on (view.md,
+    section 4; testing.md, sections 6 and 8);
+  - the link told, where the application shows jig's link part or its
+    own presentation of the link's state (testing.md, section 6).
 - **On its own pages,** an application shows jig's sections and cards
-  through slots (root.md, section 7), under the same frame and the same
-  `after_page`.
+  through slots (root.md, section 7), or presents jig's objects itself,
+  with jig's frame's parts and `after_page`'s parts where it places
+  them; jig's default places them as on jig's pages.
 
 ### 12.4 Region names
 

@@ -1,6 +1,6 @@
 # The client and the engine
 
-Provisional, 2026-10-09, revised 2026-10-14. What crosses between a
+Provisional, 2026-10-09, revised 2026-10-15. What crosses between a
 party's client and the engine, at the level of the two domains: who the
 party is, the keyed requests and their answers, the documents the engine
 gives, the reads and watches that bring them, and versions. It is to
@@ -465,12 +465,13 @@ a subject naming its owner and its scope, read from an offset within a
 window, as a run's text is (7.3). Its deliveries decide nothing and are
 never a document of the engine's committed state: they leave through
 the journal's door (`../../README.md`, 6.3), marked provisional, and
-show marked so (view.md, section 3). It adds a kind of subject to the
-application's own and a use of the journal's door, with no change to
-7.1's subjects or 7.2's rules, and waits for an application whose
-people follow its data as it comes. jig's browser parts carry such a
-stream as any watch, with no change of their own
-(`../../protocol/browser.md`, section 16).
+show marked so, in words (view.md, section 9). It adds a kind of
+subject to the application's own and a use of the journal's door, with
+no change to 7.1's subjects or 7.2's rules, and waits for an
+application whose people follow its data as it comes. In a browser,
+jig's link's adapter carries such a stream over skein's fetch part as
+any watch, with no change to either (`../../protocol/browser.md`,
+section 16).
 
 ## 8. Versions
 

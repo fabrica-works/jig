@@ -1,6 +1,6 @@
 # The client domain
 
-Provisional, 2026-10-09, revised 2026-10-14. `jig-domain-client`: what a
+Provisional, 2026-10-09, revised 2026-10-15. `jig-domain-client`: what a
 party's client knows of the engine's work, and what it does with it. It
 is the client's counterpart of the engine's core: a child of the
 application's client root, holding jig's part of the client: the frame
@@ -385,7 +385,8 @@ keeps it and sends it, is the root's (root.md, section 4).
 
 ### 8.2 The link
 
-What the frame shows everywhere (pages.md, section 2):
+What the frame's link part shows, on every page of jig's default
+arrangement (pages.md, section 2):
 
 - **starting:** before the frame's first delivery;
 - **live:** the frame's watch is live;

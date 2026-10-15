@@ -1,6 +1,6 @@
 # The example application
 
-Provisional, 2026-10-06, revised 2026-10-14. This is jig's example
+Provisional, 2026-10-06, revised 2026-10-15. This is jig's example
 application, `ops`: a small system for running services in production,
 on two connectors, with its agents inside its engine. It exists to be
 tested and to be copied.
@@ -319,11 +319,12 @@ section 12):
     says so;
   - environments: their pool, their cost, their end, and a request to
     move the end, keyed like jig's.
-- **Its arrangement:** jig's frame and jig's arrangement of every page
-  but a task's, which shows every section together, the address's own
-  marked current: its view root builds the main from the task's header
-  and its overview, activity, plan and history, and puts its budget and
-  its connectors' panels in an aside (`client/domain/pages.md`, 12.3).
+- **Its arrangement:** jig's frame and jig's default arrangement of
+  every page but a task's, which shows every section together, the
+  address's own marked current: its view root builds the main from the
+  task's header and its overview, activity, plan and history, and puts
+  its budget and its connectors' panels in an aside
+  (`client/domain/pages.md`, 12.3).
 - **Its owners:** its two connectors' client sides, numbered as its
   connectors are, in `jig-ops-domain-connectors`, which both its roots
   share (`client/domain/root.md`, section 15).
@@ -333,25 +334,26 @@ section 12):
   words (`client/domain/root.md`, section 6).
 - **Its drawing:** an incident's error rate, on the incident's page, a
   drawing of observability's with its fallback in words. Its drawing
-  code, in `jig-ops-view`, draws it as a scene (`client/domain/view.md`,
-  section 17), tested by golden scenes.
-- **A person in the worlds** is jig's fake person, reading the view tree:
+  code, in `jig-ops-view`, draws it as a scene (skein's `ui.md`, section
+  11; `client/domain/view.md`, section 17), tested by golden scenes.
+- **A person in the worlds** is skein's fake person, reading the tree:
   P accepting a restart from an incident's page
   (`client/domain/pages.md`, section 10); Q asking for an environment in
   a chat, and accepting what it costs.
-- **Its terminal client:** jig's text shell in front of its client and
-  view roots (`client/domain/view.md`, section 15), the text shell's
-  first consumer. Its client world plays it (`client/domain/testing.md`,
-  section 4): P accepts the restart from the incident's page, typing
-  the numbers the page printed. Its loop over a real terminal comes with
-  `ops` standalone (9.1), which gives it an engine to reach.
+- **Its terminal client:** skein's text shell, with jig's settings, in
+  front of its client and view roots (skein's `ui-text.md`;
+  `client/domain/view.md`, section 15). Its client world plays it
+  (`client/domain/testing.md`, section 4): P accepts the restart from
+  the incident's page, typing the numbers the page printed. Its loop
+  over a real terminal comes with `ops` standalone (9.1), which gives it
+  an engine to reach.
 - **Its browser client:** its browser shell, `jig-ops-shell-web`, copied
-  from jig's reference shell: its start and its loop over jig's browser
-  parts and its client host, which takes jig's default codec for jig's
-  places at the root and parses and prints incidents' and environments'
-  paths with its own (`protocol/browser.md`, sections 3 and 9). It comes
-  with `ops` standalone too (9.1), whose startup gives its engine the
-  bundle to serve.
+  from jig's reference shell: its start and its loop over skein's
+  browser parts, jig's and its client host, which takes jig's default
+  codec for jig's places at the root and parses and prints incidents'
+  and environments' paths with its own (`protocol/browser.md`, sections
+  3 and 9). It comes with `ops` standalone too (9.1), whose startup
+  gives its engine the bundle to serve.
 
 ## 9. Its systems
 

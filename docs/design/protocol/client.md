@@ -1,6 +1,6 @@
 # The client's protocol
 
-Provisional, 2026-10-10, revised 2026-10-14. What carries the contract
+Provisional, 2026-10-10, revised 2026-10-15. What carries the contract
 between a party's client and the engine (`../client/domain/contract.md`)
 as bytes: the wire's records and their versions, the one connection a
 client keeps, its exchanges and its stream, how a keyed request's answer
@@ -50,10 +50,10 @@ in section 15.
 - **The small store is the wire's records,** per owner, versioned, written
   by the shell before any request of the same step leaves.
 - **Shells are small:** an application's browser shell, its loop over
-  jig's browser parts: the client compiled to WebAssembly over the
-  platform's fetch, served by the engine (`browser.md`); a native one
-  over skein's HTTP client and server-sent events reader. Each maps its
-  platform onto the same component.
+  skein's browser parts and jig's: the client compiled to WebAssembly
+  over the platform's fetch, served by the engine (skein's `ui-web.md`;
+  `browser.md`); a native one over skein's HTTP client and server-sent
+  events reader. Each maps its platform onto the same component.
 - **On one person's machine** (`README.md`, section 4) the browser reaches
   the engine on a loopback address, in plaintext, and the person signs in
   by a link the engine prints at start (section 8).
@@ -396,9 +396,10 @@ the platform's HTTP stack, TLS                  TLS server, or plaintext on loop
   owner does not read is dropped, and its owner told, so a request kept
   across an update that changed its record's version is lost, not sent
   wrong. Pre-release, nothing is translated.
-- **Where:** a browser tab's session storage, as text the shell encodes
-  (`browser.md`, section 10); a file a native client writes whole and
-  syncs; a service's, a file it syncs before its requests leave
+- **Where:** a browser tab's session storage, as text skein's small
+  store part encodes (skein's `ui-web.md`, section 10; `browser.md`,
+  section 10); a file a native client writes whole and syncs; a
+  service's, a file it syncs before its requests leave
   (`../client/domain/root.md`, section 11).
 
 ## 11. An application's documents and requests
@@ -422,36 +423,45 @@ the platform's HTTP stack, TLS                  TLS server, or plaintext on loop
 ## 12. Shells
 
 - **The browser's** (`browser.md`): the application's browser shell,
-  `<application>-shell-web`, its start and its loop over jig's browser
-  parts (`jig-shell-web`) and its client host, copied from jig's
+  `<application>-shell-web`, its start and its loop over skein's browser
+  parts (`skein-ui-web`), jig's (`jig-shell-web`: the sign-in part, the
+  link's adapter and jig's look) and its client host, copied from jig's
   reference shell. The client root, its view and this component
   compiled to WebAssembly (`wasm32-unknown-unknown`, stable Rust), with
-  only the glue `wasm-bindgen` generates, which jig's bundler makes
-  beside a starter of two statements, and no other build tool (an
-  application's own page and JavaScript, from the origin only, are
-  steps it may take: `browser.md`, 3.5); exchanges and the stream over
-  the platform's fetch, the stream read as server-sent events by
-  skein's reader in the component; session storage for the small store,
-  written before a step's exchanges leave by jig's transport part
-  (`browser.md`, 5.3); the tree mapped to HTML elements with their
-  roles, and drawings' scenes to SVG, by jig's defaults, which an
-  application may override for its own nodes (`browser.md`, 6.1;
+  only the glue `wasm-bindgen` generates, which skein's bundler makes
+  beside a starter, and no other build tool (an application's own page
+  and JavaScript, from the origin only, are steps it may take: skein's
+  `ui-web.md`, 3.3; `browser.md`, 3.5); exchanges and the stream over
+  the platform's fetch, through jig's link's adapter, which gives
+  skein's transport the link's requests as plain data with the browser
+  header and turns fetch's reports into link events (`browser.md`, 5.1),
+  the stream read as server-sent events by skein's reader in the
+  component; session storage for the small store, written before a
+  step's exchanges leave by skein's transport part (skein's `ui-web.md`,
+  5.3 and section 10); the tree mapped to HTML elements with their
+  roles, and drawings' scenes to SVG, by skein's defaults, which an
+  application may override for its own nodes, or render by a component
+  of its own, a shell's, never a protocol layer's (skein's `ui.md`,
+  section 12; skein's `ui-web.md`, sections 6, 6.1 and 8;
   `../client/domain/view.md`, section 11).
 - **Served by the engine:** the engine's protocol layer serves what the
   application's startup gives it at start, as data: the client's bundle
-  (its page, its starter, its glue, its module, jig's stylesheet and the
-  application's, the pictures of both, the application's own files),
-  its root files and the policy's additions, or none, which serves no
-  browser; jig's reference reads the bundle from the directory its
-  configuration names (`configuration.md`, section 3). It answers the
-  page at every path outside `/jig/` but the root files the startup
-  names, and at the link's route. Whatever it serves, its front door
-  stays. It serves under a strict content security policy: scripts from
-  the origin only, no inline script, WebAssembly compiled only by the
-  origin's code (`'wasm-unsafe-eval'`, which compiling the module
-  needs), connections to the origin and the origins the application
-  names; and it answers only requests naming its own host (`browser.md`,
-  sections 12 and 12.1).
+  under `/jig/client/` (its page, and its digest directory: its starter,
+  its glue, its module, skein's stylesheet, then jig's and the
+  application's, each owner's pictures, the application's own files;
+  skein's `ui-web.md`, 4.2), its root files and the policy's additions,
+  or none, which serves no browser; jig's reference reads the bundle
+  from the directory its configuration names (`configuration.md`,
+  section 3). It answers the page at every path outside `/jig/` but the
+  root files the startup names, and at the link's route; it serves the
+  digest directory immutable and revalidates the page (skein's
+  `ui-web.md`, 4.4; `browser.md`, section 12). Whatever it serves, its
+  front door stays. It serves under a strict content security policy:
+  scripts from the origin only, no inline script, WebAssembly compiled
+  only by the origin's code (`'wasm-unsafe-eval'`, which compiling the
+  module needs), connections to the origin and the origins the
+  application names; and it answers only requests naming its own host
+  (`browser.md`, sections 12 and 12.1).
 - **The native one** (`jig-shell-native`): skein's HTTP client on
   skein's io, handing the stream's body to the component, whose reader
   cuts it into events, for Linux and for the worlds
@@ -490,10 +500,10 @@ Each within jig's suites' budgets (`../../development/workflow.md`).
   reaches a domain; a slow stream never holds the engine up.
 - **The browser tier:** the application's browser shell in Chromium,
   against the application's binary (for jig, `jig-test`), both children
-  of the harness's one loop, a person reading the page by role, name and
-  text through the browser's face over skein's browser kit, in jig's
-  stories for a browser shell and the application's own (skein's
-  `browser.md`; `browser.md`, section 15).
+  of skein's harness's one loop, a person reading the page by role, name
+  and text through skein's face over its browser kit, in skein's stories
+  for a browser shell, jig's and the application's own (skein's
+  `ui-web.md`, 14.2; skein's `browser.md`; `browser.md`, section 15).
 
 ## 15. Open questions
 
@@ -531,11 +541,14 @@ Each within jig's suites' budgets (`../../development/workflow.md`).
 - **The engine's domain** is owed nothing new: sign-ins numbered by their
   commit, and a party ending theirs (`../domain/people.md`, section 3),
   watches and reads as `../domain/engine.md`, section 11 has them.
-- **skein owes,** for one person's machine: skein-lib, skein-codec and
-  skein-http built for `wasm32-unknown-unknown` (skein's `lib.md`,
-  section 2); its browser kit's query matching a name by words, and its
-  press at a point within a node's box (skein's `browser.md`, sections 5
-  and 6); a client compiled to WebAssembly in its model
-  (`programming-model.md`, 2.1). Its HTTP server and client and its
-  server-sent events reader and writer serve as they are. Between hosts,
-  TLS's server side (`README.md`, section 10).
+- **skein owes,** for one person's machine: skein-lib, skein-codec,
+  skein-http and `skein-ui` built for `wasm32-unknown-unknown` (skein's
+  `lib.md`, section 2; skein's `testing.md`, section 6); its UI kit's
+  browser parts, the transport and the small store among them, its
+  bundler, and its face and harness for the browser tier (skein's
+  `ui-web.md`, 5.1, 4.2 and 14.2), over its browser kit's query matching
+  a name by words and its press at a point within a node's box (skein's
+  `browser.md`, sections 5 and 6); a client compiled to WebAssembly in
+  its model (`programming-model.md`, 2.1). Its HTTP server and client
+  and its server-sent events reader and writer serve as they are.
+  Between hosts, TLS's server side (`README.md`, section 10).

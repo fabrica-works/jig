@@ -1,6 +1,6 @@
 # jig's protocol layer
 
-Provisional, 2026-10-10, revised 2026-10-14. The design of what lies
+Provisional, 2026-10-10, revised 2026-10-15. The design of what lies
 between jig's domains and bytes: the components an application's protocol
 layers own to carry jig's vocabularies to the store, to workers, to LLM
 providers and to clients; what an application writes around them; their
@@ -73,12 +73,13 @@ section 4. What is still open is listed in section 14.
    requests, reads, watches, signing in, the small store, shells.
 7. **store.md:** the store: skein-kv in the engine, keys and records,
    commits and loads, transcripts, secrets, growth.
-8. **browser.md:** jig's browser parts, a kit on client.md's protocol,
-   and the reference shell an application copies: what an application
-   writes and what it may change, the toolchain and the bundle, the
-   application's loop over the parts, the tree as elements, scenes as
-   SVG, paths, serving behind the front door, signing in, and the
-   browser tier.
+8. **browser.md:** jig's browser layer, on client.md's protocol:
+   skein's browser parts (skein's `ui-web.md`) and what jig adds to
+   them (the sign-in part, the link's adapter, jig's look), the
+   reference shell an application copies, what an application writes
+   and what it may change, jig's default codec for its places, serving
+   behind the front door, signing in, and jig's stories for a browser
+   shell.
 
 ## 3. Names
 
@@ -86,6 +87,7 @@ section 4. What is still open is listed in section 14.
 |---|---|
 | protocol layer | a process's layer between its root and io: its components, and the application's routing between them (programming-model.md, section 4) |
 | component | a crate of a protocol layer that the application's protocol layer owns as a child and routes to |
+| component, a shell's | the client's name (`../client/domain/README.md`, section 4): a shell's native implementation of a node (skein's `ui.md`, section 12), never a protocol layer's component |
 | codec crate | a crate of records generated from a schema, used by components at both ends (skein's `codec.md`) |
 | record | a value of a protocol's vocabulary, encoded to its schema |
 | service | a process's `iterate` with its root and protocol layer; its `main` is its shell |
@@ -155,7 +157,7 @@ An application that mixes the last two has both.
 | `jig-protocol-engine-clients` | component | engine | clients' connections: exchanges, streams, sign-ins, translation to and from the core's vocabulary (`client.md`); the browser's files, page, root files and the policy's additions, data the application's startup gives, served behind a fixed front door, and a browser's sign-in by cookie (`browser.md`, sections 11, 12 and 12.1) |
 | `jig-protocol-client-link` | component | client | the connection to the engine: attempts, the stream, envelopes, the small store's records (`client.md`); jig's default codec for jig's places, its `address` module, which an application's client host uses as is, under a prefix, renamed, or replaces (`browser.md`, section 9) |
 | `jig-protocol-transcript` | decoding | client | turns' bytes into the client's vocabulary (`../client/domain/client.md`, section 10) |
-| `jig-shell-web`, `jig-shell-native` | shells' parts, a shell | client | jig's browser parts, a kit an application's browser shell runs its loop over (`browser.md`, 5.1), and the native shell (`client.md`, section 12) |
+| `jig-shell-web`, `jig-shell-native` | shells' parts, a shell | client | jig's browser parts, beside skein's (`skein-ui-web`), which an application's browser shell runs its loop over: the sign-in part, the link's adapter and jig's look (`browser.md`, 5.1); and the native shell (`client.md`, section 12) |
 
 Beside them, smith's components, by the agent capability:
 `smith-protocol-llm`, over skein's `skein-llm-connection`, in a process
@@ -164,10 +166,10 @@ worker (`llm.md`); `smith-host-protocol` on a worker with agent
 processes (smith's `protocol/hosts.md`, sections 2 and 3).
 
 - **Each crate is step code** under the subset (programming-model.md,
-  section 10), as every crate of jig's is but its test kits, the client's
-  shells and their parts, and `jig-bundle`, the bundler: a tool run at
-  build, which makes the bundle the engine serves, not a component
-  (`browser.md`, section 4).
+  section 10), as every crate of jig's is but its test kits and the
+  client's shells and their parts. The bundle the engine serves is made
+  at build by skein's bundler, `skein-ui-bundle`, a tool, not a
+  component (skein's `ui-web.md`, 4.2; `browser.md`, section 4).
 - **Each depends** on skein-lib, io's vocabulary, the skein components it
   drives, its codec crate, and the domain vocabulary it translates: the
   hub's for the channel's sides, the core's (or a child's) for the
@@ -195,17 +197,17 @@ processes (smith's `protocol/hosts.md`, sections 2 and 3).
 | the worker's root, with its choice of agent capability, its workspace and its io | the worker | its own (`../domain/hosts.md`, section 7) |
 | its store's families: keys' encoders, codecs, its store version, its indexes | the engine | its own, by `store.md`, section 12 |
 | its documents' and requests' wire, its sign-in providers' exchanges | engine and client | the client's protocol |
-| its browser shell, `<application>-shell-web`: its start and its loop over jig's browser parts and its client host, and its look, plain data the parts take | the client | copied from the reference shell, `jig-test-shell-web` (`browser.md`, 3.1 to 3.3 and section 5) |
+| its browser shell, `<application>-shell-web`: its start and its loop over skein's browser parts, jig's and its client host, and its look, plain data the parts take | the client | copied from jig's reference shell, `jig-test-shell-web` (`browser.md`, 3.1 to 3.3 and section 5; skein's `ui-web.md`, section 3) |
 | its paths, every one but those under `/jig/`, the engine's own: jig's default codec for jig's places as is, under a prefix of its own, renamed, or replaced, its families' places, and which place `/` is | the client host | its own (`browser.md`, section 9) |
 | its stylesheet and its pictures | the client's bundle | its own (`browser.md`, 3.4) |
 | what the engine serves of its browser: the bundle's files, the page, its root files, the policy's additions, as data | the engine's startup | copied from the reference, which reads the bundle's directory its configuration names (`browser.md`, section 12) |
-| what it changes beyond the reference shell, a step at a time, each needing the ones before only where it says so: its page, its files, its elements and widgets, its own JavaScript from the origin, additions to the policy, a part replaced or left out | the client, the engine's startup | its own, as `browser.md`, 3.5 allows; never the engine's front door (`browser.md`, section 12) |
+| what it changes beyond the reference shell, a step at a time, each needing the ones before only where it says so: its page, its files, its elements and components, its own JavaScript from the origin, additions to the policy, a part replaced or left out | the client, the engine's startup | its own, as skein's `ui-web.md`, 3.3, and `browser.md`, 3.5, allow; never the engine's front door (`browser.md`, section 12) |
 
 It writes no codec of jig's records, none of the channel's rules, none of
 the core's tools' decoding, no OAuth exchange of an LLM account, no agent,
 and none of `smith-inline-agent`'s runs' LLM calls. Its browser needs no
 HTML and no JavaScript of its own: its own page and its own JavaScript
-are steps it may take (`browser.md`, 3.5).
+are steps it may take (skein's `ui-web.md`, 3.3; `browser.md`, 3.5).
 
 ## 7. Versions
 
@@ -324,21 +326,43 @@ Each is generic, and says nothing about jig.
 - **The loop's host:** skein's `Host` and `drive`, with
   `next_policy_deadline` (skein's `shell.md`, section 12; `service.md`,
   section 4).
-- **For the client's WebAssembly and its records:** skein-lib, skein-codec
-  and skein-http's machines built for `wasm32-unknown-unknown`, checked by
-  skein's gate (skein's `lib.md`, section 2); skein-lib's bounded
+- **For the client's WebAssembly and its records:** skein-lib, skein-codec,
+  skein-http's machines and `skein-ui` built for
+  `wasm32-unknown-unknown`, checked by skein's gate (skein's `lib.md`,
+  section 2; skein's `testing.md`, section 6); skein-lib's bounded
   `base64`, for records in server-sent events (`client.md`, section 1);
   and skein-lib's `Secret`, the generator's `secret` type, whose `Debug`
   shows its length only, for credentials' values (section 8; skein's
   `codec.md`, section 3).
-- **For jig's browser parts** (`browser.md`): skein's browser kit
-  matching a name by words as well as exactly, and pressing at a point
-  within a node's box, for the browser tier's face (skein's
-  `browser.md`, sections 5 and 6); and `programming-model.md`, section
-  2.1, on a client compiled to WebAssembly: its shell's platform calls go
-  through the glue crates, `wasm-bindgen`, `js-sys` and `web-sys`,
-  pinned, which with their dependencies are the only `unsafe`
-  such a client runs; `jig-shell-web` forbids it in its own code.
+- **For the client's view and shells, skein's UI kit** (skein's `ui.md`,
+  `ui-text.md` and `ui-web.md`):
+  - `skein-ui`: the tree and its vocabulary, owners as opaque numbers,
+    to which jig maps its own (`../client/domain/view.md`, section 3;
+    skein's `ui.md`, 3.3), the builder with slots and splicing, bindings
+    and acts, the diff and the view, style tokens and the look's names,
+    the phrasebook's machinery with its reference hole, Markdown,
+    scenes, the outline's rules, and limits with their worst case;
+  - `skein-ui-text`, the text shell, which jig's terminal client
+    composes with jig's settings (skein's `ui-text.md`);
+  - `skein-ui-web`, the browser parts each usable alone and their
+    default mapping of roles to elements, beside which jig's own parts
+    sit (`browser.md`, 5.1): their platform halves call through the glue
+    crates, `wasm-bindgen`, `js-sys` and `web-sys`, pinned in skein's
+    workspace, which with their dependencies are the only `unsafe` such
+    a client runs (`programming-model.md`, section 2.1); `jig-shell-web`
+    forbids it in its own code;
+  - `skein-ui-bundle`, the bundler, which writes the bundle the engine
+    serves, under the bundle's prefix jig gives it, `/jig/client/`
+    (skein's `ui-web.md`, 4.2 to 4.4; `browser.md`, section 12);
+  - `skein-fake-person`, the person over the tree, and
+    `skein-fake-person-browser`, its face over skein's browser kit (a
+    name matched by words as well as exactly, a press at a point within
+    a node's box: skein's `browser.md`, sections 5 and 6) and the
+    harness, which stops the application's binary and starts it again
+    within a story, with skein's stories for a browser shell, which
+    jig's tier calls beside its own (skein's `ui-web.md`, 14.2;
+    `../client/domain/testing.md`, section 3; `browser.md`, section
+    15).
 - **What it has, as it is:** the framed channel, codecs and their
   generator, the JSON reader and writer, the key-value store, the LLM
   client and connection component and their fake peer, OAuth's client and
@@ -480,24 +504,29 @@ reads) is `store.md`, section 15.
 - **What is generic leaves jig,** within reason: a mechanism that is not
   about jig's vocabularies goes to skein, or to smith when it is about
   agents, generalised, before jig uses it: joined sockets (section 10),
-  the accounts driver, the agent in a host's process, and a run's text on
-  smith's channel (section 11). jig keeps what is entwined with its
-  domain: the worker's link policy, whose grace and stop bound are the
-  fleet's, and the translations.
+  the accounts driver, the agent in a host's process, the UI kit (the
+  tree, the text shell, the browser parts, the bundler and the fake
+  person: section 10), and a run's text on smith's channel (section
+  11). jig keeps what is entwined with its domain: the worker's link
+  policy, whose grace and stop bound are the fleet's, and the
+  translations.
 - **Crates named by layer:** `jig-domain-*`, `jig-protocol-*`,
   `jig-view`, `jig-shell-*` (`../README.md`, section 15).
 - **On one person's machine, a browser on loopback** signs in by a link
   the engine prints at start (`client.md`, section 8).
-- **jig's browser layer is a kit; the loop is the application's.** jig
-  writes its browser parts, each usable alone, the bundler, the engine's
-  serving behind a fixed front door, and its default codec for its
-  places. An application's browser shell, copied from jig's reference
-  shell, runs its own loop over the parts and its client host, whose
-  codec parses and prints its paths, and gives its look as data; past
-  the reference, it changes more a step at a time, any part but the
-  front door. The parts hold the invariants that protect requests, so
-  no order of its loop breaks them (`browser.md`, 3.5, 5.3 and section
-  19; `../README.md`, section 6).
+- **The browser's parts are skein's; the loop is the application's.**
+  skein's UI kit gives the browser parts, each usable alone, the
+  bundler, the face and the harness (section 10). jig writes what is
+  its own: its sign-in part, its link's adapter and its look, the
+  engine's serving behind a fixed front door, its default codec for its
+  places, and jig's stories for a browser shell. An application's
+  browser shell, copied from jig's reference shell, runs its own loop
+  over the parts and its client host, whose codec parses and prints its
+  paths, and gives its look as data; past the reference, it changes
+  more a step at a time, any part but the front door. The parts hold
+  the invariants that protect requests, so no order of its loop breaks
+  them (skein's `ui-web.md`, 5.3; `browser.md`, 3.5 and section 19;
+  `../README.md`, section 6).
 - **Configuration as strict JSON,** read once before the loop, composed
   per child, secrets in private files, limits by profile
   (`configuration.md`).

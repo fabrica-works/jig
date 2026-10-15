@@ -1,6 +1,6 @@
 # Objects and cards
 
-Provisional, 2026-10-09, revised 2026-10-14. The objects jig's client
+Provisional, 2026-10-09, revised 2026-10-15. The objects jig's client
 shows, each as one card wherever it appears: tasks as chips, proposals,
 escalations, questions, person tasks, results, refusals, the
 conversation; and the requests a party makes about them, each saying
@@ -43,12 +43,30 @@ is still open is listed in section 13.
   its project and its task's lineage; in a conversation, nothing more.
   Never its actions.
 - **Whole, wherever it shows.** A card is where jig's promises show: its
-  state, its acts, its refusals, its confirmation. An application
-  chooses where a card goes, restyles it and fills its slots, but never
-  rebuilds it or leaves part of it out: its nodes are built only by
-  jig's card function (view.md, section 4), in jig's sections or in an
-  application's slot. The referee checks what a card promises wherever
-  it shows (testing.md, section 6).
+  state, its acts, its refusals, its confirmation. jig's card shows its
+  object whole, wherever jig's card function builds it (view.md, section
+  4), in jig's sections or in an application's slot; an application
+  chooses where it goes, restyles it and fills its slots.
+- **Or presented by the application.** An application may present one
+  of jig's objects itself instead, from jig's domain data, in nodes of
+  its own (view.md, section 4). jig's promise holds without jig's nodes:
+  - *held by construction:* every decision goes through the domain's
+    confirmation (client.md, section 9), and names the revision of the
+    data its binding was issued from, since the application binds its
+    nodes through jig's binding constructors (view.md, section 5); a
+    revision that moved is refused (contract.md, 5.2); made once,
+    nothing lost and nothing shown done before it is durable are the
+    domain's and the engine's, whatever the tree;
+  - *exported as data:* what the card would show, its state, a refusal
+    and why, what a decision will do and whether it is dangerous, comes
+    as jig's sayings from `jig_view::facts`, for the application to show
+    where it likes;
+  - *checked, not mandated:* `jig_view::check`, which its worlds run
+    through the referee on every tree a person acted on, holds that a
+    decision was made on a tree showing its facts, in the open
+    confirmation or within the acted node's nearest named region
+    (testing.md, sections 6 and 8). The referee checks jig's cards the
+    same way, wherever they show.
 - **Its revisions.** An act that decides about something that changes
   names that thing's revision as the card showed it: a release, its
   hold's; an amendment, the spec's; an answer, the person task's. One
