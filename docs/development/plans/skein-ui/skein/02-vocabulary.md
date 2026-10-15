@@ -143,7 +143,7 @@ Files: `crates/skein-ui/src/{tree.rs, builder.rs, diff.rs}`; tests in
   `src/tests/tree.rs` and `src/tests/diff.rs`;
   `crates/skein-ui-web/src/mapping.rs` and its tests;
   `crates/skein-ui-web/src/page.rs` and `src/tests/page.rs`: the
-  mapping maps one node alone (`page.rs:197, 263`), so the page part
+  mapping maps one node alone (`page.rs:222, 292`), so the page part
   sets each item's and tree item's `aria-setsize` from its list's or
   tree's count, and sends them again as `Op::Attributes` when the count
   changes.
@@ -187,7 +187,9 @@ Test shape: two rows added to `each_rule_names_its_first_fault`
   (`src/tests/outline.rs`): Escape on a button in the main, its
   `Fault { rule: Rule::EscapeInDialog, node: <its index> }` as a
   literal; Escape on a dialog's button, `None`. In skein-ui-web's
-  `src/tests/page.rs`: `escape_presses_the_dialogs_escape_button`.
+  `src/tests/page/events.rs`, beside 09.5's
+  `a_dialogs_cancel_keeps_it_open`:
+  `escape_presses_the_dialogs_escape_button`.
   Under 20 ms each.
 Proof: joint, `heavy cargo nextest run -p skein-ui -p skein-ui-web`
   once: a dialog's cancel presses its Escape node in the page part's
@@ -216,7 +218,10 @@ Files: `crates/skein-ui/src/{tree.rs (Role, Sort, Node.sort),
   matches over `Role` take the four roles); `crates/skein-ui-web/src/{mapping.rs (rows;
   its five matches over `Role`: `base` 119, `accessible` 231, `name`
   281, `value` 358, `tag` 410), page.rs (a select's change; `Select`
-  in `focusable`, 342)}` and their tests.
+  in `focusable`, 374), page/web.rs (a `<select>`'s `change`, now
+  `Event::Change` at web.rs:578, read as `Event::Choose` with its
+  chosen option's node)}`, skein-ui-web's `Cargo.toml` (the web-sys
+  features web.rs then uses), and their tests.
 Shape: `Role::{Select, Option, ColumnHeader, RowHeader}`; `Node.sort:
   Option<Sort>` on a column header, in `Attribute`; builder
   `sort(Sort)`; `spans` takes the headers too; `bind` takes an option.
@@ -235,12 +240,14 @@ Test shape: the golden `roles.txt`, edited by hand with the fixture's
   new lines; in `src/tests/tree.rs`, `a_sort_on_a_cell_is_an_assertion`;
   in `src/tests/diff.rs`, `a_changed_sort_is_one_attribute_patch`;
   mapping rows for the four roles and the sort; in skein-ui-web's
-  `src/tests/page.rs`,
+  `src/tests/page/events.rs`,
   `a_select_change_presses_the_option_and_puts_the_choice_back`. Under
   20 ms each.
 Proof: joint, `heavy cargo nextest run -p skein-ui -p skein-ui-text -p
   skein-fake-person -p skein-ui-web` once: the golden text page prints
-  the select and the headed table, and the page part maps them.
+  the select and the headed table, and the page part maps them; and
+  `heavy cargo clippy -p skein-ui-web --target wasm32-unknown-unknown
+  -- -D warnings` once, for web.rs.
 Don't: number an option of a disabled select differently (skein 05.2);
   refuse acts by role (skein 03.2).
 Size: about 150 lines.
