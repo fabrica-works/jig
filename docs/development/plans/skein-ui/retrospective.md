@@ -876,15 +876,29 @@ designer).
 
 ## 10. Decisions
 
+2026-10-15. The user delegated these decisions: the designer's
+recommendation stands "unless there is something with long-term
+consequences and hard to change decisions" (2026-10-14), and "there are
+no important open questions, so there should be no need for my input,
+take reasonable decisions when in doubt" (2026-10-15). None of these is
+hard to change, and none is a product decision. The designer decided
+them on the evidence of sections 5 and 8, as the rows say, and applied
+what is adopted in skein `e3b148e` (development.md and its two cards).
+Changes to the kit (`plan`, `land`, `numbers.sh`, the coordinator's Codex
+profile and the workspace's files) wait until after smith's parity run,
+active on another machine, as smith abe6ec2e decided: no change to the
+kit right before an unattended run. Their work goes on skein's branch
+`kit-after-parity`.
+
 | Proposal | Decision | Where |
 |---|---|---|
-| 1 | open | |
-| 2 | open | |
-| 3 | open | |
-| 4 | open | |
-| 5 | open | |
-| 6 | open | |
-| 7 | open | |
-| 8 | open | |
-| 9 | open | |
-| 10 | open | |
+| 1 | adopted | skein e3b148e: development.md, 5.4 (the design trace, a fourth review) and 2.2 |
+| 2 | adopted | skein e3b148e: development.md, 5.2 (the README's build-lane commands for one test of a suite that needs a built artifact) and 5.5; implementer.md, 8.8 |
+| 3 | adopted | skein e3b148e: development.md, 7.3, step 4, and 10.3; implementer.md, 8.6 |
+| 4 | adopted, replacing client-composition's 1 ("once the increments it needs at its start have landed, or all but one that is running") | skein e3b148e: development.md, 7.2 and 7.3; supervisor.md, 5 |
+| 5 | adopted | skein e3b148e: development.md, 10.4; supervisor.md, 5 |
+| 6 | adopted | skein e3b148e: development.md, 5.2 and 5.4; implementer.md, 8.6 |
+| 7 | adopted | skein e3b148e: development.md, 10.3 and 10.4; supervisor.md, 4 and 5 (the unblock appends `answer.md`'s decision part only) |
+| 8 | adopted, and applied to this plan: the three `later.md` rows for temper's next repin are in temper's `STATUS.md`, "Not planned" (temper `c709551`) | skein e3b148e: development.md, 5.7 and 10.4; supervisor.md, 3 |
+| 9 | deferred: until after smith's parity run: `plan context` is the kit's. The designer and the planner already hand over past about 300K tokens (development.md, 2.1 and 2.2); running `plan context` after each report comes with the tool | skein's branch `kit-after-parity`: `plan`, with development.md, 2.1 and 2.2 |
+| 10 | deferred: until after smith's parity run: `plan downstream` is the kit's | skein's branch `kit-after-parity`: `plan`, with development.md, 14.1 |
