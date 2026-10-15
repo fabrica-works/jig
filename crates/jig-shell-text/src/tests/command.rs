@@ -8,7 +8,7 @@ fn page() -> Tree {
 }
 fn numbers(tree: &Tree) -> Print {
     let mut print = Print::new(&fixtures::LIMITS).unwrap();
-    render(tree, b"ops", &mut print);
+    render(tree, b"ops", None, &mut print);
     print
 }
 fn field(b: &mut Builder, submit: bool) {
@@ -156,7 +156,7 @@ fn numbers_hold_across_a_print_and_renumber_at_the_next() {
         command(b"2", Some(print.numbers.as_slice()), &new, 1),
         Command::Act { node: release, first: Act::Press, submit: false }
     );
-    render(&new, b"ops", &mut print);
+    render(&new, b"ops", None, &mut print);
     assert_eq!(print.numbers.as_slice(), [release]);
     assert_eq!(
         command(b"1", Some(print.numbers.as_slice()), &new, 1),

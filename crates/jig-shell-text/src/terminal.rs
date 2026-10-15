@@ -1,6 +1,6 @@
 use crate::{Command, Print, Refusal, command, refusal_line, render};
 use alloc::boxed::Box;
-use jig_view::ui::Tree;
+use jig_view::ui::{Region, Tree};
 use skein_io::{
     Event, Io, Request,
     kernel::{Complete, Fd, Op, Submit},
@@ -17,6 +17,7 @@ pub struct Settings {
     pub name: Box<[u8]>,
     pub longest: u32,
     pub interval: Duration,
+    pub status: Option<Region>,
 }
 #[derive(Debug, PartialEq, Eq)]
 enum Phase {
@@ -237,7 +238,7 @@ impl Terminal {
                     self.request(now, Request::Close { entity: output });
                 }
             } else if self.due(now) {
-                render(tree, &self.settings.name, &mut self.print);
+                render(tree, &self.settings.name, self.settings.status, &mut self.print);
                 self.printed = Some(now);
                 self.dirty = false;
                 self.immediate = false;

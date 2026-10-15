@@ -676,7 +676,7 @@ impl<A: App, F: Front<A>> World<A, F> {
             );
             Act::Input { value: words }
         } else {
-            jig_shell_text::render(tree, b"jig", print);
+            jig_shell_text::render(tree, b"jig", Some(jig_view::regions::JigRegion::Link.region()), print);
             if tree.find(node).is_some_and(|n| n.states.as_slice().contains(&jig_view::ui::State::SubmitsOnEnter))
                 && let Act::Input { value } = act
             {

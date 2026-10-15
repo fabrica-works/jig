@@ -8,7 +8,7 @@ mod fixtures;
 fn a_tree_with_every_role_and_state_prints_its_golden_text() {
     let tree = fixtures::page(fixtures::roles);
     let mut print = Print::new(&fixtures::LIMITS).unwrap();
-    render(&tree, b"ops", &mut print);
+    render(&tree, b"ops", None, &mut print);
     assert_eq!(print.text.as_slice(), include_bytes!("../tests/golden/roles.txt"));
     assert_eq!(print.numbers.len(), 11);
 }
@@ -22,7 +22,7 @@ fn control_bytes_and_bad_utf8_print_as_replacement() {
         b.close();
     });
     let mut print = Print::new(&fixtures::LIMITS).unwrap();
-    render(&tree, b"ops", &mut print);
+    render(&tree, b"ops", None, &mut print);
     assert_eq!(print.text.as_slice(), include_bytes!("../tests/golden/bytes.txt"));
 }
 #[test]
@@ -32,7 +32,7 @@ fn a_disabled_button_prints_a_dash_not_a_number() {
         fixtures::button(b, b"Release", false);
     });
     let mut print = Print::new(&fixtures::LIMITS).unwrap();
-    render(&tree, b"ops", &mut print);
+    render(&tree, b"ops", None, &mut print);
     assert_eq!(print.text.as_slice(), b"== ops == \n[1] Accept\n[-] Release (disabled)\n");
     assert_eq!(print.numbers.as_slice(), [tree.get(3).unwrap().id]);
 }
@@ -40,7 +40,7 @@ fn a_disabled_button_prints_a_dash_not_a_number() {
 fn the_first_line_is_the_main_heading_and_the_link() {
     let tree = fixtures::page(|b| {
         b.open(Role::Region);
-        b.region(jig_view::regions::JigRegion::Link.region());
+        b.region(fixtures::STATUS);
         fixtures::leaf(b, Role::Status, b"Connected");
         fixtures::leaf(b, Role::Status, b"Behind");
         b.close();
@@ -48,8 +48,22 @@ fn the_first_line_is_the_main_heading_and_the_link() {
         fixtures::leaf(b, Role::Heading { level: 1 }, b"Again");
     });
     let mut print = Print::new(&fixtures::LIMITS).unwrap();
-    render(&tree, b"ops", &mut print);
+    render(&tree, b"ops", Some(fixtures::STATUS), &mut print);
     assert_eq!(print.text.as_slice(), b"== Inbox == Connected; Behind\n# Again\n");
 }
 
 mod terminal;
+
+#[test]
+fn no_status_region_ends_the_first_line_after_its_space() {
+    let tree = fixtures::page(|b| {
+        b.open(Role::Region);
+        b.region(fixtures::STATUS);
+        fixtures::leaf(b, Role::Status, b"Connected");
+        b.close();
+        fixtures::leaf(b, Role::Heading { level: 1 }, b"Inbox");
+    });
+    let mut print = Print::new(&fixtures::LIMITS).unwrap();
+    render(&tree, b"ops", None, &mut print);
+    assert_eq!(print.text.as_slice(), b"== Inbox == \n* Connected\n");
+}

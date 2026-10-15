@@ -15,7 +15,7 @@ struct Pipes {
     tree: Tree,
 }
 fn settings(longest: u32) -> Settings {
-    Settings { name: b"test".as_slice().into(), longest, interval: Duration::from_secs(1) }
+    Settings { name: b"test".as_slice().into(), longest, interval: Duration::from_secs(1), status: None }
 }
 fn start(longest: u32, buffer: u32) -> Pipes {
     let mut config = Config::calm();

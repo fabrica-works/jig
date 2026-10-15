@@ -1,7 +1,5 @@
 //! Role-based text, independent of styles (client/domain/view.md, 15.3–15.4).
-use jig_view::regions::JigRegion;
-use jig_view::ui::Limits;
-use jig_view::ui::{Node, NodeId, Role, Run, State, Tree};
+use jig_view::ui::{Limits, Node, NodeId, Region, Role, Run, State, Tree};
 
 use skein_lib::{Decimal, List, Stack};
 /// One page's lines and its numbered node identities, beginning with `[1]`.
@@ -43,7 +41,7 @@ struct Parent {
     end: u32,
     indent: u32,
 }
-fn header(tree: &Tree, name: &[u8], out: &mut List<u8>) -> (Option<u32>, Option<u32>) {
+fn header(tree: &Tree, name: &[u8], status: Option<Region>, out: &mut List<u8>) -> (Option<u32>, Option<u32>) {
     let mut title = None;
     let mut main_end = 0;
     let mut link = None;
@@ -55,7 +53,7 @@ fn header(tree: &Tree, name: &[u8], out: &mut List<u8>) -> (Option<u32>, Option<
         if title.is_none() && index < main_end && n.role == (Role::Heading { level: 1 }) {
             title = Some(index);
         }
-        if n.region == Some(JigRegion::Link.region()) {
+        if status.is_some() && n.region == status {
             link = Some(index);
         }
     }
@@ -86,12 +84,12 @@ fn header(tree: &Tree, name: &[u8], out: &mut List<u8>) -> (Option<u32>, Option<
     (title, link)
 }
 /// Print the complete tree, assigning numbers in preorder.
-pub fn render(tree: &Tree, name: &[u8], print: &mut Print) {
+pub fn render(tree: &Tree, name: &[u8], status: Option<Region>, print: &mut Print) {
     let name_bytes = u32::try_from(name.len()).expect("shell name fits its configured node text bound");
     assert!(name_bytes <= print.name_bytes, "shell name fits its configured node text bound");
     print.text.clear();
     print.numbers.clear();
-    let (title, link) = header(tree, name, &mut print.text);
+    let (title, link) = header(tree, name, status, &mut print.text);
     let mut parents: Stack<Parent> = Stack::with_capacity(tree.len());
     let mut skip = 0;
     for index in 0..tree.len() {
