@@ -112,7 +112,7 @@ pub(super) fn entered(address: Address) -> (Domain, Vec<Request>) {
     (d, out)
 }
 pub(super) fn render(d: &Domain, words: &Words) -> Tree {
-    let limits = crate::Limits::of_words(&CLIENT, words).unwrap();
+    let limits = crate::limits::of_words(&CLIENT, words).unwrap();
     let mut b = Builder::new(&limits);
     let mut bindings = JigBindings::new(limits.bindings, CLIENT.text);
     b.open(Role::Page);
@@ -512,7 +512,7 @@ fn every_page_with_full_windows_nested_lists_and_maximum_text_fits_its_composed_
 )]
 fn capacity_composes_siblings_fragments_and_application_pages_with_checked_overflow() {
     let words = words();
-    let limits = crate::Limits::of_words(&CLIENT, words).unwrap();
+    let limits = crate::limits::of_words(&CLIENT, words).unwrap();
     let largest = crate::page_nodes(&CLIENT, 0).unwrap();
     assert_eq!(
         limits.nodes,
@@ -528,7 +528,7 @@ fn capacity_composes_siblings_fragments_and_application_pages_with_checked_overf
             .checked_add(3)
             .unwrap()
     );
-    let extra = crate::Limits::compose(
+    let extra = crate::limits::compose(
         &CLIENT,
         words,
         &jig_domain_client::pages::Arrangement::none(),
@@ -541,14 +541,14 @@ fn capacity_composes_siblings_fragments_and_application_pages_with_checked_overf
     assert_eq!(extra.depth, limits.depth.checked_add(2).unwrap());
     assert_eq!(crate::page_nodes(&CLIENT, 9), largest.checked_add(9));
     assert!(
-        crate::Limits::compose(&CLIENT, words, &jig_domain_client::pages::Arrangement::none(), u32::MAX, 0, 0)
+        crate::limits::compose(&CLIENT, words, &jig_domain_client::pages::Arrangement::none(), u32::MAX, 0, 0)
             .is_none()
     );
     assert!(crate::page_nodes(&CLIENT, u32::MAX).is_none());
     let mut huge = CLIENT;
     huge.rows = u32::MAX;
     assert!(crate::page_nodes(&huge, 0).is_none());
-    assert!(crate::worst_case(&limits).is_some());
+    assert!(crate::limits::jig_worst_case(&limits).is_some());
     assert!(crate::jig_bindings_worst_case(limits.bindings, &CLIENT).is_some());
     let (mut d, _) = start();
     drive(&mut d, Event::Went { place: Place::Elsewhere });
@@ -937,7 +937,7 @@ fn the_most_owed_cards_fit_the_pages_bound() {
         assert!(d.owes(*id));
     }
     assert_eq!(d.objects().len(), CLIENT.objects);
-    let limits = crate::Limits::of(&CLIENT, &jig_domain_client::pages::Arrangement::none()).unwrap();
+    let limits = crate::limits::of(&CLIENT, &jig_domain_client::pages::Arrangement::none()).unwrap();
     let mut b = Builder::new(&limits);
     let mut bindings = JigBindings::new(limits.bindings, CLIENT.text);
     b.open(Role::Page);

@@ -1,6 +1,7 @@
+use crate::ui::Limits;
 use crate::ui::{Builder, Tree};
 use crate::{
-    JigBindings, Limits, owner_milestone as view,
+    JigBindings, owner_milestone as view,
     phrases::{Hole, Invalid, PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat},
     words::Words,
 };

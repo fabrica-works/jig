@@ -205,7 +205,7 @@ pub fn after_page(b: &mut Builder, client: &Domain, words: &Words, bindings: &mu
     crate::notices::notices(b, client, words, bindings);
 }
 
-pub(crate) fn scratch(limits: &crate::Limits) -> Option<u64> {
+pub(crate) fn scratch(limits: &crate::ui::Limits) -> Option<u64> {
     crate::sections::task::scratch(limits.depth)?
         .checked_add(skein_lib::List::<jig_domain_client::contract::Part>::worst_case(limits.slots)?)?
         .checked_add(u64::from(limits.slots).checked_mul(u64::from(limits.text_per_node))?.checked_mul(2)?)?

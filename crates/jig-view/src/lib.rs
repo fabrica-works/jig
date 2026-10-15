@@ -33,7 +33,7 @@ pub use styles::JigStyle;
 mod chip_phase;
 pub mod frame;
 mod frame_facts;
-mod limits;
+pub mod limits;
 mod owner;
 pub mod phrases;
 pub mod regions;
@@ -44,7 +44,6 @@ pub mod ui;
 pub mod words;
 
 pub use binding::{JigBindings, JigMeaning, decode, jig_bindings_worst_case};
-pub use limits::{Limits, worst_case};
 pub use pages::{after_page, jig};
 pub use sizes::{
     arranged_nodes, banner_nodes, card_nodes, chip_nodes, confirmation_nodes, conversation_nodes, conversations_nodes,

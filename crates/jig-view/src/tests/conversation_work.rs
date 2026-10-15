@@ -225,7 +225,7 @@ fn selected_owner_work_activity_preserves_conversation_and_opaque_provisional_te
         assert!(tree.nodes().iter().any(|node| node.role == crate::ui::Role::Log && node.name.is_some()));
     }
 }
-fn fragment(value: &OwnerChipObservation, capacity: &crate::Limits) -> Tree {
+fn fragment(value: &OwnerChipObservation, capacity: &crate::ui::Limits) -> Tree {
     let mut builder = Builder::new(capacity);
     owner_chip::observation(&mut builder, value, words());
     builder.finish()
@@ -245,7 +245,7 @@ fn owner_work_fragment_checks_raw_limits_exact_six_leaves_bytes_and_one_under_st
     assert_eq!(bound.depth, 1);
     assert_eq!(bound.bindings, 0);
     assert_eq!(bound.slots, 0);
-    let capacity = crate::Limits {
+    let capacity = crate::ui::Limits {
         nodes: bound.nodes,
         depth: bound.depth,
         text_per_node: bound.text_per_node,
@@ -264,12 +264,12 @@ fn owner_work_fragment_checks_raw_limits_exact_six_leaves_bytes_and_one_under_st
     let largest = tree.nodes().iter().map(Node::text_bytes).max().unwrap();
     assert!(bound.text_per_node >= largest.checked_mul(2).unwrap());
     assert!(bound.text_bytes >= total);
-    let exact = crate::Limits { text_per_node: largest, text_bytes: total, ..capacity };
+    let exact = crate::ui::Limits { text_per_node: largest, text_bytes: total, ..capacity };
     assert_eq!(fragment(&value, &exact).nodes(), tree.nodes());
     for smaller in [
-        crate::Limits { nodes: 5, ..exact },
-        crate::Limits { text_per_node: largest - 1, ..exact },
-        crate::Limits { text_bytes: total - 1, ..exact },
+        crate::ui::Limits { nodes: 5, ..exact },
+        crate::ui::Limits { text_per_node: largest - 1, ..exact },
+        crate::ui::Limits { text_bytes: total - 1, ..exact },
     ] {
         std::panic::catch_unwind(|| fragment(&value, &smaller)).unwrap_err();
     }

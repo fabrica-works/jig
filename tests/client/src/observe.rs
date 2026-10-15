@@ -451,7 +451,7 @@ mod tests {
 
     #[test]
     fn a_nested_application_status_cannot_decide_a_jig_card() {
-        let limits = jig_view::Limits {
+        let limits = jig_view::ui::Limits {
             nodes: 16,
             depth: 4,
             text_per_node: 64,
@@ -486,7 +486,7 @@ mod tests {
     #[test]
     fn public_observations_keep_equal_task_and_party_proposal_cards_and_requests_distinct() {
         use jig_domain_client::contract::{Ask, Decision, ObjectKey, ProposalKey, Proposer};
-        let limits = jig_view::Limits {
+        let limits = jig_view::ui::Limits {
             nodes: 16,
             depth: 4,
             text_per_node: 64,

@@ -1,7 +1,8 @@
 #![expect(clippy::disallowed_methods, reason = "ordinary proofs inspect public checked languages and exact trees")]
+use crate::ui::Limits;
 use crate::ui::{Builder, Tree};
 use crate::{
-    Limits, owner_activity as view,
+    owner_activity as view,
     owner_activity_words::{self as data, ActivityPhrase as P},
     phrases::{Invalid, PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat},
     words::Words,
@@ -91,7 +92,7 @@ fn tree_limits(f: view::ActivityFragment) -> Limits {
 fn build(value: &OwnerActivityLine, words: &Words) -> Tree {
     let f = view::required(value, &client_limits(), words).unwrap();
     let limits = tree_limits(f);
-    assert!(crate::worst_case(&limits).is_some());
+    assert!(crate::limits::jig_worst_case(&limits).is_some());
     let mut b = Builder::new(&limits);
     view::render(&mut b, value, words);
     let tree = b.finish();

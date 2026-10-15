@@ -9,7 +9,7 @@ use super::{
 };
 use crate::ui::{Builder, Tree};
 use crate::{
-    JigBindings, Limits,
+    JigBindings,
     phrases::{
         HoleKind, PhraseLimits, Phrasebook, Segment, WallFormat, english,
         jig::{JigPhrase, shapes},
@@ -127,7 +127,7 @@ fn question_sender_selected_language_keeps_reordered_numeric_holes_whole_words_a
         assert!(contains(&shown, expected));
         assert!(!contains(&shown, b"Question from "));
         assert!(contains(&shown, value.words.bytes()));
-        let mut b = Builder::new(&Limits::of_words(&CLIENT, &w).unwrap());
+        let mut b = Builder::new(&crate::limits::of_words(&CLIENT, &w).unwrap());
         w.waiting(&mut b, d.wall(), value.since);
         for node in b.finish().nodes() {
             for run in &node.text {
@@ -167,7 +167,7 @@ fn question_sender_maximum_card_has_finite_bounds_and_retains_independent_older_
             ObjectKey::Question { task: value.task.task, message: value.message },
             ReadValue::Question(Box::new(value.clone())),
         );
-        let mut limits = Limits::of_words(&CLIENT, &w).unwrap();
+        let mut limits = crate::limits::of_words(&CLIENT, &w).unwrap();
         limits.nodes = crate::question_nodes(&CLIENT).unwrap();
         let mut b = Builder::new(&limits);
         let mut bindings = JigBindings::new(limits.bindings, CLIENT.text);
@@ -200,7 +200,7 @@ fn question_sender_maximum_card_has_finite_bounds_and_retains_independent_older_
         };
         assert_eq!(buttons(&shown), buttons(&old), "sender never changes independently supplied ending/act controls");
         if let Some(ending) = &value.ending {
-            let mut ending_builder = Builder::new(&Limits::of_words(&CLIENT, &w).unwrap());
+            let mut ending_builder = Builder::new(&crate::limits::of_words(&CLIENT, &w).unwrap());
             w.ending(&mut ending_builder, ending);
             for node in ending_builder.finish().nodes() {
                 for run in &node.text {

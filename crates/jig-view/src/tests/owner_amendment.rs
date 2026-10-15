@@ -2,9 +2,10 @@
     clippy::disallowed_methods,
     reason = "ordinary proofs inspect public trees and selected checked language data"
 )]
+use crate::ui::Limits;
 use crate::ui::{Builder, Tree};
 use crate::{
-    Limits, owner_amendment as view,
+    owner_amendment as view,
     owner_amendment_words::{self as data, AmendmentPhrase as P},
     phrases::{Hole, Invalid, PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat},
     words::Words,
@@ -144,7 +145,7 @@ fn build(value: &OwnerAmendmentState, words: &Words) -> Tree {
         slots: f.slots,
         markdown_depth: 2,
     };
-    assert!(crate::worst_case(&limits).is_some());
+    assert!(crate::limits::jig_worst_case(&limits).is_some());
     let mut builder = Builder::new(&limits);
     view::render(&mut builder, value, words);
     let tree = builder.finish();

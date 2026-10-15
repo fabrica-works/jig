@@ -1,7 +1,8 @@
 #![expect(clippy::disallowed_methods, reason = "ordinary proofs inspect public checked languages and trees")]
+use crate::ui::Limits;
 use crate::ui::{Builder, Tree};
 use crate::{
-    JigBindings, Limits, owner_history as view,
+    JigBindings, owner_history as view,
     owner_history_words::{self as data, HistoryPhrase as P},
     phrases::{Hole, Invalid, PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat},
     words::Words,
@@ -227,7 +228,7 @@ fn build(value: &OwnerHistoryLine, words: &Words) -> (Tree, JigBindings) {
         slots: f.slots,
         markdown_depth: 2,
     };
-    assert!(crate::worst_case(&limits).is_some());
+    assert!(crate::limits::jig_worst_case(&limits).is_some());
     let mut bindings = JigBindings::new(f.bindings, 8);
     let mut b = Builder::new(&limits);
     view::render(&mut b, value, words, &mut bindings);

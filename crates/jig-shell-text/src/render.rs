@@ -1,6 +1,7 @@
 //! Role-based text, independent of styles (client/domain/view.md, 15.3–15.4).
+use jig_view::regions::JigRegion;
+use jig_view::ui::Limits;
 use jig_view::ui::{Node, NodeId, Role, Run, State, Tree};
-use jig_view::{Limits, regions::JigRegion};
 
 use skein_lib::{Decimal, List, Stack};
 /// One page's lines and its numbered node identities, beginning with `[1]`.

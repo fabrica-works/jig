@@ -1,4 +1,4 @@
-use crate::Limits;
+use crate::ui::Limits;
 
 pub(crate) const LIMITS: Limits = Limits {
     nodes: 12,

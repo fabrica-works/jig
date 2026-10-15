@@ -277,8 +277,8 @@ fn words(selected: bool) -> &'static Words {
     static SELECTED: std::sync::OnceLock<Words> = std::sync::OnceLock::new();
     if selected { SELECTED.get_or_init(|| make_words(true)) } else { NORMAL.get_or_init(|| make_words(false)) }
 }
-fn capacity(f: view::ProjectFragment) -> crate::Limits {
-    crate::Limits {
+fn capacity(f: view::ProjectFragment) -> crate::ui::Limits {
+    crate::ui::Limits {
         nodes: f.nodes,
         depth: f.depth,
         text_per_node: f.text_per_node,
@@ -660,7 +660,7 @@ fn owner_project_public_whole_tree_accepts_exact_observed_nodes_and_text_and_ref
     let mut bound = capacity(f);
     bound.nodes = tree.len();
     bound.text_bytes = tree.nodes().iter().map(crate::ui::Node::text_bytes).sum();
-    let render = |bound: crate::Limits| {
+    let render = |bound: crate::ui::Limits| {
         let mut b = Builder::new(&bound);
         let mut bindings = JigBindings::new(f.bindings, 32);
         view::render(&mut b, &value, &Domain::new(&limits(), 9151), w, &mut bindings);
@@ -1142,13 +1142,13 @@ fn native_historical_project() -> (Domain, OwnerSpendPage) {
     );
     (domain, page)
 }
-fn historical_project_tree(domain: &Domain, w: &Words, bound: crate::Limits) -> (Tree, JigBindings) {
+fn historical_project_tree(domain: &Domain, w: &Words, bound: crate::ui::Limits) -> (Tree, JigBindings) {
     let mut b = Builder::new(&bound);
     let mut bindings = JigBindings::new(bound.bindings, 32);
     crate::pages::main(&mut b, domain, w, &mut bindings);
     (b.finish(), bindings)
 }
-fn historical_project_bound(w: &Words) -> crate::Limits {
+fn historical_project_bound(w: &Words) -> crate::ui::Limits {
     let mut bound = capacity(view::worst_case(&limits(), w).unwrap());
     bound.nodes = bound.nodes.checked_add(32).unwrap();
     bound.text_bytes = bound.text_bytes.checked_add(32_u32.checked_mul(bound.text_per_node).unwrap()).unwrap();
@@ -1218,8 +1218,8 @@ fn owner_project_historical_companion_prices_whole_languages_and_refuses_one_und
         let (rebuilt, _) = historical_project_tree(&domain, w, exact);
         assert_eq!(rebuilt.nodes(), tree.nodes());
         for short in [
-            crate::Limits { nodes: exact.nodes - 1, ..exact },
-            crate::Limits { text_bytes: exact.text_bytes - 1, ..exact },
+            crate::ui::Limits { nodes: exact.nodes - 1, ..exact },
+            crate::ui::Limits { text_bytes: exact.text_bytes - 1, ..exact },
         ] {
             assert!(
                 std::panic::catch_unwind(core::panic::AssertUnwindSafe(|| historical_project_tree(&domain, w, short)))

@@ -4,8 +4,8 @@
     reason = "the independent test model uses ordinary Rust containers and iterator queries"
 )]
 
-use crate::Limits;
 use crate::ui::Binding;
+use crate::ui::Limits;
 use crate::ui::{Builder, DrawingKind, Key, Made, NodeId, Owner, Patch, Role, Run, State, Tree, View};
 
 use skein_lib::{Queue, Rng};

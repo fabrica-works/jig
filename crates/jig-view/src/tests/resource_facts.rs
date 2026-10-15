@@ -19,7 +19,7 @@ fn list<T>(values: impl IntoIterator<Item = T>) -> List<T> {
 #[test]
 fn segmented_names_and_exact_open_patterns_keep_raw_bindings_and_separate_literal_nodes() {
     let words = shared_words();
-    let limits = crate::Limits::of_words(&CLIENT, words).unwrap();
+    let limits = crate::limits::of_words(&CLIENT, words).unwrap();
     let mut b = Builder::new(&limits);
     let mut bindings = JigBindings::new(limits.bindings, CLIENT.text);
     let path = list([Box::<[u8]>::from(*b"a/b\0"), Box::<[u8]>::from([255, 0, 128])]);

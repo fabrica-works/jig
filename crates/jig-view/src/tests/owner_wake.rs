@@ -16,7 +16,7 @@ use skein_lib::{Duration, List, Wall};
 
 fn builder(nodes: u32, book: &Phrasebook) -> Builder {
     let bytes = owner_wake::phrase_bytes(book).unwrap();
-    Builder::new(&crate::Limits {
+    Builder::new(&crate::ui::Limits {
         nodes: nodes.checked_add(1).unwrap(),
         depth: 4,
         text_per_node: bytes,

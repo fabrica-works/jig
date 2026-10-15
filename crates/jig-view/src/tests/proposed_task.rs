@@ -279,7 +279,7 @@ fn normal_phrasebooks_require_and_render_exact_owner_words_in_the_selected_langu
         language: 1,
         offset_minutes: 60,
     };
-    let limits = crate::Limits::of_words(&CLIENT, &words).unwrap();
+    let limits = crate::limits::of_words(&CLIENT, &words).unwrap();
     assert!(limits.text_per_node >= 2048, "owner saying capacities contribute to normal tree limits");
     let mut b = Builder::new(&limits);
     b.open(Role::Page);

@@ -1,7 +1,8 @@
 #![expect(clippy::disallowed_methods, reason = "ordinary tests inspect public trees and checked language data")]
+use crate::ui::Limits;
 use crate::ui::{Builder, Tree};
 use crate::{
-    JigBindings, Limits, owner_chip as view,
+    JigBindings, owner_chip as view,
     owner_chip_words::{self as data, ChipPhrase, OwnerChipWords},
     phrases::{Invalid, PhraseLimits, Segment},
     words::Words,

@@ -103,7 +103,7 @@ fn build_tree(d: &Domain) -> Tree {
     b.close();
     let tree = b.finish();
     assert!(tree.len() <= nodes);
-    assert!(crate::worst_case(&limits).is_some());
+    assert!(crate::limits::jig_worst_case(&limits).is_some());
     assert!(crate::jig_bindings_worst_case(nodes, &CLIENT).is_some());
     tree
 }

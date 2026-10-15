@@ -1793,7 +1793,7 @@ fn result_documents_keep_each_words_loss_fact_and_the_exact_change_kind_and_owne
             ResultValue::Change { kind: u16::MAX, part: raw.clone(), words: explanation },
         ];
         for value in values {
-            let mut builder = Builder::new(&crate::Limits::of_words(&CLIENT, words).unwrap());
+            let mut builder = Builder::new(&crate::limits::of_words(&CLIENT, words).unwrap());
             builder.open(Role::Page);
             let mut bindings = JigBindings::new(64, CLIENT.text);
             cards::result::value_nodes(&mut builder, &domain, &value, words, &mut bindings);
@@ -1833,7 +1833,7 @@ fn result_cards_distinguish_an_absent_completion_wall_from_epoch_and_render_supp
             proposal: None,
             cut: false,
         }));
-        let envelope = crate::Limits::of_words(&CLIENT, words).unwrap();
+        let envelope = crate::limits::of_words(&CLIENT, words).unwrap();
         let mut builder = Builder::new(&envelope);
         builder.open(Role::Page);
         let mut bindings = JigBindings::new(envelope.bindings, CLIENT.text);
@@ -1869,7 +1869,7 @@ fn exact_owner_verdict_renders_payload_and_stored_followups_without_inventing_ch
             cut: true,
         }));
         let before = value.clone();
-        let envelope = crate::Limits::of_words(&CLIENT, words).unwrap();
+        let envelope = crate::limits::of_words(&CLIENT, words).unwrap();
         let mut builder = Builder::new(&envelope);
         builder.open(Role::Page);
         let mut bindings = JigBindings::new(envelope.bindings, CLIENT.text);

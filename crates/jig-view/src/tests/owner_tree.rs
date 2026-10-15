@@ -104,7 +104,7 @@ fn domain_and_watch(value: &OwnerTree) -> (Domain, skein_lib::Token) {
 }
 fn build(value: &OwnerTree, d: &Domain, w: &Words, nodes: Option<u32>) -> Tree {
     let f = view::required(value, &CLIENT, w).unwrap();
-    let mut l = crate::Limits::of_words(&CLIENT, w).unwrap();
+    let mut l = crate::limits::of_words(&CLIENT, w).unwrap();
     l.nodes = nodes.unwrap_or(f.nodes);
     l.depth = f.depth;
     l.text_bytes = f.text_bytes;
@@ -238,12 +238,12 @@ fn owner_tree_view_uses_checked_selected_language_and_finite_node_text_scratch_e
             bytes += u32::try_from(run.text.len()).unwrap();
         }
     }
-    let mut cap = crate::Limits::of_words(&CLIENT, &w).unwrap();
+    let mut cap = crate::limits::of_words(&CLIENT, &w).unwrap();
     cap.nodes = exact;
     cap.depth = f.depth;
     cap.text_bytes = bytes;
     cap.text_per_node = f.text_per_node;
-    let render = |cap: crate::Limits| {
+    let render = |cap: crate::ui::Limits| {
         let mut b = Builder::new(&cap);
         let mut bindings = JigBindings::new(f.bindings, CLIENT.text);
         view::render(&mut b, &value, &d.task_page().plan, &d, &w, &mut bindings);
@@ -323,7 +323,7 @@ fn owner_tree_departure_keeps_a_separately_named_deciding_card_until_its_answer_
         .unwrap();
     let w = words();
     let build_page = |domain: &Domain| {
-        let mut cap = crate::Limits::of_words(&CLIENT, w).unwrap();
+        let mut cap = crate::limits::of_words(&CLIENT, w).unwrap();
         cap.nodes = cap.nodes.max(4096);
         cap.text_bytes = cap.nodes.checked_mul(cap.text_per_node).unwrap();
         let mut b = Builder::new(&cap);

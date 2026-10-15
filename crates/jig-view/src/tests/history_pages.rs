@@ -118,7 +118,7 @@ fn populated() -> Domain {
 }
 fn build(domain: &Domain, words: &Words) -> (Tree, JigBindings) {
     let client = fixture::client_limits();
-    let limits = crate::Limits::of_words(&client, words).unwrap();
+    let limits = crate::limits::of_words(&client, words).unwrap();
     let mut bindings = JigBindings::new(limits.bindings, client.text);
     let mut b = Builder::new(&limits);
     b.open(Role::Page);

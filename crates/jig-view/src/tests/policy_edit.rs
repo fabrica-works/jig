@@ -13,7 +13,7 @@ fn pattern(last: OwnerPatternEnd) -> OwnerPattern {
 fn shown(value: &PolicyEdit) -> crate::ui::Tree {
     let words = words();
     let required = policy_edit::required(value, words).unwrap();
-    let mut b = Builder::new(&crate::Limits {
+    let mut b = Builder::new(&crate::ui::Limits {
         nodes: required.nodes.checked_add(1).unwrap(),
         depth: required.depth.checked_add(1).unwrap(),
         text_per_node: required.text_per_node,

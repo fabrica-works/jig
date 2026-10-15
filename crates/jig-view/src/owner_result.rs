@@ -101,11 +101,11 @@ pub fn nodes(limits: &jig_domain_client::Limits) -> Option<u32> {
 }
 /// Reserve saying, escaped opaque byte and linked chip storage before rendering.
 #[must_use]
-pub fn limits(client: &jig_domain_client::Limits, words: &Words) -> Option<crate::Limits> {
+pub fn limits(client: &jig_domain_client::Limits, words: &Words) -> Option<crate::ui::Limits> {
     let nodes = nodes(client)?;
     let phrase = words.book.jig_capacity()?;
     let text_per_node = phrase.checked_mul(2)?.checked_add(crate::literal_segment::max_bytes(client.text)?)?;
-    Some(crate::Limits {
+    Some(crate::ui::Limits {
         nodes,
         depth: client.rows.checked_add(32)?,
         text_per_node,

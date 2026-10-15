@@ -62,7 +62,7 @@ fn maximum_card_envelope() {
     let (domain, id) = loaded(ObjectKey::Escalation(8), ReadValue::OwnerEscalation(Box::new(row)));
     let bound = crate::sizes::owner_escalation_nodes(&CLIENT).unwrap().checked_add(1).unwrap();
     let allocation =
-        crate::Limits { nodes: bound, depth: 32, text_bytes: bound.checked_mul(1024).unwrap(), ..limits() };
+        crate::ui::Limits { nodes: bound, depth: 32, text_bytes: bound.checked_mul(1024).unwrap(), ..limits() };
     let mut builder = Builder::new(&allocation);
     let mut bindings = JigBindings::new(bound, CLIENT.text);
     builder.open(Role::Page);
@@ -149,7 +149,7 @@ fn owner_escalation_amendment_inputs_keep_whole_source_baselines_and_selected_de
     }
 }
 
-fn build_closed_offers(row: &OwnerEscalation, allocation: crate::Limits, w: &crate::words::Words) -> Tree {
+fn build_closed_offers(row: &OwnerEscalation, allocation: crate::ui::Limits, w: &crate::words::Words) -> Tree {
     let (domain, id) = loaded(ObjectKey::Escalation(8), ReadValue::OwnerEscalation(Box::new(row.clone())));
     let mut builder = Builder::new(&allocation);
     let mut bindings = JigBindings::new(allocation.bindings, CLIENT.text);
@@ -195,7 +195,7 @@ fn closed_offers(refused: bool) -> OwnerEscalation {
     row
 }
 
-fn check_exact_storage(row: &OwnerEscalation, allocation: crate::Limits, tree: &Tree, w: &crate::words::Words) {
+fn check_exact_storage(row: &OwnerEscalation, allocation: crate::ui::Limits, tree: &Tree, w: &crate::words::Words) {
     let depth = u32::try_from(
         tree.nodes()
             .iter()
@@ -216,13 +216,14 @@ fn check_exact_storage(row: &OwnerEscalation, allocation: crate::Limits, tree: &
     .unwrap();
     let per_node = tree.nodes().iter().map(crate::ui::tree::Node::text_bytes).max().unwrap();
     let total = tree.nodes().iter().map(crate::ui::tree::Node::text_bytes).sum::<u32>();
-    let exact = crate::Limits { nodes: tree.len(), depth, text_per_node: per_node, text_bytes: total, ..allocation };
+    let exact =
+        crate::ui::Limits { nodes: tree.len(), depth, text_per_node: per_node, text_bytes: total, ..allocation };
     assert_eq!(build_closed_offers(row, exact, w).len(), tree.len());
     for below in [
-        crate::Limits { nodes: exact.nodes.checked_sub(1).unwrap(), ..exact },
-        crate::Limits { depth: exact.depth.checked_sub(1).unwrap(), ..exact },
-        crate::Limits { text_per_node: exact.text_per_node.checked_sub(1).unwrap(), ..exact },
-        crate::Limits { text_bytes: exact.text_bytes.checked_sub(1).unwrap(), ..exact },
+        crate::ui::Limits { nodes: exact.nodes.checked_sub(1).unwrap(), ..exact },
+        crate::ui::Limits { depth: exact.depth.checked_sub(1).unwrap(), ..exact },
+        crate::ui::Limits { text_per_node: exact.text_per_node.checked_sub(1).unwrap(), ..exact },
+        crate::ui::Limits { text_bytes: exact.text_bytes.checked_sub(1).unwrap(), ..exact },
     ] {
         std::panic::catch_unwind(core::panic::AssertUnwindSafe(|| build_closed_offers(row, below, w)))
             .expect_err("one-under storage refuses the whole escalation tree");
@@ -371,7 +372,7 @@ fn check_presence_case(present: [bool; 3], loaded: bool, owner: bool) {
     let domain = presence_domain(l, &documents);
     let id = domain.objects().find(ObjectKey::Escalation(8)).unwrap();
     let bound = crate::sizes::owner_escalation_nodes(&l).unwrap().checked_add(1).unwrap();
-    let allocation = crate::Limits {
+    let allocation = crate::ui::Limits {
         nodes: bound,
         depth: 64,
         text_bytes: bound.checked_mul(1024).unwrap(),
@@ -508,7 +509,7 @@ fn owner_escalation_closed_outer_controls_and_whole_refusals_fit_finite_view_and
         assert_eq!(row.acts.len(), MAX_OFFERED_ACTS);
         assert_eq!(row.task.context, None);
         let (domain, id) = loaded(ObjectKey::Escalation(8), ReadValue::OwnerEscalation(Box::new(row.clone())));
-        let mut allocation = crate::Limits::of_words(&CLIENT, w).unwrap();
+        let mut allocation = crate::limits::of_words(&CLIENT, w).unwrap();
         allocation.nodes = crate::sizes::owner_escalation_nodes(&CLIENT).unwrap() + 1;
         allocation.text_bytes = allocation.nodes * allocation.text_per_node;
         let mut builder = Builder::new(&allocation);
@@ -567,7 +568,7 @@ fn owner_escalation_closed_outer_controls_and_whole_refusals_fit_finite_view_and
     oversized.acts = List::with_capacity(MAX_OFFERED_ACTS + 1);
     let original = oversized.clone();
     let (domain, id) = loaded(ObjectKey::Escalation(8), ReadValue::OwnerEscalation(Box::new(oversized)));
-    let allocation = crate::Limits::of_words(&CLIENT, w).unwrap();
+    let allocation = crate::limits::of_words(&CLIENT, w).unwrap();
     let mut builder = Builder::new(&allocation);
     let mut bindings = JigBindings::new(allocation.bindings, CLIENT.text);
     builder.open(Role::Page);

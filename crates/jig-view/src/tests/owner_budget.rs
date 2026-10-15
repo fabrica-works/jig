@@ -1,7 +1,8 @@
 #![expect(clippy::disallowed_methods, reason = "ordinary tests inspect standalone trees and checked language data")]
+use crate::ui::Limits;
 use crate::ui::{Builder, Tree};
 use crate::{
-    Limits, owner_budget as view,
+    owner_budget as view,
     owner_budget_words::{self as data, BudgetPhrase, OwnerBudgetWords},
     phrases::{Invalid, PhraseId, PhraseLimits, Phrasebook, Segment, WallFormat},
     words::Words,

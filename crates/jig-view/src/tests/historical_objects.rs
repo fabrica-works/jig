@@ -5,8 +5,9 @@
     reason = "ordinary public fragment proofs inspect full supplied sources and tree bindings"
 )]
 use super::cards::{CLIENT, contains, text, words};
+use crate::ui::Limits;
 use crate::ui::{Builder, Role, Tree};
-use crate::{JigBindings, Limits, owner_historical as view};
+use crate::{JigBindings, owner_historical as view};
 
 use jig_domain_client::{Domain, contract::*};
 use skein_lib::{List, Wall};

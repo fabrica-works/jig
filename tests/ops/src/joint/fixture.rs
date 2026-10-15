@@ -63,7 +63,7 @@ fn profile() -> &'static Profile {
             .checked_mul(2)
             .expect("node text bound");
         let bounds = view::Limits {
-            tree: jig_view::Limits {
+            tree: jig_view::ui::Limits {
                 nodes: 1024,
                 depth: 128,
                 text_per_node,
@@ -250,7 +250,7 @@ impl jig_client_world::harness::App for Client {
     fn max_out(limits: &Self::Limits) -> u32 {
         Ops::max_out(limits)
     }
-    fn view_limits(view: &Self::View) -> jig_view::Limits {
+    fn view_limits(view: &Self::View) -> jig_view::ui::Limits {
         Ops::view_limits(view)
     }
     fn patch_limit(view: &Self::View) -> u32 {

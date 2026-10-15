@@ -22,7 +22,7 @@ enum Event {
 }
 struct Wire;
 const KEY: Key = Key { owner: Owner::Jig.opaque(), kind: 1, a: 1, b: 1 };
-const LIMITS: jig_view::Limits = jig_view::Limits {
+const LIMITS: jig_view::ui::Limits = jig_view::ui::Limits {
     nodes: 24,
     depth: 4,
     text_per_node: 64,
@@ -125,7 +125,7 @@ impl<const BAD: u8> App for Broken<BAD> {
     fn max_out((): &()) -> u32 {
         1
     }
-    fn view_limits(_: &View) -> jig_view::Limits {
+    fn view_limits(_: &View) -> jig_view::ui::Limits {
         LIMITS
     }
     fn patch_limit(_: &View) -> u32 {

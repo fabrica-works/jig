@@ -1,6 +1,7 @@
 use crate::ui::Binding;
+use crate::ui::Limits;
+use crate::ui::worst_case;
 use crate::ui::{Builder, DrawingKind, Key, Owner, Role, Run, State, Style};
-use crate::{Limits, worst_case};
 
 use skein_lib::{List, Token};
 

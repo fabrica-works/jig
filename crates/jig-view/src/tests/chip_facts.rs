@@ -28,7 +28,7 @@ fn chip(phase: OwnerChipPhase, details: OwnerChipDetails) -> Chip {
 }
 fn brief(value: &Chip) -> Tree {
     let client = Domain::new(&CLIENT, 1);
-    let limits = crate::Limits::of_words(&CLIENT, words()).unwrap();
+    let limits = crate::limits::of_words(&CLIENT, words()).unwrap();
     let mut b = Builder::new(&limits);
     let mut bindings = JigBindings::new(limits.bindings, CLIENT.text);
     crate::cards::chip::chip(&mut b, &client, value, words(), &mut bindings);
@@ -117,6 +117,6 @@ fn task_overview_expands_whole_metadata_but_nested_verdict_chips_stay_brief() {
     assert!(!contains(&tree, b"Ended at:"));
     assert_eq!(inner.phase, Phase::Ended);
     assert_eq!(inner.title.whole(), None);
-    let bound = crate::Limits::of_words(&CLIENT, words()).unwrap();
+    let bound = crate::limits::of_words(&CLIENT, words()).unwrap();
     assert!(tree.nodes().iter().all(|node| node.text_bytes() <= bound.text_per_node));
 }

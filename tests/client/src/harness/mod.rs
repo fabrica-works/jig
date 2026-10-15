@@ -35,7 +35,7 @@ pub trait App: Sized {
     fn record_key(record: &Self::Record) -> Self::Key;
     fn unsent(request: Self::Request) -> Option<Self::Event>;
     fn max_out(limits: &Self::Limits) -> u32;
-    fn view_limits(view: &Self::View) -> jig_view::Limits;
+    fn view_limits(view: &Self::View) -> jig_view::ui::Limits;
     fn patch_limit(view: &Self::View) -> u32;
     fn worst_case(limits: &Self::Limits) -> u64;
     fn seen(tree: &Tree) -> Vec<Seen>;

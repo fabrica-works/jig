@@ -118,8 +118,9 @@ fn authority_document_cut_is_separate_from_whole_payload_and_keeps_exact_codes()
 #[test]
 fn saturated_owner_authority_renderer_and_words_fit_composed_heap_envelopes() {
     use jig_view::ui::Builder;
+    use jig_view::ui::Limits;
     use jig_view::{
-        Limits, owner_authority as view,
+        owner_authority as view,
         owner_authority_words::{self as words, OwnerAuthorityWords},
         phrases::PhraseLimits,
     };
@@ -153,7 +154,7 @@ fn saturated_owner_authority_renderer_and_words_fit_composed_heap_envelopes() {
     view::document(&mut builder, &value, &words);
     let tree = builder.finish();
     assert_eq!(tree.len(), 59);
-    assert!(meter.held() <= jig_view::worst_case(&limits).expect("tree heap envelope"));
+    assert!(meter.held() <= jig_view::limits::jig_worst_case(&limits).expect("tree heap envelope"));
     assert_eq!(
         tree.nodes().iter().flat_map(|n| &n.text).filter(|r| r.text.as_ref() == b"a/b\0").count(),
         6,

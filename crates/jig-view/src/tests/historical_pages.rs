@@ -3,9 +3,10 @@
     reason = "ordinary proofs inspect complete public trees and checked language data"
 )]
 use super::cards::CLIENT;
+use crate::ui::Limits;
 use crate::ui::{Builder, Tree};
 use crate::{
-    JigBindings, Limits, historical_pages as view,
+    JigBindings, historical_pages as view,
     historical_pages_words::{self as sayings, HistoricalPhrase as P},
     phrases::{Hole, Invalid, PhraseLimits, Phrasebook, Segment},
     words::Words,
@@ -427,7 +428,7 @@ fn historical_public_plan_keeps_owner_tree_early_return_and_companion_ended_read
     let page = ended(OwnerChipEnding::Failed(doc(b"companion actual cause", true)), None);
     drive(&mut client, Event::Read { read, result: ReadResult::Value(ReadValue::OwnerEnded(Box::new(page.clone()))) });
     let w = words();
-    let cap = Limits::of_words(&CLIENT, &w).unwrap();
+    let cap = crate::limits::of_words(&CLIENT, &w).unwrap();
     let mut b = Builder::new(&cap);
     let mut bindings = JigBindings::new(cap.bindings, CLIENT.text);
     crate::pages::main(&mut b, &client, &w, &mut bindings);

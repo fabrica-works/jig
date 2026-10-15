@@ -2,7 +2,7 @@
 use crate::{bindings, drawing, family, words};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
-    pub tree: jig_view::Limits,
+    pub tree: jig_view::ui::Limits,
     pub text: u32,
 }
 impl Limits {
@@ -25,7 +25,7 @@ impl Limits {
             family::PART_NODES.max(owner.nodes.checked_add(16)?).max(domain.first.rows.checked_add(2)?);
         let cards = domain.first.rows.checked_add(1)?;
         let application_nodes = fragment_nodes.checked_add(cards.checked_mul(3)?)?.checked_add(9)?;
-        let mut tree = jig_view::Limits::envelope(
+        let mut tree = jig_view::limits::envelope(
             &domain.jig,
             jig.book.jig_capacity()?,
             &jig_domain_client::pages::Arrangement::none(),
@@ -83,14 +83,14 @@ impl Limits {
         let application_nodes = fragment_nodes.checked_add(cards.checked_mul(3)?)?.checked_add(9)?;
         // All nodes bound the possible slots in the public jig envelope.
         // This conservative bound also covers duplicate references to one part.
-        let jig_nodes = jig_view::Limits::of_words(&domain.jig, jig)?.nodes;
+        let jig_nodes = jig_view::limits::of_words(&domain.jig, jig)?.nodes;
         let sections = jig_view::task_section_nodes(&domain.jig, jig_domain_client::address::TaskSection::Plan)?
             .checked_add(4)?
             .checked_mul(2)?;
         let jig_cards = jig_view::card_nodes(&domain.jig)?.checked_mul(cards)?.checked_add(sections)?;
         let part_nodes = jig_nodes.checked_add(jig_cards)?.checked_mul(fragment_nodes)?;
         let slot_nodes = part_nodes.checked_add(jig_cards)?.checked_add(family::NAV_NODES)?;
-        let mut tree = jig_view::Limits::compose(
+        let mut tree = jig_view::limits::compose(
             &domain.jig,
             jig,
             &jig_domain_client::pages::Arrangement::none(),
@@ -117,7 +117,7 @@ pub fn worst_case(
     jig: &jig_view::words::Words,
     first: &words::Words,
 ) -> Option<u64> {
-    jig_view::worst_case(&limits.tree)?
+    jig_view::limits::jig_worst_case(&limits.tree)?
         .checked_add(jig_view::jig_bindings_worst_case(limits.tree.bindings, &domain.jig)?)?
         .checked_add(bindings::worst_case(limits.tree.bindings)?)?
         .checked_add(jig_view::phrases::worst_case(jig.book.limits())?)?

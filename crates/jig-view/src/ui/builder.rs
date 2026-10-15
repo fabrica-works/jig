@@ -4,8 +4,8 @@
 //! errors assert before allocating bytes: the caller's counts must cover all
 //! page nodes, fallback children and fragment nodes.
 
-use crate::Limits;
 use crate::ui::Binding;
+use crate::ui::Limits;
 use crate::ui::tree::length;
 use crate::ui::{
     Drawing, DrawingKind, Key, Node, Picture, Region, Role, Run, Shortcut, SlotRef, State, Style, TextRun, Tree, Value,

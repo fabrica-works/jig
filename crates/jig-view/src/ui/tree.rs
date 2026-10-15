@@ -274,7 +274,7 @@ impl Node {
         }
     }
 
-    pub(crate) fn new(role: Role, limits: &crate::Limits, runs: u32) -> Node {
+    pub(crate) fn new(role: Role, limits: &crate::ui::Limits, runs: u32) -> Node {
         Node {
             id: NodeId(0),
             role,

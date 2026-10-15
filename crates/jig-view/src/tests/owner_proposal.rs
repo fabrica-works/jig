@@ -145,8 +145,8 @@ fn words(selected: bool) -> Words {
         offset_minutes: 0,
     }
 }
-fn capacity(f: view::ProposalFragment) -> crate::Limits {
-    crate::Limits {
+fn capacity(f: view::ProposalFragment) -> crate::ui::Limits {
+    crate::ui::Limits {
         nodes: f.nodes,
         depth: f.depth,
         text_bytes: f.text_bytes,
@@ -413,7 +413,7 @@ fn owner_proposal_exact_checked_envelopes_keep_selected_language_whole_loss_and_
     let id = crate::owner_proposal_words::ProposalPhrase::Attempt.id();
     assert_eq!(w.book.say(1, id, &[Hole::Wall(Wall::EPOCH)]).unwrap_err(), crate::phrases::Invalid::Values { id });
     assert_eq!(w.book.say(1, id, &[Hole::Number(u64::MAX)]).unwrap().text.as_ref(), b"second 18446744073709551615");
-    let short = crate::Limits { nodes: tree.len() - 1, ..capacity(f) };
+    let short = crate::ui::Limits { nodes: tree.len() - 1, ..capacity(f) };
     let _refusal = std::panic::catch_unwind(|| {
         let mut b = Builder::new(&short);
         let mut bindings = JigBindings::new(f.bindings, 256);
@@ -474,7 +474,7 @@ fn owner_proposal_link_presence_and_same_keyed_card_across_contexts_keep_current
             crate::cards::Place::TaskPage,
             crate::cards::Place::Elsewhere,
         ] {
-            let mut b = Builder::new(&crate::Limits { nodes: f.nodes + 100, ..capacity(f) });
+            let mut b = Builder::new(&crate::ui::Limits { nodes: f.nodes + 100, ..capacity(f) });
             let mut bindings = JigBindings::new(f.bindings, 256);
             assert!(crate::cards::card(&mut b, &client, id, &place, &w, &mut bindings));
             let tree = b.finish();
@@ -492,7 +492,7 @@ fn owner_proposal_link_presence_and_same_keyed_card_across_contexts_keep_current
         maker_keys.push(expected.unwrap()).unwrap();
         super::cards::drive(&mut client, Event::Act { act: Act::Intend { object: id.token(), act: ActKind::Accept } });
         assert_eq!(client.confirmation().unwrap().revision, None);
-        let mut b = Builder::new(&crate::Limits { nodes: f.nodes + 100, ..capacity(f) });
+        let mut b = Builder::new(&crate::ui::Limits { nodes: f.nodes + 100, ..capacity(f) });
         let mut bindings = JigBindings::new(f.bindings, 256);
         crate::confirmation::confirmation(&mut b, &client, &w, &mut bindings);
         let tree = b.finish();

@@ -70,8 +70,9 @@ fn ledger_parent_state_and_period_options_survive_whole_value_pricing() {
 #[test]
 fn maximal_budget_and_ledger_fragments_fit_tree_and_checked_words_heap_bounds() {
     use jig_view::ui::Builder;
+    use jig_view::ui::Limits;
     use jig_view::{
-        Limits, owner_budget as view,
+        owner_budget as view,
         owner_budget_words::{self as data, OwnerBudgetWords},
         phrases::PhraseLimits,
     };
@@ -150,6 +151,6 @@ fn maximal_budget_and_ledger_fragments_fit_tree_and_checked_words_heap_bounds() 
                 "all owner accounting values retain their full width in both fragments"
             );
         }
-        assert!(meter.held() <= jig_view::worst_case(&limits).expect("tree heap envelope"));
+        assert!(meter.held() <= jig_view::limits::jig_worst_case(&limits).expect("tree heap envelope"));
     }
 }

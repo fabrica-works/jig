@@ -87,7 +87,7 @@ fn settled_note_answer(act: ActKind, cut: bool) {
         Some(jig_domain_client::objects::Body::Note { document, .. }) => assert_eq!(document.as_ref(), &expected_note),
         other => panic!("the answer must preserve the supplied note: {other:?}"),
     }
-    let mut envelope = crate::Limits::of_words(&CLIENT, words).unwrap();
+    let mut envelope = crate::limits::of_words(&CLIENT, words).unwrap();
     envelope.nodes = crate::card_nodes(&CLIENT).unwrap();
     let mut builder = Builder::new(&envelope);
     bindings.begin();

@@ -7,7 +7,7 @@ use skein_lib::Queue;
 
 fn read(input: &[u8], nesting: u32) -> Tree {
     let bytes = u32::try_from(input.len()).unwrap();
-    let limits = crate::Limits {
+    let limits = crate::ui::Limits {
         nodes: markdown::max_nodes(bytes).unwrap().checked_add(1).unwrap(),
         depth: nesting.checked_mul(2).unwrap().checked_add(5).unwrap(),
         text_per_node: bytes.checked_mul(2).unwrap(),
@@ -67,7 +67,7 @@ fn paragraphs_blocks_runs_links_and_literal_fallbacks() {
         assert_eq!(text(&tree), expected, "{literal:?}");
         assert!(tree.nodes().iter().all(|node| node.external.is_none()));
     }
-    let mut view = View::new(&crate::Limits {
+    let mut view = View::new(&crate::ui::Limits {
         nodes: 8,
         depth: 4,
         text_per_node: 64,

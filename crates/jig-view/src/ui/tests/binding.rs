@@ -1,4 +1,4 @@
-use crate::Limits;
+use crate::ui::Limits;
 use crate::ui::tests::fixtures::LIMITS;
 use crate::ui::{Act, Binding, BoundAct, Owner, number};
 use crate::ui::{Builder, NodeId, Role};

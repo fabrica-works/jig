@@ -174,7 +174,7 @@ impl Model {
 
 #[test]
 fn local_typing_survives_unchanged_writes_and_same_count_value_patches_are_rejected() {
-    let limits = jig_view::Limits {
+    let limits = jig_view::ui::Limits {
         nodes: 1,
         depth: 1,
         text_per_node: 8,

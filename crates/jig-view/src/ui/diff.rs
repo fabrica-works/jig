@@ -7,7 +7,7 @@
 //! Each node has at most one structural patch and three attribute patches.
 //! Bindings stay in the view: the shell sees only their presence and node ids.
 
-use crate::Limits;
+use crate::ui::Limits;
 use crate::ui::{Drawing, Node, NodeId, Picture, Region, Role, Shortcut, State, Style, TextRun, Tree, Value};
 use alloc::boxed::Box;
 use skein_lib::{List, Queue, Stack};

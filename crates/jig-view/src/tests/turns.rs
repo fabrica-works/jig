@@ -582,7 +582,7 @@ fn maximum_raw_live_calls_fit_whole_page_and_escaped_phrase_capacities() {
     }
     assert_eq!(d.conversation().live.len(), CLIENT.rows);
     assert_eq!(d.conversation().current_opened.len(), CLIENT.rows);
-    let limits = crate::Limits::of_words(&CLIENT, words).unwrap();
+    let limits = crate::limits::of_words(&CLIENT, words).unwrap();
     let mut b = crate::ui::Builder::new(&limits);
     let mut bindings = crate::JigBindings::new(limits.bindings, CLIENT.text);
     b.open(Role::Page);
@@ -706,7 +706,7 @@ fn raw_live_call_controls_use_selected_normal_language_and_checked_capacity() {
     let opened = build(&d, 3, &words).0;
     assert!(contains(&opened, b"Selected language folds actual current input"));
     assert!(contains(&opened, b"input"));
-    let limits = crate::Limits::of_words(&CLIENT, &words).unwrap();
+    let limits = crate::limits::of_words(&CLIENT, &words).unwrap();
     assert!(limits.text_per_node >= words.book.capacity(LiveCallPhrase::OpenCurrentCallInput.id()).unwrap());
 }
 
@@ -812,7 +812,7 @@ fn maximum_independent_current_call_fits_page_with_all_existing_provisional_rows
         })),
     );
     drive(&mut d, Event::Act { act: Act::FoldCurrentCall { identity: call.identity, open: true } });
-    let limits = crate::Limits::of_words(&CLIENT, words).unwrap();
+    let limits = crate::limits::of_words(&CLIENT, words).unwrap();
     let mut b = crate::ui::Builder::new(&limits);
     let mut bindings = crate::JigBindings::new(limits.bindings, CLIENT.text);
     b.open(Role::Page);
@@ -945,7 +945,7 @@ fn whole_owner_activity_and_fetched_archive_keep_numeric_senders_references_and_
     ] {
         assert!(contains(&tree, label), "missing {label:?}");
     }
-    let limits = crate::Limits::of_words(&super::cards::CLIENT, words).unwrap();
+    let limits = crate::limits::of_words(&super::cards::CLIENT, words).unwrap();
     assert!(tree.nodes.len() <= limits.nodes);
 }
 

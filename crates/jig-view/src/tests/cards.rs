@@ -56,8 +56,8 @@ pub(super) const CLIENT: jig_domain_client::Limits = jig_domain_client::Limits {
     backoff: Backoff { first: Duration::from_nanos(10), most: Duration::from_nanos(80) },
     heartbeat: Duration::from_secs(100),
 };
-pub(super) fn limits() -> crate::Limits {
-    crate::Limits {
+pub(super) fn limits() -> crate::ui::Limits {
+    crate::ui::Limits {
         nodes: 256,
         depth: 10,
         text_per_node: 1024,

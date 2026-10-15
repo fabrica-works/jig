@@ -105,7 +105,7 @@ fn domain(value: OwnerDeployment) -> Domain {
     );
     client
 }
-fn build(client: &Domain, w: &Words, limits: crate::Limits) -> Tree {
+fn build(client: &Domain, w: &Words, limits: crate::ui::Limits) -> Tree {
     let mut b = Builder::new(&limits);
     let mut bindings = JigBindings::new(limits.bindings, CLIENT.text);
     view::render(&mut b, client, client.deployment_page().owner.as_deref().unwrap(), w, &mut bindings);
@@ -434,7 +434,7 @@ fn deployment_view_all_outer_and_nested_lists_fill_together_with_exact_and_one_u
             .unwrap(),
     )
     .unwrap();
-    let exact = crate::Limits {
+    let exact = crate::ui::Limits {
         nodes: tree.len(),
         depth,
         text_per_node: tree.nodes().iter().map(crate::ui::tree::Node::text_bytes).max().unwrap(),
@@ -443,10 +443,10 @@ fn deployment_view_all_outer_and_nested_lists_fill_together_with_exact_and_one_u
     };
     assert_eq!(build(&client, w, exact).len(), tree.len());
     for below in [
-        crate::Limits { nodes: exact.nodes - 1, ..exact },
-        crate::Limits { depth: exact.depth - 1, ..exact },
-        crate::Limits { text_per_node: exact.text_per_node - 1, ..exact },
-        crate::Limits { text_bytes: exact.text_bytes - 1, ..exact },
+        crate::ui::Limits { nodes: exact.nodes - 1, ..exact },
+        crate::ui::Limits { depth: exact.depth - 1, ..exact },
+        crate::ui::Limits { text_per_node: exact.text_per_node - 1, ..exact },
+        crate::ui::Limits { text_bytes: exact.text_bytes - 1, ..exact },
     ] {
         std::panic::catch_unwind(core::panic::AssertUnwindSafe(|| build(&client, w, below)))
             .expect_err("one-under storage refuses this entire tree");

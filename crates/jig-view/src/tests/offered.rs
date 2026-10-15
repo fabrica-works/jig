@@ -43,7 +43,7 @@ const KINDS: [ActKind; 25] = [
 fn every_closed_offer_control_and_whole_refusal_fits_the_public_card_tree_with_two_paged_rows() {
     assert_eq!(u32::try_from(KINDS.len()).unwrap(), MAX_OFFERED_ACTS);
     let w = words();
-    let mut limits = crate::Limits::of_words(&CLIENT, w).unwrap();
+    let mut limits = crate::limits::of_words(&CLIENT, w).unwrap();
     limits.nodes = crate::card_nodes(&CLIENT).unwrap() + 1;
     limits.text_bytes = limits.nodes * limits.text_per_node;
     for refused in [false, true] {

@@ -61,7 +61,7 @@ pub struct Terminal {
 }
 impl Terminal {
     #[must_use]
-    pub fn new(settings: Settings, view: &jig_view::Limits) -> Option<Self> {
+    pub fn new(settings: Settings, view: &jig_view::ui::Limits) -> Option<Self> {
         if settings.name.len() > usize::try_from(view.text_per_node).ok()? || settings.longest == 0 {
             return None;
         }

@@ -5,9 +5,10 @@
     reason = "ordinary proofs inspect public trees, source data and checked language selection"
 )]
 use super::cards::{CLIENT, drive, words};
+use crate::ui::Limits;
 use crate::ui::{Builder, Role, State, Tree};
 use crate::{
-    JigBindings, Limits, owner_person_task as view,
+    JigBindings, owner_person_task as view,
     owner_person_task_words::{self, PersonPhrase},
     phrases::{Invalid, PhraseLimits, Phrasebook, Segment},
     words::Words,

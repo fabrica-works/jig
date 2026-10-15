@@ -1,4 +1,4 @@
-use crate::Limits;
+use crate::ui::Limits;
 use crate::ui::{Builder, Owner, Role, Run, SlotRef, State};
 use skein_lib::Token;
 

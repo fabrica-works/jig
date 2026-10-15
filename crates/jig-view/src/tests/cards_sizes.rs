@@ -1,7 +1,8 @@
 //! Full-list/full-text envelopes exercise public acquisition and every renderer.
 use super::*;
+use crate::Owner;
+use crate::ui::Limits;
 use crate::ui::SlotRef;
-use crate::{Limits, Owner};
 
 use jig_domain_client::{address::Address, boundary::Offset};
 use skein_lib::Token;
@@ -480,18 +481,18 @@ fn full_replies_notices(d: &mut Domain, inbox: Token, words: &crate::words::Word
     super::super::cards_access::check(&tree);
 }
 pub(super) fn scenario(words: &crate::words::Words) {
-    let default = Limits::of(&CLIENT, &jig_domain_client::pages::Arrangement::none()).unwrap();
-    let localized = Limits::of_words(&CLIENT, words).unwrap();
+    let default = crate::limits::of(&CLIENT, &jig_domain_client::pages::Arrangement::none()).unwrap();
+    let localized = crate::limits::of_words(&CLIENT, words).unwrap();
     assert!(default.text_per_node >= localized.text_per_node);
-    assert!(crate::worst_case(&localized).is_some());
+    assert!(crate::limits::jig_worst_case(&localized).is_some());
     assert!(crate::jig_bindings_worst_case(localized.bindings, &CLIENT).is_some());
     let mut excessive = CLIENT;
     excessive.rows = u32::MAX;
     assert!(crate::card_nodes(&excessive).is_none());
-    assert!(Limits::of(&excessive, &jig_domain_client::pages::Arrangement::none()).is_none());
+    assert!(crate::limits::of(&excessive, &jig_domain_client::pages::Arrangement::none()).is_none());
     excessive = CLIENT;
     excessive.text = u32::MAX;
-    assert!(Limits::of(&excessive, &jig_domain_client::pages::Arrangement::none()).is_none());
+    assert!(crate::limits::of(&excessive, &jig_domain_client::pages::Arrangement::none()).is_none());
     full_cards(words, &localized);
     full_frame_notices(words, &localized);
 }

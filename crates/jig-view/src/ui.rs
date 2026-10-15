@@ -2,6 +2,7 @@
 mod binding;
 pub(crate) mod builder;
 pub(crate) mod diff;
+mod limits;
 pub mod markdown;
 pub(crate) mod tree;
 mod view;
@@ -9,6 +10,7 @@ mod view;
 pub use binding::{Act, Binding, BoundAct, number};
 pub use builder::{Builder, Slot, SlotId};
 pub use diff::{Attribute, Made, Patch, diff};
+pub use limits::{Limits, worst_case};
 pub use tree::{
     Drawing, DrawingKind, Key, Modifier, Node, NodeId, Owner, Picture, Region, Role, Run, Shortcut, SlotRef, State,
     Style, TextRun, Tree, Value,

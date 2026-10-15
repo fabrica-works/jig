@@ -326,7 +326,7 @@ pub fn document_nodes(limits: &ConnectorLimits) -> Option<u32> {
 }
 /// Whole tree requirements, including one caller's enclosing Page and every loaded language.
 #[must_use]
-pub fn requirements(limits: &ConnectorLimits, words: &Words) -> Option<jig_view::Limits> {
+pub fn requirements(limits: &ConnectorLimits, words: &Words) -> Option<jig_view::ui::Limits> {
     let nodes = document_nodes(limits)?.max(answer_nodes()).checked_add(1)?;
     let mut phrase = jig_view::literal_segment::max_bytes(limits.segment_bytes)?;
     for word in ALL {
@@ -335,7 +335,7 @@ pub fn requirements(limits: &ConnectorLimits, words: &Words) -> Option<jig_view:
     for word in jig_view::phrases::jig::ALL {
         phrase = phrase.max(words.book.capacity(word.id())?);
     }
-    Some(jig_view::Limits {
+    Some(jig_view::ui::Limits {
         nodes,
         depth: 12,
         text_per_node: phrase,
@@ -353,7 +353,7 @@ pub fn requirements(limits: &ConnectorLimits, words: &Words) -> Option<jig_view:
 /// segment escape. Caller composition adds its other owners' retained state.
 #[must_use]
 pub fn worst_case(limits: &ConnectorLimits, words: &Words) -> Option<u64> {
-    jig_view::worst_case(&requirements(limits, words)?)?
+    jig_view::limits::jig_worst_case(&requirements(limits, words)?)?
         .checked_add(jig_view::phrases::worst_case(words.book.limits())?)?
         .checked_add(u64::from(jig_view::literal_segment::max_bytes(limits.segment_bytes)?))
 }

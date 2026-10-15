@@ -23,7 +23,7 @@ fn the_worlds_original_storage_counts_construct_a_finite_view() {
     let domain = world_domain();
     let jig = super::words();
     let first = super::family_words();
-    let native = jig_view::Limits::of_words(&domain.jig, jig).unwrap();
+    let native = jig_view::limits::of_words(&domain.jig, jig).unwrap();
     let limits = Limits::for_world(&domain, jig, first, 1024, 256).unwrap();
     assert_eq!(limits.tree.nodes, 1024);
     assert_eq!(limits.tree.bindings, 1024);
@@ -60,14 +60,14 @@ fn bounded_world_storage_survives_complete_composition_text_overflow() {
     domain.first.rows = 64;
     let jig = super::words();
     let first = super::family_words();
-    let native = jig_view::Limits::of_words(&domain.jig, jig).unwrap();
+    let native = jig_view::limits::of_words(&domain.jig, jig).unwrap();
     let owner = crate::connector_values::requirements(&domain.first.connector, jig).unwrap();
     let fragment = u64::from(crate::family::PART_NODES.max(owner.nodes + 16).max(domain.first.rows + 2));
     let cards = u64::from(domain.first.rows + 1);
     let jig_cards = u64::from(jig_view::card_nodes(&domain.jig).unwrap()) * cards;
     let slots = (u64::from(native.nodes) + jig_cards) * fragment + jig_cards + u64::from(crate::family::NAV_NODES);
     let application = fragment + cards * 3 + 3;
-    let base = jig_view::Limits::compose(
+    let base = jig_view::limits::compose(
         &domain.jig,
         jig,
         &jig_domain_client::pages::Arrangement::none(),
@@ -80,7 +80,7 @@ fn bounded_world_storage_survives_complete_composition_text_overflow() {
     u32::try_from(full_nodes).unwrap();
     assert!(full_nodes * u64::from(base.text_per_node) > u64::from(u32::MAX));
     assert!(
-        jig_view::Limits::compose(
+        jig_view::limits::compose(
             &domain.jig,
             jig,
             &jig_domain_client::pages::Arrangement::none(),
@@ -107,7 +107,7 @@ fn bounded_world_storage_survives_the_jig_envelopes_text_overflow() {
     domain.jig.document_bytes = 8192;
     let jig = super::words();
     let first = super::family_words();
-    let envelope = jig_view::Limits::envelope(
+    let envelope = jig_view::limits::envelope(
         &domain.jig,
         jig.book.jig_capacity().unwrap(),
         &jig_domain_client::pages::Arrangement::none(),
@@ -117,7 +117,7 @@ fn bounded_world_storage_survives_the_jig_envelopes_text_overflow() {
     )
     .unwrap();
     assert!(u64::from(envelope.nodes) * u64::from(envelope.text_per_node) > u64::from(u32::MAX));
-    assert!(jig_view::Limits::of_words(&domain.jig, jig).is_none());
+    assert!(jig_view::limits::of_words(&domain.jig, jig).is_none());
     let limits = Limits::for_world(&domain, jig, first, 1024, 256).unwrap();
     assert_eq!(limits.tree.nodes, 1024);
     assert_eq!(limits.tree.text_bytes, 1024 * limits.tree.text_per_node);

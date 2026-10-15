@@ -1,6 +1,7 @@
 use crate::phrases::{Hole, HoleKind, Invalid, Language, PhraseLimits, Phrasebook, Segment};
+use crate::ui::Limits;
 use crate::ui::{Builder, Role, Tree};
-use crate::{Limits, owner_outcome as view, owner_outcome_words as phrases, words::Words};
+use crate::{owner_outcome as view, owner_outcome_words as phrases, words::Words};
 
 use jig_domain_client::contract::{
     OwnerEscalationChoice, OwnerOutcome, OwnerProposalChoice, ProposalKey, Proposer, Revision, Seen,
@@ -387,7 +388,7 @@ fn normal_words_register_every_outcome_once_and_bound_the_selected_language() {
     assert!(fragment.text_per_node >= 2048);
     // This positive language proof needs one row, not every full page window.
     let client = jig_domain_client::Limits { rows: 1, ..super::cards::CLIENT };
-    assert!(Limits::of_words(&client, &words).unwrap().text_per_node >= 2048);
+    assert!(crate::limits::of_words(&client, &words).unwrap().text_per_node >= 2048);
     let value = OwnerOutcome::ProposalDecided {
         proposal: ProposalKey { proposer: Proposer::Party(u64::MAX), number: 17 },
         by: 23,

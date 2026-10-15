@@ -14,7 +14,7 @@ pub fn arrangement() -> jig_domain_client::pages::Arrangement {
 /// Bounds for the composed tree and owner bindings.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
-    pub tree: jig_view::Limits,
+    pub tree: jig_view::ui::Limits,
 }
 impl Limits {
     #[must_use]
@@ -46,7 +46,7 @@ impl Limits {
             .checked_pow(3)?
             .checked_mul(domain.jig.objects.checked_add(1)?.checked_pow(2)?)?
             .checked_mul(8)?;
-        let jig_nodes = jig_view::Limits::of_words(&domain.jig, jig)?.nodes;
+        let jig_nodes = jig_view::limits::of_words(&domain.jig, jig)?.nodes;
         let jig_cards = jig_view::card_nodes(&domain.jig)?.checked_mul(rows.checked_add(1)?)?.checked_add(
             jig_view::task_section_nodes(&domain.jig, jig_domain_client::address::TaskSection::Plan)?.checked_add(4)?,
         )?;
@@ -55,7 +55,7 @@ impl Limits {
             .checked_add(jig_nodes.checked_mul(rows.checked_add(3)?)?)?
             .checked_add(jig_cards)?
             .checked_add(8)?;
-        let mut tree = jig_view::Limits::compose(&domain.jig, jig, &arrangement(), application_nodes, slot_nodes, 8)?;
+        let mut tree = jig_view::limits::compose(&domain.jig, jig, &arrangement(), application_nodes, slot_nodes, 8)?;
         tree.text_per_node = tree
             .text_per_node
             .max(observability.capacity()?.max(infrastructure.capacity()?).checked_mul(2)?.checked_add(32)?)
@@ -75,7 +75,7 @@ pub fn worst_case(
     observability: &Words,
     infrastructure: &Words,
 ) -> Option<u64> {
-    jig_view::worst_case(&limits.tree)?
+    jig_view::limits::jig_worst_case(&limits.tree)?
         .checked_add(jig_view::jig_bindings_worst_case(limits.tree.bindings, &domain.jig)?)?
         .checked_add(
             bindings::worst_case(limits.tree.bindings, domain.infrastructure.text.max(domain.observability.text))?

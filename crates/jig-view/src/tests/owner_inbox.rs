@@ -94,7 +94,7 @@ fn domain(value: OwnerInbox) -> Domain {
     client
 }
 fn build(client: &Domain, w: &Words) -> Tree {
-    let mut limits = crate::Limits::of_words(&CLIENT, w).unwrap();
+    let mut limits = crate::limits::of_words(&CLIENT, w).unwrap();
     limits.nodes = crate::inbox_nodes(&CLIENT, 0).unwrap().checked_add(1).unwrap();
     limits.bindings = limits.nodes;
     limits.slots = limits.nodes;
