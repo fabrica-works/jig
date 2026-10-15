@@ -6,11 +6,11 @@
 )]
 use super::cards::{CLIENT, drive, words};
 use crate::owner_person_task_words::PersonPhrase;
-use crate::ui::Limits;
-use crate::ui::phrases::{Invalid, PhraseLimits, Phrasebook, Segment};
-use crate::ui::{Builder, Role, State, Tree};
 use crate::words::Words;
 use crate::{JigBindings, owner_person_task as view, owner_person_task_words};
+use skein_ui::Limits;
+use skein_ui::phrases::{Invalid, PhraseLimits, Phrasebook, Segment};
+use skein_ui::{Builder, Role, State, Tree};
 
 use jig_domain_client::{Domain, Event, action::Act, contract::*, fields::Purpose};
 use skein_lib::{Duration, List, Wall, bytes::copy_of};

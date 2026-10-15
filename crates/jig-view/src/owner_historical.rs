@@ -3,9 +3,9 @@
 //! sources are retained without acquiring current offers or manufacturing context.
 use crate::JigBindings;
 use crate::owner_historical_words::HistoricalPhrase as P;
-use crate::ui::phrases::Hole;
-use crate::ui::{Builder, Role, Run};
 use crate::words::Words;
+use skein_ui::phrases::Hole;
+use skein_ui::{Builder, Role, Run};
 
 use alloc::boxed::Box;
 use jig_domain_client::{
@@ -312,7 +312,7 @@ pub fn max_nodes(l: &Limits) -> Option<u32> {
         .checked_add(l.rows.checked_mul(l.rows.checked_add(5)?)?)?
         .checked_add(40)?;
     let question = crate::chip_nodes(l)?
-        .checked_add(crate::ui::markdown::max_nodes(l.text)?)?
+        .checked_add(skein_ui::markdown::max_nodes(l.text)?)?
         .checked_add(result.checked_mul(2)?)?
         .checked_add(l.rows.checked_mul(4)?)?
         .checked_add(120)?;

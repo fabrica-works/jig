@@ -1,8 +1,8 @@
 //! Normal jig phrasebooks compose every exact owner fragment (view.md, 7).
 //! Composition happens while languages load, never while a page renders.
-use crate::ui::phrases::{Language, PhraseShape, Phrasebook};
 use alloc::boxed::Box;
 use skein_lib::List;
+use skein_ui::phrases::{Language, PhraseShape, Phrasebook};
 
 #[must_use]
 pub fn phrase_count() -> u32 {

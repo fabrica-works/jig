@@ -13,8 +13,8 @@ use crate::{Limits, View, build, decode, words};
 use jig_domain_client::contract::*;
 use jig_test_domain_client::{Address, Domain, Event, JigOut, Place, Request, family, first};
 use jig_view::Owner;
-use jig_view::ui::Act;
-use jig_view::ui::{NodeId, Patch, Role};
+use skein_ui::Act;
+use skein_ui::{NodeId, Patch, Role};
 
 use skein_lib::{Duration, Env, List, Queue, RequestLimits, Time, Token, Wall};
 fn limits() -> jig_test_domain_client::Limits {
@@ -391,7 +391,7 @@ fn a_family_page_holding_jig_cards_holding_parts_fits_and_diffs_to_nothing() {
     assert!(contains(&view, b"Family part revision 1"));
     assert!(contains(&view, b"Waiting at policy roles"));
     assert!(view.tree().len() <= view.limits().tree.nodes);
-    assert!(!view.tree().nodes().iter().any(|node| node.states.as_slice().contains(&jig_view::ui::State::Busy)));
+    assert!(!view.tree().nodes().iter().any(|node| node.states.as_slice().contains(&skein_ui::State::Busy)));
     assert_eq!(
         view.tree()
             .nodes()
@@ -472,7 +472,7 @@ fn buttons_and_parameter_fields_decode_to_their_owner_and_departed_nodes_are_sta
     let action = decode(&mut view, apply, Act::Press).unwrap();
     drive(&mut root, Event::Act { action });
     patches(&mut view, &root);
-    assert!(view.tree().find(field).unwrap().states.as_slice().contains(&jig_view::ui::State::Disabled));
+    assert!(view.tree().find(field).unwrap().states.as_slice().contains(&skein_ui::State::Disabled));
     assert_eq!(view.tree().find(field).unwrap().binding, None);
     assert_eq!(decode(&mut view, field, Act::Input { value: b"22".as_slice().into() }), None);
     drive(
@@ -821,7 +821,7 @@ fn unsupported_individual_deployment_parts_say_cannot_show_without_a_project_or_
     let jig = words();
     let family_words = words::Words::english(limits().first.text).unwrap();
     let bounds = Limits::for_world(&limits(), jig, &family_words, 1024, 256).unwrap();
-    let mut builder = jig_view::ui::Builder::new(&bounds.tree);
+    let mut builder = skein_ui::Builder::new(&bounds.tree);
     let mut bindings = crate::bindings::Bindings::new(bounds.tree.bindings, limits().first.text);
     builder.open(Role::Page);
     crate::family::part(&mut builder, root.first(), &part, 1, &family_words, jig, &mut bindings);
@@ -846,10 +846,10 @@ fn unsupported_individual_deployment_parts_say_cannot_show_without_a_project_or_
 fn a_slot_of_a_number_no_owner_has_is_unshowable() {
     let root = ready();
     let mut view = view();
-    let mut builder = jig_view::ui::Builder::new(&view.limits().tree);
+    let mut builder = skein_ui::Builder::new(&view.limits().tree);
     builder.open(Role::Page);
     builder.slot(
-        jig_view::ui::SlotRef { owner: (Owner::Application { number: 9 }).opaque(), token: Token::new(1) },
+        skein_ui::SlotRef { owner: (Owner::Application { number: 9 }).opaque(), token: Token::new(1) },
         &words().say(jig_view::phrases::jig::JigPhrase::LoadingPart, &[]),
     );
     builder.close();

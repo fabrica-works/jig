@@ -1,5 +1,5 @@
 use crate::{Print, render};
-use jig_view::ui::{Role, Run};
+use skein_ui::{Role, Run};
 mod command;
 mod fixtures;
 

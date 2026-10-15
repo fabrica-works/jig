@@ -1,7 +1,7 @@
 //! Bare retained proposal fragments remain passive and preserve their old history position.
 use super::*;
 use crate::owner_history::HistoryFragment;
-use crate::ui::Role;
+use skein_ui::Role;
 
 fn limits(fragment: HistoryFragment) -> Limits {
     Limits {
@@ -35,8 +35,8 @@ fn bare(value: &OwnerProposalHistory, words: &Words) -> (Tree, JigBindings, Hist
     let mut bytes = 0_u32;
     let mut slots = 0_u32;
     for node in tree.nodes() {
-        assert!(node.text_bytes() <= fragment.text_per_node);
-        bytes = bytes.checked_add(node.text_bytes()).unwrap();
+        assert!(crate::tests::text_bytes(node) <= fragment.text_per_node);
+        bytes = bytes.checked_add(crate::tests::text_bytes(node)).unwrap();
         if let Some(name) = &node.name {
             assert!(name.len() <= usize::try_from(fragment.text_per_node).unwrap());
             bytes = bytes.checked_add(u32::try_from(name.len()).unwrap()).unwrap();

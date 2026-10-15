@@ -2,9 +2,9 @@
 //! view.md, 7 and 10). Stored overrides are not historical effective defaults.
 use crate::JigBindings;
 use crate::owner_history_words::HistoryPhrase as P;
-use crate::ui::phrases::Hole;
-use crate::ui::{Builder, Role, Run};
 use crate::words::Words;
+use skein_ui::phrases::Hole;
+use skein_ui::{Builder, Role, Run};
 
 use jig_domain_client::{
     Limits,
@@ -162,7 +162,7 @@ pub fn max_nodes(limits: &Limits) -> Option<u32> {
     let batch = limits.rows.checked_mul(crate::sizes::proposed_task_nodes(limits)?)?;
     let delta = crate::specification::nodes(limits)?
         .checked_add(authority)?
-        .checked_add(crate::ui::markdown::max_nodes(limits.text)?.checked_mul(2)?)?
+        .checked_add(skein_ui::markdown::max_nodes(limits.text)?.checked_mul(2)?)?
         .checked_add(limits.rows)?
         .checked_add(crate::owner_wake::policy_nodes())?
         .checked_add(30)?;

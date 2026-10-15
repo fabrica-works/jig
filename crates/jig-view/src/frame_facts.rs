@@ -2,9 +2,9 @@
 //! See client/domain/contract.md, 5.1, and pages.md, 2.
 use crate::document_text;
 use crate::phrases::jig::JigPhrase;
-use crate::ui::Builder;
-use crate::ui::phrases::Hole;
 use crate::words::{Words, name};
+use skein_ui::Builder;
+use skein_ui::phrases::Hole;
 
 use alloc::boxed::Box;
 use jig_domain_client::contract::{Charter, Frame, FrameParty, PartyKind, ProjectRole};

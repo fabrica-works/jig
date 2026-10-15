@@ -3,11 +3,11 @@
     reason = "ordinary tests inspect standalone trees and mutate checked language data"
 )]
 use crate::owner_result_words::{self as result_words, ResultPhrase};
-use crate::ui::Limits;
-use crate::ui::phrases::{Invalid, Language, PhraseLimits, Phrasebook, Segment, WallFormat};
-use crate::ui::{Builder, Tree};
 use crate::words::Words;
 use crate::{JigBindings, owner_result as view};
+use skein_ui::Limits;
+use skein_ui::phrases::{Invalid, Language, PhraseLimits, Phrasebook, Segment, WallFormat};
+use skein_ui::{Builder, Tree};
 
 use jig_domain_client::{
     Domain,

@@ -1,8 +1,8 @@
 //! Jig's closed words and typed holes (client/domain/view.md, section 7).
 use crate::Owner;
-use crate::ui::phrases::{HoleKind, HoleShape, PhraseId, PhraseShape};
 use alloc::boxed::Box;
 use skein_lib::List;
+use skein_ui::phrases::{HoleKind, HoleShape, PhraseId, PhraseShape};
 /// Each sentence jig says, independent of language word order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum JigPhrase {

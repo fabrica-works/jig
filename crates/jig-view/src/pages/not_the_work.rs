@@ -1,7 +1,7 @@
 //! Pages independent of work (client/domain/pages.md, 8).
 use crate::regions::JigRegion;
-use crate::ui::{Builder, Role};
 use crate::{JigBindings, phrases::jig::JigPhrase, words::Words};
+use skein_ui::{Builder, Role};
 
 use jig_domain_client::{Domain, action::Act, pages::Page};
 /// Render starting, signing in, missing, outdated or another party's kept work.

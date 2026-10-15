@@ -64,11 +64,10 @@ fn recurring_keeps_every_template_member_overlap_period_fact_and_last_batch_link
         assert!(contains(&tree, b"Some recurring template facts were omitted"));
         assert_eq!(contains(&tree, b"skip this period"), overlap == RecurringOverlap::Skip);
         assert_eq!(contains(&tree, b"wait for it to end"), overlap == RecurringOverlap::Wait);
-        let go =
-            crate::decode(&mut bindings, named_binding(&tree, b"Task 18446744073709551615"), crate::ui::Act::Press)
-                .unwrap();
+        let go = crate::decode(&mut bindings, named_binding(&tree, b"Task 18446744073709551615"), skein_ui::Act::Press)
+            .unwrap();
         assert_eq!(go, Act::Go { address: Address::task(u64::MAX) });
-        let go = crate::decode(&mut bindings, named_binding(&tree, b"Task 10"), crate::ui::Act::Press).unwrap();
+        let go = crate::decode(&mut bindings, named_binding(&tree, b"Task 10"), skein_ui::Act::Press).unwrap();
         assert_eq!(go, Act::Go { address: Address::task(10) });
     }
 }

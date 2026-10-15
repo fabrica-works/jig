@@ -1,19 +1,19 @@
 #![expect(clippy::disallowed_methods, reason = "ordinary tests inspect full semantic leaves")]
 use super::cards::{contains, words};
 use crate::policy_edit;
-use crate::ui::{Builder, Role};
 use jig_domain_client::contract::*;
 use skein_lib::{Duration, List};
+use skein_ui::{Builder, Role};
 fn pattern(last: OwnerPatternEnd) -> OwnerPattern {
     let mut segments = List::with_capacity(2);
     segments.push(Box::from(b"literal/slash".as_slice())).unwrap();
     segments.push(Box::from(b"\xff".as_slice())).unwrap();
     OwnerPattern { segments, last }
 }
-fn shown(value: &PolicyEdit) -> crate::ui::Tree {
+fn shown(value: &PolicyEdit) -> skein_ui::Tree {
     let words = words();
     let required = policy_edit::required(value, words).unwrap();
-    let mut b = Builder::new(&crate::ui::Limits {
+    let mut b = Builder::new(&skein_ui::Limits {
         nodes: required.nodes.checked_add(1).unwrap(),
         depth: required.depth.checked_add(1).unwrap(),
         text_per_node: required.text_per_node,

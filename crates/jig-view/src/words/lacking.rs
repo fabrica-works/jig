@@ -1,9 +1,9 @@
 //! Only supplied authority facts are said; client/domain/contract.md, 4.
 use super::Words;
 use crate::phrases::jig::JigPhrase;
-use crate::ui::Builder;
-use crate::ui::phrases::Hole;
 use jig_domain_client::contract::Lacking;
+use skein_ui::Builder;
+use skein_ui::phrases::Hole;
 impl Words {
     /// Say missing authority, keeping unavailable requested facts absent.
     pub fn lacking(&self, b: &mut Builder, lacking: &Lacking) {

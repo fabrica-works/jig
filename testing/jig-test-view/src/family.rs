@@ -10,8 +10,8 @@ use jig_test_domain_client::{
     first::{self, Card, Value},
 };
 use jig_view::Owner;
-use jig_view::ui::phrases::Hole;
-use jig_view::ui::{Builder, Key, Role, SlotRef, State};
+use skein_ui::phrases::Hole;
+use skein_ui::{Builder, Key, Role, SlotRef, State};
 
 use skein_lib::{Decimal, Id, Token};
 pub const NAV: SlotRef =

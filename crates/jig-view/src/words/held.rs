@@ -1,9 +1,9 @@
 //! Complete moved-hold facts without requiring an object slot; contract.md, 4.
 use super::{Words, name};
 use crate::phrases::jig::JigPhrase;
-use crate::ui::Builder;
-use crate::ui::phrases::Hole;
 use jig_domain_client::contract::{HoldCategory, HoldFailure, HoldReason, Part};
+use skein_ui::Builder;
+use skein_ui::phrases::Hole;
 impl Words {
     /// Admission reason facts, without invented amounts, actors, clocks or parts.
     pub(super) fn hold_category(&self, b: &mut Builder, reason: HoldCategory) {

@@ -5,8 +5,6 @@ mod held;
 mod lacking;
 mod refusals;
 use crate::phrases::jig::JigPhrase;
-use crate::ui::phrases::{Hole, Phrasebook};
-use crate::ui::{Builder, Role, Run};
 use alloc::boxed::Box;
 use jig_domain_client::{
     contract::{Actor, Decision, Ending, Executor, GoalExecutor, Made, Outcome, ProposalKey, Proposer},
@@ -14,6 +12,8 @@ use jig_domain_client::{
     link::Link,
 };
 use skein_lib::{Duration, Wall, bytes::copy_of};
+use skein_ui::phrases::{Hole, Phrasebook};
+use skein_ui::{Builder, Role, Run};
 
 /// Checked words and the person's time presentation for one tree build.
 #[derive(Clone, Debug)]

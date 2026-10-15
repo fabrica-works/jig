@@ -2,7 +2,7 @@
 use crate::{bindings, drawing, family, words};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
-    pub tree: jig_view::ui::Limits,
+    pub tree: skein_ui::Limits,
     pub text: u32,
 }
 impl Limits {
@@ -120,8 +120,8 @@ pub fn worst_case(
     jig_view::limits::jig_worst_case(&limits.tree)?
         .checked_add(jig_view::jig_bindings_worst_case(limits.tree.bindings, &domain.jig)?)?
         .checked_add(bindings::worst_case(limits.tree.bindings)?)?
-        .checked_add(jig_view::ui::phrases::worst_case(jig.book.limits())?)?
-        .checked_add(jig_view::ui::phrases::worst_case(first.book.limits())?)?
+        .checked_add(skein_ui::phrases::worst_case(jig.book.limits())?)?
+        .checked_add(skein_ui::phrases::worst_case(first.book.limits())?)?
         .checked_add(u64::from(jig.book.capacity(jig_view::phrases::jig::JigPhrase::LoadingPart.id())?))?
         .checked_add(u64::from(first.capacity()?))
 }

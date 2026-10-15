@@ -1,9 +1,9 @@
 //! Filters and live rows are the domain's facts (pages.md, 6.3).
 use crate::phrases::jig::JigPhrase;
-use crate::ui::phrases::Hole;
-use crate::ui::{Builder, Role};
 use crate::words::Words;
 use crate::{JigBindings, cards};
+use skein_ui::phrases::Hole;
+use skein_ui::{Builder, Role};
 
 use jig_domain_client::{
     Domain,

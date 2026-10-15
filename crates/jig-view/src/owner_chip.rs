@@ -3,9 +3,9 @@
 //! channel identity is retained by the contract and never turned into a number.
 use crate::JigBindings;
 use crate::owner_chip_words::ChipPhrase as P;
-use crate::ui::phrases::Hole;
-use crate::ui::{Builder, Role, Run};
 use crate::words::Words;
+use skein_ui::phrases::Hole;
+use skein_ui::{Builder, Role, Run};
 
 use jig_domain_client::{
     Domain, Limits,
@@ -99,25 +99,25 @@ pub(crate) fn result_nodes(value: &ResultValue, limits: &Limits) -> Option<u32> 
             {
                 return None;
             }
-            crate::ui::markdown::max_nodes(limits.text)?.checked_add(8)
+            skein_ui::markdown::max_nodes(limits.text)?.checked_add(8)
         }
         ResultValue::Choice { by, reason, .. } => {
             text_fits(reason, limits)?;
             if !by.name.fits(limits.text) {
                 return None;
             }
-            crate::ui::markdown::max_nodes(limits.text)?.checked_add(8)
+            skein_ui::markdown::max_nodes(limits.text)?.checked_add(8)
         }
         ResultValue::Change { part, words, .. } => {
             text_fits(words, limits)?;
             part_fits(part, limits)?;
-            crate::ui::markdown::max_nodes(limits.text)?
+            skein_ui::markdown::max_nodes(limits.text)?
                 .checked_add(crate::proposed_task::part_nodes(limits)?)?
                 .checked_add(4)
         }
         ResultValue::Report(words) | ResultValue::Failure(words) | ResultValue::Words(words) => {
             text_fits(words, limits)?;
-            crate::ui::markdown::max_nodes(limits.text)?.checked_add(4)
+            skein_ui::markdown::max_nodes(limits.text)?.checked_add(4)
         }
         ResultValue::Approved { state, words } => {
             if u32::try_from(state.len()).ok()? > limits.text {
@@ -126,7 +126,7 @@ pub(crate) fn result_nodes(value: &ResultValue, limits: &Limits) -> Option<u32> 
             if let Some(words) = words {
                 text_fits(words, limits)?;
             }
-            crate::ui::markdown::max_nodes(limits.text)?.checked_add(4)
+            skein_ui::markdown::max_nodes(limits.text)?.checked_add(4)
         }
     }
 }

@@ -1,8 +1,8 @@
 use super::fixtures;
 use crate::{Command, Print, Refusal, command, refusal_line, render};
-use jig_view::ui::Act;
-use jig_view::ui::{Builder, NodeId, Role, State, Tree};
 use skein_lib::{Queue, bytes::copy_of};
+use skein_ui::Act;
+use skein_ui::{Builder, NodeId, Role, State, Tree};
 fn page() -> Tree {
     fixtures::page(|b| fixtures::button(b, b"Accept", true))
 }
@@ -149,7 +149,7 @@ fn numbers_hold_across_a_print_and_renumber_at_the_next() {
         fixtures::button(b, b"Release", true);
     });
     let mut patches = Queue::with_capacity(fixtures::LIMITS.patches);
-    jig_view::ui::diff(&old, &mut new, &fixtures::LIMITS, &mut 50, &mut patches);
+    skein_ui::diff(&old, &mut new, &fixtures::LIMITS, &mut 50, &mut patches);
     let release = new.get(4).unwrap().id;
     assert_eq!(release, old.get(4).unwrap().id);
     assert_eq!(

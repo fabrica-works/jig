@@ -1,8 +1,8 @@
-use crate::ui::Limits;
-use crate::ui::phrases::{Hole, Invalid, PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat};
-use crate::ui::{Builder, Tree};
 use crate::words::Words;
 use crate::{JigBindings, owner_milestone as view};
+use skein_ui::Limits;
+use skein_ui::phrases::{Hole, Invalid, PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat};
+use skein_ui::{Builder, Tree};
 
 use jig_domain_client::{Domain, contract::*};
 use skein_lib::{
@@ -31,7 +31,7 @@ fn words(selected: bool) -> Words {
     let mut english = crate::phrases::english::language();
     english.wall = WallFormat::Nanos;
     english.span_unit = SpanUnit::Nanos;
-    let languages: Box<[crate::ui::phrases::Language]> = if selected {
+    let languages: Box<[skein_ui::phrases::Language]> = if selected {
         let mut second = english.clone();
         for phrase in &mut second.phrases {
             for form in &mut phrase.forms {
@@ -84,7 +84,7 @@ fn build(value: &OwnerMilestoneLine, words: &Words) -> (Tree, JigBindings, view:
     view::render(&mut b, value, &client, words, &mut bindings);
     let tree = b.finish();
     let region = tree.nodes().first().expect("standalone milestone region");
-    assert_eq!(region.role, crate::ui::Role::Region);
+    assert_eq!(region.role, skein_ui::Role::Region);
     assert_eq!(
         region.name.as_deref(),
         Some(if words.language == 0 { b"Lifecycle milestone".as_slice() } else { b"second ".as_slice() })
@@ -92,8 +92,8 @@ fn build(value: &OwnerMilestoneLine, words: &Words) -> (Tree, JigBindings, view:
     assert!(tree.len() <= f.nodes);
     let mut total = 0_u64;
     for node in tree.nodes() {
-        assert!(node.text_bytes() <= f.text_per_node);
-        total = total.checked_add(u64::from(node.text_bytes())).unwrap();
+        assert!(crate::tests::text_bytes(node) <= f.text_per_node);
+        total = total.checked_add(u64::from(crate::tests::text_bytes(node))).unwrap();
     }
     assert!(total <= u64::from(f.text_bytes));
     (tree, bindings, f)

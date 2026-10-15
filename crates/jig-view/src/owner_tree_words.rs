@@ -1,11 +1,11 @@
 //! Checked subtree sayings (client/domain/view.md, 7). IDs8300–8321.
 use crate::Owner;
-use crate::ui::phrases::{
+use alloc::boxed::Box;
+use skein_lib::{List, bytes::copy_of};
+use skein_ui::phrases::{
     Form, HoleKind, HoleShape, Language, Phrase, PhraseId, PhraseShape, PluralClass, PluralRule, Segment, SpanUnit,
     WallFormat,
 };
-use alloc::boxed::Box;
-use skein_lib::{List, bytes::copy_of};
 /// The subtree's closed facts and independent phase counts.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TreePhrase {

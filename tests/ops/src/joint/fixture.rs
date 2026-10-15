@@ -61,7 +61,7 @@ fn profile() -> &'static Profile {
             .checked_mul(2)
             .expect("node text bound");
         let bounds = view::Limits {
-            tree: jig_view::ui::Limits {
+            tree: skein_ui::Limits {
                 nodes: 1024,
                 depth: 128,
                 text_per_node,
@@ -219,13 +219,13 @@ impl jig_client_world::harness::App for Client {
     fn next_deadline(root: &Self::Root) -> Option<skein_lib::Time> {
         Ops::next_deadline(root)
     }
-    fn build(view: &mut Self::View, root: &Self::Root, patches: &mut skein_lib::Queue<jig_view::ui::Patch>) {
+    fn build(view: &mut Self::View, root: &Self::Root, patches: &mut skein_lib::Queue<skein_ui::Patch>) {
         Ops::build(view, root, patches);
     }
-    fn tree(view: &Self::View) -> &jig_view::ui::Tree {
+    fn tree(view: &Self::View) -> &skein_ui::Tree {
         Ops::tree(view)
     }
-    fn act(view: &mut Self::View, node: jig_view::ui::NodeId, act: jig_view::ui::Act) -> Option<Self::Event> {
+    fn act(view: &mut Self::View, node: skein_ui::NodeId, act: skein_ui::Act) -> Option<Self::Event> {
         Ops::act(view, node, act)
     }
     fn duty(request: Self::Request) -> jig_client_world::harness::Duty<Self> {
@@ -248,7 +248,7 @@ impl jig_client_world::harness::App for Client {
     fn max_out(limits: &Self::Limits) -> u32 {
         Ops::max_out(limits)
     }
-    fn view_limits(view: &Self::View) -> jig_view::ui::Limits {
+    fn view_limits(view: &Self::View) -> skein_ui::Limits {
         Ops::view_limits(view)
     }
     fn patch_limit(view: &Self::View) -> u32 {
@@ -258,7 +258,7 @@ impl jig_client_world::harness::App for Client {
         assert_eq!(*supplied, limits(), "constructor and receiving bounds match");
         profile().heap
     }
-    fn seen(tree: &jig_view::ui::Tree) -> Vec<jig_client_world::harness::Seen> {
+    fn seen(tree: &skein_ui::Tree) -> Vec<jig_client_world::harness::Seen> {
         Ops::seen(tree)
     }
     fn sent(request: &Self::Request) -> Option<jig_client_world::harness::Sent> {
@@ -267,7 +267,7 @@ impl jig_client_world::harness::App for Client {
     fn received(event: &Self::Event) -> Vec<jig_client_world::harness::Receipt> {
         Ops::received(event)
     }
-    fn card(tree: &jig_view::ui::Tree, node: jig_view::ui::NodeId) -> Option<jig_client_world::harness::CardKey> {
+    fn card(tree: &skein_ui::Tree, node: skein_ui::NodeId) -> Option<jig_client_world::harness::CardKey> {
         Ops::card(tree, node)
     }
     fn window_changed(event: &Self::Event) -> bool {

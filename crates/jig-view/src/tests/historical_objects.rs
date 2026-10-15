@@ -5,9 +5,9 @@
     reason = "ordinary public fragment proofs inspect full supplied sources and tree bindings"
 )]
 use super::cards::{CLIENT, contains, text, words};
-use crate::ui::Limits;
-use crate::ui::{Builder, Role, Tree};
 use crate::{JigBindings, owner_historical as view};
+use skein_ui::Limits;
+use skein_ui::{Builder, Role, Tree};
 
 use jig_domain_client::{Domain, contract::*};
 use skein_lib::{List, Wall};
@@ -125,7 +125,7 @@ fn build(value: &OwnerHistorical, words: &crate::words::Words) -> (Tree, JigBind
     let tree = b.finish();
     super::cards_access::check(&tree);
     assert!(tree.len() <= f.nodes);
-    assert!(tree.nodes().iter().map(crate::ui::tree::Node::text_bytes).sum::<u32>() <= f.text_bytes);
+    assert!(tree.nodes().iter().map(crate::tests::text_bytes).sum::<u32>() <= f.text_bytes);
     assert!(
         tree.nodes()
             .iter()
@@ -504,7 +504,7 @@ fn historical_task_all_three_supplied_presences_keep_repetition_and_whole_source
 }
 #[test]
 fn historical_selected_language_uses_checked_native_captions_and_preserves_opaque_goal_values() {
-    use crate::ui::phrases::{PhraseLimits, Phrasebook, Segment};
+    use skein_ui::phrases::{PhraseLimits, Phrasebook, Segment};
     let english = crate::phrases::english::language();
     let mut selected = english.clone();
     for phrase in &mut selected.phrases {
@@ -542,7 +542,7 @@ fn historical_selected_language_uses_checked_native_captions_and_preserves_opaqu
     assert!(contains(&tree, b"Reserved: 18446744073709551615"));
     let f = view::required(&value, &CLIENT, &words).unwrap();
     assert!(tree.len() <= f.nodes);
-    assert!(tree.nodes().iter().map(crate::ui::tree::Node::text_bytes).sum::<u32>() <= f.text_bytes);
+    assert!(tree.nodes().iter().map(crate::tests::text_bytes).sum::<u32>() <= f.text_bytes);
     for phrase in crate::owner_historical_words::ALL {
         assert!(words.book.capacity(phrase.id()).is_some());
     }

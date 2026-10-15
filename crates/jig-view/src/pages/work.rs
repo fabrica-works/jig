@@ -1,9 +1,9 @@
 //! Shared page sections, counts and accounting (client/domain/pages.md, 5–7).
 use crate::JigBindings;
 use crate::phrases::jig::JigPhrase;
-use crate::ui::phrases::Hole;
-use crate::ui::{Builder, Role, Run, State};
 use crate::words::Words;
+use skein_ui::phrases::Hole;
+use skein_ui::{Builder, Role, Run, State};
 
 use jig_domain_client::{
     action::Act,

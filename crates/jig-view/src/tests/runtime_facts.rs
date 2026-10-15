@@ -10,13 +10,13 @@ use super::{
     work_pages::{entered, list},
 };
 use crate::JigBindings;
-use crate::ui::{Builder, Role, Tree};
 use jig_domain_client::{
     Domain, Request,
     address::{Address, TaskSection},
     contract::*,
 };
 use skein_lib::{Token, Wall};
+use skein_ui::{Builder, Role, Tree};
 
 fn active(stage: RunStage) -> ActiveRun {
     ActiveRun {

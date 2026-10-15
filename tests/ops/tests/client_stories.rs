@@ -7,8 +7,8 @@ use jig_domain_client::{
 use jig_fake_person::{Find, Step};
 use jig_ops_domain_client::{Address, observability as obs};
 use jig_ops_world::client::{Ops, stories};
-use jig_view::ui::Role;
 use skein_lib::Duration;
+use skein_ui::Role;
 use skein_world::domain::{Verdict, heap::Counting};
 #[global_allocator]
 static HEAP: Counting = Counting;

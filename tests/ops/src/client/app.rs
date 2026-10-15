@@ -10,8 +10,8 @@ use jig_ops_domain_client::{
 use jig_ops_domain_connectors::{Connector, number};
 use jig_ops_view as view;
 use jig_view::Owner;
-use jig_view::ui::Act;
-use jig_view::ui::{NodeId, Patch, Role, Tree};
+use skein_ui::Act;
+use skein_ui::{NodeId, Patch, Role, Tree};
 
 use skein_lib::{Duration, Env, Queue, RequestEnvelope, RequestLimits, Time};
 
@@ -265,7 +265,7 @@ impl App for Ops {
     fn max_out(limits: &Self::Limits) -> u32 {
         domain::max_out(limits)
     }
-    fn view_limits(view: &Self::View) -> jig_view::ui::Limits {
+    fn view_limits(view: &Self::View) -> skein_ui::Limits {
         view.limits().tree
     }
     fn patch_limit(view: &Self::View) -> u32 {
@@ -308,7 +308,7 @@ impl App for Ops {
             domain::Ask::Infrastructure(infra::Ask::NativeMoveEnd { object, revision, .. }) => Sent {
                 attempt: *attempt,
                 key: *key,
-                card: Some(CardKey::of(jig_view::ui::Key {
+                card: Some(CardKey::of(skein_ui::Key {
                     owner: (jig_view::Owner::Application { number: 2 }).opaque(),
                     kind: 12,
                     a: 0,

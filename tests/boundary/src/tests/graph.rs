@@ -110,7 +110,7 @@ fn client_view_links_only_its_domain_and_foundation() {
             manifest
                 .dependencies
                 .iter()
-                .filter(|name| !["skein-lib", "jig-domain-client"].contains(&name.as_str()))
+                .filter(|name| !["skein-lib", "skein-ui", "jig-domain-client"].contains(&name.as_str()))
                 .map(|name| format!("{}: {name}", manifest.path.display()))
                 .collect::<Vec<_>>()
         })
@@ -223,7 +223,7 @@ fn fake_person_links_only_the_semantic_view_and_foundation() {
     for manifest in people {
         assert_eq!(manifest.dependencies.len(), 2, "the person's two roles");
         assert!(
-            manifest.dependencies.iter().all(|name| ["skein-lib", "jig-view"].contains(&name.as_str())),
+            manifest.dependencies.iter().all(|name| ["skein-lib", "skein-ui"].contains(&name.as_str())),
             "{}",
             manifest.path.display()
         );
@@ -285,7 +285,7 @@ fn test_client_view_links_only_client_children_and_foundation() {
     assert_eq!(roots.len(), 1, "one test application client view");
     let mut dependencies = roots[0].dependencies.clone();
     dependencies.sort();
-    assert_eq!(dependencies, ["jig-domain-client", "jig-test-domain-client", "jig-view", "skein-lib"]);
+    assert_eq!(dependencies, ["jig-domain-client", "jig-test-domain-client", "jig-view", "skein-lib", "skein-ui"]);
     let source =
         fs::read_to_string(kit_root().join("testing/jig-test-view/src/lib.rs")).expect("view source is readable");
     assert!(source.contains("cfg_attr(not(test), no_std)"), "the view root is step code");
@@ -306,6 +306,7 @@ fn client_world_joins_only_the_client_and_test_roles() {
                 "jig-protocol-transcript",
                 "smith-transcript",
                 "jig-view",
+                "skein-ui",
                 "jig-shell-text",
                 "jig-test-domain-client",
                 "jig-test-view",
@@ -371,7 +372,14 @@ fn ops_client_view_is_step_code_with_only_client_and_connector_vocabulary() {
     dependencies.sort();
     assert_eq!(
         dependencies,
-        ["jig-domain-client", "jig-ops-domain-client", "jig-ops-domain-connectors", "jig-view", "skein-lib"]
+        [
+            "jig-domain-client",
+            "jig-ops-domain-client",
+            "jig-ops-domain-connectors",
+            "jig-view",
+            "skein-lib",
+            "skein-ui"
+        ]
     );
     let source = fs::read_to_string(kit_root().join("examples/ops/view/src/lib.rs")).expect("view source");
     assert!(source.contains("cfg_attr(not(test), no_std)"));

@@ -4,10 +4,10 @@
     reason = "ordinary tests inspect checked sayings and public tree events"
 )]
 use super::cards::{CLIENT, contains, document, drive, start, words};
-use crate::ui::phrases::{PhraseLimits, Phrasebook, Segment};
-use crate::ui::{Builder, Role, Tree};
 use crate::words::Words;
 use crate::{JigBindings, owner_tree as view};
+use skein_ui::phrases::{PhraseLimits, Phrasebook, Segment};
+use skein_ui::{Builder, Role, Tree};
 
 use jig_domain_client::{
     Domain, Event, Request,
@@ -241,7 +241,7 @@ fn owner_tree_view_uses_checked_selected_language_and_finite_node_text_scratch_e
     cap.depth = f.depth;
     cap.text_bytes = bytes;
     cap.text_per_node = f.text_per_node;
-    let render = |cap: crate::ui::Limits| {
+    let render = |cap: skein_ui::Limits| {
         let mut b = Builder::new(&cap);
         let mut bindings = JigBindings::new(f.bindings, CLIENT.text);
         view::render(&mut b, &value, &d.task_page().plan, &d, &w, &mut bindings);

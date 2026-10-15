@@ -3,9 +3,9 @@
 //! them into the selected language, without deriving availability or a calendar.
 use crate::owner_budget_words::BudgetPhrase;
 use crate::proposed_task;
-use crate::ui::phrases::Hole;
-use crate::ui::{Builder, Role, Run};
 use crate::words::Words;
+use skein_ui::phrases::Hole;
+use skein_ui::{Builder, Role, Run};
 
 use jig_domain_client::contract::{OwnerBudget, OwnerNumbers, PoolLedger};
 use skein_lib::Wall;

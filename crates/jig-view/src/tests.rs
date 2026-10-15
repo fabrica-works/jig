@@ -64,4 +64,19 @@ mod turn_read;
 
 mod limits;
 
-mod ui_boundary;
+fn text_bytes(node: &skein_ui::Node) -> u32 {
+    let mut bytes = 0_u32;
+    if let Some(name) = &node.name {
+        bytes = u32::try_from(name.len()).unwrap();
+    }
+    if let Some(value) = &node.value {
+        bytes = bytes.checked_add(u32::try_from(value.text.len()).unwrap()).unwrap();
+    }
+    if let Some(external) = &node.external {
+        bytes = bytes.checked_add(u32::try_from(external.len()).unwrap()).unwrap();
+    }
+    for run in &node.text {
+        bytes = bytes.checked_add(u32::try_from(run.text.len()).unwrap()).unwrap();
+    }
+    bytes
+}

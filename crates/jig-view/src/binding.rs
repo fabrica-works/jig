@@ -1,9 +1,9 @@
 //! Owner tokens carried unchanged by the tree (client/domain/view.md, section 5).
 
 use crate::Owner;
-use crate::ui::{Act, Binding, number};
 use alloc::boxed::Box;
 use skein_lib::Token;
+use skein_ui::{Act, Binding, number};
 
 /// A typed meaning belonging to jig's last built tree.
 #[derive(Clone, Debug, PartialEq, Eq)]

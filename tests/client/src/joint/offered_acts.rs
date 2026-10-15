@@ -13,7 +13,7 @@ pub(super) fn task(world: &mut World<Test, Joint>, client: crate::ClientId, numb
     let words = jig_test_view::connector_values_words::english(32).expect("fixture English");
     let title = words.say(
         jig_view::phrases::jig::JigPhrase::ChipNumber,
-        &[jig_view::ui::phrases::Hole::Number(number), jig_view::words::name(&title)],
+        &[skein_ui::phrases::Hole::Number(number), jig_view::words::name(&title)],
     );
     let tree = world.tree(client);
     let card = match TreeFace::new(tree).find(&Find::exactly_named(Role::Region, &title)) {

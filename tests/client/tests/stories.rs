@@ -1,7 +1,7 @@
 use jig_client_world::{Until, stories, test};
 use jig_fake_person::{Find, Step, Target};
-use jig_view::ui::Role;
 use skein_lib::Duration;
+use skein_ui::Role;
 const WITHIN: Duration = Duration::from_secs(1);
 #[test]
 fn signing_in_and_starting_a_chat() {

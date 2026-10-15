@@ -7,8 +7,8 @@ use jig_client_world::{
     },
 };
 use jig_fake_person::{Find, Step};
-use jig_view::ui::Role;
 use skein_lib::Duration;
+use skein_ui::Role;
 
 fn answer(form: Form, seed: u64) {
     let mut world = person_confirmation::world(seed, form);

@@ -2,9 +2,9 @@
 //! view.md, 7 and 10). Funding and proposed contexts are supplied facts.
 use crate::JigBindings;
 use crate::owner_proposal_words::ProposalPhrase as P;
-use crate::ui::phrases::Hole;
-use crate::ui::{Builder, Role, Run};
 use crate::words::Words;
+use skein_ui::phrases::Hole;
+use skein_ui::{Builder, Role, Run};
 
 use jig_domain_client::{
     Domain, Limits,
@@ -105,7 +105,7 @@ pub fn required(value: &OwnerProposal, limits: &Limits, words: &Words) -> Option
 /// Closed action alternatives, with brief linked chips rather than expanded task cards.
 #[must_use]
 pub fn max_nodes(limits: &Limits) -> Option<u32> {
-    let markdown = crate::ui::markdown::max_nodes(limits.text)?;
+    let markdown = skein_ui::markdown::max_nodes(limits.text)?;
     let authority = crate::owner_authority::document_nodes(limits.rows)?;
     let link = crate::chip_nodes(limits)?.max(crate::owner_chip::max_nodes(limits)?).checked_add(3)?;
     let part = crate::proposed_task::part_nodes(limits)?;

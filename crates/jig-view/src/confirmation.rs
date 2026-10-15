@@ -2,10 +2,10 @@
 //! Adoption belongs to the application slot rather than this jig form (client/domain/pages.md, 6.5).
 use crate::cards::{common, person, proposal};
 use crate::phrases::jig::JigPhrase;
-use crate::ui::phrases::Hole;
-use crate::ui::{Builder, Role, Run, State};
 use crate::words::Words;
 use crate::{JigBindings, JigMeaning, JigStyle};
+use skein_ui::phrases::Hole;
+use skein_ui::{Builder, Role, Run, State};
 
 use jig_domain_client::{
     Domain,
@@ -41,7 +41,7 @@ pub fn confirmation(b: &mut Builder, client: &Domain, words: &Words, bindings: &
     } else if let Some(open) = &client.project_page().form.confirmation {
         begin(b, words, JigPhrase::ActSetGoal);
         words.text(b, JigPhrase::WillGoal, &[]);
-        crate::ui::markdown::read(open.words.bytes(), 2, b);
+        skein_ui::markdown::read(open.words.bytes(), 2, b);
         words.text(b, JigPhrase::ContextProject, &[Hole::Number(u64::from(open.form.project))]);
         words.goal_executor(b, open.form.executor);
         words.text(b, JigPhrase::Priority, &[Hole::Number(u64::from(open.form.priority))]);
@@ -183,7 +183,7 @@ fn action(
             words.text(b, JigPhrase::WillAnswer, &[]);
             match &object.body {
                 Some(Body::Question(doc)) => {
-                    crate::ui::markdown::read(doc.words.bytes(), 2, b);
+                    skein_ui::markdown::read(doc.words.bytes(), 2, b);
                     common::field(b, client, Purpose::Answer, JigPhrase::AnswerField, words, bindings);
                 }
                 Some(Body::PersonTask(doc)) => person::form(b, client, open.object, &doc.contract, words, bindings),

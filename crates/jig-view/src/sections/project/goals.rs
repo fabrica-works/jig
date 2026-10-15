@@ -1,9 +1,9 @@
 //! Goal board, factual funding and typed form controls (pages.md, 6.2).
 use crate::phrases::jig::JigPhrase;
-use crate::ui::phrases::Hole;
-use crate::ui::{Builder, Role, State};
 use crate::words::Words;
 use crate::{JigBindings, JigMeaning, cards};
+use skein_ui::phrases::Hole;
+use skein_ui::{Builder, Role, State};
 
 use jig_domain_client::{
     Domain,
@@ -27,8 +27,8 @@ pub enum Field {
 pub fn edit(form: GoalForm, field: Field, value: &[u8]) -> Option<Act> {
     let mut form = form;
     match field {
-        Field::Budget => form.budget = crate::ui::number(value)?,
-        Field::Priority => form.priority = u32::try_from(crate::ui::number(value)?).ok()?,
+        Field::Budget => form.budget = skein_ui::number(value)?,
+        Field::Priority => form.priority = u32::try_from(skein_ui::number(value)?).ok()?,
         Field::Deadline => {
             form.deadline = if value.is_empty() { None } else { Some(crate::confirmation::amendment::deadline(value)?) }
         }

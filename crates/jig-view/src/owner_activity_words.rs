@@ -1,12 +1,12 @@
 //! Closed source activity/message sayings (client/domain/view.md, 7).
 //! Allocated phrase numbers 7200 onward are independent of conversation rendering.
 use crate::Owner;
-use crate::ui::phrases::{
+use alloc::boxed::Box;
+use skein_lib::{List, bytes::copy_of};
+use skein_ui::phrases::{
     Form, HoleKind, HoleShape, Language, Phrase, PhraseId, PhraseShape, PluralClass, PluralRule, Segment, SpanUnit,
     WallFormat,
 };
-use alloc::boxed::Box;
-use skein_lib::{List, bytes::copy_of};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ActivityPhrase {
     Activity,

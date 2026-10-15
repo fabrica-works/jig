@@ -1,7 +1,7 @@
 #![expect(clippy::disallowed_methods, reason = "ordinary tests inspect public trees and exact supplied source values")]
 use super::cards::{CLIENT, contains, document, drive, limits, start, text, words};
-use crate::ui::{Builder, Role, SlotRef, Tree};
 use crate::{JigBindings, Owner, phrases::jig::JigPhrase};
+use skein_ui::{Builder, Role, SlotRef, Tree};
 
 use jig_domain_client::{Domain, Event, contract::*};
 use skein_lib::{List, Token, Wall};
@@ -218,7 +218,7 @@ fn sign_out_tree(domain: &Domain) -> Tree {
     frame_tree(domain, &sign_out_words())
 }
 fn sign_out_words() -> crate::words::Words {
-    use crate::ui::phrases::{PhraseLimits, Phrasebook};
+    use skein_ui::phrases::{PhraseLimits, Phrasebook};
     let count = u32::try_from(SIGN_OUT_PHRASES.len()).unwrap();
     let mut shapes = List::with_capacity(count);
     for phrase in SIGN_OUT_PHRASES {

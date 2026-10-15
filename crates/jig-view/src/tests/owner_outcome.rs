@@ -1,7 +1,7 @@
-use crate::ui::Limits;
-use crate::ui::phrases::{Hole, HoleKind, Invalid, Language, PhraseLimits, Phrasebook, Segment};
-use crate::ui::{Builder, Role, Tree};
 use crate::{owner_outcome as view, owner_outcome_words as phrases, words::Words};
+use skein_ui::Limits;
+use skein_ui::phrases::{Hole, HoleKind, Invalid, Language, PhraseLimits, Phrasebook, Segment};
+use skein_ui::{Builder, Role, Tree};
 
 use jig_domain_client::contract::{
     OwnerEscalationChoice, OwnerOutcome, OwnerProposalChoice, ProposalKey, Proposer, Revision, Seen,

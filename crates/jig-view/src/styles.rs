@@ -1,6 +1,6 @@
 //! Jig's closed style vocabulary (client/domain/view.md, 13).
 use crate::Owner;
-use crate::ui::Style;
+use skein_ui::Style;
 /// Appearance hints; roles, states and words carry all facts independently.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum JigStyle {

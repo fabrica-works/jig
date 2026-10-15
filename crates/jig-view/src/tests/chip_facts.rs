@@ -6,9 +6,9 @@
 )]
 use super::cards::{CLIENT, contains, shared_words as words, text};
 use crate::JigBindings;
-use crate::ui::{Builder, Tree};
 use jig_domain_client::{Domain, Request, address::Address, contract::*};
 use skein_lib::List;
+use skein_ui::{Builder, Tree};
 fn list<T>(items: impl IntoIterator<Item = T>) -> List<T> {
     let items: Vec<_> = items.into_iter().collect();
     let mut value = List::with_capacity(u32::try_from(items.len()).unwrap());
@@ -118,5 +118,5 @@ fn task_overview_expands_whole_metadata_but_nested_verdict_chips_stay_brief() {
     assert_eq!(inner.phase, Phase::Ended);
     assert_eq!(inner.title.whole(), None);
     let bound = crate::limits::of_words(&CLIENT, words()).unwrap();
-    assert!(tree.nodes().iter().all(|node| node.text_bytes() <= bound.text_per_node));
+    assert!(tree.nodes().iter().all(|node| crate::tests::text_bytes(node) <= bound.text_per_node));
 }

@@ -8,8 +8,8 @@ use super::{
     cards::{CLIENT, contains, limits, words},
     work_pages::list,
 };
-use crate::ui::{Builder, Role, Tree};
 use crate::{JigBindings, proposed_task};
+use skein_ui::{Builder, Role, Tree};
 
 use jig_domain_client::contract::*;
 
@@ -112,7 +112,7 @@ fn exact_part_slots_keep_separate_literal_segments_all_owner_kinds_and_numeric_k
             assert_eq!(slot.owner, (crate::Owner::Application { number: u16::MAX }).opaque());
             assert_eq!(bindings.owner_part(slot.token), Some(&reference));
             assert_eq!(bindings.part(slot.token), None);
-            assert_eq!(crate::decode(&mut bindings, slot.token, crate::ui::Act::Press), None);
+            assert_eq!(crate::decode(&mut bindings, slot.token, skein_ui::Act::Press), None);
             match &reference.key {
                 OwnerPartKey::Path(segments) => {
                     assert_eq!(segments.len(), 2);
@@ -131,7 +131,7 @@ fn exact_part_slots_keep_separate_literal_segments_all_owner_kinds_and_numeric_k
             }
             bindings.begin();
             assert_eq!(bindings.owner_part(slot.token), None, "a departed tree's exact part token is retired");
-            assert_eq!(crate::decode(&mut bindings, slot.token, crate::ui::Act::Press), None);
+            assert_eq!(crate::decode(&mut bindings, slot.token, skein_ui::Act::Press), None);
         }
     }
 }
@@ -232,9 +232,9 @@ fn normal_words_adjust_extreme_public_offsets_by_saturating_the_wall_instant() {
     assert_eq!(words.adjusted_wall(skein_lib::Wall::from_nanos(7_200_000_000_000)).as_nanos(), 3_600_000_000_000);
 }
 
-fn selected_owner_language() -> crate::ui::phrases::Language {
+fn selected_owner_language() -> skein_ui::phrases::Language {
     use crate::phrases::english;
-    use crate::ui::phrases::Segment;
+    use skein_ui::phrases::Segment;
     let mut selected = english::language();
     for phrase in &mut selected.phrases {
         if phrase.id.number >= 3000 {
@@ -258,7 +258,7 @@ fn selected_owner_language() -> crate::ui::phrases::Language {
 fn normal_phrasebooks_require_and_render_exact_owner_words_in_the_selected_language() {
     use crate::phrases::english;
     use crate::phrases::jig::shapes;
-    use crate::ui::phrases::{PhraseLimits, Phrasebook};
+    use skein_ui::phrases::{PhraseLimits, Phrasebook};
     let selected = selected_owner_language();
     let limits = PhraseLimits {
         languages: 2,

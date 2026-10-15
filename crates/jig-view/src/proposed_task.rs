@@ -1,10 +1,10 @@
 //! Exact batch member contracts, funding and connector references (objects.md, 4).
 use crate::phrases::jig::JigPhrase;
 use crate::proposed_task_words::ProposedPhrase;
-use crate::ui::phrases::Hole;
-use crate::ui::{Builder, Role, SlotRef};
 use crate::words::Words;
 use crate::{JigBindings, JigMeaning, Owner};
+use skein_ui::phrases::Hole;
+use skein_ui::{Builder, Role, SlotRef};
 
 use jig_domain_client::{
     Limits,
@@ -13,7 +13,7 @@ use jig_domain_client::{
 
 pub fn text(b: &mut Builder, words: &Words, phrase: ProposedPhrase, holes: &[Hole]) {
     let saying = words.book.say(words.language, phrase.id(), holes).expect("exact member words were checked");
-    b.text(crate::ui::Run::Plain, &saying.text);
+    b.text(skein_ui::Run::Plain, &saying.text);
 }
 pub fn executor(b: &mut Builder, value: OwnerExecutor, words: &Words) {
     match value {

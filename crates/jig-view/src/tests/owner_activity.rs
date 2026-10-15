@@ -1,10 +1,10 @@
 #![expect(clippy::disallowed_methods, reason = "ordinary proofs inspect public checked languages and exact trees")]
 use crate::owner_activity as view;
 use crate::owner_activity_words::{self as data, ActivityPhrase as P};
-use crate::ui::Limits;
-use crate::ui::phrases::{Invalid, PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat};
-use crate::ui::{Builder, Tree};
 use crate::words::Words;
+use skein_ui::Limits;
+use skein_ui::phrases::{Invalid, PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat};
+use skein_ui::{Builder, Tree};
 
 use jig_domain_client::contract::*;
 use skein_lib::{List, Wall, bytes::copy_of};
@@ -52,7 +52,7 @@ fn words(selected: bool) -> Words {
     let mut english = crate::phrases::english::language();
     english.wall = WallFormat::Nanos;
     english.span_unit = SpanUnit::Nanos;
-    let languages: Box<[crate::ui::phrases::Language]> = if selected {
+    let languages: Box<[skein_ui::phrases::Language]> = if selected {
         let mut translated = english.clone();
         for phrase in &mut translated.phrases {
             for form in &mut phrase.forms {
@@ -109,14 +109,14 @@ fn envelope(tree: &Tree, f: view::ActivityFragment) {
     assert!(tree.len() <= f.nodes);
     let mut total = 0_u64;
     for node in tree.nodes() {
-        assert!(node.text_bytes() <= f.text_per_node);
-        total = total.checked_add(u64::from(node.text_bytes())).unwrap();
+        assert!(crate::tests::text_bytes(node) <= f.text_per_node);
+        total = total.checked_add(u64::from(crate::tests::text_bytes(node))).unwrap();
         if let Some(name) = &node.name {
             assert!(name.len() <= usize::try_from(f.text_per_node).unwrap());
             total = total.checked_add(u64::try_from(name.len()).unwrap()).unwrap();
         }
         assert!(node.binding.is_none() && node.slot.is_none());
-        if node.role == crate::ui::Role::Region {
+        if node.role == skein_ui::Role::Region {
             assert!(node.name.is_some());
         }
     }
@@ -481,7 +481,7 @@ fn owner_activity_all_six_result_metadata_keep_approved_presence_opaque_fields_a
         .nodes()
         .iter()
         .flat_map(|n| &n.text)
-        .filter(|r| r.run == crate::ui::Run::Code)
+        .filter(|r| r.run == skein_ui::Run::Code)
         .map(|r| r.text.as_ref())
         .collect();
     assert_eq!(codes.as_ref(), [b"\\xFF\\x00".as_slice(), b"opaque", b"a/b", b"\\xFE\\x01", UTF8_TEXTS[0]].as_slice());

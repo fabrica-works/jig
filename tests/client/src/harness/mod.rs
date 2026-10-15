@@ -5,9 +5,9 @@ pub use faults::Fault;
 pub mod referee;
 pub use observation::*;
 mod world;
-use jig_view::ui::Act;
-use jig_view::ui::{NodeId, Patch, Tree};
 use skein_lib::{Env, Queue, Time, Wall};
+use skein_ui::Act;
+use skein_ui::{NodeId, Patch, Tree};
 use std::fmt::Debug;
 pub use world::*;
 /// An application root and view. The shell reads only requests and trees.
@@ -35,7 +35,7 @@ pub trait App: Sized {
     fn record_key(record: &Self::Record) -> Self::Key;
     fn unsent(request: Self::Request) -> Option<Self::Event>;
     fn max_out(limits: &Self::Limits) -> u32;
-    fn view_limits(view: &Self::View) -> jig_view::ui::Limits;
+    fn view_limits(view: &Self::View) -> skein_ui::Limits;
     fn patch_limit(view: &Self::View) -> u32;
     fn worst_case(limits: &Self::Limits) -> u64;
     fn seen(tree: &Tree) -> Vec<Seen>;

@@ -2,10 +2,10 @@
 //! (client/domain/objects.md, 7; view.md, 7 and 10).
 use crate::owner_person_task_words::PersonPhrase as P;
 use crate::phrases::jig::JigPhrase;
-use crate::ui::phrases::Hole;
-use crate::ui::{Builder, Role, Run, State};
 use crate::words::Words;
 use crate::{JigBindings, JigMeaning};
+use skein_ui::phrases::Hole;
+use skein_ui::{Builder, Role, Run, State};
 
 use alloc::boxed::Box;
 use jig_domain_client::{

@@ -673,7 +673,7 @@ pub fn held_chat(seed: u64) -> World<Test, Scripted> {
 #[must_use]
 pub fn start_chat_steps() -> Vec<jig_fake_person::Step<RootAddress>> {
     use jig_fake_person::{Find, Step};
-    use jig_view::ui::Role;
+    use skein_ui::Role;
     vec![
         Step::See { find: Find::named(Role::TextArea, b"First words"), within: Duration::from_secs(1) },
         Step::Type { find: Find::named(Role::TextArea, b"First words"), words: Box::from(*b"Hello") },

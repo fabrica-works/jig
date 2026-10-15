@@ -1,7 +1,7 @@
 use jig_client_world::{ClientId, Scripted, Test, Until, World, stories};
 use jig_fake_person::{Find, Step};
-use jig_view::ui::Role;
 use skein_lib::{Duration, Time};
+use skein_ui::Role;
 type ShellWorld = World<Test, Scripted>;
 #[test]
 fn separate_tabs_reload_and_drop_old_callbacks_while_history_moves_both_ways() {

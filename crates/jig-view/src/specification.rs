@@ -1,8 +1,8 @@
 //! Whole specification presentation (client/domain/contract.md, 5.2; view.md, 10).
 use crate::phrases::jig::JigPhrase;
-use crate::ui::phrases::Hole;
-use crate::ui::{Builder, Run};
 use crate::words::Words;
+use skein_ui::phrases::Hole;
+use skein_ui::{Builder, Run};
 
 use jig_domain_client::{
     Limits,
@@ -11,7 +11,7 @@ use jig_domain_client::{
 
 /// Show every supplied parameter and input without interpreting opaque values.
 pub fn specification(b: &mut Builder, value: &Specification, words: &Words) {
-    crate::ui::markdown::read(value.words.bytes(), 2, b);
+    skein_ui::markdown::read(value.words.bytes(), 2, b);
     for parameter in &value.parameters {
         match parameter {
             Parameter::Number { name, value } => {
@@ -61,5 +61,5 @@ pub fn document(b: &mut Builder, value: &SpecificationDocument, words: &Words) {
 /// Maximum nodes for whole words, all parameter variants, input rows and loss marker.
 #[must_use]
 pub fn nodes(limits: &Limits) -> Option<u32> {
-    crate::ui::markdown::max_nodes(limits.text)?.checked_add(limits.rows.checked_mul(4)?)?.checked_add(2)
+    skein_ui::markdown::max_nodes(limits.text)?.checked_add(limits.rows.checked_mul(4)?)?.checked_add(2)
 }

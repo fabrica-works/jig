@@ -1,8 +1,8 @@
 use jig_client_world::{ClientId, Fault, FrontFault, Scripted, Test, Until, World, stories};
 use jig_fake_person::{Face, Find, Found, Step, TreeFace};
-use jig_view::ui::Act;
-use jig_view::ui::{NodeId, Role};
 use skein_lib::{Duration, Time, Wall};
+use skein_ui::Act;
+use skein_ui::{NodeId, Role};
 fn node(w: &World<Test, Scripted>, c: ClientId, find: &Find) -> NodeId {
     let Found::Node(node) = TreeFace::new(w.tree(c)).find(find) else {
         panic!("missing {find}");

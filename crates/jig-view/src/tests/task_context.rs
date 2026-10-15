@@ -1,7 +1,7 @@
 use super::*;
 use crate::phrases::jig::JigPhrase;
-use crate::ui::phrases::Hole;
 use jig_domain_client::address::{Address, TaskSection};
+use skein_ui::phrases::Hole;
 
 #[test]
 fn task_context_view_preserves_supplied_runtime_spend_slots_and_impact_without_claiming_missing_facts() {

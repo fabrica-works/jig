@@ -141,6 +141,7 @@ skein-codec = { git = "https://github.com/forgetic/skein.git" }
 skein-codegen = { git = "https://github.com/forgetic/skein.git" }
 skein-heap = { git = "https://github.com/forgetic/skein.git" }
 skein-lib = { git = "https://github.com/forgetic/skein.git" }
+skein-ui = { git = "https://github.com/forgetic/skein.git" }
 skein-kv = { git = "https://github.com/forgetic/skein.git" }
 skein-io = { git = "https://github.com/forgetic/skein.git" }
 skein-json = { git = "https://github.com/forgetic/skein.git" }

@@ -5,8 +5,8 @@ use jig_domain_client::contract::*;
 use jig_fake_person::{Face, Find, Found, TreeFace};
 use jig_test_domain_client::{self as domain, Event, Request, family};
 use jig_view::Owner;
-use jig_view::ui::{Key, NodeId, Role, Tree};
 use skein_lib::RequestEnvelope;
+use skein_ui::{Key, NodeId, Role, Tree};
 
 #[must_use]
 pub fn key(object: ObjectKey) -> CardKey {
@@ -446,12 +446,12 @@ pub fn jig_window_changed(act: &jig_domain_client::action::Act) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{CardKey, CardSeen, Key, Owner, Role, Seen, jig_seen};
-    use jig_view::ui::View;
     use skein_lib::Queue;
+    use skein_ui::View;
 
     #[test]
     fn a_nested_application_status_cannot_decide_a_jig_card() {
-        let limits = jig_view::ui::Limits {
+        let limits = skein_ui::Limits {
             nodes: 16,
             depth: 4,
             text_per_node: 64,
@@ -486,7 +486,7 @@ mod tests {
     #[test]
     fn public_observations_keep_equal_task_and_party_proposal_cards_and_requests_distinct() {
         use jig_domain_client::contract::{Ask, Decision, ObjectKey, ProposalKey, Proposer};
-        let limits = jig_view::ui::Limits {
+        let limits = skein_ui::Limits {
             nodes: 16,
             depth: 4,
             text_per_node: 64,
@@ -518,7 +518,7 @@ mod tests {
             assert_eq!(sent.card, Some(card.clone()));
             builder.open(Role::Item);
             builder.key(Key { owner: Owner::Jig.opaque(), kind, a: u64::MAX, b: u64::MAX });
-            builder.text(jig_view::ui::Run::Plain, b"supplied proposal");
+            builder.text(skein_ui::Run::Plain, b"supplied proposal");
             builder.close();
             expected.push(Seen::Card { key: card, state: CardSeen::Waiting, revision: None });
         }

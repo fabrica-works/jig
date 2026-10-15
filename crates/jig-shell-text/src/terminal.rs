@@ -1,6 +1,5 @@
 use crate::{Command, Print, Refusal, command, refusal_line, render};
 use alloc::boxed::Box;
-use jig_view::ui::{Region, Tree};
 use skein_io::{
     Event, Io, Request,
     kernel::{Complete, Fd, Op, Submit},
@@ -9,6 +8,7 @@ use skein_lib::{
     Duration, Env, List, Queue, Time, Token, Wall, Writer,
     stream::{Down, Read, Up},
 };
+use skein_ui::{Region, Tree};
 const TAG: u64 = 1 << 62;
 const BATCH: u32 = 64;
 /// The application's whole terminal configuration, with no defaults.
@@ -62,7 +62,7 @@ pub struct Terminal {
 }
 impl Terminal {
     #[must_use]
-    pub fn new(settings: Settings, view: &jig_view::ui::Limits) -> Option<Self> {
+    pub fn new(settings: Settings, view: &skein_ui::Limits) -> Option<Self> {
         if settings.name.len() > usize::try_from(view.text_per_node).ok()? || settings.longest == 0 {
             return None;
         }

@@ -1,9 +1,9 @@
 //! Proposal action, funding and history in words (client/domain/objects.md, section 4).
 use crate::JigBindings;
 use crate::phrases::jig::JigPhrase;
-use crate::ui::phrases::Hole;
-use crate::ui::{Builder, Role};
 use crate::words::Words;
+use skein_ui::phrases::Hole;
+use skein_ui::{Builder, Role};
 
 use jig_domain_client::{
     Domain,
@@ -33,7 +33,7 @@ pub fn proposal(
     words.proposer(b, document.proposer);
     words.waiting(b, client.wall(), document.since);
     words.text(b, JigPhrase::ProposalWhy, &[]);
-    crate::ui::markdown::read(document.why.bytes(), 2, b);
+    skein_ui::markdown::read(document.why.bytes(), 2, b);
     action(b, &document.action, words, bindings);
     super::common::authority(b, &document.needs, words, bindings);
     super::common::funding(b, &document.funding, document.needs.budget, words);
@@ -75,7 +75,7 @@ pub fn action(b: &mut Builder, action: &ProposalAction, words: &Words, bindings:
         ProposalAction::Amend { task, before, change } => {
             words.text(b, JigPhrase::AmendTask, &[Hole::Number(*task)]);
             words.text(b, JigPhrase::Before, &[]);
-            crate::ui::markdown::read(before.bytes(), 2, b);
+            skein_ui::markdown::read(before.bytes(), 2, b);
             words.text(b, JigPhrase::After, &[]);
             amendment(b, change, words, bindings);
         }
@@ -114,7 +114,7 @@ pub fn amendment(b: &mut Builder, change: &Amendment, words: &Words, _bindings: 
         crate::specification::specification(b, spec, words);
     }
     if let Some(text) = &change.instructions {
-        crate::ui::markdown::read(text.bytes(), 2, b);
+        skein_ui::markdown::read(text.bytes(), 2, b);
     }
     if let Some(wake) = &change.wake {
         crate::owner_wake::policy(b, wake, &words.book, words.language);

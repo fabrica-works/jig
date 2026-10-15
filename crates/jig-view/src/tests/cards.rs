@@ -7,9 +7,6 @@
 
 use crate::phrases::english;
 use crate::phrases::jig::{JigPhrase, shapes};
-use crate::ui::Act;
-use crate::ui::phrases::{Hole, PhraseLimits, Phrasebook};
-use crate::ui::{Builder, Role, SlotRef, Tree};
 use crate::words::Words;
 use crate::{JigBindings, JigMeaning, Owner, decode};
 use jig_domain_client::{
@@ -23,6 +20,9 @@ use jig_domain_client::{
     objects::{Card, Left, Source},
 };
 use skein_lib::{Duration, Env, List, Queue, Time, Token, Wall};
+use skein_ui::Act;
+use skein_ui::phrases::{Hole, PhraseLimits, Phrasebook};
+use skein_ui::{Builder, Role, SlotRef, Tree};
 
 pub(super) const CLIENT: jig_domain_client::Limits = jig_domain_client::Limits {
     watches: 8,
@@ -53,8 +53,8 @@ pub(super) const CLIENT: jig_domain_client::Limits = jig_domain_client::Limits {
     backoff: Backoff { first: Duration::from_nanos(10), most: Duration::from_nanos(80) },
     heartbeat: Duration::from_secs(100),
 };
-pub(super) fn limits() -> crate::ui::Limits {
-    crate::ui::Limits {
+pub(super) fn limits() -> skein_ui::Limits {
+    skein_ui::Limits {
         nodes: 256,
         depth: 10,
         text_per_node: 1024,
@@ -434,7 +434,7 @@ fn jig_phrasebook_requires_every_sentence_and_says_wall_times_in_person_offset()
             }
         )
         .unwrap_err(),
-        crate::ui::phrases::Invalid::Missing { id: missing }
+        skein_ui::phrases::Invalid::Missing { id: missing }
     );
     let words = words();
     let mut b = Builder::new(&limits());

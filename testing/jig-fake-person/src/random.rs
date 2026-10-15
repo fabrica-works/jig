@@ -3,9 +3,9 @@
 //! nodes, and input bytes come from a small alphabet that includes Markdown.
 use alloc::boxed::Box;
 use alloc::vec::Vec;
-use jig_view::ui::Act;
-use jig_view::ui::{Node, NodeId, Role, State, Tree};
 use skein_lib::Rng;
+use skein_ui::Act;
+use skein_ui::{Node, NodeId, Role, State, Tree};
 
 const ALPHABET: &[u8] = b"abcdefghijklmnopqrstuvwxyz 0123456789\n#*_`[]()>-+.!";
 

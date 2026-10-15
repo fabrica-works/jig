@@ -23,10 +23,10 @@ mod tree;
 
 use alloc::boxed::Box;
 use core::fmt;
-use jig_view::ui::Act;
-use jig_view::ui::{NodeId, Role};
 pub use random::{RandomDoing, RandomPerson};
 use skein_lib::{Duration, Time};
+use skein_ui::Act;
+use skein_ui::{NodeId, Role};
 pub use tree::TreeFace;
 
 /// A semantic target, scoped through named ancestors, outermost first.

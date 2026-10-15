@@ -13,7 +13,7 @@ fn a_person_signs_in_by_the_printed_link_and_starts_a_chat() {
 #[test]
 fn a_person_s_part_request_is_answered_from_the_connector_s_outcome() {
     use jig_fake_person::{Find, Step};
-    use jig_view::ui::Role;
+    use skein_ui::Role;
     let mut w = fixtures::family_world(fixtures::SEED);
     let c = w.client(fixtures::FIRST_OWNER, stories::conversation());
     let parameters = Find::named(Role::TextField, b"Parameters");
@@ -88,7 +88,7 @@ fn a_slow_reader_gets_fewer_deliveries_and_others_are_answered() {
     world.person(
         second,
         fixtures::sign_in_then(vec![jig_fake_person::Step::See {
-            find: jig_fake_person::Find::exactly_named(jig_view::ui::Role::Button, b"Write"),
+            find: jig_fake_person::Find::exactly_named(skein_ui::Role::Button, b"Write"),
             within: Duration::from_secs(1),
         }]),
     );
@@ -134,10 +134,10 @@ fn signed_out_with_requests_pending_then_signed_in_again() {
             client,
             vec![
                 Step::See {
-                    find: Find::named(jig_view::ui::Role::Button, b"Sign in with Test"),
+                    find: Find::named(skein_ui::Role::Button, b"Sign in with Test"),
                     within: skein_lib::Duration::from_secs(1),
                 },
-                Step::Press { find: Find::named(jig_view::ui::Role::Button, b"Sign in with Test") },
+                Step::Press { find: Find::named(skein_ui::Role::Button, b"Sign in with Test") },
                 Step::See { find: Find::text(b"Held stopped"), within: skein_lib::Duration::from_secs(5) },
             ],
         );

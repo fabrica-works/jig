@@ -228,6 +228,7 @@ dependencies = [
  "skein-lib",
  "skein-shell",
  "skein-sim",
+ "skein-ui",
  "skein-world",
 ]
 
@@ -269,6 +270,7 @@ dependencies = [
  "jig-view",
  "sha2",
  "skein-lib",
+ "skein-ui",
  "skein-world",
  "smith-transcript",
 ]
@@ -466,8 +468,8 @@ dependencies = [
 name = "jig-fake-person"
 version = "0.0.0"
 dependencies = [
- "jig-view",
  "skein-lib",
+ "skein-ui",
 ]
 
 [[package]]
@@ -625,6 +627,7 @@ dependencies = [
  "jig-ops-domain-connectors",
  "jig-view",
  "skein-lib",
+ "skein-ui",
 ]
 
 [[package]]
@@ -664,6 +667,7 @@ dependencies = [
  "sha2",
  "skein-json",
  "skein-lib",
+ "skein-ui",
  "skein-world",
  "smith-channel",
  "smith-charter",
@@ -894,10 +898,10 @@ dependencies = [
 name = "jig-shell-text"
 version = "0.0.0"
 dependencies = [
- "jig-view",
  "skein-io",
  "skein-lib",
  "skein-sim",
+ "skein-ui",
 ]
 
 [[package]]
@@ -1144,6 +1148,7 @@ dependencies = [
  "jig-test-domain-client",
  "jig-view",
  "skein-lib",
+ "skein-ui",
 ]
 
 [[package]]
@@ -1168,6 +1173,7 @@ version = "0.0.0"
 dependencies = [
  "jig-domain-client",
  "skein-lib",
+ "skein-ui",
 ]
 
 [[package]]
@@ -1603,6 +1609,14 @@ dependencies = [
  "skein-lib",
  "skein-sim",
  "skein-tls",
+]
+
+[[package]]
+name = "skein-ui"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/skein.git#dc71a49f2512a2a17f92f0be02d684d56ce5eda7"
+dependencies = [
+ "skein-lib",
 ]
 
 [[package]]

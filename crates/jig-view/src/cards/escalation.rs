@@ -1,9 +1,9 @@
 //! Escalations keep the whole hold story and document-offered acts (objects.md, 5).
 use crate::JigBindings;
 use crate::phrases::jig::JigPhrase;
-use crate::ui::Builder;
-use crate::ui::phrases::Hole;
 use crate::words::Words;
+use skein_ui::Builder;
+use skein_ui::phrases::Hole;
 
 use jig_domain_client::{
     Domain,

@@ -2,9 +2,9 @@ use jig_client_world::{ClientId, Fault, FrontFault, Scripted, Test, Until, World
 use jig_domain_client::address::{Address, ProjectSection};
 use jig_fake_person::{Find, Step};
 use jig_test_domain_client::{Address as RootAddress, Event, Place};
-use jig_view::ui::Act;
-use jig_view::ui::Role;
 use skein_lib::{Duration, Time, Wall};
+use skein_ui::Act;
+use skein_ui::Role;
 type PageWorld = World<Test, Scripted>;
 fn print(w: &PageWorld, c: ClientId, label: &str, golden: &[u8]) {
     let (_, view) = jig_client_world::test::new(&jig_client_world::test::limits(), 0);

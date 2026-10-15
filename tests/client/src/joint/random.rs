@@ -4,8 +4,8 @@
 use super::{Joint, fixture};
 use crate::{Fault, FrontFault, Outcome, Test, Until, World};
 use jig_fake_person::{Face, Find, Found, Step, TreeFace};
-use jig_view::ui::Role;
 use skein_lib::{Duration, Rng};
+use skein_ui::Role;
 use skein_world::domain::Verdict;
 
 /// The real engine transaction fault reached in this seed.

@@ -10,9 +10,9 @@ use jig_test_domain_client::{
     },
     family::Scope,
 };
-use jig_view::ui::phrases::Hole;
-use jig_view::ui::{Builder, Role, Run};
 use jig_view::words::Words;
+use skein_ui::phrases::Hole;
+use skein_ui::{Builder, Role, Run};
 
 use skein_lib::{List, Wall};
 
@@ -327,7 +327,7 @@ pub fn document_nodes(limits: &ConnectorLimits) -> Option<u32> {
 }
 /// Whole tree requirements, including one caller's enclosing Page and every loaded language.
 #[must_use]
-pub fn requirements(limits: &ConnectorLimits, words: &Words) -> Option<jig_view::ui::Limits> {
+pub fn requirements(limits: &ConnectorLimits, words: &Words) -> Option<skein_ui::Limits> {
     let nodes = document_nodes(limits)?.max(answer_nodes()).checked_add(1)?;
     let mut phrase = jig_view::literal_segment::max_bytes(limits.segment_bytes)?;
     for word in ALL {
@@ -336,7 +336,7 @@ pub fn requirements(limits: &ConnectorLimits, words: &Words) -> Option<jig_view:
     for word in jig_view::phrases::jig::ALL {
         phrase = phrase.max(words.book.capacity(word.id())?);
     }
-    Some(jig_view::ui::Limits {
+    Some(skein_ui::Limits {
         nodes,
         depth: 12,
         text_per_node: phrase,
@@ -355,6 +355,6 @@ pub fn requirements(limits: &ConnectorLimits, words: &Words) -> Option<jig_view:
 #[must_use]
 pub fn worst_case(limits: &ConnectorLimits, words: &Words) -> Option<u64> {
     jig_view::limits::jig_worst_case(&requirements(limits, words)?)?
-        .checked_add(jig_view::ui::phrases::worst_case(words.book.limits())?)?
+        .checked_add(skein_ui::phrases::worst_case(words.book.limits())?)?
         .checked_add(u64::from(jig_view::literal_segment::max_bytes(limits.segment_bytes)?))
 }

@@ -1,11 +1,11 @@
 //! Neutral controls for provisional raw input; client/domain/view.md, 7 and 9.
 //! IDs 6800–6802 keep raw byte display outside bounded name holes.
 use crate::Owner;
-use crate::ui::phrases::{
-    Form, Language, Phrase, PhraseId, PhraseShape, PluralClass, PluralRule, Segment, SpanUnit, WallFormat,
-};
 use alloc::boxed::Box;
 use skein_lib::{List, bytes::copy_of};
+use skein_ui::phrases::{
+    Form, Language, Phrase, PhraseId, PhraseShape, PluralClass, PluralRule, Segment, SpanUnit, WallFormat,
+};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LiveCallPhrase {
     OpenCurrentCallInput,

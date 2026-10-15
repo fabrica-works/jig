@@ -2,14 +2,14 @@
 mod accounts;
 mod agents;
 use crate::Owner;
-use crate::ui::phrases::{
-    Form, HoleKind, HoleShape, Language, Phrase, PhraseId, PhraseShape, PluralClass, PluralRule, Segment, SpanUnit,
-    WallFormat,
-};
 pub use accounts::AccountPhrase;
 pub use agents::AgentPhrase;
 use alloc::boxed::Box;
 use skein_lib::{List, bytes::copy_of};
+use skein_ui::phrases::{
+    Form, HoleKind, HoleShape, Language, Phrase, PhraseId, PhraseShape, PluralClass, PluralRule, Segment, SpanUnit,
+    WallFormat,
+};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DeploymentPhrase {
     Agent(AgentPhrase),

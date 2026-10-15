@@ -71,9 +71,9 @@ fn ledger_parent_state_and_period_options_survive_whole_value_pricing() {
 fn maximal_budget_and_ledger_fragments_fit_tree_and_checked_words_heap_bounds() {
     use jig_view::owner_budget as view;
     use jig_view::owner_budget_words::{self as data, OwnerBudgetWords};
-    use jig_view::ui::Builder;
-    use jig_view::ui::Limits;
-    use jig_view::ui::phrases::PhraseLimits;
+    use skein_ui::Builder;
+    use skein_ui::Limits;
+    use skein_ui::phrases::PhraseLimits;
 
     let language_limits = PhraseLimits {
         languages: 1,

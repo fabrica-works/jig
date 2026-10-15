@@ -2,9 +2,9 @@
 //! See client/domain/objects.md, 3, and view.md, 7 and 10.
 use crate::JigBindings;
 use crate::phrases::jig::JigPhrase;
-use crate::ui::phrases::Hole;
-use crate::ui::{Builder, Run};
 use crate::words::Words;
+use skein_ui::phrases::Hole;
+use skein_ui::{Builder, Run};
 
 use jig_domain_client::contract::{ActiveRun, HeldRuntime, RetryNotice, RunStage, RunWork};
 

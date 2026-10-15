@@ -1,11 +1,11 @@
 //! Checked lifecycle pending proposal sayings (client/domain/view.md, 7).
 use crate::Owner;
-use crate::ui::phrases::{
+use alloc::boxed::Box;
+use skein_lib::{List, bytes::copy_of};
+use skein_ui::phrases::{
     Form, HoleKind, HoleShape, Language, Phrase, PhraseId, PhraseShape, PluralClass, PluralRule, Segment, SpanUnit,
     WallFormat,
 };
-use alloc::boxed::Box;
-use skein_lib::{List, bytes::copy_of};
 /// Closed pending proposal captions, composed into normal owner words.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ProposalPhrase {

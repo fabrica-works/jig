@@ -1,10 +1,10 @@
 #![expect(clippy::disallowed_methods, reason = "ordinary tests inspect complete semantic trees")]
 use crate::owner_wake_words::WakePhrase;
-use crate::ui::phrases::{
+use crate::{owner_wake, owner_wake_words};
+use skein_ui::phrases::{
     Form, HoleKind, Language, Phrase, PhraseLimits, Phrasebook, PluralClass, PluralRule, Segment, SpanUnit, WallFormat,
 };
-use crate::ui::{Builder, Role, Tree};
-use crate::{owner_wake, owner_wake_words};
+use skein_ui::{Builder, Role, Tree};
 
 use jig_domain_client::contract::{
     OwnerWakePolicy, ResultsWake, Subscription, SubscriptionKind, Subscriptions, WakeRule,
@@ -13,7 +13,7 @@ use skein_lib::{Duration, List, Wall};
 
 fn builder(nodes: u32, book: &Phrasebook) -> Builder {
     let bytes = owner_wake::phrase_bytes(book).unwrap();
-    Builder::new(&crate::ui::Limits {
+    Builder::new(&skein_ui::Limits {
         nodes: nodes.checked_add(1).unwrap(),
         depth: 4,
         text_per_node: bytes,
@@ -169,6 +169,6 @@ fn owner_wake_renderer_uses_checked_selected_language_with_reordered_holes() {
             &PhraseLimits { languages: 1, phrases: 27, holes: 2, segments: 100, text_bytes: 2000, hole_bytes: 0 }
         )
         .unwrap_err(),
-        crate::ui::phrases::Invalid::Missing { id: WakePhrase::Policy.id() }
+        skein_ui::phrases::Invalid::Missing { id: WakePhrase::Policy.id() }
     );
 }

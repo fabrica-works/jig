@@ -1,6 +1,6 @@
 //! jig's view limits and page scratch (client/domain/view.md, section 10).
 
-use crate::ui::Limits;
+use skein_ui::Limits;
 
 /// Whole jig composition in one enclosing page, with English's phrase
 /// envelope (256 literal bytes, at most three holes). Connector
@@ -97,5 +97,5 @@ pub fn envelope(
 /// Heap for the UI containers and jig's page-building scratch.
 #[must_use]
 pub fn jig_worst_case(limits: &Limits) -> Option<u64> {
-    crate::ui::worst_case(limits)?.checked_add(crate::pages::scratch(limits)?)
+    skein_ui::worst_case(limits)?.checked_add(crate::pages::scratch(limits)?)
 }

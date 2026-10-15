@@ -4,9 +4,9 @@
 use crate::JigBindings;
 use crate::owner_tree_words::TreePhrase as P;
 use crate::phrases::jig::JigPhrase;
-use crate::ui::phrases::Hole;
-use crate::ui::{Builder, Role, Run, State};
 use crate::words::Words;
+use skein_ui::phrases::Hole;
+use skein_ui::{Builder, Role, Run, State};
 
 use jig_domain_client::{
     Domain, Limits,

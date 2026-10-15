@@ -1,6 +1,6 @@
 //! Present each supplied text loss fact (client/domain/contract.md, 5.2; view.md, 10).
-use crate::ui::{Builder, Run};
 use crate::{phrases::jig::JigPhrase, words::Words};
+use skein_ui::{Builder, Run};
 
 use jig_domain_client::contract::DocumentText;
 
@@ -11,7 +11,7 @@ pub fn plain(b: &mut Builder, value: &DocumentText, words: &Words) {
 }
 /// Show structured words and that value's own loss marker.
 pub fn markdown(b: &mut Builder, value: &DocumentText, words: &Words) {
-    crate::ui::markdown::read(value.bytes(), 2, b);
+    skein_ui::markdown::read(value.bytes(), 2, b);
     loss(b, value, words);
 }
 /// Show only the independently supplied loss fact next to existing content.

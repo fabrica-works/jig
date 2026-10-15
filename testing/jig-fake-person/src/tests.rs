@@ -1,7 +1,7 @@
 use super::*;
-use jig_view::ui::Binding;
-use jig_view::ui::Limits;
-use jig_view::ui::{Builder, DrawingKind, Owner, Role, Run, State, View};
+use skein_ui::Binding;
+use skein_ui::Limits;
+use skein_ui::{Builder, DrawingKind, Owner, Role, Run, State, View};
 
 use skein_lib::{Queue, Token};
 
@@ -382,7 +382,7 @@ fn random_people_never_act_on_unbound_disabled_or_unshown_nodes() {
         b.close();
         b.close();
     });
-    let empty = jig_view::ui::Tree::new(0);
+    let empty = skein_ui::Tree::new(0);
     let unshown = {
         let mut b = Builder::new(&LIMITS);
         b.open(Role::Button);

@@ -86,11 +86,11 @@ fn the_project_tabs_mark_the_addresss_own_section_current() {
         let current: Vec<_> = tree
             .nodes()
             .iter()
-            .filter(|n| n.role == Role::Tab && n.states.as_slice().contains(&crate::ui::State::Current))
+            .filter(|n| n.role == Role::Tab && n.states.as_slice().contains(&skein_ui::State::Current))
             .collect();
         assert_eq!(current.len(), 1, "{section:?}");
         assert_eq!(
-            crate::decode(&mut bindings, current[0].binding.unwrap().token, crate::ui::Act::Press),
+            crate::decode(&mut bindings, current[0].binding.unwrap().token, skein_ui::Act::Press),
             Some(Act::Go { address: Address::Project { project: 4, section } })
         );
     }

@@ -1,9 +1,9 @@
 //! Inbox groups reuse the same cards and their context (client/domain/pages.md, 3).
 use crate::phrases::jig::JigPhrase;
-use crate::ui::phrases::Hole;
-use crate::ui::{Builder, Role, Run};
 use crate::words::Words;
 use crate::{JigBindings, cards};
+use skein_ui::phrases::Hole;
+use skein_ui::{Builder, Role, Run};
 
 use jig_domain_client::{
     Domain,
@@ -271,7 +271,7 @@ fn owner_entry(
         OwnerInboxObject::Reply { message } => (55, task, message),
         OwnerInboxObject::Result { position } => (56, task, position),
     };
-    b.key(crate::ui::Key { owner: crate::Owner::Jig.opaque(), kind, a, b: value });
+    b.key(skein_ui::Key { owner: crate::Owner::Jig.opaque(), kind, a, b: value });
     match entry.object {
         OwnerInboxObject::Question { message } => owner_text(b, words, InboxPhrase::Question, &[Hole::Number(message)]),
         OwnerInboxObject::Proposal { proposer, number } => match proposer {

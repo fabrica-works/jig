@@ -39,7 +39,6 @@ pub mod regions;
 mod runtime;
 mod sizes;
 pub use owner::Owner;
-pub mod ui;
 pub mod words;
 
 pub use binding::{JigBindings, JigMeaning, decode, jig_bindings_worst_case};

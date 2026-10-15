@@ -7,7 +7,7 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
-jig-view.workspace = true
+skein-ui.workspace = true
 skein-lib.workspace = true
 skein-io.workspace = true
 

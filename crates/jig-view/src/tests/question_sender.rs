@@ -10,8 +10,6 @@ use super::{
 use crate::JigBindings;
 use crate::phrases::english;
 use crate::phrases::jig::{JigPhrase, shapes};
-use crate::ui::phrases::{HoleKind, PhraseLimits, Phrasebook, Segment, WallFormat};
-use crate::ui::{Builder, Tree};
 use crate::words::Words;
 use jig_domain_client::{
     Domain,
@@ -19,6 +17,8 @@ use jig_domain_client::{
     objects::{Object, question::facts},
 };
 use skein_lib::{Id, List, Wall, bytes::copy_of};
+use skein_ui::phrases::{HoleKind, PhraseLimits, Phrasebook, Segment, WallFormat};
+use skein_ui::{Builder, Tree};
 fn fixture(from: Option<OwnerRequester>) -> (Domain, Id<Object>, Question) {
     let mut value = question();
     value.from = from;
@@ -106,7 +106,7 @@ fn question_sender_cards_render_exact_closed_kinds_full_widths_and_no_claim_for_
             shown
                 .nodes()
                 .iter()
-                .any(|node| node.role == crate::ui::Role::Button && node.name.as_deref() == Some(b"Answer"))
+                .any(|node| node.role == skein_ui::Role::Button && node.name.as_deref() == Some(b"Answer"))
         );
         assert_eq!(facts(d.objects().get(id).unwrap()), Some(&value));
     }
@@ -173,8 +173,8 @@ fn question_sender_maximum_card_has_finite_bounds_and_retains_independent_older_
         assert!(shown.len() <= limits.nodes);
         let mut total = 0_u64;
         for node in shown.nodes() {
-            assert!(node.text_bytes() <= limits.text_per_node);
-            total = total.checked_add(u64::from(node.text_bytes())).unwrap();
+            assert!(crate::tests::text_bytes(node) <= limits.text_per_node);
+            total = total.checked_add(u64::from(crate::tests::text_bytes(node))).unwrap();
         }
         assert!(total <= u64::from(limits.text_bytes));
         assert!(contains(&shown, b"4294967295 deployment/source"));
@@ -191,7 +191,7 @@ fn question_sender_maximum_card_has_finite_bounds_and_retains_independent_older_
         let buttons = |t: &Tree| {
             t.nodes()
                 .iter()
-                .filter(|node| node.role == crate::ui::Role::Button)
+                .filter(|node| node.role == skein_ui::Role::Button)
                 .map(|node| node.name.clone())
                 .collect::<Vec<_>>()
         };
@@ -209,10 +209,10 @@ fn question_sender_maximum_card_has_finite_bounds_and_retains_independent_older_
     for phrase in [JigPhrase::QuestionFromTask, JigPhrase::QuestionFromPerson, JigPhrase::QuestionFromDeployment] {
         assert_eq!(
             phrase.shape(CLIENT.text).holes.as_ref(),
-            &[crate::ui::phrases::HoleShape { kind: HoleKind::Number, bytes: 0 }]
+            &[skein_ui::phrases::HoleShape { kind: HoleKind::Number, bytes: 0 }]
         );
         assert!(
-            w.say(phrase, &[crate::ui::phrases::Hole::Number(u64::MAX)]).len()
+            w.say(phrase, &[skein_ui::phrases::Hole::Number(u64::MAX)]).len()
                 <= usize::try_from(w.book.capacity(phrase.id()).unwrap()).unwrap()
         );
     }

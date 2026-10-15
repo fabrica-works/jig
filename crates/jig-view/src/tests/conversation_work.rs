@@ -5,8 +5,6 @@
     reason = "ordinary view proofs drive public events and inspect selected semantic trees"
 )]
 use super::cards::{CLIENT, contains, text};
-use crate::ui::tree::Node;
-use crate::ui::{Builder, Tree};
 use crate::{owner_chip, owner_chip_words::ChipPhrase as P, words::Words};
 use jig_domain_client::{
     Domain, Request,
@@ -14,17 +12,18 @@ use jig_domain_client::{
     contract::*,
 };
 use skein_lib::{Token, Wall, bytes::copy_of};
+use skein_ui::{Builder, Tree};
 
 fn words() -> &'static Words {
     static WORDS: std::sync::OnceLock<Words> = std::sync::OnceLock::new();
     WORDS.get_or_init(|| {
         let mut language = crate::phrases::english::language();
-        language.wall = crate::ui::phrases::WallFormat::Nanos;
+        language.wall = skein_ui::phrases::WallFormat::Nanos;
         Words {
-            book: crate::ui::phrases::Phrasebook::load(
+            book: skein_ui::phrases::Phrasebook::load(
                 crate::phrases::jig::shapes(CLIENT.text),
                 Box::new([language]),
-                &crate::ui::phrases::PhraseLimits {
+                &skein_ui::phrases::PhraseLimits {
                     languages: 1,
                     phrases: crate::owner_words::phrase_count(),
                     holes: 4,
@@ -43,12 +42,12 @@ fn selected() -> &'static Words {
     static WORDS: std::sync::OnceLock<Words> = std::sync::OnceLock::new();
     WORDS.get_or_init(|| {
         let mut language = crate::phrases::english::language();
-        language.wall = crate::ui::phrases::WallFormat::Nanos;
+        language.wall = skein_ui::phrases::WallFormat::Nanos;
         for phrase in &mut language.phrases {
             if [P::Starting.id(), P::Writing.id(), P::Tool.id()].contains(&phrase.id) {
                 for form in &mut phrase.forms {
                     for segment in &mut form.segments {
-                        if let crate::ui::phrases::Segment::Text(bytes) = segment {
+                        if let skein_ui::phrases::Segment::Text(bytes) = segment {
                             *bytes = copy_of(b"Selected work report");
                         }
                     }
@@ -56,10 +55,10 @@ fn selected() -> &'static Words {
             }
         }
         Words {
-            book: crate::ui::phrases::Phrasebook::load(
+            book: skein_ui::phrases::Phrasebook::load(
                 crate::phrases::jig::shapes(CLIENT.text),
                 Box::new([crate::phrases::english::language(), language]),
-                &crate::ui::phrases::PhraseLimits {
+                &skein_ui::phrases::PhraseLimits {
                     languages: 2,
                     phrases: crate::owner_words::phrase_count(),
                     holes: 4,
@@ -149,7 +148,7 @@ fn owner_work_activity_without_synthetic_context_shows_all_seven_reports_and_ind
             assert!(contains(&tree, b"Work reported at: 47"));
             assert_eq!(contains(&tree, b"Actual run start unavailable"), started.is_none());
             if let Some(at) = started {
-                let caption = words().book.say(0, P::Started.id(), &[crate::ui::phrases::Hole::Wall(at)]).unwrap();
+                let caption = words().book.say(0, P::Started.id(), &[skein_ui::phrases::Hole::Wall(at)]).unwrap();
                 assert!(contains(&tree, &caption.text));
             }
             match work {
@@ -183,7 +182,7 @@ fn owner_work_absence_does_not_fabricate_report_and_preserves_independent_synthe
             assert_eq!(contains(&tree, b"Current work since: 31"), present);
             assert_eq!(contains(&tree, b"independent synthetic runtime"), context);
             assert!(!contains(&tree, b"Placed or adopted"));
-            assert!(tree.nodes().iter().any(|node| node.role == crate::ui::Role::Log));
+            assert!(tree.nodes().iter().any(|node| node.role == skein_ui::Role::Log));
         }
     }
 }
@@ -222,10 +221,10 @@ fn selected_owner_work_activity_preserves_conversation_and_opaque_provisional_te
         assert!(!contains(&tree, b"Reported work writing"));
         assert!(contains(&tree, b"Provisional"));
         assert!(contains(&tree, b"provisional reply"));
-        assert!(tree.nodes().iter().any(|node| node.role == crate::ui::Role::Log && node.name.is_some()));
+        assert!(tree.nodes().iter().any(|node| node.role == skein_ui::Role::Log && node.name.is_some()));
     }
 }
-fn fragment(value: &OwnerChipObservation, capacity: &crate::ui::Limits) -> Tree {
+fn fragment(value: &OwnerChipObservation, capacity: &skein_ui::Limits) -> Tree {
     let mut builder = Builder::new(capacity);
     owner_chip::observation(&mut builder, value, words());
     builder.finish()
@@ -245,7 +244,7 @@ fn owner_work_fragment_checks_raw_limits_exact_six_leaves_bytes_and_one_under_st
     assert_eq!(bound.depth, 1);
     assert_eq!(bound.bindings, 0);
     assert_eq!(bound.slots, 0);
-    let capacity = crate::ui::Limits {
+    let capacity = skein_ui::Limits {
         nodes: bound.nodes,
         depth: bound.depth,
         text_per_node: bound.text_per_node,
@@ -260,16 +259,16 @@ fn owner_work_fragment_checks_raw_limits_exact_six_leaves_bytes_and_one_under_st
     let tree = fragment(&value, &capacity);
     assert_eq!(tree.len(), bound.nodes);
     assert!(tree.nodes().iter().all(|node| node.binding.is_none() && node.slot.is_none()));
-    let total = tree.nodes().iter().map(Node::text_bytes).sum::<u32>();
-    let largest = tree.nodes().iter().map(Node::text_bytes).max().unwrap();
+    let total = tree.nodes().iter().map(crate::tests::text_bytes).sum::<u32>();
+    let largest = tree.nodes().iter().map(crate::tests::text_bytes).max().unwrap();
     assert!(bound.text_per_node >= largest.checked_mul(2).unwrap());
     assert!(bound.text_bytes >= total);
-    let exact = crate::ui::Limits { text_per_node: largest, text_bytes: total, ..capacity };
+    let exact = skein_ui::Limits { text_per_node: largest, text_bytes: total, ..capacity };
     assert_eq!(fragment(&value, &exact).nodes(), tree.nodes());
     for smaller in [
-        crate::ui::Limits { nodes: 5, ..exact },
-        crate::ui::Limits { text_per_node: largest - 1, ..exact },
-        crate::ui::Limits { text_bytes: total - 1, ..exact },
+        skein_ui::Limits { nodes: 5, ..exact },
+        skein_ui::Limits { text_per_node: largest - 1, ..exact },
+        skein_ui::Limits { text_bytes: total - 1, ..exact },
     ] {
         std::panic::catch_unwind(|| fragment(&value, &smaller)).unwrap_err();
     }

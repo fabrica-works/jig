@@ -1,9 +1,9 @@
 //! Durable engine categories and complete refusal facts; client/domain/contract.md, 4.
 use super::Words;
 use crate::phrases::jig::JigPhrase;
-use crate::ui::Builder;
-use crate::ui::phrases::Hole;
 use jig_domain_client::contract::{AdmissionLimit, CurrentHold, DisposalIssue, HeldRole, Limit, Moved, Refusal};
+use skein_ui::Builder;
+use skein_ui::phrases::Hole;
 impl Words {
     /// Say the supplied refusal, never deriving permission or numerical limits.
     pub fn refusal(&self, b: &mut Builder, refusal: &Refusal) {

@@ -1,9 +1,9 @@
 //! Compact exact lifecycle; whole metadata is expanded on the task page.
 //! See client/domain/objects.md, 3, and domain/tasks.md, 5.
 use crate::phrases::jig::JigPhrase;
-use crate::ui::Builder;
-use crate::ui::phrases::Hole;
 use crate::words::Words;
+use skein_ui::Builder;
+use skein_ui::phrases::Hole;
 
 use jig_domain_client::contract::{ClosingStage, OwnerChipPhase, RunStage};
 

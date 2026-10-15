@@ -5,9 +5,9 @@
 )]
 use super::cards::{CLIENT, contains, shared_words};
 use crate::JigBindings;
-use crate::ui::{Builder, Role};
 use jig_domain_client::contract::*;
 use skein_lib::List;
+use skein_ui::{Builder, Role};
 fn list<T>(values: impl IntoIterator<Item = T>) -> List<T> {
     let values: Vec<_> = values.into_iter().collect();
     let mut out = List::with_capacity(u32::try_from(values.len()).unwrap());

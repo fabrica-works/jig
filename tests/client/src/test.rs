@@ -4,9 +4,9 @@ use crate::harness::*;
 use jig_domain_client::{boundary::Offset, contract::*};
 use jig_test_domain_client::{self as domain, Address, Event, JigOut, Request, first};
 use jig_test_view as view;
-use jig_view::ui::Act;
-use jig_view::ui::{NodeId, Patch, Tree};
 use skein_lib::{Duration, Env, List, Queue, RequestEnvelope, RequestLimits, Time};
+use skein_ui::Act;
+use skein_ui::{NodeId, Patch, Tree};
 use std::{
     collections::BTreeMap,
     sync::{Mutex, OnceLock},
@@ -268,7 +268,7 @@ impl App for Test {
     fn max_out(limits: &Self::Limits) -> u32 {
         domain::max_out(limits)
     }
-    fn view_limits(view: &Self::View) -> jig_view::ui::Limits {
+    fn view_limits(view: &Self::View) -> skein_ui::Limits {
         view.limits().tree
     }
     fn patch_limit(view: &Self::View) -> u32 {

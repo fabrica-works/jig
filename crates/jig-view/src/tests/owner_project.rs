@@ -5,10 +5,10 @@
     clippy::wildcard_enum_match_arm,
     reason = "ordinary public proofs inspect complete accessible trees, raw slots and decoded actions"
 )]
-use crate::ui::phrases::{PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat};
-use crate::ui::{Builder, Role, Tree};
 use crate::words::Words;
 use crate::{JigBindings, owner_project as view};
+use skein_ui::phrases::{PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat};
+use skein_ui::{Builder, Role, Tree};
 
 use jig_domain_client::{Domain, contract::*};
 use skein_lib::{
@@ -275,8 +275,8 @@ fn words(selected: bool) -> &'static Words {
     static SELECTED: std::sync::OnceLock<Words> = std::sync::OnceLock::new();
     if selected { SELECTED.get_or_init(|| make_words(true)) } else { NORMAL.get_or_init(|| make_words(false)) }
 }
-fn capacity(f: view::ProjectFragment) -> crate::ui::Limits {
-    crate::ui::Limits {
+fn capacity(f: view::ProjectFragment) -> skein_ui::Limits {
+    skein_ui::Limits {
         nodes: f.nodes,
         depth: f.depth,
         text_per_node: f.text_per_node,
@@ -302,8 +302,8 @@ fn build(value: &OwnerProject, w: &Words) -> (Tree, JigBindings) {
         .nodes()
         .iter()
         .map(|n| {
-            assert!(n.text_bytes() <= f.text_per_node);
-            u64::from(n.text_bytes())
+            assert!(crate::tests::text_bytes(n) <= f.text_per_node);
+            u64::from(crate::tests::text_bytes(n))
         })
         .sum();
     assert!(bytes <= u64::from(f.text_bytes));
@@ -414,7 +414,7 @@ fn owner_project_raw_role_permissions_requirement_guards_and_spend_recurring_sou
     assert_eq!(value.spend.iter().map(|s| s.chip.task).collect::<Vec<_>>(), [9, 0, u64::MAX, 9]);
     assert_eq!(value.recurring.get(0).unwrap().batch.iter().map(|t| t.number).collect::<Vec<_>>(), [u64::MAX, 0]);
     let region_name = words(false)
-        .say(crate::phrases::jig::JigPhrase::RecurringKey, &[crate::ui::phrases::Hole::Number(u64::from(u32::MAX))]);
+        .say(crate::phrases::jig::JigPhrase::RecurringKey, &[skein_ui::phrases::Hole::Number(u64::from(u32::MAX))]);
     let (index, recurring) = tree
         .nodes()
         .iter()
@@ -428,7 +428,7 @@ fn owner_project_raw_role_permissions_requirement_guards_and_spend_recurring_sou
                 && node.name.as_deref().is_some_and(|name| {
                     [0, u64::MAX].into_iter().any(|task| {
                         name == words(false)
-                            .say(crate::phrases::jig::JigPhrase::TaskPage, &[crate::ui::phrases::Hole::Number(task)])
+                            .say(crate::phrases::jig::JigPhrase::TaskPage, &[skein_ui::phrases::Hole::Number(task)])
                             .as_ref()
                     })
                 })
@@ -566,7 +566,7 @@ fn check_owner_project_real_page_decodes_whole_role_edits_preserves_prior_channe
         .binding
         .unwrap()
         .token;
-    let act = crate::decode(&mut bindings, textbox, crate::ui::Act::Input { value: copy_of(b"32833") }).unwrap();
+    let act = crate::decode(&mut bindings, textbox, skein_ui::Act::Input { value: copy_of(b"32833") }).unwrap();
     assert!(native_drive(&mut d, Event::Act { act }).is_empty());
     let (tree, mut bindings) = page(&d);
     let field = tree
@@ -577,7 +577,7 @@ fn check_owner_project_real_page_decodes_whole_role_edits_preserves_prior_channe
         .binding
         .unwrap()
         .token;
-    let act = crate::decode(&mut bindings, field, crate::ui::Act::Input { value: copy_of(b"129") }).unwrap();
+    let act = crate::decode(&mut bindings, field, skein_ui::Act::Input { value: copy_of(b"129") }).unwrap();
     native_drive(&mut d, Event::Act { act });
     let (tree, mut bindings) = page(&d);
     assert!(has(&tree, b"Before"));
@@ -592,7 +592,7 @@ fn check_owner_project_real_page_decodes_whole_role_edits_preserves_prior_channe
         .binding
         .unwrap()
         .token;
-    let act = crate::decode(&mut bindings, confirm, crate::ui::Act::Press).unwrap();
+    let act = crate::decode(&mut bindings, confirm, skein_ui::Act::Press).unwrap();
     assert_eq!(act, Act::Confirm);
     let sent = native_drive(&mut d, Event::Act { act });
     let asks: Vec<_> = sent
@@ -657,8 +657,8 @@ fn owner_project_public_whole_tree_accepts_exact_observed_nodes_and_text_and_ref
     let f = view::required(&value, &limits(), w).unwrap();
     let mut bound = capacity(f);
     bound.nodes = tree.len();
-    bound.text_bytes = tree.nodes().iter().map(crate::ui::Node::text_bytes).sum();
-    let render = |bound: crate::ui::Limits| {
+    bound.text_bytes = tree.nodes().iter().map(crate::tests::text_bytes).sum();
+    let render = |bound: skein_ui::Limits| {
         let mut b = Builder::new(&bound);
         let mut bindings = JigBindings::new(f.bindings, 32);
         view::render(&mut b, &value, &Domain::new(&limits(), 9151), w, &mut bindings);
@@ -752,7 +752,7 @@ fn owner_project_public_service_and_pool_inputs_decode_explicit_values_and_prese
         .iter()
         .filter(|node| node.role == Role::Button)
         .find_map(|node| {
-            node.binding.and_then(|binding| match crate::decode(&mut bindings, binding.token, crate::ui::Act::Press) {
+            node.binding.and_then(|binding| match crate::decode(&mut bindings, binding.token, skein_ui::Act::Press) {
                 Some(act @ Act::ProjectServiceRole { role: HeldRole::Policy { role: u32::MAX } }) => Some(act),
                 _ => None,
             })
@@ -766,7 +766,7 @@ fn owner_project_public_service_and_pool_inputs_decode_explicit_values_and_prese
         .find(|node| node.role == Role::TextField && node.name.as_deref() == Some(b"Name".as_slice()))
         .unwrap();
     assert!(name.value.is_none());
-    let act = crate::decode(&mut bindings, name.binding.unwrap().token, crate::ui::Act::Input { value: copy_of(b"") })
+    let act = crate::decode(&mut bindings, name.binding.unwrap().token, skein_ui::Act::Input { value: copy_of(b"") })
         .unwrap();
     let Act::ProjectSettings { ask } = &act else { panic!("explicit service request") };
     assert!(match ask.as_ref() {
@@ -798,7 +798,7 @@ fn owner_project_public_service_and_pool_inputs_decode_explicit_values_and_prese
                 match crate::decode(
                     &mut bindings,
                     binding.token,
-                    crate::ui::Act::Input { value: copy_of(b"18446744073709551615") },
+                    skein_ui::Act::Input { value: copy_of(b"18446744073709551615") },
                 ) {
                     Some(Act::ProjectSettings { ask })
                         if match ask.as_ref() {
@@ -835,7 +835,7 @@ fn owner_project_public_service_and_pool_inputs_decode_explicit_values_and_prese
         .iter()
         .filter(|node| node.role == Role::Button)
         .find_map(|node| {
-            node.binding.and_then(|binding| match crate::decode(&mut bindings, binding.token, crate::ui::Act::Press) {
+            node.binding.and_then(|binding| match crate::decode(&mut bindings, binding.token, skein_ui::Act::Press) {
                 Some(Act::ProjectSettings { ask })
                     if match ask.as_ref() {
                         Ask::SetRoles { holdings, .. }
@@ -893,7 +893,7 @@ fn owner_project_public_goal_form_decodes_whole_bounded_procedure_and_keeps_prop
         .nodes()
         .iter()
         .find_map(|node| {
-            let act = crate::decode(&mut bindings, node.binding?.token, crate::ui::Act::Press)?;
+            let act = crate::decode(&mut bindings, node.binding?.token, skein_ui::Act::Press)?;
             match act {
                 Act::GoalForm { form } if form.executor == executor => Some(form),
                 _ => None,
@@ -906,7 +906,7 @@ fn owner_project_public_goal_form_decodes_whole_bounded_procedure_and_keeps_prop
     let (tree, mut bindings) = owner_page(&domain);
     let words_field = tree.nodes().iter().find(|node| node.role == Role::TextArea).unwrap().binding.unwrap().token;
     let act =
-        crate::decode(&mut bindings, words_field, crate::ui::Act::Input { value: copy_of(UTF8_TEXTS[0]) }).unwrap();
+        crate::decode(&mut bindings, words_field, skein_ui::Act::Input { value: copy_of(UTF8_TEXTS[0]) }).unwrap();
     assert!(match &act {
         Act::Edit { field: Purpose::NewGoal, text } if text.bytes() == UTF8_TEXTS[0] => true,
         _ => false,
@@ -923,7 +923,7 @@ fn owner_project_public_goal_form_decodes_whole_bounded_procedure_and_keeps_prop
             .nodes()
             .iter()
             .filter_map(|node| {
-                crate::decode(&mut bindings, node.binding?.token, crate::ui::Act::Input { value: copy_of(amount) })
+                crate::decode(&mut bindings, node.binding?.token, skein_ui::Act::Input { value: copy_of(amount) })
             })
             .find(|act| act == &edited)
             .unwrap();
@@ -933,7 +933,7 @@ fn owner_project_public_goal_form_decodes_whole_bounded_procedure_and_keeps_prop
     let submit = tree
         .nodes()
         .iter()
-        .filter_map(|node| crate::decode(&mut bindings, node.binding?.token, crate::ui::Act::Press))
+        .filter_map(|node| crate::decode(&mut bindings, node.binding?.token, skein_ui::Act::Press))
         .find(|act| match act {
             Act::Submit { field: Purpose::NewGoal } => true,
             _ => false,
@@ -1140,13 +1140,13 @@ fn native_historical_project() -> (Domain, OwnerSpendPage) {
     );
     (domain, page)
 }
-fn historical_project_tree(domain: &Domain, w: &Words, bound: crate::ui::Limits) -> (Tree, JigBindings) {
+fn historical_project_tree(domain: &Domain, w: &Words, bound: skein_ui::Limits) -> (Tree, JigBindings) {
     let mut b = Builder::new(&bound);
     let mut bindings = JigBindings::new(bound.bindings, 32);
     crate::pages::main(&mut b, domain, w, &mut bindings);
     (b.finish(), bindings)
 }
-fn historical_project_bound(w: &Words) -> crate::ui::Limits {
+fn historical_project_bound(w: &Words) -> skein_ui::Limits {
     let mut bound = capacity(view::worst_case(&limits(), w).unwrap());
     bound.nodes = bound.nodes.checked_add(32).unwrap();
     bound.text_bytes = bound.text_bytes.checked_add(32_u32.checked_mul(bound.text_per_node).unwrap()).unwrap();
@@ -1179,7 +1179,7 @@ fn owner_project_genuine_spend_keeps_live_historical_and_earlier_period_facts_wi
         .nodes()
         .iter()
         .filter_map(|node| node.binding)
-        .filter_map(|binding| crate::decode(&mut bindings, binding.token, crate::ui::Act::Press))
+        .filter_map(|binding| crate::decode(&mut bindings, binding.token, skein_ui::Act::Press))
         .filter(|act| match act {
             Act::More { window, .. } => *window == skein_lib::Token::new(22),
             _ => false,
@@ -1212,12 +1212,12 @@ fn owner_project_historical_companion_prices_whole_languages_and_refuses_one_und
         assert!(tree.len() <= bound.nodes);
         let mut exact = bound;
         exact.nodes = tree.len();
-        exact.text_bytes = tree.nodes().iter().map(crate::ui::Node::text_bytes).sum();
+        exact.text_bytes = tree.nodes().iter().map(crate::tests::text_bytes).sum();
         let (rebuilt, _) = historical_project_tree(&domain, w, exact);
         assert_eq!(rebuilt.nodes(), tree.nodes());
         for short in [
-            crate::ui::Limits { nodes: exact.nodes - 1, ..exact },
-            crate::ui::Limits { text_bytes: exact.text_bytes - 1, ..exact },
+            skein_ui::Limits { nodes: exact.nodes - 1, ..exact },
+            skein_ui::Limits { text_bytes: exact.text_bytes - 1, ..exact },
         ] {
             assert!(
                 std::panic::catch_unwind(core::panic::AssertUnwindSafe(|| historical_project_tree(&domain, w, short)))

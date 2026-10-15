@@ -2,10 +2,10 @@
 //! Supplied clocks, loss counters and identities stay independent.
 mod hello;
 use crate::owner_deployment_words::{AccountPhrase as A, DeploymentPhrase as P};
-use crate::ui::phrases::Hole;
-use crate::ui::{Builder, Key, Role, Run};
 use crate::words::Words;
 use crate::{JigBindings, Owner};
+use skein_ui::phrases::Hole;
+use skein_ui::{Builder, Key, Role, Run};
 
 use hello::hello;
 use jig_domain_client::{
@@ -667,11 +667,11 @@ pub fn max_nodes(l: &Limits) -> Option<u32> {
 }
 /// Finite selected-language storage, including opaque fixed-width request keys.
 #[must_use]
-pub fn limits(l: &Limits, words: &Words) -> Option<crate::ui::Limits> {
+pub fn limits(l: &Limits, words: &Words) -> Option<skein_ui::Limits> {
     let nodes = max_nodes(l)?;
     let phrase = crate::phrases::jig_capacity(&words.book)?;
     let text_per_node = phrase.max(crate::literal_segment::max_bytes(l.text)?).max(64).checked_mul(2)?;
-    Some(crate::ui::Limits {
+    Some(skein_ui::Limits {
         nodes,
         depth: l.rows.checked_add(32)?,
         text_per_node,
@@ -738,7 +738,7 @@ fn run_fits(value: &OwnerHostRun, l: &Limits, words: &Words) -> Option<()> {
 }
 /// Validate all independently allocated owner lists before using the finite fragment.
 #[must_use]
-pub fn required(value: &OwnerDeployment, l: &Limits, words: &Words) -> Option<crate::ui::Limits> {
+pub fn required(value: &OwnerDeployment, l: &Limits, words: &Words) -> Option<skein_ui::Limits> {
     if value.connectors.capacity() > l.rows
         || value.hosts.capacity() > l.rows
         || value.attempts.capacity() > l.rows

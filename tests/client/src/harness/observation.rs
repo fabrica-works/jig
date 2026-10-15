@@ -22,7 +22,7 @@ pub enum CardSeen {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Seen {
     /// The changed tree broke the page outline.
-    Outline { fault: jig_view::ui::outline::Fault },
+    Outline { fault: skein_ui::outline::Fault },
     /// One card; a printed revision overrides its last delivered document's.
     Card { key: CardKey, state: CardSeen, revision: Option<u64> },
     /// Words the person is told were sent.
@@ -99,7 +99,7 @@ pub enum Observation {
 impl CardKey {
     /// Copy a public tree key as identity, without interpreting owner tokens.
     #[must_use]
-    pub fn of(key: jig_view::ui::Key) -> Self {
+    pub fn of(key: skein_ui::Key) -> Self {
         let mut bytes = Vec::new();
         match jig_view::Owner::from_opaque(key.owner) {
             Some(jig_view::Owner::Jig) => bytes.extend_from_slice(&[0, 0, 0]),

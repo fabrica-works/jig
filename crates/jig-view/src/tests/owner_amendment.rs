@@ -4,10 +4,10 @@
 )]
 use crate::owner_amendment as view;
 use crate::owner_amendment_words::{self as data, AmendmentPhrase as P};
-use crate::ui::Limits;
-use crate::ui::phrases::{Hole, Invalid, PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat};
-use crate::ui::{Builder, Tree};
 use crate::words::Words;
+use skein_ui::Limits;
+use skein_ui::phrases::{Hole, Invalid, PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat};
+use skein_ui::{Builder, Tree};
 
 use jig_domain_client::contract::*;
 use skein_lib::{Duration, List, bytes::copy_of};
@@ -108,7 +108,7 @@ fn words(language: u16, selected: bool) -> Words {
     let mut english = crate::phrases::english::language();
     english.wall = WallFormat::Nanos;
     english.span_unit = SpanUnit::Nanos;
-    let languages: Box<[crate::ui::phrases::Language]> = if selected {
+    let languages: Box<[skein_ui::phrases::Language]> = if selected {
         let mut translated = english.clone();
         for phrase in &mut translated.phrases {
             for form in &mut phrase.forms {
@@ -148,8 +148,11 @@ fn build(value: &OwnerAmendmentState, words: &Words) -> Tree {
     view::render(&mut builder, value, words);
     let tree = builder.finish();
     assert!(tree.len() <= f.nodes);
-    assert!(tree.nodes().iter().all(|node| node.text_bytes() <= f.text_per_node));
-    assert!(tree.nodes().iter().map(|node| u64::from(node.text_bytes())).sum::<u64>() <= u64::from(f.text_bytes));
+    assert!(tree.nodes().iter().all(|node| crate::tests::text_bytes(node) <= f.text_per_node));
+    assert!(
+        tree.nodes().iter().map(|node| u64::from(crate::tests::text_bytes(node))).sum::<u64>()
+            <= u64::from(f.text_bytes)
+    );
     assert!(tree.nodes().iter().all(|node| node.binding.is_none() && node.slot.is_none()));
     assert_eq!((f.bindings, f.slots), (0, 0));
     tree
@@ -317,7 +320,7 @@ fn assert_wake_fields(value: &mut OwnerAmendmentState, words: &Words) {
             value.wake.answers = switches & 2 != 0;
             value.wake.timers = switches & 4 != 0;
             let tree = build(value, words);
-            assert_eq!(tree.nodes().iter().filter(|n| n.role == crate::ui::Role::Region).count(), 2);
+            assert_eq!(tree.nodes().iter().filter(|n| n.role == skein_ui::Role::Region).count(), 2);
             let result_label: &[u8] = match results {
                 ResultsWake::Never => b"Delegate results do not wake",
                 ResultsWake::Each => b"Each delegate result wakes",
@@ -433,7 +436,7 @@ fn owner_amendment_whole_tree_envelope_checks_full_nested_capacities_and_overflo
     let tree = build(&full, &selected);
     assert_eq!(count(&tree, b"\\xFF\\xFF\\xFF\\xFF\\xFF\\xFF\\xFF\\xFF"), 18);
     assert_eq!(count(&tree, b"12345678"), 5);
-    assert!(tree.nodes().iter().filter(|n| n.role == crate::ui::Role::Region).all(|n| n.name.is_some()));
+    assert!(tree.nodes().iter().filter(|n| n.role == skein_ui::Role::Region).all(|n| n.name.is_some()));
 }
 fn words_for_full() -> Words {
     words(1, true)

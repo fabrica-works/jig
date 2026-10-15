@@ -1,9 +1,9 @@
 //! Whole host, account and capacity facts, with connector slots (pages.md, 7).
 use crate::phrases::jig::JigPhrase;
-use crate::ui::phrases::Hole;
-use crate::ui::{Builder, Role, Run};
 use crate::words::Words;
 use crate::{JigBindings, cards};
+use skein_ui::phrases::Hole;
+use skein_ui::{Builder, Role, Run};
 
 use jig_domain_client::Domain;
 /// Show the admitted deployment document and its connector-owned parts.
@@ -28,7 +28,7 @@ pub(crate) fn section(b: &mut Builder, client: &Domain, words: &Words, bindings:
     b.name(&words.say(JigPhrase::Deployment, &[]));
     for host in &doc.hosts {
         b.open(Role::Item);
-        b.key(crate::ui::Key { owner: crate::Owner::Jig.opaque(), kind: 22, a: host.number, b: 0 });
+        b.key(skein_ui::Key { owner: crate::Owner::Jig.opaque(), kind: 22, a: host.number, b: 0 });
         b.name(&words.say(JigPhrase::HostNumber, &[Hole::Number(host.number)]));
         words.text(b, JigPhrase::HostNumber, &[Hole::Number(host.number)]);
         words.status(b, if host.connected { JigPhrase::HostConnected } else { JigPhrase::HostDisconnected }, &[]);
@@ -52,7 +52,7 @@ pub(crate) fn section(b: &mut Builder, client: &Domain, words: &Words, bindings:
     b.open(Role::List);
     for account in &doc.accounts {
         b.open(Role::Item);
-        b.key(crate::ui::Key { owner: crate::Owner::Jig.opaque(), kind: 23, a: u64::from(account.number), b: 0 });
+        b.key(skein_ui::Key { owner: crate::Owner::Jig.opaque(), kind: 23, a: u64::from(account.number), b: 0 });
         b.name(&words.say(JigPhrase::AccountNumber, &[Hole::Number(u64::from(account.number))]));
         words.text(b, JigPhrase::AccountNumber, &[Hole::Number(u64::from(account.number))]);
         words.text(b, if account.usable { JigPhrase::AccountUsable } else { JigPhrase::AccountUnavailable }, &[]);

@@ -8,15 +8,15 @@ use crate::{
 };
 use jig_ops_domain_client::Domain;
 use jig_ops_domain_connectors::Connector;
-use jig_view::ui::Act;
-use jig_view::ui::{Builder, NodeId, Patch, Role, Tree};
 use jig_view::{JigBindings, Owner};
+use skein_ui::Act;
+use skein_ui::{Builder, NodeId, Patch, Role, Tree};
 
 use skein_lib::Queue;
 /// The composed semantic tree and its owner binding tables.
 #[derive(Debug)]
 pub struct View {
-    render: jig_view::ui::View,
+    render: skein_ui::View,
     words: jig_view::words::Words,
     observability_words: words::Words,
     infrastructure_words: words::Words,
@@ -47,7 +47,7 @@ impl View {
             "view capacities are checked"
         );
         Self {
-            render: jig_view::ui::View::new(&limits.tree),
+            render: skein_ui::View::new(&limits.tree),
             jig: JigBindings::new(limits.tree.bindings, domain.jig.text),
             observability: Bindings::new(
                 limits.tree.bindings,
@@ -231,7 +231,7 @@ fn task_page(
 ) {
     use jig_domain_client::{address::TaskSection, pages::Section};
     use jig_view::phrases::jig::JigPhrase;
-    use jig_view::ui::phrases::Hole;
+    use skein_ui::phrases::Hole;
     jig_view::frame::banner(b, client, words, bindings);
     jig_view::frame::navigation(b, client, observability::NAV, words, bindings);
     b.open(Role::Main);

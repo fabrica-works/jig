@@ -9,10 +9,10 @@
 //! Native Deployment view proofs; no source translation or connector completion is inferred.
 use super::cards::{CLIENT, contains, document, drive, shared_words, start};
 use crate::owner_deployment_words::DeploymentPhrase as P;
-use crate::ui::phrases::{Invalid, PhraseLimits, Phrasebook, Segment};
-use crate::ui::{Builder, Role, Tree};
 use crate::words::Words;
 use crate::{JigBindings, owner_deployment as view};
+use skein_ui::phrases::{Invalid, PhraseLimits, Phrasebook, Segment};
+use skein_ui::{Builder, Role, Tree};
 
 use jig_domain_client::{
     Domain, Event, Request,
@@ -103,7 +103,7 @@ fn domain(value: OwnerDeployment) -> Domain {
     );
     client
 }
-fn build(client: &Domain, w: &Words, limits: crate::ui::Limits) -> Tree {
+fn build(client: &Domain, w: &Words, limits: skein_ui::Limits) -> Tree {
     let mut b = Builder::new(&limits);
     let mut bindings = JigBindings::new(limits.bindings, CLIENT.text);
     view::render(&mut b, client, client.deployment_page().owner.as_deref().unwrap(), w, &mut bindings);
@@ -432,19 +432,19 @@ fn deployment_view_all_outer_and_nested_lists_fill_together_with_exact_and_one_u
             .unwrap(),
     )
     .unwrap();
-    let exact = crate::ui::Limits {
+    let exact = skein_ui::Limits {
         nodes: tree.len(),
         depth,
-        text_per_node: tree.nodes().iter().map(crate::ui::tree::Node::text_bytes).max().unwrap(),
-        text_bytes: tree.nodes().iter().map(crate::ui::tree::Node::text_bytes).sum(),
+        text_per_node: tree.nodes().iter().map(crate::tests::text_bytes).max().unwrap(),
+        text_bytes: tree.nodes().iter().map(crate::tests::text_bytes).sum(),
         ..maximum
     };
     assert_eq!(build(&client, w, exact).len(), tree.len());
     for below in [
-        crate::ui::Limits { nodes: exact.nodes - 1, ..exact },
-        crate::ui::Limits { depth: exact.depth - 1, ..exact },
-        crate::ui::Limits { text_per_node: exact.text_per_node - 1, ..exact },
-        crate::ui::Limits { text_bytes: exact.text_bytes - 1, ..exact },
+        skein_ui::Limits { nodes: exact.nodes - 1, ..exact },
+        skein_ui::Limits { depth: exact.depth - 1, ..exact },
+        skein_ui::Limits { text_per_node: exact.text_per_node - 1, ..exact },
+        skein_ui::Limits { text_bytes: exact.text_bytes - 1, ..exact },
     ] {
         std::panic::catch_unwind(core::panic::AssertUnwindSafe(|| build(&client, w, below)))
             .expect_err("one-under storage refuses this entire tree");

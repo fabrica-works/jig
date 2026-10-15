@@ -1,10 +1,10 @@
 #![expect(clippy::disallowed_methods, reason = "ordinary tests inspect public trees and checked language data")]
 use crate::owner_chip_words::{self as data, ChipPhrase, OwnerChipWords};
-use crate::ui::Limits;
-use crate::ui::phrases::{Invalid, PhraseLimits, Segment};
-use crate::ui::{Builder, Tree};
 use crate::words::Words;
 use crate::{JigBindings, owner_chip as view};
+use skein_ui::Limits;
+use skein_ui::phrases::{Invalid, PhraseLimits, Segment};
+use skein_ui::{Builder, Tree};
 
 use jig_domain_client::{Domain, contract::*};
 use skein_lib::{Duration, List, Token, Wall, bytes::copy_of};
@@ -83,10 +83,10 @@ fn words() -> &'static Words {
     static WORDS: std::sync::OnceLock<Words> = std::sync::OnceLock::new();
     WORDS.get_or_init(|| {
         let mut language = crate::phrases::english::language();
-        language.wall = crate::ui::phrases::WallFormat::Nanos;
-        language.span_unit = crate::ui::phrases::SpanUnit::Nanos;
+        language.wall = skein_ui::phrases::WallFormat::Nanos;
+        language.span_unit = skein_ui::phrases::SpanUnit::Nanos;
         Words {
-            book: crate::ui::phrases::Phrasebook::load(
+            book: skein_ui::phrases::Phrasebook::load(
                 crate::phrases::jig::shapes(256),
                 Box::new([language]),
                 &phrase_limits(),
@@ -117,7 +117,7 @@ fn build(value: &OwnerChipDetails, words: &Words) -> (Tree, JigBindings, view::C
     view::render(&mut b, value, &client, words, &mut bindings);
     let tree = b.finish();
     assert!(tree.len() <= f.nodes);
-    assert!(tree.nodes().iter().all(|node| node.text_bytes() <= f.text_per_node));
+    assert!(tree.nodes().iter().all(|node| crate::tests::text_bytes(node) <= f.text_per_node));
     (tree, bindings, f)
 }
 fn has(tree: &Tree, bytes: &[u8]) -> bool {
@@ -140,7 +140,7 @@ fn retained_chip_preserves_concrete_executor_project_and_full_width_owner_scalar
     ] {
         value.executor = executor;
         let (tree, _, _) = build(&value, words());
-        assert_eq!(tree.nodes()[0].role, crate::ui::Role::Region);
+        assert_eq!(tree.nodes()[0].role, skein_ui::Role::Region);
         assert_eq!(tree.nodes()[0].name.as_deref(), Some(b"Project: 4294967295".as_slice()));
         assert_eq!(value.clone().executor, executor);
         assert!(has(&tree, label), "concrete executor identity is never inferred from phase");
@@ -483,7 +483,8 @@ fn exact_owner_verdict_fits_chip_result_fragment_at_full_field_capacity_and_reje
     assert!(has(&tree, &[b'x'; 256]));
     assert!(u32::try_from(tree.nodes().len()).unwrap() <= envelope.nodes);
     assert!(
-        tree.nodes().iter().map(|node| u64::from(node.text_bytes())).sum::<u64>() <= u64::from(envelope.text_bytes)
+        tree.nodes().iter().map(|node| u64::from(crate::tests::text_bytes(node))).sum::<u64>()
+            <= u64::from(envelope.text_bytes)
     );
     assert!(view::required(&value, &jig_domain_client::Limits { rows: 3, ..client_limits() }, words()).is_none());
     assert!(view::required(&value, &jig_domain_client::Limits { text: 255, ..client_limits() }, words()).is_none());
@@ -532,7 +533,8 @@ fn maximum_chip_fragment_checks_selected_language_storage_raw_slots_loss_and_ari
     value.ended_at = Some(Wall::from_nanos(200));
     let (tree, bindings, envelope) = build(&value, words());
     assert!(
-        tree.nodes().iter().map(|node| u64::from(node.text_bytes())).sum::<u64>() <= u64::from(envelope.text_bytes)
+        tree.nodes().iter().map(|node| u64::from(crate::tests::text_bytes(node))).sum::<u64>()
+            <= u64::from(envelope.text_bytes)
     );
     assert_eq!(tree.nodes().iter().filter(|node| node.slot.is_some()).count(), 7);
     for node in tree.nodes() {
@@ -569,14 +571,14 @@ fn maximum_chip_fragment_checks_selected_language_storage_raw_slots_loss_and_ari
         OwnerChipWords::load(Box::new([crate::phrases::english::language(), translated]), &phrase_limits(), 1, 0)
             .unwrap();
     let selected_tree = build(&details(), selected.words()).0;
-    assert_eq!(selected_tree.nodes()[0].role, crate::ui::Role::Region);
+    assert_eq!(selected_tree.nodes()[0].role, skein_ui::Role::Region);
     assert_eq!(selected_tree.nodes()[0].name.as_deref(), Some(b"selected 4294967295".as_slice()));
     assert!(has(&selected_tree, b"selected 4294967295"));
     assert!(!has(&selected_tree, b"Run work unobserved"));
     let mut language = data::language();
     language.phrases[0].id = ChipPhrase::PhaseSince.id();
     assert_eq!(
-        crate::ui::phrases::Phrasebook::load(data::shapes(), Box::new([language]), &phrase_limits()).err(),
+        skein_ui::phrases::Phrasebook::load(data::shapes(), Box::new([language]), &phrase_limits()).err(),
         Some(Invalid::Duplicate { id: ChipPhrase::PhaseSince.id() })
     );
     assert_eq!(
@@ -621,8 +623,11 @@ fn retry_activation_tree(retry: Option<RetryNotice>, words: &Words) -> Tree {
     crate::cards::chip::chip(&mut b, &client, &chip, words, &mut bindings);
     let tree = b.finish();
     assert!(tree.len() <= f.nodes);
-    assert!(tree.nodes().iter().all(|node| node.text_bytes() <= f.text_per_node));
-    assert!(tree.nodes().iter().map(|node| u64::from(node.text_bytes())).sum::<u64>() <= u64::from(f.text_bytes));
+    assert!(tree.nodes().iter().all(|node| crate::tests::text_bytes(node) <= f.text_per_node));
+    assert!(
+        tree.nodes().iter().map(|node| u64::from(crate::tests::text_bytes(node))).sum::<u64>()
+            <= u64::from(f.text_bytes)
+    );
     tree
 }
 
@@ -716,9 +721,9 @@ fn owner_retry_borrows_selected_checked_six_class_words_and_both_count_holes() {
         if phrase.id == crate::phrases::jig::JigPhrase::RunRetryFailed.id() {
             phrase.forms[0].segments = Box::new([
                 Segment::Text(copy_of(b"chosen count ")),
-                Segment::Hole { index: 0, kind: crate::ui::phrases::HoleKind::Number },
+                Segment::Hole { index: 0, kind: skein_ui::phrases::HoleKind::Number },
                 Segment::Text(copy_of(b" versus ")),
-                Segment::Hole { index: 1, kind: crate::ui::phrases::HoleKind::Number },
+                Segment::Hole { index: 1, kind: skein_ui::phrases::HoleKind::Number },
             ]);
         }
     }

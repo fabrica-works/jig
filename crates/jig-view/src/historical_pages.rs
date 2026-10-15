@@ -4,9 +4,9 @@
 //! record does not supply pools, task rows or an amount left.
 use crate::JigBindings;
 use crate::historical_pages_words::HistoricalPhrase as P;
-use crate::ui::phrases::Hole;
-use crate::ui::{Builder, Role, Run};
 use crate::words::Words;
+use skein_ui::phrases::Hole;
+use skein_ui::{Builder, Role, Run};
 
 use alloc::boxed::Box;
 use jig_domain_client::{
@@ -29,7 +29,7 @@ pub struct HistoricalFragment {
 pub fn ended_nodes(l: &Limits) -> Option<u32> {
     crate::chip_nodes(l)?
         .checked_add(crate::result_nodes(l)?)?
-        .checked_add(crate::ui::markdown::max_nodes(l.text)?)?
+        .checked_add(skein_ui::markdown::max_nodes(l.text)?)?
         .checked_add(32)?
         .checked_mul(l.rows)?
         .checked_add(2)

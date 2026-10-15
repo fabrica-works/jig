@@ -1,12 +1,12 @@
 //! Checked wake language data, composable with the normal jig phrasebook.
 //! See client/domain/view.md, section 7. IDs 4000–4026 are reserved for these phrases.
 use crate::Owner;
-use crate::ui::phrases::{
+use alloc::boxed::Box;
+use skein_lib::{List, bytes::copy_of};
+use skein_ui::phrases::{
     Form, HoleKind, HoleShape, Invalid, Language, Phrase, PhraseId, PhraseLimits, PhraseShape, Phrasebook, PluralClass,
     PluralRule, Segment, SpanUnit, WallFormat,
 };
-use alloc::boxed::Box;
-use skein_lib::{List, bytes::copy_of};
 
 /// Closed phrases for exact owner wake facts.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

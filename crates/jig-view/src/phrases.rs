@@ -3,7 +3,7 @@
 pub mod english;
 pub mod jig;
 
-use crate::ui::phrases::Phrasebook;
+use skein_ui::phrases::Phrasebook;
 
 /// Maximum of the complete jig vocabulary, or none for a partial book.
 #[must_use]

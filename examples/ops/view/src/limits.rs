@@ -14,7 +14,7 @@ pub fn arrangement() -> jig_domain_client::pages::Arrangement {
 /// Bounds for the composed tree and owner bindings.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
-    pub tree: jig_view::ui::Limits,
+    pub tree: skein_ui::Limits,
 }
 impl Limits {
     #[must_use]
@@ -81,9 +81,9 @@ pub fn worst_case(
             bindings::worst_case(limits.tree.bindings, domain.infrastructure.text.max(domain.observability.text))?
                 .checked_mul(2)?,
         )?
-        .checked_add(jig_view::ui::phrases::worst_case(jig.book.limits())?)?
-        .checked_add(jig_view::ui::phrases::worst_case(observability.book.limits())?)?
-        .checked_add(jig_view::ui::phrases::worst_case(infrastructure.book.limits())?)?
+        .checked_add(skein_ui::phrases::worst_case(jig.book.limits())?)?
+        .checked_add(skein_ui::phrases::worst_case(observability.book.limits())?)?
+        .checked_add(skein_ui::phrases::worst_case(infrastructure.book.limits())?)?
         .checked_add(u64::from(
             observability
                 .capacity()?

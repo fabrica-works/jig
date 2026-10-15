@@ -11,13 +11,13 @@ use super::{
     work_pages::{entered, list, part},
 };
 use crate::JigBindings;
-use crate::ui::{Builder, Role, Tree};
 use jig_domain_client::{
     Domain, Event, Request,
     address::{Address, Place, TaskSection},
     contract::*,
 };
 use skein_lib::{Token, Wall};
+use skein_ui::{Builder, Role, Tree};
 fn key(proposer: Proposer) -> ProposalKey {
     ProposalKey { proposer, number: 1 }
 }

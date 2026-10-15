@@ -5,9 +5,9 @@
 )]
 use super::cards::{CLIENT, contains, document, drive, start};
 use crate::JigBindings;
-use crate::ui::phrases::{Hole, Invalid, PhraseLimits, Phrasebook, Segment};
-use crate::ui::{Builder, Role, Tree};
 use crate::words::Words;
+use skein_ui::phrases::{Hole, Invalid, PhraseLimits, Phrasebook, Segment};
+use skein_ui::{Builder, Role, Tree};
 
 use jig_domain_client::{Domain, Event, Request, contract::*};
 use skein_lib::{List, bytes::copy_of};
@@ -106,8 +106,8 @@ fn build(client: &Domain, w: &Words) -> Tree {
     assert!(tree.len() <= limits.nodes);
     let mut total = 0_u64;
     for node in tree.nodes() {
-        assert!(node.text_bytes() <= limits.text_per_node);
-        total = total.checked_add(u64::from(node.text_bytes())).unwrap();
+        assert!(crate::tests::text_bytes(node) <= limits.text_per_node);
+        total = total.checked_add(u64::from(crate::tests::text_bytes(node))).unwrap();
     }
     assert!(total <= u64::from(limits.text_bytes));
     tree

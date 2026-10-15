@@ -8,8 +8,8 @@ use super::{
     cards::{contains, document, drive, start, text, words},
     pages::{build, deliver, named_binding},
 };
-use crate::ui::{Role, Tree};
 use crate::{JigBindings, words::Words};
+use skein_ui::{Role, Tree};
 
 use jig_domain_client::{
     Domain, Event, Request,
@@ -169,12 +169,12 @@ fn plan_folds(words: &Words) {
     let (tree, mut bindings) = build(&d, 3, words);
     assert_eq!(tree.nodes().iter().filter(|n| n.role == Role::TreeItem).count(), 2);
     assert!(contains(&tree, b"Held below: 2"));
-    let fold = crate::decode(&mut bindings, named_binding(&tree, b"Fold subtree"), crate::ui::Act::Press).unwrap();
+    let fold = crate::decode(&mut bindings, named_binding(&tree, b"Fold subtree"), skein_ui::Act::Press).unwrap();
     drive(&mut d, Event::Act { act: fold });
     let (folded, mut bindings) = build(&d, 3, words);
     assert_eq!(folded.nodes().iter().filter(|n| n.role == Role::TreeItem).count(), 1);
     assert!(contains(&folded, b"Held below: 1"));
-    let open = crate::decode(&mut bindings, named_binding(&folded, b"Open subtree"), crate::ui::Act::Press).unwrap();
+    let open = crate::decode(&mut bindings, named_binding(&folded, b"Open subtree"), skein_ui::Act::Press).unwrap();
     drive(&mut d, Event::Act { act: open });
     assert_eq!(build(&d, 3, words).0.nodes().iter().filter(|n| n.role == Role::TreeItem).count(), 2);
     for filter in [
@@ -342,10 +342,10 @@ fn history(words: &Words) {
         }
         assert_eq!(tree.nodes().iter().filter_map(|n| n.key).filter(|key| key.kind == 21).count(), 2);
         assert_eq!(
-            crate::decode(&mut bindings, named_binding(&tree, b"This task and its subtree"), crate::ui::Act::Press),
+            crate::decode(&mut bindings, named_binding(&tree, b"This task and its subtree"), skein_ui::Act::Press),
             Some(Act::HistoryScope { subtree: true })
         );
-        let more = crate::decode(&mut bindings, named_binding(&tree, b"Read later"), crate::ui::Act::Press).unwrap();
+        let more = crate::decode(&mut bindings, named_binding(&tree, b"Read later"), skein_ui::Act::Press).unwrap();
         let out = drive(&mut d, Event::Act { act: more });
         read = out
             .iter()
@@ -486,7 +486,7 @@ fn goal_form(words: &Words) {
     let action = crate::decode(
         &mut bindings,
         named_binding(&tree, b"Goal budget"),
-        crate::ui::Act::Input { value: Box::from(b"40".as_slice()) },
+        skein_ui::Act::Input { value: Box::from(b"40".as_slice()) },
     )
     .unwrap();
     match action {
@@ -499,7 +499,7 @@ fn goal_form(words: &Words) {
     let action = crate::decode(
         &mut bindings,
         named_binding(&tree, b"Goal deadline (UTC, YYYY-MM-DD HH:MM)"),
-        crate::ui::Act::Input { value: Box::from(b"2026-10-09 17:00".as_slice()) },
+        skein_ui::Act::Input { value: Box::from(b"2026-10-09 17:00".as_slice()) },
     )
     .unwrap();
     assert_eq!(
@@ -518,7 +518,7 @@ fn goal_form(words: &Words) {
         crate::decode(
             &mut bindings,
             named_binding(&tree, b"Goal priority"),
-            crate::ui::Act::Input { value: Box::from(b"bad".as_slice()) }
+            skein_ui::Act::Input { value: Box::from(b"bad".as_slice()) }
         )
         .is_none()
     );
@@ -671,7 +671,7 @@ fn procedure_goal_choices_render_whole_numeric_pairs_without_frame_charters() {
             GoalExecutor::Procedure { connector: u16::MAX, code: u32::MAX },
         ),
     ] {
-        let action = crate::decode(&mut bindings, named_binding(&tree, label), crate::ui::Act::Press).unwrap();
+        let action = crate::decode(&mut bindings, named_binding(&tree, label), skein_ui::Act::Press).unwrap();
         assert_eq!(
             action,
             Act::GoalForm { form: GoalForm { project: 4, executor, budget: 30, deadline: None, priority: 0 } }
@@ -681,7 +681,7 @@ fn procedure_goal_choices_render_whole_numeric_pairs_without_frame_charters() {
     let choice = crate::decode(
         &mut bindings,
         named_binding(&tree, b"Connector 65535, procedure 4294967295"),
-        crate::ui::Act::Press,
+        skein_ui::Act::Press,
     )
     .unwrap();
     drive(&mut d, Event::Act { act: choice });
@@ -689,7 +689,7 @@ fn procedure_goal_choices_render_whole_numeric_pairs_without_frame_charters() {
     let edit = crate::decode(
         &mut bindings,
         named_binding(&tree, b"Goal budget"),
-        crate::ui::Act::Input { value: Box::from(b"4".as_slice()) },
+        skein_ui::Act::Input { value: Box::from(b"4".as_slice()) },
     )
     .unwrap();
     let exact = GoalExecutor::Procedure { connector: u16::MAX, code: u32::MAX };
@@ -707,7 +707,7 @@ fn procedure_goal_choices_render_whole_numeric_pairs_without_frame_charters() {
     let (tree, _) = build(&d, 3, words);
     assert!(contains(&tree, b"proposed"));
     drive(&mut d, Event::Act { act: Act::Submit { field: jig_domain_client::fields::Purpose::NewGoal } });
-    let mut b = crate::ui::Builder::new(&super::cards::limits());
+    let mut b = skein_ui::Builder::new(&super::cards::limits());
     let mut bindings = JigBindings::new(32, super::cards::CLIENT.text);
     b.open(Role::Page);
     crate::confirmation::confirmation(&mut b, &d, words, &mut bindings);
@@ -721,10 +721,9 @@ fn procedure_goal_choices_render_whole_numeric_pairs_without_frame_charters() {
 #[test]
 fn a_task_section_not_shown_builds_nothing() {
     let (d, _) = task(TaskSection::Overview, Executor::Agent { charter: 2 });
-    let mut b = crate::ui::Builder::new(&super::cards::limits());
+    let mut b = skein_ui::Builder::new(&super::cards::limits());
     let mut bindings = JigBindings::new(64, super::cards::CLIENT.text);
     b.open(Role::Page);
-    let before = b.tree.len();
     assert!(!crate::sections::section(
         &mut b,
         &d,
@@ -732,7 +731,6 @@ fn a_task_section_not_shown_builds_nothing() {
         &mut bindings,
         jig_domain_client::pages::Section::Task { task: 9, section: TaskSection::Overview }
     ));
-    assert_eq!(b.tree.len(), before);
     b.close();
     assert_eq!(b.finish().len(), 1);
 }
@@ -752,11 +750,11 @@ fn the_tabs_mark_the_addresss_own_section_current() {
     ]) {
         assert_eq!(
             tab.states.as_slice(),
-            if section == TaskSection::Plan { &[crate::ui::State::Current][..] } else { &[] },
+            if section == TaskSection::Plan { &[skein_ui::State::Current][..] } else { &[] },
             "{section:?}"
         );
         assert_eq!(
-            crate::decode(&mut bindings, tab.binding.unwrap().token, crate::ui::Act::Press),
+            crate::decode(&mut bindings, tab.binding.unwrap().token, skein_ui::Act::Press),
             Some(Act::Go { address: Address::Task { task: 8, section } }),
             "{section:?}"
         );
@@ -840,7 +838,7 @@ fn the_addresss_own_section_is_marked_current_on_an_arranged_page() {
         let node = tree.nodes().iter().find(|n| n.region == Some(region.region())).unwrap();
         assert_eq!(
             node.states.as_slice(),
-            if region == JigRegion::TaskPlan { &[crate::ui::State::Current][..] } else { &[] },
+            if region == JigRegion::TaskPlan { &[skein_ui::State::Current][..] } else { &[] },
             "{region:?}"
         );
     }

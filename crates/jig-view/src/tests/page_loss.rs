@@ -174,7 +174,7 @@ fn every_native_page_retains_source_loss_and_displays_it_independently_of_contin
                 tree.nodes()
                     .iter()
                     .filter(
-                        |n| n.role == crate::ui::Role::Status && n.name.as_deref() == Some(b"This page is incomplete")
+                        |n| n.role == skein_ui::Role::Status && n.name.as_deref() == Some(b"This page is incomplete")
                     )
                     .count(),
                 usize::from(cut)
@@ -253,7 +253,7 @@ fn sliding_a_read_window_keeps_supplied_page_loss_until_that_source_is_reset() {
 }
 
 fn row_selected_words() -> crate::words::Words {
-    use crate::ui::phrases::{PhraseLimits, Phrasebook, Segment};
+    use skein_ui::phrases::{PhraseLimits, Phrasebook, Segment};
     let first = crate::phrases::english::language();
     let mut second = first.clone();
     for phrase in &mut second.phrases {
@@ -380,12 +380,12 @@ fn owner_goal_rows_render_every_distinct_stage_without_generic_ended_and_keep_pu
     ] {
         assert!(contains(
             &tree,
-            &selected.say(phrase_and_count.0, &[crate::ui::phrases::Hole::Number(u64::from(phrase_and_count.1))])
+            &selected.say(phrase_and_count.0, &[skein_ui::phrases::Hole::Number(u64::from(phrase_and_count.1))])
         ));
     }
     assert!(!contains(
         &tree,
-        &selected.say(crate::phrases::jig::JigPhrase::TasksEnded, &[crate::ui::phrases::Hole::Number(1)])
+        &selected.say(crate::phrases::jig::JigPhrase::TasksEnded, &[skein_ui::phrases::Hole::Number(1)])
     ));
     assert_eq!(domain.project_page().listed_goals.get(0), Some(&row));
     assert!(tree.len() <= crate::page_nodes(&super::cards::CLIENT, 0).unwrap());

@@ -5,14 +5,14 @@ use crate::{
     family, words,
 };
 use jig_test_domain_client::{Connector, Domain, first};
-use jig_view::ui::Act;
-use jig_view::ui::{Builder, NodeId, Patch, Role, Tree};
 use jig_view::{JigBindings, Owner};
+use skein_ui::Act;
+use skein_ui::{Builder, NodeId, Patch, Role, Tree};
 
 use skein_lib::Queue;
 #[derive(Debug)]
 pub struct View<'a> {
-    render: jig_view::ui::View,
+    render: skein_ui::View,
     words: &'a jig_view::words::Words,
     first_words: &'a words::Words,
     jig: JigBindings,
@@ -31,7 +31,7 @@ impl<'a> View<'a> {
     ) -> Self {
         assert!(crate::worst_case(limits, domain, words, first_words).is_some(), "view capacities are checked");
         Self {
-            render: jig_view::ui::View::new(&limits.tree),
+            render: skein_ui::View::new(&limits.tree),
             jig: JigBindings::new(limits.tree.bindings, domain.jig.text),
             first: Bindings::new(limits.tree.bindings, limits.text),
             words,
@@ -165,7 +165,7 @@ fn second(
     jig: &jig_view::words::Words,
 ) {
     use jig_domain_client::contract::Part;
-    use jig_view::ui::phrases::Hole;
+    use skein_ui::phrases::Hole;
     if !root.second().contains(part) {
         words.status(b, words::Word::Unshowable, &[]);
         return;

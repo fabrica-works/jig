@@ -1,7 +1,7 @@
 use super::{Seen, jig_seen, seen};
-use jig_view::ui::Limits;
-use jig_view::ui::{Builder, Role, Run, View};
 use skein_lib::Queue;
+use skein_ui::Limits;
+use skein_ui::{Builder, Role, Run, View};
 
 fn status(builder: &mut Builder, name: &[u8]) {
     builder.open(Role::Status);

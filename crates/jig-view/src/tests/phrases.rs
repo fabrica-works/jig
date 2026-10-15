@@ -1,4 +1,4 @@
-use crate::ui::phrases::{Language, PhraseLimits, Phrasebook, PluralRule, SpanUnit, WallFormat};
+use skein_ui::phrases::{Language, PhraseLimits, Phrasebook, PluralRule, SpanUnit, WallFormat};
 
 #[test]
 fn a_partial_book_has_no_jig_capacity() {

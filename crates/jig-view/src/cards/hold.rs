@@ -1,9 +1,9 @@
 //! The whole vocabulary of held reasons (client/domain/objects.md, sections 3 and 5).
 use crate::JigBindings;
 use crate::phrases::jig::JigPhrase;
-use crate::ui::Builder;
-use crate::ui::phrases::Hole;
 use crate::words::{Words, name};
+use skein_ui::Builder;
+use skein_ui::phrases::Hole;
 
 use jig_domain_client::contract::HoldReason;
 

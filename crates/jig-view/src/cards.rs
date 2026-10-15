@@ -3,9 +3,9 @@
 //! the domain; this module neither changes them nor judges offered acts.
 use crate::JigBindings;
 use crate::phrases::jig::JigPhrase;
-use crate::ui::phrases::Hole;
-use crate::ui::{Builder, Role};
 use crate::words::Words;
+use skein_ui::phrases::Hole;
+use skein_ui::{Builder, Role};
 
 use jig_domain_client::{
     Domain,
@@ -47,11 +47,11 @@ pub fn open(
     b.name(title);
     b.style(crate::JigStyle::Card.token());
     match facts.card {
-        Card::Deciding { .. } => b.state(crate::ui::State::Busy),
+        Card::Deciding { .. } => b.state(skein_ui::State::Busy),
         Card::Open | Card::Refused { .. } | Card::Unknown { .. } | Card::Leaving { .. } => {}
     }
     b.open(Role::Heading { level: 2 });
-    b.text(crate::ui::Run::Plain, title);
+    b.text(skein_ui::Run::Plain, title);
     b.close();
     match place {
         Place::Inbox { lineage } => {

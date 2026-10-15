@@ -3,8 +3,8 @@
 use jig_domain_client::contract::{ObjectKey, Revision};
 use jig_ops_domain_client::{Action, infrastructure};
 use jig_view::Owner;
-use jig_view::ui::{Act, Binding};
 use skein_lib::{List, Token};
+use skein_ui::{Act, Binding};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Meaning {
     Action(Action),
@@ -86,7 +86,7 @@ pub fn decode(bindings: &Bindings, token: Token, act: Act) -> Option<Action> {
                         Some(Action::Infrastructure(infrastructure::Act::Until {
                             object: *object,
                             revision: *revision,
-                            value: crate::time::wall(jig_view::ui::number(&value)?)?,
+                            value: crate::time::wall(skein_ui::number(&value)?)?,
                         }))
                     }
                     Act::Press | Act::Toggle | Act::Submit | Act::Drawing { .. } => None,
@@ -99,7 +99,7 @@ pub fn decode(bindings: &Bindings, token: Token, act: Act) -> Option<Action> {
                         Some(Action::Infrastructure(infrastructure::Act::NativeUntil {
                             object: *object,
                             revision: *revision,
-                            value: jig_view::ui::number(&value)?,
+                            value: skein_ui::number(&value)?,
                         }))
                     }
                     Act::Press | Act::Toggle | Act::Submit | Act::Drawing { .. } => None,

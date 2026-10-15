@@ -1,12 +1,12 @@
 //! Checked words for exact batch member facts (client/domain/view.md, 7).
 //! IDs 5000–5024 are reserved for this closed vocabulary.
 use crate::Owner;
-use crate::ui::phrases::{
+use alloc::boxed::Box;
+use skein_lib::{List, bytes::copy_of};
+use skein_ui::phrases::{
     Form, HoleKind, HoleShape, Language, Phrase, PhraseId, PhraseShape, PluralClass, PluralRule, Segment, SpanUnit,
     WallFormat,
 };
-use alloc::boxed::Box;
-use skein_lib::{List, bytes::copy_of};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ProposedPhrase {
     ExecutorCharter,

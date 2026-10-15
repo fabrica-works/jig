@@ -1,6 +1,6 @@
 //! A whole question and its one answer (client/domain/objects.md, section 6).
-use crate::ui::Builder;
 use crate::{JigBindings, phrases::jig::JigPhrase, words::Words};
+use skein_ui::Builder;
 
 use jig_domain_client::{
     Domain,
@@ -35,9 +35,9 @@ pub fn question(
             OwnerRequester::Person(number) => (JigPhrase::QuestionFromPerson, number),
             OwnerRequester::Deployment { project } => (JigPhrase::QuestionFromDeployment, u64::from(project)),
         };
-        words.text(b, phrase, &[crate::ui::phrases::Hole::Number(number)]);
+        words.text(b, phrase, &[skein_ui::phrases::Hole::Number(number)]);
     }
-    crate::ui::markdown::read(document.words.bytes(), 2, b);
+    skein_ui::markdown::read(document.words.bytes(), 2, b);
     words.waiting(b, client.wall(), document.since);
     if super::common::answering(client, object) {
         super::common::field(b, client, Purpose::Answer, JigPhrase::AnswerField, words, bindings);

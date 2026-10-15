@@ -4,11 +4,11 @@
 )]
 use super::cards::CLIENT;
 use crate::historical_pages_words::{self as sayings, HistoricalPhrase as P};
-use crate::ui::Limits;
-use crate::ui::phrases::{Hole, Invalid, PhraseLimits, Phrasebook, Segment};
-use crate::ui::{Builder, Tree};
 use crate::words::Words;
 use crate::{JigBindings, historical_pages as view};
+use skein_ui::Limits;
+use skein_ui::phrases::{Hole, Invalid, PhraseLimits, Phrasebook, Segment};
+use skein_ui::{Builder, Tree};
 
 use jig_domain_client::{Domain, contract::*};
 use skein_lib::{List, Wall, bytes::copy_of};
@@ -17,7 +17,7 @@ fn doc(bytes: &[u8], cut: bool) -> DocumentText {
 }
 fn words() -> Words {
     let mut language = crate::phrases::english::language();
-    language.wall = crate::ui::phrases::WallFormat::Nanos;
+    language.wall = skein_ui::phrases::WallFormat::Nanos;
     Words {
         book: Phrasebook::load(crate::phrases::jig::shapes(CLIENT.text), Box::new([language]), &phrase_limits())
             .unwrap(),
@@ -286,8 +286,8 @@ fn exact_limits(tree: &Tree, maximum: Limits) -> Limits {
     Limits {
         nodes: tree.len(),
         depth: u32::try_from(depth).unwrap(),
-        text_per_node: tree.nodes().iter().map(crate::ui::tree::Node::text_bytes).max().unwrap(),
-        text_bytes: tree.nodes().iter().map(crate::ui::tree::Node::text_bytes).sum(),
+        text_per_node: tree.nodes().iter().map(crate::tests::text_bytes).max().unwrap(),
+        text_bytes: tree.nodes().iter().map(crate::tests::text_bytes).sum(),
         bindings: u32::try_from(bindings).unwrap(),
         slots: u32::try_from(tree.nodes().iter().filter(|n| n.slot.is_some()).count()).unwrap(),
         ..maximum

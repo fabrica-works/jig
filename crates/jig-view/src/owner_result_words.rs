@@ -1,12 +1,12 @@
 //! Checked result metadata words (client/domain/view.md, 7).
 //! IDs 6200..6222 belong to this vocabulary within the reserved 6200..6260 range.
 use crate::Owner;
-use crate::ui::phrases::{
+use alloc::boxed::Box;
+use skein_lib::{List, bytes::copy_of};
+use skein_ui::phrases::{
     Form, HoleKind, HoleShape, Language, Phrase, PhraseId, PhraseShape, PluralClass, PluralRule, Segment, SpanUnit,
     WallFormat,
 };
-use alloc::boxed::Box;
-use skein_lib::{List, bytes::copy_of};
 
 /// Result owner facts and explicit absence, selected as checked language data.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -231,7 +231,7 @@ pub fn language() -> Language {
 }
 /// Largest result saying across every checked language.
 #[must_use]
-pub fn phrase_bytes(book: &crate::ui::phrases::Phrasebook) -> Option<u32> {
+pub fn phrase_bytes(book: &skein_ui::phrases::Phrasebook) -> Option<u32> {
     let mut largest = 0;
     for phrase in ALL {
         largest = largest.max(book.capacity(phrase.id())?);

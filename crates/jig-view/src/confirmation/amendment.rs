@@ -1,10 +1,10 @@
 //! Bounded typed amendment fields; no authority judgment (client.md, 9).
 use crate::cards::proposal;
 use crate::phrases::jig::JigPhrase;
-use crate::ui::phrases::Hole;
-use crate::ui::{Builder, Role};
 use crate::words::Words;
 use crate::{JigBindings, JigMeaning};
+use skein_ui::phrases::Hole;
+use skein_ui::{Builder, Role};
 
 use alloc::boxed::Box;
 use jig_domain_client::{
@@ -39,7 +39,7 @@ pub fn edit(before: &Amendment, selected: &Amendment, field: Field, value: Box<[
         Field::Instructions => change.instructions = Some(Text::new(value, text_limit).ok()?),
         Field::Budget => {
             let mut authority = selected.authority.clone().or(before.authority.clone())?;
-            authority.spend = crate::ui::number(&value)?;
+            authority.spend = skein_ui::number(&value)?;
             change.authority = Some(authority);
         }
         Field::Deadline => {
@@ -49,12 +49,12 @@ pub fn edit(before: &Amendment, selected: &Amendment, field: Field, value: Box<[
         }
         Field::Party => {
             let mut addressed = selected.addressed.or(before.addressed)?;
-            addressed.address = PersonAddress::Party(crate::ui::number(&value)?);
+            addressed.address = PersonAddress::Party(skein_ui::number(&value)?);
             change.addressed = Some(addressed);
         }
         Field::Role => {
             let mut addressed = selected.addressed.or(before.addressed)?;
-            addressed.address = PersonAddress::Role(u32::try_from(crate::ui::number(&value)?).ok()?);
+            addressed.address = PersonAddress::Role(u32::try_from(skein_ui::number(&value)?).ok()?);
             change.addressed = Some(addressed);
         }
     }
@@ -71,11 +71,11 @@ pub fn deadline(value: &[u8]) -> Option<skein_lib::Wall> {
     {
         return None;
     }
-    let year = crate::ui::number(value.get(0..4)?)?;
-    let month = crate::ui::number(value.get(5..7)?)?;
-    let day = crate::ui::number(value.get(8..10)?)?;
-    let hour = crate::ui::number(value.get(11..13)?)?;
-    let minute = crate::ui::number(value.get(14..16)?)?;
+    let year = skein_ui::number(value.get(0..4)?)?;
+    let month = skein_ui::number(value.get(5..7)?)?;
+    let day = skein_ui::number(value.get(8..10)?)?;
+    let hour = skein_ui::number(value.get(11..13)?)?;
+    let minute = skein_ui::number(value.get(14..16)?)?;
     if year < 1970 || !(1..=12).contains(&month) || hour > 23 || minute > 59 {
         return None;
     }

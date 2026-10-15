@@ -1,5 +1,5 @@
-use crate::ui::Act;
 use alloc::boxed::Box;
+use skein_ui::Act;
 
 #[test]
 fn jigs_view_decodes_an_act_on_a_drawing_into_nothing() {

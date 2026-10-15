@@ -1,9 +1,9 @@
 //! Page composition over domain-owned ordering and windows (client/domain/pages.md).
 //! Objects stay in their shared cards; connector values stay in owner slots.
 use crate::phrases::jig::JigPhrase;
-use crate::ui::phrases::Hole;
-use crate::ui::{Builder, Role, Run};
 use crate::{JigBindings, words::Words};
+use skein_ui::phrases::Hole;
+use skein_ui::{Builder, Role, Run};
 
 use jig_domain_client::{
     Domain,
@@ -76,7 +76,7 @@ pub fn excess(b: &mut Builder, client: &Domain, words: &Words) {
     }
 }
 
-pub(crate) fn object_key(object: jig_domain_client::contract::ObjectKey) -> crate::ui::Key {
+pub(crate) fn object_key(object: jig_domain_client::contract::ObjectKey) -> skein_ui::Key {
     use jig_domain_client::contract::ObjectKey;
     let (kind, a, b) = match object {
         ObjectKey::Task(task) => (0, task, 0),
@@ -90,7 +90,7 @@ pub(crate) fn object_key(object: jig_domain_client::contract::ObjectKey) -> crat
         ObjectKey::Result(task) => (5, task, 0),
         ObjectKey::Note { project, note } => (6, u64::from(project), note),
     };
-    crate::ui::Key { owner: crate::Owner::Jig.opaque(), kind, a, b }
+    skein_ui::Key { owner: crate::Owner::Jig.opaque(), kind, a, b }
 }
 
 /// Build the current jig page; an application's own page returns false.
@@ -163,7 +163,7 @@ pub use crate::turns::conversation;
 pub fn jig(
     b: &mut Builder,
     client: &Domain,
-    nav: crate::ui::SlotRef,
+    nav: skein_ui::SlotRef,
     words: &Words,
     bindings: &mut JigBindings,
 ) -> bool {
@@ -206,7 +206,7 @@ pub fn after_page(b: &mut Builder, client: &Domain, words: &Words, bindings: &mu
     crate::notices::notices(b, client, words, bindings);
 }
 
-pub(crate) fn scratch(limits: &crate::ui::Limits) -> Option<u64> {
+pub(crate) fn scratch(limits: &skein_ui::Limits) -> Option<u64> {
     crate::sections::task::scratch(limits.depth)?
         .checked_add(skein_lib::List::<jig_domain_client::contract::Part>::worst_case(limits.slots)?)?
         .checked_add(u64::from(limits.slots).checked_mul(u64::from(limits.text_per_node))?.checked_mul(2)?)?
@@ -217,7 +217,7 @@ pub(crate) fn mark_current(b: &mut Builder, client: &Domain, address: jig_domain
     match client.page() {
         jig_domain_client::pages::Page::Work { address: own, .. } => {
             if client.sections().len() > 1 && own == &address {
-                b.state(crate::ui::State::Current);
+                b.state(skein_ui::State::Current);
             }
         }
         jig_domain_client::pages::Page::Starting

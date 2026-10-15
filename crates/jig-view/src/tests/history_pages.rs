@@ -1,7 +1,7 @@
 #![expect(clippy::disallowed_methods, reason = "ordinary whole page proofs inspect supplied tree facts")]
 use super::{cards, owner_history as fixture};
-use crate::ui::{Builder, Key, Role, Tree};
 use crate::{JigBindings, Owner, words::Words};
+use skein_ui::{Builder, Key, Role, Tree};
 
 use jig_domain_client::{
     Domain, Event, Request,
@@ -126,7 +126,7 @@ fn build(domain: &Domain, words: &Words) -> (Tree, JigBindings) {
     b.close();
     let tree = b.finish();
     assert!(tree.len() <= limits.nodes);
-    assert!(tree.nodes().iter().all(|node| node.text_bytes() <= limits.text_per_node));
+    assert!(tree.nodes().iter().all(|node| crate::tests::text_bytes(node) <= limits.text_per_node));
     (tree, bindings)
 }
 #[test]

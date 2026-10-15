@@ -4,10 +4,10 @@
 //! remains in its owner slot. Build under an already open page.
 use crate::phrases::jig::JigPhrase;
 use crate::regions::JigRegion;
-use crate::ui::phrases::Hole;
-use crate::ui::{Builder, Role, Run, SlotRef, State};
 use crate::words::Words;
 use crate::{JigBindings, JigMeaning};
+use skein_ui::phrases::Hole;
+use skein_ui::{Builder, Role, Run, SlotRef, State};
 
 use jig_domain_client::{Domain, action::Act, address::Address, pages::navigation::Destination};
 

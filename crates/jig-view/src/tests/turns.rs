@@ -9,7 +9,6 @@ use super::{
     pages::{build, deliver, named_binding},
     work_pages::{entered, list, part},
 };
-use crate::ui::{Key, Role, Tree};
 use crate::words::Words;
 use jig_domain_client::{
     Domain, Event, Request,
@@ -19,6 +18,7 @@ use jig_domain_client::{
     fields::Purpose,
 };
 use skein_lib::{Token, Wall};
+use skein_ui::{Key, Role, Tree};
 fn read(out: &[Request]) -> Token {
     out.iter()
         .find_map(|request| match request {
@@ -129,7 +129,7 @@ fn replacement(words: &Words) {
     let act = crate::decode(
         &mut bindings,
         named_binding(&first, b"Open input and result for ReadFact"),
-        crate::ui::Act::Press,
+        skein_ui::Act::Press,
     )
     .unwrap();
     drive(&mut d, Event::Act { act });
@@ -199,7 +199,7 @@ fn replacement(words: &Words) {
     let closed = crate::decode(
         &mut bindings,
         named_binding(&committed, b"Fold input and result for ReadFact"),
-        crate::ui::Act::Press,
+        skein_ui::Act::Press,
     )
     .unwrap();
     drive(&mut d, Event::Act { act: closed });
@@ -320,7 +320,7 @@ fn activities(words: &Words) {
         let (tree, mut bindings) = build(&d, 3, words);
         access(&tree);
         assert!(contains(&tree, expected[index]), "{:?}", expected[index]);
-        let more = crate::decode(&mut bindings, named_binding(&tree, b"Read earlier"), crate::ui::Act::Press).unwrap();
+        let more = crate::decode(&mut bindings, named_binding(&tree, b"Read earlier"), skein_ui::Act::Press).unwrap();
         token = read(&drive(&mut d, Event::Act { act: more }));
     }
 }
@@ -512,7 +512,7 @@ fn raw_live_call_rendering_omits_unsupplied_wall_and_preserves_escaped_literals_
     let expanded = build(&d, 3, words).0;
     access(&expanded);
     assert!(contains(&expanded, UTF8_TEXTS[2]));
-    assert!(expanded.nodes().iter().any(|node| node.states.as_slice().contains(&crate::ui::State::Expanded)));
+    assert!(expanded.nodes().iter().any(|node| node.states.as_slice().contains(&skein_ui::State::Expanded)));
     assert_eq!(d.conversation().parts(4).len(), 0);
     match value.call.as_mut().unwrap() {
         LiveCall::Raw(call) => call.cut = false,
@@ -583,13 +583,13 @@ fn maximum_raw_live_calls_fit_whole_page_and_escaped_phrase_capacities() {
     assert_eq!(d.conversation().live.len(), CLIENT.rows);
     assert_eq!(d.conversation().current_opened.len(), CLIENT.rows);
     let limits = crate::limits::of_words(&CLIENT, words).unwrap();
-    let mut b = crate::ui::Builder::new(&limits);
+    let mut b = skein_ui::Builder::new(&limits);
     let mut bindings = crate::JigBindings::new(limits.bindings, CLIENT.text);
     b.open(Role::Page);
     assert!(crate::jig(
         &mut b,
         &d,
-        crate::ui::SlotRef { owner: (crate::Owner::Application { number: 1 }).opaque(), token: Token::new(1) },
+        skein_ui::SlotRef { owner: (crate::Owner::Application { number: 1 }).opaque(), token: Token::new(1) },
         words,
         &mut bindings
     ));
@@ -640,7 +640,7 @@ fn raw_live_call_controls_use_selected_normal_language_and_checked_capacity() {
     use super::cards::CLIENT;
     use crate::live_call_words::LiveCallPhrase;
     use crate::phrases::english;
-    use crate::ui::phrases::{Form, PhraseLimits, Phrasebook, PluralClass, Segment};
+    use skein_ui::phrases::{Form, PhraseLimits, Phrasebook, PluralClass, Segment};
 
     let first = english::language();
     let mut selected = english::language();
@@ -698,7 +698,7 @@ fn raw_live_call_controls_use_selected_normal_language_and_checked_capacity() {
     let act = crate::decode(
         &mut bindings,
         named_binding(&folded, b"Selected language opens actual current input"),
-        crate::ui::Act::Press,
+        skein_ui::Act::Press,
     )
     .unwrap();
     drive(&mut d, Event::Act { act });
@@ -812,13 +812,13 @@ fn maximum_independent_current_call_fits_page_with_all_existing_provisional_rows
     );
     drive(&mut d, Event::Act { act: Act::FoldCurrentCall { identity: call.identity, open: true } });
     let limits = crate::limits::of_words(&CLIENT, words).unwrap();
-    let mut b = crate::ui::Builder::new(&limits);
+    let mut b = skein_ui::Builder::new(&limits);
     let mut bindings = crate::JigBindings::new(limits.bindings, CLIENT.text);
     b.open(Role::Page);
     assert!(crate::jig(
         &mut b,
         &d,
-        crate::ui::SlotRef { owner: (crate::Owner::Application { number: 1 }).opaque(), token: Token::new(1) },
+        skein_ui::SlotRef { owner: (crate::Owner::Application { number: 1 }).opaque(), token: Token::new(1) },
         words,
         &mut bindings
     ));
@@ -945,7 +945,7 @@ fn whole_owner_activity_and_fetched_archive_keep_numeric_senders_references_and_
         assert!(contains(&tree, label), "missing {label:?}");
     }
     let limits = crate::limits::of_words(&super::cards::CLIENT, words).unwrap();
-    assert!(tree.nodes.len() <= limits.nodes);
+    assert!(tree.len() <= limits.nodes);
 }
 
 const UTF8_TEXTS: [&[u8]; 6] = [b"id/\x7e", b"raw/tool\x7e", b"a/b\x00\x21", b"~", b"!", b"?"];

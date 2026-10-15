@@ -2,8 +2,8 @@
 //! Reads the conversation owner's windows, word snapshots and call folds. The
 //! same task/attempt/turn key names live and committed text; no stream facts are
 //! committed by the view. Call objects use shared cards and parts leave slots.
-use crate::ui::{Builder, Key, Role, Run};
 use crate::{JigBindings, Owner, phrases::jig::JigPhrase, words::Words};
+use skein_ui::{Builder, Key, Role, Run};
 
 use jig_domain_client::{
     Domain,
@@ -23,7 +23,7 @@ pub fn conversation(b: &mut Builder, client: &Domain, words: &Words, bindings: &
     b.region(crate::regions::JigRegion::Conversation.region());
     b.name(&words.say(JigPhrase::ConversationLog, &[]));
     if state.reading.is_some() {
-        b.state(crate::ui::State::Busy);
+        b.state(skein_ui::State::Busy);
     }
     // The owner retains newest first; a log reads from oldest to newest.
     for offset in 0..state.lines.rows.len() {
@@ -60,7 +60,7 @@ pub fn conversation(b: &mut Builder, client: &Domain, words: &Words, bindings: &
         if let Some(began) = live.began {
             words.wall(b, began);
         }
-        crate::ui::markdown::read(live.text.bytes(), 2, b);
+        skein_ui::markdown::read(live.text.bytes(), 2, b);
         if live.cut {
             words.status(b, JigPhrase::TurnCut, &[]);
         }

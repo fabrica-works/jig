@@ -3,10 +3,10 @@
     clippy::wildcard_enum_match_arm,
     reason = "ordinary proofs query checked source trees and select public action requests"
 )]
-use crate::ui::phrases::{Hole, PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat};
-use crate::ui::{Builder, Tree};
 use crate::words::Words;
 use crate::{JigBindings, owner_proposal as view};
+use skein_ui::phrases::{Hole, PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat};
+use skein_ui::{Builder, Tree};
 
 use jig_domain_client::{Domain, contract::*};
 use skein_lib::{
@@ -110,7 +110,7 @@ fn words(selected: bool) -> Words {
     let mut first = crate::phrases::english::language();
     first.wall = WallFormat::Nanos;
     first.span_unit = SpanUnit::Nanos;
-    let languages: Box<[crate::ui::phrases::Language]> = if selected {
+    let languages: Box<[skein_ui::phrases::Language]> = if selected {
         let mut second = first.clone();
         for p in &mut second.phrases {
             for f in &mut p.forms {
@@ -143,8 +143,8 @@ fn words(selected: bool) -> Words {
         offset_minutes: 0,
     }
 }
-fn capacity(f: view::ProposalFragment) -> crate::ui::Limits {
-    crate::ui::Limits {
+fn capacity(f: view::ProposalFragment) -> skein_ui::Limits {
+    skein_ui::Limits {
         nodes: f.nodes,
         depth: f.depth,
         text_bytes: f.text_bytes,
@@ -170,8 +170,8 @@ fn build(value: &OwnerProposal, w: &Words) -> (Tree, JigBindings) {
         .nodes()
         .iter()
         .map(|n| {
-            assert!(n.text_bytes() <= f.text_per_node);
-            u64::from(n.text_bytes())
+            assert!(crate::tests::text_bytes(n) <= f.text_per_node);
+            u64::from(crate::tests::text_bytes(n))
         })
         .sum();
     assert!(total <= u64::from(f.text_bytes));
@@ -409,9 +409,9 @@ fn owner_proposal_exact_checked_envelopes_keep_selected_language_whole_loss_and_
     assert!(view::max_nodes(&jig_domain_client::Limits { rows: u32::MAX, ..limits() }).is_none());
     assert!(view::worst_case(&jig_domain_client::Limits { text: u32::MAX, ..limits() }, &w).is_none());
     let id = crate::owner_proposal_words::ProposalPhrase::Attempt.id();
-    assert_eq!(w.book.say(1, id, &[Hole::Wall(Wall::EPOCH)]).unwrap_err(), crate::ui::phrases::Invalid::Values { id });
+    assert_eq!(w.book.say(1, id, &[Hole::Wall(Wall::EPOCH)]).unwrap_err(), skein_ui::phrases::Invalid::Values { id });
     assert_eq!(w.book.say(1, id, &[Hole::Number(u64::MAX)]).unwrap().text.as_ref(), b"second 18446744073709551615");
-    let short = crate::ui::Limits { nodes: tree.len() - 1, ..capacity(f) };
+    let short = skein_ui::Limits { nodes: tree.len() - 1, ..capacity(f) };
     let _refusal = std::panic::catch_unwind(|| {
         let mut b = Builder::new(&short);
         let mut bindings = JigBindings::new(f.bindings, 256);
@@ -472,7 +472,7 @@ fn owner_proposal_link_presence_and_same_keyed_card_across_contexts_keep_current
             crate::cards::Place::TaskPage,
             crate::cards::Place::Elsewhere,
         ] {
-            let mut b = Builder::new(&crate::ui::Limits { nodes: f.nodes + 100, ..capacity(f) });
+            let mut b = Builder::new(&skein_ui::Limits { nodes: f.nodes + 100, ..capacity(f) });
             let mut bindings = JigBindings::new(f.bindings, 256);
             assert!(crate::cards::card(&mut b, &client, id, &place, &w, &mut bindings));
             let tree = b.finish();
@@ -490,7 +490,7 @@ fn owner_proposal_link_presence_and_same_keyed_card_across_contexts_keep_current
         maker_keys.push(expected.unwrap()).unwrap();
         super::cards::drive(&mut client, Event::Act { act: Act::Intend { object: id.token(), act: ActKind::Accept } });
         assert_eq!(client.confirmation().unwrap().revision, None);
-        let mut b = Builder::new(&crate::ui::Limits { nodes: f.nodes + 100, ..capacity(f) });
+        let mut b = Builder::new(&skein_ui::Limits { nodes: f.nodes + 100, ..capacity(f) });
         let mut bindings = JigBindings::new(f.bindings, 256);
         crate::confirmation::confirmation(&mut b, &client, &w, &mut bindings);
         let tree = b.finish();

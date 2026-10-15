@@ -2,12 +2,12 @@
 //! Application-side IDs 6600–6699, coordinated with the other suppliers.
 use alloc::boxed::Box;
 use jig_view::Owner;
-use jig_view::ui::phrases::{
+use jig_view::words::Words;
+use skein_lib::{List, bytes::copy_of};
+use skein_ui::phrases::{
     Form, HoleKind, HoleShape, Invalid, Language, Phrase, PhraseId, PhraseLimits, PhraseShape, Phrasebook, PluralClass,
     PluralRule, Segment, SpanUnit, WallFormat,
 };
-use jig_view::words::Words;
-use skein_lib::{List, bytes::copy_of};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Word {
     ScopeProject,

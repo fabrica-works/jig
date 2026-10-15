@@ -2,9 +2,9 @@
 //! Linked chips keep their supplied lifecycle; absent facts acquire no defaults.
 use crate::JigBindings;
 use crate::owner_result_words::ResultPhrase;
-use crate::ui::phrases::Hole;
-use crate::ui::{Builder, Role, Run};
 use crate::words::Words;
+use skein_ui::phrases::Hole;
+use skein_ui::{Builder, Role, Run};
 
 use jig_domain_client::{
     Domain,
@@ -104,11 +104,11 @@ pub fn nodes(limits: &jig_domain_client::Limits) -> Option<u32> {
 }
 /// Reserve saying, escaped opaque byte and linked chip storage before rendering.
 #[must_use]
-pub fn limits(client: &jig_domain_client::Limits, words: &Words) -> Option<crate::ui::Limits> {
+pub fn limits(client: &jig_domain_client::Limits, words: &Words) -> Option<skein_ui::Limits> {
     let nodes = nodes(client)?;
     let phrase = crate::phrases::jig_capacity(&words.book)?;
     let text_per_node = phrase.checked_mul(2)?.checked_add(crate::literal_segment::max_bytes(client.text)?)?;
-    Some(crate::ui::Limits {
+    Some(skein_ui::Limits {
         nodes,
         depth: client.rows.checked_add(32)?,
         text_per_node,

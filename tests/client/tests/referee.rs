@@ -2,8 +2,8 @@
 use jig_client_world::{Until, harness::*};
 use jig_fake_person::{Face, Find, Found, Step, TreeFace};
 use jig_view::Owner;
-use jig_view::ui::{Act, Binding};
-use jig_view::ui::{Key, NodeId, Patch, Role, Run, Tree, View};
+use skein_ui::{Act, Binding};
+use skein_ui::{Key, NodeId, Patch, Role, Run, Tree, View};
 
 use skein_lib::{Duration, Env, Queue, Time, Token, Wall};
 
@@ -22,7 +22,7 @@ enum Event {
 }
 struct Wire;
 const KEY: Key = Key { owner: Owner::Jig.opaque(), kind: 1, a: 1, b: 1 };
-const LIMITS: jig_view::ui::Limits = jig_view::ui::Limits {
+const LIMITS: skein_ui::Limits = skein_ui::Limits {
     nodes: 24,
     depth: 4,
     text_per_node: 64,
@@ -125,7 +125,7 @@ impl<const BAD: u8> App for Broken<BAD> {
     fn max_out((): &()) -> u32 {
         1
     }
-    fn view_limits(_: &View) -> jig_view::ui::Limits {
+    fn view_limits(_: &View) -> skein_ui::Limits {
         LIMITS
     }
     fn patch_limit(_: &View) -> u32 {
@@ -460,7 +460,7 @@ fn a_tree_breaking_the_outline_fails_the_referee() {
         Observation::Shown {
             client: ClientId(0),
             seen: vec![Seen::Outline {
-                fault: jig_view::ui::outline::Fault { rule: jig_view::ui::outline::Rule::OneMain, node: 2 },
+                fault: skein_ui::outline::Fault { rule: skein_ui::outline::Rule::OneMain, node: 2 },
             }],
         },
         &mut out,

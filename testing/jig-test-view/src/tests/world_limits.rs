@@ -1,8 +1,8 @@
 //! Bounded world storage keeps its own checked envelope (testing.md, section 6).
 use crate::Limits;
 use jig_view::Owner;
-use jig_view::ui::{Builder, Role, SlotRef};
 use skein_lib::{Duration, Token};
+use skein_ui::{Builder, Role, SlotRef};
 
 fn world_domain() -> jig_test_domain_client::Limits {
     // The focused world's profile, without changing its fixture or timers.

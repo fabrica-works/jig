@@ -2,8 +2,8 @@
 use jig_domain_client::contract::{ObjectKey, Revision};
 use jig_test_domain_client::first;
 use jig_view::Owner;
-use jig_view::ui::{Act, Binding};
 use skein_lib::{List, Token};
+use skein_ui::{Act, Binding};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Meaning {
     Action(first::Act),
@@ -78,7 +78,7 @@ pub fn decode(bindings: &Bindings, token: Token, act: Act) -> Option<first::Act>
                         Some(first::Act::Parameters {
                             object: *object,
                             revision: *revision,
-                            value: jig_view::ui::number(&value)?,
+                            value: skein_ui::number(&value)?,
                         })
                     }
                     Act::Press | Act::Submit | Act::Toggle | Act::Drawing { .. } => None,

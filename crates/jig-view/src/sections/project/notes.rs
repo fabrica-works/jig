@@ -1,9 +1,9 @@
 //! Scope/search and note cards retain the revision read (pages.md, 6.4).
 use crate::phrases::jig::JigPhrase;
-use crate::ui::phrases::Hole;
-use crate::ui::{Builder, Role, State};
 use crate::words::Words;
 use crate::{JigBindings, JigMeaning, cards};
+use skein_ui::phrases::Hole;
+use skein_ui::{Builder, Role, State};
 
 use alloc::boxed::Box;
 use jig_domain_client::{
@@ -92,7 +92,7 @@ fn scope_choice(b: &mut Builder, words: &Words, bindings: &mut JigBindings, filt
     let label = words.say(phrase, &holes);
     b.open(Role::Button);
     b.name(&label);
-    b.text(crate::ui::Run::Plain, &label);
+    b.text(skein_ui::Run::Plain, &label);
     if let NoteScope::Resource { pattern, .. } = &scope {
         crate::owner_authority::pattern(b, words, pattern);
     }

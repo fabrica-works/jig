@@ -2,10 +2,10 @@
 //! Source order, independent loss and optional ledgers remain the owner's facts.
 use crate::owner_project_words::ProjectPhrase as P;
 use crate::phrases::jig::JigPhrase;
-use crate::ui::phrases::Hole;
-use crate::ui::{Builder, Role, Run};
 use crate::words::Words;
 use crate::{JigBindings, JigMeaning, cards};
+use skein_ui::phrases::Hole;
+use skein_ui::{Builder, Role, Run};
 
 use alloc::boxed::Box;
 use jig_domain_client::{
@@ -43,13 +43,13 @@ pub fn edit(before: &Ask, field: Field, bytes: Box<[u8]>, text: u32) -> Option<A
     match &mut ask {
         Ask::ChangePolicy { edit, .. } => match edit {
             PolicyEdit::ProjectSpend { period_spend } => match field {
-                Field::Spend => *period_spend = crate::ui::number(&bytes)?,
+                Field::Spend => *period_spend = skein_ui::number(&bytes)?,
                 Field::Requests | Field::Decides | Field::Name => return None,
             },
             PolicyEdit::Role(role) => match field {
-                Field::Spend => role.period_spend = crate::ui::number(&bytes)?,
-                Field::Requests => role.requests = u16::try_from(crate::ui::number(&bytes)?).ok()?,
-                Field::Decides => role.decides = u8::try_from(crate::ui::number(&bytes)?).ok()?,
+                Field::Spend => role.period_spend = skein_ui::number(&bytes)?,
+                Field::Requests => role.requests = u16::try_from(skein_ui::number(&bytes)?).ok()?,
+                Field::Decides => role.decides = u8::try_from(skein_ui::number(&bytes)?).ok()?,
                 Field::Name => return None,
             },
             PolicyEdit::Requirements { .. } | PolicyEdit::Projections { .. } | PolicyEdit::Permissions { .. } => {
@@ -57,7 +57,7 @@ pub fn edit(before: &Ask, field: Field, bytes: Box<[u8]>, text: u32) -> Option<A
             }
         },
         Ask::SetPool { budget, .. } => match field {
-            Field::Spend => *budget = crate::ui::number(&bytes)?,
+            Field::Spend => *budget = skein_ui::number(&bytes)?,
             Field::Requests | Field::Decides | Field::Name => return None,
         },
         Ask::MakeService { name, .. } => match field {

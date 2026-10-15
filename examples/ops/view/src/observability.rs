@@ -14,8 +14,8 @@ use jig_ops_domain_client::{
     },
 };
 use jig_view::Owner;
-use jig_view::ui::phrases::Hole;
-use jig_view::ui::{Builder, Key, Role, Run, SlotRef};
+use skein_ui::phrases::Hole;
+use skein_ui::{Builder, Key, Role, Run, SlotRef};
 
 use skein_lib::Token;
 pub const NAV: SlotRef = SlotRef {

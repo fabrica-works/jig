@@ -6,9 +6,9 @@
     reason = "ordinary tests inspect trees and script public domain requests"
 )]
 use super::cards::{CLIENT, contains, document, drive, limits, start, text, words};
-use crate::ui::Act;
-use crate::ui::{Builder, Role, State, Tree};
 use crate::{JigBindings, cards, decode};
+use skein_ui::Act;
+use skein_ui::{Builder, Role, State, Tree};
 
 use jig_domain_client::{Domain, Event, Request, action::Act as Action, contract::*, fields::Purpose, objects::Object};
 use skein_lib::{Duration, Id, List, Wall};
@@ -1335,7 +1335,7 @@ fn closing_connectors_use_their_owners_words(words: &crate::words::Words) {
         assert_eq!(slot.reference.owner, (crate::Owner::Application { number: connector }).opaque());
         let mut own = Builder::new(&limits());
         own.open(Role::Region);
-        own.text(crate::ui::Run::Plain, if connector == 7 { b"amber" } else { b"blue" });
+        own.text(skein_ui::Run::Plain, if connector == 7 { b"amber" } else { b"blue" });
         own.close();
         b.splice(slot.id, own);
     }
@@ -1648,7 +1648,7 @@ fn equal_number_proposal_makers_keep_distinct_card_keys_words_and_decoding() {
         let mut bindings = JigBindings::new(64, CLIENT.text);
         let tree = render(&d, id, words, &mut bindings);
         assert!(contains(&tree, label));
-        let expected = crate::ui::Key { owner: crate::Owner::Jig.opaque(), kind, a: u64::MAX, b: u64::MAX };
+        let expected = skein_ui::Key { owner: crate::Owner::Jig.opaque(), kind, a: u64::MAX, b: u64::MAX };
         assert!(tree.nodes().iter().any(|node| node.role == Role::Item && node.key == Some(expected)));
         assert_eq!(crate::pages::object_key(key), expected);
         shown.push(expected);
@@ -1974,7 +1974,7 @@ fn moved_effect_facts_say_the_supplied_connector_proposal_without_inventing_a_ma
         builder.close();
         let tree = builder.finish();
         let expected =
-            words.say(crate::phrases::jig::JigPhrase::PartOwnerProposal, &[crate::ui::phrases::Hole::Number(proposal)]);
+            words.say(crate::phrases::jig::JigPhrase::PartOwnerProposal, &[skein_ui::phrases::Hole::Number(proposal)]);
         assert!(contains(&tree, b"Connector 65535"));
         assert!(contains(&tree, &expected));
         assert!(!contains(&tree, b"by task"));

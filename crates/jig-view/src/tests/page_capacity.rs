@@ -9,8 +9,8 @@ use super::{
     pages::deliver,
     work_pages::{chip, list, part, project_doc},
 };
-use crate::ui::{Builder, Role, SlotRef, Tree};
 use crate::{JigBindings, Owner, words::Words};
+use skein_ui::{Builder, Role, SlotRef, Tree};
 
 use jig_domain_client::{
     Domain, Event, Request,
@@ -564,7 +564,7 @@ fn capacity_composes_siblings_fragments_and_application_pages_with_checked_overf
     ));
     b.open(Role::Main);
     b.open(Role::Heading { level: 1 });
-    b.text(crate::ui::Run::Plain, b"Application page");
+    b.text(skein_ui::Run::Plain, b"Application page");
     b.close();
     b.close();
     crate::after_page(&mut b, &d, words, &mut bindings);

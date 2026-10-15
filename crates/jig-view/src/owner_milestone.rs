@@ -2,9 +2,9 @@
 //! Domain is borrowed only by existing admitted result follow-up fragments.
 use crate::JigBindings;
 use crate::owner_milestone_words::MilestonePhrase as P;
-use crate::ui::phrases::Hole;
-use crate::ui::{Builder, Role, Run};
 use crate::words::Words;
+use skein_ui::phrases::Hole;
+use skein_ui::{Builder, Role, Run};
 
 use jig_domain_client::{
     Domain, Limits,
@@ -26,7 +26,7 @@ pub struct MilestoneFragment {
 pub fn max_nodes(limits: &Limits) -> Option<u32> {
     32_u32
         .checked_add(crate::proposed_task::part_nodes(limits)?)?
-        .checked_add(crate::ui::markdown::max_nodes(limits.text)?.checked_mul(2)?)?
+        .checked_add(skein_ui::markdown::max_nodes(limits.text)?.checked_mul(2)?)?
         .checked_add(crate::result_nodes(limits)?)
 }
 fn ending_fits(value: &OwnerChipEnding, limits: &Limits) -> Option<()> {

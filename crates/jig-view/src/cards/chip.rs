@@ -3,9 +3,9 @@
 //! once through a bounded work list; neither the carrier nor traversal is recursive.
 use crate::JigBindings;
 use crate::phrases::jig::JigPhrase;
-use crate::ui::phrases::Hole;
-use crate::ui::{Builder, Role};
 use crate::words::{Words, name};
+use skein_ui::phrases::Hole;
+use skein_ui::{Builder, Role};
 
 use jig_domain_client::{
     Domain,
