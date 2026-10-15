@@ -1393,6 +1393,14 @@ None yet; they start at 101.
 133. **jig 05's Shapes against main** (ready check of jig-05.1).
      jig 05's session file corrected against skein `2f8f471` and jig `f5706d976` (ready check of jig-05.1, skein 13.5 still running): the `Limits` literals are found by `rg -n 'markdown_depth' --type rust`, 33 in 30 files, three in `crates/jig-view/src/` and one in `tests/ops`, which `Limits \{` over the listed directories missed; a repin's size is measured against `git merge-base HEAD origin/main`; the fuzzy break the check met after the repair, `random_people_with_crash_commits_and_reload` on seed 4503 (a sign-in pressed 1.1 ms after a sign-out, the page ending signed out, the referee's Online deadline armed), is a question to raise when reached, after at most 3 runs that find which side is wrong, with no re-seed and no change to the referee or jig's client in 05.1; temper's four `Limits` literals are a `later.md` row. The check's suites, through `heavy` with the repair applied: `cargo check --workspace --all-targets` clean, clippy clean, nextest default 3565 of 3565, fuzzy 108 of 109.
 
+134. **jig 05: the referee's stale frame, and a sign-out answered after a newer sign-in** (harness defect and design gap, jig 05's block of 2026-10-15T17:27:05Z).
+     The seed 4503 failure has two causes (`logs/jig-05/seed-4503-findings.md`), decided apart.
+
+     1. **The referee's stale frame: a harness defect, step `jig-05.s1`** in jig 05's session, before 05.1 lands, with its session file `jig/05.s1-referee-stale-frame.md`: a frame delivered after its watch's terminal is no evidence of a party (today `Receipt::Party` names no watch, and `referee.rs:192-194` rearms `Online` on it). It does not rest on part 2: do it now.
+     2. **The earlier sign-out's `SignedOut` after a newer sign-in: a design gap, to the designer now** (`question.md`): client.md 12 does not say which sign-in a `SignedOut` answer belongs to once a newer one is authenticated. 05.1 waits for the answer, with its commits kept unlanded; the answer comes as its own unblock.
+
+     The repin is not deferred. Unchanged: ruling 133's rules for 05.1 (no re-seed; no change to jig's client in 05.1).
+
 ## For the user
 
 Long-term choices the user may veto; each default holds unless the user
