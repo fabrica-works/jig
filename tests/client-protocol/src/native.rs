@@ -77,7 +77,7 @@ pub enum Received {
 /// A native client as a process of a skein world.
 pub struct NativeClient {
     shell: Shell,
-    terminal: Option<jig_shell_text::Terminal>,
+    terminal: Option<skein_ui_text::Terminal>,
     #[expect(clippy::disallowed_types, reason = "scenario input hands inherited pipes to the host between iterations")]
     pipes: core::cell::Cell<Option<(Fd, Fd)>>,
     complete: Queue<Complete>,
@@ -259,7 +259,7 @@ impl NativeClient {
             terminal.iterate(now, Test::tree(&self.view), changed);
             while let Some(command) = terminal.commands().pop() {
                 match command {
-                    jig_shell_text::Command::Act { node, first, submit } => {
+                    skein_ui_text::Command::Act { node, first, submit } => {
                         let event = Test::act(&mut self.view, node, first).expect("terminal act");
                         self.callback(event);
                         if submit {
@@ -268,10 +268,10 @@ impl NativeClient {
                             self.callback(event);
                         }
                     }
-                    jig_shell_text::Command::Print
-                    | jig_shell_text::Command::Close
-                    | jig_shell_text::Command::Nothing
-                    | jig_shell_text::Command::Refused { .. } => unreachable!("terminal queues acts only"),
+                    skein_ui_text::Command::Print
+                    | skein_ui_text::Command::Close
+                    | skein_ui_text::Command::Nothing
+                    | skein_ui_text::Command::Refused { .. } => unreachable!("terminal queues acts only"),
                 }
             }
             while let Some(submit) = terminal.submissions().pop() {
@@ -291,7 +291,7 @@ impl Host for NativeClient {
             self.terminal.as_mut().expect("terminal supplied").adopt(input, output).expect("pipe room");
         }
         while let Some(complete) = self.complete.pop() {
-            if jig_shell_text::Terminal::owns(complete.op) {
+            if skein_ui_text::Terminal::owns(complete.op) {
                 self.terminal.as_mut().expect("terminal operation").completions().push(complete);
             } else {
                 self.shell.completions().push(complete);
@@ -392,7 +392,7 @@ impl Host for NativeClient {
         [
             self.shell.next_deadline(),
             self.next_policy_deadline(),
-            self.terminal.as_ref().and_then(jig_shell_text::Terminal::next_deadline),
+            self.terminal.as_ref().and_then(skein_ui_text::Terminal::next_deadline),
         ]
         .into_iter()
         .flatten()
@@ -406,7 +406,7 @@ impl Host for NativeClient {
         }
     }
     fn is_empty(&self) -> bool {
-        self.closing && self.shell.is_empty() && self.terminal.as_ref().is_none_or(jig_shell_text::Terminal::closed)
+        self.closing && self.shell.is_empty() && self.terminal.as_ref().is_none_or(skein_ui_text::Terminal::closed)
     }
     fn worst_case(&self) -> u64 {
         self.shell.worst_case() + Test::worst_case(&self.env.limits) + 8 * 1024 * 1024

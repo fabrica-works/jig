@@ -350,14 +350,3 @@ fn the_native_shell_links_only_the_clients_components_and_foundation() {
         ["jig-protocol-client-link", "jig-protocol-client-wire", "skein-http", "skein-io", "skein-lib"]
     );
 }
-
-#[test]
-fn the_text_shell_links_only_the_view_and_foundation() {
-    let shell = manifests()
-        .into_iter()
-        .find(|manifest| manifest.name.as_deref() == Some("jig-shell-text"))
-        .expect("text shell manifest");
-    let mut dependencies = shell.dependencies;
-    dependencies.sort();
-    assert_eq!(dependencies, ["skein-io", "skein-lib", "skein-ui"]);
-}

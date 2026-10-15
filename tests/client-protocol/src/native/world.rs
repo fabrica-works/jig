@@ -228,8 +228,8 @@ fn run_mode(seed: u64, script: Script, terminal: bool) -> (Outcome, Box<[u8]>) {
         let mut client = NativeClient::new(settings(), root, 1000, seed, script);
         if terminal {
             client.terminal = Some(
-                jig_shell_text::Terminal::new(
-                    jig_shell_text::Settings {
+                skein_ui_text::Terminal::new(
+                    skein_ui_text::Settings {
                         name: b"jig".as_slice().into(),
                         longest: 1024,
                         interval: Duration::from_millis(1),

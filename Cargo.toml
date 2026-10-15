@@ -16,7 +16,6 @@ members = [
     "crates/jig-domain-client",
     "crates/jig-protocol-transcript",
     "crates/jig-view",
-    "crates/jig-shell-text",
     "crates/jig-domain-core",
     "crates/jig-domain-accounts",
     "crates/jig-protocol-accounts",
@@ -134,7 +133,7 @@ jig-client-world = { path = "tests/client" }
 jig-domain-client = { path = "crates/jig-domain-client" }
 jig-protocol-transcript = { path = "crates/jig-protocol-transcript" }
 jig-view = { path = "crates/jig-view" }
-jig-shell-text = { path = "crates/jig-shell-text" }
+skein-ui-text = { git = "https://github.com/forgetic/skein.git" }
 jig-fake-person = { path = "testing/jig-fake-person" }
 jig-scripted-engine = { path = "testing/jig-scripted-engine" }
 skein-codec = { git = "https://github.com/forgetic/skein.git" }

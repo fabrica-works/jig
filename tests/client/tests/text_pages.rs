@@ -8,8 +8,8 @@ use skein_ui::Role;
 type PageWorld = World<Test, Scripted>;
 fn print(w: &PageWorld, c: ClientId, label: &str, golden: &[u8]) {
     let (_, view) = jig_client_world::test::new(&jig_client_world::test::limits(), 0);
-    let mut print = jig_shell_text::Print::new(&view.limits().tree).expect("print fits");
-    jig_shell_text::render(w.tree(c), b"jig", Some(jig_view::regions::JigRegion::Link.region()), &mut print);
+    let mut print = skein_ui_text::Print::new(&view.limits().tree).expect("print fits");
+    skein_ui_text::render(w.tree(c), b"jig", Some(jig_view::regions::JigRegion::Link.region()), &mut print);
     assert_eq!(print.text.as_slice(), golden, "{label}");
 }
 fn settle(w: &mut PageWorld, c: ClientId) {

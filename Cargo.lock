@@ -214,7 +214,6 @@ dependencies = [
  "jig-protocol-client-wire",
  "jig-protocol-engine-clients",
  "jig-shell-native",
- "jig-shell-text",
  "jig-test-connector",
  "jig-test-domain",
  "jig-test-domain-client",
@@ -229,6 +228,7 @@ dependencies = [
  "skein-shell",
  "skein-sim",
  "skein-ui",
+ "skein-ui-text",
  "skein-world",
 ]
 
@@ -261,7 +261,6 @@ dependencies = [
  "jig-fake-workers",
  "jig-protocol-transcript",
  "jig-scripted-engine",
- "jig-shell-text",
  "jig-test-client-kit",
  "jig-test-connector",
  "jig-test-domain",
@@ -271,6 +270,7 @@ dependencies = [
  "sha2",
  "skein-lib",
  "skein-ui",
+ "skein-ui-text",
  "skein-world",
  "smith-transcript",
 ]
@@ -892,16 +892,6 @@ dependencies = [
  "skein-shell",
  "skein-sim",
  "skein-world",
-]
-
-[[package]]
-name = "jig-shell-text"
-version = "0.0.0"
-dependencies = [
- "skein-io",
- "skein-lib",
- "skein-sim",
- "skein-ui",
 ]
 
 [[package]]
@@ -1617,6 +1607,16 @@ version = "0.0.0"
 source = "git+https://github.com/forgetic/skein.git#dc71a49f2512a2a17f92f0be02d684d56ce5eda7"
 dependencies = [
  "skein-lib",
+]
+
+[[package]]
+name = "skein-ui-text"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/skein.git#dc71a49f2512a2a17f92f0be02d684d56ce5eda7"
+dependencies = [
+ "skein-io",
+ "skein-lib",
+ "skein-ui",
 ]
 
 [[package]]

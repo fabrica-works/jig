@@ -78,7 +78,7 @@ pub struct Outcome {
     pub heap_bound: u64,
 }
 struct TextShell {
-    print: jig_shell_text::Print,
+    print: skein_ui_text::Print,
     held: Option<(NodeId, Box<[u8]>)>,
 }
 struct Client<A: App> {
@@ -201,7 +201,7 @@ impl<A: App, F: Front<A>> World<A, F> {
     /// Play this client's subsequent person acts through the printed numbers.
     pub fn at_text_shell(&mut self, client: ClientId) {
         self.clients[client.0].text_shell = Some(TextShell {
-            print: jig_shell_text::Print::new(&A::view_limits(&self.clients[client.0].view)).expect("print bounds fit"),
+            print: skein_ui_text::Print::new(&A::view_limits(&self.clients[client.0].view)).expect("print bounds fit"),
             held: None,
         });
     }
@@ -676,7 +676,7 @@ impl<A: App, F: Front<A>> World<A, F> {
             );
             Act::Input { value: words }
         } else {
-            jig_shell_text::render(tree, b"jig", Some(jig_view::regions::JigRegion::Link.region()), print);
+            skein_ui_text::render(tree, b"jig", Some(jig_view::regions::JigRegion::Link.region()), print);
             if tree.find(node).is_some_and(|n| n.states.as_slice().contains(&skein_ui::State::SubmitsOnEnter))
                 && let Act::Input { value } = act
             {
@@ -697,19 +697,19 @@ impl<A: App, F: Front<A>> World<A, F> {
             line.push(b' ');
             line.extend_from_slice(value);
         }
-        let read = jig_shell_text::command(&line, Some(print.numbers.as_slice()), tree, u32::MAX);
-        assert_eq!(&read, &jig_shell_text::Command::Act { node, first, submit: paired }, "step {step}: text shell act");
+        let read = skein_ui_text::command(&line, Some(print.numbers.as_slice()), tree, u32::MAX);
+        assert_eq!(&read, &skein_ui_text::Command::Act { node, first, submit: paired }, "step {step}: text shell act");
         match read {
-            jig_shell_text::Command::Act { node, first, submit } => {
+            skein_ui_text::Command::Act { node, first, submit } => {
                 self.act(id, node, first);
                 if submit {
                     self.act(id, node, Act::Submit);
                 }
             }
-            jig_shell_text::Command::Print
-            | jig_shell_text::Command::Close
-            | jig_shell_text::Command::Nothing
-            | jig_shell_text::Command::Refused { .. } => unreachable!("the reader gave the asserted act"),
+            skein_ui_text::Command::Print
+            | skein_ui_text::Command::Close
+            | skein_ui_text::Command::Nothing
+            | skein_ui_text::Command::Refused { .. } => unreachable!("the reader gave the asserted act"),
         }
     }
     fn walk_people(&mut self) -> bool {
