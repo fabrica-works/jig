@@ -76,8 +76,15 @@ Files: `crates/skein-ui/src/{tree.rs (Node, Node::vacant and new,
   goldens.
   Users of `Node::picture` and `Attribute::picture`: `rg -n
   '\.picture\b|picture:' crates/skein-ui crates/skein-ui-text
-  testing/skein-fake-person` (jig's diff.rs:40 and 260,
-  tests/tree.rs:198-202 at the base).
+  crates/skein-ui-web testing/skein-fake-person` (jig's diff.rs:40 and
+  260, tests/tree.rs:198-202 at the base; skein-ui-web's
+  `mapping.rs:337`, `a.picture.and_then`, and `tests/mapping.rs:204`,
+  `made.attribute.picture = …`). `Source` holds a `Box`, so it is not
+  `Copy`: `Attribute::of` takes `node.source.clone()`, and the mapping
+  matches on `&a.source`.
+  The second-focus check's flag in `Builder`: set back in
+  `Builder::reuse` (`builder.rs:70`) as in `new`, and checked in
+  `splice` (`builder.rs:314`).
 Shape: `Node.description: Option<Box<[u8]>>`, `Node.entry:
   Option<EntryKind>`, `Node.focus: Option<u64>`, `Node.source:
   Option<Source>` (for `picture`); the same four in `Attribute`.
@@ -89,7 +96,9 @@ Shape: `Node.description: Option<Box<[u8]>>`, `Node.entry:
   -> bool`: a path starting with one `/` and not `//`, or `https://`
   and a host, with no space, control byte, quote or angle bracket.
   The web: a description an element of the page part's,
-  `id="skein-ui-<node>-description"`, named by `aria-describedby`
+  `id="skein-ui-description-<node>"`, as the landed
+  `skein-ui-label-<node>` and `skein-ui-menu-<node>` are
+  (`mapping.rs:77, 91`), named by `aria-describedby`
   (ui-web.md, 6); an entry kind the `<input>`'s `type`; an image's
   address its `src`; a focus request an `Op::Focus` after the apply,
   `tabindex="-1"` first on an element that cannot take it (ui-web.md,
@@ -132,7 +141,12 @@ Scope: ui.md 3.2 (count, position, spans).
 Needs: skein 09.5.
 Files: `crates/skein-ui/src/{tree.rs, builder.rs, diff.rs}`; tests in
   `src/tests/tree.rs` and `src/tests/diff.rs`;
-  `crates/skein-ui-web/src/mapping.rs` and its tests.
+  `crates/skein-ui-web/src/mapping.rs` and its tests;
+  `crates/skein-ui-web/src/page.rs` and `src/tests/page.rs`: the
+  mapping maps one node alone (`page.rs:197, 263`), so the page part
+  sets each item's and tree item's `aria-setsize` from its list's or
+  tree's count, and sends them again as `Op::Attributes` when the count
+  changes.
 Shape: `Node.count: Option<u32>` (list, table, tree), `Node.position:
   Option<u32>` (item, row, tree item; from 1, zero an assertion),
   `Node.spans: Option<Spans>` (cell; each at least 1); the three in
@@ -144,7 +158,8 @@ Test shape: `src/tests/tree.rs`: `a_count_on_an_item_is_an_assertion`,
   `a_position_of_zero_is_an_assertion`,
   `spans_on_a_paragraph_are_an_assertion`; `src/tests/diff.rs`:
   `a_changed_position_is_one_attribute_patch`; mapping rows for the
-  three. Each under 20 ms.
+  three; `src/tests/page.rs`:
+  `a_changed_count_sets_each_items_setsize_again`. Each under 20 ms.
 Proof: joint, `heavy cargo nextest run -p skein-ui -p skein-ui-web`
   once: the properties reach the page part's model. skein 05.3 prints
   them.
@@ -162,8 +177,10 @@ Files: `crates/skein-ui/src/{tree.rs (Shortcut), builder.rs (shortcut,
 Shape: `Shortcut::ESCAPE`; `shortcut` takes a letter, a digit, or
   `ESCAPE`; `outline::Rule::EscapeInDialog`, the fault naming the first
   node outside every dialog that names Escape. `ShortcutOnce` counts
-  Escape as any shortcut. The web: `aria-keyshortcuts="Escape"`; the
-  page part's `Event::Cancel { dialog }` presses the first bound,
+  Escape as any shortcut. The web: `aria-keyshortcuts="Escape"` landed
+  with 09.3 (`mapping.rs:474`, its row `tests/mapping.rs:177`), keyed
+  on the literal `27`: `Shortcut::ESCAPE` replaces it at
+  `mapping.rs:474` and `tests/mapping.rs:202`; the page part's `Event::Cancel { dialog }` presses the first bound,
   enabled node in the dialog naming Escape, and with none gives no act
   (ui-web.md, 7).
 Test shape: two rows added to `each_rule_names_its_first_fault`
@@ -189,14 +206,17 @@ Files: `crates/skein-ui/src/{tree.rs (Role, Sort, Node.sort),
   `crates/skein-ui-text/src/render.rs` (the role match, jig's
   render.rs:129-215; a row's join, 179-193; the choice's mark,
   227-228); `crates/skein-ui-text/src/command.rs` (its match over
-  `Role`, 74-119: an option a `Press`, a select and the headers no
-  act); `crates/skein-ui-text/src/tests/fixtures.rs` (a select of
+  `Role`, 74-119, which gives an `Act` for every role: an option, a
+  select and the headers join the `Act::Press` arm; an unbound node is
+  refused before it, at line 66); `crates/skein-ui-text/src/tests/fixtures.rs` (a select of
   three options, one selected; a table with a column header carrying a
   sort and a row header) and `src/tests/golden/roles.txt`;
-  `testing/skein-fake-person/src/tree.rs` (`role_name`, 118; `passive`,
-  170) and `src/random.rs` (`field`, 81, and `choice`, 130: their
-  matches over `Role` take the four roles); `crates/skein-ui-web/src/{mapping.rs (rows,
-  `accessible`), page.rs (a select's change)}` and their tests.
+  `testing/skein-fake-person/src/tree.rs` (`role_name`'s match, 121;
+  `passive`'s list, 173) and `src/random.rs` (`field`, 81, and `choice`, 130: their
+  matches over `Role` take the four roles); `crates/skein-ui-web/src/{mapping.rs (rows;
+  its five matches over `Role`: `base` 119, `accessible` 231, `name`
+  281, `value` 358, `tag` 410), page.rs (a select's change; `Select`
+  in `focusable`, 342)}` and their tests.
 Shape: `Role::{Select, Option, ColumnHeader, RowHeader}`; `Node.sort:
   Option<Sort>` on a column header, in `Attribute`; builder
   `sort(Sort)`; `spans` takes the headers too; `bind` takes an option.
@@ -213,6 +233,7 @@ Shape: `Role::{Select, Option, ColumnHeader, RowHeader}`; `Node.sort:
   element's choice put back by an `Op::Choice` (ui-web.md, 7).
 Test shape: the golden `roles.txt`, edited by hand with the fixture's
   new lines; in `src/tests/tree.rs`, `a_sort_on_a_cell_is_an_assertion`;
+  in `src/tests/diff.rs`, `a_changed_sort_is_one_attribute_patch`;
   mapping rows for the four roles and the sort; in skein-ui-web's
   `src/tests/page.rs`,
   `a_select_change_presses_the_option_and_puts_the_choice_back`. Under
@@ -230,7 +251,9 @@ Scope: ui.md 3.2 (required); ui-text.md 5 (`(required)`).
 Needs: skein 09.5.
 Files: `crates/skein-ui/src/tree.rs` (State);
   `crates/skein-ui-web/src/mapping.rs` (`required` where the element
-  takes it, else `aria-required`); the states' capacity
+  takes it, else `aria-required`: `Required` in the state list,
+  22-31, and in `state_attribute`, 175) and `src/tests/mapping.rs` (a
+  `Required` row in `each_state_and_property_maps_to_its_attribute`); the states' capacity
   (jig's tree.rs:288, builder.rs:161, limits.rs:32 at the base: nine,
   with `Provisional` gone and `Required` added);
   `crates/skein-ui-text/src/render.rs` (the states' order, jig's
@@ -285,6 +308,7 @@ None known.
 
 ## Done when
 
-`rg -n 'Select|ColumnHeader|RowHeader|Required|EntryKind|EscapeInDialog'
+`rg -n 'Role::Select|Role::ColumnHeader|Role::RowHeader|State::Required|EntryKind|Rule::EscapeInDialog'
 crates/skein-ui/src` prints lines for each, and `heavy cargo nextest run
--p skein-ui -p skein-ui-text -p skein-fake-person` passes.
+-p skein-ui -p skein-ui-text -p skein-fake-person -p skein-ui-web`
+passes.
