@@ -1,12 +1,8 @@
 mod binding;
-mod diff;
-mod markdown;
 mod outline;
 mod owner;
 mod phrases;
 mod regions;
-mod slots;
-mod tree;
 
 mod cards;
 mod cards_objects;

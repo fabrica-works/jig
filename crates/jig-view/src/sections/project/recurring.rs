@@ -1,9 +1,11 @@
 //! Supplied recurring templates and period facts (pages.md, section 6).
+use crate::ui::{Builder, Role};
 use crate::{
-    Builder, JigBindings, Role, cards,
+    JigBindings, cards,
     phrases::{Hole, jig::JigPhrase},
     words::Words,
 };
+
 use jig_domain_client::{
     Domain,
     action::Act,

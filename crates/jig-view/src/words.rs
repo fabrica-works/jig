@@ -4,10 +4,8 @@
 mod held;
 mod lacking;
 mod refusals;
-use crate::{
-    Builder, Role, Run,
-    phrases::{Hole, Phrasebook, jig::JigPhrase},
-};
+use crate::phrases::{Hole, Phrasebook, jig::JigPhrase};
+use crate::ui::{Builder, Role, Run};
 use alloc::boxed::Box;
 use jig_domain_client::{
     contract::{Actor, Decision, Ending, Executor, GoalExecutor, Made, Outcome, ProposalKey, Proposer},

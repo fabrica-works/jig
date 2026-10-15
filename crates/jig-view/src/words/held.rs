@@ -1,9 +1,7 @@
 //! Complete moved-hold facts without requiring an object slot; contract.md, 4.
 use super::{Words, name};
-use crate::{
-    Builder,
-    phrases::{Hole, jig::JigPhrase},
-};
+use crate::phrases::{Hole, jig::JigPhrase};
+use crate::ui::Builder;
 use jig_domain_client::contract::{HoldCategory, HoldFailure, HoldReason, Part};
 impl Words {
     /// Admission reason facts, without invented amounts, actors, clocks or parts.

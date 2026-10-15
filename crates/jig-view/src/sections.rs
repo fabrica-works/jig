@@ -1,5 +1,7 @@
 //! Sections are whole regions, shown only where the domain names them (view.md, 4.1).
-use crate::{Builder, JigBindings, words::Words};
+use crate::ui::Builder;
+use crate::{JigBindings, words::Words};
+
 use jig_domain_client::{Domain, pages::Section};
 mod conversations;
 mod deployment;

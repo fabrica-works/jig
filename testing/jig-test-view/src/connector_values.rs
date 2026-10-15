@@ -10,7 +10,9 @@ use jig_test_domain_client::{
     },
     family::Scope,
 };
-use jig_view::{Builder, Role, Run, phrases::Hole, words::Words};
+use jig_view::ui::{Builder, Role, Run};
+use jig_view::{phrases::Hole, words::Words};
+
 use skein_lib::{List, Wall};
 
 fn text(b: &mut Builder, words: &Words, word: Word, holes: &[Hole]) {

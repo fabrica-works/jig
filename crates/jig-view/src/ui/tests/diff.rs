@@ -4,7 +4,9 @@
     reason = "the independent test model uses ordinary Rust containers and iterator queries"
 )]
 
-use crate::{Binding, Builder, DrawingKind, Key, Limits, Made, NodeId, Owner, Patch, Role, Run, State, Tree, View};
+use crate::ui::{Builder, DrawingKind, Key, Made, NodeId, Owner, Patch, Role, Run, State, Tree, View};
+use crate::{Binding, Limits};
+
 use skein_lib::{Queue, Rng};
 
 const LIMITS: Limits = Limits {
@@ -116,11 +118,11 @@ fn equal(rows: &[Entry], tree: &Tree) {
 
 fn item(builder: &mut Builder, key: u64, changed: bool) {
     builder.open(Role::Item);
-    builder.key(Key { owner: Owner::Jig.opaque(), kind: 1, a: key, b: 0 });
+    builder.key(Key { owner: Owner { number: 65_536 }, kind: 1, a: key, b: 0 });
     builder.text(Run::Plain, if changed { b"new" } else { b"old" });
     builder.open(Role::Button);
     builder.name(b"Choose");
-    builder.bind(Binding { owner: Owner::Jig.opaque(), token: skein_lib::Token::new(key) });
+    builder.bind(Binding { owner: Owner { number: 65_536 }, token: skein_lib::Token::new(key) });
     builder.close();
     builder.close();
 }
@@ -205,7 +207,7 @@ fn fields_keep_typing_and_binding_changes_are_private_while_drawings_change_whol
         let mut builder = view.builder();
         builder.open(Role::TextArea);
         builder.value(text, written);
-        builder.bind(Binding { owner: Owner::Jig.opaque(), token: skein_lib::Token::new(token) });
+        builder.bind(Binding { owner: Owner { number: 65_536 }, token: skein_lib::Token::new(token) });
         builder.close();
         view.finish(builder, shown, &mut out);
         if shown == 2 {
@@ -213,7 +215,7 @@ fn fields_keep_typing_and_binding_changes_are_private_while_drawings_change_whol
         }
         if shown == 3 {
             assert_eq!(out.len(), 1);
-            match out.pop().expect("domain value write") {
+            match out.pop().expect("owner value write") {
                 Patch::Value { value, .. } => assert_eq!(value.expect("written value").text.as_ref(), b"saved"),
                 Patch::Insert { .. }
                 | Patch::Remove { .. }
@@ -226,7 +228,7 @@ fn fields_keep_typing_and_binding_changes_are_private_while_drawings_change_whol
     }
     let mut model = Vec::new();
     let mut view = View::new(&LIMITS);
-    let kind = DrawingKind { owner: (Owner::Application { number: 1 }).opaque(), kind: 1 };
+    let kind = DrawingKind { owner: Owner { number: 1 }, kind: 1 };
     for data in [b"123".as_slice(), b"456"] {
         let mut builder = view.builder();
         builder.drawing(kind, b"Count", data, 3);

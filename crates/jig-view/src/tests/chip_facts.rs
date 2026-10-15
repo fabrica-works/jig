@@ -5,7 +5,8 @@
     reason = "ordinary tests inspect public trees and select supplied watch requests"
 )]
 use super::cards::{CLIENT, contains, shared_words as words, text};
-use crate::{Builder, JigBindings, Tree};
+use crate::JigBindings;
+use crate::ui::{Builder, Tree};
 use jig_domain_client::{Domain, Request, address::Address, contract::*};
 use skein_lib::List;
 fn list<T>(items: impl IntoIterator<Item = T>) -> List<T> {

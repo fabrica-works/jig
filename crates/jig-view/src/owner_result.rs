@@ -1,6 +1,8 @@
 //! Result metadata fragments (client/domain/objects.md, 8; view.md, 7 and 10).
 //! Linked chips keep their supplied lifecycle; absent facts acquire no defaults.
-use crate::{Builder, JigBindings, Role, Run, owner_result_words::ResultPhrase, phrases::Hole, words::Words};
+use crate::ui::{Builder, Role, Run};
+use crate::{JigBindings, owner_result_words::ResultPhrase, phrases::Hole, words::Words};
+
 use jig_domain_client::{
     Domain,
     contract::{OwnerRequester, OwnerTaskLink, OwnerTaskStatus, Proposer, ResultDetails},

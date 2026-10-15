@@ -1,12 +1,14 @@
 //! Whole supplied tree presentation (client/domain/pages.md, 5.2; view.md, 10).
 //! Local folds and filters hide presentation only. Source depth, parentage,
 //! count folds and continuation are never reconstructed from displayed rows.
+use crate::ui::{Builder, Role, Run, State};
 use crate::{
-    Builder, JigBindings, Role, Run, State,
+    JigBindings,
     owner_tree_words::TreePhrase as P,
     phrases::{Hole, jig::JigPhrase},
     words::Words,
 };
+
 use jig_domain_client::{
     Domain, Limits,
     action::Act,

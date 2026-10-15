@@ -1,5 +1,7 @@
 //! A whole question and its one answer (client/domain/objects.md, section 6).
-use crate::{Builder, JigBindings, phrases::jig::JigPhrase, words::Words};
+use crate::ui::Builder;
+use crate::{JigBindings, phrases::jig::JigPhrase, words::Words};
+
 use jig_domain_client::{
     Domain,
     contract::OwnerRequester,
@@ -35,7 +37,7 @@ pub fn question(
         };
         words.text(b, phrase, &[crate::phrases::Hole::Number(number)]);
     }
-    crate::markdown::read(document.words.bytes(), 2, b);
+    crate::ui::markdown::read(document.words.bytes(), 2, b);
     words.waiting(b, client.wall(), document.since);
     if super::common::answering(client, object) {
         super::common::field(b, client, Purpose::Answer, JigPhrase::AnswerField, words, bindings);

@@ -1,4 +1,5 @@
-use crate::{Builder, Limits, Owner, Role, Run, SlotRef, State};
+use crate::Limits;
+use crate::ui::{Builder, Owner, Role, Run, SlotRef, State};
 use skein_lib::Token;
 
 const LIMITS: Limits = Limits {
@@ -15,7 +16,7 @@ const LIMITS: Limits = Limits {
 };
 
 fn reference(number: u64) -> SlotRef {
-    SlotRef { owner: (Owner::Application { number: 1 }).opaque(), token: Token::new(number) }
+    SlotRef { owner: Owner { number: 1 }, token: Token::new(number) }
 }
 
 fn page() -> Builder {

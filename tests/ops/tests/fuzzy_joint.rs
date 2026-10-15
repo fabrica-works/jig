@@ -10,7 +10,7 @@ use jig_ops_domain as root;
 use jig_ops_domain_client::{Address, observability as obs};
 use jig_ops_world::joint::engine::Milestone;
 use jig_ops_world::joint::fixture;
-use jig_view::Role;
+use jig_view::ui::Role;
 use skein_lib::Duration;
 use skein_world::domain::{Verdict, heap::Counting};
 #[global_allocator]

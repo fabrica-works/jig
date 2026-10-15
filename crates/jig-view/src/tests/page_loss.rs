@@ -173,7 +173,9 @@ fn every_native_page_retains_source_loss_and_displays_it_independently_of_contin
             assert_eq!(
                 tree.nodes()
                     .iter()
-                    .filter(|n| n.role == crate::Role::Status && n.name.as_deref() == Some(b"This page is incomplete"))
+                    .filter(
+                        |n| n.role == crate::ui::Role::Status && n.name.as_deref() == Some(b"This page is incomplete")
+                    )
                     .count(),
                 usize::from(cut)
             );

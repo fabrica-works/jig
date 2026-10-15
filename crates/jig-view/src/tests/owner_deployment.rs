@@ -8,12 +8,14 @@
 )]
 //! Native Deployment view proofs; no source translation or connector completion is inferred.
 use super::cards::{CLIENT, contains, document, drive, shared_words, start};
+use crate::ui::{Builder, Role, Tree};
 use crate::{
-    Builder, JigBindings, Role, Tree, owner_deployment as view,
+    JigBindings, owner_deployment as view,
     owner_deployment_words::DeploymentPhrase as P,
     phrases::{Invalid, PhraseLimits, Phrasebook, Segment},
     words::Words,
 };
+
 use jig_domain_client::{
     Domain, Event, Request,
     address::{Address, Place},
@@ -435,8 +437,8 @@ fn deployment_view_all_outer_and_nested_lists_fill_together_with_exact_and_one_u
     let exact = crate::Limits {
         nodes: tree.len(),
         depth,
-        text_per_node: tree.nodes().iter().map(crate::tree::Node::text_bytes).max().unwrap(),
-        text_bytes: tree.nodes().iter().map(crate::tree::Node::text_bytes).sum(),
+        text_per_node: tree.nodes().iter().map(crate::ui::tree::Node::text_bytes).max().unwrap(),
+        text_bytes: tree.nodes().iter().map(crate::ui::tree::Node::text_bytes).sum(),
         ..maximum
     };
     assert_eq!(build(&client, w, exact).len(), tree.len());

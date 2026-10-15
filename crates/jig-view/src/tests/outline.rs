@@ -1,11 +1,11 @@
+use crate::ui::{Builder, Modifier, Role, Shortcut, Tree};
 use crate::{
-    Builder, Modifier, Role, Shortcut, Tree,
     outline::{Fault, Rule, check},
     regions::JigRegion,
 };
 
 fn page() -> Builder {
-    let mut b = Builder::new(&super::tree::LIMITS);
+    let mut b = Builder::new(&crate::ui::tests::fixtures::LIMITS);
     b.open(Role::Page);
     b
 }

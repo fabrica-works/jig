@@ -1,10 +1,12 @@
 #![expect(clippy::disallowed_methods, reason = "ordinary tests inspect standalone trees and checked language data")]
+use crate::ui::{Builder, Tree};
 use crate::{
-    Builder, Limits, Tree, owner_budget as view,
+    Limits, owner_budget as view,
     owner_budget_words::{self as data, BudgetPhrase, OwnerBudgetWords},
     phrases::{Invalid, PhraseId, PhraseLimits, Phrasebook, Segment, WallFormat},
     words::Words,
 };
+
 use jig_domain_client::contract::{Funder, OwnerBudget, OwnerNumbers, PoolLedger};
 use skein_lib::{Wall, bytes::copy_of};
 

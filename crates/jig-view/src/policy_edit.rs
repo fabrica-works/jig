@@ -1,10 +1,11 @@
 //! Exact policy edit review fragments; client/domain/view.md, 7.
 //! Numeric flags and literal segments remain supplied facts, not reconstructed policy.
+use crate::ui::{Builder, Role, Run};
 use crate::{
-    Builder, Role, Run,
     phrases::{Hole, jig::JigPhrase},
     words::Words,
 };
+
 use jig_domain_client::contract::{OwnerPattern, OwnerPatternEnd, PolicyEdit, PolicyGuard};
 
 /// Allocation required for one complete review fragment.

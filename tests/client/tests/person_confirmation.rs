@@ -7,7 +7,7 @@ use jig_client_world::{
     },
 };
 use jig_fake_person::{Find, Step};
-use jig_view::Role;
+use jig_view::ui::Role;
 use skein_lib::Duration;
 
 fn answer(form: Form, seed: u64) {

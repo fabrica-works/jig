@@ -1,10 +1,12 @@
 #![expect(clippy::disallowed_methods, reason = "ordinary proofs inspect public checked languages and trees")]
+use crate::ui::{Builder, Tree};
 use crate::{
-    Builder, JigBindings, Limits, Tree, owner_history as view,
+    JigBindings, Limits, owner_history as view,
     owner_history_words::{self as data, HistoryPhrase as P},
     phrases::{Hole, Invalid, PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat},
     words::Words,
 };
+
 use jig_domain_client::contract::*;
 use skein_lib::{Duration, List, Wall, bytes::copy_of};
 fn doc(bytes: &[u8], cut: bool) -> DocumentText {

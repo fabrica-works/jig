@@ -26,13 +26,13 @@ impl Script {
     pub fn answered_report(words: &[u8], answer: &[u8], within: Duration) -> Self {
         let mut steps = Self::start_chat(words).steps.into_vec();
         steps.push(Step::See {
-            find: Find::named(jig_view::Role::Paragraph, answer).within(Box::new([
+            find: Find::named(jig_view::ui::Role::Paragraph, answer).within(Box::new([
                 jig_fake_person::Target::ExactRole {
-                    role: jig_view::Role::Region,
+                    role: jig_view::ui::Role::Region,
                     name: b"Historical object".as_slice().into(),
                 },
                 jig_fake_person::Target::ExactRole {
-                    role: jig_view::Role::Region,
+                    role: jig_view::ui::Role::Region,
                     name: b"Project: 1".as_slice().into(),
                 },
             ])),
@@ -55,11 +55,11 @@ impl Script {
         Self {
             steps: vec![
                 Step::See {
-                    find: Find::named(jig_view::Role::TextArea, b"First words"),
+                    find: Find::named(jig_view::ui::Role::TextArea, b"First words"),
                     within: Duration::from_secs(1),
                 },
-                Step::Type { find: Find::named(jig_view::Role::TextArea, b"First words"), words: words.into() },
-                Step::Press { find: Find::named(jig_view::Role::Button, b"Start a conversation") },
+                Step::Type { find: Find::named(jig_view::ui::Role::TextArea, b"First words"), words: words.into() },
+                Step::Press { find: Find::named(jig_view::ui::Role::Button, b"Start a conversation") },
             ]
             .into_boxed_slice(),
         }
@@ -87,7 +87,7 @@ pub struct NativeClient {
     person: Person<client::Address>,
     env: Env<client::Limits>,
     out: Queue<Request>,
-    patches: Queue<jig_view::Patch>,
+    patches: Queue<jig_view::ui::Patch>,
     kept: Vec<client::store::Record>,
     address: client::Address,
     started: bool,

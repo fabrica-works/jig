@@ -23,7 +23,8 @@ mod tree;
 
 use alloc::boxed::Box;
 use core::fmt;
-use jig_view::{Act, NodeId, Role};
+use jig_view::Act;
+use jig_view::ui::{NodeId, Role};
 pub use random::{RandomDoing, RandomPerson};
 use skein_lib::{Duration, Time};
 pub use tree::TreeFace;

@@ -1,10 +1,12 @@
 //! Supplied frame identity, membership, names and independent loss facts.
 //! See client/domain/contract.md, 5.1, and pages.md, 2.
+use crate::ui::Builder;
 use crate::{
-    Builder, document_text,
+    document_text,
     phrases::{Hole, jig::JigPhrase},
     words::{Words, name},
 };
+
 use alloc::boxed::Box;
 use jig_domain_client::contract::{Charter, Frame, FrameParty, PartyKind, ProjectRole};
 

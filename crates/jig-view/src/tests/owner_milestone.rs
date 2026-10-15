@@ -1,8 +1,10 @@
+use crate::ui::{Builder, Tree};
 use crate::{
-    Builder, JigBindings, Limits, Tree, owner_milestone as view,
+    JigBindings, Limits, owner_milestone as view,
     phrases::{Hole, Invalid, PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat},
     words::Words,
 };
+
 use jig_domain_client::{Domain, contract::*};
 use skein_lib::{
     List, Wall,
@@ -83,7 +85,7 @@ fn build(value: &OwnerMilestoneLine, words: &Words) -> (Tree, JigBindings, view:
     view::render(&mut b, value, &client, words, &mut bindings);
     let tree = b.finish();
     let region = tree.nodes().first().expect("standalone milestone region");
-    assert_eq!(region.role, crate::Role::Region);
+    assert_eq!(region.role, crate::ui::Role::Region);
     assert_eq!(
         region.name.as_deref(),
         Some(if words.language == 0 { b"Lifecycle milestone".as_slice() } else { b"second ".as_slice() })

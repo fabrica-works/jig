@@ -1,7 +1,9 @@
 //! Page composition over domain-owned ordering and windows (client/domain/pages.md).
 //! Objects stay in their shared cards; connector values stay in owner slots.
 use crate::phrases::{Hole, jig::JigPhrase};
-use crate::{Builder, JigBindings, Role, Run, words::Words};
+use crate::ui::{Builder, Role, Run};
+use crate::{JigBindings, words::Words};
+
 use jig_domain_client::{
     Domain,
     action::{Act, End},
@@ -73,7 +75,7 @@ pub fn excess(b: &mut Builder, client: &Domain, words: &Words) {
     }
 }
 
-pub(crate) fn object_key(object: jig_domain_client::contract::ObjectKey) -> crate::Key {
+pub(crate) fn object_key(object: jig_domain_client::contract::ObjectKey) -> crate::ui::Key {
     use jig_domain_client::contract::ObjectKey;
     let (kind, a, b) = match object {
         ObjectKey::Task(task) => (0, task, 0),
@@ -87,7 +89,7 @@ pub(crate) fn object_key(object: jig_domain_client::contract::ObjectKey) -> crat
         ObjectKey::Result(task) => (5, task, 0),
         ObjectKey::Note { project, note } => (6, u64::from(project), note),
     };
-    crate::Key { owner: crate::Owner::Jig.opaque(), kind, a, b }
+    crate::ui::Key { owner: crate::Owner::Jig.opaque(), kind, a, b }
 }
 
 /// Build the current jig page; an application's own page returns false.
@@ -157,7 +159,13 @@ pub fn main(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigB
 pub use crate::turns::conversation;
 /// Compose jig's frame and current page under the root's open page node.
 /// When false, the root builds its application's page, then calls `after_page`.
-pub fn jig(b: &mut Builder, client: &Domain, nav: crate::SlotRef, words: &Words, bindings: &mut JigBindings) -> bool {
+pub fn jig(
+    b: &mut Builder,
+    client: &Domain,
+    nav: crate::ui::SlotRef,
+    words: &Words,
+    bindings: &mut JigBindings,
+) -> bool {
     crate::frame::banner(b, client, words, bindings);
     crate::frame::navigation(b, client, nav, words, bindings);
     let built = main(b, client, words, bindings);
@@ -208,7 +216,7 @@ pub(crate) fn mark_current(b: &mut Builder, client: &Domain, address: jig_domain
     match client.page() {
         jig_domain_client::pages::Page::Work { address: own, .. } => {
             if client.sections().len() > 1 && own == &address {
-                b.state(crate::State::Current);
+                b.state(crate::ui::State::Current);
             }
         }
         jig_domain_client::pages::Page::Starting

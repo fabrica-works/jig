@@ -1,5 +1,6 @@
 //! jig's stable region names (client/domain/pages.md, sections 12.1 to 12.4).
-use crate::{Owner, Region};
+use crate::Owner;
+use crate::ui::Region;
 /// jig's region names, numbered in declaration order.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum JigRegion {

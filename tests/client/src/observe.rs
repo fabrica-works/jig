@@ -4,7 +4,8 @@ use crate::harness::{CardKey, CardSeen, Receipt, Seen, Sent};
 use jig_domain_client::contract::*;
 use jig_fake_person::{Face, Find, Found, TreeFace};
 use jig_test_domain_client::{self as domain, Event, Request, family};
-use jig_view::{Key, NodeId, Owner, Role, Tree};
+use jig_view::Owner;
+use jig_view::ui::{Key, NodeId, Role, Tree};
 use skein_lib::RequestEnvelope;
 
 #[must_use]
@@ -445,7 +446,7 @@ pub fn jig_window_changed(act: &jig_domain_client::action::Act) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{CardKey, CardSeen, Key, Owner, Role, Seen, jig_seen};
-    use jig_view::View;
+    use jig_view::ui::View;
     use skein_lib::Queue;
 
     #[test]
@@ -517,7 +518,7 @@ mod tests {
             assert_eq!(sent.card, Some(card.clone()));
             builder.open(Role::Item);
             builder.key(Key { owner: Owner::Jig.opaque(), kind, a: u64::MAX, b: u64::MAX });
-            builder.text(jig_view::Run::Plain, b"supplied proposal");
+            builder.text(jig_view::ui::Run::Plain, b"supplied proposal");
             builder.close();
             expected.push(Seen::Card { key: card, state: CardSeen::Waiting, revision: None });
         }

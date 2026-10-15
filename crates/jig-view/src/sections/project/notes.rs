@@ -1,9 +1,11 @@
 //! Scope/search and note cards retain the revision read (pages.md, 6.4).
+use crate::ui::{Builder, Role, State};
 use crate::{
-    Builder, JigBindings, JigMeaning, Role, State, cards,
+    JigBindings, JigMeaning, cards,
     phrases::{Hole, jig::JigPhrase},
     words::Words,
 };
+
 use alloc::boxed::Box;
 use jig_domain_client::{
     Domain,
@@ -91,7 +93,7 @@ fn scope_choice(b: &mut Builder, words: &Words, bindings: &mut JigBindings, filt
     let label = words.say(phrase, &holes);
     b.open(Role::Button);
     b.name(&label);
-    b.text(crate::Run::Plain, &label);
+    b.text(crate::ui::Run::Plain, &label);
     if let NoteScope::Resource { pattern, .. } = &scope {
         crate::owner_authority::pattern(b, words, pattern);
     }

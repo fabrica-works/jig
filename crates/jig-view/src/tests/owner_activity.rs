@@ -1,10 +1,12 @@
 #![expect(clippy::disallowed_methods, reason = "ordinary proofs inspect public checked languages and exact trees")]
+use crate::ui::{Builder, Tree};
 use crate::{
-    Builder, Limits, Tree, owner_activity as view,
+    Limits, owner_activity as view,
     owner_activity_words::{self as data, ActivityPhrase as P},
     phrases::{Invalid, PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat},
     words::Words,
 };
+
 use jig_domain_client::contract::*;
 use skein_lib::{List, Wall, bytes::copy_of};
 fn text(bytes: &[u8]) -> Text {
@@ -115,7 +117,7 @@ fn envelope(tree: &Tree, f: view::ActivityFragment) {
             total = total.checked_add(u64::try_from(name.len()).unwrap()).unwrap();
         }
         assert!(node.binding.is_none() && node.slot.is_none());
-        if node.role == crate::Role::Region {
+        if node.role == crate::ui::Role::Region {
             assert!(node.name.is_some());
         }
     }
@@ -480,7 +482,7 @@ fn owner_activity_all_six_result_metadata_keep_approved_presence_opaque_fields_a
         .nodes()
         .iter()
         .flat_map(|n| &n.text)
-        .filter(|r| r.run == crate::Run::Code)
+        .filter(|r| r.run == crate::ui::Run::Code)
         .map(|r| r.text.as_ref())
         .collect();
     assert_eq!(codes.as_ref(), [b"\\xFF\\x00".as_slice(), b"opaque", b"a/b", b"\\xFE\\x01", UTF8_TEXTS[0]].as_slice());

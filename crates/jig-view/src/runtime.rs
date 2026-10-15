@@ -1,10 +1,12 @@
 //! Exact owner lifecycle beside separately supplied host observations.
 //! See client/domain/objects.md, 3, and view.md, 7 and 10.
+use crate::ui::{Builder, Run};
 use crate::{
-    Builder, JigBindings, Run,
+    JigBindings,
     phrases::{Hole, jig::JigPhrase},
     words::Words,
 };
+
 use jig_domain_client::contract::{ActiveRun, HeldRuntime, RetryNotice, RunStage, RunWork};
 
 pub(crate) fn active(b: &mut Builder, value: &ActiveRun, words: &Words) {

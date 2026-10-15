@@ -1,9 +1,11 @@
 //! Goal board, factual funding and typed form controls (pages.md, 6.2).
+use crate::ui::{Builder, Role, State};
 use crate::{
-    Builder, JigBindings, JigMeaning, Role, State, cards,
+    JigBindings, JigMeaning, cards,
     phrases::{Hole, jig::JigPhrase},
     words::Words,
 };
+
 use jig_domain_client::{
     Domain,
     action::Act,

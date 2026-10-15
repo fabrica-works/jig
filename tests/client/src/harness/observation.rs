@@ -99,7 +99,7 @@ pub enum Observation {
 impl CardKey {
     /// Copy a public tree key as identity, without interpreting owner tokens.
     #[must_use]
-    pub fn of(key: jig_view::Key) -> Self {
+    pub fn of(key: jig_view::ui::Key) -> Self {
         let mut bytes = Vec::new();
         match jig_view::Owner::from_opaque(key.owner) {
             Some(jig_view::Owner::Jig) => bytes.extend_from_slice(&[0, 0, 0]),

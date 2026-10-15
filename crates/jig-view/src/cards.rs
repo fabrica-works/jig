@@ -1,11 +1,13 @@
 //! One shared card frame in every place (client/domain/objects.md, section 2).
 //! The place changes context only. Card state and terminal facts are owned by
 //! the domain; this module neither changes them nor judges offered acts.
+use crate::ui::{Builder, Role};
 use crate::{
-    Builder, JigBindings, Role,
+    JigBindings,
     phrases::{Hole, jig::JigPhrase},
     words::Words,
 };
+
 use jig_domain_client::{
     Domain,
     action::Act,
@@ -46,11 +48,11 @@ pub fn open(
     b.name(title);
     b.style(crate::JigStyle::Card.token());
     match facts.card {
-        Card::Deciding { .. } => b.state(crate::State::Busy),
+        Card::Deciding { .. } => b.state(crate::ui::State::Busy),
         Card::Open | Card::Refused { .. } | Card::Unknown { .. } | Card::Leaving { .. } => {}
     }
     b.open(Role::Heading { level: 2 });
-    b.text(crate::Run::Plain, title);
+    b.text(crate::ui::Run::Plain, title);
     b.close();
     match place {
         Place::Inbox { lineage } => {

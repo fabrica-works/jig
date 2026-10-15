@@ -1,11 +1,13 @@
 //! Whole authentic Project presentation and supported settings forms; pages.md, 6.
 //! Source order, independent loss and optional ledgers remain the owner's facts.
+use crate::ui::{Builder, Role, Run};
 use crate::{
-    Builder, JigBindings, JigMeaning, Role, Run, cards,
+    JigBindings, JigMeaning, cards,
     owner_project_words::ProjectPhrase as P,
     phrases::{Hole, jig::JigPhrase},
     words::Words,
 };
+
 use alloc::boxed::Box;
 use jig_domain_client::{
     Domain, Limits,

@@ -14,7 +14,7 @@ use skein_lib::{Decimal, Duration, List, Wall, Writer};
 /// A phrase in an owner's closed vocabulary.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct PhraseId {
-    pub owner: crate::tree::Owner,
+    pub owner: crate::ui::tree::Owner,
     pub number: u16,
 }
 /// The declared type of a phrase's hole.
@@ -299,7 +299,7 @@ impl Phrasebook {
                         segments = segments.checked_add(1).ok_or(Invalid::Overflow)?;
                         match segment {
                             Segment::Text(bytes) => {
-                                text = text.checked_add(crate::tree::length(bytes)).ok_or(Invalid::Overflow)?;
+                                text = text.checked_add(crate::ui::tree::length(bytes)).ok_or(Invalid::Overflow)?;
                             }
                             Segment::Hole { .. } => {}
                         }
@@ -360,7 +360,7 @@ impl Phrasebook {
             }
             match value {
                 Hole::Name(bytes) | Hole::Chip { title: bytes, .. } => {
-                    if crate::tree::length(bytes) > declared.bytes {
+                    if crate::ui::tree::length(bytes) > declared.bytes {
                         return Err(Invalid::Values { id });
                     }
                 }
@@ -393,7 +393,7 @@ impl Phrasebook {
         let mut size = 0_u32;
         for segment in &form.segments {
             let bytes = match segment {
-                Segment::Text(bytes) => crate::tree::length(bytes),
+                Segment::Text(bytes) => crate::ui::tree::length(bytes),
                 Segment::Hole { index, .. } => {
                     measure(values.get(usize::from(*index)).expect("hole was checked"), language)
                 }
@@ -481,13 +481,13 @@ fn check_forms(shape: &PhraseShape, words: &Phrase) -> Result<(), Invalid> {
     Ok(())
 }
 fn width(value: u64) -> u32 {
-    crate::tree::length(Decimal::of(value).as_bytes())
+    crate::ui::tree::length(Decimal::of(value).as_bytes())
 }
 fn form_capacity(shape: &PhraseShape, language: &Language, form: &Form) -> Result<u32, Invalid> {
     let mut capacity = 0_u32;
     for segment in &form.segments {
         let bytes = match segment {
-            Segment::Text(bytes) => crate::tree::length(bytes),
+            Segment::Text(bytes) => crate::ui::tree::length(bytes),
             Segment::Hole { index, .. } => {
                 let hole = shape.holes.get(usize::from(*index)).expect("hole was checked");
                 match hole.kind {
@@ -526,7 +526,7 @@ fn measure(hole: &Hole, language: &Language) -> u32 {
             WallFormat::Seconds => width(value.as_secs()),
             WallFormat::Clock => 5,
         },
-        Hole::Name(bytes) | Hole::Chip { title: bytes, .. } => crate::tree::length(bytes),
+        Hole::Name(bytes) | Hole::Chip { title: bytes, .. } => crate::ui::tree::length(bytes),
     }
 }
 fn decimal(value: u64, writer: &mut Writer) {

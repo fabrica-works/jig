@@ -1,12 +1,14 @@
 #![expect(clippy::disallowed_methods, reason = "ordinary tests inspect complete semantic trees")]
+use crate::ui::{Builder, Role, Tree};
 use crate::{
-    Builder, Role, Tree, owner_wake,
+    owner_wake,
     owner_wake_words::{self, WakePhrase},
     phrases::{
         Form, HoleKind, Language, Phrase, PhraseLimits, Phrasebook, PluralClass, PluralRule, Segment, SpanUnit,
         WallFormat,
     },
 };
+
 use jig_domain_client::contract::{
     OwnerWakePolicy, ResultsWake, Subscription, SubscriptionKind, Subscriptions, WakeRule,
 };

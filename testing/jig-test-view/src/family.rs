@@ -9,7 +9,9 @@ use jig_test_domain_client::{
     family::{Document, ItemState, Kind, Scope, Subject},
     first::{self, Card, Value},
 };
-use jig_view::{Builder, Key, Owner, Role, SlotRef, State, phrases::Hole};
+use jig_view::ui::{Builder, Key, Role, SlotRef, State};
+use jig_view::{Owner, phrases::Hole};
+
 use skein_lib::{Decimal, Id, Token};
 pub const NAV: SlotRef =
     SlotRef { owner: (Owner::Application { number: jig_test_domain_client::FIRST }).opaque(), token: Token::new(0) };

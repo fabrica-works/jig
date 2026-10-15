@@ -1,11 +1,13 @@
 //! Live task identity and phase words (client/domain/objects.md, section 3).
 //! Every chip carries whole bounded phase facts. Dependency chips are visited
 //! once through a bounded work list; neither the carrier nor traversal is recursive.
+use crate::ui::{Builder, Role};
 use crate::{
-    Builder, JigBindings, Role,
+    JigBindings,
     phrases::{Hole, jig::JigPhrase},
     words::{Words, name},
 };
+
 use jig_domain_client::{
     Domain,
     action::Act,

@@ -8,7 +8,9 @@ use super::{
     cards::{CLIENT, contains, limits, words},
     work_pages::list,
 };
-use crate::{Builder, JigBindings, Role, Tree, proposed_task};
+use crate::ui::{Builder, Role, Tree};
+use crate::{JigBindings, proposed_task};
+
 use jig_domain_client::contract::*;
 
 fn builder() -> Builder {

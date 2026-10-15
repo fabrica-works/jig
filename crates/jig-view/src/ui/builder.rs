@@ -1,14 +1,15 @@
-//! One node per call with bounded open parents (client/domain/view.md, section 4).
+//! One node per call with bounded open parents (skein's ui.md, section 5).
 //! `open` enters a parent, `close` records its subtree size, and `finish` hands
 //! over a complete tree. Attributes change the innermost open node. Capacity
 //! errors assert before allocating bytes: the caller's counts must cover all
 //! page nodes, fallback children and fragment nodes.
 
-use crate::tree::length;
-use crate::{
-    Binding, Drawing, DrawingKind, Key, Limits, Node, Picture, Region, Role, Run, Shortcut, SlotRef, State, Style,
-    TextRun, Tree, Value,
+use crate::ui::tree::length;
+use crate::ui::{
+    Drawing, DrawingKind, Key, Node, Picture, Region, Role, Run, Shortcut, SlotRef, State, Style, TextRun, Tree, Value,
 };
+use crate::{Binding, Limits};
+
 use alloc::boxed::Box;
 use core::mem::replace;
 use skein_lib::{List, Stack, bytes::copy_of};
@@ -211,7 +212,7 @@ impl Builder {
         self.node_mut().key = Some(key);
     }
 
-    /// Set a field's value together with the domain's own-write count.
+    /// Set a field's value together with the owner's own-write count.
     pub fn value(&mut self, bytes: &[u8], written: u64) {
         assert!(self.node().role == Role::TextField || self.node().role == Role::TextArea, "values belong to fields");
         let old = match &self.node().value {
@@ -237,7 +238,7 @@ impl Builder {
     pub fn external(&mut self, to: &[u8]) {
         assert!(self.node().role == Role::Link, "external addresses belong to links");
         assert!(self.node().link.is_none(), "a link has one address");
-        assert!(crate::markdown::safe_url(to), "external target is checked http or https");
+        assert!(crate::ui::markdown::safe_url(to), "external target is checked http or https");
         let old = match &self.node().external {
             Some(bytes) => length(bytes),
             None => 0,

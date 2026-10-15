@@ -3,7 +3,7 @@
     clippy::disallowed_methods,
     reason = "Q39 permits UTF-8 classification for display only; supplied literal bytes remain opaque"
 )]
-use crate::{Builder, Run};
+use crate::ui::{Builder, Run};
 use skein_lib::List;
 
 /// Display byte count without changing the supplied segment.

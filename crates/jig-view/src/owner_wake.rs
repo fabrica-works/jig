@@ -1,10 +1,11 @@
 //! Standalone exact wake fragments for owner document and editor consumers.
 //! See client/domain/objects.md, 3 and 11; view.md, section 7.
+use crate::ui::{Builder, Role, Run};
 use crate::{
-    Builder, Role, Run,
     owner_wake_words::WakePhrase,
     phrases::{Hole, Phrasebook},
 };
+
 use jig_domain_client::contract::{OwnerWakePolicy, ResultsWake, SubscriptionKind, Subscriptions, WakeRule};
 
 fn text(b: &mut Builder, book: &Phrasebook, language: u16, phrase: WakePhrase, holes: &[Hole]) {

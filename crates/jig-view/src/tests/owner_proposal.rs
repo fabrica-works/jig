@@ -3,11 +3,13 @@
     clippy::wildcard_enum_match_arm,
     reason = "ordinary proofs query checked source trees and select public action requests"
 )]
+use crate::ui::{Builder, Tree};
 use crate::{
-    Builder, JigBindings, Tree, owner_proposal as view,
+    JigBindings, owner_proposal as view,
     phrases::{Hole, PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat},
     words::Words,
 };
+
 use jig_domain_client::{Domain, contract::*};
 use skein_lib::{
     List, Wall,

@@ -1,7 +1,8 @@
 //! Fixed owner-written bytes and ordinary readable children (view.md, section 3).
 use crate::words::{Word, Words};
+use jig_view::Owner;
 use jig_view::phrases::Hole;
-use jig_view::{Builder, DrawingKind, Owner};
+use jig_view::ui::{Builder, DrawingKind};
 pub const BYTES: u32 = 8;
 pub const KIND: DrawingKind =
     DrawingKind { owner: (Owner::Application { number: jig_test_domain_client::FIRST }).opaque(), kind: 1 };

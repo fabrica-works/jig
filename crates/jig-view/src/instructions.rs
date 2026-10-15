@@ -1,5 +1,7 @@
 //! Supplied instruction facts, without default substitution (objects.md, 11; tasks.md, 7).
-use crate::{Builder, phrases::jig::JigPhrase, words::Words};
+use crate::ui::Builder;
+use crate::{phrases::jig::JigPhrase, words::Words};
+
 use jig_domain_client::{
     Limits,
     contract::{DocumentText, Text},
@@ -38,5 +40,5 @@ pub(crate) fn whole(value: Option<&DocumentText>) -> Option<Text> {
 }
 /// Markdown and one independently supplied loss or presence explanation.
 pub(crate) fn nodes(limits: &Limits) -> Option<u32> {
-    crate::markdown::max_nodes(limits.text)?.checked_add(1)
+    crate::ui::markdown::max_nodes(limits.text)?.checked_add(1)
 }

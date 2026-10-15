@@ -5,11 +5,13 @@ use crate::{
     family, words,
 };
 use jig_test_domain_client::{Connector, Domain, first};
-use jig_view::{Act, Builder, JigBindings, NodeId, Owner, Patch, Role, Tree};
+use jig_view::ui::{Builder, NodeId, Patch, Role, Tree};
+use jig_view::{Act, JigBindings, Owner};
+
 use skein_lib::Queue;
 #[derive(Debug)]
 pub struct View<'a> {
-    render: jig_view::View,
+    render: jig_view::ui::View,
     words: &'a jig_view::words::Words,
     first_words: &'a words::Words,
     jig: JigBindings,
@@ -28,7 +30,7 @@ impl<'a> View<'a> {
     ) -> Self {
         assert!(crate::worst_case(limits, domain, words, first_words).is_some(), "view capacities are checked");
         Self {
-            render: jig_view::View::new(&limits.tree),
+            render: jig_view::ui::View::new(&limits.tree),
             jig: JigBindings::new(limits.tree.bindings, domain.jig.text),
             first: Bindings::new(limits.tree.bindings, limits.text),
             words,

@@ -1,11 +1,13 @@
 //! Pending person work, supplied contracts and shown results
 //! (client/domain/objects.md, 7; view.md, 7 and 10).
+use crate::ui::{Builder, Role, Run, State};
 use crate::{
-    Builder, JigBindings, JigMeaning, Role, Run, State,
+    JigBindings, JigMeaning,
     owner_person_task_words::PersonPhrase as P,
     phrases::{Hole, jig::JigPhrase},
     words::Words,
 };
+
 use alloc::boxed::Box;
 use jig_domain_client::{
     Domain, Limits,

@@ -1,6 +1,7 @@
 #![expect(clippy::disallowed_methods, reason = "ordinary tests inspect full semantic leaves")]
 use super::cards::{contains, words};
-use crate::{Builder, Role, policy_edit};
+use crate::policy_edit;
+use crate::ui::{Builder, Role};
 use jig_domain_client::contract::*;
 use skein_lib::{Duration, List};
 fn pattern(last: OwnerPatternEnd) -> OwnerPattern {
@@ -9,7 +10,7 @@ fn pattern(last: OwnerPatternEnd) -> OwnerPattern {
     segments.push(Box::from(b"\xff".as_slice())).unwrap();
     OwnerPattern { segments, last }
 }
-fn shown(value: &PolicyEdit) -> crate::Tree {
+fn shown(value: &PolicyEdit) -> crate::ui::Tree {
     let words = words();
     let required = policy_edit::required(value, words).unwrap();
     let mut b = Builder::new(&crate::Limits {

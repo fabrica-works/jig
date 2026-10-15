@@ -3,7 +3,8 @@
     clippy::disallowed_methods,
     reason = "ordinary accessibility assertions select semantic role categories"
 )]
-use crate::{JigStyle, Owner, Role, State, Tree};
+use crate::ui::{Role, State, Tree};
+use crate::{JigStyle, Owner};
 
 /// Run on the same trees as every fact/state/action scenario. The shell can
 /// discard styles and still read names, roles, statuses and semantic states.

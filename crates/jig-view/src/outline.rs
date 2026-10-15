@@ -1,5 +1,6 @@
 //! The page's landmark outline (client/domain/view.md, section 3.1).
-use crate::{Role, Shortcut, Tree, regions::JigRegion};
+use crate::regions::JigRegion;
+use crate::ui::{Role, Shortcut, Tree};
 use skein_lib::List;
 
 /// The first node in preorder breaking the outline, or zero for a missing node.

@@ -1,12 +1,14 @@
 //! Deployment facts and bounded live diagnostics (pages.md, 7; view.md, 7).
 //! Supplied clocks, loss counters and identities stay independent.
 mod hello;
+use crate::ui::{Builder, Key, Role, Run};
 use crate::{
-    Builder, JigBindings, Key, Owner, Role, Run,
+    JigBindings, Owner,
     owner_deployment_words::{AccountPhrase as A, DeploymentPhrase as P},
     phrases::Hole,
     words::Words,
 };
+
 use hello::hello;
 use jig_domain_client::{
     Domain, Limits,

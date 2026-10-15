@@ -9,7 +9,8 @@ use super::{
     pages::{build, deliver, named_binding},
     work_pages::{entered, list, part},
 };
-use crate::{Key, Role, Tree, words::Words};
+use crate::ui::{Key, Role, Tree};
+use crate::words::Words;
 use jig_domain_client::{
     Domain, Event, Request,
     action::Act,
@@ -508,7 +509,7 @@ fn raw_live_call_rendering_omits_unsupplied_wall_and_preserves_escaped_literals_
     let expanded = build(&d, 3, words).0;
     access(&expanded);
     assert!(contains(&expanded, UTF8_TEXTS[2]));
-    assert!(expanded.nodes().iter().any(|node| node.states.as_slice().contains(&crate::State::Expanded)));
+    assert!(expanded.nodes().iter().any(|node| node.states.as_slice().contains(&crate::ui::State::Expanded)));
     assert_eq!(d.conversation().parts(4).len(), 0);
     match value.call.as_mut().unwrap() {
         LiveCall::Raw(call) => call.cut = false,
@@ -579,13 +580,13 @@ fn maximum_raw_live_calls_fit_whole_page_and_escaped_phrase_capacities() {
     assert_eq!(d.conversation().live.len(), CLIENT.rows);
     assert_eq!(d.conversation().current_opened.len(), CLIENT.rows);
     let limits = crate::Limits::of_words(&CLIENT, words).unwrap();
-    let mut b = crate::Builder::new(&limits);
+    let mut b = crate::ui::Builder::new(&limits);
     let mut bindings = crate::JigBindings::new(limits.bindings, CLIENT.text);
     b.open(Role::Page);
     assert!(crate::jig(
         &mut b,
         &d,
-        crate::SlotRef { owner: (crate::Owner::Application { number: 1 }).opaque(), token: Token::new(1) },
+        crate::ui::SlotRef { owner: (crate::Owner::Application { number: 1 }).opaque(), token: Token::new(1) },
         words,
         &mut bindings
     ));
@@ -638,6 +639,7 @@ fn raw_live_call_controls_use_selected_normal_language_and_checked_capacity() {
         live_call_words::LiveCallPhrase,
         phrases::{Form, PhraseLimits, Phrasebook, PluralClass, Segment, english},
     };
+
     let first = english::language();
     let mut selected = english::language();
     for phrase in &mut selected.phrases {
@@ -808,13 +810,13 @@ fn maximum_independent_current_call_fits_page_with_all_existing_provisional_rows
     );
     drive(&mut d, Event::Act { act: Act::FoldCurrentCall { identity: call.identity, open: true } });
     let limits = crate::Limits::of_words(&CLIENT, words).unwrap();
-    let mut b = crate::Builder::new(&limits);
+    let mut b = crate::ui::Builder::new(&limits);
     let mut bindings = crate::JigBindings::new(limits.bindings, CLIENT.text);
     b.open(Role::Page);
     assert!(crate::jig(
         &mut b,
         &d,
-        crate::SlotRef { owner: (crate::Owner::Application { number: 1 }).opaque(), token: Token::new(1) },
+        crate::ui::SlotRef { owner: (crate::Owner::Application { number: 1 }).opaque(), token: Token::new(1) },
         words,
         &mut bindings
     ));

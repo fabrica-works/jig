@@ -5,7 +5,9 @@
 )]
 use super::cards::{CLIENT, contains, words};
 use super::cards_objects::{loaded, task_doc};
-use crate::{Act, Builder, JigBindings, Role, cards, decode};
+use crate::ui::{Builder, Role};
+use crate::{Act, JigBindings, cards, decode};
+
 use jig_domain_client::{action::Act as Action, contract::*};
 use skein_lib::{List, Wall};
 

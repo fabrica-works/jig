@@ -9,7 +9,8 @@ use super::{
     pages::{build, deliver},
     work_pages::{entered, list},
 };
-use crate::{Builder, JigBindings, Role, Tree};
+use crate::JigBindings;
+use crate::ui::{Builder, Role, Tree};
 use jig_domain_client::{
     Domain, Request,
     address::{Address, TaskSection},

@@ -1,14 +1,16 @@
-//! The last displayed tree and a spare (client/domain/view.md, sections 5 and 6).
+//! The last displayed tree and a spare (skein's ui.md, section 7).
 //! `stale` compares the caller's shown count. `builder` lends the spare as owned
 //! construction state; the caller builds and splices slots, then `finish`
-//! emits patches and keeps the new tree. This module knows no domain objects.
+//! emits patches and keeps the new tree. This module knows no owner objects.
 //!
 //! State | Event | Next state | Emits
 //! Unbuilt | finish | Built at shown | Initial insert
 //! Built | unchanged shown | Built | Nothing
 //! Built | finish at changed shown | Built at shown | Diff patches
 
-use crate::{Act, Binding, BoundAct, Builder, Limits, NodeId, Patch, Tree, diff};
+use crate::ui::{Builder, NodeId, Patch, Tree, diff};
+use crate::{Act, Binding, BoundAct, Limits};
+
 use skein_lib::Queue;
 
 /// A visible tree, its spare allocation, shown count and never-reused node ids.
@@ -33,7 +35,7 @@ impl View {
             limits: *limits,
         }
     }
-    /// Whether the domain's count of what is shown differs from the last build.
+    /// Whether the owner's count of what is shown differs from the last build.
     #[must_use]
     pub fn stale(&self, shown: u64) -> bool {
         self.built != Some(shown)

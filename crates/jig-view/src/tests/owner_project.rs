@@ -5,11 +5,13 @@
     clippy::wildcard_enum_match_arm,
     reason = "ordinary public proofs inspect complete accessible trees, raw slots and decoded actions"
 )]
+use crate::ui::{Builder, Role, Tree};
 use crate::{
-    Builder, JigBindings, Role, Tree, owner_project as view,
+    JigBindings, owner_project as view,
     phrases::{PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat},
     words::Words,
 };
+
 use jig_domain_client::{Domain, contract::*};
 use skein_lib::{
     Duration, List, Wall,
@@ -657,7 +659,7 @@ fn owner_project_public_whole_tree_accepts_exact_observed_nodes_and_text_and_ref
     let f = view::required(&value, &limits(), w).unwrap();
     let mut bound = capacity(f);
     bound.nodes = tree.len();
-    bound.text_bytes = tree.nodes().iter().map(crate::Node::text_bytes).sum();
+    bound.text_bytes = tree.nodes().iter().map(crate::ui::Node::text_bytes).sum();
     let render = |bound: crate::Limits| {
         let mut b = Builder::new(&bound);
         let mut bindings = JigBindings::new(f.bindings, 32);
@@ -1211,7 +1213,7 @@ fn owner_project_historical_companion_prices_whole_languages_and_refuses_one_und
         assert!(tree.len() <= bound.nodes);
         let mut exact = bound;
         exact.nodes = tree.len();
-        exact.text_bytes = tree.nodes().iter().map(crate::Node::text_bytes).sum();
+        exact.text_bytes = tree.nodes().iter().map(crate::ui::Node::text_bytes).sum();
         let (rebuilt, _) = historical_project_tree(&domain, w, exact);
         assert_eq!(rebuilt.nodes(), tree.nodes());
         for short in [

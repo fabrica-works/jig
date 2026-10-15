@@ -2,12 +2,14 @@
     clippy::disallowed_methods,
     reason = "ordinary proofs inspect public trees and selected checked language data"
 )]
+use crate::ui::{Builder, Tree};
 use crate::{
-    Builder, Limits, Tree, owner_amendment as view,
+    Limits, owner_amendment as view,
     owner_amendment_words::{self as data, AmendmentPhrase as P},
     phrases::{Hole, Invalid, PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat},
     words::Words,
 };
+
 use jig_domain_client::contract::*;
 use skein_lib::{Duration, List, bytes::copy_of};
 fn doc(bytes: &[u8], cut: bool) -> DocumentText {
@@ -316,7 +318,7 @@ fn assert_wake_fields(value: &mut OwnerAmendmentState, words: &Words) {
             value.wake.answers = switches & 2 != 0;
             value.wake.timers = switches & 4 != 0;
             let tree = build(value, words);
-            assert_eq!(tree.nodes().iter().filter(|n| n.role == crate::Role::Region).count(), 2);
+            assert_eq!(tree.nodes().iter().filter(|n| n.role == crate::ui::Role::Region).count(), 2);
             let result_label: &[u8] = match results {
                 ResultsWake::Never => b"Delegate results do not wake",
                 ResultsWake::Each => b"Each delegate result wakes",
@@ -432,7 +434,7 @@ fn owner_amendment_whole_tree_envelope_checks_full_nested_capacities_and_overflo
     let tree = build(&full, &selected);
     assert_eq!(count(&tree, b"\\xFF\\xFF\\xFF\\xFF\\xFF\\xFF\\xFF\\xFF"), 18);
     assert_eq!(count(&tree, b"12345678"), 5);
-    assert!(tree.nodes().iter().filter(|n| n.role == crate::Role::Region).all(|n| n.name.is_some()));
+    assert!(tree.nodes().iter().filter(|n| n.role == crate::ui::Role::Region).all(|n| n.name.is_some()));
 }
 fn words_for_full() -> Words {
     words(1, true)

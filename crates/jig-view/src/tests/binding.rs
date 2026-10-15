@@ -1,5 +1,7 @@
-use super::tree::LIMITS;
-use crate::{Act, Binding, BoundAct, Builder, Limits, NodeId, Owner, Role, number};
+use crate::ui::tests::fixtures::LIMITS;
+use crate::ui::{Builder, NodeId, Role};
+use crate::{Act, Binding, BoundAct, Limits, Owner, number};
+
 use alloc::boxed::Box;
 use skein_lib::Token;
 
@@ -54,7 +56,7 @@ fn numeric_input_is_checked_digits_only() {
 
 #[test]
 fn an_act_on_a_drawing_past_its_bytes_is_dropped() {
-    let mut view = crate::View::new(&LIMITS);
+    let mut view = crate::ui::View::new(&LIMITS);
     let mut builder = view.builder();
     // Exercise admission through an ordinary binding: drawings remain unbound.
     builder.open(Role::Button);

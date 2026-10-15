@@ -1,9 +1,11 @@
 //! Person tasks present their contract and inputs (client/domain/objects.md, section 7).
+use crate::ui::{Builder, Role, Run, State};
 use crate::{
-    Builder, JigBindings, JigMeaning, Role, Run, State,
+    JigBindings, JigMeaning,
     phrases::{Hole, jig::JigPhrase},
     words::{Words, name},
 };
+
 use jig_domain_client::{
     Domain,
     action::Act,

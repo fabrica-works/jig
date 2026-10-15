@@ -1,11 +1,11 @@
-//! A bounded Markdown subset (client/domain/view.md, section 8).
+//! A bounded Markdown subset (skein's ui.md, section 10).
 //! Each line is visited once. Inline links and delimiter pairs are found by
 //! bounded scans, then emitted without recursion. A fence retains only input
 //! offsets until it closes; an unclosed fence is copied as literal text.
 //! No platform markup is created from bytes. Unsupported constructs retain
 //! their characters, and copied text is bounded by the builder's limits.
 
-use crate::{Builder, Role, Run};
+use crate::ui::{Builder, Role, Run};
 use skein_lib::{List, Stack};
 
 #[derive(Clone, Copy, Debug)]
@@ -40,7 +40,7 @@ pub fn max_text_bytes(bytes: u32) -> Option<u32> {
 /// bound. Depth and tree counts include the reader's nodes and its parent.
 pub fn read(input: &[u8], heading_base: u8, builder: &mut Builder) {
     assert!(heading_base <= 249, "six Markdown heading levels fit after the page levels");
-    assert!(crate::tree::length(input) <= builder.limits.text_bytes, "Markdown input fits the declared byte bound");
+    assert!(crate::ui::tree::length(input) <= builder.limits.text_bytes, "Markdown input fits the declared byte bound");
     let mut blocks =
         Blocks { lists: Stack::with_capacity(builder.limits.markdown_depth), paragraph: false, fence: None };
     let mut start = 0_usize;
@@ -260,7 +260,7 @@ enum LinkScan {
     Target { start: usize, label: usize, label_end: usize, target: usize, image: bool },
 }
 fn ranges(line: &[u8]) -> List<Range> {
-    let mut ranges = List::with_capacity(crate::tree::length(line));
+    let mut ranges = List::with_capacity(crate::ui::tree::length(line));
     let mut state = LinkScan::None;
     let mut code = false;
     for (index, byte) in line.iter().enumerate() {
@@ -370,7 +370,7 @@ struct Marker {
     opening: bool,
 }
 fn markers(line: &[u8], ranges: &List<Range>, depth: u32) -> List<Marker> {
-    let mut markers: List<Marker> = List::with_capacity(crate::tree::length(line));
+    let mut markers: List<Marker> = List::with_capacity(crate::ui::tree::length(line));
     let mut open: Stack<u32> = Stack::with_capacity(depth);
     let mut skip = 0_usize;
     let mut range = 0_u32;

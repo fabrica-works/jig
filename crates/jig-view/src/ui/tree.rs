@@ -1,6 +1,6 @@
 //! Accessibility roles and owned bytes, with no layout or application types.
 //! Nodes are preorder; a subtree occupies `size` consecutive nodes including
-//! its root (client/domain/view.md, section 3). New builds have unassigned ids;
+//! its root (skein's ui.md, section 3). New builds have unassigned ids;
 //! the diff assigns ids when the tree becomes visible.
 
 use alloc::boxed::Box;
@@ -191,7 +191,7 @@ pub struct TextRun {
     pub text: Box<[u8]>,
 }
 
-/// A field's value and count of the domain's own writes.
+/// A field's value and count of the owner's own writes.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Value {
     pub text: Box<[u8]>,

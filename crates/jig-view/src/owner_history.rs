@@ -1,6 +1,8 @@
 //! Immutable semantic history (client/domain/objects.md, 11; domain/tasks.md, 7;
 //! view.md, 7 and 10). Stored overrides are not historical effective defaults.
-use crate::{Builder, JigBindings, Role, Run, owner_history_words::HistoryPhrase as P, phrases::Hole, words::Words};
+use crate::ui::{Builder, Role, Run};
+use crate::{JigBindings, owner_history_words::HistoryPhrase as P, phrases::Hole, words::Words};
+
 use jig_domain_client::{
     Limits,
     contract::{
@@ -157,7 +159,7 @@ pub fn max_nodes(limits: &Limits) -> Option<u32> {
     let batch = limits.rows.checked_mul(crate::sizes::proposed_task_nodes(limits)?)?;
     let delta = crate::specification::nodes(limits)?
         .checked_add(authority)?
-        .checked_add(crate::markdown::max_nodes(limits.text)?.checked_mul(2)?)?
+        .checked_add(crate::ui::markdown::max_nodes(limits.text)?.checked_mul(2)?)?
         .checked_add(limits.rows)?
         .checked_add(crate::owner_wake::policy_nodes())?
         .checked_add(30)?;

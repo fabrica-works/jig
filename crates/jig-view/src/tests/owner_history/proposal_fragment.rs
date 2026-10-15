@@ -1,6 +1,7 @@
 //! Bare retained proposal fragments remain passive and preserve their old history position.
 use super::*;
-use crate::{Role, owner_history::HistoryFragment};
+use crate::owner_history::HistoryFragment;
+use crate::ui::Role;
 
 fn limits(fragment: HistoryFragment) -> Limits {
     Limits {

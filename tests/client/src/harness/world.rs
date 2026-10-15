@@ -4,7 +4,8 @@
 use super::{App, CardKey, Duty, Fault, Front, FrontFault, Observation, StoreWrite};
 use crate::model::Model;
 use jig_fake_person::{Doing, Next, Person, RandomDoing, RandomPerson, Step, TreeFace};
-use jig_view::{Act, NodeId, Tree};
+use jig_view::Act;
+use jig_view::ui::{NodeId, Tree};
 use skein_lib::{Duration, Env, Queue, Rng, Time, Wall};
 use skein_world::domain::{Referee, Schedule, Span, Trace, Verdict};
 
@@ -87,7 +88,7 @@ struct Client<A: App> {
     root: A::Root,
     view: A::View,
     model: Model,
-    patches: Queue<jig_view::Patch>,
+    patches: Queue<jig_view::ui::Patch>,
     kept: Vec<A::Record>,
     deferred: Vec<StoreWrite<A::Record, A::Key>>,
     history: Vec<A::Address>,
@@ -408,9 +409,9 @@ impl<A: App, F: Front<A>> World<A, F> {
             6 => Fault::Reload { client },
             7 => {
                 let Some(node) = A::tree(&self.clients[client.0].view).nodes().iter().find(|n| {
-                    n.role == jig_view::Role::Button
+                    n.role == jig_view::ui::Role::Button
                         && n.binding.is_some()
-                        && !n.states.iter().any(|s| *s == jig_view::State::Disabled)
+                        && !n.states.iter().any(|s| *s == jig_view::ui::State::Disabled)
                 }) else {
                     return;
                 };
@@ -442,7 +443,7 @@ impl<A: App, F: Front<A>> World<A, F> {
                         A::tree(&c.view)
                             .nodes()
                             .iter()
-                            .filter(|n| n.role == jig_view::Role::Button && n.binding.is_some())
+                            .filter(|n| n.role == jig_view::ui::Role::Button && n.binding.is_some())
                             .find_map(|n| {
                                 A::tree(&o.view)
                                     .nodes()
@@ -676,7 +677,7 @@ impl<A: App, F: Front<A>> World<A, F> {
             Act::Input { value: words }
         } else {
             jig_shell_text::render(tree, b"jig", print);
-            if tree.find(node).is_some_and(|n| n.states.as_slice().contains(&jig_view::State::SubmitsOnEnter))
+            if tree.find(node).is_some_and(|n| n.states.as_slice().contains(&jig_view::ui::State::SubmitsOnEnter))
                 && let Act::Input { value } = act
             {
                 *held = Some((node, value));
@@ -738,7 +739,7 @@ impl<A: App, F: Front<A>> World<A, F> {
                             Some(RandomDoing::Act { node, act: Act::Press })
                                 if except.is_some()
                                     && A::tree(&self.clients[id.0].view).find(node).is_some_and(|node| {
-                                        node.role == jig_view::Role::Button && node.name.as_deref() == *except
+                                        node.role == jig_view::ui::Role::Button && node.name.as_deref() == *except
                                     }) =>
                             {
                                 Next::Wait { until: None }
@@ -919,7 +920,7 @@ impl<A: App, F: Front<A>> World<A, F> {
 mod tests {
     use super::Until;
     use jig_fake_person::{Find, Step};
-    use jig_view::Role;
+    use jig_view::ui::Role;
     use skein_lib::Duration;
     use skein_world::domain::Verdict;
 

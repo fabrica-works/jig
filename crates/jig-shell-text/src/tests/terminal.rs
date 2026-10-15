@@ -1,6 +1,7 @@
 use super::fixtures;
 use crate::{Command, Settings, Terminal};
-use jig_view::{Act, Tree};
+use jig_view::Act;
+use jig_view::ui::Tree;
 use skein_io::kernel::Fd;
 use skein_lib::{Duration, Time};
 use skein_sim::{Config, Pid, Sim};
@@ -50,9 +51,9 @@ impl Pipes {
         self.terminal.commands().pop().expect("one command")
     }
     fn expected(&self) -> Command {
-        let mut node = jig_view::NodeId(0);
+        let mut node = jig_view::ui::NodeId(0);
         for n in self.tree.nodes() {
-            if n.role == jig_view::Role::Button {
+            if n.role == jig_view::ui::Role::Button {
                 node = n.id;
             }
         }

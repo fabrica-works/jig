@@ -1,6 +1,8 @@
 //! Full-list/full-text envelopes exercise public acquisition and every renderer.
 use super::*;
-use crate::{Limits, Owner, SlotRef};
+use crate::ui::SlotRef;
+use crate::{Limits, Owner};
+
 use jig_domain_client::{address::Address, boundary::Offset};
 use skein_lib::Token;
 

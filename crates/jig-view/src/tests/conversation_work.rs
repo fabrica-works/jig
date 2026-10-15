@@ -5,7 +5,9 @@
     reason = "ordinary view proofs drive public events and inspect selected semantic trees"
 )]
 use super::cards::{CLIENT, contains, text};
-use crate::{Builder, Tree, owner_chip, owner_chip_words::ChipPhrase as P, tree::Node, words::Words};
+use crate::ui::tree::Node;
+use crate::ui::{Builder, Tree};
+use crate::{owner_chip, owner_chip_words::ChipPhrase as P, words::Words};
 use jig_domain_client::{
     Domain, Request,
     address::{Address, TaskSection},
@@ -181,7 +183,7 @@ fn owner_work_absence_does_not_fabricate_report_and_preserves_independent_synthe
             assert_eq!(contains(&tree, b"Current work since: 31"), present);
             assert_eq!(contains(&tree, b"independent synthetic runtime"), context);
             assert!(!contains(&tree, b"Placed or adopted"));
-            assert!(tree.nodes().iter().any(|node| node.role == crate::Role::Log));
+            assert!(tree.nodes().iter().any(|node| node.role == crate::ui::Role::Log));
         }
     }
 }
@@ -220,7 +222,7 @@ fn selected_owner_work_activity_preserves_conversation_and_opaque_provisional_te
         assert!(!contains(&tree, b"Reported work writing"));
         assert!(contains(&tree, b"Provisional"));
         assert!(contains(&tree, b"provisional reply"));
-        assert!(tree.nodes().iter().any(|node| node.role == crate::Role::Log && node.name.is_some()));
+        assert!(tree.nodes().iter().any(|node| node.role == crate::ui::Role::Log && node.name.is_some()));
     }
 }
 fn fragment(value: &OwnerChipObservation, capacity: &crate::Limits) -> Tree {

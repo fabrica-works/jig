@@ -1,6 +1,8 @@
 //! Standalone amendment settings (client/domain/objects.md, 4 and 11;
 //! view.md, 7 and 10). Context comes from the enclosing owner document.
-use crate::{Builder, Role, Run, owner_amendment_words::AmendmentPhrase as P, phrases::Hole, words::Words};
+use crate::ui::{Builder, Role, Run};
+use crate::{owner_amendment_words::AmendmentPhrase as P, phrases::Hole, words::Words};
+
 use jig_domain_client::{
     Limits,
     contract::{
@@ -82,7 +84,7 @@ pub fn required(value: &OwnerAmendmentState, limits: &Limits, words: &Words) -> 
 #[must_use]
 pub fn max_nodes(limits: &Limits) -> Option<u32> {
     20_u32
-        .checked_add(crate::markdown::max_nodes(limits.text)?)?
+        .checked_add(crate::ui::markdown::max_nodes(limits.text)?)?
         .checked_add(crate::specification::nodes(limits)?)?
         .checked_add(crate::owner_authority::document_nodes(limits.rows)?)?
         .checked_add(limits.rows)

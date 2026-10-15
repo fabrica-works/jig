@@ -7,7 +7,7 @@ use jig_domain_client::contract as client;
 use jig_domain_people as people;
 use jig_fake_person::{Find, Step};
 use jig_fake_workers::{Script, Worker};
-use jig_view::Role;
+use jig_view::ui::Role;
 use skein_lib::{Duration, Time, Token};
 use std::collections::BTreeMap;
 

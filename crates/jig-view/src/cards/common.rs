@@ -1,9 +1,11 @@
 //! Shared card facts, acts and part slots (client/domain/objects.md, sections 2–9).
+use crate::ui::{Builder, Role, Run, SlotRef};
 use crate::{
-    Builder, JigBindings, JigMeaning, Owner, Role, Run, SlotRef,
+    JigBindings, JigMeaning, Owner,
     phrases::{Hole, jig::JigPhrase},
     words::{Words, name},
 };
+
 use jig_domain_client::{
     Domain,
     action::Act,

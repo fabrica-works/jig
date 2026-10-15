@@ -1,9 +1,11 @@
 //! Activity's own facts; objects are shown by their shared cards (objects.md, 10).
+use crate::ui::{Builder, Run};
 use crate::{
-    Builder, JigBindings, Run, cards,
+    JigBindings, cards,
     phrases::{Hole, jig::JigPhrase},
     words::Words,
 };
+
 use jig_domain_client::{
     Domain,
     contract::{Activity, RunBeginning, RunEnding},

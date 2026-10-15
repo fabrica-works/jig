@@ -4,7 +4,8 @@
     reason = "ordinary tests inspect whole public resource slots and literal trees"
 )]
 use super::cards::{CLIENT, contains, shared_words};
-use crate::{Builder, JigBindings, Role};
+use crate::JigBindings;
+use crate::ui::{Builder, Role};
 use jig_domain_client::contract::*;
 use skein_lib::List;
 fn list<T>(values: impl IntoIterator<Item = T>) -> List<T> {

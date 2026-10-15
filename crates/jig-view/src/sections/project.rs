@@ -1,9 +1,11 @@
 //! Project sections compose shared cards and connector parts (pages.md, 6).
+use crate::ui::{Builder, Role, Run};
 use crate::{
-    Builder, JigBindings, Role, Run, cards,
+    JigBindings, cards,
     phrases::{Hole, jig::JigPhrase},
     words::Words,
 };
+
 use jig_domain_client::{
     Domain,
     action::Act,

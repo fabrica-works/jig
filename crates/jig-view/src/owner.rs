@@ -1,6 +1,6 @@
 //! jig's owner mapping onto the opaque tree owner (client/domain/view.md, section 3).
 
-use crate::tree;
+use crate::ui::tree;
 
 /// The view child that interprets a token, key, style, region, picture or phrase.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]

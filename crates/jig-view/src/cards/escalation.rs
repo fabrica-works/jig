@@ -1,9 +1,11 @@
 //! Escalations keep the whole hold story and document-offered acts (objects.md, 5).
+use crate::ui::Builder;
 use crate::{
-    Builder, JigBindings,
+    JigBindings,
     phrases::{Hole, jig::JigPhrase},
     words::Words,
 };
+
 use jig_domain_client::{
     Domain,
     contract::{Hold, Phase, SpendLine},

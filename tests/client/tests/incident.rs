@@ -7,7 +7,7 @@ use jig_domain_client::{
 use jig_fake_person::{Find, Step};
 use jig_scripted_engine::{Change, Rows, Source};
 use jig_test_domain_client::{Address as RootAddress, family};
-use jig_view::Role;
+use jig_view::ui::Role;
 use skein_lib::{Duration, Wall};
 const WITHIN: Duration = Duration::from_secs(1);
 fn see(words: &[u8]) -> Step<RootAddress> {

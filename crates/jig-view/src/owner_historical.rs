@@ -1,9 +1,9 @@
 //! Passive whole historical objects (client/domain/client.md, 5;
 //! contract.md, 6 and view.md, 7, 10). Original identities and independent
 //! sources are retained without acquiring current offers or manufacturing context.
-use crate::{
-    Builder, JigBindings, Role, Run, owner_historical_words::HistoricalPhrase as P, phrases::Hole, words::Words,
-};
+use crate::ui::{Builder, Role, Run};
+use crate::{JigBindings, owner_historical_words::HistoricalPhrase as P, phrases::Hole, words::Words};
+
 use alloc::boxed::Box;
 use jig_domain_client::{
     Domain, Limits,
@@ -309,7 +309,7 @@ pub fn max_nodes(l: &Limits) -> Option<u32> {
         .checked_add(l.rows.checked_mul(l.rows.checked_add(5)?)?)?
         .checked_add(40)?;
     let question = crate::chip_nodes(l)?
-        .checked_add(crate::markdown::max_nodes(l.text)?)?
+        .checked_add(crate::ui::markdown::max_nodes(l.text)?)?
         .checked_add(result.checked_mul(2)?)?
         .checked_add(l.rows.checked_mul(4)?)?
         .checked_add(120)?;

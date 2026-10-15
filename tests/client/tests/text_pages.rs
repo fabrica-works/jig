@@ -2,7 +2,8 @@ use jig_client_world::{ClientId, Fault, FrontFault, Scripted, Test, Until, World
 use jig_domain_client::address::{Address, ProjectSection};
 use jig_fake_person::{Find, Step};
 use jig_test_domain_client::{Address as RootAddress, Event, Place};
-use jig_view::{Act, Role};
+use jig_view::Act;
+use jig_view::ui::Role;
 use skein_lib::{Duration, Time, Wall};
 type PageWorld = World<Test, Scripted>;
 fn print(w: &PageWorld, c: ClientId, label: &str, golden: &[u8]) {

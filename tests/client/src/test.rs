@@ -4,7 +4,8 @@ use crate::harness::*;
 use jig_domain_client::{boundary::Offset, contract::*};
 use jig_test_domain_client::{self as domain, Address, Event, JigOut, Request, first};
 use jig_test_view as view;
-use jig_view::{Act, NodeId, Patch, Tree};
+use jig_view::Act;
+use jig_view::ui::{NodeId, Patch, Tree};
 use skein_lib::{Duration, Env, List, Queue, RequestEnvelope, RequestLimits, Time};
 use std::{
     collections::BTreeMap,

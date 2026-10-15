@@ -1,6 +1,8 @@
 //! Pages independent of work (client/domain/pages.md, 8).
 use crate::regions::JigRegion;
-use crate::{Builder, JigBindings, Role, phrases::jig::JigPhrase, words::Words};
+use crate::ui::{Builder, Role};
+use crate::{JigBindings, phrases::jig::JigPhrase, words::Words};
+
 use jig_domain_client::{Domain, action::Act, pages::Page};
 /// Render starting, signing in, missing, outdated or another party's kept work.
 pub fn not_the_work(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) -> bool {

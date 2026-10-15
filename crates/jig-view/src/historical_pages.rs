@@ -2,9 +2,9 @@
 //! 7 and 10). The source owns row order, optional clocks and all counters.
 //! Brief delegate identity does not manufacture a Result card; a funding
 //! record does not supply pools, task rows or an amount left.
-use crate::{
-    Builder, JigBindings, Role, Run, historical_pages_words::HistoricalPhrase as P, phrases::Hole, words::Words,
-};
+use crate::ui::{Builder, Role, Run};
+use crate::{JigBindings, historical_pages_words::HistoricalPhrase as P, phrases::Hole, words::Words};
+
 use alloc::boxed::Box;
 use jig_domain_client::{
     Domain, Limits,
@@ -26,7 +26,7 @@ pub struct HistoricalFragment {
 pub fn ended_nodes(l: &Limits) -> Option<u32> {
     crate::chip_nodes(l)?
         .checked_add(crate::result_nodes(l)?)?
-        .checked_add(crate::markdown::max_nodes(l.text)?)?
+        .checked_add(crate::ui::markdown::max_nodes(l.text)?)?
         .checked_add(32)?
         .checked_mul(l.rows)?
         .checked_add(2)

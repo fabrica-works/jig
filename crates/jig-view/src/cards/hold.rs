@@ -1,9 +1,11 @@
 //! The whole vocabulary of held reasons (client/domain/objects.md, sections 3 and 5).
+use crate::ui::Builder;
 use crate::{
-    Builder, JigBindings,
+    JigBindings,
     phrases::{Hole, jig::JigPhrase},
     words::{Words, name},
 };
+
 use jig_domain_client::contract::HoldReason;
 
 /// Say the actual held reason and every fact it carries; parts remain connector-owned.

@@ -1,9 +1,11 @@
 //! Result contracts and unread replies (client/domain/objects.md, section 8).
+use crate::ui::{Builder, Role, Run};
 use crate::{
-    Builder, JigBindings, Role, Run,
+    JigBindings,
     phrases::{Hole, jig::JigPhrase},
     words::{Words, name},
 };
+
 use jig_domain_client::{
     Domain,
     action::Act,
@@ -110,7 +112,7 @@ fn verdict_payload(
     crate::document_text::markdown(b, explanation, words);
     for field in fields {
         b.text(Run::Plain, &field.name);
-        crate::markdown::read(&field.value, 2, b);
+        crate::ui::markdown::read(&field.value, 2, b);
     }
 }
 /// A reply opens the chat at its domain-kept first unread reply position.

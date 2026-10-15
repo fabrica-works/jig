@@ -1,10 +1,12 @@
 //! Notice outcomes without a visible card (client/domain/client.md, 13).
+use crate::ui::{Builder, Role};
 use crate::{
-    Builder, JigBindings, Role,
+    JigBindings,
     cards::common,
     phrases::{Hole, jig::JigPhrase},
     words::Words,
 };
+
 use jig_domain_client::{
     Domain,
     action::Act,

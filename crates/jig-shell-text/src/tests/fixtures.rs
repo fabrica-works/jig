@@ -1,4 +1,6 @@
-use jig_view::{Binding, Builder, Limits, Owner, Role, Run, State, Tree};
+use jig_view::ui::{Builder, Role, Run, State, Tree};
+use jig_view::{Binding, Limits, Owner};
+
 use skein_lib::{Queue, Token};
 
 pub const LIMITS: Limits = Limits {
@@ -27,7 +29,7 @@ pub fn page(main: fn(&mut Builder)) -> Tree {
     b.close();
     let mut tree = b.finish();
     let mut patches = Queue::with_capacity(LIMITS.patches);
-    jig_view::diff(&Tree::new(LIMITS.nodes), &mut tree, &LIMITS, &mut 1, &mut patches);
+    jig_view::ui::diff(&Tree::new(LIMITS.nodes), &mut tree, &LIMITS, &mut 1, &mut patches);
     tree
 }
 pub fn button(b: &mut Builder, name: &[u8], enabled: bool) {
@@ -173,12 +175,12 @@ fn remaining(b: &mut Builder) {
     b.open(Role::Slot);
     b.text(Run::Plain, b"fragment");
     b.close();
-    b.drawing(jig_view::DrawingKind { owner: Owner::Jig.opaque(), kind: 1 }, b"Drawing", b"", 8);
+    b.drawing(jig_view::ui::DrawingKind { owner: Owner::Jig.opaque(), kind: 1 }, b"Drawing", b"", 8);
     b.text(Run::Plain, b"fallback");
     b.close();
     b.open(Role::Image);
     b.name(b"Picture");
-    b.picture(jig_view::Picture { owner: Owner::Jig.opaque(), number: 2 });
+    b.picture(jig_view::ui::Picture { owner: Owner::Jig.opaque(), number: 2 });
     b.close();
     b.open(Role::Button);
     b.name(b"States");
@@ -188,8 +190,8 @@ fn remaining(b: &mut Builder) {
     {
         b.state(state);
     }
-    b.style(jig_view::Style { owner: Owner::Jig.opaque(), token: 999 });
-    b.shortcut(jig_view::Shortcut { key: b's', modifier: jig_view::Modifier::Alt });
+    b.style(jig_view::ui::Style { owner: Owner::Jig.opaque(), token: 999 });
+    b.shortcut(jig_view::ui::Shortcut { key: b's', modifier: jig_view::ui::Modifier::Alt });
     b.close();
 }
 

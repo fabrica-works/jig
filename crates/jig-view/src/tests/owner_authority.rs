@@ -1,9 +1,11 @@
 #![expect(clippy::disallowed_methods, reason = "ordinary tests inspect standalone trees and language data")]
+use crate::ui::{Builder, Tree};
 use crate::{
-    Builder, Limits, Tree, owner_authority as view,
+    Limits, owner_authority as view,
     owner_authority_words::{self as words, AuthorityPhrase, OwnerAuthorityWords},
     phrases::{Hole, Invalid, PhraseLimits, Segment, WallFormat},
 };
+
 use jig_domain_client::contract::{
     OwnerAuthority, OwnerAuthorityDocument, OwnerAuthorityExecutor, OwnerDelegation, OwnerGrant, OwnerPattern,
     OwnerPatternEnd, OwnerResourceScope,

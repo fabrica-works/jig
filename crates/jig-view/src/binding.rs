@@ -7,7 +7,7 @@ use skein_lib::Token;
 /// A meaning kept by its owner's view for the last built tree.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Binding {
-    pub owner: crate::tree::Owner,
+    pub owner: crate::ui::tree::Owner,
     pub token: Token,
 }
 

@@ -8,7 +8,9 @@ use super::{
     cards::{contains, document, drive, start, text, words},
     pages::{build, deliver, named_binding},
 };
-use crate::{JigBindings, Role, Tree, words::Words};
+use crate::ui::{Role, Tree};
+use crate::{JigBindings, words::Words};
+
 use jig_domain_client::{
     Domain, Event, Request,
     action::Act,
@@ -702,7 +704,7 @@ fn procedure_goal_choices_render_whole_numeric_pairs_without_frame_charters() {
     let (tree, _) = build(&d, 3, words);
     assert!(contains(&tree, b"proposed"));
     drive(&mut d, Event::Act { act: Act::Submit { field: jig_domain_client::fields::Purpose::NewGoal } });
-    let mut b = crate::Builder::new(&super::cards::limits());
+    let mut b = crate::ui::Builder::new(&super::cards::limits());
     let mut bindings = JigBindings::new(32, super::cards::CLIENT.text);
     b.open(Role::Page);
     crate::confirmation::confirmation(&mut b, &d, words, &mut bindings);
@@ -716,7 +718,7 @@ fn procedure_goal_choices_render_whole_numeric_pairs_without_frame_charters() {
 #[test]
 fn a_task_section_not_shown_builds_nothing() {
     let (d, _) = task(TaskSection::Overview, Executor::Agent { charter: 2 });
-    let mut b = crate::Builder::new(&super::cards::limits());
+    let mut b = crate::ui::Builder::new(&super::cards::limits());
     let mut bindings = JigBindings::new(64, super::cards::CLIENT.text);
     b.open(Role::Page);
     let before = b.tree.len();
@@ -747,7 +749,7 @@ fn the_tabs_mark_the_addresss_own_section_current() {
     ]) {
         assert_eq!(
             tab.states.as_slice(),
-            if section == TaskSection::Plan { &[crate::State::Current][..] } else { &[] },
+            if section == TaskSection::Plan { &[crate::ui::State::Current][..] } else { &[] },
             "{section:?}"
         );
         assert_eq!(
@@ -835,7 +837,7 @@ fn the_addresss_own_section_is_marked_current_on_an_arranged_page() {
         let node = tree.nodes().iter().find(|n| n.region == Some(region.region())).unwrap();
         assert_eq!(
             node.states.as_slice(),
-            if region == JigRegion::TaskPlan { &[crate::State::Current][..] } else { &[] },
+            if region == JigRegion::TaskPlan { &[crate::ui::State::Current][..] } else { &[] },
             "{region:?}"
         );
     }

@@ -2,7 +2,7 @@
 #![expect(clippy::disallowed_macros, reason = "checked-in report passages are compile-time test fixtures")]
 #![expect(clippy::disallowed_methods, reason = "ordinary test code collects semantic text for assertions")]
 
-use crate::{Builder, NodeId, Patch, Role, Run, Tree, View, markdown};
+use crate::ui::{Builder, NodeId, Patch, Role, Run, Tree, View, markdown};
 use skein_lib::Queue;
 
 fn read(input: &[u8], nesting: u32) -> Tree {
@@ -13,7 +13,7 @@ fn read(input: &[u8], nesting: u32) -> Tree {
         text_per_node: bytes.checked_mul(2).unwrap(),
         text_bytes: markdown::max_text_bytes(bytes).unwrap(),
         markdown_depth: nesting,
-        ..super::tree::LIMITS
+        ..crate::ui::tests::fixtures::LIMITS
     };
     let mut builder = Builder::new(&limits);
     builder.open(Role::Page);
@@ -67,9 +67,14 @@ fn paragraphs_blocks_runs_links_and_literal_fallbacks() {
         assert_eq!(text(&tree), expected, "{literal:?}");
         assert!(tree.nodes().iter().all(|node| node.external.is_none()));
     }
-    let mut view =
-        View::new(&crate::Limits { nodes: 8, depth: 4, text_per_node: 64, text_bytes: 128, ..super::tree::LIMITS });
-    let mut out = Queue::with_capacity(super::tree::LIMITS.patches);
+    let mut view = View::new(&crate::Limits {
+        nodes: 8,
+        depth: 4,
+        text_per_node: 64,
+        text_bytes: 128,
+        ..crate::ui::tests::fixtures::LIMITS
+    });
+    let mut out = Queue::with_capacity(crate::ui::tests::fixtures::LIMITS.patches);
     let mut link_id = NodeId(0);
     for (shown, input) in
         [(1, b"[label](https://example.org/a)".as_slice()), (2, b"[label](https://example.org/b)".as_slice())]

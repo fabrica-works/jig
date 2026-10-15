@@ -6,10 +6,12 @@ use jig_test_domain_client::{
     connector_values::*,
     family::{Kind, Scope, Subject},
 };
+use jig_view::ui::{Builder, Role, Tree};
 use jig_view::{
-    Builder, Owner, Role, Tree,
+    Owner,
     phrases::{self, Form as PhraseForm, HoleKind, PhraseLimits, Phrasebook, PluralClass, Segment, jig::JigPhrase},
 };
+
 use skein_lib::{List, Wall, bytes::copy_of};
 fn list<T>(capacity: u32, values: impl IntoIterator<Item = T>) -> List<T> {
     let mut result = List::with_capacity(capacity);

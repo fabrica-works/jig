@@ -1,6 +1,8 @@
 #![expect(clippy::disallowed_methods, reason = "ordinary tests inspect public trees and exact supplied source values")]
 use super::cards::{CLIENT, contains, document, drive, limits, start, text, words};
-use crate::{Builder, JigBindings, Owner, Role, SlotRef, Tree, phrases::jig::JigPhrase};
+use crate::ui::{Builder, Role, SlotRef, Tree};
+use crate::{JigBindings, Owner, phrases::jig::JigPhrase};
+
 use jig_domain_client::{Domain, Event, contract::*};
 use skein_lib::{List, Token, Wall};
 fn tree(domain: &Domain) -> Tree {

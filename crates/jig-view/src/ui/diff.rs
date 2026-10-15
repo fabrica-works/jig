@@ -1,4 +1,4 @@
-//! Stable identities and bounded edits (client/domain/view.md, section 6).
+//! Stable identities and bounded edits (skein's ui.md, section 7).
 //! Roots match; below matched parents, keys match objects and unkeyed nodes
 //! match by position among the same role. Four bounded index tables keep the
 //! relationships. Structural patches remove unmatched roots, insert unmatched
@@ -7,7 +7,8 @@
 //! Each node has at most one structural patch and three attribute patches.
 //! Bindings stay in the view: the shell sees only their presence and node ids.
 
-use crate::{Drawing, Limits, Node, NodeId, Picture, Region, Role, Shortcut, State, Style, TextRun, Tree, Value};
+use crate::Limits;
+use crate::ui::{Drawing, Node, NodeId, Picture, Region, Role, Shortcut, State, Style, TextRun, Tree, Value};
 use alloc::boxed::Box;
 use skein_lib::{List, Queue, Stack};
 
@@ -83,7 +84,7 @@ pub enum Patch {
     Text { node: NodeId, text: Box<[TextRun]> },
     /// Replace semantic attributes, including a drawing's whole data.
     Attribute { node: NodeId, attribute: Attribute },
-    /// Apply a domain write to a field, or remove its value.
+    /// Apply a owner write to a field, or remove its value.
     Value { node: NodeId, value: Option<Value> },
 }
 

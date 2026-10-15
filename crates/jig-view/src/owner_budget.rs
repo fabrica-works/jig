@@ -1,7 +1,9 @@
 //! Owner budget and ledger fragments (client/domain/view.md, sections 7 and 10).
 //! All accounting and period facts are supplied by the owner; this view copies
 //! them into the selected language, without deriving availability or a calendar.
-use crate::{Builder, Role, Run, owner_budget_words::BudgetPhrase, phrases::Hole, proposed_task, words::Words};
+use crate::ui::{Builder, Role, Run};
+use crate::{owner_budget_words::BudgetPhrase, phrases::Hole, proposed_task, words::Words};
+
 use jig_domain_client::contract::{OwnerBudget, OwnerNumbers, PoolLedger};
 use skein_lib::Wall;
 

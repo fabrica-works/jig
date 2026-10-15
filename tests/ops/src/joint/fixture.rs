@@ -221,13 +221,13 @@ impl jig_client_world::harness::App for Client {
     fn next_deadline(root: &Self::Root) -> Option<skein_lib::Time> {
         Ops::next_deadline(root)
     }
-    fn build(view: &mut Self::View, root: &Self::Root, patches: &mut skein_lib::Queue<jig_view::Patch>) {
+    fn build(view: &mut Self::View, root: &Self::Root, patches: &mut skein_lib::Queue<jig_view::ui::Patch>) {
         Ops::build(view, root, patches);
     }
-    fn tree(view: &Self::View) -> &jig_view::Tree {
+    fn tree(view: &Self::View) -> &jig_view::ui::Tree {
         Ops::tree(view)
     }
-    fn act(view: &mut Self::View, node: jig_view::NodeId, act: jig_view::Act) -> Option<Self::Event> {
+    fn act(view: &mut Self::View, node: jig_view::ui::NodeId, act: jig_view::Act) -> Option<Self::Event> {
         Ops::act(view, node, act)
     }
     fn duty(request: Self::Request) -> jig_client_world::harness::Duty<Self> {
@@ -260,7 +260,7 @@ impl jig_client_world::harness::App for Client {
         assert_eq!(*supplied, limits(), "constructor and receiving bounds match");
         profile().heap
     }
-    fn seen(tree: &jig_view::Tree) -> Vec<jig_client_world::harness::Seen> {
+    fn seen(tree: &jig_view::ui::Tree) -> Vec<jig_client_world::harness::Seen> {
         Ops::seen(tree)
     }
     fn sent(request: &Self::Request) -> Option<jig_client_world::harness::Sent> {
@@ -269,7 +269,7 @@ impl jig_client_world::harness::App for Client {
     fn received(event: &Self::Event) -> Vec<jig_client_world::harness::Receipt> {
         Ops::received(event)
     }
-    fn card(tree: &jig_view::Tree, node: jig_view::NodeId) -> Option<jig_client_world::harness::CardKey> {
+    fn card(tree: &jig_view::ui::Tree, node: jig_view::ui::NodeId) -> Option<jig_client_world::harness::CardKey> {
         Ops::card(tree, node)
     }
     fn window_changed(event: &Self::Event) -> bool {

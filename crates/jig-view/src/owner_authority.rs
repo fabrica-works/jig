@@ -1,11 +1,12 @@
 //! Standalone owner authority fragments (client/domain/view.md, 7 and 10).
 //! Retains literal boundaries; words are selected checked language data.
+use crate::ui::{Builder, Role, Run};
 use crate::{
-    Builder, Role, Run,
     owner_authority_words::{AuthorityPhrase, OwnerAuthorityWords},
     phrases::Hole,
     words::Words,
 };
+
 use jig_domain_client::contract::{
     OwnerAuthority, OwnerAuthorityDocument, OwnerAuthorityExecutor, OwnerPattern, OwnerPatternEnd,
 };

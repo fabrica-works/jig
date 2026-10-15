@@ -251,15 +251,13 @@ fn an_incident_drawing_has_a_readable_fallback_and_missing_lead_is_explicit() {
         view.tree()
             .nodes()
             .iter()
-            .any(|n| n.role == jig_view::Role::Drawing && n.name.as_deref() == Some(b"Error rate".as_slice()))
+            .any(|n| n.role == jig_view::ui::Role::Drawing && n.name.as_deref() == Some(b"Error rate".as_slice()))
     );
     let text: Vec<u8> =
         view.tree().nodes().iter().flat_map(|n| n.text.iter().flat_map(|r| r.text.iter().copied())).collect();
     assert!(String::from_utf8(text).unwrap().contains("Error rate 30 % Since 10:02, Before: 2 %"));
-    assert!(
-        view.tree().nodes().iter().any(|n| n.role == jig_view::Role::Status
-            && n.name.as_deref() == Some(b"No lead task has been supplied".as_slice()))
-    );
+    assert!(view.tree().nodes().iter().any(|n| n.role == jig_view::ui::Role::Status
+        && n.name.as_deref() == Some(b"No lead task has been supplied".as_slice())));
     while patches.pop().is_some() {}
     build(&mut view, &root, &mut patches);
     assert!(patches.is_empty());
@@ -373,7 +371,7 @@ fn public_effect_fragments_keep_equal_task_and_party_makers_separate() {
     let mut patches = Queue::with_capacity(view.limits().tree.patches);
     build(&mut view, &root, &mut patches);
     for kind in [5, 10] {
-        let expected = jig_view::Key {
+        let expected = jig_view::ui::Key {
             owner: (jig_view::Owner::Application { number: 2 }).opaque(),
             kind,
             a: u64::MAX,
@@ -539,7 +537,8 @@ fn arranged_task_view(section: jig_domain_client::address::TaskSection) -> View 
 
 #[test]
 fn an_ops_task_page_puts_budget_and_panels_in_an_aside() {
-    use jig_view::{Role, regions::JigRegion};
+    use jig_view::regions::JigRegion;
+    use jig_view::ui::Role;
     let view = arranged_task_view(jig_domain_client::address::TaskSection::Plan);
     let (index, aside) = view.tree().nodes().iter().enumerate().find(|(_, n)| n.role == Role::Complementary).unwrap();
     let regions: Vec<_> = view
@@ -560,7 +559,7 @@ fn an_ops_task_page_marks_the_addresss_own_section_current() {
     let rows = [
         (JigRegion::TaskOverview, &[][..]),
         (JigRegion::TaskActivity, &[][..]),
-        (JigRegion::TaskPlan, &[jig_view::State::Current][..]),
+        (JigRegion::TaskPlan, &[jig_view::ui::State::Current][..]),
         (JigRegion::TaskHistory, &[][..]),
         (JigRegion::TaskBudget, &[][..]),
         (JigRegion::TaskPanels, &[][..]),
@@ -580,7 +579,7 @@ fn an_ops_arranged_task_page_keeps_the_outline() {
 #[test]
 fn an_ops_arranged_task_page_has_no_tabs() {
     let view = arranged_task_view(jig_domain_client::address::TaskSection::Plan);
-    assert_eq!(view.tree().nodes().iter().filter(|node| node.role == jig_view::Role::Tabs).count(), 0);
+    assert_eq!(view.tree().nodes().iter().filter(|node| node.role == jig_view::ui::Role::Tabs).count(), 0);
 }
 
 fn incident_plan_page(native: bool) -> Domain {
@@ -784,11 +783,8 @@ fn an_incident_with_a_proposal_and_an_infrastructure_panel_fills_both_slot_passe
     assert!(contains(&view, b"Task 9"));
     assert!(contains(&view, b"Waiting at policy roles"));
     assert!(
-        view.tree()
-            .nodes()
-            .iter()
-            .any(|n| n.role == jig_view::Role::Region
-                && n.name.as_deref() == Some(b"Infrastructure procedure".as_slice()))
+        view.tree().nodes().iter().any(|n| n.role == jig_view::ui::Role::Region
+            && n.name.as_deref() == Some(b"Infrastructure procedure".as_slice()))
     );
     assert!(contains(&view, b"Waiting for condition"));
     assert!(view.tree().len() <= view.limits().tree.nodes);
@@ -849,7 +845,7 @@ fn moving_an_environment_end_names_the_end_revision_and_waits_for_the_final_enve
         .nodes()
         .iter()
         .find(|n| {
-            n.role == jig_view::Role::TextField
+            n.role == jig_view::ui::Role::TextField
                 && n.name.as_deref() == Some(b"New end (seconds since epoch)".as_slice())
         })
         .unwrap()
@@ -862,7 +858,7 @@ fn moving_an_environment_end_names_the_end_revision_and_waits_for_the_final_enve
         .tree()
         .nodes()
         .iter()
-        .find(|n| n.role == jig_view::Role::Button && n.name.as_deref() == Some(b"Move end".as_slice()))
+        .find(|n| n.role == jig_view::ui::Role::Button && n.name.as_deref() == Some(b"Move end".as_slice()))
         .unwrap()
         .id;
     let action = crate::decode(&mut view, button, jig_view::Act::Press).unwrap();
@@ -957,7 +953,7 @@ fn an_environment_without_an_end_has_no_revision_or_move_form() {
     let mut view = view();
     let mut patches = Queue::with_capacity(view.limits().tree.patches);
     build(&mut view, &root, &mut patches);
-    assert!(!view.tree().nodes().iter().any(|n| n.role == jig_view::Role::TextField
+    assert!(!view.tree().nodes().iter().any(|n| n.role == jig_view::ui::Role::TextField
         && n.name.as_deref() == Some(b"New end (seconds since epoch)".as_slice())));
     assert!(!view.tree().nodes().iter().any(|n| n.name.as_deref() == Some(b"Move end".as_slice())));
     assert!(!contains(&view, b"Cost:"));
@@ -1108,8 +1104,12 @@ fn actual_outbox_entries_render_from_their_explicit_scope_and_keep_proposal_keys
             PartScope::Project(project) => u64::from(project),
             PartScope::Deployment => u64::MAX,
         };
-        let expected_key =
-            jig_view::Key { owner: (jig_view::Owner::Application { number: 2 }).opaque(), kind: 6, a: value, b: 17 };
+        let expected_key = jig_view::ui::Key {
+            owner: (jig_view::Owner::Application { number: 2 }).opaque(),
+            kind: 6,
+            a: value,
+            b: 17,
+        };
         assert!(view.tree().nodes().iter().any(|node| node.key == Some(expected_key)));
         assert!(contains(&view, b"Outbox entry 17"));
         assert!(contains(&view, b"Sent"));
@@ -1176,14 +1176,14 @@ fn resource_slots_preserve_whole_opaque_segments_and_distinct_equal_concatenatio
     assert!(tree_limits.nodes <= envelope.nodes);
     assert!(tree_limits.slots <= envelope.slots);
     assert!(tree_limits.text_per_node >= 128);
-    let mut builder = jig_view::Builder::new(&tree_limits);
+    let mut builder = jig_view::ui::Builder::new(&tree_limits);
     let mut jig_bindings = jig_view::JigBindings::new(16, JIG.text);
     let mut obs_bindings = crate::bindings::Bindings::new(16, 32, 1);
     let mut infra_bindings = crate::bindings::Bindings::new(16, 32, 2);
     let mut obs = observability::Side::new(&domain_limits.observability, 63);
     let mut infra = infrastructure::Side::new(&domain_limits.infrastructure, 64);
     let mut expected = Vec::new();
-    builder.open(jig_view::Role::Page);
+    builder.open(jig_view::ui::Role::Page);
     for connector in [1, 2] {
         for path in [
             list([Box::<[u8]>::from(*b"a/b"), Box::<[u8]>::from(*b"c")]),
@@ -1231,7 +1231,7 @@ fn resource_slots_preserve_whole_opaque_segments_and_distinct_equal_concatenatio
     assert_eq!(slots.len(), 8);
     for (slot, part) in slots.iter().zip(&expected) {
         assert_eq!(jig_bindings.part(slot.reference.token), Some(part));
-        let mut fragment = jig_view::Builder::new(&tree_limits);
+        let mut fragment = jig_view::ui::Builder::new(&tree_limits);
         if slot.reference.owner == ((jig_view::Owner::Application { number: 1 }).opaque()) {
             crate::observability::part(&mut fragment, &obs, part, 11, &obs_words, &mut obs_bindings);
         } else {
@@ -1245,7 +1245,7 @@ fn resource_slots_preserve_whole_opaque_segments_and_distinct_equal_concatenatio
         .nodes()
         .iter()
         .flat_map(|node| node.text.iter())
-        .filter(|run| run.run == jig_view::Run::Code)
+        .filter(|run| run.run == jig_view::ui::Run::Code)
         .map(|run| run.text.as_ref())
         .collect();
     for bytes in [b"a/b".as_slice(), b"c", b"a", b"b/c", b"/\0", b"\\xFF\\x00"] {
@@ -1504,7 +1504,7 @@ fn deferred_connector_diagnostic_words_select_bounded_checked_language_without_h
         let book = Phrasebook::load(shapes.clone().into_boxed_slice(), languages.clone(), &bounds).unwrap();
         let selected_words = words::Words { book, language: 1, connector };
         let tree_limits = view().limits().tree;
-        let mut builder = jig_view::Builder::new(&tree_limits);
+        let mut builder = jig_view::ui::Builder::new(&tree_limits);
         for (word, text) in ids.into_iter().zip(texts) {
             assert_eq!(selected_words.say(word, &[]).as_ref(), text);
             selected_words.text(&mut builder, word, &[]);
@@ -1549,8 +1549,8 @@ fn native_effect_slots_load_infrastructure_without_loading_a_maker_effect_and_ke
     for connector in [1, 2] {
         for proposal in [0, u64::MAX] {
             let part = Part::OwnerEffect { connector, proposal };
-            let mut builder = jig_view::Builder::new(&tree_limits);
-            builder.open(jig_view::Role::Page);
+            let mut builder = jig_view::ui::Builder::new(&tree_limits);
+            builder.open(jig_view::ui::Role::Page);
             let mut bindings = crate::bindings::Bindings::new(0, 32, connector);
             if connector == 1 {
                 let mut side = observability::Side::new(&domain_limits.observability, 84);
@@ -1587,7 +1587,7 @@ fn native_effect_slots_load_infrastructure_without_loading_a_maker_effect_and_ke
             }
             builder.close();
             let tree = builder.finish();
-            let status: Vec<_> = tree.nodes().iter().filter(|node| node.role == jig_view::Role::Status).collect();
+            let status: Vec<_> = tree.nodes().iter().filter(|node| node.role == jig_view::ui::Role::Status).collect();
             assert_eq!(status.len(), 1);
             let expected =
                 if connector == 1 { b"Cannot show this part".as_slice() } else { b"Loading document".as_slice() };
@@ -1657,8 +1657,8 @@ fn native_effect_facts_have_distinct_proposal_and_state_labels() {
         },
         &mut out,
     );
-    let mut builder = jig_view::Builder::new(&tree_limits);
-    builder.open(jig_view::Role::Page);
+    let mut builder = jig_view::ui::Builder::new(&tree_limits);
+    builder.open(jig_view::ui::Role::Page);
     let mut bindings = crate::bindings::Bindings::new(tree_limits.bindings, limits.infrastructure.text, 2);
     crate::infrastructure::part(&mut builder, &side, &part, 9, &words, &jig_words, &mut bindings);
     builder.close();
@@ -1733,7 +1733,7 @@ fn native_environment_form_uses_the_supplied_request_revision_and_keeps_whole_wi
         .nodes()
         .iter()
         .find(|node| {
-            node.role == jig_view::Role::TextField
+            node.role == jig_view::ui::Role::TextField
                 && node.name.as_deref() == Some(b"New end (seconds since epoch)".as_slice())
         })
         .expect("native end field");

@@ -86,7 +86,7 @@ fn the_project_tabs_mark_the_addresss_own_section_current() {
         let current: Vec<_> = tree
             .nodes()
             .iter()
-            .filter(|n| n.role == Role::Tab && n.states.as_slice().contains(&crate::State::Current))
+            .filter(|n| n.role == Role::Tab && n.states.as_slice().contains(&crate::ui::State::Current))
             .collect();
         assert_eq!(current.len(), 1, "{section:?}");
         assert_eq!(

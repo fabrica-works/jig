@@ -1,8 +1,8 @@
 //! Standalone lifecycle milestones (client/domain/objects.md, 11; view.md, 7).
 //! Domain is borrowed only by existing admitted result follow-up fragments.
-use crate::{
-    Builder, JigBindings, Role, Run, owner_milestone_words::MilestonePhrase as P, phrases::Hole, words::Words,
-};
+use crate::ui::{Builder, Role, Run};
+use crate::{JigBindings, owner_milestone_words::MilestonePhrase as P, phrases::Hole, words::Words};
+
 use jig_domain_client::{
     Domain, Limits,
     contract::{ClosingStage, OwnerChipEnding, OwnerMilestoneLine, OwnerMilestonePhase, RunStage},
@@ -23,7 +23,7 @@ pub struct MilestoneFragment {
 pub fn max_nodes(limits: &Limits) -> Option<u32> {
     32_u32
         .checked_add(crate::proposed_task::part_nodes(limits)?)?
-        .checked_add(crate::markdown::max_nodes(limits.text)?.checked_mul(2)?)?
+        .checked_add(crate::ui::markdown::max_nodes(limits.text)?.checked_mul(2)?)?
         .checked_add(crate::result_nodes(limits)?)
 }
 fn ending_fits(value: &OwnerChipEnding, limits: &Limits) -> Option<()> {

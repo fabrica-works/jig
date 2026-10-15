@@ -1,10 +1,11 @@
 //! Compact exact lifecycle; whole metadata is expanded on the task page.
 //! See client/domain/objects.md, 3, and domain/tasks.md, 5.
+use crate::ui::Builder;
 use crate::{
-    Builder,
     phrases::{Hole, jig::JigPhrase},
     words::Words,
 };
+
 use jig_domain_client::contract::{ClosingStage, OwnerChipPhase, RunStage};
 
 pub(crate) fn brief(b: &mut Builder, phase: &OwnerChipPhase, words: &Words) {

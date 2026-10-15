@@ -35,7 +35,7 @@ fn rendered_amendment_reason_preserves_empty_opaque_bytes_and_only_selected_inst
         let tree = dialog(&domain, words, &mut bindings);
         let reason = tree.nodes().iter().find(|node| node.name.as_deref() == Some(b"Your reason")).unwrap();
         assert_eq!(reason.value.as_ref().unwrap().text.as_ref(), bytes);
-        let text_bytes: u32 = tree.nodes().iter().map(crate::tree::Node::text_bytes).sum();
+        let text_bytes: u32 = tree.nodes().iter().map(crate::ui::tree::Node::text_bytes).sum();
         assert!(text_bytes <= limits().text_bytes);
         assert!(
             tree.nodes().iter().filter(|node| node.binding.is_some()).count()

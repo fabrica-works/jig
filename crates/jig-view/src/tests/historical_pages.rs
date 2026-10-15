@@ -3,12 +3,14 @@
     reason = "ordinary proofs inspect complete public trees and checked language data"
 )]
 use super::cards::CLIENT;
+use crate::ui::{Builder, Tree};
 use crate::{
-    Builder, JigBindings, Limits, Tree, historical_pages as view,
+    JigBindings, Limits, historical_pages as view,
     historical_pages_words::{self as sayings, HistoricalPhrase as P},
     phrases::{Hole, Invalid, PhraseLimits, Phrasebook, Segment},
     words::Words,
 };
+
 use jig_domain_client::{Domain, contract::*};
 use skein_lib::{List, Wall, bytes::copy_of};
 fn doc(bytes: &[u8], cut: bool) -> DocumentText {
@@ -285,8 +287,8 @@ fn exact_limits(tree: &Tree, maximum: Limits) -> Limits {
     Limits {
         nodes: tree.len(),
         depth: u32::try_from(depth).unwrap(),
-        text_per_node: tree.nodes().iter().map(crate::tree::Node::text_bytes).max().unwrap(),
-        text_bytes: tree.nodes().iter().map(crate::tree::Node::text_bytes).sum(),
+        text_per_node: tree.nodes().iter().map(crate::ui::tree::Node::text_bytes).max().unwrap(),
+        text_bytes: tree.nodes().iter().map(crate::ui::tree::Node::text_bytes).sum(),
         bindings: u32::try_from(bindings).unwrap(),
         slots: u32::try_from(tree.nodes().iter().filter(|n| n.slot.is_some()).count()).unwrap(),
         ..maximum

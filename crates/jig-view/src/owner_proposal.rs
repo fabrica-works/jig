@@ -1,6 +1,8 @@
 //! Whole pending proposal presentation (client/domain/objects.md, 2 and 4;
 //! view.md, 7 and 10). Funding and proposed contexts are supplied facts.
-use crate::{Builder, JigBindings, Role, Run, owner_proposal_words::ProposalPhrase as P, phrases::Hole, words::Words};
+use crate::ui::{Builder, Role, Run};
+use crate::{JigBindings, owner_proposal_words::ProposalPhrase as P, phrases::Hole, words::Words};
+
 use jig_domain_client::{
     Domain, Limits,
     contract::{
@@ -100,7 +102,7 @@ pub fn required(value: &OwnerProposal, limits: &Limits, words: &Words) -> Option
 /// Closed action alternatives, with brief linked chips rather than expanded task cards.
 #[must_use]
 pub fn max_nodes(limits: &Limits) -> Option<u32> {
-    let markdown = crate::markdown::max_nodes(limits.text)?;
+    let markdown = crate::ui::markdown::max_nodes(limits.text)?;
     let authority = crate::owner_authority::document_nodes(limits.rows)?;
     let link = crate::chip_nodes(limits)?.max(crate::owner_chip::max_nodes(limits)?).checked_add(3)?;
     let part = crate::proposed_task::part_nodes(limits)?;

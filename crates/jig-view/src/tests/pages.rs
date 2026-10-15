@@ -5,7 +5,8 @@
     reason = "ordinary tests select scripted requests"
 )]
 use super::cards::{CLIENT, contains, document, drive, start, text, words};
-use crate::{Builder, JigBindings, Role, Tree};
+use crate::JigBindings;
+use crate::ui::{Builder, Role, Tree};
 use jig_domain_client::{
     Domain, Event, Request,
     address::{Address, Place},
@@ -291,7 +292,7 @@ fn conversations_form(words: &crate::words::Words) {
         })
         .unwrap();
     let waiting = build(&d, 1, words).0;
-    assert!(waiting.nodes().iter().any(|n| n.states.as_slice().contains(&crate::State::Busy)));
+    assert!(waiting.nodes().iter().any(|n| n.states.as_slice().contains(&crate::ui::State::Busy)));
     drive(&mut d, Event::Answered { request, answer: Answer::Refused(Refusal::NotOffered) });
     assert!(contains(&build(&d, 1, words).0, b"This act is not offered"));
     assert!(
@@ -489,7 +490,7 @@ fn whole_page(d: &Domain) -> Tree {
     assert!(crate::jig(
         &mut b,
         d,
-        crate::SlotRef { owner: (crate::Owner::Application { number: 1 }).opaque(), token: Token::new(1) },
+        crate::ui::SlotRef { owner: (crate::Owner::Application { number: 1 }).opaque(), token: Token::new(1) },
         words(),
         &mut bindings
     ));

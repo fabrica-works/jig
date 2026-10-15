@@ -1,6 +1,6 @@
 //! Faults are shell operations or engine-boundary faults, scheduled or drawn.
 use super::{ClientId, FrontFault};
-use jig_view::NodeId;
+use jig_view::ui::NodeId;
 /// One fault against a public boundary, without an application's object types.
 #[derive(Clone, Debug)]
 pub enum Fault {

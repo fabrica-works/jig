@@ -3,9 +3,9 @@
 //! `worst_case` counts owned heap, excluding allocator overhead, for the visible
 //! tree, builders and their splice scratch, diff scratch and output patches.
 
-use crate::builder::PlacedSlot;
-use crate::diff::Open;
-use crate::{Made, Node, Patch, Slot, State, Style, TextRun};
+use crate::ui::builder::PlacedSlot;
+use crate::ui::diff::Open;
+use crate::ui::{Made, Node, Patch, Slot, State, Style, TextRun};
 use skein_lib::{List, Queue, Stack};
 
 /// Capacities checked before each builder allocation.
@@ -45,7 +45,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     let maps = List::<Option<u32>>::worst_case(limits.nodes)?.checked_mul(4)?;
     let children = List::<u32>::worst_case(limits.nodes)?;
     let ancestry = Stack::<Open>::worst_case(limits.depth)?.checked_mul(2)?;
-    let markdown = crate::markdown::worst_case(limits.text_bytes, limits.markdown_depth)?;
+    let markdown = crate::ui::markdown::worst_case(limits.text_bytes, limits.markdown_depth)?;
     trees
         .checked_add(markdown)?
         .checked_add(stacks)?

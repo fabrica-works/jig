@@ -1,6 +1,6 @@
 use crate::{Command, Print, Refusal, command, refusal_line, render};
 use alloc::boxed::Box;
-use jig_view::Tree;
+use jig_view::ui::Tree;
 use skein_io::{
     Event, Io, Request,
     kernel::{Complete, Fd, Op, Submit},

@@ -1,10 +1,12 @@
 #![expect(clippy::disallowed_methods, reason = "ordinary tests inspect public trees and checked language data")]
+use crate::ui::{Builder, Tree};
 use crate::{
-    Builder, JigBindings, Limits, Tree, owner_chip as view,
+    JigBindings, Limits, owner_chip as view,
     owner_chip_words::{self as data, ChipPhrase, OwnerChipWords},
     phrases::{Invalid, PhraseLimits, Segment},
     words::Words,
 };
+
 use jig_domain_client::{Domain, contract::*};
 use skein_lib::{Duration, List, Token, Wall, bytes::copy_of};
 fn doc(bytes: &[u8], cut: bool) -> DocumentText {
@@ -139,7 +141,7 @@ fn retained_chip_preserves_concrete_executor_project_and_full_width_owner_scalar
     ] {
         value.executor = executor;
         let (tree, _, _) = build(&value, words());
-        assert_eq!(tree.nodes()[0].role, crate::Role::Region);
+        assert_eq!(tree.nodes()[0].role, crate::ui::Role::Region);
         assert_eq!(tree.nodes()[0].name.as_deref(), Some(b"Project: 4294967295".as_slice()));
         assert_eq!(value.clone().executor, executor);
         assert!(has(&tree, label), "concrete executor identity is never inferred from phase");
@@ -568,7 +570,7 @@ fn maximum_chip_fragment_checks_selected_language_storage_raw_slots_loss_and_ari
         OwnerChipWords::load(Box::new([crate::phrases::english::language(), translated]), &phrase_limits(), 1, 0)
             .unwrap();
     let selected_tree = build(&details(), selected.words()).0;
-    assert_eq!(selected_tree.nodes()[0].role, crate::Role::Region);
+    assert_eq!(selected_tree.nodes()[0].role, crate::ui::Role::Region);
     assert_eq!(selected_tree.nodes()[0].name.as_deref(), Some(b"selected 4294967295".as_slice()));
     assert!(has(&selected_tree, b"selected 4294967295"));
     assert!(!has(&selected_tree, b"Run work unobserved"));

@@ -9,7 +9,7 @@
 use jig_domain_client::Limits;
 
 fn markdown(limits: &Limits) -> Option<u32> {
-    crate::markdown::max_nodes(limits.text)
+    crate::ui::markdown::max_nodes(limits.text)
 }
 fn authority(limits: &Limits) -> Option<u32> {
     // Four scalars; each row may occur in kinds, grants (two slots), tools,

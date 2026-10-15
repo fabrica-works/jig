@@ -1,10 +1,12 @@
 //! An escalation shows the task owner’s facts and independent offered decisions
 //! (client/domain/objects.md, 5; contract.md, 5.1–5.3).
+use crate::ui::Builder;
 use crate::{
-    Builder, JigBindings,
+    JigBindings,
     phrases::{Hole, jig::JigPhrase},
     words::Words,
 };
+
 use jig_domain_client::{
     Domain,
     objects::{Body, Object},

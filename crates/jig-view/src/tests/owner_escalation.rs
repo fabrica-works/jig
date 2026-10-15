@@ -214,8 +214,8 @@ fn check_exact_storage(row: &OwnerEscalation, allocation: crate::Limits, tree: &
             .unwrap(),
     )
     .unwrap();
-    let per_node = tree.nodes().iter().map(crate::tree::Node::text_bytes).max().unwrap();
-    let total = tree.nodes().iter().map(crate::tree::Node::text_bytes).sum::<u32>();
+    let per_node = tree.nodes().iter().map(crate::ui::tree::Node::text_bytes).max().unwrap();
+    let total = tree.nodes().iter().map(crate::ui::tree::Node::text_bytes).sum::<u32>();
     let exact = crate::Limits { nodes: tree.len(), depth, text_per_node: per_node, text_bytes: total, ..allocation };
     assert_eq!(build_closed_offers(row, exact, w).len(), tree.len());
     for below in [

@@ -1,5 +1,5 @@
 //! A platform tree changed only by patches (client/domain/view.md, 6).
-use jig_view::{Made, NodeId, Patch, Tree};
+use jig_view::ui::{Made, NodeId, Patch, Tree};
 #[derive(Debug)]
 struct Entry {
     node: Made,
@@ -186,10 +186,10 @@ fn local_typing_survives_unchanged_writes_and_same_count_value_patches_are_rejec
         slots: 0,
         markdown_depth: 0,
     };
-    let mut view = jig_view::View::new(&limits);
+    let mut view = jig_view::ui::View::new(&limits);
     let mut patches = skein_lib::Queue::with_capacity(limits.patches);
     let mut builder = view.builder();
-    builder.open(jig_view::Role::TextField);
+    builder.open(jig_view::ui::Role::TextField);
     builder.value(b"100", 89);
     builder.close();
     view.finish(builder, 1, &mut patches);
@@ -202,6 +202,6 @@ fn local_typing_survives_unchanged_writes_and_same_count_value_patches_are_rejec
     model.apply(Patch::Text { node, text: Box::default() });
     model.check(view.tree());
     assert_eq!(model.rows[0].node.value.as_ref().expect("field").text.as_ref(), b"**h");
-    let same_count = Patch::Value { node, value: Some(jig_view::Value { text: Box::from(*b"100"), written: 89 }) };
+    let same_count = Patch::Value { node, value: Some(jig_view::ui::Value { text: Box::from(*b"100"), written: 89 }) };
     assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| model.apply(same_count))).is_err());
 }

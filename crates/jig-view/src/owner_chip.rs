@@ -1,7 +1,9 @@
 //! Source-faithful standalone chip metadata (client/domain/objects.md, 3;
 //! view.md, 7 and 10). Borrowed normal Words supply every label; opaque
 //! channel identity is retained by the contract and never turned into a number.
-use crate::{Builder, JigBindings, Role, Run, owner_chip_words::ChipPhrase as P, phrases::Hole, words::Words};
+use crate::ui::{Builder, Role, Run};
+use crate::{JigBindings, owner_chip_words::ChipPhrase as P, phrases::Hole, words::Words};
+
 use jig_domain_client::{
     Domain, Limits,
     contract::{
@@ -94,25 +96,25 @@ pub(crate) fn result_nodes(value: &ResultValue, limits: &Limits) -> Option<u32> 
             {
                 return None;
             }
-            crate::markdown::max_nodes(limits.text)?.checked_add(8)
+            crate::ui::markdown::max_nodes(limits.text)?.checked_add(8)
         }
         ResultValue::Choice { by, reason, .. } => {
             text_fits(reason, limits)?;
             if !by.name.fits(limits.text) {
                 return None;
             }
-            crate::markdown::max_nodes(limits.text)?.checked_add(8)
+            crate::ui::markdown::max_nodes(limits.text)?.checked_add(8)
         }
         ResultValue::Change { part, words, .. } => {
             text_fits(words, limits)?;
             part_fits(part, limits)?;
-            crate::markdown::max_nodes(limits.text)?
+            crate::ui::markdown::max_nodes(limits.text)?
                 .checked_add(crate::proposed_task::part_nodes(limits)?)?
                 .checked_add(4)
         }
         ResultValue::Report(words) | ResultValue::Failure(words) | ResultValue::Words(words) => {
             text_fits(words, limits)?;
-            crate::markdown::max_nodes(limits.text)?.checked_add(4)
+            crate::ui::markdown::max_nodes(limits.text)?.checked_add(4)
         }
         ResultValue::Approved { state, words } => {
             if u32::try_from(state.len()).ok()? > limits.text {
@@ -121,7 +123,7 @@ pub(crate) fn result_nodes(value: &ResultValue, limits: &Limits) -> Option<u32> 
             if let Some(words) = words {
                 text_fits(words, limits)?;
             }
-            crate::markdown::max_nodes(limits.text)?.checked_add(4)
+            crate::ui::markdown::max_nodes(limits.text)?.checked_add(4)
         }
     }
 }

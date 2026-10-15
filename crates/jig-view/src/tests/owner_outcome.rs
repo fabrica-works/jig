@@ -1,5 +1,7 @@
 use crate::phrases::{Hole, HoleKind, Invalid, Language, PhraseLimits, Phrasebook, Segment};
-use crate::{Builder, Limits, Role, Tree, owner_outcome as view, owner_outcome_words as phrases, words::Words};
+use crate::ui::{Builder, Role, Tree};
+use crate::{Limits, owner_outcome as view, owner_outcome_words as phrases, words::Words};
+
 use jig_domain_client::contract::{
     OwnerEscalationChoice, OwnerOutcome, OwnerProposalChoice, ProposalKey, Proposer, Revision, Seen,
 };

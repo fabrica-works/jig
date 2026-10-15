@@ -1,7 +1,9 @@
 //! Standalone immutable activity facts (client/domain/objects.md, 10;
 //! contract.md, 5 and 7). Archive references stay references; no decoded turn,
 //! sender name, fresh tail or run failure explanation is synthesized.
-use crate::{Builder, Role, Run, owner_activity_words::ActivityPhrase as P, phrases::Hole, words::Words};
+use crate::ui::{Builder, Role, Run};
+use crate::{owner_activity_words::ActivityPhrase as P, phrases::Hole, words::Words};
+
 use jig_domain_client::{
     Limits,
     contract::{

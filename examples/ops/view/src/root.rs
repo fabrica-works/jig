@@ -8,12 +8,14 @@ use crate::{
 };
 use jig_ops_domain_client::Domain;
 use jig_ops_domain_connectors::Connector;
-use jig_view::{Act, Builder, JigBindings, NodeId, Owner, Patch, Role, Tree};
+use jig_view::ui::{Builder, NodeId, Patch, Role, Tree};
+use jig_view::{Act, JigBindings, Owner};
+
 use skein_lib::Queue;
 /// The composed semantic tree and its owner binding tables.
 #[derive(Debug)]
 pub struct View {
-    render: jig_view::View,
+    render: jig_view::ui::View,
     words: jig_view::words::Words,
     observability_words: words::Words,
     infrastructure_words: words::Words,
@@ -44,7 +46,7 @@ impl View {
             "view capacities are checked"
         );
         Self {
-            render: jig_view::View::new(&limits.tree),
+            render: jig_view::ui::View::new(&limits.tree),
             jig: JigBindings::new(limits.tree.bindings, domain.jig.text),
             observability: Bindings::new(
                 limits.tree.bindings,

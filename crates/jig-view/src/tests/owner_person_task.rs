@@ -5,12 +5,14 @@
     reason = "ordinary proofs inspect public trees, source data and checked language selection"
 )]
 use super::cards::{CLIENT, drive, words};
+use crate::ui::{Builder, Role, State, Tree};
 use crate::{
-    Builder, JigBindings, Limits, Role, State, Tree, owner_person_task as view,
+    JigBindings, Limits, owner_person_task as view,
     owner_person_task_words::{self, PersonPhrase},
     phrases::{Invalid, PhraseLimits, Phrasebook, Segment},
     words::Words,
 };
+
 use jig_domain_client::{Domain, Event, action::Act, contract::*, fields::Purpose};
 use skein_lib::{Duration, List, Wall, bytes::copy_of};
 fn rows<T>(values: impl IntoIterator<Item = T>) -> List<T> {

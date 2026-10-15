@@ -7,8 +7,9 @@ use super::{
     cards::{CLIENT, contains, text, words},
     cards_objects::{loaded, question, render},
 };
+use crate::ui::{Builder, Tree};
 use crate::{
-    Builder, JigBindings, Limits, Tree,
+    JigBindings, Limits,
     phrases::{
         HoleKind, PhraseLimits, Phrasebook, Segment, WallFormat, english,
         jig::{JigPhrase, shapes},
@@ -108,7 +109,7 @@ fn question_sender_cards_render_exact_closed_kinds_full_widths_and_no_claim_for_
             shown
                 .nodes()
                 .iter()
-                .any(|node| node.role == crate::Role::Button && node.name.as_deref() == Some(b"Answer"))
+                .any(|node| node.role == crate::ui::Role::Button && node.name.as_deref() == Some(b"Answer"))
         );
         assert_eq!(facts(d.objects().get(id).unwrap()), Some(&value));
     }
@@ -193,7 +194,7 @@ fn question_sender_maximum_card_has_finite_bounds_and_retains_independent_older_
         let buttons = |t: &Tree| {
             t.nodes()
                 .iter()
-                .filter(|node| node.role == crate::Role::Button)
+                .filter(|node| node.role == crate::ui::Role::Button)
                 .map(|node| node.name.clone())
                 .collect::<Vec<_>>()
         };

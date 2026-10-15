@@ -1,9 +1,11 @@
 //! Typed messages preserve truncation, opaque blocks and independent usage facts.
+use crate::ui::{Builder, Role, Run};
 use crate::{
-    Builder, JigBindings, Role, Run,
+    JigBindings,
     phrases::{Hole, jig::JigPhrase},
     words::Words,
 };
+
 use jig_domain_client::{
     Domain,
     contract::{Block, Speaker, TurnName, TurnProblem, TurnRead},
@@ -43,7 +45,7 @@ pub(super) fn turn(
         words.text(b, phrase, &[]);
         for block in &message.blocks {
             match block {
-                Block::Text(text) => crate::markdown::read(text.bytes(), 2, b),
+                Block::Text(text) => crate::ui::markdown::read(text.bytes(), 2, b),
                 Block::Opaque { dialect, size } => {
                     words.text(b, JigPhrase::OpaqueDialect, &[crate::words::name(dialect.bytes())]);
                     words.text(b, JigPhrase::OpaqueBytes, &[Hole::Number(*size)]);

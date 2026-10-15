@@ -15,7 +15,8 @@ use jig_fake_person::{Face, Find, Found, TreeFace};
 use jig_ops_domain_client::{Address, infrastructure as infra, observability as obs};
 use jig_ops_domain_connectors::{Connector, number};
 use jig_scripted_engine::{Bounds, Script, Truth};
-use jig_view::{Owner, Role, Tree as ViewTree};
+use jig_view::Owner;
+use jig_view::ui::{Role, Tree as ViewTree};
 use skein_lib::{Duration, Wall};
 /// The same independent shell world used by the reference client.
 pub type ClientWorld = World<Ops, Scripted>;
