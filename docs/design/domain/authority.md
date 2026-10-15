@@ -1,6 +1,6 @@
 # Authority
 
-Provisional, 2026-10-07, revised 2026-10-12. What a task may do, and how
+Provisional, 2026-10-07, revised 2026-10-15. What a task may do, and how
 the core holds it there: authority as a value, its order and how
 delegation narrows it, where it comes from, budgets and what is spent,
 the checks every action passes, what a proposal needs and what accepting
@@ -36,14 +36,18 @@ is still open is listed in section 12.
 - **Every action is checked** before it commits: a batch, an effect, a
   read, a tool call, a run starting, a party's request, an amendment, a
   note. A check answers allow, wait, propose, or refuse.
+- **A party and an agent pass the same check.** A party's batch and an
+  agent's reach one check; only the source differs: the party's role and
+  pool, or the creating task's authority and what it has left.
 - **Requirements are verdicts.** The policy attaches requirements to
   kinds of effect; each names a connector, which judges it from its own
   facts: met, wait, or refuse. The connector making the effect need not
   be the one judging. A guarded requirement holds when the effect is
   applied; an observed one, when it is decided.
-- **Beyond its authority, a task proposes.** The nearest holder above it
-  whose authority covers what the action needs accepts and funds it, or
-  rejects it.
+- **Beyond its authority, a task or a party proposes, explicitly.** An
+  action beyond authority is refused, naming what it lacked; asked for
+  as a proposal, the nearest holder above whose authority covers what the
+  action needs accepts and funds it, or rejects it.
 - **The root is the deployment's rules and the project's policy,** as
   they stand when a decision is made. No task, and no party, loosens
   them; a narrowing reaches every task's later decisions.
@@ -66,7 +70,8 @@ authority, which the core translates.
 Its questions, each a pure function of what the core gathers:
 
 - is this authority at most that one (section 5)?
-- does this batch fit under its creator, and what do the numbers become
+- does this batch fit under its creator, a task or a party, what is a
+  budget given `AsAllowed` (section 7), and what do the numbers become
   (8.1)?
 - may this task, or this procedure, make this effect, given the verdicts
   its requirements received (8.2)? Which verdicts does it need
@@ -182,7 +187,20 @@ deployment's rules       the most any project may have; requirements on effects
   - its spend per period, from which every root task's budget is carved;
   - its roles: for each, the authority a party in it has, the spend a
     party in it may allot per period, and the kinds of proposal it may
-    decide (people.md, section 4);
+    decide, escalations among them (people.md, section 4);
+  - its escalation role, if it names one: the role whose parties hold an
+    escalation that passes every holder in its tree, and the party who
+    requested it (tasks.md, section 9). A party becomes a root's
+    requester only when their own role decides escalations or the policy
+    names this role (8.4);
+  - its overrides of the application's templates (people.md, section 7;
+    `../protocol/configuration.md`, 3.1), per template number: the
+    executor, the budget and its cap, the deadline and the default
+    priority; never the flags, the label or whether the task is tracked,
+    which are the shape's identity. A policy change whose override names
+    a template the configuration does not define is refused. The engine
+    keeps the overrides only to serve each project's merged templates in
+    `me`; no check reads them, since a template grants nothing;
   - its requirements: per kind of effect and pattern of resources, what
     an effect there needs (section 10);
   - its projections' authority: the grants its goals' projections are
@@ -196,6 +214,12 @@ deployment's rules       the most any project may have; requirements on effects
   creates a task (a chat, a goal), or accepts a proposal, funds it from
   that pool, which is itself carved from the project's spend for the
   period.
+- **Permissions stay primitive.** A role says which executors and
+  charters a party in it may create with (its delegation's kinds), how
+  deep and how much (its depth and spend), and which kinds of proposal it
+  decides; never which template. A task filled in from a template is
+  checked as any batch is (8.1), so a template grants nothing a party
+  could not create by hand.
 - **The deployment** is the requester of what configuration or a
   connector starts on a project's behalf (a recurring task, a standing
   watch), with the authority the project's policy gives such tasks,
@@ -229,6 +253,24 @@ deployment's rules       the most any project may have; requirements on effects
   pool, or a project's period. A batch reserves each delegate's budget
   from its creator in the commit that makes it; an accepted proposal
   reserves from its accepter.
+- **`AsAllowed`.** A batch may give a task's budget as `AsAllowed`: as
+  much as fits under its creator when the batch is admitted. This child
+  resolves it as it checks the batch (8.1), since what a pool has left is
+  a live number no client can read without racing:
+  - *for a party,* what their pool has left, capped by their role's
+    spend;
+  - *for a task,* what it has left;
+  - *never more* than the cap the batch names with it, if it names one.
+
+  At most one task of a batch gives `AsAllowed`, so what is left is never
+  shared out by order: a batch where two do is refused as not well
+  formed (tasks.md, section 4). It is resolved after the batch's named
+  amounts are counted, from what they leave. The answer says what was
+  given, and the task keeps that amount, as it would one given by hand.
+  One that would give nothing is refused as lacking budget, saying what
+  is left. A proposal names amounts, since what it needs is known before
+  anyone covers it: a proposed batch giving `AsAllowed` is refused as
+  not well formed (section 9).
 - **When a task ends,** in the commit that ends it, its reservation is
   released: its unspent budget goes back to its funder, and what it and
   the tasks it funded spent is added to its funder's "spent by ended
@@ -325,7 +367,18 @@ under its creator (section 5), the creator's delegation allows each
 task's executor kind and charter, and the batch's tasks, depth, budgets
 and deadlines are within what its creator has left. Beyond any of these,
 the answer is propose; beyond the project's ceiling, refuse. Allowed, the
-answer gives the creator's numbers after the reservations.
+answer gives the creator's numbers after the reservations, and what the
+budget given `AsAllowed`, if any, resolved to (section 7).
+
+- **One check for every creator.** An agent's `delegate`, a procedure's
+  step, a party's `Create` and an accepted proposal's batch reach this
+  check alike. Only the source differs: a task's authority and what it
+  has left; or a party's role's authority and what their pool has left
+  (8.4); or, for an acceptance, the accepter's (section 9).
+- **Propose is an answer, not a proposal.** A batch answered propose is
+  refused, naming what it lacked and whether a proposal could be
+  accepted, and by whom; it becomes a proposal only when its creator asks
+  for one (section 9).
 
 ### 8.2 Effects
 
@@ -383,15 +436,38 @@ naming why (tasks.md, 5.5).
 
 Before a party's request is acted on (people.md, section 5): their role
 in the project allows the request and, for what gives authority (a task
-created, a budget allotted, a proposal accepted), what it gives fits
-under their role's authority and what their pool has left.
+created, a budget allotted, a proposal accepted, an amendment that
+widens), what it gives fits under their role's authority and what their
+pool has left.
+
+- **A party's batch is 8.1's,** with the party as its creator: their
+  role's authority in place of a task's, fitted as a delegate fits under
+  its creator (section 5), its delegation's kinds naming the executors
+  and charters they may create with, and what their pool has left in
+  place of what a task has left. A budget given `AsAllowed` is resolved
+  here, against their pool and capped by their role's spend
+  (section 7).
+- **A party's root has someone to escalate to.** Every task of a party's
+  batch is a root they request. It is admitted only when its escalations
+  have a holder: the party's role decides escalations, or the project's
+  policy names an escalation role (section 6). Otherwise the request is
+  refused, saying so, whatever authority the batch fits within; the same
+  holds when a party moves a task to themselves, or accepts a proposal
+  whose tasks are to be theirs (people.md, 5.1).
+- **A compound request** is checked operation by operation, in order,
+  each against the numbers those before it leave, with one pool counted
+  across them; the first that is not allowed refuses the whole
+  (people.md, 5.1).
 
 ### 8.5 Tool calls and reads
 
 Before an agent's call is served: its family is among the task's tools,
 and a read it makes is covered by a read grant on the resource it names.
-A message to a task needs a reference to it (tasks.md, 8.5); a note
-needs its scope.
+A subscription to a connector's topic is checked as a read: `subscribe`
+among the task's tools, and a read grant covering the resources the
+connector says the topic concerns (connectors.md, 5.3; hosts.md,
+section 8). A message to a task needs a reference to it (tasks.md, 8.5);
+a note needs its scope.
 
 ## 9. Proposals
 
@@ -403,7 +479,22 @@ proposals wait and how they move is tasks.md, section 9.
   own authority (more budget, more depth, another grant, a later
   deadline); an amendment beyond the amender's authority. Never what the
   project's policy or the deployment's rules refuse, nor an effect a
-  requirement refused.
+  requirement refused. A party proposes a batch or an amendment, a
+  widening of a task's authority among them: a party makes no effect,
+  and their own authority is their role, which the policy sets
+  (people.md, 5.1).
+- **Proposing is explicit,** for tasks and parties alike. An action
+  beyond authority is refused, naming what it lacked and whether a
+  proposal could be accepted, and by whom; it is proposed only when its
+  proposer asks: a run's `propose` call, a procedure's step that
+  proposes, a party's `Propose` (engine.md, 7.3; people.md, 5.1). Nothing
+  becomes a proposal by itself, so nobody is asked by accident, but a
+  result's follow-ups beyond its task's authority, which its verdict's
+  contract allows, and which become one proposal as the result commits
+  (tasks.md, 5.6).
+- **The proposer is whoever asked:** the task, or the party, never the
+  task an amendment would change, so its decision, a rejection
+  included, reaches the one who asked.
 - **What it needs** is the least authority the action takes: for a
   batch, every tool, grant, kind and scope its tasks have, the sum of
   their tasks and budgets, their depth, their latest deadline; for an
@@ -492,9 +583,13 @@ standing allotments renewed across periods with delegates live; every
 check's answer over generated verdicts, freshness and prices, and a
 run's budget against its reserve and its main model's most costly
 completion, the strictest always winning; effective authority as policy
-narrows and widens around live tasks. The core's world exercises it in
-place (engine.md, section 15), whose referee holds the first promise of
-core.md, section 11.
+narrows and widens around live tasks; one batch checked under a task and
+under a party with the same authority and numbers left, answering alike;
+`AsAllowed` resolved over generated pools, roles and caps, never above
+any of them, after a batch's named amounts; a party's root refused
+whenever its escalations have no holder. The core's world exercises it
+in place (engine.md, section 15), whose referee holds the first promise
+of core.md, section 11.
 
 ## 12. Open questions
 

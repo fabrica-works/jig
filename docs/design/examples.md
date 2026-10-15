@@ -9,8 +9,8 @@ tested and to be copied.
   (`README.md`, 6.7).
 - Its domain is the subject of jig's conformance world (`README.md`,
   6.6).
-- As jig's second application, it is what keeps jig's vocabulary from
-  being temper's in disguise.
+- As a second application, it is what keeps jig's vocabulary from
+  being one application's in disguise.
 
 What is still open is listed in section 11.
 
@@ -21,25 +21,29 @@ What is still open is listed in section 11.
     incidents.
   - Procedures restart, scale and provision.
   - People approve what is risky, and ask for environments in a chat.
-- **Chosen for what it shares with temper, which is nothing:**
-  - no forge, no code, no workspaces;
-  - two connectors where temper has one;
-  - a stream of events, mostly noise, where temper gets occasional
-    hints;
-  - effects on shared and scarce resources that cost money, where
-    temper's are on objects it owns;
-  - agents inside the engine, where temper's are on workers.
+- **Chosen for what it shares with an application that writes code,
+  which is nothing:**
+  - no code, no workspaces;
+  - two connectors where such an application may have one;
+  - a stream of events, mostly noise, where it gets occasional hints;
+  - effects on shared and scarce resources that cost money, where its
+    effects are on objects it owns;
+  - agents inside the engine, where its agents are on workers.
 - **Two connectors:**
   - **observability:** services' logs, metrics and alerts;
   - **infrastructure:** services, environments and quotas.
 - **Agents run inside the engine** (`README.md`, section 9, the second
   shape). Their tools are reads, so `ops` has no worker. One story has no
   agent at all (the first shape).
+- **Its client is jig's reference UI on `jig-client`,** with two
+  families of its own, incidents and environments, and its server
+  mounts jig's clients' component with jig's default HTTP mapping
+  (section 8).
 - **Its systems are fakes** first: one fake production that both
   connectors see. A real backend comes later, and may be the local
   machine's own services.
 - **It stays an example.** It is small, its systems are fakes, and no
-  application imports it. temper may one day drive production too, with
+  application imports it. An application that drives production writes
   connectors of its own.
 
 ## 2. Layout
@@ -48,16 +52,19 @@ What is still open is listed in section 11.
 examples/ops/domain                   jig-ops-domain                   the engine's root: the core and two connectors, routed
 examples/ops/domain-observability     jig-ops-domain-observability     the observability connector
 examples/ops/domain-infrastructure    jig-ops-domain-infrastructure    the infrastructure connector
-examples/ops/domain-client            jig-ops-domain-client            the client's root: jig's client domain, incidents, environments
-examples/ops/view                     jig-ops-view                     the view root: jig's view, and incidents' and environments'
+examples/ops/domain-connectors        jig-ops-domain-connectors        its connectors' numbers, which the engine's root and its client share
+examples/ops/client-domain            jig-ops-client-domain            its client's domain: jig-client held, with incidents and environments on it
+examples/ops/client-protocol-wire     jig-ops-client-protocol-wire     its families' wire records, for both ends, from schemas
+examples/ops/client-view              jig-ops-client-view              its presentation: the reference UI, with incidents' and environments' views
 testing/jig-ops-fake-production       jig-ops-fake-production          the fake production: services, quotas, logs, metrics
 tests/ops                             jig-ops-world                    its worlds, on jig's conformance world
 ```
 
-The client's crates come with the building of jig's client
-(`client/domain/`); the protocol layers, `iterate` and `main` with a real
-backend (section 9). Until then `ops` is its domains and its worlds, as
-an application is before its protocol layer (`README.md`, section 11).
+Its service, `jig-ops-service`, with its server, its binary, `jig-ops`,
+and its browser shell, `jig-ops-client-shell-web`, come with `ops`
+standalone (9.1). Until then `ops` is its domains, its client and its
+worlds, as an application is before its protocol layer (`README.md`,
+section 11).
 
 ## 3. Its connectors
 
@@ -306,54 +313,79 @@ Q, a developer
 
 ## 8. Its client
 
-Its client root is the reference client root (`client/domain/root.md`,
-section 12):
+`ops` holds one `jig-client` and presents it with jig's reference UI
+(`README.md`, section 10). With jig's test application, it is how jig
+shows that the API is enough for a whole application: everything `ops`
+shows, it reads through the public client.
 
-- **jig's pages,** for tasks, conversations, proposals and a person's
-  inbox, with the inbox as home, plus two families of its own:
+- **Its client crates,** written to be copied, as its root is:
+  - `jig-ops-client-domain`, its client's domain: `jig_client::Client`,
+    held as a component (`client/domain/client.md`), and its two
+    families on it, incidents and environments, with their documents and
+    their requests, which ride the same client and the same request table
+    as bytes under their owners' numbers;
+  - `jig-ops-client-protocol-wire`, its families' wire, which its client
+    and its engine both read: incidents, alerts, environments and
+    panels, and environments' requests and their outcomes
+    (`protocol/client.md`, section 11);
+  - `jig-ops-client-view`, its presentation: the reference UI,
+    `jig-client-view`, with its families' pages, cards and parts, on
+    skein's UI kit (`client/domain/view.md`).
+- **Its owners:** its two connectors' client sides, numbered as its
+  connectors are, in `jig-ops-domain-connectors`, which its engine's
+  root and its client share (`client/domain/root.md`, section 15).
+- **The reference UI's pages,** for tasks, conversations, proposals and
+  a person's inbox, with the inbox as home, and two families of its own:
   - incidents: their state, their timeline, the service's health, and
     their lead, the task observability recorded for it (7.1), shown by
-    jig's own documents: its chip, its report and its proposals as jig's
-    cards, and its plan as jig's plan section, in a section slot
-    (`client/domain/root.md`, section 7); an incident with no lead yet
-    says so;
+    jig's own documents: its chip, its report and its proposals as the
+    reference UI's cards, and its plan as the reference UI's plan
+    section, in a section slot (`client/domain/pages.md`, section 9); an
+    incident with no lead yet says so;
   - environments: their pool, their cost, their end, and a request to
     move the end, keyed like jig's.
-- **Its arrangement:** jig's frame and jig's default arrangement of
-  every page but a task's, which shows every section together, the
-  address's own marked current: its view root builds the main from the
-  task's header and its overview, activity, plan and history, and puts
-  its budget and its connectors' panels in an aside
-  (`client/domain/pages.md`, 12.3).
-- **Its owners:** its two connectors' client sides, numbered as its
-  connectors are, in `jig-ops-domain-connectors`, which both its roots
-  share (`client/domain/root.md`, section 15).
-- **Its parts in jig's slots:** infrastructure's panels for remediate and
-  provision tasks, its words for a proposed restart, its account of
-  drift ("deleted by hand"); both connectors' resources and kinds in
-  words (`client/domain/root.md`, section 6).
+- **Its arrangement:** the reference UI's frame, and its default
+  arrangement of every page but a task's, which shows every section
+  together, the address's own marked current: `ops`'s presentation
+  builds the main from the task's header and its overview, activity,
+  plan and history, and puts its budget and its connectors' panels in an
+  aside (`client/domain/pages.md`, 12.3).
+- **Its parts in the reference UI's slots:** infrastructure's panels for
+  remediate and provision tasks, its words for a proposed restart, its
+  account of drift ("deleted by hand"); both connectors' resources and
+  kinds in words (`client/domain/pages.md`, section 9).
 - **Its drawing:** an incident's error rate, on the incident's page, a
   drawing of observability's with its fallback in words. Its drawing
-  code, in `jig-ops-view`, draws it as a scene (skein's `ui.md`, section
-  11; `client/domain/view.md`, section 17), tested by golden scenes.
+  code, in `jig-ops-client-view`, draws it as a scene (skein's `ui.md`,
+  section 11; `client/domain/view.md`, section 17), tested by golden
+  scenes.
 - **A person in the worlds** is skein's fake person, reading the tree:
   P accepting a restart from an incident's page
   (`client/domain/pages.md`, section 10); Q asking for an environment in
   a chat, and accepting what it costs.
-- **Its terminal client:** skein's text shell, with jig's settings, in
-  front of its client and view roots (skein's `ui-text.md`;
-  `client/domain/view.md`, section 15). Its client world plays it
-  (`client/domain/testing.md`, section 4): P accepts the restart from
-  the incident's page, typing the numbers the page printed. Its loop
-  over a real terminal comes with `ops` standalone (9.1), which gives it
-  an engine to reach.
-- **Its browser client:** its browser shell, `jig-ops-shell-web`, copied
-  from jig's reference shell: its start and its loop over skein's
-  browser parts, jig's and its client host, which takes jig's default
-  codec for jig's places at the root and parses and prints incidents'
-  and environments' paths with its own (`protocol/browser.md`, sections
-  3 and 9). It comes with `ops` standalone too (9.1), whose startup
-  gives its engine the bundle to serve.
+- **Its server** is `ops`'s, in its service (9.1): it owns the clients'
+  listener and the URL space, and mounts jig's clients' component under
+  `/jig` with jig's default HTTP mapping as it is, its example guards
+  included (`protocol/browser.md`). People sign in by the printed link;
+  `ops` has no sign-in of its own.
+- **Its terminal** is a presentation of the same client, on skein's text
+  shell, with jig's settings: its client and its presentation, printed
+  by `skein-ui-text` (skein's `ui-text.md`; `client/domain/view.md`,
+  section 15), over the native shell, `jig-client-shell-native`, and
+  the default mapping's client end, holding its credential as a bearer
+  token. Its client world plays it (`client/domain/testing.md`, section
+  4): P accepts the restart from the incident's page, typing the numbers
+  the page printed. Its loop over a real terminal comes with `ops`
+  standalone (9.1), which gives it an engine to reach.
+- **Its browser:** its browser shell, `jig-ops-client-shell-web`, copied
+  from jig's test application's, `jig-client-test-shell-web`: its start
+  and its loop over skein's browser parts and the reference UI's,
+  `jig-client-shell-web`, with the default mapping's client end over
+  fetch and the credential in the cookie its server sets. Its paths are
+  its own: the reference UI's places at the root, by the reference UI's
+  codec, and incidents' and environments' by its own
+  (`protocol/browser.md`, sections 3 and 9). It comes with `ops`
+  standalone too (9.1), whose server serves its page and bundle.
 
 ## 9. Its systems
 
@@ -406,6 +438,19 @@ section 12):
   own, `jig-ops-production`, on loopback beside `jig-ops` when `ops` runs
   standalone. `ops`'s systems are outside its process, as any
   application's are.
+- **Its server,** in `jig-ops-service`, on a loopback address: the
+  clients' listener and its URL space are `ops`'s
+  (`protocol/service.md`, section 7). It mounts jig's clients' component
+  under `/jig`, with jig's default HTTP mapping and its example guards
+  as they are, and serves its browser's page and bundle at its other
+  paths, under the page's policy the reference UI's browser shell gives
+  as an example (`protocol/browser.md`, section 12). Its startup prints
+  the printed link's URL, `/jig/v1/sign-in/link?secret=…` on that
+  address, by which a person signs in, in a browser or at its terminal
+  (section 8). A browser's `GET` of it spends nothing: `ops`'s server
+  answers it with its page, with `Referrer-Policy: no-referrer`, and its
+  browser shell `POST`s the secret, as its terminal does
+  (`protocol/client.md`, 17.1; `protocol/browser.md`, section 11).
 
 ## 10. Its worlds
 

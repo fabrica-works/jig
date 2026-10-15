@@ -1,13 +1,14 @@
 # Tasks
 
-Provisional, 2026-10-07, revised 2026-10-12. The core's tasks: what a
+Provisional, 2026-10-07, revised 2026-10-15. The core's tasks: what a
 task is, how tasks are made, how each moves from asked to ended, the
 resources it holds, what it hears and when it wakes, and how proposals
 and escalations travel the tree. It is the first primitive of core.md
 (3.1) in depth, and the hub of the core (engine.md, section 3).
 Authority, which every action here is checked against, is authority.md;
 what an agent's run is, engine.md, section 7; a connector's procedures,
-connectors.md, section 6. What is still open is listed in section 13.
+connectors.md, section 6; what a party asks, people.md, section 5. What
+is still open is listed in section 13.
 
 ## 1. In one page
 
@@ -20,6 +21,13 @@ connectors.md, section 6. What is still open is listed in section 13.
 - **Batches, whole or not at all.** Tasks are made in batches, checked
   whole (no cycles, within the limits, within the creator's authority as
   authority.md answers) and committed at once.
+- **Parties and agents ask alike.** A party's request and an agent's tool
+  make the same batches, amendments, cancels and proposals, against the
+  same checks; only the source of their authority differs. Nothing
+  beyond authority becomes a proposal unasked (section 9).
+- **Several operations, one decision.** A party's compound request
+  cancels, moves, amends, releases, messages and stops in one decision,
+  all or none (section 7).
 - **One lifecycle for every executor** (programming-model.md, 5.2): a
   task waits on its dependencies and its holds, is active while its
   executor works, closes (its run ended, its delegates closed, its
@@ -108,9 +116,41 @@ it is live:
 - **Its authority** (authority.md, section 3), and the numbers kept
   against it: spent by itself, spent by the ended tasks it funded,
   reserved for the live tasks it funds, and who funded its own budget.
+  Its budget is an amount, whether its creator gave one or `AsAllowed`
+  (section 4).
 - **Its wake policy** (8.3) and **its subscriptions** (8.4).
 - **Whether it is tracked,** and its priority if so: a goal (core.md,
-  6.2).
+  6.2). The engine acts on the mark: it orders the queues of write holds
+  by it (6.2), subscribes the goal to its connectors' goals' topics
+  (8.4), has it projected (connectors.md, section 8), and gives it a
+  scope for notes (engine.md, section 10).
+- **Its label:** an opaque 32-bit number the application gives, through
+  a template or by hand (core.md, 7.3). jig gives it no meaning, and no
+  rule of the engine's keys on it: task queries filter on it, and the
+  indexes of ended tasks are keyed by it (`../protocol/store.md`, 4.4).
+- **Its flags,** each with the engine's semantics:
+  - *conversation:* its turns are entries for its requester, while that
+    requester is a party, with their read position and an unread count
+    (people.md, section 6). Only an agent's run has turns, so the flag is
+    refused on any other executor (section 4);
+  - *listed:* once ended, it is indexed by its project and its label, so
+    its project's lists find it. Every ended task a party requested is
+    indexed by that party and its label, listed or not
+    (`../protocol/store.md`, 4.4);
+  - *its retention class:* *kept*, to the deployment's retention horizon
+    (`../protocol/store.md`, 11.1), and for good while retention waits for
+    a deployment whose store nears its budget; or *forgotten once read*:
+    once it has ended, its requester, a party, has read its turns and its
+    result, and no live task names it, it is erased in one decision with
+    its read position (people.md, section 6). A task whose requester is
+    not a party is kept, whatever its class: no party reads it.
+
+  The label and the flags are what a task is made as: no amendment
+  changes them (section 7).
+- **Its times:** when it is made, when it last changed, when it ended,
+  and its **last activity**: when it last heard words, its run last
+  committed a turn, or one of its delegates last ended, and until then
+  when it is made. Task queries order by them (engine.md, section 11).
 - **Its holds:** the resources it writes and holds alone, or the pool
   slots it holds; or, while it waits for them, its place in their queues
   (section 6).
@@ -128,37 +168,78 @@ that ended is named by a live one (a dependency's result not yet read,
 an input, a reference), the core keeps a stub of it: its number, its
 phase, and where its result is.
 
+What a task **waits on** is not kept: the engine computes it when a
+document shows the task, since only the engine holds the tree and the
+inbox together (engine.md, section 11). It is a party, and who, for a
+question, a proposal, an escalation or a person task in its tree; its
+delegates; news; or nothing.
+
 ## 4. Batches
 
 A batch is what one decision makes: one task or many, with the
 dependencies among them.
 
 - **Made by** an agent's `delegate` tool, a procedure's step, a party's
-  request, an accepted proposal, or a recurring task at a period. Its
-  tasks' requester is the task or the party that made it, or the
-  accepter of the proposal that asked for them to be its (section 9).
+  `Create` (people.md, 5.1), an accepted proposal, or a recurring task at
+  a period. Its tasks' requester is the task or the party that made it,
+  or the accepter of the proposal that asked for them to be its
+  (section 9).
+- **A party's batch is an agent's.** Each task names the same things,
+  whoever creates it: its executor, spec, result contract, authority,
+  budget, deadline, wake policy, dependencies and inputs, the resources
+  it will write, whether it is tracked and its priority, its label and
+  its flags (section 3). Both pass the same checks; only the source of
+  the creator's authority differs: a task's authority and what it has
+  left, or a party's role and pool (authority.md, 8.1 and 8.4).
+- **A party's root has someone to escalate to.** Every task a party
+  requests is the root of a tree, whose escalations wait for that party
+  or past them (section 9). So a party becomes the requester of a task
+  (by their batch, by accepting a proposal whose tasks are to be theirs,
+  or by moving a task to themselves, section 7) only while their
+  escalations have a holder: their role decides escalations, or the
+  project's policy names a role that does. Otherwise the request is
+  refused, saying so (people.md, 5.1), as a proposal nobody may accept is
+  (section 9).
 - **Dependencies** name tasks in the same batch, or live tasks the
-  creator references: its own delegates, or a task it was introduced to
-  (8.5). A task's dependencies are never added to once it is made
-  (section 7). Admission checks the new edges with the existing
-  dependencies and delegation waits, so that no reference makes a new
-  task depend on an ancestor, or joins two subtrees into a wait cycle. A
-  result of a task that has ended reaches a new task as one of its
-  inputs, not as a dependency.
+  creator reaches: for a task, its own delegates, or a task it is
+  introduced to (8.5); for a party, a task in their tree, or any task of
+  the project for a maintainer (people.md, 5.1). A task's dependencies
+  are never added to once it is made (section 7). Admission checks the
+  new edges with the existing dependencies and delegation waits, so that
+  no reference makes a new task depend on an ancestor, or joins two
+  subtrees into a wait cycle. A result of a task that has ended reaches
+  a new task as one of its inputs, not as a dependency, within the same
+  reach.
+- **A budget as `AsAllowed`.** A creator gives each task's budget as an
+  amount, or as `AsAllowed`: as much as fits under the creator at
+  admission, within the cap the batch gives with it, if any. For a party,
+  that is what their pool has left, capped by their role's spend; for a
+  task, what it has left. At most one task of a batch gives it, resolved
+  after the batch's named amounts are counted, from what they leave; one
+  that would give nothing is refused as lacking budget. The authority
+  child resolves it as it checks the batch (authority.md, section 7, and
+  8.1), the task keeps the amount, as it would one given by hand, and the
+  batch's answer names it. A proposal names amounts, since an accepter
+  funds what it is shown (section 9).
 - **Checked whole,** before anything of it exists:
   - every task well formed: a known executor kind, a charter or
     procedure the deployment has, a result contract its executor can
-    produce, its spec within its limits;
+    produce, its spec within its limits, the conversation flag on an
+    agent's task only;
+  - at most one task giving `AsAllowed`;
   - no cycle;
   - within the limits: live tasks in the deployment, tasks in the tree,
-    depth below its root, delegates of the creator (section 11);
+    depth below its root, delegates of the creator, goals in its project
+    (section 11);
   - within authority: each task's authority fits what the creator has
-    left, its budgets carved from what it has left (authority.md, 8.1).
+    left, its budgets carved from what it has left (authority.md, 8.1),
+    or, for a party, fits their role and their pool (authority.md, 8.4).
 
   A batch that fails a check other than authority is refused, saying
   which task and why, and nothing of it is made. One that fails only on
-  authority is refused naming what it lacked, and its creator may
-  propose it instead (section 9).
+  authority is refused naming what it lacked, and whether a proposal
+  could be accepted; its creator may propose it instead (section 9). It
+  never becomes a proposal on its own, a party's no more than a run's.
 - **Made at once.** Its tasks, their dependencies, the creator's carved
   budgets and the holds handed down commit together; its tasks with
   nothing left to wait for become active in the same commit.
@@ -355,9 +436,10 @@ which may amend, cancel or re-address it.
   whether a hold that is taken refuses or waits. A batch whose task needs
   a hold that refuses is refused, naming the holder. A task whose hold
   waits is made, and waits in the resource's queue.
-- **Queues are ordered** by the priority of the goal each task serves,
-  then by when it began to wait, and bounded per resource. A task waiting
-  past its bound is held (5.5), and its requester hears why.
+- **Queues are ordered** by the priority of the goal each task serves
+  (core.md, 6.2), then by when it began to wait, and bounded per
+  resource. A task waiting past its bound is held (5.5), and its
+  requester hears why.
 - **Freed holds go to the queue** in the commit that frees them: the
   first waiter whose every hold is now free takes them all and becomes
   active. A pool slot is free only while the pool has fewer holders than
@@ -414,15 +496,32 @@ tasks holding it: a quota cut, a machine gone.
 
 - **Who may:** a task's requester, and any task above it in the tree; a
   party whose role in the project allows it; and whoever an escalation of
-  it reached (section 9). Nobody else.
+  it reached (section 9). Nobody else. A party's request, an agent's tool
+  and a procedure's step reach the same rules (people.md, 5.1;
+  engine.md, 7.3; connectors.md, 6.3).
 - **What an amendment may change:** the spec and its parameters; the wake
   policy; the dependencies of a task still waiting, by removing some,
   never adding; the authority, narrowed freely and widened only within
-  the amender's own (beyond it, a proposal); an agent task's
-  instructions; a procedure's parameters, which go to its connector; a
-  person task's address, to another party or role, naming the person
-  task's revision as an amendment names the spec's, a party who took it
-  holding it no more. An amendment is refused once a task is closing.
+  the amender's own (beyond it, refused, and proposed if the amender asks:
+  section 9); an agent task's instructions; a procedure's parameters,
+  which go to its connector; a person task's address, to another party
+  or role, naming the person task's revision as an amendment names the
+  spec's, a party who took it holding it no more; whether it is tracked,
+  within goals per project (section 11), and its priority. An amendment
+  is refused once a task is closing. Its label and its flags are never
+  amended (section 3).
+- **Tracking and untracking.** A task an amendment tracks is a goal from
+  that commit, with all a goal has (core.md, 6.2). One it untracks is no
+  goal from that commit: the core ends its goals' topics, and its
+  projections write their last, as when a goal closes (connectors.md,
+  section 8).
+- **A decision names what it saw.** An amendment names its task's spec's
+  revision, and a release its hold's (5.5), whoever makes it: a party,
+  as their client showed it (`../client/domain/contract.md`, 5.2); a
+  run, as it last read it (engine.md, 7.3). One whose revision has moved
+  is refused as moved, saying what it is. A priority moves no revision,
+  and an amendment of the priority alone names none: the first commit
+  decides (people.md, 5.1). A cancel, a move and a stop name none.
 - **Instructions are replaced whole.** An agent task runs with its
   charter's instructions until an amendment gives it its own. An
   amendment's instructions replace the task's whole instructions, and
@@ -442,11 +541,39 @@ tasks holding it: a quota cut, a machine gone.
   counts; a task waiting for holds leaves their queues. Each task ends
   once its own closing is done, deepest first, and its requester hears
   that it ended cancelled, with what it had done.
+- **Cancelling with a grace.** A cancel may give a grace, within the
+  longest the tasks child allows (section 11), so that a task finishes
+  what it can before it is cut off: a conversation closed by its person,
+  a run asked to report what it has. The task hears that it is asked to
+  finish, as it hears an amendment (8.1): an agent's run is woken by it,
+  and a procedure's connector and a person task's holder hear it as they
+  hear an amendment. It is cancelled, as above and with the cancel's
+  reason, when the grace ends, unless it ended first. The grace's end is
+  kept with the task, on a timer of the tasks child's, so a restart
+  keeps it. A task that cannot finish on its own, waiting or held, is
+  cancelled at once. A cancel made during a grace ends the task no later
+  than that grace would: one without a grace cancels it at once.
 - **Moving a task.** A party may make themselves the requester of a live
   task they may amend, so that it outlives the task that asked for it, as
   a goal outlives the chat it came from. Its reservation moves to their
   funding (authority.md, section 7); the task that asked for it keeps a
-  reference to it.
+  reference to it, and does not wait for it as for a delegate. It
+  becomes the root of a tree of the party's, so a move needs their
+  escalations to have a holder, as their batch does (section 4).
+- **Several operations, one decision.** A party's compound request
+  (people.md, 5.1) holds a list of operations on one project's tasks:
+  cancels, with a grace or not; moves; amendments, priority included;
+  releases; messages; stops. They are admitted in order, each checked as
+  it would be alone against the state those before it leave, with one
+  pool counted across them (a move's reservation and the rest), and
+  committed in one decision: all are made, or none is, and the refusal
+  names the first that failed, and why. Each names its revision where it
+  would alone. So a conversation is closed in one decision, each of its
+  live delegates cancelled or moved to its party, then itself cancelled
+  with a grace; a project's goals are reordered at once; a held task is
+  amended and released. Creating, proposing, deciding and answering are
+  requests of their own. Its operations are bounded by the people
+  child's operations per request (section 11).
 
 ## 8. Messages
 
@@ -458,7 +585,7 @@ tasks holding it: a quota cut, a machine gone.
 | a question, expecting an answer | a delegate | yes |
 | an answer | its requester | yes |
 | a decision on its own proposal | the holder that decided | yes |
-| an amendment | its requester, a task above it, or a party | yes |
+| an amendment; a cancel's grace, asking it to finish (section 7) | its requester, a task above it, or a party | yes |
 | a cancel | the same | always |
 | words | a party; a task holding a reference to it | a party's, yes; a task's, by policy |
 | news: a connector's event, classified | its subscriptions (8.4) | by policy |
@@ -479,7 +606,8 @@ are entries of its own (section 9), which always wake it.
   kind of message is admitted in one of three ways:
   - *room kept:* one result from each live delegate, one answer to each
     open question it asked, one decision on each of its pending
-    proposals, and a cancel, so none of them can be refused;
+    proposals, and a cancel, its grace's ask to finish taking the same
+    room, so none of them can be refused;
   - *merged:* news of one subscription with the news of it already
     waiting, since news is a hint to read afresh; notices likewise; a new
     amendment with one still waiting; timers;
@@ -568,15 +696,29 @@ connectors offer for goals are the core's to keep, not its executor's
 
 ## 9. Proposals and escalations
 
-A proposal is an action a task may not take alone, waiting for a holder
-of the authority it needs; an escalation is a held task waiting for a
-decision. authority.md, section 9 says what may be proposed, what an
-action needs, and what an acceptance funds.
+A proposal is an action a task or a party may not take alone, waiting
+for a holder of the authority it needs; an escalation is a held task
+waiting for a decision. authority.md, section 9 says what may be
+proposed, what an action needs, and what an acceptance funds.
 
-- **Their state.** A proposal: its proposer, a task or a party asking
-  for a goal beyond their allotment (people.md, 5.1); the action, as the
-  tool, the step or the request asked for it (a batch, an effect, an
-  amendment, a widening of its own authority); its reason, in words;
+- **Proposing is asked for.** Nothing becomes a proposal on its own: a
+  batch or an amendment beyond its maker's authority is refused, naming
+  what it lacked and whether a proposal could be accepted (section 4),
+  and its maker proposes it, with reasons: a run with its `propose`
+  call (engine.md, 7.3), a procedure in its step (connectors.md, 6.3), a
+  party with a `Propose` request (people.md, 5.1). So a person is never
+  asked by accident, by a program or by their own client. The one
+  exception is a result's follow-ups beyond its task's authority, which
+  its verdict's contract allows, and which become one proposal as the
+  result commits (5.6).
+- **What each may propose.** A task proposes any action: a batch, an
+  amendment, an effect, or a widening of its own authority. A party
+  proposes a batch or an amendment: a party makes no effect, and their
+  authority is their role's, which the project's owners change
+  (people.md, 5.2).
+- **Their state.** A proposal: its proposer, a task or a party; the
+  action, as the call, the step or the request asked for it; its reason,
+  in words;
   whether the tasks it makes are to be the accepter's; where it waits;
   and pending, accepted, rejected or withdrawn. An effect's own
   description stays with its connector, under the proposal's number
@@ -584,7 +726,7 @@ action needs, and what an acceptance funds.
   one per held task, never more. Both are kept in the store, and pending
   ones in this child domain.
 - **Admitted once.** A proposal is admitted at its entrance, the
-  `propose` call, the step or the party's request that asks, against the
+  `propose` call, the step or the party's `Propose` that asks, against the
   pending proposals allowed per proposer and in the deployment, and
   refused there if they are full; an escalation needs no room beyond its
   held task. Neither takes room in any inbox: each shows as an entry in
@@ -620,19 +762,24 @@ action needs, and what an acceptance funds.
   to the next holder that covers it. An accepted proposal is made as the
   proposer's action, with the accepter's authority funding what it
   needs, in the commit that accepts it; the tasks it makes are the
-  proposer's delegates, or, when the proposal asked, the accepter's (a
-  chat proposing a goal asks so). A rejection is a message to the
-  proposer. A party who does not cover a proposal may reject it or pass
-  it up, never accept it. At the parties the policy names there is no one
-  further: they accept or reject, and the proposal waits for them,
-  however long. Passing a proposal up where nobody further may accept it
-  is refused, saying there is no one further.
+  proposer's (a task's delegates, a party's roots), or, when the proposal
+  asked, the accepter's (a chat proposing a goal asks so). A rejection is
+  a message to the proposer: a task hears it in its inbox, and a party
+  finds it in theirs (people.md, section 6). A party's proposal to amend
+  a task is the party's, not that task's. A party who does not cover a
+  proposal may reject it or pass it up, never accept it. At the parties
+  the policy names there is no one further: they accept or reject, and
+  the proposal waits for them, however long. Passing a proposal up where
+  nobody further may accept it is refused, saying there is no one
+  further.
 - **Stalled** past its bound, undecided, a proposal or an escalation
   passes up to the next holder that covers it, and past the last, waits
   for the parties the policy names.
-- **Withdrawn** when the proposer withdraws it, closes, or when the state
-  it was made against has changed so that it no longer applies (a batch
-  naming a task since ended); an escalation ends with its hold. The
+- **Withdrawn** when the proposer withdraws it (a run's call, a
+  procedure's step, a party's `Withdraw`), when a proposing task closes,
+  or when the state it was made against has changed so that it no longer
+  applies (a batch naming a task since ended); an escalation ends with
+  its hold. The
   proposal a task's result made is the exception: its closing waits for
   it to be decided (5.6), and only a cancel of the task withdraws it.
 
@@ -662,6 +809,9 @@ worst case (engine.md, section 13):
 
 - live tasks in the deployment, and per project, and the stubs of ended
   ones;
+- goals per project: the live tracked tasks in one project, refused at
+  the entrance like live tasks per project, whether a batch, an
+  amendment or an accepted proposal tracks them;
 - tasks per tree, and the depth of a tree;
 - delegates per task, and batch size;
 - a spec's and a result's bytes, and inputs per task;
@@ -673,10 +823,20 @@ worst case (engine.md, section 13):
   task;
 - tries per class of failure, and their backoff;
 - the stall of a person task, of a pending proposal or escalation, and
-  of an agent task idle with delegates still live.
+  of an agent task idle with delegates still live;
+- a grace's span: the longest grace a cancel may give.
 
 A live task is never evicted: when the deployment is full, new batches
 are refused, and the creator hears why.
+
+A compound request's operations are bounded by operations per request,
+a limit of the people child's (people.md, 5.1). Configuration refuses a
+profile where it is smaller than the larger of delegates per task plus
+one and goals per project (`../protocol/configuration.md`, section 6),
+so that closing a task and all its delegates, or reordering all of a
+project's goals, fits in one request. Its decision is priced in the
+engine's worst case as that many of its costliest operation, a cancel of
+a whole tree within tasks per tree (engine.md, section 13).
 
 ## 12. The world
 
@@ -702,15 +862,40 @@ go beyond its task's authority, their proposal accepted and the
 follow-ups run before the result reaches the requester, and another
 whose proposal is rejected, its result delivered at once.
 
+Its stories of what parties and agents ask alike: a party's batch of an
+agent's task and a person task, made as an agent's would be; a party's
+batch beyond their role refused, naming what it lacked, then proposed
+and accepted; another party's proposal rejected, the rejection reaching
+that party, not a task; a party refused a root while their escalations
+have no holder, and made once the policy names one; a budget given as
+`AsAllowed` beside named amounts, resolved to what the pool has left
+after them and named in the answer, one that comes to nothing refused,
+and a batch where two tasks give it refused; an agent's amendment and a
+party's release each named with a revision that has moved, refused as
+moved; a party withdrawing their proposal; a goal tracked past goals per
+project, refused at the entrance, and one untracked, its projection's
+last write made; a conversation closed in one compound request, one
+delegate moved to its party, another cancelled, and the conversation
+cancelled with a grace in which its run finishes, ended done; another
+whose grace ends first, cancelled; one compound request refused whole
+when its third operation fails, nothing of it made; a project's goals
+reordered in one compound request, its priorities naming no revision; a
+task's last activity moving with words, a turn and a delegate's end; a
+conversation forgotten once its party has read it, and one kept.
+
 Its referee: a task starts only after its dependencies are done and its
-holds taken; batches are made whole or not at all; one run at most per
-task; a resource has one holder, and a pool admits no holder beyond the
-slots it is known to have;
+holds taken; batches are made whole or not at all, and compound requests
+too; one run at most per task; a resource has one holder, and a pool
+admits no holder beyond the slots it is known to have;
 no task holds one resource while waiting for another; every result
 reaches its requester once, after the task has closed; a cancel ends
-every task below it, deepest first; no committed message is lost, and
-none is refused once committed; every proposal and escalation waits
-where a holder can decide it; nothing beyond a task's limits is held.
+every task below it, deepest first, and one with a grace ends its task
+by the grace's end; no amendment or release is made against a revision
+that moved; nothing becomes a proposal unasked but a result's
+follow-ups; no committed message is lost, and none is refused once
+committed; every proposal and escalation waits where a holder can decide
+it; nothing beyond a task's limits is held, goals per project
+included.
 
 ## 13. Open questions
 
@@ -723,7 +908,7 @@ where a holder can decide it; nothing beyond a task's limits is held.
 - **Adding dependencies by amendment,** which the model forbids so that
   the cycle check stays local to a batch.
 - **Priorities among tasks that are not goals,** when hosts or pools are
-  scarce: today's order is by when each became due.
+  scarce: they are ordered by when each became due.
 - **Pools across projects:** whether a pool's slots are shared fairly
   between projects, or by goal priority alone.
 - **A pending proposal whose holders go:** one that waits for a policy's

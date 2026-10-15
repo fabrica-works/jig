@@ -1,6 +1,6 @@
 # The core
 
-Provisional, 2026-10-07, revised 2026-10-14. What jig's core is, as a
+Provisional, 2026-10-07, revised 2026-10-15. What jig's core is, as a
 domain layer inside an application's engine: its parts and how they fit,
 what crosses between it and the application's root, how a decision
 reaches the store before anything leaves the engine, how it restarts,
@@ -37,6 +37,13 @@ is still open is listed in section 16.
   engine's tools its authority allows. Each turn it takes is
   committed as it ends; every call that changed something is committed
   and answered once, however often it is asked.
+- **It computes what only it can** (section 11): the documents parties
+  watch and read, from committed state: `me`, the signed-in party's own;
+  task queries, over the live tasks it holds and the ended tasks' indexes
+  in the store; what each task waits on, from its tree and the entries
+  waiting in it; what a decision would do, as data. A conversation is
+  known by its flag, never by its charter, and a template is served,
+  never used.
 - **Bounded.** The core holds live work only: live tasks, their inboxes
   and proposals, the runs in flight. Ended tasks, transcripts, history
   and notes are in the store, loaded when wanted.
@@ -122,8 +129,10 @@ translates between them with small total functions.
 - **from hosts:** a host's hello with its slots, what it hosts and its
   agent's bounds; turns, with the messages a run refused, calls, answers
   and facts of runs; a host lost or back;
-- **from parties:** sign-ins and their ends, keyed requests, reads of
-  their inbox and of history;
+- **from parties:** sign-ins and their ends, a credential to mint for an
+  identity the application's server verified (people.md, section 3);
+  keyed requests, each one operation or a compound request of several
+  (people.md, 5.1); reads, and watches opened and closed (section 11);
 - **from accounts' protocol:** a generation granted, a failure, the
   component closed;
 - **from the application,** through its root: each generation of an
@@ -190,12 +199,27 @@ step its last answer arrives.
 | a procedure's step | its connector → authority (each effect, its judges; each batch) → tasks | commit; effects made; tasks started |
 | a connector's news | classified by the connector → tasks (inboxes, wakes) | commit; due tasks run, procedures step |
 | an outbox outcome | its connector → tasks (settled; closing advances) | commit |
-| a party's request | people → authority (their role) → tasks | commit; the party answered |
+| a party's request | people → authority (their role and pool; a budget given `AsAllowed` resolved) → tasks | commit; the party answered, with what an `AsAllowed` budget was given |
+| a party's compound request | people (one project, within operations per request) → for each operation in order: authority, one pool counted across them → tasks | one commit, or none; one answer: all made, or the first operation refused and why |
 | a task due | tasks → authority (the run may start) → brief, with its connectors gathering, and its transcript's current window loading → tasks (claim, with its inbox's messages for the start) → fleet (place) | commit the claim; assign |
 | a task closing | tasks → its connectors (release) | commit; releases made |
 | a goal changing | tasks → its projecting connectors | commit; projections made |
 | a project's period | authority (its spend within the policy) → tasks (the period's funding opened; recurring tasks' batches; standing allotments renewed) | commit; tasks started |
 | a timer | its child | as its child says |
+
+- **A budget given `AsAllowed`** is resolved by authority as the batch is
+  admitted, from what the creator may give then (authority.md,
+  section 7). One task of a batch at most gives it, resolved after the
+  batch's named amounts are counted, and refused as lacking budget if it
+  would give nothing (tasks.md, section 4). A pool's amount left is a
+  live number only the core holds, which no client could read and send
+  back without racing. The task keeps the amount, and the answer, a
+  party's or a run's, says what was given.
+- **A compound request is one decision** (people.md, 5.1): its operations
+  are admitted in order, each against what those before it left, and
+  committed together, so the route above runs once per operation within
+  one step of the root's, and its hand-offs are bounded by its operations
+  (section 13).
 
 ## 5. Decisions and the store
 
@@ -268,6 +292,16 @@ answers to a run's reads.
   (`../client/domain/contract.md`, section 6): from live state where the
   engine holds it, loaded otherwise, and answered once the last commit
   made is durable (5.2).
+- **Ended tasks are read through the store's indexes.** An ended task is
+  loaded by its key; a list of ended tasks, a task query's ended part,
+  through one of the ended indexes (11.2): by requester, every ended task
+  a party requested; a task's ended delegates; by project, the ended
+  tasks flagged *listed*. A subtree's is read by the delegates' index,
+  task by task. A row joins its task's record, and an ended
+  conversation's read position, by point reads in the same step
+  (`../protocol/store.md`, 7.3). A filter beyond an index's prefix
+  scans its pages, which may come back cut, and the next page goes on
+  from the last row examined.
 
 ### 5.4 What the store keeps of the core
 
@@ -277,7 +311,9 @@ answers to a run's reads.
 | projects: resources and roles, homes, policy, parties' roles | people | at start |
 | parties: identities, sign-ins | people | those with a live sign-in or a role, at start; others as they sign in |
 | parties' requests' keys, with their answers, for a retention | people | at start, those within it |
-| tasks: every field of tasks.md, section 3, holds and their queues, writer slots, the last turn committed for a live attempt | tasks | live ones at start; ended ones on demand |
+| tasks: every field of tasks.md, section 3 (its label, flags and last activity among them), holds and their queues, writer slots, the last turn committed for a live attempt | tasks | live ones at start; ended ones on demand |
+| the indexes of ended tasks: by requester, every ended task a party requested; by project, the ended tasks flagged listed; each saved in the decision that ends its task (11.2; `../protocol/store.md`, 7.4) | tasks | on demand |
+| parties' read positions over conversations: a live one's; an ended one's, moved by the decision that ends the task and erased with it (11.4) | people | live ones at start; ended ones on demand |
 | calls committed since each live task's last turn, by attempt and name, with the core's part of their answers | the core | with their task |
 | each live agent task's conversation: its first attempt, and where its current window starts (7.2) | the core | with their task |
 | funders' numbers: each party's pool and each project's spend, per period; a period's beginning, and when the next begins if its source said | tasks | at start |
@@ -350,7 +386,8 @@ as a script: it asks the root for one step at a time, and asks for the
 next only once the root says this one is done (root.md, section 8).
 
 1. **The core's records:** the deployment's numbers; projects, their
-   policies and parties' roles; live tasks with their inboxes,
+   policies and parties' roles; parties' read positions over live
+   conversations, never ended ones' (11.4); live tasks with their inboxes,
    subscriptions, holds and queues; pending proposals; the calls
    committed since each live task's last turn; each live agent task's
    conversation; the funders' numbers; LLM accounts. The core's limits
@@ -394,8 +431,8 @@ the core hears it from its root before anything closes
 would make a commit:
 
 - **a party's request** is answered not ready, and an application's
-  request likewise, and so are a sign-in and a sign-out, which commit
-  too (`../protocol/client.md`, section 8);
+  request likewise, and so are a sign-in, a credential to mint and a
+  sign-out, which commit too (`../protocol/client.md`, section 8);
 - **a run's turn or call** is answered busy, and its answer left
   unacknowledged, so its host keeps them and sends them again, to this
   engine or the next;
@@ -468,7 +505,10 @@ When an agent task is due (tasks.md, 5.2), the core:
   conversation is the turns from the last run that started fresh, and
   its current window the conversation's turns from the last that opens a
   window: a window turn, which a compaction made, or the conversation's
-  first (smith's `protocol/transcript.md`, section 3).
+  first (smith's `protocol/transcript.md`, section 3). That conversation
+  is the transcript's, which every agent task has; a task flagged
+  *conversation* is another matter, whose turns are entries for its
+  requester (11.4).
 - **Beside it, the task's activity:** the words parties wrote to it as
   they wrote them, its runs' beginnings and ends, the results and news it
   heard and the decisions made about it, kept in the order they
@@ -515,12 +555,14 @@ answered after the commit:
 
 | Tool | What it does | Answers |
 |---|---|---|
-| `delegate` | makes a batch of tasks as its delegates (tasks.md, section 4) | their numbers; refused, and why; beyond authority, and what |
+| `delegate` | makes a batch of tasks as its delegates, each with what a party's `Create` names, its label and flags among them (tasks.md, section 4) | their numbers and their specs' revisions, and what a budget given `AsAllowed` was given; refused, and why; beyond authority, naming what it lacked and whether a proposal could be accepted |
 | `message` | words, a question or an answer to a task it references | sent; no reference; the inbox full; too large for a run to read |
-| `amend`, `cancel`, `release` | its delegates (tasks.md, section 7) | done; refused, and why |
-| `decide` | accepts, rejects or passes up a proposal or an escalation waiting for it (tasks.md, section 9) | done; beyond its authority, and passed up |
-| `propose` | any of these, or an effect, or more authority for itself, with a reason | proposed, and to whom; refused, when nobody may accept it (tasks.md, section 9) |
-| `subscribe`, `unsubscribe` | a connector's topic, a referenced task's state, a timer | done; refused |
+| `amend`, `release` | a task below it: an amendment naming its spec's revision as the run last read it, but for a change of priority alone; a release naming its hold's, and, for an effect held uncertain, whether to make it again (tasks.md, 5.5 and section 7) | done, with the revision it made; refused, and why; moved, with what it is now |
+| `cancel` | a task below it and its tree, with a reason, and a grace if the run gives one, within the tasks child's bound: the task is asked to finish first (tasks.md, section 7) | done; refused, and why |
+| `decide` | accepts, rejects or passes up a proposal or an escalation waiting for it, an escalation naming its hold's revision (tasks.md, section 9) | done; beyond its authority, and passed up; moved, with what it is now |
+| `propose` | an action beyond its authority, with a reason: a batch, an amendment, an effect, or a widening of its own authority (authority.md, section 9) | proposed, and to whom; refused, when nobody may accept it (tasks.md, section 9) |
+| `withdraw` | its own pending proposal (tasks.md, section 9) | withdrawn; already decided, and how |
+| `subscribe`, `unsubscribe` | a topic a connector offers to agents (connectors.md, 5.3), under a read grant on the resources the connector says it concerns (authority.md, 8.5); a referenced task's state; a timer (tasks.md, 8.4) | done; refused, and why |
 | `effect` | one of a connector's kinds of effect offered to agents (connectors.md, 4.5) | made, with what it made; committed and pending, past the call's deadline; waiting for a verdict; failed |
 | `note`, `recall` | writes a note in a scope; reads entries by name or by a search (section 10) | written; the entries |
 | a connector's reads | reads its system (connectors.md, section 9) | the answer, within the read's budget |
@@ -551,6 +593,26 @@ Beyond authority, a call is refused naming what it lacked; the run may
 `propose` the same action with a reason. Calls never become proposals on
 their own, so a person is never asked by accident.
 
+**The tools are a party's operations.** Each engine tool that acts on
+tasks is one of the operations a party's requests make (people.md, 5.1),
+checked by the same rules (authority.md, 8.1 and 8.4), so a run and a
+party do the same things to the same tasks: `delegate` is `Create`;
+`message` is `Message`, and `Answer` for a question; `propose`,
+`withdraw`, `amend`, `cancel`, `release` and `decide` are theirs by
+name. What only parties do stays theirs (people.md, 5.1): carrying out
+person tasks, stopping runs, moving tasks, marking what they have seen,
+and running the project.
+
+**A call names what it saw.** An amendment, a release and a decision
+about an escalation name the revision the run was shown, as a party's
+do: its brief shows its delegates' revisions (section 9), the messages
+relayed to it show a hold's (hosts.md, section 9), and `delegate`'s and
+`amend`'s answers show the revisions they made. One whose object has
+moved since is answered moved, with what it is now, and the run decides
+again on that; a change of priority alone names none, and the first
+commit decides (tasks.md, section 7). So no call writes over a change its
+run was not shown.
+
 ### 7.4 Answers, waiting and parking
 
 - **A run answers once:** finished, with its result; parked; or failed,
@@ -560,13 +622,15 @@ their own, so a person is never asked by accident.
   answer says the run left on resources goes to their connectors
   (connectors.md, section 10).
 - **Waiting holds the slot; parking frees it.** A run that calls `wait`
-  keeps its host's slot while it waits, so a chat answers at once. Idle
+  keeps its host's slot while it waits, so a run that is talked with
+  answers at once. Idle
   past its charter's threshold, it parks: every turn it took is committed
   first, and it ends. A coordinator's threshold is zero: it parks as soon
   as it waits.
 - **Woken again,** a parked task is due. Its charter says whether the
   next run resumes the transcript or starts fresh from a brief; by
-  default a chat resumes and a coordinator starts fresh, its brief
+  default a charter for conversations resumes and a coordinator's starts
+  fresh, its brief
   carrying its goal, its plan's state and its notes, and its start the
   messages that woke it (7.1).
 - **Messages to a live run** are relayed as the run reads, named, in
@@ -658,8 +722,10 @@ Its sections come from two places:
 
 - **The core's,** which it holds typed: the task (its spec and contract,
   and its lineage: its requesters' specs, cut); its dependencies' and
-  inputs' results in jig's terms; its delegates and their states, and
-  the results that came since (the plan, for a coordinator); its earlier
+  inputs' results in jig's terms; its delegates, their states, and the
+  revisions a decision about them names, each one's spec's and a held
+  one's hold's (7.3), and the results that came since (the plan, for a
+  coordinator); its earlier
   attempts and why they failed; the calls its task committed since its
   last turn, when it does not resume; the proposals and escalations
   waiting for its decision; the index of its notes; a transcript's tail,
@@ -709,26 +775,32 @@ prefers. The notes child domain knows scopes, entries and indexes:
 ## 11. Views
 
 The views child domain keeps parties' watches, and paces what each is
-delivered. What a watch shows, and what a client reads, is the client's
-contract (`../client/domain/contract.md`, sections 5 to 7).
+delivered; the core makes the documents they deliver, and answers
+parties' reads, from what its children hold. What a watch shows, and
+what a client reads, is the client's contract
+(`../client/domain/contract.md`, sections 5 to 7); what the core
+computes for them is said below (11.1 to 11.5).
 
-- **Watches:** the frame of a party (who they are, their projects, what
-  needs them); a task; a task's tree; a party's inbox, across projects; a
-  project's goals; a project's live tasks, filtered by phase, by
-  executor, by goal, or by whether the party asked for them; a party's
-  conversations; a task's live run; the deployment; and an
-  application's own subjects, through the root to the connector that
-  owns them. The other objects a client shows (a proposal, an
-  escalation, a question, a person task, a result, a project, a note)
-  are read, and read again when a watch that names them moves.
-- **An application's subjects name their scope,** a project or the
-  deployment, as its reads do, since the core cannot read a connector's
-  subject. The core admits a watch or a read of one on the party's
-  sign-in and their role in that scope, and the views' limits, as it
-  admits jig's; the connector, asked for the document, judges that the
-  subject is in that scope and what the party may see of it, and answers
-  unknown, or not allowed, otherwise (connectors.md, 5.5). Only the
-  document, or why there is none, crosses back; the root only routes.
+- **Watches:** jig's subjects (`../client/domain/contract.md`, 7.1):
+  `me`, the signed-in party's own document (11.1); a task; a task's
+  tree; chips, a bounded set of tasks; the party's inbox, across
+  projects; a task query's live lines (11.2); a task's live run; the
+  deployment; and an application's own subjects, through the root to the
+  connector that owns them. The other objects a client shows (a
+  proposal, an escalation, a question, a person task, a result, a task's
+  activity, a task query's ended part, a project, a note) are read, and
+  read again when a watch that names them moves.
+- **An application's subjects name their scope,** as its reads do, since
+  the core cannot read a connector's subject: a project, the deployment,
+  or the party's own, what is the signed-in party's across projects. The
+  core admits a watch or a read of one on the party's sign-in and their
+  role in that scope, the party's own on the sign-in alone, and on the
+  views' limits, as it admits jig's; the connector, asked for the
+  document, judges that the subject is in that scope and what the party
+  may see of it, and answers unknown, or not allowed, otherwise
+  (connectors.md, 5.5). Its watches and reads carry a window, as jig's
+  do (`../client/domain/contract.md`, 7.5). Only the document, or why
+  there is none, crosses back; the root only routes.
 - **Level-triggered,** as facts are (core.md, section 4). A delivery is
   the subject's whole current document, within the watch's window, made
   by the subject's owner when the delivery is made: the core, or a
@@ -744,13 +816,20 @@ contract (`../client/domain/contract.md`, sections 5 to 7).
 - **A slow watcher never holds the engine up,** and is never told it
   missed anything: it sees fewer deliveries. What the views child keeps
   per watch is its subject, its window, and two marks: a delivery in
-  flight, and a change since. Nothing grows.
+  flight, and a change since. A task query's subject is its keys and its
+  order, of a fixed size. Nothing grows.
 - **Marked by commits:** each decision's commit names the tasks, projects
-  and parties it touched, and the views mark the watches they concern: a
-  task's own, the trees along its lineage, chips naming it, its
-  project's tasks and goals, its requester's conversations, and the frames and
-  inboxes of parties whose entries changed. A connector marks its own
-  subjects (connectors.md, 5.5).
+  and parties it touched, and the views mark the watches they concern:
+  - *a task touched:* its own, the trees along its lineage, chips
+    naming it, and every task query it matches before the decision or
+    after it (11.2);
+  - *what a task waits on moving:* the same watches of the tasks along
+    its lineage (11.3);
+  - *a party touched,* their entries, a turn of a conversation they
+    requested, their read positions, their roles or pools, or a policy's
+    templates in a project of theirs: their `me` and their inbox.
+
+  A connector marks its own subjects (connectors.md, 5.5).
 - **Durable before shown:** a delivery waits for the last commit made
   before it, as every read's answer does (5.2).
 - **A run's text as it is written** is the one stream: kept per live run
@@ -760,10 +839,166 @@ contract (`../client/domain/contract.md`, sections 5 to 7).
   and leaves at once (5.2). A committed turn reaches a client through the
   task's activity, read (7.2).
 - **History is the store's.** What a client shows of the past (a task's
-  results, its activity, a plan's revisions and why) is read (5.3),
-  paged, never held.
+  results, its activity, a plan's revisions and why, the ended tasks a
+  query finds) is read (5.3), paged, never held.
 
 Nothing the core decides depends on a view arriving.
+
+### 11.1 `me`
+
+- **The signed-in party's own document,** about whoever the credential
+  belongs to; no party watches or reads another's. The core makes it
+  from:
+  - the people child: the party, their kind, login and name; their
+    projects and their role in each; what waits for them, counted
+    exactly, and their updates unread, counted up to a limit; their read
+    position over results; their role in the deployment, if any;
+  - authority: their pool in each project, and what they may create,
+    the bounds a draft is compared with, their allotment left among
+    them;
+  - the templates: each of their projects' merged templates.
+
+  What it carries, field by field, is the client's contract's
+  (`../client/domain/contract.md`, 5.1).
+- **Templates are served, never used.** The core keeps the
+  configuration's templates (`../protocol/configuration.md`, 3.1) and
+  each project's policy's overrides of them (authority.md, section 6)
+  only to merge them, per project, into `me`. No decision reads one: the
+  client fills a template into an ordinary request, which the core
+  checks as one written by hand, so a template grants nothing, and a task
+  keeps the values it was made with, never which template gave them.
+- **Marked** as any of it moves. A pool's amount left moves with spend;
+  its marks are coalesced, as every watch's are.
+
+### 11.2 Task queries
+
+- **One query for every list of tasks.** A task query names keys, an
+  order and a window: its keys among project, requester (a party or a
+  task), root, parent, label, phase class, executor kind and tracked;
+  its order one of number, last change, last activity, priority and
+  ended at; its window by cursor (`../client/domain/contract.md`, 6.1).
+  Its rows are task lines, the one record every list of tasks is made of
+  (`../client/domain/contract.md`, 5.1): its live tasks first, in its
+  order, then its ended ones, each group with its own cursor. Its live
+  lines are watched; its ended ones are read, a page at a time. The core
+  admits it on the party's role in the project it names, or, naming
+  none, for tasks whose requester the party is
+  (`../client/domain/contract.md`, 7.1).
+- **Live tasks are scanned.** The tasks child keeps no secondary index,
+  and its live tasks are bounded by its limits (tasks.md, section 11), so
+  a query's live part is one pass over them, whatever its keys, keeping
+  the window's rows in order. The fixed set of keys bounds what marking
+  compares and what a query carries, never the filtering.
+- **Ended tasks are found through indexes** in the store, which the tasks
+  child saves in the decision that ends a task (`../protocol/store.md`,
+  7.3 and 7.4):
+  - *by requester:* every ended task whose requester is a party, by that
+    party and the label;
+  - *the ended delegates',* for a query naming a requester task or a
+    parent: that task's ended delegates;
+  - *by project:* only the ended tasks flagged *listed*, by their project
+    and the label. The flag is the task's, set when it was made, so the
+    core reads no template to index.
+
+  A query's keys choose one index, in that order: a requester party; a
+  requester task or a parent; a project (`../protocol/store.md`, 7.3).
+  Its other keys, the root among them, filter that index's pages, which
+  may come back cut, and the next page goes on from the last row
+  examined. A query whose keys choose none has no ended part, and its
+  answer says so. A task forgotten once read leaves
+  its index rows in the decision that forgets it (11.4); retention erases
+  the rest with their tasks (`../protocol/store.md`, 11.1).
+- **What a query never finds:** words in a text (`../protocol/store.md`,
+  section 16); ended tasks by outcome, resource or spend; tasks by a
+  procedure's parameters, which belong in the application's own records
+  naming the tasks; ended tracked tasks across projects.
+- **Each line** comes from its live task, or from an ended task's index
+  row joined to its record, with what only the core can give: what the
+  task waits on (11.3), and, for a conversation, its unread count
+  (11.4).
+- **Marked by a task it matches,** before the decision or after it, so a
+  task entering a query, leaving it, moving within its order or ending
+  marks it. Matching compares the task's fields, and its lineage's root
+  and parent, with the query's keys: a bounded comparison per watch. The
+  core gives the views each touched task's keys as they were and as they
+  are.
+
+### 11.3 What a task waits on, and its last activity
+
+Two values each task line and each task's document carry (tasks.md,
+section 3):
+
+- **What it waits on is computed,** since only the core holds a task's
+  tree and the entries waiting in it together. It is never stored, so no
+  restart finds it stale. It is the first of:
+  - *a party,* when an entry in the task's live subtree, itself
+    included, waits for a party: a question put to one, a proposal or an
+    escalation waiting at parties, a person task addressed to a party or
+    a role. It names whom the oldest such entry waits for, a party or a
+    role, and how many wait;
+  - *nothing,* when it is working: its run live and not waiting;
+  - *its delegates,* when it has live delegates;
+  - *news,* when it is idle, its run parked or waiting, or its procedure
+    waiting on its facts: what moves it next is a message its wake
+    policy lets through, or a fact its connector reads (tasks.md, 8.3;
+    connectors.md, 6.2);
+  - *nothing,* otherwise: its phase says what it waits for (its
+    dependencies, its holds, its closing), or it has ended.
+
+  The core computes it as it makes a line or a document, by a walk of
+  the task's live subtree, within tasks per tree. An entry for a party
+  made or ended, and a delegate made or ended, touch every task along
+  its lineage, within the depth limit, so their watches are marked
+  (section 11).
+- **Its last activity is kept** on every task: a wall time, set by the
+  decision that commits its cause, words the task heard, a turn its run
+  committed, or a delegate's end (tasks.md, section 3). It orders lists,
+  moves no revision, and stays on the ended task, so a query's ended
+  rows show it.
+
+### 11.4 Conversations
+
+- **Known by its flag,** never by its charter, its label, or the
+  template that made it (tasks.md, section 3). Only an agent's task
+  carries it, so its turns are its transcript's (7.2).
+- **Its turns are entries for its requester,** while that requester is a
+  party: a turn committed is an update for them, and marks their `me`,
+  their inbox, and the queries the task matches.
+- **Read positions are the people child's** (people.md, section 6),
+  moved only by the party's `Seen`. A line's unread count is the task's
+  turns past its requester's position. There is one per task
+  flagged conversation, its requester's, so they number at most the
+  tasks flagged conversation:
+  - *a live task's,* in the people child, restored at start (section 6);
+  - *an ended task's,* moved to the store by the decision that ends it,
+    never held, and joined by a point read where a party reads the
+    conversation or a query's ended row (5.3), so an ended conversation
+    reads with what its party had read.
+- **A task's retention class** says what becomes of it once ended
+  (tasks.md, section 3): *kept,* to the deployment's retention horizon
+  (`../protocol/store.md`, 11.1), and for good while retention waits for
+  a deployment whose store nears its budget; *forgotten once read,*
+  erased once its requester, a party, has read its result and, for a
+  conversation, its turns, and no live task names it, in one decision
+  with its read position and its index rows, so no restart sees one
+  without the other, and nothing read comes back unread. A task whose
+  requester is not a party is kept, whatever its class.
+
+### 11.5 What a decision would do
+
+- **Offers are the core's judgement.** Each object's document says which
+  acts the party may make on it now, and for each whether it would be
+  made, proposed and to whom, or refused and why, with its bounds. The
+  core judges them from the authority, policies and pools only it holds,
+  and judges again when the act comes (`../client/domain/contract.md`,
+  5.3).
+- **A decision's effect is data,** made from the core's state as the
+  document is made (`../client/domain/contract.md`, 5.4): what accepting
+  a proposal grants and costs, and the pool after; what a release does;
+  what a cancel ends, by phase, runs, proposals and effects; the
+  reservation a move takes. Confirming a decision is the application's;
+  the core gives the facts it shows, and takes the decision naming the
+  revision its party was shown (`../client/domain/contract.md`, 5.2).
 
 ## 12. Accounts
 
@@ -840,7 +1075,11 @@ worst case (programming-model.md, 6.3):
   queues; pending proposals (tasks.md, section 11);
 - the rules and the live projects' policies, within limits on projects,
   resources per project and parties holding roles;
-- parties signed in, and their pending requests;
+- parties signed in, and their pending requests; their read positions
+  over live conversations, one per live task flagged conversation
+  (11.4);
+- the configuration's templates and each live project's overrides of
+  them, which the core only serves (11.1);
 - the calls committed since each live task's last turn, and the funders'
   numbers;
 - hosts, their runs, and the calls and messages relayed;
@@ -849,12 +1088,26 @@ worst case (programming-model.md, 6.3):
   rows;
 - briefs gathering, with the sizes of the connectors' sections, and the
   notes' indexes in use;
-- watches, each its subject, its window and two marks (section 11).
+- watches, each its subject, a task query's keys and order among them,
+  its window and two marks (section 11).
 
 None of it grows with the store's history. A new task, a party, a run or
 a watch past its limit is refused at its entrance, and the asker told
 why. The root adds the core's worst case to its connectors' and its own
 (root.md, section 10).
+
+- **A compound request's decision** is priced as operations per request,
+  the people child's limit (people.md, 5.1), times the costliest
+  operation it may hold: a cancel of a whole tree, within tasks per tree,
+  with the hand-offs to the connectors its tasks name. It is summed into
+  the worst case with the rest, as every decision is (`../README.md`,
+  6.2), so one request holding a whole conversation's close, or a whole
+  project's goals reordered, fits.
+- **What reads and deliveries compute** is priced with them: a task
+  query's live part is one pass over the live tasks, and what each of
+  its lines waits on a walk of a tree, within tasks per tree (11.2 and
+  11.3); its ended part is a load, within the loads' limits (5.3). None
+  of it is kept between deliveries.
 
 ## 14. Below the domain
 
@@ -870,9 +1123,15 @@ protocol layer, which composes jig's pieces with its own:
   hellos, turns and answers with the messages refused, calls and facts
   up (hosts.md, section 10).
 - **Connectors:** each its own protocol, the application's.
-- **Parties:** a client protocol carrying jig's documents and the
-  application's, with sign-in by the application's providers
-  (people.md, section 10; `../client/domain/contract.md`, section 10).
+- **Parties:** jig's messages, carried by the application's transport to
+  the clients' component, which knows no transport
+  (`../protocol/client.md`): jig's documents and the application's, its
+  requests and reads, and credentials. jig mints, verifies, expires and
+  revokes credentials; the printed link and a service's credential are
+  its own ways of signing in, and any other is the application's, which
+  asks the component to mint a credential for the identity it verified
+  (people.md, sections 3 and 10; `../client/domain/contract.md`,
+  sections 2 and 10).
 - **Accounts:** sign-in, refresh, records kept and tokens lent, by
   skein's OAuth accounts driver (`../protocol/llm.md`, section 5); an
   application's credentials by its own protocol layer, each generation
@@ -881,8 +1140,9 @@ protocol layer, which composes jig's pieces with its own:
   systems' addresses and credentials, LLM endpoints, accounts, and models
   with their windows, outputs and prices, workers' secrets, the engine's
   own slots, the charters the deployment offers with their runs' budgets
-  and reserves, procedures' settings, limits. Projects and their
-  policies are the store's, seeded from configuration on a first start.
+  and reserves, the application's templates, which the core only serves
+  (11.1), procedures' settings, limits. Projects and their policies are
+  the store's, seeded from configuration on a first start.
 
 ## 15. The world
 
@@ -899,10 +1159,10 @@ whose runs play scripts; scripted parties; the store on skein-kv's
 in-memory mode, slow or failing a commit; and the engine restarting
 cold, at drawn moments or at one a scenario chooses.
 
-Its stories: a chat that answers, parks and resumes; a plan of reports, a
-choice and procedure tasks, revised mid-way, and done; a procedure's
-effect waiting for another connector's verdict, then made; a delegate
-held past its tries, escalated to a person and released; a goal
+Its stories: a conversation that answers, parks and resumes; a plan of
+reports, a choice and procedure tasks, revised mid-way, and done; a
+procedure's effect waiting for another connector's verdict, then made; a
+delegate held past its tries, escalated to a person and released; a goal
 cancelled with runs live and effects in flight, closing deepest first; a
 tool call whose answer is lost with the channel and the engine, asked
 again after a restart and answered from its record, made once; a run
@@ -912,11 +1172,34 @@ under them; an uncertain effect across restarts made before its retry
 deadline; an effect of a kind that cannot be recovered, uncertain and
 held for a person; a judge's facts changing between its verdict and the
 effect; a policy narrowed while a proposal waits, an entry is committed
-and a run is live; a note written, corrected
-by a person and recalled; a recurring task across a period's reset; a
-person's words to a running run; a chat resumed from its current window
-after a compaction; a message a run left unread, waking its task again
-as the run ends; drift holding a task, and the client told why.
+and a run is live; a note written, corrected by a person and recalled; a
+recurring task across a period's reset; a person's words to a running
+run; a conversation resumed from its current window after a compaction;
+a message a run left unread, waking its task again as the run ends;
+drift holding a task, and the client told why.
+
+Its stories of what the core computes and serves: a task query watched
+while tasks enter it, leave it, change its order and end, each delivery
+after its commit, the ended ones then read through the ended indexes,
+by requester and, for a listed task, by project, a filter past the
+prefix coming back cut; what a task waits on moving from its delegates
+to a party as a delegate asks its person a question, and back once it
+is answered; a conversation's turns counted unread until its person
+marks them seen, the conversation ended and read after a restart with
+the position its person left, and one forgotten once read leaving
+nothing that shows; `me` marked as a pool is spent from, deliveries
+coalesced; a budget given `AsAllowed` answered with what was given.
+
+Its stories of agents and procedures doing what parties do: a run
+amending a delegate a party amended since it was shown, answered moved
+with what it is now, then amending again; a run releasing a held
+delegate, naming its hold's revision, and making an uncertain effect
+again; a run proposing an amendment and an effect beyond its authority,
+each accepted by a person; a run subscribing to a connector's topic and
+woken by its news; a run cancelling a delegate with a grace it finishes
+within; a procedure amending, cancelling and messaging its delegates,
+one amendment refused as moved and the procedure stepping again on what
+it is told.
 
 Its referee holds the core to core.md, section 11, seen from outside;
 applications' worlds reuse it on jig's conformance world (testing.md,
@@ -935,6 +1218,9 @@ section 5).
   fresh; and how long the store keeps earlier windows' turns, which no
   run is sent.
 - **Views:** a limit on watchers per subject; how a watch of a task's
-  tree is bounded when the tree is large.
+  tree is bounded when the tree is large; whether, should a pass over the
+  live tasks per delivery, or a walk of a tree per line, prove slow, the
+  tasks child keeps what a task waits on along its lineage as entries
+  come and go (11.2 and 11.3).
 - **Scaling out:** one engine per deployment until it binds; the store
   being the engine's alone is what would change first.

@@ -1,6 +1,6 @@
 # The store
 
-Provisional, 2026-10-12, revised 2026-10-13. What lies beneath the
+Provisional, 2026-10-12, revised 2026-10-15. What lies beneath the
 engine's store vocabulary: skein's key-value store, embedded in the
 engine's process, holds every record jig's core and the application
 keep, transcripts are files beside it, and secrets are in a second
@@ -42,14 +42,19 @@ section 16.
   pages: the restart's live ranges, parties' reads with their joins, a
   child's pages, single records (section 7). Only a turn's bytes, read
   from its transcript, take io.
+- **Ended tasks are found through indexes,** the tasks child's: by their
+  requester party, and by their project for those flagged listed, each
+  by label and newest ended first. Live tasks are the tasks child's
+  memory, never the store's to list (7.3, 7.4).
 - **Transcripts are files, one per task,** each turn a frame written and
   synced before the commit that accepts it. The map keeps where each
   task's current window starts, so a resumed run reads only its window
   (section 8).
 - **Secrets in a second store,** in a directory only the engine's user
   may read, written by components alone (section 9).
-- **Growth is bounded by retention and fill:** the domain shrinks ended
-  work past horizons on its timers, and refuses new work above a
+- **Growth is bounded by retention and fill:** the domain forgets an
+  ended task once read, or shrinks it past a horizon, by the task's
+  retention class, on its timers, and refuses new work above a
   high-water mark of the map (section 11).
 - **The real store in every world:** the domain worlds run the component
   over skein-kv's in-memory mode, with an in-memory stand-in for
@@ -182,13 +187,14 @@ child puts live first.
 | component | the format row | none: one row | at open |
 | component | transcripts' places: each task's committed length and its current window's start; each attempt's first turn | task; task, attempt | at open, the run proofs' tasks' lengths (8.4); the rest when read |
 | core | the deployment: its id, its numbers, the last commit | none: one row | at start |
-| core | goals' projections (feed, plan rows, pending milestones), run proofs, calls committed since a live task's last turn, conversations | a goal's, then its own; task; task, attempt, completion, position; task | at start |
+| core | goals' projections (feed, plan rows, pending milestones), run proofs, calls committed since a live task's last turn, live agent tasks' conversations (their first attempt, their current window's start) | a goal's, then its own; task; task, attempt, completion, position; task | at start |
 | core | turns (in transcripts' files, section 8), terminals, decisions on proposals and escalations | task, attempt, turn; task, attempt; proposer, proposal; task, revision | on demand |
 | tasks | live tasks, stubs naming ended results, the funders' live periods, writer slots, pools' slots, pending proposals | task; task; funder; slot; proposal | at start |
 | tasks | ended tasks, past periods, decided proposals, history, milestones, activity | task, then a position or revision; funder, period; proposal | on demand |
-| people | parties, sign-ins (no secret), roles, projects' policies, read positions, answered keys within the retention | as the people child keys them | at start |
+| people | parties, sign-ins (no secret), roles, projects' policies (their overrides of templates among them), read positions over results and over live conversations, answered keys within the retention | as the people child keys them; a live conversation's position by party, then task | at start |
+| people | ended conversations' read positions (7.4) | task, then party | on demand |
 | notes | entries, and an index line per entry per scope | name; scope, name | when a scope is in use; entries on demand |
-| tasks, people | indexes for parties' reads (7.4) | the index's own, newest first where it reads so | on demand |
+| tasks, people | indexes for parties' reads (7.4): each party's inbox by time; ended tasks by requester party and by project; ended delegates; a subtree's delegates | the index's own, newest first where it reads so: an ended index's by party or project, then label, ended at reversed and task | on demand |
 
 Children that keep nothing durable (the views, the fleet, authority,
 briefs, accounts) have no family. What a run reports as it goes (its
@@ -332,13 +338,16 @@ The core's restart script (`../domain/engine.md`, section 6) asks the
 root for one step at a time, and the root asks the store:
 
 - **the core's live ranges,** in the order the core restores them: the
-  deployment's header first, then people's families, then the tasks
-  child's live families, then the core's own live rows (goals'
-  projections, run proofs, calls, conversations). It is a fixed list of
-  intervals, in that order, paged and handed up typed;
+  deployment's header first, then people's families (live
+  conversations' read positions among them, ended ones never), then the
+  tasks child's live families, then the core's own live rows (goals'
+  projections, run proofs, calls, agents' conversations). It is a fixed
+  list of intervals, in that order, paged and handed up typed;
 - **the inbox's census,** a step of its own once people's read positions
   are restored: the index of what parties' inboxes show (7.4), never
-  every ended task (section 15);
+  every ended task (section 15); a reply of an ended conversation joins
+  its requester's ended read position by a point read, as a read does
+  (7.3);
 - **each connector's live ranges,** as the application's byte intervals,
   handed up as bytes for its codecs;
 - **what the core never restores** (turns, terminals, history, ended
@@ -364,15 +373,31 @@ relates to.
 | a task's history, or a subtree's | the history and milestone families; a subtree's by the index of its delegates, task by task: the task's own rows, then each delegate's in that index's order, each task's rows in its own history's order |
 | a task's ended delegates | the index of ended delegates by requester |
 | an inbox group | the index of the party's inbox, by time: what needs them oldest first, updates newest first; a group, and the filter, select within it |
-| conversations | the index of the party's conversations, newest first |
-| a project's goals | the index of the project's goals, live then ended newest first |
+| a task query's live tasks | not the store's: the tasks child's live tasks, scanned in memory |
+| a task query's ended tasks, naming a requester party | the index of ended tasks by requester, from the party, and the label where the query names one |
+| a task query's ended tasks, naming a requester task or a parent | the index of ended delegates by requester |
+| a task query's ended tasks, naming a project and none of the above | the index of ended tasks by project, from the project, and the label where the query names one: listed tasks only |
 | a project's notes, a scope's notes | the notes' lines of the project's scopes, or of the one scope, filtered by description, each with its entry: by scope, then by name within it, as the lines are keyed |
 | a project's spend | the funders' periods of the project |
 
+- **A task query's ended part** (`../client/domain/contract.md`, 6.1)
+  is served from one index, chosen by the query's keys in the table's
+  order: a requester party; a requester task or a parent; a project. A
+  query naming none of these has no ended part, and its page says so.
+  The keys beyond the index's prefix (the label, where it is not in it;
+  the root; the phase class; the executor kind; tracked) filter its
+  rows. Its rows come in the index's order: within a label, newest
+  ended first from the two ended indexes; by task from the ended
+  delegates', whatever order the query asks of its live part.
+- **A task query's row joins** its task's record, by key: the ended
+  record, or its summary once retention has shrunk it (11.1); and, for
+  a task flagged conversation, its requester's ended read position, by
+  a point read (7.4).
 - **A page goes on from the last row it examined,** in its scope's
   order, not from the last it returned. A page that skips rows (an index
   row whose owner is gone, 7.4) or leaves them out (an inbox group, a
-  description's filter) goes on past them; a page that reached its bound
+  description's filter, a task query's filter beyond its index's
+  prefix) goes on past them; a page that reached its bound
   and returned none is cut, not ended, and the client reads on from its
   position. A subtree's history is in its scope's order, task by task,
   its position the task and the row.
@@ -418,15 +443,47 @@ the records they point at, with keys reversed in time where a page reads
 newest first. Each index is its owner's, tested in its world. Section
 15 lists those the domain owes.
 
+**The ended indexes,** the tasks child's, each saved in the decision
+that ends a task (`../domain/tasks.md`, section 3):
+
+- *ended by requester:* key `(party, label, ended at reversed, task)`, a
+  row for every ended task whose requester is a party;
+- *ended by project:* key `(project, label, ended at reversed, task)`, a
+  row only for an ended task flagged *listed*. The flag is the task's,
+  set from its template when it was made, so the engine reads no
+  template to index.
+
+Each serves a task query's ended part from its prefix, the party or the
+project, then the label (7.3). A filter beyond the prefix scans the
+index's pages, which may come back cut. A task moved to a party
+(`../domain/tasks.md`, section 7) is indexed by the requester it has
+when it ends.
+
+**Read positions over conversations,** the people child's: one per task
+flagged *conversation*, its requester's, while that requester is a
+party (`../domain/people.md`, section 6):
+
+- *a live conversation's,* in a family keyed `(party, task)`, loaded at
+  start, so their bound in memory stays the live conversations, one
+  each;
+- *an ended one's:* the decision that ends the task moves its position
+  to the family of ended read positions, keyed `(task, party)`, read on
+  demand. A read of the conversation, a task query's row and the
+  inbox's census join it by a point read (7.2, 7.3);
+- *erased with the task:* by retention, as it shrinks a kept task
+  (11.1); or in the decision that forgets a task forgotten once read
+  (below).
+
 **An owner erased first.** When a task's record is erased before the
-records its index rows name, as a forgotten chat's is
-(`../domain/people.md`, section 6), its decision erases the index rows
-its record names whole: the chat's result's update and its conversation
-rows. Its replies' updates stay, since a chat's replies are unbounded, a
-decision is bounded, and the chat's record names only its newest; they
-go when retention erases the reply lines they name (11.1). Until then a
-page skips a row whose owner is gone, counting it within its bounds, so
-nothing of a forgotten chat shows and no reply read comes back unread.
+records its index rows name, as a task forgotten once read is
+(`../domain/people.md`, section 6; 11.1), its decision erases the rows
+its record names whole: its result's update, its rows in the ended
+indexes, and its ended read position. Its replies' updates stay, since a
+conversation's replies are unbounded, a decision is bounded, and the
+task's record names only its newest; they go when retention erases the
+reply lines they name (11.1). Until then a page skips a row whose owner
+is gone, counting it within its bounds, so nothing of a forgotten task
+shows and no reply read comes back unread.
 
 **Reading backwards:** a family whose positions are dense (activity)
 reads newest first by computing forward intervals from its last
@@ -534,8 +591,10 @@ Removing a missing file is not a failure.
   logs hold no secret.
 - **What it keeps,** each under its owner's tag and the number the domain
   gives it:
-  - sign-ins' digests, by the sign-in's number, with their expiry
-    (`client.md`, section 8);
+  - minted credentials' digests, by their sign-in's number, with their
+    expiry: each credential the clients' component mints, for a printed
+    link's sign-in, a service's, or an identity the application's server
+    verified (`client.md`, section 8);
   - services' credentials' digests, by the service's number;
   - an application's own records, under its tag: its connectors'
     credentials, which it decodes itself.
@@ -546,18 +605,20 @@ Removing a missing file is not a failure.
   The domain names a secret by number, never holds one, and never sees
   the secrets' store's commits, which have numbers of their own.
 - **Kept before used.** A sign-in is committed first, which gives it its
-  number; its digest is then kept, and durable; only then does the
-  client's component hand its secret out (`README.md`, section 8). A
-  crash between leaves a sign-in no client holds a secret for, which
-  expires with its time.
-- **A presented secret names its sign-in:** the secret a client holds is
-  the sign-in's number and its random bytes. The component gets the
-  digest by number, and the client's component compares in constant time.
-- **Erased** when the core says a sign-in ended or expired, or a service
-  was removed. A crash between that commit and the erase leaves a digest
-  nobody names, which the restart sweeps: once people's families are
-  restored, the component erases each of jig's digests whose sign-in or
-  service it did not hand up.
+  number; its credential's digest is then kept, and durable; only then
+  does the clients' component answer the credential, to the client that
+  signed in or to the application's server that asked it to mint
+  (`README.md`, section 8). A crash between leaves a sign-in no client
+  holds a credential for, which expires with its time.
+- **A presented credential names its sign-in:** a credential is the
+  sign-in's number and its random bytes, opaque to the transport that
+  carries it. The component gets the digest by number, and the clients'
+  component compares in constant time.
+- **Erased** when the core says a sign-in ended (signed out or revoked)
+  or expired, or a service was removed. A crash between that commit and
+  the erase leaves a digest nobody names, which the restart sweeps:
+  once people's families are restored, the component erases each of
+  jig's digests whose sign-in or service it did not hand up.
 - **A failure stops the engine,** as the store's does (section 6): what a
   failed commit of the secrets' store was keeping is never handed out.
 - **Read at start,** whole: small, with its own limits and worst case.
@@ -585,19 +646,31 @@ Removing a missing file is not a failure.
 ### 11.1 Retention
 
 Retention is the domain's: mechanisms on its timers, tested in its
-worlds, with horizons the deployment's configuration gives:
+worlds, with horizons the deployment's configuration gives. What becomes
+of an ended task is its retention class, set from its template when it
+was made (`../domain/tasks.md`, section 3):
 
+- **A task kept** is kept to the deployment's horizons.
 - **Ended tasks shrink** past a horizon: one commit erases a task's full
-  records (its record, history, activity, terminals) and saves a summary,
-  so what parties read of old work comes from summaries.
+  records (its record, history, activity, terminals, its ended read
+  position) and saves a summary, so what parties read of old work comes
+  from summaries. Its rows in the ended indexes stay, and a task query
+  joins its summary (7.3).
 - **Transcripts go** past a longer horizon, whole, by their task (8.5).
   A live task keeps its transcript, whatever its age.
-- **Answered keys expire** past the people child's retention; **ended
-  chats are forgotten** once read (`../domain/people.md`, section 6).
-- **A forgotten chat's remains go** at retention's next pass, whatever
+- **Answered keys expire** past the people child's retention.
+- **A task forgotten once read** is forgotten, whatever its age, once it
+  has ended, its requester has read its result and, for a conversation,
+  its turns, and no live task names it (`../domain/people.md`, section
+  6): its record, its rows in the ended indexes, its result's update and
+  its read position erased in one decision (7.4). A task whose requester
+  is not a party is kept, whatever its class.
+- **A forgotten task's remains go** at retention's next pass, whatever
   their age: its activity, history, terminals and transcript, and its
-  replies' rows in its person's updates (7.4). Nothing reads them, and
-  the person's pages of updates skip those rows until then.
+  replies' rows in its requester's updates (7.4). Nothing reads them,
+  and the requester's pages of updates skip those rows until then.
+- **The horizons wait** for a deployment whose store nears its map's
+  budget (11.2): until one is set, a kept task is kept whole.
 
 ### 11.2 Fill
 
@@ -605,7 +678,7 @@ worlds, with horizons the deployment's configuration gives:
   bytes against its budget (skein's `kv.md`, section 7).
 - **Above a high-water mark** of that budget (both are limits,
   `configuration.md`, section 6), the domain refuses new work at its
-  entrances: new tasks and chats, new sign-ins. Work under way goes on,
+  entrances: new tasks, new sign-ins. Work under way goes on,
   and a refusal is never a failed commit. The deployment's document
   shows the fill.
 - **Transcripts' disk** is the deployment's: retention bounds it, and its
@@ -682,24 +755,33 @@ Each within jig's suites' budgets (`../../development/workflow.md`).
      these), decided proposals apart from pending ones, and past funding
      periods apart from live ones (4.3);
   2. **the restart reads live work only:** the inbox's restore reads what
-     the inbox shows from an index, not every ended task (7.2);
-  3. **indexes for parties' reads:** each party's inbox by time,
-     each party's conversations, each project's goals, each task's ended
-     delegates, a subtree's delegates for its history (7.3, 7.4);
+     the inbox shows from an index, not every ended task, and joins an
+     ended conversation's read position by a point read, never restoring
+     ended ones (7.2);
+  3. **indexes for parties' reads:** each party's inbox by time; ended
+     tasks by requester party, and by project for those flagged listed,
+     each keyed by label and ended at reversed, the flag read from the
+     task, never from a template; each task's ended delegates; a
+     subtree's delegates for its history (7.3, 7.4);
   4. **turns as the store keeps them:** saved with whether each opens a
      window, never erased one by one, a task's transcript dropped whole;
      a resume reads the current window, from the turn the core keeps as
      its start (8.3; `../domain/engine.md`, 5.4 and 7.2);
   5. **fill:** with each commit's answer, and new work refused above the
      high-water mark (11.2);
-  6. **retention:** summaries of ended tasks, transcripts dropped, answered
-     keys expired, chats forgotten and their remains collected, each on
-     the domain's timer (11.1);
+  6. **retention:** by each task's retention class, summaries of ended
+     tasks kept, transcripts dropped, answered keys expired, tasks
+     forgotten once read and their remains collected, each on the
+     domain's timer (11.1);
   7. **keys for single reads:** a question's line and its answer's, an
      escalation's hold, and a task's proposal's row in its proposer's
      history, each named by its position in its task's record, as a
      reply's is, an answer's with the task whose activity holds it, so a
-     read finds it by key, never by a scan (7.3).
+     read finds it by key, never by a scan (7.3);
+  8. **read positions over conversations:** a live conversation's in the
+     people child's family, loaded at start; moved, by the decision that
+     ends its task, to the family of ended read positions, read on
+     demand; erased with the task (7.4, 11.1).
 - **skein owes:** io's `OpenWrite` and `Cut` (skein's `io.md`, section
   5), for 8.2 and 8.4. skein-kv serves as it is: its in-memory
   mode, its key writer, its fill.

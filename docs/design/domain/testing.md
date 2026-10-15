@@ -1,6 +1,6 @@
 # Testing the domain
 
-Provisional, 2026-10-07, revised 2026-10-12. How jig's domain is tested,
+Provisional, 2026-10-07, revised 2026-10-15. How jig's domain is tested,
 and how it tests an application's: the worlds of jig's own parts, the
 core's world, and the conformance world every application runs its
 domain on, with the referee that holds it to jig's promises. It applies
@@ -47,15 +47,27 @@ referee in the loop, the heap counted at every iteration
 ## 3. The children's worlds
 
 - **tasks:** batches, lifecycle, holds and queues, inboxes, wakes,
-  proposals (tasks.md, section 12).
-- **authority:** step tests only, as a decision over data (authority.md,
+  proposals; a task's label, flags and last activity, cancels with a
+  grace across a restart, goals per project, the ended indexes saved as
+  tasks end, and what parties and agents ask alike (tasks.md,
+  section 12).
+- **authority:** step tests only, as a decision over data; one batch
+  under a task and under a party answering alike, and `AsAllowed`
+  resolved over generated pools, roles and caps (authority.md,
   section 11).
-- **people:** sign-ins, roles, requests, inboxes (people.md,
-  section 11).
+- **people:** sign-ins and credentials minted, roles, requests,
+  inboxes; operations alone and in compound requests, made whole or not
+  at all; read positions over conversations, live and ended, across a
+  restart (people.md, section 11).
 - **fleet:** hosts of both kinds, placement, fencing, graces, adoption.
 - **brief:** sections planned, gathered, cut by size, a required one
   missing; connectors' sections as sizes and tokens only.
-- **notes, views, accounts:** each its own concern.
+- **views:** watches of jig's subjects marked by generated commits: a
+  task query by the tasks it matches before a decision or after it, `me`
+  and an inbox by their party's changes; changes coalesced, one delivery
+  in flight per watch, and the watches' limits refused at the entrance
+  (engine.md, section 11).
+- **notes, accounts:** each its own concern.
 - **the hub,** with agent capabilities of both kinds, smith's: agent
   processes, `smith-host-domain` over smith's agent processes over skein's
   fake LLM;
@@ -85,6 +97,11 @@ testing, against fakes that share none of its types:
   the store's last durable commit.
 
 Its stories are engine.md, section 15's; its referee is section 6's.
+Beside the referee, the documents the core delivers are held to a
+reference made from outside: a task query's rows against every task the
+scenario made, filtered and ordered as the query asks, its ended part
+within what its index serves; what each task waits on against the
+tree and the entries the scenario made.
 
 ## 5. The conformance world
 
@@ -111,6 +128,20 @@ What every application runs, and what makes jig's promises its own.
     - a standing task running across many periods;
     - many sessions and sub-agents of one run near the end of its
       budget;
+    - a compound request, the engine crashing before and after its
+      commit and the request sent again: made whole once, or not at all,
+      and answered once;
+    - a cancel with a grace across restarts: the task finishing within
+      it, or cancelled once when it ends, from the grace kept with it;
+    - a party's and a run's decisions about one task racing: the one
+      named with a revision that has moved refused, never made over the
+      other;
+    - a conversation ending while its party reads it, the engine
+      restarting between: no turn read comes back unread, and a task
+      forgotten once read leaves nothing a page shows;
+    - a task query watched while its tasks end, and watched again after
+      each restart: every delivery after its commit, the ended ones
+      found through their indexes;
 
     Each runs with the application's own kinds. One the application has
     no kind for (a pool, where its connectors take no pooled holds) is
@@ -158,7 +189,9 @@ becomes observations:
   it, a met verdict from each judge, each observed one within its
   freshness when decided, each guarded one still true when applied; the
   effect a fake observed is the effect the core decided, in kind and
-  resources.
+  resources; nothing waits as a proposal that its proposer did not ask
+  for: a run's `propose`, a step's proposal, a party's `Propose`, or a
+  result's follow-ups.
 - **Spend is bounded:** recorded spend never passes a task's budget,
   and actual spend, the fake LLM's own count, passes it by no more than
   the turns lost with workers allow.
@@ -166,12 +199,13 @@ becomes observations:
   effect on its fake system at most once, late copies included; an
   idempotent one ends in the decided state; an unrecoverable one whose
   outcome was uncertain is never repeated before a person decides; every
-  batch is in the store whole or not at all; every uncertain entry is
-  resolved, or held, within a bound however often the engine restarts.
+  batch, and every compound request, is in the store whole or not at
+  all; every uncertain entry is resolved, or held, within a bound
+  however often the engine restarts.
 - **Nothing ahead of its commit:** every effect a fake system saw, every
-  assignment a host saw, every answer a party or a run saw followed a
-  durable commit that holds it; after a crash, nothing seen is missing
-  from the store.
+  assignment a host saw, every answer a party or a run saw, and every
+  document a party's watch or read was given followed a durable commit
+  that holds it; after a crash, nothing seen is missing from the store.
 - **Order:** no task started before its dependencies were done and
   closed; no two runs held one resource's writer slot at once; no pool
   admitted a holder beyond the slots it was known to have; no task ended
@@ -179,10 +213,13 @@ becomes observations:
 - **Nothing lost:** liveness deadlines for every result to reach its
   requester, every person's words to reach their task or the task to end,
   every proposal to be decided, withdrawn, or waiting where a holder sees
-  it.
+  it; no turn a party has seen comes back unread, across its task's end
+  and restarts (people.md, section 6).
 - **Nothing written over:** no effect on an owned object that the
   application did not make it, but as a participant or through its
-  connector's mechanics.
+  connector's mechanics; no amendment or release made against a
+  revision that had moved since the one its party, run or procedure
+  named.
 - **Bounded:** the heap within the worst case at every iteration, and
   every story ending within its bound.
 
@@ -202,17 +239,19 @@ more than one world needs them (testing-strategy.md, section 4):
 - **`smith-inline-agent`'s runs:** smith's real domain over skein's fake
   LLM, with a script per charter, for the hub's world and for an
   application's worlds that run smith's own domain;
-- **scripted parties:** sign-ins and requests, by script or at random
-  within their role;
+- **scripted parties:** sign-ins, operations alone and in compound
+  requests, reads and watches, by script or at random within their role;
+  a template filled into a `Create` as a client fills it from `me`;
 - **the test connector:** resources named by paths, kinds of hold
   (exclusive and pooled, refusing and waiting, pools that shrink),
   priced effects of every form and every recovery class, with keys,
   conditions, late copies and uncertainty, requirements guarded and
-  observed, judged on its facts, procedures that step, wait, delegate
-  and finish, topics with classified news, drift, and a fake system
-  beneath it that reports what it saw. The core's world runs two of
-  them, so that judges, resources and kinds cross connectors, with
-  names and kinds generated from the seed;
+  observed, judged on its facts, procedures that step, wait, delegate,
+  amend, cancel with a grace, message and finish, topics with classified
+  news, some offered to agents, drift, and a fake system beneath it that
+  reports what it saw. The core's world runs two of them, so that
+  judges, resources and kinds cross connectors, with names and kinds
+  generated from the seed;
 - **the referee and the harness** of the conformance world.
 
 They stay in jig, and an application's worlds reuse them. What jig finds
@@ -222,8 +261,8 @@ missing in skein's world harness goes into skein first.
 
 - **its connectors' worlds,** each with its system's fake below and the
   root scripted above (connectors.md, section 15);
-- **its conformance scenarios,** which are its stories: `ops`'s are its
-  `examples.md`, section 7;
+- **its conformance scenarios,** which are its stories: `ops`'s are
+  `../examples.md`, section 7;
 - **its system worlds,** if it has workers: its engine, its workers with
   their workspaces, and smith's agents, together;
 - **its own tiers below the domain,** with its protocol layers.
@@ -234,7 +273,11 @@ jig's tests fit the suites' budgets (testing-strategy.md, section 8):
 the focused suite runs a few cuts and seeds per scenario, the fuzzy
 suite sweeps. jig's tests count against jig's budgets
 (`docs/development/workflow.md`); an application's conformance scenarios
-count against the application's.
+count against the application's. The stories of the plumbing (operations
+alone and compound, a grace, task queries, read positions, revisions
+named by runs and procedures) join the scenarios of the worlds they
+belong to, a few cuts each in the focused suite and swept with the rest
+in the fuzzy one: none needs a suite of its own.
 
 ## 10. Open questions
 

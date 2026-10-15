@@ -1,33 +1,51 @@
 # The view
 
-Provisional, 2026-10-09, revised 2026-10-15. `jig-view`: jig's client
-domain shown on skein's UI kit, `skein-ui` (skein's `ui.md`). It is
-optional: a service has none. It holds jig's primitives, which build
-parts of a tree from the domain's state (the frame's parts, the
-sections, the cards, the confirmation, the owed cards and the notices)
-or handle a person's acts on them (jig's bindings, which turn those acts
-into typed actions); jig's default arrangement of them into pages; and
-what an application needs to present jig's objects itself: the binding
-constructors, a decision's facts and jig's check. The tree, the builder,
-the diff, the outline's rules, words' machinery, Markdown, scenes,
-limits and the text shell are skein's, and each section that names them
-points there and keeps what is jig's: its owner, its region names and
-tokens, its phrases, its limits' constructors, its settings of the text
-shell (section 15) and its drawings (section 17). What is still open is
-listed in section 14, and what waits in section 16.
+Provisional, 2026-10-09, revised 2026-10-15. `jig-client-view`: the
+reference UI, jig's optional presentation, for `ops` and jig's test
+application. It is built on the public client alone, `jig-client` and
+its helpers (client.md, sections 4 and 19), and on skein's UI kit,
+`skein-ui` (skein's `ui.md`); a service has none, and an application may
+present jig's work its own way instead. It holds the reference UI's
+state (section 18: its place and page, the working set, the requests it
+sends, drafts and the confirmation, notices and its own records);
+jig's primitives, which build parts of a tree from that state and the
+client's documents (the frame's parts, the sections, the cards, the
+confirmation, the owed cards and the notices) or handle a person's acts
+on them (jig's bindings, which turn those acts into the reference UI's
+actions); and jig's default arrangement of them into pages. The tree,
+the builder, the diff, the outline's rules, words' machinery, Markdown,
+scenes, limits and the text shell are skein's, and each section that
+names them points there and keeps what is jig's: its owner, its region
+names and tokens, its phrases, its limits' constructors, its settings of
+the text shell (section 15) and its drawings (section 17). What is still
+open is listed in section 14, and what waits in section 16.
 
 ## 1. In one page
 
+- **The reference UI, on the public client alone.** It uses
+  `jig-client`'s surface and its helpers (`shapes`, `facts`, `thread`,
+  `words`) as any application does, and nothing else of jig's: no door
+  into the client of its own, no record on the wire of its own. Whatever
+  it shows, an application can show, so it proves the API is enough. It
+  is optional: an application presents jig's objects from jig's
+  documents itself, on skein's UI kit or anything else (pages.md,
+  section 9).
 - **Built on skein-ui.** The tree and its vocabulary, owners, the
   builder, bindings and acts, the diff, words' machinery, Markdown,
   scenes, the outline's rules and limits are skein-ui's (skein's
   `ui.md`); the text shell is `skein-ui-text`'s and the browser's parts
-  `skein-ui-web`'s. jig-view is what of a client's view is jig's.
+  `skein-ui-web`'s. `jig-client-view` is what of the reference UI's view
+  is jig's.
+- **Its own state, beside the client's.** Where the person is, what the
+  page holds, the requests it sent, drafts, the confirmation and
+  notices are the reference UI's, in step code beside the client, which
+  the application steps both of (section 18). The client holds the
+  documents; the reference UI reads them by its handles.
 - **State in, tree out.** Each of the frame's parts, each section of a
   page, each card, the confirmation, the owed cards and the notices is a
-  function from the domain's state to tree nodes, through skein-ui's
-  builder, one node a call. A card has one function, called wherever jig
-  shows it (objects.md, section 2).
+  function from the reference UI's state and the client's documents to
+  tree nodes, through skein-ui's builder, one node a call. A card has
+  one function, called wherever jig shows it (objects.md, section 2).
 - **Primitives, nothing mandated.** An application generates whatever
   tree it wants with skein-ui and composes jig's primitives where it
   likes, or not at all. jig's pages are jig's default arrangement of the
@@ -42,12 +60,13 @@ listed in section 14, and what waits in section 16.
   rule. jig's default arrangement keeps a banner with the link, what
   needs the party and who is signed in, and `after_page`'s parts last
   (section 3.1).
-- **The promise, kept without mandated nodes.** A deciding act goes
-  through the domain's confirmation and names the revision its binding
-  was issued from, whatever the tree. What a card shows besides, an
-  application presenting jig's objects itself takes from jig as data
-  (`jig_view::facts`), and its worlds check it showed it
-  (`jig_view::check`), never at run (section 4).
+- **The promise, below any tree.** A deciding act on the reference UI
+  goes through its confirmation and names the revision of the document
+  its binding was issued from, whatever the tree; the engine refuses a
+  moved one, and the client makes it once. An application presenting
+  jig's objects itself reads what a card shows from jig's documents
+  with the helper `facts`, and jig's check finds, in its worlds, what it
+  failed to show (section 4; testing.md, 6.2), never at run.
 - **Accessible because tested.** Every node a person acts on, or reads
   to decide, has a role and a name, since the fake person finds nodes
   only by role, name and text (testing.md, section 3). A node it cannot
@@ -55,12 +74,12 @@ listed in section 14, and what waits in section 16.
 - **Bindings are tokens.** A node a person acts on carries its owner's
   token, never a closure (programming-model.md, 4.2), as skein-ui's
   bindings are (skein's `ui.md`, section 6). jig's bindings say what
-  each of jig's tokens means and decode an act into jig's action
-  (section 5).
+  each of jig's tokens means and decode an act into the reference UI's
+  action (section 5).
 - **Diffed, not replaced,** by skein-ui's diff (skein's `ui.md`, section
   7): a matched node keeps its id, so the platform keeps focus, caret,
-  selection and scroll; a field's value is written only when the domain
-  wrote it (section 6).
+  selection and scroll; a field's value is written only when the
+  reference UI wrote it (section 6).
 - **Slots, spliced.** jig's pages and cards leave slots for an
   application's parts, and an application's pages leave them for jig's
   cards and sections; the view root fills each from its owner's view
@@ -68,54 +87,63 @@ listed in section 14, and what waits in section 16.
 - **Owners, mapped.** jig's typed owner, jig or one of the application's
   by the number both its roots share, maps onto skein-ui's opaque owner
   (section 3; root.md, section 15).
-- **Words from a phrasebook.** Phases, holds, amounts and times are said
-  in jig's phrases by skein-ui's phrasebook: jig ships English, and an
-  application may give its own as data (section 7).
-- **Sized from the domain's limits,** by jig's constructors of skein-ui's
-  limits, so a tree always fits (section 10).
-- **No framework.** The view is step code under the subset, as the
-  domain is; a framework's closures, signals, hooks and scheduler are
-  what the subset leaves out (programming-model.md, section 10). The
-  domain and its worlds would not change if one rendered the same tree.
+- **Words from phrasebooks.** jig's enums (phases, holds, refusals) are
+  said with the helper `words`, the reference UI's own sentences with
+  its phrases, both by skein-ui's phrasebook: jig ships English, and an
+  application overrides either phrase by phrase, as data (section 7).
+- **Sized from limits,** the reference UI's and the client's, by jig's
+  constructors of skein-ui's limits, so a tree always fits (section 10).
+- **No framework.** The reference UI is step code under the subset, as
+  the client is; a framework's closures, signals, hooks and scheduler
+  are what the subset leaves out (programming-model.md, section 10). Its
+  state and its worlds would not change if one rendered the same tree.
 - **skein's shells, with jig's parts.** A terminal client composes
   skein's text shell with jig's settings (section 15); a browser shell
-  composes skein's browser parts with jig's sign-in part, the link's
-  adapter and jig's look (section 11).
+  composes skein's browser parts with jig's, in `jig-client-shell-web`:
+  the client's adapter, the printed link's sign-in and jig's look
+  (section 11).
 
 ## 2. Structure
 
 ```
-jig-view/src/
+jig-client-view/src/
+├── ui.rs           the reference UI's state machine: its events and requests, step, fire (section 18)
+├── address.rs      its places, and their codec (pages.md, section 2)
+├── page.rs         the page at the place: its sections, handles, windows, folds and filters (18.2; pages.md, 12.5)
+├── objects.rs      the working set: objects by key, their revisions and card states (18.3)
+├── intents.rs      the requests it sent, by key, and what each is about (18.4)
+├── drafts.rs       fields, drafts and the confirmation's state (18.5)
+├── records.rs      its own records: drafts and the place (18.8)
 ├── owner.rs        jig's owner, and its mapping onto skein-ui's (section 3)
 ├── regions.rs      jig's region names, each with its name (pages.md, 12.4)
 ├── styles.rs       jig's style tokens, each with its name (section 13)
 ├── binding.rs      jig's bindings: its meanings, their table, the binding constructors, decoding (section 5)
-├── phrases/        jig's phrases and their holes (jig.rs), and English (english.rs) (section 7)
-├── words.rs        phases, holds, executors, amounts, spans, times, in jig's phrases
-├── turns.rs        a conversation's turns and its provisional text (section 9)
+├── phrases/        the reference UI's phrases and their holes (jig.rs), and English (english.rs) (section 7)
+├── turns.rs        a conversation's thread as nodes, and its provisional text (section 9)
 ├── frame.rs        the frame's parts, and jig's banner (section 4.1)
 ├── confirmation.rs the confirmation
-├── notices.rs      the notices
+├── notices.rs      the notices: kept, timed and built (18.7)
 ├── cards.rs        each card, and their shared parts: head, context, state
 ├── sections/       each section of jig's pages, and the pages' headers (section 4.1)
 ├── pages.rs        jig's default arrangement, `after_page` and the owed cards; the pages not about the work
-├── facts.rs        a decision's facts, as jig's sayings (section 4)
-├── check.rs        jig's check (section 4)
 ├── draw.rs         jig's drawing code, which draws no kind (section 17)
-├── limits.rs       jig's constructors of skein-ui's limits, and jig's scratch (section 10)
+├── limits.rs       its limits and worst case, jig's constructors of skein-ui's limits, and jig's scratch (sections 10 and 18.9)
 └── tests.rs
 ```
 
-It depends on `skein-ui` and `jig-domain-client`. What every
-application's view shares is skein-ui's, and jig-view uses it without
-repeating it: the tree and its vocabulary, owners, the builder with
-slots and splicing, bindings and acts, the diff and its patches, the view
-that keeps the last tree, tokens, region names and the look's names, the
-phrasebook's machinery, the Markdown reader, scenes, the outline's rules,
-and `Limits` with its worst case (skein's `ui.md`, section 2).
+It depends on `skein-ui` and `jig-client`, and on nothing else of
+jig's: the client's surface, its documents and its helpers are all it
+uses. What every application's view shares is skein-ui's, and the
+reference UI uses it without repeating it: the tree and its vocabulary,
+owners, the builder with slots and splicing, bindings and acts, the diff
+and its patches, the view that keeps the last tree, tokens, region names
+and the look's names, the phrasebook's machinery, the Markdown reader,
+scenes, the outline's rules, and `Limits` with its worst case (skein's
+`ui.md`, section 2).
 
-The application's view root (`<application>-view`) depends on jig-view,
-on skein-ui, and on its families' views.
+The application's view root (`<application>-client-view`:
+`jig-ops-client-view`, `jig-client-test-view`) depends on
+`jig-client-view`, on skein-ui, and on its families' views.
 
 ## 3. The tree
 
@@ -126,28 +154,29 @@ and properties, owners, text, values and keys, images and drawings
 state: jig says provisional text is provisional in words (section 9).
 What of the tree is jig's:
 
-- **jig's owner.** `jig_view::Owner` is `Jig`, or `Application {
+- **jig's owner.** `jig_client_view::Owner` is `Jig`, or `Application {
   number }`, one of the application's owners by its `u16` (root.md,
   section 15); there is no other kind, so an owner that is not a
   connector's (root.md, 15.1) names its nodes as a connector's side does.
-  It maps onto skein-ui's opaque owner (skein's `ui.md`, 3.3) by a total
-  function, an application's number to the same number and jig to
-  65536, one past every `u16`, so the two never meet; and back by a
-  partial one, which gives none for a number that names no owner. Both
-  are matched whole. Every key, style token, region name, binding, slot,
-  drawing kind, picture and phrase jig's view builds names jig.
+  It maps onto skein-ui's opaque owner (skein's `ui.md`, 3.3), and onto
+  the client's asker (client.md, section 4), by a total function, an
+  application's number to the same number and jig to 65536, one past
+  every `u16`, so the two never meet; and back by a partial one, which
+  gives none for a number that names no owner. Both are matched whole.
+  Every key, style token, region name, binding, slot, drawing kind,
+  picture and phrase the reference UI builds names jig.
 - **jig's names in the tree:** its keys, one kind per kind of object, so
   lists diff by object; its region names (pages.md, 12.4); its style
   tokens (section 13); its pictures, in jig's look (section 13); no
   drawing kind (section 17).
-- **A field's value** carries `jig-domain-client`'s count of its own
-  writes to the field (client.md, section 9) as skein-ui's count of the
-  owner's writes (skein's `ui.md`, 3.4).
+- **A field's value** carries the reference UI's count of its own writes
+  to the field (18.5) as skein-ui's count of the owner's writes (skein's
+  `ui.md`, 3.4).
 - **Menus and disclosures** are skein-ui's (skein's `ui.md`, section 3):
   a card or a page offers the acts past the few it shows in a menu, and
   a disclosure's content stays in the tree while a shell folds it, the
   fold the shell's and lost on a reload. A fold that leaves what it
-  folds out of the tree is the domain's instead (client.md, section 9).
+  folds out of the tree is the reference UI's state's instead (18.5).
 - **An application's own kinds of node** are drawings (skein's `ui.md`,
   3.5): a chart of an incident's error rate, a map of a pool's
   environments, a timeline, each with a fallback saying what it shows in
@@ -165,12 +194,13 @@ What of the tree is jig's:
   at most once; Escape only inside a dialog. `skein_ui::outline::check`
   gives the first fault, naming the rule and the node; the referee runs
   it on every tree a person sees, in jig's worlds and in each
-  application's (testing.md, section 6).
+  application's on skein's UI kit (testing.md, 6.3).
 - **jig adds none.** An application places jig's frame's parts and
   `after_page`'s parts where it likes, or omits them; what a person
   loses when one is omitted is said in pages.md, section 2 and 12.1.
-- **jig's default arrangement** (`jig_view::jig`; pages.md, 12.3) keeps
-  this outline, as defaults an application may use, copy or ignore:
+- **jig's default arrangement** (`jig_client_view::jig`; pages.md, 12.3)
+  keeps this outline, as defaults an application may use, copy or
+  ignore:
   1. the banner, first, holding jig's link (`jig-link`), what needs the
      party (`jig-needs`) and who is signed in (`jig-party`), on every
      page (pages.md, 12.1);
@@ -183,9 +213,10 @@ What of the tree is jig's:
 
   Forms and searches are inside the others (a new chat's form, the
   notes' search), and a page not about the work (pages.md, section 8) is
-  inside the main. jig-view's tests check that jig's default arrangement
-  keeps its banner, with those three regions, and `after_page`'s parts
-  last, on each of jig's pages (testing.md, section 2).
+  inside the main. The reference UI's tests check that jig's default
+  arrangement keeps its banner, with those three regions, and
+  `after_page`'s parts last, on each of jig's pages (testing.md,
+  section 2).
 
 ## 4. Building
 
@@ -196,12 +227,12 @@ What of the tree is jig's:
 - **jig's primitives** each build one part of a tree, or nothing, where
   the application calls them, and bind what they build with jig's
   bindings (section 5); 4.1 lists them:
-  - *a card* is a function over the builder, the domain and its object,
-    called wherever the card shows; its place changes its line of
-    context only;
-  - *a section* is a function reading the domain's state for one of the
-    page's sections (client.md, 5.1) and calling the cards' functions
-    for the objects it names;
+  - *a card* is a function over the builder, the reference UI's state,
+    the client and its object, called wherever the card shows; its place
+    changes its line of context only;
+  - *a section* is a function reading the reference UI's state and the
+    client's documents for one of the page's sections (pages.md, 12.5)
+    and calling the cards' functions for the objects it names;
   - *the frame's parts* (`frame::link`, `needs`, `party`, `projects`,
     `go_to_task` and `navigation`) are functions, each placed anywhere
     or nowhere; `frame::banner` is jig's default banner of the first
@@ -224,23 +255,23 @@ What of the tree is jig's:
 - **The view root** builds a client's whole tree with skein-ui's
   builder, in the arrangement it chooses:
   1. under its page node, its landmarks and dialogs, from jig's
-     primitives, its own nodes and its families' views: at an address of
+     primitives, its own nodes and its families' views: at a place of
      jig's, jig's page or its own arrangement of the page's sections,
-     headers and heading; at the application's address, its page, from
+     headers and heading; at the application's place, its page, from
      its owner's view; on a page not about the work, jig's
-     (`pages::not_the_work`), whatever the address, or its own, from the
-     domain's page (client.md, section 5); then the page node is closed;
+     (`pages::not_the_work`), whatever the place, or its own, from the
+     reference UI's page (18.2); then the page node is closed;
   2. each slot's nodes, in two passes, from the slot's owner's view,
      which the builder splices in at the slot, since it splices only a
      tree whose nodes are all closed.
 
-  `jig_view::jig` is jig's default: it builds the banner
+  `jig_client_view::jig` is jig's default: it builds the banner
   (`frame::banner`), the navigation (`frame::navigation`, with the
   application's entries in their slot), jig's main (`pages::main`) and
-  `after_page`, and returns true; when the domain's page is the
-  application's (elsewhere: client.md, section 5) it builds the banner
-  and the navigation only and returns false, and the root builds its
-  main, then calls `after_page`, or places its three parts its own way.
+  `after_page`, and returns true; when the page is the application's
+  (elsewhere: 18.2) it builds the banner and the navigation only and
+  returns false, and the root builds its main, then calls `after_page`,
+  or places its three parts its own way.
 - **Two deep.** A family's page may leave slots for jig's cards and
   sections, which the view root fills from jig's view, and those leave
   slots for parts in turn, which the second pass fills: a section's
@@ -248,49 +279,49 @@ What of the tree is jig's:
   therefore nest two deep, never more: the builder splices in two
   passes, and the tree's capacity counts both.
 - **A slot left empty** shows as loading, and one its owner cannot show
-  says so (a section the domain does not show on this page, a part its
-  owner does not know); neither breaks the page.
+  says so (a section the reference UI does not show on this page, a part
+  its owner does not know); neither breaks the page.
 - **jig's objects, presented by an application.** jig's card and section
   functions are the defaults. An application may instead present one of
-  jig's objects itself, from jig's domain data: it names the object as a
-  card's slot does (root.md, section 7), so `jig-domain-client` holds it
-  in its working set, follows it live and counts it shown on the page,
-  never owed; it reads the object's document from the domain and builds
-  its own nodes, binding each act through jig's binding constructors
-  (section 5), whose acts jig's decoders turn into jig's actions. jig's
-  promise holds without mandating its nodes:
-  - *held by construction, whatever the tree:* a deciding act goes
-    through the domain's confirmation (client.md, section 9); it names
-    the revision of the data its binding was issued from, and a revision
-    that moved is refused (contract.md, 5.2); made once, nothing lost and
-    nothing shown done before it is durable are the domain's and the
-    engine's, not the tree's;
-  - *exported as data:* `jig_view::facts` gives the facts a card's
-    promise rests on, as jig's sayings (section 7): the object's state, a
-    refusal and why, what a decision will do and whether it is
-    dangerous, from the object's document and the open confirmation; the
-    application says them with jig's words, in nodes of its own;
-  - *checked, not mandated:* `jig_view::check` holds a tree a person
-    acted on to one rule: a deciding act was made on a tree that showed
-    its decision's facts, in the open confirmation or within the acted
-    node's nearest named region. The referee runs it on every tree a
-    person acted on, in jig's worlds and in each application's, so an
-    application that presents jig's objects itself is held to it in its
-    own worlds (testing.md, sections 6 and 8);
-  - *the application's to show:* the confirmation's step and the
-    revision in jig's bindings stay fixed, since they are the domain's,
-    not the tree's; the rest of a card's promise is the application's to
-    show when it presents the object itself, checked by jig's check in
-    its worlds, never at run.
+  jig's objects itself, from the object's document as the client
+  delivers it: on a page of the reference UI, it names the object as a
+  card's slot does (root.md, section 7), so the reference UI holds it in
+  its working set, follows it live and counts it shown on the page,
+  never owed, and its nodes may bind their acts through jig's binding
+  constructors (section 5), so they go through the reference UI's
+  confirmation; with no reference UI, it watches the object's subject
+  through the client and sends the decision itself. jig's promise holds
+  without mandating its nodes:
+  - *held below any tree:* a decision names the revision of the
+    document it was decided on, and a revision that moved is refused
+    (contract.md, 5.2); made once, nothing lost and nothing reported
+    answered before it is durable are the client's and the engine's
+    (client.md, section 6), not the tree's;
+  - *given as data:* what a decision will do is in the object's document
+    (contract.md, 5.4); the helper `facts` reads it, with the object's
+    state, a refusal and why, and whether the act is dangerous
+    (client.md, section 19); the application says them with `words` or
+    its own, in nodes of its own;
+  - *checked, not mandated:* jig's check, which the referee runs in
+    jig's worlds and in each application's, finds a decision whose
+    revision was not in a document the client delivered to the
+    application before it was sent, and, on a tree a person acted on, a
+    deciding act made on a tree that did not show its decision's facts,
+    in the open confirmation or within the acted node's nearest named
+    region (testing.md, 6.2);
+  - *the application's to show:* the confirmation is the application's
+    (contract.md, 5.4); the reference UI keeps jig's, and the rest of a
+    card's promise is the application's to show when it presents the
+    object itself, checked by jig's check in its worlds, never at run.
 
 ### 4.1 The parts, sections and pages, as functions
 
-Each takes skein-ui's builder, `jig-domain-client`'s `Domain`, jig's
-words and jig's bindings (`b, client, words, bindings`), and what its
-line names; each builds the regions and landmarks pages.md, section 12,
-names for it, with their region names, and each has a companion that
-counts the most nodes it may build (section 10). Each is a primitive:
-the application calls it where it likes, or not at all.
+Each takes skein-ui's builder, the reference UI's state, the client,
+jig's words and jig's bindings (`b, ui, client, words, bindings`), and
+what its line names; each builds the regions and landmarks pages.md,
+section 12, names for it, with their region names, and each has a
+companion that counts the most nodes it may build (section 10). Each is
+a primitive: the application calls it where it likes, or not at all.
 
 - **The frame's parts** (`frame`, pages.md, 12.1): `link`, `needs`,
   `party`, `projects` and `go_to_task`, each a region the application
@@ -302,53 +333,48 @@ the application calls it where it likes, or not at all.
 - **The sections** (`sections`, pages.md, 12.2):
   `section(…, section: Section) -> bool` builds one section of the page,
   a region with its level-2 heading, or nothing, returning false, when
-  the domain does not show that section on this page (client.md, 5.1).
-  The headers, each shown with any of its page's sections:
+  the reference UI does not show that section on this page (pages.md,
+  12.5). The headers, each shown with any of its page's sections:
   `inbox::header`; `task::header` and `task::tabs`, naming the task;
   `project::header` and `project::tabs`, naming the project. Each builds
   nothing, returning false, while no section of its subject is shown.
 - **The pages** (`pages`): `heading`, the page's level-1 heading in
   jig's words; `main(…) -> bool`, the main landmark with jig's page at
-  the address in jig's arrangement (its heading, its header, its tabs
+  the place in jig's arrangement (its heading, its header, its tabs
   unless the page shows every section its subject offers, then each
-  section the domain shows, in their order), or a page not about the
-  work; it builds nothing and returns false when the page is the
-  application's (the domain's page is elsewhere: client.md, section 5);
-  `not_the_work(…) -> bool`, which opens the main and builds the page
-  not about the work (pages.md, section 8), returning false, and
-  building nothing, when the page is about the work or the
-  application's.
+  section the reference UI shows, in their order), or a page not about
+  the work; it builds nothing and returns false when the page is the
+  application's (elsewhere: 18.2); `not_the_work(…) -> bool`, which
+  opens the main and builds the page not about the work (pages.md,
+  section 8), returning false, and building nothing, when the page is
+  about the work or the application's; it takes the application's slot
+  for its ways of signing in, which the sign-in page leaves after the
+  printed link's, as the navigation leaves one for its entries.
 - **`after_page`'s parts,** each building nothing when it has nothing to
   show:
   - `pages::owed`: the cards the page still owes, in a complementary
     landmark. A card is owed while it is deciding, leaving, or unknown
-    whether made (client.md, sections 5 and 6) and no section of the
-    page and no card the application's page names shows it: its object
-    named by none of the page's sources, or a proposal that left the
-    plan's rows while the page shows that plan (client.md, section 5)
-    and no conversation the page shows names it. A card a shown
-    conversation holds, at the call that made its object or a line
-    deciding it (section 9), stays there, on a page that shows the plan
-    beside it too, and is never owed. It is decided from the domain,
-    never from the tree built so far, since slots are filled after it;
+    whether made (18.3 and 18.4) and no section of the page and no card
+    the application's page names shows it: its object named by none of
+    the page's handles, or a proposal that left the plan's rows while
+    the page shows that plan and no conversation the page shows names
+    it. A card a shown conversation holds, at the call that made its
+    object or a line deciding it (section 9), stays there, on a page
+    that shows the plan beside it too, and is never owed. It is decided
+    from the reference UI's state, never from the tree built so far,
+    since slots are filled after it;
   - `confirmation::confirmation`: the open confirmation, a dialog, its
     cancel button naming Escape (skein's `ui.md`, 6.1);
   - `notices::notices`: the notices, a named region, and dismissing
     them.
 - **`after_page`:** jig's default, the three in that order, built last
   (section 3.1).
-- **`jig(b, client, nav, words, bindings) -> bool`:** jig's default
+- **`jig(b, ui, client, nav, words, bindings) -> bool`:** jig's default
   arrangement, as section 4 says.
 - **Cards** (`cards::card`): one function per card, wherever jig shows
   it (objects.md, section 2).
-- **The binding constructors** (section 5), for an application that
-  presents jig's objects itself.
-- **`facts`:** from the domain, one of jig's objects or the open
-  confirmation, and jig's words, a decision's facts as jig's sayings,
-  within jig's limits (section 4).
-- **`check`:** from a tree a person acted on, the node acted on, the
-  action its act decoded into and that decision's facts (`facts`), none
-  or the fault, naming the node (section 4; testing.md, section 6).
+- **The binding constructors** (section 5), for an application's own
+  nodes on a page of the reference UI that act on jig's objects.
 
 ## 5. Bindings
 
@@ -361,27 +387,29 @@ owner's view. Shortcuts are
 skein-ui's (skein's `ui.md`, 6.1), and so is a link's address (skein's
 `ui.md`, 6.2). What is jig's:
 
-- **jig's meanings.** jig's view keeps, for the tree it last built, a
-  bounded table (`JigBindings`) of what each of its tokens means
-  (`JigMeaning`): go to an address, edit a field, submit, intend an act
-  on an object, choose, confirm, dismiss, fold, filter, read more, sign
-  in. Each family's view keeps its own.
-- **Decoding:** `jig_view::decode` turns one of jig's tokens and an act
-  into jig's action, or nothing; the view root wraps it with its owner
-  for the domain's root.
+- **jig's meanings.** The reference UI keeps, for the tree it last
+  built, a bounded table (`JigBindings`) of what each of its tokens
+  means (`JigMeaning`): go to a place, edit a field, submit, intend an
+  act on an object, choose, confirm, dismiss, fold, filter, read more,
+  sign out. Each family's view keeps its own.
+- **Decoding:** `jig_client_view::decode` turns one of jig's tokens and
+  an act into the reference UI's action, or nothing; the application
+  steps the reference UI with it (18.1).
 - **The binding constructors.** `JigBindings`' constructors issue a
-  binding for one of jig's meanings, which jig's cards use and an
-  application presenting jig's objects itself uses alike (section 4): an
-  act on an object is bound from the object as `jig-domain-client` holds
-  it when the tree is built, so the decision names the revision that
-  data carried. The binding's owner is jig, whatever node carries it:
-  the view root hands its acts to jig's view, which decodes them as any
-  of jig's.
+  binding for one of jig's meanings, which jig's cards use, and which an
+  application's own nodes on a page of the reference UI may carry to act
+  on one of jig's objects (section 4): an act on an object is bound from
+  the object as the reference UI holds it when the tree is built, so the
+  decision names the revision of the document that object came from, and
+  goes through the reference UI's confirmation. The binding's owner is
+  jig, whatever node carries it: the view root hands its acts to jig's
+  view, which decodes them as any of jig's. An application with no
+  reference UI binds its own nodes with its own bindings, and sends its
+  requests through the client itself.
 - **A link's address, for a shell.** A link node of jig's resolves,
-  without acting, to jig's address, which the application's client host
-  prints as a path with its codec (`../../protocol/browser.md`, section
-  9), as skein-ui's addresses are given to a shell (skein's `ui.md`,
-  6.2).
+  without acting, to the reference UI's place, which the application
+  prints as a path with its codec (pages.md, section 2), as skein-ui's
+  addresses are given to a shell (skein's `ui.md`, 6.2).
 - **The act on a drawing:** every owner's view matches it; jig's decodes
   it into nothing (section 17).
 - **jig's shortcuts:** jig's nodes name none but Escape, which the
@@ -390,10 +418,10 @@ skein-ui's (skein's `ui.md`, 6.1), and so is a link's address (skein's
 - **Two kinds of stale, both dropped, neither an error:** a node the last
   patches removed decodes to nothing, as skein-ui's view drops it; a
   node still there whose object has left the working set carries a
-  handle the domain refuses.
+  handle the reference UI refuses.
 - **Typed input is made here:** a field's digits become a number, with
   skein-ui's `number` (skein's `ui.md`, section 6), or nothing when they
-  are not one, as the protocol layer makes bytes typed for the domain.
+  are not one, as the protocol layer makes bytes typed for the client.
 
 ## 6. The diff
 
@@ -402,12 +430,14 @@ by position, patches, nodes never replaced while they can be updated,
 bindings the view's, and bounded by the two trees. What is jig's are the
 counts it reads:
 
-- **A field's write count** is `jig-domain-client`'s count of its own
-  writes to that field (client.md, section 9): a matched field whose
-  count did not move gets no value patch, whatever its text, so what the
-  person is typing stays theirs.
-- **The view's staleness** is `jig-domain-client`'s count of what is
-  shown: the view builds the next tree, and diffs it, when it moved.
+- **A field's write count** is the reference UI's count of its own
+  writes to that field (18.5): a matched field whose count did not move
+  gets no value patch, whatever its text, so what the person is typing
+  stays theirs.
+- **The view's staleness** is the reference UI's count of what is shown,
+  which moves with its own state and with each document the client
+  reports changed for one of its handles: the view builds the next tree,
+  and diffs it, when it moved.
 
 ## 7. Words
 
@@ -416,27 +446,34 @@ by their owner, typed holes, plural classes, languages given as data, a
 capacity checked when a phrasebook is loaded, and saying into a bounded
 buffer, with skein-lib's decimal for numbers. What is jig's:
 
-- **Facts in, words out.** The domain carries typed facts; jig's view
-  says them, from tables that match the domain's enums whole, so a new
-  phase or hold is a build error until it is said.
-- **jig's phrases** (`JigPhrase`, `phrases/jig.rs`) are the sentences
-  jig's view says ("held: out of tries", "funds 40 from your pool: 120
-  left this period, 80 after"), with typed holes: a number, an amount, a
+- **Facts in, words out.** The client's documents and the helpers carry
+  typed facts; the reference UI says them, from tables that match jig's
+  enums whole, so a new phase or hold is a build error until it is said.
+- **jig's enums, in `words`.** The helper `words` (client.md, section
+  19) holds jig's phrases for its enums (phases, holds, executors,
+  outcomes, refusals) and their English, a phrasebook the reference UI
+  says every enum with, loaded into skein-ui's machinery beside its own
+  phrases. An application overrides it phrase by phrase: its own
+  wording, or another language, as data, which the reference UI then
+  says.
+- **The reference UI's phrases** (`JigPhrase`, `phrases/jig.rs`) are the
+  sentences of its pages and cards ("funds 40 from your pool: 120 left
+  this period, 80 after"), with typed holes: a number, an amount, a
   span, a wall time, a name, and skein-ui's reference hole, which jig
   uses for a task: its title with its number as the reference, copied
   unchanged, whose span jig builds as a chip linking to its page
   (objects.md, section 3). Each family's view has its own.
-- **English is jig's** (`phrases/english.rs`): an application, or a
-  deployment, may give another language, with the application's own
-  phrases beside jig's.
+- **English is jig's** (`phrases/english.rs`, and `words`' own): an
+  application, or a deployment, may give another language, with the
+  application's own phrases beside jig's.
 - **The language** is the person's, as the shell reads it from the
   platform, or as the person chose it.
 - **Names are copied in,** never translated: a task's title, a party's
   name, a resource's words.
 - **A shell's own words.** The words jig's look gives the browser's
-  parts (a credential shown once, the client failed) are jig's phrases,
-  in the person's language (`../../protocol/browser.md`, section 5 and
-  3.3). The text shell's markers and refusals are skein's
+  parts (a credential shown once, the application failed) are jig's
+  phrases, in the person's language (`../../protocol/browser.md`, 3.3
+  and section 5). The text shell's markers and refusals are skein's
   (skein's `ui-text.md`, sections 5 and 6).
 
 ## 8. Markdown
@@ -450,38 +487,43 @@ tests feed it agents' replies and results kept as files beside them.
 
 ## 9. Conversations
 
-- **Turns** are the client's own (client.md, section 10): each message's
-  blocks become nodes, text as Markdown, each call a folded line naming
-  its tool and its outcome, opened on demand to its input and its
-  result.
+- **A conversation is a thread:** the helper `thread`'s `Thread`
+  (client.md, section 19), built from the task's activity read in
+  pages, the person's words pending and sent, and the run's provisional
+  text, which the reference UI turns into nodes: each message's blocks,
+  text as Markdown, each call a folded line naming its tool and its
+  outcome, opened on demand to its input and its result. Turns are
+  decoded below the client (client.md, section 10), so the reference UI
+  links nothing of smith's.
 - **Calls to the engine** show as the cards of what they made, live.
 - **Provisional text** is said to be provisional in words: its region
   holds a status in jig's phrase for it, and carries jig's style token
   `jig-provisional`, its look (section 13). There is no provisional
-  state (skein's `ui.md`, 3.2). It shows as it comes, and is replaced by
+  state (skein's `ui.md`, 3.2). It shows as it comes, and gives way to
   the turn once it commits, matched by its key so the place on screen
   holds.
 - **The conversation is a log:** its role tells a shell to keep its end
   in view as it grows, while the person has not scrolled away.
 
-## 10. Sized from the domain's limits
+## 10. Sized from limits
 
 `skein_ui::Limits` and `skein_ui::worst_case` are skein-ui's (skein's
 `ui.md`, section 15): the most nodes, the depth, a node's text and the
 text bytes, a drawing's bytes, a node's style tokens, the patches, the
 bindings, the slots, Markdown's depth, a scene's marks and bytes, and
 the heap skein-ui's own containers take for them. jig's are the
-constructors that derive the numbers from the domain's limits
-(`jig_view::limits::of`, `compose`, `of_words` and `envelope`, each
-returning `skein_ui::Limits`), and jig's own scratch, which jig's worst
-case adds to skein-ui's.
+constructors that derive the numbers from the reference UI's limits
+(18.9) and the client's (client.md, section 14)
+(`jig_client_view::limits::of`, `compose`, `of_words` and `envelope`,
+each returning `skein_ui::Limits`), and jig's own scratch, which jig's
+worst case adds to skein-ui's.
 
 Each of jig's parts, sections and pages has a companion that counts the
 most nodes it may build with every window full and every text at its
 most bytes, and the largest page is the tree's capacity. A page showing
 sections together counts their sum, so the limits take the arrangement:
 `limits::of` and `limits::compose` count jig's pages with the sections
-the application's `Arrangement` adds beside each address's own. A
+the application's `Arrangement` adds beside each place's own. A
 Markdown text builds at most a fixed number of nodes per byte. The
 application's view root counts its own arrangement from the same
 companions: the parts and sections it builds, its families' pages, its
@@ -501,33 +543,34 @@ as files; components, a shell's native implementation of a node
 (skein's `ui.md`, section 12). In a browser, skein's browser parts
 (skein's `ui-web.md`). What is jig's:
 
-- **The order that protects requests.** The host, the application's loop
-  over its shell's parts and its client host, runs one step for each
-  event, then does what it asked, in order: the small store written,
-  then jig's link's requests sent, then the address shown; once no
-  report waits, it builds and applies the patches. The parts hold the
-  order, so no order of the loop breaks it: `jig-shell-native`, and in a
-  browser skein's transport, hold a step's requests until its small
-  store's writes are done (skein's `ui-web.md`, 5.3).
-- **A panic is fail-stop:** the shell restarts the client, as a
-  supervisor restarts a process, and its small store and its keys make
-  what was pending safe to send again.
+- **The order that protects requests** is the client's and its
+  transport's: a request is kept in the client's small store before it
+  is sent, whatever the loop (client.md, section 11;
+  `../../protocol/browser.md`, 5.3). The application's loop gives the
+  reference UI's records to be written with the client's, in the same
+  step's writes (18.8), shows the place the reference UI asked for, and,
+  once no report waits, builds and applies the patches.
+- **A panic is fail-stop:** the shell restarts the application, as a
+  supervisor restarts a process, and the client's small store and its
+  keys make what was pending safe to send again; the reference UI comes
+  back to its place and its drafts from its records.
 - **jig's shells and parts:**
-  - *jig's browser parts* (`jig-shell-web`), beside `skein-ui-web`'s:
-    the sign-in part (the cookie, the printed link, the providers,
-    signing out, a credential shown once); the link's adapter, from
-    jig's link's requests to the transport's plain data and from fetch's
-    reports to the link's events; and jig's look (`jig.css`, jig's
-    palette, its pictures, its phrases for the parts' words). An
-    application's browser shell, copied from jig's reference,
-    `jig-test-shell-web`, composes them with skein's parts and its
-    client host; its bundle, under the prefix `/jig/client/`, is served
-    by the engine from its one origin under a strict content security
-    policy (`../../protocol/browser.md`, sections 3, 11 and 12);
-  - *the native one* (`jig-shell-native`): skein's HTTP client and its
-    server-sent events reader, for Linux and for the worlds that make
-    bytes real; it carries jig's link, not the tree, and with no view it
-    is a service's shell;
+  - *jig's browser parts* (`jig-client-shell-web`), beside
+    `skein-ui-web`'s: the client's adapter, which carries the client's
+    exchanges, its stream and its small store over skein's fetch,
+    transport and small store through the default HTTP mapping; the
+    printed link's sign-in; and jig's look (`jig.css`, jig's palette,
+    its pictures, its phrases for the parts' words)
+    (`../../protocol/browser.md`, sections 3 and 5). An application's
+    browser shell on the reference UI is copied from jig's reference,
+    `jig-client-test-shell-web`; its page and its bundle are served by
+    the application's server, under its page's policy
+    (`../../protocol/browser.md`, section 12);
+  - *the native one* (`jig-client-shell-native`): skein's HTTP client
+    and its server-sent events reader with `jig-client-protocol-http`,
+    for Linux and for the worlds that make bytes real; it carries the
+    client's messages, not the tree, and with no view it is a service's
+    shell;
   - *the text shell:* skein's (`skein-ui-text`), which an application's
     terminal client composes with jig's settings, in front of the native
     one (section 15).
@@ -537,7 +580,7 @@ as files; components, a shell's native implementation of a node
 - **Drawings:** jig's view draws no kind of its own (section 17).
 - **An application's shell,** a phone's or a desktop's, mapping the same
   tree onto its platform (skein's `ui.md`, 16.2 and 16.3), is the
-  application's to write over the same domain and view. Graphics beyond
+  application's to write over the same client and view. Graphics beyond
   a scene (a canvas of hundreds of thousands of points, three
   dimensions, video) are not jig's: a component of the application's
   draws them (skein's `ui.md`, section 12).
@@ -599,7 +642,7 @@ is a fact. What is jig's:
   one `macro_rules!` expanding to the same calls of skein-ui's builder,
   the one place a macro might live.
 - **Right-to-left languages:** right-to-left text waits as vocabulary
-  (skein's `ui.md`, 4.2); what they ask of jig's phrasebook and pages
+  (skein's `ui.md`, 4.2); what they ask of jig's phrasebooks and pages
   beyond it waits with it.
 - **Other browsers** than Chromium, which skein's browser kit drives
   (skein's `browser.md`, section 11).
@@ -609,9 +652,10 @@ is a fact. What is jig's:
 `skein-ui-text`, skein's text shell (skein's `ui-text.md`), prints a
 tree as lines and reads each line a person types as an act on a node, a
 print, or closing. It knows no application. An application's terminal
-client is its client root and view root, `jig-protocol-client-link` and
-`jig-shell-native`, composed with `skein-ui-text` and jig's settings
-(15.1), and whatever the application prints of its own.
+client is its client root (the client, with the reference UI or its own
+presentation: root.md) and its view root, `jig-client-shell-native`,
+composed with `skein-ui-text` and jig's settings (15.1), and whatever
+the application prints of its own.
 
 ### 15.1 Its parts
 
@@ -669,11 +713,14 @@ host's iteration; closing on `q`, the end of the input or a termination
 signal. What is jig's:
 
 - **Closing** closes the client without signing out. What is pending
-  stays in the small store, sent at the next start with its keys
-  (client.md, section 11).
-- **Signing in** is the host's: a terminal cannot follow a provider's
-  navigation, so pressing a provider on jig's sign-in page prints the
-  application's own line saying how to sign in.
+  stays in the client's small store, sent at the next start with its
+  keys (client.md, section 11), and the reference UI's drafts and place
+  stay in its records (18.8).
+- **Signing in** is the host's: a terminal follows no browser's
+  navigation, so it signs the client in at start with the printed link's
+  secret or a credential the application's own sign-in gave it
+  (client.md, section 12), and the reference UI's sign-in page prints
+  the application's own line saying how to sign in.
 
 ### 15.6 Its tests
 
@@ -682,19 +729,19 @@ signal. What is jig's:
   section 8).
 - **jig's pages, printed by skein's text shell:** golden text kept as
   files beside jig's tests and changed only by hand, built by jig's test
-  view root from fixture states (the inbox with entries of each kind, a
-  task page with its conversation, a project's sections, the
-  deployment, the pages not about the work), with the first line's
-  link.
-- **The client's worlds play the text shell** (testing.md, section 4),
-  and the client's protocol world runs one story with the terminal in
-  front of its native client: lines in on a pipe, pages out on another
-  (testing.md, section 2).
+  application's view root, `jig-client-test-view`, from fixture states
+  (the inbox with entries of each kind, a task page with its
+  conversation, a project's sections, the deployment, the pages not
+  about the work), with the first line's link.
+- **The reference UI's worlds play the text shell** (testing.md,
+  section 4), and the client's protocol world runs one story with the
+  terminal in front of its native client: lines in on a pipe, pages out
+  on another (testing.md, section 2).
 
 ## 16. Later
 
 Each waits for the application that needs it, and adds without changing
-what sections 3 to 5, 15 and 17 settle.
+what sections 3 to 5, 15, 17 and 18 settle.
 
 - **jig's own drawing kinds:** a chart every application shares, drawn
   by jig's `draw` (section 17). A kind moves into jig, as jig's, when a
@@ -748,3 +795,351 @@ Golden scenes, printed as lines, fix drawing code (skein's `ui.md`,
 sections 11 and 17); a scene as SVG is skein's browser parts' to test
 (skein's `ui-web.md`, section 14). jig's are its test family's: its
 drawing code's golden scenes and its act (testing.md, section 4).
+
+## 18. Its state
+
+What of the reference UI is not a tree: where the person is, what the
+page holds, the requests it sent, what the person is in the middle of,
+and its notices. It is step code under the subset, as the client is
+(programming-model.md, section 3), with its own limits, worst case and
+stories (18.9, 18.10). It keeps no document of its own: it reads each
+from the client, by its handles, when the client reports it changed. It
+decides nothing the engine or the client decides: what is made, when,
+and once, is theirs.
+
+### 18.1 Its surface
+
+```
+jig_client_view::Ui: step(now, &Client, Event, &mut Queue<Request>), fire(now, &Client, &mut Queue<Request>), next_deadline()
+
+made with: its limits; the application's navigation and home; its arrangement
+
+Event, in
+  from the application:
+    Start { records, place, seed }  its own records, as the application kept them; the place the client starts at; its seed
+    Went { place } | Left           a place of the reference UI's gone to; a place of the application's
+    Act { action }                  a person's act on one of its nodes, as its bindings decoded it (section 5)
+    Named { objects, sections }     what the application's page names of jig's, the whole list each time (pages.md, 12.5)
+    Client { told }                 what the client tells under jig's asker, and the link, as the root routes them (client.md, section 4)
+Request, out
+  for the client:      Watch | Unwatch | Read | Send | SignOut               the client's events, under its handles and keys
+  for the application: Show { place, how } | Save { records } | Erase { records } | ShowPart { part, scope } | PartsLeft
+read by the application: ui.sections(), ui.shown()
+```
+
+- **A child of the client root,** as any presentation is (root.md,
+  section 2). The root steps it with the person's acts and the places
+  gone to, which its shell reports, and with what the client tells of
+  its handles and keys and of the link, routed by asker (root.md,
+  section 5).
+- **It asks the client through the root:** each request for the client
+  is one of the client's events, which the root gives the client in the
+  same step; the reference UI never holds the client, and reads it only
+  by the `&Client` the root lends it (`document`, `pending`, `link`).
+- **Its handles and keys** carry its asker, jig's owner, 65536 (section
+  3; root.md, section 15), which the client hands back with everything
+  it tells of them. It numbers its handles itself, and draws its keys'
+  numbers from its seed, fresh for each request it means (client.md,
+  sections 4 and 6).
+- **Navigation, home and arrangement** are given when it is made, as
+  data, and never change after: which of jig's pages the frame offers,
+  in what order, which is home, and the sections its arrangement adds
+  (pages.md, section 2 and 12.5).
+  A navigation naming a page twice, or an arrangement pages.md, 12.5
+  refuses, is refused when it is made.
+- **`ShowPart` and `PartsLeft`** ask the application to show a part in a
+  slot, naming the project or the deployment it shows in, and tell it
+  the page's parts have left (root.md, section 6).
+- **No loop, no call.** It runs no loop of its own, and never calls the
+  application or the client: it is stepped, and asks.
+
+### 18.2 The place and the page
+
+- **One page at a time.** The page at the place is one of the reference
+  UI's (pages.md) or the application's, which it knows only as
+  elsewhere, and by the sections and objects of jig's the application's
+  page names (`Named`). Pages that are not about the work (starting,
+  signing in, a page missing, a client out of date, someone else's
+  work: pages.md, section 8) are pages too, whatever the place.
+- **`me`, always.** It watches `me` from its start, whatever the page,
+  by a handle of its own, which shares the client's own watch of it
+  (client.md, 8.2): the frame's parts, the templates the pages fill, the
+  bounds a draft is compared with, and the party whose work is kept
+  come from it (contract.md, 5.1).
+- **Going to a page** closes the old page's watches (`Unwatch`), forgets
+  its reads, tells the application its parts have left (`PartsLeft`),
+  drops from the working set every object no request in flight is about
+  (18.3), then opens the new page's watches and reads (pages.md, 12.5),
+  and asks for its place to be shown (`Show`). Requests in flight, `me`,
+  drafts and notices carry over.
+- **Handles, not generations.** Each watch and read a page opens has a
+  handle of the reference UI's; what the client tells of a handle the
+  page does not hold is dropped. The client drops what comes for a watch
+  closed or a read abandoned, so a handle may serve the next page at
+  once, and a `Watch` on a handle already open moves it to the new
+  subject (client.md, section 7 and 8.1).
+- **The link is the client's** (`Link`; client.md, 8.2), which the
+  reference UI judges nothing of: starting, live and offline are the
+  frame's link part's to say; signed out and out of date are pages not
+  about the work (pages.md, section 8).
+- **Behind** is the page's: a handle of the page whose state the client
+  gives as behind (client.md, 8.1) makes it behind, and the page says
+  what it shows may be old, beside the link's state. On an application's
+  page, each section of jig's says it in its own region (pages.md,
+  12.5).
+- **Full is a refusal the page shows.** A page whose watches or reads
+  would pass the reference UI's limits opens what fits, and says what it
+  left out; nothing grows.
+
+### 18.3 The working set
+
+- **Objects by key, once.** Each object a card shows is held once, under
+  the key the engine names it by: a task, a proposal, an escalation, a
+  question, a person task, a result. One object may show in several
+  places on a page (an escalation in a task's overview and in its plan);
+  it is one object, with one card.
+- **Read from the client's documents.** Its facts are the documents the
+  client holds for the page's handles (`client.document(handle)`), read
+  each time the client reports one changed. The working set keeps only
+  what no document holds: which handles name each object, its card's
+  state, and, for a leaving object, how it ended.
+- **Sources, not reference counts.** Each object records which of the
+  page's handles name it. Each change stands for the whole of what its
+  handle names: an object no handle names leaves, unless a request about
+  it is pending or it is leaving.
+- **Each object carries the revisions of what may be decided about it,**
+  as its document gave them: a held task its hold's, a task its spec's,
+  a person task its own, a note its own. Each moves only when what is
+  decided on changes, never with spend or a delegate's phase. An act
+  names the one it decides (18.4).
+- **A card's state** (objects.md, section 2):
+  - *open;*
+  - *deciding:* a request about it is pending, shown as asked, never as
+    done;
+  - *refused:* the answer refused it; the card says why, and stays;
+  - *leaving:* it was decided, answered, withdrawn or ended, by this
+    person or another; the card says what happened, by whom and when,
+    and leaves after a linger.
+- **Leaving, whichever comes first.** A card leaves on its request's
+  answer ("you accepted it"), or when no document of the page names it.
+  In the second case, a read of the object's document says how it ended
+  ("Pat released it at 10:14") before it leaves. While a request about
+  it is pending, it stays deciding until the answer, so the person
+  learns how their own request ended.
+- **Full is a refusal the page shows.** A document naming more objects
+  than the working set holds keeps what fits in its order, and the page
+  says how many more there are.
+
+### 18.4 Requests
+
+- **Asked once per intent.** A card's act opens its confirmation (18.5);
+  confirming it sends one request through the client (`Send`), under a
+  key of its own, unless one for the same act on the same object is
+  pending, which the second press joins. A double press and a retry
+  therefore carry the request's one key, and a reload carries it as the
+  client keeps it (client.md, section 11).
+- **One request per act.** What the person sees as one act is one
+  request: one of jig's operations, or one compound request
+  (contract.md, 3.4): amending and releasing a held task; words that
+  release a stopped chat; closing a chat with what becomes of its live
+  delegates; reordering goals. The reference UI never chains two
+  requests, so it never has to undo the first when the second is
+  refused.
+- **Shapes through the helpers.** A chat is started with `shapes::chat`,
+  a goal set with `shapes::set_goal`, a chat closed with
+  `shapes::close_chat` (client.md,
+  section 19), each filling the project's template as `me` serves it; the
+  reference UI sends what they give, and knows no shape of its own.
+- **Shown as asked.** The card is deciding from the confirmation until
+  the answer: "being decided", "retrying", "waiting for the engine", as
+  the client reports the request's progress (`Pending`,
+  `client.pending(key)`). Nothing is shown as done before its answer,
+  which the client reports only once its commit is durable (client.md,
+  section 6).
+- **Said before it is sent.** An object's document offers each act:
+  made; proposable, and to whom; or refused, and why; setting a goal and
+  amending are offered with bounds (contract.md, 5.3). The form
+  and the confirmation compare the draft with the offer's facts (a
+  number no larger, a grant among those listed) and say which before
+  anything is sent: within them, the operation is sent; beyond what the
+  party may do alone but proposable, a `Propose` is sent, the
+  confirmation saying to whom; refused, it says why, as when nobody may
+  accept the proposal, and sends nothing. That is the engine's word
+  read, never authority computed: the engine judges the request again
+  when it comes.
+- **The answer, applied.** Done: the card shows the outcome (made, or
+  proposed, naming the proposal), and leaves if its object stopped
+  waiting. Refused: the card says why, from the refusal's facts
+  (contract.md, section 4), and offers what fits: look at the object
+  again, where it moved; change what was asked, where a limit or the
+  party's authority refused it; propose it, where a `Create` or an
+  `Amend` was refused for want of authority and the refusal says a
+  proposal could be accepted (objects.md, section 9).
+- **Unknown.** A request the client could not send again within the
+  engine's retention may or may not have been made (client.md, section
+  6): the card says so, and where to look.
+- **Not kept.** A request whose record the client could not write was
+  never sent (client.md, section 11): the card says so, and offers it
+  again.
+- **Words are a request too.** A composer's words are a `Message`, shown
+  as being sent while pending, as sent once answered, and as read once a
+  committed turn took them (section 9).
+- **Asks name what they saw.** A release, and a decision about a held
+  task, name its hold's revision; an amendment, the task's spec's; an
+  answer to a person task, its own; a note's correction or deletion, the
+  note's: each as the document the card was built from gave it. The
+  engine refuses one whose revision has moved, saying what it is, and
+  the card asks the person to look again (contract.md, 5.2). A
+  priority-only amendment names none, and the first commit decides.
+- **Kept work.** A request the client restored at start under jig's
+  asker (`Kept`, root.md, section 8) has no card: the reference UI keeps
+  no intent across a restart, since its records are its drafts and its
+  place (18.8). Refused, or unknown whether made, it shows as a notice
+  (18.7); made, it shows in what it made. Kept for another party, it is
+  counted for the page someone else's work (pages.md, section 8).
+- **Bounded.** The intents it keeps are a limit; an act past them is
+  refused in place ("too many requests in flight"), never queued; so is
+  one the client refuses for want of room.
+
+### 18.5 Drafts and the confirmation
+
+- **A field** is something a person types into, named by what it is for:
+  the new chat's words, a task's composer, the open confirmation's
+  reason, an amendment's fields, a new goal's. It keeps the text, and a
+  count of the reference UI's own writes (a composer cleared once its
+  words are sent, a draft restored), so the view writes a field's value
+  only when that count moved and the person's typing is never
+  overwritten (section 6).
+- **Composers keep their drafts per task,** across pages and reloads,
+  among the reference UI's records (18.8), bounded by the drafts kept;
+  the oldest untouched leaves first.
+- **One confirmation at a time:** the act, the object and the revision
+  the act names, as the object's document gave it when the confirmation
+  opened, the choices made (an option of a person task, what becomes of
+  each live delegate on closing), and what is missing (a reason; a draft
+  its offer's bounds say would be refused, 18.4). What it says comes from
+  the object's document through `facts` (client.md, section 19): what an
+  acceptance grants and costs and the pool after, what a cancel ends,
+  what a release will do (contract.md, 5.4), so the view says it
+  without asking anything.
+- **The confirmation is the reference UI's.** The engine asks for none,
+  and an application confirms as it chooses (contract.md, 5.4); the
+  reference UI opens one on every act that decides something, and sends
+  nothing until it is confirmed.
+- **A revision that moves under an open confirmation** marks it changed:
+  a held task's hold, under its release. Confirming it then is refused in
+  place, saying what changed, rather than sent. What the act does not
+  name (spend, a delegate's phase) changes the confirmation's words, not
+  its validity. Bounds that move under an open confirmation, as a newer
+  document gives them, are compared with the draft again, and the
+  confirmation says what it will be: made, proposed, or refused.
+- **A confirmation's fields** are cleared when it closes, confirmed or
+  dismissed.
+- **Folds the reference UI keeps** leave what they fold out of the tree:
+  a plan's level folded into counts, a call folded to its line. They are
+  its state's because opening one changes what is read or built. A
+  disclosure, whose content is always in the tree, is the shell's to
+  fold, and the reference UI never knows it (section 3).
+
+### 18.6 Signing in and out
+
+- **Signed out:** the link says it (client.md, 8.2 and section 12), and
+  the client ends every handle. The reference UI shows the sign-in page
+  (pages.md, section 8), keeping the place to come back to; the requests
+  in flight wait, parked, in the client.
+- **Signing in is the application's:** the printed link's secret or its
+  own sign-in's credential, which its shell or its host gives the
+  client (client.md, section 12), or a browser's cookie, which the
+  client never sees. Once `me` names the party, the reference UI returns
+  to the place it kept.
+- **Signing out,** from the frame's party part, sends the client
+  `SignOut`; the reference UI shows the sign-in page once the client
+  reports the party signed out.
+- **A sign-out that does not reach the engine** leaves the person signed
+  in, as the link says (client.md, 8.2 and section 12): the frame says the
+  sign-out did not reach the engine and offers it again; nothing is
+  shown done before it is (testing.md, 6.3).
+- **A service** has no reference UI, and never sees a sign-in page.
+
+### 18.7 Time and notices
+
+- **Wall times are for showing:** the engine's records carry wall times,
+  and "waiting 4 min" is the view's, from an object's wall time and the
+  step's. While a page shows any, a tick once a minute counts a change to
+  what is shown, so the view builds again.
+- **Deadlines are the reference UI's:** a card's linger, a notice's
+  life, the coalescing of drafts' saves, on the monotonic clock
+  (programming-model.md, section 9). Backoffs and heartbeats are the
+  client's (client.md, section 8).
+- **Notices** are short-lived, for what has no card: a request answered
+  for an object not shown, a refusal with nothing to show it on, a
+  kept request of jig's refused or unknown, the link going and coming
+  back. A card's own outcome is on the card.
+
+### 18.8 Its records
+
+- **Its own records:** the drafts, and where the person was (the place).
+  Nothing else: requests are the client's to keep (client.md, section
+  11), and everything shown is read again.
+- **Kept through the application.** The reference UI asks the
+  application to save and erase them (`Save`, `Erase`), and is given them
+  back at `Start`. The application keeps them where it keeps the
+  client's small store, under keys of the reference UI's own, apart
+  from the client's records, which the client's own saves carry alone:
+  in a browser, skein's small store, the tab's session storage
+  (`../../protocol/browser.md`, section 10); a file, for a terminal.
+- **Written with the client's.** The application gives the transport a
+  step's records of the reference UI's among the step's writes, with
+  the client's, so they are written before the step's exchanges leave:
+  a composer cleared because its words were sent is never restored
+  beside the kept request that carries them.
+- **Versioned** by the reference UI, so a client updated since reads
+  what an older one kept, and a record it cannot read is dropped, never
+  guessed: a draft lost, a place forgotten for the home.
+- **Bounded:** the drafts kept, a draft's bytes and a place's are
+  limits.
+
+### 18.9 Limits and the worst case
+
+Each is configured and part of its worst case:
+
+- objects in a page's working set; rows per window; turns a
+  conversation's window holds; nodes of a plan held;
+- its handles (watches open, `me`'s included, and reads in flight) and
+  intents kept;
+- these, and the objects and windows above, counted for the most
+  sections a page may show together: at a place of jig's, its own with
+  the arrangement's beside them; on an application's page, every
+  section of one task, one project and one inbox filter, with the
+  conversations and the deployment (pages.md, 12.5);
+- drafts kept; notices;
+- bytes a person may write (the engine's own bound on words); bytes of
+  any one text shown (a spec, a result, a turn); bytes of a provisional
+  turn;
+- the linger, a notice's life, the drafts' coalescing.
+
+`worst_case` sums the containers' own and the bytes each entity may hold
+(programming-model.md, 6.3), and bounds what the view builds: the
+view's limits derive from these and the client's, so a tree always fits
+(section 10). An application's worst case adds it to the client's
+(client.md, section 14).
+
+### 18.10 Its world
+
+The reference UI's stories, in a person's terms, run in jig's client
+world with jig's test application and the fake person (testing.md,
+section 4), and in the joint world with the engine's domain (testing.md,
+section 5): signing in and starting a chat; a held chat released; a
+proposal accepted in the inbox while its chat shows it; two tabs
+deciding one thing; a reload with requests pending; the engine
+restarting under a pending request; a watch dropped and the page behind;
+a page left with reads in flight; a draft kept across a reload; a goal
+beyond the person's authority, proposed as the confirmation said it
+would be; a chat closed with one live delegate cancelled and another
+made the person's; goals reordered together; a task's page arranged
+with every section together, a proposal accepted in its plan while its
+conversation shows it; an application's page showing a task's plan in a
+section slot, and a second task's not shown, its slot saying so.
+
+Its referee's rules are testing.md's, section 6: those on the client's
+surface, jig's check, and those on what the person saw.

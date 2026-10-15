@@ -1,6 +1,6 @@
 # jig's domain
 
-Provisional, 2026-10-07, revised 2026-10-12. The design of jig's domain
+Provisional, 2026-10-07, revised 2026-10-15. The design of jig's domain
 layer: the core an application's engine composes, the contract its
 connectors meet, what its root does, where its agents run, and how all
 of it is tested. jig as a whole, and why it is a kit, is `../README.md`;
@@ -26,8 +26,9 @@ mechanics are those of skein's `programming-model.md`.
 6. **root.md:** what an application's root does: the one shape, the
    journal, routing, translation, putting outputs together, and what it
    never does.
-7. **people.md:** parties: identity, roles, requests, inboxes, chats,
-   person tasks, notifications.
+7. **people.md:** parties: identity and credentials, roles, their
+   requests as jig's operations, inboxes, chats as a template, person
+   tasks, notifications.
 8. **hosts.md:** agents and their hosts: the contract, the three shapes,
    the agent's two kinds, both smith's, the one host for runs wherever
    their agents run, smith's payloads it carries, workspaces, and what
@@ -86,7 +87,7 @@ system.
   smith's name and their path there: smith's `domain/run.md`, smith's
   `protocol/channel.md`.
 - **An application** appears only as an example, and says so: `ops`
-  most often, temper where a second example helps.
+  most often, jig's test application where a second example helps.
 - **Each document** says in one page what it is, then its structure, its
   parts, what it owes and is owed below the domain, its world, and what
   is open.
@@ -106,7 +107,7 @@ system.
 | the door | the journal's way out for outputs that decide nothing |
 | project | resources with roles, homes, a policy, parties' roles, notes (core.md, 6.1) |
 | task | a unit of work someone asked for (core.md, 3.1) |
-| goal | a tracked task: a priority, projections, goals' topics, a notes scope (core.md, 6.2) |
+| goal | a tracked task: a priority, projections, goals' topics, a notes scope (core.md, 6.2); jig's goal template gives its defaults |
 | plan | the subtree of tasks one task delegated (core.md, 7.1) |
 | batch | the tasks one decision makes, checked whole (tasks.md, section 4) |
 | input | an ended task's result a new task names |
@@ -114,7 +115,11 @@ system.
 | executor | who carries a task out: an agent, a procedure, a party |
 | charter | how an agent executor is set up, and which hosts may run it |
 | result contract | what counts as done: a report, a verdict, a connector's result, a delivery, a choice, an approval |
-| chat | an agent task whose requester is a person (people.md, section 7) |
+| chat | jig's default template for a conversation with an agent: an agent task flagged conversation and kept, whose requester is a party (people.md, section 7) |
+| template | an application's recipe for creating a task of one shape, numbered in its configuration and overridden by a project's policy; the client fills it into a `Create`, and the engine never sees one (core.md, 7.3; people.md, section 7; `../protocol/configuration.md`, 3.1) |
+| label | an opaque number the application gives a task, through a template or by hand, which lists filter on and no engine rule reads (tasks.md, section 3) |
+| conversation, listed, retention class | a task's flags: its turns are entries for its requester, with a read position; once ended, it is indexed by its project; kept, or forgotten once read (tasks.md, section 3; people.md, section 6) |
+| last activity, waiting on | when a task last heard words, committed a turn or had a delegate end; what it waits for, computed by the engine: a party, its delegates, news, or nothing (tasks.md, section 3) |
 | coordinator | an agent whose charter is to delegate and supervise |
 | standing procedure | a procedure subscribed to topics that makes tasks as news arrives (connectors.md, 6.6) |
 | run, attempt | one activation of an agent task on a host; one try at it, fenced by a number that only grows |
@@ -130,7 +135,14 @@ system.
 | subscription, topic | a task's standing interest; a connector's subject |
 | reference | a task another may message |
 | party | a person or a service that takes part (people.md) |
-| provider | one of the application's ways of signing in |
+| provider | one of the application's ways of signing in, numbered in its configuration; an identity is a provider and a subject (people.md, section 3) |
+| credential, sign-in | what jig mints for an identity, verifies, expires and revokes; the signed-in session it names, numbered by the core (people.md, section 3) |
+| the printed link, the application's sign-in, `Mint` | jig's one-time secret on loopback; any other way of signing in, on the application's own routes; its server's word that it verified an identity, on which jig mints (people.md, section 3) |
+| operation | one of jig's primitives as a request: `Create`, `Propose`, `Withdraw`, `Message`, `Amend`, `Cancel`, `Release`, `Stop`, `Move`, `Decide`, `Answer`, `Take`, `HandBack`, `Seen`, and the project's own (people.md, 5.1) |
+| compound request | one keyed request holding several operations, admitted in order and committed in one decision, all or none, within operations per request (people.md, 5.1) |
+| grace | how long a task cancelled with one has to finish before it is cancelled (tasks.md, section 7) |
+| `AsAllowed` | a budget given as much as fits under its creator at admission, capped; the answer says what was given (authority.md, section 7) |
+| escalation role | the role a project's policy names to hold escalations past every holder in a tree (authority.md, section 6) |
 | a party's role | what a party may do in a project: owner, maintainer, member, observer, or the policy's own |
 | a resource's role | owned, fork, or context, in a project |
 | authority | what a task may do (authority.md, section 3) |
@@ -183,10 +195,14 @@ where each is answered:
   refuses or waits, as its connector says; a task takes every hold at
   once or waits with none (tasks.md, section 6).
 - **Parties that are not people:** a party is a person or a service; a
-  service signs in with a credential the deployment issues, holds roles,
-  and makes requests, but no chat (people.md, section 3).
-- **Sign-in providers:** the application's; the core knows an identity as
-  a provider and a subject (people.md, section 3).
+  service signs in with a credential jig mints, holds roles, and makes
+  the requests a person makes (people.md, section 3).
+- **Credentials are jig's, sign-in flows the application's:** jig mints,
+  verifies, expires and revokes credentials; the printed link and
+  services' credentials are its own ways of signing in, and any other is
+  the application's, on its own routes, ending in a `Mint` on its
+  server's word; the core knows an identity as a provider and a subject,
+  and jig adds no acting for (people.md, section 3).
 - **Hosting runs inside the engine:** the same hub as on a worker, a
   child of the application's root, whose slots the fleet places on like
   a worker's, with `smith-inline-agent` as its agent, with no workspace
@@ -277,8 +293,12 @@ where each is answered:
   What marks a watch changed is named by each commit (engine.md,
   section 11).
 - **The inbox across projects,** its read positions (one over results,
-  one per chat) moved by an explicit request, a chat's kept until the
-  chat is forgotten (people.md, section 6).
+  one per task flagged conversation) moved by `Seen`; a live
+  conversation's held by the people child, an ended one's in the store,
+  erased with its task (people.md, section 6).
+- **Retention is a task's class:** kept, or forgotten once read, its
+  record and read position erased in one decision; jig's chat template
+  keeps (people.md, section 6).
 - **Decisions name what they saw:** a release names its hold's revision,
   an amendment its task's spec's, a person task's answer its own; each
   moves only when that thing changes, and a decision whose revision
@@ -290,22 +310,46 @@ where each is answered:
   party's at admission, a run's `propose` in its answer, a procedure's
   step in its decision, saying so, rather than made to wait for ever
   (people.md, 5.1; tasks.md, section 9).
-- **One request per act:** words that release a stopped chat; an
-  amendment that releases; closing a chat with its delegates'
-  disposals; an uncertain effect's release saying whether to make it
-  again (people.md, 5.1).
+- **A party's requests are jig's plumbing:** its primitives as
+  operations, the same an agent's tools reach, through the same check,
+  only the source differing (people.md, 5.1; authority.md, 8.1 and 8.4).
+  Shapes of work are templates and helpers above them, never the
+  engine's.
+- **Compound requests:** several operations under one key, admitted in
+  order and committed in one decision, all or none, within operations
+  per request: closing a conversation with its delegates' disposals,
+  ordering goals, an amendment that releases, words that release a
+  stopped task (people.md, 5.1). A release of an uncertain effect says
+  whether to make it again.
+- **Proposing is explicit,** for parties as for tasks: a request beyond
+  authority is refused, naming what it lacked and whether a proposal
+  could be accepted, and a proposal is asked for (authority.md,
+  section 9; people.md, 5.1).
+- **A party's root has someone to escalate to:** a party becomes a
+  root's requester only when their role decides escalations or the
+  project's policy names an escalation role (people.md, 5.1;
+  authority.md, 8.4).
+- **Templates are the application's, never the engine's:** numbered in
+  its configuration, their defaults overridden per project by its
+  policy, never their flags, label or tracking, served in `me`, and
+  filled in by the client; permissions stay primitive (people.md,
+  section 7; authority.md, section 6).
+- **`AsAllowed`,** the one piece of plumbing templates need: resolved by
+  the engine at admission, the answer saying what was given
+  (authority.md, section 7).
 - **Refusals with facts,** and **acts offered** in each object's
-  document, so a client never computes authority; setting a goal and
-  amending are offered with bounds, the facts a draft is compared with
-  and what happens beyond them, and judged again when they come
-  (`../client/domain/contract.md`, 3.2, and sections 4 and 5).
+  document, so a client never computes authority; creating and amending
+  are offered with bounds, made, proposable and to whom, or refused, and
+  judged again when they come (`../client/domain/contract.md`, 3.2, and
+  sections 4 and 5).
 - **An application's keyed requests** kept by the people child as jig's
   are, their outcomes by their connector (people.md, 5.1;
   connectors.md, 5.5).
-- **An application's subjects and reads name their scope,** a project
-  or the deployment: the core admits on the party's role there, and the
+- **An application's subjects, reads and requests name their scope,** a
+  project, the deployment, or the party's own: the core admits on the
+  party's role there, the party's own on the credential alone, and the
   connector judges what the party may see (engine.md, section 11;
-  connectors.md, 5.5).
+  connectors.md, 5.5; people.md, 5.1).
 - **A procedure hears what its step made:** the task its step's batch
   was given, within the same decision, for its connector to record
   durably (connectors.md, 6.3).

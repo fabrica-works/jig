@@ -1,6 +1,6 @@
 # Agents and their hosts
 
-Provisional, 2026-10-07, revised 2026-10-13. Where an application's
+Provisional, 2026-10-07, revised 2026-10-15. Where an application's
 agents run, and what hosts them: the contract between the core and a
 host, the three shapes an application may take, the agent as a
 capability of two kinds, both smith's, jig's one host for runs wherever
@@ -43,13 +43,19 @@ and 8. What is still open is listed in section 12.
 - **Workspaces are the application's** (section 7): a capability of the
   root that prepares what the connectors named, saves unfinished work,
   delivers what a run hands over, and says what the run left. jig defines
-  the vocabulary; temper's git checkouts are one workspace. The engine
-  has none, by policy: it runs no commands for its agents.
+  the vocabulary; an application's checkouts of its repositories are one
+  workspace. The engine has none, by policy: it runs no commands for its
+  agents.
 - **Neither the core nor the hub depends on smith** (6.8). The core
   keeps turns as bytes and its charter in its own terms, which
   `jig-protocol-charter` puts into smith's (section 8); the hub carries
   smith's payloads as bytes, which its root hands out to its protocol
   layer to be decoded for the agent, or encoded from it.
+- **A run does what a party does** (section 8). The engine's host tools
+  speak the operations a party's requests make: a run's amendment and
+  release name the revision it was shown, it proposes an action beyond
+  its authority, explicitly, and it subscribes to the topics a connector
+  offers to agents.
 - **Every message ends once** (section 9): read, refused or unread. The
   start carries the messages waiting in the task's inbox; a refusal
   travels inside the run's next turn, or its answer; a message the run
@@ -135,7 +141,8 @@ agents on workers   the hub and agent processes            workspaces, commands,
    then in the worker's process, with no containment (5.2).
 
 A charter says which kinds of host may run it, and the fleet places by it
-(engine.md, section 8). `ops` is the second shape; temper is the third.
+(engine.md, section 8). `ops` is the second shape; an application whose
+agents change code in workspaces is the third.
 
 One process may run the engine and its workers, for one person's
 machine, development and tests, from the same parts
@@ -563,10 +570,11 @@ jig's workspace vocabulary with the hub, through the root:
 - **None in the engine,** by policy: the engine's root composes no
   workspace, and a charter whose runs need one is placed on workers only.
 
-temper's workspace is git checkouts of a forge's repositories: prepare
-clones and checks out a starting point or a merge in progress, deliver
-commits the tree the run checked and pushes it as a fast-forward, save
-pushes to a saved-work branch. It is an example, not part of jig.
+An application's workspace may be checkouts of its repositories:
+prepare clones and checks out a starting point or a merge in progress,
+deliver commits the tree the run checked and pushes it as a
+fast-forward, save pushes to a saved-work branch. It is an example, not
+part of jig.
 
 ## 8. Charters, tools and contracts
 
@@ -588,7 +596,7 @@ host tools' calls (6.8).
   | inspecting, modifying, the shell | smith's inspect, modify and shell, when the run has a workspace |
   | sub-agents | smith's sub-agents |
   | the engine's tools (engine.md, 7.3) | host tools, each declared with its schema, its description and whether it writes |
-  | each connector's reads and offered effects | host tools, declared by the application |
+  | each connector's reads, and the effects and topics it offers to agents | host tools, declared by the application; its effects through the engine's `effect`, its topics through `subscribe` |
   | waiting, by its wake policy | smith's `wait` |
   | a delivery, by its result contract or mid-run | smith's `deliver`, when the run has a workspace that delivers |
 
@@ -599,6 +607,41 @@ host tools' calls (6.8).
   protocol layer decodes every call the fleet has admitted, from workers
   and from the engine's own hub alike, so no domain parses a call's input
   (`../protocol/channel.md`, 6.3).
+- **The engine's tools speak a party's operations** (engine.md, 7.3;
+  people.md, 5.1). Each host tool's input names what its operation
+  names, as the run was shown it:
+  - `delegate`: a batch, each task with what a party's `Create` names:
+    its executor, spec, contract, authority, budget (an amount, or
+    `AsAllowed`), deadline, wake policy, dependencies and inputs, the
+    resources it will write, whether it is tracked and its priority, its
+    label and its flags (tasks.md, section 4);
+  - `amend`: the task, its spec's revision, and the change; a change of
+    priority alone names none;
+  - `release`: the task, its hold's revision, and, for an effect held
+    uncertain, whether to make it again;
+  - `cancel`: the task, a reason, and a grace, if the run gives one;
+  - `decide`: a proposal by its number, or an escalation with its hold's
+    revision, and the choice, with a reason;
+  - `propose`: the action, with a reason: a batch; an amendment, naming
+    the revision as `amend` does; an effect of a kind a connector offers
+    to agents; or a widening of the task's own authority;
+  - `withdraw`: the proposal;
+  - `subscribe`, `unsubscribe`: a topic a connector offers to agents, a
+    referenced task's state, or a timer.
+- **A revision is shown before it is named.** A run sees a task's
+  revisions where it sees the task: its brief's section on its delegates
+  (engine.md, section 9), the messages relayed to it (section 9), and
+  the answers of `delegate` and `amend`, each rendered by this
+  translation. A call naming one that has moved is answered moved, with
+  what the task is now, rendered for the run, which decides again
+  (engine.md, 7.3).
+- **A connector's topics offered to agents** are declared by the
+  application with its connector's host tools, each with its schema and
+  description, as its offered effects are. A `subscribe` call naming one
+  is decoded by the engine's protocol layer into the connector's typed
+  topic, and checked as a read is: the task's tools hold `subscribe`, and
+  a read grant covers the resources the connector says the topic
+  concerns (authority.md, 8.5; connectors.md, 5.3).
 - **Result contracts** become smith's (smith's `domain/run.md`, 7.1): a
   report; a verdict, with its labels, fields and follow-ups; a delivery,
   which the run must make through its workspace before it finishes, with
@@ -635,7 +678,10 @@ host tools' calls (6.8).
   (section 8): a sender's label (its requester, a delegate by number, a
   party by name, a subscription's topic) and the message's words, whole.
   Proposals and escalations waiting for the task are relayed the same
-  way. The run names the last it read with each turn and when it waits.
+  way. What a decision about a task names travels with it: a notice of
+  a delegate held, and an escalation, carry the hold's revision
+  (section 8). The run names the last it read with each turn and when it
+  waits.
 - **The start carries the inbox,** as many of its messages as the run's
   inbox takes, oldest first; the rest are relayed as the run reads
   (tasks.md, 8.2). The run opens on them (smith's `domain/host.md`,
@@ -657,7 +703,7 @@ host tools' calls (6.8).
   then (tasks.md, 8.2 and 8.3). Nothing a host does drops a message.
 - **Delivery** is the workspace's: smith's `deliver` is served by the hub
   through the application's workspace (section 7), which makes it, for
-  temper, as a push. Its outcome is smith's (smith's `domain/run.md`,
+  a workspace of checkouts, as a push. Its outcome is smith's (smith's `domain/run.md`,
   8.2): delivered, nothing, stale, refused, failed. A delivery that was
   made is the run's result even if the run was winding down; what it
   left on resources reaches their connectors with the answer.
@@ -673,8 +719,8 @@ host tools' calls (6.8).
   (smith's `protocol/hosts.md`, section 2). The agent may be a command of
   the application's own binary that runs smith's agent shell
   (`smith-agent-shell`).
-- **Workspaces' io:** the application's (for temper, git invocations and
-  workspace directories).
+- **Workspaces' io:** the application's (for a workspace of checkouts,
+  its commands and its directories).
 - **In a host's process:** `smith-inline-agent`'s LLM completions and,
   with a workspace, the machine's operations, on smith's components
   (`smith-protocol-llm`, `smith-protocol-machine`) in the protocol layer

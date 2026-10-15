@@ -26,7 +26,22 @@ section 4. What is still open is listed in section 14.
 - **Five boundaries in the engine** (section 4): the store, workers,
   LLM providers and accounts, clients, and connectors' systems. The
   first four are jig's, each with components of jig's; connectors'
-  protocols are the application's.
+  protocols are the application's. At the clients' boundary jig's
+  vocabulary is its messages, and the transport that carries them is
+  the application's.
+- **Clients, by jig's messages.** The clients' component,
+  `jig-protocol-engine-clients`, takes jig's messages with an opaque
+  credential and answers with jig's messages, and knows no HTTP, path,
+  cookie or listener. The application's service owns the listener, its
+  routes, its URL space and every HTTP and browser guard, and mounts
+  the component under any prefix. jig ships a default HTTP mapping, both
+  ends, with example guards, to use, wrap or leave (`client.md`,
+  sections 4 and 17; `browser.md`, 12.2).
+- **jig owns credentials, not sign-in flows.** The clients' component
+  mints, verifies, expires and revokes credentials. Its built-ins are
+  the printed link, on loopback, and services' credentials; any other
+  way of signing in is the application's, on its own routes, and ends
+  in a `Mint` its server sends (`client.md`, section 8).
 - **Generic mechanisms are skein's,** as for smith: framed channels,
   codecs generated from schemas, the key-value store, LLM connections,
   OAuth, HTTP and server-sent events, TLS, contained processes. jig keeps
@@ -62,24 +77,29 @@ section 4. What is still open is listed in section 14.
 1. **README.md:** this page.
 2. **service.md:** the engine's and the worker's services: the protocol
    layer as a parent of components, `iterate`, starting and ending, one
-   process, and the reference binary, `jig-test`, with its service.
+   process, the application's server, which owns the clients' listener
+   and mounts the clients' component, and the reference binary,
+   `jig-test`, with its service.
 3. **channel.md:** jig's channel between the engine and its workers, and
    where host tools' calls are decoded.
 4. **llm.md:** LLM calls in a host's own process, for
    `smith-inline-agent`'s runs, and LLM accounts on skein's accounts
    driver: the translation, the table of access tokens, credential grants.
 5. **configuration.md:** what an engine and a worker are told at start.
-6. **client.md:** the client's protocol: its wire, the connection, keyed
-   requests, reads, watches, signing in, the small store, shells.
+6. **client.md:** the client's protocol: jig's messages and their wire,
+   the clients' component and its messages toward the application's
+   transport and server, the default HTTP mapping's routes and stream,
+   keyed requests, reads, watches, signing in and credentials, versions,
+   the small store, shells.
 7. **store.md:** the store: skein-kv in the engine, keys and records,
    commits and loads, transcripts, secrets, growth.
-8. **browser.md:** jig's browser layer, on client.md's protocol:
-   skein's browser parts (skein's `ui-web.md`) and what jig adds to
-   them (the sign-in part, the link's adapter, jig's look), the
-   reference shell an application copies, what an application writes
-   and what it may change, jig's default codec for its places, serving
-   behind the front door, signing in, and jig's stories for a browser
-   shell.
+8. **browser.md:** a browser's client: the default HTTP mapping's
+   browser end, `jig-client-shell-web`, over skein's browser parts
+   (skein's `ui-web.md`), and the cookie that carries a browser's
+   credential; the example guards and jig's attack stories, for the
+   application's server; jig's test application's browser shell, server
+   and page policy, as the example of an application's; and where jig's
+   promise stops.
 
 ## 3. Names
 
@@ -96,7 +116,12 @@ section 4. What is still open is listed in section 14.
 | payload version | the number an application gives jig's components for its own encodings carried inside jig's records |
 | credential grant | an LLM account's credential, or an application's, named by account (or the application's number for it) and generation, with how long it is valid; its value is beside it (section 8). Not the authority's grant (`../domain/README.md`, section 4) |
 | table | a component's holding of secrets' values, by account and generation; jig's accounts' table, or the application's of its credentials |
-| secrets' records | what the store keeps of secrets that change while the engine runs: sign-ins' and services' digests, and an application's own |
+| secrets' records | what the store keeps of secrets that change while the engine runs: minted credentials' and services' digests, and an application's own |
+| jig's messages | what a client and the clients' component exchange, whatever carries them: a keyed request, a read, opening and closing a watch, signing in and out, and the stream's events; each names its owner and its version (`client.md`, 4.1) |
+| the clients' component | `jig-protocol-engine-clients`, the engine's side of jig's messages: it takes them with an opaque credential from the application's transport, and a `Mint` from its server; it mints, verifies, expires and revokes credentials; it knows no HTTP (`client.md`, 4.2) |
+| the transport | the application's carrier of jig's messages between `jig-client` and the clients' component: HTTP, a local socket, or an in-process channel |
+| the default HTTP mapping | jig's optional transport over HTTP, both ends, `jig-client-protocol-http` and `jig-protocol-engine-clients-http`, with example guards (`client.md`, section 17; `browser.md`, 12.2) |
+| a credential | what signing in leaves: minted for an identity, its digest in the secrets' records, opaque bytes to the transport (`client.md`, section 8). Neither a credential grant nor an application's credential |
 | profile | a named set of every limit jig takes, consistent with one another (`configuration.md`, section 6) |
 | agent capability | the hub's agent: `smith-host-domain`, agent processes, one per run; or `smith-inline-agent`, smith's domains in the host's process (`../domain/hosts.md`, section 5) |
 | smith's parent face | the vocabulary both agent capabilities speak toward their parent (`smith_host_domain::parent`; smith's `domain/host.md`, 9.4) |
@@ -112,11 +137,12 @@ client's link is a client's reach of the engine, not a worker's link.
 
 ```
 engine     the root (../domain/root.md) and its protocol layer:
-           the store, workers' channels, LLM calls and accounts, host tools, clients, connectors' systems
+           the store, workers' channels, LLM calls and accounts, host tools,
+           clients (the application's server and transport, jig's clients' component), connectors' systems
 worker     if any: the worker's root (jig-domain-host, an agent capability, a workspace) and its protocol layer:
            the link to the engine, smith's host half and its agent processes, the workspace's io
-client     the client root and view (../client/domain/) and its protocol layer:
-           the connection to the engine, the small store, the shell
+client     the application's presentation over jig-client (../client/domain/), and its transport:
+           jig's messages to the engine and back, the small store's host, the shell
 ```
 
 By `../domain/hosts.md`, section 3's shapes:
@@ -139,7 +165,8 @@ An application that mixes the last two has both.
   skein's in-process addresses (section 10), over the same components,
   codecs and channels, with no TLS, and the workers' agents child
   processes, as between hosts (`service.md`, section 10). A client
-  reaches the engine over TCP on loopback. It is the first shape built.
+  reaches the engine through the application's server, over TCP on
+  loopback. It is the first shape built.
 
 ## 5. Components
 
@@ -153,11 +180,13 @@ An application that mixes the last two has both.
 | `jig-protocol-accounts` | translation, table | engine | the accounts child's vocabulary to skein's accounts driver's and back, and the access tokens lent (`llm.md`, section 5) |
 | `jig-protocol-config` | parsing | engine, worker | jig's part of a configuration, parsed and checked (`configuration.md`) |
 | `jig-protocol-store` | component, codecs | engine | jig's records and the application's on skein-kv, transcripts' files, the secrets' store (`store.md`) |
-| `jig-protocol-client-wire` | codecs | engine, client | the client's records: requests, answers, reads, subjects, documents, the small store's (`client.md`, section 3) |
-| `jig-protocol-engine-clients` | component | engine | clients' connections: exchanges, streams, sign-ins, translation to and from the core's vocabulary (`client.md`); the browser's files, page, root files and the policy's additions, data the application's startup gives, served behind a fixed front door, and a browser's sign-in by cookie (`browser.md`, sections 11, 12 and 12.1) |
-| `jig-protocol-client-link` | component | client | the connection to the engine: attempts, the stream, envelopes, the small store's records (`client.md`); jig's default codec for jig's places, its `address` module, which an application's client host uses as is, under a prefix, renamed, or replaces (`browser.md`, section 9) |
-| `jig-protocol-transcript` | decoding | client | turns' bytes into the client's vocabulary (`../client/domain/client.md`, section 10) |
-| `jig-shell-web`, `jig-shell-native` | shells' parts, a shell | client | jig's browser parts, beside skein's (`skein-ui-web`), which an application's browser shell runs its loop over: the sign-in part, the link's adapter and jig's look (`browser.md`, 5.1); and the native shell (`client.md`, section 12) |
+| `jig-client-protocol-wire` | codecs | engine, client | jig's wire records, both ends, from schemas: jig's messages, their operations and compound requests, subjects and reads, documents, the stream's events, the small store's records (`client.md`, section 3) |
+| `jig-protocol-engine-clients` | component | engine | the clients' component: jig's messages from the application's transport, each with its credential as opaque bytes, and to it; a `Mint` from the application's server; streams and their pacing; credentials minted, verified, expired and revoked, the printed link's secret; translation to and from the core's vocabulary. No HTTP, path, cookie or listener (`client.md`, 4.2) |
+| `jig-protocol-engine-clients-http` | mapping | engine | the default HTTP mapping's engine end: its routes under the prefix the application mounts it at, the stream as server-sent events, the credential as a cookie or a bearer, and the example guards (`client.md`, section 17; `browser.md`, 12.2) |
+| `jig-client-protocol-link` | component | client | jig's messages encoded and decoded, the stream's events, the small store's records; no HTTP (`client.md`, 4.3) |
+| `jig-client-protocol-http` | mapping | client | the default HTTP mapping's client end: a message as a method, a path, headers and a body; the stream's server-sent events cut into events; for the host and wasm32 (`client.md`, 17.4) |
+| `jig-protocol-transcript` | decoding | engine, client | turns' bytes into the client's vocabulary (`../client/domain/client.md`, section 10) |
+| `jig-client-shell-web`, `jig-client-shell-native` | shells' parts, a shell | client | the reference UI's browser parts over skein's `skein-ui-web`: the default mapping's client end over fetch, the printed link's sign-in, jig's look (`browser.md`, 5.1); and the native shell over skein's HTTP client, with `jig-client-protocol-http` (`client.md`, section 12) |
 
 Beside them, smith's components, by the agent capability:
 `smith-protocol-llm`, over skein's `skein-llm-connection`, in a process
@@ -165,11 +194,17 @@ that runs `smith-inline-agent`, with `smith-protocol-machine` on a
 worker (`llm.md`); `smith-host-protocol` on a worker with agent
 processes (smith's `protocol/hosts.md`, sections 2 and 3).
 
+- **The client itself is not a component of these:** `jig-client`, the
+  client the application holds, with its domain, `jig-client-domain`,
+  and the reference UI, `jig-client-view`, are `../client/domain/`'s.
+  Every client crate is named under `jig-client`, wherever it runs
+  (`../README.md`, section 15).
 - **Each crate is step code** under the subset (programming-model.md,
   section 10), as every crate of jig's is but its test kits and the
-  client's shells and their parts. The bundle the engine serves is made
-  at build by skein's bundler, `skein-ui-bundle`, a tool, not a
-  component (skein's `ui-web.md`, 4.2; `browser.md`, section 4).
+  client's shells and their parts. The reference UI's bundle is made at
+  build by skein's bundler, `skein-ui-bundle`, a tool, not a component,
+  and served by the application's server (skein's `ui-web.md`, 4.2;
+  `browser.md`, 4.2 and section 12).
 - **Each depends** on skein-lib, io's vocabulary, the skein components it
   drives, its codec crate, and the domain vocabulary it translates: the
   hub's for the channel's sides, the core's (or a child's) for the
@@ -189,25 +224,24 @@ processes (smith's `protocol/hosts.md`, sections 2 and 3).
 | `iterate` and `main` | each process | copied from the reference service and the reference binary, `jig-test` |
 | an `agent` command, smith's agent shell, if its workers run agent processes from its own binary | the binary | copied from the reference binary (`service.md`, section 7) |
 | its configuration's own members, and their parsing | each process | its own |
-| its connectors' protocols: their systems' clients, credentials, and webhooks, each connector's on a listener of its own at an address its configuration names; jig's clients' listener serves the client's routes and files only | the engine | its own |
+| its connectors' protocols: their systems' clients, credentials, and webhooks, on a listener of each connector's own at an address its configuration names, or on its server's, routed by path (section 13) | the engine | its own |
+| its server: the clients' listener, its TLS, its routes and its URL space; its own pages, bundle and API; jig's clients' component, mounted under any prefix it chooses, since jig reserves no path; every HTTP and browser guard, jig's example guards as they are, wrapped, or its own | the engine | its own, after the reference service's (`service.md`, section 7; `browser.md`, section 12) |
+| its transport: jig's messages carried between `jig-client` and the clients' component, each with its credential: jig's default HTTP mapping, as it is or wrapped, or its own (a local socket, an in-process channel) | engine and client | jig's default mapping, or its own (`client.md`, section 17) |
+| its sign-in: every way of signing in but the printed link and services' credentials (OAuth, a directory, a chat platform's identity), on its own routes, redirects included, with its settings and secrets; the identity it verified, handed to the clients' component in a `Mint`, from its server code alone; how the minted credential travels | the engine, the client | its own (`client.md`, section 8) |
+| its presentation: its routes and screens, words and look, confirmations and drafts, home and navigation, on `jig-client` and jig's helpers if they suit, with skein's UI kit, anything else, or nothing; or jig's reference UI, `jig-client-view`, as `ops` and jig's test application use it | the client | its own (`../client/domain/`) |
 | its credentials for runs' workspaces: their tables, and their sources (a file, or an exchange it refreshes) on the engine | engine and worker | its own (`channel.md`, section 8) |
 | its connectors' host tools: schemas, decoding, rendering | the engine | beside each tool, as `jig-protocol-tools` is for the core's (`../domain/hosts.md`, section 8) |
 | its parts' encodings: workspace items, left and saved work, delivery evidence, with its payload version | engine and worker | its own codecs (`channel.md`, 6.2) |
 | its periods' source | the engine | a child of its root (`configuration.md`, section 5) |
 | the worker's root, with its choice of agent capability, its workspace and its io | the worker | its own (`../domain/hosts.md`, section 7) |
 | its store's families: keys' encoders, codecs, its store version, its indexes | the engine | its own, by `store.md`, section 12 |
-| its documents' and requests' wire, its sign-in providers' exchanges | engine and client | the client's protocol |
-| its browser shell, `<application>-shell-web`: its start and its loop over skein's browser parts, jig's and its client host, and its look, plain data the parts take | the client | copied from jig's reference shell, `jig-test-shell-web` (`browser.md`, 3.1 to 3.3 and section 5; skein's `ui-web.md`, section 3) |
-| its paths, every one but those under `/jig/`, the engine's own: jig's default codec for jig's places as is, under a prefix of its own, renamed, or replaced, its families' places, and which place `/` is | the client host | its own (`browser.md`, section 9) |
-| its stylesheet and its pictures | the client's bundle | its own (`browser.md`, 3.4) |
-| what the engine serves of its browser: the bundle's files, the page, its root files, the policy's additions, as data | the engine's startup | copied from the reference, which reads the bundle's directory its configuration names (`browser.md`, section 12) |
-| what it changes beyond the reference shell, a step at a time, each needing the ones before only where it says so: its page, its files, its elements and components, its own JavaScript from the origin, additions to the policy, a part replaced or left out | the client, the engine's startup | its own, as skein's `ui-web.md`, 3.3, and `browser.md`, 3.5, allow; never the engine's front door (`browser.md`, section 12) |
+| its documents' and requests' wire, versioned per owner | engine and client | its own codec crate, generated as jig's is (`client.md`, section 11) |
+| its templates: its own shapes of work, and jig's chat and goal kept, changed or dropped | the engine's configuration | its own data (`configuration.md`, 3.1) |
 
 It writes no codec of jig's records, none of the channel's rules, none of
 the core's tools' decoding, no OAuth exchange of an LLM account, no agent,
-and none of `smith-inline-agent`'s runs' LLM calls. Its browser needs no
-HTML and no JavaScript of its own: its own page and its own JavaScript
-are steps it may take (skein's `ui-web.md`, 3.3; `browser.md`, 3.5).
+none of `smith-inline-agent`'s runs' LLM calls, and no credential's
+keeping: jig mints, verifies, expires and revokes them.
 
 ## 7. Versions
 
@@ -228,11 +262,20 @@ are steps it may take (skein's `ui-web.md`, 3.3; `browser.md`, 3.5).
 - **What outlives a process** carries its version: the store's records,
   per family (`store.md`, section 5), and the client's small store
   (`../client/domain/client.md`, section 11).
-- **The client's documents and requests are the exception:** they are
-  versioned per owner, jig's by jig and the application's by the
-  application, and the engine serves a range of versions, so a client
-  that does not come from the engine may lag it
+- **jig's messages are the exception:** they are versioned per owner,
+  jig's by jig and the application's by the application, each message
+  naming its owner and its version, and the engine serves a range of
+  versions, so a client that does not come from the engine may lag it
   (`../client/domain/contract.md`, section 8).
+  - *A version not served* is answered with a typed refusal, *version
+    not served*, naming the owner and the ranges served, never a bare
+    failure of the transport (`client.md`, section 9).
+  - *One jig pin:* an application takes `jig-client` and the engine's
+    components from one revision of jig, so a change to jig's
+    operations moves jig's wire version, and before a release every
+    range is one version.
+  - *How jig itself is released and pinned* waits for an application
+    outside this workspace (`../README.md`, section 14).
 - **Configuration** has no version: unknown fields refuse the start
   (`configuration.md`, section 9).
 
@@ -242,9 +285,11 @@ are steps it may take (skein's `ui-web.md`, 3.3; `browser.md`, 3.5).
 |---|---|---|---|
 | an LLM account's record: its generation, its access token and expiry, its refresh token | skein's accounts driver; the access tokens lent, `jig-protocol-accounts`' table | the driver's private files, one per account, before the access token is lent (`llm.md`, section 5) | the refresh token, nobody; the access token, `smith-inline-agent`'s runs in the engine through smith's LLM component, and workers through credential grants, then their agent processes through smith's host half, or smith's LLM component on a worker that composes `smith-inline-agent` (`llm.md`, section 6) |
 | a worker's secret | the worker; its digest on the engine | configuration's files | the opening of the worker's link, over TLS, loopback, or an in-process address (`channel.md`, 4.1) |
-| a sign-in's secret | the client's shell; its digest on the engine | the store's secrets' records | each of the party's requests, checked by the engine's client protocol (`../domain/people.md`, section 3) |
-| a service's credential | the service; its digest on the engine | the store's secrets' records | likewise |
-| a TLS key, a provider's client secret | the engine | configuration's files | its exchanges |
+| a credential, a sign-in's | `jig-client`, where its transport needs it in hand (a bearer); or a browser, as a cookie the application's server sets and the client never sees; its digest on the engine | the store's secrets' records | the application's server once, in `Minted`, where it asked for it; then each of the party's messages, verified by the clients' component (`../domain/people.md`, section 3) |
+| a service's credential | the service; its digest on the engine | the store's secrets' records | its sign-in only, which answers a sign-in's credential |
+| the printed link's secret | the clients' component, which gives it; the application's startup, which prints it in a URL of its own | the component's memory only, until spent or lapsed: a restart gives a fresh one | the client that signs in with it, once, on loopback: a browser that opens the link, or a native client |
+| the workers' listener's TLS key | the engine | configuration's files | the workers' TLS |
+| the clients' listener's TLS key; the secrets of the application's sign-in | the application's server | its own configuration's files | its exchanges |
 | a connector's credentials | the application's protocol layer | its files, or its own records in the secrets' store | its system |
 | an application's credential, for a run's workspace | the application's protocol layer: its table on the engine, and on each worker that holds a grant of it | its own source's: a file, or an exchange it refreshes | the workspace's systems, through credential grants with the assignment (`channel.md`, section 8) |
 
@@ -255,11 +300,12 @@ are steps it may take (skein's `ui-web.md`, 3.3; `browser.md`, 3.5).
   never through a root.
 - **Kept before used.** An account's record is durable before the access
   token it bought is lent, by skein's driver. A sign-in is committed
-  first, which gives it its number; its digest is then kept under that
-  number; and only then is its secret handed to the client. A crash
-  between them leaves at worst a record nobody uses, or a sign-in no
-  client holds a secret for: never a name with two values, or a secret the
-  engine does not know.
+  first, which gives it its number; its credential's digest is then
+  kept under that number; and only then is the credential answered, to
+  the client that signed in or to the application's server that asked
+  for it. A crash between them leaves at worst a record nobody uses, or
+  a sign-in no client holds a credential for: never a name with two
+  values, or a credential the engine does not know.
 - **Across hosts, only over TLS,** in plaintext over loopback, or over a
   joined socket in one process, and validity as durations, never times.
 
@@ -304,9 +350,10 @@ Each is generic, and says nothing about jig.
   reaching the simulator, for the one-process shape (section 4; skein's
   `io.md`, 3.5 and section 4).
 - **TLS's server side with independent output,** for the engine's
-  listeners: workers' links between hosts, and clients' HTTPS (skein's
-  `tls.md`, section 8; skein's `channel.md`, section 12). Not needed in
-  one process.
+  workers' listener between hosts, and for clients' HTTPS on an
+  application's server built on skein's HTTP, as the reference's is
+  (skein's `tls.md`, section 8; skein's `channel.md`, section 12). Not
+  needed in one process.
 - **Contained process trees,** for workers' agents: spawned within a
   deadline, with an environment given whole and only named directories
   writable, stopped politely, then terminated, then killed, and proved
@@ -321,21 +368,24 @@ Each is generic, and says nothing about jig.
   (skein's `shell.md`, 6.1; skein's `io.md`, 5.3).
 - **A cryptographic generator:** skein-lib's `CryptoRng`, keyed by the
   seed the shell draws at start (skein's `lib.md`, section 8; skein's
-  `shell.md`, section 5), for sign-ins' secrets, the deployment's link,
-  services' credentials, and the accounts driver's states.
+  `shell.md`, section 5), for minted credentials, the printed link's
+  secret, services' credentials, and the accounts driver's states.
 - **The loop's host:** skein's `Host` and `drive`, with
   `next_policy_deadline` (skein's `shell.md`, section 12; `service.md`,
   section 4).
-- **For the client's WebAssembly and its records:** skein-lib, skein-codec,
-  skein-http's machines and `skein-ui` built for
-  `wasm32-unknown-unknown`, checked by skein's gate (skein's `lib.md`,
-  section 2; skein's `testing.md`, section 6); skein-lib's bounded
-  `base64`, for records in server-sent events (`client.md`, section 1);
+- **For `jig-client` on WebAssembly, and its records:** skein-lib and
+  skein-codec built for `wasm32-unknown-unknown`, with skein-http's
+  machines for the default mapping's client end, and `skein-ui` for the
+  reference UI, checked by skein's gate (skein's `lib.md`, section 2;
+  skein's `testing.md`, section 6); skein-lib's bounded `base64`, for
+  records in the default mapping's server-sent events (`client.md`,
+  17.2);
   and skein-lib's `Secret`, the generator's `secret` type, whose `Debug`
   shows its length only, for credentials' values (section 8; skein's
   `codec.md`, section 3).
-- **For the client's view and shells, skein's UI kit** (skein's `ui.md`,
-  `ui-text.md` and `ui-web.md`):
+- **For the reference UI and its shells, skein's UI kit** (skein's
+  `ui.md`, `ui-text.md` and `ui-web.md`), which an application's own
+  presentation may use or leave:
   - `skein-ui`: the tree and its vocabulary, owners as opaque numbers,
     to which jig maps its own (`../client/domain/view.md`, section 3;
     skein's `ui.md`, 3.3), the builder with slots and splicing, bindings
@@ -349,11 +399,11 @@ Each is generic, and says nothing about jig.
     sit (`browser.md`, 5.1): their platform halves call through the glue
     crates, `wasm-bindgen`, `js-sys` and `web-sys`, pinned in skein's
     workspace, which with their dependencies are the only `unsafe` such
-    a client runs (`programming-model.md`, section 2.1); `jig-shell-web`
-    forbids it in its own code;
-  - `skein-ui-bundle`, the bundler, which writes the bundle the engine
-    serves, under the bundle's prefix jig gives it, `/jig/client/`
-    (skein's `ui-web.md`, 4.2 to 4.4; `browser.md`, section 12);
+    a client runs (`programming-model.md`, section 2.1);
+    `jig-client-shell-web` forbids it in its own code;
+  - `skein-ui-bundle`, the bundler, which writes the reference UI's
+    bundle, under the prefix the application's server serves it at
+    (skein's `ui-web.md`, 4.2 to 4.4; `browser.md`, 4.2);
   - `skein-fake-person`, the person over the tree, and
     `skein-fake-person-browser`, its face over skein's browser kit (a
     name matched by words as well as exactly, a press at a point within
@@ -369,6 +419,10 @@ Each is generic, and says nothing about jig.
   fake issuer, HTTP's server and client, server-sent events.
 - **The store** needs skein-kv as it is, and io's `OpenWrite` and `Cut`
   (skein's `io.md`, section 5; `store.md`, section 15).
+- **Nothing new for the client's API.** The generic half of the client
+  (keyed requests until durable, level-triggered watches, the link,
+  generic guards) may move to skein, as skein-ui did, once a second
+  user wants it; it waits for that user.
 
 ## 11. What jig needs from smith
 
@@ -388,9 +442,9 @@ Each is generic, and says nothing about jig.
   and smith's values: `smith-protocol-channel`'s functions, and
   `smith-channel`'s records for a call's name and a fact (section 13).
 - **`smith-transcript` built for `wasm32-unknown-unknown`,** as it is:
-  the browser's module decodes turns with it, through
+  `jig-client` decodes turns with it below its surface, through
   `jig-protocol-transcript`, whose build for that target jig's gate
-  checks (`browser.md`, section 15).
+  checks (`../client/domain/client.md`, section 10).
 - **Not asked: a completion's result contract.** A protocol layer that
   runs `smith-inline-agent` keeps each slot's beside smith's LLM
   component, as smith's own local host does (`llm.md`, section 3).
@@ -402,7 +456,7 @@ Each is generic, and says nothing about jig.
     completion's retry and its offset; and a tool begun with its call's
     name, its tool and its input within a bound. Until then a run in an
     agent process shows its activity, and its words as each turn
-    commits (`channel.md`, 6.4). The chat's web interface wants it;
+    commits (`channel.md`, 6.4). A conversation's presentation wants it;
   - **closing smith's LLM component as an owner closes it:** an abort
     that ends every completion in flight, for a process that stops
     without draining (`service.md`, section 5), and a completion asked
@@ -427,7 +481,7 @@ left is the code's:
    agent's notices, on a worker as in the engine (`../domain/hosts.md`,
    6.1; `channel.md`, section 1).
 5. **The client's:** reads answered signed out, a reopened run's watch
-   starting from its turn's beginning, and signing out from the frame
+   starting from its turn's beginning, and signing out from `me`
    (`client.md`, section 16).
 6. **Following smith's `main`:** windows, and resuming from the current
    one (`../domain/engine.md`, 7.2); the start's messages, refusals carried
@@ -438,10 +492,21 @@ left is the code's:
    refuse for its budget (`../domain/authority.md`, section 7).
 7. **An application's credentials,** kept beside LLM accounts and
    granted with the assignment (`../domain/engine.md`, 12.1).
+8. **The client's API:** parties' `Create`, `Propose` and `Withdraw`;
+   compound requests within operations per request, admitted in order
+   and committed in one decision; cancel with a grace; a party's root
+   with someone to escalate to; a task's label, flags, last activity and
+   what it waits on; `AsAllowed`; goals per project; task queries, and
+   `me` with each project's merged templates; credentials minted on the
+   application's server's word (`../domain/people.md`, sections 3, 5.1
+   and 6; `../domain/tasks.md`, sections 3, 4, 7 and 11;
+   `configuration.md`, 3.1 and section 6; `client.md`, sections 4
+   and 8).
 
 What the store asks of the domain (live before history, indexes for
-parties' reads, turns kept by window, fill, retention, keys for single
-reads) is `store.md`, section 15.
+parties' reads and the two ended indexes, read positions over ended
+conversations, turns kept by window, fill, retention by each task's
+class, keys for single reads) is `store.md`, section 15.
 
 ## 13. Decisions this design takes
 
@@ -491,9 +556,11 @@ reads) is `store.md`, section 15.
   tools' calls (`../domain/hosts.md`, 6.8; `channel.md`, 6.1).
 - **smith's LLM component for runs in a host's own process,** with each
   slot's result contract kept beside it (`llm.md`, section 3).
-- **A connector's webhooks on a listener of its own,** owned by its
-  protocol component; jig's clients' listener serves the client's routes
-  and files only.
+- **A connector's webhooks where the application routes them:** on a
+  listener of the connector's own, owned by its protocol component, or
+  on the application's server beside its clients, routed by path, so a
+  deployment may expose one origin. jig owns no listener for clients,
+  so the choice is the application's.
 - **A reference binary,** `jig-test`, the template an application copies
   for its `main`, and the process layer of jig's proofs (`service.md`,
   sections 7 and 8).
@@ -510,23 +577,47 @@ reads) is `store.md`, section 15.
   11). jig keeps what is entwined with its domain: the worker's link
   policy, whose grace and stop bound are the fleet's, and the
   translations.
-- **Crates named by layer:** `jig-domain-*`, `jig-protocol-*`,
-  `jig-view`, `jig-shell-*` (`../README.md`, section 15).
-- **On one person's machine, a browser on loopback** signs in by a link
-  the engine prints at start (`client.md`, section 8).
-- **The browser's parts are skein's; the loop is the application's.**
-  skein's UI kit gives the browser parts, each usable alone, the
-  bundler, the face and the harness (section 10). jig writes what is
-  its own: its sign-in part, its link's adapter and its look, the
-  engine's serving behind a fixed front door, its default codec for its
-  places, and jig's stories for a browser shell. An application's
-  browser shell, copied from jig's reference shell, runs its own loop
-  over the parts and its client host, whose codec parses and prints its
-  paths, and gives its look as data; past the reference, it changes
-  more a step at a time, any part but the front door. The parts hold
-  the invariants that protect requests, so no order of its loop breaks
-  them (skein's `ui-web.md`, 5.3; `browser.md`, 3.5 and section 19;
-  `../README.md`, section 6).
+- **Crates named by layer, and every client crate under `jig-client`:**
+  `jig-domain-*` and `jig-protocol-*` for what runs in the engine and on
+  workers; `jig-client-{domain,protocol,<kind>}-*` for the client's,
+  wherever it runs, with `jig-client` their base, as `skein-ui` is
+  `skein-ui-*`'s (`../README.md`, section 15).
+- **On one person's machine, a browser on loopback** signs in by the
+  printed link: the clients' component gives a one-time secret at
+  start, and the application's startup prints it in a URL of its own,
+  `<prefix>/v1/sign-in/link?secret=…` under the default mapping
+  (`client.md`, section 8, and 17.1).
+- **Presentation, the server and the transport are the application's.**
+  jig's clients' component takes jig's messages with an opaque
+  credential, and knows no HTTP, path, cookie, host, CORS or server-sent
+  event; jig reserves no path. The application's service owns the
+  listener and its URL space, mounts the component where it chooses,
+  and owns every HTTP and browser guard, since the guards that protect
+  a browser's credential belong to the transport, not to jig's model.
+  jig ships what an application may take or leave: its default HTTP
+  mapping, both ends, with example guards, and attack stories in its
+  test kit, checked and never mandated (`client.md`, section 17;
+  `browser.md`, 12.2 and section 15); and its reference UI, on the
+  public client alone, which proves the API is enough
+  (`../client/domain/`).
+- **jig owns credentials, the application owns sign-in flows.** jig
+  mints, verifies, expires and revokes credentials, and keeps their
+  digests; its built-in ways of signing in are the printed link and
+  services' credentials. Every other way runs on the application's
+  routes and ends in a `Mint`, which only its server code sends, and
+  which names an identity of a provider of kind application
+  (`configuration.md`, section 3). jig adds no "acting for": a bot
+  relaying a person's decision holds that person's own credential, and
+  waits for an application that needs one (`../domain/people.md`,
+  section 3; `../client/domain/contract.md`, section 2).
+- **Versions per owner, refused by type:** a message in a version the
+  engine does not serve is answered *version not served*, naming the
+  owner and the ranges served; `jig-client` and the engine come from
+  one jig pin (section 7).
+- **Templates are configuration, served and never expanded by the
+  engine** (`configuration.md`, 3.1), and lists are task queries: live
+  tasks scanned in memory, ended ones through one index of the store,
+  chosen by the query's keys (`store.md`, 7.3 and 7.4).
 - **Configuration as strict JSON,** read once before the loop, composed
   per child, secrets in private files, limits by profile
   (`configuration.md`).
@@ -547,6 +638,3 @@ reads) is `store.md`, section 15.
 ## 14. Open questions
 
 - **Signing an LLM account in through a client** (`llm.md`, section 10).
-- **One origin for clients and webhooks:** whether one listener, routed
-  by path, may serve both, shared between components by the protocol
-  layer, so a deployment exposes one origin.

@@ -1,8 +1,9 @@
 # Configuration
 
-Provisional, 2026-10-10, revised 2026-10-14. What an engine and a worker
+Provisional, 2026-10-10, revised 2026-10-15. What an engine and a worker
 are told when they start, as far as jig defines its shape: the parts of
-`../domain/engine.md`, section 14 that are jig's, how an application's
+`../domain/engine.md`, section 14 that are jig's, the templates an
+application defines its shapes of work with, how an application's
 configuration composes them with its own, where secrets come from, and
 when configuration is read. What is still open is listed in section 9.
 
@@ -36,6 +37,15 @@ when configuration is read. What is still open is listed in section 9.
   parties' requests. Configuration seeds projects, their policies and
   their parties' roles on a deployment's first start only; resources and
   homes come by adoption after it (section 3).
+- **Templates are data the engine serves and never expands.** The
+  application's shapes of work (jig's chat and goal among them) are
+  numbered templates in jig's part; a project's policy may override some
+  of their defaults; the engine serves each project's merged templates
+  to the client, which fills them into ordinary requests (3.1).
+- **The server is the application's.** The clients' listener, its
+  certificate and key, and whatever serves a browser are the
+  application's service's own members; jig's part keeps what the clients'
+  component takes: the heartbeat and the printed link (section 3).
 
 ## 2. Where it sits
 
@@ -64,21 +74,22 @@ the application's main (its shell)
 
 | Member | What it gives | Used by |
 |---|---|---|
-| deployment | the deployment's directory, which holds the store, transcripts and the secrets' store; retention's horizons; the seed's source, for tests | the store (`store.md`); the domain's retention; the shell |
+| deployment | the deployment's directory, which holds the store, transcripts and the secrets' store; retention's horizons, which wait (`store.md`, 11.1); the seed's source, for tests | the store (`store.md`); the domain's retention; the shell |
 | owners | the deployment's first owners, each a provider and a subject (`../domain/people.md`, section 3), each an owner of every project seeded with it | the people child, on a first start |
-| providers | each sign-in provider's number and kind; its settings are the application's. One, of kind deployment, is the deployment's own, for services' credentials (`../domain/people.md`, section 3) | the people child; the client's protocol |
+| providers | the numbers and kinds that identities name (`../domain/people.md`, section 3), and nothing else: jig runs no provider's exchange. Of kind *link*, the printed link's; of kind *deployment*, exactly one, the deployment's own, for services' credentials; of kind *application*, each of the application's ways of signing in, whose identities its server verifies on its own routes and asks the clients' component to mint a credential for (`client.md`, section 8). The settings and secrets of the application's sign-in are its own members | the people child; `jig-protocol-engine-clients`, which mints a printed link's credential for the first owner it names, a service's under the deployment's provider, and a `Mint`'s only for an identity whose provider is of kind application |
 | rules | the deployment's rules: the ceilings every project's policy is under (`../domain/authority.md`, section 6) | authority |
-| projects | each project seeded on a first start: its number; its policy, with its spend per period and its roles (each one's authority, the spend a party in it may allot per period, the kinds of proposal it decides; `../domain/authority.md`, section 6); its parties' roles. Its resources and homes come by adoption (below) | the core, on a first start |
-| charters | each charter the deployment offers, numbered: its instructions (a file it names), its models, named from the llm member's (its main model, and those its sub-agents may use), its tool families, the hosts that may run it, its waiting time, whether its runs resume, its default budget (turns, spend and time, and a reserve of turns and time), which applies to a task whose batch gives none (`../domain/hosts.md`, section 8); its models' endpoints name one account, until a run needs several; and which charter chats run under, with the grace a closed chat has to finish (`../domain/people.md`, section 7) | the core; `jig-protocol-charter` |
+| projects | each project seeded on a first start: its number; its policy, with its spend per period, its roles (each one's authority, the spend a party in it may allot per period, the kinds of proposal it decides; `../domain/authority.md`, section 6) and its overrides of templates' defaults (3.1); its parties' roles. Its resources and homes come by adoption (below) | the core, on a first start |
+| charters | each charter the deployment offers, numbered: its instructions (a file it names), its models, named from the llm member's (its main model, and those its sub-agents may use), its tool families, the hosts that may run it, its waiting time, whether its runs resume, its default budget (turns, spend and time, and a reserve of turns and time), which applies to a task whose batch gives none (`../domain/hosts.md`, section 8); its models' endpoints name one account, until a run needs several | the core; `jig-protocol-charter` |
+| templates | each template the application defines, numbered and never renumbered, with its defaults; jig's chat and goal among them unless the application drops them (3.1) | the core, only to serve each project's merged templates in `me` (`../client/domain/contract.md`, 5.1); the client, which fills them in |
 | hosts | the engine's own slots, if it runs agents in the engine (shape 2), and their `smith-inline-agent`'s limits; the workers' names, each with the file of its secret's digest; the workers' listener: its addresses, socket addresses or an in-process name (skein's `io.md`, section 4), and its certificate and key files, but for an in-process name (`channel.md`, section 10); a listener on an in-process name tells the core its workers are in its process, and that no worker outlives it (`../domain/engine.md`, section 6) | the fleet; `jig-protocol-engine-workers`; `smith-inline-agent`, through the application's startup |
 | llm | endpoints, each with the models it serves; each model's window, output and the rest of what smith's agent configuration declares of it (smith's `protocol/agent.md`, section 4), and its prices: input, cached input, output, and cache writes when priced apart; accounts, each signed in, with its registration and its token endpoint, or handed in, with the private file of its access token (`llm.md`, 5.4), and the private directory of their records (`llm.md`, sections 4 and 5) | the core; smith's and skein's components and skein's accounts driver, through the application's startup; `jig-protocol-accounts` |
-| clients | the clients' listener (a TCP address, or loopback on one person's machine) and its certificate and key files, but on loopback; the heartbeat; whether the engine prints a local sign-in link at start (`client.md`, sections 4 and 8); the bundle's directory, or none: the reference startup reads the bundle there at start and gives it to the component, and none serves no browser; an application's startup may give its browser's files from elsewhere, built or embedded (`browser.md`, section 12). It serves the client's routes and files only: a connector's webhooks are on a listener of its own | `jig-protocol-engine-clients`; the bundle's files, through the application's startup |
+| clients | the heartbeat of the clients' streams (`client.md`, section 4); whether the clients' component gives a printed link's one-time secret at start, whose URL the application's startup prints (`client.md`, section 8), only where its clients reach it on loopback, which that startup checks against its own listener (`service.md`, section 3). The listener, its certificate and key, and what serves a browser are the application's service's own members (`service.md`, section 7) | `jig-protocol-engine-clients` |
 | connectors | the application's connectors' numbers, as the core knows them (`../domain/core.md`, 3.5); none takes the number the core keeps for its own procedures (below) | the core |
 | limits | a profile, and any limit overridden by name (section 6) | every child and component of jig's |
 
 - **Each connector's own configuration** (its system's address, its
   credentials' files, the address of its webhooks' listener, its
-  procedures' settings, its templates) is the application's, in its own
+  procedures' settings and texts) is the application's, in its own
   member.
 - **An application's credentials** for its runs' workspaces (a token to
   fetch and push) are its own members: each with its number, as the
@@ -97,12 +108,16 @@ the application's main (its shell)
     bounds its budget;
   - *a party's pool* for a period: the allotment their role gives, from
     the project's policy;
-  - *a chat's authority and budget,* from the project's policy: its
-    authority the most that fits under its person's role, as any task a
-    person makes fits (the role's, one level shallower, within the tasks
-    and spend left: `../domain/authority.md`, sections 5 and 6), and its
-    budget the role's default for chats (`../domain/people.md`,
-    sections 4, 5.1 and 7);
+  - *a task's authority and budget, as a template gives them:* in the
+    request, never in configuration the core reads. The client fills a
+    template's authority (the creator's role narrowed) and its budget
+    into a `Create`, and the core checks them as it checks any request
+    (`../domain/authority.md`, sections 5 and 6). A budget given as
+    `AsAllowed` the core resolves at admission: as much as the creator's
+    role and pool allow, capped by the role's spend and by the cap the
+    request names, the answer saying what was given
+    (`../domain/tasks.md`, section 4; `../domain/authority.md`, section
+    7);
   - *the core's recurring procedure* (`../domain/tasks.md`, section 10):
     the core's own, under a number the core keeps for its procedures,
     which no connector takes;
@@ -118,6 +133,77 @@ the application's main (its shell)
   cannot say. A home is a resource its adoption names as the project's
   home for that connector. A project seeded with none has none until
   then.
+
+### 3.1 Templates
+
+- **A template is the application's definition of a shape of work:** the
+  defaults that turn "a chat with these words" or "a goal for this"
+  into a complete `Create` (`../domain/tasks.md`, section 4). An
+  application's own shapes (one for `ops`'s incidents, say) and jig's
+  defaults are alike.
+- **Numbered, never renumbered.** A number is the template's identity
+  across the configuration, projects' policies and clients; a template
+  dropped leaves its number unused.
+- **What each carries:**
+  - a name, for showing;
+  - the executor: a charter, by its number among the charters member's;
+    or "a charter or procedure the role may create with", the creator's
+    choice;
+  - the result contract;
+  - authority: the creator's role narrowed, by default one level
+    shallower in delegation;
+  - the budget: an amount; `AsAllowed`, with an optional cap; or the
+    creator's to give, within their allotment;
+  - a deadline: none; a span from creation; or the creator's to give;
+  - wake and park: the charter's;
+  - tracked, with a default priority;
+  - the flags: *conversation*, *listed*, and the retention class,
+    *kept* or *forgotten once read* (`../domain/tasks.md`, section 3);
+  - the label: an opaque 32-bit number, which jig gives no meaning;
+  - the grace its helper cancels with, or none.
+- **jig's defaults,** which an application keeps, changes or drops:
+
+| Field | chat (template 1) | goal (template 2) |
+|---|---|---|
+| executor | a charter the template names: the application's charter for chats | a charter or procedure the role may create with, the creator's choice |
+| contract | a report | a report |
+| authority | the role's, one level shallower in delegation | the role's, one level shallower |
+| budget | `AsAllowed` | the creator's, within their allotment |
+| deadline | none | the creator's, or none |
+| wake, park | the charter's | the charter's |
+| tracked | no | yes, with a default priority |
+| conversation | yes | no |
+| listed | no | yes |
+| retention | kept | kept |
+| label | 1 | 2 |
+| grace | a span, which the helper closing a chat cancels with | none |
+
+- **A project's policy may override,** per template number, the
+  executor, the budget and its cap, the deadline and the default
+  priority (`../domain/authority.md`, section 6). Never the flags, the
+  label or tracked: they are the shape's identity, which lists and the
+  engine's behaviour key on. An override naming a template the
+  configuration does not define is refused when the policy is changed,
+  and a seeded policy's refuses the start.
+- **The engine never expands or checks one.** The core keeps the
+  configuration's templates, and each policy's overrides, only to serve
+  each project's merged templates in `me`
+  (`../client/domain/contract.md`, 3.6 and 5.1). The client fills a
+  template into an ordinary request, which the core checks as it checks
+  one written by hand. A template grants nothing: whatever it makes, a
+  `Create` could make within the creator's authority.
+- **Permissions stay primitive:** which charters and executors a role may
+  create with, its spend and its delegation (`../domain/authority.md`,
+  section 6). No role is given or refused a template.
+- **A task keeps the values it was made with.** A template changed or
+  dropped at a later start touches no task already made; a policy's
+  override naming a template the configuration does not define at that
+  start serves nothing, and the next change of that policy must leave
+  it out, as above.
+- **Checked at start:** numbers unique; each charter an executor names
+  configured; each grace within the tasks child's limit on a grace's
+  span (`../domain/tasks.md`, section 11); each seeded policy's
+  overrides as above.
 
 ## 4. jig's part for a worker
 
@@ -172,6 +258,21 @@ secret, and every credential its runs need comes with their assignments
   reserve's, and its default budget holds its reserve and one of its main
   model's most costly completions (`../domain/authority.md`, section 7),
   or the engine's start is refused, naming the charter.
+- **Operations per request,** the people child's limit on a compound
+  request (`../domain/people.md`, 5.1), is at least the larger of
+  *delegates per task* plus one and *goals per project*, both the tasks
+  child's (`../domain/tasks.md`, section 11), or the start is refused,
+  naming the three. So closing a conversation, each of its live
+  delegates cancelled or moved and the conversation then cancelled with
+  a grace, fits one request; and so does reordering every live goal of
+  a project.
+- **A compound request's worst case:** its decision is priced as
+  operations per request times the costliest operation it may hold, a
+  cancel of a whole tree within *tasks per tree*, and summed into the
+  engine's worst case with the rest, as every decision is
+  (`../README.md`, 6.2; `../domain/root.md`, section 10).
+- **A template's grace** is within the tasks child's limit on a grace's
+  span, or the start is refused, naming the template (3.1).
 - **The deployment's message bound** holds every kind of message a
   task's inbox admits, as a run renders it with its sender's label: a
   party's words and questions by the people child's bound, which is at
@@ -190,8 +291,8 @@ secret, and every credential its runs need comes with their assignments
 | an LLM account's record | its tokens, as skein's accounts driver keeps them | a private file per account, written by a sign-in, loaded by the driver (`llm.md`, 5.4) |
 | a handed-in LLM account's access token | an access token and when it lapses | a private file, filled by another program's login, read at start (`llm.md`, 5.4) |
 | an LLM account's client secret, if its provider has one | a confidential client's | a file |
-| the listeners' TLS keys | private keys | files beside their certificates |
-| a sign-in provider's client secret | a confidential client's | a file (`client.md`, section 8) |
+| the workers' listener's TLS key | a private key | a file beside its certificate |
+| the clients' listener's TLS key; the secrets of the application's sign-in (an OAuth client's) | the application's server's | its own members' files; jig's part names none (`service.md`, section 7; `client.md`, section 8) |
 | a connector's credentials | the application's | the application's files, or its own secrets' records |
 | an application's credential, for runs' workspaces | the application's | its own member's source: a file, or an exchange it refreshes (section 3) |
 
@@ -203,8 +304,8 @@ secret, and every credential its runs need comes with their assignments
   secrets by number (`../domain/engine.md`, section 12).
 - **What changes while the engine runs** is kept by its owner, never
   written back to configuration: a rotated refresh token in the account's
-  private file, by skein's driver; a sign-in's digest in the store's
-  secrets' records.
+  private file, by skein's driver; a minted credential's digest in the
+  store's secrets' records (`store.md`, section 9).
 
 ## 8. First start, and every start
 
@@ -213,14 +314,15 @@ secret, and every credential its runs need comes with their assignments
   from configuration into its first commit (`../domain/engine.md`, 5.4
   and section 14).
 - **Every later start** reads the deployment from the store. The
-  configuration's projects are ignored; its rules, charters, limits,
-  hosts, endpoints and accounts apply as configured, and a narrowing
-  reaches every later decision, as a policy's does (`../domain/authority.md`,
-  section 6).
-- **What the store holds and configuration no longer names** (a charter
+  configuration's projects are ignored; its rules, charters, templates,
+  limits, hosts, endpoints and accounts apply as configured, and a
+  narrowing reaches every later decision, as a policy's does
+  (`../domain/authority.md`, section 6).
+- **What the store holds and the configuration does not name** (a charter
   removed, a connector gone) is the domain's to judge at restart, as it
   judges a live set past limits lowered since (`../domain/engine.md`,
-  section 6); what it decides is open (section 9).
+  section 6); what it decides is open (section 9). A template dropped
+  is not among them: no task depends on one (3.1).
 
 ## 9. Open questions
 

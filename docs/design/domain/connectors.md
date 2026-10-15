@@ -1,6 +1,6 @@
 # Connectors
 
-Provisional, 2026-10-07, revised 2026-10-12. The contract an external
+Provisional, 2026-10-07, revised 2026-10-15. The contract an external
 system meets to be driven by an application on jig: what a connector is,
 what crosses between it and the core through the application's root, and
 what every connector does: resources and holds, effects and the outbox,
@@ -38,7 +38,9 @@ owed. What is still open is listed in section 16.
   working set of what its system owns of the live work, and publishes
   what changed on topics, classified for each subscriber.
 - **Procedures are the mechanics,** as executors of tasks: pure step
-  machines, level-triggered, their state committed with each step.
+  machines, level-triggered, their state committed with each step. A
+  step acts on tasks with the operations a party or an agent has, naming
+  the revisions it was told, but decides no proposal or escalation.
 - **Requirements are judged by their connector** (section 7): asked
   about an effect's exact state, it answers met, wait or refuse from its
   own facts, whichever connector makes the effect. A guarded requirement
@@ -75,7 +77,7 @@ application root            routes between the core and every connector
   | keep this effect under this key, or under this proposal; drop it | — (part of the decision) |
   | make this outbox entry (the journal released it) | made, with what it made; failed; uncertain |
   | judge this requirement for this effect's state | met; wait, for what; refuse, on which fact |
-  | a procedure task: made with its parameters; activated; a message; closing; the task its step made | a step's decision: effects, batches, amendments, proposals, messages up, a hold, a result |
+  | a procedure task: made with its parameters; activated; a message; closing; what its step made, with the revisions it names; a step refused, and why | a step's decision: effects, batches, amendments, cancels, proposals, messages, a hold, a result |
   | project this goal: its state, its plan, its milestones | the projection's effects |
   | release what this closing task held | the release's effects |
   | subscribe this task to this topic; unsubscribe | news for these subscribers, classified |
@@ -329,6 +331,11 @@ is news for the closing task.
 - **Subscribers are tasks,** by number, and their number per topic is
   bounded. A task subscribes through its tool, through its creator, or
   through the core (a goal's topics, 5.4).
+- **Offered to agents.** A connector says which kinds of its topics an
+  agent may subscribe to with `subscribe` (engine.md, 7.3), each with
+  what a call names it by, as it offers kinds of effect (4.5); asked,
+  it names the resources a topic concerns, which a read grant of the
+  task's must cover (authority.md, 8.5; hosts.md, section 8).
 - **Each event is classified per subscriber:** *wakes*, *kept* or
   *dropped*, by the connector's judgement and without an LLM: an alert
   on a service a watch covers wakes it; one it already has open news of
@@ -342,7 +349,10 @@ A connector may offer topics for goals: what a goal's subtree should
 hear of the resources it works on, such as the landings that overlap a
 goal's changes, or the alerts on the services an incident's
 remediations touched. The core subscribes each goal to them as its
-subtree names resources (core.md, 6.2).
+subtree names resources (core.md, 6.2). A goal is a task marked
+tracked, by whatever request made or amended it: the core knows it by
+that mark, never by a template or a label, and a connector hears of it
+only from the core (tasks.md, section 3).
 
 ### 5.5 What clients see of it
 
@@ -357,12 +367,17 @@ documents, beside jig's (`../client/domain/contract.md`, section 5):
   makes when the core has admitted the read, as jig's reads are answered
   (engine.md, 5.3);
 - **the scope each names:** a watch of one of its subjects, and a read
-  of one of its documents, name a project or the deployment, since the
+  of one of its documents, name a project, the deployment, or the
+  party's own (what is the signed-in party's across projects), since the
   core cannot read a connector's subject. The core admits them on the
-  party's sign-in and role in that scope, and the views' limits; the
-  connector, asked for the document, judges that the subject is in that
-  scope and what the party may see of it, and answers that it is
-  unknown, or not allowed, otherwise;
+  party's sign-in and role in that scope, the party's own on the sign-in
+  alone, and on the views' limits; the connector, asked for the
+  document, judges that the subject is in that scope and what the party
+  may see of it, and answers that it is unknown, or not allowed,
+  otherwise;
+- **windows:** a watch of one of its subjects, and a read, carry a
+  window, as jig's do; the connector makes the document within it
+  (`../client/domain/contract.md`, 7.5);
 - **its parts,** which jig's documents name by reference (a resource, a
   kind, a task's panel, a proposed effect, a hold's account), read and
   followed by its side of the application's client. An outbox entry is
@@ -370,8 +385,8 @@ documents, beside jig's (`../client/domain/contract.md`, section 5):
   apart from a proposed effect's description: an effect made or in
   flight, or the one that held a task. A part's value lives as long as
   the connector's records keep it (a procedure's result, while it keeps
-  that procedure's record); past that, the part is unknown, and jig's
-  card says so;
+  that procedure's record); past that, the part is unknown, and its
+  connector answers so;
 - **its keyed requests:** a request about one of its own objects comes
   to it through the root, keyed by the people child; it decides it
   within the decision, asks the core for what it needs on the party's
@@ -397,7 +412,10 @@ number, its delegates by number, and the facts it reads. A projection
 
 - when its task becomes active;
 - when a message its owner lets through reaches its task: a delegate's
-  result, an amendment, a cancel, an answer, news it subscribed to;
+  result, an amendment, a cancel, an answer, news it subscribed to; a
+  cancel's grace, asking it to finish, comes as an amendment does
+  (tasks.md, section 7);
+- when its last step was refused, with why (6.3);
 - when a fact it reads changes, which its connector knows from its
   working set;
 - when a deadline its state names passes: a stall, a backoff, the end of
@@ -411,12 +429,20 @@ One decision, committed with its new state:
 
 - effects, described and kept for the outbox (4.1);
 - batches of delegates: agents for what needs judgement (a triage, a
-  diagnosis, a repair), people for what needs a decision;
-- amendments and cancels of its delegates;
+  diagnosis, a repair), people for what needs a decision, each task
+  with what a party's `Create` names (tasks.md, section 4);
+- amendments of its delegates and the tasks below them, each naming the
+  revision of the spec it was told, but for a change of priority alone
+  (tasks.md, section 7);
+- cancels of its delegates and their trees, with a reason, and a grace
+  when the step gives one, in which the task is asked to finish first
+  (tasks.md, section 7);
 - proposals, for what its task's authority does not cover, while the
-  rest of the step commits;
-- messages up: a question, an escalation, news its requester should
-  have;
+  rest of the step commits: a batch, an amendment, an effect, or a
+  widening of its task's authority (authority.md, section 9);
+- messages: words to its delegates and to the tasks its task references
+  (tasks.md, 8.5), and an answer to a delegate's question; and up, a
+  question, an escalation, news its requester should have;
 - a hold, when it needs a decision it cannot make;
 - its result, which ends its task: in jig's terms (a report, a verdict),
   or a connector's result it keeps, with words summarising it (tasks.md,
@@ -426,12 +452,33 @@ Every effect and batch is checked against its task's authority, as any
 decision is (authority.md, section 8); a procedure's authority is its
 task's, given by its creator.
 
+**The same operations, by the same rules.** A step's batches,
+amendments, cancels, proposals and messages are the operations a
+party's requests and a run's tools make (people.md, 5.1; engine.md,
+7.3), and reach the same rules: who may amend or cancel a task, what an
+amendment may change, a grace's bound (tasks.md, section 7); who may
+message whom (tasks.md, 8.5). What a procedure never does is decide: it
+releases no hold and decides no proposal or escalation, which pass over
+it to the next holder (tasks.md, section 9); stopping a run and moving a
+task are parties' alone.
+
+**A step names the revisions it was told.** An amendment names its
+task's spec's revision as the core last told the procedure's connector:
+with what its step made or amended (below), or with a step refused as
+moved. A step whose amendment names a revision that has moved is
+refused whole, as a step that fails any check other than authority is:
+nothing of it commits, its connector is told why, with what the task is
+now, and the procedure steps again on that (6.2). So no procedure writes
+over a change it was not told of.
+
 **What its step made comes back** within the same decision. The core
 numbers a step's batch as it admits it, so the step cannot know its
 delegates' numbers; the core tells the procedure's connector, through
 the root, the number of the first task the step made, or that it made
-none. A connector that must know what that task is for (an incident's
-lead) keeps, in its procedure's state, what the step made it for, and
+none, with the revisions of the specs it made or amended; or that the
+step was refused, and why. A connector that must know what that task is
+for (an incident's lead) keeps, in its procedure's state, what the step
+made it for, and
 records the number when it hears it, durably, in that decision, so a
 restart keeps it. Nothing is inferred from the task's words or the
 order tasks were made in.
@@ -509,15 +556,16 @@ procedure, but a mechanism of the connector's, keyed to the goal.
   as they are recorded, each with an identity of its own, so the
   connector keeps what it has written and adds to it; the plan comes
   whole, within the tree's limits (tasks.md, section 11). The last
-  feed, as the goal closes, is its closing state.
+  feed, as the goal closes, is its closing state; a goal an amendment
+  untracks is fed its state then, as a last feed (tasks.md, section 7).
 - **Where:** in the project's home for that connector (core.md, 6.1).
   A project with no home there has no projection there.
 - **Its effects** have keys of their own (4.4), are checked against the
   authority the project's policy gives its goals' projections, and are
   made through the outbox like any other.
 - **Its state** (what it last wrote, by a digest) is kept with the goal,
-  and outlives it until its last write, made as the goal closes, has
-  settled.
+  and outlives it until its last write, made as the goal closes or is
+  untracked, has settled.
 
 ## 9. Reads and brief sections
 
@@ -664,13 +712,16 @@ uncertain entries resolved as their recovery class says, with copies
 arriving late, after their deadline and after a retry, and targets that
 another hand reached too; deadlines that survive restarts made before
 they pass; procedures that decide the same when stepped twice on the
-same facts; verdicts that never say met on facts older than their
-freshness; facts that change between a verdict and its effect; pools
-that shrink while held and while waited for; topics whose news reaches
-every subscriber once, classified; values it keeps for the root handed
-over once, or dropped when the core drops their token; and a load that
-follows change, the system preloaded with ten times the history making
-the same calls while idle.
+same facts; procedures that amend, cancel with a grace and message their
+delegates, an amendment refused as moved when a party amended the
+delegate first, and the procedure stepping again on what it is told,
+never writing over that change; verdicts that never say met on facts
+older than their freshness; facts that change between a verdict and its
+effect; pools that shrink while held and while waited for; topics whose
+news reaches every subscriber once, classified; values it keeps for the
+root handed over once, or dropped when the core drops their token; and a
+load that follows change, the system preloaded with ten times the
+history making the same calls while idle.
 
 ## 16. Open questions
 
