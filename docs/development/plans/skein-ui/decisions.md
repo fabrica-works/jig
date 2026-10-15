@@ -1404,6 +1404,270 @@ None yet; they start at 101.
 135. **skein-13.s1: the chart test's bad data written as escapes** (steer of 2026-10-15T17:31:22Z).
      **A step `skein-13.s1`: the chart test's bad data written as escapes** (the check of 17:23, Taste; the handover of 17:29). skein 13.4's `examples/ui/view/src/tests/chart.rs:110` holds raw NUL and 0x04 bytes in `BAD_DATA`'s byte strings, so git, the pulse and grep read the file as binary (`git show 2f8f471 --numstat` prints `-	-` for it); no other `.rs` file of skein or jig holds raw control bytes (`git grep -lP '[\x00-\x08\x0b\x0c\x0e-\x1f]' origin/main -- '*.rs'`, in each). The step, with its session file `skein/13.s1-chart-bytes-escaped.md`, writes the same bytes as escapes (`b"\0\x04idea"`, `b"A\0\0\0\0\0"`, `b"\0\0\0\0\0\0x"`), in a fresh skein implementer, and lands before jig 05.1, so that 05.1's repin takes it and jig pins skein's last landing of this plan (Done when 4). 05.1 still waits for the designer's answer (ruling 134, part 2); if it resumes before skein-13.s1 has landed, it waits for that landing, then repins to skein's `origin/main` (`heavy cargo update -p skein-lib`) before its gate. Unchanged: ruling 133's and 134's rules for 05.1, and jig-05.s1.
 
+136. **jig 05.1: a sign-out's answer after a newer sign-in, step jig-05.s2** (design gap, jig 05's block of 2026-10-15T17:27:05Z).
+     The designer's answer (jig `09864655c`, `ee986de90`), below, placed as its default says: step `jig-05.s2`, the joint front drops an earlier sign-out's answer, in jig 05's session, after jig-05.s1 (landed, `b50df4289`), before 05.1 lands, at jig's current pin, with its session file `jig/05.s2-sign-out-answer-kept.md`. Its Files add what the answer's miss: `tests/ops/src/joint/front.rs` builds `Reply::SignOut { client }` (960) and matches `Incoming` with no wildcard (126-155), so it takes `sign_in` and an `Incoming::SignedOut` arm that pushes `client::Event::SignedOut`, as today. The answer's question for the supervisor, the transport's clearing on a watch ended signed out and a keyed answer signed out, is deferred: a `later.md` row, since no seed has met it. temper's joint front, which the new field and variant break (temper `tests/client/src/front.rs:127-141`, 352), waits for temper's next plan that takes jig: a `later.md` row, as its `Limits` literals'. Then 05.1 resumes, under rulings 133 to 135: it repins to skein's `origin/main`, which holds skein-13.s1 (`f12f29d`), before its gate.
+
+
+     ### jig 05.1: a sign-out's answer that arrives after a newer sign-in, 2026-10-15T17:27:05Z
+
+     **Decision: the supervisor's reading. The client keeps the newer
+     sign-in's page. The shell tells the two answers apart, not the domain.
+     In the client's joint world, step `jig-05.s2` makes the front play the
+     shell's part.**
+
+     1. **A sign-out's answer, signed out or lost, speaks only of the
+        sign-in it carried.** Once a newer sign-in is authenticated, the
+        shell drops an earlier sign-out's answer. It keeps the newer
+        sign-in's secret and tells the client nothing, so the person stays
+        signed in, on the page the newer sign-in came back to. client.md 12
+        now says so, and protocol/client.md 8 and browser.md 11 say it from
+        the shell's side.
+     2. **The shell tells them apart, and the domain does not.** The
+        shell's secret names its sign-in. The domain holds neither the
+        secret nor the sign-in's number. Its `Event::SignedOut` names no
+        sign-in and gets no field.
+     3. **In jig's worlds, the joint front plays the shell.** That needs
+        code, in step `jig-05.s2` (below). It changes no crate of jig's
+        client, and no referee. `jig-shell-native` and the scripted front
+        have the same gap, but no seed has met it there. They wait, in a
+        `later.md` row.
+
+     Why:
+
+     - **Nothing the person asked for is lost.** The sign-out ended the
+       sign-in it carried. The client had already shown the sign-in page
+       before the newer sign-in, because a sign-in is asked only from there
+       (`signin.rs:33-44`: `choose` sends `Request::SignIn` only on
+       `Page::SigningIn`). Showing the sign-in page again would sign out,
+       on the page, a person whose sign-in the engine still holds. On seed
+       4503 the transport held sign-in 3 while the page was signed out.
+     - **Only the shell can tell the two apart.** The sign-out's answer is
+       the one terminal the domain cannot place: `Request::SignOut` and
+       `Event::SignedOut` carry no token (`boundary.rs:57-59, 84-86`).
+       Every other way the domain hears signed out is already scoped by a
+       token it or the table owns. Going signed out (`signin.rs:59-75`):
+       - parks every request (`Request::Confirmed { party: None }`), so an
+         earlier attempt's answer is `Stale` to the table (skein-lib
+         `requests.rs:268-283`, 540-558);
+       - abandons every read, whose result is then dropped (`reads.rs:71-78`;
+         `routing.rs:441-443`; `objects.rs:741-745`);
+       - closes every watch, so a closing watch's terminal only retires it
+         (`domain.rs:575-586`, 1033-1037).
+     - **The shell must decide anyway, for its own secret.** A shell that
+       took a late answer would also clear the newer secret. The native shell
+       does that today: `sign_in.rs:41-46` sets `*token = None` on any sign-out
+       answered signed out. A rule in the domain would leave that wrong.
+     - **Not "drop it in the domain once the person chose a provider".**
+       The domain could see that, but only indirectly: choosing a provider is
+       not the same as being authenticated. It would also have to tell the
+       sign-out's `SignedOut` from a keyed answer's, which the root routes
+       the same way (`jig-test-domain-client/src/domain.rs:128-129`).
+     - **A browser needs no code.** Each sign-in loads a new page: a
+       provider is a navigation, and the printed link signs in before the
+       client host starts (browser.md 5). So an earlier page's sign-out
+       never answers into a newer sign-in's client host.
+
+     ### Landed
+
+     - jig `09864655c`, "Keep a sign-out's answer to the sign-in it
+       carried":
+       - `client/domain/client.md` 12: the new bullet "A sign-out's answer is
+         its sign-in's";
+       - `protocol/client.md` 8, the "Signed out" bullet;
+       - `protocol/browser.md` 11, the "Signing out" bullet;
+       - STATUS.md: the skein-ui plan row, and the `client/domain/client.md`
+         and `protocol/client.md` rows.
+     - jig `ee986de90`, "skein-ui: a sign-out's answer after a newer
+       sign-in, through client.md 12":
+       - `jig/05-repin.md`: the known question is marked answered. 05.1's
+         own rules are unchanged: no re-seed, and no change to the referee or
+         to jig's client;
+       - `later.md`: one row, the same rule in `jig-shell-native` and in the
+         scripted front.
+     - One thing deferred, with that row. `jig/05.s1-referee-stale-frame.md`
+       is unchanged: its Don't (no change to jig's client) still holds.
+
+     ### The text it rests on (jig `09864655c`)
+
+     - client.md 12 (from line 570): "**A sign-out's answer is its
+       sign-in's.** A sign-out carries one sign-in's secret, and its answer,
+       signed out or lost, speaks of that sign-in alone. Once a newer sign-in
+       is authenticated, the shell drops an earlier sign-out's answer: it
+       keeps the newer sign-in's secret and tells the client nothing, so the
+       person stays signed in, on the page the newer sign-in came back to.
+       Nothing the person asked for is lost: the sign-out ended the sign-in
+       it carried, and the client had shown the sign-in page before the newer
+       sign-in, since a sign-in is asked only from there." Its sub-bullets:
+       "*The shell tells the two apart,* because it holds the secret, which
+       names its sign-in (`../../protocol/client.md`, section 8). The domain
+       holds neither the secret nor the sign-in's number."; "*The domain's
+       own exchanges need no such rule.* Going signed out parks every
+       request, abandons every read and closes every watch, so a terminal the
+       earlier sign-in still owes meets no live token …"; "*A browser keeps
+       the rule by its pages:* each sign-in loads a new page, so no earlier
+       page's sign-out reaches the newer sign-in's client host".
+     - protocol/client.md 8 (from line 355): "Its answer, signed out or
+       lost, is the sign-in's whose secret it carried: a shell that has since
+       authenticated a newer sign-in drops it, and keeps the newer secret
+       (`../client/domain/client.md`, section 12)."
+     - browser.md 11 (from line 604): "A sign-in always loads a new page (a
+       provider's navigation, or the printed link, signed in before the
+       client host starts: section 5), so an earlier page's sign-out never
+       answers into the client host of a newer sign-in".
+     - Unchanged, and still true for the current sign-in: client.md 12's
+       "**Signing out,** from the frame, is the shell's exchange too: it ends
+       the sign-in on the engine …, and the client then shows the sign-in
+       page, as when signed out."
+
+     ### What each step does
+
+     - **jig-05.s2, the joint front drops an earlier sign-out's answer**
+       (new; you write its session file and place it). The default: in jig
+       05's session, after jig-05.s1 (landed, `b50df4289`) and before 05.1
+       lands, at jig's current pin, as 05.s1 landed.
+       - **Files:** in `tests/client/src/`: `joint/transport.rs`,
+         `joint/packets.rs`, `joint/session.rs`, `joint/front.rs` and its
+         tests, `harness/mod.rs`, `harness/world.rs`.
+       - **Why the check is at delivery:** the front translates the
+         sign-out's reply when the engine answers, which also clears the
+         transport's sign-in. The harness then delivers the callback 1 to
+         3 ms later (`harness/world.rs:827-831`). The rule is judged when the
+         root would take the answer, which is when a real shell would read
+         it.
+       - **Shape:**
+         - `Reply::SignOut` (`transport.rs:30`) names the sign-in its
+           exchange ends: `SignOut { client, sign_in }`. `Session::sign_out`
+           has `sign_in` at hand (`session.rs:216-217`).
+         - `people_reply`'s `Reply::SignOut` arm (`packets.rs:324-330`)
+           clears the transport's sign-in only while it is still that one
+           (`transport.sign_in(client) == Some(sign_in)`). It returns a new
+           `Incoming::SignedOut { client, sign_in }` (`packets.rs:34-39`) in
+           place of `Incoming::Callback { event: Event::SignedOut }`.
+         - `Session::incoming` (`session.rs:439`) keeps, per client, the
+           sign-ins ended by the sign-out answers still in flight, oldest
+           first. It pushes `Event::SignedOut` as a callback, as today.
+           `detach` (`session.rs:883`) clears the client's entries, as it
+           clears the client's callbacks.
+         - `Front` (`harness/mod.rs:69-84`) gets a default method, `fn
+           delivers(&mut self, client: ClientId, event: &A::Event) -> bool`,
+           which returns true. The delivery loop (`harness/world.rs:840-849`)
+           asks it of each due that passed the epoch and navigation checks,
+           before `received`. A false counts in `dropped`, as a stale due
+           does.
+         - The joint front's `delivers` (`joint/front.rs`, beside `received`
+           at 218), for `Event::SignedOut`: it takes the client's oldest
+           entry and returns true only if the transport holds no sign-in for
+           the client, or that same one. For every other event it returns
+           true.
+       - **Tests:** in `joint/front.rs`'s tests (line 236), each under 20 ms:
+         - `a_sign_out_answered_after_a_newer_sign_in_is_not_delivered`:
+           bind client 0, then `sign_out`. Poll until the `SignedOut`
+           callback comes back, without delivering it. Then `sign_in`, and
+           poll until the transport holds a sign-in other than the first.
+           `delivers(ClientId(0), &Event::SignedOut)` is false, and the
+           transport still holds the newer sign-in.
+         - `a_sign_out_answered_with_no_newer_sign_in_is_delivered`: the same
+           with no sign-in after the sign-out. `delivers` is true, and the
+           transport holds no sign-in.
+       - **Proof:**
+         - the two tests, once;
+         - the gate through `land`, once, at jig's current pin.
+         - Seed 4503 is 05.1's: its gate runs the fuzzy profile on top of
+           jig-05.s1 and this step. If seed 4503 fails there again, that is a
+           new block, with its trace.
+       - **Don't:**
+         - change `jig-domain-client`, the client root
+           (`jig-test-domain-client`), the referee or a seed, or widen a
+           deadline;
+         - give the root's `Event::SignedOut` a field: the domain holds no
+           sign-in (client.md 12);
+         - change the scripted front (`scripted.rs`) or `jig-shell-native`:
+           `later.md`'s row;
+         - change the transport's clearing on a watch ended signed out
+           (`packets.rs:223-225`) or on a keyed answer signed out
+           (`packets.rs:350-352`): see "For the supervisor".
+       - **Size:** aim for at most 40 lines outside `#[cfg(test)]`. Past
+         80, stop and report the shape.
+     - **jig 05.1:** unchanged. It resumes once jig-05.s2 has landed, under
+       your rulings 133 to 135.
+
+     ### For the supervisor, not decided here
+
+     - **The world's transport also forgets a client's sign-in on two other
+       answers:** a watch ended signed out (`packets.rs:223-225`) and a keyed
+       answer signed out (`packets.rs:350-352`). No shell does that.
+       `jig-shell-native` clears its token only on its own sign-out's answer
+       (`sign_in.rs:41-46`), and a browser's cookie only the engine clears.
+       If one of those answers is translated after a newer sign-in, the world
+       forgets the newer sign-in. Seed 4503 did not meet this: its last
+       `Transport::signed_out` came before sign-in 3
+       (`logs/jig-05/seed-4503-transport.log`, lines 141-148 and 155). But a
+       watch's terminal can follow its sign-out's commit by about 0.6 ms
+       there. A fix would make each watch and keyed route record the sign-in
+       it carried: about 12 test sites build those routes
+       (`rg -n 'Reply::Keyed \{|transport\.open\(' tests/client/src/joint`).
+       Ruling on it or deferring it is yours. client.md 12 says nothing
+       about a shell clearing its secret on those answers.
+
+     ### Checked against main
+
+     - **Design,** jig `09864655c` (on `origin/main` under `ee986de90`): the
+       quotes above, from `docs/design/client/domain/client.md`,
+       `protocol/client.md` and `protocol/browser.md`.
+     - **Code,** jig `b50df4289` (the code is the same at `ee986de90`):
+       - `crates/jig-domain-client/src/`:
+         - `signin.rs:33-44`: `choose` sends `Request::SignIn` only on
+           `Page::SigningIn`;
+         - `signin.rs:46-51`: `sign_out` pushes `Request::SignOut`, with no
+           token;
+         - `signin.rs:59-75`: `signed_out` runs `close_all`, `reads.abandon`
+           and `Request::Confirmed { party: None }`, and shows `SigningIn`;
+         - `boundary.rs:57-59, 84-86`: `SignOutLost`, `SignedOut` and
+           `Request::SignOut`, none with a token;
+         - `domain.rs:575-586`: `close_watch` makes a live watch `Closing`;
+         - `domain.rs:1033-1037`: a `Closing` watch's terminal retires it
+           and nothing else;
+         - `reads.rs:71-78` and `pages/routing.rs:441-443`, and
+           `objects.rs:741-745` for a card read: an abandoned read's
+           terminal returns early.
+       - `testing/jig-test-domain-client/src/`:
+         - `route.rs:80`: the root's `Event::SignedOut` becomes the
+           domain's;
+         - `domain.rs:128-129`: a keyed answer signed out does too, while
+           its attempt is current;
+         - `route.rs:147-150`: `Confirmed` reaches `root.table.confirmed`.
+       - skein `7fc3f27`, `crates/skein-lib/src/requests.rs:268-283` and
+         `540-558`: an answer to an attempt that is not `InFlight` is
+         `Stale`, and an unconfirmed scope parks `InFlight` entries.
+       - `crates/jig-shell-native/src/sign_in.rs:41-46`: `*token = None` on
+         any `SignOutAnswer::SignedOut`; `connections.rs:288-294`: only
+         sign-in and sign-out answers reach it.
+       - `tests/client/src/`:
+         - `joint/transport.rs:30` (`Reply::SignOut { client }`), 174
+           (`signed_in`), 181 (`sign_in`) and 190 (`signed_out`);
+         - `joint/session.rs:210-219` (`sign_out`), 439 (`incoming`) and
+           883-892 (`detach`);
+         - `joint/packets.rs:34-39` (`Incoming`), 223-225, 324-330 and
+           350-352;
+         - `harness/mod.rs:69-84` (`Front`);
+         - `harness/world.rs:827-831` (each front callback scheduled after
+           `settings.latency`, 1 to 3 ms, line 42) and 838-849 (the delivery
+           loop);
+         - `joint/front.rs:218` (`received`) and 236 (`mod tests`);
+         - `scripted.rs:585-593` and 602.
+     - **The trace:** `logs/jig-05/seed-4503-transport.log`:
+       - lines 140-141: `Act SignOut` at 0.706100737, then `TRANSPORT
+         SIGNED_OUT old=Some(2)`;
+       - lines 151-155: the frame `Ended SignedOut` at 0.707174354, then
+         `Act SignIn` and `SIGNED_IN new=3` at 0.707233803;
+       - lines 170-171: the root's `SignedOut` at 0.708717799, then
+         `HiddenPage` shown.
+     - **Commands:** `rg -n 'SignedOut|SignOutLost|SignOut\b|SignIn\b'` over
+       the domain's `src`; `rg -n 'Reply::SignOut|signed_out\(|signed_in\('
+       tests/client/src/joint/*.rs`; `rg -n 'set_token|token = None'
+       crates/jig-shell-native/src`; `grep -n` for each line cited above, at
+       `b50df4289`; `sed -n 90,203p` of the transport log.
+
 ## For the user
 
 Long-term choices the user may veto; each default holds unless the user
