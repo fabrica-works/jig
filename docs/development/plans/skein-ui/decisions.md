@@ -133,6 +133,9 @@ None yet; they start at 101.
 102. **jig 03's Shapes against main** (ready check of jig-03.1).
      jig 03's session file corrected against jig `d2a7a714e` (01.3 landed): line numbers moved by 01.1 and 01.3; 03.1's landmark test opens a button inside each landmark and binds that; `bind`'s role check is an exhaustive `match` (`clippy.toml` disallows `matches!`), after the drawing's assertion, and is about 50 lines; 03.2's Files name the makers of `Settings` (`tests/client-protocol/src/native/world.rs`, `crates/jig-shell-text/src/tests/terminal.rs`) and the callers of `render`, and its proof adds `jig-client-protocol-world`'s native terminal test; 03.3 imports from `jig_view::ui` only what 01.3 moved, jig 02 moving the rest. A further user of `Settings`, `render` or a moved item that these Files miss: change it in the same increment, and list it in the commit body.
 
+103. **skein 01's Shapes against main** (ready check of skein-01.1).
+     skein 01's session file corrected against jig `f15431139` (jig 02.5 landed) and skein `9366d5d`: `lib.rs` comes from jig's `ui.rs`, not `ui/mod.rs`; the six doc comments citing jig's `view.md` name their skein sections; each increment runs `cargo fmt` after the rename; `skein-sim` goes in `crates/skein-ui-text/Cargo.toml`, with `[workspace.dependencies] skein-ui-text` in skein's; skein-fake-person drops jig's three `disallowed_*` allows and takes a copy of `tests/clippy.toml`, as skein-fake-channel does; the sizes are those counted at jig `f15431139`. A further name of jig, citation or lint the copy trips that these lines miss: fix it in the same increment, and list it in the commit body.
+
 ## For the user
 
 Long-term choices the user may veto; each default holds unless the user
