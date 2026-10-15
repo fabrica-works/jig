@@ -68,11 +68,11 @@ Files: new `tests/browser/tests/browser_facts.rs`, in the kit's world
   `tests/browser/Cargo.toml` (dev-dependencies `skein-ui-web`,
   `skein-ui`); `crates/skein-ui-web/src/mapping.rs` (`accessible`, if a
   fact differs: the table is fixed first, ui-web.md 14.1), with its
-  copy, the `ROLES` table at `src/tests/mapping.rs:8` (asserted at 97),
+  copy, the `ROLES` table at `src/tests/mapping.rs:8` (asserted at 96),
   and its users at `testing/skein-fake-person-browser/src/face.rs:197-198`.
 Shape: one page holding an element of each row of ui-web.md 6's table
   and a select of three options, built in the test from
-  `mapping::element`, as `crates/skein-ui-web/src/tests/mapping.rs:305-333`
+  `mapping::element`, as `crates/skein-ui-web/src/tests/mapping.rs:318-347`
   does, each element its own node id, a table's parts inside
   `<table><tr>`, an option inside its select, the menu open. Not the
   golden `mapping.html` served as is: its `<th>`, `<tr>` and `<td>` sit

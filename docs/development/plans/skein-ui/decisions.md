@@ -310,6 +310,9 @@ None yet; they start at 101.
 118. **skein 14's Shapes against main** (ready check of skein-14.1).
      skein 14's session file corrected against skein `0fd10aa` (skein 02.4 landed) and jig `81744cca6`: 14.1's facts test goes in the kit's world package, `tests/browser/tests/browser_facts.rs`, over its `Rig` and `serve::Pages`, since the harness only spawns `Setup.server`; its page is built in the test from `mapping::element`, each element its own node, the table's parts in `<table><tr>`, the option in its select, the menu open, not the golden `mapping.html`, whose loose table parts Chromium drops; a fixed fact moves `accessible` with its `ROLES` copy and the face's users; the panic story's `Setup.expected` holds `Uncaught`, the kit's text for the trap, not the panic's words; `stories::panic` takes `failed: Find` (the designer's question of the same time may amend it, and 14.4's `arrives`); 14.2 names skein-ui-web's `lib.rs` and `tests.rs`, the view's `Place` users and path table, and panics by an `assert!` since `clippy::panic` is denied; 14.3 names the shell, which makes the store, and the second person waits on the first's end before playing `Gone`; 14.4 adds `harness::Step::Type`, the kit's `Type` at the caret, and names `face.rs`'s `perform`; the sketch's stories are `#[must_use]`. A further user of a `Place`, of `accessible` or of the harness's steps these Files miss: change it in the same increment, and list it in the commit body.
 
+119. **skein 14 against 02.5** (re-check of skein-14.1 after skein-02.5).
+     skein 14's session file re-checked after skein 02.5 (`54ca50f`): skein-ui-web's golden page test is at `src/tests/mapping.rs:318-347` and `ROLES` is asserted at 96; `accessible` (`mapping.rs:339`) and its users in the face (`face.rs:197-198`) are as ruling 118 names them.
+
 ## For the user
 
 Long-term choices the user may veto; each default holds unless the user
