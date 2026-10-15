@@ -352,7 +352,10 @@ the platform's HTTP stack, TLS                  TLS server, or plaintext on loop
   as signing in is (`../client/domain/client.md`, section 12). Sent with
   a secret the engine no longer knows, it is answered signed out like
   any exchange, so a shell may send it again after it ended lost; a lost
-  one clears nothing on the client's side.
+  one clears nothing on the client's side. Its answer, signed out or
+  lost, is the sign-in's whose secret it carried: a shell that has since
+  authenticated a newer sign-in drops it, and keeps the newer secret
+  (`../client/domain/client.md`, section 12).
 - **While the engine stops** (`../domain/engine.md`, 6.1), a sign-in and
   a sign-out are answered not ready, as a keyed request is: nothing is
   committed, kept or erased, and a link's secret is not spent. Not ready

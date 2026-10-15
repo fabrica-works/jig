@@ -601,7 +601,11 @@ provider's navigation through skein's transport, after the step's writes
 - **Signing out** is the sign-in part's exchange to `/jig/v1/sign-out`,
   which clears the cookie (`Max-Age=0`). Answered signed out, the
   browser shell steps its client host with signed out; any other end,
-  the sign-out lost (`../client/domain/client.md`, section 12).
+  the sign-out lost (`../client/domain/client.md`, section 12). A
+  sign-in always loads a new page (a provider's navigation, or the
+  printed link, signed in before the client host starts: section 5), so
+  an earlier page's sign-out never answers into the client host of a
+  newer sign-in (`../client/domain/client.md`, section 12).
 - **A service's credential, shown once,** in the sign-in part's dialog
   of its own, outside the view's tree: selected text, and a button
   closing it, in jig's words. The part never keeps it.

@@ -567,6 +567,27 @@ What a chat's page leads with, and every agent task's activity
   a sign-out whose sign-in has already ended is answered signed out, the
   end the person asked for, and a lost one that did reach the engine
   shows at the client's next exchange, answered signed out.
+- **A sign-out's answer is its sign-in's.** A sign-out carries one
+  sign-in's secret, and its answer, signed out or lost, speaks of that
+  sign-in alone. Once a newer sign-in is authenticated, the shell drops
+  an earlier sign-out's answer: it keeps the newer sign-in's secret and
+  tells the client nothing, so the person stays signed in, on the page
+  the newer sign-in came back to. Nothing the person asked for is lost:
+  the sign-out ended the sign-in it carried, and the client had shown
+  the sign-in page before the newer sign-in, since a sign-in is asked
+  only from there.
+  - *The shell tells the two apart,* because it holds the secret, which
+    names its sign-in (`../../protocol/client.md`, section 8). The
+    domain holds neither the secret nor the sign-in's number.
+  - *The domain's own exchanges need no such rule.* Going signed out
+    parks every request, abandons every read and closes every watch, so
+    a terminal the earlier sign-in still owes meets no live token: an
+    earlier attempt's answer is stale to the request table (root.md,
+    section 4), an abandoned read's result is dropped, and a closed
+    watch's terminal retires it (sections 6 to 8).
+  - *A browser keeps the rule by its pages:* each sign-in loads a new
+    page, so no earlier page's sign-out reaches the newer sign-in's
+    client host (`../../protocol/browser.md`, section 11).
 - **Keys are the party's across sign-ins,** so the parked requests are
   sent again once the same party is confirmed (`../../domain/people.md`,
   5.1), within the engine's retention.
