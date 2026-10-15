@@ -1105,6 +1105,288 @@ None yet; they start at 101.
          in this session's scratch directory, which goes with the session.
          Its output is quoted above, and the 13.2 fact replaces it.
 
+131. **skein-14.s2: a find's scope resolved in the current document** (design gap, the supervisor's question of 2026-10-15T16:15:02Z).
+     The designer's answer, landed as skein `b4c7740` and jig `c8b887b29`, follows word for word. From it, the supervisor's part: step `skein-14.s2`, "a find's scope resolved in the current document", with its session file `skein/14.s2-scope-in-current-document.md`, written from the answer's "What each step does"; a new implementer, in a free place, beside skein 13, which scopes no find across a navigation. The answer's two points "for the supervisor" are deferred, each a `later.md` row: a press's or a type's node of an earlier document refused `Protocol` rather than `Gone` (the same Chromium messages come from a hidden node of the current document, so a fix tells them apart by the node's document, not by its message), and a scope removed from the current document matching nothing. The README's "Files over the plan's limit" names 14.4's small fix and 14.s2 among the additions to `browser.rs` it expects.
+
+
+     ### skein-14.s1: the kit's `Runtime.evaluate` of `document`, against browser.md 4, 2026-10-15T16:15:02Z
+
+     **Decision: the supervisor's first reading. browser.md now names the
+     call. It also binds a scoped find's root to the current document, which
+     needs a step.**
+
+     1. **The kit may send `Runtime.evaluate` with the expression
+        `document`, and no other expression.** That object is an unscoped
+        find's root, as skein-14.s1 (`580b0ab`) already takes it.
+        `Runtime.callFunctionOn` stays never. browser.md 1 and 4 now say
+        so. On this point the code on `main` already matches the design.
+     2. **A find's root is never a node id. It is an object that Chromium
+        checks against its document.** Without a scope, that object is
+        `document`'s. With a scope, it is the scope's object, resolved in
+        the current document (`DOM.resolveNode`). A scope from an earlier
+        document is then refused `Gone`. This second half is not on `main`,
+        so it needs a step, `skein-14.s2`, which you write from "What each
+        step does" below. I make this part of the answer because the probe
+        below crashed Chromium 147's renderer 3 times out of 3. The probe
+        found a node, reloaded, waited for the load, then sent a scoped
+        `Accessibility.queryAXTree` by that node's `backendNodeId`. The kit
+        sends the same command for a find `within` a node it found before
+        (`browser.rs:696-702`).
+     3. **The hold during a navigation is now in the design** (browser.md
+        6, "A find waits out a navigation"), as `main` does it.
+
+     Why:
+
+     - **The rule is about what the kit does to the page and what it reads
+       from it, and this call does neither.** browser.md 1's rule exists so
+       that a test acts and observes only as a person does. The expression
+       `document` calls nothing and reads no page state. A page also cannot
+       change what it names: in Chromium 147, `Object.defineProperty(window,
+       "document", …)` throws `TypeError`, `var document = 1` leaves `typeof
+       document` as `object`, and `let document` is a `SyntaxError`. The
+       result is a handle, as a node id is.
+     - **It is the root Chromium checks.** An object belongs to the
+       execution context of the document it names. After a reload, Chromium
+       refuses the old object with "Cannot find context with specified id",
+       both while the reload is in flight and after the load. `main`'s
+       `command_error` already looks again at the next poll for that message
+       (`browser.rs:1271-1277`).
+     - **Not the second reading, a root by DOM commands alone.**
+       `DOM.getDocument` then `DOM.resolveNode` gives the same object, and
+       Chromium refuses stale ids there ("No node with given id found",
+       "Node with given id does not belong to the document"). But it costs
+       one more command on every look of every await, at the poll's rate,
+       and a new diagnosis of a race that only shows under load. All of that
+       buys only the rule's letter.
+     - **Not `Accessibility.getFullAXTree` filtered in the kit.** browser.md
+       6 says "exactly, both asked of CDP", and a reply sized by the whole
+       tree would break `Limits::message` (section 6, the find by words).
+     - **The scope gets `DOM.resolveNode`, not `Runtime`.** A scope is a
+       node the test found. Resolving it is a DOM command and runs no
+       script. Chromium refuses a node of an earlier document there, both
+       during a reload and after it, with no crash. A scope cannot come back
+       after a navigation, so the result is `Gone` (browser.md 5: "A node
+       since removed is `Gone`, as a stale handle is"), not another look.
+
+     ### Landed
+
+     - skein `b4c7740`, "Bind a browser find's root to the current
+       document":
+       - browser.md 1, 4, 6 and 9;
+       - STATUS.md: the browser.md row, and jig's skein-ui plan row.
+     - jig `c8b887b29`, "skein-ui: the kit's one evaluated expression,
+       through skein b4c7740":
+       - `skein/07-browser-kit.md`: the rule on the kit's script, now the
+         check that holds on `main`;
+       - `skein/13-example-whole.md`: 13.2's Don't, quoting browser.md 1 as
+         amended. Its instruction is unchanged.
+     - Nothing deferred, so no `later.md` row. The two kit defects under
+       "For the supervisor" are not this answer's to defer.
+
+     ### The text it rests on (skein `b4c7740`)
+
+     - browser.md 1 (line 24): "It reads no page state, and the one script
+       it runs in the page is the expression `document`, which names the
+       page's current document as a find's root (sections 4 and 6)."
+     - browser.md 4 (from line 148): "**The one expression the kit evaluates
+       is `document`.** It sends `Runtime.evaluate` with that expression
+       alone, for a find's root (section 6), and it never sends
+       `Runtime.callFunctionOn`." Its sub-bullets: "The expression calls
+       nothing and reads no page state. A page cannot change what it names:
+       a window's `document` can be neither redefined nor shadowed." and
+       "Its result is a handle, as a node id is: an object of the execution
+       context that holds the page's current document. The kit releases it
+       (`Runtime.releaseObject`) after its find's query." The domains list
+       now gives `DOM` "a scope's object" and `Runtime` "the document's
+       object".
+     - browser.md 6, the find row (line 241): "under the scope or the
+       page's current document, either asked by its object in that document
+       (below)".
+     - browser.md 6 (from line 256): "**A find asks only under the current
+       document.** Its root is never a node id, whose document the query
+       does not check, but an object that Chromium checks against the
+       document that holds it:", then "without a scope, the object of
+       `document`, evaluated in the page's current execution context
+       (section 4);" and "with a scope, the scope's object, resolved in the
+       current document (`DOM.resolveNode`). Chromium refuses a node of an
+       earlier document, and the find is refused `Gone` (section 5)." Then:
+       "The kit releases the object after the query. Chromium refuses an
+       object once its execution context is gone, as when the page navigates
+       by itself between the object's command and the query: the find then
+       looks again at its next poll, and an `Await` keeps its deadline."
+     - browser.md 6 (from line 269): "**A find waits out a navigation.**
+       While a navigation of the page is in flight, the kit's go or the
+       page's own, the kit holds its DOM and accessibility commands to the
+       page, and the evaluation of `document`, until the navigation commits,
+       as a go's does. A find in flight when the navigation begins starts
+       again, and asks once it has committed."
+     - browser.md 9 (from line 385): the real browser's pages add "a page
+       that reloads itself", and its facts add "a find across a reload (a
+       page that reloads itself found again after it, a scope found before it
+       `Gone`)".
+     - jig `skein/07-browser-kit.md` (line 39): "**The kit sends no script
+       but the expression `document`** (browser.md, 4): `rg -n
+       'Runtime\.callFunctionOn' testing/skein-browser` prints nothing, and
+       `rg -n 'b"expression"' testing/skein-browser/src` prints one line,
+       `Params::Document`'s in `params.rs`."
+
+     ### What each step does
+
+     - **skein-14.s2, a scope resolved in the current document** (new; you
+       write its session file and place it). The default is in skein 14's
+       session, and it goes before any step that scopes a find across a
+       navigation.
+       - **Files:** `testing/skein-browser/src/browser.rs`; the fake's
+         replies in `tests/browser/src/world.rs`; step tests beside
+         `tests/browser/src/tests/navigation.rs`; a real test in
+         `tests/browser/tests/browser_real.rs` with a Rig scenario in
+         `tests/browser/tests/support/real.rs`.
+       - **Shape:**
+         - `start_find`'s `Some(root)` arm (`browser.rs:696-702`) sends
+           `DOM.resolveNode` with the existing `Params::Backend(root)`.
+           Today it sends `Accessibility.queryAXTree` by `backendNodeId`.
+         - The reply's `object.objectId` goes to `query_document` (1667)
+           the way `document`'s does. Note that `result_object` (1627)
+           reads `result.objectId`, while `resolveNode` answers
+           `{"object":{…}}`.
+         - The late-reply path (1236-1250) releases that object too.
+         - In `command_error` (1269), the refusal "Node with given id does
+           not belong to the document" from that command becomes
+           `Refused { why: Gone }`. Today it falls through to `Protocol`.
+         - "Cannot find context with specified id", on the query that uses
+           the object, still looks again at the next poll (1271-1277).
+           That next look resolves the scope again, and so ends `Gone`
+           after a navigation.
+       - **Tests:**
+         - two step tests, `a_scoped_find_asks_under_its_scopes_object` and
+           `a_scope_of_an_earlier_document_is_gone`;
+         - one real test, `chromium_refuses_a_scope_found_before_a_reload`.
+           It finds a named region, reloads (`Go::Reload`, `Done`), finds a
+           heading `within` the region, and expects `Refused { why: Gone }`
+           and no `Crash`. On `main` this scenario crashes the renderer
+           (the probe below, 3 of 3). About 1 s.
+       - **Proof:** live, one `heavy` command: the gate's browser line
+         (`scripts/check.sh:31`) 5 times with no `Crash`, then `heavy
+         --gate scripts/check.sh` once.
+       - **Don't:**
+         - send `Accessibility.queryAXTree` with a `backendNodeId`;
+         - retry a `Gone` scope;
+         - accept `Crash` in any test;
+         - add an evaluated expression: `rg -n 'b"expression"'
+           testing/skein-browser/src` must still print one line.
+       - **Size:** aim for at most 40 lines of production code. Past 80,
+         stop and report the shape.
+       - `browser.rs` is 2,042 lines on `main` (`git show
+         origin/main:testing/skein-browser/src/browser.rs | wc -l`). Its
+         allowance in the README's "Files over the plan's limit" is yours to
+         amend, as ruling 128 did.
+     - **Other steps:** unchanged. Unscoped finds and their hold are as
+       skein-14.s1 landed them.
+
+     ### For the supervisor, not decided here
+
+     - **A node of an earlier document in a press or a type is refused
+       `Protocol`, not `Gone`.** Chromium refuses it with no crash. I sent
+       each command once after a reload with a node found before it:
+       - `Accessibility.getPartialAXTree`: "Frame is detached.";
+       - `DOM.scrollIntoViewIfNeeded`: "Node does not have a layout object";
+       - `DOM.getContentQuads`: "Could not compute content quads.";
+       - `DOM.focus`: "Element is not focusable";
+       - `DOM.describeNode`: answered with a result.
+
+       `command_error` maps only "No node found" to `Gone` (1279-1284), so
+       every one of these becomes `Protocol`. browser.md 5 says such a node
+       is `Gone`. This is a kit defect against design text that already
+       exists, and fixing or deferring it is your ruling. It is not a crash.
+     - **A scope removed from the current document matches nothing, rather
+       than `Gone`.** This holds by node id on `main`, and by a resolved
+       object too: the node still belongs to its document, so
+       `DOM.resolveNode` answers, and the query returns no nodes. 14.s2 does
+       not change it. It sits against the same browser.md 5 sentence as the
+       point above, and is also yours to rule on or defer.
+
+     ### Checked against main
+
+     - **The code,** at skein `a57d41d` (whose code is the same as
+       `b4c7740`'s), `testing/skein-browser/src/`:
+       - `browser.rs`:
+         - 418: `queue_page` holds `Accessibility.*`, `DOM.*` and
+           `Runtime.evaluate` (`command.read`), and `sendable` (435) skips
+           them while `page.navigating`;
+         - 1468-1490: `navigating` is set at `Page.frameRequestedNavigation`
+           and `Page.frameStartedLoading` of the page's frame, which also
+           calls `restart_finds` (1573). It is cleared in `loaded` (1599) at
+           `Page.loadEventFired`, `Page.navigatedWithinDocument`, or a
+           `BackForwardCacheRestore`;
+         - 696-704: a scoped find sends `Accessibility.queryAXTree` with
+           `Params::Query { root: Some(root), object: None, … }`, and an
+           unscoped one sends `Runtime.evaluate` with `Params::Document`;
+         - 1667-1684: `query_document` queries by `objectId`, then queues
+           `Runtime.releaseObject`;
+         - 1269-1284: `command_error`.
+       - `params.rs`:
+         - 52-55: `Params::Document` writes `"expression": "document"`, and
+           it has no field;
+         - 84-91: `Params::Backend` writes `backendNodeId`, and
+           `Params::Query`'s `root` writes `backendNodeId`.
+     - **Chromium 147.0.7727.101** (`/usr/bin/chromium`, Debian 13),
+       headless over `--remote-debugging-pipe`, with the kit's environment
+       (`LANG` and `LC_ALL` `C.UTF-8`, `TZ` `UTC`), one fresh profile per
+       run:
+       - **On a page whose CSP gives `script-src 'unsafe-inline'` and no
+         `unsafe-eval`:**
+         - `Runtime.evaluate` `document` gave `{type: object, subtype: node,
+           className: HTMLDocument}`, and `queryAXTree` by its `objectId`
+           found `heading "Before"`;
+         - the page's own scripts: `Object.defineProperty(window,
+           "document", …)` threw `TypeError`, `var document = 1` left
+           `typeof document` as `object`, and `let document = 2` threw
+           "SyntaxError: Identifier 'document' has already been declared".
+       - **The old `document` object after `Page.reload`:**
+         - `queryAXTree` sent right after the reload, and again after
+           `Page.loadEventFired`, both gave `-32000` "Cannot find context
+           with specified id";
+         - a new evaluation found the heading;
+         - 0 crash events.
+       - **A scope found before a reload, sent by `backendNodeId`:**
+         - sent right after `Page.reload`: no reply within 10 s, then
+           `Inspector.targetCrashed`;
+         - sent after `Page.loadEventFired`, in 3 runs: no reply within
+           10 s, then `Inspector.targetCrashed`, each time;
+         - the control, a reload with no query: 0 crash events.
+       - **`DOM.resolveNode` of the same scope,** 2 runs:
+         - in the same document it gave an `HTMLElement`, and `queryAXTree`
+           by its object found the heading;
+         - during the reload and after the load it gave `-32000` "Node with
+           given id does not belong to the document";
+         - 0 crash events.
+       - **`DOM.resolveNode` of `DOM.getDocument`'s ids after a reload:**
+         the `nodeId` gave "No node with given id found", and the
+         `backendNodeId` gave "Node with given id does not belong to the
+         document".
+       - **A scope removed by a press in the same document:** by
+         `backendNodeId`, `queryAXTree` gave `[]`. `DOM.resolveNode` gave
+         an `HTMLElement`, and `queryAXTree` by its object gave `[]`. 0
+         crash events.
+       - **A press's and a type's commands with a node from before a
+         reload:** as quoted under "For the supervisor". 0 crash events.
+     - **Commands:**
+       - `rg -n 'Runtime\.callFunctionOn' testing/skein-browser` (prints
+         nothing);
+       - `rg -n 'b"expression"' testing/skein-browser/src` (prints
+         `params.rs:53`);
+       - `rg -n 'Runtime\.evaluate' testing/skein-browser/src` (prints
+         `browser.rs:418` and `browser.rs:704`);
+       - `grep -n 'fn start_find\|Params::Document\|fn query_document\|fn
+         command_error\|fn result_object\|fn restart_finds\|fn loaded\|fn
+         sendable' testing/skein-browser/src/browser.rs`;
+       - `git show origin/main:testing/skein-browser/src/browser.rs | wc -l`
+         (prints `2042`);
+       - the probes: Python scripts over CDP's pipe (descriptors 3 and 4),
+         in this session's scratch directory, which goes with the session.
+         Their output is quoted above, and 14.s2's real test replaces the
+         scoped one.
+
 ## For the user
 
 Long-term choices the user may veto; each default holds unless the user

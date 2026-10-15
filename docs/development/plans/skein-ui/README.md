@@ -165,10 +165,14 @@ capability.
   plan: skein's `testing/skein-browser/src/browser.rs` (1,774 lines),
   to which skein 07 adds at most 60 lines, and skein-14.s1 (ruling
   126, 137 lines: 1,920 at its landing), 13.1 (ruling 127: the
-  closing warning and native dialogs) and 13.2 (ruling 130: `keys`,
-  about 40 lines) add what their rulings name; its split is a
-  `later.md` row. The pulse lists it; the supervisor reads that line as
-  expected for these four, and as a finding for any other file.
+  closing warning and native dialogs), 13.2 (ruling 130: `keys`,
+  about 40 lines), 14.4 (its back-forward cache restore, an
+  implementer.md 8.2 small fix, +8) and skein-14.s2 (ruling 131: a
+  scope resolved in the current document, at most 80 lines) add what
+  their rulings name: 2,042 lines on skein's `main` at `b4c7740`; its
+  split is a `later.md` row. The pulse lists it; the supervisor reads
+  that line as expected for these six, and as a finding for any other
+  file.
 
 ## Prerequisites the run checks at its start
 
