@@ -761,15 +761,29 @@ change, which none of the four has. They are applied in skein
 `f80521b`. The others concern the run, and stay open until the next run
 starts.
 
+2026-10-15. The others were decided before jig's next run, under the
+user's delegation: its recommendation is accepted "unless there is
+something with long-term consequences and hard to change decisions"
+(2026-10-14), and the next run is to be planned and started, "fix any
+issue along the way" (2026-10-15). None of these is hard to change. The
+designer decided them as the rows say, and applied what is adopted in
+skein `e601ee2`: development.md and its two cards. Proposals 4
+and 5, and proposal 9's metrics, change the kit. They wait until after
+smith's parity run, active on another machine, as smith abe6ec2e decided:
+no change to the kit right before an unattended run. Their work goes on
+skein's branch `kit-after-parity`. The same commit writes development.md
+4.6, which the user accepted that day: the process side of skein's
+`ui.md` 4.3, "The light path".
+
 | Proposal | Decision | Where |
 |---|---|---|
-| 1 | open | |
+| 1 | adopted | development.md, 7.2 (a session is set to `check` once the increments it needs at its start have landed, or all but one that is running), 7.3 (the states) and 10.5 (a ready check never holds the watch; a handover stops open checks, and the successor starts them again); supervisor.md, 5 (the check in a background sub-agent, a background wait for the landing, then a re-check of what `main` moved since) and 7 |
 | 2 | adopted | development.md, 5.3 (the increment whose Needs land first leads its session, and gives the README's "Needs at start") and 5.4 (the consistency review checks it) |
-| 3 | open | |
-| 4 | open | |
-| 5 | open | |
+| 3 | adopted | supervisor.md, 5: the check's prompt reads every increment of its session, and runs through `heavy` each suite its code corrections reach, under each profile of the gate, fuzzy included |
+| 4 | deferred: until after smith's parity run | `plan ring` and `plan resume`, on skein's branch `kit-after-parity`, with development.md, 7.4 and 10.5, and supervisor.md, 2 |
+| 5 | deferred: until after smith's parity run | `plan watch` and `plan handover`, on skein's branch `kit-after-parity`; until then a successor starts again each ready check left open (supervisor.md, 5) |
 | 6 | adopted | development.md, 5.2 (a session file's "Read first" names the sections of `programming-model.md` and `testing-strategy.md`) and 7.2 (a successor's prompt); implementer.md, 8.1 (reading, and reading after a handover) and 8.3 (a heavy command starts with the longest wait) |
 | 7 | adopted | development.md, 2.1 and 2.2 |
-| 8 | open | |
-| 9 | open | |
+| 8 | adopted | implementer.md, 8.4: before `land`, `git log -1 --format='%(trailers:key=Step,valueonly)'` prints the step, or the commit is amended with `-F`; `land`'s refusal stays on `kit-after-parity` (test-budgets' proposal 7) |
+| 9 | adopted in part: the `Designer-Session:` trailer on a design's landing commit, which designers already write. `numbers.sh` counting it, a Proof's layer read to its first hyphen, and a thread loaded by hand counted as a restart are deferred until after smith's parity run | development.md, 4.4 |
 | 10 | adopted | development.md, 5.6 |
