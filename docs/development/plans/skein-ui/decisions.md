@@ -160,6 +160,9 @@ None yet; they start at 101.
 111. **jig 04's pin held through each dependency** (ready check of jig-04.2 and jig-04.3).
      jig 04.2 and 04.3 checked against skein `dc71a49` (skein 01.3): adding a skein dependency moves every skein entry of jig's `Cargo.lock` to skein's newest `main`, whose skein-ui has skein 04.1's `Limits` fields, so each of 04.1, 04.2 and 04.3 reruns the rule's `cargo update -p skein-lib --precise` after adding its dependency, until `grep -o 'skein.git#[0-9a-f]*' Cargo.lock | sort -u` prints skein 01.3's commit alone; 04.2 and 04.3 run `cargo fmt` after their renames. The downstream repository's users of `jig_fake_person` join its `later.md` row. A further dependency or rename these Files miss: the same, listed in the commit body.
 
+112. **skein 09.3 goes on without the primary shortcut (interim)** (design gap, skein 09's block of 2026-10-15T12:34:37Z).
+     Interim ruling 112, until the designer's answer to the run's `question.md` (sent 2026-10-15T12:36:14Z): the question is a design gap, so the designer decides it (development.md, 10.4). Meanwhile skein 09.3 goes on with the work that does not rest on the answer: every row of `each_role_maps_to_its_element` and `each_state_and_property_maps_to_its_attribute`, and the golden page, except a shortcut with `Modifier::Primary`; `Plain`, `Alt` and Escape are written as ui-web.md, 6, says ("`Alt+K`, `K`, `Escape`"). It keeps the Shape's `mapping::element(made: &Made, look: &Look<'_>, prefix: &[u8]) -> Element`, adds no entry point, no field of `Look` and no convention type, and writes no `Control+K` or `Meta+K`. It commits nothing of 09.3 and does not land it until the answer's unblock, which says how the primary modifier reaches the mapping; then 09.3 adds the primary row and lands. Nothing else of the plan changes.
+
 ## For the user
 
 Long-term choices the user may veto; each default holds unless the user
