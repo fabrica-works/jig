@@ -119,5 +119,7 @@ pub fn limits(client: &jig_domain_client::Limits, words: &Words) -> Option<skein
         bindings: nodes,
         slots: nodes,
         markdown_depth: 3,
+        scene_marks: 0,
+        scene_bytes: 0,
     })
 }

@@ -111,6 +111,8 @@ fn build(value: &OwnerChipDetails, words: &Words) -> (Tree, JigBindings, view::C
         bindings: f.bindings,
         slots: f.slots,
         markdown_depth: 2,
+        scene_marks: 0,
+        scene_bytes: 0,
     };
     let mut b = Builder::new(&capacity);
     let mut bindings = JigBindings::new(f.bindings, 256);
@@ -602,6 +604,8 @@ fn retry_activation_tree(retry: Option<RetryNotice>, words: &Words) -> Tree {
         bindings: f.bindings,
         slots: f.slots,
         markdown_depth: 2,
+        scene_marks: 0,
+        scene_bytes: 0,
     };
     let client = Domain::new(&client_limits(), 1);
     let chip = Chip {

@@ -127,6 +127,8 @@ fn maximal_budget_and_ledger_fragments_fit_tree_and_checked_words_heap_bounds() 
             bindings: 0,
             slots: 0,
             markdown_depth: 0,
+            scene_marks: 0,
+            scene_bytes: 0,
         };
         let meter = Meter::new();
         let mut builder = Builder::new(&limits);

@@ -57,6 +57,8 @@ fn limits(fragment: view::BudgetFragment) -> Limits {
         bindings: 0,
         slots: 0,
         markdown_depth: 0,
+        scene_marks: 0,
+        scene_bytes: 0,
     }
 }
 fn budget_tree(value: &OwnerBudget, words: &Words) -> Tree {

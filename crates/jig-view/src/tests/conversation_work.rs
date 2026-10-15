@@ -255,6 +255,8 @@ fn owner_work_fragment_checks_raw_limits_exact_six_leaves_bytes_and_one_under_st
         bindings: 0,
         slots: 0,
         markdown_depth: 1,
+        scene_marks: 0,
+        scene_bytes: 0,
     };
     let tree = fragment(&value, &capacity);
     assert_eq!(tree.len(), bound.nodes);

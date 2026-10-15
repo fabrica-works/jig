@@ -31,6 +31,8 @@ fn render(value: &OwnerOutcome, words: &Words) -> Tree {
         bindings: 0,
         slots: 0,
         markdown_depth: 0,
+        scene_marks: 0,
+        scene_bytes: 0,
     };
     let mut b = Builder::new(&limits);
     view::render(&mut b, value, words);
@@ -432,6 +434,8 @@ fn durable_answer_rendering_keeps_every_owner_fact_within_the_existing_notice_en
         bindings: 0,
         slots: 0,
         markdown_depth: 0,
+        scene_marks: 0,
+        scene_bytes: 0,
     };
     for (value, expected) in max_cases() {
         let mut builder = Builder::new(&limits);

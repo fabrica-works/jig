@@ -146,6 +146,8 @@ fn saturated_owner_authority_renderer_and_words_fit_composed_heap_envelopes() {
         bindings: 0,
         slots: 0,
         markdown_depth: 0,
+        scene_marks: 0,
+        scene_bytes: 0,
     };
     let meter = Meter::new();
     let mut builder = Builder::new(&limits);

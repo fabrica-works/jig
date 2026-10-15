@@ -85,6 +85,8 @@ fn tree_limits(f: view::ActivityFragment) -> Limits {
         bindings: f.bindings,
         slots: f.slots,
         markdown_depth: 2,
+        scene_marks: 0,
+        scene_bytes: 0,
     }
 }
 fn build(value: &OwnerActivityLine, words: &Words) -> Tree {

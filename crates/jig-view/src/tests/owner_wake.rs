@@ -24,6 +24,8 @@ fn builder(nodes: u32, book: &Phrasebook) -> Builder {
         bindings: 0,
         slots: 0,
         markdown_depth: 0,
+        scene_marks: 0,
+        scene_bytes: 0,
     })
 }
 fn contains(tree: &Tree, needle: &[u8]) -> bool {

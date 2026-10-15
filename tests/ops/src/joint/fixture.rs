@@ -72,6 +72,8 @@ fn profile() -> &'static Profile {
                 bindings: 1024,
                 slots: 256,
                 markdown_depth: 32,
+                scene_marks: 0,
+                scene_bytes: 0,
             },
         };
 

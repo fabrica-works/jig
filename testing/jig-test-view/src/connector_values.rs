@@ -347,6 +347,8 @@ pub fn requirements(limits: &ConnectorLimits, words: &Words) -> Option<skein_ui:
         bindings: 0,
         slots: 0,
         markdown_depth: 0,
+        scene_marks: 0,
+        scene_bytes: 0,
     })
 }
 

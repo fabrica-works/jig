@@ -287,6 +287,8 @@ fn capacity(f: view::ProjectFragment) -> skein_ui::Limits {
         bindings: f.bindings,
         slots: f.slots,
         markdown_depth: 4,
+        scene_marks: 0,
+        scene_bytes: 0,
     }
 }
 fn build(value: &OwnerProject, w: &Words) -> (Tree, JigBindings) {

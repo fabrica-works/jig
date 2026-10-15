@@ -76,6 +76,8 @@ fn limits(f: view::HistoricalFragment) -> Limits {
         bindings: f.bindings,
         slots: f.slots,
         markdown_depth: 2,
+        scene_marks: 0,
+        scene_bytes: 0,
     }
 }
 fn ended_tree(page: &OwnerEndedPage, w: &Words, cap: Option<Limits>) -> Tree {

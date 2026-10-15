@@ -682,6 +682,8 @@ pub fn limits(l: &Limits, words: &Words) -> Option<skein_ui::Limits> {
         bindings: nodes,
         slots: nodes,
         markdown_depth: 3,
+        scene_marks: 0,
+        scene_bytes: 0,
     })
 }
 

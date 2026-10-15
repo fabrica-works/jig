@@ -469,6 +469,8 @@ mod tests {
             bindings: 0,
             slots: 0,
             markdown_depth: 1,
+            scene_marks: 0,
+            scene_bytes: 0,
         };
         let mut view = View::new(&limits);
         let mut builder = view.builder();
@@ -504,6 +506,8 @@ mod tests {
             bindings: 0,
             slots: 0,
             markdown_depth: 1,
+            scene_marks: 0,
+            scene_bytes: 0,
         };
         let mut view = View::new(&limits);
         let mut builder = view.builder();

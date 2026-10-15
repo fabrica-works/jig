@@ -225,6 +225,8 @@ fn build(value: &OwnerHistoryLine, words: &Words) -> (Tree, JigBindings) {
         bindings: f.bindings,
         slots: f.slots,
         markdown_depth: 2,
+        scene_marks: 0,
+        scene_bytes: 0,
     };
     assert!(crate::limits::jig_worst_case(&limits).is_some());
     let mut bindings = JigBindings::new(f.bindings, 8);

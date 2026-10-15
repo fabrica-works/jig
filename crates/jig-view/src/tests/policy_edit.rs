@@ -24,6 +24,8 @@ fn shown(value: &PolicyEdit) -> skein_ui::Tree {
         bindings: 0,
         slots: 0,
         markdown_depth: 0,
+        scene_marks: 0,
+        scene_bytes: 0,
     });
     b.open(Role::Page);
     policy_edit::render(&mut b, value, words);

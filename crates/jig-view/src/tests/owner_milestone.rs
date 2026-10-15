@@ -77,6 +77,8 @@ fn build(value: &OwnerMilestoneLine, words: &Words) -> (Tree, JigBindings, view:
         bindings: f.bindings,
         slots: f.slots,
         markdown_depth: 2,
+        scene_marks: 0,
+        scene_bytes: 0,
     };
     let mut b = Builder::new(&capacity);
     let mut bindings = JigBindings::new(f.bindings, 256);

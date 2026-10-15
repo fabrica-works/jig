@@ -15,6 +15,8 @@ fn limits(fragment: HistoryFragment) -> Limits {
         bindings: fragment.bindings,
         slots: fragment.slots,
         markdown_depth: 2,
+        scene_marks: 0,
+        scene_bytes: 0,
     }
 }
 fn render(value: &OwnerProposalHistory, words: &Words, limits: &Limits) -> (Tree, JigBindings) {

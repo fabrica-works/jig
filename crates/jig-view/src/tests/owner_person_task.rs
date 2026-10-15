@@ -107,6 +107,8 @@ fn limits_for(client: &jig_domain_client::Limits, words: &Words) -> Limits {
         bindings: f.bindings,
         slots: f.slots,
         markdown_depth: 3,
+        scene_marks: 0,
+        scene_bytes: 0,
     }
 }
 fn build(value: &OwnerPersonTask, words: &Words, cap: Limits) -> Tree {

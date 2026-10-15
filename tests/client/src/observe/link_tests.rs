@@ -21,6 +21,8 @@ fn view(current: Option<&[u8]>, retained: &[u8]) -> View {
         bindings: 0,
         slots: 0,
         markdown_depth: 1,
+        scene_marks: 0,
+        scene_bytes: 0,
     };
     let mut view = View::new(&limits);
     let mut builder = view.builder();

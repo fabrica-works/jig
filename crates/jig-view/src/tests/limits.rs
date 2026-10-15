@@ -9,6 +9,8 @@ const LIMITS: skein_ui::Limits = skein_ui::Limits {
     bindings: 4,
     slots: 4,
     markdown_depth: 2,
+    scene_marks: 0,
+    scene_bytes: 0,
 };
 
 #[test]
