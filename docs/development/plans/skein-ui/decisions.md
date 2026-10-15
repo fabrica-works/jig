@@ -837,6 +837,274 @@ None yet; they start at 101.
 
      Unchanged: the face's select press through the kit's keys (13.2's Files, 14.1's `chromium_chooses_an_option_by_the_kits_keys`); the kit's hit test (`includeUserAgentShadowDOM: true`, `params.rs:109-110`). A further caller of `Params::Describe` that the pierce changes: name it in the commit body.
 
+130. **skein 13.2: a date and a time typed by the kit's keys** (design gap, skein 13's block of 2026-10-15T15:56:05Z).
+     The designer's answer, landed as skein `cef6a1a` and jig `357179a7f`, follows word for word. The README's "Files over the plan's limit" names 13.2's `keys` among the additions to `browser.rs` that it expects.
+
+
+     ### skein 13.2: typing a value into a native date field, 2026-10-15T15:56:05Z
+
+     **Decision: the supervisor's first reading, split between the kit and
+     the face, with no `--lang`.**
+
+     1. **The kit gains a request, `keys`.** It focuses the node, then sends
+        each character of the text as a key down and up, with the character
+        as the key and its text. `type` stays as it is: it inserts text, and
+        it commits a composition left open. The kit types the characters it
+        is given and does not know about dates.
+     2. **The face turns a date or a time into the keys of its parts.** It
+        knows the field by the role Chromium computes for it, `Date` or
+        `InputTime`, which its role table already asks for. It types:
+        - a date `YYYY-MM-DD` as month, day, year: `2026-10-15` as
+          `10152026`;
+        - a time `HH:MM` as its hour on a 12-hour clock, its minutes, then
+          `A` before noon or `P` from noon: `14:30` as `0230P`, `00:00` as
+          `1200A`, `12:00` as `1200P`;
+        - the empty value as no key;
+        - any other value fails the step, naming the field and the value.
+
+        Every other field is still typed with `type`.
+     3. **The locale is already fixed, so no `--lang`.** io's spawn gives
+        Chromium the kit's environment and nothing else. In it, `LANG` and
+        `LC_ALL` are `C.UTF-8`, which Chromium takes as `en-US`. browser.md
+        3 now says so. A new fact checks the order of the parts against
+        Chromium, so a Chromium that orders them differently fails that
+        fact.
+     4. **"The field cleared first" does not change.** The face still types
+        only into a field that shows no value, as 11.1 does. later.md's
+        select-all row stays as written.
+
+     Why:
+
+     - **Not the kit setting the value by a page call (the second
+       reading).** The kit runs no script in the page (browser.md 1: "It
+       runs no script in the page and reads no page state"; 4: "The kit
+       never sends `Runtime.evaluate` or `Runtime.callFunctionOn` to run
+       script"). A person's entry also never sets an attribute. A value set
+       by script would test the page's `input` handler and skip the browser
+       control that a person actually uses.
+     - **Not dropping the date from the story (the third reading).**
+       ui-web.md 14.3 asks the example's tier for "a field of each entry
+       kind it uses". The date field is the one entry kind whose control is
+       not a text box, so it is the one most worth checking in a real
+       browser.
+     - **The translation belongs in the face, not the kit.** The kit's
+       vocabulary is its own, and the test translates the person's actions
+       into it (browser.md 5). The face already does this for a select: it
+       chooses an option with the kit's keys, and 14.1 checks that as a
+       fact. The face also has what the translation needs: the value's
+       format (ui.md 3.4) and the field's role from its find. The kit would
+       need an extra describe to learn the input type.
+     - **A new request, not a mode of `type`.** The kit has three ways to
+       enter text, and `keys` sits beside `compose` as its own request. It
+       is one operation with one terminal. Composing it in the face from a
+       focus and one `Key` per character would put several operations on
+       one page, and the kit does not promise that their steps stay in
+       order.
+     - **Not every field by keys.** That would change the typing in every
+       landed story. It would also break `compose`'s contract, under which
+       a later `Type` commits the open composition.
+     - **Not `--lang`.** The environment already fixes the locale, so the
+       flag would fix it a second time. On this machine I could not show
+       that the flag does anything: Debian's Chromium here ships only
+       `en-US.pak`, and `--lang=sv-SE` still gave `navigator.language`
+       `en-US`. The fact is the check that holds on every machine.
+
+     ### Landed
+
+     - skein `cef6a1a`, "Type a native date or time field by keys":
+       - browser.md 3, 5, 6 and 9;
+       - ui-web.md 14.1 and 14.2;
+       - STATUS.md, the rows of browser.md and of jig's skein-ui plan.
+     - jig `357179a7f`, "skein-ui: a date and a time typed by the kit's keys
+       through skein 13.2": `skein/13-example-whole.md`, What the design
+       asks, and 13.2's Scope, Files, Shape, Test shape, Proof, Don't and
+       Size.
+     - Nothing deferred: no `later.md` row.
+
+     ### The text it rests on (skein `cef6a1a`)
+
+     - browser.md 3 (line 96): "The environment is minimal, and it is the
+       child's whole environment (io.md, 6): `LANG` and `LC_ALL` are
+       `C.UTF-8`, which Chromium takes as its `en-US`, and `TZ` is `UTC`.
+       So a page renders dates and numbers the same everywhere, and a native
+       date or time field shows its parts in one order (section 6)."
+     - browser.md 5 (line 163): "`Keys { page: Token, op: Token, node: Node,
+       text: Box<[u8]> },  // each character a key: a native date or time
+       field`".
+     - browser.md 6, the table (line 236): "| keys | the node focused; for
+       each character of the text, in order, its key down and up, the
+       character its key and its text |".
+     - browser.md 6, the bullet (from line 258): "**Typing inserts; keys
+       press.** `type` inserts its text as one edit, and commits a
+       composition left open. A native date or time field takes no inserted
+       text. Each of its parts, a number or the half of the day, takes keys,
+       and a part filled moves the focus to the next. `keys` reaches it as a
+       person's keyboard does." Its sub-bullets: "The kit types the
+       characters it is given, in order. Which characters a field's parts
+       take, and in which order, is the test's: the browser's locale sets
+       them (section 3), and the face checks them as its facts (ui-web.md,
+       14.1 and 14.2)." and "A key goes where the focus is. Focusing a field
+       that does not have the focus puts it on the field's first part; a
+       field that has it keeps it in the part it is in."
+     - browser.md 9 (line 362): "The keys a native date or time field
+       takes, and their order, are the face's facts, checked with its others
+       in this suite (ui-web.md, 14.1)."
+     - ui-web.md 14.1 (line 844): "…; a `<select>`'s option chosen by the
+       kit's keys; and a date field and a time field given their values by
+       the keys 14.2 names, in their parts' order under the kit's locale
+       (browser.md, sections 3 and 6)."
+     - ui-web.md 14.2 (line 857), the face's roles: "(a text field:
+       `textbox`; `spinbutton` for a number's, `Date` for a date's and
+       `InputTime` for a time's; 14.1)".
+     - ui-web.md 14.2 (line 863), its acts: "type, an input's whole value
+       (the field cleared, then the words), a date's or a time's by the
+       kit's keys (below)".
+     - ui-web.md 14.2 (from line 869): "**A date or a time is typed as a
+       person types it,** into its native field's parts, since that field
+       takes no inserted text (browser.md, section 6). The face knows the
+       field by the role Chromium computes for it, `Date` or `InputTime`.
+       It turns the value, in the element's own format (section 6), into
+       the keys of the field's parts under the kit's locale, `en-US`
+       (browser.md, section 3), and gives them to the kit's `keys`:" a date
+       "as its month, its day, then its year: `2026-10-15` as `10152026`";
+       a time "as its hour on a 12-hour clock, its minutes, then `A` before
+       noon or `P` from noon: `14:30` as `0230P`, `00:00` as `1200A`,
+       `12:00` as `1200P`"; "the empty value is typed as no key"; "any other
+       value fails the step, naming the field and the value, since no
+       person's keys put it in that field." Then (line 885): "The order is a
+       fact the face assumes (14.1). A Chromium that orders the parts
+       otherwise fails that fact, which names the field it typed."
+
+     ### What each step does
+
+     - **13.2** (jig `357179a7f`, `skein/13-example-whole.md`, 13.2's
+       Files):
+       - **The kit:**
+         - `Request::Keys { page, op, node, text }` in `boundary.rs`, after
+           `Compose`.
+         - In `browser.rs`, `OpKind::Type { text, compose: bool }` becomes
+           `OpKind::Type { text, entry: Entry }`, with `enum Entry { Insert,
+           Compose, Keys }`.
+         - After `Step::Focus`, each character gets one
+           `Input.dispatchKeyEvent` `keyDown` and one `keyUp`, one at a
+           time, through the existing `Params::Key`. `Done` comes after the
+           last `keyUp`, or after the focus when the text is empty.
+         - About 40 lines.
+       - **The face:**
+         - `perform`'s `Act::Input` sends `Request::Keys` for a node whose
+           `Seen.role` is `Date` or `InputTime`. The emptiness check stays
+           first.
+         - The new pure `src/keys.rs` has `date` and `time`, each giving
+           `Option<Box<[u8]>>`. `None` fails the step: `field '<name>' takes
+           no value '<value>'`.
+       - **Tests:**
+         - kit step test `keys_type_each_character_as_its_key_down_and_up`;
+         - face host tests `a_date_and_a_time_become_the_keys_of_their_parts`
+           and `a_date_field_is_typed_by_the_kits_keys`;
+         - the fact `chromium_takes_a_date_and_a_time_by_the_kits_keys`, on
+           the facts page's existing `case-entry_date` and `case-entry_time`
+           rows (`browser_facts.rs:147-148`).
+       - **The story:** `a_person_fills_each_entry_kind_and_chooses_a_label`
+         types `2026-10-15` as before, and the face turns it into keys.
+       - **Size:** about 470 lines, up from about 250.
+       - **Unchanged:** ruling 129's part 1 (the press inside a select's
+         shadow tree), the kit's command, and every other field's typing.
+     - **For the supervisor, not decided here:**
+       - **README.md's "Files over the plan's limit"** names the three
+         increments that may add to `browser.rs`: skein 07, skein-14.s1 and
+         13.1. 13.2's `keys` adds about 40 lines to it as well. The README
+         is yours to amend, so that the pulse's line about the file reads as
+         expected.
+       - **A related point, also not decided here.** The kit already sends
+         `Runtime.evaluate` with the expression `document`
+         (`testing/skein-browser/src/browser.rs:690`, `params.rs:52-55`),
+         from skein-14.s1's finds in the current document. browser.md 4
+         still says that the kit never sends it. The call runs no script
+         that changes the page, but the design does not name it. If you
+         want that settled, it is a question of its own.
+     - **14.4 and the rest:** unchanged. Typing while a patch arrives types
+       into a text field with `type`.
+
+     ### Checked against main
+
+     - **The code,** at skein `462e555`, whose code is the same as
+       `cef6a1a`'s:
+       - `testing/skein-browser/src/boundary.rs:36-38`: `Type`, `Compose`
+         and `Key` (`Key { page, op, key: Key }`, the named keys alone, from
+         line 107).
+       - `browser.rs`:
+         - 85: `Type { text: Box<[u8]>, compose: bool }`;
+         - 583-594: `Request::Type` and `Request::Compose` admitted;
+         - 704: `fn issue_key`;
+         - 1152: `fn key_info`, the eight named keys;
+         - 1858-1872: `Step::Focus` then `Input.insertText` or
+           `Input.imeSetComposition`.
+       - `params.rs`: `Params::Key { kind, key, code, windows, text }`.
+       - `command.rs`: the arguments carry no `--lang`; the environment is
+         `LANG`, `LC_ALL` (`C.UTF-8`) and `TZ` (`UTC`).
+       - `crates/skein-shell/src/ring/process.rs:179-183, 265-271`:
+         `pidfd_spawn` gets `envp` built from `command.env` alone, so
+         Chromium has no `LANGUAGE`.
+       - `crates/skein-ui-web/src/mapping.rs:367`: `Role::TextField =>
+         &[b"textbox", b"spinbutton", b"Date", b"InputTime"]`.
+       - `testing/skein-fake-person-browser/src/face.rs:222-230`:
+         `Act::Input` refuses a field whose `seen.value` is not empty, then
+         sends `Request::Type`.
+       - `tests/browser/tests/support/real.rs:466-541`: the `Choose`
+         scenario focuses with an empty `Type`, then sends `Key::ArrowDown`.
+         This is the precedent for keys composed by the face.
+     - **Chromium 147.0.7727.101** (`/usr/bin/chromium`, Debian 13), headless
+       over `--remote-debugging-pipe`, with the kit's environment (`LANG`
+       and `LC_ALL` `C.UTF-8`, `TZ` `UTC`). Each trial used a fresh
+       `<input>`, `DOM.focus`, then `Input.dispatchKeyEvent` `keyDown` and
+       `keyUp` per character, in `Params::Key`'s shape (`key`, `code`,
+       `windowsVirtualKeyCode` and `text` on both):
+       - `navigator.language` was `en-US`, also with `--lang=en-GB` or
+         `--lang=sv-SE`, or with `LANG=de_DE.UTF-8`. `ls
+         /usr/lib/chromium/locales` printed only `en-US.pak`.
+       - Date fields:
+         - `Input.insertText` `2026-10-15` left the value `''` and fired no
+           `input` event;
+         - keys `10152026` gave `2026-10-15`, with `input` events along the
+           way;
+         - keys `01012026` gave `2026-01-01`, and `12310001` gave
+           `0001-12-31`;
+         - keys `02302026` (February 30) gave `''`, as ui-web.md 6 says:
+           "A value the element does not accept shows empty";
+         - keys `20261015` (ISO order) gave `61015-02-02`, and
+           `2026-10-15` gave `61015-02-02` too: the dash moves no part.
+       - Time fields:
+         - `Input.insertText` `14:30` gave `''`;
+         - `0230P` gave `14:30`, `1159P` `23:59`, `1200A` `00:00`, `1200P`
+           `12:00`, `0905A` `09:05`, and `0905a` `09:05`;
+         - `0905` with no meridiem gave `''`. `2359P` gave `14:35`: a `2`
+           fills the 12-hour field's hour at once. So the face types the
+           12-hour form.
+       - Fields holding a value: from the first part, the keys replace each
+         part. `2020-01-02` then `10152026` gave `2026-10-15`; `09:05` then
+         `0230P` gave `14:30`; `14:30` then `0905A` gave `09:05`.
+       - A field that already had the focus kept it in its last part when
+         `DOM.focus` came again, and the next keys went there.
+       - The accessibility tree gave an empty date field role `Date` and no
+         value, an empty time field `InputTime` and no value, and a filled
+         one its value (`2026-10-15`, `14:30`).
+     - **Commands:**
+       - `chromium --version`;
+       - `ls /usr/lib/chromium/locales`;
+       - `grep -n 'Compose\|Key {\|pub enum Key'
+         testing/skein-browser/src/boundary.rs`;
+       - `grep -n 'Request::Compose\|Request::Type\|Type { text\|fn
+         issue_key\|fn key_info\|Step::Focus =>'
+         testing/skein-browser/src/browser.rs`;
+       - `grep -n 'pidfd_spawn\|envp\|env'
+         crates/skein-shell/src/ring/process.rs`;
+       - `grep -n 'Date\|InputTime' crates/skein-ui-web/src/mapping.rs`;
+       - `grep -n 'ENTRY_DATE\|ENTRY_TIME'
+         tests/browser/tests/browser_facts.rs`;
+       - the probe, a Python script over CDP's pipe (descriptors 3 and 4),
+         in this session's scratch directory, which goes with the session.
+         Its output is quoted above, and the 13.2 fact replaces it.
+
 ## For the user
 
 Long-term choices the user may veto; each default holds unless the user
