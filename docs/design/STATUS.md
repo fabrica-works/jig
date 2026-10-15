@@ -211,3 +211,4 @@ smith, and builds what section 2's rows name it for.
 
 | Draft | About | Next |
 |---|---|---|
+| `client-api.md` | jig's client presentation-agnostic. Its main points:<ul><li>jig's API is its primitives as plumbing, and shapes such as a chat are sugar: templates the client fills in, and helpers.</li><li>One `jig-client` with no view.</li><li>A transport-agnostic clients' component the application mounts in its own server.</li><li>jig owns credentials, and the application owns sign-in flows, guards and every URL.</li></ul>Every question is settled (its section 15). It replaces skein-ui's `later.md` rows that wait for the analysis of jig's boundary with applications. | A designer pass on `client/domain/`, `protocol/client.md`, `protocol/browser.md`, `protocol/service.md`, `protocol/configuration.md`, `domain/people.md`, `domain/tasks.md` and `../README.md`, 10, 11 and 15 |
