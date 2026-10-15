@@ -1,7 +1,7 @@
 use jig_client_world::{ClientId, Fault, FrontFault, Scripted, Test, Until, World, stories};
 use jig_domain_client::address::{Address, ProjectSection};
-use jig_fake_person::{Find, Step};
 use jig_test_domain_client::{Address as RootAddress, Event, Place};
+use skein_fake_person::{Find, Step};
 use skein_lib::{Duration, Time, Wall};
 use skein_ui::Act;
 use skein_ui::Role;

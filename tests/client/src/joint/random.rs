@@ -3,7 +3,7 @@
 //! (client/domain/testing.md, sections 5–7).
 use super::{Joint, fixture};
 use crate::{Fault, FrontFault, Outcome, Test, Until, World};
-use jig_fake_person::{Face, Find, Found, Step, TreeFace};
+use skein_fake_person::{Face, Find, Found, Step, TreeFace};
 use skein_lib::{Duration, Rng};
 use skein_ui::Role;
 use skein_world::domain::Verdict;

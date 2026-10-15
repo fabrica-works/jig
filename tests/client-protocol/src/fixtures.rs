@@ -105,9 +105,9 @@ pub fn link_limits() -> jig_protocol_client_link::Limits {
 }
 #[must_use]
 pub fn sign_in_then(
-    mut steps: Vec<jig_fake_person::Step<jig_test_domain_client::Address>>,
-) -> Vec<jig_fake_person::Step<jig_test_domain_client::Address>> {
-    use jig_fake_person::{Find, Step};
+    mut steps: Vec<skein_fake_person::Step<jig_test_domain_client::Address>>,
+) -> Vec<skein_fake_person::Step<jig_test_domain_client::Address>> {
+    use skein_fake_person::{Find, Step};
     let find = Find::named(skein_ui::Role::Button, b"Sign in with Test");
     let mut before = vec![Step::See { find: find.clone(), within: Duration::from_secs(1) }, Step::Press { find }];
     before.append(&mut steps);

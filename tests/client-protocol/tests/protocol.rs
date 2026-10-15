@@ -12,7 +12,7 @@ fn a_person_signs_in_by_the_printed_link_and_starts_a_chat() {
 
 #[test]
 fn a_person_s_part_request_is_answered_from_the_connector_s_outcome() {
-    use jig_fake_person::{Find, Step};
+    use skein_fake_person::{Find, Step};
     use skein_ui::Role;
     let mut w = fixtures::family_world(fixtures::SEED);
     let c = w.client(fixtures::FIRST_OWNER, stories::conversation());
@@ -87,8 +87,8 @@ fn a_slow_reader_gets_fewer_deliveries_and_others_are_answered() {
     );
     world.person(
         second,
-        fixtures::sign_in_then(vec![jig_fake_person::Step::See {
-            find: jig_fake_person::Find::exactly_named(skein_ui::Role::Button, b"Write"),
+        fixtures::sign_in_then(vec![skein_fake_person::Step::See {
+            find: skein_fake_person::Find::exactly_named(skein_ui::Role::Button, b"Write"),
             within: Duration::from_secs(1),
         }]),
     );
@@ -125,7 +125,7 @@ fn a_reload_restores_a_pending_request_from_the_small_store_s_bytes() {
 #[test]
 fn signed_out_with_requests_pending_then_signed_in_again() {
     use jig_client_protocol_world::stories as bytes;
-    use jig_fake_person::{Find, Step};
+    use skein_fake_person::{Find, Step};
     for &seed in bytes::SEEDS {
         let (mut world, client) = bytes::ready(seed);
         pending_stop(&mut world, client);
@@ -160,7 +160,7 @@ fn a_person_s_words_reach_a_running_run_through_bytes() {
 #[test]
 fn an_engine_outside_the_client_s_versions_shows_out_of_date() {
     use jig_client_protocol_world::stories as bytes;
-    use jig_fake_person::{Find, Step};
+    use skein_fake_person::{Find, Step};
     for &seed in bytes::SEEDS {
         let (mut world, client) = bytes::ready(seed);
         world.fault(jig_client_world::FrontFault::Versions);

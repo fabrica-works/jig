@@ -671,8 +671,8 @@ pub fn held_chat(seed: u64) -> World<Test, Scripted> {
 }
 /// Person's new-chat sequence, reused by focused and random worlds.
 #[must_use]
-pub fn start_chat_steps() -> Vec<jig_fake_person::Step<RootAddress>> {
-    use jig_fake_person::{Find, Step};
+pub fn start_chat_steps() -> Vec<skein_fake_person::Step<RootAddress>> {
+    use skein_fake_person::{Find, Step};
     use skein_ui::Role;
     vec![
         Step::See { find: Find::named(Role::TextArea, b"First words"), within: Duration::from_secs(1) },

@@ -5,7 +5,7 @@ static HEAP: Counting = Counting;
 #[test]
 fn clearing_the_filter_shows_the_same_still_waiting_proposal() {
     use jig_client_world::{Until, stories};
-    use jig_fake_person::{Find, Step};
+    use skein_fake_person::{Find, Step};
     use skein_lib::Duration;
     use skein_ui::Role;
     let mut world = stories::proposal_world(111);

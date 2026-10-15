@@ -35,7 +35,6 @@ members = [
     "testing/jig-fake-store",
     "testing/jig-fake-workers",
     "testing/jig-fake-parties",
-    "testing/jig-fake-person",
     "testing/jig-scripted-engine",
     "testing/jig-test-system",
     "testing/jig-ops-fake-production",
@@ -134,7 +133,7 @@ jig-domain-client = { path = "crates/jig-domain-client" }
 jig-protocol-transcript = { path = "crates/jig-protocol-transcript" }
 jig-view = { path = "crates/jig-view" }
 skein-ui-text = { git = "https://github.com/forgetic/skein.git" }
-jig-fake-person = { path = "testing/jig-fake-person" }
+skein-fake-person = { git = "https://github.com/forgetic/skein.git" }
 jig-scripted-engine = { path = "testing/jig-scripted-engine" }
 skein-codec = { git = "https://github.com/forgetic/skein.git" }
 skein-codegen = { git = "https://github.com/forgetic/skein.git" }

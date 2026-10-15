@@ -1,6 +1,6 @@
 //! Faults across authenticated tabs use the actual proposal and retained decision.
 use super::*;
-use jig_fake_person::{Face, Found, TreeFace};
+use skein_fake_person::{Face, Found, TreeFace};
 
 fn confirm(world: &World<Test, Joint>, tab: crate::ClientId) -> skein_ui::NodeId {
     match TreeFace::new(world.tree(tab)).find(&Find::exactly_named(Role::Button, b"Confirm")) {

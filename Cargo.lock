@@ -208,7 +208,6 @@ dependencies = [
  "jig-domain-tasks",
  "jig-domain-views",
  "jig-fake-parties",
- "jig-fake-person",
  "jig-fake-workers",
  "jig-protocol-client-link",
  "jig-protocol-client-wire",
@@ -222,6 +221,7 @@ dependencies = [
  "jig-test-view",
  "jig-view",
  "skein-fake-machine",
+ "skein-fake-person",
  "skein-http",
  "skein-io",
  "skein-lib",
@@ -257,7 +257,6 @@ dependencies = [
  "jig-domain-tasks",
  "jig-domain-views",
  "jig-fake-parties",
- "jig-fake-person",
  "jig-fake-workers",
  "jig-protocol-transcript",
  "jig-scripted-engine",
@@ -268,6 +267,7 @@ dependencies = [
  "jig-test-view",
  "jig-view",
  "sha2",
+ "skein-fake-person",
  "skein-lib",
  "skein-ui",
  "skein-ui-text",
@@ -465,14 +465,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "jig-fake-person"
-version = "0.0.0"
-dependencies = [
- "skein-lib",
- "skein-ui",
-]
-
-[[package]]
 name = "jig-fake-store"
 version = "0.0.0"
 
@@ -647,7 +639,6 @@ dependencies = [
  "jig-domain-people",
  "jig-domain-tasks",
  "jig-domain-views",
- "jig-fake-person",
  "jig-fake-store",
  "jig-ops-domain",
  "jig-ops-domain-client",
@@ -665,6 +656,7 @@ dependencies = [
  "jig-test-system",
  "jig-view",
  "sha2",
+ "skein-fake-person",
  "skein-json",
  "skein-lib",
  "skein-ui",
@@ -1459,6 +1451,15 @@ dependencies = [
  "skein-llm",
  "skein-oauth",
  "skein-world",
+]
+
+[[package]]
+name = "skein-fake-person"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/skein.git#dc71a49f2512a2a17f92f0be02d684d56ce5eda7"
+dependencies = [
+ "skein-lib",
+ "skein-ui",
 ]
 
 [[package]]

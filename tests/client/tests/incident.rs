@@ -4,9 +4,9 @@ use jig_domain_client::{
     address::{Address, TaskSection},
     contract::*,
 };
-use jig_fake_person::{Find, Step};
 use jig_scripted_engine::{Change, Rows, Source};
 use jig_test_domain_client::{Address as RootAddress, family};
+use skein_fake_person::{Find, Step};
 use skein_lib::{Duration, Wall};
 use skein_ui::Role;
 const WITHIN: Duration = Duration::from_secs(1);

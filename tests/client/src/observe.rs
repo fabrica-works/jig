@@ -2,9 +2,9 @@
 #![allow(clippy::wildcard_imports, reason = "boundary adapter covers the owner vocabulary")]
 use crate::harness::{CardKey, CardSeen, Receipt, Seen, Sent};
 use jig_domain_client::contract::*;
-use jig_fake_person::{Face, Find, Found, TreeFace};
 use jig_test_domain_client::{self as domain, Event, Request, family};
 use jig_view::Owner;
+use skein_fake_person::{Face, Find, Found, TreeFace};
 use skein_lib::RequestEnvelope;
 use skein_ui::{Key, NodeId, Role, Tree};
 

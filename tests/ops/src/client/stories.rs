@@ -11,11 +11,11 @@ use jig_domain_client::{
     address::{Address as JigAddress, TaskSection},
     contract::*,
 };
-use jig_fake_person::{Face, Find, Found, TreeFace};
 use jig_ops_domain_client::{Address, infrastructure as infra, observability as obs};
 use jig_ops_domain_connectors::{Connector, number};
 use jig_scripted_engine::{Bounds, Script, Truth};
 use jig_view::Owner;
+use skein_fake_person::{Face, Find, Found, TreeFace};
 use skein_lib::{Duration, Wall};
 use skein_ui::{Role, Tree as ViewTree};
 /// The same independent shell world used by the reference client.

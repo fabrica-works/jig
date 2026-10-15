@@ -5,11 +5,11 @@ use jig_client_world::{
 };
 use jig_conformance::Cut;
 use jig_domain_client::address::{Address as JigAddress, TaskSection};
-use jig_fake_person::{Find, Step};
 use jig_ops_domain as root;
 use jig_ops_domain_client::{Address, observability as obs};
 use jig_ops_world::joint::engine::Milestone;
 use jig_ops_world::joint::fixture;
+use skein_fake_person::{Find, Step};
 use skein_lib::Duration;
 use skein_ui::Role;
 use skein_world::domain::{Verdict, heap::Counting};

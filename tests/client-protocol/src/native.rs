@@ -2,10 +2,10 @@
 use crate::{family, front::Side};
 use jig_client_world::{App, Test};
 use jig_domain_client::address::{Address, TaskSection};
-use jig_fake_person::{Doing, Find, Next, Person, Step, TreeFace};
 use jig_protocol_client_link as link;
 use jig_shell_native::{Settings, Shell, Signing};
 use jig_test_domain_client::{self as client, Request};
+use skein_fake_person::{Doing, Find, Next, Person, Step, TreeFace};
 use skein_io::kernel::{Complete, Fd, Submit};
 use skein_lib::{Duration, Env, Queue, RequestRecord, Time, Wall};
 use skein_shell::Host;
@@ -27,11 +27,11 @@ impl Script {
         let mut steps = Self::start_chat(words).steps.into_vec();
         steps.push(Step::See {
             find: Find::named(skein_ui::Role::Paragraph, answer).within(Box::new([
-                jig_fake_person::Target::ExactRole {
+                skein_fake_person::Target::ExactRole {
                     role: skein_ui::Role::Region,
                     name: b"Historical object".as_slice().into(),
                 },
-                jig_fake_person::Target::ExactRole {
+                skein_fake_person::Target::ExactRole {
                     role: skein_ui::Role::Region,
                     name: b"Project: 1".as_slice().into(),
                 },

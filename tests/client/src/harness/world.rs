@@ -3,7 +3,7 @@
 //! (client/domain/testing.md, 4; client/domain/view.md, 11).
 use super::{App, CardKey, Duty, Fault, Front, FrontFault, Observation, StoreWrite};
 use crate::model::Model;
-use jig_fake_person::{Doing, Next, Person, RandomDoing, RandomPerson, Step, TreeFace};
+use skein_fake_person::{Doing, Next, Person, RandomDoing, RandomPerson, Step, TreeFace};
 use skein_lib::{Duration, Env, Queue, Rng, Time, Wall};
 use skein_ui::Act;
 use skein_ui::{NodeId, Tree};
@@ -919,7 +919,7 @@ impl<A: App, F: Front<A>> World<A, F> {
 #[cfg(test)]
 mod tests {
     use super::Until;
-    use jig_fake_person::{Find, Step};
+    use skein_fake_person::{Find, Step};
     use skein_lib::Duration;
     use skein_ui::Role;
     use skein_world::domain::Verdict;

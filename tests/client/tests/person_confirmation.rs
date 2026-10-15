@@ -6,7 +6,7 @@ use jig_client_world::{
         person_confirmation::{self, Form},
     },
 };
-use jig_fake_person::{Find, Step};
+use skein_fake_person::{Find, Step};
 use skein_lib::Duration;
 use skein_ui::Role;
 

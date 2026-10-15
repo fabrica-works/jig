@@ -254,8 +254,8 @@ fn full_documents_tabs_and_all_page_kinds_fit_the_client_and_view_worst_cases() 
         if task {
             w.person(
                 c,
-                vec![jig_fake_person::Step::See {
-                    find: jig_fake_person::Find::text(&[b't'; 32]),
+                vec![skein_fake_person::Step::See {
+                    find: skein_fake_person::Find::text(&[b't'; 32]),
                     within: skein_lib::Duration::from_secs(1),
                 }],
             );

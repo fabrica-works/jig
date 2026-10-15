@@ -1,5 +1,5 @@
 use jig_client_world::{Until, stories, test};
-use jig_fake_person::{Find, Step, Target};
+use skein_fake_person::{Find, Step, Target};
 use skein_lib::Duration;
 use skein_ui::Role;
 const WITHIN: Duration = Duration::from_secs(1);

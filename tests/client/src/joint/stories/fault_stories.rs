@@ -98,7 +98,7 @@ pub(super) fn answers(world: &mut World<Test, Joint>) -> usize {
         .count()
 }
 fn shown(world: &World<Test, Joint>, client: crate::ClientId, words: &[u8]) -> bool {
-    use jig_fake_person::{Face, Found, TreeFace};
+    use skein_fake_person::{Face, Found, TreeFace};
     matches!(TreeFace::new(world.tree(client)).find(&Find::text(words)), Found::Node(_))
 }
 

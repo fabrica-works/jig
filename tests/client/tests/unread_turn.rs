@@ -1,5 +1,5 @@
 use jig_client_world::{Until, stories};
-use jig_fake_person::{Find, Step};
+use skein_fake_person::{Find, Step};
 use skein_lib::Duration;
 
 #[test]

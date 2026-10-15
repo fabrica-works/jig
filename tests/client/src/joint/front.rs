@@ -273,7 +273,7 @@ mod tests {
     #[test]
     fn an_unsigned_protocol_client_signs_in_only_when_the_person_chooses_the_visible_provider() {
         use crate::{Settings, Until, World};
-        use jig_fake_person::{Find, Step};
+        use skein_fake_person::{Find, Step};
         use skein_ui::Role;
         let mut limits = jig_core_world::world::limits();
         limits.core.documents.rows = 2;

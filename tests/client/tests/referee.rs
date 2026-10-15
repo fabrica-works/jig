@@ -1,7 +1,7 @@
 //! Faulty client and front run through real callbacks, trees, patches and people.
 use jig_client_world::{Until, harness::*};
-use jig_fake_person::{Face, Find, Found, Step, TreeFace};
 use jig_view::Owner;
+use skein_fake_person::{Face, Find, Found, Step, TreeFace};
 use skein_ui::{Act, Binding};
 use skein_ui::{Key, NodeId, Patch, Role, Run, Tree, View};
 

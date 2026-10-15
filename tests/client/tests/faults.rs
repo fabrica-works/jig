@@ -1,5 +1,5 @@
 use jig_client_world::{ClientId, Fault, FrontFault, Scripted, Test, Until, World, stories};
-use jig_fake_person::{Face, Find, Found, Step, TreeFace};
+use skein_fake_person::{Face, Find, Found, Step, TreeFace};
 use skein_lib::{Duration, Time, Wall};
 use skein_ui::Act;
 use skein_ui::{NodeId, Role};

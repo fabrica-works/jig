@@ -1,5 +1,5 @@
 use jig_client_world::{App, Settings, Test, Until, stories, test};
-use jig_fake_person::{Find, Step};
+use skein_fake_person::{Find, Step};
 use skein_lib::Duration;
 use skein_world::domain::Verdict;
 use stories::client_construction as fixture;

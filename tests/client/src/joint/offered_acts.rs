@@ -1,7 +1,7 @@
 //! Offered Task acts are checked against the actual admitted source packet and
 //! the public card, not private domain state (client/domain/testing.md, 6).
 use super::*;
-use jig_fake_person::{Face, Found, TreeFace};
+use skein_fake_person::{Face, Found, TreeFace};
 
 pub(super) fn task(world: &mut World<Test, Joint>, client: crate::ClientId, number: u64) {
     use jig_domain_core::acts::{Act, Admission};

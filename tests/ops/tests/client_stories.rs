@@ -4,9 +4,9 @@ use jig_domain_client::{
     address::{Address as JigAddress, TaskSection},
     contract::{ObjectKey, ReadValue},
 };
-use jig_fake_person::{Find, Step};
 use jig_ops_domain_client::{Address, observability as obs};
 use jig_ops_world::client::{Ops, stories};
+use skein_fake_person::{Find, Step};
 use skein_lib::Duration;
 use skein_ui::Role;
 use skein_world::domain::{Verdict, heap::Counting};
@@ -77,7 +77,7 @@ fn accept_restart(seed: u64) {
             Step::See { find: Find::named(Role::Link, b"Incident 12"), within: WITHIN },
             Step::Press { find: Find::named(Role::Link, b"Incident 12") },
             Step::See {
-                find: Find::text(b"Error rate 30").within(Box::from([jig_fake_person::Target::Role {
+                find: Find::text(b"Error rate 30").within(Box::from([skein_fake_person::Target::Role {
                     role: Role::Drawing,
                     name: b"Error rate".as_slice().into(),
                 }])),

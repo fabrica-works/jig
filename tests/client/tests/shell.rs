@@ -1,5 +1,5 @@
 use jig_client_world::{ClientId, Scripted, Test, Until, World, stories};
-use jig_fake_person::{Find, Step};
+use skein_fake_person::{Find, Step};
 use skein_lib::{Duration, Time};
 use skein_ui::Role;
 type ShellWorld = World<Test, Scripted>;
