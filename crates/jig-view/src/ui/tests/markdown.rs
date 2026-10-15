@@ -116,7 +116,7 @@ fn paragraphs_blocks_runs_links_and_literal_fallbacks() {
 
 #[test]
 fn a_dozen_agent_reports_and_malformed_inputs_fit_the_byte_bound() {
-    // Verbatim passages from the jig-extraction, jig-move and
+    // Verbatim passages from the extraction, module move and
     // smith-protocol-layer coordination logs under ~/src/plans/.
     let reports: [&[u8]; 12] = [
         include_bytes!("markdown/01.md"),

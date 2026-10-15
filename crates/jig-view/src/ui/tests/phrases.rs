@@ -206,10 +206,10 @@ fn twice(bytes: &[u8]) -> Box<[u8]> {
 
 const ROWS: [(PhraseId, &[u8]); 6] = [
     (PhraseId { owner: Owner { number: 65_535 }, number: 0 }, b"other maximum".as_slice()),
-    (PhraseId { owner: Owner { number: 65_536 }, number: u16::MAX }, b"jig maximum".as_slice()),
+    (PhraseId { owner: Owner { number: 65_536 }, number: u16::MAX }, b"kit maximum".as_slice()),
     (PhraseId { owner: Owner { number: 5 }, number: 1 }, b"side five".as_slice()),
     (PhraseId { owner: Owner { number: 6 }, number: 1 }, b"other four".as_slice()),
-    (PhraseId { owner: Owner { number: 65_536 }, number: 1 }, b"jig one".as_slice()),
+    (PhraseId { owner: Owner { number: 65_536 }, number: 1 }, b"kit one".as_slice()),
     (PhraseId { owner: Owner { number: 4 }, number: 1 }, b"side four".as_slice()),
 ];
 

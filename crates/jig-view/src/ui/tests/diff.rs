@@ -299,21 +299,21 @@ fn a_changed_region_name_is_one_attribute_patch() {
     let mut out = Queue::with_capacity(LIMITS.patches);
     let mut builder = view.builder();
     builder.open(Role::Region);
-    builder.region(crate::regions::JigRegion::TaskPlan.region());
+    builder.region(crate::ui::Region { owner: Owner { number: 65_536 }, number: 17 });
     builder.close();
     view.finish(builder, 1, &mut out);
     while out.pop().is_some() {}
     let id = view.tree().get(0).unwrap().id;
     let mut builder = view.builder();
     builder.open(Role::Region);
-    builder.region(crate::regions::JigRegion::TaskHistory.region());
+    builder.region(crate::ui::Region { owner: Owner { number: 65_536 }, number: 18 });
     builder.close();
     view.finish(builder, 2, &mut out);
     assert_eq!(out.len(), 1);
     match out.pop().unwrap() {
         Patch::Attribute { node, attribute } => {
             assert_eq!(node, id);
-            assert_eq!(attribute.region, Some(crate::regions::JigRegion::TaskHistory.region()));
+            assert_eq!(attribute.region, Some(crate::ui::Region { owner: Owner { number: 65_536 }, number: 18 }));
         }
         Patch::Insert { .. } | Patch::Remove { .. } | Patch::Move { .. } | Patch::Text { .. } | Patch::Value { .. } => {
             panic!("only the region attribute changed")
