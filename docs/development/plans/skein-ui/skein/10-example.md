@@ -65,13 +65,21 @@ Needs: skein 01.1.
 Files: new `examples/ui/view/{Cargo.toml (skein-ui-example-view),
   schema/notes-v1.schema, src/generated/v1.rs, src/lib.rs,
   src/state.rs, src/view.rs, src/places.rs, src/limits.rs,
-  src/tests.rs, src/tests/fixtures.rs, src/tests/drift.rs}`; skein's
-  `Cargo.toml` (member, `[workspace.dependencies]`). The family's
-  pattern: `tests/codec` (`schema/`, `src/generated/`,
-  `tests/drift.rs:10-37`).
+  src/tests.rs, src/tests/fixtures.rs, src/tests/drift.rs, golden/v1/}`
+  (the drift test writes and checks `golden/v1/*.bin`: 12 files for
+  this family); skein's `Cargo.toml` (member, `[workspace.dependencies]`).
+  The view takes `skein-codec` by path, as `tests/codec/Cargo.toml:10`
+  does: it is not in `[workspace.dependencies]`. The family's pattern:
+  `tests/codec` (`schema/`, `src/generated/`, `tests/drift.rs:10-37`);
+  the view is step code under the root `clippy.toml`, which disallows
+  `drift.rs:14`'s `is_some_and`: the copy writes
+  `std::env::var_os("SKEIN_CODEGEN_WRITE").as_deref() ==
+  Some(std::ffi::OsStr::new("1"))`.
 Shape: records `Note { number: u64, title, body, due, minutes, label:
-  Label }`, `Add { key: u64, title, body, due, minutes, label }`, `List
-  { notes }` (bounded by the limits); `State::start(seed, path,
+  Label }`, `Add { key: u64, title, body, due, minutes, label }`, `Notes
+  { notes }` (bounded by the limits; not `List`, which skein-codegen
+  reserves, with `Box`, `Limits`, `Option`, `Path`, `Problem` and
+  `Result`: `testing/skein-codegen/src/check.rs:191-199`); `State::start(seed, path,
   records, offset, languages) -> State`; `State::step(report, now,
   wall, duties)`; `State::build(&mut View, out)`; `State::address(&self,
   Binding) -> Option<Place>`; `places::{parse(&[u8]) -> Place,
@@ -95,10 +103,15 @@ Files: new `examples/ui/server/{Cargo.toml (skein-ui-example-server),
   src/lib.rs (domain: notes in memory, bounded), src/routes.rs,
   src/bundle.rs (read at startup; types), src/main.rs, src/tests.rs}`;
   new `tests/ui-web/{Cargo.toml (skein-ui-web-tests), src/lib.rs,
-  tests/serve.rs}`; skein's `Cargo.toml` (members). The patterns:
-  `examples/echo/shell/src/{main.rs, lib.rs:26-79}` (startup, `drive`,
-  the listening line); `tests/browser/src/serve.rs:111-160` (HTTP
-  connections over `skein_http::server`).
+  tests/serve.rs}`; a new `examples/ui/server/clippy.toml`, a copy of
+  `examples/echo/shell/clippy.toml`, and the server's own
+  `[lints.rust]` and `[lints.clippy]` tables, copied from
+  `examples/echo/shell/Cargo.toml` (under the workspace's lints an
+  echo-like `main` fails 15 times); skein's `Cargo.toml` (members). The
+  patterns: `examples/echo/shell/src/{main.rs, lib.rs:26-79}` (startup,
+  `drive`, the listening line); `tests/browser/src/serve.rs:118-238`
+  (HTTP connections over `skein_http::server`, their answers
+  included).
 Shape: routes: `GET /api/notes` the list record as
   `application/octet-stream`; `GET /bundle/<digest>/<path>` the file,
   `Cache-Control: public, max-age=31536000, immutable`, its type by
@@ -164,9 +177,9 @@ pub enum Report {
 pub struct Record { pub key: Box<[u8]>, pub value: Box<[u8]> }
 /// What a step asks of the shell's parts, in order (ui-web.md, 3.1).
 pub struct Duties {
-    pub writes: Vec<Record>,
-    pub removes: Vec<Box<[u8]>>,
-    pub exchanges: Vec<Exchange>,
+    pub writes: Queue<Record>,
+    pub removes: Queue<Box<[u8]>>,
+    pub exchanges: Queue<Exchange>,
     pub show: Option<(Place, bool)>,
 }
 pub struct Exchange { pub id: u32, pub post: bool, pub path: Box<[u8]>, pub body: Box<[u8]>, pub bound: u32 }

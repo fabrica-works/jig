@@ -136,6 +136,9 @@ None yet; they start at 101.
 103. **skein 01's Shapes against main** (ready check of skein-01.1).
      skein 01's session file corrected against jig `f15431139` (jig 02.5 landed) and skein `9366d5d`: `lib.rs` comes from jig's `ui.rs`, not `ui/mod.rs`; the six doc comments citing jig's `view.md` name their skein sections; each increment runs `cargo fmt` after the rename; `skein-sim` goes in `crates/skein-ui-text/Cargo.toml`, with `[workspace.dependencies] skein-ui-text` in skein's; skein-fake-person drops jig's three `disallowed_*` allows and takes a copy of `tests/clippy.toml`, as skein-fake-channel does; the sizes are those counted at jig `f15431139`. A further name of jig, citation or lint the copy trips that these lines miss: fix it in the same increment, and list it in the commit body.
 
+104. **skein 10's Shapes against main** (ready check of skein-10.1).
+     skein 10's session file corrected against skein `a37b22a` (skein 01.1 and 01.2 landed): the list's record is `Notes`, since skein-codegen reserves `List`; 10.1's Files add the drift test's `golden/v1/`, take `skein-codec` by path, and write the drift copy's switch without `is_some_and`, which the step-code `clippy.toml` disallows; the sketch's `Duties` holds `skein_lib::Queue`s, not `Vec`s; 10.2's Files add the server's `clippy.toml` and `[lints]` tables, copied from the echo shell's, and cite `tests/browser/src/serve.rs:118-238`. skein 12's `Requests` mirrors `Duties`: its own ready check settles its types. A further use of a reserved record name or a disallowed type or method the copy trips: fix it in the same increment, and list it in the commit body.
+
 ## For the user
 
 Long-term choices the user may veto; each default holds unless the user
