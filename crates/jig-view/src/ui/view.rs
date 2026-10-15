@@ -8,8 +8,9 @@
 //! Built | unchanged shown | Built | Nothing
 //! Built | finish at changed shown | Built at shown | Diff patches
 
+use crate::Limits;
+use crate::ui::{Act, Binding, BoundAct};
 use crate::ui::{Builder, NodeId, Patch, Tree, diff};
-use crate::{Act, Binding, BoundAct, Limits};
 
 use skein_lib::Queue;
 

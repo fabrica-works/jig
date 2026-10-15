@@ -5,9 +5,10 @@
     reason = "ordinary tests collect text, query trees and select scripted requests"
 )]
 
+use crate::ui::Act;
 use crate::ui::{Builder, Role, SlotRef, Tree};
 use crate::{
-    Act, JigBindings, JigMeaning, Owner, decode,
+    JigBindings, JigMeaning, Owner, decode,
     phrases::{
         Hole, PhraseLimits, Phrasebook, english,
         jig::{JigPhrase, shapes},

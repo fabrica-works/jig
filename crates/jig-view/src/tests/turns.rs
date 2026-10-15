@@ -126,9 +126,12 @@ fn replacement(words: &Words) {
     assert!(contains(&first, b"Provisional"));
     assert!(!contains(&first, b"whole private input"));
     let key = keys(&first)[0];
-    let act =
-        crate::decode(&mut bindings, named_binding(&first, b"Open input and result for ReadFact"), crate::Act::Press)
-            .unwrap();
+    let act = crate::decode(
+        &mut bindings,
+        named_binding(&first, b"Open input and result for ReadFact"),
+        crate::ui::Act::Press,
+    )
+    .unwrap();
     drive(&mut d, Event::Act { act });
     assert!(contains(&build(&d, 3, words).0, b"whole private input"));
     live(&mut d, run, 2);
@@ -196,7 +199,7 @@ fn replacement(words: &Words) {
     let closed = crate::decode(
         &mut bindings,
         named_binding(&committed, b"Fold input and result for ReadFact"),
-        crate::Act::Press,
+        crate::ui::Act::Press,
     )
     .unwrap();
     drive(&mut d, Event::Act { act: closed });
@@ -317,7 +320,7 @@ fn activities(words: &Words) {
         let (tree, mut bindings) = build(&d, 3, words);
         access(&tree);
         assert!(contains(&tree, expected[index]), "{:?}", expected[index]);
-        let more = crate::decode(&mut bindings, named_binding(&tree, b"Read earlier"), crate::Act::Press).unwrap();
+        let more = crate::decode(&mut bindings, named_binding(&tree, b"Read earlier"), crate::ui::Act::Press).unwrap();
         token = read(&drive(&mut d, Event::Act { act: more }));
     }
 }
@@ -696,7 +699,7 @@ fn raw_live_call_controls_use_selected_normal_language_and_checked_capacity() {
     let act = crate::decode(
         &mut bindings,
         named_binding(&folded, b"Selected language opens actual current input"),
-        crate::Act::Press,
+        crate::ui::Act::Press,
     )
     .unwrap();
     drive(&mut d, Event::Act { act });

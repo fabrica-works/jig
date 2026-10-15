@@ -40,7 +40,7 @@ pub fn edit(before: &Amendment, selected: &Amendment, field: Field, value: Box<[
         Field::Instructions => change.instructions = Some(Text::new(value, text_limit).ok()?),
         Field::Budget => {
             let mut authority = selected.authority.clone().or(before.authority.clone())?;
-            authority.spend = crate::number(&value)?;
+            authority.spend = crate::ui::number(&value)?;
             change.authority = Some(authority);
         }
         Field::Deadline => {
@@ -50,12 +50,12 @@ pub fn edit(before: &Amendment, selected: &Amendment, field: Field, value: Box<[
         }
         Field::Party => {
             let mut addressed = selected.addressed.or(before.addressed)?;
-            addressed.address = PersonAddress::Party(crate::number(&value)?);
+            addressed.address = PersonAddress::Party(crate::ui::number(&value)?);
             change.addressed = Some(addressed);
         }
         Field::Role => {
             let mut addressed = selected.addressed.or(before.addressed)?;
-            addressed.address = PersonAddress::Role(u32::try_from(crate::number(&value)?).ok()?);
+            addressed.address = PersonAddress::Role(u32::try_from(crate::ui::number(&value)?).ok()?);
             change.addressed = Some(addressed);
         }
     }
@@ -72,11 +72,11 @@ pub fn deadline(value: &[u8]) -> Option<skein_lib::Wall> {
     {
         return None;
     }
-    let year = crate::number(value.get(0..4)?)?;
-    let month = crate::number(value.get(5..7)?)?;
-    let day = crate::number(value.get(8..10)?)?;
-    let hour = crate::number(value.get(11..13)?)?;
-    let minute = crate::number(value.get(14..16)?)?;
+    let year = crate::ui::number(value.get(0..4)?)?;
+    let month = crate::ui::number(value.get(5..7)?)?;
+    let day = crate::ui::number(value.get(8..10)?)?;
+    let hour = crate::ui::number(value.get(11..13)?)?;
+    let minute = crate::ui::number(value.get(14..16)?)?;
     if year < 1970 || !(1..=12).contains(&month) || hour > 23 || minute > 59 {
         return None;
     }

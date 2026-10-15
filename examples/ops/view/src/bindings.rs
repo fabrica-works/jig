@@ -2,7 +2,8 @@
 //! Replace: application actions and family document identities.
 use jig_domain_client::contract::{ObjectKey, Revision};
 use jig_ops_domain_client::{Action, infrastructure};
-use jig_view::{Act, Binding, Owner};
+use jig_view::Owner;
+use jig_view::ui::{Act, Binding};
 use skein_lib::{List, Token};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Meaning {
@@ -85,7 +86,7 @@ pub fn decode(bindings: &Bindings, token: Token, act: Act) -> Option<Action> {
                         Some(Action::Infrastructure(infrastructure::Act::Until {
                             object: *object,
                             revision: *revision,
-                            value: crate::time::wall(jig_view::number(&value)?)?,
+                            value: crate::time::wall(jig_view::ui::number(&value)?)?,
                         }))
                     }
                     Act::Press | Act::Toggle | Act::Submit | Act::Drawing { .. } => None,
@@ -98,7 +99,7 @@ pub fn decode(bindings: &Bindings, token: Token, act: Act) -> Option<Action> {
                         Some(Action::Infrastructure(infrastructure::Act::NativeUntil {
                             object: *object,
                             revision: *revision,
-                            value: jig_view::number(&value)?,
+                            value: jig_view::ui::number(&value)?,
                         }))
                     }
                     Act::Press | Act::Toggle | Act::Submit | Act::Drawing { .. } => None,

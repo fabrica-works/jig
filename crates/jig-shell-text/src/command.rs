@@ -1,6 +1,6 @@
 //! Last-print numbers interpreted against the current tree (view.md, 15.4).
 use alloc::boxed::Box;
-use jig_view::Act;
+use jig_view::ui::Act;
 use jig_view::ui::{NodeId, Role, State, Tree};
 use skein_lib::{Decimal, Writer, bytes};
 /// What one typed line asks the host to do.
@@ -45,7 +45,7 @@ pub fn command(line: &[u8], numbers: Option<&[NodeId]>, tree: &Tree, longest: u3
     }
     let split = bytes::find(line, b" ").unwrap_or(line.len());
     let digits = line.get(..split).expect("split is in line");
-    let Some(number) = jig_view::number(digits) else {
+    let Some(number) = jig_view::ui::number(digits) else {
         return refused(Refusal::Unknown, 0);
     };
     let Some(numbers) = numbers else {

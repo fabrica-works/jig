@@ -90,7 +90,7 @@ fn the_project_tabs_mark_the_addresss_own_section_current() {
             .collect();
         assert_eq!(current.len(), 1, "{section:?}");
         assert_eq!(
-            crate::decode(&mut bindings, current[0].binding.unwrap().token, crate::Act::Press),
+            crate::decode(&mut bindings, current[0].binding.unwrap().token, crate::ui::Act::Press),
             Some(Act::Go { address: Address::Project { project: 4, section } })
         );
     }

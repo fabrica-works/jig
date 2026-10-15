@@ -227,7 +227,7 @@ impl jig_client_world::harness::App for Client {
     fn tree(view: &Self::View) -> &jig_view::ui::Tree {
         Ops::tree(view)
     }
-    fn act(view: &mut Self::View, node: jig_view::ui::NodeId, act: jig_view::Act) -> Option<Self::Event> {
+    fn act(view: &mut Self::View, node: jig_view::ui::NodeId, act: jig_view::ui::Act) -> Option<Self::Event> {
         Ops::act(view, node, act)
     }
     fn duty(request: Self::Request) -> jig_client_world::harness::Duty<Self> {

@@ -1,5 +1,6 @@
+use jig_view::ui::Binding;
 use jig_view::ui::{Builder, Role, Run, State, Tree};
-use jig_view::{Binding, Limits, Owner};
+use jig_view::{Limits, Owner};
 
 use skein_lib::{Queue, Token};
 

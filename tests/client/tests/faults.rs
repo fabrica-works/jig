@@ -1,6 +1,6 @@
 use jig_client_world::{ClientId, Fault, FrontFault, Scripted, Test, Until, World, stories};
 use jig_fake_person::{Face, Find, Found, Step, TreeFace};
-use jig_view::Act;
+use jig_view::ui::Act;
 use jig_view::ui::{NodeId, Role};
 use skein_lib::{Duration, Time, Wall};
 fn node(w: &World<Test, Scripted>, c: ClientId, find: &Find) -> NodeId {

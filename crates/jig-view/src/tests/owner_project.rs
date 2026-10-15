@@ -568,7 +568,7 @@ fn check_owner_project_real_page_decodes_whole_role_edits_preserves_prior_channe
         .binding
         .unwrap()
         .token;
-    let act = crate::decode(&mut bindings, textbox, crate::Act::Input { value: copy_of(b"32833") }).unwrap();
+    let act = crate::decode(&mut bindings, textbox, crate::ui::Act::Input { value: copy_of(b"32833") }).unwrap();
     assert!(native_drive(&mut d, Event::Act { act }).is_empty());
     let (tree, mut bindings) = page(&d);
     let field = tree
@@ -579,7 +579,7 @@ fn check_owner_project_real_page_decodes_whole_role_edits_preserves_prior_channe
         .binding
         .unwrap()
         .token;
-    let act = crate::decode(&mut bindings, field, crate::Act::Input { value: copy_of(b"129") }).unwrap();
+    let act = crate::decode(&mut bindings, field, crate::ui::Act::Input { value: copy_of(b"129") }).unwrap();
     native_drive(&mut d, Event::Act { act });
     let (tree, mut bindings) = page(&d);
     assert!(has(&tree, b"Before"));
@@ -594,7 +594,7 @@ fn check_owner_project_real_page_decodes_whole_role_edits_preserves_prior_channe
         .binding
         .unwrap()
         .token;
-    let act = crate::decode(&mut bindings, confirm, crate::Act::Press).unwrap();
+    let act = crate::decode(&mut bindings, confirm, crate::ui::Act::Press).unwrap();
     assert_eq!(act, Act::Confirm);
     let sent = native_drive(&mut d, Event::Act { act });
     let asks: Vec<_> = sent
@@ -754,7 +754,7 @@ fn owner_project_public_service_and_pool_inputs_decode_explicit_values_and_prese
         .iter()
         .filter(|node| node.role == Role::Button)
         .find_map(|node| {
-            node.binding.and_then(|binding| match crate::decode(&mut bindings, binding.token, crate::Act::Press) {
+            node.binding.and_then(|binding| match crate::decode(&mut bindings, binding.token, crate::ui::Act::Press) {
                 Some(act @ Act::ProjectServiceRole { role: HeldRole::Policy { role: u32::MAX } }) => Some(act),
                 _ => None,
             })
@@ -768,8 +768,8 @@ fn owner_project_public_service_and_pool_inputs_decode_explicit_values_and_prese
         .find(|node| node.role == Role::TextField && node.name.as_deref() == Some(b"Name".as_slice()))
         .unwrap();
     assert!(name.value.is_none());
-    let act =
-        crate::decode(&mut bindings, name.binding.unwrap().token, crate::Act::Input { value: copy_of(b"") }).unwrap();
+    let act = crate::decode(&mut bindings, name.binding.unwrap().token, crate::ui::Act::Input { value: copy_of(b"") })
+        .unwrap();
     let Act::ProjectSettings { ask } = &act else { panic!("explicit service request") };
     assert!(match ask.as_ref() {
         Ask::MakeService { project: 4, name, role: HeldRole::Policy { role: u32::MAX } } if name.bytes().is_empty() =>
@@ -800,7 +800,7 @@ fn owner_project_public_service_and_pool_inputs_decode_explicit_values_and_prese
                 match crate::decode(
                     &mut bindings,
                     binding.token,
-                    crate::Act::Input { value: copy_of(b"18446744073709551615") },
+                    crate::ui::Act::Input { value: copy_of(b"18446744073709551615") },
                 ) {
                     Some(Act::ProjectSettings { ask })
                         if match ask.as_ref() {
@@ -837,7 +837,7 @@ fn owner_project_public_service_and_pool_inputs_decode_explicit_values_and_prese
         .iter()
         .filter(|node| node.role == Role::Button)
         .find_map(|node| {
-            node.binding.and_then(|binding| match crate::decode(&mut bindings, binding.token, crate::Act::Press) {
+            node.binding.and_then(|binding| match crate::decode(&mut bindings, binding.token, crate::ui::Act::Press) {
                 Some(Act::ProjectSettings { ask })
                     if match ask.as_ref() {
                         Ask::SetRoles { holdings, .. }
@@ -895,7 +895,7 @@ fn owner_project_public_goal_form_decodes_whole_bounded_procedure_and_keeps_prop
         .nodes()
         .iter()
         .find_map(|node| {
-            let act = crate::decode(&mut bindings, node.binding?.token, crate::Act::Press)?;
+            let act = crate::decode(&mut bindings, node.binding?.token, crate::ui::Act::Press)?;
             match act {
                 Act::GoalForm { form } if form.executor == executor => Some(form),
                 _ => None,
@@ -907,7 +907,8 @@ fn owner_project_public_goal_form_decodes_whole_bounded_procedure_and_keeps_prop
     assert!(native_drive(&mut domain, Event::Act { act: Act::GoalForm { form: choice } }).is_empty());
     let (tree, mut bindings) = owner_page(&domain);
     let words_field = tree.nodes().iter().find(|node| node.role == Role::TextArea).unwrap().binding.unwrap().token;
-    let act = crate::decode(&mut bindings, words_field, crate::Act::Input { value: copy_of(UTF8_TEXTS[0]) }).unwrap();
+    let act =
+        crate::decode(&mut bindings, words_field, crate::ui::Act::Input { value: copy_of(UTF8_TEXTS[0]) }).unwrap();
     assert!(match &act {
         Act::Edit { field: Purpose::NewGoal, text } if text.bytes() == UTF8_TEXTS[0] => true,
         _ => false,
@@ -924,7 +925,7 @@ fn owner_project_public_goal_form_decodes_whole_bounded_procedure_and_keeps_prop
             .nodes()
             .iter()
             .filter_map(|node| {
-                crate::decode(&mut bindings, node.binding?.token, crate::Act::Input { value: copy_of(amount) })
+                crate::decode(&mut bindings, node.binding?.token, crate::ui::Act::Input { value: copy_of(amount) })
             })
             .find(|act| act == &edited)
             .unwrap();
@@ -934,7 +935,7 @@ fn owner_project_public_goal_form_decodes_whole_bounded_procedure_and_keeps_prop
     let submit = tree
         .nodes()
         .iter()
-        .filter_map(|node| crate::decode(&mut bindings, node.binding?.token, crate::Act::Press))
+        .filter_map(|node| crate::decode(&mut bindings, node.binding?.token, crate::ui::Act::Press))
         .find(|act| match act {
             Act::Submit { field: Purpose::NewGoal } => true,
             _ => false,
@@ -1180,7 +1181,7 @@ fn owner_project_genuine_spend_keeps_live_historical_and_earlier_period_facts_wi
         .nodes()
         .iter()
         .filter_map(|node| node.binding)
-        .filter_map(|binding| crate::decode(&mut bindings, binding.token, crate::Act::Press))
+        .filter_map(|binding| crate::decode(&mut bindings, binding.token, crate::ui::Act::Press))
         .filter(|act| match act {
             Act::More { window, .. } => *window == skein_lib::Token::new(22),
             _ => false,

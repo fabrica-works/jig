@@ -1,10 +1,12 @@
 //! Portable UI trees, building and diffs (skein's ui.md, sections 3, 5 and 7).
+mod binding;
 pub(crate) mod builder;
 pub(crate) mod diff;
 pub mod markdown;
 pub(crate) mod tree;
 mod view;
 
+pub use binding::{Act, Binding, BoundAct, number};
 pub use builder::{Builder, Slot, SlotId};
 pub use diff::{Attribute, Made, Patch, diff};
 pub use tree::{

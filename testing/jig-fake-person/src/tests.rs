@@ -1,6 +1,7 @@
 use super::*;
+use jig_view::ui::Binding;
 use jig_view::ui::{Builder, DrawingKind, Role, Run, State, View};
-use jig_view::{Binding, Limits, Owner};
+use jig_view::{Limits, Owner};
 
 use skein_lib::{Queue, Token};
 

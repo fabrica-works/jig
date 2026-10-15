@@ -6,8 +6,9 @@
     reason = "ordinary tests inspect trees and script public domain requests"
 )]
 use super::cards::{CLIENT, contains, document, drive, limits, start, text, words};
+use crate::ui::Act;
 use crate::ui::{Builder, Role, State, Tree};
-use crate::{Act, JigBindings, cards, decode};
+use crate::{JigBindings, cards, decode};
 
 use jig_domain_client::{Domain, Event, Request, action::Act as Action, contract::*, fields::Purpose, objects::Object};
 use skein_lib::{Duration, Id, List, Wall};

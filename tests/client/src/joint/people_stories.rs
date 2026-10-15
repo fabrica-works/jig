@@ -228,7 +228,7 @@ fn a_hold_moved_under_the_open_confirmation_is_refused_in_place() {
         Found::Node(id) => id,
         Found::Absent | Found::Pending => panic!("changed confirmation stays in place"),
     };
-    assert!(!face.allows(confirm, &jig_view::Act::Press), "the moved revision disables Confirm");
+    assert!(!face.allows(confirm, &jig_view::ui::Act::Press), "the moved revision disables Confirm");
     world.person(
         client,
         vec![

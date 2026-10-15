@@ -264,7 +264,7 @@ impl NativeClient {
                         self.callback(event);
                         if submit {
                             let event =
-                                Test::act(&mut self.view, node, jig_view::Act::Submit).expect("terminal submit");
+                                Test::act(&mut self.view, node, jig_view::ui::Act::Submit).expect("terminal submit");
                             self.callback(event);
                         }
                     }

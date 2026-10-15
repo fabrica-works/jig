@@ -91,7 +91,7 @@ fn a_shortcut_named_twice_is_a_fault_at_its_second_node() {
     b.open(Role::Main);
     for _ in 0_u8..2 {
         b.open(Role::Button);
-        b.bind(crate::Binding {
+        b.bind(crate::ui::Binding {
             owner: (crate::Owner::Application { number: 1 }).opaque(),
             token: skein_lib::Token::new(1),
         });

@@ -12,8 +12,9 @@ mod world_limits;
 use crate::{Limits, View, build, decode, words};
 use jig_domain_client::contract::*;
 use jig_test_domain_client::{Address, Domain, Event, JigOut, Place, Request, family, first};
+use jig_view::Owner;
+use jig_view::ui::Act;
 use jig_view::ui::{NodeId, Patch, Role};
-use jig_view::{Act, Owner};
 
 use skein_lib::{Duration, Env, List, Queue, RequestLimits, Time, Token, Wall};
 fn limits() -> jig_test_domain_client::Limits {

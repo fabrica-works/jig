@@ -1,6 +1,6 @@
 use super::fixtures;
 use crate::{Command, Print, Refusal, command, refusal_line, render};
-use jig_view::Act;
+use jig_view::ui::Act;
 use jig_view::ui::{Builder, NodeId, Role, State, Tree};
 use skein_lib::{Queue, bytes::copy_of};
 fn page() -> Tree {

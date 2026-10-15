@@ -169,12 +169,12 @@ fn plan_folds(words: &Words) {
     let (tree, mut bindings) = build(&d, 3, words);
     assert_eq!(tree.nodes().iter().filter(|n| n.role == Role::TreeItem).count(), 2);
     assert!(contains(&tree, b"Held below: 2"));
-    let fold = crate::decode(&mut bindings, named_binding(&tree, b"Fold subtree"), crate::Act::Press).unwrap();
+    let fold = crate::decode(&mut bindings, named_binding(&tree, b"Fold subtree"), crate::ui::Act::Press).unwrap();
     drive(&mut d, Event::Act { act: fold });
     let (folded, mut bindings) = build(&d, 3, words);
     assert_eq!(folded.nodes().iter().filter(|n| n.role == Role::TreeItem).count(), 1);
     assert!(contains(&folded, b"Held below: 1"));
-    let open = crate::decode(&mut bindings, named_binding(&folded, b"Open subtree"), crate::Act::Press).unwrap();
+    let open = crate::decode(&mut bindings, named_binding(&folded, b"Open subtree"), crate::ui::Act::Press).unwrap();
     drive(&mut d, Event::Act { act: open });
     assert_eq!(build(&d, 3, words).0.nodes().iter().filter(|n| n.role == Role::TreeItem).count(), 2);
     for filter in [
@@ -342,10 +342,10 @@ fn history(words: &Words) {
         }
         assert_eq!(tree.nodes().iter().filter_map(|n| n.key).filter(|key| key.kind == 21).count(), 2);
         assert_eq!(
-            crate::decode(&mut bindings, named_binding(&tree, b"This task and its subtree"), crate::Act::Press),
+            crate::decode(&mut bindings, named_binding(&tree, b"This task and its subtree"), crate::ui::Act::Press),
             Some(Act::HistoryScope { subtree: true })
         );
-        let more = crate::decode(&mut bindings, named_binding(&tree, b"Read later"), crate::Act::Press).unwrap();
+        let more = crate::decode(&mut bindings, named_binding(&tree, b"Read later"), crate::ui::Act::Press).unwrap();
         let out = drive(&mut d, Event::Act { act: more });
         read = out
             .iter()
@@ -486,7 +486,7 @@ fn goal_form(words: &Words) {
     let action = crate::decode(
         &mut bindings,
         named_binding(&tree, b"Goal budget"),
-        crate::Act::Input { value: Box::from(b"40".as_slice()) },
+        crate::ui::Act::Input { value: Box::from(b"40".as_slice()) },
     )
     .unwrap();
     match action {
@@ -499,7 +499,7 @@ fn goal_form(words: &Words) {
     let action = crate::decode(
         &mut bindings,
         named_binding(&tree, b"Goal deadline (UTC, YYYY-MM-DD HH:MM)"),
-        crate::Act::Input { value: Box::from(b"2026-10-09 17:00".as_slice()) },
+        crate::ui::Act::Input { value: Box::from(b"2026-10-09 17:00".as_slice()) },
     )
     .unwrap();
     assert_eq!(
@@ -518,7 +518,7 @@ fn goal_form(words: &Words) {
         crate::decode(
             &mut bindings,
             named_binding(&tree, b"Goal priority"),
-            crate::Act::Input { value: Box::from(b"bad".as_slice()) }
+            crate::ui::Act::Input { value: Box::from(b"bad".as_slice()) }
         )
         .is_none()
     );
@@ -671,22 +671,25 @@ fn procedure_goal_choices_render_whole_numeric_pairs_without_frame_charters() {
             GoalExecutor::Procedure { connector: u16::MAX, code: u32::MAX },
         ),
     ] {
-        let action = crate::decode(&mut bindings, named_binding(&tree, label), crate::Act::Press).unwrap();
+        let action = crate::decode(&mut bindings, named_binding(&tree, label), crate::ui::Act::Press).unwrap();
         assert_eq!(
             action,
             Act::GoalForm { form: GoalForm { project: 4, executor, budget: 30, deadline: None, priority: 0 } }
         );
     }
     assert!(!tree.nodes().iter().any(|n| n.name.as_deref() == Some(b"Charter 2")));
-    let choice =
-        crate::decode(&mut bindings, named_binding(&tree, b"Connector 65535, procedure 4294967295"), crate::Act::Press)
-            .unwrap();
+    let choice = crate::decode(
+        &mut bindings,
+        named_binding(&tree, b"Connector 65535, procedure 4294967295"),
+        crate::ui::Act::Press,
+    )
+    .unwrap();
     drive(&mut d, Event::Act { act: choice });
     let (tree, mut bindings) = build(&d, 3, words);
     let edit = crate::decode(
         &mut bindings,
         named_binding(&tree, b"Goal budget"),
-        crate::Act::Input { value: Box::from(b"4".as_slice()) },
+        crate::ui::Act::Input { value: Box::from(b"4".as_slice()) },
     )
     .unwrap();
     let exact = GoalExecutor::Procedure { connector: u16::MAX, code: u32::MAX };
@@ -753,7 +756,7 @@ fn the_tabs_mark_the_addresss_own_section_current() {
             "{section:?}"
         );
         assert_eq!(
-            crate::decode(&mut bindings, tab.binding.unwrap().token, crate::Act::Press),
+            crate::decode(&mut bindings, tab.binding.unwrap().token, crate::ui::Act::Press),
             Some(Act::Go { address: Address::Task { task: 8, section } }),
             "{section:?}"
         );

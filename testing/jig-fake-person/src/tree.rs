@@ -2,7 +2,7 @@
 //! The preorder subtree sizes scope queries (client/domain/view.md, section 3).
 use crate::{Face, Find, Found, Target};
 use alloc::vec::Vec;
-use jig_view::Act;
+use jig_view::ui::Act;
 use jig_view::ui::{Node, NodeId, Role, State, Tree};
 
 /// An immediate face over the last tree shown to the person.

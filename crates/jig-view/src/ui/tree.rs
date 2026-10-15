@@ -242,11 +242,11 @@ pub struct Node {
     pub picture: Option<Picture>,
     pub text: List<TextRun>,
     pub value: Option<Value>,
-    pub link: Option<crate::Binding>,
+    pub link: Option<crate::ui::Binding>,
     /// A checked external Markdown target, independent of application addresses.
     pub external: Option<Box<[u8]>>,
     pub key: Option<Key>,
-    pub binding: Option<crate::Binding>,
+    pub binding: Option<crate::ui::Binding>,
     pub slot: Option<SlotRef>,
     pub drawing: Option<Drawing>,
 }
@@ -354,7 +354,7 @@ impl Tree {
     /// Resolve an act's token in this displayed tree. A removed or unbound node
     /// gives nothing. A link's address binding also names its navigation act.
     #[must_use]
-    pub fn bound(&self, id: NodeId) -> Option<crate::Binding> {
+    pub fn bound(&self, id: NodeId) -> Option<crate::ui::Binding> {
         if id == NodeId(0) {
             return None;
         }
@@ -364,14 +364,14 @@ impl Tree {
 
     /// Resolve the whole shell act; the owner interprets its token and value.
     #[must_use]
-    pub fn act(&self, id: NodeId, act: crate::Act) -> Option<crate::BoundAct> {
+    pub fn act(&self, id: NodeId, act: crate::ui::Act) -> Option<crate::ui::BoundAct> {
         let binding = self.bound(id)?;
-        Some(crate::BoundAct { binding, act })
+        Some(crate::ui::BoundAct { binding, act })
     }
 
     /// Ask the view root to translate this link owner's address for the shell.
     #[must_use]
-    pub fn address(&self, id: NodeId) -> Option<crate::Binding> {
+    pub fn address(&self, id: NodeId) -> Option<crate::ui::Binding> {
         if id == NodeId(0) {
             return None;
         }

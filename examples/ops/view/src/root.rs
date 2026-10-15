@@ -8,8 +8,9 @@ use crate::{
 };
 use jig_ops_domain_client::Domain;
 use jig_ops_domain_connectors::Connector;
+use jig_view::ui::Act;
 use jig_view::ui::{Builder, NodeId, Patch, Role, Tree};
-use jig_view::{Act, JigBindings, Owner};
+use jig_view::{JigBindings, Owner};
 
 use skein_lib::Queue;
 /// The composed semantic tree and its owner binding tables.

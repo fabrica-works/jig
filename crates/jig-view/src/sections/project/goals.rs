@@ -28,8 +28,8 @@ pub enum Field {
 pub fn edit(form: GoalForm, field: Field, value: &[u8]) -> Option<Act> {
     let mut form = form;
     match field {
-        Field::Budget => form.budget = crate::number(value)?,
-        Field::Priority => form.priority = u32::try_from(crate::number(value)?).ok()?,
+        Field::Budget => form.budget = crate::ui::number(value)?,
+        Field::Priority => form.priority = u32::try_from(crate::ui::number(value)?).ok()?,
         Field::Deadline => {
             form.deadline = if value.is_empty() { None } else { Some(crate::confirmation::amendment::deadline(value)?) }
         }

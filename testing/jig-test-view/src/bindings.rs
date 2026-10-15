@@ -1,7 +1,8 @@
 //! Family meanings are rebuilt with each tree; no token is reused (view.md, 5).
 use jig_domain_client::contract::{ObjectKey, Revision};
 use jig_test_domain_client::first;
-use jig_view::{Act, Binding, Owner};
+use jig_view::Owner;
+use jig_view::ui::{Act, Binding};
 use skein_lib::{List, Token};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Meaning {
@@ -77,7 +78,7 @@ pub fn decode(bindings: &Bindings, token: Token, act: Act) -> Option<first::Act>
                         Some(first::Act::Parameters {
                             object: *object,
                             revision: *revision,
-                            value: jig_view::number(&value)?,
+                            value: jig_view::ui::number(&value)?,
                         })
                     }
                     Act::Press | Act::Submit | Act::Toggle | Act::Drawing { .. } => None,

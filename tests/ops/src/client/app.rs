@@ -9,8 +9,9 @@ use jig_ops_domain_client::{
 };
 use jig_ops_domain_connectors::{Connector, number};
 use jig_ops_view as view;
+use jig_view::Owner;
+use jig_view::ui::Act;
 use jig_view::ui::{NodeId, Patch, Role, Tree};
-use jig_view::{Act, Owner};
 
 use skein_lib::{Duration, Env, Queue, RequestEnvelope, RequestLimits, Time};
 

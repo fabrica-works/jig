@@ -4,7 +4,7 @@
 use super::{App, CardKey, Duty, Fault, Front, FrontFault, Observation, StoreWrite};
 use crate::model::Model;
 use jig_fake_person::{Doing, Next, Person, RandomDoing, RandomPerson, Step, TreeFace};
-use jig_view::Act;
+use jig_view::ui::Act;
 use jig_view::ui::{NodeId, Tree};
 use skein_lib::{Duration, Env, Queue, Rng, Time, Wall};
 use skein_world::domain::{Referee, Schedule, Span, Trace, Verdict};

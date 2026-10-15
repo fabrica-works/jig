@@ -112,7 +112,7 @@ fn exact_part_slots_keep_separate_literal_segments_all_owner_kinds_and_numeric_k
             assert_eq!(slot.owner, (crate::Owner::Application { number: u16::MAX }).opaque());
             assert_eq!(bindings.owner_part(slot.token), Some(&reference));
             assert_eq!(bindings.part(slot.token), None);
-            assert_eq!(crate::decode(&mut bindings, slot.token, crate::Act::Press), None);
+            assert_eq!(crate::decode(&mut bindings, slot.token, crate::ui::Act::Press), None);
             match &reference.key {
                 OwnerPartKey::Path(segments) => {
                     assert_eq!(segments.len(), 2);
@@ -131,7 +131,7 @@ fn exact_part_slots_keep_separate_literal_segments_all_owner_kinds_and_numeric_k
             }
             bindings.begin();
             assert_eq!(bindings.owner_part(slot.token), None, "a departed tree's exact part token is retired");
-            assert_eq!(crate::decode(&mut bindings, slot.token, crate::Act::Press), None);
+            assert_eq!(crate::decode(&mut bindings, slot.token, crate::ui::Act::Press), None);
         }
     }
 }

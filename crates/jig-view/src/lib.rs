@@ -43,7 +43,7 @@ pub use owner::Owner;
 pub mod ui;
 pub mod words;
 
-pub use binding::{Act, Binding, BoundAct, JigBindings, JigMeaning, decode, jig_bindings_worst_case, number};
+pub use binding::{JigBindings, JigMeaning, decode, jig_bindings_worst_case};
 pub use limits::{Limits, worst_case};
 pub use pages::{after_page, jig};
 pub use sizes::{

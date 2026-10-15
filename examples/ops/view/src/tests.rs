@@ -850,7 +850,7 @@ fn moving_an_environment_end_names_the_end_revision_and_waits_for_the_final_enve
         })
         .unwrap()
         .id;
-    let action = crate::decode(&mut view, field, jig_view::Act::Input { value: Box::from(*b"900") }).unwrap();
+    let action = crate::decode(&mut view, field, jig_view::ui::Act::Input { value: Box::from(*b"900") }).unwrap();
     drive(&mut root, Event::Act { action });
     while patches.pop().is_some() {}
     build(&mut view, &root, &mut patches);
@@ -861,7 +861,7 @@ fn moving_an_environment_end_names_the_end_revision_and_waits_for_the_final_enve
         .find(|n| n.role == jig_view::ui::Role::Button && n.name.as_deref() == Some(b"Move end".as_slice()))
         .unwrap()
         .id;
-    let action = crate::decode(&mut view, button, jig_view::Act::Press).unwrap();
+    let action = crate::decode(&mut view, button, jig_view::ui::Act::Press).unwrap();
     assert!(drive(&mut root, Event::Act { action }).is_empty());
     let mut out = Queue::with_capacity(root::max_out(&limits()));
     root::take(&mut root, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits() }, &mut out);
@@ -1741,7 +1741,7 @@ fn native_environment_form_uses_the_supplied_request_revision_and_keeps_whole_wi
     assert_eq!(field.value.as_ref().expect("native value").written, 17);
     let field = field.id;
     assert_eq!(
-        crate::decode(&mut view, field, jig_view::Act::Input { value: Box::from(*b"18446744073709551614") }),
+        crate::decode(&mut view, field, jig_view::ui::Act::Input { value: Box::from(*b"18446744073709551614") }),
         Some(jig_ops_domain_client::Action::Infrastructure(infrastructure::Act::NativeUntil {
             object: id.token(),
             revision: Revision { value: 17 },

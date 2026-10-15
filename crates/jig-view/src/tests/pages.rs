@@ -61,7 +61,7 @@ pub(super) fn special_pages(words: &crate::words::Words) {
     drive(&mut d, Event::SignedOut);
     let (tree, mut bindings) = build(&d, 2, words);
     assert_eq!(
-        crate::decode(&mut bindings, named_binding(&tree, b"Sign in with Organization"), crate::Act::Press),
+        crate::decode(&mut bindings, named_binding(&tree, b"Sign in with Organization"), crate::ui::Act::Press),
         Some(jig_domain_client::action::Act::SignIn { provider: 3 })
     );
     let (mut d, f) = start();
@@ -165,14 +165,14 @@ fn inbox_edges(words: &crate::words::Words) {
         assert!(contains(&tree, label));
     }
     assert_eq!(
-        crate::decode(&mut bindings, named_binding(&tree, b"Read later"), crate::Act::Press),
+        crate::decode(&mut bindings, named_binding(&tree, b"Read later"), crate::ui::Act::Press),
         Some(jig_domain_client::action::Act::More {
             window: Token::new(jig_domain_client::pages::conversations::INBOX_WINDOW),
             end: jig_domain_client::action::End::After
         })
     );
     assert_eq!(
-        crate::decode(&mut bindings, named_binding(&tree, b"Goal 7"), crate::Act::Press),
+        crate::decode(&mut bindings, named_binding(&tree, b"Goal 7"), crate::ui::Act::Press),
         Some(jig_domain_client::action::Act::FilterInbox {
             filter: jig_domain_client::pages::inbox::Filter { project: None, kind: None, goal: Some(7) }
         })
@@ -242,7 +242,7 @@ fn inbox_committed_read_position(words: &crate::words::Words) {
     let (tree, mut bindings) = build(&d, 0, words);
     assert!(contains(&tree, b"Read earlier"));
     assert!(contains(&tree, b"Read later"));
-    let act = crate::decode(&mut bindings, named_binding(&tree, b"Read earlier"), crate::Act::Press).unwrap();
+    let act = crate::decode(&mut bindings, named_binding(&tree, b"Read earlier"), crate::ui::Act::Press).unwrap();
     let out = drive(&mut d, Event::Act { act });
     assert!(out.iter().any(|r| match r {
         Request::Read { what: Read::Inbox { after: Some(cursor), .. }, .. } => cursor.value.bytes() == b"earlier",
@@ -273,13 +273,13 @@ fn conversations_form(words: &crate::words::Words) {
         assert!(contains(&tree, label) || tree.nodes().iter().any(|n| n.name.as_deref() == Some(label)));
     }
     assert_eq!(
-        crate::decode(&mut bindings, named_binding(&tree, b"Start a conversation"), crate::Act::Press),
+        crate::decode(&mut bindings, named_binding(&tree, b"Start a conversation"), crate::ui::Act::Press),
         Some(jig_domain_client::action::Act::StartChat { project: 4 })
     );
     let edit = crate::decode(
         &mut bindings,
         named_binding(&tree, b"First words"),
-        crate::Act::Input { value: b"Hello".to_vec().into_boxed_slice() },
+        crate::ui::Act::Input { value: b"Hello".to_vec().into_boxed_slice() },
     )
     .unwrap();
     drive(&mut d, Event::Act { act: edit });
@@ -398,7 +398,7 @@ fn conversation_states(words: &crate::words::Words) {
         assert_eq!(keyed[0].a, 2);
         assert_eq!(keyed[1].a, 1);
         assert_eq!(
-            crate::decode(&mut bindings, named_binding(&tree, b"Task 2: Help"), crate::Act::Press),
+            crate::decode(&mut bindings, named_binding(&tree, b"Task 2: Help"), crate::ui::Act::Press),
             Some(jig_domain_client::action::Act::OpenChat { task: 2 })
         );
     }
@@ -449,7 +449,7 @@ fn inbox_group_controls_decode_independent_windows() {
     let mut acts = Vec::new();
     for node in tree.nodes() {
         if node.name.as_deref() == Some(b"Read later".as_slice()) {
-            acts.push(crate::decode(&mut bindings, node.binding.unwrap().token, crate::Act::Press).unwrap());
+            acts.push(crate::decode(&mut bindings, node.binding.unwrap().token, crate::ui::Act::Press).unwrap());
         }
     }
     assert_eq!(

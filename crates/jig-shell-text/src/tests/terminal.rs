@@ -1,6 +1,6 @@
 use super::fixtures;
 use crate::{Command, Settings, Terminal};
-use jig_view::Act;
+use jig_view::ui::Act;
 use jig_view::ui::Tree;
 use skein_io::kernel::Fd;
 use skein_lib::{Duration, Time};

@@ -5,8 +5,9 @@ use crate::{
     family, words,
 };
 use jig_test_domain_client::{Connector, Domain, first};
+use jig_view::ui::Act;
 use jig_view::ui::{Builder, NodeId, Patch, Role, Tree};
-use jig_view::{Act, JigBindings, Owner};
+use jig_view::{JigBindings, Owner};
 
 use skein_lib::Queue;
 #[derive(Debug)]
