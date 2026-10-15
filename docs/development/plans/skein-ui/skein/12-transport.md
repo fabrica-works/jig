@@ -203,11 +203,16 @@ Files: `crates/skein-ui-web/src/{fetch.rs, fetch/web.rs (the stream),
 Shape: `Fetch::open_stream(path, headers, bound)`, a piece handed in
   parts past the bound, `read_on()` after the step; `hidden::Hidden`
   (a deadline a minute after hidden; an opening while hidden held until
-  shown); the stream's event data one note record in base64.
+  shown); the stream's event data one note record in base64; the
+  view live from the list's answer, read after the stream opened, until
+  the stream ends, the status saying `Live` then and `Offline`
+  otherwise, an add's failed exchange leaving it as it is (examples.md
+  9.2, skein `1ff0531`; `state.rs:70` today ends it on any failure).
 Test shape: `src/tests/fetch.rs`: `a_piece_past_its_bound_comes_in_parts`;
   `src/tests/hidden.rs`: `the_stream_goes_a_minute_after_the_tab_hides`,
   `an_opening_while_hidden_waits_for_shown`; view:
-  `a_note_seen_twice_shows_once`; story
+  `a_note_seen_twice_shows_once`,
+  `live_from_the_lists_answer_until_the_stream_ends`; story
   `a_note_added_in_one_page_shows_in_another` (two people). Step tests
   under 20 ms; the story about 3 s.
 Proof: live, `heavy --gate scripts/check.sh` once: the two-person

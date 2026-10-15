@@ -126,21 +126,27 @@ Removes: nothing.
 
 ### 14.3 A write refused
 Scope: ui-web.md 10 (the bound), 14.2 (a write refused).
-Needs: 14.2; skein 12.3 (the add written to the small store).
+Needs: 14.2; skein 12.3 (the add written to the small store); skein
+  12.4 (the live status the story sees first, examples.md 9.2).
 Files: `examples/ui/view/src/places.rs` and `state.rs`
   (`/test/small-store`); `examples/ui/shell-web/src/lib.rs` (the shell
   makes the small store, 12.3: at `/test/small-store`, under
   `cfg(debug_assertions)`, its bound below an add's record);
   `testing/skein-fake-person-browser/src/stories.rs` (`write_refused`);
   `tests/ui-web/tests/browser_stories.rs`.
-Shape: `stories::write_refused(setup, address, script, absent)`: the
-  person's script, opened at `address`, makes a step that writes past
-  the bound; a second person then opens the application at `/` and
-  `absent` (what the refused step would have made) is not there, a
-  `Gone` step within 1 s. Each person's page opens at `/` at the start
-  and all play at once (`harness.rs:382-414, 486-489`), so the second
-  person's `Play` waits on a flag the first's sets when it is done, then
-  goes to `/` and plays `Gone`.
+Shape: `stories::write_refused(setup, address, script, absent,
+  loaded)`: the person's script, opened at `address`, makes a step that
+  writes past the bound; a second person then opens the application at
+  `/`, sees `loaded` (what a page shows once it holds its server's
+  state: a `See` step within 5 s), and only then sees `absent` (what the
+  refused step would have made) gone, a `Gone` step within 1 s. Each
+  person's page opens at `/` at the start and all play at once
+  (`harness.rs:382-414, 486-489`), so the second person's `Play` waits
+  on a flag the first's sets when it is done, then goes to `/` and plays `See` on `loaded`, then `Gone` on `absent`. A
+  `Gone` passes the first time its find is absent
+  (`testing/skein-fake-person/src/lib.rs:233`), which a page still
+  reading its list gives too: `loaded` comes first (ui-web.md 14.2,
+  skein `1ff0531`).
 Test shape: story `a_refused_write_makes_no_note`. About 3 s.
 Proof: live, `heavy --gate scripts/check.sh` once: the story passes.
   Bound: 15 minutes.
@@ -159,13 +165,13 @@ Files: `testing/skein-fake-person-browser/src/stories.rs`
   `Step::Forward`, the kit's `Compose`, `Type` and `Go::Back`,
   `Go::Forward`) and `src/face.rs` (`perform`, 135-145, which takes an
   act, `Go` and a reload alone); `tests/ui-web/tests/browser_stories.rs`.
-Shape: `stories::typing_while_patched(setup, field, second, arrives)`:
-  the first person composes in `field`, sees `arrives` gone (a `Gone`
-  step: the page that showed the field shows no patch yet), and sets a
-  flag the second person's `Play` waits on, as 14.3's second person
-  does; the second's act then patches the first's page, and the first
-  sees `arrives` (a `See` step within 5 s) before it types again; the
-  field keeps its focus, its caret and its words (the harness's
+Shape: `stories::typing_while_patched(setup, field, second, arrives,
+  loaded)`: the first person sees `loaded` (a `See` step within 5 s),
+  composes in `field`, sees `arrives` gone (a `Gone` step, which means
+  something only once `loaded` is seen), and sets a flag the second
+  person's `Play` waits on, as 14.3's second person does; the second's
+  act then patches the first's page, and the first sees `arrives` (a
+  `See` step within 5 s) before it types again; the field keeps its focus, its caret and its words (the harness's
   `Compose`, then its `Type`, the kit's `Type` inserting at the caret,
   which the person's `Input`, a whole value, cannot show); `stories::back_and_forward(setup, first, second)`:
   two addresses and what each shows, back and forward between them, and
@@ -189,13 +195,13 @@ Removes: nothing.
 pub struct Shown<'a> { pub address: &'a [u8], pub sees: Find }
 // Each story returns `#[must_use]` (pedantic clippy's `must_use_candidate`).
 #[must_use]
-pub fn typing_while_patched(setup: &Setup<'_>, field: Find, second: &mut dyn Play, arrives: Find) -> Outcome;
+pub fn typing_while_patched(setup: &Setup<'_>, field: Find, second: &mut dyn Play, arrives: Find, loaded: Find) -> Outcome;
 #[must_use]
 pub fn back_and_forward(setup: &Setup<'_>, first: Shown<'_>, second: Shown<'_>) -> Outcome;
 #[must_use]
 pub fn panic(setup: &Setup<'_>, address: &[u8], failed: Find) -> Outcome;
 #[must_use]
-pub fn write_refused(setup: &Setup<'_>, address: &[u8], script: &mut dyn Play, absent: Find) -> Outcome;
+pub fn write_refused(setup: &Setup<'_>, address: &[u8], script: &mut dyn Play, absent: Find, loaded: Find) -> Outcome;
 ```
 
 ## Questions to raise when reached
