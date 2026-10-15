@@ -1,0 +1,26 @@
+# skein-ui: later
+
+What the design names but this plan does not do. The user's scope
+(2026-10-15, decisions.md, 1): skein's UI layer whole, and of jig only
+what the extraction needs. jig's new primitives wait for the analysis
+of jig's boundary with applications, which may change them.
+
+| Item | Design | When |
+|---|---|---|
+| jig's frame parts (`frame.rs`'s banner, navigation, link part) as primitives an application places or omits, and `after_page` split into the owed cards, the confirmation and the notices | jig's `client/domain/view.md`, 4.1; `pages.md`, 1, 2, 9 and 12 | waits for the analysis of jig's boundary with applications |
+| jig's cards as defaults; an application presenting jig's objects itself through jig's binding constructors | jig's `client/domain/objects.md`, 2; `view.md`, 4; `root.md`, 7, 9 and 15 | waits for the analysis of jig's boundary with applications |
+| `jig_view::facts` and `jig_view::check`, and the referee running jig's check ("a decision was seen") | jig's `client/domain/view.md`, 4; `testing.md`, 2, 3, 4, 6 and 8 | waits for the analysis of jig's boundary with applications |
+| The link told where the application shows jig's link part or its own presentation of the link's state | jig's `client/domain/client.md`, 8.2; `testing.md`, 2 | waits for the analysis of jig's boundary with applications |
+| jig's reduced `jig-shell-web`: the sign-in part, the link's adapter and jig's look (`jig.css`, pictures, the parts' words) over `skein-ui-web` | jig's `protocol/browser.md`; `protocol/client.md`, 8, 10, 12 | waits for the analysis of jig's boundary with applications |
+| jig's reference shell, `jig-test-shell-web`, the engine's serving of the bundle under `/jig/client/`, jig's default codec, jig's stories for a browser shell and jig's browser tier, its wasm32 builds | jig's `protocol/browser.md`, 1 to 19; `protocol/service.md`, 7 and 8; `protocol/configuration.md`, 3; `client/domain/testing.md`, 1 to 4, 8 and 9 | waits for the analysis of jig's boundary with applications |
+| `ops`'s browser shell over skein's browser parts and jig's | jig's `examples.md`, 8 and 9.1 | waits for jig's browser layer, above |
+| jig's own drawing code (`draw.rs`, drawing no kind) and jig's drawing kinds | jig's `client/domain/view.md`, 16 and 17 | waits for jig's browser layer; kinds for a second application drawing the same kind |
+| The vocabulary that waits: a combo box, a slider and a meter, a switch, media, a feed and its act for an end reached, a list box choosing several, a tree grid; right-to-left text | skein's `ui.md`, 4.2, 18 and 19 | each when an application needs it, by the light path (`ui.md`, 4.3) |
+| The file picker part, and parts for other effects | skein's `ui-web.md`, 11 and 15 | the first application asking for a file; a second application writing the same effect |
+| The bundle served compressed; tabs of one person sharing one stream; HTTP/2 | skein's `ui-web.md`, 15 | a bundle whose size over the network matters; HTTP/2 in skein's HTTP |
+| A server keeping the previous bundle's digest directory | skein's `ui.md`, 19; `ui-web.md`, 16 | an application serving a new bundle while people keep tabs open |
+| A markup macro for the builder | skein's `ui.md`, 19 | plain calls proving unreadable for whole pages |
+| The text shell's own words in another language; a secret typed without echo | skein's `ui-text.md`, 9 | a second language; a design of a command that says a secret comes |
+| Parts for a phone or a desktop | skein's `ui.md`, 16 and 18 | an application shipping on that platform |
+| The native shell split into parts (`jig-shell-native` stays one crate, carrying jig's link, not the tree) | jig's `STATUS.md`, "jig on skein-ui" | the user's decision, default later |
+| Repinning the repository downstream of jig onto this plan's jig, which renames the tree's types it uses and drops `State::Provisional` (decisions.md, 3) | development.md, 5.7 | that repository's next plan, after its own active run |
