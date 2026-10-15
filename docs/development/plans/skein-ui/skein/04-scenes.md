@@ -39,7 +39,7 @@ line per mark, a group's marks indented (ui.md, 17).
   `group +X,Y`, `line X,Y X,Y`, `polyline X,Y X,Y …`, `path M X,Y L
   X,Y Q X,Y X,Y C X,Y X,Y X,Y Z`, `rect X,Y WxH rR`, `circle X,Y rR`,
   `text X,Y start|middle|end "BYTES"`; then ` [O:N …]` for its tokens
-  (owner and number), ` hint="…"` and ` act=HEX` where present. Bytes
+  (owner and token), ` hint="…"` and ` act=HEX` where present. Bytes
   outside printable ASCII print as `\xHH`.
 
 ## Rules that bind it
@@ -61,17 +61,22 @@ Needs: skein 01.3 (the moved crates, whose fixtures' `Limits` it
   changes; nothing in skein-ui changes between skein 01.1 and 01.3).
 Files: new `crates/skein-ui/src/scene.rs`; `crates/skein-ui/src/limits.rs`
   (`Limits`, two fields; jig's limits.rs:11-26 at the base);
-  `crates/skein-ui/src/lib.rs`; every literal of skein-ui's `Limits`
-  in skein (`rg -n 'Limits \{' crates/skein-ui crates/skein-ui-text
-  testing/skein-fake-person examples/ui`; at jig's base the three
-  fixtures' `LIMITS`: `crates/jig-view/src/tests/tree.rs:16`, moved to
-  `src/tests/fixtures.rs`; `crates/jig-shell-text/src/tests/fixtures.rs:4`;
-  `testing/jig-fake-person/src/tests.rs:31`; and the example's
-  `examples/ui/view/src/limits.rs` if skein 10.1 has landed); new
-  `src/tests/scene.rs`.
-Shape: as the sketch. A mark's bytes (its text, hint, act and path
-  commands, a command 1 byte plus its points' 4 bytes each) count
-  against `scene_bytes`; marks, groups included, against `scene_marks`;
+  `crates/skein-ui/src/lib.rs` (`pub mod scene`: skein 09 names
+  `skein_ui::scene::Draw`); every literal of skein-ui's `Limits` in
+  skein (`rg -n 'Limits \{' crates/skein-ui crates/skein-ui-text
+  testing/skein-fake-person examples/ui tests/ui-text`, a path not made
+  yet skipped; at skein `a37b22a`: `crates/skein-ui/src/tests/fixtures.rs:3`,
+  `crates/skein-ui/src/tests/diff.rs:13`,
+  `crates/skein-ui/src/tests/slots.rs:5`,
+  `crates/skein-ui-text/src/tests/fixtures.rs:5`; then
+  `testing/skein-fake-person/src/tests.rs`, from jig's
+  `testing/jig-fake-person/src/tests.rs:34`; `tests/ui-text/src/lib.rs`
+  if skein 05.1 has landed; and the example's
+  `examples/ui/view/src/limits.rs` if skein 10.1 has); new
+  `src/tests/scene.rs`, and `mod scene;` in `src/tests.rs`.
+Shape: as the sketch. A mark's bytes (its text, hint and act bytes,
+  its path commands, a command 1 byte plus its points' 4 bytes each, and
+  a polyline's points, 4 bytes each) count against `scene_bytes`; marks, groups included, against `scene_marks`;
   a mark's tokens at most `styles_per_node`.
 Test shape: `src/tests/scene.rs`: `a_mark_past_scene_marks_refuses_the_scene`,
   `bytes_past_scene_bytes_refuse_the_scene`,
@@ -141,7 +146,8 @@ Files: new `tests/ui/{Cargo.toml (skein-ui-tests), src/lib.rs (a page
   limits). The pattern: `tests/json/tests/memory.rs` (its `Counting`
   and `Meter`, `testing/skein-heap`).
 Shape: `worst_case(&Limits)` adds a scene's capacity
-  (`Scene::new`'s reservations at `scene_marks` and `scene_bytes`).
+  (`Scene::new`'s reservations at `scene_marks` and `scene_bytes`, and
+  its tokens, `scene_marks × styles_per_node` `Style`s).
   `skein_ui_tests::full_page(&Limits, &mut Builder)` builds a tree with
   every node holding the most text the limits allow.
 Test shape: `tests/ui/tests/memory.rs`: `the_view_holds_no_more_than_its_worst_case`
@@ -162,12 +168,16 @@ Removes: nothing.
 // The shell owns a Scene per drawing it draws; drawing code writes it.
 
 /// Whole pixels from the box's top left.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Point { pub x: u16, pub y: u16 }
 /// Where a text mark's point is.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Anchor { Start, Middle, End }
 /// A path's commands.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Command { Move(Point), Line(Point), Quadratic(Point, Point), Cubic(Point, Point, Point), Close }
 /// One mark, its bytes in the scene's store.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Mark {
     Group { offset: Point, marks: u32 },
     Line { from: Point, to: Point },
@@ -177,11 +187,15 @@ pub enum Mark {
     Circle { centre: Point, radius: u16 },
     Text { at: Point, anchor: Anchor },
 }
+#[derive(Debug)]
 pub struct Scene { /* marks, their bytes, refused */ }
 impl Scene {
+    #[must_use]
     pub fn new(limits: &Limits) -> Scene;
     pub fn clear(&mut self);
+    #[must_use]
     pub fn refused(&self) -> bool;
+    #[must_use]
     pub fn marks(&self) -> &[Mark];
     /// Each writer adds one mark with its tokens; false once refused.
     pub fn group(&mut self, offset: Point, marks: u32, styles: &[Style]) -> bool;

@@ -188,7 +188,9 @@ Files: `crates/skein-ui/src/{tree.rs (Role, Sort, Node.sort),
   builder.rs (sort, spans on headers, bind's role list), diff.rs}`;
   `crates/skein-ui-text/src/render.rs` (the role match, jig's
   render.rs:129-215; a row's join, 179-193; the choice's mark,
-  227-228); `crates/skein-ui-text/src/tests/fixtures.rs` (a select of
+  227-228); `crates/skein-ui-text/src/command.rs` (its match over
+  `Role`, 74-119: an option a `Press`, a select and the headers no
+  act); `crates/skein-ui-text/src/tests/fixtures.rs` (a select of
   three options, one selected; a table with a column header carrying a
   sort and a row header) and `src/tests/golden/roles.txt`;
   `testing/skein-fake-person/src/tree.rs` (`role_name`, jig's
