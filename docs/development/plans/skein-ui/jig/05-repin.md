@@ -90,6 +90,12 @@ Removes: nothing.
   page then lost), and raise it as a question with the trace. Do not
   re-seed it, and change neither the referee nor jig's client in
   05.1.
+  Raised and answered (2026-10-15T17:40:29Z): both sides were wrong. The
+  referee's is jig-05.s1. The other is the client world's: jig's
+  `client/domain/client.md` 12, "A sign-out's answer is its sign-in's",
+  has the shell drop an earlier sign-out's answer once a newer sign-in
+  is authenticated, and step jig-05.s2 makes the world's joint front do
+  so. 05.1 itself still changes neither.
 
 ## Done when
 
