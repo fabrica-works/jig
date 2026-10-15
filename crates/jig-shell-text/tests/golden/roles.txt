@@ -71,6 +71,6 @@ fragment
 Drawing:
   fallback
 Picture
-[-] States (disabled) (expanded) (busy) (current) (invalid) (pressed) (selected) (provisional)
+[-] States (disabled) (expanded) (busy) (current) (invalid) (pressed) (selected)
 - Card:
     [11] Nested

@@ -183,16 +183,9 @@ fn remaining(b: &mut Builder) {
     b.open(Role::Button);
     b.name(b"States");
     b.bind(binding());
-    for state in [
-        State::Provisional,
-        State::Selected,
-        State::Pressed,
-        State::Invalid,
-        State::Current,
-        State::Busy,
-        State::Expanded,
-        State::Disabled,
-    ] {
+    for state in
+        [State::Selected, State::Pressed, State::Invalid, State::Current, State::Busy, State::Expanded, State::Disabled]
+    {
         b.state(state);
     }
     b.style(jig_view::Style { owner: Owner::Jig.opaque(), token: 999 });

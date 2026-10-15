@@ -132,8 +132,6 @@ pub enum State {
     Pressed,
     /// The node is selected.
     Selected,
-    /// The node is provisional.
-    Provisional,
     /// The node is submitsonenter.
     SubmitsOnEnter,
 }
