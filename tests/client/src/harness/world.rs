@@ -629,7 +629,7 @@ impl<A: App, F: Front<A>> World<A, F> {
                 self.last_removed = Some((id, node));
             }
             let mut seen = A::seen(A::tree(&c.view));
-            if let Some(fault) = jig_view::outline::check(A::tree(&c.view)) {
+            if let Some(fault) = jig_view::ui::outline::check(A::tree(&c.view)) {
                 seen.push(super::Seen::Outline { fault });
             }
             Some(seen)

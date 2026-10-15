@@ -22,7 +22,7 @@ pub enum CardSeen {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Seen {
     /// The changed tree broke the page outline.
-    Outline { fault: jig_view::outline::Fault },
+    Outline { fault: jig_view::ui::outline::Fault },
     /// One card; a printed revision overrides its last delivered document's.
     Card { key: CardKey, state: CardSeen, revision: Option<u64> },
     /// Words the person is told were sent.

@@ -573,7 +573,7 @@ fn an_ops_task_page_marks_the_addresss_own_section_current() {
 #[test]
 fn an_ops_arranged_task_page_keeps_the_outline() {
     let view = arranged_task_view(jig_domain_client::address::TaskSection::Plan);
-    assert_eq!(jig_view::outline::check(view.tree()), None);
+    assert_eq!(jig_view::ui::outline::check(view.tree()), None);
 }
 
 #[test]

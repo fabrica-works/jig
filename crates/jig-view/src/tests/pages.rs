@@ -510,7 +510,7 @@ fn each_of_jigs_pages_keeps_the_outline() {
         ("page missing", Place::Missing),
     ];
     let (mut d, watch) = start();
-    assert_eq!(crate::outline::check(&whole_page(&d)), None, "starting");
+    assert_eq!(crate::ui::outline::check(&whole_page(&d)), None, "starting");
     deliver(&mut d, watch, Delivery::Frame(Box::new(document())));
     for (label, place) in rows {
         let out = drive(&mut d, Event::Went { place });
@@ -519,10 +519,10 @@ fn each_of_jigs_pages_keeps_the_outline() {
                 deliver(&mut d, watch, Delivery::Task(Box::new(super::cards_objects::task_doc(&[]))));
             }
         }
-        assert_eq!(crate::outline::check(&whole_page(&d)), None, "{label}");
+        assert_eq!(crate::ui::outline::check(&whole_page(&d)), None, "{label}");
     }
     drive(&mut d, Event::SignedOut);
-    assert_eq!(crate::outline::check(&whole_page(&d)), None, "signing in");
+    assert_eq!(crate::ui::outline::check(&whole_page(&d)), None, "signing in");
 }
 
 fn domain_with_an_owed_card() -> Domain {
@@ -571,7 +571,7 @@ fn the_owed_cards_sit_in_their_aside_after_the_main() {
     assert_eq!(tree.nodes()[owed].role, Role::Complementary);
     assert_eq!(main + usize::try_from(tree.nodes()[main].size).unwrap(), owed);
     assert!(tree.nodes()[owed].size > 1);
-    assert_eq!(crate::outline::check(&tree), None);
+    assert_eq!(crate::ui::outline::check(&tree), None);
 }
 
 #[test]

@@ -460,7 +460,7 @@ fn a_tree_breaking_the_outline_fails_the_referee() {
         Observation::Shown {
             client: ClientId(0),
             seen: vec![Seen::Outline {
-                fault: jig_view::outline::Fault { rule: jig_view::outline::Rule::BannerFirst, node: 1 },
+                fault: jig_view::ui::outline::Fault { rule: jig_view::ui::outline::Rule::OneMain, node: 2 },
             }],
         },
         &mut out,
