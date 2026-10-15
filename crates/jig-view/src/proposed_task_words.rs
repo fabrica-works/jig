@@ -94,7 +94,7 @@ impl ProposedPhrase {
             Self::PartOutbox => 5023,
             Self::PartHold => 5024,
         };
-        PhraseId { owner: Owner::Jig, number }
+        PhraseId { owner: Owner::Jig.opaque(), number }
     }
     #[must_use]
     pub fn shape(self) -> PhraseShape {

@@ -6,7 +6,7 @@ use crate::phrases::{
 };
 use skein_lib::{Duration, Wall};
 
-const ID: PhraseId = PhraseId { owner: Owner::Application { number: 4 }, number: 1 };
+const ID: PhraseId = PhraseId { owner: (Owner::Application { number: 4 }).opaque(), number: 1 };
 const LIMITS: PhraseLimits =
     PhraseLimits { languages: 2, phrases: 2, holes: 6, segments: 60, text_bytes: 200, hole_bytes: 8 };
 fn shape() -> Box<[PhraseShape]> {
@@ -68,7 +68,7 @@ fn loading_refuses_missing_phrases_wrong_holes_and_incomplete_forms() {
 
 #[test]
 fn a_language_with_a_foreign_phrase_is_refused_naming_it() {
-    let foreign = PhraseId { owner: Owner::Application { number: 4 }, number: 2 };
+    let foreign = PhraseId { owner: (Owner::Application { number: 4 }).opaque(), number: 2 };
     let mut words = language(false);
     words.phrases[0].id = foreign;
     let shapes = shape();
@@ -160,12 +160,15 @@ fn plural_selection_hole_values_and_longest_language_capacity_are_checked() {
 )]
 fn shuffled_languages_keep_owner_scoped_ids_capacities_and_whole_load_refusals() {
     let rows = [
-        (PhraseId { owner: Owner::Application { number: u16::MAX }, number: 0 }, b"other maximum".as_slice()),
-        (PhraseId { owner: Owner::Jig, number: u16::MAX }, b"jig maximum".as_slice()),
-        (PhraseId { owner: Owner::Application { number: 5 }, number: 1 }, b"side five".as_slice()),
-        (PhraseId { owner: Owner::Application { number: 6 }, number: 1 }, b"other four".as_slice()),
-        (PhraseId { owner: Owner::Jig, number: 1 }, b"jig one".as_slice()),
-        (PhraseId { owner: Owner::Application { number: 4 }, number: 1 }, b"side four".as_slice()),
+        (
+            PhraseId { owner: (Owner::Application { number: u16::MAX }).opaque(), number: 0 },
+            b"other maximum".as_slice(),
+        ),
+        (PhraseId { owner: Owner::Jig.opaque(), number: u16::MAX }, b"jig maximum".as_slice()),
+        (PhraseId { owner: (Owner::Application { number: 5 }).opaque(), number: 1 }, b"side five".as_slice()),
+        (PhraseId { owner: (Owner::Application { number: 6 }).opaque(), number: 1 }, b"other four".as_slice()),
+        (PhraseId { owner: Owner::Jig.opaque(), number: 1 }, b"jig one".as_slice()),
+        (PhraseId { owner: (Owner::Application { number: 4 }).opaque(), number: 1 }, b"side four".as_slice()),
     ];
     let shapes = rows
         .iter()
@@ -201,7 +204,7 @@ fn shuffled_languages_keep_owner_scoped_ids_capacities_and_whole_load_refusals()
         assert_eq!(book.capacity(id), Some(u32::try_from(bytes.len().checked_mul(2).unwrap()).unwrap()));
         assert_eq!(book.clone().say(1, id, &[]), book.say(1, id, &[]));
     }
-    let absent = PhraseId { owner: Owner::Application { number: 7 }, number: 1 };
+    let absent = PhraseId { owner: (Owner::Application { number: 7 }).opaque(), number: 1 };
     assert_eq!(book.capacity(absent), None);
     assert_eq!(book.say(0, absent, &[]), Err(Invalid::Unknown { id: absent }));
     assert_eq!(book.jig_capacity(), None, "partial jig words do not compose a complete jig page");

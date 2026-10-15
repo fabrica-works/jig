@@ -37,12 +37,14 @@ pub mod frame;
 mod frame_facts;
 mod limits;
 pub mod markdown;
+mod owner;
 pub mod phrases;
 pub mod regions;
 mod render;
 mod runtime;
 mod sizes;
 mod tree;
+pub use owner::Owner;
 pub mod words;
 
 pub use binding::{Act, Binding, BoundAct, JigBindings, JigMeaning, decode, jig_bindings_worst_case, number};
@@ -59,8 +61,8 @@ pub use sizes::{
     result_nodes, task_header_nodes, task_nodes, task_section_nodes,
 };
 pub use tree::{
-    Drawing, DrawingKind, Key, Modifier, Node, NodeId, Owner, Picture, Region, Role, Run, Shortcut, SlotRef, State,
-    Style, TextRun, Tree, Value,
+    Drawing, DrawingKind, Key, Modifier, Node, NodeId, Picture, Region, Role, Run, Shortcut, SlotRef, State, Style,
+    TextRun, Tree, Value,
 };
 pub use turns::conversation;
 

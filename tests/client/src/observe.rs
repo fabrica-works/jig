@@ -21,7 +21,7 @@ pub fn key(object: ObjectKey) -> CardKey {
         ObjectKey::Result(task) => (5, task, 0),
         ObjectKey::Note { project, note } => (6, u64::from(project), note),
     };
-    CardKey::of(Key { owner: Owner::Jig, kind, a, b })
+    CardKey::of(Key { owner: Owner::Jig.opaque(), kind, a, b })
 }
 #[must_use]
 pub fn sent(request: &Request) -> Option<Sent> {
@@ -245,7 +245,9 @@ fn contains(tree: &Tree, start: usize, end: usize, role: Role, name: &[u8]) -> b
                 && !tree.nodes()[start + 1..=at].iter().enumerate().any(|(offset, n)| {
                     (n.key.is_some_and(card_key)
                         || (n.role == Role::Item
-                            && n.key.is_some_and(|key| matches!(key.owner, Owner::Application { .. }))))
+                            && n.key.is_some_and(|key| {
+                                matches!(Owner::from_opaque(key.owner), Some(Owner::Application { .. }))
+                            })))
                         && start + 1 + offset + usize::try_from(n.size).expect("subtree") > at
                 })
         }
@@ -266,11 +268,12 @@ fn explained(tree: &Tree, start: usize, end: usize) -> bool {
     through <= end && tree.nodes()[at..through].iter().any(|n| !n.text.is_empty())
 }
 fn card_key(k: Key) -> bool {
-    match k.owner {
-        Owner::Jig => k.kind <= 6 || k.kind == 29,
-        Owner::Application { number: connector } => {
+    match Owner::from_opaque(k.owner) {
+        Some(Owner::Jig) => k.kind <= 6 || k.kind == 29,
+        Some(Owner::Application { number: connector }) => {
             connector == domain::FIRST && ((10..=16).contains(&k.kind) || k.kind == 19 || k.kind == 20)
         }
+        None => false,
     }
 }
 #[must_use]
@@ -280,7 +283,7 @@ pub fn card(tree: &Tree, node: NodeId) -> Option<CardKey> {
 /// Find a jig card using only its stable public key and tree ancestry.
 #[must_use]
 pub fn jig_card(tree: &Tree, node: NodeId) -> Option<CardKey> {
-    enclosing_card(tree, node, |key| key.owner == Owner::Jig && (key.kind <= 6 || key.kind == 29))
+    enclosing_card(tree, node, |key| key.owner == Owner::Jig.opaque() && (key.kind <= 6 || key.kind == 29))
 }
 fn enclosing_card(tree: &Tree, node: NodeId, admits: fn(Key) -> bool) -> Option<CardKey> {
     let at = tree.nodes().iter().position(|n| n.id == node)?;
@@ -343,8 +346,8 @@ fn visible(tree: &Tree, include_test_family: bool) -> Vec<Seen> {
         };
         let end = at + usize::try_from(node.size).expect("subtree");
         // Plan tree items reuse object identity, but only Item nodes are cards.
-        if (k.owner == Owner::Jig && (k.kind <= 6 || k.kind == 29) && node.role == Role::Item)
-            || (include_test_family && k.owner != Owner::Jig && card_key(k))
+        if (k.owner == Owner::Jig.opaque() && (k.kind <= 6 || k.kind == 29) && node.role == Role::Item)
+            || (include_test_family && k.owner != Owner::Jig.opaque() && card_key(k))
         {
             let deciding = contains(tree, at, end, Role::Status, b"In flight")
                 || contains(tree, at, end, Role::Status, b"Retrying")
@@ -368,7 +371,7 @@ fn visible(tree: &Tree, include_test_family: bool) -> Vec<Seen> {
             };
             seen.push(Seen::Card { key: CardKey::of(k), state, revision: None });
         }
-        if k.owner == Owner::Jig
+        if k.owner == Owner::Jig.opaque()
             && (k.kind == 25 || k.kind == 26)
             && !contains(tree, at, end, Role::Status, b"Being sent")
         {
@@ -461,12 +464,12 @@ mod tests {
         };
         let mut view = View::new(&limits);
         let mut builder = view.builder();
-        let card = Key { owner: Owner::Jig, kind: 0, a: 9, b: 0 };
+        let card = Key { owner: Owner::Jig.opaque(), kind: 0, a: 9, b: 0 };
         builder.open(Role::Page);
         builder.open(Role::Item);
         builder.key(card);
         builder.open(Role::Item);
-        builder.key(Key { owner: Owner::Application { number: 77 }, kind: 2, a: 1, b: 5 });
+        builder.key(Key { owner: (Owner::Application { number: 77 }).opaque(), kind: 2, a: 1, b: 5 });
         builder.open(Role::Status);
         builder.name(b"Gone");
         builder.close();
@@ -505,7 +508,7 @@ mod tests {
                 Proposer::Task(_) => 1,
                 Proposer::Party(_) => 29,
             };
-            assert_eq!(card, CardKey::of(Key { owner: Owner::Jig, kind, a: u64::MAX, b: u64::MAX }));
+            assert_eq!(card, CardKey::of(Key { owner: Owner::Jig.opaque(), kind, a: u64::MAX, b: u64::MAX }));
             let sent = super::jig_sent(
                 skein_lib::Token::new(1),
                 [7; 16],
@@ -513,7 +516,7 @@ mod tests {
             );
             assert_eq!(sent.card, Some(card.clone()));
             builder.open(Role::Item);
-            builder.key(Key { owner: Owner::Jig, kind, a: u64::MAX, b: u64::MAX });
+            builder.key(Key { owner: Owner::Jig.opaque(), kind, a: u64::MAX, b: u64::MAX });
             builder.text(jig_view::Run::Plain, b"supplied proposal");
             builder.close();
             expected.push(Seen::Card { key: card, state: CardSeen::Waiting, revision: None });

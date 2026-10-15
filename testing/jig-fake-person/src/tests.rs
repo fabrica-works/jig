@@ -49,7 +49,7 @@ fn build(fill: impl FnOnce(&mut Builder)) -> View {
     view
 }
 fn binding(n: u64) -> Binding {
-    Binding { owner: Owner::Jig, token: Token::new(n) }
+    Binding { owner: Owner::Jig.opaque(), token: Token::new(n) }
 }
 fn region(name: &[u8]) -> Target {
     Target::Role { role: Role::Region, name: Box::from(name) }
@@ -84,7 +84,12 @@ fn fixture() -> View {
         b.bind(binding(4));
         b.state(State::Disabled);
         b.close();
-        b.drawing(DrawingKind { owner: Owner::Application { number: 1 }, kind: 1 }, b"Error rate", b"secret data", 32);
+        b.drawing(
+            DrawingKind { owner: (Owner::Application { number: 1 }).opaque(), kind: 1 },
+            b"Error rate",
+            b"secret data",
+            32,
+        );
         b.text(Run::Plain, b"30 % since 10:02");
         b.close();
         b.close();

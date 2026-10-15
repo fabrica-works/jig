@@ -64,7 +64,7 @@ impl MilestonePhrase {
     #[must_use]
     pub const fn id(self) -> PhraseId {
         PhraseId {
-            owner: Owner::Jig,
+            owner: Owner::Jig.opaque(),
             number: match self {
                 Self::Milestone => 8100,
                 Self::Task => 8101,

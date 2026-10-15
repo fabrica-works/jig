@@ -14,7 +14,7 @@ pub const LIMITS: Limits = Limits {
     markdown_depth: 2,
 };
 pub fn binding() -> Binding {
-    Binding { owner: Owner::Jig, token: Token::new(1) }
+    Binding { owner: Owner::Jig.opaque(), token: Token::new(1) }
 }
 pub fn page(main: fn(&mut Builder)) -> Tree {
     let mut b = Builder::new(&LIMITS);
@@ -173,12 +173,12 @@ fn remaining(b: &mut Builder) {
     b.open(Role::Slot);
     b.text(Run::Plain, b"fragment");
     b.close();
-    b.drawing(jig_view::DrawingKind { owner: Owner::Jig, kind: 1 }, b"Drawing", b"", 8);
+    b.drawing(jig_view::DrawingKind { owner: Owner::Jig.opaque(), kind: 1 }, b"Drawing", b"", 8);
     b.text(Run::Plain, b"fallback");
     b.close();
     b.open(Role::Image);
     b.name(b"Picture");
-    b.picture(jig_view::Picture { owner: Owner::Jig, number: 2 });
+    b.picture(jig_view::Picture { owner: Owner::Jig.opaque(), number: 2 });
     b.close();
     b.open(Role::Button);
     b.name(b"States");
@@ -195,7 +195,7 @@ fn remaining(b: &mut Builder) {
     ] {
         b.state(state);
     }
-    b.style(jig_view::Style { owner: Owner::Jig, token: 999 });
+    b.style(jig_view::Style { owner: Owner::Jig.opaque(), token: 999 });
     b.shortcut(jig_view::Shortcut { key: b's', modifier: jig_view::Modifier::Alt });
     b.close();
 }

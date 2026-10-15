@@ -37,7 +37,7 @@ impl InboxPhrase {
     #[must_use]
     pub const fn id(self) -> PhraseId {
         PhraseId {
-            owner: Owner::Jig,
+            owner: Owner::Jig.opaque(),
             number: match self {
                 Self::Question => 8200,
                 Self::TaskProposal => 8201,

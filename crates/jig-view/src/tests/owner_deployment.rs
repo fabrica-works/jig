@@ -695,7 +695,10 @@ fn deployment_view_configured_empty_and_clipped_catalogues_are_distinct_and_slot
     let slots: Vec<_> = tree.nodes().iter().filter_map(|n| n.slot).collect();
     assert_eq!(
         slots.iter().map(|s| s.owner).collect::<Vec<_>>(),
-        vec![crate::Owner::Application { number: u16::MAX }, crate::Owner::Application { number: 0 }]
+        vec![
+            (crate::Owner::Application { number: u16::MAX }).opaque(),
+            (crate::Owner::Application { number: 0 }).opaque()
+        ]
     );
     assert!(!contains(&tree, b"No configured connectors"));
 }

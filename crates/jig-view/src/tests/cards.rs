@@ -211,7 +211,7 @@ fn frame_builds_statuses_counts_navigation_and_number_submission_in_every_link_s
         crate::frame::navigation(
             &mut b,
             &d,
-            SlotRef { owner: Owner::Application { number: 1 }, token: Token::new(1) },
+            SlotRef { owner: (Owner::Application { number: 1 }).opaque(), token: Token::new(1) },
             words,
             &mut bindings,
         );

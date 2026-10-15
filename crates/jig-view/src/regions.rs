@@ -158,7 +158,7 @@ impl JigRegion {
             Self::OutOfDate => 46,
             Self::SomeoneElse => 47,
         };
-        Region { owner: Owner::Jig, number }
+        Region { owner: Owner::Jig.opaque(), number }
     }
     #[must_use]
     pub fn of(number: u16) -> Option<JigRegion> {

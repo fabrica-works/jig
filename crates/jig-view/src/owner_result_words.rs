@@ -115,7 +115,7 @@ impl ResultPhrase {
             Self::StatusUnknown => 6221,
             Self::Cut => 6222,
         };
-        PhraseId { owner: Owner::Jig, number }
+        PhraseId { owner: Owner::Jig.opaque(), number }
     }
     /// Typed hole contract independent of language order.
     #[must_use]

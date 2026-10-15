@@ -12,7 +12,7 @@ use jig_test_domain_client::{
 use jig_view::{Builder, Key, Owner, Role, SlotRef, State, phrases::Hole};
 use skein_lib::{Decimal, Id, Token};
 pub const NAV: SlotRef =
-    SlotRef { owner: Owner::Application { number: jig_test_domain_client::FIRST }, token: Token::new(0) };
+    SlotRef { owner: (Owner::Application { number: jig_test_domain_client::FIRST }).opaque(), token: Token::new(0) };
 /// A fragment includes a document heading, drawing fallback, card status and form.
 pub const PART_NODES: u32 = 39;
 pub const NAV_NODES: u32 = 2;
@@ -45,7 +45,7 @@ pub fn page(b: &mut Builder, side: &first::Side, words: &Words, jig: &jig_view::
             }
             for section in document.sections().into_boxed() {
                 let binding = bindings.insert(Meaning::Section(section));
-                b.slot(SlotRef { owner: Owner::Jig, token: binding.token }, &words.say(Word::Loading, &[]));
+                b.slot(SlotRef { owner: Owner::Jig.opaque(), token: binding.token }, &words.say(Word::Loading, &[]));
             }
         }
         Value::Known(Document::Part(_) | Document::Connector(_))
@@ -57,7 +57,7 @@ pub fn page(b: &mut Builder, side: &first::Side, words: &Words, jig: &jig_view::
 }
 fn jig_slot(b: &mut Builder, key: ObjectKey, words: &Words, bindings: &mut Bindings) {
     let binding = bindings.insert(Meaning::Object(key));
-    b.slot(SlotRef { owner: Owner::Jig, token: binding.token }, &words.say(Word::Loading, &[]));
+    b.slot(SlotRef { owner: Owner::Jig.opaque(), token: binding.token }, &words.say(Word::Loading, &[]));
 }
 pub fn part(
     b: &mut Builder,

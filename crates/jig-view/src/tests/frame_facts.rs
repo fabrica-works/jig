@@ -21,7 +21,7 @@ fn frame_tree(domain: &Domain, words: &crate::words::Words) -> Tree {
     crate::frame::navigation(
         &mut builder,
         domain,
-        SlotRef { owner: Owner::Application { number: 1 }, token: Token::new(1) },
+        SlotRef { owner: (Owner::Application { number: 1 }).opaque(), token: Token::new(1) },
         words,
         &mut bindings,
     );
@@ -257,7 +257,7 @@ fn the_banner_holds_link_needs_party_projects_and_task_in_order() {
         let node = shown.get(at).unwrap();
         assert_eq!(node.role, Role::Region);
         let region = node.region.unwrap();
-        assert_eq!(region.owner, Owner::Jig);
+        assert_eq!(region.owner, Owner::Jig.opaque());
         regions.push(crate::regions::JigRegion::of(region.number).unwrap().name()).unwrap();
         at += node.size;
     }
@@ -281,7 +281,7 @@ fn the_navigation_landmark_ends_with_the_applications_slot() {
         at += usize::try_from(last.size).unwrap();
     }
     assert_eq!(last.role, Role::Slot);
-    assert_eq!(last.slot, Some(SlotRef { owner: Owner::Application { number: 1 }, token: Token::new(1) }));
+    assert_eq!(last.slot, Some(SlotRef { owner: (Owner::Application { number: 1 }).opaque(), token: Token::new(1) }));
 }
 
 #[test]

@@ -4,7 +4,7 @@ use jig_view::phrases::Hole;
 use jig_view::{Builder, DrawingKind, Owner};
 pub const BYTES: u32 = 8;
 pub const KIND: DrawingKind =
-    DrawingKind { owner: Owner::Application { number: jig_test_domain_client::FIRST }, kind: 1 };
+    DrawingKind { owner: (Owner::Application { number: jig_test_domain_client::FIRST }).opaque(), kind: 1 };
 pub fn value(b: &mut Builder, words: &Words, value: u64) {
     let bytes = value.to_le_bytes();
     b.drawing(KIND, &words.say(Word::Drawing, &[]), &bytes, BYTES);

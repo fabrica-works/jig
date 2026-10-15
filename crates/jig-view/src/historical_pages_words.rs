@@ -54,7 +54,7 @@ impl HistoricalPhrase {
     #[must_use]
     pub const fn id(self) -> PhraseId {
         PhraseId {
-            owner: Owner::Jig,
+            owner: Owner::Jig.opaque(),
             number: match self {
                 Self::EndedDelegates => 9500,
                 Self::EndedRow => 9501,

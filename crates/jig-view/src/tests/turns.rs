@@ -585,7 +585,7 @@ fn maximum_raw_live_calls_fit_whole_page_and_escaped_phrase_capacities() {
     assert!(crate::jig(
         &mut b,
         &d,
-        crate::SlotRef { owner: crate::Owner::Application { number: 1 }, token: Token::new(1) },
+        crate::SlotRef { owner: (crate::Owner::Application { number: 1 }).opaque(), token: Token::new(1) },
         words,
         &mut bindings
     ));
@@ -814,7 +814,7 @@ fn maximum_independent_current_call_fits_page_with_all_existing_provisional_rows
     assert!(crate::jig(
         &mut b,
         &d,
-        crate::SlotRef { owner: crate::Owner::Application { number: 1 }, token: Token::new(1) },
+        crate::SlotRef { owner: (crate::Owner::Application { number: 1 }).opaque(), token: Token::new(1) },
         words,
         &mut bindings
     ));

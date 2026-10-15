@@ -110,8 +110,8 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
     for pass in 0..2 {
         for slot in builder.slots(pass) {
             let mut fragment = Builder::new(&view.limits.tree);
-            let filled = match slot.reference.owner {
-                Owner::Jig => {
+            let filled = match Owner::from_opaque(slot.reference.owner) {
+                Some(Owner::Jig) => {
                     let key = match view.observability.object(slot.reference.token) {
                         Some(key) => Some(key),
                         None => view.infrastructure.object(slot.reference.token),
@@ -140,7 +140,7 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
                         },
                     }
                 }
-                Owner::Application { number } => match jig_ops_domain_connectors::connector(number) {
+                Some(Owner::Application { number }) => match jig_ops_domain_connectors::connector(number) {
                     Some(Connector::Observability) => {
                         if slot.reference == observability::NAV {
                             observability::navigation(
@@ -191,6 +191,7 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
                     },
                     None => false,
                 },
+                None => false,
             };
             if filled {
                 builder.splice(slot.id, fragment);
@@ -257,15 +258,16 @@ fn infrastructure_part(bindings: &JigBindings, token: skein_lib::Token) -> Optio
 #[expect(clippy::manual_map, reason = "step code explicitly wraps the owner action")]
 pub fn decode(view: &mut View, node: NodeId, act: Act) -> Option<Action> {
     let bound = view.render.act(node, act)?;
-    match bound.binding.owner {
-        Owner::Jig => match jig_view::decode(&mut view.jig, bound.binding.token, bound.act) {
+    match Owner::from_opaque(bound.binding.owner) {
+        Some(Owner::Jig) => match jig_view::decode(&mut view.jig, bound.binding.token, bound.act) {
             Some(value) => Some(Action::Jig(value)),
             None => None,
         },
-        Owner::Application { number } => match jig_ops_domain_connectors::connector(number) {
+        Some(Owner::Application { number }) => match jig_ops_domain_connectors::connector(number) {
             Some(Connector::Observability) => bindings::decode(&view.observability, bound.binding.token, bound.act),
             Some(Connector::Infrastructure) => bindings::decode(&view.infrastructure, bound.binding.token, bound.act),
             None => None,
         },
+        None => None,
     }
 }

@@ -69,8 +69,8 @@ pub(crate) fn slots(view: &mut View<'_>, root: &Domain, b: &mut Builder) {
     for pass in 0..2 {
         for slot in b.slots(pass) {
             let mut fragment = Builder::new(&view.limits.tree);
-            let filled = match slot.reference.owner {
-                Owner::Jig => match view.first.object(slot.reference.token) {
+            let filled = match Owner::from_opaque(slot.reference.owner) {
+                Some(Owner::Jig) => match view.first.object(slot.reference.token) {
                     Some(key) => match root.jig().objects().find(key) {
                         Some(id) => jig_view::cards::card(
                             &mut fragment,
@@ -89,7 +89,7 @@ pub(crate) fn slots(view: &mut View<'_>, root: &Domain, b: &mut Builder) {
                         None => false,
                     },
                 },
-                Owner::Application { number } => match Connector::of(number) {
+                Some(Owner::Application { number }) => match Connector::of(number) {
                     Some(Connector::First) => {
                         if slot.reference == family::NAV {
                             family::navigation(&mut fragment, view.navigation, view.first_words, &mut view.first);
@@ -144,6 +144,7 @@ pub(crate) fn slots(view: &mut View<'_>, root: &Domain, b: &mut Builder) {
                     },
                     None => false,
                 },
+                None => false,
             };
             if filled {
                 b.splice(slot.id, fragment);
@@ -189,17 +190,18 @@ fn second(
 #[expect(clippy::manual_map, reason = "step code matches optional owner actions explicitly")]
 pub fn decode(view: &mut View<'_>, node: NodeId, act: Act) -> Option<Action> {
     let bound = view.render.act(node, act)?;
-    match bound.binding.owner {
-        Owner::Jig => match jig_view::decode(&mut view.jig, bound.binding.token, bound.act) {
+    match Owner::from_opaque(bound.binding.owner) {
+        Some(Owner::Jig) => match jig_view::decode(&mut view.jig, bound.binding.token, bound.act) {
             Some(action) => Some(Action::Jig(action)),
             None => None,
         },
-        Owner::Application { number } => match Connector::of(number) {
+        Some(Owner::Application { number }) => match Connector::of(number) {
             Some(Connector::First) => match bindings::decode(&view.first, bound.binding.token, bound.act) {
                 Some(action) => Some(Action::First(action)),
                 None => None,
             },
             Some(Connector::Second) | None => None,
         },
+        None => None,
     }
 }

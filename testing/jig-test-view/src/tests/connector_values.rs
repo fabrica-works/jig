@@ -208,7 +208,8 @@ fn connector_values_view_preserves_literal_segment_boundaries_and_each_outbox_sc
         assert_eq!(literal, 2, "request and description own separate complete paths");
         assert!(!contains(&tree, b"Owner proposal reference:"));
         assert!(tree.nodes().iter().any(|node| {
-            node.key.is_some_and(|key| key.owner == Owner::Application { number: jig_test_domain_client::FIRST })
+            node.key
+                .is_some_and(|key| key.owner == (Owner::Application { number: jig_test_domain_client::FIRST }).opaque())
         }));
     }
 }

@@ -15,7 +15,7 @@ const LIMITS: Limits = Limits {
 };
 
 fn reference(number: u64) -> SlotRef {
-    SlotRef { owner: Owner::Application { number: 1 }, token: Token::new(number) }
+    SlotRef { owner: (Owner::Application { number: 1 }).opaque(), token: Token::new(number) }
 }
 
 fn page() -> Builder {

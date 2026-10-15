@@ -306,7 +306,7 @@ impl App for Ops {
                 attempt: *attempt,
                 key: *key,
                 card: Some(CardKey::of(jig_view::Key {
-                    owner: jig_view::Owner::Application { number: 2 },
+                    owner: (jig_view::Owner::Application { number: 2 }).opaque(),
                     kind: 12,
                     a: 0,
                     b: object.raw(),
@@ -376,7 +376,7 @@ impl App for Ops {
             .filter(|(i, n)| *i + usize::try_from(n.size).expect("subtree") > at)
             .filter_map(|(_, n)| {
                 n.key.filter(|k| {
-                    matches!(k.owner, Owner::Application { number: connector } if connector == number(Connector::Infrastructure))
+                    matches!(Owner::from_opaque(k.owner), Some(Owner::Application { number: connector }) if connector == number(Connector::Infrastructure))
                         && matches!(k.kind, 2 | 12)
                         && n.role == Role::Item
                 })

@@ -53,7 +53,7 @@ impl AmendmentPhrase {
             Self::Dependencies => 7109,
             Self::DependenciesCut => 7110,
         };
-        PhraseId { owner: Owner::Jig, number }
+        PhraseId { owner: Owner::Jig.opaque(), number }
     }
     fn numbered(self) -> bool {
         match self {

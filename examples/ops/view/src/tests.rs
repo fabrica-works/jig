@@ -373,8 +373,12 @@ fn public_effect_fragments_keep_equal_task_and_party_makers_separate() {
     let mut patches = Queue::with_capacity(view.limits().tree.patches);
     build(&mut view, &root, &mut patches);
     for kind in [5, 10] {
-        let expected =
-            jig_view::Key { owner: jig_view::Owner::Application { number: 2 }, kind, a: u64::MAX, b: u64::MAX };
+        let expected = jig_view::Key {
+            owner: (jig_view::Owner::Application { number: 2 }).opaque(),
+            kind,
+            a: u64::MAX,
+            b: u64::MAX,
+        };
         assert_eq!(view.tree().nodes().iter().filter(|node| node.key == Some(expected)).count(), 1);
     }
     assert!(contains(&view, b"Loading"));
@@ -1105,7 +1109,7 @@ fn actual_outbox_entries_render_from_their_explicit_scope_and_keep_proposal_keys
             PartScope::Deployment => u64::MAX,
         };
         let expected_key =
-            jig_view::Key { owner: jig_view::Owner::Application { number: 2 }, kind: 6, a: value, b: 17 };
+            jig_view::Key { owner: (jig_view::Owner::Application { number: 2 }).opaque(), kind: 6, a: value, b: 17 };
         assert!(view.tree().nodes().iter().any(|node| node.key == Some(expected_key)));
         assert!(contains(&view, b"Outbox entry 17"));
         assert!(contains(&view, b"Sent"));
@@ -1228,10 +1232,10 @@ fn resource_slots_preserve_whole_opaque_segments_and_distinct_equal_concatenatio
     for (slot, part) in slots.iter().zip(&expected) {
         assert_eq!(jig_bindings.part(slot.reference.token), Some(part));
         let mut fragment = jig_view::Builder::new(&tree_limits);
-        if slot.reference.owner == (jig_view::Owner::Application { number: 1 }) {
+        if slot.reference.owner == ((jig_view::Owner::Application { number: 1 }).opaque()) {
             crate::observability::part(&mut fragment, &obs, part, 11, &obs_words, &mut obs_bindings);
         } else {
-            assert_eq!(slot.reference.owner, jig_view::Owner::Application { number: 2 });
+            assert_eq!(slot.reference.owner, (jig_view::Owner::Application { number: 2 }).opaque());
             crate::infrastructure::part(&mut fragment, &infra, part, 11, &infra_words, &jig_words, &mut infra_bindings);
         }
         builder.splice(slot.id, fragment);

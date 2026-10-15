@@ -318,7 +318,7 @@ impl ChipPhrase {
             Self::PoolLost => 7097,
             Self::HoldProcedure => 7098,
         };
-        PhraseId { owner: Owner::Jig, number }
+        PhraseId { owner: Owner::Jig.opaque(), number }
     }
     #[expect(clippy::too_many_lines, reason = "one total table keeps the closed phrase shapes together")]
     fn hole(self) -> Option<HoleKind> {

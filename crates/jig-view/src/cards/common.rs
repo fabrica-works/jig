@@ -90,7 +90,10 @@ pub fn part(b: &mut Builder, part: &Part, words: &Words, bindings: &mut JigBindi
         | Part::Deployment { connector } => *connector,
     };
     let token = bindings.insert(JigMeaning::Part(part.clone())).token;
-    b.slot(SlotRef { owner: Owner::Application { number: connector }, token }, &words.say(JigPhrase::LoadingPart, &[]));
+    b.slot(
+        SlotRef { owner: (Owner::Application { number: connector }).opaque(), token },
+        &words.say(JigPhrase::LoadingPart, &[]),
+    );
 }
 /// Closing keeps only engine-owned delegate counts and the connectors it waits on.
 /// The connector's words fill a name-only part; effect details remain in its task panel.

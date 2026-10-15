@@ -1329,7 +1329,7 @@ fn closing_connectors_use_their_owners_words(words: &crate::words::Words) {
             Part::Connector { connector } => *connector,
             _ => panic!("a name-only connector part"),
         };
-        assert_eq!(slot.reference.owner, crate::Owner::Application { number: connector });
+        assert_eq!(slot.reference.owner, (crate::Owner::Application { number: connector }).opaque());
         let mut own = Builder::new(&limits());
         own.open(Role::Region);
         own.text(crate::Run::Plain, if connector == 7 { b"amber" } else { b"blue" });
@@ -1645,7 +1645,7 @@ fn equal_number_proposal_makers_keep_distinct_card_keys_words_and_decoding() {
         let mut bindings = JigBindings::new(64, CLIENT.text);
         let tree = render(&d, id, words, &mut bindings);
         assert!(contains(&tree, label));
-        let expected = crate::Key { owner: crate::Owner::Jig, kind, a: u64::MAX, b: u64::MAX };
+        let expected = crate::Key { owner: crate::Owner::Jig.opaque(), kind, a: u64::MAX, b: u64::MAX };
         assert!(tree.nodes().iter().any(|node| node.role == Role::Item && node.key == Some(expected)));
         assert_eq!(crate::pages::object_key(key), expected);
         shown.push(expected);
@@ -1931,7 +1931,7 @@ fn connector_effect_slots_keep_raw_numbers_separate_from_jig_proposal_makers() {
         builder.close();
         let tree = builder.finish();
         let slot = tree.nodes().iter().find_map(|node| node.slot).unwrap();
-        assert_eq!(slot.owner, crate::Owner::Application { number: connector });
+        assert_eq!(slot.owner, (crate::Owner::Application { number: connector }).opaque());
         assert_eq!(bindings.part(slot.token), Some(&native));
         for proposer in [Proposer::Task(proposal), Proposer::Party(proposal)] {
             let maker_effect = Part::Effect { connector, proposal: ProposalKey { proposer, number: proposal } };

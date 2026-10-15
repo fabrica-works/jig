@@ -270,7 +270,7 @@ fn owner_entry(
         OwnerInboxObject::Reply { message } => (55, task, message),
         OwnerInboxObject::Result { position } => (56, task, position),
     };
-    b.key(crate::Key { owner: crate::Owner::Jig, kind, a, b: value });
+    b.key(crate::Key { owner: crate::Owner::Jig.opaque(), kind, a, b: value });
     match entry.object {
         OwnerInboxObject::Question { message } => owner_text(b, words, InboxPhrase::Question, &[Hole::Number(message)]),
         OwnerInboxObject::Proposal { proposer, number } => match proposer {

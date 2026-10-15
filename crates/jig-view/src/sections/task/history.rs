@@ -26,12 +26,12 @@ pub(super) fn history(b: &mut Builder, client: &Domain, words: &Words, bindings:
         match row {
             HistoryRow::Line(row) => line(b, row, words, bindings),
             HistoryRow::Change(row) => {
-                b.key(crate::Key { owner: crate::Owner::Jig, kind: 41, a: row.task, b: row.revision });
+                b.key(crate::Key { owner: crate::Owner::Jig.opaque(), kind: 41, a: row.task, b: row.revision });
                 crate::owner_history::render(b, row, words, bindings);
                 task_link(b, row.task, words, bindings);
             }
             HistoryRow::Milestone(row) => {
-                b.key(crate::Key { owner: crate::Owner::Jig, kind: 42, a: row.task, b: row.position });
+                b.key(crate::Key { owner: crate::Owner::Jig.opaque(), kind: 42, a: row.task, b: row.position });
                 crate::owner_milestone::render(b, row, client, words, bindings);
                 task_link(b, row.task, words, bindings);
             }
@@ -61,7 +61,7 @@ fn task_link(b: &mut Builder, task: u64, words: &Words, bindings: &mut JigBindin
     );
 }
 fn line(b: &mut Builder, row: &jig_domain_client::contract::HistoryLine, words: &Words, bindings: &mut JigBindings) {
-    b.key(crate::Key { owner: crate::Owner::Jig, kind: 21, a: row.task, b: row.position });
+    b.key(crate::Key { owner: crate::Owner::Jig.opaque(), kind: 21, a: row.task, b: row.position });
     crate::frame::control(
         b,
         words,

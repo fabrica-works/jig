@@ -489,7 +489,7 @@ fn whole_page(d: &Domain) -> Tree {
     assert!(crate::jig(
         &mut b,
         d,
-        crate::SlotRef { owner: crate::Owner::Application { number: 1 }, token: Token::new(1) },
+        crate::SlotRef { owner: (crate::Owner::Application { number: 1 }).opaque(), token: Token::new(1) },
         words(),
         &mut bindings
     ));

@@ -64,7 +64,7 @@ impl BudgetPhrase {
             Self::Began => 6011,
             Self::Next => 6012,
         };
-        PhraseId { owner: Owner::Jig, number }
+        PhraseId { owner: Owner::Jig.opaque(), number }
     }
     fn hole(self) -> Option<HoleKind> {
         match self {

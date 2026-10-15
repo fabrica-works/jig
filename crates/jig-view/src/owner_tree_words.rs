@@ -87,7 +87,7 @@ impl TreePhrase {
             Self::Failed => 8320,
             Self::Cancelled => 8321,
         };
-        PhraseId { owner: Owner::Jig, number }
+        PhraseId { owner: Owner::Jig.opaque(), number }
     }
     fn hole(self) -> Option<HoleKind> {
         match self {

@@ -53,7 +53,7 @@ impl PersonPhrase {
     #[must_use]
     pub const fn id(self) -> PhraseId {
         PhraseId {
-            owner: Owner::Jig,
+            owner: Owner::Jig.opaque(),
             number: match self {
                 Self::PersonTask => 8600,
                 Self::Party => 8601,

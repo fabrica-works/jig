@@ -22,7 +22,7 @@ impl LiveCallPhrase {
             Self::FoldCurrentCallInput => 6801,
             Self::ObservedCurrentCall => 6802,
         };
-        PhraseId { owner: Owner::Jig, number }
+        PhraseId { owner: Owner::Jig.opaque(), number }
     }
 }
 #[must_use]

@@ -191,7 +191,7 @@ impl HistoryPhrase {
             Self::DependenciesAbsent => 7654,
             Self::DependenciesCut => 7655,
         };
-        PhraseId { owner: Owner::Jig, number }
+        PhraseId { owner: Owner::Jig.opaque(), number }
     }
     fn hole(self) -> Option<HoleKind> {
         match self {

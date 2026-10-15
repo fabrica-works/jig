@@ -10,13 +10,10 @@ use skein_lib::{List, Token};
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct NodeId(pub u32);
 
-/// The view child that interprets a token, key, style, region, picture or phrase.
+/// An opaque owner of tokens, keys, styles, regions, pictures and phrases.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
-pub enum Owner {
-    /// jig's own view.
-    Jig,
-    /// One of the application's owners, by the number both its roots share.
-    Application { number: u16 },
+pub struct Owner {
+    pub number: u32,
 }
 
 /// A node's meaning, mapped exhaustively by every shell.

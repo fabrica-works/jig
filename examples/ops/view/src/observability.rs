@@ -16,9 +16,10 @@ use jig_ops_domain_client::{
 use jig_view::{Builder, Key, Owner, Role, Run, SlotRef, phrases::Hole};
 use skein_lib::Token;
 pub const NAV: SlotRef = SlotRef {
-    owner: Owner::Application {
+    owner: (Owner::Application {
         number: jig_ops_domain_connectors::number(jig_ops_domain_connectors::Connector::Observability),
-    },
+    })
+    .opaque(),
     token: Token::new(0),
 };
 pub fn navigation(builder: &mut Builder, project: u32, words: &Words, bindings: &mut Bindings) {
@@ -62,11 +63,11 @@ fn plan_slot(builder: &mut Builder, task: u64, words: &Words, bindings: &mut Bin
     let section =
         jig_domain_client::pages::Section::Task { task, section: jig_domain_client::address::TaskSection::Plan };
     let binding = bindings.insert(Meaning::Section(section));
-    builder.slot(SlotRef { owner: Owner::Jig, token: binding.token }, &words.say(Word::Loading, &[]));
+    builder.slot(SlotRef { owner: Owner::Jig.opaque(), token: binding.token }, &words.say(Word::Loading, &[]));
 }
 fn jig_slot(builder: &mut Builder, key: ObjectKey, words: &Words, bindings: &mut Bindings) {
     let binding = bindings.insert(Meaning::Object(key));
-    builder.slot(SlotRef { owner: Owner::Jig, token: binding.token }, &words.say(Word::Loading, &[]));
+    builder.slot(SlotRef { owner: Owner::Jig.opaque(), token: binding.token }, &words.say(Word::Loading, &[]));
 }
 pub fn show_incident(builder: &mut Builder, incident: &Incident, words: &Words, bindings: &mut Bindings, slots: bool) {
     builder.open(Role::Region);

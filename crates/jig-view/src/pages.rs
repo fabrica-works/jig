@@ -87,7 +87,7 @@ pub(crate) fn object_key(object: jig_domain_client::contract::ObjectKey) -> crat
         ObjectKey::Result(task) => (5, task, 0),
         ObjectKey::Note { project, note } => (6, u64::from(project), note),
     };
-    crate::Key { owner: crate::Owner::Jig, kind, a, b }
+    crate::Key { owner: crate::Owner::Jig.opaque(), kind, a, b }
 }
 
 /// Build the current jig page; an application's own page returns false.

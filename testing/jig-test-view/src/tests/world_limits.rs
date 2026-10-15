@@ -38,7 +38,10 @@ fn the_worlds_original_storage_counts_construct_a_finite_view() {
     builder.open(Role::Page);
     for _ in 0_u32..256_u32 {
         builder.slot(
-            SlotRef { owner: Owner::Application { number: jig_test_domain_client::FIRST }, token: Token::new(1) },
+            SlotRef {
+                owner: (Owner::Application { number: jig_test_domain_client::FIRST }).opaque(),
+                token: Token::new(1),
+            },
             b"loading",
         );
     }
@@ -166,7 +169,10 @@ fn a_world_fixture_beyond_its_slot_bound_is_rejected() {
     let mut builder = Builder::new(&limits.tree);
     builder.open(Role::Page);
     builder.slot(
-        SlotRef { owner: Owner::Application { number: jig_test_domain_client::FIRST }, token: Token::new(1) },
+        SlotRef {
+            owner: (Owner::Application { number: jig_test_domain_client::FIRST }).opaque(),
+            token: Token::new(1),
+        },
         b"loading",
     );
 }

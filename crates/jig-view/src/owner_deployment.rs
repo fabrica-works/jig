@@ -144,7 +144,7 @@ fn run(b: &mut Builder, client: &Domain, words: &Words, value: &OwnerHostRun, bi
         words,
         P::Attempt,
         &[Hole::Number(value.attempt)],
-        Some(Key { owner: Owner::Jig, kind: 96, a: value.task.number(), b: value.attempt }),
+        Some(Key { owner: Owner::Jig.opaque(), kind: 96, a: value.task.number(), b: value.attempt }),
     );
     field_number(b, words, P::Attempt, value.attempt);
     crate::owner_result::link(b, client, &value.task, words, bindings);
@@ -477,7 +477,7 @@ fn render_hosts(b: &mut Builder, client: &Domain, value: &OwnerDeployment, words
             words,
             P::Host,
             &[Hole::Number(host.channel)],
-            Some(Key { owner: Owner::Jig, kind: 94, a: host.channel, b: 0 }),
+            Some(Key { owner: Owner::Jig.opaque(), kind: 94, a: host.channel, b: 0 }),
         );
         field_number(b, words, P::Host, host.channel);
         host_kind(b, words, host.kind);
@@ -515,7 +515,12 @@ fn render_accounts(
             words,
             P::Account,
             &[Hole::Number(u64::from(account.number))],
-            Some(Key { owner: Owner::Jig, kind: 95, a: u64::from(account.number), b: account.generation.unwrap_or(0) }),
+            Some(Key {
+                owner: Owner::Jig.opaque(),
+                kind: 95,
+                a: u64::from(account.number),
+                b: account.generation.unwrap_or(0),
+            }),
         );
         field_number(b, words, P::Account, u64::from(account.number));
         if let Some(generation) = account.generation {
@@ -577,7 +582,7 @@ pub fn render(b: &mut Builder, client: &Domain, value: &OwnerDeployment, words: 
             words,
             P::Project,
             &[Hole::Number(u64::from(project.project))],
-            Some(Key { owner: Owner::Jig, kind: 98, a: u64::from(project.project), b: 0 }),
+            Some(Key { owner: Owner::Jig.opaque(), kind: 98, a: u64::from(project.project), b: 0 }),
         );
         field_number(b, words, P::Project, u64::from(project.project));
         capacity(b, words, P::ProjectTasksCapacity, &project.tasks);
@@ -596,7 +601,7 @@ pub fn render(b: &mut Builder, client: &Domain, value: &OwnerDeployment, words: 
     list(b, words, P::PersonRefusals);
     let mut position = 0_u64;
     for value in &value.person_room_refusals {
-        region(b, words, P::PersonRefusal, &[], Some(Key { owner: Owner::Jig, kind: 99, a: position, b: 0 }));
+        region(b, words, P::PersonRefusal, &[], Some(Key { owner: Owner::Jig.opaque(), kind: 99, a: position, b: 0 }));
         field_number(b, words, P::Person, value.key.person);
         text(b, words, P::RequestKey, &[]);
         crate::literal_segment::render(b, &value.key.key);
@@ -613,7 +618,7 @@ pub fn render(b: &mut Builder, client: &Domain, value: &OwnerDeployment, words: 
     list(b, words, P::TaskRefusals);
     let mut position = 0_u64;
     for value in &value.task_room_refusals {
-        region(b, words, P::TaskRefusal, &[], Some(Key { owner: Owner::Jig, kind: 100, a: position, b: 0 }));
+        region(b, words, P::TaskRefusal, &[], Some(Key { owner: Owner::Jig.opaque(), kind: 100, a: position, b: 0 }));
         project(b, words, value.request.project);
         crate::owner_result::requester(b, value.request.by, words);
         text(b, words, P::At, &[Hole::Wall(words.adjusted_wall(value.at))]);

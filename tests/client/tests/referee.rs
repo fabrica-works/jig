@@ -18,7 +18,7 @@ enum Event {
     Answer,
 }
 struct Wire;
-const KEY: Key = Key { owner: Owner::Jig, kind: 1, a: 1, b: 1 };
+const KEY: Key = Key { owner: Owner::Jig.opaque(), kind: 1, a: 1, b: 1 };
 const LIMITS: jig_view::Limits = jig_view::Limits {
     nodes: 24,
     depth: 4,
@@ -92,7 +92,7 @@ impl<const BAD: u8> App for Broken<BAD> {
             b.text(Run::Plain, b"Revision 7");
             b.open(Role::Button);
             b.name(b"Choose");
-            b.bind(Binding { owner: Owner::Jig, token: Token::new(1) });
+            b.bind(Binding { owner: Owner::Jig.opaque(), token: Token::new(1) });
             b.close();
             b.close();
         }

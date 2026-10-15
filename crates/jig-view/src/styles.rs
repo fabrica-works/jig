@@ -26,6 +26,6 @@ impl JigStyle {
             Self::ButtonWeight => 6,
             Self::DenseList => 7,
         };
-        Style { owner: Owner::Jig, token }
+        Style { owner: Owner::Jig.opaque(), token }
     }
 }

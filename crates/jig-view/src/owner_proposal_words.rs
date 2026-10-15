@@ -80,7 +80,7 @@ impl ProposalPhrase {
     #[must_use]
     pub const fn id(self) -> PhraseId {
         PhraseId {
-            owner: Owner::Jig,
+            owner: Owner::Jig.opaque(),
             number: match self {
                 Self::Proposal => 8400,
                 Self::Number => 8401,

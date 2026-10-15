@@ -233,7 +233,7 @@ fn budget_words_check_the_whole_closed_language_holes_selection_and_offset_befor
     assert_eq!(
         OwnerBudgetWords::load(Box::new([data::language()]), &phrase_limits(), 0, 0)
             .expect_err("shared sayings must also be supplied"),
-        Invalid::Missing { id: PhraseId { owner: crate::Owner::Jig, number: 5000 } }
+        Invalid::Missing { id: PhraseId { owner: crate::Owner::Jig.opaque(), number: 5000 } }
     );
     assert_eq!(
         OwnerBudgetWords::load(Box::new([data::standalone_language()]), &phrase_limits(), 1, 0)

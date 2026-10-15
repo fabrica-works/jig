@@ -335,7 +335,7 @@ impl ActivityPhrase {
             Self::ResultFailed => 7302,
             Self::ResultCancelled => 7303,
         };
-        PhraseId { owner: Owner::Jig, number }
+        PhraseId { owner: Owner::Jig.opaque(), number }
     }
     #[expect(clippy::too_many_lines, reason = "one total data table keeps all closed activity phrase shapes together")]
     fn hole(self) -> Option<HoleKind> {

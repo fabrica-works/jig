@@ -35,7 +35,7 @@ pub(super) fn check(tree: &Tree) {
         if let Some(key) = node.key {
             assert_eq!(node.role, Role::Item);
             let card = tree.nodes().get(index.checked_add(1).unwrap()).unwrap();
-            let role = if key.owner == Owner::Jig && key.kind == 28 { Role::Log } else { Role::Region };
+            let role = if key.owner == Owner::Jig.opaque() && key.kind == 28 { Role::Log } else { Role::Region };
             assert_eq!(card.role, role);
             assert!(card.name.as_ref().is_some_and(|name| !name.is_empty()));
         }

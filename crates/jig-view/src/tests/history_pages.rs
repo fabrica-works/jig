@@ -135,7 +135,7 @@ fn whole_history_page_keeps_three_distinct_keys_stored_overrides_and_raw_slots_i
         let words = fixture::words(selected);
         let (tree, bindings) = build(&domain, &words);
         for kind in [21, 41, 42] {
-            let key = Key { owner: Owner::Jig, kind, a: u64::MAX, b: u64::MAX };
+            let key = Key { owner: Owner::Jig.opaque(), kind, a: u64::MAX, b: u64::MAX };
             assert_eq!(tree.nodes().iter().filter(|node| node.key == Some(key)).count(), 1);
             if kind != 21 {
                 let index = tree.nodes().iter().position(|node| node.key == Some(key)).unwrap();

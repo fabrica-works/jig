@@ -21,7 +21,7 @@ pub(crate) fn section(
     b.open(Role::List);
     for row in &client.conversation_rows().rows {
         b.open(Role::Item);
-        b.key(Key { owner: Owner::Jig, kind: 20, a: row.chip.task, b: 0 });
+        b.key(Key { owner: Owner::Jig.opaque(), kind: 20, a: row.chip.task, b: 0 });
         crate::frame::control(
             b,
             words,

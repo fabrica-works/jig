@@ -102,7 +102,7 @@ impl WakePhrase {
             Self::Once => 4025,
             Self::Topic => 4026,
         };
-        PhraseId { owner: Owner::Jig, number }
+        PhraseId { owner: Owner::Jig.opaque(), number }
     }
     #[must_use]
     pub fn shape(self) -> PhraseShape {

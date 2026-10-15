@@ -8,14 +8,13 @@
 pub mod english;
 pub mod jig;
 
-use crate::Owner;
 use alloc::boxed::Box;
 use skein_lib::{Decimal, Duration, List, Wall, Writer};
 
 /// A phrase in an owner's closed vocabulary.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct PhraseId {
-    pub owner: Owner,
+    pub owner: crate::tree::Owner,
     pub number: u16,
 }
 /// The declared type of a phrase's hole.

@@ -498,7 +498,7 @@ impl Word {
             Self::DeadlineSeconds => 119,
             Self::ObservedSeconds => 120,
         };
-        PhraseId { owner: Owner::Application { number: connector }, number }
+        PhraseId { owner: (Owner::Application { number: connector }).opaque(), number }
     }
 }
 #[derive(Clone, Debug)]

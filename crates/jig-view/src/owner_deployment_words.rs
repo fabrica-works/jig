@@ -449,7 +449,7 @@ impl DeploymentPhrase {
     #[expect(clippy::too_many_lines, reason = "the closed deployment vocabulary has one exhaustive mapping table")]
     pub const fn id(self) -> PhraseId {
         PhraseId {
-            owner: Owner::Jig,
+            owner: Owner::Jig.opaque(),
             number: match self {
                 Self::Deployment => 9200,
                 Self::Hosts => 9201,

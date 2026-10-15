@@ -453,7 +453,9 @@ fn buttons_and_parameter_fields_decode_to_their_owner_and_departed_nodes_are_sta
         .tree()
         .nodes()
         .iter()
-        .find(|node| node.binding.is_some_and(|binding| binding.owner == Owner::Jig) && node.role == Role::Link)
+        .find(|node| {
+            node.binding.is_some_and(|binding| binding.owner == Owner::Jig.opaque()) && node.role == Role::Link
+        })
         .unwrap()
         .id;
     let Some(crate::Action::Jig(_)) = decode(&mut view, jig_node, Act::Press) else {
@@ -844,7 +846,7 @@ fn a_slot_of_a_number_no_owner_has_is_unshowable() {
     let mut builder = jig_view::Builder::new(&view.limits().tree);
     builder.open(Role::Page);
     builder.slot(
-        jig_view::SlotRef { owner: Owner::Application { number: 9 }, token: Token::new(1) },
+        jig_view::SlotRef { owner: (Owner::Application { number: 9 }).opaque(), token: Token::new(1) },
         &words().say(jig_view::phrases::jig::JigPhrase::LoadingPart, &[]),
     );
     builder.close();
@@ -905,7 +907,7 @@ fn a_second_tasks_section_slot_says_it_cannot_be_shown() {
         .enumerate()
         .find(|(_, node)| {
             node.slot.is_some_and(|reference| {
-                reference.owner == Owner::Jig && view.first.section(reference.token) == Some(section)
+                reference.owner == Owner::Jig.opaque() && view.first.section(reference.token) == Some(section)
             })
         })
         .unwrap();

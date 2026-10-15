@@ -117,7 +117,10 @@ fn every_family_departure_fits_the_public_view_and_checked_selected_words() {
     ] {
         assert_eq!(
             word.id(),
-            jig_view::phrases::PhraseId { owner: Owner::Application { number: jig_test_domain_client::FIRST }, number }
+            jig_view::phrases::PhraseId {
+                owner: (Owner::Application { number: jig_test_domain_client::FIRST }).opaque(),
+                number
+            }
         );
         assert!(!checked.say(word, &[]).is_empty());
         assert!(checked.book.capacity(word.id()).unwrap() <= checked.capacity().unwrap());

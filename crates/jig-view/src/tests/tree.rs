@@ -20,7 +20,7 @@ fn nodes_are_preorder_and_sizes_include_descendants() {
     builder.open(Role::Page);
     builder.open(Role::List);
     builder.open(Role::Item);
-    builder.key(Key { owner: Owner::Jig, kind: 1, a: 7, b: 0 });
+    builder.key(Key { owner: Owner::Jig.opaque(), kind: 1, a: 7, b: 0 });
     builder.text(Run::Plain, b"one");
     builder.close();
     builder.open(Role::Item);
@@ -48,8 +48,8 @@ fn a_fields_own_write_count_and_semantic_attributes_are_kept() {
     builder.value(b"42", 19);
     builder.state(State::Invalid);
     builder.state(State::Invalid);
-    builder.style(Style { owner: Owner::Application { number: 3 }, token: 2 });
-    let binding = Binding { owner: Owner::Application { number: 8 }, token: Token::new(5) };
+    builder.style(Style { owner: (Owner::Application { number: 3 }).opaque(), token: 2 });
+    let binding = Binding { owner: (Owner::Application { number: 8 }).opaque(), token: Token::new(5) };
     builder.bind(binding);
     let shortcut = crate::Shortcut { key: b'a', modifier: crate::Modifier::Primary };
     builder.shortcut(shortcut);
@@ -67,7 +67,7 @@ fn a_fields_own_write_count_and_semantic_attributes_are_kept() {
 #[test]
 fn a_drawing_keeps_opaque_data_and_readable_fallback() {
     let mut builder = Builder::new(&LIMITS);
-    let kind = DrawingKind { owner: Owner::Application { number: 2 }, kind: 1 };
+    let kind = DrawingKind { owner: (Owner::Application { number: 2 }).opaque(), kind: 1 };
     builder.drawing(kind, b"Activity", b"1234", 4);
     builder.text(Run::Strong, b"four changes");
     builder.close();
@@ -82,22 +82,22 @@ fn a_drawing_keeps_opaque_data_and_readable_fallback() {
 #[should_panic(expected = "drawing fits its owner's byte bound")]
 fn a_drawing_past_its_owners_bound_asserts() {
     let mut builder = Builder::new(&LIMITS);
-    builder.drawing(DrawingKind { owner: Owner::Jig, kind: 1 }, b"name", b"12345", 4);
+    builder.drawing(DrawingKind { owner: Owner::Jig.opaque(), kind: 1 }, b"name", b"12345", 4);
 }
 
 #[test]
 #[should_panic(expected = "drawing fits its owner's byte bound")]
 fn a_drawing_past_the_trees_bound_asserts() {
     let mut builder = Builder::new(&LIMITS);
-    builder.drawing(DrawingKind { owner: Owner::Jig, kind: 1 }, b"name", b"123456789", 16);
+    builder.drawing(DrawingKind { owner: Owner::Jig.opaque(), kind: 1 }, b"name", b"123456789", 16);
 }
 
 #[test]
 #[should_panic(expected = "a drawing is shown and never bound")]
 fn a_drawing_cannot_be_bound() {
     let mut builder = Builder::new(&LIMITS);
-    builder.drawing(DrawingKind { owner: Owner::Jig, kind: 1 }, b"name", b"", 0);
-    builder.bind(Binding { owner: Owner::Jig, token: Token::new(1) });
+    builder.drawing(DrawingKind { owner: Owner::Jig.opaque(), kind: 1 }, b"name", b"", 0);
+    builder.bind(Binding { owner: Owner::Jig.opaque(), token: Token::new(1) });
 }
 
 #[test]
@@ -159,7 +159,7 @@ fn spare_node_storage_is_reused_and_replaced_bytes_are_recounted() {
 fn runs_and_link_addresses_keep_their_owner_tokens() {
     let mut builder = Builder::new(&LIMITS);
     builder.open(Role::Link);
-    let link = Binding { owner: Owner::Application { number: 1 }, token: Token::new(77) };
+    let link = Binding { owner: (Owner::Application { number: 1 }).opaque(), token: Token::new(77) };
     builder.link(link);
     builder.open(Role::Text);
     builder.run(Run::Plain, b"read ");
@@ -185,7 +185,7 @@ fn a_built_text_leaf_reserves_one_run() {
 fn a_shortcut_on_a_key_outside_letters_and_digits_is_refused() {
     let mut builder = Builder::new(&LIMITS);
     builder.open(Role::Button);
-    builder.bind(Binding { owner: Owner::Jig, token: Token::new(1) });
+    builder.bind(Binding { owner: Owner::Jig.opaque(), token: Token::new(1) });
     builder.shortcut(crate::Shortcut { key: b'!', modifier: crate::Modifier::Plain });
 }
 
@@ -194,7 +194,7 @@ fn an_image_keeps_its_owners_picture() {
     let mut builder = Builder::new(&LIMITS);
     builder.open(Role::Image);
     builder.name(b"A mark");
-    let picture = crate::Picture { owner: Owner::Application { number: 3 }, number: 7 };
+    let picture = crate::Picture { owner: (Owner::Application { number: 3 }).opaque(), number: 7 };
     builder.picture(picture);
     builder.close();
     let tree = builder.finish();

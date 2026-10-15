@@ -8,7 +8,7 @@ pub(super) fn hello(b: &mut Builder, words: &Words, value: &OwnerHelloRefusalLin
         words,
         P::Host,
         &[Hole::Number(value.channel)],
-        Some(Key { owner: Owner::Jig, kind: 97, a: position, b: value.channel }),
+        Some(Key { owner: Owner::Jig.opaque(), kind: 97, a: position, b: value.channel }),
     );
     field_number(b, words, P::Host, value.channel);
     field_number(b, words, P::Slots, u64::from(value.slots));

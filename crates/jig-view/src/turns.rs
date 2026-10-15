@@ -16,7 +16,7 @@ pub fn conversation(b: &mut Builder, client: &Domain, words: &Words, bindings: &
     let state = client.conversation();
     b.open(Role::List);
     b.open(Role::Item);
-    b.key(Key { owner: Owner::Jig, kind: 28, a: state.task, b: 0 });
+    b.key(Key { owner: Owner::Jig.opaque(), kind: 28, a: state.task, b: 0 });
     b.open(Role::Log);
     b.region(crate::regions::JigRegion::Conversation.region());
     b.name(&words.say(JigPhrase::ConversationLog, &[]));
@@ -37,7 +37,7 @@ pub fn conversation(b: &mut Builder, client: &Domain, words: &Words, bindings: &
         let key = match (line.event.committed_turn(), line.event.word_message()) {
             (Some(name), _) => turn_key(name),
             (None, Some((message, _))) => word_key(state, message),
-            (None, None) => Key { owner: Owner::Jig, kind: 27, a: state.task, b: line.position },
+            (None, None) => Key { owner: Owner::Jig.opaque(), kind: 27, a: state.task, b: line.position },
         };
         b.open(Role::Item);
         b.key(key);
@@ -111,7 +111,7 @@ fn pending(b: &mut Builder, state: &Conversation, words: &Words) {
         }
         b.open(Role::Item);
         match sent.request {
-            Some(request) => b.key(Key { owner: Owner::Jig, kind: 26, a: state.task, b: request.raw() }),
+            Some(request) => b.key(Key { owner: Owner::Jig.opaque(), kind: 26, a: state.task, b: request.raw() }),
             None => {
                 if let Some(message) = message {
                     b.key(word_key(state, message));
@@ -139,18 +139,18 @@ fn word_key(state: &Conversation, message: u64) -> Key {
                 if message == number
                     && let Some(request) = sent.request
                 {
-                    return Key { owner: Owner::Jig, kind: 26, a: state.task, b: request.raw() };
+                    return Key { owner: Owner::Jig.opaque(), kind: 26, a: state.task, b: request.raw() };
                 }
             }
             WordState::BeingSent => {}
         }
     }
-    Key { owner: Owner::Jig, kind: 25, a: state.task, b: message }
+    Key { owner: Owner::Jig.opaque(), kind: 25, a: state.task, b: message }
 }
 // Keys are matched only below matched parents (view.md, 6). The log's enclosing item
 // task key supplies the first identity; these two words keep full attempt/turn.
 fn turn_key(name: TurnName) -> Key {
-    Key { owner: Owner::Jig, kind: 24, a: name.attempt, b: u64::from(name.number) }
+    Key { owner: Owner::Jig.opaque(), kind: 24, a: name.attempt, b: u64::from(name.number) }
 }
 
 fn party(b: &mut Builder, by: &Party, words: &Words) {

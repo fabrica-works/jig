@@ -123,7 +123,7 @@ impl HistoricalPhrase {
     #[must_use]
     pub const fn id(self) -> PhraseId {
         PhraseId {
-            owner: Owner::Jig,
+            owner: Owner::Jig.opaque(),
             number: match self {
                 Self::Historical => 9600,
                 Self::At => 9601,

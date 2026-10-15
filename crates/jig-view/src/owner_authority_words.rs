@@ -77,7 +77,7 @@ impl AuthorityPhrase {
             Self::Cut => 3016,
             Self::Deadline => 3017,
         };
-        PhraseId { owner: Owner::Jig, number }
+        PhraseId { owner: Owner::Jig.opaque(), number }
     }
     fn hole(self) -> Option<HoleKind> {
         match self {

@@ -1731,7 +1731,7 @@ impl JigPhrase {
             Self::RecurringPendingPeriod => 804,
             Self::RecurringCut => 805,
         };
-        PhraseId { owner: Owner::Jig, number }
+        PhraseId { owner: Owner::Jig.opaque(), number }
     }
     /// Hole contract checked for every supplied language.
     #[must_use]

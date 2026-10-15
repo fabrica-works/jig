@@ -117,7 +117,7 @@ pub(super) fn render(d: &Domain, words: &Words) -> Tree {
     assert!(crate::jig(
         &mut b,
         d,
-        SlotRef { owner: Owner::Application { number: 1 }, token: Token::new(1) },
+        SlotRef { owner: (Owner::Application { number: 1 }).opaque(), token: Token::new(1) },
         words,
         &mut bindings
     ));
@@ -556,7 +556,7 @@ fn capacity_composes_siblings_fragments_and_application_pages_with_checked_overf
     assert!(!crate::jig(
         &mut b,
         &d,
-        SlotRef { owner: Owner::Application { number: 1 }, token: Token::new(1) },
+        SlotRef { owner: (Owner::Application { number: 1 }).opaque(), token: Token::new(1) },
         words,
         &mut bindings
     ));
