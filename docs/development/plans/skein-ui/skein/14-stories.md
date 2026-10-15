@@ -106,7 +106,11 @@ Files: new `crates/skein-ui-web/src/{restart.rs, restart/web.rs}`;
   (`panic`, setting `Setup.expected` to `Uncaught`); new
   `tests/ui-web/tests/browser_stories.rs`. The workspace denies
   `clippy::panic` (`Cargo.toml:190`): the test address panics through
-  an `assert!` on the path, not `panic!`.
+  an `assert!` on the path, not `panic!`. If ruling 124's diagnosis
+  finds a Chromium flag that stops the renderer crash on reload:
+  `testing/skein-browser/src/command.rs` (the flag, in its list at
+  47-59, and its test, `chromium_pipe_command`, 91) and
+  `tests/browser/tests/browser_facts.rs` (the reduction, as a fact).
 Shape: `restart::Restart::new(limit: 3, within: 60 s, key:
   "skein-ui-restarts", words)`; its pure half decides from the dates
   kept whether to reload or to say the words; `stories::panic(setup,

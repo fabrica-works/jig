@@ -589,6 +589,19 @@ None yet; they start at 101.
 123. **skein 13 against 12.3** (re-check of skein-13.1 after skein-12.3).
      skein 13's session file re-checked after skein 12.3 (`890b1a1`): the lines it cites moved: the view's `address` at `state.rs:145`, its limits at `limits.rs:11-18` (`bindings` now 66), its node count at `tests.rs:87` (461), the shell's `Look` literal at 56, `Dom::new` at 61 and its `href`s at 121-124; nothing else ruling 121 names changed.
 
+124. **skein 14.2's renderer crash: a bounded diagnosis** (process, skein 14's block of 2026-10-15T14:41:18Z).
+     skein 14.2's third `Crash` is a renderer crash: the kit reports `Crash` only on Chromium's `Inspector.targetCrashed` and `Target.targetCrashed` (`testing/skein-browser/src/browser.rs:1331-1349`), and the failure's Chromium stderr names no reason. The implementer's proposal holds: a diagnosis, below the story's layer, with `Setup.expected` holding `Uncaught` alone. Its bound: 25 minutes, and at most 5 runs through `heavy`, counted apart from the proof's runs; the proof runs once, after a change aimed at the cause the diagnosis names.
+
+     1. **Rebase `skein-ui/skein-14-2-restart` on skein's `origin/main` first.** Its base predates skein 12.3 (`890b1a1`), whose `a_reload_keeps_a_pending_add_made_once` (`tests/ui-web/tests/browser_example.rs:21`) reloads the example's page through the kit (`Page.reload`) and passes on `main`.
+     2. **Chromium's reason, one run.** In the worktree, not committed: add `--enable-logging=stderr` and `--log-level=0` to the list in `testing/skein-browser/src/command.rs` (47-59), and run the focused story once. The kit keeps the last 32,768 bytes of Chromium's stderr (`limits.rs:38`), which the failure prints. What counts: a line from the renderer's process near the crash naming a signal, `Check failed`, `FATAL`, `OOM` or `bad_message`. A stderr naming nothing is a finding too: go on to 3.
+     3. **The reduction, two runs.** In the kit's world package (`Rig`, `tests/browser/tests/support/real.rs:157`; `serve::Pages`, `tests/browser/src/serve.rs:52`), one scratch test with a fixed page whose inline script, once per page, guarded by a session storage key: (a) calls an export of a minimal Wasm module that executes `unreachable`, then `location.reload()` from a `setTimeout`; (b) the same with a JavaScript `throw` in place of the trap. Each run: does the kit report `Crash`?
+     4. **What follows:**
+        - The cause is skein's code (the hook, the glue, the bundle; the minimal page does not crash): fix it in 14.2; the story unchanged.
+        - Chromium crashes on the minimal page too, and a flag in the kit's command stops it: add the flag to `command.rs`'s list, with an assertion in `chromium_pipe_command` (91), and keep the reduction as a fact in `tests/browser/tests/browser_facts.rs`, beside 14.1's (ui-web.md, 14.1: the facts the face assumes). Name both in the commit body.
+        - Chromium crashes on the minimal page, and no flag stops it, or the bound is reached without a cause: stop, with a question that quotes the stderr line and each run's result. The design says the restart part reloads the page (ui-web.md, 5: "the restart part reloads the page, which starts the application again from its small store"); a change to that is the designer's.
+
+     Unchanged: the panic story's `Setup.expected` holds `Uncaught` and nothing else; no story or harness accepts `Crash`; the restart part reloads the page; the logging flags of step 2 leave the worktree once step 2 is done. A further copy of the kit's argument list that a flag would change (a test asserting the list): change it in the same commit, and list it in the commit body.
+
 ## For the user
 
 Long-term choices the user may veto; each default holds unless the user
