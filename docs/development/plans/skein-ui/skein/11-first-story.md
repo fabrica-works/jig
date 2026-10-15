@@ -276,7 +276,7 @@ impl Harness {
     pub fn new(setup: Setup<'_>) -> Harness;
     pub fn run(&mut self, people: &mut [&mut dyn Play]) -> Outcome;
 }
-// harness.rs grows `stop_server` and `start_server` in skein 12.3.
+// `Step` grows `StopServer` and `StartServer` in skein 12.3.
 ```
 
 ## Questions to raise when reached

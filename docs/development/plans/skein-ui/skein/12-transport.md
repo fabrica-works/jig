@@ -33,18 +33,27 @@ time; a hidden tab lets it go after a minute (ui-web.md, 10).
 ## Choices this plan makes
 
 - **The small store's prefix** for the example is `notes-`; its add's
-  key is `notes-add-<16 hex digits of the key>`.
+  record's key is `add-<16 hex digits of the key>`, which the store
+  puts under the prefix (`notes-` and the key's base64), not
+  `notes-add-…`, which would carry the prefix twice.
 - **The platform the store and the transport go through** is one trait,
   `skein_ui_web::platform::Platform`: 12.1 makes it with `read_all`,
   `write` and `remove` (session storage), 12.2 adds `send` and
-  `navigate`; the browser's implementation is `platform::web::Browser`,
+  `navigate`; the browser's implementation is `platform::Browser`,
+  re-exported beside `clocks` and `facts` at skein-ui-web's
+  `platform.rs:6` (`mod web` stays private, `platform.rs:4`),
   the host tests' `FakePlatform` in `crates/skein-ui-web/src/tests/
   fixtures.rs`, recording each call in order, with a quota.
-- **The harness stops and starts the server** (ui-web.md, 14.2) in
-  12.3, where a story first needs it: `Harness::stop_server(&mut self)`
-  and `Harness::start_server(&mut self)`, called by the test between
-  two `run`s, the server started again at the address it had; the pages
-  stay open across runs.
+- **The harness stops and starts the server** (ui-web.md, 14.2: "at a
+  story's step") in 12.3, where a story first needs it: the harness's
+  own steps `harness::Step::StopServer` and `harness::Step::StartServer`,
+  within one `run`, so that the pages and their session storage stay
+  open (each `run` makes its own runtime and Chromium profile,
+  `testing/skein-fake-person-browser/src/harness.rs:81-83`, and ends
+  both children, 371-381). The server starts again at the address it
+  had: its arguments' address (`args[0]`, the server's `ADDRESS
+  --bundle DIR`) replaced by the address its listening line gave, so
+  that the first start keeps port 0 and no test names a fixed port.
 
 ## Rules that bind it
 
@@ -67,8 +76,10 @@ Scope: ui-web.md 10 (the small store), 13.
 Needs: skein 11.4 (the first story).
 Files: new `crates/skein-ui-web/src/store.rs`;
   `crates/skein-ui-web/src/{platform.rs, platform/web.rs}` (the
-  `Platform` trait and `Browser`); `src/tests/store.rs`;
-  `src/tests/fixtures.rs` (`FakePlatform`).
+  `Platform` trait and `Browser`); `src/lib.rs` (`pub mod store;`,
+  beside lines 18-19); `src/tests.rs` (`mod store;`, beside 53-54);
+  `src/tests/store.rs`; `src/tests/fixtures.rs` (`FakePlatform`);
+  `crates/skein-ui-web/Cargo.toml` (web-sys `Storage`, line 16).
 Shape: `platform::Platform { fn read_all(&self) -> Vec<Record>; fn
   write(&mut self, key: &[u8], value: &[u8]) -> bool; fn remove(&mut
   self, key: &[u8]); }` (raw text records, as session storage holds
@@ -78,7 +89,7 @@ Shape: `platform::Platform { fn read_all(&self) -> Vec<Record>; fn
   example's `Record`); `write(&mut self, key, value, platform) ->
   Result<(), Refused>`, `remove(&mut self, key, platform)`; a write past
   the bound or refused by the platform is `Refused`; `Browser` over
-  `window.sessionStorage`.
+  `window.sessionStorage`, re-exported as `platform::Browser`.
 Test shape: `src/tests/store.rs`: `records_are_base64_under_the_prefix`
   (the platform's raw text literal), `a_write_past_the_bound_is_refused`,
   `records_of_another_prefix_are_not_read`. Each under 20 ms.
@@ -93,13 +104,20 @@ Scope: ui-web.md 5.3, 10 (the transport); 14 (its host tests).
 Needs: 12.1.
 Files: new `crates/skein-ui-web/src/transport.rs`;
   `src/tests/transport.rs`; `crates/skein-ui-web/src/{platform.rs,
-  platform/web.rs}` (`send`, `navigate`).
+  platform/web.rs}` (`send`, `navigate`); `src/lib.rs` (`pub mod
+  transport;`); `src/tests.rs` (`mod transport;`);
+  `crates/skein-ui-web/Cargo.toml` (web-sys `Location`).
 Shape: `Platform` gains `send` and `navigate`;
-  `transport::carry(duties: Requests, store, fetch, platform, reports:
-  &mut Vec<Carried>)`: each write, then each exchange, which `Fetch`
-  records in flight and sends through `Platform::send`, then the
-  navigation through `Platform::navigate`; on the first refused write, each
-  exchange of the step reported failed and the navigation dropped.
+  `transport::carry(duties: Requests, store, platform, reports: &mut
+  Vec<Carried>)`: each write, then each remove, then each exchange
+  through `Platform::send`, then the navigation through
+  `Platform::navigate`; on the first refused write, each exchange of
+  the step reported failed and the navigation dropped. `carry` takes no
+  `Fetch`: `platform::Browser<R>` holds the shell's
+  `fetch::web::Fetch<R>`, and its `send` calls `exchange`, which records
+  the exchange in its own pure `Fetch` (`fetch/web.rs:31-32`); a second
+  record in the transport would never finish, and past the shell's 8
+  (`examples/ui/shell-web/src/lib.rs:49`) every exchange would fail.
   `Requests { writes, removes, exchanges, stream: Option<StreamDuty>,
   navigate: Option<Box<[u8]>> }`.
 Test shape: `src/tests/transport.rs`: `writes_go_before_exchanges`
@@ -121,10 +139,26 @@ Scope: examples.md 9.1 (the form's title and the add button), 9.2 (an
 Needs: 12.2.
 Files: `examples/ui/view/src/{state.rs, view.rs}` (the form's title
   field and the add button, the add in the small store);
+  `examples/ui/view/src/limits.rs` (`bindings` 64 to 66, for the form's
+  two; at 64 notes `builder.rs:263` panics otherwise);
+  `examples/ui/view/src/tests.rs` (the tree's length at line 79, 458 to
+  462, and the step tests) and `src/tests/golden/{empty,list}.txt`
+  (checked at `src/tests/text.rs:16-30`, the links renumbered);
   `examples/ui/server/src/{lib.rs, routes.rs}` (`POST /api/notes`, one
-  note per key); `examples/ui/shell-web/src/lib.rs` (the transport, the
-  small store at start); `testing/skein-fake-person-browser/src/harness.rs`
-  (`stop_server`, `start_server`); `tests/ui-web/tests/browser_example.rs`.
+  note per key: `route` takes `&mut State` and the request's body, and
+  answers 405 to all but GET today, `routes.rs:40-41`);
+  `examples/ui/server/src/main.rs` (it routes with `&self.state` and
+  discards the body before routing, 244-248);
+  `examples/ui/server/src/tests.rs` (`route`'s calls at 34, 56, 63, 81;
+  the case at 30 posts to `/api/notes`; the server's step test goes
+  here); `tests/ui-web/tests/serve.rs` (`route`'s calls at 48, 56);
+  `examples/ui/shell-web/src/lib.rs` (the transport, the small store at
+  start); `testing/skein-fake-person-browser/src/harness.rs`
+  (`Step::StopServer`, `Step::StartServer`: `Script::new`'s map of
+  every step to a person's, line 46; the failure on a child's exit
+  before closing, 274-277; the server's root closed after its spawn,
+  238; the run's end at `closed == 2`, 520);
+  `tests/ui-web/tests/browser_example.rs`.
 Shape: the title is a text field submitting on enter (required comes
   with the whole form, skein 13.2); the
   add button adds it; the add's record is written under its key, then
@@ -134,9 +168,10 @@ Shape: the title is a text field submitting on enter (required comes
 Test shape: view step tests `an_add_is_written_before_it_is_sent`,
   `an_answered_add_leaves_the_store`, `a_pending_add_is_sent_again_at_start`;
   server step test `a_second_add_with_one_key_makes_no_second_note`;
-  story `a_reload_keeps_a_pending_add_made_once` (the server stopped; a
-  note added, its exchange failing; the server started; the page
-  reloaded; one note of that title on the list). Step tests under 20 ms; the story about 3 s.
+  story `a_reload_keeps_a_pending_add_made_once` (the harness's
+  `StopServer`; a note added, its exchange failing; `StartServer`; the
+  page reloaded; one note of that title on the list, all in one
+  `run`). Step tests under 20 ms; the story about 3 s.
 Proof: live, `heavy --gate scripts/check.sh` once: the story shows the
   transport and the store in Chromium keeping an add across a reload.
   Bound: 15 minutes.
@@ -150,10 +185,20 @@ Scope: ui-web.md 5.1 (fetch's stream, the hidden tab), 10; examples.md
 Needs: 12.3.
 Files: `crates/skein-ui-web/src/{fetch.rs, fetch/web.rs (the stream),
   hidden.rs, hidden/web.rs}`; `src/tests/{fetch.rs, hidden.rs}`;
+  `src/lib.rs` (`pub mod hidden;`); `src/tests.rs` (`mod hidden;`);
+  `crates/skein-ui-web/src/{transport.rs, platform.rs, platform/web.rs}`
+  and `src/tests/fixtures.rs` (the stream's duty through the platform:
+  12.2's `Platform` has no stream call); skein-ui-web's `Cargo.toml`
+  (the web-sys features the stream and `hidden/web.rs` use);
   `examples/ui/server/src/routes.rs` (the event stream, on
-  `skein_http`'s writer); `examples/ui/view/src/state.rs` (open the
-  stream, then read the list; apply each note by its number; the live
-  status); `examples/ui/shell-web/src/lib.rs`;
+  `skein_http`'s writer; every answer closes its connection today,
+  `close: true` at 34); `examples/ui/server/src/main.rs` (the
+  30-second deadline at 195 would drop the stream; `worst_case` at 38
+  counts each stream's writer; a new note goes out to every open
+  stream); `examples/ui/view/src/state.rs` (open the stream, then read
+  the list; apply each note by its number; the live status);
+  `examples/ui/view/src/tests/fixtures.rs` (its `Duties` at 34 gains the
+  stream's duty); `examples/ui/shell-web/src/lib.rs`;
   `tests/ui-web/tests/browser_example.rs`.
 Shape: `Fetch::open_stream(path, headers, bound)`, a piece handed in
   parts past the bound, `read_on()` after the step; `hidden::Hidden`
@@ -185,15 +230,16 @@ pub struct Requests {
     pub stream: Option<StreamDuty>,
     pub navigate: Option<Box<[u8]>>,
 }
-pub enum StreamDuty { Open { path: Box<[u8]>, bound: u32 }, Close }
+pub enum StreamDuty { Open { path: Box<[u8]>, headers: Vec<(Box<[u8]>, Box<[u8]>)>, bound: u32 }, Close }
 /// What the transport reports back into the turn, in order.
 pub enum Carried {
     Written { key: Box<[u8]> },
     Refused { key: Box<[u8]> },
     Failed { exchange: u32 },
 }
-pub fn carry<P: Platform>(requests: Requests, store: &mut Store, fetch: &mut Fetch, platform: &mut P, reports: &mut Vec<Carried>);
-/// skein_ui_web::platform::Platform: what the store and the transport
+/// Writes, then removes, then exchanges and the stream, then the navigation.
+pub fn carry<P: Platform>(requests: Requests, store: &mut Store, platform: &mut P, reports: &mut Vec<Carried>);
+/// `skein_ui_web::platform::Platform`: what the store and the transport
 /// go through, the browser's on wasm32, the fake one in the host tests.
 pub trait Platform {
     fn read_all(&self) -> Vec<Record>;
