@@ -33,7 +33,9 @@ component reports only its node's role's acts (ui-web.md, 6.1). The
 closing warning is the window's `onbeforeunload`, set only while closing
 loses requests (ui-web.md, 5.1); a go accepts it and reports `Warned`,
 and the kit dismisses any other native dialog as `Trouble` (browser.md,
-6 and 7).
+6 and 7). A native date or time field takes no inserted text: the face
+types its value by the kit's `keys`, in its parts' order under the
+kit's locale, `en-US` (ui-web.md 14.2; browser.md 3 and 6).
 
 ## Choices this plan makes
 
@@ -199,7 +201,9 @@ Removes: nothing.
 
 ### 13.2 The form whole
 Scope: examples.md 9.1 (the form), 9.5 (a required title refused in
-  words; a label chosen); ui-web.md 14 (golden pages of the example).
+  words; a label chosen); ui-web.md 14 (golden pages of the example),
+  14.1 and 14.2 (a date and a time typed by the kit's keys); browser.md
+  3 and 6 (`keys`).
 Needs: 13.1; skein 02.1 (entry kinds, descriptions), 02.4 (select,
   option), 02.5 (required).
 Files: `examples/ui/view/src/{state.rs, view.rs}` (body, due date,
@@ -222,21 +226,81 @@ Files: `examples/ui/view/src/{state.rs, view.rs}` (body, due date,
   `pierce: true`, so that a hit in a node's user-agent shadow tree is
   inside the node) and the fact
   `chromium_presses_a_select_inside_its_shadow_tree` in
-  `tests/browser/tests/browser_facts.rs`; the date field's typing waits
-  for the designer's answer to the question of 15:56.
+  `tests/browser/tests/browser_facts.rs`. The date field, typed by the
+  kit's keys (the designer's answer of 2026-10-15, skein `cef6a1a`:
+  browser.md 3 and 6; ui-web.md 14.1 and 14.2):
+  - the kit: `testing/skein-browser/src/boundary.rs`,
+    `Request::Keys { page, op, node, text }` after `Compose` (line 37);
+    `browser.rs`, admitted beside `Request::Type` and `Compose`
+    (583-594), whose `OpKind::Type { text, compose: bool }` (85, 1607)
+    becomes `OpKind::Type { text, entry: Entry }`, `enum Entry { Insert,
+    Compose, Keys }`; after `Step::Focus` (1858), `Keys` sends each
+    character's `Input.dispatchKeyEvent`, `keyDown` then `keyUp`, one
+    at a time, through `Params::Key` with the character as `key` and
+    `text`, `code` `Digit<d>` or `Key<L>` and `windowsVirtualKeyCode`
+    its uppercase ASCII code (for any other character: `code` empty,
+    0), and `Done` after the last `keyUp`, or after the focus for the
+    empty text; `key_info` (1152) stays the named keys' table; about
+    40 lines in `browser.rs`, whose split stays `later.md`'s row;
+  - the face: `testing/skein-fake-person-browser/src/face.rs`,
+    `perform`'s `Act::Input` (222-230): after the emptiness check (223,
+    unchanged), a node whose `Seen.role` is `Date` gets
+    `Request::Keys` with `keys::date(&value)`, one whose role is
+    `InputTime` gets `keys::time(&value)`, and any other node keeps
+    `Request::Type`; `None` fails the step with `field '<name>' takes
+    no value '<value>'`. New `src/keys.rs`, pure: `pub(crate) fn
+    date(value: &[u8]) -> Option<Box<[u8]>>` takes exactly
+    `DDDD-DD-DD` (digits and dashes, no range check) and gives month,
+    day, year (`2026-10-15` → `10152026`); `pub(crate) fn time(value:
+    &[u8]) -> Option<Box<[u8]>>` takes exactly `DD:DD` with the hour
+    00-23 and the minutes 00-59, and gives the hour on a 12-hour clock
+    as two digits (00 → 12, 13-23 → 01-11), the minutes, then `A`
+    before 12:00 or `P` from it; both give the empty text for the
+    empty value;
+  - the fact: `chromium_takes_a_date_and_a_time_by_the_kits_keys` in
+    `tests/browser/tests/browser_facts.rs`, with a `Scenario::Dates` on
+    `/facts` in `tests/browser/tests/support/real.rs` (beside
+    `Choose`, 130-160): find role `Date` named exactly
+    `case-entry_date`, `Keys` `10152026`; find role `InputTime` named
+    exactly `case-entry_time`, `Keys` `0230P`; then the snapshot holds
+    a line that, trimmed, starts `Date case-entry_date 2026-10-15`, and
+    one that starts `InputTime case-entry_time 14:30`;
+  - the story types `2026-10-15` as it does now: the face turns it into
+    keys.
 Shape: minutes read by `skein_ui::number`, invalid when not one; the
   due date `YYYY-MM-DD`, invalid otherwise; an empty title refused in
-  words (the field invalid, its description saying why).
+  words (the field invalid, its description saying why); a date or a
+  time typed by the kit's `keys` in its parts' order under `en-US`,
+  every other field by `type` as before.
 Test shape: view: `an_empty_title_is_refused_in_words`,
   `minutes_that_are_not_a_number_are_invalid`, `a_label_is_chosen_by_its_option`;
   `tests/ui-web/tests/pages.rs`: `the_list_page_maps_as_its_golden_html`
   (the view's patches through the page part's host half), by hand;
-  story `a_person_fills_each_entry_kind_and_chooses_a_label`. Step tests
-  under 20 ms; the story about 3 s.
-Proof: live, `heavy --gate scripts/check.sh` once: the story and the
-  golden pages pass. Bound: 15 minutes.
-Don't: check a field's words in the shell (the view's, ui.md 6).
-Size: about 250 lines.
+  story `a_person_fills_each_entry_kind_and_chooses_a_label`. The kit,
+  in `tests/browser/src/tests.rs`: `keys_type_each_character_as_its_key_down_and_up`
+  (`Keys` with `0230P` sends `DOM.focus`, then ten
+  `Input.dispatchKeyEvent` in order, each character's `keyDown` then
+  `keyUp`, then `Done`; the empty text sends the focus alone, then
+  `Done`). The face, in `src/tests.rs`:
+  `a_date_and_a_time_become_the_keys_of_their_parts` (`2026-10-15` →
+  `10152026`, `0001-12-31` → `12310001`, `00:00` → `1200A`, `09:05` →
+  `0905A`, `12:00` → `1200P`, `14:30` → `0230P`, `23:59` → `1159P`, the
+  empty value → the empty text; `2026-1-5`, `14:30:00`, `24:00` and
+  `9:05` → `None`) and `a_date_field_is_typed_by_the_kits_keys` (a seen
+  node of role `Date` and an `Input` of `2026-10-15` give
+  `Request::Keys` with `10152026`). The fact above. Step tests under
+  20 ms; the story about 3 s; the fact about 2 s.
+Proof: live, `heavy --gate scripts/check.sh` once: the story, the
+  golden pages and the facts pass. Bound: 15 minutes.
+Don't: check a field's words in the shell (the view's, ui.md 6); set a
+  field's value by a page call (`Runtime.evaluate`,
+  `DOM.setAttributeValue`): the kit runs no script in the page
+  (browser.md 1 and 4), and a person's entry sets no attribute; add
+  `--lang` to the kit's command, whose environment already fixes the
+  locale (browser.md 3); type any other field by keys: `type` still
+  inserts.
+Size: about 470 lines, up from about 250 (the kit's `keys`, the face's
+  keys and the fact: about 220).
 Removes: nothing.
 
 ### 13.3 The dialog, Escape, and a focus request
