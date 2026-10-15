@@ -295,6 +295,9 @@ None yet; they start at 101.
        crates/skein-ui-web/Cargo.toml`; `grep -n 'pub fn platform\|pub fn
        user_agent_data' ~/.cargo/registry/src/*/web-sys-0.3.103/src/features/gen_Navigator.rs`.
 
+114. **skein 11's Shapes against main** (ready check of skein-11.1).
+     skein 11's session file corrected against skein `5b4e135` and jig `fb802523a` (11.3 as jig `041267fd8` left it): 11.1 takes `testing/skein-fake-person-browser/clippy.toml`, a copy of skein-fake-person's; the face numbers the kit's `u64` nodes itself and keeps each one's `Seen`; a heading's level is not checked (`Seen` has none); `Toggle` is a press at the centre, `Drawing` a failure of the step; `Input` types only into a field whose `Seen.value` is empty and fails the step naming a field holding words, since the kit has no select-all (later.md has its row; new test `an_input_into_a_field_holding_words_fails_naming_it`); `Go` is `Go::Address` of `http://<the listening address>` followed by the step's path, `Play` yielding `Next<Box<[u8]>>`; 11.2 reads the listening line on the server's stderr and opens `http://<address>/`, cites `browser_real.rs:49-94, 154-604`, puts the copy of `chromium()` in `tests/ui-web/src/lib.rs`, and names `tests/ui-web/Cargo.toml`, as 11.4 does; 11.3 names skein-ui-web's `Cargo.toml` (web-sys features), `lib.rs` and `tests/fetch.rs`, and drops the example view's `lib.rs`, its answered list a report already. A further file, lint table or dependency these Files miss: add it in the same increment, and list it in the commit body.
+
 ## For the user
 
 Long-term choices the user may veto; each default holds unless the user

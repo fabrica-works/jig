@@ -69,22 +69,41 @@ Scope: ui-web.md 14.2 (the face, its acts).
 Needs: skein 07.2 (`Match::Words`, 07.1, and `Press { at }`); skein 09.3
   (`mapping::accessible`).
 Files: new `testing/skein-fake-person-browser/{Cargo.toml, src/lib.rs,
-  src/face.rs, src/tests.rs}`; skein's `Cargo.toml` (member,
-  `[workspace.dependencies]`).
+  src/face.rs, src/tests.rs}`; new
+  `testing/skein-fake-person-browser/clippy.toml`, a copy of
+  `testing/skein-fake-person/clippy.toml` (without it the root's
+  applies, which refuses the sketch's `Vec`, `String`, `format!`);
+  skein's `Cargo.toml` (member, `[workspace.dependencies]`).
 Shape: `BrowserFace` implements `skein_fake_person::Face`: a `Find`
   becomes one kit `Find` per role it may compute (`accessible`), scoped
   `within` the nodes its ancestors found, outermost first, `Exact` or
   `Words` as the target says; text by `Words` on `StaticText`; it
   answers `Pending` until the kit's terminal event, then the first
-  match; `allows` refuses a node the kit reports disabled. Its acts as
-  kit requests: `Press` a press at the centre; `Input` a select-all and
-  the words by `Type`; `Submit` the key Enter; `Go` the path the codec
-  prints; a reload `Go::Reload`.
+  match; `allows` refuses a node the kit reports disabled. The face
+  numbers the kit's nodes itself (the kit's `Node` is a `u64` backend
+  id, `testing/skein-browser/src/boundary.rs:9`; skein-ui's `NodeId` a
+  `u32`, `crates/skein-ui/src/tree.rs:11`) and keeps each one's `Seen`
+  for `allows` and its acts. A heading's level is not checked: `Seen`
+  has none (`boundary.rs:116-123`), so `Role::Heading { level }` finds
+  a heading of any level; 09.3's tests and 14.1 check levels. Its acts
+  as kit requests: `Press` and `Toggle` a press at the centre; `Input`
+  the words by `Type` into a field whose `Seen.value` is empty, and a
+  failure of the step naming the field when it holds words, since the
+  kit has no select-all (`Key`, `boundary.rs:71-80`; `Type` focuses and
+  inserts, `testing/skein-browser/src/browser.rs:540-544`; later.md has
+  its row); `Submit` the key Enter; `Drawing` a failure of the step (a
+  person presses no mark: the harness's mark press is skein 13.4's);
+  `Go` the kit's `Go::Address` of `http://<the listening address>`
+  followed by the step's path (`Play` yields `Next<Box<[u8]>>`, the
+  path already printed; `Page.navigate` takes an absolute URL,
+  `browser.rs:620`); a reload `Go::Reload`.
 Test shape: `src/tests.rs`, the kit's events scripted as literals:
   `a_find_asks_each_accessible_role_of_the_person_role`,
   `the_face_is_pending_until_the_kit_answers`,
   `text_is_found_by_words_within_one_run`,
-  `a_press_becomes_the_kits_press_at_the_centre`. Each under 20 ms.
+  `a_press_becomes_the_kits_press_at_the_centre`,
+  `an_input_into_a_field_holding_words_fails_naming_it`. Each under
+  20 ms.
 Proof: unit, `heavy cargo nextest run -p skein-fake-person-browser`
   once; 11.4's story runs it against Chromium.
 Don't: send script to the page (browser.md, 4).
@@ -96,15 +115,22 @@ Scope: ui-web.md 14.2 (the harness, but stopping and restarting the
   server, skein 12.3's, and pressing a mark, skein 13.4's).
 Needs: skein 10.2 (the server binary); 11.1.
 Files: `testing/skein-fake-person-browser/src/{harness.rs, tests.rs}`;
-  `tests/ui-web/src/lib.rs` (`server_binary`, a fixture bundle);
+  `tests/ui-web/src/lib.rs` (`server_binary`, a fixture bundle, and the
+  copy of `chromium()` that `Setup.chromium` takes);
+  `tests/ui-web/Cargo.toml` (gaining `skein-fake-person-browser`,
+  `skein-fake-person` and `skein-ui`);
   new `tests/ui-web/tests/browser_harness.rs`;
   `.config/nextest.toml` (the browser profile's filter takes
   `package(skein-ui-web-tests) and binary(/^browser_/)` beside the
   kit's). The loop's pattern: `tests/browser/tests/browser_real.rs:49-94,
-  181-583` (`chromium()`, `spawn`, the `Rig`).
+  154-604` (`chromium()` at 49-63, `spawn`, the `Rig` at 154-182 and
+  its `impl` at 184-604).
 Shape: as the sketch. `Harness::run` starts both children, reads the
-  server's stdout to the line starting with `setup.listening`, opens a
-  page per player at the address after it, steps each `Play` through
+  server's stderr to the line starting with `setup.listening` (the
+  server writes it with `eprintln!`, `examples/ui/server/src/main.rs:364`;
+  read it as `tests/echo/tests/end_to_end.rs:116-118` does), opens a
+  page per player at `http://<the address after it>/` (the line names
+  no scheme: `127.0.0.1:44327`), steps each `Play` through
   its `BrowserFace` until each is done or failed, fails on any trouble
   not matching one of `setup.expected` (words in the trouble's text),
   and on a failure puts the snapshot, a screenshot's path and both
@@ -132,10 +158,15 @@ Needs: skein 09.5 (the page part's platform half); skein 10.1.
 Files: new `crates/skein-ui-web/src/{fetch.rs, fetch/web.rs,
   platform.rs, platform/web.rs}`; new `examples/ui/shell-web/{Cargo.toml
   (cdylib, wasm32 only, its code under `#![cfg(target_arch =
-  "wasm32")]`), src/lib.rs}`; `examples/ui/view/src/lib.rs` (the
-  answered list as a report); skein's `Cargo.toml` (member); new
-  `crates/skein-ui-web/src/tests/platform.rs`, `src/tests.rs` (`mod
-  platform;`).
+  "wasm32")]`), src/lib.rs}`; skein's `Cargo.toml` (member);
+  `crates/skein-ui-web/Cargo.toml` (the web-sys features fetch and the
+  facts use, `Request`, `RequestInit`, `Response`, `AbortController`,
+  `Navigator` and `Performance` among them; 09.5 adds the page half's);
+  `crates/skein-ui-web/src/lib.rs` (`pub mod fetch; pub mod platform;`);
+  new `crates/skein-ui-web/src/tests/{fetch.rs, platform.rs}`,
+  `src/tests.rs` (`mod fetch; mod platform;`). The example's view needs
+  no change: the answered list is a report already
+  (`examples/ui/view/src/state.rs:16, 62-69`).
 Shape: `fetch::Fetch` (pure: the exchanges in flight by id, each
   answer's body bound; platform: `window.fetch` with an
   `AbortController`, same-origin credentials); `platform::facts() ->
@@ -168,6 +199,8 @@ Removes: nothing.
 Scope: ui-web.md 14.1, 14.3 (its first story); testing.md 6 (the gate).
 Needs: skein 08.5 (the bundler's binary); 11.1 to 11.3.
 Files: new `tests/ui-web/tests/browser_example.rs`; `scripts/check.sh`;
+  `tests/ui-web/Cargo.toml` (a dependency the story uses that 11.2 did
+  not add);
   `tests/ui-web/src/lib.rs` (`example_bundle()` reads
   `SKEIN_UI_EXAMPLE_BUNDLE`, failing naming `scripts/check.sh` when
   unset or missing; `example_harness() -> Harness`, the example's
