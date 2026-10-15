@@ -313,6 +313,145 @@ None yet; they start at 101.
 119. **skein 14 against 02.5** (re-check of skein-14.1 after skein-02.5).
      skein 14's session file re-checked after skein 02.5 (`54ca50f`): skein-ui-web's golden page test is at `src/tests/mapping.rs:318-347` and `ROLES` is asserted at 96; `accessible` (`mapping.rs:339`) and its users in the face (`face.rs:197-198`) are as ruling 118 names them.
 
+120. **what skein 14's stories take** (the designer's answer of 2026-10-15T14:14Z, no step blocked).
+     The designer's answer to the question of 2026-10-15T14:07:16Z (what skein 14's stories take from an application), landed as skein `7c5a482` (ui-web.md 14.2 and 14.3; examples.md 9.4) and jig `e240ff1eb` (skein/14-stories.md), follows.
+
+
+     **Decision: yes, the supervisor's reading.** Each of the two stories
+     takes one more `Find` from the application:
+     `typing_while_patched(setup, field, second, arrives: Find)` and
+     `panic(setup, address, failed: Find)`, as ruling 118 already has it.
+     ui-web.md 14.2's table is amended so that its third column names
+     everything a story takes, and nothing else. The write-refused row and
+     the panic row now also name what the plan's signatures already took.
+
+     - **Why `arrives`:** the first person can only learn that the patch
+       reached its page by seeing it. Seeing it also proves that a patch
+       came at all: with no patch, the field keeps its focus, caret and
+       words anyway, and the story would pass for nothing. A fixed sleep
+       waits the same time whether or not the page changed.
+     - **Why `failed` is a `Find` and not skein's own text:** 5.1 gives the
+       restart part "the words for "the application failed"", and 3.2 says
+       those words come from the application's phrasebooks. Skein does not
+       know them. A `Find`, not the bare words, keeps the panic story in line
+       with the other three, whose pages the application names by `Find`
+       (`Shown.sees`, `absent`). It also lets an application that replaced
+       the restart part (3.3, step 8) say where its words show.
+     - **The panic row now names an address, not a script,** to match the
+       plan's `panic(setup, address, failed)` and examples.md 9.4. The
+       module panics at start, so each reload panics again and the page
+       reaches the limit with no person acting. A script's act, made once,
+       would not.
+     - **The reloads within the limit need nothing from the application:**
+       the kit sees each load and each panic's `Uncaught`. How the story
+       counts them is the plan's.
+
+     ### Landed
+
+     - skein `7c5a482`, "Name what skein's browser stories take from an
+       application": ui-web.md 14.2 (the table's three rows and a new
+       bullet) and 14.3; examples.md 9.4.
+     - jig `e240ff1eb`, "skein-ui: what skein 14's stories take, through
+       14.2 and 14.4": `skein/14-stories.md` (What the design asks; 14.2's
+       Don't; 14.4's Shape; the sketch).
+     - Nothing deferred: no `later.md` row.
+
+     ### The text it rests on
+
+     - ui-web.md 5.1 (unchanged), the parts' table: "| restart | the words
+       for "the application failed"; its limit, three reloads in a minute by
+       default; its key | …". 3.2 (unchanged): "the parts' own words in the
+       person's language (section 5), from its phrasebooks".
+     - ui-web.md 14.2 (skein `7c5a482`, lines 873, 875, 876):
+       - "| typing while a patch arrives | the field keeps its focus, its
+         caret and its words | a field; a second person's script whose act
+         patches the first person's page; and what that patch shows there,
+         which the page does not show before it |"
+       - "| a panic | the page reloads within the restart limit, and past it
+         says the application failed | an address at which its module panics
+         at start, as its test build allows; and its words for "the
+         application failed" (5.1), which its page then shows |"
+       - "| a write refused | a write the small store refuses fails the
+         step's exchanges, and none leaves | an address at which its small
+         store is bounded below a step's write, as its test build allows; a
+         script making that step there; and what the step would have made,
+         which no page then shows |"
+       - The new bullet: "**What the application names is what a story
+         takes,** and nothing else. What a story must see on a person's page
+         is named as what a person looks for (ui.md, 17.1), and the story
+         awaits it: never for a fixed time, and never by skein's words where
+         the page shows the application's, as the restart part does (5.1).
+         Seeing the patch is also what shows that one came: with no patch, a
+         field keeps its focus, its caret and its words anyway. The panic's
+         module panics at start, so that each reload panics again and the
+         page reaches the limit with no person acting; a script's act, made
+         once, would not."
+
+     ### What each step does
+
+     - **14.2:** `stories::panic(setup, address, failed: Find)`, as the
+       session file has had it since ruling 118. The Don't adds: "give
+       `Restart` or the story words of skein's own: `words` and `failed` are
+       the application's". The example's tier gives the words its
+       phrasebook gives `Restart`, as `Find::text`.
+     - **14.3:** unchanged. `write_refused(setup, address, script, absent)`
+       is what the design's row now names.
+     - **14.4:** `stories::typing_while_patched(setup, field, second,
+       arrives)`, in this order:
+       1. The first person composes in `field`.
+       2. It sees `arrives` gone, a `Gone` step. The page that showed the
+          field shows no patch yet.
+       3. It sets a flag that the second person's `Play` waits on, as 14.3's
+          second person does.
+       4. The second person's act patches the first person's page.
+       5. The first person sees `arrives`, a `See` step within 5 s, before
+          it types again.
+
+       The field's checks stand as they were. The example passes the note
+       that its second person adds, as its list shows it. The Shape names
+       `back_and_forward(setup, first, second)`, as the sketch does. The
+       Don't stands: "pause by a fixed sleep: each person awaits what it
+       sees".
+
+     ### Not decided here: for 14.3's ready check
+
+     A `Gone` step passes the first time its find is absent
+     (`testing/skein-fake-person/src/lib.rs:233`: `Step::Gone { .. } =>
+     found == Found::Absent`). A page that is still loading gives that too.
+     So 14.3's second person, going to `/` after the first person's end,
+     could pass `absent` before its page holds the server's notes. That
+     order of steps is the plan's. If fixing it needs one more thing that
+     the application names, it is a design question.
+
+     ### Checked against main
+
+     - skein `bd89b69`, before the landing:
+       - `testing/skein-fake-person/src/lib.rs:34`: `pub struct Find`, with
+         `Find::text` (52).
+       - `lib.rs:85`: `See { find: Find, within: Duration }`, and `Gone` at
+         87.
+       - `testing/skein-fake-person-browser/src/harness.rs:28`: `pub
+         expected: Vec<Box<[u8]>>`, and `pub trait Play` at 30.
+       - `testing/skein-browser/src/browser.rs:1292`: `b"Page.loadEventFired"
+         | b"Page.navigatedWithinDocument"`, and each exception's
+         `exceptionDetails` text at 1299.
+       - No `restart` module yet in `crates/skein-ui-web/src/`.
+     - jig `e240ff1eb`, `skein/14-stories.md`:
+       - 192: `pub fn typing_while_patched(setup: &Setup<'_>, field: Find,
+         second: &mut dyn Play, arrives: Find) -> Outcome;`
+       - 196: `pub fn panic(setup: &Setup<'_>, address: &[u8], failed: Find)
+         -> Outcome;`
+       - 198: `pub fn write_refused(setup: &Setup<'_>, address: &[u8],
+         script: &mut dyn Play, absent: Find) -> Outcome;`
+     - Commands:
+       - `grep -n 'Step::Gone { .. } => found == Found::Absent\|See { find:
+         Find, within: Duration }' testing/skein-fake-person/src/lib.rs`
+       - `grep -n 'b"Page.loadEventFired"\|exceptionDetails'
+         testing/skein-browser/src/browser.rs`
+       - `git show origin/main:docs/development/plans/skein-ui/skein/14-stories.md
+         | grep -n 'pub fn typing_while_patched\|pub fn panic\|pub fn
+         write_refused'`
+
 ## For the user
 
 Long-term choices the user may veto; each default holds unless the user
