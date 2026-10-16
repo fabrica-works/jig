@@ -102,7 +102,7 @@ pub(super) fn admit(core: &Core, limits: &Limits, party: u64, act: Act, number: 
         }
         Act::Close => allowed(close(core, party, row)),
         Act::MarkSeen => {
-            if core.chat_requester(row) == Some(party) && held.is_some() {
+            if core.conversation_requester(row) == Some(party) && held.is_some() {
                 Admission::Allowed
             } else {
                 Admission::Refused(people::Refusal::Unknown)
@@ -158,7 +158,7 @@ pub(crate) fn write(core: &Core, limits: &Limits, party: u64, number: u64) -> Re
 
 pub(crate) fn close(core: &Core, party: u64, row: &tasks::TaskRecord) -> Result<(), people::Refusal> {
     standing::role(core, row.project, core.people.role(party, row.project), Act::Close)?;
-    if core.chat_requester(row) != Some(party) {
+    if core.conversation_requester(row) != Some(party) {
         return Err(people::Refusal::Unknown);
     }
     if row.grace.is_some() {

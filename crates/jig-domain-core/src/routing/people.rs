@@ -282,7 +282,7 @@ pub(super) fn tag_people(
                         }
                         people::Seen::Chat { task, .. } => match core.tasks.task(task) {
                             Some(row) => {
-                                if core.chat_requester(row) == Some(person)
+                                if core.conversation_requester(row) == Some(person)
                                     && core.people.role(person, row.project).is_some()
                                 {
                                     work.push(Event::People(people::Event::ChatSeen {

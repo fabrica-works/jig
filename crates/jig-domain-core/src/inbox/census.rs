@@ -24,7 +24,7 @@ impl Core {
         let mut out = Queue::with_capacity(people::max_out(&limits.people));
         for task in self.tasks.view_tasks() {
             let row = self.tasks.task(task.number).expect("live view names its owner");
-            if let Some(party) = self.chat_requester(row) {
+            if let Some(party) = self.conversation_requester(row) {
                 people::step(
                     &mut self.people,
                     &env,
@@ -130,7 +130,7 @@ impl Core {
                     party,
                     people::ResultRef { task: row.number, project: row.project, at, position: row.result_position },
                 );
-                if self.chat_requester(row).is_some() {
+                if self.conversation_requester(row).is_some() {
                     people::step(
                         &mut self.people,
                         &env,

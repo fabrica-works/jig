@@ -184,3 +184,37 @@ fn a_watched_task_query_is_delivered_again_when_its_task_ends() {
     assert!(value.lines.is_empty());
     assert!(*durable > before, "the removal followed its commit");
 }
+
+const TURN_QUERY_WATCHER: u64 = 45_108;
+const COMMITTED_TURN: u32 = 1;
+
+#[test]
+fn a_committed_turn_of_a_conversation_marks_the_query_listing_it() {
+    let mut world = jig_core_world::stories::reads::world(1210);
+    world.client_peer = Some(ClientPeer::default());
+    world.send(root::Event::Core(core::Event::Watch {
+        watcher: Token::new(TURN_QUERY_WATCHER),
+        sign_in: world.sign_in.expect("signed in"),
+        subject: documents::Watched::Query { query: jig_core_world::fixtures::OWN_TASKS },
+        window: documents::Window { rows: 1, after: None },
+    }));
+    world.send(root::Event::Core(core::Event::Delivered { watcher: Token::new(TURN_QUERY_WATCHER) }));
+    world.client_peer.as_mut().expect("client peer").delivered.clear();
+    world.store.fault(Fault::Hold { commits: 1 });
+    world.turn(COMMITTED_TURN, 0, None, b"a committed turn");
+    assert!(world.client_peer.as_ref().expect("client peer").delivered.is_empty());
+    let number = world.store.release_held().expect("turn commit");
+    world.send(root::Event::Committed { number, fill: 0 });
+    let (durable, root::Delivery::Core(core::Held::Delivery { watcher, document })) =
+        world.client_peer.as_ref().expect("client peer").delivered.last().expect("query redelivered")
+    else {
+        panic!("query delivery")
+    };
+    assert_eq!(*watcher, Token::new(TURN_QUERY_WATCHER));
+    assert!(*durable >= number);
+    let documents::Document::Lines(value) = document.as_ref() else { panic!("query lines") };
+    assert_eq!(
+        value.lines.get(0).expect("conversation line").conversation.as_ref().expect("conversation").unread,
+        documents::Count::Known(1)
+    );
+}

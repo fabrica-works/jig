@@ -766,7 +766,7 @@ pub(super) fn tag_tasks(
                 };
                 crate::indexes::save(core, &record, &mut out);
                 if let tasks::Stored::Live(task) | tasks::Stored::Ended(task) = &record {
-                    if let Some(party) = core.chat_requester(task) {
+                    if let Some(party) = core.conversation_requester(task) {
                         let live = match &record {
                             tasks::Stored::Live(_) => true,
                             tasks::Stored::Ended(_) => false,

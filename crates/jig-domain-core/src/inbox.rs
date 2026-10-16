@@ -102,17 +102,11 @@ pub(crate) fn worst_case(limits: &Limits) -> Option<u64> {
 }
 
 impl Core {
-    /// The authenticated requester of a chat, also usable for a loaded ended task.
+    /// The requesting party of a flagged conversation, live or loaded ended.
     #[must_use]
-    pub fn chat_requester(&self, row: &tasks::TaskRecord) -> Option<u64> {
-        if row.tracked.is_some() || row.recurring.is_some() {
+    pub fn conversation_requester(&self, row: &tasks::TaskRecord) -> Option<u64> {
+        if !row.flags.conversation {
             return None;
-        }
-        match row.executor {
-            tasks::Executor::Agent { charter } if charter == self.settings.chat => {}
-            tasks::Executor::Agent { .. } | tasks::Executor::Person(_) | tasks::Executor::Procedure { .. } => {
-                return None;
-            }
         }
         match row.requester {
             tasks::Party::Person(party) => Some(party),
@@ -128,7 +122,7 @@ impl Core {
         if self.people.role(party, row.project).is_none() {
             return;
         }
-        let line = if self.chat_requester(row) == Some(party) && row.last_reply > 0 {
+        let line = if self.conversation_requester(row) == Some(party) && row.last_reply > 0 {
             Some(crate::documents::conversation_from_row(self, limits, party, row).expect("authorized archive owner"))
         } else {
             None
@@ -204,7 +198,7 @@ impl Core {
             }
             tasks::Party::Task(_) | tasks::Party::Deployment { .. } => {}
         }
-        if let Some(person) = self.chat_requester(row) {
+        if let Some(person) = self.conversation_requester(row) {
             for reply in &row.replies {
                 add(
                     &mut entries,
@@ -372,7 +366,7 @@ pub(crate) fn seen_chat_loaded(
     } else if let Some(row) = row {
         if row.number != task || !valid_header(core, &env.limits, &row) || !matches_ended(&row.phase) {
             people::Event::Decided { request, outcome: people::Outcome::Refused(people::Refusal::Unknown) }
-        } else if core.chat_requester(&row) != Some(party) || core.people.role(party, row.project).is_none() {
+        } else if core.conversation_requester(&row) != Some(party) || core.people.role(party, row.project).is_none() {
             people::Event::Decided {
                 request,
                 outcome: people::Outcome::Refused(people::Refusal::Role { held: core.people.role(party, row.project) }),
@@ -419,7 +413,7 @@ pub(crate) fn forget_chat(
         && row.ended_at.is_some()
         && row.result_position > 0
         && row.result_position <= core.counters.deployment().messages
-        && let Some(party) = core.chat_requester(row)
+        && let Some(party) = core.conversation_requester(row)
         && core.people.chat_seen(party, row.number).unwrap_or(0) >= row.last_reply
         && core.people.results_seen(party).unwrap_or(0) >= row.result_position
     {

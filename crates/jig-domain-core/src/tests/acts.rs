@@ -615,7 +615,8 @@ fn offered_proposal_decisions_are_made_at_the_named_holder_and_another_holder_is
 fn leaving_an_escalation_held_closing_a_chat_and_marking_it_seen_are_admitted() {
     let (mut core, limits) = tree_core();
     sign_in(&mut core, &limits);
-    let chat = new_row(&core, 1, tasks::Funder::Period { project: 1, period: 1 }, None);
+    let mut chat = new_row(&core, 1, tasks::Funder::Period { project: 1, period: 1 }, None);
+    chat.flags.conversation = true;
     send_task(
         &mut core,
         &limits,

@@ -358,7 +358,7 @@ pub(crate) fn make_task(core: &mut Core, limits: &Limits, number: u64) {
     given.budget.spend = 100;
     let row = tasks::New {
         label: 0,
-        flags: jig_domain_tasks::Flags::PLAIN,
+        flags: tasks::Flags { conversation: true, ..tasks::Flags::PLAIN },
         number,
         project: 1,
         executor: tasks::Executor::Agent { charter: 1 },
@@ -1587,7 +1587,8 @@ fn documents_cached_inbox_results_preserve_positions_project_and_time() {
 #[test]
 fn documents_conversations_show_chats_and_exclude_goals() {
     let (mut core, limits) = make_tree();
-    let row = new_row(&core, 5, tasks::Funder::Period { project: 1, period: 1 }, None);
+    let mut row = new_row(&core, 5, tasks::Funder::Period { project: 1, period: 1 }, None);
+    row.flags.conversation = true;
     send_task(
         &mut core,
         &limits,

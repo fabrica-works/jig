@@ -91,7 +91,7 @@ pub(super) fn task(
         }
         kinds.push(Act::Amend).expect("task act bound");
         kinds.push(Act::TakeOver).expect("task act bound");
-        if core.chat_requester(row).is_some() {
+        if core.conversation_requester(row).is_some() {
             kinds.push(Act::Close).expect("task act bound");
         }
     }
@@ -114,7 +114,7 @@ pub(super) fn task(
     match row.phase {
         tasks::Phase::Waiting | tasks::Phase::Active(_) | tasks::Phase::Closing(_) | tasks::Phase::Held { .. } => {
             kinds.push(Act::Cancel).expect("task act bound");
-            if core.chat_requester(row).is_some() {
+            if core.conversation_requester(row).is_some() {
                 kinds.push(Act::MarkSeen).expect("task act bound");
             }
         }

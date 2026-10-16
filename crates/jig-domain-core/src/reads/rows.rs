@@ -783,7 +783,7 @@ fn object(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Optio
                 }
                 tasks::Line::Turn { reply, attempt, turn, .. } => {
                     let owner = row_owner(&row).expect("matched reply owner");
-                    if core.chat_requester(owner) != Some(range.party) || *reply > owner.last_reply {
+                    if core.conversation_requester(owner) != Some(range.party) || *reply > owner.last_reply {
                         return Ok(None);
                     }
                     let Some(related) = &row.related else {
@@ -1210,7 +1210,7 @@ fn reply_update(
     }
     let (message, reply) = match &line.line {
         tasks::Line::Turn { reply, .. } => {
-            if core.chat_requester(owner) != Some(party)
+            if core.conversation_requester(owner) != Some(party)
                 || *reply > owner.last_reply
                 || *reply <= core.people.chat_seen(party, owner.number).unwrap_or(0)
             {

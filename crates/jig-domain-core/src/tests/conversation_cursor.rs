@@ -543,3 +543,88 @@ fn a_before_cursor_continues_in_the_oldest_family() {
     let page = backward_page(&mut core, &limits, before, &[10], false);
     assert_eq!(numbers(&page).as_ref(), [10]);
 }
+
+const CONVERSATION: u64 = 1;
+const CONVERSATION_REQUESTER: u64 = 1;
+const OTHER_CHARTER: u32 = 77;
+const SEEN_TURN: u64 = 2;
+const LAST_TURN: u64 = 3;
+const RUN_ATTEMPT: u64 = 1;
+const TURN: u32 = 1;
+
+#[test]
+fn a_task_flagged_conversation_under_another_charter_is_one() {
+    let (mut core, limits) = watch_core();
+    let mut row = core.tasks.task(CONVERSATION).expect("conversation fixture").clone();
+    row.executor = tasks::Executor::Agent { charter: OTHER_CHARTER };
+    assert_eq!(core.conversation_requester(&row), Some(CONVERSATION_REQUESTER));
+    core.tasks = tasks::Domain::new(&limits.tasks, 17, Box::new([OTHER_CHARTER]));
+    send_task(&mut core, &limits, tasks::Event::Restore { record: tasks::Stored::Live(Box::new(row)) });
+    assert!(core.tasks.task(CONVERSATION).is_some());
+    let Document::Conversations(value) = make(
+        &core,
+        &limits,
+        CONVERSATION_REQUESTER,
+        &Subject::Conversations { party: CONVERSATION_REQUESTER },
+        &window(),
+    )
+    .expect("conversation document") else {
+        panic!("conversation document")
+    };
+    assert_eq!(value.lines.get(0).expect("flagged conversation").chip.number, CONVERSATION);
+}
+
+#[test]
+fn a_chat_charters_task_not_flagged_is_no_conversation() {
+    let (mut core, limits) = watch_core();
+    let mut row = core.tasks.task(CONVERSATION).expect("conversation fixture").clone();
+    row.flags.conversation = false;
+    assert_eq!(core.conversation_requester(&row), None);
+    fixtures::restore(&mut core, &limits, Box::new([row]));
+    let Document::Conversations(value) = make(
+        &core,
+        &limits,
+        CONVERSATION_REQUESTER,
+        &Subject::Conversations { party: CONVERSATION_REQUESTER },
+        &window(),
+    )
+    .expect("conversation document") else {
+        panic!("conversation document")
+    };
+    assert!(value.lines.is_empty());
+}
+
+#[test]
+fn a_tracked_conversation_keeps_its_read_position() {
+    let (mut core, limits) = watch_core();
+    let mut row = core.tasks.task(CONVERSATION).expect("conversation fixture").clone();
+    row.tracked = Some(4);
+    row.last_reply = LAST_TURN;
+    row.activity = LAST_TURN;
+    row.attempt = RUN_ATTEMPT;
+    row.turn = TURN;
+    row.ever_turned = true;
+    row.replies = Box::new([tasks::ReplyHint {
+        number: LAST_TURN,
+        activity: LAST_TURN,
+        attempt: RUN_ATTEMPT,
+        turn: TURN,
+        at: Wall::EPOCH,
+    }]);
+    fixtures::restore(&mut core, &limits, Box::new([row]));
+    fixtures::restore_conversation_seen(&mut core, &limits, CONVERSATION_REQUESTER, CONVERSATION, SEEN_TURN);
+    let Document::Conversations(value) = make(
+        &core,
+        &limits,
+        CONVERSATION_REQUESTER,
+        &Subject::Conversations { party: CONVERSATION_REQUESTER },
+        &window(),
+    )
+    .expect("conversation document") else {
+        panic!("conversation document")
+    };
+    let line = value.lines.get(0).expect("tracked conversation");
+    assert_eq!(line.chip.number, CONVERSATION);
+    assert_eq!(line.seen, SEEN_TURN);
+    assert_eq!(line.replies_unread, Some(Count::Known(1)));
+}

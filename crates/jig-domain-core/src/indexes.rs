@@ -13,7 +13,7 @@ pub(crate) fn save(core: &Core, record: &tasks::Stored, out: &mut Queue<Request>
                 }
                 tasks::Party::Task(_) | tasks::Party::Deployment { .. } => {}
             }
-            if let Some(party) = core.chat_requester(task) {
+            if let Some(party) = core.conversation_requester(task) {
                 let row = tasks::Conversation { party, task: task.number };
                 for record in [tasks::Stored::ConversationNewest(row), tasks::Stored::ConversationOldest(row)] {
                     out.push(Request::Write(Write::Save(Record::Tasks(record))));

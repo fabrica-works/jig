@@ -189,7 +189,7 @@ pub(super) fn conversation_row(
     let Some(owner) = &row.owner else { return Ok(None) };
     if conversation.party != range.party
         || conversation.task != owner.number
-        || core.chat_requester(owner) != Some(range.party)
+        || core.conversation_requester(owner) != Some(range.party)
     {
         return Ok(None);
     }

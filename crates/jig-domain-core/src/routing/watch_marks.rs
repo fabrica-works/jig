@@ -199,20 +199,7 @@ pub(super) fn touch_task(core: &mut Core, limits: &Limits, row: &tasks::TaskReco
         Some(root) => root,
         None => row,
     };
-    let chat = root.tracked.is_none()
-        && root.recurring.is_none()
-        && match root.executor {
-            tasks::Executor::Agent { charter } => charter == core.settings.chat,
-            tasks::Executor::Person(_) | tasks::Executor::Procedure { .. } => false,
-        };
-    let owner = if chat {
-        match root.requester {
-            tasks::Party::Person(party) => Some(party),
-            tasks::Party::Task(_) | tasks::Party::Deployment { .. } => None,
-        }
-    } else {
-        None
-    };
+    let owner = core.conversation_requester(root);
     for (_, binding) in &core.view_subjects {
         let subject = &core.view_names.get(binding.subject).expect("bound subject").subject;
         let touched = match subject {

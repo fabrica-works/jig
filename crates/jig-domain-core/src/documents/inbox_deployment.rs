@@ -127,7 +127,7 @@ fn reply_activity(core: &Core, task: u64, object: InboxObject) -> Option<u64> {
     match object {
         InboxObject::Reply { message } => {
             let row = core.tasks.task(task)?;
-            if core.chat_requester(row).is_some() {
+            if core.conversation_requester(row).is_some() {
                 for reply in &row.replies {
                     if reply.number == message {
                         return Some(reply.activity);
@@ -295,7 +295,7 @@ pub fn conversation_from_row(
     party: u64,
     row: &tasks::TaskRecord,
 ) -> Result<ConversationLine, Missing> {
-    if core.chat_requester(row) != Some(party) || core.people.role(party, row.project).is_none() {
+    if core.conversation_requester(row) != Some(party) || core.people.role(party, row.project).is_none() {
         return Err(Missing::NotAllowed);
     }
     let seen = core.people.chat_seen(party, row.number).ok_or(Missing::Unknown)?;
@@ -337,12 +337,7 @@ pub(super) fn conversations(
             continue;
         }
         let row = core.tasks.task(row.number).expect("live task view");
-        let chat = row.requester == tasks::Party::Person(party)
-            && match row.executor {
-                tasks::Executor::Agent { charter } => charter == core.settings.chat,
-                tasks::Executor::Person(_) | tasks::Executor::Procedure { .. } => false,
-            };
-        if !chat || row.tracked.is_some() || row.recurring.is_some() || core.people.role(party, row.project).is_none() {
+        if core.conversation_requester(row) != Some(party) || core.people.role(party, row.project).is_none() {
             continue;
         }
         if lines.room() == 0 {

@@ -284,3 +284,30 @@ fn a_task_query_read_waits_for_the_commit_in_flight_and_survives_the_crash() {
     assert_eq!(world.reads.as_ref().expect("party").receipts.len(), 1);
     assert_eq!(latest(&world), &answer);
 }
+
+const CONVERSATION_TURN: u32 = 1;
+const SEEN_CONVERSATION: u64 = 1;
+
+#[test]
+fn seen_over_a_conversations_turns_clears_its_lines_unread_count() {
+    let mut world = world(1209);
+    let task = world.assigned.as_ref().expect("conversation").task;
+    world.turn(CONVERSATION_TURN, 0, None, b"a committed turn");
+    let query = jig_core_world::fixtures::OWN_TASKS;
+    ask(&mut world, QUERY_READ, reads::Read::Tasks { query, from: None });
+    let reads::Answer::Page(page) = latest(&world) else { panic!("task query") };
+    let reads::PageRow::Line(line) = page.rows.get(0).expect("conversation line") else { panic!("task line") };
+    assert_eq!(line.conversation, Some(documents::ConversationRead { seen: 0, unread: documents::Count::Known(1) }));
+    request(
+        &mut world,
+        QUERY_REQUEST,
+        people::Ask::MarkSeen { seen: people::Seen::Chat { task, through: SEEN_CONVERSATION } },
+    );
+    ask(&mut world, QUERY_NEXT_READ, reads::Read::Tasks { query, from: None });
+    let reads::Answer::Page(page) = latest(&world) else { panic!("task query") };
+    let reads::PageRow::Line(line) = page.rows.get(0).expect("conversation line") else { panic!("task line") };
+    assert_eq!(
+        line.conversation,
+        Some(documents::ConversationRead { seen: SEEN_CONVERSATION, unread: documents::Count::Known(0) })
+    );
+}
