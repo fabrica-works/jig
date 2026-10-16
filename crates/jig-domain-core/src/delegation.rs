@@ -39,6 +39,7 @@ pub struct Delegate {
 pub struct ProcedureStep {
     pub batch: Box<[Delegate]>,
     pub amendments: Box<[StepAmendment]>,
+    pub cancels: Box<[StepCancel]>,
     pub messages: Box<[StepMessage]>,
     pub proposals: Box<[tasks::ProposalAction]>,
     pub end: StepEnd,
@@ -49,6 +50,13 @@ pub struct StepAmendment {
     pub task: u64,
     pub revision: u64,
     pub amendment: tasks::Amendment,
+}
+
+#[derive(PartialEq, Eq, Debug)]
+pub struct StepCancel {
+    pub task: u64,
+    pub reason: Box<[u8]>,
+    pub grace: Option<skein_lib::Duration>,
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -68,7 +76,14 @@ pub enum StepEnd {
 impl ProcedureStep {
     #[must_use]
     pub fn new(end: StepEnd) -> Self {
-        Self { batch: Box::new([]), amendments: Box::new([]), messages: Box::new([]), proposals: Box::new([]), end }
+        Self {
+            batch: Box::new([]),
+            amendments: Box::new([]),
+            cancels: Box::new([]),
+            messages: Box::new([]),
+            proposals: Box::new([]),
+            end,
+        }
     }
 }
 

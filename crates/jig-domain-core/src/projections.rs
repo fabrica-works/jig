@@ -155,10 +155,20 @@ pub(crate) fn save(core: &mut Core, limits: &Limits, row: &tasks::TaskRecord, ou
             )
             .expect("tracked projection room admitted");
     }
-    let Some(number) = core.goal_of(row) else { return };
+    let number = if core.projections.contains_key(&row.number) {
+        row.number
+    } else {
+        let Some(number) = core.goal_of(row) else { return };
+        number
+    };
     let Some(state) = core.projections.get_mut(&number) else { return };
     if row.number == number {
-        let next = goal(row);
+        let mut next = state.goal.clone();
+        next.words.clone_from(&row.spec.words);
+        next.phase.clone_from(&row.phase);
+        if let Some(priority) = row.tracked {
+            next.priority = priority;
+        }
         state.changed |= state.goal != next;
         state.goal = next;
     }
@@ -258,8 +268,15 @@ pub fn finish_decision(core: &mut Core, env: &Env<Limits>) -> Requests {
         goals.push(*number).expect("bounded tracked goals");
     }
     for number in &goals {
+        let untracked = match core.tasks.task(*number) {
+            Some(task) => task.tracked.is_none(),
+            None => false,
+        };
         let state = core.projections.get_mut(number).expect("retained feed state");
-        if !state.changed && (state.milestones.is_empty() || state.fed_at == Some(commit)) {
+        if untracked && !state.pending.is_empty() {
+            continue;
+        }
+        if !state.changed && (state.milestones.is_empty() || state.fed_at == Some(commit)) && !untracked {
             continue;
         }
         let feed = if state.fed_at == Some(commit) {
@@ -272,7 +289,7 @@ pub fn finish_decision(core: &mut Core, env: &Env<Limits>) -> Requests {
                 | tasks::Phase::Active(_)
                 | tasks::Phase::Closing(_)
                 | tasks::Phase::Held { .. } => false,
-            };
+            } || untracked;
             if closing && state.pending.is_empty() {
                 state.pending.clone_from(&core.connectors);
             }
@@ -304,7 +321,7 @@ pub fn finish_decision(core: &mut Core, env: &Env<Limits>) -> Requests {
                 false
             }
         };
-        if ended && core.connectors.is_empty() {
+        if (ended || untracked) && core.connectors.is_empty() {
             forget(core, *number, &mut out);
         }
     }
@@ -458,7 +475,11 @@ fn restore_goal(
         tasks::Phase::Ended(_) => true,
         tasks::Phase::Waiting | tasks::Phase::Active(_) | tasks::Phase::Closing(_) | tasks::Phase::Held { .. } => false,
     };
-    if !closing && !pending.is_empty() {
+    let untracked = match core.tasks.task(goal.number) {
+        Some(task) => task.tracked.is_none(),
+        None => false,
+    };
+    if !closing && !untracked && !pending.is_empty() {
         return false;
     }
     let mut seen = List::with_capacity(limits.connectors);

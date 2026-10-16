@@ -600,7 +600,11 @@ impl Observer {
         for row in store.rows.values() {
             match row {
                 root::Record::Core(core::Record::Tasks(tasks::Stored::Live(value) | tasks::Stored::Ended(value))) => {
-                    snapshot.tasks.insert(value.number, task(value));
+                    let mut snapshot_task = task(value);
+                    snapshot_task.tracked |= store.rows.contains_key(&root::Key::Core(core::Key::Core(
+                        core::CoreKey::Projection(core::ProjectionKey::Goal(value.number)),
+                    )));
+                    snapshot.tasks.insert(value.number, snapshot_task);
                     snapshot.receipts.insert(r::Receipt::Task(value.number));
                     if let tasks::Escalation::Waiting { holder: tasks::EscalationHolder::Task(holder), entry, .. } =
                         value.escalation

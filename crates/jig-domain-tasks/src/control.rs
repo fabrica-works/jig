@@ -556,7 +556,7 @@ fn below(domain: &Domain, number: u64, ancestor: u64, bound: u32) -> bool {
     false
 }
 
-fn allowed(domain: &Domain, number: u64, by: Party, bound: u32) -> bool {
+pub(crate) fn allowed(domain: &Domain, number: u64, by: Party, bound: u32) -> bool {
     match by {
         Party::Task(task) => task != number && below(domain, number, task, bound),
         Party::Person(person) => person != 0,

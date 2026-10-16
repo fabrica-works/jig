@@ -28,7 +28,19 @@ pub(crate) fn translate(
         }
         connector::StepDecision::Wait { .. } | connector::StepDecision::Stall => core::StepEnd::Wait,
         connector::StepDecision::Hold { .. } => core::StepEnd::Hold(tasks::Hold::Effects),
-        connector::StepDecision::Amend { task, revision, words } => return Some(amendment(task, revision, words)),
+        connector::StepDecision::Amend { task, revision, words, priority } => {
+            return Some(amendment(task, revision, words, priority));
+        }
+        connector::StepDecision::Cancel { task, grace } => {
+            return Some(core::ProcedureStep {
+                cancels: Box::new([core::StepCancel {
+                    task,
+                    reason: b"procedure cancelled delegate".as_slice().into(),
+                    grace: Some(grace),
+                }]),
+                ..core::ProcedureStep::new(core::StepEnd::Wait)
+            });
+        }
         connector::StepDecision::Message { task, words } => {
             return Some(core::ProcedureStep {
                 messages: Box::new([core::StepMessage {
@@ -123,18 +135,26 @@ fn words(task: u64, step: u64) -> Box<[u8]> {
     words.finish()
 }
 
-fn amendment(task: u64, revision: u64, words: u64) -> core::ProcedureStep {
+fn amendment(task: u64, revision: u64, words: u64, priority: Option<u32>) -> core::ProcedureStep {
     let count = Decimal::of(words);
     let mut text = Writer::new(8_usize.checked_add(count.as_bytes().len()).expect("bounded spec"));
     text.put(b"amended ").expect("bounded spec");
     text.put(count.as_bytes()).expect("bounded word count");
+    let mut tracked = None;
+    if let Some(priority) = priority {
+        tracked = Some(tasks::Tracking::Tracked { priority });
+    }
     core::ProcedureStep {
         amendments: Box::new([core::StepAmendment {
             task,
             revision,
             amendment: tasks::Amendment {
-                spec: Some(tasks::Spec { words: text.finish(), parameters: Box::new([]), inputs: Box::new([]) }),
-                tracked: None,
+                spec: if priority.is_some() {
+                    None
+                } else {
+                    Some(tasks::Spec { words: text.finish(), parameters: Box::new([]), inputs: Box::new([]) })
+                },
+                tracked,
                 addressed: None,
                 instructions: None,
                 release: None,

@@ -277,6 +277,7 @@ pub struct RecurringState {
 pub struct ProcedureDecision {
     pub batch: Box<[New]>,
     pub amendments: Box<[ProcedureAmendment]>,
+    pub cancels: Box<[ProcedureCancel]>,
     pub messages: Box<[ProcedureMessage]>,
     pub proposals: Box<[crate::Proposal]>,
     pub end: ProcedureEnd,
@@ -288,6 +289,14 @@ pub struct ProcedureAmendment {
     pub message: u64,
     pub stop_run: bool,
     pub amendment: crate::Amendment,
+}
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct ProcedureCancel {
+    pub task: u64,
+    pub reason: Box<[u8]>,
+    pub grace: Option<Duration>,
+    pub message: Option<u64>,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -306,7 +315,14 @@ pub enum ProcedureEnd {
 impl ProcedureDecision {
     #[must_use]
     pub fn new(end: ProcedureEnd) -> Self {
-        Self { batch: Box::new([]), amendments: Box::new([]), messages: Box::new([]), proposals: Box::new([]), end }
+        Self {
+            batch: Box::new([]),
+            amendments: Box::new([]),
+            cancels: Box::new([]),
+            messages: Box::new([]),
+            proposals: Box::new([]),
+            end,
+        }
     }
 }
 

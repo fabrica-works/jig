@@ -1,4 +1,5 @@
 use jig_core_world::effects::{World, fixture};
+use jig_core_world::fixtures::finish_chat;
 use jig_domain_authority as authority;
 use jig_domain_core as core;
 use jig_domain_people as people;
@@ -332,4 +333,102 @@ fn settle_tree(world: &mut World, goal: (u64, u64), child: (u64, u64), restart_c
 fn projections_scenario_family() {
     projections_use_project_grants_require_verdicts_and_observe_a_policy_narrowing_after_restart();
     a_delegate_of_a_delegate_ending_feeds_the_whole_plan_once_and_closing_waits_for_its_write();
+}
+
+fn untracked_configuration(seed: u64) -> (root::Config, root::Limits) {
+    let (mut configuration, limits) = fixture(seed, false);
+    let mut policy = configuration.core.authority.policy(1).expect("fixture policy").clone();
+    policy.projections.clone_from(&policy.ceiling.grants);
+    authority::step(
+        &mut configuration.core.authority,
+        authority::Event::Policy { project: 1, policy },
+        &mut Queue::with_capacity(authority::POLICY_MAX_OUT),
+    );
+    (configuration, limits)
+}
+
+fn untracked_world(seed: u64) -> (World, root::Config, u64) {
+    let (configuration, limits) = untracked_configuration(seed);
+    let restart = untracked_configuration(seed).0;
+    let mut world = World::configured(seed, false, configuration, limits);
+    finish_chat(&mut world, 0, b"");
+    jig_core_world::stories::reads::request(
+        &mut world,
+        91,
+        people::Ask::SetGoal {
+            project: 1,
+            spec: b"untracked goal".as_slice().into(),
+            executor: people::GoalExecutor::Charter(1),
+            budget: 20,
+            priority: 1,
+            deadline: None,
+        },
+    );
+    let goal = world.assigned.as_ref().expect("goal assigned").task;
+    world.hold_projection_settlements = true;
+    world.projections.clear();
+    jig_core_world::stories::reads::request(
+        &mut world,
+        92,
+        people::Ask::Amend {
+            project: 1,
+            task: goal,
+            revision: 0,
+            release: None,
+            amendment: people::Amendment {
+                tracked: Some(people::Tracking::Untracked),
+                spec: Some(people::Spec {
+                    words: b"last goal state".as_slice().into(),
+                    parameters: Box::new([]),
+                    inputs: Box::new([]),
+                }),
+                ..jig_core_world::fixtures::person_unchanged(b"untracked")
+            },
+        },
+    );
+    assert_eq!(
+        world.people_answers.last(),
+        Some(&people::Reply::Outcome(people::Outcome::Amended { task: goal, released: false }))
+    );
+    (world, restart, goal)
+}
+
+#[test]
+fn an_untracked_goal_is_fed_its_state_once_as_its_last_feed() {
+    let (mut world, configuration, goal) = untracked_world(172);
+    assert_eq!(jig_core_world::fixtures::live_row(&world, goal).tracked, None);
+    let feeds = world.projections.iter().map(|(_, connector, feed)| (*connector, feed.clone())).collect::<Vec<_>>();
+    assert_eq!(feeds.len(), 2);
+    for (connector, feed) in &feeds {
+        assert!([1, 2].contains(connector));
+        assert_eq!(feed.goal.number, goal);
+        assert_eq!(feed.goal.words.as_ref(), b"last goal state");
+        assert!(feed.closing);
+    }
+    assert_ne!(feeds[0].0, feeds[1].0);
+    world.restart_with(configuration);
+    jig_core_world::stories::reads::request(
+        &mut world,
+        93,
+        people::Ask::Say { project: 1, task: goal, words: b"still live".as_slice().into(), release: false },
+    );
+    assert_eq!(world.projections.len(), 2, "later decisions and restart send no further feed");
+}
+
+#[test]
+fn an_untracked_goals_projection_is_forgotten_once_its_write_settles() {
+    let (mut world, configuration, goal) = untracked_world(173);
+    assert_eq!(projection_rows(&world, goal), 2, "header and task retained");
+    world.restart_with(configuration);
+    world.hold_writes = true;
+    world.send(root::Event::ProjectionEffect { goal, number: 1, effect: World::effect() });
+    assert_eq!(world.pending_writes.len(), 1, "the closing projection still writes");
+    assert_eq!(projection_rows(&world, goal), 2);
+    world.release_writes();
+    assert_eq!(world.systems[0].observed().iter().filter(|effect| effect.applied).count(), 1);
+    world.send(root::Event::Core(core::Event::ProjectionSettled { goal, connector: 1 }));
+    assert_eq!(projection_rows(&world, goal), 2, "second connector still owns its feed");
+    world.send(root::Event::Core(core::Event::ProjectionSettled { goal, connector: 2 }));
+    assert_eq!(projection_rows(&world, goal), 0);
+    assert_eq!(jig_core_world::fixtures::live_row(&world, goal).tracked, None, "the task stays live");
 }

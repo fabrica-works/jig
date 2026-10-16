@@ -37,7 +37,9 @@ pub(super) fn parts(
                     return Err(StepRefusal::Denied { answer, findings: Box::new([]) });
                 }
             };
-        if let Err(jig_domain_people::Refusal::Moved { now }) = core.spec_revision(part.task, part.revision) {
+        if let Err(jig_domain_people::Refusal::Moved { now }) =
+            core.party_amend_revision(part.task, part.revision, &part.amendment)
+        {
             return Err(StepRefusal::Moved { task: part.task, now });
         }
         let Some(message) = crate::fresh(&mut core.counters, crate::Family::Message) else {
@@ -87,6 +89,7 @@ pub(super) fn parts(
     Ok(tasks::ProcedureDecision {
         batch: Box::new([]),
         amendments: amendments.into_boxed(),
+        cancels: cancels(core, env, &step.cancels)?,
         messages: messages.into_boxed(),
         proposals: proposals(core, env, task, &step.proposals)?,
         end,
@@ -213,4 +216,30 @@ fn proposals(
             .expect("one proposal per step");
     }
     Ok(proposals.into_boxed())
+}
+
+#[expect(clippy::result_large_err, reason = "step refusals retain exact owner diagnostics")]
+fn cancels(
+    core: &mut Core,
+    env: &Env<Limits>,
+    parts: &[crate::StepCancel],
+) -> Result<Box<[tasks::ProcedureCancel]>, StepRefusal> {
+    let mut cancels = List::with_capacity(env.limits.tasks.batch);
+    for part in parts {
+        let message = if part.grace.is_some() {
+            let Some(message) = crate::fresh(&mut core.counters, crate::Family::Message) else {
+                return Err(problem(part.task, tasks::Refusal::Busy));
+            };
+            Some(message)
+        } else {
+            None
+        };
+        if cancels
+            .push(tasks::ProcedureCancel { task: part.task, reason: part.reason.clone(), grace: part.grace, message })
+            .is_err()
+        {
+            return Err(problem(part.task, tasks::Refusal::Batch));
+        }
+    }
+    Ok(cancels.into_boxed())
 }

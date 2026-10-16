@@ -21,7 +21,7 @@ pub mod connector;
 mod delegation;
 pub use amendments::TaskAmendDenied;
 pub use delegation::{
-    Delegate, Dependency, ProcedureStep, StepAmendment, StepEnd, StepMessage, resolved_delegate_authority,
+    Delegate, Dependency, ProcedureStep, StepAmendment, StepCancel, StepEnd, StepMessage, resolved_delegate_authority,
     symbolic_grants,
 };
 pub mod documents;

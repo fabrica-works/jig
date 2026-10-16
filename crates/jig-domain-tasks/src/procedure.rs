@@ -9,6 +9,7 @@ use crate::{
     Active, Closing, Ending, Executor, Limits, Party, Phase, ProcedureDecision, ProcedureEnd, Refusal, Request, Stage,
     TaskResult,
 };
+use alloc::boxed::Box;
 use skein_lib::{Env, Queue, ReplyTo};
 
 #[expect(clippy::too_many_arguments, reason = "one fenced procedure decision")]
@@ -113,6 +114,17 @@ fn apply(domain: &mut Domain, env: &Env<Limits>, fence: Fence, decision: Procedu
     for proposal in decision.proposals {
         crate::proposals::propose(domain, env, ReplyTo::new(skein_lib::Token::new(u64::MAX - 1)), proposal, out);
     }
+    for part in decision.cancels {
+        crate::control::apply(
+            domain,
+            env,
+            ReplyTo::new(skein_lib::Token::new(u64::MAX - 1)),
+            Party::Task(number),
+            part.task,
+            crate::Control::Cancel { reason: part.reason, grace: part.grace, message: part.message },
+            out,
+        );
+    }
     match decision.end {
         ProcedureEnd::Result(result) => {
             let ending = match result {
@@ -143,7 +155,8 @@ fn check(
     decision: &ProcedureDecision,
 ) -> Result<(), crate::Problem> {
     let task = record(domain, number).expect("step task checked");
-    if decision.amendments.len() > usize::try_from(env.limits.batch).expect("batch fits")
+    if decision.cancels.len() > usize::try_from(env.limits.batch).expect("batch fits")
+        || decision.amendments.len() > usize::try_from(env.limits.batch).expect("batch fits")
         || decision.messages.len() > usize::try_from(env.limits.batch).expect("batch fits")
         || decision.proposals.len() > 1
     {
@@ -221,6 +234,45 @@ fn check_parts(
         if let Some(problem) = crate::proposals::admission_problem(domain, &env.limits, proposal) {
             return Err(problem);
         }
+    }
+    check_cancels(domain, env, number, &decision.cancels)
+}
+
+fn check_cancels(
+    domain: &Domain,
+    env: &Env<Limits>,
+    number: u64,
+    cancels: &[crate::ProcedureCancel],
+) -> Result<(), crate::Problem> {
+    let mut staged = crate::compound::Staged::new(env.limits.tasks);
+    for part in cancels {
+        if record(domain, part.task).is_none() {
+            return Err(problem(part.task, Refusal::Unknown));
+        }
+        if !crate::control::allowed(domain, part.task, Party::Task(number), env.limits.tasks) {
+            return Err(problem(part.task, Refusal::Reference));
+        }
+        if staged.closing.as_slice().contains(&part.task) {
+            return Err(problem(part.task, Refusal::State));
+        }
+        let plan = match crate::control::check_cancel(
+            domain,
+            &staged,
+            env,
+            Party::Task(number),
+            crate::control::Cancel {
+                number: part.task,
+                reason: part.reason.clone(),
+                grace: part.grace,
+                message: part.message,
+            },
+        ) {
+            Ok(plan) => plan,
+            Err(problem) => return Err(*problem),
+        };
+        let plan = crate::compound::Plan::Cancel(Box::new(plan));
+        staged.after(domain, &plan);
+        assert!(staged.plans.push(plan).is_ok(), "cancel batch bounded");
     }
     Ok(())
 }

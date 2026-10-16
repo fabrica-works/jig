@@ -628,7 +628,7 @@ fn amending_procedure() -> Domain {
     let mut connector = domain();
     connector.config.procedures[0].actions = Box::new([
         crate::ProcedureAction::Delegate { kinds: Box::new([2]) },
-        crate::ProcedureAction::Amend { words: 12 },
+        crate::ProcedureAction::Amend { words: 12, priority: None },
     ]);
     drop(run(&mut connector, procedure_event(crate::ProcedureSignal::Activate)));
     drop(run(
@@ -651,7 +651,7 @@ fn an_amend_action_names_the_revision_it_was_told() {
         requests.last(),
         Some(&Request::Step {
             task: PROCEDURE_TASK,
-            decision: crate::StepDecision::Amend { task: DELEGATE_TASK, revision: 3, words: 12 },
+            decision: crate::StepDecision::Amend { task: DELEGATE_TASK, revision: 3, words: 12, priority: None },
         })
     );
 }
@@ -668,7 +668,7 @@ fn a_moved_refusal_makes_the_next_step_name_the_new_revision() {
         requests.last(),
         Some(&Request::Step {
             task: PROCEDURE_TASK,
-            decision: crate::StepDecision::Amend { task: DELEGATE_TASK, revision: 4, words: 12 },
+            decision: crate::StepDecision::Amend { task: DELEGATE_TASK, revision: 4, words: 12, priority: None },
         })
     );
 }

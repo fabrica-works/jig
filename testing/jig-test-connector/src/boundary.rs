@@ -329,7 +329,9 @@ pub enum ProcedureAction {
     /// Make a bounded batch of child tasks.
     Delegate { kinds: Box<[u16]> },
     /// Amend the delegate using the last revision told back.
-    Amend { words: u64 },
+    Amend { words: u64, priority: Option<u32> },
+    /// Ask the delegate to finish within its grace.
+    Cancel { grace: Duration },
     /// Send words to the delegate.
     Message { words: u64 },
     /// Ask a holder to widen this task's spending budget.
@@ -407,7 +409,8 @@ pub enum ProcedureSignal {
 pub enum StepDecision {
     Effect(Effect),
     Delegate { kinds: Box<[u16]> },
-    Amend { task: u64, revision: u64, words: u64 },
+    Amend { task: u64, revision: u64, words: u64, priority: Option<u32> },
+    Cancel { task: u64, grace: Duration },
     Message { task: u64, words: u64 },
     Propose { spend: u64 },
     Wait { deadline: Wall },

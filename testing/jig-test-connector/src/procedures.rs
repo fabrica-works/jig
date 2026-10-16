@@ -135,10 +135,22 @@ fn decide(
             state.awaiting = true;
             StepDecision::Delegate { kinds: kinds.clone() }
         }
-        ProcedureAction::Amend { words } => match state.delegate {
+        ProcedureAction::Amend { words, priority } => match state.delegate {
             Some(task) => {
                 state.awaiting = true;
-                StepDecision::Amend { task, revision: state.revision, words: *words }
+                StepDecision::Amend {
+                    task,
+                    revision: if priority.is_some() { 0 } else { state.revision },
+                    words: *words,
+                    priority: *priority,
+                }
+            }
+            None => StepDecision::Hold { reason: 0 },
+        },
+        ProcedureAction::Cancel { grace } => match state.delegate {
+            Some(task) => {
+                state.awaiting = true;
+                StepDecision::Cancel { task, grace: *grace }
             }
             None => StepDecision::Hold { reason: 0 },
         },
@@ -267,7 +279,10 @@ pub(crate) fn made(
         let advances = match program(domain, state.number) {
             Some(spec) => match spec.actions.get(usize::from(state.index)) {
                 Some(
-                    ProcedureAction::Delegate { .. } | ProcedureAction::Amend { .. } | ProcedureAction::Message { .. },
+                    ProcedureAction::Delegate { .. }
+                    | ProcedureAction::Amend { .. }
+                    | ProcedureAction::Cancel { .. }
+                    | ProcedureAction::Message { .. },
                 ) => true,
                 Some(
                     ProcedureAction::Effect { .. }

@@ -1,5 +1,6 @@
 use jig_core_world::Fault;
 use jig_core_world::effects::World;
+use jig_core_world::fixtures::finish_chat;
 use jig_domain_core as core;
 use jig_domain_tasks as tasks;
 use jig_test_domain as root;
@@ -216,12 +217,6 @@ fn a_fill_below_the_mark_admits_a_chat_again() {
     );
 }
 
-fn finish_chat(world: &mut World, cumulative: u64, words: &[u8]) {
-    world.end(
-        tasks::End::Finished { result: tasks::TaskResult::Report { words: words.into() }, cancel_delegates: false },
-        cumulative,
-    );
-}
 #[test]
 fn a_seen_chat_is_read_back_through_the_store_after_restart() {
     let mut world = World::new(127, false);

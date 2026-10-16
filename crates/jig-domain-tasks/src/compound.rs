@@ -53,7 +53,7 @@ impl Staged {
             funding: List::with_capacity(bound.saturating_mul(4)),
         }
     }
-    fn after(&mut self, domain: &Domain, plan: &Plan) {
+    pub(crate) fn after(&mut self, domain: &Domain, plan: &Plan) {
         match plan {
             Plan::Cancel(plan) => {
                 let closing = match &plan.finish {

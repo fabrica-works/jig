@@ -1,5 +1,5 @@
 use jig_core_world::effects::World;
-use jig_core_world::fixtures::{live_row, member};
+use jig_core_world::fixtures::{finish_chat, live_row, member, unchanged};
 use jig_domain_core as core;
 use jig_domain_tasks as tasks;
 use jig_test_connector as connector;
@@ -152,8 +152,10 @@ fn next_program_step(world: &mut World, task: u64) {
 
 #[test]
 fn a_procedure_amends_its_delegate_naming_the_revision_it_was_told() {
-    let (mut world, procedure) =
-        program_world(463, Some(delegate_program(connector::ProcedureAction::Amend { words: SPEC_WORDS })));
+    let (mut world, procedure) = program_world(
+        463,
+        Some(delegate_program(connector::ProcedureAction::Amend { words: SPEC_WORDS, priority: None })),
+    );
     run_program(&mut world, procedure);
     let child = live_row(&world, procedure).delegates[0];
     next_program_step(&mut world, procedure);
@@ -163,8 +165,10 @@ fn a_procedure_amends_its_delegate_naming_the_revision_it_was_told() {
 
 #[test]
 fn a_procedure_steps_again_after_its_amendment_is_refused_as_moved() {
-    let (mut world, procedure) =
-        program_world(464, Some(delegate_program(connector::ProcedureAction::Amend { words: SPEC_WORDS })));
+    let (mut world, procedure) = program_world(
+        464,
+        Some(delegate_program(connector::ProcedureAction::Amend { words: SPEC_WORDS, priority: None })),
+    );
     run_program(&mut world, procedure);
     let child = live_row(&world, procedure).delegates[0];
     let run = world.assignments[0];
@@ -265,4 +269,180 @@ fn a_procedure_proposes_a_widening_while_its_message_commits() {
         });
         proposal && message
     }));
+}
+
+const CANCEL_GRACE: skein_lib::Duration = skein_lib::Duration::from_secs(5);
+const PRIORITY: u32 = 7;
+
+#[test]
+fn a_procedure_cancels_its_delegate_with_a_grace_it_finishes_within() {
+    let (mut world, procedure) =
+        program_world(468, Some(delegate_program(connector::ProcedureAction::Cancel { grace: CANCEL_GRACE })));
+    run_program(&mut world, procedure);
+    let child = live_row(&world, procedure).delegates[0];
+    next_program_step(&mut world, procedure);
+    let grace = live_row(&world, child).grace.as_ref().expect("finish requested");
+    assert_eq!(grace.by, tasks::Party::Task(procedure));
+    assert_eq!(grace.reason.as_ref(), b"procedure cancelled delegate");
+    assert_eq!(world.inbound.last().expect("finish word").number, grace.message);
+    finish_chat(&mut world, 0, b"finished in time");
+    let key = root::Key::Core(core::Key::Tasks(tasks::Key::Ended(child)));
+    let Some(root::Record::Core(core::Record::Tasks(tasks::Stored::Ended(row)))) = world.store.rows.get(&key) else {
+        panic!("delegate ended")
+    };
+    assert_eq!(
+        row.phase,
+        tasks::Phase::Ended(tasks::Ending::Done(tasks::TaskResult::Report {
+            words: b"finished in time".as_slice().into(),
+        }))
+    );
+}
+
+#[test]
+fn a_procedure_asked_to_finish_by_a_grace_steps_as_on_an_amendment() {
+    let (mut world, procedure) = procedure_world(469);
+    decide(&mut world, procedure, core::ProcedureStep::new(core::StepEnd::Wait));
+    let before = world.procedure_inputs.len();
+    jig_core_world::stories::reads::request(
+        &mut world,
+        75,
+        jig_domain_people::Ask::Cancel {
+            project: 1,
+            task: procedure,
+            reason: b"finish procedure".as_slice().into(),
+            grace: Some(CANCEL_GRACE),
+        },
+    );
+    assert_eq!(world.procedure_inputs.len(), before + 1);
+    let (step, _, _, context) = world.procedure_inputs.last().expect("finish wake");
+    assert_eq!(*step, 2);
+    assert_eq!(live_row(&world, procedure).grace.as_ref().expect("durable grace").reason.as_ref(), b"finish procedure");
+    assert_eq!(context.inbox.last().expect("finish amendment").kind, tasks::MessageKind::Amendment { revision: 1 });
+    decide(
+        &mut world,
+        procedure,
+        core::ProcedureStep::new(core::StepEnd::Result(tasks::TaskResult::Report {
+            words: b"finished".as_slice().into(),
+        })),
+    );
+    assert!(world.store.rows.contains_key(&root::Key::Core(core::Key::Tasks(tasks::Key::Ended(procedure)))));
+}
+
+fn move_delegate(world: &mut World, child: u64) {
+    let run = world.assignments[0];
+    world.send(root::Event::Core(core::Event::NamedAction {
+        to: ReplyTo::new(Token::new(AMEND_CALL)),
+        key: core::CallKey { task: run.0, attempt: run.1, completion: MOVED_COMPLETION, position: 0 },
+        action: core::NamedAction::Amend {
+            target: child,
+            revision: 0,
+            amendment: tasks::Amendment {
+                tracked: Some(tasks::Tracking::Tracked { priority: 1 }),
+                spec: Some(tasks::Spec {
+                    words: b"new spec".as_slice().into(),
+                    parameters: Box::new([]),
+                    inputs: Box::new([]),
+                }),
+                ..unchanged(b"")
+            },
+        },
+    }));
+}
+
+#[test]
+fn a_procedures_priority_change_names_no_revision_and_commits_after_a_spec_change() {
+    let (mut world, procedure) = program_world(
+        470,
+        Some(delegate_program(connector::ProcedureAction::Amend { words: SPEC_WORDS, priority: Some(PRIORITY) })),
+    );
+    run_program(&mut world, procedure);
+    let child = live_row(&world, procedure).delegates[0];
+    move_delegate(&mut world, child);
+    assert_eq!(live_row(&world, child).revisions.spec, 1);
+    next_program_step(&mut world, procedure);
+    assert_eq!(live_row(&world, child).tracked, Some(PRIORITY));
+    assert_eq!(live_row(&world, child).spec.words.as_ref(), b"new spec");
+    assert_eq!(live_row(&world, child).revisions.spec, 1);
+    let key = root::Key::Connector { number: CONNECTOR, key: connector::RecordKey::Procedure(procedure) };
+    let Some(root::Record::Connector { record: connector::Record::Procedure(state), .. }) = world.store.rows.get(&key)
+    else {
+        panic!("procedure state committed")
+    };
+    assert_eq!(state.steps, 2, "the priority step had no moved retry");
+}
+
+fn assert_cancel_refused(world: &mut World, procedure: u64, child: u64, cancels: Box<[core::StepCancel]>) {
+    world.send(root::Event::Core(core::Event::Tasks(tasks::Event::WakeProcedure { task: procedure })));
+    let before = live_row(world, child).clone();
+    let parent = live_row(world, procedure).clone();
+    decide(
+        world,
+        procedure,
+        core::ProcedureStep {
+            messages: Box::new([core::StepMessage {
+                target: child,
+                kind: tasks::MessageKind::Words,
+                words: b"atomic".as_slice().into(),
+            }]),
+            cancels,
+            ..core::ProcedureStep::new(core::StepEnd::Wait)
+        },
+    );
+    assert_eq!(live_row(world, child), &before);
+    assert_eq!(live_row(world, procedure), &parent);
+}
+
+#[test]
+fn a_cancel_of_an_unknown_task_leaves_the_whole_procedure_step_unmade() {
+    let (mut world, procedure) = procedure_world(471);
+    let child = make_delegate(&mut world, procedure);
+    assert_cancel_refused(
+        &mut world,
+        procedure,
+        child,
+        Box::new([core::StepCancel { task: u64::MAX, reason: Box::new([]), grace: None }]),
+    );
+}
+
+#[test]
+fn a_cancel_of_itself_leaves_the_whole_procedure_step_unmade() {
+    let (mut world, procedure) = procedure_world(472);
+    let child = make_delegate(&mut world, procedure);
+    assert_cancel_refused(
+        &mut world,
+        procedure,
+        child,
+        Box::new([core::StepCancel { task: procedure, reason: Box::new([]), grace: None }]),
+    );
+}
+
+#[test]
+fn a_cancel_past_the_grace_bound_leaves_the_whole_procedure_step_unmade() {
+    let (mut world, procedure) = procedure_world(473);
+    let child = make_delegate(&mut world, procedure);
+    assert_cancel_refused(
+        &mut world,
+        procedure,
+        child,
+        Box::new([core::StepCancel {
+            task: child,
+            reason: Box::new([]),
+            grace: Some(skein_lib::Duration::from_secs(601)),
+        }]),
+    );
+}
+
+#[test]
+fn a_duplicate_cancel_leaves_the_whole_procedure_step_unmade() {
+    let (mut world, procedure) = procedure_world(474);
+    let child = make_delegate(&mut world, procedure);
+    assert_cancel_refused(
+        &mut world,
+        procedure,
+        child,
+        Box::new([
+            core::StepCancel { task: child, reason: Box::new([]), grace: None },
+            core::StepCancel { task: child, reason: Box::new([]), grace: None },
+        ]),
+    );
 }

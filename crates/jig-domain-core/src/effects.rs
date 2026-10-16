@@ -778,7 +778,7 @@ fn origin_current(core: &Core, connector: u16, origin: &EffectOrigin) -> bool {
         EffectOrigin::Projection { goal, entry } => {
             core.connectors.contains(&connector)
                 && match core.tasks.task(*goal) {
-                    Some(row) => row.tracked.is_some(),
+                    Some(row) => row.tracked.is_some() || core.projections.contains_key(goal),
                     None => core.projections.contains_key(goal),
                 }
                 && match entry {

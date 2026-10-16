@@ -152,3 +152,27 @@ pub fn person_unchanged(reason: &[u8]) -> jig_domain_people::Amendment {
         reason: reason.into(),
     }
 }
+
+/// Finish the assigned chat with a report.
+pub fn finish_chat(world: &mut crate::effects::World, cumulative: u64, words: &[u8]) {
+    world.end(
+        tasks::End::Finished { result: tasks::TaskResult::Report { words: words.into() }, cancel_delegates: false },
+        cumulative,
+    );
+}
+
+/// A task amendment retaining every setting.
+#[must_use]
+pub fn unchanged(reason: &[u8]) -> tasks::Amendment {
+    tasks::Amendment {
+        tracked: None,
+        addressed: None,
+        instructions: None,
+        release: None,
+        spec: None,
+        wake: None,
+        dependencies: None,
+        authority: None,
+        reason: reason.into(),
+    }
+}
