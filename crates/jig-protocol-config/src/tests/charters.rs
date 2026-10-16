@@ -26,10 +26,6 @@ fn a_charter_time_not_above_its_reserve_is_refused() {
     refuses(br#""time_ms": 30000"#, br#""time_ms": 5000"#, What::Reserve { charter: 1 });
 }
 
-fn a_chats_charter_not_offered_is_refused() {
-    refuses(br#""chats": {"charter": 1"#, br#""chats": {"charter": 2"#, What::Refers);
-}
-
 fn a_charter_naming_an_unknown_model_is_refused() {
     refuses(br#""model": "small""#, br#""model": "absent""#, What::Refers);
 }
@@ -62,7 +58,6 @@ fn charters_configuration_problems_name_the_invalid_fields() {
         ),
         ("a_charter_turns_not_above_its_reserve_are_refused", a_charter_turns_not_above_its_reserve_are_refused),
         ("a_charter_time_not_above_its_reserve_is_refused", a_charter_time_not_above_its_reserve_is_refused),
-        ("a_chats_charter_not_offered_is_refused", a_chats_charter_not_offered_is_refused),
         ("a_charter_naming_an_unknown_model_is_refused", a_charter_naming_an_unknown_model_is_refused),
     ]);
 }

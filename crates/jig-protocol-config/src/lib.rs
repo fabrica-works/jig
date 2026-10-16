@@ -4,8 +4,8 @@
 extern crate alloc;
 use alloc::boxed::Box;
 mod charters;
-pub use charters::Chats;
 mod core;
+mod templates;
 pub use core::core;
 mod domain;
 mod projects;
@@ -47,7 +47,7 @@ pub struct Engine {
     pub connectors: Box<[u16]>,
     pub memory: u64,
     pub charters: Box<[jig_domain_core::Charter]>,
-    pub chats: Chats,
+    pub templates: Box<[jig_domain_core::Template]>,
     pub llm: Llm,
     pub hosts: Hosts,
     pub clients: Clients,
@@ -90,12 +90,11 @@ pub fn engine(document: &skein_json::Document, at: u32) -> Result<Engine, Proble
     {
         charters = charters::parse(document, at, &path.member(b"charters"), llm, &limits, &mut problems);
     }
-    let at = object.required(document, b"chats", &path, &mut problems);
-    let mut chats = None;
+    let at = object.required(document, b"templates", &path, &mut problems);
+    let mut templates = None;
     if let Some(at) = at {
         let offered = charters.as_deref().unwrap_or(&[]);
-        let bound = limits.core.tasks.grace;
-        chats = charters::chats(document, at, &path.member(b"chats"), offered, bound, &mut problems);
+        templates = templates::templates(document, at, &path.member(b"templates"), offered, &limits, &mut problems);
     }
     let mut deployment = None;
     if let Some(at) = object.required(document, b"deployment", &path, &mut problems) {
@@ -133,7 +132,7 @@ pub fn engine(document: &skein_json::Document, at: u32) -> Result<Engine, Proble
         owners: Box::default(),
         memory: memory.expect("required member checked"),
         charters: charters.expect("required member checked"),
-        chats: chats.expect("required member checked"),
+        templates: templates.expect("required member checked"),
         llm: llm.expect("required member checked"),
         hosts: hosts.expect("required member checked"),
         clients: clients.expect("required member checked"),

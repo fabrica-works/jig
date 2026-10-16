@@ -1,0 +1,329 @@
+//! Configured defaults for client shapes of work (configuration.md, 3.1).
+use crate::{Limits, Path, Problems, What, check, read};
+use alloc::boxed::Box;
+use jig_domain_core::{Charter, Template};
+use jig_domain_people::{TemplateBudget, TemplateDeadline, TemplateExecutor};
+use jig_domain_tasks as tasks;
+use skein_json::{Document, document::Kind};
+use skein_lib::{Duration, List};
+
+pub(crate) fn templates(
+    document: &Document,
+    at: u32,
+    path: &Path,
+    charters: &[Charter],
+    limits: &Limits,
+    problems: &mut Problems,
+) -> Option<Box<[Template]>> {
+    let items = report_list(read::list(document, at, limits.core.templates), path, problems)?;
+    let mut templates = List::<Template>::with_capacity(items.len());
+    for (index, at) in items.iter().enumerate() {
+        let path = check::index(path, index);
+        if let Some(template) = template(document, *at, &path, limits, problems) {
+            for previous in &templates {
+                if previous.number == template.number {
+                    problems.push(path.member(b"number"), What::Unique);
+                    break;
+                }
+            }
+            match template.executor {
+                TemplateExecutor::Charter(number) => {
+                    let mut configured = false;
+                    for charter in charters {
+                        configured |= charter.number == number;
+                    }
+                    if !configured {
+                        problems.push(path.member(b"executor"), What::Refers);
+                    }
+                }
+                TemplateExecutor::Chosen => {}
+            }
+            templates.push(template).expect("bounded templates");
+        }
+    }
+    let templates = templates.into_boxed();
+    if chat(&templates).is_none() {
+        problems.push(path.clone(), What::Refers);
+    }
+    Some(templates)
+}
+/// Transitional until jig 16 removes the engine's chat operations.
+pub(crate) fn chat(templates: &[Template]) -> Option<(u32, Duration)> {
+    for template in templates {
+        if template.number == 1 {
+            return match template.executor {
+                TemplateExecutor::Charter(charter) => Some((charter, template.grace?)),
+                TemplateExecutor::Chosen => None,
+            };
+        }
+    }
+    None
+}
+
+fn report(value: Result<u64, What>, path: &Path, problems: &mut Problems) -> Option<u64> {
+    match value {
+        Ok(value) => Some(value),
+        Err(what) => {
+            problems.push(path.clone(), what);
+            None
+        }
+    }
+}
+fn report_list(value: Result<List<u32>, What>, path: &Path, problems: &mut Problems) -> Option<List<u32>> {
+    match value {
+        Ok(value) => Some(value),
+        Err(what) => {
+            problems.push(path.clone(), what);
+            None
+        }
+    }
+}
+fn template(document: &Document, at: u32, path: &Path, limits: &Limits, problems: &mut Problems) -> Option<Template> {
+    let mut object = check::object(document, at, path, problems)?;
+    let number = check::count(&mut object, document, b"number", path, problems);
+    let name = match object.required(document, b"name", path, problems) {
+        Some(at) => match read::text(document, at, limits.core.documents.text_bytes) {
+            Ok(name) => Some(name),
+            Err(what) => {
+                problems.push(path.member(b"name"), what);
+                None
+            }
+        },
+        None => None,
+    };
+    let executor = match object.required(document, b"executor", path, problems) {
+        Some(at) => executor(document, at, &path.member(b"executor"), problems),
+        None => None,
+    };
+    let contract = match object.required(document, b"contract", path, problems) {
+        Some(at) => contract(document, at, &path.member(b"contract"), &limits.core.tasks, problems),
+        None => None,
+    };
+    let shallower = check::count(&mut object, document, b"shallower", path, problems);
+    let budget = match object.required(document, b"budget", path, problems) {
+        Some(at) => budget(document, at, &path.member(b"budget"), problems),
+        None => None,
+    };
+    let deadline = match object.required(document, b"deadline", path, problems) {
+        Some(at) => deadline(document, at, &path.member(b"deadline"), problems),
+        None => None,
+    };
+    let tracked = match object.required(document, b"tracked", path, problems) {
+        Some(at) => priority(document, at, &path.member(b"tracked"), problems),
+        None => Err(What::Missing),
+    };
+    let conversation = check::boolean(&mut object, document, b"conversation", path, problems);
+    let listed = check::boolean(&mut object, document, b"listed", path, problems);
+    let retention = check::text(&mut object, document, b"retention", path, problems);
+    let label = check::count(&mut object, document, b"label", path, problems);
+    let grace = match object.required(document, b"grace_ms", path, problems) {
+        Some(at) => grace(document, at, &path.member(b"grace_ms"), problems),
+        None => Err(What::Missing),
+    };
+    object.finish(document, path, problems);
+    let retention = match retention?.as_ref() {
+        b"kept" => tasks::Retention::Kept,
+        b"forgotten_once_read" => tasks::Retention::ForgottenOnceRead,
+        _ => {
+            problems.push(path.member(b"retention"), What::Form);
+            return None;
+        }
+    };
+    let template = Template {
+        number: number?,
+        name: name?,
+        executor: executor?,
+        contract: contract?,
+        shallower: shallower?,
+        budget: budget?,
+        deadline: deadline?,
+        tracked: tracked.ok()?,
+        flags: tasks::Flags { conversation: conversation?, listed: listed?, retention },
+        label: label?,
+        grace: grace.ok()?,
+    };
+    if template.number == 0 {
+        problems.push(path.member(b"number"), What::Bound);
+    }
+    if let Some(grace) = template.grace
+        && grace > limits.core.tasks.grace
+    {
+        problems.push(path.member(b"grace_ms"), What::Grace { template: template.number });
+    }
+    Some(template)
+}
+fn null(document: &Document, at: u32) -> bool {
+    match document.token(at) {
+        Some(token) => token.kind == Kind::Null,
+        None => false,
+    }
+}
+fn named(document: &Document, at: u32, name: &[u8]) -> bool {
+    match read::text(document, at, 32) {
+        Ok(text) => text.as_ref() == name,
+        Err(_) => false,
+    }
+}
+fn form_object(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> Option<read::Object> {
+    if let Some(token) = document.token(at)
+        && token.kind == Kind::String
+    {
+        problems.push(path.clone(), What::Form);
+        return None;
+    }
+    check::object(document, at, path, problems)
+}
+pub(crate) fn executor(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> Option<TemplateExecutor> {
+    if named(document, at, b"chosen") {
+        return Some(TemplateExecutor::Chosen);
+    }
+    let mut object = form_object(document, at, path, problems)?;
+    let number = if object.member(document, b"charter").is_some() {
+        check::count(&mut object, document, b"charter", path, problems)
+    } else {
+        problems.push(path.clone(), What::Form);
+        None
+    };
+    object.finish(document, path, problems);
+    Some(TemplateExecutor::Charter(number?))
+}
+pub(crate) fn budget(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> Option<TemplateBudget> {
+    if named(document, at, b"given") {
+        return Some(TemplateBudget::Given);
+    }
+    let mut object = form_object(document, at, path, problems)?;
+    let value = if let Some(at) = object.member(document, b"amount") {
+        Some(TemplateBudget::Amount(report(read::integer(document, at, u64::MAX), &path.member(b"amount"), problems)?))
+    } else if let Some(at) = object.member(document, b"as_allowed") {
+        if null(document, at) {
+            Some(TemplateBudget::AsAllowed { cap: None })
+        } else {
+            Some(TemplateBudget::AsAllowed {
+                cap: Some(report(read::integer(document, at, u64::MAX), &path.member(b"as_allowed"), problems)?),
+            })
+        }
+    } else {
+        problems.push(path.clone(), What::Form);
+        None
+    };
+    object.finish(document, path, problems);
+    value
+}
+pub(crate) fn deadline(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> Option<TemplateDeadline> {
+    if named(document, at, b"given") {
+        return Some(TemplateDeadline::Given);
+    }
+    if named(document, at, b"none") {
+        return Some(TemplateDeadline::None);
+    }
+    let mut object = form_object(document, at, path, problems)?;
+    let span = if object.member(document, b"span_ms").is_some() {
+        check::duration(&mut object, document, b"span_ms", path, problems)
+    } else {
+        problems.push(path.clone(), What::Form);
+        None
+    };
+    object.finish(document, path, problems);
+    Some(TemplateDeadline::Span(span?))
+}
+fn grace(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> Result<Option<Duration>, What> {
+    if null(document, at) {
+        return Ok(None);
+    }
+    match read::duration(document, at) {
+        Ok(span) => Ok(Some(span)),
+        Err(what) => {
+            problems.push(path.clone(), what);
+            Err(what)
+        }
+    }
+}
+fn priority(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> Result<Option<u32>, What> {
+    if null(document, at) {
+        return Ok(None);
+    }
+    let mut object = check::object(document, at, path, problems).ok_or(What::Kind)?;
+    let value = check::count(&mut object, document, b"priority", path, problems);
+    object.finish(document, path, problems);
+    Ok(Some(value.ok_or(What::Bound)?))
+}
+
+fn contract(
+    document: &Document,
+    at: u32,
+    path: &Path,
+    limits: &tasks::Limits,
+    problems: &mut Problems,
+) -> Option<tasks::Contract> {
+    let mut object = check::object(document, at, path, problems)?;
+    let value = if let Some(at) = object.member(document, b"report") {
+        let path = path.member(b"report");
+        let mut report = check::object(document, at, &path, problems)?;
+        let words = check::count(&mut report, document, b"words", &path, problems);
+        report.finish(document, &path, problems);
+        Some(tasks::Contract::Report { words: words? })
+    } else if let Some(at) = object.member(document, b"change") {
+        change(document, at, &path.member(b"change"), problems)
+    } else if let Some(at) = object.member(document, b"verdict") {
+        verdict(document, at, &path.member(b"verdict"), limits, problems)
+    } else {
+        problems.push(path.clone(), What::Form);
+        return None;
+    };
+    object.finish(document, path, problems);
+    let value = value?;
+    if !tasks::valid_contract(limits, &value) {
+        problems.push(path.clone(), What::Bound);
+    }
+    Some(value)
+}
+fn change(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> Option<tasks::Contract> {
+    let mut object = check::object(document, at, path, problems)?;
+    let connector = check::short(&mut object, document, b"connector", path, problems);
+    let kind = check::short(&mut object, document, b"kind", path, problems);
+    let words = check::count(&mut object, document, b"words", path, problems);
+    object.finish(document, path, problems);
+    Some(tasks::Contract::Change { connector: connector?, kind: kind?, words: words? })
+}
+fn verdict(
+    document: &Document,
+    at: u32,
+    path: &Path,
+    limits: &tasks::Limits,
+    problems: &mut Problems,
+) -> Option<tasks::Contract> {
+    let mut object = check::object(document, at, path, problems)?;
+    let items = check::list(&mut object, document, b"choices", limits.contract_choices, path, problems);
+    object.finish(document, path, problems);
+    let items = items?;
+    let mut choices = List::with_capacity(items.len());
+    for (index, at) in items.iter().enumerate() {
+        let path = check::index(&path.member(b"choices"), index);
+        let mut object = check::object(document, *at, &path, problems)?;
+        let code = check::count(&mut object, document, b"code", &path, problems);
+        let words = check::count(&mut object, document, b"words", &path, problems);
+        let followups = check::count(&mut object, document, b"followups", &path, problems);
+        let fields = match object.required(document, b"fields", &path, problems) {
+            Some(at) => fields(document, at, &path.member(b"fields"), problems),
+            None => None,
+        };
+        object.finish(document, &path, problems);
+        choices
+            .push(tasks::Verdict { code: code?, words: words?, followups: followups?, fields: fields? })
+            .expect("bounded choices");
+    }
+    Some(tasks::Contract::Verdict { choices: choices.into_boxed() })
+}
+fn fields(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> Option<Box<[tasks::FieldRule]>> {
+    let items = report_list(read::list(document, at, document.len()), path, problems)?;
+    let mut fields = List::with_capacity(items.len());
+    for (index, at) in items.iter().enumerate() {
+        let path = check::index(path, index);
+        let mut object = check::object(document, *at, &path, problems)?;
+        let name = check::text(&mut object, document, b"name", &path, problems);
+        let max = check::count(&mut object, document, b"max", &path, problems);
+        object.finish(document, &path, problems);
+        fields.push(tasks::FieldRule { name: name?, max: max? }).expect("bounded fields");
+    }
+    Some(fields.into_boxed())
+}

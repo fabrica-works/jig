@@ -294,6 +294,8 @@ pub enum Now {
 /// Limits of the core's child routes.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Limits {
+    /// Configured templates and overrides per project policy.
+    pub templates: u32,
     /// Store map bytes at or above which new party work is refused (store.md, 11.2).
     pub fill_mark: u64,
     /// Number of numbered connectors retained by the core.

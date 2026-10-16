@@ -75,7 +75,10 @@ const ENGINE: &[u8] = br#"{
 "turns": 4, "time_ms": 30000, "reserve_turns": 1, "reserve_time_ms": 5000, "spend": 20,
 "inspect": false, "modify": false, "shell": false, "agents": false, "call_timeout_ms": 10000
 }],
-"chats": {"charter": 1, "close_grace_ms": 5000},
+"templates": [
+{"number": 1, "name": "chat", "executor": {"charter": 1}, "contract": {"report": {"words": 32}}, "shallower": 1, "budget": {"as_allowed": null}, "deadline": "none", "tracked": null, "conversation": true, "listed": false, "retention": "kept", "label": 1, "grace_ms": 5000},
+{"number": 2, "name": "goal", "executor": "chosen", "contract": {"report": {"words": 32}}, "shallower": 1, "budget": "given", "deadline": "given", "tracked": {"priority": 1}, "conversation": false, "listed": true, "retention": "kept", "label": 2, "grace_ms": null}
+],
 "clients": {
 "listener": {"socket": "127.0.0.1:7100"},
 "heartbeat_ms": 10000,

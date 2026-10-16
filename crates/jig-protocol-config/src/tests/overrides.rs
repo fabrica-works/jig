@@ -248,6 +248,7 @@ const SMALL: &[(&[u8], u64)] = &[
     (b"core.brief_core_budgets.attempts", 1_024),
     (b"core.brief_core_budgets.plan", 2_048),
     (b"core.brief_core_budgets.notes", 2_048),
+    (b"core.templates", 8),
     (b"core.fill_mark", 268_435_456),
     (b"core.connectors", 2),
     (b"core.resume_bytes", 65_536),

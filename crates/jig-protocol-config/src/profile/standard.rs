@@ -10,7 +10,7 @@
 //! **views**: `runs=32, watchers=16, facts=256`.
 //! **notes**: `scopes=16, entries_per_scope=64, body_bytes=8192, lines=8, recalled=8`.
 //! **documents**: `rows=8, text_bytes=8192, chips=8, lines=8`.
-//! **core**: `fill_mark=1073741824, connectors=4, load_slots=16, call_records=128, tasks=TASKS, authority=AUTHORITY, people=PEOPLE, fleet=FLEET, brief=BRIEF, accounts=ACCOUNTS, notes=NOTES, views=VIEWS, resume_bytes=262144, run_bytes=65536, documents=DOCUMENTS`.
+//! **core**: `templates=16, fill_mark=1073741824, connectors=4, load_slots=16, call_records=128, tasks=TASKS, authority=AUTHORITY, people=PEOPLE, fleet=FLEET, brief=BRIEF, accounts=ACCOUNTS, notes=NOTES, views=VIEWS, resume_bytes=262144, run_bytes=65536, documents=DOCUMENTS`.
 //! **hub**: `slots=4, accounts=32, facts=256, told=256`.
 //! **link**: `opening=16, facts=256`.
 use super::small;
@@ -96,6 +96,7 @@ pub(super) const NOTES: notes::Limits =
 pub(super) const DOCUMENTS: core::documents::DocumentLimits =
     core::documents::DocumentLimits { rows: 8, text_bytes: 8_192, chips: 8, lines: 8, ..small::DOCUMENTS };
 pub(super) const CORE: core::Limits = core::Limits {
+    templates: 16,
     fill_mark: 1_073_741_824,
     connectors: 4,
     load_slots: 16,

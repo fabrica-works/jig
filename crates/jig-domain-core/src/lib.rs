@@ -10,6 +10,8 @@
 
 extern crate alloc;
 
+pub mod templates;
+pub use templates::Template;
 pub mod acts;
 mod amendments;
 mod authority_facts;

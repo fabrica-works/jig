@@ -54,6 +54,8 @@
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 extern crate alloc;
+mod templates;
+pub use templates::{TemplateBudget, TemplateDeadline, TemplateExecutor};
 mod amendment;
 mod boundary;
 mod capacity;

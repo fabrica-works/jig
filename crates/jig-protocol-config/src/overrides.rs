@@ -399,6 +399,7 @@ fn set_documents(limits: &mut jig_domain_core::documents::DocumentLimits, name: 
 
 fn set_core(limits: &mut jig_domain_core::Limits, name: &[u8], value: u64) -> Result<(), What> {
     let jig_domain_core::Limits {
+        templates,
         fill_mark,
         connectors,
         resume_bytes,
@@ -423,6 +424,7 @@ fn set_core(limits: &mut jig_domain_core::Limits, name: &[u8], value: u64) -> Re
     } = limits;
     let jig_domain_core::CoreBriefBudgets { task, dependencies, attempts, plan, notes } = brief_core_budgets;
     match name {
+        b"templates" => *templates = count(value)?,
         b"fill_mark" => *fill_mark = value,
         b"connectors" => *connectors = count(value)?,
         b"resume_bytes" => *resume_bytes = count(value)?,

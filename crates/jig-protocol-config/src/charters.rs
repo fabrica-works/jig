@@ -5,38 +5,6 @@ use jig_domain_core::{Charter, Model, RunPolicy};
 use jig_domain_fleet::Kinds;
 use skein_json::Document;
 use skein_lib::List;
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct Chats {
-    pub charter: u32,
-    pub close_grace: skein_lib::Duration,
-}
-pub(crate) fn chats(
-    document: &Document,
-    at: u32,
-    path: &Path,
-    charters: &[Charter],
-    grace: skein_lib::Duration,
-    problems: &mut Problems,
-) -> Option<Chats> {
-    let mut object = check::object(document, at, path, problems)?;
-    let charter = check::count(&mut object, document, b"charter", path, problems);
-    let close_grace = check::duration(&mut object, document, b"close_grace_ms", path, problems);
-    object.finish(document, path, problems);
-    let charter = charter?;
-    let mut offered = false;
-    for configured in charters {
-        offered |= configured.number == charter;
-    }
-    if !offered {
-        problems.push(path.member(b"charter"), What::Refers);
-    }
-    let close_grace = close_grace?;
-    if close_grace > grace {
-        problems.push(path.member(b"close_grace_ms"), What::Bound);
-    }
-    Some(Chats { charter, close_grace })
-}
-
 pub(crate) fn parse(
     document: &Document,
     at: u32,

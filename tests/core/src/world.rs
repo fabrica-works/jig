@@ -114,6 +114,7 @@ pub fn limits() -> root::Limits {
         routes: 200,
         connector: jig_test_connector_world::LIMITS,
         core: core::Limits {
+            templates: 8,
             fill_mark: 1000,
             documents: core::documents::DocumentLimits {
                 rows: 32,

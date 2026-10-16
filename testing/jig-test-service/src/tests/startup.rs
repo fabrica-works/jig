@@ -19,3 +19,10 @@ fn an_in_process_engine_address_naming_no_listener_is_refused() {
         assert_eq!(problem.what, What::Refers, "{label}");
     }
 }
+
+#[test]
+fn a_template_grace_past_the_tasks_limit_refuses_the_service_start() {
+    let document = fixtures::with(&fixtures::engine_document(), br#""grace_ms": 5000"#, br#""grace_ms": 600001"#);
+    let found = crate::named(&document).expect_err("template grace");
+    assert_eq!(found.problems.get(0).expect("problem").what, What::Grace { template: 1 });
+}

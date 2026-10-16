@@ -51,6 +51,7 @@ pub enum What {
     Reserve { charter: u32 },
     Budget { charter: u32 },
     Accounts { charter: u32 },
+    Grace { template: u32 },
     Message,
     Silence,
     StopBound,

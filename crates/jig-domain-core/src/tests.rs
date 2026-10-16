@@ -115,6 +115,7 @@ fn limits() -> Limits {
         history: 2,
     };
     Limits {
+        templates: 8,
         fill_mark: 1000,
         documents: DocumentLimits {
             rows: 32,

@@ -243,8 +243,3 @@ fn table<const N: usize>(cases: [Case; N]) {
     }
     assert!(passed, "{failures:?}");
 }
-
-#[test]
-fn a_chat_close_grace_past_the_tasks_limit_refuses_the_start() {
-    refuses(br#""close_grace_ms": 5000"#, br#""close_grace_ms": 600001"#, What::Bound);
-}
