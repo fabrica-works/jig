@@ -161,7 +161,7 @@ pub(crate) fn close(core: &Core, party: u64, row: &tasks::TaskRecord) -> Result<
     if core.chat_requester(row) != Some(party) {
         return Err(people::Refusal::Unknown);
     }
-    if row.chat_close.is_some() {
+    if row.grace.is_some() {
         return Err(people::Refusal::NotWaiting);
     }
     mutable(row)?;

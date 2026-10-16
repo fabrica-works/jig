@@ -57,7 +57,7 @@ fn the_complete_last_batch_survives_skips_endings_restart_and_rejected_replaceme
             reply_to: to(),
             by: Party::Task(100),
             task: child,
-            control: Control::Cancel { reason: Box::new([]) },
+            control: Control::Cancel { reason: Box::new([]), grace: None, message: None },
         });
         test.send(Event::EffectsSettled { task: child });
         test.send(Event::Settled { task: child });

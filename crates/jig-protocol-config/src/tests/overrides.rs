@@ -147,6 +147,7 @@ const SMALL: &[(&[u8], u64)] = &[
     (b"tasks.hold_bytes", 1_024),
     (b"tasks.hold_waiters", 8),
     (b"tasks.hold_wait_ms", 120_000),
+    (b"tasks.grace_ms", 600_000),
     (b"tasks.inputs", 8),
     (b"tasks.spec_bytes", 4_096),
     (b"tasks.parameters", 4),

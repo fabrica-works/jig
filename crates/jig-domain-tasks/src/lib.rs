@@ -74,6 +74,7 @@ mod escalation;
 mod facts;
 mod failures;
 mod flags;
+mod grace;
 pub use flags::{Flags, Retention};
 mod funders;
 mod hold_origin;
@@ -118,7 +119,7 @@ pub use boundary::{
     Verdict, WakePolicy, WakeRule, Was, Word, Writer, WriterSlot,
 };
 pub use capacity::{Capacity, CapacityAction, CapacityCause, CapacityRefusal};
-pub use chat::{Disposal, Grace, Keep};
+pub use chat::{Disposal, Keep};
 pub use control::{
     AddressChange, Amendment, AmendmentHistory, Change, Control, History, Milestone, Settings, address_admit,
     instruction_admit,
@@ -128,6 +129,7 @@ pub use escalation::{Escalation, EscalationContext, EscalationDecision, Escalati
 pub use facts::Fact;
 pub use failures::{Class, Retries, Retry, Tries};
 pub use funders::FundingRecord;
+pub use grace::Grace;
 pub use holds::valid_name;
 pub use limits::{Limits, worst_case};
 pub use owned::{phase_bytes, stored_bytes, task_bytes, terminal_bytes};

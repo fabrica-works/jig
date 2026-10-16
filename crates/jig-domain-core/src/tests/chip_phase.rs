@@ -201,7 +201,7 @@ fn chip_closing_names_the_connectors_waited_on_without_counting_their_effects() 
             reply_to: ReplyTo::new(Token::new(200)),
             by: tasks::Party::Person(1),
             task: 4,
-            control: tasks::Control::Cancel { reason: Box::from(&b"done"[..]) },
+            control: tasks::Control::Cancel { reason: Box::from(&b"done"[..]), grace: None, message: None },
         }),
     );
     finish_watch_outputs(&mut core, &limits);

@@ -19,7 +19,7 @@ pub(crate) struct Task {
     pub published: Option<Box<TaskRecord>>,
     pub record: TaskRecord,
     pub alarm: Option<Alarm>,
-    pub chat_alarm: Option<Alarm>,
+    pub grace_alarm: Option<Alarm>,
     pub procedure_offered: Option<u64>,
     pub observed_hold: Option<crate::Hold>,
     pub observed_phase: Option<Phase>,
@@ -42,7 +42,7 @@ pub struct Domain {
     pub(crate) names: Map<u64, Id<Task>>,
     pub(crate) stubs: Map<u64, crate::Stub>,
     pub(crate) alarms: Deadlines<u64>,
-    pub(crate) chat_alarms: Deadlines<u64>,
+    pub(crate) grace_alarms: Deadlines<u64>,
     pub(crate) timers: Deadlines<u64>,
     pub(crate) wakes: Deadlines<u64>,
     pub(crate) proposal_alarms: Deadlines<u64>,
@@ -96,7 +96,7 @@ impl Domain {
         let mut next: Option<Time> = None;
         for at in [
             self.alarms.next(),
-            self.chat_alarms.next(),
+            self.grace_alarms.next(),
             self.timers.next(),
             self.wakes.next(),
             self.proposal_alarms.next(),
@@ -159,7 +159,7 @@ impl Domain {
             names: Map::with_capacity(limits.tasks),
             stubs: Map::with_capacity(crate::limits::stub_capacity(limits).expect("valid stub bound")),
             alarms: Deadlines::with_capacity(limits.tasks),
-            chat_alarms: Deadlines::with_capacity(limits.tasks),
+            grace_alarms: Deadlines::with_capacity(limits.tasks),
             timers: Deadlines::with_capacity(limits.tasks.checked_mul(limits.subscriptions).expect("timer room")),
             wakes: Deadlines::with_capacity(limits.tasks),
             proposal_alarms: Deadlines::with_capacity(limits.tasks),
@@ -671,7 +671,7 @@ pub fn fire(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     if !domain.ready() {
         return;
     }
-    crate::chat::fire(domain, env, out);
+    crate::grace::fire(domain, env, out);
     crate::subscriptions::timer_due(domain, env, out);
     crate::wake::fire(domain, env, out);
     crate::proposals::fire(domain, env, out);
@@ -951,7 +951,7 @@ pub(crate) fn publish(domain: &mut Domain, env: &Env<Limits>, number: u64, out: 
     task.alarm = alarm;
     crate::changed::observe(task, env.wall);
     out.push(Request::Save { record: Stored::Live(Box::new(task.record.clone())) });
-    crate::chat::schedule(domain, env, number);
+    crate::grace::schedule(domain, env, number);
     crate::escalation::schedule(domain, env, number);
     if escalation {
         out.push(Request::EscalationNeeded {
@@ -1166,7 +1166,7 @@ pub(crate) fn make_admitted(
                 proposal_rows: Box::new([]),
                 instructions: None,
                 refused: Box::new([]),
-                chat_close: None,
+                grace: None,
                 created_at: env.wall,
                 changed: env.wall,
                 phase_since: env.wall,
@@ -1236,7 +1236,7 @@ pub(crate) fn make_admitted(
                 phase: Phase::Waiting,
             },
             alarm: None,
-            chat_alarm: None,
+            grace_alarm: None,
             observed_hold: None,
             observed_phase: None,
         };

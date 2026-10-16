@@ -227,7 +227,12 @@ fn a_history_without_optional_details_reads_back() {
 }
 fn a_finish_grace_reads_back() {
     use crate::{codec::tasks::phase, tasks_v3::Grace};
-    let source = jig_domain_tasks::Grace { by: 31, until: skein_lib::Wall::from_nanos(u64::MAX) };
+    let source = jig_domain_tasks::Grace {
+        by: jig_domain_tasks::Party::Person(31),
+        until: skein_lib::Wall::from_nanos(u64::MAX),
+        reason: b"finish".as_slice().into(),
+        message: 1,
+    };
     let encoded = phase::grace(&source, &tasks_limits()).expect("fixed-width fields fit");
     let encoded = saved_wire(encoded, Grace::measure, Grace::encode, Grace::decode);
     assert_eq!(phase::read_grace(encoded, &tasks_limits()), Ok(source));

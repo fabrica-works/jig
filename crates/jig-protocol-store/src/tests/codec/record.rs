@@ -224,7 +224,7 @@ fn each_subscription_kind_reads_back() {
 fn a_task_record_without_optional_values_reads_back() {
     let mut record = fixtures::task_record();
     record.instructions = None;
-    record.chat_close = None;
+    record.grace = None;
     record.run_since = None;
     record.retry_notice = None;
     record.ended_at = None;
@@ -254,7 +254,13 @@ fn a_task_record_at_its_inbox_bound_reads_back() {
 #[test]
 fn a_task_record_past_its_inbox_count_is_refused() {
     let mut record = fixtures::task_record();
-    record.inbox = Box::new([fixtures::task_word(5), fixtures::task_word(7), fixtures::task_word(11)]);
+    record.inbox = Box::new([
+        fixtures::task_word(5),
+        fixtures::task_word(7),
+        fixtures::task_word(11),
+        fixtures::task_word(13),
+        fixtures::task_word(17),
+    ]);
     assert_eq!(
         tasks::encode(&live_record(record), &tasks_limits()),
         Err(bound_problem(wire::Path::TaskInterestsInbox))
@@ -264,9 +270,15 @@ fn a_task_record_past_its_inbox_count_is_refused() {
 fn a_task_record_inbox_decoded_above_its_count_is_refused() {
     let limits = tasks_limits();
     let mut wider = limits;
-    wider.task_interests_inbox = 3;
+    wider.task_interests_inbox = 5;
     let mut record = fixtures::task_record();
-    record.inbox = Box::new([fixtures::task_word(5), fixtures::task_word(7), fixtures::task_word(11)]);
+    record.inbox = Box::new([
+        fixtures::task_word(5),
+        fixtures::task_word(7),
+        fixtures::task_word(11),
+        fixtures::task_word(13),
+        fixtures::task_word(17),
+    ]);
     let bytes = tasks::encode(&live_record(record), &wider).expect("within wider count");
     assert_eq!(tasks::decode(&bytes, &limits), Err(bound_problem(wire::Path::TaskInterestsInbox)));
 }

@@ -5,16 +5,13 @@ use alloc::boxed::Box;
 use jig_domain_tasks as domain;
 use skein_lib::{List, Wall};
 
-fn optional_chat_close(
-    source: Option<&domain::Grace>,
-    limits: &wire::Limits,
-) -> Result<Option<wire::Grace>, wire::Problem> {
+fn optional_grace(source: Option<&domain::Grace>, limits: &wire::Limits) -> Result<Option<wire::Grace>, wire::Problem> {
     match source {
         Some(source) => Ok(Some(phase::grace(source, limits)?)),
         None => Ok(None),
     }
 }
-fn read_optional_chat_close(
+fn read_optional_grace(
     source: Option<wire::Grace>,
     limits: &wire::Limits,
 ) -> Result<Option<domain::Grace>, wire::Problem> {
@@ -327,7 +324,7 @@ fn task_history(source: &domain::TaskRecord, limits: &wire::Limits) -> Result<wi
             proposal_rows: proposal_rows(&source.proposal_rows, limits)?,
             instructions: source.instructions.clone(),
             refused: refused(&source.refused, limits)?,
-            chat_close: optional_chat_close(source.chat_close.as_ref(), limits)?,
+            grace: optional_grace(source.grace.as_ref(), limits)?,
             revisions: phase::revisions(&source.revisions, limits)?,
             created_at: source.created_at.as_nanos(),
             changed: source.changed.as_nanos(),
@@ -445,7 +442,7 @@ pub fn read_task_record(source: wire::TaskRecord, limits: &wire::Limits) -> Resu
         proposal_rows: read_proposal_rows(history.proposal_rows, limits)?,
         instructions: history.instructions,
         refused: phase::read_references(history.refused),
-        chat_close: read_optional_chat_close(history.chat_close, limits)?,
+        grace: read_optional_grace(history.grace, limits)?,
         revisions: phase::read_revisions(history.revisions, limits)?,
         created_at: Wall::from_nanos(history.created_at),
         changed: Wall::from_nanos(history.changed),

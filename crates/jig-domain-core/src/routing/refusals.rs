@@ -59,7 +59,7 @@ fn task_answer(core: &Core, task: Option<u64>, why: tasks::Refusal) -> people::O
         tasks::Refusal::Subscription => people::Refusal::Limit { which: people::LimitKind::Subscription },
         tasks::Refusal::Dependencies => people::Refusal::Limit { which: people::LimitKind::Dependencies },
         tasks::Refusal::Cycle => people::Refusal::Limit { which: people::LimitKind::Cycle },
-        tasks::Refusal::Spec => people::Refusal::Limit { which: people::LimitKind::Spec },
+        tasks::Refusal::Grace | tasks::Refusal::Spec => people::Refusal::Limit { which: people::LimitKind::Spec },
         tasks::Refusal::Contract => people::Refusal::Limit { which: people::LimitKind::Contract },
         tasks::Refusal::Inputs => people::Refusal::Limit { which: people::LimitKind::Inputs },
         tasks::Refusal::Attempt => people::Refusal::Limit { which: people::LimitKind::Attempts },

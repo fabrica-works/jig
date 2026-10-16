@@ -101,7 +101,7 @@ fn filtered_task_watches_coalesce_enter_leave_and_ending_then_revoke_visibility(
             reply_to: ReplyTo::new(Token::new(60)),
             by: tasks::Party::Person(1),
             task: 3,
-            control: tasks::Control::Cancel { reason: Box::new([]) },
+            control: tasks::Control::Cancel { reason: Box::new([]), grace: None, message: None },
         }),
     );
     let changed = finish_watch_outputs(&mut core, &limits);
@@ -184,7 +184,7 @@ fn an_ended_task_watch_stays_empty_when_a_live_task_ends() {
             reply_to: ReplyTo::new(Token::new(60)),
             by: tasks::Party::Person(1),
             task: 3,
-            control: tasks::Control::Cancel { reason: Box::new([]) },
+            control: tasks::Control::Cancel { reason: Box::new([]), grace: None, message: None },
         }),
     );
     at(&mut core, &limits, 60, Event::Tasks(tasks::Event::EffectsSettled { task: 3 }));

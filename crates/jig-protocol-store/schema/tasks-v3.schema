@@ -142,7 +142,7 @@ record RejectedPersonProposal { by: Party reason: bytes 65536 message: u64 at: u
 enum PersonProposalState { pending: PendingPersonProposal, accepted: AcceptedProposal, rejected: RejectedPersonProposal }
 record PersonProposal { number: u64 proposer: u64 project: u32 goal: Creation state: PersonProposalState }
 record Milestone { task: u64 position: u64 phase: Phase at: u64 }
-record Grace { by: u64 until: u64 }
+record Grace { by: Party until: u64 reason: bytes 65536 message: u64 }
 record Revisions { hold: u64 spec: u64 person: u64 }
 record FailedRetry { class: Class count: u32 allowance: u32 }
 record RefusedRetry { count: u32 }
@@ -225,7 +225,7 @@ record TaskHistory {
     proposal_rows: list 64 ProposalRow
     instructions: option bytes 65536
     refused: list 64 Number
-    chat_close: option Grace
+    grace: option Grace
     revisions: Revisions
     created_at: u64
     changed: u64
@@ -326,7 +326,7 @@ record CapacityCauseWriters { limit: u32 }
 enum CapacityCause { tasks: CapacityCauseTasks, creation_flights: CapacityCauseCreationFlights, resource_reports: CapacityCauseResourceReports, project_tasks: CapacityCauseProjectTasks, tree: CapacityCauseTree, delegates: CapacityCauseDelegates, inbox: CapacityCauseInbox, holdings: CapacityCauseHoldings, hold_waiters: CapacityCauseHoldWaiters, proposals: CapacityCauseProposals, references: CapacityCauseReferences, subscriptions: CapacityCauseSubscriptions, funders: CapacityCauseFunders, writers: CapacityCauseWriters }
 record Capacity { project: option u32 by: Party action: CapacityAction cause: CapacityCause }
 record RefusalPersonRevision { revision: u64 }
-enum Refusal { unproposable, person_revision: RefusalPersonRevision, resource_unavailable, not_ready, unknown, busy, duplicate, empty, batch, live, project, tree, depth, delegates, reference, subscription, dependencies, cycle, executor, spec, contract, authority_shape, inputs, state, attempt, live_delegates, restore, read, turn, funding, hold_kind, hold_taken, holds }
+enum Refusal { grace, unproposable, person_revision: RefusalPersonRevision, resource_unavailable, not_ready, unknown, busy, duplicate, empty, batch, live, project, tree, depth, delegates, reference, subscription, dependencies, cycle, executor, spec, contract, authority_shape, inputs, state, attempt, live_delegates, restore, read, turn, funding, hold_kind, hold_taken, holds }
 versioned record TaskProblem { task: option u64 why: Refusal blocked_by: option list 8192 Number capacity: option Capacity }
 record ResultFollowupsDelegates { value: list 4 Creation }
 record ResultFollowupsProposal { value: Proposal }

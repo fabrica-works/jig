@@ -864,8 +864,8 @@ pub struct TaskRecord {
     pub instructions: Option<Box<[u8]>>,
     /// Messages the current attempt's run refused; untaken by later fences of that attempt.
     pub refused: Box<[u64]>,
-    /// A person requested this chat to finish by this durable deadline.
-    pub chat_close: Option<crate::chat::Grace>,
+    /// A cancel asked this task to finish by a durable deadline.
+    pub grace: Option<crate::grace::Grace>,
     /// Independent revisions retained in live and ended records.
     pub revisions: Revisions,
     /// Injected creation time used to order active person tasks in derived inboxes.
@@ -1080,6 +1080,8 @@ impl Stored {
 /// (domain/tasks.md, sections 4–5).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Refusal {
+    /// A cancel gave a grace longer than the configured span.
+    Grace,
     /// No policy role may accept this proposal kind; nothing of it is committed.
     Unproposable,
     /// The address edit names an older person task revision.

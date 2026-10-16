@@ -370,6 +370,10 @@ pub fn task_bytes(task: &TaskRecord) -> Option<u64> {
         }
     }
     bytes(size_of::<TaskRecord>())?
+        .checked_add(match &task.grace {
+            Some(grace) => bytes(grace.reason.len())?,
+            None => 0,
+        })?
         .checked_add(match &task.recurring {
             Some(state) => {
                 let mut total = bytes(size_of::<crate::RecurringState>())?

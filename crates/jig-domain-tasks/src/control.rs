@@ -6,13 +6,13 @@ use crate::{
     Active, Authority, Limits, MessageKind, Party, Phase, Refusal, Request, Spec, Stored, Tries, WakePolicy, Was, Word,
 };
 use alloc::boxed::Box;
-use skein_lib::{Env, Queue, ReplyTo};
+use skein_lib::{Duration, Env, Queue, ReplyTo};
 
 /// One tool change to a live delegate, authenticated by root's current claim.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Control {
     /// Close a whole subtree with a common bounded reason.
-    Cancel { reason: Box<[u8]> },
+    Cancel { reason: Box<[u8]>, grace: Option<Duration>, message: Option<u64> },
     /// Lift a hold and reset the failure counts it exhausted.
     Release { again: Option<bool>, message: Option<u64> },
 }
@@ -504,7 +504,16 @@ pub(crate) fn apply(
         return refused(to, Some(number), Refusal::Reference, out);
     }
     match control {
-        Control::Cancel { reason } => {
+        Control::Cancel { reason, grace, message } => {
+            if grace.is_some() != message.is_some() {
+                return refused(to, Some(number), Refusal::Read, out);
+            }
+            if match grace {
+                Some(span) => span > env.limits.grace,
+                None => false,
+            } {
+                return refused(to, Some(number), Refusal::Grace, out);
+            }
             if reason.len() > usize::try_from(env.limits.result_bytes).expect("u32 fits usize") {
                 return refused(to, Some(number), Refusal::Read, out);
             }
@@ -515,16 +524,22 @@ pub(crate) fn apply(
                     return refused(to, Some(*child), Refusal::State, out);
                 }
             }
-            let mut selected = skein_lib::List::with_capacity(env.limits.tasks);
-            for (child, _) in &domain.names {
-                if below(domain, *child, number, env.limits.tasks) {
-                    selected.push(*child).expect("live child bound");
+            if let Some(span) = grace {
+                if let Err(why) = crate::grace::ask_to_finish(
+                    domain,
+                    env,
+                    number,
+                    by,
+                    skein_lib::Wall::from_nanos(env.wall.as_nanos().saturating_add(span.as_nanos())),
+                    message.expect("grace message checked"),
+                    &reason,
+                    out,
+                ) {
+                    return refused(to, Some(number), why, out);
                 }
+            } else {
+                crate::grace::cancel(domain, env, number, by, &reason, out);
             }
-            for child in selected.into_boxed() {
-                history(domain, child, env.wall, by, Change::Cancelled, &reason, out);
-            }
-            crate::closing::cancel_tree(domain, env, number, by, &reason, out);
             out.push(Request::Done { reply_to: to });
         }
         Control::Release { again, message } => {

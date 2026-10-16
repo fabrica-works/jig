@@ -34,6 +34,7 @@ pub fn limits() -> root::Limits {
         hold_segments: 4,
         hold_bytes: 128,
         hold_waiters: 2,
+        grace: skein_lib::Duration::from_secs(600),
         hold_wait: Duration::from_secs(10),
         inputs: 1,
         spec_bytes: 64,

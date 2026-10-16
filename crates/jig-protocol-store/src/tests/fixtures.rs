@@ -68,6 +68,7 @@ pub const TASKS_LIMITS: jig_domain_tasks::Limits = jig_domain_tasks::Limits {
     pools: 2,
     hold_segments: 2,
     hold_bytes: 16,
+    grace: skein_lib::Duration::from_secs(600),
     hold_wait: skein_lib::Duration::from_nanos(1),
     hold_waiters: 2,
     inputs: 2,

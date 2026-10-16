@@ -1,6 +1,6 @@
 //! One person: two workers, two slots each, four LLM accounts (configuration.md, 6).
 //! Byte limits are bytes; durations below state their units. Counts are items.
-//! **tasks**: `tasks=8, funders=8, project_tasks=8, tree_tasks=32, depth=8, delegates=4, references=8, subscriptions=4, batch=2, dependencies=8, holdings=4, hold_kinds=8, resource_reports=128, pools=8, hold_segments=4, hold_bytes=1024, hold_waiters=8, hold_wait=Duration::from_secs(120), inputs=8, spec_bytes=4096, parameters=4, result_bytes=512, run_inbox=8, inbox_messages=8, inbox_bytes=4096, message_bytes=4096, person_stall=Duration::from_secs(3600), proposal_stall=Duration::from_secs(3600), escalation_stall=Duration::from_secs(3600), saved_resources=4, contract_choices=1, charters=4, authority_grants=4, authority_segments=4, authority_bytes=2048, executor_kinds=4, retries=RETRIES, facts=32, room_refusals=8`.
+//! **tasks**: `tasks=8, funders=8, project_tasks=8, tree_tasks=32, depth=8, delegates=4, references=8, subscriptions=4, batch=2, dependencies=8, holdings=4, hold_kinds=8, resource_reports=128, pools=8, hold_segments=4, hold_bytes=1024, hold_waiters=8, hold_wait=Duration::from_secs(120), grace=Duration::from_secs(600), inputs=8, spec_bytes=4096, parameters=4, result_bytes=512, run_inbox=8, inbox_messages=8, inbox_bytes=4096, message_bytes=4096, person_stall=Duration::from_secs(3600), proposal_stall=Duration::from_secs(3600), escalation_stall=Duration::from_secs(3600), saved_resources=4, contract_choices=1, charters=4, authority_grants=4, authority_segments=4, authority_bytes=2048, executor_kinds=4, retries=RETRIES, facts=32, room_refusals=8`.
 //! **people**: `people=4, inbox_entries=8, inbox_tasks=16, inbox_recipients=32, sign_ins=8, projects=2, holdings=8, goals=16, initial_owners=2, requests=32, room_refusals=8, pending=8, waiters=4, identity_bytes=1024, words=2048, amendment_bytes=8192, sign_in_lifetime=Duration::from_secs(86400), request_retention=Duration::from_secs(86400), facts=32`.
 //! **fleet**: `needs_bytes=65536, grants=8, workers=2, engine_slots=0, slots=2, workstreams=8, attempts=8, calls=32, call_name_bytes=64, progress_bytes=1024, turns=32, grace=Duration::from_secs(120), facts=32, history=8`.
 //! **authority**: `projects=2, roles=4, requirements=4, facts=16, grants=4, executors=4, segments=4, segment_bytes=256, implications=8, batch=2, accounts=4, writes=4`.
@@ -46,6 +46,7 @@ pub(super) const TASKS: tasks::Limits = tasks::Limits {
     hold_segments: 4,
     hold_bytes: 1_024,
     hold_waiters: 8,
+    grace: Duration::from_secs(600),
     hold_wait: Duration::from_secs(120),
     inputs: 8,
     spec_bytes: 4_096,
@@ -302,7 +303,7 @@ pub(super) const DRIVER: skein_oauth_accounts::Limits = skein_oauth_accounts::Li
 // 19.s3: application key2078/value4304, one orphan erase, 256 MiB map.
 pub(super) const STORE_KV: skein_kv::Limits = skein_kv::Limits {
     key: 2079,
-    value: 1_281_082,
+    value: 1_303_199,
     ops: 24_710,
     commit: 320_029_962,
     queued: 3,
@@ -310,8 +311,8 @@ pub(super) const STORE_KV: skein_kv::Limits = skein_kv::Limits {
     budget: 268_435_456,
     segment: 640_059_924,
     snapshot_after: 320_029_962,
-    chunk: 1_283_181,
-    page: skein_kv::Page { rows: 2, bytes: 1_283_161 },
+    chunk: 1_305_298,
+    page: skein_kv::Page { rows: 2, bytes: 1_305_278 },
     deadline: Duration::from_secs(30),
 };
 pub(super) const STORE: jig_protocol_store::Limits = jig_protocol_store::Limits {

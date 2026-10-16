@@ -111,7 +111,11 @@ fn a_delayed_judge_cannot_keep_or_charge_an_effect_after_its_calling_run_is_canc
             reply_to: ReplyTo::new(Token::new(9902)),
             by: tasks::Party::Person(1),
             task: key.task,
-            control: tasks::Control::Cancel { reason: b"cancel while the judge reads".as_slice().into() },
+            control: tasks::Control::Cancel {
+                reason: b"cancel while the judge reads".as_slice().into(),
+                grace: None,
+                message: None,
+            },
         }),
     );
     let before = core.tasks.task(key.task).expect("closing task").numbers;
@@ -171,7 +175,11 @@ fn a_delayed_judge_cannot_commit_a_step_of_a_cancelled_procedure() {
             reply_to: ReplyTo::new(Token::new(9930)),
             by: tasks::Party::Task(parent),
             task,
-            control: tasks::Control::Cancel { reason: b"procedure withdrawn".as_slice().into() },
+            control: tasks::Control::Cancel {
+                reason: b"procedure withdrawn".as_slice().into(),
+                grace: None,
+                message: None,
+            },
         }),
     );
     let before = core.tasks.task(task).expect("closing procedure").numbers;
@@ -200,7 +208,11 @@ fn every_connector_must_acknowledge_closure_and_duplicates_cannot_replace_a_miss
             reply_to: ReplyTo::new(Token::new(9940)),
             by: tasks::Party::Person(1),
             task: key.task,
-            control: tasks::Control::Cancel { reason: b"close all outboxes".as_slice().into() },
+            control: tasks::Control::Cancel {
+                reason: b"close all outboxes".as_slice().into(),
+                grace: None,
+                message: None,
+            },
         }),
     );
     let _requests = core::step(
@@ -329,7 +341,11 @@ fn late_busy_or_refused_descriptions_cannot_answer_a_cancelled_run() {
                 reply_to: ReplyTo::new(Token::new(9952)),
                 by: tasks::Party::Person(1),
                 task: key.task,
-                control: tasks::Control::Cancel { reason: b"cancel while describing".as_slice().into() },
+                control: tasks::Control::Cancel {
+                    reason: b"cancel while describing".as_slice().into(),
+                    grace: None,
+                    message: None,
+                },
             }),
         );
         let event = if busy {

@@ -93,8 +93,9 @@ pub fn engine(document: &skein_json::Document, at: u32) -> Result<Engine, Proble
     let at = object.required(document, b"chats", &path, &mut problems);
     let mut chats = None;
     if let Some(at) = at {
-        chats =
-            charters::chats(document, at, &path.member(b"chats"), charters.as_deref().unwrap_or(&[]), &mut problems);
+        let offered = charters.as_deref().unwrap_or(&[]);
+        let bound = limits.core.tasks.grace;
+        chats = charters::chats(document, at, &path.member(b"chats"), offered, bound, &mut problems);
     }
     let mut deployment = None;
     if let Some(at) = object.required(document, b"deployment", &path, &mut problems) {

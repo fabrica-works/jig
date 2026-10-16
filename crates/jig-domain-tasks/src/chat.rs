@@ -1,7 +1,7 @@
 //! One whole chat close and its durable finish grace (domain/people.md, section 7;
 //! domain/tasks.md, section 7). Every disposal and reservation is checked before
 //! mutation. The task alarm reprojects the saved wall deadline after restart.
-use crate::domain::{Domain, entrance, record, refused, task_mut};
+use crate::domain::{Domain, entrance, record, refused};
 use crate::{Change, Executor, Funder, Limits, Party, Phase, Refusal, Request, Was};
 use skein_lib::{Env, List, Queue, ReplyTo, Wall};
 
@@ -15,12 +15,6 @@ pub struct Disposal {
     pub task: u64,
     pub keep: Keep,
 }
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub struct Grace {
-    pub by: u64,
-    pub until: Wall,
-}
-
 pub(crate) fn mutable(phase: &Phase) -> bool {
     match phase {
         Phase::Waiting | Phase::Active(_) | Phase::Held { was: Was::Waiting | Was::Active(_), .. } => true,
@@ -61,7 +55,7 @@ pub(crate) fn close(
         || old.requester != Party::Person(person)
         || person == 0
         || !mutable(&old.phase)
-        || old.chat_close.is_some()
+        || old.grace.is_some()
         || until <= env.wall
         || message == 0
         || message <= old.last_message
@@ -167,27 +161,9 @@ pub(crate) fn close(
             Keep::Cancel => cancel(domain, env, disposal.task, person, CANCEL, out),
         }
     }
-    task_mut(domain, number).expect("live chat").record.chat_close = Some(Grace { by: person, until });
-    crate::control::amend(
-        domain,
-        env,
-        to,
-        Party::Person(person),
-        number,
-        message,
-        false,
-        crate::Amendment {
-            addressed: None,
-            release: None,
-            instructions: None,
-            spec: None,
-            wake: None,
-            dependencies: None,
-            authority: None,
-            reason: FINISH.into(),
-        },
-        out,
-    );
+    crate::grace::ask_chat(domain, env, number, person, until, message, FINISH, EXPIRED, out)
+        .expect("whole chat close preflighted its grace");
+    out.push(Request::Done { reply_to: to });
     crate::moving::reroute(domain, env, out);
 }
 
@@ -202,41 +178,4 @@ fn cancel(domain: &mut Domain, env: &Env<Limits>, number: u64, person: u64, reas
         crate::control::history(domain, task, env.wall, Party::Person(person), Change::Cancelled, reason, out);
     }
     crate::closing::cancel_tree(domain, env, number, Party::Person(person), reason, out);
-}
-
-pub(crate) fn schedule(domain: &mut Domain, env: &Env<Limits>, number: u64) {
-    let task = task_mut(domain, number).expect("live chat schedule");
-    let until = match task.record.chat_close {
-        Some(grace) if mutable(&task.record.phase) => Some(grace.until),
-        Some(_) | None => None,
-    };
-    let alarm = match until {
-        Some(until) => match task.chat_alarm {
-            Some(old) if old.until == until => Some(old),
-            Some(_) | None => Some(crate::domain::Alarm {
-                until,
-                due: env.now.saturating_add(skein_lib::Duration::from_nanos(
-                    until.as_nanos().saturating_sub(env.wall.as_nanos()),
-                )),
-            }),
-        },
-        None => None,
-    };
-    task.chat_alarm = alarm;
-    match alarm {
-        Some(alarm) => assert!(domain.chat_alarms.arm(number, alarm.due).is_ok(), "one grace per live task"),
-        None => {
-            domain.chat_alarms.cancel(number);
-        }
-    }
-}
-
-pub(crate) fn fire(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
-    let Some(number) = domain.chat_alarms.expire(env.now) else { return };
-    let Some(row) = record(domain, number) else { return };
-    let Some(grace) = row.chat_close else { return };
-    if !mutable(&row.phase) {
-        return;
-    }
-    crate::closing::cancel_tree(domain, env, number, Party::Person(grace.by), EXPIRED, out);
 }

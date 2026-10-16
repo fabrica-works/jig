@@ -170,8 +170,8 @@ fn a_person_closes_a_chat_keeping_one_delegate_and_cancelling_another(
     assert_eq!(live(world, delegates[0]).requester, tasks::Party::Person(person));
     assert_eq!(live(world, delegates[0]).funder, tasks::Funder::Pool { project: 1, person, period: 1 });
     assert!(world.store.rows.contains_key(&root::Key::Core(core::Key::Tasks(tasks::Key::Ended(delegates[1])))));
-    let grace = live(world, chat).chat_close.expect("close story fixture");
-    assert_eq!(grace.by, person);
+    let grace = live(world, chat).grace.clone().expect("close story fixture");
+    assert_eq!(grace.by, tasks::Party::Person(person));
     let Some(root::Record::Core(core::Record::People(people::Stored::Answer { at, .. }))) = world
         .store
         .rows
@@ -201,7 +201,7 @@ fn a_person_closes_a_chat_keeping_one_delegate_and_cancelling_another(
             .count(),
         decisions + 1
     );
-    assert_eq!(live(world, chat).chat_close, Some(grace), "key replay retained original deadline");
+    assert_eq!(live(world, chat).grace, Some(grace), "key replay retained original deadline");
 }
 
 fn a_chat_that_does_not_finish_within_its_grace_is_cancelled(
@@ -213,8 +213,8 @@ fn a_chat_that_does_not_finish_within_its_grace_is_cancelled(
     world.advance(Duration::from_secs(2));
     world.restart_with(configuration);
     world.advance(Duration::from_secs(1));
-    assert!(live(&world, chat).chat_close.is_some());
-    let until = live(&world, chat).chat_close.expect("close story fixture").until;
+    assert!(live(&world, chat).grace.is_some());
+    let until = live(&world, chat).grace.clone().expect("close story fixture").until;
     world.advance(Duration::from_secs(3));
     let Some(root::Record::Core(core::Record::Tasks(tasks::Stored::Ended(row)))) =
         world.store.rows.get(&root::Key::Core(core::Key::Tasks(tasks::Key::Ended(chat))))
@@ -222,5 +222,5 @@ fn a_chat_that_does_not_finish_within_its_grace_is_cancelled(
         panic!("grace expired: {:?}", world.trace)
     };
     assert!(matches!(row.phase, tasks::Phase::Ended(tasks::Ending::Cancelled { at, .. }) if at >= until));
-    assert!(live(&world, kept).chat_close.is_none(), "kept work survived old chat cancellation");
+    assert!(live(&world, kept).grace.is_none(), "kept work survived old chat cancellation");
 }

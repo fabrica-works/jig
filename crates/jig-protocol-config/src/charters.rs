@@ -15,6 +15,7 @@ pub(crate) fn chats(
     at: u32,
     path: &Path,
     charters: &[Charter],
+    grace: skein_lib::Duration,
     problems: &mut Problems,
 ) -> Option<Chats> {
     let mut object = check::object(document, at, path, problems)?;
@@ -29,7 +30,11 @@ pub(crate) fn chats(
     if !offered {
         problems.push(path.member(b"charter"), What::Refers);
     }
-    Some(Chats { charter, close_grace: close_grace? })
+    let close_grace = close_grace?;
+    if close_grace > grace {
+        problems.push(path.member(b"close_grace_ms"), What::Bound);
+    }
+    Some(Chats { charter, close_grace })
 }
 
 pub(crate) fn parse(

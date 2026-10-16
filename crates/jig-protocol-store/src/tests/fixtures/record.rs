@@ -30,7 +30,7 @@ pub fn task_record() -> jig_domain_tasks::TaskRecord {
         proposal_rows: Box::new([task::ProposalRow { proposal: 43, revision: 3 }]),
         instructions: Some(Box::from(b"instructions".as_slice())),
         refused: Box::new([5]),
-        chat_close: Some(task::Grace { by: 31, until: Wall::from_nanos(61) }),
+        grace: Some(task_grace()),
         revisions: task::Revisions { hold: 3, spec: 5, person: 7 },
         created_at: Wall::from_nanos(11),
         changed: Wall::from_nanos(13),
@@ -119,4 +119,13 @@ fn reply_hints() -> Box<[jig_domain_tasks::ReplyHint]> {
         turn: 5,
         at: skein_lib::Wall::from_nanos(41),
     }])
+}
+
+fn task_grace() -> jig_domain_tasks::Grace {
+    jig_domain_tasks::Grace {
+        by: jig_domain_tasks::Party::Person(31),
+        until: skein_lib::Wall::from_nanos(61),
+        reason: b"finish".as_slice().into(),
+        message: 1,
+    }
 }

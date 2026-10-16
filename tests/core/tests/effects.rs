@@ -490,7 +490,7 @@ fn a_stale_claim_keeps_its_effect_deadline_until_the_due_right_is_consumed_witho
             reply_to: ReplyTo::new(Token::new(322)),
             by: tasks::Party::Person(1),
             task: key.task,
-            control: tasks::Control::Cancel { reason: Box::new([]) },
+            control: tasks::Control::Cancel { reason: Box::new([]), grace: None, message: None },
         }),
     );
     assert!(!matches!(

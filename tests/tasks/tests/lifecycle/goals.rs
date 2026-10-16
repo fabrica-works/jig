@@ -20,7 +20,7 @@ fn subtree() -> World {
         reply_to,
         by: Party::Person(1),
         task: 4,
-        control: Control::Cancel { reason: Box::new([1]) },
+        control: Control::Cancel { reason: Box::new([1]), grace: None, message: None },
     });
     world.settle(4);
     world

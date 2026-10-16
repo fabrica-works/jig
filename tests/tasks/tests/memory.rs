@@ -364,6 +364,12 @@ fn borrowed_stored_bytes_matches_allocator_for_every_retained_row() {
     world.make(Party::Person(1), vec![task(1, &[])]);
     let mut record = world.record(1).clone();
     let new = filled(&LIMITS, 1);
+    record.grace = Some(tasks::Grace {
+        by: Party::Person(1),
+        until: Wall::from_nanos(5),
+        reason: b"finish".as_slice().into(),
+        message: 1,
+    });
     record.refused = Box::new([1, 2]);
     record.spec = new.spec;
     record.spec.parameters = Box::new([
@@ -459,7 +465,7 @@ fn the_complete_maximum_recurring_batch_and_retained_ids_fit_the_owner_bound() {
             reply_to,
             by: Party::Task(1),
             task: number,
-            control: tasks::Control::Cancel { reason: Box::new([]) },
+            control: tasks::Control::Cancel { reason: Box::new([]), grace: None, message: None },
         });
         measured.event(Event::EffectsSettled { task: number });
         measured.event(Event::Settled { task: number });

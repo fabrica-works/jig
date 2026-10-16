@@ -200,7 +200,7 @@ pub(super) fn cancel_request(
                 reply_to: ReplyTo::new(request),
                 by: tasks::Party::Person(person),
                 task,
-                control: tasks::Control::Cancel { reason },
+                control: tasks::Control::Cancel { reason, grace: None, message: None },
             }));
         }
         Err(why) => {

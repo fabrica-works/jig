@@ -405,13 +405,21 @@ pub fn read_phase(source: wire::Phase, limits: &wire::Limits) -> Result<domain::
 
 /// Translate `Grace` to its store record.
 pub fn grace(source: &domain::Grace, limits: &wire::Limits) -> Result<wire::Grace, wire::Problem> {
-    let domain::Grace { by, until } = source;
-    wire::Grace::new(limits, wire::GraceParts { by: *by, until: until.as_nanos() })
+    let domain::Grace { by, until, reason, message } = source;
+    wire::Grace::new(
+        limits,
+        wire::GraceParts {
+            by: value::party(by, limits)?,
+            until: until.as_nanos(),
+            reason: reason.clone(),
+            message: *message,
+        },
+    )
 }
 /// Read `Grace` from its store record.
 pub fn read_grace(source: wire::Grace, _limits: &wire::Limits) -> Result<domain::Grace, wire::Problem> {
-    let wire::GraceParts { by, until } = source.into_parts();
-    Ok(domain::Grace { by, until: Wall::from_nanos(until) })
+    let wire::GraceParts { by, until, reason, message } = source.into_parts();
+    Ok(domain::Grace { by: value::read_party(by), until: Wall::from_nanos(until), reason, message })
 }
 
 /// Translate `Revisions` to its store record.

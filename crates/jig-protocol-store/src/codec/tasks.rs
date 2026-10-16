@@ -34,6 +34,7 @@ pub fn limits(domain: &domain::Limits) -> Option<wire::Limits> {
         .ok()?,
     )?;
     let limits = wire::Limits {
+        grace_reason: domain.result_bytes,
         task_problem_blocked_by_some: domain.delegates,
         result_followups_delegates_value: domain.batch,
         segment_bytes: domain.hold_bytes,
@@ -96,7 +97,7 @@ pub fn limits(domain: &domain::Limits) -> Option<wire::Limits> {
         task_interests_references: domain.references,
         task_interests_questions: domain.inbox_messages,
         task_interests_subscriptions: domain.subscriptions,
-        task_interests_inbox: domain.inbox_messages,
+        task_interests_inbox: domain.inbox_messages.checked_add(2)?,
         task_interests_saved: domain.saved_resources,
     };
     wire::check_limits(&limits).ok()?;

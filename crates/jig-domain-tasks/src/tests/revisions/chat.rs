@@ -85,7 +85,15 @@ fn disposals_finish_request_and_restart_grace_are_one_whole_close() {
         "{out:?}"
     );
     let root = test.domain.task(1).unwrap();
-    assert_eq!(root.chat_close, Some(Grace { by: 9, until: Wall::from_nanos(5_000_000_000) }));
+    assert_eq!(
+        root.grace,
+        Some(Grace {
+            by: Party::Person(9),
+            until: Wall::from_nanos(5_000_000_000),
+            reason: b"Chat finish grace expired.".as_slice().into(),
+            message: 1,
+        })
+    );
     assert_eq!(root.last_message, 1);
     assert_eq!(test.domain.task(2).unwrap().requester, Party::Person(9));
     assert_eq!(test.domain.task(2).unwrap().funder, Funder::Pool { project: 1, person: 9, period: 0 });

@@ -166,7 +166,7 @@ fn a_message_bound_below_a_delegate_result_is_refused() {
 fn memory_below_the_components_sum_is_refused() {
     let document = fixtures::with(fixtures::ENGINE_SMALL, br#""memory_bytes": 17179869184"#, br#""memory_bytes": 1"#);
     let problems = fixtures::engine(&document).unwrap_err();
-    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 11_995_183_047 });
+    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 11_995_201_223 });
 }
 fn instruction_file(files: &[crate::File]) -> &crate::File {
     for file in files {
@@ -242,4 +242,9 @@ fn table<const N: usize>(cases: [Case; N]) {
         }
     }
     assert!(passed, "{failures:?}");
+}
+
+#[test]
+fn a_chat_close_grace_past_the_tasks_limit_refuses_the_start() {
+    refuses(br#""close_grace_ms": 5000"#, br#""close_grace_ms": 600001"#, What::Bound);
 }

@@ -26,7 +26,7 @@ fn changed_tracks_creation_real_changes_backward_walls_restore_and_ending() {
         reply_to: to(),
         by: Party::Person(9),
         task: 1,
-        control: Control::Cancel { reason: Box::new([]) },
+        control: Control::Cancel { reason: Box::new([]), grace: None, message: None },
     });
     test.send(Event::EffectsSettled { task: 1 });
     test.env.wall = Wall::from_nanos(400);

@@ -126,7 +126,7 @@ fn cancelling_a_closing_result_withdraws_its_pending_followup_proposal() {
         reply_to: to,
         by: Party::Person(1),
         task: 1,
-        control: jig_domain_tasks::Control::Cancel { reason: Box::new([9]) },
+        control: jig_domain_tasks::Control::Cancel { reason: Box::new([9]), grace: None, message: None },
     });
     assert!(w.record(1).proposal.is_none());
     assert!(!w.record(1).result_proposal);
@@ -776,3 +776,6 @@ mod goals;
 
 #[path = "lifecycle/delegates.rs"]
 mod delegates;
+
+#[path = "lifecycle/grace.rs"]
+mod grace;

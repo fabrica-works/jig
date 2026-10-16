@@ -36,7 +36,15 @@ fn deadlines(first: usize) -> Harness {
                 row.refusals = 1;
                 row.retry_notice = Some(RetryNotice::Refused { count: 1 });
             }
-            1 => row.chat_close = Some(Grace { by: 9, until: at }),
+            1 => {
+                row.last_message = 1;
+                row.grace = Some(Grace {
+                    by: Party::Person(9),
+                    until: at,
+                    reason: b"Chat finish grace expired.".as_slice().into(),
+                    message: 1,
+                });
+            }
             2 => {
                 row.subscriptions =
                     Box::new([Subscription { number: 1, kind: SubscriptionKind::Timer { at, period: None } }]);

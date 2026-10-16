@@ -46,6 +46,8 @@ pub struct Limits {
     pub hold_bytes: u32,
     /// Maximum tasks waiting on any one resource.
     pub hold_waiters: u32,
+    /// Longest span a cancel may give its task to finish.
+    pub grace: skein_lib::Duration,
     /// Wall-clock bound before a task waiting for holds is held for review.
     pub hold_wait: skein_lib::Duration,
     /// Shape bound for historical input identities checked by the root before delegation.
@@ -119,6 +121,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         || limits.inbox_bytes == 0
         || limits.message_bytes == 0
         || limits.message_bytes > limits.inbox_bytes
+        || limits.grace == skein_lib::Duration::ZERO
         || limits.hold_wait == skein_lib::Duration::ZERO
         || limits.person_stall == skein_lib::Duration::ZERO
         || limits.proposal_stall == skein_lib::Duration::ZERO
@@ -147,8 +150,10 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     let approval_contract = u64::from(limits.result_bytes)
         .checked_add(u64::from(limits.hold_bytes))?
         .checked_add(List::<Box<[u8]>>::worst_case(limits.hold_segments)?)?;
-    let payload = u64::from(limits.inbox_messages)
-        .checked_mul(u64::try_from(size_of::<u64>()).ok()?)?
+    let payload = u64::from(limits.result_bytes)
+        .checked_mul(2)?
+        .checked_add(u64::try_from(size_of::<crate::Word>()).ok()?)?
+        .checked_add(u64::from(limits.inbox_messages).checked_mul(u64::try_from(size_of::<u64>()).ok()?)?)?
         .checked_add(u64::from(limits.spec_bytes))?
         .checked_add(u64::from(limits.message_bytes))?
         .checked_add(u64::from(limits.inbox_bytes))?

@@ -21,8 +21,8 @@ fn the_document_names_the_files_its_caller_reads() {
 #[test]
 fn both_jig_profiles_have_a_bounded_service() {
     for (label, name, value, commit, ops) in [
-        ("small", jig_protocol_config::Profile::Small, 1_281_082, 320_029_962, 24_710),
-        ("standard", jig_protocol_config::Profile::Standard, 10_374_226, 563_883_306, 141_498),
+        ("small", jig_protocol_config::Profile::Small, 1_303_199, 320_029_962, 24_710),
+        ("standard", jig_protocol_config::Profile::Standard, 10_396_343, 563_883_306, 141_498),
     ] {
         let limits = crate::limits::profile_limits(name);
         assert!(crate::limits::worst_case(&limits).is_some(), "{label}");

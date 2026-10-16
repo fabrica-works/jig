@@ -331,7 +331,7 @@ fn end_task(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queue
     crate::refs::end(domain, env, number, out);
     domain.tasks.retire(id);
     domain.alarms.cancel(number);
-    domain.chat_alarms.cancel(number);
+    domain.grace_alarms.cancel(number);
     out.push(Request::Erase { key: Key::Live(number) });
     if ended.tracked.is_some() {
         out.push(Request::Save {

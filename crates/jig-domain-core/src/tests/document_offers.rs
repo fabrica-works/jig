@@ -155,7 +155,7 @@ fn cancellation_during_closing_and_release_of_a_held_closing_task_keep_the_owner
             reply_to: ReplyTo::new(Token::new(94)),
             by: tasks::Party::Person(1),
             task: 3,
-            control: tasks::Control::Cancel { reason: b"cancel closing".as_slice().into() },
+            control: tasks::Control::Cancel { reason: b"cancel closing".as_slice().into(), grace: None, message: None },
         },
     );
     let tasks::Phase::Closing(closing) = &core.tasks.task(3).unwrap().phase else { panic!("closing cancellation") };

@@ -366,7 +366,7 @@ fn valid_record(domain: &Domain, limits: &Limits, task: &TaskRecord) -> bool {
         || !valid_escalation(task, limits)
         || !valid_proposal(task, limits)
         || !valid_followups(task)
-        || !valid_chat_close(task)
+        || !valid_grace(task, limits)
         || !valid_person_answer(task)
         || !crate::positions::valid(task, limits.inbox_messages)
         || !crate::inbox::valid_refusals(task, Some(task.last_message), &task.refused)
@@ -390,15 +390,18 @@ fn valid_record(domain: &Domain, limits: &Limits, task: &TaskRecord) -> bool {
     };
     let mut amendments = 0_usize;
     let mut amendment_bytes = 0_usize;
+    let mut ordinary_amendment = false;
     for word in &task.inbox {
         match word.kind {
             crate::MessageKind::Amendment { revision } => {
-                if amendments != 0 {
+                let finish = crate::inbox::finish_word(task, word.number);
+                if !finish && ordinary_amendment {
                     return false;
                 }
-                amendments = 1;
-                amendment_bytes = word.words.len();
-                if revision == 0 || revision > task.revision || amendments > 1 {
+                ordinary_amendment |= !finish;
+                amendments = amendments.checked_add(1).expect("bounded amendments");
+                amendment_bytes = amendment_bytes.checked_add(word.words.len()).expect("bounded amendment bytes");
+                if revision == 0 || revision > task.revision {
                     return false;
                 }
             }
@@ -495,21 +498,25 @@ fn valid_record(domain: &Domain, limits: &Limits, task: &TaskRecord) -> bool {
             crate::MessageKind::PersonStalled { task: child } => child != 0 && word.from == Party::Task(child),
             crate::MessageKind::Timer { .. } => word.from == Party::Task(task.number),
         };
-        let bound = match &word.kind {
-            crate::MessageKind::Words
-            | crate::MessageKind::ProposalDecision { .. }
-            | crate::MessageKind::Amendment { .. }
-            | crate::MessageKind::Question
-            | crate::MessageKind::Answer { .. } => limits.message_bytes,
-            crate::MessageKind::Result(_) => limits.result_bytes,
-            crate::MessageKind::Notice { .. } | crate::MessageKind::News { .. } => {
-                limits.result_bytes.max(limits.message_bytes)
+        let bound = if crate::inbox::finish_word(task, word.number) {
+            limits.result_bytes
+        } else {
+            match &word.kind {
+                crate::MessageKind::Words
+                | crate::MessageKind::ProposalDecision { .. }
+                | crate::MessageKind::Amendment { .. }
+                | crate::MessageKind::Question
+                | crate::MessageKind::Answer { .. } => limits.message_bytes,
+                crate::MessageKind::Result(_) => limits.result_bytes,
+                crate::MessageKind::Notice { .. } | crate::MessageKind::News { .. } => {
+                    limits.result_bytes.max(limits.message_bytes)
+                }
+                crate::MessageKind::EffectNotMade { .. }
+                | crate::MessageKind::Proposal { .. }
+                | crate::MessageKind::Escalation { .. }
+                | crate::MessageKind::PersonStalled { .. }
+                | crate::MessageKind::Timer { .. } => 0,
             }
-            crate::MessageKind::EffectNotMade { .. }
-            | crate::MessageKind::Proposal { .. }
-            | crate::MessageKind::Escalation { .. }
-            | crate::MessageKind::PersonStalled { .. }
-            | crate::MessageKind::Timer { .. } => 0,
         };
         if word.number <= previous
             || word.number > task.last_message
@@ -757,7 +764,7 @@ pub(crate) fn restore(domain: &mut Domain, env: &Env<Limits>, stored: Stored, ou
                     observed_phase: Some(task.phase.clone()),
                     record: *task,
                     alarm: None,
-                    chat_alarm: None,
+                    grace_alarm: None,
                     observed_hold,
                 })
                 .expect("restored task admitted");
@@ -1003,7 +1010,7 @@ pub(crate) fn restored(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<R
     crate::wake::restore(domain, env);
     let numbers = snapshot(domain, env.limits.tasks);
     for number in numbers.into_boxed() {
-        crate::chat::schedule(domain, env, number);
+        crate::grace::schedule(domain, env, number);
         let phase = record(domain, number).expect("restored name exists").phase.clone();
         match record(domain, number).expect("restored name exists").escalation {
             crate::Escalation::Waiting { .. } => out.push(Request::EscalationNeeded {
@@ -1063,11 +1070,17 @@ pub(crate) fn restored(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<R
     }
 }
 
-fn valid_chat_close(task: &TaskRecord) -> bool {
-    let Some(grace) = task.chat_close else { return true };
-    grace.by != 0
-        && match task.executor {
-            Executor::Agent { .. } => true,
-            Executor::Procedure { .. } | Executor::Person(_) => false,
-        }
+fn valid_grace(task: &TaskRecord, limits: &Limits) -> bool {
+    let Some(grace) = &task.grace else { return true };
+    if grace.message == 0
+        || grace.message > task.last_message
+        || grace.reason.len() > usize::try_from(limits.result_bytes).expect("reason bound")
+    {
+        return false;
+    }
+    match grace.by {
+        Party::Person(person) => person != 0,
+        Party::Task(task) => task != 0,
+        Party::Deployment { .. } => false,
+    }
 }

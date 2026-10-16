@@ -68,9 +68,9 @@ pub(crate) fn prepare(
         Admission::Merged => merge_key(&word.kind),
         Admission::Refusable | Admission::RoomKept => None,
     };
-    let mut inbox = List::with_capacity(limits.inbox_messages.saturating_add(1));
+    let mut inbox = List::with_capacity(limits.inbox_messages.saturating_add(2));
     for old in &task.inbox {
-        if key.is_some() && key == merge_key(&old.kind) {
+        if key.is_some() && key == merge_key(&old.kind) && !finish_word(task, old.number) {
             // The hint offered to a procedure belongs to that step. A later
             // hint stays unread and begins a fresh batch after its fence.
             match domain.procedure_offered(number) {
@@ -128,6 +128,15 @@ pub(crate) fn room(domain: &Domain, limits: &Limits, task: u64, count: u32, byte
     let Some(total_count) = record.inbox.len().checked_add(reserved) else {
         return false;
     };
+    let mut finish_count = 0;
+    let mut finish_bytes = 0;
+    for word in &record.inbox {
+        if finish_word(record, word.number) {
+            finish_count = 1;
+            finish_bytes = word.words.len();
+        }
+    }
+    let total_count = total_count.saturating_sub(finish_count);
     let Some(total_count) = total_count.checked_add(subscription_count) else { return false };
     let Some(total_count) = total_count.checked_add(usize::try_from(count).expect("u32 fits usize")) else {
         return false;
@@ -152,6 +161,7 @@ pub(crate) fn room(domain: &Domain, limits: &Limits, task: u64, count: u32, byte
     else {
         return false;
     };
+    let total_bytes = total_bytes.checked_sub(finish_bytes).expect("finish included");
     let Some(total_bytes) = total_bytes.checked_add(result_bytes) else { return false };
     let Some(total_bytes) = total_bytes.checked_add(answer_bytes) else {
         return false;
@@ -497,5 +507,13 @@ pub(crate) fn take(task: &mut crate::TaskRecord, read: Option<u64>, refused: &[u
             }
         }
         task.inbox = kept.into_boxed();
+    }
+}
+
+/// The one finish word has its own reserved room beside the merged amendment.
+pub(crate) fn finish_word(task: &crate::TaskRecord, message: u64) -> bool {
+    match &task.grace {
+        Some(grace) => grace.message == message,
+        None => false,
     }
 }

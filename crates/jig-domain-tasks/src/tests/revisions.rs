@@ -36,6 +36,7 @@ pub(super) const LIMITS: Limits = Limits {
     hold_segments: 4,
     hold_bytes: 64,
     hold_waiters: 8,
+    grace: Duration::from_secs(600),
     hold_wait: Duration::from_secs(10),
     inputs: 4,
     spec_bytes: 64,
@@ -510,7 +511,7 @@ fn activity_positions_continue_after_restart_and_the_ended_task_keeps_its_lines(
         reply_to: to(),
         by: Party::Person(9),
         task: 1,
-        control: Control::Cancel { reason: Box::from(&b"Ended"[..]) },
+        control: Control::Cancel { reason: Box::from(&b"Ended"[..]), grace: None, message: None },
     });
     test.send(Event::EffectsSettled { task: 1 });
     test.send(Event::Settled { task: 1 });

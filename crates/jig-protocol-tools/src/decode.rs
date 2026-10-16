@@ -28,7 +28,7 @@ fn read(tool: &[u8], input: &[u8], limits: &Limits) -> Result<Decoded, Problem> 
         b"message" => message(&value)?,
         b"cancel" => core::NamedAction::Control {
             target: value.required(b"target")?.number()?,
-            control: tasks::Control::Cancel { reason: value.required(b"reason")?.text()? },
+            control: tasks::Control::Cancel { reason: value.required(b"reason")?.text()?, grace: None, message: None },
         },
         b"release" => core::NamedAction::Release {
             target: value.required(b"target")?.number()?,
