@@ -10,6 +10,9 @@ const PROJECT: u32 = 1;
 const OWNER: u64 = 1;
 const CANCEL: u8 = 1;
 const AMEND: u8 = 2;
+const MOVE_SIGN_IN: u64 = 6100;
+const MARK_BEFORE_MOVE: u8 = 21;
+const MOVE: u8 = 22;
 
 #[test]
 fn a_partys_cancel_with_a_grace_ends_the_chat_when_the_grace_ends() {
@@ -295,4 +298,83 @@ fn an_earlier_compound_amendment_sets_the_next_spec_revision() {
     request(&mut world, 19, compound([edit(0, b"first"), edit(1, b"second")]));
     assert_eq!(live_row(&world, task).revisions.spec, 2);
     assert_eq!(live_row(&world, task).spec.words.as_ref(), b"second");
+}
+
+fn another_requester(world: &mut jig_core_world::effects::World) -> u64 {
+    let first = world.sign_in.expect("first requester signed in");
+    world.send(root::Event::Core(core::Event::SignIn {
+        reply_to: skein_lib::ReplyTo::new(skein_lib::Token::new(MOVE_SIGN_IN)),
+        identity: people::Identity {
+            key: people::IdentityKey { provider: 0, subject: 8_u64.to_be_bytes().into() },
+            login: b"second".as_slice().into(),
+            name: b"second requester".as_slice().into(),
+        },
+    }));
+    let people::Reply::SignedIn { person, .. } = *world.people_answers.last().expect("second sign-in") else {
+        panic!("second signed in")
+    };
+    let second = world.sign_in.replace(first).expect("second session");
+    world.send(root::Event::Core(core::Event::People(people::Event::Roles {
+        project: PROJECT,
+        holdings: Box::new([
+            people::Holding { person: OWNER, role: people::Role::Owner },
+            people::Holding { person, role: people::Role::Owner },
+        ]),
+    })));
+    second
+}
+
+#[test]
+fn a_moved_conversation_starts_its_new_requester_with_nothing_read() {
+    const COMPOUND: [bool; 2] = [false, true];
+    for compound_request in COMPOUND {
+        let mut world = world(1116);
+        let task = world.assigned.as_ref().expect("conversation").task;
+        world.turn(1, 0, None, b"unread after move");
+        let second = another_requester(&mut world);
+        request(&mut world, MARK_BEFORE_MOVE, people::Ask::MarkSeen { seen: people::Seen::Chat { task, through: 1 } });
+        assert!(
+            world
+                .store
+                .rows
+                .contains_key(&root::Key::Core(core::Key::People(people::Key::ReadChat { party: OWNER, task })))
+        );
+        world.sign_in = Some(second);
+        let ask = if compound_request {
+            compound([people::Operation::Move { task, reason: b"continue".as_slice().into() }])
+        } else {
+            people::Ask::Move { project: PROJECT, task, reason: b"continue".as_slice().into() }
+        };
+        request(&mut world, MOVE, ask);
+        assert_moved_read(&world, task, compound_request);
+    }
+}
+
+fn assert_moved_read(world: &jig_core_world::effects::World, task: u64, compound_request: bool) {
+    let tasks::Party::Person(to) = live_row(world, task).requester else { panic!("new requester") };
+    assert_ne!(to, OWNER, "compound={compound_request}: {:?}", world.people_answers.last());
+    assert_eq!(
+        world.store.rows.get(&root::Key::Core(core::Key::People(people::Key::ReadChat { party: OWNER, task }))),
+        None
+    );
+    assert_eq!(
+        world.store.rows.get(&root::Key::Core(core::Key::People(people::Key::ReadChat { party: to, task }))),
+        Some(&root::Record::Core(core::Record::People(people::Stored::ReadChat { party: to, task, through: 0 })))
+    );
+    let decision = world
+        .commits
+        .iter()
+        .find(|commit| {
+            commit.iter().any(|write| {
+                *write
+                    == root::Write::Erase(root::Key::Core(core::Key::People(people::Key::ReadChat {
+                        party: OWNER,
+                        task,
+                    })))
+            })
+        })
+        .expect("one move decision");
+    assert!(decision.contains(&root::Write::Save(root::Record::Core(core::Record::People(
+        people::Stored::ReadChat { party: to, task, through: 0 }
+    )))));
 }

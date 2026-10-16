@@ -6,6 +6,10 @@ use crate::{Application, Cut, Harness, Outcome};
 /// An adversarial story shared by every application with the required kinds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Scenario {
+    /// A keyed compound is made whole across crashes and duplicate requests.
+    Compound,
+    /// A grace survives two restarts and ends by completion or cancellation.
+    Grace,
     /// A delayed effect copy reaches the system after its retry.
     LateCopy,
     /// Another participant reaches the conditional write's target first.
@@ -31,7 +35,7 @@ pub enum Scenario {
 }
 
 /// Every shared story, in a stable order for focused cuts and sweeps.
-pub const ALL: [Scenario; 11] = [
+pub const ALL: [Scenario; 13] = [
     Scenario::LateCopy,
     Scenario::OtherHand,
     Scenario::UncertainRestarts,
@@ -43,11 +47,21 @@ pub const ALL: [Scenario; 11] = [
     Scenario::RacingDecisions,
     Scenario::ConversationEndsWhileRead,
     Scenario::QueryWatchedWhileTasksEnd,
+    Scenario::Compound,
+    Scenario::Grace,
 ];
 
 /// One scenario action, translated at the application's outside boundaries.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Action {
+    /// Move and cancel two delegates, and ask their conversation to finish.
+    Compound,
+    /// Send the identical compound under its original request key.
+    CompoundAgain,
+    /// Ask a running task to finish within a two-second grace.
+    CancelWithGrace,
+    /// Finish the run in the seed half that completes inside the grace.
+    Finish,
     /// Let an unseen claim pass adoption grace and retry backoff if needed.
     Ready,
     /// Delay one effect copy independently of the connector.
@@ -137,20 +151,12 @@ pub enum Step {
 #[must_use]
 pub fn program(scenario: Scenario) -> Vec<Step> {
     let mut steps = vec![Step::Drain, Step::Action(Action::Ready), Step::Drain];
+    if matches!(scenario, Scenario::Compound | Scenario::Grace) {
+        lifecycle(&mut steps, scenario);
+        return steps;
+    }
     if scenario == Scenario::QueryWatchedWhileTasksEnd {
-        steps.extend([Step::Action(Action::WatchQuery), Step::Drain]);
-        for _ in 0..3 {
-            steps.extend([
-                Step::Action(Action::EndTask),
-                Step::Drain,
-                Step::Crash,
-                Step::Drain,
-                Step::Action(Action::WatchQuery),
-                Step::Drain,
-                Step::Action(Action::ReadEnded),
-                Step::Drain,
-            ]);
-        }
+        query(&mut steps);
         return steps;
     }
     if scenario == Scenario::ConversationEndsWhileRead {
@@ -185,7 +191,10 @@ pub fn program(scenario: Scenario) -> Vec<Step> {
         }
         Scenario::RunBudget => &[Action::Resume],
         Scenario::RacingDecisions => &[Action::PartyAmend, Action::RunAmend],
-        Scenario::QueryWatchedWhileTasksEnd | Scenario::ConversationEndsWhileRead => {
+        Scenario::Compound
+        | Scenario::Grace
+        | Scenario::QueryWatchedWhileTasksEnd
+        | Scenario::ConversationEndsWhileRead => {
             unreachable!("conversation program returned")
         }
     };
@@ -221,7 +230,9 @@ pub fn program(scenario: Scenario) -> Vec<Step> {
             }
             steps.push(Step::Drain);
         }
-        Scenario::ShrinkingPool
+        Scenario::Compound
+        | Scenario::Grace
+        | Scenario::ShrinkingPool
         | Scenario::StandingTask
         | Scenario::RunBudget
         | Scenario::RacingDecisions
@@ -280,4 +291,47 @@ fn conversation(steps: &mut Vec<Step>) {
         Step::Crash,
         Step::Drain,
     ]);
+}
+
+const GRACE_NANOS: u64 = 2_000_000_000;
+const RESTART_AFTER_NANOS: u64 = 500_000_000;
+const GRACE_LEFT_NANOS: u64 = 1_000_000_000;
+
+fn lifecycle(steps: &mut Vec<Step>, scenario: Scenario) {
+    use Step::{Action as Act, Advance, Crash, Drain};
+    let actions: &[Step] = if scenario == Scenario::Compound {
+        &[Act(Action::Compound), Drain, Crash, Drain, Act(Action::CompoundAgain), Drain, Advance(GRACE_NANOS), Drain]
+    } else {
+        &[
+            Act(Action::CancelWithGrace),
+            Drain,
+            Advance(RESTART_AFTER_NANOS),
+            Crash,
+            Drain,
+            Advance(RESTART_AFTER_NANOS),
+            Crash,
+            Drain,
+            Act(Action::Finish),
+            Drain,
+            Advance(GRACE_LEFT_NANOS),
+            Drain,
+        ]
+    };
+    steps.extend_from_slice(actions);
+}
+
+fn query(steps: &mut Vec<Step>) {
+    steps.extend([Step::Action(Action::WatchQuery), Step::Drain]);
+    for _ in 0..3 {
+        steps.extend([
+            Step::Action(Action::EndTask),
+            Step::Drain,
+            Step::Crash,
+            Step::Drain,
+            Step::Action(Action::WatchQuery),
+            Step::Drain,
+            Step::Action(Action::ReadEnded),
+            Step::Drain,
+        ]);
+    }
 }

@@ -3,6 +3,11 @@ use jig_conformance::{
     scenarios::{ALL, Scenario, run},
 };
 use jig_conformance_world::Testing;
+
+const GRACE_RESTART_COMMIT: u64 = 7;
+const COMPOUND_ANSWER_COMMIT: u64 = 10;
+const COMPOUND_DELEGATION_COMMIT: u64 = 7;
+const COMPOUND_RUNNING_COMMIT: u64 = 9;
 #[global_allocator]
 static HEAP: skein_world::domain::heap::Counting = skein_world::domain::heap::Counting;
 
@@ -92,4 +97,32 @@ fn conversation_ends_while_read_chosen_cut_ends_the_story() {
 #[test]
 fn query_watched_while_tasks_end_chosen_cut_ends_the_story() {
     chosen_cut(Scenario::QueryWatchedWhileTasksEnd);
+}
+
+#[test]
+fn compound_chosen_answer_cut_ends_the_story() {
+    run::<Testing>(Scenario::Compound, Cut::AfterCommit(COMPOUND_ANSWER_COMMIT), 31)
+        .expect("compound commit survives before its answer is released")
+        .expect("application binds compound");
+}
+
+#[test]
+fn grace_chosen_restart_cut_ends_the_story() {
+    for seed in [30, 31] {
+        run::<Testing>(Scenario::Grace, Cut::AfterCommit(GRACE_RESTART_COMMIT), seed)
+            .expect("grace survives its chosen restart cut")
+            .expect("application binds grace");
+    }
+}
+
+#[test]
+fn compound_chosen_delegate_admission_cut_restores_live_delegates() {
+    jig_conformance_world::replay::chosen_cuts_traced(
+        Scenario::Compound,
+        301,
+        None,
+        &[COMPOUND_DELEGATION_COMMIT, COMPOUND_RUNNING_COMMIT],
+        |_, _| {},
+    )
+    .expect("admitted delegates resume before the compound is sent");
 }

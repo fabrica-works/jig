@@ -1,5 +1,6 @@
 //! The shared scenarios bound to two test connectors and independent hosts.
 mod conversations;
+pub(crate) mod lifecycle;
 pub(crate) mod queries;
 use crate::{Config, Testing, actions::World};
 use jig_conformance::referee::{Promise, Violation};
@@ -27,9 +28,11 @@ fn authority(world: &World) -> tasks::Authority {
     }
 }
 
+const PARTY_REPLY_BASE: u64 = 6000;
+
 fn ask(world: &mut World, key: u8, ask: people::Ask) {
     world.send(root::Event::Core(core::Event::People(people::Event::Ask {
-        reply_to: ReplyTo::new(Token::new(6000 + u64::from(key))),
+        reply_to: ReplyTo::new(Token::new(PARTY_REPLY_BASE + u64::from(key))),
         sign_in: world.peers.peers.parties[0].sign_in.expect("scripted sign-in"),
         key: [key; 16],
         ask,
@@ -104,7 +107,10 @@ impl ScenarioApplication for Testing {
             false,
             if matches!(
                 scenario,
-                Scenario::ShrinkingPool | Scenario::ConversationEndsWhileRead | Scenario::QueryWatchedWhileTasksEnd
+                Scenario::Compound
+                    | Scenario::ShrinkingPool
+                    | Scenario::ConversationEndsWhileRead
+                    | Scenario::QueryWatchedWhileTasksEnd
             ) {
                 3
             } else {
@@ -125,6 +131,7 @@ impl ScenarioApplication for Testing {
     fn check(world: &World, scenario: Scenario) -> Result<(), Violation> {
         let applied = world.systems[0].observed().iter().filter(|effect| effect.applied).count();
         match scenario {
+            Scenario::Compound | Scenario::Grace => lifecycle::check_ending(world, scenario),
             Scenario::QueryWatchedWhileTasksEnd => queries::check_ending(world),
             Scenario::ConversationEndsWhileRead => conversations::check_ending(world),
             Scenario::RacingDecisions => crate::actions::check_racing_decisions(world),
@@ -220,6 +227,9 @@ impl Continuation {
     pub(crate) fn advance(&mut self, world: &mut World) -> Result<bool, Violation> {
         loop {
             match self.action {
+                Action::Compound | Action::CompoundAgain | Action::CancelWithGrace | Action::Finish => {
+                    return lifecycle::advance(world, self.action, &mut self.phase);
+                }
                 Action::WatchQuery | Action::EndTask | Action::ReadEnded => {
                     return queries::advance(world, self.action, &mut self.phase);
                 }
@@ -284,7 +294,13 @@ impl Continuation {
                     }
                     _ => {
                         check(!world.peers.assignments.is_empty(), "caller was not assigned")?;
+                        if world.peers.scenario == Some(Scenario::Compound)
+                            && lifecycle::prepare(world, &mut self.phase)?
+                        {
+                            return Ok(true);
+                        }
                         world.peers.initial_assignments = world.peers.assignments.len();
+                        world.peers.lifecycle.ready = world.outcome().commits;
                         return Ok(false);
                     }
                 },
@@ -579,25 +595,7 @@ fn atomic(world: &mut World, action: Action) -> Result<(), Violation> {
         Action::OtherHand => world.systems[0].other_hand(&jig_test_connector_world::path(1, 1), 13),
         Action::HoldWrites => world.peers.hold_writes = true,
         Action::ReleaseWrites => release_writes(world),
-        Action::CheckDeadline => {
-            let deadline = world
-                .store
-                .rows
-                .values()
-                .find_map(|row| match row {
-                    root::Record::Connector { number: 1, record: connector::Record::Outbox(entry) } => {
-                        entry.attempt.map(|attempt| attempt.deadline)
-                    }
-                    root::Record::Core(_) | root::Record::Connector { .. } => None,
-                })
-                .expect("durable uncertain attempt");
-            if let Some(saved) = world.peers.saved_deadline {
-                check(deadline == saved, "cold restart changed the uncertain deadline")?;
-                check(world.clock().now < saved.as_nanos(), "restarts passed the uncertain deadline")?;
-            } else {
-                world.peers.saved_deadline = Some(deadline);
-            }
-        }
+        Action::CheckDeadline => check_deadline(world)?,
         Action::ChangeJudge => {
             world.systems[1].other_hand(&jig_test_connector_world::path(1, 1), 14);
             let event = world.systems[1].answer(
@@ -648,6 +646,10 @@ fn atomic(world: &mut World, action: Action) -> Result<(), Violation> {
         | Action::MarkTurns
         | Action::EndConversations
         | Action::MarkResults
+        | Action::Compound
+        | Action::CompoundAgain
+        | Action::CancelWithGrace
+        | Action::Finish
         | Action::Ready
         | Action::FillPool
         | Action::FinishHolder(_)
@@ -660,6 +662,27 @@ fn atomic(world: &mut World, action: Action) -> Result<(), Violation> {
         | Action::WatchQuery
         | Action::EndTask
         | Action::ReadEnded => unreachable!("continued action"),
+    }
+    Ok(())
+}
+
+fn check_deadline(world: &mut World) -> Result<(), Violation> {
+    let deadline = world
+        .store
+        .rows
+        .values()
+        .find_map(|row| match row {
+            root::Record::Connector { number: 1, record: connector::Record::Outbox(entry) } => {
+                entry.attempt.map(|attempt| attempt.deadline)
+            }
+            root::Record::Core(_) | root::Record::Connector { .. } => None,
+        })
+        .expect("durable uncertain attempt");
+    if let Some(saved) = world.peers.saved_deadline {
+        check(deadline == saved, "cold restart changed the uncertain deadline")?;
+        check(world.clock().now < saved.as_nanos(), "restarts passed the uncertain deadline")?;
+    } else {
+        world.peers.saved_deadline = Some(deadline);
     }
     Ok(())
 }

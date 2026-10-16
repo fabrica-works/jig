@@ -625,6 +625,8 @@ impl Stored {
     reason = "bounded whole keyed requests stay inline and event storage is priced by size_of"
 )]
 pub enum Event {
+    /// Move a live conversation and start its new requester with nothing read.
+    MoveChat { task: u64, project: u32, from: u64, to: u64 },
     /// Authentic committed chat header; live headers replace their previous contribution.
     ChatState {
         party: u64,

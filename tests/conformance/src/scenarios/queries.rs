@@ -94,7 +94,11 @@ pub(super) fn advance(world: &mut World, action: Action, phase: &mut u8) -> Resu
             )?;
             world.peers.query.checks += 1;
         }
-        Action::Ready
+        Action::Compound
+        | Action::CompoundAgain
+        | Action::CancelWithGrace
+        | Action::Finish
+        | Action::Ready
         | Action::Late
         | Action::Effect(_)
         | Action::DeliverLate

@@ -423,6 +423,9 @@ pub fn max_out(limits: &Limits) -> u32 {
 /// targets for keyed replay.
 pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     match event {
+        Event::MoveChat { task, project, from, to } => {
+            inbox::move_chat(domain, &env.limits, task, project, from, to, out);
+        }
         Event::ChatState { party, project, task, last_reply, live, seen, replies } => {
             inbox::chat_state_event(domain, env, party, project, task, last_reply, live, seen, replies, out);
         }

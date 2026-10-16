@@ -128,6 +128,7 @@ fn people_gate(event: people::Event) -> Result<Event, Requests> {
         people::Event::Ask { reply_to, .. } | people::Event::SignOut { reply_to, .. } => Err(party(reply_to)),
         people::Event::ChatSeen { .. } => Err(empty()),
         event @ (people::Event::ChatState { .. }
+        | people::Event::MoveChat { .. }
         | people::Event::Forget { .. }
         | people::Event::MakeService { .. }
         | people::Event::Seed { .. }

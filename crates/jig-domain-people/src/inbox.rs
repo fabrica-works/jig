@@ -1,6 +1,10 @@
 //! Task-derived inbox census, one shared recent prefix, and explicit read marks
 //! (`domain/people.md`, section 6). Owner rows rebuild volatile counts after
 //! positions restore. Ended chats retain positions until the owner forgets them.
+#[path = "inbox/moving.rs"]
+mod moving;
+pub(super) use moving::move_chat;
+
 use super::{ChatTotal, Domain, Need, Pending, Phase, Recent, decided, role};
 use crate::{
     Again, Ask, Counts, Entry, EntryKind, Key, Limits, Needs, Outcome, ReplyRef, Request, ResultRef, Role, Seen,
@@ -168,6 +172,13 @@ impl Domain {
             }
             None => false,
         }
+    }
+
+    /// Requester represented by the live conversation projection.
+    #[must_use]
+    pub fn chat_owner(&self, task: u64) -> Option<u64> {
+        let chat = self.chat_totals.get(&task)?;
+        Some(chat.party)
     }
 
     /// Last position explicitly marked seen over one chat, zero before any mark.

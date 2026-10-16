@@ -57,6 +57,25 @@ impl Config {
 
     fn root(self) -> (root::Config, root::Limits) {
         let (mut config, mut limits) = jig_core_world::peers::fixture(self.seed, u32::from(self.engine));
+        if self.scenario == Some(Scenario::Compound) {
+            limits.core.tasks.tasks = 3;
+            limits.core.tasks.project_tasks = 3;
+            limits.core.tasks.tree_tasks = 3;
+            limits.core.tasks.inbox_messages = 5;
+            limits.core.tasks.inbox_bytes = 512;
+            limits.core.people.inbox_recipients = 24;
+            limits.core.tasks.batch = 2;
+            limits.core.authority.batch = 2;
+            let mut domain = authority::Domain::new(config.core.authority.rules().clone(), limits.core.authority)
+                .expect("compound authority bounds");
+            let policy = config.core.authority.policy(1).expect("compound policy").clone();
+            let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
+            authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut out);
+            assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
+            config.core.authority = domain;
+            limits.core.fleet.slots = 3;
+            limits.core.people.operations = 3;
+        }
         if self.scenario == Some(Scenario::ShrinkingPool) {
             limits.core.fleet.slots = 3;
             limits.core.tasks.inbox_bytes = 512;
@@ -145,6 +164,7 @@ pub struct Neighbours {
     fault: negative::Fault,
     routes: Vec<jig_conformance::referee::Observed>,
     query: scenarios::queries::State,
+    lifecycle: scenarios::lifecycle::State,
 }
 
 fn env(config: &Config, clock: Clock) -> Env<root::Limits> {
@@ -231,31 +251,18 @@ impl Application for Testing {
                 Script::Wait,
                 Script::Finish { report: b"conversation done".as_slice().into() },
             ]) as Box<[Script]>,
+            Some(Scenario::Compound) => Box::new([Script::Wait, Script::Wait]) as Box<[Script]>,
+            Some(Scenario::Grace) => {
+                Box::new([Script::Wait, Script::Wait, Script::Finish { report: b"grace finished".as_slice().into() }])
+                    as Box<[Script]>
+            }
             Some(Scenario::ShrinkingPool) => {
                 Box::new([Script::Wait, Script::Finish { report: b"pool done".as_slice().into() }]) as Box<[Script]>
             }
             Some(Scenario::StandingTask) => {
                 Box::new([Script::Wait, Script::Finish { report: b"period done".as_slice().into() }]) as Box<[Script]>
             }
-            Some(Scenario::RunBudget) => {
-                let mut script = vec![Script::Wait];
-                for session in 0..8 {
-                    script.push(Script::Turn {
-                        body: format!("session {session}").into_bytes().into_boxed_slice(),
-                        cost: 2,
-                        read: None,
-                    });
-                }
-                for child in 0..4 {
-                    script.push(Script::Turn {
-                        body: format!("sub-agent {child}").into_bytes().into_boxed_slice(),
-                        cost: 1,
-                        read: None,
-                    });
-                }
-                script.push(Script::Park);
-                script.into_boxed_slice()
-            }
+            Some(Scenario::RunBudget) => run_budget_script(),
             None
             | Some(
                 Scenario::LateCopy
@@ -317,6 +324,7 @@ impl Application for Testing {
             fault: config.fault,
             routes: Vec::new(),
             query: scenarios::queries::State::default(),
+            lifecycle: scenarios::lifecycle::State::new(config.seed),
         }
     }
 
@@ -461,6 +469,7 @@ impl Application for Testing {
             };
         };
         scenarios::queries::delivered(peers, store, &delivery);
+        scenarios::lifecycle::delivered(peers, &delivery);
         peers.observer.delivered(clock.now, &mut delivery);
         peers.peers.delivered(&delivery);
         match delivery {
@@ -650,3 +659,23 @@ pub mod replay;
 pub mod scenarios;
 
 pub mod negative;
+
+fn run_budget_script() -> Box<[Script]> {
+    let mut script = vec![Script::Wait];
+    for session in 0..8 {
+        script.push(Script::Turn {
+            body: format!("session {session}").into_bytes().into_boxed_slice(),
+            cost: 2,
+            read: None,
+        });
+    }
+    for child in 0..4 {
+        script.push(Script::Turn {
+            body: format!("sub-agent {child}").into_bytes().into_boxed_slice(),
+            cost: 1,
+            read: None,
+        });
+    }
+    script.push(Script::Park);
+    script.into_boxed_slice()
+}

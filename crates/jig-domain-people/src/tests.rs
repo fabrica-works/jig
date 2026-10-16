@@ -1613,3 +1613,5 @@ mod fixtures;
 
 mod compound;
 mod ended;
+
+mod moving_chat;

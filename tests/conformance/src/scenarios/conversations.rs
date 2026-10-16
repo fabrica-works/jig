@@ -77,6 +77,10 @@ pub(super) fn action(world: &mut World, action: Action) {
         | Action::EndTask
         | Action::ReadEnded
         | Action::EndConversations
+        | Action::Compound
+        | Action::CompoundAgain
+        | Action::CancelWithGrace
+        | Action::Finish
         | Action::Ready
         | Action::Late
         | Action::Effect(_)

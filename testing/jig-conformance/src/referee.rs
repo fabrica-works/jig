@@ -4,6 +4,7 @@
 //! captured before constructing the root; it is never inferred from its live
 //! state (`domain/core.md`, 11; `domain/testing.md`, 6).
 mod application;
+mod compound;
 mod conversations;
 mod positions;
 pub use application::{ApplicationAnswer, ApplicationKey};
@@ -300,6 +301,10 @@ pub enum Observed {
     Reached(Receipt),
     /// A newly accepted word needs delivery, or the addressed task must close.
     Words { task: u64, message: u64 },
+    /// A scenario sends a compound, retaining the first ask across retries.
+    CompoundAsked { tasks: Vec<u64> },
+    /// A compound answer judges the first commit changing its named task rows.
+    Compound { tasks: Vec<u64>, made: bool },
     /// A scenario declares the atomic batch it asked to create.
     Batch { members: Vec<u64> },
     /// Engine-only heap meter, excluding histories held by test neighbours.
@@ -346,6 +351,7 @@ pub struct Violation {
 #[derive(Clone, Debug)]
 pub struct Referee {
     applications: application::Applications,
+    compounds: BTreeMap<Vec<u64>, compound::Compound>,
     pub policy: Policy,
     last: Snapshot,
     ended_budgets: BTreeMap<u64, u64>,
@@ -380,6 +386,7 @@ impl Referee {
     pub fn new(policy: Policy) -> Self {
         Self {
             applications: application::Applications::default(),
+            compounds: BTreeMap::new(),
             policy,
             last: Snapshot::default(),
             ended_budgets: BTreeMap::new(),
@@ -660,8 +667,11 @@ impl Referee {
                 self.ended_budgets.insert(*task, row.budget);
             }
         }
-        positions::check(&self.last.read_positions, &snapshot)?;
+        positions::check(&self.last, &snapshot)?;
         self.commit = number;
+        for compound in self.compounds.values_mut() {
+            compound.durable(number, &snapshot);
+        }
         self.last = snapshot;
         Ok(())
     }
@@ -1002,6 +1012,13 @@ impl Referee {
                 } else {
                     self.waiting.entry(receipt).or_insert(now + self.policy.delivery_bound);
                 }
+            }
+            Observed::CompoundAsked { tasks } => {
+                self.compounds.entry(tasks.clone()).or_insert_with(|| compound::Compound::asked(&tasks, &self.last));
+            }
+            Observed::Compound { tasks, made } => {
+                require(self.compounds.contains_key(&tasks), Promise::Once, "compound answer has no ask")?;
+                self.compounds[&tasks].answered(made)?;
             }
             Observed::Batch { members } => self.batch(&members)?,
             Observed::Heap { held, maximum } => {

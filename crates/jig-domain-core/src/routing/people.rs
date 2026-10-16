@@ -51,6 +51,7 @@ pub(super) fn route_people(
             people::Event::Decided { request, outcome }
         }
         other @ (people::Event::ChatState { .. }
+        | people::Event::MoveChat { .. }
         | people::Event::ChatSeen { .. }
         | people::Event::Forget { .. }
         | people::Event::MakeService { .. }

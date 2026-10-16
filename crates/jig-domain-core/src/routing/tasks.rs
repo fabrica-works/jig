@@ -823,6 +823,17 @@ pub(super) fn tag_tasks(
                 };
                 crate::indexes::save(core, &record, env.wall, &mut out);
                 if let tasks::Stored::Live(task) | tasks::Stored::Ended(task) = &record {
+                    if let Some(to) = core.conversation_requester(task)
+                        && let Some(from) = core.people.chat_owner(task.number)
+                        && from != to
+                    {
+                        append_people(
+                            core,
+                            env,
+                            people::Event::MoveChat { task: task.number, project: task.project, from, to },
+                            &mut out,
+                        );
+                    }
                     let seen = match core.conversation_requester(task) {
                         Some(party) => core.people.chat_seen(party, task.number),
                         None => None,

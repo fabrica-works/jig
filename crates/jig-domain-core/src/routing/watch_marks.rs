@@ -271,6 +271,10 @@ pub(super) fn touch_people_event(core: &mut Core, limits: &Limits, event: &peopl
     match event {
         people::Event::Roles { project, .. } => core.touch_project_parties(*project),
         people::Event::ChatState { party, .. } => core.touch_party(*party),
+        people::Event::MoveChat { from, to, .. } => {
+            core.touch_party(*from);
+            core.touch_party(*to);
+        }
         people::Event::ChatSeen { request, .. } => {
             if let Some((party, _)) = core.people.seen_context(*request) {
                 core.touch_party(party);
