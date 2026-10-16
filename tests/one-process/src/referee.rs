@@ -163,6 +163,13 @@ fn snapshot(rows: &BTreeMap<root::Key, root::Record>) -> rules::Snapshot {
         if let root::Record::Core(core::Record::Core(core::CoreRecord::Terminal(end))) = row {
             snapshot.receipts.insert(rules::Receipt::Terminal(end.task, end.attempt));
         }
+        if let root::Record::Core(core::Record::People(
+            jig_domain_people::Stored::ReadChat { party, task, through }
+            | jig_domain_people::Stored::EndedRead { party, task, through },
+        )) = row
+        {
+            snapshot.read_positions.insert((*party, *task), *through);
+        }
         if let root::Record::Core(core::Record::People(jig_domain_people::Stored::SignIn { number, .. })) = row {
             snapshot.receipts.insert(rules::Receipt::SignIn(*number));
         }

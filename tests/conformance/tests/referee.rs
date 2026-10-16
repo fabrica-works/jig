@@ -211,3 +211,97 @@ fn a_cold_store_that_loses_a_drained_party_answer_is_a_violation() {
     assert_eq!(failure.promise, Promise::Commit);
     assert_eq!(failure.why, "cold store lost a drained receipt");
 }
+
+fn position_referee() -> jig_conformance::referee::Referee {
+    jig_core_world::observations::Observer::new(&jig_core_world::world::config(31)).referee
+}
+
+fn position_snapshot(
+    referee: &jig_conformance::referee::Referee,
+    phase: jig_conformance::referee::Phase,
+) -> jig_conformance::referee::Snapshot {
+    use jig_conformance::referee as r;
+    let mut snapshot = r::Snapshot::default();
+    snapshot.tasks.insert(
+        5,
+        r::Task {
+            tracked: false,
+            number: 5,
+            project: 1,
+            source: r::Source::Deployment,
+            scope: referee.policy.projects[&1].clone(),
+            executor: (0, 1),
+            budget: 0,
+            spent: 0,
+            spent_below: 0,
+            reserved: 0,
+            run_reserved: 0,
+            run_spent: 0,
+            attempt: 1,
+            period: None,
+            phase,
+            dependencies: Vec::new(),
+            delegates: Vec::new(),
+            pools: Vec::new(),
+            inbox: Vec::new(),
+            proposal: None,
+        },
+    );
+    snapshot.read_positions.insert((1, 5), 2);
+    snapshot.read_positions.insert((2, 5), 7);
+    snapshot
+}
+
+const POSITION_BOUNDARIES: [bool; 2] = [false, true];
+
+#[test]
+fn a_read_position_moving_back_across_an_end_is_a_violation() {
+    use jig_conformance::referee as r;
+    for restart in POSITION_BOUNDARIES {
+        let mut referee = position_referee();
+        let before = position_snapshot(&referee, r::Phase::Active);
+        let mut after = position_snapshot(&referee, r::Phase::Ended);
+        after.read_positions.insert((1, 5), 1);
+        after.read_positions.insert((2, 5), 8);
+        referee.observe(1, r::Observed::Durable { number: 1, snapshot: before }).expect("live position");
+        if restart {
+            referee.observe(2, r::Observed::Restart).expect("cold start");
+        }
+        let failure = referee.observe(3, r::Observed::Durable { number: 2, snapshot: after }).expect_err("regression");
+        assert_eq!(failure.promise, Promise::Lost, "restart {restart}");
+        assert_eq!(failure.why, "a retained task lost or moved back its party's read position", "restart {restart}");
+    }
+}
+
+#[test]
+fn a_read_position_erased_without_its_task_is_a_violation() {
+    use jig_conformance::referee as r;
+    let mut referee = position_referee();
+    let before = position_snapshot(&referee, r::Phase::Ended);
+    let mut after = before.clone();
+    after.read_positions.remove(&(1, 5));
+    referee.observe(1, r::Observed::Durable { number: 1, snapshot: before }).expect("ended position");
+    let failure = referee.observe(2, r::Observed::Durable { number: 2, snapshot: after }).expect_err("lost position");
+    assert_eq!(failure.promise, Promise::Lost);
+    assert_eq!(failure.why, "a retained task lost or moved back its party's read position");
+}
+
+#[test]
+fn a_read_position_kept_across_a_restart_passes() {
+    use jig_conformance::referee as r;
+    let mut referee = position_referee();
+    let before = position_snapshot(&referee, r::Phase::Active);
+    let after = position_snapshot(&referee, r::Phase::Ended);
+    referee.observe(1, r::Observed::Durable { number: 1, snapshot: before }).expect("live position");
+    referee.observe(2, r::Observed::Restart).expect("cold start retains seen evidence");
+    referee.observe(3, r::Observed::Durable { number: 2, snapshot: after }).expect("same positions after task end");
+}
+
+#[test]
+fn a_task_and_its_read_positions_can_be_forgotten_together() {
+    use jig_conformance::referee as r;
+    let mut referee = position_referee();
+    let before = position_snapshot(&referee, r::Phase::Ended);
+    referee.observe(1, r::Observed::Durable { number: 1, snapshot: before }).expect("ended positions");
+    referee.observe(2, r::Observed::Durable { number: 2, snapshot: r::Snapshot::default() }).expect("atomic forget");
+}

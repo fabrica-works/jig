@@ -5,6 +5,7 @@
 //! state (`domain/core.md`, 11; `domain/testing.md`, 6).
 mod application;
 mod conversations;
+mod positions;
 pub use application::{ApplicationAnswer, ApplicationKey};
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -217,6 +218,8 @@ pub struct Acceptance {
 #[derive(Clone, PartialEq, Eq, Debug, Default)]
 pub struct Snapshot {
     pub tasks: BTreeMap<u64, Task>,
+    /// Committed conversation positions, live or ended, keyed by party then task.
+    pub read_positions: BTreeMap<(u64, u64), u64>,
     pub receipts: BTreeSet<Receipt>,
     pub writers: Vec<(Name, u64, u64)>,
     pub pools: BTreeMap<Name, u32>,
@@ -256,6 +259,7 @@ pub struct Policy {
 }
 
 /// A neighbour or store observation, in the referee's vocabulary.
+#[expect(clippy::large_enum_variant, reason = "durable observations own the complete atomic snapshot")]
 #[derive(Clone, Debug)]
 pub enum Observed {
     /// An application's independently encoded request reached the root.
@@ -649,6 +653,7 @@ impl Referee {
                 self.ended_budgets.insert(*task, row.budget);
             }
         }
+        positions::check(&self.last.read_positions, &snapshot)?;
         self.commit = number;
         self.last = snapshot;
         Ok(())

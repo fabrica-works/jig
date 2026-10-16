@@ -696,6 +696,12 @@ impl Observer {
                         }
                     }
                 }
+                root::Record::Core(core::Record::People(
+                    people::Stored::ReadChat { party, task, through }
+                    | people::Stored::EndedRead { party, task, through },
+                )) => {
+                    snapshot.read_positions.insert((*party, *task), *through);
+                }
                 root::Record::Core(core::Record::People(people::Stored::SignIn { number, .. })) => {
                     snapshot.receipts.insert(r::Receipt::SignIn(*number));
                 }
