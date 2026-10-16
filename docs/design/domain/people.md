@@ -365,6 +365,15 @@ entry naming the task or proposal it is and its project:
     the conversation or a task query's row joins it by a point read, and
     the inbox's census reads the family through at start
     (`../protocol/store.md`, 4.4, 7.2 and 7.4).
+  - *A mark on an ended conversation,* a `Seen` over its turns, loads
+    its record and its position, and is decided on them: the position
+    moves to the larger of the two, never back. One such mark loads at a
+    time: while it does, the party's next `Seen` over that
+    conversation's turns, or over results that would forget it, is
+    answered busy (`engine.md`, 5.3). Its loads are held behind the
+    commits before them, so a mark sent after another was decided sees
+    that one's position, and no mark saves a position over a newer one,
+    or saves one for a task already forgotten.
   - *It is erased with the task:* by retention when the task is kept, or
     at once when it is forgotten once read.
 - **A task's retention class** says what becomes of it once it has ended

@@ -286,6 +286,13 @@ answers to a run's reads.
   bounded pages (programming-model.md, 4.4). What waits on it is in a
   state that says so: a brief gathering, a run being prepared to resume,
   a party's page.
+- **What a decision loads stays as loaded until it is decided.** Its
+  loads are held (4.2): each is sent once every commit made before it is
+  durable, so it sees them. While they are in flight, a request whose
+  decision would change what they load is answered busy (people.md,
+  section 6, a mark on an ended conversation). Otherwise two decisions
+  that each loaded one record before either changed it would both decide
+  on the old record, and the later commit would undo the earlier.
 - **Bounded:** the loads in flight, and the bytes a load brings, are
   limits; a load past its bytes is cut, and says how much.
 - **Parties' reads** are documents and pages the client's contract lists

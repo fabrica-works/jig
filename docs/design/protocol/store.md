@@ -121,7 +121,10 @@ the application's part with the application's codecs.
   goes whole, by retention (11.1).
 - **Reads see what is durable.** A load, a read, a get or a transcript
   sees every commit answered before it was asked, and nothing that is
-  not durable (skein's `kv.md`, section 2).
+  not durable (skein's `kv.md`, section 2). Each load of the core's is
+  held until every commit made before it is answered
+  (`../domain/engine.md`, 4.2 and 5.3), so it sees what the decisions
+  before it wrote.
 - **One terminal per request,** tagged with the asker's token
   (programming-model.md, 4.4).
 
