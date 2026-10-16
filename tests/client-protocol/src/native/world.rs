@@ -232,6 +232,8 @@ fn run_mode(seed: u64, script: Script, terminal: bool) -> (Outcome, Box<[u8]>) {
                     skein_ui_text::Settings {
                         name: b"jig".as_slice().into(),
                         longest: 1024,
+                        lines: 0,
+                        line_bytes: 0,
                         interval: Duration::from_millis(1),
                         status: Some(jig_client_view::regions::JigRegion::Link.region()),
                     },
