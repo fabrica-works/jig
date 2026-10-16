@@ -338,6 +338,16 @@ fn end_task(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queue
             record: Stored::Goal(crate::GoalRow { project: ended.project, task: number, endings }),
         });
     }
+    if let Party::Person(party) = requester {
+        out.push(Request::Save {
+            record: Stored::EndedByParty(crate::EndedByParty {
+                party,
+                label: ended.label,
+                ended_at: env.wall,
+                task: number,
+            }),
+        });
+    }
     out.push(Request::Save { record: Stored::Ended(Box::new(ended)) });
     let dependents = snapshot(domain, env.limits.tasks);
     for dependent in dependents.into_boxed() {

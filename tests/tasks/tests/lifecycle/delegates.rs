@@ -52,3 +52,39 @@ fn an_adopted_task_leaves_its_old_requesters_delegate_rows() {
     finish_delegate(&mut world);
     assert!(!world.records.contains_key(&Key::EndedDelegate { requester: 1, task: 2 }));
 }
+
+const MOVED_REQUESTER: u64 = 9;
+const MOVED_DELEGATE: u64 = 2;
+
+#[test]
+fn a_delegate_moved_to_a_party_is_indexed_by_that_party_when_it_ends() {
+    let mut world = delegates();
+    let reply_to = world.to();
+    world.send(Event::Move {
+        reply_to,
+        task: MOVED_DELEGATE,
+        person: MOVED_REQUESTER,
+        period: 0,
+        pool_budget: 100,
+        period_budget: 1000,
+        reason: Box::new([]),
+    });
+    finish_delegate(&mut world);
+    let Stored::Ended(ended) = &world.records[&Key::Ended(MOVED_DELEGATE)] else { panic!("ended delegate") };
+    let key = Key::EndedByParty {
+        party: MOVED_REQUESTER,
+        label: 0,
+        ended_at: jig_domain_tasks::Newest::of(ended.ended_at.expect("ended").as_nanos()),
+        task: MOVED_DELEGATE,
+    };
+    assert_eq!(
+        world.records.get(&key),
+        Some(&Stored::EndedByParty(jig_domain_tasks::EndedByParty {
+            party: MOVED_REQUESTER,
+            label: 0,
+            ended_at: ended.ended_at.expect("ended"),
+            task: MOVED_DELEGATE
+        }))
+    );
+    assert_eq!(world.records.keys().filter(|key| matches!(key, Key::EndedByParty { .. })).count(), 1);
+}

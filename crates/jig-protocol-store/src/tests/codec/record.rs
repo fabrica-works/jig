@@ -98,6 +98,12 @@ fn each_index_row_reads_back() {
         }),
         domain::Stored::EndedDelegate(domain::Edge { requester: 17, task: 19 }),
         domain::Stored::Delegate(domain::Edge { requester: 17, task: 19 }),
+        domain::Stored::EndedByParty(domain::EndedByParty {
+            party: 31,
+            label: 3,
+            ended_at: Wall::from_nanos(41),
+            task: 17,
+        }),
     ] {
         assert_eq!(saved_tasks(&row), Ok(row));
     }

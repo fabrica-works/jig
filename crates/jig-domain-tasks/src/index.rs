@@ -125,6 +125,13 @@ pub enum Key {
         requester: u64,
         task: u64,
     },
+    /// Ended tasks by requester and label, newest ended first.
+    EndedByParty {
+        party: u64,
+        label: u32,
+        ended_at: Newest,
+        task: u64,
+    },
 }
 
 impl Key {
@@ -149,6 +156,7 @@ impl Key {
             | Self::ConversationNewest { .. }
             | Self::ConversationOldest { .. }
             | Self::Goal { .. }
+            | Self::EndedByParty { .. }
             | Self::EndedDelegate { .. }
             | Self::Delegate { .. } => false,
         }
@@ -201,4 +209,25 @@ pub struct GoalRow {
 pub struct Edge {
     pub requester: u64,
     pub task: u64,
+}
+
+/// An ended task indexed by its requesting party (protocol/store.md, 7.4).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct EndedByParty {
+    pub party: u64,
+    pub label: u32,
+    pub ended_at: Wall,
+    pub task: u64,
+}
+impl EndedByParty {
+    /// Its key, newest ended first within the party and label.
+    #[must_use]
+    pub const fn key(self) -> Key {
+        Key::EndedByParty {
+            party: self.party,
+            label: self.label,
+            ended_at: Newest::of(self.ended_at.as_nanos()),
+            task: self.task,
+        }
+    }
 }

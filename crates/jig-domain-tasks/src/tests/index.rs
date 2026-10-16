@@ -60,3 +60,21 @@ fn lifetime_ending_counts_saturate() {
     assert_eq!(counts, crate::Endings { done: u32::MAX, failed: u32::MAX, cancelled: u32::MAX });
     assert_eq!(counts.ended(crate::Status::Done), counts);
 }
+
+const REQUESTER: u64 = 7;
+const INDEXED_TASK: u64 = 30;
+
+#[test]
+fn a_newer_ended_task_sorts_first_within_party_and_label() {
+    let row = crate::EndedByParty { party: REQUESTER, label: 3, ended_at: Wall::from_nanos(1_000), task: INDEXED_TASK };
+    let later = crate::EndedByParty { ended_at: Wall::from_nanos(2_000), ..row };
+    assert!(later.key() < row.key());
+    assert!(!row.key().live());
+}
+
+#[test]
+fn one_label_sorts_before_the_next_for_one_party() {
+    let row = crate::EndedByParty { party: REQUESTER, label: 3, ended_at: Wall::from_nanos(1_000), task: INDEXED_TASK };
+    let next = crate::EndedByParty { label: 4, ended_at: Wall::from_nanos(2_000), ..row };
+    assert!(row.key() < next.key());
+}

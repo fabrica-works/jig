@@ -80,7 +80,7 @@ mod hold_origin;
 mod holds;
 mod inbox;
 mod index;
-pub use index::{Conversation, Edge, Endings, GoalRow, Newest, ResultRow, Update, UpdateObject};
+pub use index::{Conversation, Edge, EndedByParty, Endings, GoalRow, Newest, ResultRow, Update, UpdateObject};
 mod limits;
 mod moving;
 mod owned;

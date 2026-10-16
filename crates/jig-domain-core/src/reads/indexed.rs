@@ -123,6 +123,7 @@ pub(super) fn is_update(key: &Key) -> bool {
             | tasks::Key::Result { .. }
             | tasks::Key::ConversationNewest { .. }
             | tasks::Key::Goal { .. }
+            | tasks::Key::EndedByParty { .. }
             | tasks::Key::EndedDelegate { .. }
             | tasks::Key::Delegate { .. }
             | tasks::Key::ConversationOldest { .. },
@@ -161,6 +162,7 @@ pub(super) fn conversation_row(
             tasks::Stored::Result(_)
             | tasks::Stored::ConversationNewest(_)
             | tasks::Stored::Goal(_)
+            | tasks::Stored::EndedByParty(_)
             | tasks::Stored::EndedDelegate(_)
             | tasks::Stored::Delegate(_)
             | tasks::Stored::ConversationOldest(_)
@@ -210,6 +212,7 @@ pub(super) fn goal_row(
         crate::Record::Tasks(tasks::Stored::Goal(goal)) => goal,
         crate::Record::Tasks(
             tasks::Stored::Delegate(_)
+            | tasks::Stored::EndedByParty(_)
             | tasks::Stored::EndedDelegate(_)
             | tasks::Stored::Update(_)
             | tasks::Stored::Result(_)
@@ -265,7 +268,8 @@ pub(super) fn ended_delegate_row(
     let edge = match &row.value {
         crate::Record::Tasks(tasks::Stored::EndedDelegate(edge)) => edge,
         crate::Record::Tasks(
-            tasks::Stored::Delegate(_)
+            tasks::Stored::EndedByParty(_)
+            | tasks::Stored::Delegate(_)
             | tasks::Stored::Goal(_)
             | tasks::Stored::Update(_)
             | tasks::Stored::Result(_)

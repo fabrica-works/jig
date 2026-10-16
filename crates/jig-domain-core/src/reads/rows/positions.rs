@@ -64,6 +64,7 @@ pub(super) fn examined(range: &Range, previous: Option<&Position>, next: &Positi
                 | tasks::Key::ConversationNewest { .. }
                 | tasks::Key::ConversationOldest { .. }
                 | tasks::Key::Goal { .. }
+                | tasks::Key::EndedByParty { .. }
                 | tasks::Key::EndedDelegate { .. },
             )
             | Key::Notes(notes::Key::Line { .. }),

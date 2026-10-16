@@ -211,6 +211,7 @@ impl Accounting {
     #[expect(clippy::too_many_lines, reason = "accounting referee checks all durable row forms")]
     pub fn committed(&mut self, rows: &BTreeMap<Key, Stored>, requests: &[Request]) -> Result<(), &'static str> {
         self.messages_and_holders(rows, requests)?;
+        ended_party_indexes(rows, requests)?;
         for (key, old) in &self.before {
             if matches!(
                 old,
@@ -284,6 +285,7 @@ impl Accounting {
                             | Stored::Result(_)
                             | Stored::ConversationNewest(_)
                             | Stored::Goal(_)
+                            | Stored::EndedByParty(_)
                             | Stored::EndedDelegate(_)
                             | Stored::Delegate(_)
                             | Stored::ConversationOldest(_)
@@ -337,6 +339,7 @@ impl Accounting {
                             | Stored::Result(_)
                             | Stored::ConversationNewest(_)
                             | Stored::Goal(_)
+                            | Stored::EndedByParty(_)
                             | Stored::EndedDelegate(_)
                             | Stored::Delegate(_)
                             | Stored::ConversationOldest(_)
@@ -410,6 +413,7 @@ impl Accounting {
                 | Stored::Result(_)
                 | Stored::ConversationNewest(_)
                 | Stored::Goal(_)
+                | Stored::EndedByParty(_)
                 | Stored::EndedDelegate(_)
                 | Stored::Delegate(_)
                 | Stored::ConversationOldest(_)
@@ -434,4 +438,24 @@ impl Accounting {
         self.charged = None;
         self.procedure = None;
     }
+}
+
+fn ended_party_indexes(rows: &BTreeMap<Key, Stored>, requests: &[Request]) -> Result<(), &'static str> {
+    for request in requests {
+        let Request::Save { record: Stored::Ended(task) } = request else { continue };
+        let jig_domain_tasks::Party::Person(party) = task.requester else { continue };
+        let row = jig_domain_tasks::EndedByParty {
+            party,
+            label: task.label,
+            ended_at: task.ended_at.ok_or("ending has no time")?,
+            task: task.number,
+        };
+        let expected = Stored::EndedByParty(row);
+        if rows.get(&row.key()) != Some(&expected)
+            || !requests.iter().any(|request| matches!(request, Request::Save { record } if record == &expected))
+        {
+            return Err("ended task missing its party index row");
+        }
+    }
+    Ok(())
 }

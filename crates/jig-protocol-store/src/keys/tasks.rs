@@ -64,6 +64,13 @@ pub(super) fn write(writer: &mut KeyWriter, key: &Key) {
             writer.u64(*party);
             writer.u64(task.raw());
         }
+        Key::EndedByParty { party, label, ended_at, task } => {
+            writer.tag(19);
+            writer.u64(*party);
+            writer.u64(u64::from(*label));
+            writer.u64(ended_at.raw());
+            writer.u64(*task);
+        }
         Key::EndedDelegate { requester, task } => {
             writer.tag(17);
             writer.u64(*requester);
@@ -89,16 +96,7 @@ pub(super) fn write(writer: &mut KeyWriter, key: &Key) {
             writer.u64(*party);
             writer.u64(at.raw());
             writer.u64(task.raw());
-            match object {
-                UpdateObject::Result => {
-                    writer.tag(0);
-                }
-                UpdateObject::Reply { message, activity } => {
-                    writer.tag(1);
-                    writer.u64(message.raw());
-                    writer.u64(activity.raw());
-                }
-            }
+            update_object(writer, object);
         }
     }
 }
@@ -131,6 +129,12 @@ pub(super) fn read(reader: &mut KeyReader<'_>) -> Option<Key> {
         },
         13 => Key::Result { party: reader.u64()?, position: reader.u64()? },
         14 => Key::ConversationNewest { party: reader.u64()?, task: Newest::from_raw(reader.u64()?) },
+        19 => Key::EndedByParty {
+            party: reader.u64()?,
+            label: u32::try_from(reader.u64()?).ok()?,
+            ended_at: Newest::from_raw(reader.u64()?),
+            task: reader.u64()?,
+        },
         17 => Key::EndedDelegate { requester: reader.u64()?, task: reader.u64()? },
         18 => Key::Delegate { requester: reader.u64()?, task: reader.u64()? },
         16 => Key::Goal { project: u32::try_from(reader.u64()?).ok()?, task: Newest::from_raw(reader.u64()?) },
@@ -175,4 +179,17 @@ fn read_funder(reader: &mut KeyReader<'_>) -> Option<Funder> {
         3 => Funder::Period { project: u32::try_from(reader.u64()?).ok()?, period: reader.u64()? },
         _ => return None,
     })
+}
+
+fn update_object(writer: &mut KeyWriter, object: &UpdateObject) {
+    match object {
+        UpdateObject::Result => {
+            writer.tag(0);
+        }
+        UpdateObject::Reply { message, activity } => {
+            writer.tag(1);
+            writer.u64(message.raw());
+            writer.u64(activity.raw());
+        }
+    }
 }

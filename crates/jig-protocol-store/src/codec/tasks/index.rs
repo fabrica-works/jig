@@ -167,3 +167,22 @@ fn read_optional_answer(
         None => Ok(None),
     }
 }
+
+/// The ended-by-requester row (protocol/store.md, 7.4).
+pub fn ended_by_party(row: &domain::EndedByParty, limits: &wire::Limits) -> Result<wire::EndedByParty, wire::Problem> {
+    wire::EndedByParty::new(
+        limits,
+        wire::EndedByPartyParts {
+            party: row.party,
+            label: row.label,
+            ended_at: row.ended_at.as_nanos(),
+            task: row.task,
+        },
+    )
+}
+/// Decode the ended-by-requester row.
+#[must_use]
+pub fn read_ended_by_party(row: wire::EndedByParty) -> domain::EndedByParty {
+    let wire::EndedByPartyParts { party, label, ended_at, task } = row.into_parts();
+    domain::EndedByParty { party, label, ended_at: Wall::from_nanos(ended_at), task }
+}
