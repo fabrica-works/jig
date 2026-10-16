@@ -1,6 +1,6 @@
+use jig_client_protocol_wire::v7 as w;
 use jig_domain_core as core;
 use jig_engine_clients_world::fixtures::{self, Peer};
-use jig_protocol_client_wire::v7 as w;
 use skein_lib::{
     Reader, Writer,
     base64::{self, Alphabet},

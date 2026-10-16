@@ -15,7 +15,7 @@ jig-domain-accounts.workspace = true
 jig-domain-authority.workspace = true
 skein-http.workspace = true
 skein-io.workspace = true
-jig-protocol-client-wire.workspace = true
+jig-client-protocol-wire.workspace = true
 jig-domain-core.workspace = true
 jig-domain-notes.workspace = true
 jig-protocol-store.workspace = true
@@ -26,6 +26,6 @@ jig-domain-views.workspace = true
 workspace = true
 
 [dev-dependencies]
-jig-protocol-client-link = {path = "../jig-protocol-client-link"}
+jig-client-protocol-link = {path = "../jig-client-protocol-link"}
 jig-domain-client = {path = "../jig-domain-client"}
-jig-test-client-records = {path = "../../testing/jig-test-client-records"}
+jig-client-test-records = {path = "../../testing/jig-client-test-records"}

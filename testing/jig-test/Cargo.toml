@@ -40,7 +40,7 @@ disallowed_methods = "deny"
 [dev-dependencies]
 jig-client-protocol-world = { path = "../../tests/client-protocol" }
 jig-channel-world = { path = "../../tests/channel" }
-jig-shell-native = { path = "../../crates/jig-shell-native" }
+jig-client-shell-native = { path = "../../crates/jig-client-shell-native" }
 skein-tls-world.workspace = true
 skein-world.workspace = true
 skein-fake-peers.workspace = true

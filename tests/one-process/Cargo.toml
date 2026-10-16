@@ -14,7 +14,7 @@ smith-channel.workspace = true
 smith-charter.workspace = true
 jig-channel-world = { path = "../channel" }
 jig-client-protocol-world = { path = "../client-protocol" }
-jig-shell-native = { path = "../../crates/jig-shell-native" }
+jig-client-shell-native = { path = "../../crates/jig-client-shell-native" }
 jig-test-service.workspace = true
 jig-test-domain.workspace = true
 jig-domain-core.workspace = true

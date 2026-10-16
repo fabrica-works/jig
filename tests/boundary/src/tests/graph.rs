@@ -141,8 +141,8 @@ fn client_step(name: &str) -> bool {
         "jig-domain-client"
             | "jig-view"
             | "jig-protocol-transcript"
-            | "jig-protocol-client-wire"
-            | "jig-protocol-client-link"
+            | "jig-client-protocol-wire"
+            | "jig-client-protocol-link"
             | "jig-test-domain-client"
             | "jig-test-view"
             | "jig-ops-domain-connectors"
@@ -372,12 +372,15 @@ fn application_breaches(manifests: &[CrateManifest]) -> Vec<String> {
     let mut failures = Vec::new();
     let first_application = ["tem", "per"].concat();
     for manifest in manifests {
-        if !manifest.name.as_deref().is_some_and(|name| name.starts_with("jig-protocol-")) {
+        if !manifest.name.as_deref().is_some_and(|name| {
+            name.starts_with("jig-protocol-") || (name.starts_with("jig-client-protocol-") && !name.ends_with("-world"))
+        }) {
             continue;
         }
         for dependency in &manifest.dependencies {
             if dependency.starts_with("jig-ops-")
                 || dependency.starts_with("jig-test-")
+                || dependency.starts_with("jig-client-test-")
                 || dependency.starts_with(&first_application)
             {
                 failures.push(format!("{}: {dependency}", manifest.path.display()));
@@ -394,7 +397,8 @@ fn smith_breaches(manifests: &[CrateManifest]) -> Vec<String> {
         if !(name.starts_with("jig-domain-")
             || name.starts_with("jig-protocol-")
             || name == "jig-view"
-            || name.starts_with("jig-shell-"))
+            || name.starts_with("jig-client-shell-")
+            || (name.starts_with("jig-client-protocol-") && !name.ends_with("-world")))
         {
             continue;
         }
@@ -441,16 +445,16 @@ fn client_engine_breaches(manifests: &[CrateManifest]) -> Vec<String> {
             Some(
                 "jig-domain-client"
                     | "jig-view"
-                    | "jig-protocol-client-wire"
-                    | "jig-protocol-client-link"
-                    | "jig-shell-native"
+                    | "jig-client-protocol-wire"
+                    | "jig-client-protocol-link"
+                    | "jig-client-shell-native"
             )
         ) {
             continue;
         }
         for dependency in &manifest.dependencies {
             let engine_protocol = dependency.starts_with("jig-protocol-")
-                && !["jig-protocol-client-wire", "jig-protocol-client-link", "jig-protocol-transcript"]
+                && !["jig-client-protocol-wire", "jig-client-protocol-link", "jig-protocol-transcript"]
                     .contains(&dependency.as_str());
             if CORE_FAMILY.contains(&dependency.as_str()) || dependency == "jig-domain-host" || engine_protocol {
                 failures.push(format!("{}: {dependency}", manifest.path.display()));
@@ -531,7 +535,7 @@ fn client_crates_link_no_engine_side_crate_even_when_empty() {
 fn a_native_shell_naming_the_store_is_reported() {
     let manifest = parse_manifest(
         PathBuf::from("fixture/shell/Cargo.toml"),
-        "[package]\nname = \"jig-shell-native\"\n[dependencies]\njig-protocol-store.workspace = true\n",
+        "[package]\nname = \"jig-client-shell-native\"\n[dependencies]\njig-protocol-store.workspace = true\n",
     );
     assert_eq!(client_engine_breaches(&[manifest]), ["fixture/shell/Cargo.toml: jig-protocol-store"]);
 }
@@ -548,7 +552,7 @@ fn configuration_links_only_its_vocabulary_and_foundation() {
             ["skein-lib", "skein-json", "skein-io", "skein-oauth", "skein-oauth-accounts", "skein-tls"]
                 .contains(&dependency.as_str())
                 || CORE_FAMILY.contains(&dependency.as_str())
-                || ["jig-domain-host", "jig-protocol-engine-clients", "jig-protocol-client-wire", "skein-http"]
+                || ["jig-domain-host", "jig-protocol-engine-clients", "jig-client-protocol-wire", "skein-http"]
                     .contains(&dependency.as_str())
                 || ["jig-protocol-store", "skein-kv"].contains(&dependency.as_str()),
             "configuration dependency: {dependency}"
@@ -560,7 +564,7 @@ fn configuration_links_only_its_vocabulary_and_foundation() {
 fn client_wire_links_only_its_codec_and_foundation() {
     let wires: Vec<_> = manifests()
         .into_iter()
-        .filter(|manifest| manifest.name.as_deref() == Some("jig-protocol-client-wire"))
+        .filter(|manifest| manifest.name.as_deref() == Some("jig-client-protocol-wire"))
         .collect();
     assert_eq!(wires.len(), 1, "one client wire family");
     let mut dependencies = wires[0].dependencies.clone();

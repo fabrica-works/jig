@@ -1,6 +1,6 @@
+use jig_client_protocol_wire::v7 as w;
 use jig_domain_core as core;
 use jig_engine_clients_world::fixtures::{self, Peer};
-use jig_protocol_client_wire::v7 as w;
 use skein_lib::{Duration, List, Reader, Writer};
 fn streaming() -> (Peer, [u8; 16]) {
     let mut peer = Peer::signed_in(&fixtures::settings(), fixtures::FIRST_SIGN_IN);
@@ -137,7 +137,7 @@ fn a_frame_watched_after_a_restart_is_the_signed_in_partys() {
     assert_eq!(peer.taken(watcher), 1);
 }
 fn hello(stream: [u8; 16]) -> w::StreamEvent {
-    let lim = jig_test_client_records::limits();
+    let lim = jig_client_test_records::limits();
     let mut served = List::with_capacity(1);
     served
         .push(w::Served::new(&lim, w::ServedParts { owner: w::Owner::Jig, first: 7, last: 7 }).expect("literal range"))
@@ -148,8 +148,8 @@ fn hello(stream: [u8; 16]) -> w::StreamEvent {
     )
 }
 fn frame(watch: u64, needs: u32) -> w::StreamEvent {
-    let lim = jig_test_client_records::limits();
-    let mut frame = jig_test_client_records::frame_record().into_parts();
+    let lim = jig_client_test_records::limits();
+    let mut frame = jig_client_test_records::frame_record().into_parts();
     frame.needs_total = needs;
     let value = w::DeliveryValue::Frame(w::Frame::new(&lim, frame).expect("literal frame"));
     let mut record = Writer::new(usize::try_from(value.measure()).expect("literal size"));
@@ -161,8 +161,8 @@ fn frame(watch: u64, needs: u32) -> w::StreamEvent {
 fn text(watch: u64) -> w::StreamEvent {
     w::StreamEvent::Text(
         w::StreamText::new(
-            &jig_test_client_records::limits(),
-            w::StreamTextParts { watch, value: jig_test_client_records::run_text_record() },
+            &jig_client_test_records::limits(),
+            w::StreamTextParts { watch, value: jig_client_test_records::run_text_record() },
         )
         .expect("literal text"),
     )

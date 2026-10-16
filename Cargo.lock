@@ -197,9 +197,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "jig-client-protocol-link"
+version = "0.0.0"
+dependencies = [
+ "jig-client-protocol-wire",
+ "jig-client-test-records",
+ "jig-domain-client",
+ "jig-protocol-transcript",
+ "skein-codec",
+ "skein-http",
+ "skein-lib",
+]
+
+[[package]]
+name = "jig-client-protocol-wire"
+version = "0.0.0"
+dependencies = [
+ "skein-codec",
+ "skein-lib",
+]
+
+[[package]]
 name = "jig-client-protocol-world"
 version = "0.0.0"
 dependencies = [
+ "jig-client-protocol-link",
+ "jig-client-protocol-wire",
+ "jig-client-shell-native",
+ "jig-client-test-protocol-wire",
  "jig-client-world",
  "jig-core-world",
  "jig-domain-client",
@@ -209,14 +234,10 @@ dependencies = [
  "jig-domain-views",
  "jig-fake-parties",
  "jig-fake-workers",
- "jig-protocol-client-link",
- "jig-protocol-client-wire",
  "jig-protocol-engine-clients",
- "jig-shell-native",
  "jig-test-connector",
  "jig-test-domain",
  "jig-test-domain-client",
- "jig-test-protocol-client-wire",
  "jig-test-service",
  "jig-test-view",
  "jig-view",
@@ -233,11 +254,43 @@ dependencies = [
 ]
 
 [[package]]
+name = "jig-client-shell-native"
+version = "0.0.0"
+dependencies = [
+ "jig-client-protocol-link",
+ "jig-client-protocol-wire",
+ "skein-fake-machine",
+ "skein-http",
+ "skein-io",
+ "skein-lib",
+ "skein-shell",
+ "skein-sim",
+ "skein-world",
+]
+
+[[package]]
+name = "jig-client-test-protocol-wire"
+version = "0.0.0"
+dependencies = [
+ "skein-codec",
+ "skein-lib",
+]
+
+[[package]]
+name = "jig-client-test-records"
+version = "0.0.0"
+dependencies = [
+ "jig-client-protocol-wire",
+ "skein-codec",
+ "skein-lib",
+]
+
+[[package]]
 name = "jig-client-wire-world"
 version = "0.0.0"
 dependencies = [
- "jig-protocol-client-wire",
- "jig-test-protocol-client-wire",
+ "jig-client-protocol-wire",
+ "jig-client-test-protocol-wire",
  "skein-codegen",
  "skein-lib",
 ]
@@ -428,15 +481,15 @@ dependencies = [
 name = "jig-engine-clients-world"
 version = "0.0.0"
 dependencies = [
+ "jig-client-protocol-wire",
+ "jig-client-test-records",
  "jig-domain-authority",
  "jig-domain-core",
  "jig-domain-fleet",
  "jig-domain-people",
  "jig-domain-views",
- "jig-protocol-client-wire",
  "jig-protocol-config",
  "jig-protocol-engine-clients",
- "jig-test-client-records",
  "skein-http",
  "skein-io",
  "skein-lib",
@@ -508,6 +561,7 @@ version = "0.0.0"
 dependencies = [
  "jig-channel-world",
  "jig-client-protocol-world",
+ "jig-client-shell-native",
  "jig-conformance",
  "jig-core-world",
  "jig-domain-client",
@@ -520,7 +574,6 @@ dependencies = [
  "jig-protocol-config",
  "jig-protocol-store",
  "jig-protocol-worker-wire",
- "jig-shell-native",
  "jig-test-connector",
  "jig-test-domain",
  "jig-test-service",
@@ -721,30 +774,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "jig-protocol-client-link"
-version = "0.0.0"
-dependencies = [
- "jig-domain-client",
- "jig-protocol-client-wire",
- "jig-protocol-transcript",
- "jig-test-client-records",
- "skein-codec",
- "skein-http",
- "skein-lib",
-]
-
-[[package]]
-name = "jig-protocol-client-wire"
-version = "0.0.0"
-dependencies = [
- "skein-codec",
- "skein-lib",
-]
-
-[[package]]
 name = "jig-protocol-config"
 version = "0.0.0"
 dependencies = [
+ "jig-client-protocol-wire",
  "jig-domain-accounts",
  "jig-domain-authority",
  "jig-domain-brief",
@@ -755,7 +788,6 @@ dependencies = [
  "jig-domain-people",
  "jig-domain-tasks",
  "jig-domain-views",
- "jig-protocol-client-wire",
  "jig-protocol-engine-clients",
  "jig-protocol-store",
  "skein-http",
@@ -772,6 +804,9 @@ dependencies = [
 name = "jig-protocol-engine-clients"
 version = "0.0.0"
 dependencies = [
+ "jig-client-protocol-link",
+ "jig-client-protocol-wire",
+ "jig-client-test-records",
  "jig-domain-accounts",
  "jig-domain-authority",
  "jig-domain-client",
@@ -781,10 +816,7 @@ dependencies = [
  "jig-domain-people",
  "jig-domain-tasks",
  "jig-domain-views",
- "jig-protocol-client-link",
- "jig-protocol-client-wire",
  "jig-protocol-store",
- "jig-test-client-records",
  "skein-codec",
  "skein-http",
  "skein-io",
@@ -872,21 +904,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "jig-shell-native"
-version = "0.0.0"
-dependencies = [
- "jig-protocol-client-link",
- "jig-protocol-client-wire",
- "skein-fake-machine",
- "skein-http",
- "skein-io",
- "skein-lib",
- "skein-shell",
- "skein-sim",
- "skein-world",
-]
-
-[[package]]
 name = "jig-store-codecs-world"
 version = "0.0.0"
 dependencies = [
@@ -936,10 +953,10 @@ version = "0.0.0"
 dependencies = [
  "jig-channel-world",
  "jig-client-protocol-world",
+ "jig-client-shell-native",
  "jig-domain-host",
  "jig-protocol-config",
  "jig-protocol-store",
- "jig-shell-native",
  "jig-test-service",
  "serde_json",
  "skein-fake-llm-domain",
@@ -966,15 +983,6 @@ version = "0.0.0"
 dependencies = [
  "jig-test-connector",
  "jig-test-domain-client",
- "skein-lib",
-]
-
-[[package]]
-name = "jig-test-client-records"
-version = "0.0.0"
-dependencies = [
- "jig-protocol-client-wire",
- "skein-codec",
  "skein-lib",
 ]
 
@@ -1025,17 +1033,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "jig-test-protocol-client-wire"
-version = "0.0.0"
-dependencies = [
- "skein-codec",
- "skein-lib",
-]
-
-[[package]]
 name = "jig-test-service"
 version = "0.0.0"
 dependencies = [
+ "jig-client-protocol-wire",
+ "jig-client-test-protocol-wire",
  "jig-domain-accounts",
  "jig-domain-brief",
  "jig-domain-core",
@@ -1045,7 +1047,6 @@ dependencies = [
  "jig-domain-tasks",
  "jig-protocol-accounts",
  "jig-protocol-charter",
- "jig-protocol-client-wire",
  "jig-protocol-config",
  "jig-protocol-engine-clients",
  "jig-protocol-engine-workers",
@@ -1055,7 +1056,6 @@ dependencies = [
  "jig-protocol-worker-wire",
  "jig-test-connector",
  "jig-test-domain",
- "jig-test-protocol-client-wire",
  "jig-test-store",
  "jig-test-worker",
  "skein-channel",

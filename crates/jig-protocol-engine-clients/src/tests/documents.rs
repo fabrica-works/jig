@@ -1,24 +1,24 @@
 use super::fixtures;
 use crate::translate;
-use jig_protocol_client_wire::v7 as w;
+use jig_client_protocol_wire::v7 as w;
 fn a_frame_with_two_projects_becomes_its_record() {
     let limits = fixtures::wire_limits();
     assert_eq!(
         translate::owner::frame(&fixtures::frame_two_projects(), &limits),
-        Ok(jig_test_client_records::frame_two_projects_record())
+        Ok(jig_client_test_records::frame_two_projects_record())
     );
 }
 fn a_task_with_a_hold_becomes_its_record() {
     let limits = fixtures::wire_limits();
     assert_eq!(
         translate::task::document(&fixtures::task_with_hold(), &limits),
-        Ok(jig_test_client_records::task_with_hold_record())
+        Ok(jig_client_test_records::task_with_hold_record())
     );
 }
 fn a_chip_in_each_phase_becomes_its_record() {
     let limits = fixtures::wire_limits();
     let phases = fixtures::phases();
-    let records = jig_test_client_records::owner_chip_records();
+    let records = jig_client_test_records::owner_chip_records();
     let source = fixtures::chip();
     for ((phase, _compact), record) in phases.into_iter().zip(records) {
         let mut chip = source.clone();
@@ -58,24 +58,24 @@ fn a_non_utf8_document_text_fails_translation() {
 fn a_run_writing_with_a_call_becomes_its_run_state() {
     let limits = fixtures::wire_limits();
     let source = fixtures::run_writing();
-    assert_eq!(translate::live::run(&source, &limits), Ok(jig_test_client_records::run_writing_record()));
+    assert_eq!(translate::live::run(&source, &limits), Ok(jig_client_test_records::run_writing_record()));
 }
 fn a_run_text_keeps_its_turn_retry_and_offsets() {
     let limits = fixtures::wire_limits();
-    assert_eq!(translate::live::writing(&fixtures::writing(), &limits), Ok(jig_test_client_records::writing_record()));
+    assert_eq!(translate::live::writing(&fixtures::writing(), &limits), Ok(jig_client_test_records::writing_record()));
 }
 fn an_inbox_with_both_groups_becomes_its_record() {
     let limits = fixtures::wire_limits();
     assert_eq!(
         translate::inbox::document(&fixtures::inbox_document(), &limits),
-        Ok(jig_test_client_records::inbox_both_groups_record())
+        Ok(jig_client_test_records::inbox_both_groups_record())
     );
 }
 fn a_deployment_document_becomes_its_record() {
     let limits = fixtures::wire_limits();
     assert_eq!(
         translate::deployment::document(&fixtures::deployment_document(), &limits),
-        Ok(jig_test_client_records::deployment_rows_record())
+        Ok(jig_client_test_records::deployment_rows_record())
     );
 }
 fn conversations_keep_their_rows_more_and_opaque_cursor() {
@@ -83,31 +83,31 @@ fn conversations_keep_their_rows_more_and_opaque_cursor() {
     assert_eq!(
         translate::live::conversations(
             &fixtures::conversations(),
-            jig_test_client_records::live_cursor_record(),
+            jig_client_test_records::live_cursor_record(),
             &limits
         ),
-        Ok(jig_test_client_records::conversations_rows_record())
+        Ok(jig_client_test_records::conversations_rows_record())
     );
 }
 fn goals_keep_all_ten_phase_counts_and_budget() {
     let limits = fixtures::wire_limits();
     assert_eq!(
         translate::live::goals(7, &fixtures::goals(), &limits),
-        Ok(jig_test_client_records::goals_rows_record())
+        Ok(jig_client_test_records::goals_rows_record())
     );
 }
 fn tasks_keep_the_filter_requester_goal_and_changed_wall() {
     let limits = fixtures::wire_limits();
     assert_eq!(
         translate::live::tasks(&fixtures::tasks_document(), &limits),
-        Ok(jig_test_client_records::tasks_rows_record())
+        Ok(jig_client_test_records::tasks_rows_record())
     );
 }
 fn a_tree_keeps_its_rows_folds_dependencies_and_opaque_cursor() {
     let limits = fixtures::wire_limits();
     assert_eq!(
-        translate::live::tree(&fixtures::tree_document(), Some(jig_test_client_records::live_cursor_record()), &limits),
-        Ok(jig_test_client_records::tree_rows_record())
+        translate::live::tree(&fixtures::tree_document(), Some(jig_client_test_records::live_cursor_record()), &limits),
+        Ok(jig_client_test_records::tree_rows_record())
     );
 }
 #[test]

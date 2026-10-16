@@ -1,9 +1,9 @@
 //! The test application's native client over simulated or real io.
 use crate::{family, front::Side};
+use jig_client_protocol_link as link;
+use jig_client_shell_native::{Settings, Shell, Signing};
 use jig_client_world::{App, Test};
 use jig_domain_client::address::{Address, TaskSection};
-use jig_protocol_client_link as link;
-use jig_shell_native::{Settings, Shell, Signing};
 use jig_test_domain_client::{self as client, Request};
 use skein_fake_person::{Doing, Find, Next, Person, Step, TreeFace};
 use skein_io::kernel::{Complete, Fd, Submit};
@@ -132,7 +132,7 @@ impl NativeClient {
     }
     /// # Errors
     /// Refuses a link outside the configured loopback engine's address.
-    pub fn sign_in(&mut self, printed: &[u8]) -> Result<(), jig_shell_native::Unlinked> {
+    pub fn sign_in(&mut self, printed: &[u8]) -> Result<(), jig_client_shell_native::Unlinked> {
         self.shell.sign_in(printed)
     }
     fn callback(&mut self, event: client::Event) {

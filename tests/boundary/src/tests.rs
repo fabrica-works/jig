@@ -237,9 +237,9 @@ fn store_schema_module_names_pass_the_source_guard() {
 #[test]
 fn client_link_depends_only_on_client_vocabulary_and_foundation() {
     let link =
-        manifests().into_iter().find(|m| m.name.as_deref() == Some("jig-protocol-client-link")).expect("link manifest");
+        manifests().into_iter().find(|m| m.name.as_deref() == Some("jig-client-protocol-link")).expect("link manifest");
     assert!(link.dependencies.iter().all(|name| {
-        ["skein-lib", "skein-codec", "skein-http", "jig-domain-client", "jig-protocol-client-wire"]
+        ["skein-lib", "skein-codec", "skein-http", "jig-domain-client", "jig-client-protocol-wire"]
             .contains(&name.as_str())
             || name == "jig-protocol-transcript"
     }));
@@ -278,6 +278,7 @@ fn engine_clients_link_only_their_boundary_wire_and_foundation() {
     assert_eq!(
         dependencies,
         [
+            "jig-client-protocol-wire",
             "jig-domain-accounts",
             "jig-domain-authority",
             "jig-domain-core",
@@ -286,7 +287,6 @@ fn engine_clients_link_only_their_boundary_wire_and_foundation() {
             "jig-domain-people",
             "jig-domain-tasks",
             "jig-domain-views",
-            "jig-protocol-client-wire",
             "jig-protocol-store",
             "skein-codec",
             "skein-http",
@@ -341,12 +341,12 @@ fn the_store_files_kit_uses_only_the_store_and_foundation() {
 fn the_native_shell_links_only_the_clients_components_and_foundation() {
     let shell = manifests()
         .into_iter()
-        .find(|manifest| manifest.name.as_deref() == Some("jig-shell-native"))
+        .find(|manifest| manifest.name.as_deref() == Some("jig-client-shell-native"))
         .expect("native shell manifest");
     let mut dependencies = shell.dependencies;
     dependencies.sort();
     assert_eq!(
         dependencies,
-        ["jig-protocol-client-link", "jig-protocol-client-wire", "skein-http", "skein-io", "skein-lib"]
+        ["jig-client-protocol-link", "jig-client-protocol-wire", "skein-http", "skein-io", "skein-lib"]
     );
 }

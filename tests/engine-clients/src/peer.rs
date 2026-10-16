@@ -1,9 +1,9 @@
 //! io's stream records joined to an actual HTTP client, with scripted durability.
 mod closing;
 use crate::fixtures;
+use jig_client_protocol_wire::v7 as w;
 use jig_domain_core as core;
 use jig_domain_people as people;
-use jig_protocol_client_wire::v7 as w;
 use jig_protocol_engine_clients::{
     Component, Event, Kept, Limits, Request, SecretOwner, SecretsAnswer, SecretsRequest, Settings,
 };

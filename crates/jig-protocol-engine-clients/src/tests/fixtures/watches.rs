@@ -1,7 +1,7 @@
 use super::{Exchange, wire};
 use crate::{Request, stream::Stream};
+use jig_client_protocol_wire::v7 as w;
 use jig_domain_core as core;
-use jig_protocol_client_wire::v7 as w;
 use skein_lib::{Token, Writer};
 impl Exchange {
     pub fn open_stream(&mut self) -> [u8; 16] {

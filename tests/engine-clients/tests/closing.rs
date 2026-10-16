@@ -1,7 +1,7 @@
+use jig_client_protocol_wire::v7 as w;
 use jig_domain_core as core;
 use jig_domain_people as people;
 use jig_engine_clients_world::fixtures::{self, Peer};
-use jig_protocol_client_wire::v7 as w;
 use jig_protocol_engine_clients::{Event, Settings, Verdict};
 use skein_lib::{List, Reader, Token, Writer};
 fn signed() -> Peer {

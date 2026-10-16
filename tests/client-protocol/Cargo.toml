@@ -7,7 +7,7 @@ publish.workspace = true
 
 [dependencies]
 skein-ui.workspace = true
-jig-test-protocol-client-wire.workspace = true
+jig-client-test-protocol-wire.workspace = true
 jig-test-service.workspace = true
 jig-test-connector.workspace = true
 jig-view.workspace = true
@@ -20,8 +20,8 @@ skein-sim.workspace = true
 skein-fake-machine.workspace = true
 jig-test-view.workspace = true
 skein-world.workspace = true
-jig-protocol-client-link.workspace = true
-jig-protocol-client-wire.workspace = true
+jig-client-protocol-link.workspace = true
+jig-client-protocol-wire.workspace = true
 jig-protocol-engine-clients.workspace = true
 jig-domain-client.workspace = true
 jig-domain-core.workspace = true
@@ -33,7 +33,7 @@ jig-test-domain-client.workspace = true
 skein-fake-person.workspace = true
 jig-fake-workers.workspace = true
 jig-fake-parties.workspace = true
-jig-shell-native = { path = "../../crates/jig-shell-native" }
+jig-client-shell-native = { path = "../../crates/jig-client-shell-native" }
 jig-client-world = { path = "../client" }
 jig-core-world = { path = "../core" }
 

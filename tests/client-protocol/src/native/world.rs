@@ -176,8 +176,8 @@ fn files() -> jig_test_service::Files {
     }
 }
 #[must_use]
-pub fn settings() -> jig_shell_native::Settings {
-    jig_shell_native::Settings {
+pub fn settings() -> jig_client_shell_native::Settings {
+    jig_client_shell_native::Settings {
         engine: skein_io::Addr::Ip((std::net::Ipv4Addr::LOCALHOST, 7100).into()),
         directory: b"private".as_slice().into(),
         limits: fixtures::connections_limits(),

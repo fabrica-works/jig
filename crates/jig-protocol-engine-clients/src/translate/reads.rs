@@ -150,7 +150,7 @@ pub(crate) fn answer(
     };
     let mut out = Writer::new(usize::try_from(value.measure()).expect("wire measure fits"));
     value.encode(&mut out).expect("measured value");
-    owned(w::Owner::Jig, jig_protocol_client_wire::VERSION, out.finish(), limits)
+    owned(w::Owner::Jig, jig_client_protocol_wire::VERSION, out.finish(), limits)
 }
 pub(crate) fn owned(
     owner: w::Owner,

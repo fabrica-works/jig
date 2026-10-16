@@ -1,7 +1,7 @@
 //! The application's own wire, at the engine's protocol boundary (client.md, 11).
 use alloc::boxed::Box;
+use jig_client_test_protocol_wire::v1 as w;
 use jig_test_connector as d;
-use jig_test_protocol_client_wire::v1 as w;
 use skein_lib::{Reader, Writer};
 mod documents;
 mod facts;
@@ -132,7 +132,7 @@ pub fn to_root(
     use jig_protocol_engine_clients::{Event, FromApplication, ToApplication};
     match request {
         ToApplication::Request { reply_to, sign_in, key, family, version, record, digest } => {
-            let decoded = if family == 1 && version == jig_test_protocol_client_wire::VERSION {
+            let decoded = if family == 1 && version == jig_client_test_protocol_wire::VERSION {
                 self::request(&record, bound)
             } else {
                 Err(Undecodable)
@@ -151,7 +151,7 @@ pub fn to_root(
             })
         }
         ToApplication::Read { reply, sign_in, family, version, record } => {
-            let decoded = if family == 1 && version == jig_test_protocol_client_wire::VERSION {
+            let decoded = if family == 1 && version == jig_client_test_protocol_wire::VERSION {
                 read_value(&record, bound)
             } else {
                 Err(Undecodable)
@@ -168,7 +168,7 @@ pub fn to_root(
             })
         }
         ToApplication::Watch { watcher, sign_in, family, version, record } => {
-            let decoded = if family == 1 && version == jig_test_protocol_client_wire::VERSION {
+            let decoded = if family == 1 && version == jig_client_test_protocol_wire::VERSION {
                 subject_value(&record, bound)
             } else {
                 Err(Undecodable)

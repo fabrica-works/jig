@@ -1,0 +1,13 @@
+[package]
+name = "jig-client-test-records"
+description = "Independent literal client wire records shared by both translations"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+[dependencies]
+jig-client-protocol-wire.workspace = true
+skein-lib.workspace = true
+skein-codec.workspace = true
+[lints]
+workspace = true

@@ -85,22 +85,22 @@ pub fn engine_limits() -> Limits {
             response: 65536,
             send: 1024,
         },
-        wire: jig_protocol_client_wire::v7::CEILINGS,
+        wire: jig_client_protocol_wire::v7::CEILINGS,
         link_span: Duration::from_secs(300),
         stall: Duration::from_secs(30),
     }
 }
 #[must_use]
-pub fn connections_limits() -> jig_shell_native::Limits {
-    jig_shell_native::Limits {
+pub fn connections_limits() -> jig_client_shell_native::Limits {
+    jig_client_shell_native::Limits {
         exchanges: 8,
         body_bytes: 65536,
         http: skein_http::client::Limits { head: 4096, headers: 8, request: 4096, read: 1024, send: 1024 },
     }
 }
 #[must_use]
-pub fn link_limits() -> jig_protocol_client_link::Limits {
-    jig_protocol_client_link::Limits::new(jig_client_world::test::limits().jig, 8, Duration::from_secs(1))
+pub fn link_limits() -> jig_client_protocol_link::Limits {
+    jig_client_protocol_link::Limits::new(jig_client_world::test::limits().jig, 8, Duration::from_secs(1))
         .expect("bounded link")
 }
 #[must_use]

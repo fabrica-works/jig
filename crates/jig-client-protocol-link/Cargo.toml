@@ -1,0 +1,19 @@
+[package]
+name = "jig-client-protocol-link"
+description = "Client attempts and envelopes over the client wire"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+[dependencies]
+skein-lib.workspace = true
+skein-http.workspace = true
+skein-codec.workspace = true
+jig-domain-client = { path = "../jig-domain-client" }
+jig-client-protocol-wire = { path = "../jig-client-protocol-wire" }
+jig-protocol-transcript.workspace = true
+[lints]
+workspace = true
+
+[dev-dependencies]
+jig-client-test-records = {path = "../../testing/jig-client-test-records"}

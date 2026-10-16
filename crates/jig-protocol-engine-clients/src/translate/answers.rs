@@ -1,8 +1,8 @@
 //! Durable keyed answers (protocol/client.md, section 5; contract.md, 4).
 use super::refusals;
 use alloc::boxed::Box;
+use jig_client_protocol_wire::v7 as w;
 use jig_domain_people as p;
-use jig_protocol_client_wire::v7 as w;
 use skein_lib::Writer;
 pub(crate) fn answer(reply: &p::Reply, limits: &w::Limits) -> Result<w::Answer, w::Problem> {
     let final_answer = match reply {
@@ -28,7 +28,7 @@ pub(crate) fn answer(reply: &p::Reply, limits: &w::Limits) -> Result<w::Answer, 
     };
     let mut out = Writer::new(usize::try_from(final_answer.measure()).expect("wire size fits"));
     final_answer.encode(&mut out).expect("measured final answer");
-    owned(w::Owner::Jig, jig_protocol_client_wire::VERSION, out.finish(), limits)
+    owned(w::Owner::Jig, jig_client_protocol_wire::VERSION, out.finish(), limits)
 }
 pub(crate) fn service(party: u64, credential: skein_lib::Secret, limits: &w::Limits) -> Result<w::Answer, w::Problem> {
     let what = w::Made::Service(w::MadeService::new(limits, w::MadeServiceParts { party, credential })?);
@@ -36,7 +36,7 @@ pub(crate) fn service(party: u64, credential: skein_lib::Secret, limits: &w::Lim
     let answer = w::Final::Done(w::Done::new(limits, w::DoneParts { outcome })?);
     let mut out = Writer::new(usize::try_from(answer.measure()).expect("wire size fits"));
     answer.encode(&mut out).expect("measured final answer");
-    owned(w::Owner::Jig, jig_protocol_client_wire::VERSION, out.finish(), limits)
+    owned(w::Owner::Jig, jig_client_protocol_wire::VERSION, out.finish(), limits)
 }
 pub(crate) fn owned(
     owner: w::Owner,

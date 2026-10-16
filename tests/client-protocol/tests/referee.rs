@@ -1,5 +1,5 @@
+use jig_client_protocol_wire::v7 as wire;
 use jig_client_protocol_world::referee::{Broken, Rules};
-use jig_protocol_client_wire::v7 as wire;
 use skein_lib::{Reader, Token, Writer};
 
 #[test]

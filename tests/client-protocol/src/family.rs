@@ -1,14 +1,14 @@
 //! The client's family records, retaining the originally scoped route.
+use jig_client_protocol_link::Family;
+use jig_client_test_protocol_wire::v1 as w;
 use jig_client_world::joint::wire::family as application;
-use jig_protocol_client_link::Family;
 use jig_test_domain_client::{connector_values::ConnectorDocument, family as d, first};
-use jig_test_protocol_client_wire::v1 as w;
 use jig_test_service::family as codec;
 use skein_lib::{Reader, Writer};
 
 #[must_use]
 pub fn owned(bytes: Box<[u8]>) -> Family {
-    Family { family: 1, version: jig_test_protocol_client_wire::VERSION, bytes }
+    Family { family: 1, version: jig_client_test_protocol_wire::VERSION, bytes }
 }
 /// # Errors
 /// Refuses a mutation without its explicit value.
@@ -30,7 +30,7 @@ pub fn read(value: d::Subject) -> Result<Family, application::Invalid> {
 }
 #[must_use]
 pub fn answer(value: &Family) -> Option<first::Answer> {
-    if value.family != 1 || value.version != jig_test_protocol_client_wire::VERSION {
+    if value.family != 1 || value.version != jig_client_test_protocol_wire::VERSION {
         return None;
     }
     let value = codec::outcome_value(&value.bytes, &crate::fixtures::owner_limits().connector).ok()?;

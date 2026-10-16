@@ -4,7 +4,7 @@ use std::{fs, path::Path};
 
 #[test]
 fn test_client_wire_schema_matches_generated_code_and_goldens() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../testing/jig-test-protocol-client-wire");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../testing/jig-client-test-protocol-wire");
     let source = fs::read_to_string(root.join("schema/test-client-v1.schema")).expect("client schema");
     let output = generate(&parse(&source).expect("schema valid"));
     let code = root.join("src/generated/v1.rs");

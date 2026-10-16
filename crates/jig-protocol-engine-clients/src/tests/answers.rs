@@ -1,7 +1,7 @@
 use super::fixtures::{self as f, Exchange};
 use crate::{Event, Request, SecretsRequest};
+use jig_client_protocol_wire::v7 as w;
 use jig_domain_people as p;
-use jig_protocol_client_wire::v7 as w;
 use skein_lib::{Reader, ReplyTo, Token};
 #[test]
 fn a_made_chat_is_answered_done_with_its_task() {
@@ -153,11 +153,11 @@ fn done_ending_round_trips(limits: &w::Limits) {
     value.encode(&mut out).expect("final answer");
     let owned = w::Owned::new(
         limits,
-        w::OwnedParts { owner: w::Owner::Jig, version: jig_protocol_client_wire::VERSION, record: out.finish() },
+        w::OwnedParts { owner: w::Owner::Jig, version: jig_client_protocol_wire::VERSION, record: out.finish() },
     )
     .expect("owned final");
     assert_eq!(
-        jig_protocol_client_link::translate::answers::answer(w::Answer::FinalAnswer(owned), &f::client_limits()),
+        jig_client_protocol_link::translate::answers::answer(w::Answer::FinalAnswer(owned), &f::client_limits()),
         Ok(jig_domain_client::contract::Answer::Refused(jig_domain_client::contract::Refusal::Ended {
             how: jig_domain_client::contract::Ending::Done
         }))

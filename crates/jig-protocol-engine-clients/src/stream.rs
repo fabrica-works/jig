@@ -1,8 +1,8 @@
 //! One paced SSE writer, with one outstanding item of each kind per watch (client.md, 7).
 use crate::{Limits, translate::watches as translate};
 use alloc::boxed::Box;
+use jig_client_protocol_wire::v7 as w;
 use jig_domain_core as core;
-use jig_protocol_client_wire::v7 as w;
 use skein_http::sse::writer as sse;
 use skein_lib::{Env, Map, Queue, Time, Token, stream::Down};
 #[derive(Debug)]

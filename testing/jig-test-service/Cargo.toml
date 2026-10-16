@@ -7,8 +7,8 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
-jig-protocol-client-wire.workspace = true
-jig-test-protocol-client-wire.workspace = true
+jig-client-protocol-wire.workspace = true
+jig-client-test-protocol-wire.workspace = true
 jig-protocol-engine-clients.workspace = true
 jig-protocol-store.workspace = true
 jig-test-store.workspace = true

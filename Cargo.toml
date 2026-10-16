@@ -5,13 +5,13 @@ resolver = "3"
 members = [
     "tests/one-process",
     "testing/jig-test",
-    "crates/jig-shell-native",
+    "crates/jig-client-shell-native",
     "tests/client-protocol",
-    "testing/jig-test-client-records",
+    "testing/jig-client-test-records",
     "crates/jig-protocol-engine-clients",
     "tests/engine-clients",
-    "crates/jig-protocol-client-link",
-    "crates/jig-protocol-client-wire",
+    "crates/jig-client-protocol-link",
+    "crates/jig-client-protocol-wire",
     "tests/client-wire",
     "crates/jig-domain-client",
     "crates/jig-protocol-transcript",
@@ -25,7 +25,7 @@ members = [
     "testing/jig-test-domain",
     "testing/jig-test-worker",
     "testing/jig-test-service",
-    "testing/jig-test-protocol-client-wire",
+    "testing/jig-client-test-protocol-wire",
     "testing/jig-test-domain-client",
     "testing/jig-test-client-kit",
     "testing/jig-test-view",
@@ -88,7 +88,7 @@ publish = false
 
 [workspace.dependencies]
 smith-local-service = { git = "https://github.com/forgetic/smith.git" }
-jig-protocol-client-link = { path = "crates/jig-protocol-client-link" }
+jig-client-protocol-link = { path = "crates/jig-client-protocol-link" }
 
 smith-protocol-llm = { git = "https://github.com/forgetic/smith.git" }
 smith-agent-service = { git = "https://github.com/forgetic/smith.git" }
@@ -101,7 +101,7 @@ skein-llm = { git = "https://github.com/forgetic/skein.git" }
 skein-shell = { git = "https://github.com/forgetic/skein.git" }
 smith-host-protocol = { git = "https://github.com/forgetic/smith.git" }
 jig-test-service = { path = "testing/jig-test-service" }
-jig-test-protocol-client-wire = { path = "testing/jig-test-protocol-client-wire" }
+jig-client-test-protocol-wire = { path = "testing/jig-client-test-protocol-wire" }
 jig-protocol-engine-clients = { path = "crates/jig-protocol-engine-clients" }
 smith-protocol-channel = { git = "https://github.com/forgetic/smith.git" }
 smith-domain = { git = "https://github.com/forgetic/smith.git" }
@@ -124,7 +124,7 @@ jig-protocol-worker-link = { path = "crates/jig-protocol-worker-link" }
 skein-fake-channel = { git = "https://github.com/forgetic/skein.git" }
 jig-protocol-worker-wire = { path = "crates/jig-protocol-worker-wire" }
 skein-channel = { git = "https://github.com/forgetic/skein.git" }
-jig-protocol-client-wire = { path = "crates/jig-protocol-client-wire" }
+jig-client-protocol-wire = { path = "crates/jig-client-protocol-wire" }
 jig-protocol-config = { path = "crates/jig-protocol-config" }
 jig-protocol-store = { path = "crates/jig-protocol-store" }
 jig-protocol-tools = { path = "crates/jig-protocol-tools" }

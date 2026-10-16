@@ -3,8 +3,8 @@ use crate::{
     Request, ToApplication,
     translate::{Untranslatable, asks::ask},
 };
+use jig_client_protocol_wire::v7 as w;
 use jig_domain_people as p;
-use jig_protocol_client_wire::v7 as w;
 #[test]
 fn a_start_chat_record_becomes_the_core_s_start_chat() {
     let limits = f::wire();
