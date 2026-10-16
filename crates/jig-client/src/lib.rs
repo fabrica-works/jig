@@ -4,6 +4,7 @@
 extern crate alloc;
 mod client;
 mod limits;
+mod store;
 pub use client::{Client, Event, LinkView, Request};
 pub use jig_client_domain::Limits as DomainLimits;
 pub use jig_client_domain::{

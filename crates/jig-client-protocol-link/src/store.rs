@@ -8,7 +8,6 @@ use skein_lib::{List, Queue, Reader, Token, Writer, bytes};
 struct Held {
     exchange: Token,
     message: Message,
-    tracked: bool,
     credential: Option<skein_lib::Secret>,
 }
 #[derive(Debug)]
@@ -28,8 +27,7 @@ impl Store {
 }
 pub(super) fn worst_case(limits: &Limits) -> Option<u64> {
     let capacity = limits.exchanges.checked_add(1)?;
-    let body = core::cmp::max(w::Keyed::worst_case_bytes(&limits.wire)?, w::Open::worst_case_bytes(&limits.wire)?);
-    let body = core::cmp::max(body, w::Owned::worst_case_bytes(&limits.wire)?);
+    let body = w::Keyed::worst_case_bytes(&limits.wire)?;
     Queue::<Held>::worst_case(capacity)?.checked_add(body.checked_add(40)?.checked_mul(u64::from(capacity))?)
 }
 pub(super) fn records(limits: &Limits) -> Option<u32> {
@@ -165,6 +163,10 @@ fn restore(value: w::Kept, storage_key: &[u8], limits: &Limits) -> Result<Saved,
     Ok(saved)
 }
 impl Link {
+    /// Keeps keyed exchanges behind writes the composing client has already given.
+    pub fn wait_for_store(&mut self) {
+        self.store.waiting = true;
+    }
     pub(super) fn exchange(&mut self, exchange: Token, message: Message, out: &mut Queue<Request>) {
         let tracked = match &message {
             Message::Request(_) | Message::Read(_) | Message::Watch(_) => true,
@@ -173,22 +175,30 @@ impl Link {
         if !self.attempts.contains_key(&exchange) && tracked {
             return;
         }
+        let keyed = match &message {
+            Message::Request(_) => true,
+            Message::Read(_)
+            | Message::Watch(_)
+            | Message::Unwatch(_)
+            | Message::StreamGone(_)
+            | Message::SignInLink(_)
+            | Message::SignOut => false,
+        };
+        if !keyed {
+            out.push(Request::Exchange { exchange, message, credential: self.credential.clone() });
+            return;
+        }
         if self.store.failed {
             if let Some(attempt) = self.attempts.remove(&exchange) {
-                self.failure(attempt, out);
+                out.push(Request::NotKept { attempt: attempt.token });
             }
         } else if self.store.waiting {
             if self.store.held.len() == self.store.held.capacity() {
                 if let Some(attempt) = self.attempts.remove(&exchange) {
-                    self.failure(attempt, out);
+                    out.push(Request::NotKept { attempt: attempt.token });
                 }
             } else {
-                self.store.held.push(Held {
-                    exchange,
-                    message,
-                    tracked: self.attempts.contains_key(&exchange),
-                    credential: self.credential.clone(),
-                });
+                self.store.held.push(Held { exchange, message, credential: self.credential.clone() });
             }
         } else {
             out.push(Request::Exchange { exchange, message, credential: self.credential.clone() });
@@ -205,6 +215,7 @@ impl Link {
                 | Request::Kept { .. }
                 | Request::Dropped { .. }
                 | Request::Answer { .. }
+                | Request::NotKept { .. }
                 | Request::OpenStream { .. }
                 | Request::CloseStream
                 | Request::Watch { .. }
@@ -263,7 +274,7 @@ impl Link {
         self.store.failed = false;
         for _ in 0..self.store.held.capacity() {
             let Some(value) = self.store.held.pop() else { break };
-            if !value.tracked || self.attempts.contains_key(&value.exchange) {
+            if self.attempts.contains_key(&value.exchange) {
                 out.push(Request::Exchange {
                     exchange: value.exchange,
                     message: value.message,
@@ -278,7 +289,7 @@ impl Link {
         for _ in 0..self.store.held.capacity() {
             let Some(value) = self.store.held.pop() else { break };
             if let Some(attempt) = self.attempts.remove(&value.exchange) {
-                self.failure(attempt, out);
+                out.push(Request::NotKept { attempt: attempt.token });
             }
         }
     }

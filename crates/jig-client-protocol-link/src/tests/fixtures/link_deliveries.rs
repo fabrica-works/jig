@@ -116,6 +116,7 @@ impl Harness {
                 }
                 Request::Exchange { .. }
                 | Request::Answer { .. }
+                | Request::NotKept { .. }
                 | Request::Read { .. }
                 | Request::OpenStream { .. }
                 | Request::CloseStream

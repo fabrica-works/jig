@@ -1,7 +1,7 @@
 //! One bounded exchange per request-table attempt (protocol/client.md, 5).
 use crate::{Event, Fact, Limits, Message, Request, Streamed, Unusable, translate};
 use alloc::boxed::Box;
-use jig_client_domain::{Answered, Ask, Family, Readable, Readout, Watchable};
+use jig_client_domain::{Answered, Ask, Family, Readable, Readout, Retry, Watchable};
 use jig_client_protocol_wire::{self as wire, v8 as w};
 use skein_lib::{Map, Queue, Reader, RequestEnvelope, RequestKey, Secret, Time, Token, Writer};
 #[derive(Debug)]
@@ -165,8 +165,20 @@ impl Link {
             }
         }
         let Ok(record) = w::Answer::decode(&self.limits.wire, &mut Reader::new(body)) else {
-            lost(attempt.token, out);
+            out.push(Request::Fact { fact: Fact::UndecodableAnswer });
+            out.push(Request::Answer {
+                attempt: attempt.token,
+                envelope: RequestEnvelope::Lost,
+                answer: None,
+                why: Some(Retry::Undecodable),
+            });
             return;
+        };
+        let why = match &record {
+            w::Answer::Busy => Some(Retry::Busy),
+            w::Answer::NotReady => Some(Retry::NotReady),
+            w::Answer::SignedOut => None,
+            w::Answer::FinalAnswer(_) => Some(Retry::Undecodable),
         };
         let envelope = match record {
             w::Answer::Busy | w::Answer::NotReady => RequestEnvelope::Again,
@@ -198,6 +210,7 @@ impl Link {
                             attempt: attempt.token,
                             envelope: RequestEnvelope::Final,
                             answer: Some(answer),
+                            why: None,
                         });
                         return;
                     }
@@ -208,7 +221,7 @@ impl Link {
                 }
             }
         };
-        out.push(Request::Answer { attempt: attempt.token, envelope, answer: None });
+        out.push(Request::Answer { attempt: attempt.token, envelope, answer: None, why });
     }
     fn read_answer(&self, attempt: Attempt, body: &[u8], out: &mut Queue<Request>) {
         let result = match w::ReadAnswer::decode(&self.limits.wire, &mut Reader::new(body)) {
@@ -265,7 +278,7 @@ fn failed(attempt: Attempt, out: &mut Queue<Request>) {
     }
 }
 fn lost(attempt: Token, out: &mut Queue<Request>) {
-    out.push(Request::Answer { attempt, envelope: RequestEnvelope::Lost, answer: None });
+    out.push(Request::Answer { attempt, envelope: RequestEnvelope::Lost, answer: None, why: Some(Retry::Lost) });
 }
 fn keyed(key: RequestKey, ask: Ask, limits: &w::Limits) -> Result<w::Keyed, w::Problem> {
     let (owner, version, request) = match ask {

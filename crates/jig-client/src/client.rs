@@ -47,6 +47,7 @@ pub struct Client {
     limits: Limits,
     domain_out: Queue<domain::Request>,
     link_out: Queue<link::Request>,
+    store: crate::store::Store,
     saves: List<Record>,
     erases: List<Box<[u8]>>,
 }
@@ -68,6 +69,7 @@ impl Client {
             limits: *limits,
             domain_out: Queue::with_capacity(bound),
             link_out: Queue::with_capacity(bound),
+            store: crate::store::Store::new(limits.domain.requests.requests),
             saves: List::with_capacity(bound),
             erases: List::with_capacity(bound),
         })
@@ -109,8 +111,8 @@ impl Client {
             Event::Lost { exchange } => self.link.step(now, link::Event::Lost { exchange }, &mut self.link_out),
             Event::Streamed { message } => self.link.step(now, link::Event::Streamed { message }, &mut self.link_out),
             Event::StreamGone => self.link.step(now, link::Event::StreamGone, &mut self.link_out),
-            Event::Stored => self.link.step(now, link::Event::Stored, &mut self.link_out),
-            Event::NotStored => self.link.step(now, link::Event::NotStored, &mut self.link_out),
+            Event::Stored => self.store_answer(&env, true),
+            Event::NotStored => self.store_answer(&env, false),
         }
         self.drain(&env, out);
     }
@@ -156,6 +158,23 @@ impl Client {
             credential: self.link.credential(),
         }
     }
+    fn store_answer(&mut self, env: &Env<DomainLimits>, stored: bool) {
+        if let Some(write) = self.store.answer() {
+            while let Some(key) = self.store.take(write) {
+                if !stored {
+                    self.up(env, Up::NotKept { key });
+                }
+            }
+        }
+        if !stored {
+            self.link.step(env.now, link::Event::NotStored, &mut self.link_out);
+        } else if !self.store.pending() {
+            self.link.step(env.now, link::Event::Stored, &mut self.link_out);
+        }
+        if self.store.pending() {
+            self.link.wait_for_store();
+        }
+    }
     fn domain_step(&mut self, env: &Env<DomainLimits>, event: domain::Event) {
         domain::step(&mut self.domain, env, event, &mut self.domain_out);
     }
@@ -171,6 +190,15 @@ impl Client {
                     domain::Request::Told { told } => out.push(Request::Told { told }),
                     domain::Request::Down { down } => {
                         if self.domain.link() != Link::OutOfDate {
+                            match &down {
+                                Down::Save { record } => self.store.save(record.key),
+                                Down::Erase { key } => self.store.erase(*key),
+                                Down::Send { .. }
+                                | Down::Open { .. }
+                                | Down::Continue { .. }
+                                | Down::Close { .. }
+                                | Down::Read { .. } => {}
+                            }
                             self.link.step(env.now, down_event(down), &mut self.link_out);
                         }
                     }
@@ -181,11 +209,13 @@ impl Client {
         }
         assert!(self.link_out.is_empty() && self.domain_out.is_empty(), "bounded composition settles");
         if !self.saves.is_empty() {
+            self.store.write();
             out.push(Request::Save {
                 records: core::mem::replace(&mut self.saves, List::with_capacity(crate::max_out(&self.limits))),
             });
         }
         if !self.erases.is_empty() {
+            self.store.write();
             out.push(Request::Erase {
                 records: core::mem::replace(&mut self.erases, List::with_capacity(crate::max_out(&self.limits))),
             });
@@ -206,8 +236,14 @@ impl Client {
             link::Request::CloseStream => out.push(Request::CloseStream),
             link::Request::Save { record } => self.saves.push(record).expect("bounded step saves"),
             link::Request::Erase { key } => self.erases.push(key).expect("bounded step erases"),
-            link::Request::Answer { attempt, envelope, answer } => {
-                self.up(env, Up::Answer { attempt, envelope, answer, why: None });
+            link::Request::Answer { attempt, envelope, answer, why } => {
+                self.up(env, Up::Answer { attempt, envelope, answer, why });
+            }
+            link::Request::NotKept { attempt } => {
+                self.up(
+                    env,
+                    Up::Answer { attempt, envelope: skein_lib::RequestEnvelope::Lost, answer: None, why: None },
+                );
             }
             link::Request::Watch { watch, event } => self.up(env, Up::Watched { watch, event }),
             link::Request::FamilyDelivery { watch, record } => self.up(env, Up::FamilyDelivered { watch, record }),

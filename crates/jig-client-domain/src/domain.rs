@@ -162,6 +162,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::Read { handle, read } => domain.read(env, handle, read, out),
         Event::Up { up } => match up {
             crate::Up::SignedIn => domain.signed_in(out),
+            crate::Up::NotKept { key } => domain.not_kept(key, out),
             crate::Up::Served { served } => {
                 if !served {
                     domain.set_link(crate::Link::OutOfDate, out);

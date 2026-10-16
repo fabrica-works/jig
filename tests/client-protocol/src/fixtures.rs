@@ -152,3 +152,19 @@ pub fn domain_limits() -> jig_client_domain::Limits {
         heartbeat: jig.heartbeat,
     }
 }
+
+pub const OWNER_SUBJECT: [u8; 8] = 7_u64.to_be_bytes();
+pub const START_KEY: [u8; 16] = [63; 16];
+#[must_use]
+pub fn starter() -> jig_fake_parties::Party {
+    use jig_fake_parties::{Act, Ask, Party, Role};
+    Party::new(
+        u32::try_from(FIRST_OWNER).expect("scripted party identifier fits"),
+        Role::Owner,
+        1_000_000,
+        Box::new([
+            Act::SignIn { provider: 0, subject: OWNER_SUBJECT.as_slice().into() },
+            Act::Request { key: START_KEY, ask: Ask::Chat { words: b"hello".as_slice().into() } },
+        ]),
+    )
+}

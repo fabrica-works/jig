@@ -4,7 +4,7 @@ use crate::{
     domain::{down, tell},
 };
 use skein_lib::{
-    Env, List, Queue, RequestAnswered, RequestEnvelope, RequestOut, RequestProgress, RequestRecord, Token,
+    Env, List, Queue, RequestAnswered, RequestEnvelope, RequestKey, RequestOut, RequestProgress, RequestRecord, Token,
 };
 #[derive(Debug)]
 pub(crate) struct PendingRequest {
@@ -73,6 +73,13 @@ impl Domain {
         }
         if dropped != 0 {
             tell(out, Told::Dropped { count: dropped });
+        }
+    }
+    /// Retires a request whose last small-store write failed, in any table state.
+    pub(crate) fn not_kept(&mut self, key: RequestKey, out: &mut Queue<Request>) {
+        if let Some(owner) = self.table.not_kept(key) {
+            self.requests.remove(&owner);
+            tell(out, Told::Answered { key: owner, outcome: Outcome::NotKept });
         }
     }
     pub(crate) fn answer(

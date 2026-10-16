@@ -1,6 +1,6 @@
 //! The composition's bounded queues (client/domain/client.md, 14).
 use alloc::boxed::Box;
-use skein_lib::{List, Queue};
+use skein_lib::{List, Map, Queue, RequestKey};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
     pub domain: crate::DomainLimits,
@@ -27,6 +27,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(jig_client_protocol_link::worst_case(&link)?)?
         .checked_add(Queue::<jig_client_domain::Request>::worst_case(bound)?)?
         .checked_add(Queue::<jig_client_protocol_link::Request>::worst_case(bound)?)?
+        .checked_add(Map::<RequestKey, u64>::worst_case(limits.domain.requests.requests)?)?
         .checked_add(List::<crate::Record>::worst_case(bound)?)?
         .checked_add(List::<Box<[u8]>>::worst_case(bound)?)?
         .checked_add(u64::from(bound).checked_mul(limits.domain.document_bytes.checked_mul(2)?)?)

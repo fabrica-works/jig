@@ -87,6 +87,7 @@ pub enum Event {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Up {
     SignedIn,
+    NotKept { key: RequestKey },
     Served { served: bool },
     Answer { attempt: Token, envelope: RequestEnvelope, answer: Option<Answered>, why: Option<Retry> },
     Watched { watch: Token, event: contract::WatchEvent },
@@ -135,6 +136,7 @@ pub struct Held {
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Outcome {
+    NotKept,
     Answered(Answered),
     Unknown,
     Limit,

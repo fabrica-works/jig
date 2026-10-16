@@ -1,4 +1,5 @@
 mod fixtures;
+mod store;
 use crate::*;
 use fixtures::{Client, ME, PARTY, PROJECT, STOP, TASK, task};
 #[test]

@@ -70,7 +70,9 @@ pub fn event(value: &w::StreamEvent) -> Box<[u8]> {
     out.finish()
 }
 pub fn frame(watch: u64) -> Box<[u8]> {
-    let value = w::DeliveryValue::Frame(jig_client_test_records::frame_record());
+    let mut parts = jig_client_test_records::frame_record().into_parts();
+    parts.retention = Duration::from_secs(60);
+    let value = w::DeliveryValue::Frame(w::Frame::new(&w::CEILINGS, parts).unwrap());
     let mut bytes = Writer::new(usize::try_from(value.measure()).unwrap());
     value.encode(&mut bytes).unwrap();
     let document = w::Owned::new(
@@ -87,23 +89,29 @@ pub struct Client {
 }
 impl Client {
     pub fn new() -> Self {
+        Self::with_kept(List::with_capacity(0))
+    }
+    pub fn with_kept(kept: List<Record>) -> Self {
         let limits = limits();
         let mut c = Self {
             machine: crate::Client::new(&limits, 7).unwrap(),
             out: Queue::with_capacity(max_out(&limits)),
             requests: List::with_capacity(max_out(&limits)),
         };
-        c.step(Event::Start { kept: List::with_capacity(0) });
+        c.step(Event::Start { kept });
         c
     }
     pub fn signed_in() -> Self {
         let mut c = Self::new();
-        c.step(Event::SignIn { with: With::Held(Secret::new(Box::new([7; 40]))) });
-        c.stream(hello(jig_client_protocol_wire::VERSION));
-        let watch = c.opened_watch();
-        c.stream(frame(watch));
-        c.requests.clear();
+        c.sign_in();
         c
+    }
+    pub fn sign_in(&mut self) {
+        self.step(Event::SignIn { with: With::Held(Secret::new(Box::new([7; 40]))) });
+        self.stream(hello(jig_client_protocol_wire::VERSION));
+        let watch = self.opened_watch();
+        self.stream(frame(watch));
+        self.requests.clear();
     }
     pub fn step(&mut self, event: Event) {
         self.requests.clear();
@@ -152,4 +160,40 @@ pub fn unknown_read() -> Box<[u8]> {
     let mut out = Writer::new(usize::try_from(value.measure()).unwrap());
     value.encode(&mut out).unwrap();
     out.finish()
+}
+
+pub fn saved(requests: &[Request]) -> List<Record> {
+    let mut records = List::with_capacity(max_out(&limits()));
+    for request in requests {
+        if let Request::Save { records: rows } = request {
+            for record in rows {
+                records.push(record.clone()).unwrap();
+            }
+        }
+    }
+    records
+}
+pub fn answer(value: &w::Answer) -> Box<[u8]> {
+    let mut out = Writer::new(usize::try_from(value.measure()).unwrap());
+    value.encode(&mut out).unwrap();
+    out.finish()
+}
+pub fn other_store_version(record: &mut Record) {
+    let value = w::Kept::decode(&w::CEILINGS, &mut skein_lib::Reader::new(&record.bytes)).unwrap();
+    let mut parts = value.into_parts();
+    parts.store_version = parts.store_version.checked_add(1).unwrap();
+    let value = w::Kept::new(&w::CEILINGS, parts).unwrap();
+    let mut writer = Writer::new(usize::try_from(value.measure()).unwrap());
+    value.encode(&mut writer).unwrap();
+    record.bytes = writer.finish();
+}
+
+pub fn answers(requests: &[Request]) -> List<(Key, Outcome)> {
+    let mut answers = List::with_capacity(max_out(&limits()));
+    for request in requests {
+        if let Request::Told { told: Told::Answered { key, outcome } } = request {
+            answers.push((*key, outcome.clone())).unwrap();
+        }
+    }
+    answers
 }

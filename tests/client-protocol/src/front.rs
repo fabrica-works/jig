@@ -61,7 +61,7 @@ impl Side {
     }
     pub(super) fn callback(&mut self, request: link::Request) -> Result<Event, link::Request> {
         Ok(match request {
-            link::Request::Answer { attempt, envelope, answer } => Event::Answer {
+            link::Request::Answer { attempt, envelope, answer, .. } => Event::Answer {
                 attempt,
                 envelope,
                 answer: answer.and_then(|answer| match answer {
@@ -69,6 +69,9 @@ impl Side {
                     jig_client_domain::Answered::Family(record) => family::answer(&record).map(client::Answered::First),
                 }),
             },
+            link::Request::NotKept { attempt } => {
+                Event::Answer { attempt, envelope: skein_lib::RequestEnvelope::Final, answer: None }
+            }
             link::Request::Watch { watch, event } => {
                 let (is_family, original) = *self.routes.get(&watch).expect("live watch route");
                 if is_family {

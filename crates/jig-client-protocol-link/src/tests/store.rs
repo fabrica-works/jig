@@ -77,7 +77,7 @@ fn a_failed_write_withholds_the_step_s_exchanges() {
     harness.write_failed();
     harness.written();
     assert_eq!(harness.exchanges(), 0);
-    harness.lost();
+    assert!(harness.has(&Request::NotKept { attempt: fixtures::ATTEMPT }));
     assert_eq!(harness.terminals(), 1);
 }
 #[test]
@@ -133,32 +133,6 @@ fn a_mismatched_table_storage_key_drops_its_record() {
     assert!(harness.has(&Request::Fact { fact: Fact::UndecodableStore }));
 }
 #[test]
-fn a_write_failure_answers_a_held_read_as_unreachable_once() {
-    let mut harness = fixtures::Harness::new(&fixtures::limits());
-    harness.save(fixtures::saved_draft());
-    harness.link.step(
-        Time::ZERO,
-        Event::Read { read: fixtures::ATTEMPT, what: Readable::Jig(c::Read::Task { task: 7 }) },
-        &mut harness.out,
-    );
-    harness.write_failed();
-    harness.written();
-    assert_eq!(harness.exchanges(), 0);
-    assert!(harness.has(&Request::Read {
-        read: fixtures::ATTEMPT,
-        result: Readout::Jig(c::ReadResult::None(c::ReadNone::Unreachable))
-    }));
-}
-#[test]
-fn a_write_failure_drops_a_held_watch_opening() {
-    let mut harness = fixtures::Harness::streaming(fixtures::family_subject());
-    harness.save(fixtures::saved_draft());
-    harness.write_failed();
-    harness.written();
-    assert_eq!(harness.exchanges(), 0);
-    assert_eq!(harness.ended(fixtures::WATCH), Some(c::WatchEnd::Dropped));
-}
-#[test]
 fn a_cancelled_opening_already_in_the_step_queue_is_never_sent_after_writing() {
     let mut harness = fixtures::Harness::streaming(fixtures::family_subject());
     let (exchange, _) = harness.opening();
@@ -190,7 +164,7 @@ fn a_family_key_past_its_owner_s_bound_withholds_the_step_s_exchange() {
     };
     let mut harness = pending_write(record);
     assert_eq!(harness.exchanges(), 0);
-    harness.lost();
+    assert!(harness.has(&Request::NotKept { attempt: fixtures::ATTEMPT }));
     harness.written();
     assert_eq!(harness.exchanges(), 0);
 }

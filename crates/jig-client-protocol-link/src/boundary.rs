@@ -1,6 +1,6 @@
 //! Owner routing and shell exchanges (protocol/client.md, 2 and 5).
 use alloc::boxed::Box;
-use jig_client_domain::{Answered, Ask, Family, Readable, Readout, Watchable, contract};
+use jig_client_domain::{Answered, Ask, Family, Readable, Readout, Retry, Watchable, contract};
 use skein_lib::{List, RequestEnvelope, RequestKey, RequestRecord, Secret, Token};
 /// The owner of a small-store record (protocol/client.md, 10).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -105,10 +105,14 @@ pub enum Request {
         credential: Option<Secret>,
         message: Message,
     },
+    NotKept {
+        attempt: Token,
+    },
     Answer {
         attempt: Token,
         envelope: RequestEnvelope,
         answer: Option<Answered>,
+        why: Option<Retry>,
     },
     /// The shell shows this once; it never enters the client's domain.
     ServiceCredential {

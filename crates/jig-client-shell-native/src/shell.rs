@@ -115,6 +115,7 @@ impl Shell {
             link::Request::Kept { .. }
             | link::Request::Dropped { .. }
             | link::Request::Answer { .. }
+            | link::Request::NotKept { .. }
             | link::Request::Signing { .. }
             | link::Request::ServiceCredential { .. }
             | link::Request::Watch { .. }

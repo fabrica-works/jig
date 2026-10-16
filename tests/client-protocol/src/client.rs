@@ -2,15 +2,20 @@
 use crate::{engine::Engine, fixtures, net::Net};
 use jig_client::{self as client, Ask, Event, Handle, Key, Latest, Link, Outcome, Readable, Told, Watchable};
 use jig_client_protocol_link as link;
+use jig_client_protocol_wire::v8 as w;
 use jig_client_shell_native::{Conn, Connections};
 use jig_client_world::{ClientId, harness::Observed};
+use skein_lib::Reader;
 use skein_lib::{Duration, List, Queue, Time, stream::Down};
 use std::collections::BTreeMap;
+use std::ops::{Deref, DerefMut};
+const SECOND_CLIENT: ClientId = ClientId(1);
 const CLIENT: ClientId = ClientId(0);
 /// Checks revisions from the documents the application was told changed.
 #[derive(Default)]
 pub struct Referee {
     revisions: Vec<(Watchable, u64)>,
+    stored: BTreeMap<[u8; 16], u64>,
 }
 impl Referee {
     /// # Errors
@@ -26,79 +31,129 @@ impl Referee {
         }
         Ok(())
     }
+    fn stored(&mut self, record: &client::Record) {
+        let kept = w::Kept::decode(&w::CEILINGS, &mut Reader::new(&record.bytes)).expect("client's kept record");
+        if kept.keeper() == &w::Keeper::Table {
+            let entry = w::TableEntry::decode(&w::CEILINGS, &mut Reader::new(kept.record())).expect("table record");
+            self.stored.insert(*entry.key(), entry.scope());
+        }
+    }
+    /// # Errors
+    /// Refuses an exchange whose record is not stored or whose party is unconfirmed.
+    pub fn keyed(&self, key: [u8; 16], party: Option<u64>) -> Result<(), &'static str> {
+        let scope = self.stored.get(&key).ok_or("keyed exchange left before its record was stored")?;
+        if Some(*scope) != party {
+            return Err("keyed exchange left for an unconfirmed party");
+        }
+        Ok(())
+    }
 }
-/// A scripted application, one client and its host's small store.
-pub struct Story {
+/// One application's client and host, connected to the story's shared engine.
+pub struct Front {
     pub client: client::Client,
     connections: Connections,
-    engine: Engine,
-    net: Net,
-    now: Time,
     out: Queue<client::Request>,
     up: Queue<link::Event>,
     below: Queue<(Conn, Down)>,
     told: Vec<Told>,
+    told_at: BTreeMap<Key, Time>,
     store: BTreeMap<Box<[u8]>, Box<[u8]>>,
     subjects: BTreeMap<Handle, Watchable>,
-    seen: Vec<Observed>,
     referee: Referee,
+    refuse_save: bool,
+    seed: u64,
 }
-impl Story {
-    #[must_use]
-    pub fn new(seed: u64) -> Self {
+impl Front {
+    fn new(seed: u64) -> Self {
         let limits = client::Limits { domain: fixtures::domain_limits(), exchanges: 8 };
-        let mut story = Self {
+        Self {
             client: client::Client::new(&limits, seed).expect("bounded client"),
             connections: Connections::new(&fixtures::connections_limits()),
-            engine: Engine::bounded(seed, &fixtures::owner_limits()),
-            net: Net::new(seed),
-            now: Time::ZERO,
             out: Queue::with_capacity(client::max_out(&limits)),
             up: Queue::with_capacity(256),
             below: Queue::with_capacity(256),
             told: Vec::new(),
+            told_at: BTreeMap::new(),
             store: BTreeMap::new(),
             subjects: BTreeMap::new(),
-            seen: Vec::new(),
             referee: Referee::default(),
-        };
-        story.event(Event::Start { kept: List::with_capacity(0) });
-        story.advance();
-        story
+            refuse_save: false,
+            seed,
+        }
     }
-    #[must_use]
-    pub fn live(seed: u64) -> Self {
-        let mut story = Self::new(seed);
-        story.sign_in();
-        assert!(story.run_until(|s| s.client.link().state == Link::Live, Duration::from_secs(1)));
-        story
+    fn event(&mut self, now: Time, event: Event) {
+        self.client.step(now, fixtures::wall(now), event, &mut self.out);
     }
-    pub fn sign_in(&mut self) {
-        let secret = self.connections.printed(&self.engine.link).expect("engine's printed link");
-        self.event(Event::SignIn { with: client::With::Link(secret) });
+    fn advance(&mut self, now: Time, id: ClientId, net: &mut Net, engine: &mut Engine) -> bool {
+        let active = !self.up.is_empty() || !self.out.is_empty() || !self.below.is_empty();
+        while let Some(event) = self.up.pop() {
+            self.event(now, transport(event));
+        }
+        while let Some(request) = self.out.pop() {
+            self.request(now, request);
+        }
+        self.connections.take(now, &mut self.up, &mut self.below);
+        while let Some((conn, down)) = self.below.pop() {
+            if let Some(event) = net.down(id, conn, down) {
+                engine.event(jig_protocol_engine_clients::Event::Io(event));
+            }
+        }
+        self.client.reclaim();
+        active
     }
-    pub fn watch(&mut self, handle: Handle, subject: Watchable) {
-        self.subjects.insert(handle, subject.clone());
-        self.event(Event::Watch { handle, subject });
-    }
-    pub fn read(&mut self, handle: Handle, read: Readable) {
-        self.event(Event::Read { handle, read });
-    }
-    pub fn send(&mut self, key: Key, request: Ask) {
-        self.event(Event::Send { key, request });
-    }
-    pub fn event(&mut self, event: Event) {
-        self.client.step(self.now, fixtures::wall(self.now), event, &mut self.out);
-    }
-    pub fn cut_answer(&mut self) {
-        self.net.cut_answer();
-    }
-    pub fn cut_stream(&mut self) {
-        self.net.cut_stream(CLIENT);
-    }
-    #[must_use]
-    pub fn told_links(&self) -> Vec<Link> {
-        self.told.iter().filter_map(|t| if let Told::Link { link } = t { Some(*link) } else { None }).collect()
+    fn request(&mut self, now: Time, request: client::Request) {
+        match request {
+            client::Request::Told { told } => {
+                if let Told::Changed { handle } = &told
+                    && let Some(subject) = self.subjects.get(handle)
+                    && let Some(document) = self.client.document(*handle)
+                    && let Some(Latest::Jig(client::contract::Delivery::Task(task))) = document.latest
+                {
+                    self.referee.document(subject.clone(), task.spec_revision.value).expect("ordered document");
+                }
+                if let Told::Answered { key, .. } = &told {
+                    self.told_at.insert(*key, now);
+                }
+                self.told.push(told);
+            }
+            client::Request::Save { records } => {
+                if core::mem::take(&mut self.refuse_save) {
+                    self.event(now, Event::NotStored);
+                } else {
+                    for record in records.into_boxed() {
+                        self.referee.stored(&record);
+                        self.store.insert(record.key, record.bytes);
+                    }
+                    self.event(now, Event::Stored);
+                }
+            }
+            client::Request::Erase { records } => {
+                for key in records.into_boxed() {
+                    self.store.remove(&key);
+                }
+                self.event(now, Event::Stored);
+            }
+            client::Request::Exchange { exchange, credential, message } => {
+                if let client::Message::Request(bytes) = &message {
+                    let keyed =
+                        w::Keyed::decode(&w::CEILINGS, &mut Reader::new(bytes)).expect("client's keyed request");
+                    self.referee.keyed(*keyed.key(), self.client.link().party).expect("kept and confirmed exchange");
+                }
+                self.connections.down(now, link::Request::Exchange { exchange, credential, message }, &mut self.below);
+            }
+            client::Request::OpenStream { credential } => {
+                self.connections.down(now, link::Request::OpenStream { credential }, &mut self.below);
+            }
+            client::Request::CloseStream => {
+                self.connections.down(now, link::Request::CloseStream, &mut self.below);
+            }
+        }
+        let limits = client::Limits { domain: fixtures::domain_limits(), exchanges: 8 };
+        assert!(self.out.len() <= client::max_out(&limits), "bounded client output queue");
+        assert!(
+            self.store.len() <= usize::try_from(limits.domain.requests.requests).expect("table bound fits"),
+            "bounded small store"
+        );
     }
     #[must_use]
     pub fn answered(&self, key: Key) -> Vec<Outcome> {
@@ -114,6 +169,14 @@ impl Story {
             .collect()
     }
     #[must_use]
+    pub fn kept(&self, key: Key) -> bool {
+        self.told.iter().any(|t| matches!(t, Told::Kept { key: held, .. } if *held == key))
+    }
+    #[must_use]
+    pub fn told_links(&self) -> Vec<Link> {
+        self.told.iter().filter_map(|t| if let Told::Link { link } = t { Some(*link) } else { None }).collect()
+    }
+    #[must_use]
     pub fn pages(&self, handle: Handle) -> Vec<client::Readout> {
         self.told
             .iter()
@@ -123,8 +186,185 @@ impl Story {
             .collect()
     }
     #[must_use]
+    pub fn told_at(&self, key: Key) -> Time {
+        self.told_at[&key]
+    }
+}
+/// Scripted applications against one durable real engine over HTTP bytes.
+pub struct Story {
+    front: Front,
+    second: Option<Front>,
+    engine: Engine,
+    net: Net,
+    now: Time,
+    seen: Vec<Observed>,
+}
+impl Deref for Story {
+    type Target = Front;
+    fn deref(&self) -> &Front {
+        &self.front
+    }
+}
+impl DerefMut for Story {
+    fn deref_mut(&mut self) -> &mut Front {
+        &mut self.front
+    }
+}
+impl Story {
+    #[must_use]
+    pub fn new(seed: u64) -> Self {
+        let mut limits = fixtures::owner_limits();
+        limits.core.people.sign_ins = 3;
+        let mut story = Self {
+            front: Front::new(seed),
+            second: None,
+            engine: Engine::bounded(seed, &limits),
+            net: Net::new(seed),
+            now: Time::ZERO,
+            seen: Vec::new(),
+        };
+        story.event(Event::Start { kept: List::with_capacity(0) });
+        story.advance();
+        story
+    }
+    #[must_use]
+    pub fn live(seed: u64) -> Self {
+        let mut story = Self::new(seed);
+        story.sign_in();
+        assert!(story.run_until(|s| s.client.link().state == Link::Live, Duration::from_secs(1)));
+        story
+    }
+    pub fn sign_in(&mut self) {
+        let secret = self.front.connections.printed(&self.engine.link).expect("engine's printed link");
+        self.event(Event::SignIn { with: client::With::Link(secret) });
+    }
+    pub fn watch(&mut self, handle: Handle, subject: Watchable) {
+        self.front.subjects.insert(handle, subject.clone());
+        self.event(Event::Watch { handle, subject });
+    }
+    pub fn read(&mut self, handle: Handle, read: Readable) {
+        self.event(Event::Read { handle, read });
+    }
+    pub fn send(&mut self, key: Key, request: Ask) {
+        self.event(Event::Send { key, request });
+    }
+    pub fn event(&mut self, event: Event) {
+        self.front.event(self.now, event);
+    }
+    pub fn cut_answer(&mut self) {
+        self.net.cut_answer();
+    }
+    pub fn cut_stream(&mut self) {
+        self.net.cut_stream(CLIENT);
+    }
+    pub fn refuse_next_save(&mut self) {
+        self.front.refuse_save = true;
+    }
+    pub fn reload(&mut self) {
+        let credential = self.client.link().credential.cloned().expect("signed in before reload");
+        self.net.cut_client(CLIENT);
+        self.advance();
+        self.net.retire(CLIENT);
+        let mut front = Front::new(self.front.seed);
+        front.store = core::mem::take(&mut self.front.store);
+        let mut kept = List::with_capacity(u32::try_from(front.store.len()).expect("bounded store"));
+        for (key, bytes) in &front.store {
+            let record = client::Record { key: key.clone(), bytes: bytes.clone() };
+            front.referee.stored(&record);
+            kept.push(record).expect("bounded store");
+        }
+        front.event(self.now, Event::Start { kept });
+        front.event(self.now, Event::SignIn { with: client::With::Held(credential) });
+        self.front = front;
+    }
+    pub fn restart_engine(&mut self, offline: Duration) {
+        self.net.cut_all();
+        self.advance();
+        self.engine.driver.restart(jig_core_world::world::config(self.engine.seed), self.now, fixtures::wall(self.now));
+        self.net.offline(self.now.saturating_add(offline));
+        while self.engine.out.pop().is_some() {}
+        self.engine.component = jig_protocol_engine_clients::Component::new(
+            fixtures::settings(self.engine.limits.core.documents.rows),
+            &self.engine.env,
+            &mut self.engine.out,
+        )
+        .expect("bounded replacement");
+    }
+    pub fn add_second_client(&mut self) {
+        let mut second = Front::new(self.front.seed.checked_add(1).expect("second seed"));
+        let printed = self.engine.link.clone();
+        let secret = second.connections.printed(&printed).expect("engine's printed link");
+        second.event(self.now, Event::Start { kept: List::with_capacity(0) });
+        second.event(self.now, Event::SignIn { with: client::With::Link(secret) });
+        self.second = Some(second);
+        self.advance();
+        // A consumed printed link is refused and the engine prints its replacement.
+        if self.second().client.link().state == Link::SignedOut && self.engine.link != printed {
+            let second = self.second.as_mut().expect("second client attached");
+            let secret = second.connections.printed(&self.engine.link).expect("fresh printed link");
+            second.event(self.now, Event::SignIn { with: client::With::Link(secret) });
+        }
+        assert!(self.run_until(|s| s.second().client.link().state == Link::Live, Duration::from_secs(1)));
+    }
+    #[must_use]
+    pub fn second(&self) -> &Front {
+        self.second.as_ref().expect("second client attached")
+    }
+    pub fn send_second(&mut self, key: Key, request: Ask) {
+        self.second.as_mut().expect("second client attached").event(self.now, Event::Send { key, request });
+    }
+    pub fn start_task(&mut self) -> u64 {
+        self.engine.driver.scripted_party(fixtures::starter(), self.now, fixtures::wall(self.now));
+        self.engine.driver.world.send(jig_test_domain::Event::Timer(jig_domain_core::Timer::People));
+        self.advance();
+        self.engine
+            .driver
+            .world
+            .store
+            .rows
+            .values()
+            .find_map(|row| match row {
+                jig_test_domain::Record::Core(jig_domain_core::Record::People(jig_domain_people::Stored::Answer {
+                    outcome: jig_domain_people::Outcome::Started { task },
+                    ..
+                })) => Some(*task),
+                jig_test_domain::Record::Core(_) | jig_test_domain::Record::Connector { .. } => None,
+            })
+            .expect("scripted party started a task")
+    }
+    #[must_use]
     pub fn made(&self, party: u64) -> usize {
         self.seen.iter().filter(|o| matches!(o, Observed::Made { party: held, .. } if *held == party)).count()
+    }
+    #[must_use]
+    pub fn durable_at(&self, party: u64) -> Time {
+        let commit = self
+            .seen
+            .iter()
+            .find_map(|o| match o {
+                Observed::Made { party: held, commit, .. } if *held == party => Some(*commit),
+                Observed::Durable { .. }
+                | Observed::Made { .. }
+                | Observed::Kept { .. }
+                | Observed::Retained { .. }
+                | Observed::Stopped { .. }
+                | Observed::Ended { .. }
+                | Observed::Reachable { .. } => None,
+            })
+            .expect("party's made commit");
+        self.seen
+            .iter()
+            .find_map(|o| match o {
+                Observed::Durable { commit: held, at } if *held == commit => Some(*at),
+                Observed::Durable { .. }
+                | Observed::Made { .. }
+                | Observed::Kept { .. }
+                | Observed::Retained { .. }
+                | Observed::Stopped { .. }
+                | Observed::Ended { .. }
+                | Observed::Reachable { .. } => None,
+            })
+            .expect("made commit is durable")
     }
     #[must_use]
     pub fn deliveries_taken(&self) -> bool {
@@ -140,11 +380,16 @@ impl Story {
             if self.now >= end {
                 return false;
             }
+            let second = self
+                .second
+                .iter()
+                .flat_map(|f| f.client.next_deadline().into_iter().chain(f.connections.next_deadline()));
             let next = self
                 .client
                 .next_deadline()
                 .into_iter()
-                .chain(self.connections.next_deadline())
+                .chain(self.front.connections.next_deadline())
+                .chain(second)
                 .chain(self.engine.component.next_deadline())
                 .chain(self.engine.driver.world.next_due())
                 .chain(self.net.next_due())
@@ -152,7 +397,10 @@ impl Story {
                 .min()
                 .unwrap_or(end);
             self.now = next.min(end);
-            self.client.fire(self.now, fixtures::wall(self.now), &mut self.out);
+            self.front.client.fire(self.now, fixtures::wall(self.now), &mut self.front.out);
+            if let Some(second) = &mut self.second {
+                second.client.fire(self.now, fixtures::wall(self.now), &mut second.out);
+            }
         }
         panic!("story did not settle")
     }
@@ -170,54 +418,9 @@ impl Story {
                     self.engine.event(jig_protocol_engine_clients::Event::Io(event));
                 }
             }
-            while let Some(event) = self.up.pop() {
-                active = true;
-                self.event(transport(event));
-            }
-            while let Some(request) = self.out.pop() {
-                active = true;
-                match request {
-                    client::Request::Told { told } => {
-                        if let Told::Changed { handle } = &told
-                            && let Some(subject) = self.subjects.get(handle)
-                            && let Some(document) = self.client.document(*handle)
-                            && let Some(Latest::Jig(client::contract::Delivery::Task(task))) = document.latest
-                        {
-                            self.referee.document(subject.clone(), task.spec_revision.value).expect("ordered document");
-                        }
-                        self.told.push(told);
-                    }
-                    client::Request::Save { records } => {
-                        for record in records.into_boxed() {
-                            self.store.insert(record.key, record.bytes);
-                        }
-                        self.event(Event::Stored);
-                    }
-                    client::Request::Erase { records } => {
-                        for key in records.into_boxed() {
-                            self.store.remove(&key);
-                        }
-                        self.event(Event::Stored);
-                    }
-                    client::Request::Exchange { exchange, credential, message } => self.connections.down(
-                        self.now,
-                        link::Request::Exchange { exchange, credential, message },
-                        &mut self.below,
-                    ),
-                    client::Request::OpenStream { credential } => {
-                        self.connections.down(self.now, link::Request::OpenStream { credential }, &mut self.below);
-                    }
-                    client::Request::CloseStream => {
-                        self.connections.down(self.now, link::Request::CloseStream, &mut self.below);
-                    }
-                }
-            }
-            self.connections.take(self.now, &mut self.up, &mut self.below);
-            while let Some((conn, down)) = self.below.pop() {
-                active = true;
-                if let Some(event) = self.net.down(CLIENT, conn, down) {
-                    self.engine.event(jig_protocol_engine_clients::Event::Io(event));
-                }
+            active |= self.front.advance(self.now, CLIENT, &mut self.net, &mut self.engine);
+            if let Some(second) = &mut self.second {
+                active |= second.advance(self.now, SECOND_CLIENT, &mut self.net, &mut self.engine);
             }
             let (events, clients, changed) = self.net.advance(&mut self.engine.rules);
             active |= changed;
@@ -225,8 +428,13 @@ impl Story {
                 self.engine.event(jig_protocol_engine_clients::Event::Io(event));
             }
             for (id, conn, up) in clients {
-                assert_eq!(id, CLIENT);
-                self.connections.up(self.now, conn, up, &mut self.up, &mut self.below);
+                let front = if id == CLIENT {
+                    &mut self.front
+                } else {
+                    assert_eq!(id, SECOND_CLIENT);
+                    self.second.as_mut().expect("second client attached")
+                };
+                front.connections.up(self.now, conn, up, &mut front.up, &mut front.below);
             }
             self.seen.extend(self.engine.observed());
             quiet = if active { 0 } else { quiet + 1 };

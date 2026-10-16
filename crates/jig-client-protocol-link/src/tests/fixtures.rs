@@ -92,6 +92,7 @@ impl Harness {
         match self.out.iter().next().expect("one exchange") {
             Request::Exchange { exchange, .. } => *exchange,
             other @ (Request::Answer { .. }
+            | Request::NotKept { .. }
             | Request::Read { .. }
             | Request::OpenStream { .. }
             | Request::CloseStream
@@ -121,11 +122,12 @@ impl Harness {
     pub fn answered(&self, token: Token) -> Option<(RequestEnvelope, Option<&Answered>)> {
         for request in &self.out {
             match request {
-                Request::Answer { attempt, envelope, answer } if *attempt == token => {
+                Request::Answer { attempt, envelope, answer, .. } if *attempt == token => {
                     return Some((*envelope, answer.as_ref()));
                 }
                 Request::Exchange { .. }
                 | Request::Answer { .. }
+                | Request::NotKept { .. }
                 | Request::Read { .. }
                 | Request::OpenStream { .. }
                 | Request::CloseStream
@@ -156,7 +158,7 @@ impl Harness {
         let mut count: u32 = 0;
         for value in &self.out {
             match value {
-                Request::Answer { .. } => count = count.saturating_add(1),
+                Request::Answer { .. } | Request::NotKept { .. } => count = count.saturating_add(1),
                 Request::Exchange { .. }
                 | Request::Read { .. }
                 | Request::OpenStream { .. }

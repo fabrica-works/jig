@@ -91,6 +91,7 @@ impl Harness {
                 }
                 Request::Exchange { .. }
                 | Request::Answer { .. }
+                | Request::NotKept { .. }
                 | Request::Read { .. }
                 | Request::OpenStream { .. }
                 | Request::CloseStream
@@ -115,6 +116,7 @@ impl Harness {
                 Request::Ended { watch: token, end } if *token == watch => return Some(*end),
                 Request::Exchange { .. }
                 | Request::Answer { .. }
+                | Request::NotKept { .. }
                 | Request::Read { .. }
                 | Request::OpenStream { .. }
                 | Request::CloseStream
@@ -140,6 +142,7 @@ impl Harness {
                 Request::Ended { .. } => count = count.checked_add(1).unwrap(),
                 Request::Exchange { .. }
                 | Request::Answer { .. }
+                | Request::NotKept { .. }
                 | Request::Read { .. }
                 | Request::OpenStream { .. }
                 | Request::CloseStream
@@ -163,6 +166,7 @@ impl Harness {
             Request::Exchange { exchange, message: Message::Unwatch(_), .. } => *exchange,
             other @ (Request::Exchange { .. }
             | Request::Answer { .. }
+            | Request::NotKept { .. }
             | Request::Read { .. }
             | Request::OpenStream { .. }
             | Request::CloseStream
@@ -192,6 +196,7 @@ impl Harness {
                 }
                 Request::Exchange { .. }
                 | Request::Answer { .. }
+                | Request::NotKept { .. }
                 | Request::Read { .. }
                 | Request::OpenStream { .. }
                 | Request::CloseStream
@@ -233,6 +238,7 @@ impl Harness {
                 }
                 Request::Exchange { .. }
                 | Request::Answer { .. }
+                | Request::NotKept { .. }
                 | Request::Read { .. }
                 | Request::OpenStream { .. }
                 | Request::CloseStream
