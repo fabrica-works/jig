@@ -49,7 +49,7 @@ fn application_watch_and_read_admission_checks_the_scope_before_any_document_han
             Event::Read {
                 reply: ReplyTo::new(Token::new(31)),
                 sign_in: 10,
-                read: reads::Read::Application { scope, connector: 1, read: Token::new(501) },
+                read: reads::Read::Application { scope, connector: 1, read: Token::new(501), window: window() },
             },
         );
         let Request::Ask { connector: 1, ask: Ask::Read { party: 1, .. } } = &out[0] else {
@@ -77,7 +77,7 @@ fn application_watch_and_read_admission_checks_the_scope_before_any_document_han
         Event::Read {
             reply: ReplyTo::new(Token::new(31)),
             sign_in: 10,
-            read: reads::Read::Application { scope, connector: 1, read: Token::new(501) },
+            read: reads::Read::Application { scope, connector: 1, read: Token::new(501), window: window() },
         },
     );
     let Request::Ask { ask: Ask::DropDocument { .. }, .. } = &out[0] else {

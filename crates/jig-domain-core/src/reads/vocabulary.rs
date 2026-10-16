@@ -124,7 +124,12 @@ pub enum Cursor {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Read {
     /// A connector-owned document within the client's stated role scope.
-    Application { scope: documents::ApplicationScope, connector: u16, read: skein_lib::Token },
+    Application {
+        scope: documents::ApplicationScope,
+        connector: u16,
+        read: skein_lib::Token,
+        window: documents::Window,
+    },
     /// The authenticated party's frame.
     Frame,
     /// A task overview, live or ended.

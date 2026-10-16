@@ -31,8 +31,11 @@ pub(super) fn made_outputs(core: &mut Core, env: &Env<Limits>, mut child: Queue<
     for _ in 0..child.len() {
         match child.pop().expect("view output count") {
             views::Request::Make { watcher, .. } => {
-                if let Some((connector, subject, scope, party)) = application_subject(core, watcher) {
-                    out.push(Request::Ask { connector, ask: crate::Ask::Document { watcher, scope, subject, party } });
+                if let Some((connector, subject, scope, party, window)) = application_subject(core, watcher) {
+                    out.push(Request::Ask {
+                        connector,
+                        ask: crate::Ask::Document { watcher, scope, subject, party, window },
+                    });
                     continue;
                 }
                 let outcome = match watch_document(core, &env.limits, watcher, env.now, env.wall) {
@@ -62,7 +65,7 @@ pub(super) fn made_outputs(core: &mut Core, env: &Env<Limits>, mut child: Queue<
             views::Request::Watching { .. } => {}
             views::Request::Make { .. } => unreachable!("construction answered within the step"),
             views::Request::Deliver { watcher, .. } => match application_subject(core, watcher) {
-                Some((connector, subject, _, _)) => {
+                Some((connector, subject, _, _, _)) => {
                     out.push(Request::Held(Box::new(Held::ApplicationDelivery { watcher, connector, subject })));
                 }
                 None => {
@@ -72,7 +75,7 @@ pub(super) fn made_outputs(core: &mut Core, env: &Env<Limits>, mut child: Queue<
             },
             views::Request::Ended { watcher, end: why } => {
                 let held = match application_subject(core, watcher) {
-                    Some((connector, subject, _, _)) => {
+                    Some((connector, subject, _, _, _)) => {
                         Held::ApplicationWatchEnded { watcher, connector, subject, why }
                     }
                     None => Held::WatchEnded { watcher, why },
@@ -275,7 +278,7 @@ fn admission(core: &Core, env: &Env<Limits>, party: u64, subject: &Subject, wind
             if !core.connectors.as_ref().contains(connector) {
                 return Some(WatchRefusal::Unknown);
             }
-            if core.people.role(party, scope.project()).is_none() {
+            if *scope != documents::ApplicationScope::Own && core.people.role(party, scope.project()).is_none() {
                 return Some(WatchRefusal::NotAllowed);
             }
             if window.rows > env.limits.documents.rows {
@@ -324,11 +327,13 @@ fn named_subject(subject: Watched, party: u64) -> Subject {
     }
 }
 
-fn application_subject(core: &Core, watcher: Token) -> Option<(u16, Token, documents::ApplicationScope, u64)> {
+fn application_subject(core: &Core, watcher: Token) -> Option<(u16, Token, documents::ApplicationScope, u64, Window)> {
     let binding = core.view_subjects.get(&watcher)?;
     let subject = &core.view_names.get(binding.subject)?.subject;
     match subject {
-        Subject::Application { scope, connector, subject } => Some((*connector, *subject, *scope, binding.party)),
+        Subject::Application { scope, connector, subject } => {
+            Some((*connector, *subject, *scope, binding.party, binding.window))
+        }
         Subject::Frame { .. }
         | Subject::Task { .. }
         | Subject::Tree { .. }

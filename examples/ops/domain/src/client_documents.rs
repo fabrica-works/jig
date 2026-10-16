@@ -39,12 +39,14 @@ fn infrastructure_scope(scope: core::documents::ApplicationScope) -> infrastruct
     match scope {
         core::documents::ApplicationScope::Project(project) => infrastructure::ClientScope::Project(project),
         core::documents::ApplicationScope::Deployment => infrastructure::ClientScope::Deployment,
+        core::documents::ApplicationScope::Own => unreachable!("own document refused before translation"),
     }
 }
 fn observability_scope(scope: core::documents::ApplicationScope) -> observability::ClientScope {
     match scope {
         core::documents::ApplicationScope::Project(project) => observability::ClientScope::Project(project),
         core::documents::ApplicationScope::Deployment => observability::ClientScope::Deployment,
+        core::documents::ApplicationScope::Own => unreachable!("own document refused before translation"),
     }
 }
 
@@ -57,6 +59,13 @@ pub(crate) fn ask_document(
     party: u64,
     work: &mut Queue<Work>,
 ) {
+    if scope == core::documents::ApplicationScope::Own {
+        work.push(Work::Core(core::Event::View(jig_domain_views::Event::Made {
+            watcher,
+            outcome: jig_domain_views::Made::Gone { why: jig_domain_views::End::Gone },
+        })));
+        return;
+    }
     match jig_ops_domain_connectors::connector(number) {
         Some(Connector::Infrastructure) => {
             work.push(Work::Infrastructure(infrastructure::Event::Document {
@@ -176,6 +185,11 @@ pub(crate) fn read(
     party: u64,
     work: &mut Queue<Work>,
 ) {
+    if scope == core::documents::ApplicationScope::Own {
+        forget(domain, number, read, work);
+        held(decision, Output::ApplicationRead { reply, answer: Err(ClientMissing::Unknown) });
+        return;
+    }
     let mut reply = Some(reply);
     match jig_ops_domain_connectors::connector(number) {
         Some(Connector::Infrastructure) => {

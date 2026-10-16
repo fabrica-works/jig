@@ -408,6 +408,7 @@ pub(super) enum Work {
         scope: core::documents::ApplicationScope,
         number: u16,
         subject: connector::ClientSubject,
+        window: core::documents::Window,
     },
     Application {
         reply_to: ReplyTo,

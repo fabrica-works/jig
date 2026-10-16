@@ -90,6 +90,7 @@ pub fn send(
                     scope: application_scope(scope),
                     number: 1,
                     subject: owner,
+                    window: core::documents::Window { rows: limits.rows, after: None },
                 }
             }
             first::Out::Open { watch, subject } => {
@@ -161,6 +162,7 @@ fn application_scope(value: jig_test_connector::ClientScope) -> ApplicationScope
     match value {
         jig_test_connector::ClientScope::Project(project) => ApplicationScope::Project(project),
         jig_test_connector::ClientScope::Deployment => ApplicationScope::Deployment,
+        jig_test_connector::ClientScope::Own => ApplicationScope::Own,
     }
 }
 

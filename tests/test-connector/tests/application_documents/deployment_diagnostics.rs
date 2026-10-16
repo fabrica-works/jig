@@ -4,13 +4,19 @@ use connector::{DiagnosticAvailability, EffectPhase};
 
 fn deployment(world: &mut World, token: Token, read: bool) -> ClientDocument {
     let requests = if read {
-        world.event(Event::ReadDocument { scope: ClientScope::Deployment, read: token, party: 1 })
+        world.event(Event::ReadDocument {
+            scope: ClientScope::Deployment,
+            read: token,
+            party: 1,
+            window: connector::ClientWindow { rows: 16, after: None },
+        })
     } else {
         world.event(Event::Document {
             watcher: Token::new(70),
             scope: ClientScope::Deployment,
             subject: token,
             party: 1,
+            window: connector::ClientWindow { rows: 16, after: None },
         })
     };
     match requests.as_slice() {
@@ -99,6 +105,7 @@ fn deployment_source_empty_outbox_wrong_scope_and_consumed_read_keep_the_origina
         scope: ClientScope::Project(1),
         subject: token,
         party: 1,
+        window: connector::ClientWindow { rows: 16, after: None },
     });
     assert!(matches!(wrong.as_slice(), [Request::Document {
         watcher, subject, document: Err(connector::DocumentMissing::Unknown),
@@ -112,7 +119,12 @@ fn deployment_source_empty_outbox_wrong_scope_and_consumed_read_keep_the_origina
     assert_eq!(outbox.capacity(), jig_test_connector_world::LIMITS.entries);
     assert_eq!(request_budget, DiagnosticAvailability::NotKept);
     assert_eq!(system_last_response, DiagnosticAvailability::NotKept);
-    let consumed = world.event(Event::ReadDocument { scope: ClientScope::Deployment, read: token, party: 1 });
+    let consumed = world.event(Event::ReadDocument {
+        scope: ClientScope::Deployment,
+        read: token,
+        party: 1,
+        window: connector::ClientWindow { rows: 16, after: None },
+    });
     assert!(matches!(consumed.as_slice(), [Request::ReadAnswered {
         read, answer: Err(connector::DocumentMissing::Unknown),
     }] if *read == token));

@@ -34,9 +34,21 @@ pub enum Ask {
     /// Discard the connector-owned binding of a refused application watch or read.
     DropDocument { subject: Token },
     /// Make a connector's current document, then complete the views' Make within this decision.
-    Document { watcher: Token, scope: crate::documents::ApplicationScope, subject: Token, party: u64 },
+    Document {
+        watcher: Token,
+        scope: crate::documents::ApplicationScope,
+        subject: Token,
+        party: u64,
+        window: crate::documents::Window,
+    },
     /// Answer an admitted connector read; the root holds its typed answer in this decision.
-    Read { reply: ReplyTo, scope: crate::documents::ApplicationScope, read: Token, party: u64 },
+    Read {
+        reply: ReplyTo,
+        scope: crate::documents::ApplicationScope,
+        read: Token,
+        party: u64,
+        window: crate::documents::Window,
+    },
     /// Decide the admitted connector-owned value in this decision and retain its outcome.
     Application {
         request: Token,

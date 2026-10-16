@@ -6,6 +6,10 @@ use crate::{
     Request, ResourceRole, ResourceSpec, SystemEvent, TopicSpec, step,
 };
 
+const PROJECT_DOCUMENT: u64 = 800;
+const DEPLOYMENT_DOCUMENT: u64 = 801;
+const WINDOW_ROWS: [u32; 3] = [0, 1, 2];
+
 const LIMITS: Limits = Limits {
     tasks: 2,
     adoptions: 3,
@@ -491,7 +495,13 @@ fn a_prepared_client_subject_checks_its_actual_scope_and_echoes_only_its_owner_n
     );
     let out = run(
         &mut domain,
-        Event::Document { watcher: Token::new(101), scope: ClientScope::Project(2), subject, party: 7 },
+        Event::Document {
+            watcher: Token::new(101),
+            scope: ClientScope::Project(2),
+            subject,
+            party: 7,
+            window: crate::ClientWindow { rows: 16, after: None },
+        },
     );
     let [Request::Document { subject: named, document: Err(DocumentMissing::Unknown), .. }] = out.as_ref() else {
         panic!("wrong scope is unknown")
@@ -499,14 +509,28 @@ fn a_prepared_client_subject_checks_its_actual_scope_and_echoes_only_its_owner_n
     assert_eq!(*named, subject);
     let out = run(
         &mut domain,
-        Event::Document { watcher: Token::new(101), scope: ClientScope::Project(1), subject, party: 7 },
+        Event::Document {
+            watcher: Token::new(101),
+            scope: ClientScope::Project(1),
+            subject,
+            party: 7,
+            window: crate::ClientWindow { rows: 16, after: None },
+        },
     );
     let [Request::Document { document: Ok(ClientDocument::Object { object: 1, now }), .. }] = out.as_ref() else {
         panic!("the prepared owner constructs its object")
     };
     assert_eq!((now.revision, now.value), (0, 0));
     run(&mut domain, Event::DocumentForget { subject });
-    let out = run(&mut domain, Event::ReadDocument { scope: ClientScope::Project(1), read: subject, party: 7 });
+    let out = run(
+        &mut domain,
+        Event::ReadDocument {
+            scope: ClientScope::Project(1),
+            read: subject,
+            party: 7,
+            window: crate::ClientWindow { rows: 16, after: None },
+        },
+    );
     let [Request::ReadAnswered { answer: Err(DocumentMissing::Unknown), .. }] = out.as_ref() else {
         panic!("forgotten name is unknown")
     };
@@ -529,4 +553,68 @@ fn a_topic_not_offered_to_agents_is_refused() {
     let mut out = Queue::with_capacity(MAX_OUT);
     step(&mut domain, &env, Event::DescribeTopic { token: skein_lib::Token::new(82), topic: 7 }, &mut out);
     assert_eq!(out.pop(), Some(Request::TopicRefused { token: skein_lib::Token::new(82) }));
+}
+
+fn project_document(window: crate::ClientWindow) -> crate::ClientDocument {
+    use crate::{ClientScope, ClientSubject};
+    let mut domain = domain();
+    for resource in [service(), pool()] {
+        run(&mut domain, Event::Adopt { project: 1, resource, role: ResourceRole::Owned });
+    }
+    let subject = skein_lib::Token::new(PROJECT_DOCUMENT);
+    run(&mut domain, Event::DocumentPrepare { token: subject, subject: ClientSubject::Project { project: 1 } });
+    let out = run(&mut domain, Event::ReadDocument { scope: ClientScope::Project(1), read: subject, party: 7, window });
+    let [Request::ReadAnswered { answer: Ok(document), .. }] = out.as_ref() else { panic!("project rows") };
+    document.clone()
+}
+
+#[test]
+fn a_document_holds_at_most_its_windows_rows() {
+    for rows in WINDOW_ROWS {
+        let crate::ClientDocument::Project { resources, .. } =
+            project_document(crate::ClientWindow { rows, after: None })
+        else {
+            panic!("project")
+        };
+        assert_eq!(resources.len(), rows, "window {rows}");
+    }
+}
+
+#[test]
+fn a_document_starts_after_its_windows_cursor() {
+    let crate::ClientDocument::Project { resources, .. } =
+        project_document(crate::ClientWindow { rows: 2, after: Some(crate::ClientCursor::Number(1)) })
+    else {
+        panic!("project")
+    };
+    assert_eq!(resources.len(), 1);
+    assert_eq!(resources.get(0).expect("second row").path, pool());
+}
+
+#[test]
+fn an_own_scope_shows_what_the_deployment_scope_shows() {
+    let mut domain = domain();
+    let subject = skein_lib::Token::new(DEPLOYMENT_DOCUMENT);
+    run(&mut domain, Event::DocumentPrepare { token: subject, subject: crate::ClientSubject::Deployment });
+    let expected = crate::ClientDocument::Deployment {
+        outbox: List::with_capacity(LIMITS.entries),
+        subject_limit: LIMITS.values,
+        staged_limit: LIMITS.staged,
+        request_budget: crate::DiagnosticAvailability::NotKept,
+        system_last_response: crate::DiagnosticAvailability::NotKept,
+    };
+    for scope in [crate::ClientScope::Deployment, crate::ClientScope::Own] {
+        let out = run(
+            &mut domain,
+            Event::Document {
+                watcher: subject,
+                scope,
+                subject,
+                party: 7,
+                window: crate::ClientWindow { rows: 2, after: None },
+            },
+        );
+        let [Request::Document { document, .. }] = out.as_ref() else { panic!("deployment") };
+        assert_eq!(document, &Ok(expected.clone()), "scope {scope:?}");
+    }
 }

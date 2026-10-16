@@ -8,6 +8,10 @@ use jig_test_connector::{self as connector, ClientDocument, ClientSubject};
 use jig_test_domain as root;
 use skein_lib::{ReplyTo, Token};
 
+const OWN_WATCHER: u64 = 56;
+const DEPLOYMENT_WATCHER: u64 = 57;
+const UNKNOWN_SUBJECT: u64 = 900;
+
 fn world(seed: u64) -> World {
     let mut world = World::new(seed, false);
     world.watches = Some(watches::Parties::new(seed, world.store.applied, false, world.sign_in.expect("signed in")));
@@ -169,4 +173,74 @@ fn a_connector_subject_ends_when_its_object_does() {
     );
     assert_eq!(received(&world, 51).len(), 1, "the missing object never produces another document");
     world.watches.as_ref().expect("story fixture supplies this value").finish();
+}
+
+#[test]
+fn an_own_scope_watch_is_admitted_on_the_sign_in_alone() {
+    let mut world = world(884);
+    world.send(root::Event::Core(core::Event::People(jig_domain_people::Event::Roles {
+        project: 1,
+        holdings: Box::new([]),
+    })));
+    watches::application(&mut world, OWN_WATCHER, ApplicationScope::Own, 1, ClientSubject::Deployment);
+    let [ClientDocument::Deployment { outbox, .. }] = received(&world, OWN_WATCHER).as_slice() else {
+        panic!("own document")
+    };
+    assert!(outbox.is_empty());
+    world.watches.as_ref().expect("watch parties").finish();
+}
+
+#[test]
+fn a_deployment_scope_watch_without_a_deployment_role_is_refused() {
+    let mut world = world(885);
+    let env = skein_lib::Env {
+        now: skein_lib::Time::ZERO,
+        wall: skein_lib::Wall::EPOCH,
+        limits: jig_core_world::effects::fixture(885, false).1,
+    };
+    root::step(
+        &mut world.domain,
+        &env,
+        root::Event::Core(core::Event::Watch {
+            watcher: Token::new(DEPLOYMENT_WATCHER),
+            sign_in: world.sign_in.expect("signed in"),
+            subject: core::documents::Watched::Application {
+                scope: ApplicationScope::Deployment,
+                connector: 1,
+                subject: Token::new(UNKNOWN_SUBJECT),
+            },
+            window: core::documents::Window { rows: 1, after: None },
+        }),
+    );
+    let mut out = skein_lib::Queue::with_capacity(16);
+    root::release(&mut world.domain, &env, &mut out);
+    let mut refusals = Vec::new();
+    while let Some(request) = out.pop() {
+        if let root::Request::Now(core::Now::WatchRefused { watcher, why }) = request {
+            refusals.push((watcher, why));
+        }
+    }
+    assert_eq!(refusals, [(Token::new(DEPLOYMENT_WATCHER), core::WatchRefusal::NotAllowed)]);
+}
+
+#[test]
+fn an_application_read_carries_its_window_to_the_connector() {
+    let mut world = world(886);
+    let path = jig_test_connector_world::path(1, 2);
+    world.send(root::Event::Connector {
+        number: 1,
+        event: connector::Event::Adopt { project: 1, resource: path.clone(), role: connector::ResourceRole::Owned },
+    });
+    reads::application_window(
+        &mut world,
+        1,
+        ApplicationScope::Project(1),
+        1,
+        ClientSubject::Project { project: 1 },
+        core::documents::Window { rows: 1, after: Some(core::documents::Cursor::Number { number: 1 }) },
+    );
+    let receipt = &world.reads.as_ref().expect("read parties").application_receipts[0];
+    let Ok(ClientDocument::Project { resources, .. }) = &receipt.3 else { panic!("project rows") };
+    assert_eq!(resources.len(), 1);
+    assert_eq!(resources.get(0).expect("second resource").path, path);
 }

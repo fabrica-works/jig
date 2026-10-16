@@ -7,10 +7,22 @@ use jig_domain_views as views;
 use jig_test_connector as connector;
 use skein_lib::{Decision, Env, Queue, ReplyTo, Token};
 
+pub(crate) fn window(value: core::documents::Window) -> connector::ClientWindow {
+    connector::ClientWindow {
+        rows: value.rows,
+        after: match value.after {
+            Some(core::documents::Cursor::Number { number }) => Some(connector::ClientCursor::Number(number)),
+            Some(core::documents::Cursor::Inbox { .. }) => Some(connector::ClientCursor::Unknown),
+            None => None,
+        },
+    }
+}
+
 pub(crate) fn scope(value: core::documents::ApplicationScope) -> connector::ClientScope {
     match value {
         core::documents::ApplicationScope::Project(project) => connector::ClientScope::Project(project),
         core::documents::ApplicationScope::Deployment => connector::ClientScope::Deployment,
+        core::documents::ApplicationScope::Own => connector::ClientScope::Own,
     }
 }
 
@@ -116,6 +128,7 @@ pub(crate) fn read(
     scope: connector::ClientScope,
     read: Token,
     party: u64,
+    window: core::documents::Window,
     work: &mut Queue<Work>,
 ) {
     let mut reply = Some(reply);
@@ -123,7 +136,7 @@ pub(crate) fn read(
     connector::step(
         crate::numbered(domain, number),
         &Env { now: env.now, wall: env.wall, limits: env.limits.connector },
-        connector::Event::ReadDocument { scope, read, party },
+        connector::Event::ReadDocument { scope, read, party, window: self::window(window) },
         &mut out,
     );
     for _ in 0..out.len() {

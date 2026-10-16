@@ -173,6 +173,8 @@ pub enum ApplicationScope {
     Project(u32),
     /// A party must hold a deployment role.
     Deployment,
+    /// The signed-in party's values across projects, without a role check.
+    Own,
 }
 
 impl ApplicationScope {
@@ -182,6 +184,7 @@ impl ApplicationScope {
         match self {
             Self::Project(project) => project,
             Self::Deployment => 0,
+            Self::Own => unreachable!("own scope has no project"),
         }
     }
 }

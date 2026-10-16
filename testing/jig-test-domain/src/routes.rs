@@ -116,11 +116,17 @@ fn route_ask(
                 work.push(Work::Connector { number, event: connector::Event::DocumentForget { subject } });
             }
         }
-        core::Ask::Document { watcher, scope, subject, party } => work.push(Work::Connector {
+        core::Ask::Document { watcher, scope, subject, party, window } => work.push(Work::Connector {
             number,
-            event: connector::Event::Document { watcher, scope: crate::client_documents::scope(scope), subject, party },
+            event: connector::Event::Document {
+                watcher,
+                scope: crate::client_documents::scope(scope),
+                subject,
+                party,
+                window: crate::client_documents::window(window),
+            },
         }),
-        core::Ask::Read { reply, scope, read, party } => crate::client_documents::read(
+        core::Ask::Read { reply, scope, read, party, window } => crate::client_documents::read(
             domain,
             env,
             decision,
@@ -129,6 +135,7 @@ fn route_ask(
             crate::client_documents::scope(scope),
             read,
             party,
+            window,
             work,
         ),
         core::Ask::Application { request, token, owner, person, project, role, retention } => {

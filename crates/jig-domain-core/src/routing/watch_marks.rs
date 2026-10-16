@@ -4,7 +4,7 @@
 //! no state snapshots and coalesce in a set. Once projection handoffs finish,
 //! the views child asks for documents from the decision's final live state.
 
-use crate::documents::{Proposer, Subject};
+use crate::documents::{ApplicationScope, Proposer, Subject};
 use crate::{Core, Limits, Request, Requests};
 use jig_domain_people as people;
 use jig_domain_tasks as tasks;
@@ -412,7 +412,7 @@ fn visibility_end(core: &Core, binding: &crate::WatchBinding) -> Option<views::E
     let subject = &core.view_names.get(binding.subject).expect("bound subject").subject;
     match subject {
         Subject::Application { scope, .. } => {
-            if core.people.role(binding.party, scope.project()).is_some() {
+            if *scope == ApplicationScope::Own || core.people.role(binding.party, scope.project()).is_some() {
                 None
             } else {
                 Some(views::End::NotAllowed)

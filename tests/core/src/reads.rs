@@ -184,6 +184,24 @@ pub fn application(
     connector: u16,
     subject: jig_test_connector::ClientSubject,
 ) {
+    application_window(
+        world,
+        number,
+        scope,
+        connector,
+        subject,
+        jig_domain_core::documents::Window { rows: 16, after: None },
+    );
+}
+
+pub fn application_window(
+    world: &mut World,
+    number: u64,
+    scope: jig_domain_core::documents::ApplicationScope,
+    connector: u16,
+    subject: jig_test_connector::ClientSubject,
+    window: jig_domain_core::documents::Window,
+) {
     world.reads.as_mut().expect("read parties").queued.push_back(20_000 + number);
     world.send(root::Event::ReadApplication {
         reply: ReplyTo::new(Token::new(20_000 + number)),
@@ -191,6 +209,7 @@ pub fn application(
         scope,
         number: connector,
         subject,
+        window,
     });
 }
 

@@ -7,6 +7,19 @@ use skein_lib::{List, Queue, Token};
 pub enum ClientScope {
     Project(u32),
     Deployment,
+    Own,
+}
+
+/// Requested slice of connector-owned rows; other cursor kinds are unknown.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct ClientWindow {
+    pub rows: u32,
+    pub after: Option<ClientCursor>,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum ClientCursor {
+    Number(u64),
+    Unknown,
 }
 
 /// The root gives this owner's typed subject a fresh opaque name.
@@ -135,18 +148,26 @@ fn resources(
     limits: &Limits,
     project: u32,
     paths: &[crate::Path],
+    window: ClientWindow,
 ) -> Result<List<ClientResource>, DocumentMissing> {
     let mut values = List::with_capacity(limits.resources_per_task);
-    for path in paths {
+    for (index, path) in paths.iter().enumerate() {
+        if !in_window(
+            window,
+            u64::try_from(index).expect("bounded resource index").checked_add(1).expect("bounded row"),
+            values.len(),
+        ) {
+            continue;
+        }
         values.push(resource(domain, project, path)?).expect("admitted task resource count");
     }
     Ok(values)
 }
 
-fn effects(domain: &Domain, limits: &Limits, task: Option<u64>) -> List<crate::OutboxEntry> {
+fn effects(domain: &Domain, limits: &Limits, task: Option<u64>, window: ClientWindow) -> List<crate::OutboxEntry> {
     let mut effects = List::with_capacity(limits.entries);
     for (_, entry) in &domain.outbox.entries {
-        if task.is_none() || task == Some(entry.task) {
+        if (task.is_none() || task == Some(entry.task)) && in_window(window, entry.number, effects.len()) {
             effects.push(entry.clone()).expect("bounded outbox entries");
         }
     }
@@ -181,7 +202,13 @@ fn make(
     scope: ClientScope,
     token: Token,
     _party: u64,
+    window: ClientWindow,
 ) -> Result<ClientDocument, DocumentMissing> {
+    let after = match window.after {
+        None => 0,
+        Some(ClientCursor::Number(number)) => number,
+        Some(ClientCursor::Unknown) => return Err(DocumentMissing::Unknown),
+    };
     let subject = domain.client_subjects.get(&token).ok_or(DocumentMissing::Unknown)?;
     match subject {
         ClientSubject::Object { project, object } => {
@@ -208,8 +235,8 @@ fn make(
                 task: *number,
                 procedure: domain.procedures.get(number).cloned(),
                 result: domain.results.get(number).copied(),
-                resources: resources(domain, limits, *project, paths)?,
-                effects: effects(domain, limits, Some(*number)),
+                resources: resources(domain, limits, *project, paths, window)?,
+                effects: effects(domain, limits, Some(*number), window),
             })
         }
         ClientSubject::Result { project, task: number } => {
@@ -243,26 +270,30 @@ fn make(
             scoped(scope, *project)?;
             Ok(ClientDocument::Hold {
                 task: *number,
-                resources: resources(domain, limits, *project, task(domain, *project, *number)?)?,
-                effects: effects(domain, limits, Some(*number)),
+                resources: resources(domain, limits, *project, task(domain, *project, *number)?, window)?,
+                effects: effects(domain, limits, Some(*number), window),
             })
         }
         ClientSubject::Project { project } => {
             scoped(scope, *project)?;
             let mut resources = List::with_capacity(limits.adoptions);
-            for ((owner, path), _) in &domain.adoptions {
-                if owner == project {
-                    resources.push(resource(domain, *project, path)?).expect("bounded adoptions");
+            for (index, specification) in domain.config.resources.iter().enumerate() {
+                let row = u64::try_from(index).expect("bounded resource index").checked_add(1).expect("bounded row");
+                if row > after
+                    && resources.len() < window.rows
+                    && domain.adoptions.get(&(*project, specification.path.clone())).is_some()
+                {
+                    resources.push(resource(domain, *project, &specification.path)?).expect("bounded adoptions");
                 }
             }
             Ok(ClientDocument::Project { project: *project, resources })
         }
         ClientSubject::Deployment => {
-            if scope != ClientScope::Deployment {
+            if scope != ClientScope::Deployment && scope != ClientScope::Own {
                 return Err(DocumentMissing::Unknown);
             }
             Ok(ClientDocument::Deployment {
-                outbox: effects(domain, limits, None),
+                outbox: effects(domain, limits, None, window),
                 subject_limit: limits.values,
                 staged_limit: limits.staged,
                 request_budget: DiagnosticAvailability::NotKept,
@@ -272,6 +303,15 @@ fn make(
     }
 }
 
+fn in_window(window: ClientWindow, number: u64, count: u32) -> bool {
+    let after = match window.after {
+        Some(ClientCursor::Number(number)) => number,
+        None | Some(ClientCursor::Unknown) => 0,
+    };
+    number > after && count < window.rows
+}
+
+#[expect(clippy::too_many_arguments, reason = "construction carries its owner and requested slice")]
 pub(crate) fn document(
     domain: &Domain,
     limits: &Limits,
@@ -279,9 +319,10 @@ pub(crate) fn document(
     scope: ClientScope,
     subject: Token,
     party: u64,
+    window: ClientWindow,
     out: &mut Queue<Request>,
 ) {
-    let document = make(domain, limits, scope, subject, party);
+    let document = make(domain, limits, scope, subject, party, window);
     out.push(Request::Document { watcher, subject, document });
 }
 
@@ -291,9 +332,10 @@ pub(crate) fn read(
     scope: ClientScope,
     read: Token,
     party: u64,
+    window: ClientWindow,
     out: &mut Queue<Request>,
 ) {
-    let answer = make(domain, limits, scope, read, party);
+    let answer = make(domain, limits, scope, read, party, window);
     domain.client_subjects.remove(&read);
     out.push(Request::ReadAnswered { read, answer });
 }

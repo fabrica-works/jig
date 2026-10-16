@@ -165,6 +165,7 @@ pub fn to_root(
                 scope: scope(subject),
                 number: family,
                 subject,
+                window: jig_domain_core::documents::Window { rows, after: None },
             })
         }
         ToApplication::Watch { watcher, sign_in, family, version, record } => {

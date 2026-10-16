@@ -503,9 +503,9 @@ pub enum Event {
     /// The paced watch ended; forget its owner binding.
     DocumentForget { subject: Token },
     /// Make the current whole document for one due delivery.
-    Document { watcher: Token, scope: crate::ClientScope, subject: Token, party: u64 },
+    Document { watcher: Token, scope: crate::ClientScope, subject: Token, party: u64, window: crate::ClientWindow },
     /// Answer one admitted client read in the same decision.
-    ReadDocument { scope: crate::ClientScope, read: Token, party: u64 },
+    ReadDocument { scope: crate::ClientScope, read: Token, party: u64, window: crate::ClientWindow },
     /// The root leaves a decoded application value with this owner before admission.
     ApplicationPrepare { owner: Token, value: crate::ApplicationRequest },
     /// Drop an unconsumed prepared value after keyed admission.

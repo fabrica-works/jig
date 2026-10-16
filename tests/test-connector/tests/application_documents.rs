@@ -27,6 +27,7 @@ fn document(world: &mut World, token: Token) -> Result<ClientDocument, connector
         scope: ClientScope::Project(1),
         subject: token,
         party: 1,
+        window: connector::ClientWindow { rows: 16, after: None },
     });
     let [Request::Document { watcher, subject, document }] = requests.as_slice() else { panic!("one whole document") };
     assert_eq!(*watcher, Token::new(50));
@@ -89,7 +90,12 @@ fn a_panel_read_waits_for_the_commit_it_reflects() {
     assert!(marked(&requests, panel));
     assert!(world.records.contains_key(&connector::RecordKey::Task(4)), "the world journals names before answering");
     let commits = world.commits;
-    let requests = world.event(Event::ReadDocument { scope: ClientScope::Project(1), read: panel, party: 1 });
+    let requests = world.event(Event::ReadDocument {
+        scope: ClientScope::Project(1),
+        read: panel,
+        party: 1,
+        window: connector::ClientWindow { rows: 16, after: None },
+    });
     let [
         Request::ReadAnswered {
             read,
@@ -203,7 +209,12 @@ fn every_part_is_owned_scoped_and_read_without_mutating_its_records() {
         let token = prepare(&mut world, 20 + index as u64, subject);
         let scope =
             if subject == ClientSubject::Deployment { ClientScope::Deployment } else { ClientScope::Project(1) };
-        let requests = world.event(Event::ReadDocument { scope, read: token, party: 1 });
+        let requests = world.event(Event::ReadDocument {
+            scope,
+            read: token,
+            party: 1,
+            window: connector::ClientWindow { rows: 16, after: None },
+        });
         let [Request::ReadAnswered { answer: Ok(document), .. }] = requests.as_slice() else {
             panic!("known owner part")
         };
@@ -240,7 +251,12 @@ fn every_part_is_owned_scoped_and_read_without_mutating_its_records() {
     assert_eq!(*staged_limit, jig_test_connector_world::LIMITS.staged);
     assert_eq!(world.records, records, "every part reads its source without new persistence");
     let token = prepare(&mut world, 30, ClientSubject::Panel { project: 2, task: 4 });
-    let requests = world.event(Event::ReadDocument { scope: ClientScope::Project(2), read: token, party: 1 });
+    let requests = world.event(Event::ReadDocument {
+        scope: ClientScope::Project(2),
+        read: token,
+        party: 1,
+        window: connector::ClientWindow { rows: 16, after: None },
+    });
     assert!(
         matches!(requests.as_slice(), [Request::ReadAnswered { answer: Err(connector::DocumentMissing::Unknown), .. }]),
         "the typed scope must also match the actual owner record"
@@ -281,7 +297,12 @@ fn an_outbox_part_uses_the_retained_entry_and_marks_its_removal() {
     assert_eq!(description.price, Some(3));
     assert_eq!(world.records, records, "description does not stage an effect");
     let wrong = prepare(&mut world, 2, ClientSubject::Outbox { project: 2, entry: 3 });
-    let read = world.event(Event::ReadDocument { scope: ClientScope::Project(2), read: wrong, party: 1 });
+    let read = world.event(Event::ReadDocument {
+        scope: ClientScope::Project(2),
+        read: wrong,
+        party: 1,
+        window: connector::ClientWindow { rows: 16, after: None },
+    });
     assert!(matches!(
         read.as_slice(),
         [Request::ReadAnswered { answer: Err(connector::DocumentMissing::Unknown), .. }]
@@ -322,7 +343,12 @@ fn a_resource_less_procedure_panel_keeps_its_actual_project_across_restart() {
         }
         let records = world.records.clone();
         let panel = prepare(&mut world, 90, ClientSubject::Panel { project: 7, task: 9 });
-        let requests = world.event(Event::ReadDocument { scope: ClientScope::Project(7), read: panel, party: 1 });
+        let requests = world.event(Event::ReadDocument {
+            scope: ClientScope::Project(7),
+            read: panel,
+            party: 1,
+            window: connector::ClientWindow { rows: 16, after: None },
+        });
         let [
             Request::ReadAnswered {
                 read,
@@ -361,7 +387,14 @@ fn a_resource_less_procedure_panel_refuses_an_inferred_or_changed_project() {
     ] {
         let panel = prepare(&mut world, 90, ClientSubject::Panel { project, task });
         assert!(matches!(
-            world.event(Event::ReadDocument { scope, read: panel, party: 1 }).as_slice(),
+            world
+                .event(Event::ReadDocument {
+                    scope,
+                    read: panel,
+                    party: 1,
+                    window: connector::ClientWindow { rows: 16, after: None }
+                })
+                .as_slice(),
             [Request::ReadAnswered { answer: Err(connector::DocumentMissing::Unknown), .. }]
         ));
     }
@@ -380,7 +413,14 @@ fn a_resource_less_procedure_panel_refuses_an_inferred_or_changed_project() {
     world.event(Event::Unnamed { task: 9 });
     let panel = prepare(&mut world, 90, ClientSubject::Panel { project: 7, task: 9 });
     assert!(matches!(
-        world.event(Event::ReadDocument { scope: ClientScope::Project(7), read: panel, party: 1 }).as_slice(),
+        world
+            .event(Event::ReadDocument {
+                scope: ClientScope::Project(7),
+                read: panel,
+                party: 1,
+                window: connector::ClientWindow { rows: 16, after: None }
+            })
+            .as_slice(),
         [Request::ReadAnswered { answer: Err(connector::DocumentMissing::Unknown), .. }]
     ));
 }
@@ -412,7 +452,12 @@ fn a_resource_less_proposals_description_keeps_its_authentic_project_across_rest
         }
         let before = world.records.clone();
         let token = prepare(&mut world, 1, ClientSubject::Effect { project: 1, proposal: 7 });
-        let requests = world.event(Event::ReadDocument { scope: ClientScope::Project(1), read: token, party: 1 });
+        let requests = world.event(Event::ReadDocument {
+            scope: ClientScope::Project(1),
+            read: token,
+            party: 1,
+            window: connector::ClientWindow { rows: 16, after: None },
+        });
         let [Request::ReadAnswered { answer: Ok(value), .. }] = requests.as_slice() else {
             panic!("the retained proposal supplies its own scope without task names")
         };
@@ -433,7 +478,12 @@ fn a_resource_less_proposals_description_keeps_its_authentic_project_across_rest
         }
         for (number, project, scope) in [(2, 2, ClientScope::Project(2)), (3, 1, ClientScope::Project(2))] {
             let token = prepare(&mut world, number, ClientSubject::Effect { project, proposal: 7 });
-            let requests = world.event(Event::ReadDocument { scope, read: token, party: 1 });
+            let requests = world.event(Event::ReadDocument {
+                scope,
+                read: token,
+                party: 1,
+                window: connector::ClientWindow { rows: 16, after: None },
+            });
             assert!(matches!(
                 requests.as_slice(),
                 [Request::ReadAnswered { answer: Err(connector::DocumentMissing::Unknown), .. }]

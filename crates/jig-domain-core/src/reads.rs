@@ -258,14 +258,16 @@ pub(crate) fn start(core: &mut Core, env: &Env<Limits>, reply: ReplyTo, sign_in:
         return refused_application(reply, &read, why);
     };
     match &read {
-        Read::Application { scope, connector, read: name } => {
-            if core.people.role(party, scope.project()).is_none() || !core.connectors.as_ref().contains(connector) {
+        Read::Application { scope, connector, read: name, window } => {
+            if (*scope != documents::ApplicationScope::Own && core.people.role(party, scope.project()).is_none())
+                || !core.connectors.as_ref().contains(connector)
+            {
                 return refused_application(reply, &read, Why::Unknown);
             }
             let mut out = Queue::with_capacity(2);
             out.push(Request::Ask {
                 connector: *connector,
-                ask: crate::Ask::Read { reply, scope: *scope, read: *name, party },
+                ask: crate::Ask::Read { reply, scope: *scope, read: *name, party, window: *window },
             });
             out.push(Request::Decided);
             return Requests::Out(out);

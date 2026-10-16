@@ -177,6 +177,7 @@ pub enum Event {
         scope: core::documents::ApplicationScope,
         number: u16,
         subject: connector::ClientSubject,
+        window: core::documents::Window,
     },
     /// A protocol-decoded application value with its independently computed digest.
     Application {
@@ -505,8 +506,8 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event) {
         Event::WatchApplication { watcher, sign_in, scope, number, subject, window } => {
             decide(domain, env, Work::WatchApplication { watcher, sign_in, scope, number, subject, window });
         }
-        Event::ReadApplication { reply, sign_in, scope, number, subject } => {
-            decide(domain, env, Work::ReadApplication { reply, sign_in, scope, number, subject });
+        Event::ReadApplication { reply, sign_in, scope, number, subject, window } => {
+            decide(domain, env, Work::ReadApplication { reply, sign_in, scope, number, subject, window });
         }
         Event::CallAnswered { to, call } => decide(domain, env, Work::CallAnswered { to, call }),
         Event::Connector { number, event } => decide(domain, env, Work::Connector { number, event }),
@@ -621,7 +622,7 @@ fn decide(domain: &mut Domain, env: &Env<Limits>, first: Work) {
                     window,
                 }));
             }
-            Work::ReadApplication { reply, sign_in, scope, number, subject } => {
+            Work::ReadApplication { reply, sign_in, scope, number, subject, window } => {
                 let token = Token::new(domain.next_payload);
                 domain.next_payload = domain.next_payload.checked_add(1).expect("root read token room");
                 if number == 1 || number == 2 {
@@ -630,7 +631,7 @@ fn decide(domain: &mut Domain, env: &Env<Limits>, first: Work) {
                 work.push(Work::Core(core::Event::Read {
                     reply,
                     sign_in,
-                    read: core::reads::Read::Application { scope, connector: number, read: token },
+                    read: core::reads::Read::Application { scope, connector: number, read: token, window },
                 }));
             }
             Work::Application { reply_to, sign_in, key, project, number, digest, value } => {

@@ -180,11 +180,11 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::DocumentForget { subject } => {
             domain.client_subjects.remove(&subject);
         }
-        Event::Document { watcher, scope, subject, party } => {
-            crate::client_documents::document(domain, &env.limits, watcher, scope, subject, party, out);
+        Event::Document { watcher, scope, subject, party, window } => {
+            crate::client_documents::document(domain, &env.limits, watcher, scope, subject, party, window, out);
         }
-        Event::ReadDocument { scope, read, party } => {
-            crate::client_documents::read(domain, &env.limits, scope, read, party, out);
+        Event::ReadDocument { scope, read, party, window } => {
+            crate::client_documents::read(domain, &env.limits, scope, read, party, window, out);
         }
         Event::ApplicationPrepare { owner, value } => domain.application.prepare(owner, value),
         Event::ApplicationDrop { owner } => domain.application.drop(owner),

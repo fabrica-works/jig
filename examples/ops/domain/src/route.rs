@@ -115,7 +115,12 @@ fn event_in(
             work.push(Work::Core(core::Event::Read {
                 reply,
                 sign_in,
-                read: core::reads::Read::Application { scope, connector: number, read: token },
+                read: core::reads::Read::Application {
+                    scope,
+                    connector: number,
+                    read: token,
+                    window: core::documents::Window { rows: env.limits.core.documents.rows, after: None },
+                },
             }));
         }
         Event::Application { reply_to, sign_in, key, project, digest, value } => {
@@ -376,10 +381,10 @@ fn core_ask(
 ) {
     match ask {
         core::Ask::DropDocument { subject } => crate::client_documents::forget(domain, number, subject, work),
-        core::Ask::Document { watcher, scope, subject, party } => {
+        core::Ask::Document { watcher, scope, subject, party, window: _ } => {
             crate::client_documents::ask_document(domain, number, watcher, scope, subject, party, work);
         }
-        core::Ask::Read { reply, scope, read, party } => {
+        core::Ask::Read { reply, scope, read, party, window: _ } => {
             crate::client_documents::read(domain, env, decision, number, reply, scope, read, party, work);
         }
         core::Ask::Application { request, token, owner, person, project, role, retention } => {
