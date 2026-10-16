@@ -20,7 +20,7 @@ fn note_project(scope: &notes::Scope) -> u32 {
 
 pub(super) fn scope_allowed(core: &Core, party: u64, scope: &Scope) -> bool {
     match scope {
-        Scope::Tasks { .. } => false,
+        Scope::Tasks { query } => documents::task_query::admission(core, party, query).is_ok(),
         Scope::Goals { project } | Scope::Notes { project } | Scope::Spend { project } => {
             core.people.role(party, *project).is_some()
         }
@@ -264,6 +264,9 @@ pub(super) fn live_page(core: &Core, limits: &Limits, party: u64, read: &Read, d
                 Some(after) => {
                     Some(Cursor::Live { scope: Scope::Tasks { query: value.query }, after, store_after: None })
                 }
+                None if super::ended::ended_part(&value.query) != super::ended::EndedPart::None => {
+                    Some(Cursor::Store { scope: Scope::Tasks { query: value.query }, after: None })
+                }
                 None => None,
             };
             return Answer::Page(Box::new(Page { rows, before: None, next, cut: false, inbox_selection: None }));
@@ -498,6 +501,9 @@ pub(super) fn from_store(
         }
     }
     if is_page(&range.scope) {
+        if let Scope::Tasks { .. } = range.scope {
+            page.cut = page.rows.is_empty() && page.next.is_some();
+        }
         Answer::Page(Box::new(page))
     } else if let Scope::Reply { .. } = &range.scope {
         Answer::None(Why::Gone)
@@ -927,6 +933,7 @@ fn page_row(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Opt
                 | tasks::Funder::Recurring { .. } => Ok(None),
             }
         }
+        Scope::Tasks { query } => super::ended::line(core, limits, range.party, query, &row),
         Scope::Goals { project } => super::indexed::goal_row(core, limits, *project, &row),
         Scope::Conversations => super::indexed::conversation_row(core, limits, range, &row),
         Scope::Inbox { group, filter } => inbox_row(core, limits, range.party, *group, *filter, row),
@@ -937,8 +944,7 @@ fn page_row(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Opt
         | Scope::PersonTask { .. }
         | Scope::Result { .. }
         | Scope::Reply { .. }
-        | Scope::Turn { .. }
-        | Scope::Tasks { .. } => Ok(None),
+        | Scope::Turn { .. } => Ok(None),
     }
 }
 
@@ -1473,7 +1479,7 @@ pub(super) fn position_allowed(scope: &Scope, position: &Position) -> bool {
                     | KeyKind::Unsupported => false,
                 },
                 Scope::Conversations => super::indexed::conversation_position(position, true).is_some(),
-                Scope::Tasks { .. } => false,
+                Scope::Tasks { query } => super::ended::position(query, key),
                 Scope::Goals { project } => match key {
                     Key::Tasks(tasks::Key::Goal { project: owner, .. }) => owner == project,
                     Key::Tasks(_) | Key::Core(_) | Key::People(_) | Key::Notes(_) => false,

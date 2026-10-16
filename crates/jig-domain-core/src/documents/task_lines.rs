@@ -31,7 +31,13 @@ pub struct TaskLine {
 }
 
 /// Construct a visible task's line without retaining derived facts.
-pub fn task_line(core: &Core, limits: &Limits, party: u64, row: &tasks::TaskRecord) -> Result<TaskLine, Missing> {
+pub fn task_line(
+    core: &Core,
+    limits: &Limits,
+    party: u64,
+    row: &tasks::TaskRecord,
+    ended_read: Option<u64>,
+) -> Result<TaskLine, Missing> {
     if core.people.role(party, row.project).is_none() {
         return Err(Missing::NotAllowed);
     }
@@ -61,7 +67,8 @@ pub fn task_line(core: &Core, limits: &Limits, party: u64, row: &tasks::TaskReco
     });
     let conversation = match row.requester {
         tasks::Party::Person(requester) if row.flags.conversation => {
-            let seen = core.people.chat_seen(requester, row.number).ok_or(Missing::Unknown)?;
+            let seen = if ended { ended_read } else { core.people.chat_seen(requester, row.number) }
+                .ok_or(Missing::Unknown)?;
             let unread = row.last_reply.saturating_sub(seen);
             let count = u32::try_from(unread.min(u64::from(limits.people.inbox_entries))).expect("bounded unread");
             Some(ConversationRead {

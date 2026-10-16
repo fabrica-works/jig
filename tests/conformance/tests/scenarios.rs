@@ -88,3 +88,8 @@ fn conversation_ends_while_read_chosen_cut_ends_the_story() {
         .expect("results mark and forget survive their commit cut")
         .expect("application binds the conversation story");
 }
+
+#[test]
+fn query_watched_while_tasks_end_chosen_cut_ends_the_story() {
+    chosen_cut(Scenario::QueryWatchedWhileTasksEnd);
+}

@@ -371,3 +371,94 @@ fn a_subtree_cursor_advances_past_rows_whose_owner_is_gone() {
     assert!(rows.is_empty());
     assert_eq!(next, None);
 }
+
+fn task_query() -> documents::TaskQuery {
+    documents::TaskQuery {
+        project: None,
+        requester: Some(tasks::Party::Person(ALICE)),
+        root: None,
+        parent: None,
+        label: Some(2),
+        phase: None,
+        executor: None,
+        tracked: None,
+        order: documents::QueryOrder::Number,
+    }
+}
+
+fn ended_index_store() -> Store {
+    let mut store = fixtures::opened();
+    for (task, at, label, listed) in [(GOAL, 10, 2, true), (CHILD, 30, 3, true), (GRANDCHILD, 50, 2, false)] {
+        let core::Record::Tasks(tasks::Stored::Ended(mut owner)) = owner_at(task, at, PROJECT) else {
+            panic!("ended owner")
+        };
+        owner.label = label;
+        owner.flags.listed = listed;
+        keep(
+            &mut store,
+            &[
+                core::Record::Tasks(tasks::Stored::Ended(owner)),
+                core::Record::Tasks(tasks::Stored::EndedByParty(tasks::EndedByParty {
+                    party: ALICE,
+                    label,
+                    ended_at: skein_lib::Wall::from_nanos(at),
+                    task,
+                })),
+            ],
+        );
+        if listed {
+            keep(
+                &mut store,
+                &[core::Record::Tasks(tasks::Stored::EndedByProject(tasks::EndedByProject {
+                    project: PROJECT,
+                    label,
+                    ended_at: skein_lib::Wall::from_nanos(at),
+                    task,
+                }))],
+            );
+        }
+    }
+    store
+}
+
+#[test]
+fn ended_tasks_read_one_partys_label_newest_first() {
+    let mut store = ended_index_store();
+    let result = load(&mut store, fixtures::read(ALICE, reads::Scope::Tasks { query: task_query() }));
+    let (rows, next) = page(result);
+    assert_eq!(owner_numbers(&rows).as_ref(), [GRANDCHILD, GOAL]);
+    assert_eq!(next, None);
+}
+
+#[test]
+fn a_projects_ended_part_holds_listed_tasks_only() {
+    let mut store = ended_index_store();
+    let query = documents::TaskQuery { project: Some(PROJECT), requester: None, label: None, ..task_query() };
+    let result = load(&mut store, fixtures::read(ALICE, reads::Scope::Tasks { query }));
+    let (rows, next) = page(result);
+    assert_eq!(owner_numbers(&rows).as_ref(), [GOAL, CHILD]);
+    assert_eq!(next, None);
+}
+
+#[test]
+fn an_ended_query_joins_its_requesters_position_for_another_reader() {
+    let mut store = ended_index_store();
+    let core::Record::Tasks(tasks::Stored::Ended(mut owner)) = owner_at(GOAL, 10, PROJECT) else {
+        panic!("ended owner")
+    };
+    owner.label = 2;
+    owner.flags.conversation = true;
+    owner.last_reply = 3;
+    keep(
+        &mut store,
+        &[
+            core::Record::Tasks(tasks::Stored::Ended(owner)),
+            core::Record::People(jig_domain_people::Stored::EndedRead { task: GOAL, party: ALICE, through: 2 }),
+        ],
+    );
+    let result = load(&mut store, fixtures::read(ALICE + 1, reads::Scope::Tasks { query: task_query() }));
+    let (rows, next) = page(result);
+    assert_eq!(owner_numbers(&rows).as_ref(), [GRANDCHILD, GOAL]);
+    assert_eq!(rows[1].ended_read, Some(2));
+    assert_eq!(next, None);
+}

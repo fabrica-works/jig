@@ -1,5 +1,6 @@
 //! The shared scenarios bound to two test connectors and independent hosts.
 mod conversations;
+pub(crate) mod queries;
 use crate::{Config, Testing, actions::World};
 use jig_conformance::referee::{Promise, Violation};
 use jig_conformance::scenarios::{Action, Scenario, ScenarioApplication};
@@ -101,7 +102,14 @@ impl ScenarioApplication for Testing {
         Some(Config::new(
             seed,
             false,
-            if matches!(scenario, Scenario::ShrinkingPool | Scenario::ConversationEndsWhileRead) { 3 } else { 2 },
+            if matches!(
+                scenario,
+                Scenario::ShrinkingPool | Scenario::ConversationEndsWhileRead | Scenario::QueryWatchedWhileTasksEnd
+            ) {
+                3
+            } else {
+                2
+            },
             Some(scenario),
         ))
     }
@@ -117,6 +125,7 @@ impl ScenarioApplication for Testing {
     fn check(world: &World, scenario: Scenario) -> Result<(), Violation> {
         let applied = world.systems[0].observed().iter().filter(|effect| effect.applied).count();
         match scenario {
+            Scenario::QueryWatchedWhileTasksEnd => queries::check_ending(world),
             Scenario::ConversationEndsWhileRead => conversations::check_ending(world),
             Scenario::RacingDecisions => crate::actions::check_racing_decisions(world),
             Scenario::LateCopy => check(
@@ -211,6 +220,9 @@ impl Continuation {
     pub(crate) fn advance(&mut self, world: &mut World) -> Result<bool, Violation> {
         loop {
             match self.action {
+                Action::WatchQuery | Action::EndTask | Action::ReadEnded => {
+                    return queries::advance(world, self.action, &mut self.phase);
+                }
                 Action::Conversation { .. } | Action::Turn | Action::MarkTurns | Action::MarkResults => {
                     conversations::action(world, self.action);
                     return Ok(false);
@@ -644,7 +656,10 @@ fn atomic(world: &mut World, action: Action) -> Result<(), Violation> {
         | Action::Period(_)
         | Action::Resume
         | Action::PartyAmend
-        | Action::RunAmend => unreachable!("continued action"),
+        | Action::RunAmend
+        | Action::WatchQuery
+        | Action::EndTask
+        | Action::ReadEnded => unreachable!("continued action"),
     }
     Ok(())
 }

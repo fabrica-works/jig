@@ -162,7 +162,7 @@ pub fn lines(core: &Core, limits: &Limits, party: u64, query: &TaskQuery, window
             break;
         }
         let row = core.tasks.task(*number).expect("ordered live task");
-        lines.push(super::task_lines::task_line(core, limits, party, row)?).expect("bounded query window");
+        lines.push(super::task_lines::task_line(core, limits, party, row, None)?).expect("bounded query window");
         last = Some(Cursor::Number { number: *number });
     }
     if !taking {

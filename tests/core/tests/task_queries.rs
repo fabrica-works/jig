@@ -234,7 +234,7 @@ fn a_task_query_reads_a_partys_live_tasks_in_last_activity_order() {
     ask(&mut world, QUERY_READ, reads::Read::Tasks { query, from: None });
     assert_eq!(jig_core_world::fixtures::query_numbers(&world), [older, newer]);
     let reads::Answer::Page(page) = latest(&world) else { panic!("query page") };
-    assert_eq!(page.next, None);
+    assert_eq!(page.next, Some(reads::Cursor::Store { scope: reads::Scope::Tasks { query }, after: None }));
 }
 
 #[test]
@@ -256,7 +256,7 @@ fn a_task_query_read_pages_its_live_group_and_then_ends() {
     ask(&mut world, QUERY_NEXT_READ, reads::Read::Tasks { query, from });
     assert_eq!(jig_core_world::fixtures::query_numbers(&world), expected[1..]);
     let reads::Answer::Page(page) = latest(&world) else { panic!("last query page") };
-    assert_eq!(page.next, None);
+    assert_eq!(page.next, Some(reads::Cursor::Store { scope: reads::Scope::Tasks { query }, after: None }));
 }
 
 #[test]

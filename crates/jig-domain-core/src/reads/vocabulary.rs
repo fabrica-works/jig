@@ -59,7 +59,7 @@ pub struct Filter {
 /// Identity of a store query, independent of its continuation.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Scope {
-    /// A task query's live group; no stored range yet.
+    /// A task query's live group and its indexed ended group.
     Tasks { query: documents::TaskQuery },
     /// One retained task.
     Task { task: u64 },

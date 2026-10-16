@@ -64,8 +64,12 @@ impl Config {
             limits.core.people.inbox_recipients = 24;
             jig_core_world::world::edit_role(&mut config.core, |role| role.authority.budget.spend = 80);
         }
-        if self.scenario == Some(Scenario::ConversationEndsWhileRead) {
+        if matches!(self.scenario, Some(Scenario::ConversationEndsWhileRead | Scenario::QueryWatchedWhileTasksEnd)) {
             limits.core.fleet.slots = 3;
+        }
+        if self.scenario == Some(Scenario::QueryWatchedWhileTasksEnd) {
+            limits.core.tasks.tasks = 3;
+            limits.core.tasks.project_tasks = 3;
         }
         if self.scenario == Some(Scenario::StandingTask) {
             limits.core.tasks.tasks = 5;
@@ -140,6 +144,7 @@ pub struct Neighbours {
     pub saved_deadline: Option<Wall>,
     fault: negative::Fault,
     routes: Vec<jig_conformance::referee::Observed>,
+    query: scenarios::queries::State,
 }
 
 fn env(config: &Config, clock: Clock) -> Env<root::Limits> {
@@ -216,6 +221,10 @@ impl Application for Testing {
 
     fn peers(config: &Config, _: u64) -> Neighbours {
         let script = || match config.scenario {
+            Some(Scenario::QueryWatchedWhileTasksEnd) => {
+                Box::new([Script::Wait, Script::Finish { report: b"query task done".as_slice().into() }])
+                    as Box<[Script]>
+            }
             Some(Scenario::ConversationEndsWhileRead) => Box::new([
                 Script::Wait,
                 Script::Turn { body: b"conversation turn".as_slice().into(), cost: 1, read: None },
@@ -307,6 +316,7 @@ impl Application for Testing {
             saved_deadline: None,
             fault: config.fault,
             routes: Vec::new(),
+            query: scenarios::queries::State::default(),
         }
     }
 
@@ -450,6 +460,7 @@ impl Application for Testing {
                 Delivery::Held(_) => unreachable!("held handled above"),
             };
         };
+        scenarios::queries::delivered(peers, store, &delivery);
         peers.observer.delivered(clock.now, &mut delivery);
         peers.peers.delivered(&delivery);
         match delivery {

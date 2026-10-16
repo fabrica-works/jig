@@ -21,6 +21,7 @@ pub use vocabulary::{
 };
 pub(crate) mod activity;
 mod answers;
+pub mod ended;
 pub mod indexed;
 mod rows;
 pub use rows::row_key;
@@ -378,7 +379,6 @@ fn read_start(read: &Read, party: u64) -> Option<ReadStart> {
             reverse_live = true;
         }
         Some(Cursor::ConversationsStart) if target != Some(Scope::Conversations) => return None,
-        Some(Cursor::Store { scope: Scope::Tasks { .. }, .. }) => return None,
         Some(Cursor::Store { scope, after }) => {
             if Some(scope) != target.as_ref() {
                 return None;

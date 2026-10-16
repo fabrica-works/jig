@@ -9,9 +9,12 @@ use skein_lib::List;
 
 fn owner_number(key: &core::Key) -> Result<(u64, bool), Failure> {
     match key {
-        core::Key::Tasks(tasks::Key::EndedDelegate { task, .. } | tasks::Key::ConversationOldest { task, .. }) => {
-            Ok((*task, false))
-        }
+        core::Key::Tasks(
+            tasks::Key::EndedDelegate { task, .. }
+            | tasks::Key::ConversationOldest { task, .. }
+            | tasks::Key::EndedByParty { task, .. }
+            | tasks::Key::EndedByProject { task, .. },
+        ) => Ok((*task, false)),
         core::Key::Tasks(tasks::Key::Update { task, .. } | tasks::Key::ConversationNewest { task, .. }) => {
             Ok((task.value(), false))
         }
@@ -30,8 +33,6 @@ fn owner_number(key: &core::Key) -> Result<(u64, bool), Failure> {
             | tasks::Key::Milestone { .. }
             | tasks::Key::Activity { .. }
             | tasks::Key::Result { .. }
-            | tasks::Key::EndedByParty { .. }
-            | tasks::Key::EndedByProject { .. }
             | tasks::Key::Delegate { .. },
         )
         | core::Key::Core(_)
@@ -218,12 +219,16 @@ fn joined(
         };
         inbox = Some(documents::Cursor::Inbox { task: number, object, at });
     }
+    let position_party = match (&range.scope, owner.requester) {
+        (reads::Scope::Tasks { .. }, tasks::Party::Person(requester)) => requester,
+        _ => range.party,
+    };
     let ended_read = if owner.flags.conversation
         && let tasks::Phase::Ended(_) = owner.phase
     {
         match joins::get(
             store,
-            &core::Key::People(jig_domain_people::Key::EndedRead { task: owner.number, party: range.party }),
+            &core::Key::People(jig_domain_people::Key::EndedRead { task: owner.number, party: position_party }),
             spent,
         )? {
             Some(core::Record::People(jig_domain_people::Stored::EndedRead { through, .. })) => Some(through),
@@ -273,6 +278,15 @@ fn family(
 }
 
 pub(super) fn ended_delegates(
+    store: &mut Store,
+    range: &reads::Range,
+    spent: &mut Spent,
+) -> Result<reads::Loaded, Failure> {
+    let selected = intervals::scope(range.party, &range.scope).ok_or(Failure::Corrupt)?;
+    family(store, range, &selected, spent)
+}
+
+pub(super) fn ended_tasks(
     store: &mut Store,
     range: &reads::Range,
     spent: &mut Spent,

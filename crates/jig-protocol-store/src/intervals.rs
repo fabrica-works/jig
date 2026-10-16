@@ -95,7 +95,7 @@ pub fn scope(party: u64, scope: &core::reads::Scope) -> Option<Box<[Range]>> {
             }
         }
         Scope::EndedDelegates { task } => Box::new([numbered_prefix(&[keys::JIG, 1, 17], *task)]),
-        Scope::Tasks { .. } => Box::new([]),
+        Scope::Tasks { query } => ended_tasks(query),
         Scope::Goals { project } => Box::new([numbered_prefix(&[keys::JIG, 1, 16], u64::from(*project))]),
         Scope::Spend { project } => Box::new([
             numbered_prefix(&[keys::JIG, 1, 2, 3], u64::from(*project)),
@@ -147,4 +147,23 @@ fn numbered_prefix(prefix: &[u8], number: u64) -> Range {
 #[must_use]
 pub fn delegates(requester: u64) -> Range {
     numbered_prefix(&[keys::JIG, 1, 18], requester)
+}
+
+fn ended_tasks(query: &core::documents::TaskQuery) -> Box<[Range]> {
+    use core::reads::ended::{EndedPart, ended_part};
+    let (tag, owner, label) = match ended_part(query) {
+        EndedPart::ByParty { party, label } => (19, party, label),
+        EndedPart::Delegates { requester } => return Box::new([numbered_prefix(&[keys::JIG, 1, 17], requester)]),
+        EndedPart::ByProject { project, label } => (20, u64::from(project), label),
+        EndedPart::None => return Box::new([]),
+    };
+    let mut writer = KeyWriter::new(u32::MAX);
+    for byte in [keys::JIG, 1, tag] {
+        writer.tag(byte);
+    }
+    writer.u64(owner);
+    if let Some(label) = label {
+        writer.u64(u64::from(label));
+    }
+    Box::new([Range::prefix(&writer.finish().expect("fixed-width ended prefix"))])
 }

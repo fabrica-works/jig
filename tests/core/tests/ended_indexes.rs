@@ -118,3 +118,133 @@ fn an_ended_chat_saves_no_project_row() {
         0
     );
 }
+
+fn query_page(
+    world: &mut jig_core_world::effects::World,
+    query: core::documents::TaskQuery,
+    from: Option<core::reads::Cursor>,
+) -> core::reads::Page {
+    jig_core_world::reads::ask(world, 900, core::reads::Read::Tasks { query, from });
+    let core::reads::Answer::Page(page) = jig_core_world::reads::latest(world) else { panic!("query page") };
+    *page.clone()
+}
+
+fn query_ended(
+    world: &mut jig_core_world::effects::World,
+    query: core::documents::TaskQuery,
+) -> Vec<core::documents::TaskLine> {
+    let mut from = Some(core::reads::Cursor::Store { scope: core::reads::Scope::Tasks { query }, after: None });
+    let mut lines = Vec::new();
+    for _ in 0..8 {
+        let page = query_page(world, query, from.take());
+        for row in page.rows.into_boxed() {
+            let core::reads::PageRow::Line(line) = row else { panic!("task line") };
+            lines.push(line);
+        }
+        from = page.next;
+        if from.is_none() {
+            return lines;
+        }
+    }
+    panic!("bounded ended group");
+}
+
+fn chats(world: &mut jig_core_world::effects::World) -> Vec<u64> {
+    let mut numbers = Vec::new();
+    for index in 0..3 {
+        if index != 0 {
+            jig_core_world::stories::reads::request(
+                world,
+                80 + index,
+                jig_domain_people::Ask::StartChat { project: 1, words: b"indexed chat".as_slice().into() },
+            );
+        }
+        numbers.push(world.assigned.as_ref().expect("chat").task);
+        world.turn(1, 1, None, b"unread indexed reply");
+        world.advance(skein_lib::Duration::from_secs(1));
+        jig_core_world::fixtures::finish_chat(world, 1, b"indexed result");
+    }
+    numbers.reverse();
+    numbers
+}
+
+#[test]
+fn a_partys_ended_chats_page_newest_first_after_a_restart() {
+    let mut world = world(830);
+    let expected = chats(&mut world);
+    world.restart(830, false);
+    let lines = query_ended(&mut world, jig_core_world::fixtures::OWN_TASKS);
+    assert_eq!(lines.iter().map(|line| line.chip.number).collect::<Vec<_>>(), expected);
+    for line in lines {
+        assert_eq!(
+            line.conversation,
+            Some(core::documents::ConversationRead { seen: 0, unread: core::documents::Count::Known(1) })
+        );
+    }
+}
+
+#[test]
+fn a_projects_ended_goals_page_from_the_project_index() {
+    let mut world = world(831);
+    jig_core_world::fixtures::finish_chat(&mut world, 0, b"chat complete");
+    jig_core_world::stories::reads::request(&mut world, 100, jig_core_world::stories::offers::goal(100));
+    let goal = world.assigned.as_ref().expect("goal").task;
+    jig_core_world::fixtures::finish_chat(&mut world, 0, b"goal complete");
+    let query = core::documents::TaskQuery { project: Some(1), requester: None, ..jig_core_world::fixtures::OWN_TASKS };
+    assert_eq!(query_ended(&mut world, query).iter().map(|line| line.chip.number).collect::<Vec<_>>(), [goal]);
+}
+
+#[test]
+fn a_parents_ended_delegates_page_by_task() {
+    let mut world = world(832);
+    let parent = world.assigned.as_ref().expect("parent").task;
+    world.delegate();
+    world.observed(13);
+    let child = world.procedure.expect("ended delegate");
+    let query = core::documents::TaskQuery {
+        project: Some(1),
+        requester: None,
+        parent: Some(parent),
+        ..jig_core_world::fixtures::OWN_TASKS
+    };
+    assert_eq!(query_ended(&mut world, query).iter().map(|line| line.chip.number).collect::<Vec<_>>(), [child]);
+}
+
+#[test]
+fn a_filter_past_the_prefix_comes_back_cut_and_goes_on() {
+    let mut world = world(833);
+    chats(&mut world);
+    let query = core::documents::TaskQuery { tracked: Some(true), ..jig_core_world::fixtures::OWN_TASKS };
+    let page = query_page(
+        &mut world,
+        query,
+        Some(core::reads::Cursor::Store { scope: core::reads::Scope::Tasks { query }, after: None }),
+    );
+    assert!(page.rows.is_empty());
+    assert!(page.cut);
+    let Some(core::reads::Cursor::Store { scope, after: Some(position) }) = page.next else {
+        panic!("examined continuation")
+    };
+    assert_eq!(scope, core::reads::Scope::Tasks { query });
+    let core::reads::Position::Owner(core::Key::Tasks(tasks::Key::EndedByParty { .. })) = position else {
+        panic!("party index")
+    };
+    let last = query_page(&mut world, query, Some(core::reads::Cursor::Store { scope, after: Some(position) }));
+    assert!(last.rows.is_empty());
+    assert_eq!(last.next, None);
+    assert!(!last.cut);
+}
+
+#[test]
+fn a_query_naming_no_index_says_it_has_no_ended_part() {
+    let mut world = world(834);
+    let query = core::documents::TaskQuery {
+        phase: Some(core::documents::PhaseClass::Working),
+        ..jig_core_world::fixtures::OWN_TASKS
+    };
+    let page = query_page(&mut world, query, None);
+    assert_eq!(page.rows.len(), 1);
+    assert_eq!(page.next, None);
+    let unindexed = core::documents::TaskQuery { requester: None, phase: None, ..query };
+    assert_eq!(core::reads::ended::ended_part(&unindexed), core::reads::ended::EndedPart::None);
+}
