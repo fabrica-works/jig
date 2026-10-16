@@ -1,6 +1,6 @@
 # The client's protocol
 
-Provisional, 2026-10-10, revised 2026-10-15. What carries jig's API
+Provisional, 2026-10-10, revised 2026-10-16. What carries jig's API
 (`../client/domain/contract.md`) as messages and bytes, whatever the
 transport: jig's messages; the clients' component's messages toward the
 application's transport and server, and the client's link toward its
@@ -214,7 +214,7 @@ the engine's messages to the client as they come.
 
 | Message | Carries | Answered with |
 |---|---|---|
-| a keyed request | its key; the request's owner, version and record: one of jig's operations, a compound request, or an application's request | an answer (section 5) |
+| a keyed request | its key; the request's owner, version and record: one of jig's operations, a compound request, or an application's request naming its scope | an answer (section 5) |
 | a read | its owner, version and record: one of jig's reads, or an application's naming its scope and window | the document, a page, or why there is none (section 6) |
 | opening a watch | the stream's name; the client's name for the watch; the subject, with its owner, version and window | admitted, or refused (section 7) |
 | closing a watch | the stream's name and the watch's | closed, once the engine has ended it |
@@ -240,11 +240,14 @@ out, to the transport:
   Reply { exchange, message }                  one record: an answer, a page, a watch admitted or refused, a sign-in's credential
   Streamed { stream, message }                 the hello, a delivery, a run's text, a heartbeat, a watch ended
   StreamEnded { stream, why }                  signed out, or the engine stopping
-  Minted { exchange, credential } | MintRefused { exchange, why }
+  Minted { exchange, credential, expires } | MintRefused { exchange, why }
 out, to the application's startup:
   Link { secret }                              the printed link's one-time secret, each time one is drawn (section 8)
 ```
 
+- **`Minted` carries the sign-in's expiry,** its wall time, beside the
+  credential, so the server gives the credential the sign-in's life, as
+  the default mapping's cookie's `Max-Age` (17.3).
 - **Names.** `exchange` and `stream` are the transport's, which the
   component gives back and never reads. The stream's name that watches
   carry is the component's, drawn when the stream opens and sent in its
@@ -327,8 +330,10 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
   not ready are *again*; signed out, or a credential the engine does not
   know, is *signed out*; an exchange that failed, timed out or ended
   without a whole answer is *lost*. A final answer that does not decode
-  is *lost* too, and reported: the engine has it, and sending the
-  request again under its key fetches it again. A version not served is
+  is *lost* too, and reported in the request's progress, retrying
+  because its answer did not decode (`../client/domain/client.md`,
+  section 6): the engine has it, and sending the request again under
+  its key fetches it again. A version not served is
   neither final nor sent again: the request is held, kept and unsent, for
   its owner's version (section 9).
 
@@ -417,11 +422,11 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
   configuration numbers it (`configuration.md`, section 3, providers),
   the subject there, and a login and a name for display. The component
   makes a sign-in for it, as above, and answers `Minted` with its
-  credential; or `MintRefused`, saying why: a provider the configuration
-  does not give as one of the application's (of kind application), the
-  printed link's and the deployment's being jig's own; a login or a name
-  not UTF-8 or past its bound; not ready, while the engine stops; busy,
-  at the people child's limits.
+  credential and the sign-in's expiry; or `MintRefused`, saying why: a
+  provider the configuration does not give as one of the application's
+  (of kind application), the printed link's and the deployment's being
+  jig's own; a login or a name not UTF-8 or past its bound; not ready,
+  while the engine stops; busy, at the people child's limits.
   - *From the server only.* `Mint` is a message of the application's
     server code; no message a client sends becomes one, and a transport
     never makes one from a client's bytes.
@@ -505,7 +510,10 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
 - **The envelope is fixed.** A message's owner and version, and the
   answer *version not served*, are encoded the same in every version of
   jig's wire, so any engine reads them from any client, and any client
-  reads that answer from any engine.
+  reads that answer from any engine. *Version not served* is the first
+  variant, tag 0, of each answer that carries it (a keyed request's, a
+  read's, a watch's opening's, and a watch's end), and its bytes never
+  change: a later version adds its variants after it.
 - **The engine serves a range** of each owner's versions, which its
   stream's hello states (`../client/domain/contract.md`, section 8). To
   serve a version is to keep its generated codecs and their translations
@@ -562,11 +570,11 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
 - **On the same messages and stream:** a keyed request names its owner,
   jig or the application's family; a read and a subject name theirs; a
   streamed message's record is its watch's owner's.
-- **Scopes:** an application's read or subject names its scope, a
-  project, the deployment, or the party's own, and its window
-  (`../client/domain/contract.md`, 7.5). The party's own names no party:
-  the core names it from the sign-in (section 7), and admits it on the
-  credential alone.
+- **Scopes:** an application's request, read or subject names its
+  scope, a project, the deployment, or the party's own, and a read or
+  subject its window (`../client/domain/contract.md`, 3.3 and 7.5).
+  The party's own names no party: the core names it from the sign-in
+  (section 7), and admits it on the credential alone.
 - **The engine's side** decodes an application's record with the
   application's wire, through the protocol layer's routing, before the
   engine's root sees it; on the way out it encodes the connector's
@@ -588,9 +596,11 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
 - **jig's native shell,** `jig-client-shell-native`: skein's HTTP client
   on skein's io, with the default mapping's client end,
   `jig-client-protocol-http`, which cuts the stream's body into
-  messages; a file for the small store; for Linux and for the worlds
-  that make bytes real. With no presentation, it is a service's shell,
-  and a one-shot command's.
+  messages; a file for the small store, and a private file for the
+  credential, which it writes when its host gives it one to keep, or
+  none, and reads back at start for its host to give as held (section
+  8); for Linux and for the worlds that make bytes real. With no
+  presentation, it is a service's shell, and a one-shot command's.
 - **The reference UI's browser parts,** `jig-client-shell-web`: the
   default mapping's client end over fetch, the printed link's sign-in,
   and jig's look, over skein's `skein-ui-web`, for `ops` and jig's test
@@ -777,7 +787,8 @@ prefix; jig's test application mounts it at `/jig`.
   application's server after a `Minted`, through the engine end's
   function that sets the same cookie; `HttpOnly`, `Secure` but on
   loopback, `SameSite=Strict`, its `Path` the prefix, its life the
-  sign-in's; cleared by signing out. The engine end reads it as each
+  sign-in's, as `Max-Age`, from the sign-in's expiry, which a `Minted`
+  carries (4.2); cleared by signing out. The engine end reads it as each
   exchange's credential.
 - **As `Authorization: Bearer`,** everywhere else: the credential in
   base64url, and a service's credential on its sign-in route the same

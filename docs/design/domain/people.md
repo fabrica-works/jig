@@ -1,6 +1,6 @@
 # Parties
 
-Provisional, 2026-10-07, revised 2026-10-15. How people, and the
+Provisional, 2026-10-07, revised 2026-10-16. How people, and the
 services that act like them, take part: who they are and the credentials
 they sign in with, what their role in a project lets them do, the
 operations they ask of the engine and what waits for them, the
@@ -186,7 +186,7 @@ The operations as the client sends them are
 
 | Operation | Needs | Becomes |
 |---|---|---|
-| `Create`, a batch | member, within their role's authority and their pool (authority.md, 8.4); its dependencies, references and inputs within their reach, and a holder for its escalations (below) | its tasks, with their dependencies, checked whole and made at once (tasks.md, section 4), each with the fields it names (tasks.md, section 3); the party their requester and their funder; a budget given `AsAllowed` resolved, and what was given answered (authority.md, section 7) |
+| `Create`, a batch | member, within their role's authority and their pool (authority.md, 8.4); its dependencies and inputs within their reach, and a holder for its escalations (below) | its tasks, with their dependencies, checked whole and made at once (tasks.md, section 4), each with the fields it names (tasks.md, section 3); the party their requester and their funder; a budget given `AsAllowed` resolved, and what was given answered (authority.md, section 7) |
 | `Propose`, an action | member; a batch or an amendment beyond their authority, of a kind a role the project's policy names may accept | a proposal of theirs, waiting for that role (tasks.md, section 9), its number and to whom answered |
 | `Withdraw` | their own pending proposal | withdrawn (tasks.md, section 9) |
 | `Message` | the task in their tree, or maintainer | words in its inbox (tasks.md, 8.1), their message number answered |
@@ -245,10 +245,11 @@ The operations as the client sends them are
   so, as a proposal nobody may accept is: a held task never waits for
   nobody.
 - **Where a party reaches.** A party's `Create` may name, as a
-  dependency, a reference or an input, a task in their tree, or any task
-  of the project for a maintainer, as a task's batch reaches its
-  delegates and the tasks it was introduced to (tasks.md, 8.5). Their
-  other operations reach what the table says.
+  dependency, a live task, or, as an input, an ended task's result: a
+  task in their tree, or any task of the project for a maintainer, as a
+  task's batch reaches its delegates and the tasks it was introduced to
+  (tasks.md, section 4 and 8.5); a batch gives its tasks no references.
+  Their other operations reach what the table says.
 - **What only parties do,** by design: carry out person tasks (`Take`,
   `HandBack`, and `Answer` with a result), stop runs, move tasks to
   themselves, mark what they have seen, and run the project (5.2).
@@ -359,9 +360,10 @@ entry naming the task or proposal it is and its project:
     keyed by party and task, loaded at start.
   - *When it ends,* the decision that ends it moves the position to this
     child's family of ended read positions, keyed by task and party and
-    loaded on demand; the child holds none of them in memory, and a read
-    of the conversation, a task query's row or the inbox joins it by a
-    point read (`../protocol/store.md`, 4.4 and 7.4).
+    loaded on demand; the child holds none of them in memory, a read of
+    the conversation or a task query's row joins it by a point read, and
+    the inbox's census reads the family through at start
+    (`../protocol/store.md`, 4.4, 7.2 and 7.4).
   - *It is erased with the task:* by retention when the task is kept, or
     at once when it is forgotten once read.
 - **A task's retention class** says what becomes of it once it has ended
@@ -374,9 +376,12 @@ entry naming the task or proposal it is and its project:
     result and, for a conversation, its turns, and no live task names it,
     its record and its read position are erased in one decision, so no
     restart sees one without the other, and nothing read comes back
-    unread. Its other remains go at retention's next pass
-    (`../protocol/store.md`, 7.4 and 11.1). A task whose requester is not
-    a party is kept, whatever its class: no party reads it.
+    unread. The `Seen` after which it is read forgets it, in its own
+    decision, while the party's inbox holds it (the bound below);
+    retention's next pass forgets one it holds no longer. Its other
+    remains go at retention's next pass (`../protocol/store.md`, 7.4 and
+    11.1). A task whose requester is not a party is kept, whatever its
+    class: no party reads it.
 - **Unread counts.** A conversation's unread turns are counted from its
   requester's position and carried on its task line; `me` counts what
   waits for the party, and their unread updates

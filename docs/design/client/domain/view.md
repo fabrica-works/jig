@@ -1,6 +1,6 @@
 # The view
 
-Provisional, 2026-10-09, revised 2026-10-15. `jig-client-view`: the
+Provisional, 2026-10-09, revised 2026-10-16. `jig-client-view`: the
 reference UI, jig's optional presentation, for `ops` and jig's test
 application. It is built on the public client alone, `jig-client` and
 its helpers (client.md, sections 4 and 19), and on skein's UI kit,
@@ -980,7 +980,8 @@ read by the application: ui.sections(), ui.shown()
   6): the card says so, and where to look.
 - **Not kept.** A request whose record the client could not write was
   never sent (client.md, section 11): the card says so, and offers it
-  again.
+  again. So it does for one answered unconfirmed, sent before `me` named
+  the party (client.md, section 6).
 - **Words are a request too.** A composer's words are a `Message`, shown
   as being sent while pending, as sent once answered, and as read once a
   committed turn took them (section 9).

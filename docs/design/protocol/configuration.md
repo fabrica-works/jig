@@ -1,6 +1,6 @@
 # Configuration
 
-Provisional, 2026-10-10, revised 2026-10-15. What an engine and a worker
+Provisional, 2026-10-10, revised 2026-10-16. What an engine and a worker
 are told when they start, as far as jig defines its shape: the parts of
 `../domain/engine.md`, section 14 that are jig's, the templates an
 application defines its shapes of work with, how an application's
@@ -184,7 +184,10 @@ the application's main (its shell)
   label or tracked: they are the shape's identity, which lists and the
   engine's behaviour key on. An override naming a template the
   configuration does not define is refused when the policy is changed,
-  and a seeded policy's refuses the start.
+  and a seeded policy's refuses the start. An override of the default
+  priority of a template whose tasks are untracked is kept, and shown
+  with the policy, but has no effect: the merged template `me` serves
+  stays untracked.
 - **The engine never expands or checks one.** The core keeps the
   configuration's templates, and each policy's overrides, only to serve
   each project's merged templates in `me`
@@ -354,3 +357,26 @@ secret, and every credential its runs need comes with their assignments
   `access_token`, a string; `expires_at`, the Unix time in seconds at
   which it lapses; and `account_id`, a string, where the account's
   provider names one. Nothing else.
+- **A template,** in the `templates` member (3.1), is one JSON object
+  whose members are all required, `null` where it has none: `number`;
+  `name`; `executor`, `{"charter": n}` or `"chosen"`; `contract`,
+  `{"report": {"words": n}}`, `{"verdict": {"choices": [{"code": c,
+  "words": n}]}}` or `{"change": {"connector": c, "kind": k, "words":
+  n}}`, a connector's result (an approval names a state its procedure
+  gives, so no template makes one); `shallower`, the levels of
+  delegation its authority is below the creator's role; `budget`,
+  `{"amount": n}`, `{"as_allowed": cap}`, the cap a number or `null`, or
+  `"given"`; `deadline`, `"none"`, `{"span_ms": n}` or `"given"`;
+  `tracked`, `null` or `{"priority": n}`; `conversation` and `listed`,
+  booleans; `retention`, `"kept"` or `"forgotten_once_read"`; `label`;
+  and `grace_ms`, or `null`. jig's chat: `{"number": 1, "name": "chat",
+  "executor": {"charter": 1}, "contract": {"report": {"words": 512}},
+  "shallower": 1, "budget": {"as_allowed": null}, "deadline": "none",
+  "tracked": null, "conversation": true, "listed": false, "retention":
+  "kept", "label": 1, "grace_ms": 5000}`.
+- **A policy's override of a template,** in its `templates` list, is one
+  JSON object: `template`, its number; and `executor`, `budget`,
+  `deadline` and `priority`, each in the template's form (`priority` a
+  number), or `null` where the template's own stands:
+  `{"template": 2, "executor": null, "budget": null, "deadline": null,
+  "priority": 5}`.

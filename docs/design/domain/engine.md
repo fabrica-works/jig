@@ -1,6 +1,6 @@
 # The core
 
-Provisional, 2026-10-07, revised 2026-10-15. What jig's core is, as a
+Provisional, 2026-10-07, revised 2026-10-16. What jig's core is, as a
 domain layer inside an application's engine: its parts and how they fit,
 what crosses between it and the application's root, how a decision
 reaches the store before anything leaves the engine, how it restarts,
@@ -557,11 +557,12 @@ answered after the commit:
 |---|---|---|
 | `delegate` | makes a batch of tasks as its delegates, each with what a party's `Create` names, its label and flags among them (tasks.md, section 4) | their numbers and their specs' revisions, and what a budget given `AsAllowed` was given; refused, and why; beyond authority, naming what it lacked and whether a proposal could be accepted |
 | `message` | words, a question or an answer to a task it references | sent; no reference; the inbox full; too large for a run to read |
-| `amend`, `release` | a task below it: an amendment naming its spec's revision as the run last read it, but for a change of priority alone; a release naming its hold's, and, for an effect held uncertain, whether to make it again (tasks.md, 5.5 and section 7) | done, with the revision it made; refused, and why; moved, with what it is now |
+| `amend`, `release` | a task below it: an amendment naming its spec's revision as the run last read it, but for a change of priority alone; a release naming its hold's, and, for an effect held uncertain, whether to make it again (tasks.md, 5.5 and section 7) | done, with the task's spec revision after the commit, the one its next amendment names (a release moves none); refused, and why; moved, with what it is now |
 | `cancel` | a task below it and its tree, with a reason, and a grace if the run gives one, within the tasks child's bound: the task is asked to finish first (tasks.md, section 7) | done; refused, and why |
 | `decide` | accepts, rejects or passes up a proposal or an escalation waiting for it, an escalation naming its hold's revision (tasks.md, section 9) | done; beyond its authority, and passed up; moved, with what it is now |
 | `propose` | an action beyond its authority, with a reason: a batch, an amendment, an effect, or a widening of its own authority (authority.md, section 9) | proposed, and to whom; refused, when nobody may accept it (tasks.md, section 9) |
 | `withdraw` | its own pending proposal (tasks.md, section 9) | withdrawn; already decided, and how |
+| `introduce` | two tasks it references, each given a reference to the other, within their limits (tasks.md, 8.5) | done; no reference; refused, and why |
 | `subscribe`, `unsubscribe` | a topic a connector offers to agents (connectors.md, 5.3), under a read grant on the resources the connector says it concerns (authority.md, 8.5); a referenced task's state; a timer (tasks.md, 8.4) | done; refused, and why |
 | `effect` | one of a connector's kinds of effect offered to agents (connectors.md, 4.5) | made, with what it made; committed and pending, past the call's deadline; waiting for a verdict; failed |
 | `note`, `recall` | writes a note in a scope; reads entries by name or by a search (section 10) | written; the entries |
@@ -594,24 +595,26 @@ Beyond authority, a call is refused naming what it lacked; the run may
 their own, so a person is never asked by accident.
 
 **The tools are a party's operations.** Each engine tool that acts on
-tasks is one of the operations a party's requests make (people.md, 5.1),
-checked by the same rules (authority.md, 8.1 and 8.4), so a run and a
-party do the same things to the same tasks: `delegate` is `Create`;
+tasks, `introduce` aside, is one of the operations a party's requests
+make (people.md, 5.1), checked by the same rules (authority.md, 8.1 and
+8.4), so a run and a party do the same things to the same tasks:
+`delegate` is `Create`;
 `message` is `Message`, and `Answer` for a question; `propose`,
 `withdraw`, `amend`, `cancel`, `release` and `decide` are theirs by
 name. What only parties do stays theirs (people.md, 5.1): carrying out
 person tasks, stopping runs, moving tasks, marking what they have seen,
-and running the project.
+and running the project. `introduce` is a task's alone: only a task
+holds references (tasks.md, 8.5).
 
 **A call names what it saw.** An amendment, a release and a decision
 about an escalation name the revision the run was shown, as a party's
 do: its brief shows its delegates' revisions (section 9), the messages
-relayed to it show a hold's (hosts.md, section 9), and `delegate`'s and
-`amend`'s answers show the revisions they made. One whose object has
-moved since is answered moved, with what it is now, and the run decides
-again on that; a change of priority alone names none, and the first
-commit decides (tasks.md, section 7). So no call writes over a change its
-run was not shown.
+relayed to it show a hold's (hosts.md, section 9), and `delegate`'s,
+`amend`'s and `release`'s answers show the spec's revisions they leave.
+One whose object has moved since is answered moved, with what it is
+now, and the run decides again on that; a change of priority alone
+names none, and the first commit decides (tasks.md, section 7). So no
+call writes over a change its run was not shown.
 
 ### 7.4 Answers, waiting and parking
 

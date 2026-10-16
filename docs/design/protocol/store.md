@@ -1,6 +1,6 @@
 # The store
 
-Provisional, 2026-10-12, revised 2026-10-15. What lies beneath the
+Provisional, 2026-10-12, revised 2026-10-16. What lies beneath the
 engine's store vocabulary: skein's key-value store, embedded in the
 engine's process, holds every record jig's core and the application
 keep, transcripts are files beside it, and secrets are in a second
@@ -194,6 +194,7 @@ child puts live first.
 | people | parties, sign-ins (no secret), roles, projects' policies (their overrides of templates among them), read positions over results and over live conversations, answered keys within the retention | as the people child keys them; a live conversation's position by party, then task | at start |
 | people | ended conversations' read positions (7.4) | task, then party | on demand |
 | notes | entries, and an index line per entry per scope | name; scope, name | when a scope is in use; entries on demand |
+| tasks | the results' index, the inbox's census's (7.2): a row per result of a task a party requested, at its position among that party's results; the tasks child's family tag 13, past its live families | party, position | at start, by the census, past each party's read position over results |
 | tasks, people | indexes for parties' reads (7.4): each party's inbox by time; ended tasks by requester party and by project; ended delegates; a subtree's delegates | the index's own, newest first where it reads so: an ended index's by party or project, then label, ended at reversed and task | on demand |
 
 Children that keep nothing durable (the views, the fleet, authority,
@@ -344,10 +345,10 @@ root for one step at a time, and the root asks the store:
   projections, run proofs, calls, agents' conversations). It is a fixed
   list of intervals, in that order, paged and handed up typed;
 - **the inbox's census,** a step of its own once people's read positions
-  are restored: the index of what parties' inboxes show (7.4), never
-  every ended task (section 15); a reply of an ended conversation joins
-  its requester's ended read position by a point read, as a read does
-  (7.3);
+  are restored: the results' index from each party's read position over
+  results (4.4), and the family of ended read positions, one row per
+  ended conversation not yet erased (7.4), each row joined to its ended
+  task's record by a point read; never every ended task (section 15);
 - **each connector's live ranges,** as the application's byte intervals,
   handed up as bytes for its codecs;
 - **what the core never restores** (turns, terminals, history, ended
@@ -468,8 +469,9 @@ party (`../domain/people.md`, section 6):
   each;
 - *an ended one's:* the decision that ends the task moves its position
   to the family of ended read positions, keyed `(task, party)`, read on
-  demand. A read of the conversation, a task query's row and the
-  inbox's census join it by a point read (7.2, 7.3);
+  demand. A read of the conversation and a task query's row join it by
+  a point read (7.3); the inbox's census reads the family through
+  (7.2);
 - *erased with the task:* by retention, as it shrinks a kept task
   (11.1); or in the decision that forgets a task forgotten once read
   (below).
@@ -754,10 +756,11 @@ Each within jig's suites' budgets (`../../development/workflow.md`).
      history and ended tasks after its live families (stubs among
      these), decided proposals apart from pending ones, and past funding
      periods apart from live ones (4.3);
-  2. **the restart reads live work only:** the inbox's restore reads what
-     the inbox shows from an index, not every ended task, and joins an
-     ended conversation's read position by a point read, never restoring
-     ended ones (7.2);
+  2. **the restart reads live work only:** the inbox's census reads
+     unread results from the results' index and ended conversations from
+     the family of ended read positions, not every ended task, joining
+     each to its record by a point read, and restores no ended read
+     position (7.2);
   3. **indexes for parties' reads:** each party's inbox by time; ended
      tasks by requester party, and by project for those flagged listed,
      each keyed by label and ended at reversed, the flag read from the
@@ -770,9 +773,11 @@ Each within jig's suites' budgets (`../../development/workflow.md`).
   5. **fill:** with each commit's answer, and new work refused above the
      high-water mark (11.2);
   6. **retention:** by each task's retention class, summaries of ended
-     tasks kept, transcripts dropped, answered keys expired, tasks
-     forgotten once read and their remains collected, each on the
-     domain's timer (11.1);
+     tasks kept, transcripts dropped, answered keys expired, and the
+     remains of tasks forgotten once read collected, each on the
+     domain's timer (11.1); a task forgotten once read is forgotten by
+     the read mark that reads it while its party's inbox holds it, and
+     by retention's pass otherwise (`../domain/people.md`, section 6);
   7. **keys for single reads:** a question's line and its answer's, an
      escalation's hold, and a task's proposal's row in its proposer's
      history, each named by its position in its task's record, as a

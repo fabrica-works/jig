@@ -1,6 +1,6 @@
 # The client
 
-Provisional, 2026-10-09, revised 2026-10-15. `jig-client`: the client an
+Provisional, 2026-10-09, revised 2026-10-16. `jig-client`: the client an
 application holds, as a component, to reach jig's engine. It holds the
 link, the watches the application names by handle and the latest
 document of each, the application's keyed requests in skein-lib's
@@ -119,7 +119,9 @@ jig-client                        jig_client::Client: the domain and the link, c
   It knows no HTTP.
 - **`jig-client`** composes the two into `jig_client::Client`, one step
   machine, and holds jig's helpers as modules: `shapes`, `facts`,
-  `thread` and `words` (section 19).
+  `thread` and `words` (section 19). It depends on `skein-ui` for its
+  `words` module alone, whose phrases are skein-ui's phrasebook types;
+  it builds no tree, so the client stays presentation-agnostic.
 - **Builds:** the three crates and the helpers are step code under the
   strict subset, built for the host and for wasm32 (programming-model.md,
   section 10). Only `jig-protocol-transcript` links smith, the client's
@@ -202,7 +204,8 @@ read by the application: client.document(handle), client.pending(key), client.li
     written before the requests they keep are sent (section 11).
 - **Of the application,** told, never asked to act:
   - *`Link(state)`:* the link's state, whenever it changes (8.2);
-  - *`Changed { handle }`:* a newer document for the handle (8.1);
+  - *`Changed { handle }`:* a newer document for the handle, or the
+    handle behind or live again (8.1);
     *`Text { handle }`:* more of a run's text (8.3); *`Ended { handle,
     why }`:* the handle's one terminal, and why (8.1);
   - *`Page { handle, page }`:* a read's one terminal (section 7);
@@ -257,8 +260,8 @@ handles, as every presentation does (sections 7 and 8).
   - a compound request, `Compound { project, operations }`: operations
     admitted in order and committed in one decision, all or none, under
     one key and one answer (contract.md, 3.4);
-  - a family's request: its owner's number, its version and its record's
-    bytes (contract.md, 3.3).
+  - a family's request: its owner's number, its scope, its version and
+    its record's bytes (contract.md, 3.3).
 
   The client reads none of it but its owner and its size.
 - **The key is the application's name for a request:** its asker, and a
@@ -290,7 +293,10 @@ handles, as every presentation does (sections 7 and 8).
     and never queued.
 - **Progress, for showing.** `Pending { key }` says the request's
   progress changed: in flight, retrying, parked (offline, signed out, or
-  another party's), or held for its owner's version (8.2).
+  another party's), or held for its owner's version (8.2). Retrying
+  says why: busy, not ready, lost, or a final answer that did not
+  decode, which is how the client reports such an answer, once per
+  answer (`../../protocol/client.md`, section 5).
   `client.pending(key)` reads it. Whether and how it shows is the
   presentation's.
 - **One answer.** `Answered { key, outcome }` comes once per request:
@@ -306,6 +312,9 @@ handles, as every presentation does (sections 7 and 8).
     its key, says where to look;
   - *not kept,* the client's own: its record could not be written, so the
     client never sent it (section 11).
+  - *unconfirmed,* the client's own: sent before `me` named the party,
+    so no record could say whose it is. It is answered at once, and
+    nothing of it is kept or sent (section 11).
 
   Done and refused come only once the engine's commit is durable
   (`../../domain/core.md`, section 11), so the client never says done
@@ -390,7 +399,9 @@ handles, as every presentation does (sections 7 and 8).
 - **A handle's states,** which `client.document(handle)` gives beside the
   document: *opening,* no document yet; *live;* *behind,* its watch
   dropped and opening again, or changed, so the document held may be
-  old; *ended.*
+  old; *ended.* A handle that falls behind, or is live again, is told
+  `Changed { handle }`, as for a newer document: level-triggered, the
+  application reads both with `client.document(handle)`.
 - **Dropped is not ended.** A watch the stream lost, or one the engine
   let go as it stopped, is opened again after a backoff, under a fresh
   name; its handle stays, behind, and is live again at its next
@@ -555,6 +566,8 @@ for any presentation of a chat or of any agent task's activity.
   unsent, until its party returns or the retention passes and it is
   answered unknown. Whether, and how, to warn of someone else's kept
   work is the presentation's (the reference UI's: pages.md, section 8).
+  A `Send` before `me` has named the party is answered unconfirmed at
+  once, and nothing of it is kept (section 6).
 - **Versioned** with jig's store version, so a client updated since reads
   what an older one kept. A record of a version it does not read is
   dropped, and the application told (`../../protocol/client.md`, section
@@ -733,11 +746,12 @@ the durable answer and stops.
 
 Its referee: nothing answered done before the engine made it durable;
 every request sent is made once, whatever the faults; no request the
-application sent is lost, but those answered not kept; no request is
-sent before its record is stored, nor for a party not confirmed; every
-operation names a revision that a document delivered to the application
-carried; nothing beyond the client's limits is held. The reference UI's
-stories, with a person in front of a tree, are view.md's, 18.10.
+application sent is lost, but those answered not kept or unconfirmed;
+no request is sent before its record is stored, nor for a party not
+confirmed; every operation names a revision that a document delivered
+to the application carried; nothing beyond the client's limits is held.
+The reference UI's stories, with a person in front of a tree, are
+view.md's, 18.10.
 
 ## 18. Open questions
 
@@ -779,8 +793,9 @@ stories, with a person in front of a tree, are view.md's, 18.10.
 - **`thread`:** a conversation's thread (section 10).
 - **`words`:** jig's English for its enums (phases, holds, refusals, what
   a task waits on), as phrases with holes an application overrides
-  phrase by phrase; the reference UI says them through skein-ui's
-  phrasebook (view.md, section 7).
+  phrase by phrase, built with skein-ui's phrasebook types,
+  `jig-client`'s one use of skein-ui (section 3); the reference UI says
+  them through skein-ui's phrasebook (view.md, section 7).
 - **What jig adopts.** Sugar starts in an application. jig adopts it
   when a second consumer uses it, or early when it is hard to interpret
   consistently (what "waiting for you" means, how committed turns and

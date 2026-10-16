@@ -1,6 +1,6 @@
 # The client and the engine
 
-Provisional, 2026-10-09, revised 2026-10-15. jig's API: what crosses
+Provisional, 2026-10-09, revised 2026-10-16. jig's API: what crosses
 between a party's client and the engine, at the level of the two
 domains. It says who the party is; the plumbing operations a party asks,
 alone or several in one compound request, each keyed and answered once
@@ -191,9 +191,10 @@ has left (`../../domain/authority.md`, 8.1 and 8.4).
   amounts are counted, and refused as lacking budget where it would give
   nothing (`../../domain/tasks.md`, section 4). It is the one piece of
   plumbing templates need (3.6).
-- **Where a party may reach.** A party's `Create` may depend on, or
-  reference, a task in their tree, or any task of the project for a
-  maintainer; its tasks' requester is the party. An agent reaches its
+- **Where a party may reach.** A party's `Create` may depend on a live
+  task, or take an ended task's result as an input, in their tree, or
+  any task of the project for a maintainer; its tasks' requester is the
+  party. An agent reaches its
   delegates and the tasks it was introduced to (`../../domain/tasks.md`,
   8.5).
 - **A party's root has someone to escalate to.** A party may create a
@@ -224,12 +225,14 @@ this environment) is the application's (`../../domain/people.md`, 5.1):
 - **keyed alike,** in the same key space, by the same request table in
   the client (client.md, section 6);
 - **admitted by the people child** by key, as jig's are: duplicates
-  joined, the party's sign-in and their role in the request's project
-  checked; a key sent again with another request is told apart by a
-  digest of the request's encoding, which the protocol layer gives the
-  domain with it;
+  joined, the party's sign-in checked, and, by the scope the request
+  names as a read or a subject does (7.5), their role in its project,
+  their role in the deployment, or nothing more for the party's own; a
+  key sent again with another request is told apart by a digest of the
+  request's encoding, which the protocol layer gives the domain with
+  it;
 - **refused at admission with jig's refusal:** a request the people
-  child refuses there (its party's role in the request's project, a key
+  child refuses there (its party's role in the request's scope, a key
   sent again with another request, a limit), or one whose sign-in has
   ended, is answered as jig's are (section 4) and never reaches its
   connector. The client hands that answer to the application under the
@@ -345,7 +348,9 @@ this environment) is the application's (`../../domain/people.md`, 5.1):
   executor, the budget and its cap, the deadline and the default
   priority; never the flags, the label or tracked, which are the
   shape's identity. An override naming a template the configuration
-  does not define is refused when the policy is changed.
+  does not define is refused when the policy is changed. One of the
+  default priority, on a template whose tasks are untracked, is kept
+  and has no effect: the merged template stays untracked.
 - **The engine never expands or checks one.** It keeps the
   configuration's templates and each policy's overrides only to serve
   each project's merged templates in `me` (5.1). The client fills a
@@ -636,12 +641,14 @@ party reads is therefore never lost by a crash.
 - **A task query** selects tasks by a fixed set of keys, any conjunction
   of them: project; requester (a party, or a task); root; parent;
   label; phase class (working, waiting, held, closing, ended); executor
-  kind; tracked. It orders by number, last change, last activity,
-  priority, or ended at; and it reads within a window, by cursor. Its
-  rows are task lines (5.1). It is read a page at a time, and watched as
-  `tasks{query}` (7.1). A list of a party's conversations, of a
-  project's goals by priority, of a task's ended delegates, are each a
-  task query.
+  kind; tracked. It orders by number, ascending; last change or last
+  activity, latest first; priority, ascending, tracked tasks before
+  untracked; or ended at, latest first, its live group, which has no
+  end, by number ascending. Ties go by number, ascending. It reads
+  within a window, by cursor. Its rows are task lines (5.1). It is read
+  a page at a time, and watched as `tasks{query}` (7.1). A list of a
+  party's conversations, of a project's goals by priority, of a task's
+  ended delegates, are each a task query.
 - **Live first, then ended,** in two groups, each with its own cursor.
 - **Live tasks are scanned,** in the order asked: the tasks child keeps
   no secondary index, and its live tasks are bounded by its limits, so
@@ -785,7 +792,7 @@ waits for an application whose people follow its data as it comes.
 
 ### 7.5 An application's scopes and windows
 
-- **Scopes.** An application's read or subject names one:
+- **Scopes.** An application's request, read or subject names one:
   - *a project,* admitted on the party's role in it;
   - *the deployment,* admitted on their role in the deployment;
   - *the party's own,* what is the signed-in party's across projects (an

@@ -1,6 +1,6 @@
 # jig's design
 
-Provisional, 2026-10-06, revised 2026-10-15. What jig is, how an
+Provisional, 2026-10-06, revised 2026-10-16. What jig is, how an
 application is built around it, and what keeps the application's wiring
 from breaking what jig promises. This document comes first. The documents
 it lists in section 12 go deeper into each part. The mechanics are those
@@ -782,7 +782,11 @@ open (`domain/README.md`, section 5), and the client's on its own
   kit's `-client-test-<name>`, `-client-fake-<name>` or
   `-client-scripted-<name>`, and a world's name ending in `-world`. The
   project is jig, or an application under its own name: `jig-ops` for
-  `ops`.
+  `ops`. An application's name, `ops` in `jig-ops-client`, is one word,
+  and never one of jig's layer or kind words (`domain`, `protocol`,
+  `engine`, `test`, `fake`, `scripted`, `conformance`, `shell`, `view`),
+  so that a crate named `jig-<layer>-client`, such as
+  `jig-domain-client`, is no application's client.
 - **What a client crate is:** a crate that exists for the client: its
   domain, its protocol (the records it speaks, even where the engine
   reads them too), its presentation, its shells, its test kits and its

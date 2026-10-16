@@ -1,6 +1,6 @@
 # jig's client
 
-Provisional, 2026-10-09, revised 2026-10-15. The design of jig's client:
+Provisional, 2026-10-09, revised 2026-10-16. The design of jig's client:
 `jig-client`, the client an application holds to reach the engine; the
 API it speaks with the engine; how an application's client root holds it
 beside its own kinds of object; jig's helpers; jig's reference UI, the
@@ -81,8 +81,9 @@ jig-client-world, jig-client-protocol-world, jig-client-wire-world   the client'
 - **Every client crate lives under the `<project>-client` prefix,**
   jig's and an application's alike (`../../README.md`, section 15).
 - **The crate graph is the role graph,** as in the engine.
-  `jig-client-domain` depends on skein-lib alone; `jig-client` on it and
-  its link; `jig-client-view` on `jig-client` and `skein-ui`. None of
+  `jig-client-domain` depends on skein-lib alone; `jig-client` on it,
+  its link, and `skein-ui` for its `words` alone (client.md, section 3);
+  `jig-client-view` on `jig-client` and `skein-ui`. None of
   them links smith: only `jig-protocol-transcript`, below the client's
   surface, does, and it is the client's only use of smith
   (`../../README.md`, section 9).
