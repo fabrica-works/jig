@@ -162,3 +162,53 @@ fn the_frame_offers_both_charters_for_goals() {
     let frame = frame(&core, &limits);
     assert_eq!(frame.charters.get(0).expect("project charters").goals.as_slice(), [1, 2]);
 }
+
+pub(super) fn owner_creating(capacity: u32) -> crate::acts::Bounds {
+    let mut charters = List::with_capacity(capacity);
+    charters.push(1).unwrap();
+    let mut procedures = List::with_capacity(capacity);
+    for connector in [1, 2] {
+        procedures.push(crate::acts::GoalProcedure { connector, code: 1 }).unwrap();
+    }
+    crate::acts::Bounds::Goal {
+        pool_left: 500,
+        charters,
+        procedures,
+        latest: None,
+        budget: 500,
+        maximum_budget: 1000,
+        maximum_deadline: None,
+    }
+}
+
+fn hold(core: &mut Core, limits: &Limits, role: people::Role) {
+    let mut out = Queue::with_capacity(people::max_out(&limits.people));
+    people::step(
+        &mut core.people,
+        &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.people },
+        people::Event::Roles { project: 1, holdings: Box::new([people::Holding { person: 1, role }]) },
+        &mut out,
+    );
+}
+
+#[test]
+fn me_carries_a_members_creating_bounds_per_project() {
+    let (mut core, limits) = tree_core();
+    let mut policy = core.authority.policy(1).unwrap().clone();
+    policy.roles[0].number = people::Role::Member.number();
+    policy.escalation_role = Some(people::Role::Member.number());
+    let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
+    authority::step(&mut core.authority, authority::Event::Policy { project: 1, policy }, &mut out);
+    assert_eq!(out.pop(), Some(authority::PolicyFact::Changed { project: 1 }));
+    hold(&mut core, &limits, people::Role::Member);
+    let value = frame(&core, &limits);
+    assert_eq!(value.projects.get(0).unwrap().creating, Some(owner_creating(limits.documents.lines)));
+}
+
+#[test]
+fn me_carries_no_creating_bounds_for_an_observer() {
+    let (mut core, limits) = tree_core();
+    hold(&mut core, &limits, people::Role::Observer);
+    let value = frame(&core, &limits);
+    assert_eq!(value.projects.get(0).unwrap().creating, None);
+}

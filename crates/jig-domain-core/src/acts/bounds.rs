@@ -19,7 +19,7 @@ pub(crate) fn recipient(core: &Core, project: u32, kind: authority::ProposalKind
     if roles.is_empty() { None } else { Some(Recipient::Roles { project, roles }) }
 }
 
-pub(super) fn goal(core: &Core, limits: &Limits, party: u64, project: u32, held: Option<people::Role>) -> Admission {
+pub(crate) fn goal(core: &Core, limits: &Limits, party: u64, project: u32, held: Option<people::Role>) -> Admission {
     let Some(held) = held else {
         return Admission::Refused(people::Refusal::Role { held });
     };

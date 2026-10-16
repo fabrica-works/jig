@@ -85,3 +85,14 @@ fn what_each_live_task_waits_on_matches_the_reference_from_the_store() {
         assert_eq!(value.waits_on, expected, "task {task}");
     }
 }
+
+#[test]
+fn me_reads_the_pool_left_in_its_creating_bounds() {
+    let mut world = world(1203);
+    ask(&mut world, 20, reads::Read::Frame);
+    let reads::Answer::Document(document) = latest(&world) else { panic!("me document") };
+    let documents::Document::Frame(value) = document.as_ref() else { panic!("me") };
+    let project = value.projects.iter().find(|project| project.project == 1).expect("project");
+    let Some(core::acts::Bounds::Goal { pool_left, .. }) = &project.creating else { panic!("creating") };
+    assert_eq!(*pool_left, 200);
+}

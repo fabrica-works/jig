@@ -139,6 +139,7 @@ pub fn wake(value: t::WakePolicy, limits: &w::Limits) -> Result<w::OwnerWakePoli
     )
 }
 fn project(value: &d::FrameProjectRole, limits: &w::Limits) -> Result<w::ProjectRole, w::Problem> {
+    // Creating bounds are carried on the wire in jig 22.
     w::ProjectRole::new(
         limits,
         w::ProjectRoleParts {

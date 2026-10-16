@@ -105,6 +105,13 @@ pub(super) fn frame(core: &Core, limits: &Limits, party: u64) -> Result<Frame, M
                 role: role.role,
                 name: None,
                 pool,
+                creating: match crate::acts::bounds::goal(core, limits, party, role.project, Some(role.role)) {
+                    crate::acts::Admission::Bounded { within, .. } => Some(within),
+                    crate::acts::Admission::Refused(_) => None,
+                    crate::acts::Admission::Allowed | crate::acts::Admission::Proposed { .. } => {
+                        unreachable!("creating is bounded or refused")
+                    }
+                },
                 chat_budget: match core.authority.role(role.project, role.role.number()) {
                     Some(_) => {
                         core.chat_authority(role.project, party, role.role, limits.tasks.tree_tasks).budget.spend
