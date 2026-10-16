@@ -8,6 +8,7 @@ mod domain;
 pub mod limits;
 mod reads;
 mod requests;
+mod text;
 mod watches;
 /// The small-store version of keyed client request records.
 pub const TABLE_VERSION: u16 = 2;

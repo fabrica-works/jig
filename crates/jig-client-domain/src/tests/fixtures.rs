@@ -3,6 +3,12 @@ use alloc::boxed::Box;
 use skein_lib::{Duration, Env, List, Queue, Time, Token, Wall};
 pub(crate) const ME: Handle = Handle { asker: Asker::JIG, number: 1 };
 pub(crate) const TASK: Handle = Handle { asker: Asker::JIG, number: 2 };
+pub(crate) const RUN: Handle = Handle { asker: Asker::JIG, number: 4 };
+pub(crate) const RUN_ATTEMPT: u64 = 1;
+pub(crate) const FIRST_TURN: u32 = 1;
+pub(crate) const NEXT_TURN: u32 = 2;
+pub(crate) const FIRST_RETRY: u32 = 0;
+pub(crate) const NEXT_RETRY: u32 = 1;
 pub(crate) const PAGE: Handle = Handle { asker: Asker::JIG, number: 3 };
 pub(crate) const PROJECT: u32 = 1;
 pub(crate) const OTHER: Handle = Handle { asker: Asker::JIG, number: 5 };
@@ -22,6 +28,7 @@ pub(crate) fn limits() -> Limits {
         },
         ask_bytes: 16384,
         handles: 8,
+        turn_bytes: 32,        // tests/client/src/test.rs:42
         reads: 8,              // tests/client/src/test.rs:32
         watches: 8,            // tests/client/src/test.rs:23
         document_bytes: 65536, // tests/client/src/test.rs:38
@@ -264,5 +271,42 @@ impl Client {
             panic!("one read");
         };
         *read
+    }
+}
+
+pub(crate) fn run(task: u64, turn: u32, retry: u32, from: u32, bytes: &[u8]) -> Up {
+    assert_eq!(task, SUBJECT_TASK);
+    Up::Watched {
+        watch: INITIAL_TASK_WATCH,
+        event: contract::WatchEvent::Delivered(contract::Delivery::Run(Box::new(contract::RunText {
+            attempt: RUN_ATTEMPT,
+            began: Some(Wall::EPOCH),
+            turn: contract::ProvisionalTurnName { attempt: RUN_ATTEMPT, number: turn, retry },
+            from,
+            through: from.checked_add(u32::try_from(bytes.len()).unwrap()).unwrap(),
+            text: contract::Text::new(Box::from(bytes), u32::MAX).unwrap(),
+            cut: false,
+            call: None,
+        }))),
+    }
+}
+
+pub(crate) fn run_subject() -> Watchable {
+    Watchable::Jig(contract::Subject::Run { task: SUBJECT_TASK, turn: None, offset: 0 })
+}
+impl Client {
+    pub(crate) fn running() -> Self {
+        let mut c = Self::started();
+        c.step(Event::Watch { handle: RUN, subject: run_subject() });
+        c.downs();
+        c
+    }
+    pub(crate) fn run(&mut self, turn: u32, retry: u32, from: u32, bytes: &[u8]) {
+        let mut up = run(SUBJECT_TASK, turn, retry, from, bytes);
+        let Up::Watched { watch, .. } = &mut up else {
+            unreachable!("fixture run delivery");
+        };
+        *watch = self.name(run_subject());
+        self.step(Event::Up { up });
     }
 }

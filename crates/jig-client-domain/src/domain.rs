@@ -186,7 +186,7 @@ pub fn fire(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
         let w = domain.watches.get_mut(&id).expect("due watch");
         w.name = Some(name);
         w.until = None;
-        down(out, Down::Open { watch: name, subject: w.subject.clone() });
+        down(out, w.opening(name));
     }
     domain.due.clear();
     domain.flush(env, out);

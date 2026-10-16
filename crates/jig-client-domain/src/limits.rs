@@ -13,6 +13,7 @@ pub struct Limits {
     pub handles: u32,
     pub watches: u32,
     pub reads: u32,
+    pub turn_bytes: u32,
     pub document_bytes: u64,
     pub backoff: Backoff,
 }
@@ -59,6 +60,9 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(RequestTable::<crate::Key, crate::Held>::worst_case(&limits.requests)?)?
         .checked_add(Map::<crate::Key, crate::requests::PendingRequest>::worst_case(limits.requests.requests)?)?
         .checked_add(limits.requests.bytes.checked_mul(2)?)?;
+    let own = own.checked_add(
+        u64::from(limits.handles.checked_add(limits.watches)?).checked_mul(u64::from(limits.turn_bytes))?,
+    )?;
     own.checked_add(
         u64::from(limits.handles.checked_add(limits.watches)?).checked_mul(limits.document_bytes.checked_mul(2)?)?,
     )

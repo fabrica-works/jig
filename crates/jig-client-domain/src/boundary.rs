@@ -103,6 +103,7 @@ pub enum Down {
     Erase { key: RequestKey },
     Send { attempt: Token, key: RequestKey, request: Ask },
     Open { watch: Token, subject: Watchable },
+    Continue { watch: Token, subject: contract::Subject },
     Close { watch: Token },
     Read { read: Token, what: Readable },
 }
@@ -113,6 +114,7 @@ pub enum Told {
     Kept { key: Key, request: Ask },
     Dropped { count: u32 },
     Changed { handle: Handle },
+    Text { handle: Handle },
     Ended { handle: Handle, why: Why },
     Page { handle: Handle, page: Readout },
 }

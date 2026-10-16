@@ -4,6 +4,7 @@ use crate::{
     contract::{WatchEnd, WatchEvent},
     domain::tell,
 };
+use alloc::boxed::Box;
 use skein_lib::{Duration, Env, Queue, Time, Token};
 #[derive(Debug)]
 pub(crate) struct Watch {
@@ -34,10 +35,10 @@ impl Domain {
         match up {
             Up::Answer { .. } | Up::ReadDone { .. } => unreachable!("watch events only"),
             Up::Watched { event, .. } => match event {
-                WatchEvent::Delivered(value) => self.deliver(id, Latest::Jig(value), out),
+                WatchEvent::Delivered(value) => self.deliver(env, id, Latest::Jig(value), out),
                 WatchEvent::Opened | WatchEvent::Alive => {}
             },
-            Up::FamilyDelivered { record, .. } => self.deliver(id, Latest::Family(record), out),
+            Up::FamilyDelivered { record, .. } => self.deliver(env, id, Latest::Family(record), out),
             Up::WatchEnded { end, .. } => self.ended(env, id, end, out),
         }
     }
@@ -49,11 +50,29 @@ impl Domain {
             }
         }
     }
-    fn deliver(&mut self, id: u64, latest: Latest, out: &mut Queue<Request>) {
+    fn deliver(&mut self, env: &Env<Limits>, id: u64, latest: Latest, out: &mut Queue<Request>) {
         let w = self.watches.get_mut(&id).expect("delivery watch");
         if w.closing {
             return;
         }
+        let (latest, streamed) = match latest {
+            Latest::Jig(crate::contract::Delivery::Run(value)) => {
+                let Some(text) = crate::text::merge(w, *value, env.limits.turn_bytes) else {
+                    return;
+                };
+                (Latest::Jig(crate::contract::Delivery::Run(Box::new(text))), true)
+            }
+            Latest::Jig(crate::contract::Delivery::RunState(mut state)) => {
+                if let Some(value) = state.writing.take() {
+                    let Some(text) = crate::text::merge(w, value, env.limits.turn_bytes) else {
+                        return;
+                    };
+                    state.writing = Some(text);
+                }
+                (Latest::Jig(crate::contract::Delivery::RunState(state)), true)
+            }
+            latest @ (Latest::Jig(_) | Latest::Family(_)) => (latest, false),
+        };
         w.latest = Some(latest);
         w.state = State::Live;
         w.span = None;
@@ -64,6 +83,9 @@ impl Domain {
             held.state = State::Live;
             held.previous = None;
             tell(out, Told::Changed { handle });
+            if streamed {
+                tell(out, Told::Text { handle });
+            }
         }
         self.scratch.clear();
     }
