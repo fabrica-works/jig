@@ -110,6 +110,9 @@ fn apply(domain: &mut Domain, env: &Env<Limits>, fence: Fence, decision: Procedu
             out,
         );
     }
+    for proposal in decision.proposals {
+        crate::proposals::propose(domain, env, ReplyTo::new(skein_lib::Token::new(u64::MAX - 1)), proposal, out);
+    }
     match decision.end {
         ProcedureEnd::Result(result) => {
             let ending = match result {
@@ -142,6 +145,7 @@ fn check(
     let task = record(domain, number).expect("step task checked");
     if decision.amendments.len() > usize::try_from(env.limits.batch).expect("batch fits")
         || decision.messages.len() > usize::try_from(env.limits.batch).expect("batch fits")
+        || decision.proposals.len() > 1
     {
         return Err(problem(number, Refusal::Batch));
     }
@@ -209,6 +213,14 @@ fn check_parts(
             return Err(problem(part.task, Refusal::Reference));
         }
         crate::inbox::preview_message(domain, env, project, part.task, part.word.clone())?;
+    }
+    for proposal in &decision.proposals {
+        if proposal.proposer != number {
+            return Err(problem(number, Refusal::Reference));
+        }
+        if let Some(problem) = crate::proposals::admission_problem(domain, &env.limits, proposal) {
+            return Err(problem);
+        }
     }
     Ok(())
 }

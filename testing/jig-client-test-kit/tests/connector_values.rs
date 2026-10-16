@@ -76,6 +76,8 @@ fn procedure() -> ProcedureState {
         index: u16::MAX,
         steps: u16::MAX,
         awaiting: true,
+        delegate: None,
+        revision: 0,
         deadline: Some(Wall::from_nanos(u64::MAX)),
     }
 }

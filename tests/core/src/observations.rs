@@ -607,6 +607,12 @@ impl Observer {
                     {
                         snapshot.receipts.insert(r::Receipt::Word(holder, entry));
                     }
+                    if let Some(proposal) = &value.proposal
+                        && let tasks::ProposalState::Pending { holder: tasks::ProposalHolder::Task(holder), .. } =
+                            proposal.state
+                    {
+                        snapshot.receipts.insert(r::Receipt::Word(holder, proposal.number));
+                    }
                     if matches!(value.phase, tasks::Phase::Ended(_)) {
                         snapshot.receipts.insert(r::Receipt::Ended(value.number));
                     }

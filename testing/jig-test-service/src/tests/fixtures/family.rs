@@ -76,6 +76,8 @@ pub fn documents() -> [(&'static str, d::ClientDocument); 8] {
                     index: 4,
                     steps: 5,
                     awaiting: true,
+                    delegate: None,
+                    revision: 0,
                     deadline: Some(Wall::from_nanos(6)),
                 }),
                 result: Some(7),

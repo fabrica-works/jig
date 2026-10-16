@@ -278,6 +278,7 @@ pub struct ProcedureDecision {
     pub batch: Box<[New]>,
     pub amendments: Box<[ProcedureAmendment]>,
     pub messages: Box<[ProcedureMessage]>,
+    pub proposals: Box<[crate::Proposal]>,
     pub end: ProcedureEnd,
 }
 
@@ -305,7 +306,7 @@ pub enum ProcedureEnd {
 impl ProcedureDecision {
     #[must_use]
     pub fn new(end: ProcedureEnd) -> Self {
-        Self { batch: Box::new([]), amendments: Box::new([]), messages: Box::new([]), end }
+        Self { batch: Box::new([]), amendments: Box::new([]), messages: Box::new([]), proposals: Box::new([]), end }
     }
 }
 

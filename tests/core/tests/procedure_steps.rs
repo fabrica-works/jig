@@ -14,7 +14,15 @@ const COMPLETION: u32 = 1;
 const MOVED_COMPLETION: u32 = 2;
 
 fn procedure_world(seed: u64) -> (World, u64) {
-    let (configuration, limits) = jig_core_world::faults::plan_fixture(seed);
+    program_world(seed, None)
+}
+
+fn program_world(seed: u64, actions: Option<Box<[connector::ProcedureAction]>>) -> (World, u64) {
+    let (mut configuration, limits) = jig_core_world::faults::plan_fixture(seed);
+    if let Some(actions) = actions {
+        configuration.first.procedures[0].actions = actions;
+        configuration.first.procedures[0].max_steps = 6;
+    }
     let mut world = World::configured(seed, false, configuration, limits);
     world.hold_procedures = true;
     let root_run = world.assignments[0];
@@ -115,4 +123,146 @@ fn a_step_naming_a_moved_revision_is_refused_and_told_what_it_is_now() {
         Some(&root::Record::Connector { number: CONNECTOR, record })
     );
     assert_eq!(before.revisions.spec, 1);
+}
+
+const MESSAGE_WORDS: u64 = 12;
+const SPEC_WORDS: u64 = 34;
+
+fn delegate_program(action: connector::ProcedureAction) -> Box<[connector::ProcedureAction]> {
+    Box::new([connector::ProcedureAction::Delegate { kinds: Box::new([1]) }, action, connector::ProcedureAction::Stall])
+}
+
+fn run_program(world: &mut World, task: u64) {
+    world.send(root::Event::Connector {
+        number: CONNECTOR,
+        event: connector::Event::Procedure {
+            project: 1,
+            task,
+            number: u16::try_from(PROCEDURE_CODE).expect("test procedure code"),
+            resource: jig_test_connector_world::path(1, 1),
+            signal: connector::ProcedureSignal::Activate,
+        },
+    });
+}
+
+fn next_program_step(world: &mut World, task: u64) {
+    world.send(root::Event::Core(core::Event::Tasks(tasks::Event::WakeProcedure { task })));
+    run_program(world, task);
+}
+
+#[test]
+fn a_procedure_amends_its_delegate_naming_the_revision_it_was_told() {
+    let (mut world, procedure) =
+        program_world(463, Some(delegate_program(connector::ProcedureAction::Amend { words: SPEC_WORDS })));
+    run_program(&mut world, procedure);
+    let child = live_row(&world, procedure).delegates[0];
+    next_program_step(&mut world, procedure);
+    assert_eq!(live_row(&world, child).spec.words.as_ref(), b"amended 34");
+    assert_eq!(live_row(&world, child).revisions.spec, 1);
+}
+
+#[test]
+fn a_procedure_steps_again_after_its_amendment_is_refused_as_moved() {
+    let (mut world, procedure) =
+        program_world(464, Some(delegate_program(connector::ProcedureAction::Amend { words: SPEC_WORDS })));
+    run_program(&mut world, procedure);
+    let child = live_row(&world, procedure).delegates[0];
+    let run = world.assignments[0];
+    let amendment = tasks::Amendment {
+        spec: Some(tasks::Spec { words: b"moved".as_slice().into(), parameters: Box::new([]), inputs: Box::new([]) }),
+        tracked: None,
+        addressed: None,
+        instructions: None,
+        release: None,
+        wake: None,
+        dependencies: None,
+        authority: None,
+        reason: Box::new([]),
+    };
+    world.send(root::Event::Core(core::Event::NamedAction {
+        to: ReplyTo::new(Token::new(AMEND_CALL)),
+        key: core::CallKey { task: run.0, attempt: run.1, completion: MOVED_COMPLETION, position: 0 },
+        action: core::NamedAction::Amend { target: child, revision: 0, amendment },
+    }));
+    next_program_step(&mut world, procedure);
+    let key = root::Key::Connector { number: CONNECTOR, key: connector::RecordKey::Procedure(procedure) };
+    let Some(root::Record::Connector { record: connector::Record::Procedure(state), .. }) = world.store.rows.get(&key)
+    else {
+        panic!("procedure state committed");
+    };
+    assert_eq!(state.steps, 3);
+    assert_eq!(state.revision, 2);
+    assert_eq!(live_row(&world, child).spec.words.as_ref(), b"amended 34");
+    assert_eq!(live_row(&world, child).revisions.spec, 2);
+}
+
+#[test]
+fn a_procedure_messages_its_delegate_in_its_step() {
+    let (mut world, procedure) =
+        program_world(465, Some(delegate_program(connector::ProcedureAction::Message { words: MESSAGE_WORDS })));
+    run_program(&mut world, procedure);
+    let child = live_row(&world, procedure).delegates[0];
+    next_program_step(&mut world, procedure);
+    assert!(live_row(&world, child).inbox.iter().any(|word| {
+        word.from == tasks::Party::Task(procedure)
+            && word.kind == tasks::MessageKind::Words
+            && word.words.as_ref() == b"12"
+    }));
+}
+
+#[test]
+fn a_procedure_program_proposes_a_widening() {
+    let (mut world, procedure) = program_world(466, Some(Box::new([connector::ProcedureAction::Propose { spend: 5 }])));
+    run_program(&mut world, procedure);
+    let row = live_row(&world, procedure);
+    let proposal = row.proposal.as_ref().expect("procedure proposal");
+    let mut authority = row.authority.clone();
+    authority.budget.spend = 25;
+    assert_eq!(proposal.action, tasks::ProposalAction::Widen { task: procedure, authority });
+    assert_eq!(proposal.proposer, procedure);
+}
+
+#[test]
+fn a_procedure_proposes_a_widening_while_its_message_commits() {
+    let (mut world, procedure) = procedure_world(467);
+    let child = make_delegate(&mut world, procedure);
+    world.send(root::Event::Core(core::Event::Tasks(tasks::Event::WakeProcedure { task: procedure })));
+    let mut authority = live_row(&world, procedure).authority.clone();
+    authority.budget.spend += 5;
+    let action = tasks::ProposalAction::Widen { task: procedure, authority };
+    decide(
+        &mut world,
+        procedure,
+        core::ProcedureStep {
+            messages: Box::new([core::StepMessage {
+                target: child,
+                kind: tasks::MessageKind::Words,
+                words: b"hello".as_slice().into(),
+            }]),
+            proposals: Box::new([action.clone()]),
+            ..core::ProcedureStep::new(core::StepEnd::Wait)
+        },
+    );
+    assert_eq!(live_row(&world, procedure).proposal.as_ref().expect("pending proposal").action, action);
+    assert!(
+        live_row(&world, child)
+            .inbox
+            .iter()
+            .any(|word| word.words.as_ref() == b"hello" && word.from == tasks::Party::Task(procedure))
+    );
+    assert!(world.commits.iter().any(|commit| {
+        let proposal = commit.iter().any(|write| {
+            matches!(write,
+                root::Write::Save(root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row))))
+                    if row.number == procedure && row.proposal.is_some()
+            )
+        });
+        let message = commit.iter().any(|write| {
+            matches!(write,
+                root::Write::Save(root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row))))
+                    if row.number == child && row.inbox.iter().any(|word| word.words.as_ref() == b"hello")
+            )
+        });
+        proposal && message
+    }));
 }

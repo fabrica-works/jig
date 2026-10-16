@@ -492,14 +492,23 @@ pub(crate) fn propose(
     proposal: Proposal,
     out: &mut Queue<Request>,
 ) {
+    if let Some(problem) = admission_problem(domain, &env.limits, &proposal) {
+        return crate::capacity::refused(domain, env, to, problem, out);
+    }
+    install(domain, env, proposal, false, out);
+    out.push(Request::Done { reply_to: to });
+}
+
+/// Shared admission for standalone proposals and compound procedure steps.
+pub(crate) fn admission_problem(domain: &Domain, limits: &Limits, proposal: &Proposal) -> Option<crate::Problem> {
     if proposal.number == 0
         || proposal.proposer == 0
-        || proposal.reason.len() > usize::try_from(env.limits.message_bytes).expect("u32 fits usize")
+        || proposal.reason.len() > usize::try_from(limits.message_bytes).expect("u32 fits usize")
     {
-        return refused(to, Some(proposal.proposer), Refusal::Read, out);
+        return Some(proposal_problem(proposal.proposer, Refusal::Read));
     }
     let Some(task) = record(domain, proposal.proposer) else {
-        return refused(to, Some(proposal.proposer), Refusal::Unknown, out);
+        return Some(proposal_problem(proposal.proposer, Refusal::Unknown));
     };
     if task.project != proposal.project || task.proposal.is_some() || task.revision == u64::MAX {
         if task.project == proposal.project
@@ -508,10 +517,7 @@ pub(crate) fn propose(
         {
             match prior.state {
                 ProposalState::Pending { .. } => {
-                    return crate::capacity::refuse(
-                        domain,
-                        env,
-                        to,
+                    return Some(crate::Problem::capacity(
                         Some(proposal.proposer),
                         Refusal::Busy,
                         crate::Capacity {
@@ -520,50 +526,48 @@ pub(crate) fn propose(
                             action: crate::CapacityAction::Proposal { number: proposal.number },
                             cause: crate::CapacityCause::Proposals { limit: 1 },
                         },
-                        out,
-                    );
+                    ));
                 }
                 ProposalState::Accepted { .. } | ProposalState::Rejected { .. } | ProposalState::Withdrawn => {}
             }
         }
-        return refused(to, Some(proposal.proposer), Refusal::Busy, out);
+        return Some(proposal_problem(proposal.proposer, Refusal::Busy));
     }
     if !crate::inbox::room(
         domain,
-        &env.limits,
+        limits,
         proposal.proposer,
         1,
-        usize::try_from(env.limits.message_bytes).expect("u32 fits usize"),
+        usize::try_from(limits.message_bytes).expect("u32 fits usize"),
     ) {
-        return crate::capacity::refuse(
-            domain,
-            env,
-            to,
+        return Some(crate::Problem::capacity(
             Some(proposal.proposer),
             Refusal::Busy,
             crate::Capacity {
                 project: Some(proposal.project),
                 by: Party::Task(proposal.proposer),
                 action: crate::CapacityAction::Proposal { number: proposal.number },
-                cause: crate::capacity::inbox(proposal.proposer, &env.limits),
+                cause: crate::capacity::inbox(proposal.proposer, limits),
             },
-            out,
-        );
+        ));
     }
     match task.phase {
         Phase::Waiting | Phase::Active(_) | Phase::Held { was: Was::Waiting | Was::Active(_), .. } => {}
         Phase::Closing(_) | Phase::Held { was: Was::Closing(_), .. } | Phase::Ended(_) => {
-            return refused(to, Some(proposal.proposer), Refusal::State, out);
+            return Some(proposal_problem(proposal.proposer, Refusal::State));
         }
     }
     match proposal.state {
         ProposalState::Pending { .. } => {}
         ProposalState::Accepted { .. } | ProposalState::Rejected { .. } | ProposalState::Withdrawn => {
-            return refused(to, Some(proposal.proposer), Refusal::State, out);
+            return Some(proposal_problem(proposal.proposer, Refusal::State));
         }
     }
-    install(domain, env, proposal, false, out);
-    out.push(Request::Done { reply_to: to });
+    None
+}
+
+fn proposal_problem(task: u64, why: Refusal) -> crate::Problem {
+    crate::Problem { task: Some(task), why, blocked_by: None, capacity: None }
 }
 
 /// Check the one proposal a verdict creates before any result expense is posted.

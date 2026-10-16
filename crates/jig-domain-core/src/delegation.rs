@@ -40,6 +40,7 @@ pub struct ProcedureStep {
     pub batch: Box<[Delegate]>,
     pub amendments: Box<[StepAmendment]>,
     pub messages: Box<[StepMessage]>,
+    pub proposals: Box<[tasks::ProposalAction]>,
     pub end: StepEnd,
 }
 
@@ -67,7 +68,7 @@ pub enum StepEnd {
 impl ProcedureStep {
     #[must_use]
     pub fn new(end: StepEnd) -> Self {
-        Self { batch: Box::new([]), amendments: Box::new([]), messages: Box::new([]), end }
+        Self { batch: Box::new([]), amendments: Box::new([]), messages: Box::new([]), proposals: Box::new([]), end }
     }
 }
 

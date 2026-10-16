@@ -92,7 +92,7 @@ pub fn config(seed: u8) -> Config {
             actions: Box::from([
                 ProcedureAction::Effect { kind: kind(seed, 1), purpose: 8, target: 5 },
                 ProcedureAction::Delegate { kinds: Box::from([kind(seed, 2)]) },
-                ProcedureAction::Propose { number: 7 },
+                ProcedureAction::Propose { spend: 7 },
                 ProcedureAction::Wait { state: 5 },
                 ProcedureAction::Finish { result: ProcedureResult::Local { code: 9 } },
             ]),

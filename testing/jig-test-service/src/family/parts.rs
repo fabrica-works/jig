@@ -70,7 +70,8 @@ pub(super) fn decode_attempt(value: w::Attempt, _limits: &d::Limits) -> d::Attem
 }
 #[expect(clippy::manual_map, reason = "step code translates optional fields without closures")]
 pub(super) fn encode_procedure_state(value: &d::ProcedureState) -> w::ProcedureState {
-    let d::ProcedureState { project, task, number, resource, index, steps, awaiting, deadline } = value;
+    let d::ProcedureState { project, task, number, resource, index, steps, awaiting, deadline, delegate, revision } =
+        value;
     w::ProcedureState::new(
         &w::CEILINGS,
         w::ProcedureStateParts {
@@ -81,6 +82,8 @@ pub(super) fn encode_procedure_state(value: &d::ProcedureState) -> w::ProcedureS
             index: *index,
             steps: *steps,
             awaiting: *awaiting,
+            delegate: *delegate,
+            revision: *revision,
             deadline: match deadline {
                 Some(value) => Some(value.as_nanos()),
                 None => None,
@@ -94,8 +97,18 @@ pub(super) fn decode_procedure_state(
     value: w::ProcedureState,
     limits: &d::Limits,
 ) -> Result<d::ProcedureState, Undecodable> {
-    let w::ProcedureStateParts { project, task, number, resource, index, steps, awaiting, deadline } =
-        value.into_parts();
+    let w::ProcedureStateParts {
+        project,
+        task,
+        number,
+        resource,
+        index,
+        steps,
+        awaiting,
+        deadline,
+        delegate,
+        revision,
+    } = value.into_parts();
     Ok(d::ProcedureState {
         project,
         task,
@@ -104,6 +117,8 @@ pub(super) fn decode_procedure_state(
         index,
         steps,
         awaiting,
+        delegate,
+        revision,
         deadline: match deadline {
             Some(value) => Some(Wall::from_nanos(value)),
             None => None,

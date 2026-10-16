@@ -48,7 +48,18 @@ pub(crate) fn step(
         if signal != ProcedureSignal::Activate || domain.procedures.len() >= env.limits.procedures {
             return;
         }
-        ProcedureState { project, task, number, resource, index: 0, steps: 0, awaiting: false, deadline: None }
+        ProcedureState {
+            project,
+            task,
+            number,
+            resource,
+            index: 0,
+            steps: 0,
+            awaiting: false,
+            deadline: None,
+            delegate: None,
+            revision: 0,
+        }
     };
     let original = state.clone();
     if usize::from(state.index) >= spec.actions.len() {
@@ -124,9 +135,23 @@ fn decide(
             state.awaiting = true;
             StepDecision::Delegate { kinds: kinds.clone() }
         }
-        ProcedureAction::Propose { number } => {
+        ProcedureAction::Amend { words } => match state.delegate {
+            Some(task) => {
+                state.awaiting = true;
+                StepDecision::Amend { task, revision: state.revision, words: *words }
+            }
+            None => StepDecision::Hold { reason: 0 },
+        },
+        ProcedureAction::Message { words } => match state.delegate {
+            Some(task) => {
+                state.awaiting = true;
+                StepDecision::Message { task, words: *words }
+            }
+            None => StepDecision::Hold { reason: 0 },
+        },
+        ProcedureAction::Propose { spend } => {
             state.awaiting = true;
-            StepDecision::Propose { number: *number }
+            StepDecision::Propose { spend: *spend }
         }
         ProcedureAction::Wait { .. } => {
             let deadline = match state.deadline {
@@ -229,6 +254,39 @@ pub(crate) fn made(
     if revisions.len() > usize::try_from(env.limits.tasks).expect("bounded revisions") {
         return;
     }
+    if let Some(state) = domain.procedures.get(&task) {
+        let mut state = state.clone();
+        if let Some(child) = child {
+            state.delegate = Some(child);
+        }
+        for &(number, revision) in &revisions {
+            if state.delegate == Some(number) {
+                state.revision = revision;
+            }
+        }
+        let advances = match program(domain, state.number) {
+            Some(spec) => match spec.actions.get(usize::from(state.index)) {
+                Some(
+                    ProcedureAction::Delegate { .. } | ProcedureAction::Amend { .. } | ProcedureAction::Message { .. },
+                ) => true,
+                Some(
+                    ProcedureAction::Effect { .. }
+                    | ProcedureAction::Propose { .. }
+                    | ProcedureAction::Wait { .. }
+                    | ProcedureAction::Stall
+                    | ProcedureAction::Hold { .. }
+                    | ProcedureAction::Finish { .. },
+                )
+                | None => false,
+            },
+            None => false,
+        };
+        if state.awaiting && advances {
+            state.awaiting = false;
+            state.index = state.index.saturating_add(1);
+        }
+        save(domain, state, out);
+    }
     if domain.delegate_outcomes.contains_key(&task) || domain.delegate_outcomes.len() < env.limits.tasks {
         domain.delegate_outcomes.insert(task, (step, child, revisions.clone())).expect("outcome capacity checked");
         out.push(Request::Save { record: Record::ProcedureDelegateOutcome { task, step, child, revisions } });
@@ -245,12 +303,28 @@ pub(crate) fn refused(
     why: crate::StepRefusal,
     out: &mut Queue<Request>,
 ) {
-    let revisions: Box<[(u64, u64)]> = match why {
-        crate::StepRefusal::Moved { revision } => match domain.delegate_outcomes.get(&task) {
-            Some((_, Some(child), _)) => Box::new([(*child, revision)]),
-            Some((_, None, _)) | None => Box::new([]),
-        },
-        crate::StepRefusal::Refused => Box::new([]),
+    let revisions: Box<[(u64, u64)]> = if let Some(state) = domain.procedures.get(&task) {
+        let mut state = state.clone();
+        state.awaiting = false;
+        let revisions: Box<[(u64, u64)]> = match (why, state.delegate) {
+            (crate::StepRefusal::Moved { revision }, Some(child)) => {
+                state.revision = revision;
+                Box::new([(child, revision)])
+            }
+            _ => Box::new([]),
+        };
+        save(domain, state, out);
+        revisions
+    } else {
+        match (why, domain.delegate_outcomes.get(&task)) {
+            (crate::StepRefusal::Moved { revision }, Some((_, Some(child), _))) => Box::new([(*child, revision)]),
+            _ => Box::new([]),
+        }
     };
     made(domain, env, task, step, None, revisions, out);
+    if let crate::StepRefusal::Moved { .. } = why
+        && let Some(state) = domain.procedures.get(&task).cloned()
+    {
+        self::step(domain, env, state.project, task, state.number, state.resource, ProcedureSignal::Message, out);
+    }
 }

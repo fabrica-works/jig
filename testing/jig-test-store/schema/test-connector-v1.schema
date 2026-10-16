@@ -4,7 +4,7 @@ record ResourcePath { segments: list 32 Segment }
 record Key { attempt: u64 completion: u32 position: u32 deployment: fixed 16 task: u64 purpose: u64 }
 record Effect { kind: u16 resources: list 64 ResourcePath purpose: u64 condition: option u64 target: u64 state: u64 }
 record Attempt { number: u32 sent: u64 deadline: u64 }
-record ProcedureState { project: u32 task: u64 number: u16 resource: ResourcePath index: u16 steps: u16 awaiting: bool deadline: option u64 }
+record ProcedureState { project: u32 task: u64 number: u16 resource: ResourcePath index: u16 steps: u16 awaiting: bool deadline: option u64 delegate: option u64 revision: u64 }
 record ApplicationObject { revision: u64 value: u64 }
 record RefusalRole { held: option u32 }
 record RefusalTaken { by: u64 }

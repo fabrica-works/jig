@@ -189,3 +189,59 @@ fn a_step_counts_its_batch_before_admitting_a_tracking_amendment() {
     );
     assert_eq!(world.records, before);
 }
+
+const PROPOSAL: u64 = 12;
+const NEXT_PROPOSAL: u64 = 13;
+const PROPOSAL_ROOM_CASES: [(&str, bool); 2] = [("existing proposal", true), ("delegate reservation", false)];
+
+fn proposal(world: &World, number: u64) -> tasks::Proposal {
+    tasks::Proposal {
+        number,
+        proposer: PROCEDURE,
+        project: world.record(PROCEDURE).project,
+        action: tasks::ProposalAction::Widen { task: PROCEDURE, authority: world.record(PROCEDURE).authority.clone() },
+        reason: Box::new([]),
+        as_holder: false,
+        state: tasks::ProposalState::Pending {
+            holder: tasks::ProposalHolder::Task(ROOT),
+            since: skein_lib::Wall::EPOCH,
+        },
+    }
+}
+
+#[test]
+fn a_step_with_no_room_for_its_proposal_keeps_its_message_uncommitted() {
+    for (case, pending) in PROPOSAL_ROOM_CASES {
+        let mut world = procedure_with_child();
+        let cause = if pending {
+            let proposal = proposal(&world, PROPOSAL);
+            let reply_to = world.to();
+            world.send(Event::Propose { reply_to, proposal });
+            tasks::CapacityCause::Proposals { limit: 1 }
+        } else {
+            world.env.limits.inbox_messages = 1;
+            tasks::CapacityCause::Inbox { task: PROCEDURE, messages: 1, bytes: LIMITS.inbox_bytes }
+        };
+        let before = world.records.clone();
+        let decision = ProcedureDecision {
+            messages: Box::new([message(b"hello")]),
+            proposals: Box::new([proposal(&world, NEXT_PROPOSAL)]),
+            ..ProcedureDecision::new(tasks::ProcedureEnd::Wait)
+        };
+        assert_eq!(
+            step(&mut world, PROCEDURE, 2, decision),
+            Reply::Refused(tasks::Problem::capacity(
+                Some(PROCEDURE),
+                tasks::Refusal::Busy,
+                tasks::Capacity {
+                    project: Some(1),
+                    by: Party::Task(PROCEDURE),
+                    action: tasks::CapacityAction::Proposal { number: NEXT_PROPOSAL },
+                    cause,
+                },
+            )),
+            "{case}"
+        );
+        assert_eq!(world.records, before, "{case}");
+    }
+}

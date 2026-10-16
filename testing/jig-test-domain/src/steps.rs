@@ -28,7 +28,25 @@ pub(crate) fn translate(
         }
         connector::StepDecision::Wait { .. } | connector::StepDecision::Stall => core::StepEnd::Wait,
         connector::StepDecision::Hold { .. } => core::StepEnd::Hold(tasks::Hold::Effects),
-        connector::StepDecision::Propose { .. } => core::StepEnd::Hold(tasks::Hold::Procedure),
+        connector::StepDecision::Amend { task, revision, words } => return Some(amendment(task, revision, words)),
+        connector::StepDecision::Message { task, words } => {
+            return Some(core::ProcedureStep {
+                messages: Box::new([core::StepMessage {
+                    target: task,
+                    kind: tasks::MessageKind::Words,
+                    words: Decimal::of(words).as_bytes().into(),
+                }]),
+                ..core::ProcedureStep::new(core::StepEnd::Wait)
+            });
+        }
+        connector::StepDecision::Propose { spend } => {
+            let mut authority = domain.core.tasks.task(task).expect("procedure task live").authority.clone();
+            authority.budget.spend = authority.budget.spend.saturating_add(spend);
+            return Some(core::ProcedureStep {
+                proposals: Box::new([tasks::ProposalAction::Widen { task, authority }]),
+                ..core::ProcedureStep::new(core::StepEnd::Wait)
+            });
+        }
         connector::StepDecision::Delegate { kinds } => {
             let row = domain.core.tasks.task(task).expect("procedure task live");
             let capacity = u32::try_from(kinds.len()).expect("bounded program");
@@ -91,10 +109,41 @@ pub(crate) fn refused(number: u16, task: u64, step: u64, why: core::StepRefusal,
 fn words(task: u64, step: u64) -> Box<[u8]> {
     let task = Decimal::of(task);
     let step = Decimal::of(step);
-    let mut words = Writer::new(56);
+    let mut words = Writer::new(
+        16_usize
+            .checked_add(task.as_bytes().len())
+            .expect("bounded task label")
+            .checked_add(step.as_bytes().len())
+            .expect("bounded step label"),
+    );
     words.put(b"procedure ").expect("bounded label");
     words.put(task.as_bytes()).expect("bounded task number");
     words.put(b" step ").expect("bounded label");
     words.put(step.as_bytes()).expect("bounded step number");
     words.finish()
+}
+
+fn amendment(task: u64, revision: u64, words: u64) -> core::ProcedureStep {
+    let count = Decimal::of(words);
+    let mut text = Writer::new(8_usize.checked_add(count.as_bytes().len()).expect("bounded spec"));
+    text.put(b"amended ").expect("bounded spec");
+    text.put(count.as_bytes()).expect("bounded word count");
+    core::ProcedureStep {
+        amendments: Box::new([core::StepAmendment {
+            task,
+            revision,
+            amendment: tasks::Amendment {
+                spec: Some(tasks::Spec { words: text.finish(), parameters: Box::new([]), inputs: Box::new([]) }),
+                tracked: None,
+                addressed: None,
+                instructions: None,
+                release: None,
+                wake: None,
+                dependencies: None,
+                authority: None,
+                reason: Box::new([]),
+            },
+        }]),
+        ..core::ProcedureStep::new(core::StepEnd::Wait)
+    }
 }

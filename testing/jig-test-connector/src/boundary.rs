@@ -328,8 +328,12 @@ pub enum ProcedureAction {
     Effect { kind: u16, purpose: u64, target: u64 },
     /// Make a bounded batch of child tasks.
     Delegate { kinds: Box<[u16]> },
-    /// Ask a person to approve the named proposal.
-    Propose { number: u64 },
+    /// Amend the delegate using the last revision told back.
+    Amend { words: u64 },
+    /// Send words to the delegate.
+    Message { words: u64 },
+    /// Ask a holder to widen this task's spending budget.
+    Propose { spend: u64 },
     /// Wait for a named fact to reach the state, no longer than the configured stall.
     Wait { state: u64 },
     /// Remain stalled until the caller delivers another message.
@@ -381,6 +385,10 @@ pub struct ProcedureState {
     pub awaiting: bool,
     /// Absolute deadline while waiting for a fact.
     pub deadline: Option<Wall>,
+    /// First delegate identified by the core.
+    pub delegate: Option<u64>,
+    /// Delegate spec revision told back by the core.
+    pub revision: u64,
 }
 
 /// What reached a procedure task; the next step reads state and current facts.
@@ -399,7 +407,9 @@ pub enum ProcedureSignal {
 pub enum StepDecision {
     Effect(Effect),
     Delegate { kinds: Box<[u16]> },
-    Propose { number: u64 },
+    Amend { task: u64, revision: u64, words: u64 },
+    Message { task: u64, words: u64 },
+    Propose { spend: u64 },
     Wait { deadline: Wall },
     Stall,
     Hold { reason: u16 },

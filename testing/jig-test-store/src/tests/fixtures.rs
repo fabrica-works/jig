@@ -95,6 +95,8 @@ fn procedure() -> d::Record {
         index: 4,
         steps: 5,
         awaiting: true,
+        delegate: None,
+        revision: 0,
         deadline: Some(Wall::from_nanos(6)),
     })
 }

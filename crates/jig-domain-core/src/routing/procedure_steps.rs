@@ -88,6 +88,7 @@ pub(super) fn parts(
         batch: Box::new([]),
         amendments: amendments.into_boxed(),
         messages: messages.into_boxed(),
+        proposals: proposals(core, env, task, &step.proposals)?,
         end,
     })
 }
@@ -157,4 +158,59 @@ pub(super) fn append_problem(core: &Core, task: u64, step: u64, problem: tasks::
             out.push(Request::Ask { connector, ask });
         }
     }
+}
+
+#[expect(clippy::result_large_err, reason = "step refusals retain exact owner diagnostics")]
+fn proposals(
+    core: &mut Core,
+    env: &Env<Limits>,
+    task: u64,
+    actions: &[tasks::ProposalAction],
+) -> Result<Box<[tasks::Proposal]>, StepRefusal> {
+    let Some(context) = core.tasks.delegation(task) else { return Err(problem(task, tasks::Refusal::Unknown)) };
+    if actions.len() > 1 {
+        return Err(problem(task, tasks::Refusal::Busy));
+    }
+    let mut proposals = List::with_capacity(1);
+    for action in actions {
+        match action {
+            tasks::ProposalAction::Batch(_)
+            | tasks::ProposalAction::Amend { .. }
+            | tasks::ProposalAction::Widen { .. } => {}
+            tasks::ProposalAction::Effect { .. }
+            | tasks::ProposalAction::ProcedureEffect { .. }
+            | tasks::ProposalAction::Release { .. } => {
+                return Err(problem(task, tasks::Refusal::Unproposable));
+            }
+        }
+        if let tasks::ProposalAction::Amend { amendment, .. } = action
+            && (amendment.authority.is_none() || amendment.release.is_some())
+        {
+            return Err(problem(task, tasks::Refusal::AuthorityShape));
+        }
+        if let Err(why) = core.proposal_admit_action(context.project, action) {
+            return Err(problem(task, why));
+        }
+        let Some(holder) = core.proposal_holder(&env.limits, task, action, None) else {
+            return Err(problem(task, tasks::Refusal::Reference));
+        };
+        if !crate::acts::bounds::proposal_has_recipient(core, holder) {
+            return Err(problem(task, tasks::Refusal::Unproposable));
+        }
+        let Some(number) = crate::fresh(&mut core.counters, crate::Family::Message) else {
+            return Err(problem(task, tasks::Refusal::Busy));
+        };
+        proposals
+            .push(tasks::Proposal {
+                number,
+                proposer: task,
+                project: context.project,
+                action: action.clone(),
+                reason: Box::new([]),
+                as_holder: false,
+                state: tasks::ProposalState::Pending { holder, since: env.wall },
+            })
+            .expect("one proposal per step");
+    }
+    Ok(proposals.into_boxed())
 }

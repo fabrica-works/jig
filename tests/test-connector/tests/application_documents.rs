@@ -175,6 +175,8 @@ fn every_part_is_owned_scoped_and_read_without_mutating_its_records() {
         index: 3,
         steps: 3,
         awaiting: false,
+        delegate: None,
+        revision: 0,
         deadline: Some(Wall::from_nanos(9)),
     };
     world.event(Event::Restore { record: connector::Record::Procedure(procedure.clone()) });

@@ -91,7 +91,7 @@ fn domain() -> Domain {
                 actions: Box::from([
                     crate::ProcedureAction::Effect { kind: 1, purpose: 9, target: 3 },
                     crate::ProcedureAction::Delegate { kinds: Box::from([2]) },
-                    crate::ProcedureAction::Propose { number: 7 },
+                    crate::ProcedureAction::Propose { spend: 7 },
                     crate::ProcedureAction::Wait { state: 3 },
                     crate::ProcedureAction::Finish { result: crate::ProcedureResult::Local { code: 8 } },
                 ]),
@@ -193,7 +193,7 @@ fn procedure_commits_each_decision_once_and_waits_on_a_fact_not_a_wake() {
         Some(&Request::Step { task: 9, decision: crate::StepDecision::Delegate { kinds: Box::from([2]) } })
     );
     let proposed = run_at(&mut connector, 12, procedure_event(crate::ProcedureSignal::DelegateDone));
-    assert_eq!(proposed.get(1), Some(&Request::Step { task: 9, decision: crate::StepDecision::Propose { number: 7 } }));
+    assert_eq!(proposed.get(1), Some(&Request::Step { task: 9, decision: crate::StepDecision::Propose { spend: 7 } }));
     let waiting = run_at(&mut connector, 13, procedure_event(crate::ProcedureSignal::ProposalDone));
     assert_eq!(
         waiting.get(1),
@@ -617,4 +617,58 @@ fn an_own_scope_shows_what_the_deployment_scope_shows() {
         let [Request::Document { document, .. }] = out.as_ref() else { panic!("deployment") };
         assert_eq!(document, &Ok(expected.clone()), "scope {scope:?}");
     }
+}
+
+const PROCEDURE_TASK: u64 = 9;
+const DELEGATE_TASK: u64 = 42;
+const FIRST_STEP: u64 = 1;
+const AMEND_STEP: u64 = 2;
+
+fn amending_procedure() -> Domain {
+    let mut connector = domain();
+    connector.config.procedures[0].actions = Box::new([
+        crate::ProcedureAction::Delegate { kinds: Box::new([2]) },
+        crate::ProcedureAction::Amend { words: 12 },
+    ]);
+    drop(run(&mut connector, procedure_event(crate::ProcedureSignal::Activate)));
+    drop(run(
+        &mut connector,
+        Event::StepMade {
+            task: PROCEDURE_TASK,
+            step: FIRST_STEP,
+            first: Some(DELEGATE_TASK),
+            revisions: Box::new([(DELEGATE_TASK, 3)]),
+        },
+    ));
+    connector
+}
+
+#[test]
+fn an_amend_action_names_the_revision_it_was_told() {
+    let mut connector = amending_procedure();
+    let requests = run(&mut connector, procedure_event(crate::ProcedureSignal::Activate));
+    assert_eq!(
+        requests.last(),
+        Some(&Request::Step {
+            task: PROCEDURE_TASK,
+            decision: crate::StepDecision::Amend { task: DELEGATE_TASK, revision: 3, words: 12 },
+        })
+    );
+}
+
+#[test]
+fn a_moved_refusal_makes_the_next_step_name_the_new_revision() {
+    let mut connector = amending_procedure();
+    drop(run(&mut connector, procedure_event(crate::ProcedureSignal::Activate)));
+    let requests = run(
+        &mut connector,
+        Event::StepRefused { task: PROCEDURE_TASK, step: AMEND_STEP, why: crate::StepRefusal::Moved { revision: 4 } },
+    );
+    assert_eq!(
+        requests.last(),
+        Some(&Request::Step {
+            task: PROCEDURE_TASK,
+            decision: crate::StepDecision::Amend { task: DELEGATE_TASK, revision: 4, words: 12 },
+        })
+    );
 }

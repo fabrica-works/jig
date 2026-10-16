@@ -261,6 +261,13 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(limits.call_records.checked_mul(task.batch)?)?
         .checked_add(task.tasks.checked_mul(task.batch)?)?;
     total = total.checked_add(bytes(creations, new_task)?)?;
+    // Each holdings flight also retains the step's one pending proposal.
+    total = total.checked_add(bytes(
+        task.tasks,
+        sizeof(size_of::<tasks::Proposal>())?
+            .checked_add(bytes(task.batch, new_task)?)?
+            .checked_add(u64::from(task.message_bytes))?,
+    )?)?;
     total = total.checked_add(new_task)?;
     total = total.checked_add(bytes(
         limits.fleet.calls.checked_add(limits.load_slots)?,
@@ -309,6 +316,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     // copy and a connector handoff at each bounded route position.
     let payload = new_task
         .checked_mul(u64::from(task.batch.max(1)).checked_add(2)?)?
+        .checked_add(bytes(task.batch, new_task)?)?
+        .checked_add(sizeof(size_of::<tasks::Proposal>())?)?
         .checked_add(List::<people::Entry>::worst_case(crate::inbox::waiting_capacity(limits)?)?)?
         .checked_add(context)?
         .checked_add(u64::from(task.message_bytes.max(task.result_bytes)).checked_mul(field_size.checked_add(1)?)?)?

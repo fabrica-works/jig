@@ -112,6 +112,7 @@ fn route_ask(
 ) {
     match ask {
         core::Ask::StepMade { task, step, first, revisions } => {
+            domain.procedure_steps.remove(&task);
             work.push(Work::Connector { number, event: connector::Event::StepMade { task, step, first, revisions } });
         }
         core::Ask::StepRefused { task, step, why } => crate::steps::refused(number, task, step, why, work),
@@ -630,7 +631,7 @@ pub(super) fn route_connector(
                 write(domain, decision, Write::Erase(Key::Connector { number, key }));
             }
             connector::Request::Step { task, decision: step } => {
-                let (numbered_step, code) = domain.procedure_steps.remove(&task).expect("procedure chose a step");
+                let (numbered_step, code) = *domain.procedure_steps.get(&task).expect("procedure chose a step");
                 let Some(action) = crate::steps::translate(domain, task, numbered_step, number, step, work) else {
                     continue;
                 };
