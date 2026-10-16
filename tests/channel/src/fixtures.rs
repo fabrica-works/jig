@@ -36,6 +36,7 @@ const ENGINE: &[u8] = br#"{
 "brief.briefs":1,"brief.sections":1,
 "notes.entries_per_scope":1,"views.runs":1,"views.watchers":2,"views.watchers_per_party":2,
 "core.load_slots":1
+,"core.templates":2,"documents.rows":1,"documents.lines":1,"documents.chips":1,"documents.text_bytes":128
 }},
 "llm": {
 "endpoints": [{

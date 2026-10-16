@@ -645,6 +645,7 @@ fn deployment_frame_role_is_independent_of_another_project_owner_or_clipped_proj
                     pool: None,
                     chat_budget: u64::MAX,
                     creating: None,
+                    templates: List::with_capacity(0),
                 }],
             ),
             needs: 0,

@@ -19,6 +19,45 @@ pub struct Template {
     pub grace: Option<Duration>,
 }
 
+/// Apply the project's named overrides in configuration order (engine.md, 11.1).
+#[must_use]
+pub fn merged(templates: &[Template], overrides: &[jig_domain_people::TemplateOverride]) -> Box<[Template]> {
+    let mut merged = skein_lib::List::with_capacity(u32::try_from(templates.len()).expect("configured template count"));
+    for template in templates {
+        let mut value = template.clone();
+        for entry in overrides {
+            if entry.template != template.number {
+                continue;
+            }
+            if let Some(executor) = entry.executor {
+                value.executor = executor;
+            }
+            if let Some(budget) = entry.budget {
+                value.budget = budget;
+            }
+            if let Some(deadline) = entry.deadline {
+                value.deadline = deadline;
+            }
+            if let (Some(priority), Some(_)) = (entry.priority, value.tracked) {
+                value.tracked = Some(priority);
+            }
+            break;
+        }
+        merged.push(value).expect("one merged value per configured template");
+    }
+    merged.into_boxed()
+}
+
+pub(crate) fn list_worst_case(limits: &crate::Limits) -> Option<u64> {
+    let fields = u64::from(limits.tasks.result_bytes)
+        .checked_mul(u64::try_from(size_of::<jig_domain_tasks::FieldRule>()).ok()?.checked_add(1)?)?;
+    let choices = skein_lib::List::<jig_domain_tasks::Verdict>::worst_case(limits.tasks.contract_choices)?
+        .checked_add(u64::from(limits.tasks.contract_choices).checked_mul(fields)?)?;
+    skein_lib::List::<Template>::worst_case(limits.templates)?.checked_add(
+        u64::from(limits.templates).checked_mul(u64::from(limits.documents.text_bytes).checked_add(choices)?)?,
+    )
+}
+
 pub(crate) fn assert_configured(config: &crate::Config, limits: &crate::Limits) {
     assert!(
         config.settings.templates.len() <= usize::try_from(limits.templates).expect("template bound"),

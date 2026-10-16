@@ -99,8 +99,18 @@ pub(super) fn frame(core: &Core, limits: &Limits, party: u64) -> Result<Frame, M
             Some(record) => Some(super::project_note::ledger(record)),
             None => None,
         };
+        let overrides = match core.template_overrides.get(&role.project) {
+            Some(entries) => entries.as_ref(),
+            None => &[],
+        };
+        let merged = crate::templates::merged(&core.settings.templates, overrides);
+        let mut templates = List::with_capacity(limits.templates);
+        for template in merged {
+            templates.push(template).expect("configured template bound");
+        }
         projects
             .push(FrameProjectRole {
+                templates,
                 project: role.project,
                 role: role.role,
                 name: None,

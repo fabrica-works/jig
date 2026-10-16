@@ -808,6 +808,7 @@ pub(super) mod tests {
                     pool: None,
                     chat_budget: u64::MAX,
                     creating: None,
+                    templates: List::with_capacity(0),
                 })
                 .expect("the complete supplied fixture is admitted");
         }

@@ -415,6 +415,7 @@ fn documents_frame_carries_roles_retention_and_configured_charters() {
             pool: None,
             chat_budget: core.authority.role(1, 0).unwrap().authority.budget.spend,
             creating: Some(frame_facts::owner_creating(limits.documents.lines)),
+            templates: List::with_capacity(0),
         }]
     );
     assert_eq!(frame.retention, limits.people.request_retention);

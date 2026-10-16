@@ -273,7 +273,10 @@ impl Parties {
                         })
                 }
                 root::Write::Save(root::Record::Core(core::Record::People(people::Stored::Policy { project, .. }))) =>
-                    project_subject(&consumer.subject, *project, &self.task_projects, &self.proposal_projects),
+                    project_subject(&consumer.subject, *project, &self.task_projects, &self.proposal_projects)
+                        || self.projects.iter().any(|(party, projects)| {
+                            projects.contains(project) && party_subject(&consumer.subject, *party)
+                        }),
                 root::Write::Save(root::Record::Core(core::Record::Tasks(tasks::Stored::Ledger(row) | tasks::Stored::ClosedLedger(row)))) => match row.funder {
                     tasks::Funder::Pool { project, .. } | tasks::Funder::Period { project, .. } | tasks::Funder::Recurring { project, .. } =>
                         project_subject(&consumer.subject, project, &self.task_projects, &self.proposal_projects),

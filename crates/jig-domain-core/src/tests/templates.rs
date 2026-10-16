@@ -39,3 +39,71 @@ fn a_policy_change_past_the_templates_limit_is_refused() {
         Err(people::Refusal::Limit { which: people::LimitKind::Policy })
     );
 }
+
+fn template() -> Template {
+    Template {
+        number: PROJECT,
+        name: Box::from(&b"work"[..]),
+        executor: people::TemplateExecutor::Chosen,
+        contract: tasks::Contract::Report { words: 32 },
+        shallower: 1,
+        budget: people::TemplateBudget::Given,
+        deadline: people::TemplateDeadline::Given,
+        tracked: Some(1),
+        flags: tasks::Flags { conversation: false, listed: true, retention: tasks::Retention::Kept },
+        label: 2,
+        grace: None,
+    }
+}
+
+#[test]
+fn an_override_replaces_only_the_fields_it_names() {
+    let empty =
+        people::TemplateOverride { template: PROJECT, executor: None, budget: None, deadline: None, priority: None };
+    for (name, overrides, expected) in [
+        ("none", empty.clone(), template()),
+        (
+            "executor",
+            people::TemplateOverride { executor: Some(people::TemplateExecutor::Charter(PROJECT)), ..empty.clone() },
+            Template { executor: people::TemplateExecutor::Charter(PROJECT), ..template() },
+        ),
+        (
+            "budget",
+            people::TemplateOverride {
+                budget: Some(people::TemplateBudget::AsAllowed { cap: Some(20) }),
+                ..empty.clone()
+            },
+            Template { budget: people::TemplateBudget::AsAllowed { cap: Some(20) }, ..template() },
+        ),
+        (
+            "deadline",
+            people::TemplateOverride {
+                deadline: Some(people::TemplateDeadline::Span(Duration::from_secs(2))),
+                ..empty.clone()
+            },
+            Template { deadline: people::TemplateDeadline::Span(Duration::from_secs(2)), ..template() },
+        ),
+        (
+            "priority",
+            people::TemplateOverride { priority: Some(5), ..empty },
+            Template { tracked: Some(5), ..template() },
+        ),
+    ] {
+        assert_eq!(crate::templates::merged(&[template()], &[overrides]).as_ref(), &[expected], "{name}");
+    }
+}
+
+#[test]
+fn an_override_naming_no_configured_template_serves_nothing() {
+    let overrides =
+        people::TemplateOverride { template: UNKNOWN, executor: None, budget: None, deadline: None, priority: Some(5) };
+    assert_eq!(crate::templates::merged(&[template()], &[overrides]).as_ref(), &[template()]);
+}
+
+#[test]
+fn a_priority_override_leaves_an_untracked_template_untracked() {
+    let untracked = Template { tracked: None, ..template() };
+    let overrides =
+        people::TemplateOverride { template: PROJECT, executor: None, budget: None, deadline: None, priority: Some(5) };
+    assert_eq!(crate::templates::merged(core::slice::from_ref(&untracked), &[overrides]).as_ref(), &[untracked]);
+}

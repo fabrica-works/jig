@@ -69,10 +69,13 @@ fn frame_deployment_role_preserves_every_builtin_and_admitted_policy_and_full_wi
             + List::<FrameProjectRole>::worst_case(value.projects.capacity()).unwrap()
             + List::<OfferedCharter>::worst_case(value.charters.capacity()).unwrap()
             + u64::try_from(value.login.bytes.len() + value.name.bytes.len()).unwrap();
+        for project in &value.projects {
+            held += List::<Template>::worst_case(project.templates.capacity()).unwrap();
+        }
         for charters in &value.charters {
             held += List::<u32>::worst_case(charters.goals.capacity()).unwrap();
         }
-        assert!(document_worst_case(&limits.documents).unwrap() >= held);
+        assert!(document_with_context_worst_case(&limits).unwrap() >= held);
         let Ok(Document::Deployment(_)) = make(&core, &limits, 1, &Subject::Deployment, &window()) else {
             panic!("deployment document admitted");
         };

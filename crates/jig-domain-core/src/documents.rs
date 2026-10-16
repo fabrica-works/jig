@@ -277,6 +277,8 @@ pub struct FrameProjectRole {
     pub chat_budget: u64,
     /// Direct creating bounds for this party and project (contract.md, 5.3).
     pub creating: Option<crate::acts::Bounds>,
+    /// Configured templates with this project's policy overrides applied.
+    pub templates: List<crate::Template>,
 }
 
 /// Party identity, current roles, bounded counts and contract configuration.
@@ -469,7 +471,8 @@ pub fn document_worst_case(limits: &DocumentLimits) -> Option<u64> {
 #[must_use]
 pub fn document_with_context_worst_case(limits: &Limits) -> Option<u64> {
     document_worst_case(&limits.documents)?
-        .checked_add(inbox_selection_worst_case(limits.documents.rows, limits.tasks.depth)?)
+        .checked_add(inbox_selection_worst_case(limits.documents.rows, limits.tasks.depth)?)?
+        .checked_add(u64::from(limits.documents.lines).checked_mul(crate::templates::list_worst_case(limits)?)?)
 }
 
 /// Peak scratch allocated while constructing party/deployment pages. Child
@@ -479,6 +482,7 @@ pub(crate) fn document_scratch_worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(List::<people::Entry>::worst_case(crate::inbox::waiting_capacity(limits)?)?)?;
     Some(
         deployment::scratch_worst_case(limits)?
+            .max(List::<crate::Template>::worst_case(limits.templates)?)
             .max(project_tasks::scratch_worst_case(limits)?)
             .max(task_query::scratch_worst_case(limits)?.checked_add(waits)?),
     )

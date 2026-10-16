@@ -15,7 +15,15 @@ pub fn frame_two_projects() -> d::Frame {
         [(3, jig_domain_people::Role::Owner, 11), (5, jig_domain_people::Role::Observer, 13)]
     {
         projects
-            .push(d::FrameProjectRole { project, role, name: None, pool: None, creating: None, chat_budget })
+            .push(d::FrameProjectRole {
+                project,
+                role,
+                name: None,
+                pool: None,
+                creating: None,
+                chat_budget,
+                templates: List::with_capacity(0),
+            })
             .unwrap();
     }
     let mut goals = List::with_capacity(1);
