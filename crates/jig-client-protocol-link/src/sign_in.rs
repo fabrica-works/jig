@@ -1,9 +1,8 @@
 //! Signing belongs to the link (client/domain/client.md, 12).
 use crate::{
-    Link, Request, Signing, With,
+    Link, Message, Request, Signing, With,
     component::{Attempt, ExchangeKind},
 };
-use alloc::boxed::Box;
 use jig_client_protocol_wire::v7 as w;
 use skein_lib::{Queue, Reader, Secret, Time, Token, Writer};
 impl Link {
@@ -27,27 +26,14 @@ impl Link {
                 };
                 let mut writer = Writer::new(usize::try_from(record.measure()).expect("short sign-in"));
                 record.encode(&mut writer).expect("measured sign-in");
-                self.signing_exchange(now, ExchangeKind::SignIn, b"/jig/v1/sign-in/link", writer.finish(), out);
+                self.signing_exchange(now, ExchangeKind::SignIn, Message::SignInLink(writer.finish()), out);
             }
         }
     }
     pub(super) fn sign_out(&mut self, now: Time, out: &mut Queue<Request>) {
-        self.signing_exchange(
-            now,
-            ExchangeKind::SignOut { generation: self.generation },
-            b"/jig/v1/sign-out",
-            Box::new([]),
-            out,
-        );
+        self.signing_exchange(now, ExchangeKind::SignOut { generation: self.generation }, Message::SignOut, out);
     }
-    fn signing_exchange(
-        &mut self,
-        now: Time,
-        kind: ExchangeKind,
-        path: &'static [u8],
-        body: Box<[u8]>,
-        out: &mut Queue<Request>,
-    ) {
+    fn signing_exchange(&mut self, _now: Time, kind: ExchangeKind, message: Message, out: &mut Queue<Request>) {
         let Some(next) = self.next.checked_add(1) else {
             out.push(Request::Signing { signing: Signing::Lost });
             return;
@@ -59,20 +45,11 @@ impl Link {
         let exchange = Token::new(self.next);
         self.next = next;
         self.attempts
-            .insert(
-                exchange,
-                Attempt {
-                    token: exchange,
-                    owner: w::Owner::Jig,
-                    version: 7,
-                    until: now.saturating_add(self.limits.deadline),
-                    kind,
-                },
-            )
+            .insert(exchange, Attempt { token: exchange, owner: w::Owner::Jig, version: 7, kind })
             .expect("checked exchange capacity");
-        self.exchange(exchange, path, body, out);
+        self.exchange(exchange, message, out);
     }
-    pub(super) fn signing_answer(&mut self, kind: ExchangeKind, status: u16, body: &[u8], out: &mut Queue<Request>) {
+    pub(super) fn signing_answer(&mut self, kind: ExchangeKind, body: &[u8], out: &mut Queue<Request>) {
         match kind {
             ExchangeKind::SignOut { generation } if generation != self.generation => return,
             ExchangeKind::SignOut { .. }
@@ -83,10 +60,6 @@ impl Link {
             | ExchangeKind::WatchClose { .. } => {}
         }
         let mut reader = Reader::new(body);
-        if status != 200 {
-            out.push(Request::Signing { signing: Signing::Lost });
-            return;
-        }
         let signing = {
             match kind {
                 ExchangeKind::SignIn => match w::SignInAnswer::decode(&self.limits.wire, &mut reader) {

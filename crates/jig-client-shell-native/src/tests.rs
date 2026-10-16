@@ -1,4 +1,6 @@
 use super::*;
+use jig_client_protocol_http::Unlinked;
+const EXCHANGE: u64 = 42;
 use jig_client_protocol_link as link;
 use skein_lib::{
     Queue, Secret, Time, Token, Writer,
@@ -11,6 +13,7 @@ fn limits() -> Limits {
     Limits {
         exchanges: 2,
         body_bytes: 128,
+        deadline: skein_lib::Duration::from_secs(1),
         http: skein_http::client::Limits { head: 1024, headers: 8, request: 1024, read: 64, send: 64 },
     }
 }
@@ -35,10 +38,9 @@ impl Peer {
         self.shell.down(
             Time::ZERO,
             link::Request::Exchange {
-                exchange: Token::new(42),
+                exchange: Token::new(EXCHANGE),
                 credential: Some(Secret::new(Box::new(TOKEN))),
-                path: b"/jig/v1/request",
-                body: Box::from(b"ask".as_slice()),
+                message: link::Message::Request(Box::from(b"ask".as_slice())),
             },
             &mut self.below,
         );
@@ -74,7 +76,7 @@ fn an_exchange_carries_the_bearer_token() {
     assert!(text.to_ascii_lowercase().contains("content-length: 3\r\n"));
     assert!(text.to_ascii_lowercase().contains("host: localhost\r\n"));
     assert!(
-        matches!(peer.up.pop(), Some(link::Event::Answered { exchange, status: 200, body }) if exchange == Token::new(42) && body.as_ref() == b"ok")
+        matches!(peer.up.pop(), Some(link::Event::Reply { exchange, message: body }) if exchange == Token::new(EXCHANGE) && body.as_ref() == b"ok")
     );
 }
 #[test]
@@ -88,8 +90,8 @@ fn a_body_of_unknown_length_read_as_it_arrives_is_the_same_whatever_its_cuts() {
         }
         peer.wire.eof = true;
         peer.drive();
-        assert!(matches!(peer.up.pop(), Some(link::Event::Answered { exchange, status: 200, body })
-            if exchange == Token::new(42) && body.as_ref() == b"whole body"));
+        assert!(matches!(peer.up.pop(), Some(link::Event::Reply { exchange, message: body })
+            if exchange == Token::new(EXCHANGE) && body.as_ref() == b"whole body"));
         assert!(peer.up.is_empty());
     }
 }
@@ -100,7 +102,7 @@ fn a_connection_cut_mid_body_fails_the_exchange() {
     peer.respond(b"HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nab");
     peer.wire.eof = true;
     peer.drive();
-    assert!(matches!(peer.up.pop(), Some(link::Event::Failed { exchange }) if exchange == Token::new(42)));
+    assert!(matches!(peer.up.pop(), Some(link::Event::Lost { exchange }) if exchange == Token::new(EXCHANGE)));
     assert!(peer.up.is_empty());
 }
 #[test]
@@ -172,10 +174,9 @@ impl Disk {
                 self.shell
                     .down(link::Request::Write { key: b"key".as_slice().into(), record: b"pending".as_slice().into() });
                 self.shell.down(link::Request::Exchange {
-                    exchange: Token::new(42),
+                    exchange: Token::new(EXCHANGE),
                     credential: Some(Secret::new(Box::new(TOKEN))),
-                    path: b"/jig/v1/request",
-                    body: b"ask".as_slice().into(),
+                    message: link::Message::Request(b"ask".as_slice().into()),
                 });
             }
         }
@@ -200,7 +201,7 @@ impl skein_shell::Host for Disk {
                     self.failures += 1;
                     self.closing = true;
                 }
-                link::Event::Failed { .. } => self.closing = true,
+                link::Event::Lost { .. } => self.closing = true,
                 other @ (link::Event::SignIn { .. }
                 | link::Event::SignOut
                 | link::Event::Start { .. }
@@ -208,7 +209,7 @@ impl skein_shell::Host for Disk {
                 | link::Event::Erase { .. }
                 | link::Event::Send { .. }
                 | link::Event::Read { .. }
-                | link::Event::Answered { .. }
+                | link::Event::Reply { .. }
                 | link::Event::Open { .. }
                 | link::Event::Continue { .. }
                 | link::Event::Close { .. }
@@ -331,4 +332,18 @@ fn a_failed_store_write_withholds_the_exchanges() {
     assert_eq!(outcome.procs[0].failures, 1);
     assert_eq!(outcome.procs[0].writes, 0);
     assert_eq!(outcome.procs[0].sockets, 0);
+}
+
+#[test]
+fn an_exchange_past_its_deadline_is_answered_lost() {
+    let mut peer = Peer::new();
+    peer.exchange();
+    peer.drive();
+    let until = Time::ZERO.saturating_add(limits().deadline);
+    assert_eq!(peer.shell.next_deadline(), Some(until));
+    peer.shell.take(until, &mut peer.up, &mut peer.below);
+    assert!(matches!(peer.up.pop(), Some(link::Event::Lost { exchange }) if exchange == Token::new(EXCHANGE)));
+    assert_eq!(peer.shell.next_deadline(), None);
+    peer.respond(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok");
+    assert!(peer.up.is_empty());
 }

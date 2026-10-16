@@ -188,7 +188,6 @@ impl Harness {
                 | Request::Write { .. }
                 | Request::Remove { .. }
                 | Request::Dropped { .. }
-                | Request::Abandon { .. }
                 | Request::Answer { .. }
                 | Request::Read { .. }
                 | Request::OpenStream { .. }
@@ -213,7 +212,6 @@ impl Harness {
                 | Request::Write { .. }
                 | Request::Remove { .. }
                 | Request::Dropped { .. }
-                | Request::Abandon { .. }
                 | Request::Answer { .. }
                 | Request::Read { .. }
                 | Request::OpenStream { .. }

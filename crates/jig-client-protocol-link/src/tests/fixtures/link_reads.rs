@@ -24,8 +24,7 @@ impl Harness {
         self.link.step(Time::ZERO, Event::Read { read: READ, what }, &mut self.out);
         match self.out.iter().last().expect("one exchange") {
             Request::Exchange { exchange, .. } => *exchange,
-            other @ (Request::Abandon { .. }
-            | Request::Answer { .. }
+            other @ (Request::Answer { .. }
             | Request::Read { .. }
             | Request::OpenStream { .. }
             | Request::CloseStream
@@ -60,7 +59,6 @@ impl Harness {
                 Request::Read { read, result } if *read == READ => return Some(result),
                 Request::Read { .. }
                 | Request::Exchange { .. }
-                | Request::Abandon { .. }
                 | Request::Answer { .. }
                 | Request::OpenStream { .. }
                 | Request::CloseStream
@@ -86,7 +84,6 @@ impl Harness {
                 Request::Read { read, .. } if *read == READ => count = count.saturating_add(1),
                 Request::Read { .. }
                 | Request::Exchange { .. }
-                | Request::Abandon { .. }
                 | Request::Answer { .. }
                 | Request::OpenStream { .. }
                 | Request::CloseStream
@@ -289,5 +286,5 @@ pub fn malformed_read_values() -> [Box<[u8]>; 4] {
 pub fn read_byte_limits(document_bytes: u64) -> Limits {
     let mut client = limits().client;
     client.document_bytes = document_bytes;
-    Limits::new(client, 4, limits().deadline).unwrap()
+    Limits::new(client, 4).unwrap()
 }

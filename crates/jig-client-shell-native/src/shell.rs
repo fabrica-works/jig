@@ -1,5 +1,6 @@
 //! Connections on sockets, with private durable storage (protocol/client.md, 12).
-use crate::{Conn, Connections, Limits, Unlinked, files::Files};
+use crate::{Conn, Connections, Limits, files::Files};
+use jig_client_protocol_http::{Mapping, Unlinked};
 use jig_client_protocol_link::boundary as link;
 use skein_io::{
     self as io,
@@ -91,7 +92,8 @@ impl Shell {
     /// # Errors
     /// Refuses a printed link whose address differs from the configured engine.
     pub fn sign_in(&mut self, printed: &[u8]) -> Result<Secret, Unlinked> {
-        let (host, _) = crate::sign_in::parse(printed)?;
+        let parsed = jig_client_protocol_http::printed(&Mapping::new(b"/jig").expect("default mapping"), printed)?;
+        let host = std::str::from_utf8(&parsed.host).map_err(|_| Unlinked::Address)?;
         let addr = host.parse().map_err(|_| Unlinked::Address)?;
         if self.engine != io::Addr::Ip(addr) {
             return Err(Unlinked::Address);
@@ -107,7 +109,7 @@ impl Shell {
                 assert!(self.held.len() < usize::try_from(self.max * 64).expect("held bound"), "step output bound");
                 self.held.push_back(request);
             }
-            request @ (link::Request::Abandon { .. } | link::Request::CloseStream) => {
+            request @ link::Request::CloseStream => {
                 self.connections.down(self.env.now, request, &mut self.below);
             }
             link::Request::Kept { .. }
@@ -238,7 +240,7 @@ impl Shell {
             if !ok {
                 while let Some(request) = self.held.pop_front() {
                     if let link::Request::Exchange { exchange, .. } = request {
-                        self.events.push(link::Event::Failed { exchange });
+                        self.events.push(link::Event::Lost { exchange });
                     } else {
                         assert!(matches!(request, link::Request::OpenStream { .. }), "only exchanges and streams held");
                         self.events.push(link::Event::StreamEnded);
@@ -287,7 +289,7 @@ impl Shell {
     }
     #[must_use]
     pub fn next_deadline(&self) -> Option<Time> {
-        [self.io.next_deadline(), self.files.deadline()].into_iter().flatten().min()
+        [self.io.next_deadline(), self.files.deadline(), self.connections.next_deadline()].into_iter().flatten().min()
     }
     #[must_use]
     pub fn next_policy_deadline(&self) -> Option<Time> {

@@ -130,7 +130,6 @@ impl Side {
                 Event::Jig(jig_domain_client::Event::Hello { served: link::serves(versions) })
             }
             transport @ (link::Request::Exchange { .. }
-            | link::Request::Abandon { .. }
             | link::Request::OpenStream { .. }
             | link::Request::CloseStream) => return Err(transport),
             ignored @ (link::Request::Signing { .. }
@@ -421,7 +420,8 @@ impl Front<Test> for Protocol {
     fn next_due(&self) -> Option<Time> {
         self.clients
             .values()
-            .filter_map(|side| side.link.next_deadline())
+            .flat_map(|side| [side.link.next_deadline(), side.connections.next_deadline()])
+            .flatten()
             .chain(self.engine.component.next_deadline())
             .chain(self.engine.driver.world.next_due())
             .chain(self.release)

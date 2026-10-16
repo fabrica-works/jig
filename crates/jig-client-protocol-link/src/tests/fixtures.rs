@@ -35,7 +35,7 @@ const CLIENT: jig_domain_client::Limits = jig_domain_client::Limits {
 };
 
 pub fn limits() -> Limits {
-    Limits::new(CLIENT, 4, Duration::from_secs(10)).expect("valid client limits")
+    Limits::new(CLIENT, 4).expect("valid client limits")
 }
 pub fn start_chat() -> c::Ask {
     c::Ask::StartChat { project: 7, words: c::Text::new(Box::from(b"hello".as_slice()), 32).expect("fixture text") }
@@ -93,8 +93,7 @@ impl Harness {
         self.link.step(Time::ZERO, Event::Send { attempt, key, ask: Ask::Jig(Box::new(ask)) }, &mut self.out);
         match self.out.iter().next().expect("one exchange") {
             Request::Exchange { exchange, .. } => *exchange,
-            other @ (Request::Abandon { .. }
-            | Request::Answer { .. }
+            other @ (Request::Answer { .. }
             | Request::Read { .. }
             | Request::OpenStream { .. }
             | Request::CloseStream
@@ -118,8 +117,8 @@ impl Harness {
         let exchange = h.send(ATTEMPT, KEY, start_chat());
         (h, exchange)
     }
-    pub fn answer(&mut self, exchange: Token, status: u16, bytes: &[u8]) {
-        self.link.step(Time::ZERO, Event::Answered { exchange, status, body: Box::from(bytes) }, &mut self.out);
+    pub fn answer(&mut self, exchange: Token, bytes: &[u8]) {
+        self.link.step(Time::ZERO, Event::Reply { exchange, message: Box::from(bytes) }, &mut self.out);
     }
     pub fn answered(&self, token: Token) -> Option<(RequestEnvelope, Option<&Answered>)> {
         for request in &self.out {
@@ -128,7 +127,6 @@ impl Harness {
                     return Some((*envelope, answer.as_ref()));
                 }
                 Request::Exchange { .. }
-                | Request::Abandon { .. }
                 | Request::Answer { .. }
                 | Request::Read { .. }
                 | Request::OpenStream { .. }
@@ -162,7 +160,6 @@ impl Harness {
             match value {
                 Request::Answer { .. } => count = count.saturating_add(1),
                 Request::Exchange { .. }
-                | Request::Abandon { .. }
                 | Request::Read { .. }
                 | Request::OpenStream { .. }
                 | Request::CloseStream

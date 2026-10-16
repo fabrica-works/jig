@@ -95,13 +95,13 @@ pub fn connections_limits() -> jig_client_shell_native::Limits {
     jig_client_shell_native::Limits {
         exchanges: 8,
         body_bytes: 65536,
+        deadline: Duration::from_secs(1),
         http: skein_http::client::Limits { head: 4096, headers: 8, request: 4096, read: 1024, send: 1024 },
     }
 }
 #[must_use]
 pub fn link_limits() -> jig_client_protocol_link::Limits {
-    jig_client_protocol_link::Limits::new(jig_client_world::test::limits().jig, 8, Duration::from_secs(1))
-        .expect("bounded link")
+    jig_client_protocol_link::Limits::new(jig_client_world::test::limits().jig, 8).expect("bounded link")
 }
 #[must_use]
 pub fn sign_in_then(

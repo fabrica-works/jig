@@ -6,7 +6,6 @@ use skein_lib::{Duration, Map};
 pub struct Limits {
     pub client: jig_domain_client::Limits,
     pub exchanges: u32,
-    pub deadline: Duration,
     pub wire: w::Limits,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -19,9 +18,9 @@ impl Limits {
     pub const fn stream_chunk(&self) -> u32 {
         1024
     }
-    pub fn new(client: jig_domain_client::Limits, exchanges: u32, deadline: Duration) -> Result<Self, Unusable> {
+    pub fn new(client: jig_domain_client::Limits, exchanges: u32) -> Result<Self, Unusable> {
         let wire = wire(&client).ok_or(Unusable::Limits)?;
-        let value = Self { client, exchanges, deadline, wire };
+        let value = Self { client, exchanges, wire };
         worst_case(&value).ok_or(Unusable::Limits)?;
         Ok(value)
     }
@@ -167,7 +166,7 @@ fn wire(client: &jig_domain_client::Limits) -> Option<w::Limits> {
 }
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
-    if limits.exchanges == 0 || limits.deadline == Duration::ZERO {
+    if limits.exchanges == 0 {
         return None;
     }
     if wire(&limits.client)? != limits.wire {

@@ -204,6 +204,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "jig-client-protocol-http"
+version = "0.0.0"
+dependencies = [
+ "jig-client-protocol-link",
+ "skein-http",
+ "skein-lib",
+]
+
+[[package]]
 name = "jig-client-protocol-link"
 version = "0.0.0"
 dependencies = [
@@ -230,6 +239,7 @@ name = "jig-client-protocol-world"
 version = "0.0.0"
 dependencies = [
  "jig-client-domain",
+ "jig-client-protocol-http",
  "jig-client-protocol-link",
  "jig-client-protocol-wire",
  "jig-client-shell-native",
@@ -275,6 +285,7 @@ dependencies = [
 name = "jig-client-shell-native"
 version = "0.0.0"
 dependencies = [
+ "jig-client-protocol-http",
  "jig-client-protocol-link",
  "jig-client-protocol-wire",
  "skein-fake-machine",

@@ -171,7 +171,7 @@ fn a_page_one_byte_past_the_document_limit_is_refused() {
     let record = fixtures::object_page_piece(fixtures::result_rows(1));
     let mut client = fixtures::limits().client;
     client.document_bytes = u64::from(record.measure()).checked_sub(1).unwrap();
-    let limits = Limits::new(client, 4, fixtures::limits().deadline).unwrap();
+    let limits = Limits::new(client, 4).unwrap();
     assert_eq!(translate::pages::object_page(record, &limits), Err(Undecodable::TooLarge));
 }
 #[test]

@@ -59,8 +59,9 @@ fn each_wire_none_keeps_its_reason() {
 fn a_read_becomes_one_post_with_its_owner_and_cursor() {
     let (mut h, _) = fixtures::Harness::reading();
     assert_eq!(h.out.len(), 1);
-    let Request::Exchange { path, body, .. } = h.out.pop().unwrap() else { panic!("expected read exchange") };
-    assert_eq!(path, b"/jig/v1/read");
+    let Request::Exchange { message: Message::Read(body), .. } = h.out.pop().unwrap() else {
+        panic!("expected read exchange")
+    };
     let record = w::Owned::decode(&fixtures::limits().wire, &mut Reader::new(&body)).unwrap();
     assert_eq!(record.owner(), &w::Owner::Jig);
     assert_eq!(record.version(), jig_client_protocol_wire::VERSION);
@@ -73,26 +74,25 @@ fn a_read_becomes_one_post_with_its_owner_and_cursor() {
 #[test]
 fn a_read_signed_out_is_answered_signed_out() {
     let (mut h, exchange) = fixtures::Harness::reading();
-    h.answer(exchange, 200, &fixtures::read_none_answer(w::ReadNone::SignedOut));
+    h.answer(exchange, &fixtures::read_none_answer(w::ReadNone::SignedOut));
     assert_eq!(h.read_answered(), Some(&Readout::Jig(c::ReadResult::None(c::ReadNone::SignedOut))));
     assert_eq!(h.link.next_deadline(), None);
 }
 #[test]
 fn a_read_with_no_answer_is_unreachable() {
     let (mut h, exchange) = fixtures::Harness::reading();
-    h.link.step(Time::ZERO, Event::Failed { exchange }, &mut h.out);
+    h.link.step(Time::ZERO, Event::Lost { exchange }, &mut h.out);
     h.read_unreachable();
-    h.answer(exchange, 200, &fixtures::read_none_answer(w::ReadNone::Unknown));
+    h.answer(exchange, &fixtures::read_none_answer(w::ReadNone::Unknown));
     assert_eq!(h.read_terminals(), 1);
     assert_eq!(h.link.next_deadline(), None);
 }
 #[test]
-fn a_read_past_its_deadline_is_abandoned_and_answered_once() {
+fn a_lost_read_is_answered_once() {
     let (mut h, exchange) = fixtures::Harness::reading();
-    h.link.fire(Time::ZERO.saturating_add(fixtures::limits().deadline), &mut h.out);
-    assert!(h.has(&Request::Abandon { exchange }));
+    h.link.step(Time::ZERO, Event::Lost { exchange }, &mut h.out);
     h.read_unreachable();
-    h.answer(exchange, 200, &fixtures::read_none_answer(w::ReadNone::Busy));
+    h.answer(exchange, &fixtures::read_none_answer(w::ReadNone::Busy));
     assert_eq!(h.read_terminals(), 1);
     assert_eq!(h.link.next_deadline(), None);
 }
@@ -105,8 +105,8 @@ fn a_read_none_answer_keeps_each_wire_reason_once() {
         (w::ReadNone::Busy, c::ReadNone::Busy),
     ] {
         let (mut h, exchange) = fixtures::Harness::reading();
-        h.answer(exchange, 200, &fixtures::read_none_answer(wire));
-        h.answer(exchange, 200, &fixtures::read_none_answer(w::ReadNone::SignedOut));
+        h.answer(exchange, &fixtures::read_none_answer(wire));
+        h.answer(exchange, &fixtures::read_none_answer(w::ReadNone::SignedOut));
         assert_eq!(h.read_answered(), Some(&Readout::Jig(c::ReadResult::None(client))));
         assert_eq!(h.read_terminals(), 1);
     }
@@ -114,36 +114,32 @@ fn a_read_none_answer_keeps_each_wire_reason_once() {
 #[test]
 fn a_family_read_is_answered_once_with_its_opaque_value() {
     let (mut h, exchange) = fixtures::Harness::reading_family();
-    h.answer(exchange, 200, &fixtures::family_read_answer(19, 23));
-    h.answer(exchange, 200, &fixtures::family_read_answer(19, 23));
+    h.answer(exchange, &fixtures::family_read_answer(19, 23));
+    h.answer(exchange, &fixtures::family_read_answer(19, 23));
     assert_eq!(h.read_answered(), Some(&Readout::Family { family: 19, record: Some(Box::from([255, 0, 1])) }));
     assert_eq!(h.read_terminals(), 1);
 }
 #[test]
 fn a_family_read_none_stays_under_its_owner() {
     let (mut h, exchange) = fixtures::Harness::reading_family();
-    h.answer(exchange, 200, &fixtures::read_none_answer(w::ReadNone::Unknown));
+    h.answer(exchange, &fixtures::read_none_answer(w::ReadNone::Unknown));
     assert_eq!(h.read_answered(), Some(&Readout::Family { family: 19, record: None }));
 }
 #[test]
 fn a_read_value_from_another_owner_or_version_is_reported() {
     for (owner, version) in [(20, 23), (19, 24)] {
         let (mut h, exchange) = fixtures::Harness::reading_family();
-        h.answer(exchange, 200, &fixtures::family_read_answer(owner, version));
+        h.answer(exchange, &fixtures::family_read_answer(owner, version));
         assert_eq!(h.read_answered(), Some(&Readout::Family { family: 19, record: None }));
         assert!(h.has(&Request::Fact { fact: Fact::UndecodableDocument }));
     }
 }
 #[test]
-fn a_failed_read_status_or_malformed_body_is_unreachable() {
-    for (status, body, reported) in
-        [(503, fixtures::read_none_answer(w::ReadNone::Busy), false), (200, Box::from([255]), true)]
-    {
-        let (mut h, exchange) = fixtures::Harness::reading();
-        h.answer(exchange, status, &body);
-        h.read_unreachable();
-        assert_eq!(h.has(&Request::Fact { fact: Fact::UndecodableDocument }), reported);
-    }
+fn a_malformed_read_body_is_unreachable() {
+    let (mut h, exchange) = fixtures::Harness::reading();
+    h.answer(exchange, &[255]);
+    h.read_unreachable();
+    assert!(h.has(&Request::Fact { fact: Fact::UndecodableDocument }));
 }
 #[test]
 fn reads_and_attempts_share_the_exchange_admission_bound() {
@@ -164,8 +160,8 @@ fn reads_and_attempts_share_the_exchange_admission_bound() {
 #[test]
 fn a_read_is_answered_once_with_its_value() {
     let (mut h, exchange) = fixtures::Harness::reading();
-    h.answer(exchange, 200, &fixtures::jig_read_value_answer(&fixtures::frame_read_value()));
-    h.answer(exchange, 200, &fixtures::read_none_answer(w::ReadNone::Unknown));
+    h.answer(exchange, &fixtures::jig_read_value_answer(&fixtures::frame_read_value()));
+    h.answer(exchange, &fixtures::read_none_answer(w::ReadNone::Unknown));
     assert_eq!(h.read_answered(), Some(&fixtures::expected_frame_read()));
     assert_eq!(h.read_terminals(), 1);
     assert_eq!(h.link.next_deadline(), None);
@@ -174,7 +170,7 @@ fn a_read_is_answered_once_with_its_value() {
 fn a_value_past_the_client_s_limits_is_unreachable_and_reported() {
     for value in fixtures::values_past_client_limits() {
         let (mut h, exchange) = fixtures::Harness::reading();
-        h.answer(exchange, 200, &fixtures::jig_read_value_answer(&value));
+        h.answer(exchange, &fixtures::jig_read_value_answer(&value));
         h.read_unreachable();
         assert!(h.has(&Request::Fact { fact: Fact::UndecodableDocument }));
         assert_eq!(h.read_terminals(), 1);
@@ -184,7 +180,7 @@ fn a_value_past_the_client_s_limits_is_unreachable_and_reported() {
 fn each_discriminated_read_value_reaches_its_contract_variant() {
     for (wire, expected) in fixtures::read_value_cases() {
         let (mut h, exchange) = fixtures::Harness::reading();
-        h.answer(exchange, 200, &fixtures::jig_read_value_answer(&wire));
+        h.answer(exchange, &fixtures::jig_read_value_answer(&wire));
         assert_eq!(h.read_answered(), Some(&Readout::Jig(c::ReadResult::Value(expected))));
         assert!(!h.has(&Request::Fact { fact: Fact::UndecodableDocument }));
     }
@@ -193,7 +189,7 @@ fn each_discriminated_read_value_reaches_its_contract_variant() {
 fn a_malformed_read_value_is_unreachable_and_reported() {
     for value in fixtures::malformed_read_values() {
         let (mut h, exchange) = fixtures::Harness::reading();
-        h.answer(exchange, 200, &fixtures::jig_read_record_answer(value, jig_client_protocol_wire::VERSION));
+        h.answer(exchange, &fixtures::jig_read_record_answer(value, jig_client_protocol_wire::VERSION));
         h.read_unreachable();
         assert!(h.has(&Request::Fact { fact: Fact::UndecodableDocument }));
     }
@@ -202,7 +198,7 @@ fn a_malformed_read_value_is_unreachable_and_reported() {
 fn a_read_value_of_another_wire_version_is_unreachable_and_reported() {
     let (mut h, exchange) = fixtures::Harness::reading();
     let value = fixtures::encoded_read_value(&fixtures::frame_read_value());
-    h.answer(exchange, 200, &fixtures::jig_read_record_answer(value, 2));
+    h.answer(exchange, &fixtures::jig_read_record_answer(value, 2));
     h.read_unreachable();
     assert!(h.has(&Request::Fact { fact: Fact::UndecodableDocument }));
 }
@@ -226,7 +222,7 @@ fn a_read_value_rejects_mutated_original_limits() {
 fn a_read_page_keeps_both_long_cursors_without_parsing_them() {
     let (mut h, exchange) = fixtures::Harness::reading();
     let value = w::ReadValue::Notes(fixtures::note_page_with_cursors());
-    h.answer(exchange, 200, &fixtures::jig_read_value_answer(&value));
+    h.answer(exchange, &fixtures::jig_read_value_answer(&value));
     let expected = c::ReadValue::Notes(Box::new(fixtures::expected_note_page_with_cursors()));
     assert_eq!(h.read_answered(), Some(&Readout::Jig(c::ReadResult::Value(expected))));
 }
@@ -234,7 +230,7 @@ fn a_read_page_keeps_both_long_cursors_without_parsing_them() {
 fn a_read_activity_keeps_each_undecodable_turn_in_its_page() {
     for (record, expected) in fixtures::unread_pages() {
         let (mut h, exchange) = fixtures::Harness::reading();
-        h.answer(exchange, 200, &fixtures::jig_read_value_answer(&w::ReadValue::Activity(record)));
+        h.answer(exchange, &fixtures::jig_read_value_answer(&w::ReadValue::Activity(record)));
         let expected = c::ReadValue::Activity(Box::new(expected));
         assert_eq!(h.read_answered(), Some(&Readout::Jig(c::ReadResult::Value(expected))));
     }

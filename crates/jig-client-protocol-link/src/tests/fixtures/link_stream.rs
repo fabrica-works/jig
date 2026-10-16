@@ -92,12 +92,11 @@ impl Harness {
     pub fn opening(&self) -> (Token, u64) {
         for request in &self.out {
             match request {
-                Request::Exchange { exchange, path, body, .. } if *path == b"/jig/v1/watch" => {
+                Request::Exchange { exchange, message: Message::Watch(body), .. } => {
                     let record = w::Open::decode(&limits().wire, &mut Reader::new(body)).unwrap();
                     return (*exchange, record.watch());
                 }
                 Request::Exchange { .. }
-                | Request::Abandon { .. }
                 | Request::Answer { .. }
                 | Request::Read { .. }
                 | Request::OpenStream { .. }
@@ -122,7 +121,6 @@ impl Harness {
             match request {
                 Request::Ended { watch: token, end } if *token == watch => return Some(*end),
                 Request::Exchange { .. }
-                | Request::Abandon { .. }
                 | Request::Answer { .. }
                 | Request::Read { .. }
                 | Request::OpenStream { .. }
@@ -148,7 +146,6 @@ impl Harness {
             match request {
                 Request::Ended { .. } => count = count.checked_add(1).unwrap(),
                 Request::Exchange { .. }
-                | Request::Abandon { .. }
                 | Request::Answer { .. }
                 | Request::Read { .. }
                 | Request::OpenStream { .. }
@@ -170,9 +167,8 @@ impl Harness {
     pub fn close(&mut self) -> Token {
         self.link.step(Time::ZERO, Event::Close { watch: WATCH }, &mut self.out);
         match self.out.iter().last().unwrap() {
-            Request::Exchange { exchange, path: b"/jig/v1/unwatch", .. } => *exchange,
+            Request::Exchange { exchange, message: Message::Unwatch(_), .. } => *exchange,
             other @ (Request::Exchange { .. }
-            | Request::Abandon { .. }
             | Request::Answer { .. }
             | Request::Read { .. }
             | Request::OpenStream { .. }
@@ -198,11 +194,10 @@ impl Harness {
     pub fn gone_name(&self) -> [u8; 16] {
         for request in &self.out {
             match request {
-                Request::Exchange { path: b"/jig/v1/stream-gone", body, .. } => {
+                Request::Exchange { message: Message::StreamGone(body), .. } => {
                     return *w::Gone::decode(&limits().wire, &mut Reader::new(body)).unwrap().stream();
                 }
                 Request::Exchange { .. }
-                | Request::Abandon { .. }
                 | Request::Answer { .. }
                 | Request::Read { .. }
                 | Request::OpenStream { .. }
@@ -225,7 +220,7 @@ impl Harness {
     pub fn assert_run_subject(&self) {
         for request in &self.out {
             match request {
-                Request::Exchange { path: b"/jig/v1/watch", body, .. } => {
+                Request::Exchange { message: Message::Watch(body), .. } => {
                     let lim = limits().wire;
                     let open = w::Open::decode(&lim, &mut Reader::new(body)).unwrap();
                     let subject = w::Subject::decode(&lim, &mut Reader::new(open.subject().record())).unwrap();
@@ -244,7 +239,6 @@ impl Harness {
                     return;
                 }
                 Request::Exchange { .. }
-                | Request::Abandon { .. }
                 | Request::Answer { .. }
                 | Request::Read { .. }
                 | Request::OpenStream { .. }

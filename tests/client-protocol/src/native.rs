@@ -135,7 +135,7 @@ impl NativeClient {
     }
     /// # Errors
     /// Refuses a link outside the configured loopback engine's address.
-    pub fn sign_in(&mut self, printed: &[u8]) -> Result<(), jig_client_shell_native::Unlinked> {
+    pub fn sign_in(&mut self, printed: &[u8]) -> Result<(), jig_client_protocol_http::Unlinked> {
         let secret = self.shell.sign_in(printed)?;
         self.side.event(self.env.now, link::Event::SignIn { with: link::With::Link(secret) });
         Ok(())

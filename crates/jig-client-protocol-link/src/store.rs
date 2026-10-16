@@ -1,5 +1,5 @@
 //! Durability before exchanges, and owner-versioned restoration (protocol/client.md, 10).
-use crate::{Erased, Fact, Keeper, Limits, Link, Request, Saved, StoreRead, StoreVersion, translate};
+use crate::{Erased, Fact, Keeper, Limits, Link, Message, Request, Saved, StoreRead, StoreVersion, translate};
 use alloc::boxed::Box;
 use jig_client_protocol_wire::v7 as w;
 use jig_domain_client::store::StoreKey;
@@ -7,8 +7,7 @@ use skein_lib::{List, Queue, Reader, Token, Writer, bytes};
 #[derive(Debug)]
 struct Held {
     exchange: Token,
-    path: &'static [u8],
-    body: Box<[u8]>,
+    message: Message,
     tracked: bool,
     credential: Option<skein_lib::Secret>,
 }
@@ -166,10 +165,12 @@ fn restore(value: w::Kept, storage_key: &[u8], limits: &Limits) -> Result<Saved,
     Ok(saved)
 }
 impl Link {
-    pub(super) fn exchange(&mut self, exchange: Token, path: &'static [u8], body: Box<[u8]>, out: &mut Queue<Request>) {
-        if !self.attempts.contains_key(&exchange)
-            && (path == b"/jig/v1/request" || path == b"/jig/v1/read" || path == b"/jig/v1/watch")
-        {
+    pub(super) fn exchange(&mut self, exchange: Token, message: Message, out: &mut Queue<Request>) {
+        let tracked = match &message {
+            Message::Request(_) | Message::Read(_) | Message::Watch(_) => true,
+            Message::Unwatch(_) | Message::StreamGone(_) | Message::SignInLink(_) | Message::SignOut => false,
+        };
+        if !self.attempts.contains_key(&exchange) && tracked {
             return;
         }
         if self.store.failed {
@@ -184,14 +185,13 @@ impl Link {
             } else {
                 self.store.held.push(Held {
                     exchange,
-                    path,
-                    body,
+                    message,
                     tracked: self.attempts.contains_key(&exchange),
                     credential: self.credential.clone(),
                 });
             }
         } else {
-            out.push(Request::Exchange { exchange, path, body, credential: self.credential.clone() });
+            out.push(Request::Exchange { exchange, message, credential: self.credential.clone() });
         }
     }
     fn gather(&mut self, out: &mut Queue<Request>) {
@@ -199,12 +199,11 @@ impl Link {
         let count = out.len();
         for _ in 0..count {
             match out.pop().expect("counted step outputs") {
-                Request::Exchange { exchange, path, body, .. } => self.exchange(exchange, path, body, out),
+                Request::Exchange { exchange, message, .. } => self.exchange(exchange, message, out),
                 value @ (Request::Write { .. }
                 | Request::Remove { .. }
                 | Request::Kept { .. }
                 | Request::Dropped { .. }
-                | Request::Abandon { .. }
                 | Request::Answer { .. }
                 | Request::OpenStream { .. }
                 | Request::CloseStream
@@ -267,8 +266,7 @@ impl Link {
             if !value.tracked || self.attempts.contains_key(&value.exchange) {
                 out.push(Request::Exchange {
                     exchange: value.exchange,
-                    path: value.path,
-                    body: value.body,
+                    message: value.message,
                     credential: value.credential,
                 });
             }

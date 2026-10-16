@@ -1,5 +1,7 @@
 //! One bounded exchange per request-table attempt (protocol/client.md, 5).
-use crate::{Answered, Ask, Event, Fact, Family, Limits, Readable, Readout, Request, Unusable, Watchable, translate};
+use crate::{
+    Answered, Ask, Event, Fact, Family, Limits, Message, Readable, Readout, Request, Unusable, Watchable, translate,
+};
 use alloc::boxed::Box;
 use jig_client_protocol_wire::{self as wire, v7 as w};
 use skein_lib::{Map, Queue, Reader, RequestEnvelope, RequestKey, Secret, Time, Token, Writer};
@@ -8,7 +10,6 @@ pub(crate) struct Attempt {
     pub(super) token: Token,
     pub(super) owner: w::Owner,
     pub(super) version: u32,
-    pub(super) until: Time,
     pub(super) kind: ExchangeKind,
 }
 #[derive(Clone, Copy, Debug)]
@@ -54,20 +55,8 @@ impl Link {
     }
     #[must_use]
     pub fn next_deadline(&self) -> Option<Time> {
-        let mut first = None;
-        for (_, attempt) in &self.attempts {
-            first = Some(match first {
-                Some(value) => core::cmp::min(value, attempt.until),
-                None => attempt.until,
-            });
-        }
-        if let Some(stream) = &self.stream {
-            first = Some(match first {
-                Some(value) => core::cmp::min(value, stream.deadline()),
-                None => stream.deadline(),
-            });
-        }
-        first
+        let Some(stream) = &self.stream else { return None };
+        Some(stream.deadline())
     }
     pub fn reclaim(&mut self) {}
     #[must_use]
@@ -98,8 +87,8 @@ impl Link {
             Event::StreamEnded => self.drop_stream(now, out),
             Event::Send { attempt, key, ask } => self.send(now, attempt, key, ask, out),
             Event::Read { read, what } => self.read(now, read, what, out),
-            Event::Answered { exchange, status, body } => self.answered(exchange, status, &body, out),
-            Event::Failed { exchange } => {
+            Event::Reply { exchange, message } => self.answered(exchange, &message, out),
+            Event::Lost { exchange } => {
                 if let Some(attempt) = self.attempts.remove(&exchange) {
                     self.failure(attempt, out);
                 }
@@ -107,24 +96,13 @@ impl Link {
         }
     }
     pub fn fire(&mut self, now: Time, out: &mut Queue<Request>) {
-        let mut expired = skein_lib::List::with_capacity(self.limits.exchanges);
-        for (exchange, attempt) in &self.attempts {
-            if now >= attempt.until {
-                expired.push(*exchange).expect("bounded attempts");
-            }
-        }
-        for exchange in &expired {
-            let attempt = self.attempts.remove(exchange).expect("collected live exchange");
-            out.push(Request::Abandon { exchange: *exchange });
-            self.failure(attempt, out);
-        }
         if let Some(stream) = &self.stream
             && now >= stream.deadline()
         {
             self.drop_stream(now, out);
         }
     }
-    fn send(&mut self, now: Time, attempt: Token, key: RequestKey, ask: Ask, out: &mut Queue<Request>) {
+    fn send(&mut self, _now: Time, attempt: Token, key: RequestKey, ask: Ask, out: &mut Queue<Request>) {
         if self.attempts.len() == self.attempts.capacity() {
             lost(attempt, out);
             return;
@@ -143,15 +121,14 @@ impl Link {
             token: attempt,
             owner: record.owner().clone(),
             version: record.version(),
-            until: now.saturating_add(self.limits.deadline),
             kind: ExchangeKind::Attempt,
         };
         self.attempts.insert(exchange, state).expect("checked exchange capacity");
         let mut writer = Writer::new(usize::try_from(record.measure()).expect("u32 fits usize"));
         record.encode(&mut writer).expect("measured envelope");
-        self.exchange(exchange, b"/jig/v1/request", writer.finish(), out);
+        self.exchange(exchange, Message::Request(writer.finish()), out);
     }
-    fn read(&mut self, now: Time, read: Token, what: Readable, out: &mut Queue<Request>) {
+    fn read(&mut self, _now: Time, read: Token, what: Readable, out: &mut Queue<Request>) {
         let owner = match &what {
             Readable::Jig(_) => w::Owner::Jig,
             Readable::Family(value) => w::Owner::Family(
@@ -173,38 +150,28 @@ impl Link {
         };
         let exchange = Token::new(self.next);
         self.next = next;
-        let state = Attempt {
-            token: read,
-            owner,
-            version: record.version(),
-            until: now.saturating_add(self.limits.deadline),
-            kind: ExchangeKind::Read,
-        };
+        let state = Attempt { token: read, owner, version: record.version(), kind: ExchangeKind::Read };
         self.attempts.insert(exchange, state).expect("checked exchange capacity");
         let mut writer = Writer::new(usize::try_from(record.measure()).expect("u32 fits usize"));
         record.encode(&mut writer).expect("measured read envelope");
-        self.exchange(exchange, b"/jig/v1/read", writer.finish(), out);
+        self.exchange(exchange, Message::Read(writer.finish()), out);
     }
-    fn answered(&mut self, exchange: Token, status: u16, body: &[u8], out: &mut Queue<Request>) {
+    fn answered(&mut self, exchange: Token, body: &[u8], out: &mut Queue<Request>) {
         let Some(attempt) = self.attempts.remove(&exchange) else { return };
         match attempt.kind {
             ExchangeKind::SignIn | ExchangeKind::SignOut { .. } => {
-                self.signing_answer(attempt.kind, status, body, out);
+                self.signing_answer(attempt.kind, body, out);
                 return;
             }
             ExchangeKind::Attempt => {}
             ExchangeKind::WatchOpen { name } | ExchangeKind::WatchClose { name } => {
-                self.watch_answer(attempt, name, status, body, out);
+                self.watch_answer(attempt, name, body, out);
                 return;
             }
             ExchangeKind::Read => {
-                self.read_answer(attempt, status, body, out);
+                self.read_answer(attempt, body, out);
                 return;
             }
-        }
-        if status != 200 {
-            lost(attempt.token, out);
-            return;
         }
         let Ok(record) = w::Answer::decode(&self.limits.wire, &mut Reader::new(body)) else {
             lost(attempt.token, out);
@@ -252,11 +219,7 @@ impl Link {
         };
         out.push(Request::Answer { attempt: attempt.token, envelope, answer: None });
     }
-    fn read_answer(&self, attempt: Attempt, status: u16, body: &[u8], out: &mut Queue<Request>) {
-        if status != 200 {
-            failed(attempt, out);
-            return;
-        }
+    fn read_answer(&self, attempt: Attempt, body: &[u8], out: &mut Queue<Request>) {
         let result = match w::ReadAnswer::decode(&self.limits.wire, &mut Reader::new(body)) {
             Ok(w::ReadAnswer::None(record)) => {
                 read_none(attempt.token, &attempt.owner, translate::reads::none(record.value()), out);
@@ -373,7 +336,7 @@ impl Link {
             }
         }
     }
-    fn send_open(&mut self, now: Time, watch: Token, out: &mut Queue<Request>) {
+    fn send_open(&mut self, _now: Time, watch: Token, out: &mut Queue<Request>) {
         let Some(stream) = &self.stream else { return };
         let Some(stream) = stream.name else { return };
         if self.attempts.len() == self.attempts.capacity() {
@@ -392,13 +355,12 @@ impl Link {
             token: watch,
             owner: opening.owner.clone(),
             version: opening.version,
-            until: now.saturating_add(self.limits.deadline),
             kind: ExchangeKind::WatchOpen { name: opening.name },
         };
         self.attempts.insert(exchange, attempt).expect("checked opening exchange capacity");
         let mut writer = Writer::new(usize::try_from(record.measure()).expect("u32 fits usize"));
         record.encode(&mut writer).expect("measured opening");
-        self.exchange(exchange, b"/jig/v1/watch", writer.finish(), out);
+        self.exchange(exchange, Message::Watch(writer.finish()), out);
     }
     fn close(&mut self, now: Time, watch: Token, out: &mut Queue<Request>) {
         let Some(opening) = self.watches.0.get(&watch) else { return };
@@ -424,13 +386,12 @@ impl Link {
             token: watch,
             owner: opening.owner.clone(),
             version: opening.version,
-            until: now.saturating_add(self.limits.deadline),
             kind: ExchangeKind::WatchClose { name },
         };
         self.attempts.insert(exchange, attempt).expect("checked closing exchange capacity");
         self.unwatch(exchange, stream, name, out);
     }
-    fn cancel_open(&mut self, watch: Token, name: u64, out: &mut Queue<Request>) {
+    fn cancel_open(&mut self, watch: Token, name: u64, _out: &mut Queue<Request>) {
         let mut tokens = skein_lib::List::with_capacity(self.limits.exchanges);
         for (exchange, attempt) in &self.attempts {
             match attempt.kind {
@@ -444,7 +405,6 @@ impl Link {
         }
         for exchange in &tokens {
             assert!(self.attempts.remove(exchange).is_some(), "collected live watch exchange");
-            out.push(Request::Abandon { exchange: *exchange });
         }
     }
     fn forget(&mut self, watch: Token, out: &mut Queue<Request>) {
@@ -465,19 +425,15 @@ impl Link {
             w::WatchClose::new(&self.limits.wire, w::WatchCloseParts { stream, watch }).expect("fixed closing names");
         let mut writer = Writer::new(usize::try_from(record.measure()).expect("u32 fits usize"));
         record.encode(&mut writer).expect("measured closing");
-        self.exchange(exchange, b"/jig/v1/unwatch", writer.finish(), out);
+        self.exchange(exchange, Message::Unwatch(writer.finish()), out);
     }
-    fn watch_answer(&mut self, attempt: Attempt, name: u64, status: u16, body: &[u8], out: &mut Queue<Request>) {
+    fn watch_answer(&mut self, attempt: Attempt, name: u64, body: &[u8], out: &mut Queue<Request>) {
         if self.watches.named(name) != Some(attempt.token) {
             return;
         }
         if let ExchangeKind::WatchOpen { .. } = attempt.kind
             && self.watches.0.get(&attempt.token).expect("named opening").live
         {
-            return;
-        }
-        if status != 200 {
-            self.failure(attempt, out);
             return;
         }
         match attempt.kind {
@@ -659,7 +615,7 @@ impl Link {
             let record = w::Gone::new(&self.limits.wire, w::GoneParts { stream }).expect("fixed stream name");
             let mut writer = Writer::new(usize::try_from(record.measure()).expect("u32 fits usize"));
             record.encode(&mut writer).expect("measured stream gone");
-            self.exchange(exchange, b"/jig/v1/stream-gone", writer.finish(), out);
+            self.exchange(exchange, Message::StreamGone(writer.finish()), out);
         }
         out.push(Request::CloseStream);
         out.push(Request::Fact { fact: Fact::StreamDropped });

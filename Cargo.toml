@@ -11,6 +11,7 @@ members = [
     "crates/jig-protocol-engine-clients",
     "tests/engine-clients",
     "crates/jig-client-protocol-link",
+    "crates/jig-client-protocol-http",
     "crates/jig-client-protocol-wire",
     "tests/client-wire",
     "crates/jig-domain-client",
@@ -91,6 +92,7 @@ publish = false
 jig-client-domain = { path = "crates/jig-client-domain" }
 smith-local-service = { git = "https://github.com/forgetic/smith.git" }
 jig-client-protocol-link = { path = "crates/jig-client-protocol-link" }
+jig-client-protocol-http = { path = "crates/jig-client-protocol-http" }
 
 smith-protocol-llm = { git = "https://github.com/forgetic/smith.git" }
 smith-agent-service = { git = "https://github.com/forgetic/smith.git" }

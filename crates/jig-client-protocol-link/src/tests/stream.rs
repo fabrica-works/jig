@@ -39,7 +39,7 @@ fn a_delivery_before_its_opening_s_answer_admits_it() {
     let mut harness = fixtures::Harness::streaming(fixtures::family_subject());
     let (exchange, name) = harness.opening();
     harness.stream_bytes(&fixtures::family_delivery(name));
-    harness.answer(exchange, 200, &fixtures::open_answer(&w::OpenAnswer::Admitted));
+    harness.answer(exchange, &fixtures::open_answer(&w::OpenAnswer::Admitted));
     assert!(harness.has(&Request::Watch { watch: fixtures::WATCH, event: c::WatchEvent::Opened }));
     harness.expected_family();
 }
@@ -77,7 +77,7 @@ fn an_opening_waits_for_the_stream_s_name() {
 fn a_watch_s_opening_answer_is_handed_up() {
     let mut harness = fixtures::Harness::streaming(fixtures::frame_subject());
     let (exchange, _) = harness.opening();
-    harness.answer(exchange, 200, &fixtures::open_answer(&w::OpenAnswer::Admitted));
+    harness.answer(exchange, &fixtures::open_answer(&w::OpenAnswer::Admitted));
     assert!(harness.has(&Request::Watch { watch: fixtures::WATCH, event: c::WatchEvent::Opened }));
 }
 #[test]
@@ -93,7 +93,7 @@ fn each_watch_refusal_is_handed_up() {
         let value = w::OpenAnswer::Refused(
             w::OpenAnswerRefused::new(&fixtures::limits().wire, w::OpenAnswerRefusedParts { why }).unwrap(),
         );
-        harness.answer(exchange, 200, &fixtures::open_answer(&value));
+        harness.answer(exchange, &fixtures::open_answer(&value));
         assert_eq!(harness.ended(fixtures::WATCH), Some(expected));
     }
 }
@@ -102,7 +102,7 @@ fn a_close_s_answer_and_stream_ending_yield_one_terminal() {
     let mut harness = fixtures::Harness::streaming(fixtures::frame_subject());
     let (_, name) = harness.opening();
     let close = harness.close();
-    harness.answer(close, 200, &fixtures::close_answer());
+    harness.answer(close, &fixtures::close_answer());
     harness.stream_bytes(&fixtures::ending(name, w::WatchEnd::Closed));
     assert_eq!(harness.ended(fixtures::WATCH), Some(c::WatchEnd::Closed));
     assert_eq!(harness.closed_count(), 1);
@@ -113,7 +113,7 @@ fn a_stream_ending_before_the_close_answer_yields_one_terminal() {
     let (_, name) = harness.opening();
     let close = harness.close();
     harness.stream_bytes(&fixtures::ending(name, w::WatchEnd::Closed));
-    harness.answer(close, 200, &fixtures::close_answer());
+    harness.answer(close, &fixtures::close_answer());
     assert_eq!(harness.closed_count(), 1);
 }
 #[test]
@@ -205,11 +205,11 @@ fn a_continued_watch_has_a_fresh_name_and_retains_its_run_offset() {
     assert_eq!(harness.ended(fixtures::WATCH), None);
 }
 #[test]
-fn an_opening_past_its_deadline_drops_its_watch() {
+fn a_lost_opening_drops_its_watch() {
     let mut harness = fixtures::Harness::streaming(fixtures::frame_subject());
     let (exchange, _) = harness.opening();
-    harness.advance(Time::ZERO.saturating_add(fixtures::limits().deadline));
-    harness.answer(exchange, 200, &fixtures::open_answer(&w::OpenAnswer::Admitted));
+    harness.link.step(Time::ZERO, Event::Lost { exchange }, &mut harness.out);
+    harness.answer(exchange, &fixtures::open_answer(&w::OpenAnswer::Admitted));
     assert_eq!(harness.closed_count(), 1);
     assert_eq!(harness.ended(fixtures::WATCH), Some(c::WatchEnd::Dropped));
 }
@@ -240,17 +240,17 @@ fn a_jig_delivery_before_the_opening_answer_admits_it() {
     let mut harness = fixtures::Harness::streaming(fixtures::frame_subject());
     let (exchange, name) = harness.opening();
     harness.stream_bytes(&fixtures::jig_delivery(&w::DeliveryValue::Frame(fixtures::frame_record()), name));
-    harness.answer(exchange, 200, &fixtures::open_answer(&w::OpenAnswer::Admitted));
+    harness.answer(exchange, &fixtures::open_answer(&w::OpenAnswer::Admitted));
     assert_eq!(harness.delivered(), Some(&c::Delivery::Frame(Box::new(fixtures::frame()))));
 }
 #[test]
 fn a_delivery_over_the_original_document_bound_is_refused() {
     let value = w::DeliveryValue::Frame(fixtures::frame_record());
     let bytes = fixtures::encoded_delivery(&value);
-    let limits = Limits::new(fixtures::limits().client, 4, fixtures::limits().deadline).unwrap();
+    let limits = Limits::new(fixtures::limits().client, 4).unwrap();
     let mut client = limits.client;
     client.document_bytes = u64::from(value.measure()).checked_sub(1).unwrap();
-    let limits = Limits::new(client, 4, limits.deadline).unwrap();
+    let limits = Limits::new(client, 4).unwrap();
     assert_eq!(translate::watches::delivery(&bytes, &limits), Err(Undecodable::TooLarge));
 }
 #[test]

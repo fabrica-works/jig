@@ -97,7 +97,7 @@ pub fn turn_limits(text: u32, document_bytes: u64) -> Limits {
     let mut client = original.client;
     client.text = text;
     client.document_bytes = document_bytes;
-    Limits::new(client, 4, original.deadline).unwrap()
+    Limits::new(client, 4).unwrap()
 }
 
 const UTF8_TEXTS: [&[u8]; 1] = [b"~\0\x01"];

@@ -767,7 +767,7 @@ pub fn client_limits() -> jig_client_protocol_link::Limits {
         backoff: jig_domain_client::limits::Backoff { first: Duration::from_nanos(10), most: Duration::from_nanos(80) },
         heartbeat: Duration::from_nanos(100),
     };
-    jig_client_protocol_link::Limits::new(client, 4, Duration::from_secs(10)).expect("valid receiving limits")
+    jig_client_protocol_link::Limits::new(client, 4).expect("valid receiving limits")
 }
 #[path = "fixtures/services.rs"]
 mod services;

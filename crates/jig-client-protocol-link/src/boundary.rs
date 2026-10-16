@@ -93,12 +93,11 @@ pub enum Event {
         read: Token,
         what: Readable,
     },
-    Answered {
+    Reply {
         exchange: Token,
-        status: u16,
-        body: Box<[u8]>,
+        message: Box<[u8]>,
     },
-    Failed {
+    Lost {
         exchange: Token,
     },
     Open {
@@ -136,15 +135,11 @@ pub enum Request {
     Dropped {
         keeper: Keeper,
     },
-    /// A POST; its shell adds the bearer and content type.
+    /// One message; its transport owns the mapping and deadline.
     Exchange {
         exchange: Token,
         credential: Option<Secret>,
-        path: &'static [u8],
-        body: Box<[u8]>,
-    },
-    Abandon {
-        exchange: Token,
+        message: Message,
     },
     Answer {
         attempt: Token,
@@ -210,4 +205,22 @@ pub enum Signing {
     Refused,
     Lost,
     SignedOut,
+}
+
+/// A protocol record, independent of its transport's route.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Message {
+    Request(Box<[u8]>),
+    Read(Box<[u8]>),
+    Watch(Box<[u8]>),
+    Unwatch(Box<[u8]>),
+    StreamGone(Box<[u8]>),
+    SignInLink(Box<[u8]>),
+    SignOut,
+}
+/// A transport exchange's terminal outcome.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Heard {
+    Reply { exchange: Token, message: Box<[u8]> },
+    Lost { exchange: Token },
 }

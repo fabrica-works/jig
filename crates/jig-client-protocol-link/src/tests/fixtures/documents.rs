@@ -319,7 +319,7 @@ pub fn task_with_piece(bytes: &[u8]) -> w::Task {
 pub fn limits_for_document(bytes: u64) -> Limits {
     let mut client = limits().client;
     client.document_bytes = bytes;
-    Limits::new(client, 4, Duration::from_secs(10)).unwrap()
+    Limits::new(client, 4).unwrap()
 }
 
 pub fn task_at_row_bound() -> w::Task {

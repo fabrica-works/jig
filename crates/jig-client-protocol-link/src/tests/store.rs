@@ -81,16 +81,6 @@ fn a_failed_write_withholds_the_step_s_exchanges() {
     assert_eq!(harness.terminals(), 1);
 }
 #[test]
-fn an_expired_held_exchange_never_leaves_after_the_write_is_durable() {
-    let limits = fixtures::limits();
-    let mut harness = pending_write(fixtures::saved_draft());
-    harness.link.fire(Time::ZERO.saturating_add(limits.deadline), &mut harness.out);
-    harness.written();
-    assert_eq!(harness.exchanges(), 0);
-    harness.lost();
-    assert_eq!(harness.terminals(), 1);
-}
-#[test]
 fn a_place_round_trips_every_jig_address() {
     for expected in fixtures::saved_places().into_boxed() {
         assert!(restored(&expected).restored(&expected));
@@ -169,7 +159,7 @@ fn a_write_failure_drops_a_held_watch_opening() {
 fn a_cancelled_opening_already_in_the_step_queue_is_never_sent_after_writing() {
     let mut harness = fixtures::Harness::streaming(fixtures::family_subject());
     let (exchange, _) = harness.opening();
-    harness.link.step(Time::ZERO, Event::Failed { exchange }, &mut harness.out);
+    harness.link.step(Time::ZERO, Event::Lost { exchange }, &mut harness.out);
     harness.save(fixtures::saved_draft());
     harness.written();
     assert_eq!(harness.exchanges(), 0);

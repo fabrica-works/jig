@@ -115,7 +115,6 @@ impl Harness {
                     return Some(value);
                 }
                 Request::Exchange { .. }
-                | Request::Abandon { .. }
                 | Request::Answer { .. }
                 | Request::Read { .. }
                 | Request::OpenStream { .. }
