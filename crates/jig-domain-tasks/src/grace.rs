@@ -14,20 +14,6 @@ pub struct Grace {
     pub message: u64,
 }
 
-#[expect(clippy::too_many_arguments, reason = "one durable finish request with its maker, deadline and message")]
-pub(crate) fn ask_to_finish(
-    domain: &mut Domain,
-    env: &Env<Limits>,
-    number: u64,
-    by: Party,
-    until: Wall,
-    message: u64,
-    reason: &[u8],
-    out: &mut Queue<Request>,
-) -> Result<(), Refusal> {
-    ask(domain, env, number, by, until, message, reason, reason, out)
-}
-
 #[expect(clippy::too_many_arguments, reason = "the chat keeps its existing distinct finish and cancellation texts")]
 pub(crate) fn ask_chat(
     domain: &mut Domain,
@@ -55,6 +41,33 @@ fn ask(
     reason: &[u8],
     out: &mut Queue<Request>,
 ) -> Result<(), Refusal> {
+    let plan = check_finish(domain, env, Finish { number, by, until, message }, words, reason)?;
+    apply_finish(domain, env, plan, out);
+    Ok(())
+}
+
+pub(crate) struct Finish {
+    pub number: u64,
+    pub by: Party,
+    pub until: Wall,
+    pub message: u64,
+}
+
+pub(crate) enum FinishPlan {
+    Cancel { finish: Finish, reason: Box<[u8]>, selected: Box<[u64]> },
+    Sooner { finish: Finish, reason: Box<[u8]> },
+    Word { finish: Finish, reason: Box<[u8]>, prepared: crate::inbox::Prepared },
+    Unchanged,
+}
+
+pub(crate) fn check_finish(
+    domain: &Domain,
+    env: &Env<Limits>,
+    finish: Finish,
+    words: &[u8],
+    reason: &[u8],
+) -> Result<FinishPlan, Refusal> {
+    let Finish { number, by, until, message } = finish;
     let old = record(domain, number).ok_or(Refusal::Unknown)?;
     if message == 0
         || message <= old.last_message
@@ -64,21 +77,23 @@ fn ask(
     }
     match old.phase {
         Phase::Waiting | Phase::Held { .. } => {
-            cancel(domain, env, number, by, reason, out);
-            return Ok(());
+            let mut selected = skein_lib::List::with_capacity(env.limits.tasks);
+            for (child, _) in &domain.names {
+                if crate::moving::descendant(domain, *child, number, env.limits.tasks) {
+                    selected.push(*child).expect("live subtree bound");
+                }
+            }
+            return Ok(FinishPlan::Cancel { finish, reason: reason.into(), selected: selected.into_boxed() });
         }
         Phase::Active(_) => {}
         Phase::Closing(_) | Phase::Ended(_) => return Err(Refusal::State),
     }
     if let Some(grace) = &old.grace {
-        if until < grace.until {
-            let grace = task_mut(domain, number).expect("live grace").record.grace.as_mut().expect("saved grace");
-            grace.by = by;
-            grace.until = until;
-            grace.reason = reason.into();
-            publish(domain, env, number, out);
-        }
-        return Ok(());
+        return Ok(if until < grace.until {
+            FinishPlan::Sooner { finish, reason: reason.into() }
+        } else {
+            FinishPlan::Unchanged
+        });
     }
     let revision = old.revision.checked_add(1).ok_or(Refusal::State)?;
     let word = Word {
@@ -92,33 +107,49 @@ fn ask(
     };
     let prepared = crate::inbox::prepare(domain, &env.limits, number, word, crate::inbox::Admission::RoomKept)
         .expect("grace has its reserved inbox slot");
+    Ok(FinishPlan::Word { finish, reason: reason.into(), prepared })
+}
+
+pub(crate) fn apply_finish(domain: &mut Domain, env: &Env<Limits>, plan: FinishPlan, out: &mut Queue<Request>) {
+    let (finish, reason, prepared) = match plan {
+        FinishPlan::Unchanged => return,
+        FinishPlan::Cancel { finish, reason, selected } => {
+            cancel_selected(domain, env, finish.number, finish.by, &reason, selected, out);
+            return;
+        }
+        FinishPlan::Sooner { finish, reason } => {
+            let grace =
+                task_mut(domain, finish.number).expect("live grace").record.grace.as_mut().expect("saved grace");
+            grace.by = finish.by;
+            grace.until = finish.until;
+            grace.reason = reason;
+            publish(domain, env, finish.number, out);
+            return;
+        }
+        FinishPlan::Word { finish, reason, prepared } => (finish, reason, prepared),
+    };
+    let Finish { number, by, until, message } = finish;
     let task = task_mut(domain, number).expect("live grace task");
-    task.record.grace = Some(Grace { by, until, reason: reason.into(), message });
+    task.record.grace = Some(Grace { by, until, reason: reason.clone(), message });
     task.record.last_activity = env.wall;
     task.record.last_message = message;
     task.record.inbox = prepared.inbox;
     crate::activity::message(&mut task.record, &prepared.activity_word, env.limits.inbox_messages, out);
-    crate::control::history(domain, number, env.wall, by, Change::Amended, reason, out);
+    crate::control::history(domain, number, env.wall, by, Change::Amended, &reason, out);
     publish(domain, env, number, out);
     crate::wake::after_message(domain, env, number, prepared.previous, prepared.word, out);
-    Ok(())
 }
 
-pub(crate) fn cancel(
+pub(crate) fn cancel_selected(
     domain: &mut Domain,
     env: &Env<Limits>,
     number: u64,
     by: Party,
     reason: &[u8],
+    selected: Box<[u64]>,
     out: &mut Queue<Request>,
 ) {
-    let mut selected = skein_lib::List::with_capacity(env.limits.tasks);
-    for (child, _) in &domain.names {
-        if crate::moving::descendant(domain, *child, number, env.limits.tasks) {
-            selected.push(*child).expect("live subtree bound");
-        }
-    }
-    for child in selected.into_boxed() {
+    for child in selected {
         crate::control::history(domain, child, env.wall, by, Change::Cancelled, reason, out);
     }
     crate::closing::cancel_tree(domain, env, number, by, reason, out);

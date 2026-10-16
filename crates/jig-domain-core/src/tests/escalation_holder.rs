@@ -95,3 +95,14 @@ fn a_restored_person_task_for_policy_role_five_is_supported() {
     assert_eq!(fresh(&mut core.counters, Family::Person), Some(REQUESTER));
     assert!(core.restore_task_row(&tasks::Stored::Live(Box::new(row))));
 }
+
+#[test]
+fn a_move_is_refused_while_nobody_holds_its_escalations() {
+    let (mut core, limits) = tree_core();
+    make_task(&mut core, &limits, TASK);
+    holder_policy(&mut core, authority::Proposals(0), None);
+    assert_eq!(
+        core.move_admit(REQUESTER, Some(people::Role::Owner), PROJECT, TASK, 2, 2),
+        Err(people::Refusal::NoEscalationHolder)
+    );
+}

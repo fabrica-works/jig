@@ -519,40 +519,61 @@ pub(crate) fn hold_from(
     source: Option<Box<crate::HoldSource>>,
     out: &mut Queue<Request>,
 ) {
+    if let Some(plan) = check_stop(domain, env, number, why, source) {
+        apply_stop(domain, env, plan, out);
+    }
+}
+
+pub(crate) struct StopPlan {
+    number: u64,
+    why: Hold,
+    attempt: Option<u64>,
+    next: Phase,
+}
+
+pub(crate) fn check_stop(
+    domain: &Domain,
+    env: &Env<Limits>,
+    number: u64,
+    why: Hold,
+    source: Option<Box<crate::HoldSource>>,
+) -> Option<StopPlan> {
     if !crate::hold_origin::valid(&env.limits, why, source.as_deref()) {
-        return;
+        return None;
     }
     if !why.valid() {
-        return;
+        return None;
     }
     if !domain.ready() {
-        return;
+        return None;
     }
-    let Some(task) = record(domain, number) else {
-        return;
-    };
+    let task = record(domain, number)?;
     match task.phase {
         Phase::Held { why: current, source: ref previous, .. }
             if current == why && (source.is_none() || previous == &source) =>
         {
-            return;
+            return None;
         }
-        Phase::Ended(_) => return,
+        Phase::Ended(_) => return None,
         Phase::Waiting | Phase::Active(_) | Phase::Closing(_) | Phase::Held { .. } => {}
     }
-    if let Some(attempt) = run_attempt(&task.phase) {
-        out.push(Request::Stop { task: number, attempt });
-    }
-    let task = task_mut(domain, number).expect("hold names live task");
-    let old = core::mem::replace(&mut task.record.phase, Phase::Waiting);
-    task.record.phase = match old {
+    let next = match task.phase.clone() {
         Phase::Held { was, source: previous, why: before } => {
             Phase::Held { was, why, source: if before == why && source.is_none() { previous } else { source } }
         }
         Phase::Waiting | Phase::Active(_) | Phase::Closing(_) | Phase::Ended(_) => {
-            Phase::Held { was: was(old), why, source }
+            Phase::Held { was: was(task.phase.clone()), why, source }
         }
     };
+    Some(StopPlan { number, why, attempt: run_attempt(&task.phase), next })
+}
+
+pub(crate) fn apply_stop(domain: &mut Domain, env: &Env<Limits>, plan: StopPlan, out: &mut Queue<Request>) {
+    let StopPlan { number, why, attempt, next } = plan;
+    if let Some(attempt) = attempt {
+        out.push(Request::Stop { task: number, attempt });
+    }
+    task_mut(domain, number).expect("hold names live task").record.phase = next;
     publish(domain, env, number, out);
     fact(domain, Fact::Held { task: number, why });
 }

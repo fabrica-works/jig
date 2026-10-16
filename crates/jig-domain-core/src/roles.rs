@@ -35,6 +35,9 @@ impl Core {
         if !role_policy.requests.allows(authority::RequestKind::Amend) && !standing {
             return Err(people::Refusal::Role { held: Some(holding) });
         }
+        if !self.authority.escalations_held(project, holding.number()) {
+            return Err(people::Refusal::NoEscalationHolder);
+        }
         let Some(policy) = self.authority.policy(project) else { unreachable!("configured policy") };
         if self.period_budget(project) > policy.period_spend {
             return Err(people::Refusal::Authority {
