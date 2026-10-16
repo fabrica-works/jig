@@ -51,6 +51,7 @@ fn change(core: &Core, spend: u64) -> tasks::Amendment {
     let mut after = core.tasks.task(1).unwrap().authority.clone();
     after.budget.spend = spend;
     tasks::Amendment {
+        tracked: None,
         addressed: None,
         instructions: None,
         spec: None,

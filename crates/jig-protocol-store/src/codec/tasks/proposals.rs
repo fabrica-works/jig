@@ -121,10 +121,12 @@ pub fn read_address_change(
 
 /// Translate `Amendment` to its store record.
 pub fn amendment(source: &domain::Amendment, limits: &wire::Limits) -> Result<wire::Amendment, wire::Problem> {
-    let domain::Amendment { addressed, instructions, release, spec, wake, dependencies, authority, reason } = source;
+    let domain::Amendment { tracked, addressed, instructions, release, spec, wake, dependencies, authority, reason } =
+        source;
     wire::Amendment::new(
         limits,
         wire::AmendmentParts {
+            tracked: optional_tracking(*tracked, limits)?,
             addressed: optional_address_change(addressed.as_ref(), limits)?,
             instructions: instructions.clone(),
             release: *release,
@@ -138,9 +140,10 @@ pub fn amendment(source: &domain::Amendment, limits: &wire::Limits) -> Result<wi
 }
 /// Read `Amendment` from its store record.
 pub fn read_amendment(source: wire::Amendment, limits: &wire::Limits) -> Result<domain::Amendment, wire::Problem> {
-    let wire::AmendmentParts { addressed, instructions, release, spec, wake, dependencies, authority, reason } =
+    let wire::AmendmentParts { tracked, addressed, instructions, release, spec, wake, dependencies, authority, reason } =
         source.into_parts();
     Ok(domain::Amendment {
+        tracked: read_tracking(tracked),
         addressed: read_optional_address_change(addressed, limits)?,
         instructions,
         release,
@@ -312,10 +315,11 @@ pub fn read_change(source: wire::Change, _limits: &wire::Limits) -> Result<domai
 
 /// Translate `Settings` to its store record.
 pub fn settings(source: &domain::Settings, limits: &wire::Limits) -> Result<wire::Settings, wire::Problem> {
-    let domain::Settings { addressed, taken_by, instructions, spec, wake, dependencies, authority } = source;
+    let domain::Settings { tracked, addressed, taken_by, instructions, spec, wake, dependencies, authority } = source;
     wire::Settings::new(
         limits,
         wire::SettingsParts {
+            tracked: *tracked,
             addressed: optional_address(addressed.as_ref(), limits)?,
             taken_by: *taken_by,
             instructions: instructions.clone(),
@@ -328,9 +332,10 @@ pub fn settings(source: &domain::Settings, limits: &wire::Limits) -> Result<wire
 }
 /// Read `Settings` from its store record.
 pub fn read_settings(source: wire::Settings, limits: &wire::Limits) -> Result<domain::Settings, wire::Problem> {
-    let wire::SettingsParts { addressed, taken_by, instructions, spec, wake, dependencies, authority } =
+    let wire::SettingsParts { tracked, addressed, taken_by, instructions, spec, wake, dependencies, authority } =
         source.into_parts();
     Ok(domain::Settings {
+        tracked,
         addressed: read_optional_address(addressed),
         taken_by,
         instructions,
@@ -660,5 +665,27 @@ fn read_optional_amendment_history(
     match source {
         Some(value) => Ok(Some(Box::new(read_amendment_history(value, limits)?))),
         None => Ok(None),
+    }
+}
+
+fn optional_tracking(
+    source: Option<domain::Tracking>,
+    limits: &wire::Limits,
+) -> Result<Option<wire::Tracking>, wire::Problem> {
+    Ok(match source {
+        Some(domain::Tracking::Tracked { priority }) => {
+            Some(wire::Tracking::Tracked(wire::Tracked::new(limits, wire::TrackedParts { priority })?))
+        }
+        Some(domain::Tracking::Untracked) => Some(wire::Tracking::Untracked),
+        None => None,
+    })
+}
+fn read_tracking(source: Option<wire::Tracking>) -> Option<domain::Tracking> {
+    match source {
+        Some(wire::Tracking::Tracked(value)) => {
+            Some(domain::Tracking::Tracked { priority: value.into_parts().priority })
+        }
+        Some(wire::Tracking::Untracked) => Some(domain::Tracking::Untracked),
+        None => None,
     }
 }

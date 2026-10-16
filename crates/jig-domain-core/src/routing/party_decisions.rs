@@ -280,6 +280,7 @@ pub(super) fn person_proposal_accept(
                 message: amend_message,
                 stop_run: false,
                 amendment: tasks::Amendment {
+                    tracked: None,
                     addressed: None,
                     release: None,
                     instructions: None,

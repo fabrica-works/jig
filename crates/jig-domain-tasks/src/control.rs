@@ -17,9 +17,20 @@ pub enum Control {
     Release { again: Option<bool>, message: Option<u64> },
 }
 
+/// Whether an amendment tracks a task at a priority, or untracks it.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Tracking {
+    /// A goal from this decision, at this priority.
+    Tracked { priority: u32 },
+    /// No goal from this decision.
+    Untracked,
+}
+
 /// Whole optional task changes; root checks any widening against its holder.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Amendment {
+    /// Change goal tracking independently of the specification.
+    pub tracked: Option<Tracking>,
     /// Whole person address change, independent of spec and hold revisions.
     pub addressed: Option<AddressChange>,
     /// Replace the charter's instructions, delivered whole as this amendment's message.
@@ -104,6 +115,7 @@ pub struct History {
 /// Immutable settings before and after an admitted amendment.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Settings {
+    pub tracked: Option<u32>,
     /// Exact person address and holder before or after the amendment.
     pub addressed: Option<crate::PersonAddress>,
     pub taken_by: Option<u64>,
@@ -123,6 +135,7 @@ pub struct AmendmentHistory {
 
 fn settings(task: &crate::TaskRecord) -> Settings {
     Settings {
+        tracked: task.tracked,
         addressed: match task.executor {
             crate::Executor::Person(address) => Some(address),
             crate::Executor::Agent { .. } | crate::Executor::Procedure { .. } => None,
@@ -208,6 +221,12 @@ pub(crate) fn amend(
         return refused(to, Some(number), Refusal::Reference, out);
     }
     let old = record(domain, number).expect("entrance found task");
+    if let Some(Tracking::Tracked { .. }) = amendment.tracked
+        && old.tracked.is_none()
+        && let Err(why) = crate::goals::room(domain, old.project, 1, &env.limits)
+    {
+        return refused(to, Some(number), why, out);
+    }
     let releasing = match old.phase {
         Phase::Held { .. } => amendment.release == Some(old.revisions.hold),
         Phase::Waiting | Phase::Active(_) | Phase::Closing(_) | Phase::Ended(_) => false,
@@ -340,6 +359,12 @@ pub(crate) fn amend(
         crate::funders::resize(domain, env, number, authority.budget.spend, out);
     }
     let task = task_mut(domain, number).expect("amendment task live");
+    if let Some(tracked) = amendment.tracked {
+        task.record.tracked = match tracked {
+            Tracking::Tracked { priority } => Some(priority),
+            Tracking::Untracked => None,
+        };
+    }
     if let Some(change) = amendment.addressed {
         task.record.executor = crate::Executor::Person(change.address);
         task.record.taken_by = None;

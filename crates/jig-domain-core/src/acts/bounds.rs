@@ -99,6 +99,7 @@ pub(super) fn amend_preflight(
 ) -> Result<(), people::Refusal> {
     let row = core.tasks.task(task).ok_or(people::Refusal::Unknown)?;
     let empty = tasks::Amendment {
+        tracked: None,
         addressed: None,
         instructions: None,
         spec: None,

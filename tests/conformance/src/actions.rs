@@ -100,6 +100,7 @@ pub(crate) fn run_racing_amendment(world: &mut World) {
             target: world.peers.children[0],
             revision: 0,
             amendment: tasks::Amendment {
+                tracked: None,
                 addressed: None,
                 release: None,
                 instructions: None,

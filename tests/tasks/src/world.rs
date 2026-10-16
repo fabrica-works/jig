@@ -18,6 +18,7 @@ pub const LIMITS: Limits = Limits {
     tasks: 16,
     funders: 32,
     project_tasks: 16,
+    project_goals: 2,
     tree_tasks: 16,
     depth: 4,
     delegates: 8,

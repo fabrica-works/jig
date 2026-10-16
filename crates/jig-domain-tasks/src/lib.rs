@@ -74,6 +74,7 @@ mod escalation;
 mod facts;
 mod failures;
 mod flags;
+mod goals;
 mod grace;
 pub use flags::{Flags, Retention};
 mod funders;
@@ -123,7 +124,7 @@ pub use boundary::{
 pub use capacity::{Capacity, CapacityAction, CapacityCause, CapacityRefusal};
 pub use chat::{Disposal, Keep};
 pub use control::{
-    AddressChange, Amendment, AmendmentHistory, Change, Control, History, Milestone, Settings, address_admit,
+    AddressChange, Amendment, AmendmentHistory, Change, Control, History, Milestone, Settings, Tracking, address_admit,
     instruction_admit,
 };
 pub use domain::{Domain, ViewTask, fire, max_out, step, view_phase};

@@ -179,6 +179,7 @@ fn an_amendment_uses_live_pool_and_remaining_task_facts_and_preserves_narrowing(
     let mut after = core.tasks.task(1).unwrap().authority.clone();
     after.budget.spend = 550;
     let mut change = tasks::Amendment {
+        tracked: None,
         addressed: None,
         instructions: None,
         spec: None,

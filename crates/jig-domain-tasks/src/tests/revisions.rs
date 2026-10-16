@@ -22,6 +22,7 @@ pub(super) const LIMITS: Limits = Limits {
     tasks: 16,
     funders: 32,
     project_tasks: 16,
+    project_goals: 2,
     tree_tasks: 16,
     depth: 4,
     delegates: 8,
@@ -208,6 +209,7 @@ impl Harness {
 
 fn amendment() -> Amendment {
     Amendment {
+        tracked: None,
         addressed: None,
         release: None,
         instructions: None,
@@ -967,3 +969,5 @@ fn retry_observations_distinguish_attempt_failures_from_preparation_refusals_and
 mod chat;
 
 mod positions;
+
+mod tracking;

@@ -190,6 +190,7 @@ fn generated_event(core: &Core, draw: u64, iteration: u64) -> Event {
             message: FIRST_GENERATED.checked_add(iteration).unwrap(),
             stop_run: false,
             amendment: tasks::Amendment {
+                tracked: None,
                 spec: Some(tasks::Spec {
                     words: Box::from(&b"changed task"[..]),
                     parameters: Box::new([]),

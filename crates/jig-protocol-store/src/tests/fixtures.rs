@@ -55,6 +55,7 @@ pub const TASKS_LIMITS: jig_domain_tasks::Limits = jig_domain_tasks::Limits {
     tasks: 2,
     funders: 2,
     project_tasks: 2,
+    project_goals: 8,
     tree_tasks: 2,
     depth: 2,
     delegates: 2,
@@ -234,6 +235,7 @@ pub fn task_phase() -> jig_domain_tasks::Phase {
 }
 pub fn task_settings() -> jig_domain_tasks::Settings {
     jig_domain_tasks::Settings {
+        tracked: Some(7),
         addressed: Some(jig_domain_tasks::PersonAddress::Role(19)),
         taken_by: Some(31),
         instructions: Some(Box::from(b"override".as_slice())),
@@ -245,6 +247,7 @@ pub fn task_settings() -> jig_domain_tasks::Settings {
 }
 pub fn task_amendment() -> jig_domain_tasks::Amendment {
     jig_domain_tasks::Amendment {
+        tracked: Some(jig_domain_tasks::Tracking::Tracked { priority: 7 }),
         addressed: Some(jig_domain_tasks::AddressChange {
             revision: 7,
             address: jig_domain_tasks::PersonAddress::Person(31),

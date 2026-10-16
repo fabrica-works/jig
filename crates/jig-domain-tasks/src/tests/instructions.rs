@@ -18,6 +18,7 @@ fn oversized() -> Vec<u8> {
 
 fn change(instructions: &[u8]) -> Amendment {
     Amendment {
+        tracked: None,
         addressed: None,
         instructions: Some(instructions.into()),
         release: None,

@@ -241,6 +241,15 @@ fn check_members(
                 crate::CapacityCause::ProjectTasks { limit: limits.project_tasks },
             ));
         }
+        let mut adding = 0_u32;
+        for row in batch {
+            if row.project == new.project && row.tracked.is_some() {
+                adding = adding.checked_add(1).expect("bounded batch");
+            }
+        }
+        if let Err(why) = crate::goals::room(domain, new.project, adding, limits) {
+            return Err(problem(number, why));
+        }
         match new.executor {
             Executor::Agent { charter } => {
                 let mut known = false;

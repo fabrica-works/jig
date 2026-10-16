@@ -1,7 +1,7 @@
 //! A team: eight workers, four slots each, sixteen LLM accounts (configuration.md, 6).
 //! Every field omitted below has the small profile's documented value. Token: 16384 bytes.
 //! Byte limits are bytes; durations below state their units. Counts are items.
-//! **tasks**: `tasks=32, funders=32, project_tasks=32, tree_tasks=128, delegates=8, resource_reports=256, pools=32, hold_waiters=32, charters=8, facts=128, room_refusals=32, batch=4, dependencies=16, inputs=16, references=16, holdings=8, parameters=8, saved_resources=8, authority_grants=8, authority_bytes=4096, executor_kinds=8`.
+//! **tasks**: `tasks=32, funders=32, project_tasks=32, project_goals=16, tree_tasks=128, delegates=8, resource_reports=256, pools=32, hold_waiters=32, charters=8, facts=128, room_refusals=32, batch=4, dependencies=16, inputs=16, references=16, holdings=8, parameters=8, saved_resources=8, authority_grants=8, authority_bytes=4096, executor_kinds=8`.
 //! **people**: `people=16, inbox_tasks=64, sign_ins=32, projects=8, holdings=32, goals=64, initial_owners=4, requests=128, room_refusals=32, pending=32, facts=128`.
 //! **fleet**: `needs_bytes=262144, grants=32, workers=8, slots=4, workstreams=64, attempts=64, calls=256, turns=128, facts=256, history=64`.
 //! **authority**: `projects=8, accounts=16, roles=8, requirements=8, grants=8, executors=8, batch=4, writes=8`.
@@ -29,6 +29,7 @@ pub(super) const TASKS: tasks::Limits = tasks::Limits {
     tasks: 32,
     funders: 32,
     project_tasks: 32,
+    project_goals: 16,
     tree_tasks: 128,
     delegates: 8,
     resource_reports: 256,

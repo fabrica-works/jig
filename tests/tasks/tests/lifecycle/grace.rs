@@ -45,6 +45,7 @@ fn amend(world: &mut World) {
         message,
         stop_run: false,
         amendment: Amendment {
+            tracked: None,
             addressed: None,
             instructions: None,
             release: None,

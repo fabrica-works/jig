@@ -32,6 +32,7 @@ fn limits() -> Limits {
         tasks: 2,
         funders: 4,
         project_tasks: 2,
+        project_goals: 8,
         tree_tasks: 2,
         depth: 1,
         delegates: 1,
@@ -876,6 +877,7 @@ fn person_address_proposals_keep_the_named_revision_and_actual_beforefacts() {
     let mut wider = core.tasks.task(2).unwrap().authority.clone();
     wider.budget.spend = 15;
     let edit = tasks::Amendment {
+        tracked: None,
         addressed: Some(named),
         instructions: None,
         release: None,
@@ -967,6 +969,7 @@ fn documents_proposal_actions_keep_effect_parts_and_amendment_before_and_after()
         tasks::ProposalAction::Amend {
             task: 2,
             amendment: tasks::Amendment {
+                tracked: None,
                 addressed: None,
                 release: Some(1),
                 instructions: Some(b"Use the new evidence".as_slice().into()),

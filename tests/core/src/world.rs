@@ -20,6 +20,7 @@ pub fn limits() -> root::Limits {
         tasks: 2,
         funders: 4,
         project_tasks: 2,
+        project_goals: 2,
         tree_tasks: 2,
         depth: 1,
         delegates: 1,

@@ -16,6 +16,8 @@ pub struct Limits {
     pub funders: u32,
     /// Maximum live tasks per project, including every member of an admitted batch.
     pub project_tasks: u32,
+    /// Maximum live tracked tasks per project.
+    pub project_goals: u32,
     /// Maximum lifetime tasks made in a requester tree, including its root; completed delegates do
     /// not return this capacity.
     pub tree_tasks: u32,

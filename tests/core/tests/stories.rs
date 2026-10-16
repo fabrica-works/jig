@@ -101,6 +101,7 @@ fn a_plan_of_reports_and_a_procedure_is_revised_midway_and_done() {
             target: report,
             revision: 0,
             amendment: tasks::Amendment {
+                tracked: None,
                 addressed: None,
                 release: None,
                 instructions: None,

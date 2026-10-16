@@ -13,6 +13,7 @@ use alloc::vec::Vec;
 
 fn change(revision: u64, address: PersonAddress) -> Amendment {
     Amendment {
+        tracked: None,
         addressed: Some(AddressChange { revision, address }),
         release: None,
         instructions: None,

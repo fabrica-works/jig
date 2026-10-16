@@ -205,6 +205,7 @@ fn each_proposal_decision_reads_back() {
 fn an_amendment_without_replacements_reads_back() {
     use crate::{codec::tasks::proposals, tasks_v3::Amendment};
     let source = jig_domain_tasks::Amendment {
+        tracked: None,
         addressed: None,
         instructions: None,
         release: None,
@@ -310,4 +311,17 @@ fn task_phases_and_proposals_read_back_as_written() {
         ("lifecycle_phases_read_back", lifecycle_phases_read_back),
         ("results_read_back", results_read_back),
     ]);
+}
+
+#[test]
+fn tracking_amendments_read_back() {
+    use crate::{codec::tasks::proposals, tasks_v3::Amendment};
+    use jig_domain_tasks::Tracking;
+    for tracked in [None, Some(Tracking::Untracked), Some(Tracking::Tracked { priority: 7 })] {
+        let mut source = fixtures::task_amendment();
+        source.tracked = tracked;
+        let encoded = proposals::amendment(&source, &tasks_limits()).unwrap();
+        let encoded = saved_wire(encoded, Amendment::measure, Amendment::encode, Amendment::decode);
+        assert_eq!(proposals::read_amendment(encoded, &tasks_limits()), Ok(source), "{tracked:?}");
+    }
 }

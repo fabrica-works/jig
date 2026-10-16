@@ -132,6 +132,7 @@ const SMALL: &[(&[u8], u64)] = &[
     (b"tasks.tasks", 8),
     (b"tasks.funders", 8),
     (b"tasks.project_tasks", 8),
+    (b"tasks.project_goals", 8),
     (b"tasks.tree_tasks", 32),
     (b"tasks.depth", 8),
     (b"tasks.delegates", 4),

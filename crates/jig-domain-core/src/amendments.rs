@@ -206,6 +206,7 @@ fn granted(value: people::Authority, limits: &tasks::Limits) -> Option<tasks::Au
 #[expect(clippy::manual_map, reason = "the step subset spells out both option cases without a closure")]
 pub(crate) fn translate(value: people::Amendment, limits: &tasks::Limits) -> Option<tasks::Amendment> {
     Some(tasks::Amendment {
+        tracked: None,
         addressed: match value.addressed {
             Some(change) => Some(tasks::AddressChange {
                 revision: change.revision,

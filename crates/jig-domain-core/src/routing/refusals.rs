@@ -52,7 +52,9 @@ fn task_answer(core: &Core, task: Option<u64>, why: tasks::Refusal) -> people::O
         tasks::Refusal::Empty => people::Refusal::Limit { which: people::LimitKind::Empty },
         tasks::Refusal::Batch => people::Refusal::Limit { which: people::LimitKind::Batch },
         tasks::Refusal::Live => people::Refusal::Limit { which: people::LimitKind::LiveTasks },
-        tasks::Refusal::Project => people::Refusal::Limit { which: people::LimitKind::ProjectLiveTasks },
+        tasks::Refusal::Goals | tasks::Refusal::Project => {
+            people::Refusal::Limit { which: people::LimitKind::ProjectLiveTasks }
+        }
         tasks::Refusal::Tree => people::Refusal::Limit { which: people::LimitKind::Tree },
         tasks::Refusal::Depth => people::Refusal::Limit { which: people::LimitKind::Depth },
         tasks::Refusal::Delegates => people::Refusal::Limit { which: people::LimitKind::Delegates },

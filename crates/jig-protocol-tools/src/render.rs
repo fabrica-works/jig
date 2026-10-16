@@ -261,6 +261,7 @@ fn task_problem(problem: &jig_domain_tasks::Problem) -> Rendered {
         jig_domain_tasks::Refusal::AuthorityShape => b"authority shape",
         jig_domain_tasks::Refusal::Inputs => b"inputs",
         jig_domain_tasks::Refusal::State => b"state",
+        jig_domain_tasks::Refusal::Goals => b"goals",
         jig_domain_tasks::Refusal::Grace => b"grace",
         jig_domain_tasks::Refusal::Attempt => b"attempt",
         jig_domain_tasks::Refusal::LiveDelegates => b"live delegates",

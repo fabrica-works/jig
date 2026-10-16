@@ -1084,6 +1084,8 @@ impl Stored {
 pub enum Refusal {
     /// A cancel gave a grace longer than the configured span.
     Grace,
+    /// The project has no room for more live tracked tasks.
+    Goals,
     /// No policy role may accept this proposal kind; nothing of it is committed.
     Unproposable,
     /// The address edit names an older person task revision.

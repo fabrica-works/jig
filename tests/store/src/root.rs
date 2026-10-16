@@ -24,6 +24,7 @@ pub const TASKS_LIMITS: jig_domain_tasks::Limits = jig_domain_tasks::Limits {
     tasks: 2,
     funders: 2,
     project_tasks: 2,
+    project_goals: 8,
     tree_tasks: 2,
     depth: 2,
     delegates: 2,
