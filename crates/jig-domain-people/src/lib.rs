@@ -62,11 +62,12 @@ pub use templates::{TemplateBudget, TemplateDeadline, TemplateExecutor, Template
 mod amendment;
 mod batch;
 pub use batch::{
-    Budget, Contract, Dependency, FieldRule, Flags, Given, Member, Retention, TaskExecutor, Verdict, member_bytes,
+    Action, Budget, Contract, Dependency, FieldRule, Flags, Given, Member, Retention, TaskExecutor, Verdict,
+    member_bytes,
 };
 mod boundary;
 mod results;
-pub use results::{Forgettable, ReplyRef, ResultRef, Update};
+pub use results::{Forgettable, ReplyRef, ResultRef, Seen, Update};
 mod capacity;
 mod compound;
 pub use compound::Operation;
@@ -88,7 +89,7 @@ pub use boundary::{
     Adoption, Ask, Counts, Disposal, Entry, EntryKind, EscalationChoice, EscalationDecision, Event, GoalExecutor,
     Holding, Identity, IdentityKey, InitialOwner, Keep, Key, Kind, Needs, NoteChange, NoteScope, Outcome, PersonResult,
     ProjectRole, ProposalChoice, ProposalDecision, Proposer, Reply, Request, RequestKey, ResourceName, ResourceRole,
-    Role, Seed, Seen, Stored, Whom,
+    Role, Seed, Stored, Whom,
 };
 pub use capacity::{CapacityAction, CapacityCause, CapacityRefusal};
 pub use decisions::{FailureClass, HoldReason, Moved};

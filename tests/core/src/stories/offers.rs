@@ -17,6 +17,28 @@ pub fn world_configuration(seed: u64) -> root::Config {
     configuration
 }
 
+/// The member world's role policy, for its cold restoration stories.
+#[must_use]
+pub fn member_configuration(seed: u64) -> root::Config {
+    let mut configuration = world_configuration(seed);
+    let mut limits = *configuration.core.authority.limits();
+    limits.roles = 2;
+    limits.batch = 2;
+    let mut policy = configuration.core.authority.policy(1).expect("policy").clone();
+    let mut member = policy.roles[0].clone();
+    member.number = people::Role::Member.number();
+    member.authority.budget.spend = 100;
+    member.decides = authority::Proposals(0);
+    policy.roles = Box::new([policy.roles[0].clone(), member]);
+    let mut domain =
+        authority::Domain::new(configuration.core.authority.rules().clone(), limits).expect("member policy limits");
+    let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
+    authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut facts);
+    assert_eq!(facts.pop(), Some(authority::PolicyFact::Added { project: 1 }));
+    configuration.core.authority = domain;
+    configuration
+}
+
 #[must_use]
 pub fn world(seed: u64, role: Option<people::Role>) -> World {
     world_with(seed, role, |_| {})

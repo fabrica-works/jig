@@ -12,7 +12,6 @@ use skein_lib::{Queue, ReplyTo, Token, Wall};
 
 /// One store response, belonging to its named owner.
 #[derive(Debug)]
-#[expect(clippy::large_enum_variant, reason = "store pages own complete typed child events")]
 pub enum Store {
     /// This whole transaction is durable.
     Committed { number: u64, fill: u64 },

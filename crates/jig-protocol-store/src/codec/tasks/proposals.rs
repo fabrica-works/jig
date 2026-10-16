@@ -404,6 +404,9 @@ pub fn person_state(
     limits: &wire::Limits,
 ) -> Result<wire::PersonProposalState, wire::Problem> {
     Ok(match source {
+        domain::PersonProposalState::Withdrawn { at } => wire::PersonProposalState::Withdrawn(
+            wire::WithdrawnPersonProposal::new(limits, wire::WithdrawnPersonProposalParts { at: at.as_nanos() })?,
+        ),
         domain::PersonProposalState::Pending { since } => wire::PersonProposalState::Pending(
             wire::PendingPersonProposal::new(limits, wire::PendingPersonProposalParts { since: since.as_nanos() })?,
         ),
@@ -429,6 +432,9 @@ pub fn read_person_state(
     _limits: &wire::Limits,
 ) -> Result<domain::PersonProposalState, wire::Problem> {
     Ok(match source {
+        wire::PersonProposalState::Withdrawn(value) => {
+            domain::PersonProposalState::Withdrawn { at: Wall::from_nanos(value.into_parts().at) }
+        }
         wire::PersonProposalState::Pending(value) => {
             let wire::PendingPersonProposalParts { since } = value.into_parts();
             domain::PersonProposalState::Pending { since: Wall::from_nanos(since) }
@@ -454,14 +460,25 @@ pub fn person_proposal(
     source: &domain::PersonProposal,
     limits: &wire::Limits,
 ) -> Result<wire::PersonProposal, wire::Problem> {
-    let domain::PersonProposal { number, proposer, project, goal, state } = source;
+    let domain::PersonProposal {
+        number,
+        proposer,
+        project,
+        action: domain::PersonAction::Batch(members),
+        reason,
+        state,
+    } = source;
     wire::PersonProposal::new(
         limits,
         wire::PersonProposalParts {
             number: *number,
             proposer: *proposer,
             project: *project,
-            goal: phase::new(goal, limits)?,
+            action: wire::PersonAction::Batch(wire::ProposedBatch::new(
+                limits,
+                wire::ProposedBatchParts { members: batch(members, limits)? },
+            )?),
+            reason: reason.clone(),
             state: person_state(state, limits)?,
         },
     )
@@ -471,12 +488,20 @@ pub fn read_person_proposal(
     source: wire::PersonProposal,
     limits: &wire::Limits,
 ) -> Result<domain::PersonProposal, wire::Problem> {
-    let wire::PersonProposalParts { number, proposer, project, goal, state } = source.into_parts();
+    let wire::PersonProposalParts {
+        number,
+        proposer,
+        project,
+        action: wire::PersonAction::Batch(batch),
+        reason,
+        state,
+    } = source.into_parts();
     Ok(domain::PersonProposal {
         number,
         proposer,
         project,
-        goal: phase::read_new(goal, limits)?,
+        action: domain::PersonAction::Batch(read_batch(batch.into_parts().members, limits)?),
+        reason,
         state: read_person_state(state, limits)?,
     })
 }

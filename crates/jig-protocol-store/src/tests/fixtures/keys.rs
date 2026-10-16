@@ -134,10 +134,10 @@ pub fn tasks_key(rng: &mut Rng) -> jig_domain_tasks::Key {
             party: number(rng),
             at: Newest::of(number(rng)),
             task: Newest::of(number(rng)),
-            object: if rng.below(2) == 0 {
-                UpdateObject::Result
-            } else {
-                UpdateObject::Reply { message: Newest::of(number(rng)), activity: Newest::of(number(rng)) }
+            object: match rng.below(3) {
+                0 => UpdateObject::Result,
+                1 => UpdateObject::Reply { message: Newest::of(number(rng)), activity: Newest::of(number(rng)) },
+                _ => UpdateObject::Proposal { proposal: Newest::of(number(rng)) },
             },
         },
         _ => Key::Activity { task: number(rng), position: number(rng) },

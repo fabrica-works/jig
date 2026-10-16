@@ -95,6 +95,7 @@ mod periods;
 mod positions;
 pub use positions::{AnswerLine, ProposalRow, QuestionLine};
 mod person;
+mod person_proposals;
 mod procedure;
 mod proposals;
 mod recurring;
@@ -142,8 +143,8 @@ pub use owned::{phase_bytes, stored_bytes, task_bytes, terminal_bytes};
 pub use parts::{Part, PartKey, PartKind};
 pub use periods::PeriodTimes;
 pub use proposals::{
-    PersonProposal, PersonProposalState, Proposal, ProposalAction, ProposalDecision, ProposalHolder, ProposalKind,
-    ProposalOutcome, ProposalState,
+    PersonAction, PersonProposal, PersonProposalState, Proposal, ProposalAction, ProposalDecision, ProposalHolder,
+    ProposalKind, ProposalOutcome, ProposalState,
 };
 pub use runtime::RetryNotice;
 pub use value::{

@@ -3,7 +3,7 @@ use crate::{Core, Record, Request, Write};
 use jig_domain_tasks as tasks;
 use skein_lib::Queue;
 
-pub(crate) fn save(core: &Core, record: &tasks::Stored, out: &mut Queue<Request>) {
+pub(crate) fn save(core: &Core, record: &tasks::Stored, at: skein_lib::Wall, out: &mut Queue<Request>) {
     let update = match record {
         tasks::Stored::Ended(task) => {
             match task.requester {
@@ -58,6 +58,15 @@ pub(crate) fn save(core: &Core, record: &tasks::Stored, out: &mut Queue<Request>
                 },
             })
         }
+        tasks::Stored::DecidedProposal(row) => {
+            let Some(decision) = crate::proposals::decision_record(record, at) else { return };
+            Some(tasks::Update {
+                party: row.proposer,
+                at: decision.at,
+                task: row.first(),
+                object: tasks::UpdateObject::Proposal { proposal: tasks::Newest::of(row.number) },
+            })
+        }
         tasks::Stored::Result(_)
         | tasks::Stored::ConversationNewest(_)
         | tasks::Stored::Goal(_)
@@ -75,8 +84,7 @@ pub(crate) fn save(core: &Core, record: &tasks::Stored, out: &mut Queue<Request>
         | tasks::Stored::Ledger(_)
         | tasks::Stored::Writer(_)
         | tasks::Stored::Pool(_)
-        | tasks::Stored::ClosedLedger(_)
-        | tasks::Stored::DecidedProposal(_) => None,
+        | tasks::Stored::ClosedLedger(_) => None,
     };
     if let Some(update) = update {
         out.push(Request::Write(Write::Save(Record::Tasks(tasks::Stored::Update(update)))));

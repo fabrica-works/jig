@@ -621,6 +621,33 @@ fn a_batch_member_without_its_covered_acceptance_is_rejected() {
 }
 
 #[test]
+fn an_accepted_party_batch_stays_within_its_accepters_authority() {
+    for (budget, accepted) in [(50, true), (61, false)] {
+        let mut fake = Fake::new(Recovery::Keyed);
+        fake.referee.policy.people.get_mut(&(1, 1)).expect("proposer").budget = 20;
+        let mut accepter = scope();
+        accepter.budget = 60;
+        fake.referee.policy.people.insert((1, 2), accepter);
+        let mut rows = Snapshot::default();
+        rows.party_proposals.insert(9, 1);
+        fake.commit(1, rows.clone()).expect("party's pending batch");
+        rows.party_proposals.clear();
+        let mut member = task(2);
+        member.scope.budget = budget;
+        member.budget = budget;
+        rows.tasks.insert(2, member);
+        rows.receipts.insert(Receipt::Task(2));
+        rows.accepted_tasks.insert(2, Acceptance { proposal: 9, by: Source::Person(2) });
+        let result = fake.commit(2, rows);
+        if accepted {
+            result.expect("the accepter funds the proposer's root");
+        } else {
+            assert_eq!(result.expect_err("past the accepter's ceiling").promise, Promise::Authority);
+        }
+    }
+}
+
+#[test]
 fn a_watch_delivery_before_its_no_write_decisions_prior_commit_is_caught() {
     let mut fence = jig_core_world::watches::Fence::opened(7);
     assert_eq!(fence.delivered(6), Err("watch delivery preceded its durable fence"));

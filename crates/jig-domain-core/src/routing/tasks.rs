@@ -47,7 +47,19 @@ pub(super) fn tag_tasks(
                 Request::Held(Box::new(relay))
             }
             tasks::Request::PersonProposed { reply_to, proposal } => {
-                let event = core.person_proposed(reply_to.into_token(), proposal);
+                let (event, stubs) = core.person_proposed(reply_to.into_token(), proposal);
+                for stub in stubs {
+                    let mut follow = Queue::with_capacity(room);
+                    tasks::step(
+                        &mut core.tasks,
+                        &Env { now: env.now, wall: env.wall, limits: env.limits.tasks },
+                        tasks::Event::RememberStub { stub },
+                        &mut follow,
+                    );
+                    for _ in 0..follow.len() {
+                        pending.push(follow.pop().expect("proposal input stub output"));
+                    }
+                }
                 append_people(core, env, event, &mut out);
                 continue;
             }
@@ -809,7 +821,7 @@ pub(super) fn tag_tasks(
                     | tasks::Stored::Stub(_)
                     | tasks::Stored::PersonProposal(_) => record,
                 };
-                crate::indexes::save(core, &record, &mut out);
+                crate::indexes::save(core, &record, env.wall, &mut out);
                 if let tasks::Stored::Live(task) | tasks::Stored::Ended(task) = &record {
                     let seen = match core.conversation_requester(task) {
                         Some(party) => core.people.chat_seen(party, task.number),
@@ -919,6 +931,7 @@ pub(super) fn tag_tasks(
                     tasks::Stored::PersonProposal(row) | tasks::Stored::DecidedProposal(row) => {
                         core.touch_deployment();
                         core.touch_project_objects(row.project);
+                        core.touch_party(row.proposer);
                     }
                     tasks::Stored::Ledger(row) | tasks::Stored::ClosedLedger(row) => match row.funder {
                         tasks::Funder::Pool { project, person, .. } => {
@@ -951,7 +964,7 @@ pub(super) fn tag_tasks(
                         Some((task.number, core.waiting_entries(&env.limits, task)))
                     }
                     tasks::Stored::PersonProposal(row) | tasks::Stored::DecidedProposal(row) => {
-                        Some((row.goal.number, core.person_proposal_entries(row)))
+                        Some((row.first(), core.person_proposal_entries(row)))
                     }
                     tasks::Stored::Ledger(_)
                     | tasks::Stored::Writer(_)

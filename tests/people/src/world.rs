@@ -502,7 +502,9 @@ impl World {
                         Ask::Compound { .. } => RouteKind::Control,
                         Ask::Application { .. } => RouteKind::Application,
                         Ask::StartChat { .. } => RouteKind::Chat,
-                        Ask::Create { .. } => unreachable!("Create is exercised by the core world"),
+                        Ask::Create { .. } | Ask::Propose { .. } | Ask::Withdraw { .. } => {
+                            unreachable!("party batches are exercised by the core world")
+                        }
                         Ask::SetGoal { .. } => RouteKind::Goal,
                         Ask::MakeService { .. } => RouteKind::Service,
                         Ask::DecideProposal { .. } => RouteKind::Proposal,
@@ -618,7 +620,9 @@ impl World {
                                     &mut self.out,
                                 );
                             }
-                            Ask::Create { .. } => unreachable!("Create is exercised by the core world"),
+                            Ask::Create { .. } | Ask::Propose { .. } | Ask::Withdraw { .. } => {
+                                unreachable!("party batches are exercised by the core world")
+                            }
                             Ask::StartChat { .. } | Ask::SetGoal { .. } => {
                                 let goal = kind == RouteKind::Goal;
                                 let outcome = if self.settings.authority_refuses {
@@ -790,6 +794,8 @@ impl World {
                                         | Ask::MakeService { .. }
                                         | Ask::Adopt { .. }
                                         | Ask::Create { .. }
+                                        | Ask::Propose { .. }
+                                        | Ask::Withdraw { .. }
                                         | Ask::SetGoal { .. }
                                         | Ask::Stop { .. }
                                         | Ask::Cancel { .. }

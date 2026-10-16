@@ -1288,16 +1288,17 @@ fn a_goal_with_a_deadline_is_held_past_it() {
     ask(
         &mut world,
         90,
-        people::Ask::SetGoal {
+        jig_core_world::fixtures::propose_goal(people::Ask::SetGoal {
             project: 1,
             spec: b"finish before the deadline".as_slice().into(),
             executor: jig_domain_people::GoalExecutor::Charter(1),
             budget: 600,
             priority: 0,
             deadline: Some(deadline),
-        },
+        }),
     );
-    let Some(people::Reply::Outcome(people::Outcome::GoalProposed { proposal })) = world.people_answers.last().copied()
+    let Some(people::Reply::Outcome(people::Outcome::Proposed { proposal, to: 0 })) =
+        world.people_answers.last().copied()
     else {
         panic!("goal proposed: {:?}", world.people_answers)
     };
@@ -1307,9 +1308,9 @@ fn a_goal_with_a_deadline_is_held_past_it() {
     else {
         panic!("durable goal proposal")
     };
-    let goal = row.goal.number;
+    let goal = row.batch().first().expect("proposed member").number;
     let proposer = people::Proposer::Party(row.proposer);
-    assert_eq!(row.goal.authority.budget.deadline, Some(deadline));
+    assert_eq!(row.batch().first().expect("proposed member").authority.budget.deadline, Some(deadline));
     world.hold_accounts = true;
     world.restart_with(amendment_world_fixture(161).0);
     let Some(root::Record::Core(core::Record::Tasks(tasks::Stored::PersonProposal(row)))) =
@@ -1317,7 +1318,7 @@ fn a_goal_with_a_deadline_is_held_past_it() {
     else {
         panic!("restored goal proposal")
     };
-    assert_eq!(row.goal.authority.budget.deadline, Some(deadline));
+    assert_eq!(row.batch().first().expect("proposed member").authority.budget.deadline, Some(deadline));
     ask(
         &mut world,
         91,

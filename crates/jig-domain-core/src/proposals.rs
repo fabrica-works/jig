@@ -334,6 +334,7 @@ pub(crate) fn decision_record(row: &tasks::Stored, at: skein_lib::Wall) -> Optio
                 tasks::PersonProposalState::Rejected { by: tasks::Party::Person(by), .. } => {
                     (*by, people::ProposalChoice::Rejected)
                 }
+                tasks::PersonProposalState::Withdrawn { .. } => (row.proposer, people::ProposalChoice::Withdrawn),
                 tasks::PersonProposalState::Pending { .. }
                 | tasks::PersonProposalState::Accepted {
                     by: tasks::Party::Task(_) | tasks::Party::Deployment { .. },
@@ -349,9 +350,21 @@ pub(crate) fn decision_record(row: &tasks::Stored, at: skein_lib::Wall) -> Optio
                 proposal: row.number,
                 kind: tasks::ProposalKind::Batch,
                 by,
-                at,
+                at: match row.state {
+                    tasks::PersonProposalState::Withdrawn { at } => at,
+                    tasks::PersonProposalState::Pending { .. }
+                    | tasks::PersonProposalState::Accepted { .. }
+                    | tasks::PersonProposalState::Rejected { .. } => at,
+                },
                 choice,
-                created: None,
+                created: if choice == people::ProposalChoice::Accepted {
+                    match (row.batch().first(), row.batch().last()) {
+                        (Some(first), Some(last)) => Some((first.number, last.number)),
+                        (None, _) | (_, None) => None,
+                    }
+                } else {
+                    None
+                },
             })
         }
         tasks::Stored::History(history) => {

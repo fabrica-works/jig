@@ -178,9 +178,15 @@ fn ask_bytes(limits: &Limits) -> Option<u64> {
     )?;
     Some(
         List::<crate::Disposal>::worst_case(disposal_capacity(limits))?
-            .max(u64::from(limits.batch).checked_mul(
-                u64::try_from(size_of::<crate::Member>()).ok()?.checked_add(u64::from(limits.amendment_bytes))?,
-            )?)
+            .max(
+                u64::from(limits.batch)
+                    .checked_mul(
+                        u64::try_from(size_of::<crate::Member>())
+                            .ok()?
+                            .checked_add(u64::from(limits.amendment_bytes))?,
+                    )?
+                    .checked_add(u64::from(limits.words))?,
+            )
             .max(compound)
             .max(u64::from(limits.words))
             .max(u64::from(limits.amendment_bytes))

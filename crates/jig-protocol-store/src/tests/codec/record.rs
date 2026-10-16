@@ -5,6 +5,7 @@ use jig_domain_tasks as domain;
 use skein_lib::{Duration, Token, Wall};
 
 const PROJECT_INDEX_TASK: u64 = 17;
+const PROPOSAL_UPDATED_AT: Wall = Wall::from_nanos(41);
 
 fn activity(line: domain::Line) -> domain::Stored {
     domain::Stored::Activity(domain::ActivityLine { task: 17, position: 29, at: Wall::from_nanos(31), line })
@@ -89,6 +90,12 @@ fn each_index_row_reads_back() {
             at: Wall::from_nanos(41),
             task: 17,
             object: domain::UpdateObject::Reply { message: domain::Newest::of(37), activity: domain::Newest::of(29) },
+        }),
+        domain::Stored::Update(domain::Update {
+            party: 31,
+            at: PROPOSAL_UPDATED_AT,
+            task: 17,
+            object: domain::UpdateObject::Proposal { proposal: domain::Newest::of(43) },
         }),
         domain::Stored::Result(domain::ResultRow { party: 31, position: 43, task: 17 }),
         domain::Stored::ConversationNewest(domain::Conversation { party: 31, task: 17 }),

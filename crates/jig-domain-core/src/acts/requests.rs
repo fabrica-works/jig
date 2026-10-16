@@ -16,8 +16,11 @@ pub(crate) fn request(
     ask: &people::Ask,
 ) -> Result<(), people::Refusal> {
     let (act, subject) = match ask {
-        people::Ask::Application { .. } | people::Ask::Compound { .. } => return Ok(()),
-        people::Ask::Create { .. } | people::Ask::StartChat { .. } | people::Ask::SetGoal { .. } => {
+        people::Ask::Application { .. } | people::Ask::Compound { .. } | people::Ask::Withdraw { .. } => return Ok(()),
+        people::Ask::Create { .. }
+        | people::Ask::Propose { .. }
+        | people::Ask::StartChat { .. }
+        | people::Ask::SetGoal { .. } => {
             return standing::role(core, project, role, Act::SetGoal);
         }
         people::Ask::Say { task, .. } => (Act::Write, documents::Subject::Task { task: *task }),
@@ -119,6 +122,8 @@ pub(crate) fn request(
         | people::Ask::Close { .. }
         | people::Ask::Move { .. }
         | people::Ask::Create { .. }
+        | people::Ask::Propose { .. }
+        | people::Ask::Withdraw { .. }
         | people::Ask::SetGoal { .. }
         | people::Ask::Prioritise { .. }
         | people::Ask::MarkSeen { .. }

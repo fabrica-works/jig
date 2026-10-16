@@ -176,6 +176,8 @@ pub(super) fn cancel_request(
         | people::Ask::MakeService { .. }
         | people::Ask::Adopt { .. }
         | people::Ask::Create { .. }
+        | people::Ask::Propose { .. }
+        | people::Ask::Withdraw { .. }
         | people::Ask::SetGoal { .. }
         | people::Ask::Stop { .. }
         | people::Ask::Release { .. }
@@ -242,6 +244,8 @@ pub(super) fn release_request(
                 | people::Ask::MakeService { .. }
                 | people::Ask::Adopt { .. }
                 | people::Ask::Create { .. }
+                | people::Ask::Propose { .. }
+                | people::Ask::Withdraw { .. }
                 | people::Ask::SetGoal { .. }
                 | people::Ask::Stop { .. }
                 | people::Ask::Cancel { .. }

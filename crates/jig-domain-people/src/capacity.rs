@@ -57,7 +57,7 @@ pub struct CapacityRefusal {
     pub cause: CapacityCause,
 }
 
-pub(crate) fn action(ask: &Ask) -> CapacityAction {
+pub(crate) fn action(ask: &Ask, person: u64) -> CapacityAction {
     match ask {
         Ask::Compound { .. } => CapacityAction::Compound,
         Ask::Close { .. } => CapacityAction::Close,
@@ -69,7 +69,10 @@ pub(crate) fn action(ask: &Ask) -> CapacityAction {
         Ask::ChangePolicy { .. } => CapacityAction::Policy,
         Ask::SetPool { person, .. } => CapacityAction::Pool { person: *person },
         Ask::StartChat { .. } => CapacityAction::Chat,
-        Ask::Create { .. } => CapacityAction::Create,
+        Ask::Create { .. } | Ask::Propose { .. } => CapacityAction::Create,
+        Ask::Withdraw { proposal, .. } => {
+            CapacityAction::Proposal { proposer: crate::Proposer::Party(person), number: *proposal }
+        }
         Ask::SetGoal { .. } => CapacityAction::Goal,
         Ask::DecideEscalation { task, .. } => CapacityAction::Escalation { task: *task },
         Ask::DecideProposal { proposer, proposal, .. } => {
@@ -115,6 +118,8 @@ pub(crate) fn project(ask: &Ask) -> Option<u32> {
         | Ask::Cancel { project, .. }
         | Ask::Release { project, .. }
         | Ask::Create { project, .. }
+        | Ask::Propose { project, .. }
+        | Ask::Withdraw { project, .. }
         | Ask::SetGoal { project, .. } => Some(*project),
         Ask::Application { scope, .. } => match scope {
             crate::ApplicationScope::Own => None,
@@ -137,7 +142,8 @@ pub(crate) fn permanent(outcome: Outcome) -> Option<CapacityCause> {
         | Outcome::Adopted { .. }
         | Outcome::Created { .. }
         | Outcome::GoalStarted { .. }
-        | Outcome::GoalProposed { .. }
+        | Outcome::Proposed { .. }
+        | Outcome::Withdrawn { .. }
         | Outcome::Closing { .. }
         | Outcome::Stopped { .. }
         | Outcome::Cancelled { .. }

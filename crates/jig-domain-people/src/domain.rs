@@ -225,7 +225,7 @@ impl Domain {
                 let value = crate::CapacityRefusal {
                     key: *key,
                     project: crate::capacity::project(&answer.ask),
-                    action: crate::capacity::action(&answer.ask),
+                    action: crate::capacity::action(&answer.ask, key.person),
                     at: answer.at,
                     cause,
                 };
@@ -518,7 +518,8 @@ fn outcome_reply(outcome: Outcome) -> Reply {
         | Outcome::Adopted { .. }
         | Outcome::Created { .. }
         | Outcome::GoalStarted { .. }
-        | Outcome::GoalProposed { .. }
+        | Outcome::Proposed { .. }
+        | Outcome::Withdrawn { .. }
         | Outcome::Closing { .. }
         | Outcome::Stopped { .. }
         | Outcome::Cancelled { .. }
@@ -594,6 +595,8 @@ fn apply_roles(
         | Ask::Cancel { .. }
         | Ask::Release { .. }
         | Ask::Create { .. }
+        | Ask::Propose { .. }
+        | Ask::Withdraw { .. }
         | Ask::SetGoal { .. } => {
             return Err(Outcome::Refused(Refusal::Unknown));
         }
@@ -641,6 +644,8 @@ fn apply_roles(
         | Ask::Cancel { .. }
         | Ask::Release { .. }
         | Ask::Create { .. }
+        | Ask::Propose { .. }
+        | Ask::Withdraw { .. }
         | Ask::SetGoal { .. } => {
             unreachable!("validated roster flight")
         }
@@ -731,6 +736,8 @@ fn make_service(domain: &mut Domain, env: &Env<Limits>, request: Token, person: 
         | Ask::EditNote { .. }
         | Ask::Adopt { .. }
         | Ask::Create { .. }
+        | Ask::Propose { .. }
+        | Ask::Withdraw { .. }
         | Ask::SetGoal { .. }
         | Ask::Stop { .. }
         | Ask::Cancel { .. }
@@ -948,6 +955,8 @@ fn project(ask: &Ask) -> u32 {
         | Ask::Cancel { project, .. }
         | Ask::Release { project, .. }
         | Ask::Create { project, .. }
+        | Ask::Propose { project, .. }
+        | Ask::Withdraw { project, .. }
         | Ask::SetGoal { project, .. } => *project,
     }
 }
@@ -1096,6 +1105,10 @@ pub(crate) fn valid_ask(limits: &Limits, ask: &Ask) -> bool {
         },
         Ask::SetPool { person, .. } => *person != 0,
         Ask::Create { batch, .. } => crate::batch::valid(limits, batch),
+        Ask::Propose { action: crate::Action::Batch(batch), reason, .. } => {
+            crate::batch::valid(limits, batch) && reason.len() <= usize::try_from(limits.words).expect("u32 fits usize")
+        }
+        Ask::Withdraw { proposal, .. } => *proposal != 0,
         Ask::SetGoal { spec, executor, .. } => {
             goal_executor(*executor)
                 && !spec.is_empty()
@@ -1196,18 +1209,13 @@ pub(crate) fn invalid_ask(limits: &Limits, ask: &Ask) -> Refusal {
         | Ask::HandBackPerson { .. }
         | Ask::Stop { .. }
         | Ask::Release { .. }
-        | Ask::SetPool { .. } => return Refusal::Unknown,
+        | Ask::SetPool { .. }
+        | Ask::Withdraw { .. } => return Refusal::Unknown,
         Ask::Adopt { .. } => LimitKind::Resource,
         Ask::SetRoles { .. } => LimitKind::Roles,
         Ask::ChangePolicy { .. } => LimitKind::Policy,
-        Ask::Create { batch, .. } => {
-            if batch.is_empty() {
-                LimitKind::Empty
-            } else if batch.len() > usize::try_from(limits.batch).expect("u32 fits usize") {
-                LimitKind::Batch
-            } else {
-                LimitKind::Words
-            }
+        Ask::Create { batch, .. } | Ask::Propose { action: crate::Action::Batch(batch), .. } => {
+            crate::batch::invalid(limits, batch)
         }
         Ask::SetGoal { spec, executor, .. } => {
             if !goal_executor(*executor) {
@@ -1269,6 +1277,8 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
         Service,
         Create,
         Goal,
+        Propose,
+        Withdraw(u64),
         Stop(u64),
         Cancel(u64),
         Release(u64),
@@ -1308,6 +1318,8 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
         Ask::MakeService { .. } => Expected::Service,
         Ask::Adopt { project, .. } => Expected::Adoption(*project),
         Ask::Create { .. } => Expected::Create,
+        Ask::Propose { .. } => Expected::Propose,
+        Ask::Withdraw { proposal, .. } => Expected::Withdraw(*proposal),
         Ask::SetGoal { .. } => Expected::Goal,
         Ask::Stop { task, .. } => Expected::Stop(*task),
         Ask::Cancel { task, .. } => Expected::Cancel(*task),
@@ -1358,7 +1370,8 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
         Outcome::Adopted { project } => expected == Expected::Adoption(project),
         Outcome::Created { first, last, .. } => expected == Expected::Create && first != 0 && last >= first,
         Outcome::GoalStarted { task } => expected == Expected::Goal && task != 0,
-        Outcome::GoalProposed { proposal } => expected == Expected::Goal && proposal != 0,
+        Outcome::Proposed { proposal, .. } => expected == Expected::Propose && proposal != 0,
+        Outcome::Withdrawn { proposal } => expected == Expected::Withdraw(proposal),
         Outcome::Stopped { task } => expected == Expected::Stop(task),
         Outcome::Cancelled { task } => expected == Expected::Cancel(task),
         Outcome::Released { task } => expected == Expected::Release(task),
@@ -1494,7 +1507,7 @@ fn room_pressure(domain: &mut Domain, env: &Env<Limits>, key: RequestKey, ask: &
     domain.room_refusals.push(crate::CapacityRefusal {
         key,
         project: crate::capacity::project(ask),
-        action: crate::capacity::action(ask),
+        action: crate::capacity::action(ask, key.person),
         at: env.wall,
         cause,
     });
@@ -1567,7 +1580,8 @@ pub(super) fn answer_decided(
         | Outcome::Released { .. }
         | Outcome::Created { .. }
         | Outcome::GoalStarted { .. }
-        | Outcome::GoalProposed { .. }
+        | Outcome::Proposed { .. }
+        | Outcome::Withdrawn { .. }
         | Outcome::PersonTaken { .. }
         | Outcome::PersonHandedBack { .. }
         | Outcome::PersonAnswered { .. }
@@ -1737,6 +1751,8 @@ fn restored(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
                 | Ask::Cancel { .. }
                 | Ask::Release { .. }
                 | Ask::Create { .. }
+                | Ask::Propose { .. }
+                | Ask::Withdraw { .. }
                 | Ask::SetGoal { .. } => {
                     unreachable!("restored role success has a matching roster ask");
                 }
@@ -1765,7 +1781,8 @@ fn restored(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
             | Outcome::Released { .. }
             | Outcome::Created { .. }
             | Outcome::GoalStarted { .. }
-            | Outcome::GoalProposed { .. }
+            | Outcome::Proposed { .. }
+            | Outcome::Withdrawn { .. }
             | Outcome::EscalationDecided { .. }
             | Outcome::ProposalDecided { .. }
             | Outcome::Refused(_) => {}
@@ -1822,6 +1839,8 @@ pub fn application_part(domain: &mut Domain, env: &Env<Limits>, request: Token, 
         | Ask::SetPool { .. }
         | Ask::StartChat { .. }
         | Ask::Create { .. }
+        | Ask::Propose { .. }
+        | Ask::Withdraw { .. }
         | Ask::SetGoal { .. }
         | Ask::Say { .. }
         | Ask::AnswerQuestion { .. }
@@ -1850,6 +1869,8 @@ pub fn application_part(domain: &mut Domain, env: &Env<Limits>, request: Token, 
         | Ask::SetPool { .. }
         | Ask::StartChat { .. }
         | Ask::Create { .. }
+        | Ask::Propose { .. }
+        | Ask::Withdraw { .. }
         | Ask::SetGoal { .. }
         | Ask::Say { .. }
         | Ask::AnswerQuestion { .. }
@@ -1907,6 +1928,8 @@ fn admission(domain: &Domain, person: u64, _project: u32, role: Option<Role>, as
         | Ask::ChangePolicy { .. }
         | Ask::SetPool { .. }
         | Ask::Create { .. }
+        | Ask::Propose { .. }
+        | Ask::Withdraw { .. }
         | Ask::SetGoal { .. }
         | Ask::Close { .. }
         | Ask::Say { .. }

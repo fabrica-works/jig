@@ -599,6 +599,11 @@ impl Observer {
         let mut reached = Vec::new();
         for row in store.rows.values() {
             match row {
+                root::Record::Core(core::Record::Tasks(tasks::Stored::PersonProposal(value)))
+                    if matches!(value.state, tasks::PersonProposalState::Pending { .. }) =>
+                {
+                    snapshot.party_proposals.insert(value.number, value.proposer);
+                }
                 root::Record::Core(core::Record::Tasks(tasks::Stored::Live(value) | tasks::Stored::Ended(value))) => {
                     let mut snapshot_task = task(value);
                     snapshot_task.tracked |= store.rows.contains_key(&root::Key::Core(core::Key::Core(

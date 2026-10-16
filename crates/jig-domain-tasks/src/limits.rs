@@ -102,7 +102,13 @@ pub struct Limits {
 /// Maximum ended identities named by bounded live dependencies, inputs or references.
 #[must_use]
 pub(crate) fn stub_capacity(limits: &Limits) -> Option<u32> {
-    limits.tasks.checked_mul(limits.dependencies.checked_add(limits.inputs)?.checked_add(limits.references)?)
+    limits.tasks.checked_mul(
+        limits
+            .dependencies
+            .checked_add(limits.inputs)?
+            .checked_add(limits.references)?
+            .checked_add(limits.batch.checked_mul(limits.dependencies.checked_add(limits.inputs)?)?)?,
+    )
 }
 
 /// Pure checked heap bound for live containers and nested payloads, finite ledgers, charter
@@ -259,6 +265,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
             .checked_add(u64::from(limits.hold_bytes))?,
     )?;
     Slab::<Task>::worst_case(limits.tasks)?
+        .checked_add(Map::<u64, crate::PersonProposal>::worst_case(limits.tasks)?)?
+        .checked_add(u64::from(limits.tasks).checked_mul(proposal_payload)?)?
         .checked_add(crate::compound::worst_case(limits, payload.checked_add(proposal_payload)?)?)?
         .checked_add(Deadlines::<u64>::worst_case(limits.tasks)?)?
         .checked_add(List::<crate::moving::Plan>::worst_case(limits.delegates)?)?

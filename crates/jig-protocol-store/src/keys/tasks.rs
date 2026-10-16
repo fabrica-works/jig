@@ -123,6 +123,7 @@ pub(super) fn read(reader: &mut KeyReader<'_>) -> Option<Key> {
                     message: Newest::from_raw(reader.u64()?),
                     activity: Newest::from_raw(reader.u64()?),
                 },
+                2 => UpdateObject::Proposal { proposal: Newest::from_raw(reader.u64()?) },
                 _ => return None,
             },
         },
@@ -188,6 +189,10 @@ fn read_funder(reader: &mut KeyReader<'_>) -> Option<Funder> {
 
 fn update_object(writer: &mut KeyWriter, object: &UpdateObject) {
     match object {
+        UpdateObject::Proposal { proposal } => {
+            writer.tag(2);
+            writer.u64(proposal.raw());
+        }
         UpdateObject::Result => {
             writer.tag(0);
         }

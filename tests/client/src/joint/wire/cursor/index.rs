@@ -12,6 +12,10 @@ pub(super) fn put(
     w.u64(at.raw())?;
     w.u64(task.raw())?;
     match object {
+        tasks::UpdateObject::Proposal { proposal } => {
+            w.byte(2)?;
+            w.u64(proposal.raw())?;
+        }
         tasks::UpdateObject::Result => w.byte(0)?,
         tasks::UpdateObject::Reply { message, activity } => {
             w.byte(1)?;
@@ -32,6 +36,7 @@ pub(super) fn take(r: &mut Reader<'_>) -> Option<tasks::Key> {
                 message: tasks::Newest::from_raw(r.u64()?),
                 activity: tasks::Newest::from_raw(r.u64()?),
             },
+            2 => tasks::UpdateObject::Proposal { proposal: tasks::Newest::from_raw(r.u64()?) },
             _ => return None,
         },
     })

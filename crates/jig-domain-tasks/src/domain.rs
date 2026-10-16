@@ -494,6 +494,9 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::ProposePerson { reply_to, proposal } => {
             crate::proposals::propose_person(domain, env, reply_to, proposal, out);
         }
+        Event::WithdrawPersonProposal { reply_to, proposer, proposal } => {
+            crate::person_proposals::withdraw(domain, env, Some(reply_to), proposer, proposal, out);
+        }
         Event::DecidePersonProposal { reply_to, proposer, proposal, by, message, decision } => {
             crate::proposals::decide_person(domain, env, reply_to, proposer, proposal, by, message, decision, out);
         }

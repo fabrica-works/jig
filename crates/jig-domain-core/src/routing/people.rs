@@ -166,7 +166,8 @@ pub(super) fn tag_people(
                     | people::Outcome::Adopted { .. }
                     | people::Outcome::Created { .. }
                     | people::Outcome::GoalStarted { .. }
-                    | people::Outcome::GoalProposed { .. }
+                    | people::Outcome::Proposed { .. }
+                    | people::Outcome::Withdrawn { .. }
                     | people::Outcome::Closing { .. }
                     | people::Outcome::Stopped { .. }
                     | people::Outcome::Cancelled { .. }
@@ -265,6 +266,28 @@ pub(super) fn tag_people(
                         &mut out,
                         work,
                         super::create::Creation { request, person, project, role: role.expect("admitted role"), batch },
+                    ),
+                    people::Ask::Propose { action, reason, .. } => super::propose::propose_request(
+                        core,
+                        env,
+                        &mut out,
+                        work,
+                        super::create::Creation {
+                            request,
+                            person,
+                            project,
+                            role: role.expect("admitted role"),
+                            batch: match action {
+                                people::Action::Batch(batch) => batch,
+                            },
+                        },
+                        reason,
+                    ),
+                    people::Ask::Withdraw { proposal, .. } => super::propose::withdraw_request(
+                        core,
+                        work,
+                        &mut out,
+                        super::propose::Withdrawal { request, person, project, proposal },
                     ),
                     people::Ask::SetGoal { spec, executor, budget, priority, deadline, .. } => begin_goal_creation(
                         core,

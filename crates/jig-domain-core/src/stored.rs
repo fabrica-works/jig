@@ -334,9 +334,13 @@ impl Core {
         let deployment = self.counters.deployment();
         match row {
             tasks::Stored::PersonProposal(proposal) => {
+                for member in proposal.batch() {
+                    if member.number > deployment.tasks {
+                        return false;
+                    }
+                }
                 proposal.number <= deployment.messages
                     && proposal.proposer <= deployment.people
-                    && proposal.goal.number <= deployment.tasks
                     && self.authority.policy(proposal.project).is_some()
             }
             tasks::Stored::Stub(stub) => stub.task <= deployment.tasks,

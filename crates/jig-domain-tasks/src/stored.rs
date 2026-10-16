@@ -741,7 +741,9 @@ pub(crate) fn restore(domain: &mut Domain, env: &Env<Limits>, stored: Stored, ou
                     let inserted = domain.person_proposals.insert(row.number, *row);
                     assert!(inserted == Ok(None), "restored person proposal admitted");
                 }
-                crate::PersonProposalState::Accepted { .. } | crate::PersonProposalState::Rejected { .. } => {
+                crate::PersonProposalState::Accepted { .. }
+                | crate::PersonProposalState::Rejected { .. }
+                | crate::PersonProposalState::Withdrawn { .. } => {
                     failed(domain, None, Refusal::Restore, out);
                 }
             }

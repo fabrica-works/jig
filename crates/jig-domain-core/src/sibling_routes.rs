@@ -130,7 +130,7 @@ impl Core {
                         }
                         entries
                             .push(people::Entry {
-                                task: row.goal.number,
+                                task: row.first(),
                                 project: row.project,
                                 whom: people::Whom::Role { project: row.project, role: policy.number },
                                 kind: people::EntryKind::Proposal { number: row.number },
@@ -140,18 +140,9 @@ impl Core {
                     }
                 }
             }
-            tasks::PersonProposalState::Rejected { message, at, .. } => {
-                entries
-                    .push(people::Entry {
-                        task: row.goal.number,
-                        project: row.project,
-                        whom: people::Whom::Person(row.proposer),
-                        kind: people::EntryKind::Reply { message: *message },
-                        at: *at,
-                    })
-                    .expect("one rejection reply");
-            }
-            tasks::PersonProposalState::Accepted { .. } => {}
+            tasks::PersonProposalState::Rejected { .. }
+            | tasks::PersonProposalState::Accepted { .. }
+            | tasks::PersonProposalState::Withdrawn { .. } => {}
         }
         entries.into_boxed()
     }
@@ -230,8 +221,13 @@ impl Core {
         if request.raw() >= u64::MAX - 3 {
             return MadeRoute::Internal;
         }
-        if let Some(GoalRoute::Accepting { proposer, proposal, by, task }) = self.goal_routes.get(&request).copied() {
-            assert!(tasks.as_ref() == [task], "accepted goal task made");
+        if let Some(GoalRoute::Accepting { proposer, proposal, by }) = self.goal_routes.get(&request).cloned() {
+            let row = self.tasks.person_proposal(proposer, proposal).expect("accepted party proposal");
+            let tasks::PersonAction::Batch(batch) = &row.action;
+            assert!(batch.len() == tasks.len(), "accepted batch length");
+            for (member, number) in batch.iter().zip(tasks.iter()) {
+                assert!(member.number == *number, "accepted batch made");
+            }
             let inserted = self.goal_routes.insert(request, GoalRoute::Deciding { proposer, proposal, by });
             assert!(inserted.is_ok(), "goal route replaced");
             return MadeRoute::Tasks(tasks::Event::DecidePersonProposal {
@@ -300,10 +296,13 @@ impl Core {
 
     /// Translate the task child's successful person-origin proposal into the
     /// people child's keyed reply, consuming the in-flight correlation.
-    pub fn person_proposed(&mut self, request: Token, proposal: u64) -> people::Event {
+    pub fn person_proposed(&mut self, request: Token, proposal: u64) -> (people::Event, Box<[tasks::Stub]>) {
         let route = self.goal_routes.remove(&request).expect("person proposal route");
-        assert!(route == GoalRoute::Proposing { proposal }, "proposal identity");
-        people::Event::Decided { request, outcome: people::Outcome::GoalProposed { proposal } }
+        let GoalRoute::Offering { proposal: named, to, stubs } = route else {
+            unreachable!("proposal admission route")
+        };
+        assert!(named == proposal, "proposal identity");
+        (people::Event::Decided { request, outcome: people::Outcome::Proposed { proposal, to } }, stubs)
     }
 
     /// Translate the task child's person-origin proposal decision into the
@@ -318,10 +317,14 @@ impl Core {
     ) -> people::Event {
         let route = self.goal_routes.remove(&request).expect("goal decision route");
         let (named, proposal, by) = match route {
+            GoalRoute::Withdrawing { proposer: named, proposal } => {
+                assert!(named == proposer && proposal == number, "withdrawal identity");
+                return people::Event::Decided { request, outcome: people::Outcome::Withdrawn { proposal: number } };
+            }
             GoalRoute::Deciding { proposer, proposal, by } => (proposer, proposal, by),
-            GoalRoute::Proposing { .. } | GoalRoute::Accepting { .. } => unreachable!("goal decision stage"),
+            GoalRoute::Offering { .. } | GoalRoute::Accepting { .. } => unreachable!("proposal decision stage"),
         };
-        assert!(named == proposer && proposal == number, "goal decision identity");
+        assert!(named == proposer && proposal == number, "party decision identity");
         let choice = match outcome {
             tasks::ProposalOutcome::Accepted => people::ProposalChoice::Accepted,
             tasks::ProposalOutcome::Rejected => people::ProposalChoice::Rejected,

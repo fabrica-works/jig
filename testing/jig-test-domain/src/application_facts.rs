@@ -34,9 +34,10 @@ pub(super) fn refusal(value: people::Refusal) -> application::Refusal {
         people::Refusal::NotWellFormed { why: people::Malformed::Cycle, .. } => {
             application::Refusal::Limit { which: application::LimitKind::Cycle }
         }
-        people::Refusal::NotWellFormed { why: people::Malformed::AsAllowedTwice, .. } => {
-            application::Refusal::Limit { which: application::LimitKind::Batch }
-        }
+        people::Refusal::NotWellFormed {
+            why: people::Malformed::AsAllowedTwice | people::Malformed::ProposedAsAllowed,
+            ..
+        } => application::Refusal::Limit { which: application::LimitKind::Batch },
         people::Refusal::NotWellFormed { why: people::Malformed::Conversation, .. } => {
             application::Refusal::Limit { which: application::LimitKind::Spec }
         }

@@ -138,58 +138,61 @@ pub struct Proposal {
     pub state: ProposalState,
 }
 
-/// A person's pending goal request, kept separately from task-origin proposals.
+/// A party's explicit batch request, kept separately from task-origin proposals.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct PersonProposal {
     pub number: u64,
     pub proposer: u64,
     pub project: u32,
-    pub goal: New,
+    pub action: PersonAction,
+    pub reason: Box<[u8]>,
     pub state: PersonProposalState,
 }
 
-/// Durable decision on a person-origin goal; terminal rows remain in the store.
+impl PersonProposal {
+    /// The proposed roots, in their durable batch order.
+    #[must_use]
+    pub fn batch(&self) -> &[New] {
+        let PersonAction::Batch(batch) = &self.action;
+        batch
+    }
+    /// First root for the inbox's task link, or zero for an invalid empty batch.
+    #[must_use]
+    pub fn first(&self) -> u64 {
+        match self.batch().first() {
+            Some(member) => member.number,
+            None => 0,
+        }
+    }
+}
+
+/// A party's requested roots, funded by the accepter.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum PersonAction {
+    Batch(Box<[New]>),
+}
+
+/// Durable decision on a person-origin proposal; terminal rows remain in the store.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum PersonProposalState {
     Pending { since: Wall },
     Accepted { by: Party },
     Rejected { by: Party, reason: Box<[u8]>, message: u64, at: Wall },
+    Withdrawn { at: Wall },
 }
 
-/// A restored or newly proposed goal has the same bounded shape as a future root make.
+/// A restored or newly proposed batch has the bounded shape of future roots.
 pub(crate) fn valid_person_proposal(proposal: &PersonProposal, limits: &Limits) -> bool {
     if proposal.number == 0
         || proposal.proposer == 0
         || proposal.project == 0
-        || proposal.goal.number == 0
-        || proposal.goal.project != proposal.project
-        || proposal.goal.tracked.is_none()
-        || proposal.goal.recurring.is_some()
-        || !proposal.goal.dependencies.is_empty()
-        || !crate::valid_spec(limits, &proposal.goal.spec)
-        || !crate::valid_contract(limits, &proposal.goal.contract)
-        || !crate::valid_authority(limits, &proposal.goal.authority)
-        || !crate::wake::valid(&proposal.goal.wake)
-        || proposal.goal.numbers.budget == 0
-        || proposal.goal.numbers.spent != 0
-        || proposal.goal.numbers.spent_below != 0
-        || proposal.goal.numbers.reserved != 0
+        || proposal.reason.len() > usize::try_from(limits.message_bytes).expect("u32 fits usize")
+        || !crate::person_proposals::valid_action(proposal, limits)
     {
         return false;
     }
-    let executor = match proposal.goal.executor {
-        crate::Executor::Agent { charter } => charter != 0,
-        crate::Executor::Procedure { connector, code } => {
-            connector != 0 && code != 0 && proposal.goal.authority.tools == crate::Tools(0)
-        }
-        crate::Executor::Person(_) => false,
-    };
-    let funder = match proposal.goal.funder {
-        crate::Funder::Pool { project, person, .. } => project == proposal.project && person == proposal.proposer,
-        crate::Funder::Task(_) | crate::Funder::Period { .. } | crate::Funder::Recurring { .. } => false,
-    };
-    let state = match &proposal.state {
-        PersonProposalState::Pending { .. } => true,
+    match &proposal.state {
+        PersonProposalState::Pending { .. } | PersonProposalState::Withdrawn { .. } => true,
         PersonProposalState::Accepted { by } => match by {
             Party::Person(person) => *person != 0,
             Party::Task(_) | Party::Deployment { .. } => false,
@@ -202,11 +205,10 @@ pub(crate) fn valid_person_proposal(proposal: &PersonProposal, limits: &Limits) 
             }
             Party::Task(_) | Party::Deployment { .. } => false,
         },
-    };
-    executor && funder && state
+    }
 }
 
-/// Admit one policy-bound person proposal without creating its goal task.
+/// Admit one policy-bound party proposal without creating its roots.
 pub(crate) fn propose_person(
     domain: &mut Domain,
     env: &Env<Limits>,
@@ -220,7 +222,9 @@ pub(crate) fn propose_person(
     if !valid_person_proposal(&proposal, &env.limits)
         || match proposal.state {
             PersonProposalState::Pending { .. } => false,
-            PersonProposalState::Accepted { .. } | PersonProposalState::Rejected { .. } => true,
+            PersonProposalState::Accepted { .. }
+            | PersonProposalState::Rejected { .. }
+            | PersonProposalState::Withdrawn { .. } => true,
         }
     {
         return refused(to, None, Refusal::Read, out);
@@ -257,7 +261,7 @@ pub(crate) fn propose_person(
     out.push(Request::PersonProposed { reply_to: to, proposal: number });
 }
 
-/// Finish one exact policy decision after root has made an accepted goal.
+/// Finish one exact policy decision after root has made the accepted batch.
 #[expect(clippy::too_many_arguments, reason = "one exact person proposal decision and its output")]
 pub(crate) fn decide_person(
     domain: &mut Domain,
@@ -286,7 +290,9 @@ pub(crate) fn decide_person(
     }
     if match old.state {
         PersonProposalState::Pending { .. } => false,
-        PersonProposalState::Accepted { .. } | PersonProposalState::Rejected { .. } => true,
+        PersonProposalState::Accepted { .. }
+        | PersonProposalState::Rejected { .. }
+        | PersonProposalState::Withdrawn { .. } => true,
     } {
         return out.push(Request::PersonProposalDecided {
             reply_to: to,
@@ -297,7 +303,7 @@ pub(crate) fn decide_person(
     }
     let outcome = match &decision {
         ProposalDecision::Accept => {
-            if record(domain, old.goal.number).is_none() {
+            if !crate::person_proposals::made(domain, &old.action) {
                 return refused(to, None, Refusal::State, out);
             }
             ProposalOutcome::Accepted
@@ -328,6 +334,7 @@ pub(crate) fn decide_person(
     };
     out.push(Request::Erase { key: crate::Key::PersonProposal(number) });
     out.push(Request::Save { record: Stored::DecidedProposal(Box::new(proposal)) });
+    crate::closing::prune_stubs(domain, env, out);
     out.push(Request::PersonProposalDecided { reply_to: to, proposer, number, outcome });
 }
 

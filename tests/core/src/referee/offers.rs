@@ -150,14 +150,14 @@ pub fn check(expected: &Admission, actual: &people::Reply) -> Result<(), &'stati
     let matches = match expected {
         Admission::Refused(why) => *answer == people::Outcome::Refused(*why),
         Admission::Proposed { .. } => {
-            matches!(answer, people::Outcome::GoalProposed { .. } | people::Outcome::AmendProposed { .. })
+            matches!(answer, people::Outcome::Proposed { .. } | people::Outcome::AmendProposed { .. })
         }
         Admission::Allowed => !matches!(
             answer,
             people::Outcome::Refused(_)
                 | people::Outcome::Again(_)
                 | people::Outcome::SignedOut
-                | people::Outcome::GoalProposed { .. }
+                | people::Outcome::Proposed { .. }
                 | people::Outcome::AmendProposed { .. }
         ),
         Admission::Bounded { .. } => false,
@@ -194,7 +194,9 @@ fn fits(received: &Subject, request: &Subject) -> bool {
 }
 fn request(ask: &people::Ask) -> Option<(Act, Subject)> {
     Some(match ask {
-        people::Ask::SetGoal { project, .. } => (Act::SetGoal, Subject::Project { project: *project }),
+        people::Ask::SetGoal { project, .. } | people::Ask::Propose { project, .. } => {
+            (Act::SetGoal, Subject::Project { project: *project })
+        }
         people::Ask::Say { task, .. } => (Act::Write, Subject::Task { task: *task }),
         people::Ask::AnswerQuestion { task, question, .. } => {
             (Act::Answer, Subject::Question { task: *task, message: *question })
@@ -244,6 +246,7 @@ fn request(ask: &people::Ask) -> Option<(Act, Subject)> {
         people::Ask::SetPool { project, .. } => (Act::SetPool, Subject::Project { project: *project }),
         people::Ask::Compound { .. }
         | people::Ask::Create { .. }
+        | people::Ask::Withdraw { .. }
         | people::Ask::Application { .. }
         | people::Ask::StartChat { .. }
         | people::Ask::MarkSeen { seen: people::Seen::Results { .. } } => return None,

@@ -54,10 +54,8 @@ pub(super) fn encode_outcome(value: &domain::Outcome, limits: &wire::Limits) -> 
             limits,
             wire::OutcomeGoalStartedParts { task: *task },
         )?),
-        domain::Outcome::GoalProposed { proposal } => wire::Outcome::GoalProposed(wire::OutcomeGoalProposed::new(
-            limits,
-            wire::OutcomeGoalProposedParts { proposal: *proposal },
-        )?),
+        domain::Outcome::Proposed { proposal, to } => encode_proposed(*proposal, *to, limits)?,
+        domain::Outcome::Withdrawn { proposal } => encode_withdrawn(*proposal, limits)?,
         domain::Outcome::Stopped { task } => {
             wire::Outcome::Stopped(wire::OutcomeStopped::new(limits, wire::OutcomeStoppedParts { task: *task })?)
         }
@@ -164,10 +162,11 @@ pub(super) fn decode_outcome(value: wire::Outcome) -> domain::Outcome {
             let wire::OutcomeGoalStartedParts { task } = value.into_parts();
             domain::Outcome::GoalStarted { task }
         }
-        wire::Outcome::GoalProposed(value) => {
-            let wire::OutcomeGoalProposedParts { proposal } = value.into_parts();
-            domain::Outcome::GoalProposed { proposal }
+        wire::Outcome::Proposed(value) => {
+            let wire::OutcomeProposedParts { proposal, to } = value.into_parts();
+            domain::Outcome::Proposed { proposal, to }
         }
+        wire::Outcome::Withdrawn(value) => domain::Outcome::Withdrawn { proposal: value.into_parts().proposal },
         wire::Outcome::Stopped(value) => {
             let wire::OutcomeStoppedParts { task } = value.into_parts();
             domain::Outcome::Stopped { task }
@@ -375,4 +374,11 @@ fn decode_created(value: wire::OutcomeCreated) -> domain::Outcome {
 fn decode_marked_seen(value: wire::OutcomeMarkedSeen) -> domain::Outcome {
     let wire::OutcomeMarkedSeenParts { seen } = value.into_parts();
     domain::Outcome::MarkedSeen { seen: super::asks::decode_seen(seen) }
+}
+
+fn encode_proposed(proposal: u64, to: u32, limits: &wire::Limits) -> Result<wire::Outcome, wire::Problem> {
+    Ok(wire::Outcome::Proposed(wire::OutcomeProposed::new(limits, wire::OutcomeProposedParts { proposal, to })?))
+}
+fn encode_withdrawn(proposal: u64, limits: &wire::Limits) -> Result<wire::Outcome, wire::Problem> {
+    Ok(wire::Outcome::Withdrawn(wire::OutcomeWithdrawn::new(limits, wire::OutcomeWithdrawnParts { proposal })?))
 }

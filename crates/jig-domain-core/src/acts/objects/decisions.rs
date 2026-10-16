@@ -20,7 +20,9 @@ pub(crate) fn proposal(
             core.goal_standing(&row, row.project, role)?;
             match &row.state {
                 tasks::PersonProposalState::Pending { .. } => {}
-                tasks::PersonProposalState::Accepted { .. } | tasks::PersonProposalState::Rejected { .. } => {
+                tasks::PersonProposalState::Accepted { .. }
+                | tasks::PersonProposalState::Rejected { .. }
+                | tasks::PersonProposalState::Withdrawn { .. } => {
                     return Err(people::Refusal::Unknown);
                 }
             }

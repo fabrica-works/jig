@@ -293,7 +293,8 @@ fn goal_proposal(number: u64) -> tasks::PersonProposal {
         number,
         proposer: 9,
         project: 1,
-        goal,
+        action: tasks::PersonAction::Batch(Box::new([goal])),
+        reason: Box::from(b"proposed batch".as_slice()),
         state: tasks::PersonProposalState::Pending { since: skein_lib::Wall::EPOCH },
     }
 }

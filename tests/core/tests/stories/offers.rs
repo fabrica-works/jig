@@ -36,7 +36,7 @@ fn a_members_goal_beyond_their_pool_is_refused_when_nobody_may_accept_it() {
         deadline: None,
     };
     let refused = people::Reply::Outcome(people::Outcome::Refused(people::Refusal::Authority {
-        lacking: people::Lack::Approver,
+        lacking: people::Lack::Budget { needs: 600, left: 100 },
         proposable: Some(people::Accepter::Nobody),
     }));
     ask(&mut world, 91, goal.clone());
@@ -86,11 +86,12 @@ fn a_member_is_offered_a_goal_past_their_allotment_as_proposed() {
     assert!(*maximum_budget >= 600);
     assert_eq!((*project, roles.as_slice()), (1, [0].as_slice()));
     let before = world.assignments.len();
-    ask(&mut world, 92, goal(600));
-    let Some(people::Reply::Outcome(people::Outcome::GoalProposed { proposal })) = world.people_answers.last() else {
+    ask(&mut world, 92, jig_core_world::fixtures::propose_goal(goal(600)));
+    let Some(people::Reply::Outcome(people::Outcome::Proposed { proposal, to: 0 })) = world.people_answers.last()
+    else {
         panic!("goal proposed");
     };
-    assert!(world.store.rows.values().any(|row| matches!(row, root::Record::Core(core::Record::Tasks(tasks::Stored::PersonProposal(value))) if value.number == *proposal && value.goal.authority.budget.spend == 600)));
+    assert!(world.store.rows.values().any(|row| matches!(row, root::Record::Core(core::Record::Tasks(tasks::Stored::PersonProposal(value))) if value.number == *proposal && value.batch().first().expect("proposed member").authority.budget.spend == 600)));
     assert_eq!(world.assignments.len(), before, "no goal runs before acceptance");
     assert_eq!(world.offers.as_ref().expect("offer referee").checked, 1);
     world.watches.as_ref().expect("watch parties").finish();

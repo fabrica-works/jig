@@ -27,16 +27,17 @@ pub fn stored_bytes(record: &Stored) -> Option<u64> {
         },
         Stored::Milestone(row) => phase_bytes(&row.phase),
         Stored::PersonProposal(row) | Stored::DecidedProposal(row) => {
+            let crate::PersonAction::Batch(batch) = &row.action;
             let mut total = bytes(size_of::<crate::PersonProposal>())?
-                .checked_add(spec_bytes(&row.goal.spec)?)?
-                .checked_add(authority_bytes(&row.goal.authority)?)?
-                .checked_add(contract_bytes(&row.goal.contract)?)?
-                .checked_add(bytes(size_of_val(&*row.goal.dependencies))?)?;
+                .checked_add(bytes(row.reason.len())?)?
+                .checked_add(batch_bytes(batch)?)?;
             match &row.state {
                 PersonProposalState::Rejected { reason, .. } => {
                     total = total.checked_add(bytes(reason.len())?)?;
                 }
-                PersonProposalState::Pending { .. } | PersonProposalState::Accepted { .. } => {}
+                PersonProposalState::Pending { .. }
+                | PersonProposalState::Accepted { .. }
+                | PersonProposalState::Withdrawn { .. } => {}
             }
             Some(total)
         }

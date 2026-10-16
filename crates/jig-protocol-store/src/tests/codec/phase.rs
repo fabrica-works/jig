@@ -1,6 +1,8 @@
 //! Task lifecycle and proposal rows in both directions (protocol/store.md, 5.1).
 use super::{bound_problem, fixtures, saved_tasks, saved_wire, tasks_limits};
 
+const WITHDRAWN_AT: skein_lib::Wall = skein_lib::Wall::from_nanos(73);
+
 fn a_history_row_with_an_amendment_reads_back() {
     let row = jig_domain_tasks::Stored::History(fixtures::task_history());
     assert_eq!(saved_tasks(&row), Ok(row));
@@ -44,6 +46,7 @@ fn a_decided_person_proposal_reads_back() {
     use jig_domain_tasks::{Party, PersonProposalState};
     for state in [
         PersonProposalState::Accepted { by: Party::Person(31) },
+        PersonProposalState::Withdrawn { at: WITHDRAWN_AT },
         PersonProposalState::Rejected {
             by: Party::Person(31),
             reason: Box::from(b"no".as_slice()),

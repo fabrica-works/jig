@@ -963,7 +963,8 @@ fn application_answer(outcome: people::Outcome) -> connector::ApplicationCoreAns
         | people::Outcome::Adopted { .. }
         | people::Outcome::Created { .. }
         | people::Outcome::GoalStarted { .. }
-        | people::Outcome::GoalProposed { .. }
+        | people::Outcome::Proposed { .. }
+        | people::Outcome::Withdrawn { .. }
         | people::Outcome::Closing { .. }
         | people::Outcome::Stopped { .. }
         | people::Outcome::Cancelled { .. }

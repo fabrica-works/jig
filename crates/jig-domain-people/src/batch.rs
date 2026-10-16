@@ -1,6 +1,22 @@
 //! A party's batch (domain/tasks.md, sections 3 and 4).
 use crate::{Authority, Grant, Parameter, PersonAddress, WakePolicy};
 use alloc::boxed::Box;
+/// A party's explicitly proposed action.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum Action {
+    Batch(Box<[Member]>),
+}
+
+pub(crate) fn invalid(limits: &crate::Limits, batch: &[Member]) -> crate::LimitKind {
+    if batch.is_empty() {
+        crate::LimitKind::Empty
+    } else if batch.len() > usize::try_from(limits.batch).expect("u32 fits usize") {
+        crate::LimitKind::Batch
+    } else {
+        crate::LimitKind::Words
+    }
+}
+
 /// One root requested by a party, mirroring the tasks child's New.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Member {

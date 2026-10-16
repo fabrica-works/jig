@@ -46,12 +46,7 @@ impl Core {
         }
         for (_, proposal) in self.tasks.person_proposals() {
             let entries = self.person_proposal_entries(proposal);
-            people::step(
-                &mut self.people,
-                &env,
-                people::Event::Waiting { task: proposal.goal.number, entries },
-                &mut out,
-            );
+            people::step(&mut self.people, &env, people::Event::Waiting { task: proposal.first(), entries }, &mut out);
             assert!(out.is_empty(), "restored pending proposals decide nothing");
         }
         let mut results = List::with_capacity(limits.people.people);

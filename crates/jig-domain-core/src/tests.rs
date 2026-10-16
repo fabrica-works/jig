@@ -2780,19 +2780,15 @@ fn goal_deadlines_are_checked_against_the_role_and_policy() {
     let started = core
         .goal_start(1, 1, people::Role::Owner, people::GoalExecutor::Charter(1), 10, Some(earlier), 2)
         .expect("within role");
-    assert!(started.direct);
+    assert_eq!(started.authority.budget.spend, 10);
     assert_eq!(started.authority.budget.deadline, Some(earlier));
-    assert!(
-        !core
-            .goal_start(1, 1, people::Role::Owner, people::GoalExecutor::Charter(1), 10, Some(later), 2)
-            .expect("proposed deadline")
-            .direct
+    assert_eq!(
+        core.goal_start(1, 1, people::Role::Owner, people::GoalExecutor::Charter(1), 10, Some(later), 2).unwrap_err(),
+        people::Refusal::Authority { lacking: people::Lack::Deadline, proposable: Some(people::Accepter::Role(0)) }
     );
-    assert!(
-        !core
-            .goal_start(1, 1, people::Role::Owner, people::GoalExecutor::Charter(1), 10, None, 2)
-            .expect("unbounded deadline proposed")
-            .direct
+    assert_eq!(
+        core.goal_start(1, 1, people::Role::Owner, people::GoalExecutor::Charter(1), 10, None, 2).unwrap_err(),
+        people::Refusal::Authority { lacking: people::Lack::Deadline, proposable: Some(people::Accepter::Role(0)) }
     );
     policy.ceiling.budget.deadline = Some(deadline);
     while out.pop().is_some() {}

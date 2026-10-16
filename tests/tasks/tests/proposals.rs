@@ -73,3 +73,81 @@ fn a_proposal_reroute_only_applies_to_the_holder_and_revision_it_checked() {
     );
     world.restart();
 }
+
+fn propose_batch(world: &mut World, proposer: u64, number: u64, batch: Vec<jig_domain_tasks::New>) {
+    let mut batch = batch.into_boxed_slice();
+    for member in &mut batch {
+        member.funder = Funder::Pool { project: 1, person: proposer, period: 0 };
+    }
+    let reply_to = world.to();
+    world.send(Event::ProposePerson {
+        reply_to,
+        proposal: jig_domain_tasks::PersonProposal {
+            number,
+            proposer,
+            project: 1,
+            action: jig_domain_tasks::PersonAction::Batch(batch),
+            reason: Box::from(b"please fund this work".as_slice()),
+            state: jig_domain_tasks::PersonProposalState::Pending { since: world.env.wall },
+        },
+    });
+}
+#[test]
+fn a_partys_batch_proposal_is_kept_until_decided() {
+    let mut world = World::new(340, LIMITS);
+    propose_batch(&mut world, 9, 100, vec![task(1, &[]), task(2, &[1])]);
+    let before = world.records[&jig_domain_tasks::Key::PersonProposal(100)].clone();
+    world.restart();
+    assert_eq!(world.records[&jig_domain_tasks::Key::PersonProposal(100)], before);
+    assert!(!world.records.contains_key(&jig_domain_tasks::Key::Live(1)));
+}
+#[test]
+fn a_partys_withdrawn_proposal_is_decided_withdrawn() {
+    let mut world = World::new(341, LIMITS);
+    propose_batch(&mut world, 9, 100, vec![task(1, &[])]);
+    let reply_to = world.to();
+    world.send(Event::WithdrawPersonProposal { reply_to, proposer: 9, proposal: 100 });
+    let jig_domain_tasks::Stored::DecidedProposal(row) = &world.records[&jig_domain_tasks::Key::DecidedProposal(100)]
+    else {
+        panic!("decided proposal")
+    };
+    assert_eq!(row.state, jig_domain_tasks::PersonProposalState::Withdrawn { at: world.env.wall });
+    assert!(!world.records.contains_key(&jig_domain_tasks::Key::PersonProposal(100)));
+    world.restart();
+}
+#[test]
+fn withdrawing_another_partys_proposal_is_unknown() {
+    let mut world = World::new(342, LIMITS);
+    propose_batch(&mut world, 9, 100, vec![task(1, &[])]);
+    let reply_to = world.to();
+    world.send(Event::WithdrawPersonProposal { reply_to, proposer: 8, proposal: 100 });
+    assert_eq!(
+        world.replies.last_key_value().expect("withdrawal reply").1.clone(),
+        Reply::Refused(jig_domain_tasks::Problem {
+            task: None,
+            why: jig_domain_tasks::Refusal::Unknown,
+            blocked_by: None,
+            capacity: None
+        })
+    );
+    assert!(world.records.contains_key(&jig_domain_tasks::Key::PersonProposal(100)));
+}
+#[test]
+fn a_batch_proposal_naming_a_task_since_ended_is_withdrawn() {
+    let mut world = World::new(343, LIMITS);
+    assert_eq!(world.make(Party::Person(9), vec![task(1, &[])]), Reply::Made(vec![1]));
+    propose_batch(&mut world, 9, 100, vec![task(2, &[1])]);
+    let reply_to = world.to();
+    world.send(Event::Control {
+        reply_to,
+        by: Party::Person(9),
+        task: 1,
+        control: jig_domain_tasks::Control::Cancel { reason: Box::new([]), message: None, grace: None },
+    });
+    world.settle(1);
+    let jig_domain_tasks::Stored::DecidedProposal(row) = &world.records[&jig_domain_tasks::Key::DecidedProposal(100)]
+    else {
+        panic!("decided proposal")
+    };
+    assert_eq!(row.state, jig_domain_tasks::PersonProposalState::Withdrawn { at: world.env.wall });
+}

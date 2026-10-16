@@ -142,8 +142,10 @@ record AmendmentHistory { before: Settings after: Settings }
 record History { task: u64 revision: u64 by: Party change: Change reason: bytes 65536 proposal: option Proposal at: u64 amendment: option AmendmentHistory }
 record PendingPersonProposal { since: u64 }
 record RejectedPersonProposal { by: Party reason: bytes 65536 message: u64 at: u64 }
-enum PersonProposalState { pending: PendingPersonProposal, accepted: AcceptedProposal, rejected: RejectedPersonProposal }
-record PersonProposal { number: u64 proposer: u64 project: u32 goal: Creation state: PersonProposalState }
+record WithdrawnPersonProposal { at: u64 }
+enum PersonProposalState { pending: PendingPersonProposal, accepted: AcceptedProposal, rejected: RejectedPersonProposal, withdrawn: WithdrawnPersonProposal }
+enum PersonAction { batch: ProposedBatch }
+record PersonProposal { number: u64 proposer: u64 project: u32 action: PersonAction reason: bytes 65536 state: PersonProposalState }
 record Milestone { task: u64 position: u64 phase: Phase at: u64 }
 record Grace { by: Party until: u64 reason: bytes 65536 message: u64 }
 record Revisions { hold: u64 spec: u64 person: u64 }
@@ -215,7 +217,8 @@ record ProposalRow { proposal: u64 revision: u64 }
 record Endings { done: u32 failed: u32 cancelled: u32 }
 record GoalRow { project: u32 task: u64 endings: Endings }
 record ReplyObject { message: u64 activity: u64 }
-enum UpdateObject { result, reply: ReplyObject }
+record ProposalUpdate { proposal: u64 }
+enum UpdateObject { result, reply: ReplyObject, proposal: ProposalUpdate }
 record Update { party: u64 at: u64 task: u64 object: UpdateObject }
 record ResultRow { party: u64 position: u64 task: u64 }
 record Conversation { party: u64 task: u64 }

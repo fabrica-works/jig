@@ -41,32 +41,25 @@ fn a_goal_within_its_offer_is_direct_and_a_supported_goal_beyond_it_is_proposed(
     assert_eq!((budget, pool_left), (500, 500));
     assert_eq!(charters.as_slice(), &[1]);
     assert_eq!(beyond, Beyond::Proposed { to: policy_holder(&[0]) });
-    assert!(
+    let started = core
+        .goal_start(1, 1, people::Role::Owner, people::GoalExecutor::Charter(1), budget, None, limits.tasks.tree_tasks)
+        .unwrap();
+    assert_eq!(started.authority.budget.spend, budget);
+    assert_eq!(
         core.goal_start(
             1,
             1,
             people::Role::Owner,
             people::GoalExecutor::Charter(1),
-            budget,
+            budget + 1,
             None,
             limits.tasks.tree_tasks
         )
-        .unwrap()
-        .direct
-    );
-    assert!(
-        !core
-            .goal_start(
-                1,
-                1,
-                people::Role::Owner,
-                people::GoalExecutor::Charter(1),
-                budget + 1,
-                None,
-                limits.tasks.tree_tasks
-            )
-            .unwrap()
-            .direct
+        .unwrap_err(),
+        people::Refusal::Authority {
+            lacking: people::Lack::Budget { needs: 501, left: 500 },
+            proposable: Some(people::Accepter::Role(0))
+        }
     );
     assert_eq!(
         core.goal_start(
@@ -107,21 +100,15 @@ fn a_goal_without_an_accepting_role_reports_the_same_refusal_in_its_bound_and_ad
             limits.tasks.tree_tasks
         )
         .unwrap_err(),
-        why
+        people::Refusal::Authority {
+            lacking: people::Lack::Budget { needs: 501, left: 500 },
+            proposable: Some(people::Accepter::Nobody)
+        }
     );
-    assert!(
-        core.goal_start(
-            1,
-            1,
-            people::Role::Owner,
-            people::GoalExecutor::Charter(1),
-            100,
-            None,
-            limits.tasks.tree_tasks
-        )
-        .unwrap()
-        .direct
-    );
+    let started = core
+        .goal_start(1, 1, people::Role::Owner, people::GoalExecutor::Charter(1), 100, None, limits.tasks.tree_tasks)
+        .unwrap();
+    assert_eq!(started.authority.budget.spend, 100);
 }
 
 #[test]
@@ -145,11 +132,21 @@ fn a_policy_proposal_names_every_eligible_role_without_choosing_one_holder() {
         panic!("bounded goal")
     };
     assert_eq!(beyond, Beyond::Proposed { to: policy_holder(&[0, 4]) });
-    assert!(
-        !core
-            .goal_start(1, 1, people::Role::Owner, people::GoalExecutor::Charter(1), 501, None, limits.tasks.tree_tasks)
-            .unwrap()
-            .direct
+    assert_eq!(
+        core.goal_start(
+            1,
+            1,
+            people::Role::Owner,
+            people::GoalExecutor::Charter(1),
+            501,
+            None,
+            limits.tasks.tree_tasks
+        )
+        .unwrap_err(),
+        people::Refusal::Authority {
+            lacking: people::Lack::Budget { needs: 501, left: 500 },
+            proposable: Some(people::Accepter::Role(0))
+        }
     );
 }
 
@@ -730,14 +727,20 @@ fn procedure_goal_bounds_and_admission_keep_exact_executor_and_authority_facts()
         &[offers::GoalProcedure { connector: 1, code: 1 }, offers::GoalProcedure { connector: 2, code: 1 },]
     );
     let admitted = core.goal_start(1, 1, people::Role::Owner, executor, 100, None, limits.tasks.tree_tasks).unwrap();
-    assert!(admitted.direct);
+    assert_eq!(admitted.authority.budget.spend, 100);
     assert_eq!(admitted.authority.tools, authority::Tools(0));
     assert_eq!(admitted.authority.grants, core.authority.role(1, 0).unwrap().authority.grants);
     assert_eq!(
         admitted.authority.delegation,
         core.chat_authority(1, 1, people::Role::Owner, limits.tasks.tree_tasks).delegation
     );
-    assert!(!core.goal_start(1, 1, people::Role::Owner, executor, 501, None, limits.tasks.tree_tasks).unwrap().direct);
+    assert_eq!(
+        core.goal_start(1, 1, people::Role::Owner, executor, 501, None, limits.tasks.tree_tasks).unwrap_err(),
+        people::Refusal::Authority {
+            lacking: people::Lack::Budget { needs: 501, left: 500 },
+            proposable: Some(people::Accepter::Role(0))
+        }
+    );
     assert_eq!(
         core.goal_start(
             1,
@@ -785,7 +788,7 @@ fn procedure_goal_bounds_refuse_an_incomplete_executor_list() {
     );
     let executor = people::GoalExecutor::Procedure { connector: 2, code: 1 };
     assert!(
-        core.goal_start(1, 1, people::Role::Owner, executor, 100, None, limits.tasks.tree_tasks).unwrap().direct,
+        core.goal_start(1, 1, people::Role::Owner, executor, 100, None, limits.tasks.tree_tasks).is_ok(),
         "document receiving bound does not alter owner admission"
     );
 }
@@ -855,7 +858,8 @@ fn a_task_and_a_party_with_identical_proposal_numbers_are_decided_separately() {
                     number: 10,
                     proposer: 1,
                     project: 1,
-                    goal,
+                    action: tasks::PersonAction::Batch(Box::new([goal])),
+                    reason: Box::from(b"proposed batch".as_slice()),
                     state: tasks::PersonProposalState::Pending { since: Wall::EPOCH },
                 },
             },

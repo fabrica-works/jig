@@ -180,6 +180,8 @@ impl Core {
             | people::Ask::DecideEscalation { .. }
             | people::Ask::StartChat { .. }
             | people::Ask::Create { .. }
+            | people::Ask::Propose { .. }
+            | people::Ask::Withdraw { .. }
             | people::Ask::SetGoal { .. } => unreachable!("control route owns its ask"),
         };
         if let people::Ask::Cancel { grace: Some(span), .. } = ask

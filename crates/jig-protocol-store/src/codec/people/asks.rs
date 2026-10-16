@@ -351,6 +351,23 @@ pub fn encode_ask(value: &domain::Ask, limits: &wire::Limits) -> Result<wire::As
             limits,
             wire::AskCompoundParts { project: *project, operations: super::compound::encode(operations, limits)? },
         )?),
+        domain::Ask::Propose { project, action: domain::Action::Batch(batch), reason } => {
+            wire::Ask::Propose(wire::AskPropose::new(
+                limits,
+                wire::AskProposeParts {
+                    project: *project,
+                    action: wire::Action::Batch(wire::ActionBatch::new(
+                        limits,
+                        wire::ActionBatchParts { members: super::batch::encode(batch, limits)? },
+                    )?),
+                    reason: reason.clone(),
+                },
+            )?)
+        }
+        domain::Ask::Withdraw { project, proposal } => wire::Ask::Withdraw(wire::AskWithdraw::new(
+            limits,
+            wire::AskWithdrawParts { project: *project, proposal: *proposal },
+        )?),
         domain::Ask::Create { project, batch } => wire::Ask::Create(wire::AskCreate::new(
             limits,
             wire::AskCreateParts { project: *project, batch: super::batch::encode(batch, limits)? },
@@ -528,6 +545,18 @@ pub fn decode_ask(value: wire::Ask, limits: &wire::Limits) -> Result<domain::Ask
         wire::Ask::Compound(value) => {
             let wire::AskCompoundParts { project, operations } = value.into_parts();
             domain::Ask::Compound { project, operations: super::compound::decode(operations, limits)? }
+        }
+        wire::Ask::Propose(value) => {
+            let wire::AskProposeParts { project, action: wire::Action::Batch(batch), reason } = value.into_parts();
+            domain::Ask::Propose {
+                project,
+                action: domain::Action::Batch(super::batch::decode(batch.into_parts().members, limits)?),
+                reason,
+            }
+        }
+        wire::Ask::Withdraw(value) => {
+            let wire::AskWithdrawParts { project, proposal } = value.into_parts();
+            domain::Ask::Withdraw { project, proposal }
         }
         wire::Ask::Create(value) => {
             let wire::AskCreateParts { project, batch } = value.into_parts();

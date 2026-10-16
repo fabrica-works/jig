@@ -39,7 +39,9 @@ impl Group {
 
     pub(crate) fn includes(self, object: documents::InboxObject) -> bool {
         match object {
-            documents::InboxObject::Proposal { .. } => self == Self::Needs || self == Self::Proposals,
+            documents::InboxObject::Proposal { .. } => {
+                self == Self::Needs || self == Self::Proposals || self == Self::Updates
+            }
             documents::InboxObject::Escalation { .. } => self == Self::Needs || self == Self::Escalations,
             documents::InboxObject::Question { .. } => self == Self::Needs || self == Self::Questions,
             documents::InboxObject::PersonTask => self == Self::Needs || self == Self::PersonTasks,

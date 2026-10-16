@@ -403,7 +403,7 @@ fn party_reply(reply: people::Reply) -> parties::Reply {
         people::Reply::Outcome(people::Outcome::Said { task, message, released }) => {
             parties::Reply::Said { task, message, released }
         }
-        people::Reply::Outcome(people::Outcome::GoalProposed { proposal }) => parties::Reply::Proposed { proposal },
+        people::Reply::Outcome(people::Outcome::Proposed { proposal, .. }) => parties::Reply::Proposed { proposal },
         people::Reply::Outcome(people::Outcome::Closing { chat, cancelled, kept }) => {
             parties::Reply::Closed { chat, cancelled, kept }
         }
@@ -629,9 +629,10 @@ fn party_refusal(why: people::Refusal) -> parties::Refusal {
         people::Refusal::NotWellFormed { why: people::Malformed::Cycle, .. } => {
             parties::Refusal::Limit { which: parties::LimitKind::Cycle }
         }
-        people::Refusal::NotWellFormed { why: people::Malformed::AsAllowedTwice, .. } => {
-            parties::Refusal::Limit { which: parties::LimitKind::Batch }
-        }
+        people::Refusal::NotWellFormed {
+            why: people::Malformed::AsAllowedTwice | people::Malformed::ProposedAsAllowed,
+            ..
+        } => parties::Refusal::Limit { which: parties::LimitKind::Batch },
         people::Refusal::NotWellFormed { why: people::Malformed::Conversation, .. } => {
             parties::Refusal::Limit { which: parties::LimitKind::Spec }
         }

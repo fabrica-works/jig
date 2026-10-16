@@ -42,7 +42,7 @@ fn an_outside_allotment_goal_is_shown_as_proposed_before_send_and_named_in_the_a
         member,
         vec![
             Step::Press { find: Find::exactly_named(Role::Button, b"Confirm") },
-            Step::See { find: Find::text(b"Goal proposed"), within },
+            Step::See { find: Find::text(b"Your pool has"), within },
         ],
     );
     let outcome = world.run(Until::Done);
@@ -58,17 +58,17 @@ fn an_outside_allotment_goal_is_shown_as_proposed_before_send_and_named_in_the_a
         .values()
         .filter_map(|row| match row {
             jig_test_domain::Record::Core(jig_domain_core::Record::People(people::Stored::Answer {
-                outcome: people::Outcome::GoalProposed { proposal },
-                ..
-            })) => Some(*proposal),
+                outcome, ..
+            })) => Some(*outcome),
             jig_test_domain::Record::Core(_) | jig_test_domain::Record::Connector { .. } => None,
         })
         .collect();
-    assert_eq!(answers.len(), 1);
-    let label = format!("Proposal number: {}", answers[0]).into_bytes();
-    world.person(member, vec![Step::See { find: Find::text(&label), within }]);
-    let outcome = world.run(Until::Done);
-    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
-    assert!(outcome.judged.0 > 0);
+    assert_eq!(
+        answers,
+        vec![people::Outcome::Refused(people::Refusal::Authority {
+            lacking: people::Lack::Budget { needs: 150, left: 50 },
+            proposable: Some(people::Accepter::Role(0)),
+        })]
+    );
     assert!(world.front().session.driver.world.peers.as_ref().expect("actual worker").workers[0].seen.is_empty());
 }

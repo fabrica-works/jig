@@ -38,3 +38,12 @@ pub enum Update {
     Reply(Entry),
     ChatReply(ReplyRef),
 }
+
+/// A party's requested read position (domain/people.md, section 6).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Seen {
+    /// Results committed through this position.
+    Results { through: u64 },
+    /// Replies of one chat through this position.
+    Chat { task: u64, through: u64 },
+}

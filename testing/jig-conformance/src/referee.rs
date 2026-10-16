@@ -229,6 +229,8 @@ pub struct Snapshot {
     pub acceptances: BTreeMap<(u16, SystemKey), Acceptance>,
     /// Durable covered-holder acceptance for each member of a proposed batch.
     pub accepted_tasks: BTreeMap<u64, Acceptance>,
+    /// Pending party proposal numbers and the parties that proposed them.
+    pub party_proposals: BTreeMap<u64, u64>,
     pub held_effects: BTreeSet<(u16, SystemKey)>,
     pub settled_effects: BTreeSet<(u16, SystemKey)>,
     pub batches: Vec<Vec<u64>>,
@@ -469,8 +471,13 @@ impl Referee {
                 let prior =
                     proposer.and_then(|parent| self.last.tasks.get(&parent.number)).and_then(|parent| parent.proposal);
                 let known = self.last.accepted_tasks.get(&task.number) == Some(accepted);
+                let party = match task.source {
+                    Source::Person(person) => self.last.party_proposals.get(&accepted.proposal) == Some(&person),
+                    Source::Task(_) | Source::Deployment => false,
+                };
                 require(
                     known
+                        || party
                         || prior.is_some_and(|(proposal, holder)| {
                             proposal == accepted.proposal
                                 && (holder == accepted.by

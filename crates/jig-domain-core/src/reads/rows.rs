@@ -326,6 +326,9 @@ pub(super) fn live_page(core: &Core, limits: &Limits, party: u64, read: &Read, d
 /// Stable address supplied by the owning record, never by a client row number.
 #[must_use]
 pub fn row_key(row: &Row) -> Option<Position> {
+    if let Some(position) = super::indexed::proposal_position(row) {
+        return Some(position);
+    }
     let key = match &row.value {
         Record::Tasks(value) => Some(Key::Tasks(value.key())),
         Record::Notes(notes::Record::Entry(value)) => {
@@ -634,7 +637,8 @@ fn object(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Optio
                     }
                     tasks::PersonProposalState::Accepted { .. }
                     | tasks::PersonProposalState::Pending { .. }
-                    | tasks::PersonProposalState::Rejected { .. } => {}
+                    | tasks::PersonProposalState::Rejected { .. }
+                    | tasks::PersonProposalState::Withdrawn { .. } => {}
                 }
                 let (at, by) = match &value.state {
                     tasks::PersonProposalState::Pending { since } => (Some(*since), None),
@@ -646,6 +650,9 @@ fn object(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Optio
                         Some(*by),
                     ),
                     tasks::PersonProposalState::Rejected { by, at, .. } => (Some(*at), Some(*by)),
+                    tasks::PersonProposalState::Withdrawn { at } => {
+                        (Some(*at), Some(tasks::Party::Person(value.proposer)))
+                    }
                 };
                 Ok(Some(historical(Past::PersonProposal { proposal: value.clone(), decision }, at, by)))
             }
@@ -977,7 +984,7 @@ fn inbox_selection_row(limits: &Limits, row: &Row) -> Result<Option<documents::I
     };
     let task = match &row.value {
         Record::Tasks(tasks::Stored::PersonProposal(proposal) | tasks::Stored::DecidedProposal(proposal)) => {
-            let context = documents::inbox_selection_from_ancestry(limits, proposal.goal.number, cursor, &[])?;
+            let context = documents::inbox_selection_from_ancestry(limits, proposal.first(), cursor, &[])?;
             return Ok(Some(context));
         }
         Record::Tasks(
@@ -1159,19 +1166,32 @@ fn person_proposal_need(
     row: &Row,
     proposal: &tasks::PersonProposal,
 ) -> Result<Option<PageRow>, Missing> {
-    if !group.includes(documents::InboxObject::Proposal {
-        proposer: Proposer::Party(proposal.proposer),
-        number: proposal.number,
-    }) || (filter.project.is_some() && filter.project != Some(proposal.project))
-        || (filter.goal.is_some() && filter.goal != Some(proposal.goal.number))
+    let object =
+        documents::InboxObject::Proposal { proposer: Proposer::Party(proposal.proposer), number: proposal.number };
+    if !group.includes(object)
+        || (filter.project.is_some() && filter.project != Some(proposal.project))
+        || (filter.goal.is_some() && filter.goal != Some(proposal.first()))
     {
         return Ok(None);
     }
     let at = match proposal.state {
-        tasks::PersonProposalState::Pending { since } => since,
-        tasks::PersonProposalState::Accepted { .. } | tasks::PersonProposalState::Rejected { .. } => return Ok(None),
+        tasks::PersonProposalState::Pending { since } if !group.updates() => since,
+        tasks::PersonProposalState::Rejected { at, .. } | tasks::PersonProposalState::Withdrawn { at }
+            if group.updates() && party == proposal.proposer =>
+        {
+            at
+        }
+        tasks::PersonProposalState::Accepted { .. } if group.updates() && party == proposal.proposer => {
+            let Some(record) = &row.related else { return Err(Missing::Unknown) };
+            let Some(decision) = proposal_decision(record) else { return Err(Missing::Unknown) };
+            decision.at
+        }
+        tasks::PersonProposalState::Pending { .. }
+        | tasks::PersonProposalState::Accepted { .. }
+        | tasks::PersonProposalState::Rejected { .. }
+        | tasks::PersonProposalState::Withdrawn { .. } => return Ok(None),
     };
-    let mut addressed = false;
+    let mut addressed = group.updates() && party == proposal.proposer;
     for entry in core.person_proposal_entries(proposal) {
         match entry.whom {
             jig_domain_people::Whom::Person(person) => addressed = addressed || person == party,
@@ -1187,13 +1207,13 @@ fn person_proposal_need(
     }
     let object =
         documents::InboxObject::Proposal { proposer: Proposer::Party(proposal.proposer), number: proposal.number };
-    let cursor = documents::Cursor::Inbox { task: proposal.goal.number, object, at: Some(at) };
+    let cursor = documents::Cursor::Inbox { task: proposal.first(), object, at: Some(at) };
     if row.inbox != Some(cursor) {
         return Err(Missing::Unknown);
     }
     Ok(Some(PageRow::Inbox(documents::InboxEntry {
         reply: None,
-        task: documents::TaskLink::Stored { number: proposal.goal.number, status: None },
+        task: documents::TaskLink::Stored { number: proposal.first(), status: None },
         project: Some(proposal.project),
         object,
         activity: None,

@@ -78,6 +78,10 @@ pub fn update_object(
     limits: &wire::Limits,
 ) -> Result<wire::UpdateObject, wire::Problem> {
     Ok(match source {
+        domain::UpdateObject::Proposal { proposal } => wire::UpdateObject::Proposal(wire::ProposalUpdate::new(
+            limits,
+            wire::ProposalUpdateParts { proposal: proposal.value() },
+        )?),
         domain::UpdateObject::Result => wire::UpdateObject::Result,
         domain::UpdateObject::Reply { message, activity } => wire::UpdateObject::Reply(wire::ReplyObject::new(
             limits,
@@ -91,6 +95,9 @@ pub fn read_update_object(
     _limits: &wire::Limits,
 ) -> Result<domain::UpdateObject, wire::Problem> {
     Ok(match source {
+        wire::UpdateObject::Proposal(value) => {
+            domain::UpdateObject::Proposal { proposal: domain::Newest::of(value.into_parts().proposal) }
+        }
         wire::UpdateObject::Result => domain::UpdateObject::Result,
         wire::UpdateObject::Reply(source) => {
             let wire::ReplyObjectParts { message, activity } = source.into_parts();

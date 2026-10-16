@@ -54,20 +54,16 @@ pub(super) fn goal_decide(
             if let Some(event) = pool {
                 work.push(Event::Tasks(event));
             }
-            let mut goal = proposal.goal.clone();
-            goal.funder = source;
+            let tasks::PersonAction::Batch(mut batch) = proposal.action;
+            for member in &mut batch {
+                member.funder = source;
+            }
             assert!(
-                core.goal_routes.insert(
-                    request,
-                    GoalRoute::Accepting { proposer, proposal: number, by: person, task: goal.number },
-                ) == Ok(None),
+                core.goal_routes.insert(request, GoalRoute::Accepting { proposer, proposal: number, by: person },)
+                    == Ok(None),
                 "one goal acceptance"
             );
-            tasks::Event::Make {
-                reply_to: ReplyTo::new(request),
-                creator: tasks::Party::Person(proposer),
-                batch: Box::new([goal]),
-            }
+            tasks::Event::Make { reply_to: ReplyTo::new(request), creator: tasks::Party::Person(proposer), batch }
         }
         people::ProposalDecision::Reject { reason } => {
             let Some(message) = crate::fresh(&mut core.counters, crate::Family::Message) else {

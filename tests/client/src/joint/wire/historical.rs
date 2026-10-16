@@ -142,8 +142,9 @@ fn person_proposal(value: &tasks::PersonProposal, limits: &Limits) -> Result<cli
         number: value.number,
         proposer: value.proposer,
         project: value.project,
-        goal: historical_goal::goal(&value.goal, limits)?,
+        goal: historical_goal::goal(value.batch().first().expect("one v8 goal"), limits)?,
         state: match &value.state {
+            tasks::PersonProposalState::Withdrawn { .. } => unreachable!("no v8 withdrawal"),
             tasks::PersonProposalState::Pending { since } => {
                 client::OwnerPersonProposalState::Pending { since: *since }
             }

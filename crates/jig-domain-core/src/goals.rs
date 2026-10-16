@@ -17,8 +17,6 @@ pub struct GoalStart {
     pub source: tasks::Funder,
     /// Authority bounded to this goal's requested budget.
     pub authority: authority::Authority,
-    /// True when current policy and funding admit the task directly.
-    pub direct: bool,
 }
 
 impl Core {
@@ -101,22 +99,25 @@ impl Core {
         tasks_left: u32,
     ) -> Result<tasks::Funder, people::Refusal> {
         let (source, numbers) = self.goal_pool(project, person);
-        let executor = match proposal.goal.executor {
-            tasks::Executor::Agent { charter } => authority::Executor::Charter(charter),
-            tasks::Executor::Procedure { code, .. } => authority::Executor::Procedure(code),
-            tasks::Executor::Person(_) => return Err(people::Refusal::NotOffered),
-        };
+        let tasks::PersonAction::Batch(batch) = &proposal.action;
+        let mut members = skein_lib::List::with_capacity(u32::try_from(batch.len()).expect("bounded party batch"));
+        for member in batch {
+            members
+                .push(authority::Delegate {
+                    executor: self.delegation_executor(project, member.executor).ok_or(people::Refusal::Unknown)?,
+                    authority: translate::authority_value(&member.authority),
+                    symbolic: Box::new([]),
+                })
+                .expect("bounded party batch");
+        }
+        let action = authority::Action::Batch(members.into_boxed());
         let mut findings = Queue::with_capacity(authority::max_out(self.authority.limits()).expect("authority room"));
         let ask = authority::PersonAsk {
             project,
             role: role.number(),
             pool: translate::authority_numbers(numbers),
             tasks_left,
-            request: authority::PersonRequest::Accept(authority::Action::Batch(Box::new([authority::Delegate {
-                executor,
-                authority: translate::authority_value(&proposal.goal.authority),
-                symbolic: Box::new([]),
-            }]))),
+            request: authority::PersonRequest::Accept(action),
         };
         let checked = authority::check_request(&self.authority, &ask, &mut findings);
         if checked.answer == authority::Answer::Allow {

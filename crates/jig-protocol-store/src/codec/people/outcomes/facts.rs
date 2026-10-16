@@ -413,6 +413,7 @@ pub(super) fn encode_refusal(value: &domain::Refusal, limits: &wire::Limits) -> 
             wire::RefusalNotWellFormedParts {
                 at: *at,
                 why: match why {
+                    domain::Malformed::ProposedAsAllowed => wire::Malformed::ProposedAsAllowed,
                     domain::Malformed::Cycle => wire::Malformed::Cycle,
                     domain::Malformed::AsAllowedTwice => wire::Malformed::AsAllowedTwice,
                     domain::Malformed::Conversation => wire::Malformed::Conversation,
@@ -476,6 +477,7 @@ pub(super) fn decode_refusal(value: wire::Refusal) -> domain::Refusal {
             domain::Refusal::NotWellFormed {
                 at,
                 why: match why {
+                    wire::Malformed::ProposedAsAllowed => domain::Malformed::ProposedAsAllowed,
                     wire::Malformed::Cycle => domain::Malformed::Cycle,
                     wire::Malformed::AsAllowedTwice => domain::Malformed::AsAllowedTwice,
                     wire::Malformed::Conversation => domain::Malformed::Conversation,

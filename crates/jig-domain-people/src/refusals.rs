@@ -53,6 +53,8 @@ pub enum Refusal {
 /// Why a batch member is not well formed.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Malformed {
+    /// A proposed batch must name every budget.
+    ProposedAsAllowed,
     Cycle,
     AsAllowedTwice,
     Conversation,

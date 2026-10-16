@@ -262,14 +262,18 @@ pub fn proposal_decision(
     )
 }
 pub fn person_proposal(value: &t::PersonProposal, limits: &w::Limits) -> Result<w::OwnerPersonProposal, w::Problem> {
+    let [goal] = value.batch() else { return Err(super::super::problem(skein_codec::Reason::Malformed)) };
     w::OwnerPersonProposal::new(
         limits,
         w::OwnerPersonProposalParts {
             number: value.number,
             proposer: value.proposer,
             project: value.project,
-            goal: super::goal::goal(&value.goal, limits)?,
+            goal: super::goal::goal(goal, limits)?,
             state: match &value.state {
+                t::PersonProposalState::Withdrawn { .. } => {
+                    return Err(super::super::problem(skein_codec::Reason::Malformed));
+                }
                 t::PersonProposalState::Pending { since } => {
                     w::OwnerPersonProposalState::Pending(w::OwnerPersonProposalStatePending::new(
                         limits,

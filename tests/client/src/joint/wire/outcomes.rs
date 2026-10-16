@@ -24,9 +24,12 @@ pub fn outcome(value: &people::Outcome) -> Outcome {
         people::Outcome::Adopted { project } => client::OwnerOutcome::Adopted { project: *project },
         people::Outcome::Compound { .. }
         | people::Outcome::CompoundRefused { .. }
-        | people::Outcome::Created { .. } => unreachable!("no v8 ask leads to Created"),
+        | people::Outcome::Created { .. }
+        | people::Outcome::Proposed { .. }
+        | people::Outcome::Withdrawn { .. } => {
+            unreachable!("no v8 ask leads to these outcomes")
+        }
         people::Outcome::GoalStarted { task } => client::OwnerOutcome::GoalStarted { task: *task },
-        people::Outcome::GoalProposed { proposal } => client::OwnerOutcome::GoalProposed { proposal: *proposal },
         people::Outcome::Stopped { task } => client::OwnerOutcome::Stopped { task: *task },
         people::Outcome::Cancelled { task } => client::OwnerOutcome::Cancelled { task: *task },
         people::Outcome::Released { task } => client::OwnerOutcome::Released { task: *task },
@@ -196,10 +199,6 @@ mod tests {
         assert_eq!(
             outcome(&people::Outcome::MarkedSeen { seen: people::Seen::Results { through: 0 } }),
             Outcome::Owner(client::OwnerOutcome::MarkedSeen { seen: client::Seen::Results { through: 0 } })
-        );
-        assert_eq!(
-            outcome(&people::Outcome::GoalProposed { proposal: u64::MAX }),
-            Outcome::Owner(client::OwnerOutcome::GoalProposed { proposal: u64::MAX })
         );
         for why in [people::Again::Busy, people::Again::NotReady] {
             assert_eq!(outcome(&people::Outcome::Again(why)), Outcome::Again(why));

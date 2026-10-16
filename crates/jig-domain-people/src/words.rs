@@ -4,24 +4,8 @@ use crate::{Ask, EscalationDecision, NoteChange, PersonResult, ProposalDecision}
 pub(crate) fn valid(ask: &Ask) -> bool {
     match ask {
         Ask::StartChat { words, .. } | Ask::Say { words, .. } | Ask::AnswerQuestion { words, .. } => text(words),
-        Ask::Create { batch, .. } => {
-            for member in batch {
-                if !text(&member.words) {
-                    return false;
-                }
-                for parameter in &member.parameters {
-                    match parameter {
-                        crate::Parameter::Bytes { value, .. } => {
-                            if !text(value) {
-                                return false;
-                            }
-                        }
-                        crate::Parameter::Number { .. } | crate::Parameter::Resource { .. } => {}
-                    }
-                }
-            }
-            true
-        }
+        Ask::Propose { action: crate::Action::Batch(batch), reason, .. } => text(reason) && batch_words(batch),
+        Ask::Create { batch, .. } => batch_words(batch),
         Ask::SetGoal { spec, .. } => text(spec),
         Ask::MakeService { name, .. } => text(name),
         Ask::Move { reason, .. } | Ask::Cancel { reason, .. } => text(reason),
@@ -83,11 +67,31 @@ pub(crate) fn valid(ask: &Ask) -> bool {
         | Ask::SetRoles { .. }
         | Ask::ChangePolicy { .. }
         | Ask::SetPool { .. }
-        | Ask::Prioritise { .. } => true,
+        | Ask::Prioritise { .. }
+        | Ask::Withdraw { .. } => true,
     }
 }
 
 #[expect(clippy::disallowed_methods, reason = "client/domain/contract.md, 5.3 requires UTF-8 text validation")]
 fn text(bytes: &[u8]) -> bool {
     core::str::from_utf8(bytes).is_ok()
+}
+
+fn batch_words(batch: &[crate::Member]) -> bool {
+    for member in batch {
+        if !text(&member.words) {
+            return false;
+        }
+        for parameter in &member.parameters {
+            match parameter {
+                crate::Parameter::Bytes { value, .. } => {
+                    if !text(value) {
+                        return false;
+                    }
+                }
+                crate::Parameter::Number { .. } | crate::Parameter::Resource { .. } => {}
+            }
+        }
+    }
+    true
 }

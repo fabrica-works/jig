@@ -5,7 +5,7 @@
 
 use super::refusals::pool_refused;
 use super::{Creation, CreationKind};
-use crate::{Ask, Core, Event, GoalRoute, Limits, PersonTaskRoute, Record, Request, Requests, Write};
+use crate::{Ask, Core, Event, Limits, PersonTaskRoute, Record, Request, Requests, Write};
 use alloc::boxed::Box;
 use jig_domain_people as people;
 use jig_domain_tasks as tasks;
@@ -190,15 +190,7 @@ pub(super) fn begin_goal_creation(
         pool_refused(work, request, people::Refusal::Limit { which: people::LimitKind::Words });
         return;
     }
-    begin_creation(
-        core,
-        env,
-        out,
-        work,
-        request,
-        CreationKind::Goal { person, direct: admitted.direct },
-        Box::new([new]),
-    );
+    begin_creation(core, env, out, work, request, CreationKind::Goal { person }, Box::new([new]));
 }
 
 #[expect(clippy::too_many_arguments, reason = "one authenticated chat carries its membership and opening words")]
@@ -337,9 +329,22 @@ pub(super) fn created_holdings(
 }
 
 fn finish_creation(core: &mut Core, env: &Env<Limits>, work: &mut Queue<Event>, request: Token, creating: Creation) {
+    match creating.kind {
+        CreationKind::Propose { person, reason, to, stubs } => {
+            super::propose::keep(
+                core,
+                env,
+                work,
+                super::propose::Proposal { request, person, reason, to, batch: creating.members, stubs },
+            );
+            return;
+        }
+        CreationKind::Batch { .. } | CreationKind::Goal { .. } | CreationKind::Chat { .. } => {}
+    }
     let person = match creating.kind {
         CreationKind::Batch { person, .. } => Some(person),
         CreationKind::Goal { .. } | CreationKind::Chat { .. } => None,
+        CreationKind::Propose { .. } => unreachable!("proposal handled above"),
     };
     if let Some(person) = person {
         let first = creating.members.first().expect("nonempty batch").number;
@@ -364,8 +369,8 @@ fn finish_creation(core: &mut Core, env: &Env<Limits>, work: &mut Queue<Event>, 
     }
     let new = creating.members.into_iter().next().expect("single creation");
     match creating.kind {
-        CreationKind::Batch { .. } => unreachable!("batch handled above"),
-        CreationKind::Goal { person, direct: true } => {
+        CreationKind::Batch { .. } | CreationKind::Propose { .. } => unreachable!("batch handled above"),
+        CreationKind::Goal { person } => {
             let (period, pool) = core.goal_open_pool(new.project, person);
             if let Some(event) = period {
                 work.push(Event::Tasks(event));
@@ -384,26 +389,6 @@ fn finish_creation(core: &mut Core, env: &Env<Limits>, work: &mut Queue<Event>, 
                 reply_to: ReplyTo::new(request),
                 creator: tasks::Party::Person(person),
                 batch: Box::new([new]),
-            }));
-        }
-        CreationKind::Goal { person, direct: false } => {
-            let Some(proposal) = crate::fresh(&mut core.counters, crate::Family::Message) else {
-                pool_refused(work, request, people::Refusal::Limit { which: people::LimitKind::Arithmetic });
-                return;
-            };
-            assert!(
-                core.goal_routes.insert(request, GoalRoute::Proposing { proposal }) == Ok(None),
-                "one goal proposal flight"
-            );
-            work.push(Event::Tasks(tasks::Event::ProposePerson {
-                reply_to: ReplyTo::new(request),
-                proposal: tasks::PersonProposal {
-                    number: proposal,
-                    proposer: person,
-                    project: new.project,
-                    goal: new,
-                    state: tasks::PersonProposalState::Pending { since: env.wall },
-                },
             }));
         }
         CreationKind::Chat { person } => {

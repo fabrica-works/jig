@@ -68,7 +68,7 @@ pub const ENGINE_SMALL: &[u8] = br#"{
 "owners": [{"provider": 1, "subject": "owner-a"}],
 "providers": [{"number": 1, "kind": "link"}, {"number": 2, "kind": "deployment"}],
 "connectors": [1],
-"memory_bytes": 17179869184,
+"memory_bytes": 34359738368,
 "rules": {
 "ceiling": {"tools": 1023, "grants": [],
 "delegation": {"kinds": [{"kind": "charter", "number": 1}], "tasks": 8, "depth": 8},

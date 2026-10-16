@@ -123,6 +123,10 @@ record AskApplication { scope: ApplicationScope connector: u16 digest: fixed 32 
 record AskEditNote { project: u32 name: u64 scope: NoteScope change: NoteChange }
 record AskMakeService { project: u32 name: bytes 8192 role: Role }
 record AskAdopt { project: u32 adoption: Adoption }
+record ActionBatch { members: list 8 Member }
+enum Action { batch: ActionBatch }
+record AskPropose { project: u32 action: Action reason: bytes 8192 }
+record AskWithdraw { project: u32 proposal: u64 }
 record AskSetGoal { project: u32 spec: bytes 8192 executor: GoalExecutor budget: u64 priority: u32 deadline: option u64 }
 record AskStop { project: u32 task: u64 }
 record AskCancel { project: u32 task: u64 reason: bytes 8192 grace: option u64 }
@@ -141,7 +145,7 @@ record AskChangePolicy { project: u32 change: PolicyChange }
 record AskSetPool { project: u32 person: u64 budget: u64 }
 record AskDecideEscalation { project: u32 task: u64 revision: u64 decision: EscalationDecision }
 record AskStartChat { project: u32 words: bytes 8192 }
-enum Ask { compound: AskCompound, create: AskCreate, close: AskClose, mark_seen: AskMarkSeen, application: AskApplication, edit_note: AskEditNote, make_service: AskMakeService, adopt: AskAdopt, set_goal: AskSetGoal, stop: AskStop, cancel: AskCancel, release: AskRelease, take_person: AskTakePerson, hand_back_person: AskHandBackPerson, answer_person: AskAnswerPerson, move_task: AskMove, decide_proposal: AskDecideProposal, say: AskSay, answer_question: AskAnswerQuestion, prioritise: AskPrioritise, amend: boxed AskAmend, set_roles: AskSetRoles, change_policy: AskChangePolicy, set_pool: AskSetPool, decide_escalation: AskDecideEscalation, start_chat: AskStartChat }
+enum Ask { compound: AskCompound, create: AskCreate, close: AskClose, mark_seen: AskMarkSeen, application: AskApplication, edit_note: AskEditNote, make_service: AskMakeService, adopt: AskAdopt, set_goal: AskSetGoal, stop: AskStop, cancel: AskCancel, release: AskRelease, take_person: AskTakePerson, hand_back_person: AskHandBackPerson, answer_person: AskAnswerPerson, move_task: AskMove, decide_proposal: AskDecideProposal, say: AskSay, answer_question: AskAnswerQuestion, prioritise: AskPrioritise, amend: boxed AskAmend, set_roles: AskSetRoles, change_policy: AskChangePolicy, set_pool: AskSetPool, decide_escalation: AskDecideEscalation, start_chat: AskStartChat, propose: AskPropose, withdraw: AskWithdraw }
 record StoredPerson { number: u64 identity: Identity }
 record StoredReadResults { party: u64 through: u64 }
 record StoredReadChat { party: u64 task: u64 through: u64 }
@@ -190,7 +194,7 @@ record RefusalLimit { which: LimitKind }
 record RefusalMoved { now: Moved }
 record RefusalEnded { how: Ending }
 record RefusalTaken { by: u64 }
-enum Malformed { cycle, as_allowed_twice, conversation }
+enum Malformed { cycle, as_allowed_twice, conversation, proposed_as_allowed }
 record RefusalNotWellFormed { at: u32 why: Malformed }
 enum Refusal { not_well_formed: RefusalNotWellFormed, disposal: RefusalDisposal, role: RefusalRole, authority: RefusalAuthority, limit: RefusalLimit, moved: RefusalMoved, ended: RefusalEnded, taken: RefusalTaken, not_waiting, no_further, unknown, not_offered, key_conflict, no_escalation_holder }
 enum ProposalChoice { accepted, rejected, passed, withdrawn, stale }
@@ -205,7 +209,8 @@ record OutcomeNoteEdited { name: u64 }
 record OutcomeServiceMade { person: u64 }
 record OutcomeAdopted { project: u32 }
 record OutcomeGoalStarted { task: u64 }
-record OutcomeGoalProposed { proposal: u64 }
+record OutcomeProposed { proposal: u64 to: u32 }
+record OutcomeWithdrawn { proposal: u64 }
 record OutcomeStopped { task: u64 }
 record OutcomeCancelled { task: u64 }
 record OutcomeReleased { task: u64 }
@@ -227,7 +232,7 @@ record OutcomeStarted { task: u64 }
 record OutcomeRefused { value: Refusal }
 record Given { task: u64 amount: u64 }
 record OutcomeCreated { first: u64 last: u64 given: option Given }
-enum Outcome { compound: OutcomeCompound, compound_refused: OutcomeCompoundRefused, created: OutcomeCreated, closing: OutcomeClosing, marked_seen: OutcomeMarkedSeen, applied: OutcomeApplied, again: OutcomeAgain, signed_out, note_edited: OutcomeNoteEdited, service_made: OutcomeServiceMade, adopted: OutcomeAdopted, goal_started: OutcomeGoalStarted, goal_proposed: OutcomeGoalProposed, stopped: OutcomeStopped, cancelled: OutcomeCancelled, released: OutcomeReleased, person_taken: OutcomePersonTaken, person_handed_back: OutcomePersonHandedBack, person_answered: OutcomePersonAnswered, moved: OutcomeMoved, proposal_decided: OutcomeProposalDecided, said: OutcomeSaid, question_answered: OutcomeQuestionAnswered, prioritised: OutcomePrioritised, amended: OutcomeAmended, amend_proposed: OutcomeAmendProposed, roles_set: OutcomeRolesSet, policy_changed: OutcomePolicyChanged, pool_set: OutcomePoolSet, escalation_decided: OutcomeEscalationDecided, started: OutcomeStarted, refused: OutcomeRefused }
+enum Outcome { compound: OutcomeCompound, compound_refused: OutcomeCompoundRefused, created: OutcomeCreated, closing: OutcomeClosing, marked_seen: OutcomeMarkedSeen, applied: OutcomeApplied, again: OutcomeAgain, signed_out, note_edited: OutcomeNoteEdited, service_made: OutcomeServiceMade, adopted: OutcomeAdopted, goal_started: OutcomeGoalStarted, proposed: OutcomeProposed, stopped: OutcomeStopped, cancelled: OutcomeCancelled, released: OutcomeReleased, person_taken: OutcomePersonTaken, person_handed_back: OutcomePersonHandedBack, person_answered: OutcomePersonAnswered, moved: OutcomeMoved, proposal_decided: OutcomeProposalDecided, said: OutcomeSaid, question_answered: OutcomeQuestionAnswered, prioritised: OutcomePrioritised, amended: OutcomeAmended, amend_proposed: OutcomeAmendProposed, roles_set: OutcomeRolesSet, policy_changed: OutcomePolicyChanged, pool_set: OutcomePoolSet, escalation_decided: OutcomeEscalationDecided, started: OutcomeStarted, refused: OutcomeRefused, withdrawn: OutcomeWithdrawn }
 record StoredAnswer { key: RequestKey ask: Ask outcome: Outcome at: u64 }
 enum Value { person: StoredPerson, read_results: StoredReadResults, read_chat: StoredReadChat, sign_in: StoredSignIn, roles: StoredRoles, policy: StoredPolicy, answer: StoredAnswer, ended_read: EndedRead }
 versioned record Row { value: Value }

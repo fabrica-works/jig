@@ -222,3 +222,63 @@ pub fn two_projects(seed: u64) -> (root::Config, root::Limits) {
     ]);
     (config, limits)
 }
+
+/// Move the former implicit goal-proposal stories onto the explicit batch request.
+#[must_use]
+pub fn propose_goal(ask: jig_domain_people::Ask) -> jig_domain_people::Ask {
+    use jig_domain_people as people;
+    let people::Ask::SetGoal { project, spec, executor, budget, priority, deadline } = ask else {
+        panic!("goal fixture")
+    };
+    let mut member = people_member(b"", budget);
+    member.words = spec;
+    member.executor = match executor {
+        people::GoalExecutor::Charter(charter) => people::TaskExecutor::Agent { charter },
+        people::GoalExecutor::Procedure { connector, code } => people::TaskExecutor::Procedure { connector, code },
+    };
+    member.authority.deadline = deadline;
+    member.tracked = Some(priority);
+    member.flags.listed = true;
+    people::Ask::Propose {
+        project,
+        reason: Box::from(b"please fund this goal".as_slice()),
+        action: people::Action::Batch(Box::new([member])),
+    }
+}
+
+/// One requested root, shared by direct creation and explicit proposal stories.
+#[must_use]
+pub fn people_member(words: &[u8], spend: u64) -> jig_domain_people::Member {
+    use jig_domain_people as people;
+    people::Member {
+        executor: people::TaskExecutor::Agent { charter: 1 },
+        words: words.into(),
+        parameters: Box::new([]),
+        inputs: Box::new([]),
+        budget: people::Budget::Named,
+        named: Box::new([]),
+        contract: people::Contract::Report { words: 16 },
+        authority: people::Authority {
+            tools: 0,
+            grants: Box::new([]),
+            delegation: people::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 },
+            spend,
+            deadline: None,
+            notes: 0,
+            note_resources: Box::new([]),
+        },
+        wake: people::WakePolicy {
+            words: people::WakeRule::Immediate,
+            notices: people::WakeRule::Never,
+            news: people::WakeRule::Never,
+            results: people::ResultsWake::Never,
+            questions: false,
+            answers: false,
+            timers: false,
+        },
+        dependencies: Box::new([]),
+        tracked: None,
+        label: 0,
+        flags: people::Flags::PLAIN,
+    }
+}

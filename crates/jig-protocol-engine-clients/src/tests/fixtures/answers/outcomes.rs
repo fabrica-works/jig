@@ -32,15 +32,6 @@ fn case_3() -> (p::Reply, w::Final) {
         )),
     )
 }
-fn case_4() -> (p::Reply, w::Final) {
-    (
-        p::Reply::Outcome(p::Outcome::GoalProposed { proposal: 8 }),
-        owner(w::OwnerOutcome::GoalProposed(
-            w::OwnerOutcomeGoalProposed::new(&wire(), w::OwnerOutcomeGoalProposedParts { proposal: 8 })
-                .expect("GoalProposed"),
-        )),
-    )
-}
 fn case_5() -> (p::Reply, w::Final) {
     (
         p::Reply::Outcome(p::Outcome::Stopped { task: 8 }),
@@ -184,13 +175,12 @@ fn case_20() -> (p::Reply, w::Final) {
         )),
     )
 }
-pub fn owner_outcomes() -> [(p::Reply, w::Final); 21] {
+pub fn owner_outcomes() -> [(p::Reply, w::Final); 20] {
     [
         case_0(),
         case_1(),
         case_2(),
         case_3(),
-        case_4(),
         case_5(),
         case_6(),
         case_7(),

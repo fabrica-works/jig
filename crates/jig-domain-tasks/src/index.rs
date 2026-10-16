@@ -27,10 +27,17 @@ impl Newest {
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum UpdateObject {
     Result,
-    Reply { message: Newest, activity: Newest },
+    Reply {
+        message: Newest,
+        activity: Newest,
+    },
+    /// A party proposal's retained decision, with no task owner required.
+    Proposal {
+        proposal: Newest,
+    },
 }
 
-/// One person's result or reply, saved with the record it names.
+/// One person's result, reply or decided proposal, saved with the record it names.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Update {
     pub party: u64,

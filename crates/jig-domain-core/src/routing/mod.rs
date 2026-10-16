@@ -7,6 +7,7 @@
 pub(crate) mod application_routes;
 mod create;
 pub(crate) mod party_inputs;
+mod propose;
 
 use crate::{CallKey, CallPart, Core, RoutedCall};
 use alloc::boxed::Box;
@@ -104,7 +105,8 @@ pub(crate) struct PersonEscalation {
 #[derive(Debug)]
 pub(super) enum CreationKind {
     Batch { person: u64, given: Option<people::Given>, stubs: Box<[tasks::Stub]> },
-    Goal { person: u64, direct: bool },
+    Goal { person: u64 },
+    Propose { person: u64, reason: Box<[u8]>, to: u32, stubs: Box<[tasks::Stub]> },
     Chat { person: u64 },
 }
 

@@ -1285,6 +1285,8 @@ pub enum Event {
     WakeProcedure { task: u64 },
     /// Root admits a person's goal proposal after validating policy and shape.
     ProposePerson { reply_to: ReplyTo, proposal: crate::PersonProposal },
+    /// Withdraw the proposing party's pending proposal.
+    WithdrawPersonProposal { reply_to: ReplyTo, proposer: u64, proposal: u64 },
     /// Root commits a policy holder's decision on a person-origin goal proposal.
     DecidePersonProposal {
         reply_to: ReplyTo,

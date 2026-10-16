@@ -58,7 +58,6 @@ pub enum StoreOut {
 }
 /// A restored row, a root terminal or the next store request.
 #[derive(Debug)]
-#[expect(clippy::large_enum_variant, reason = "the routing passes the root's events by value")]
 pub enum Up {
     Restore(jig_test_domain::Record),
     Root(jig_test_domain::Event),

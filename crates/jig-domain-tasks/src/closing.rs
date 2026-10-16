@@ -10,6 +10,13 @@ use alloc::boxed::Box;
 use skein_lib::{Env, List, Queue};
 
 pub(crate) fn named_by_live(domain: &Domain, ended: u64) -> bool {
+    for (_, proposal) in &domain.person_proposals {
+        for member in proposal.batch() {
+            if member.spec.inputs.contains(&ended) || member.dependencies.contains(&ended) {
+                return true;
+            }
+        }
+    }
     for (number, _) in &domain.names {
         let row = record(domain, *number).expect("indexed live task");
         if crate::batch::contains(&row.dependencies, ended)
@@ -33,7 +40,7 @@ pub(crate) fn remember_stub(domain: &mut Domain, stub: crate::Stub, out: &mut Qu
     out.push(Request::Save { record: Stored::Stub(stub) });
 }
 
-fn prune_stubs(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
+pub(crate) fn prune_stubs(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     let mut unused = List::with_capacity(crate::limits::stub_capacity(&env.limits).expect("valid stub bound"));
     for (number, _) in &domain.stubs {
         if !named_by_live(domain, *number) {
@@ -321,6 +328,7 @@ fn end_task(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queue
             crate::SubscriptionKind::Task { .. } | crate::SubscriptionKind::Timer { .. } => {}
         }
     }
+    crate::person_proposals::ended(domain, env, number, out);
     crate::funders::end(domain, env, number, out);
     ended.phase = Phase::Ended(ending.clone());
     end_milestone(&mut ended, env.wall, out);

@@ -422,6 +422,7 @@ impl World {
             | Event::Control { .. }
             | Event::Propose { .. }
             | Event::ProposePerson { .. }
+            | Event::WithdrawPersonProposal { .. }
             | Event::DecidePersonProposal { .. }
             | Event::DecideProposal { .. }
             | Event::WithdrawProposal { .. }
@@ -498,6 +499,7 @@ impl World {
             | Event::Compound { .. }
             | Event::Propose { .. }
             | Event::ProposePerson { .. }
+            | Event::WithdrawPersonProposal { .. }
             | Event::DecidePersonProposal { .. }
             | Event::DecideProposal { .. }
             | Event::WithdrawProposal { .. }

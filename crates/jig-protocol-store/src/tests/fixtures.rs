@@ -302,7 +302,8 @@ pub fn task_person_proposal() -> jig_domain_tasks::PersonProposal {
         number: 43,
         proposer: 31,
         project: 3,
-        goal,
+        action: jig_domain_tasks::PersonAction::Batch(Box::new([goal])),
+        reason: Box::from(b"proposed batch".as_slice()),
         state: jig_domain_tasks::PersonProposalState::Pending { since: skein_lib::Wall::from_nanos(47) },
     }
 }
@@ -472,6 +473,14 @@ pub fn people_member() -> people::Member {
         flags: people::Flags::PLAIN,
     }
 }
+fn people_propose() -> people::Ask {
+    people::Ask::Propose {
+        project: 1,
+        action: people::Action::Batch(Box::new([people_member()])),
+        reason: Box::from(b"please fund it".as_slice()),
+    }
+}
+
 pub fn people_asks() -> Box<[people::Ask]> {
     use people::{Ask, Proposer};
     let [cancel_move, amend_release, message_stop] = people_compounds();
@@ -492,6 +501,8 @@ pub fn people_asks() -> Box<[people::Ask]> {
         cancel_move,
         amend_release,
         message_stop,
+        people_propose(),
+        Ask::Withdraw { project: 1, proposal: 43 },
         Ask::Close { project: 1, chat: 2, disposals },
         Ask::MarkSeen { seen: people::Seen::Chat { task: 2, through: 3 } },
         Ask::Application { scope: jig_domain_people::ApplicationScope::Project(1), connector: 2, digest: [3; 32] },

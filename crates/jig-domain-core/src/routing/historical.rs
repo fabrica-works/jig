@@ -110,7 +110,8 @@ pub(super) fn route_historical_proposal(
             && row.by <= core.counters.deployment().people
             && row.proposer == proposer;
         if named {
-            let allowed = person == row.by
+            let allowed = proposer == people::Proposer::Party(person)
+                || person == row.by
                 || core.proposal_policy_standing(
                     person,
                     project,

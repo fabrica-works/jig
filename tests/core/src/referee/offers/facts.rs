@@ -106,8 +106,35 @@ pub(super) fn predict(value: &Admission, ask: &people::Ask, before: Option<&Task
             Some(if amount <= pool_left && amount <= budget && deadline(*latest, *until) {
                 Admission::Allowed
             } else {
-                beyond(outcome)
+                let proposable = match outcome {
+                    Beyond::Proposed { to: jig_domain_core::acts::Recipient::Roles { roles, .. } } => {
+                        roles.iter().copied().min().map(people::Accepter::Role)
+                    }
+                    Beyond::Refused(people::Refusal::Authority { proposable, .. }) => *proposable,
+                    Beyond::Proposed { .. } | Beyond::Refused(_) => return None,
+                };
+                Admission::Refused(people::Refusal::Authority {
+                    proposable,
+                    lacking: if amount > budget {
+                        people::Lack::Budget { needs: *amount, left: *budget }
+                    } else {
+                        people::Lack::Deadline
+                    },
+                })
             })
+        }
+        (
+            Bounds::Goal { maximum_budget, maximum_deadline, .. },
+            people::Ask::Propose { action: people::Action::Batch(batch), .. },
+        ) => {
+            let [member] = batch.as_ref() else { return None };
+            if member.tracked.is_none()
+                || member.authority.spend > *maximum_budget
+                || !deadline(*maximum_deadline, member.authority.deadline)
+            {
+                return None;
+            }
+            Some(beyond(outcome))
         }
         (
             Bounds::Amend { budget_left, grants, implications, authority, ceiling },

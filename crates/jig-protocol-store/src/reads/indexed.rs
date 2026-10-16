@@ -155,7 +155,7 @@ fn group_keeps(group: reads::Group, object: tasks::UpdateObject) -> bool {
         reads::Group::Updates => true,
         reads::Group::Results => object == tasks::UpdateObject::Result,
         reads::Group::Replies => match object {
-            tasks::UpdateObject::Result => false,
+            tasks::UpdateObject::Result | tasks::UpdateObject::Proposal { .. } => false,
             tasks::UpdateObject::Reply { .. } => true,
         },
         reads::Group::Needs
@@ -164,6 +164,44 @@ fn group_keeps(group: reads::Group, object: tasks::UpdateObject) -> bool {
         | reads::Group::Questions
         | reads::Group::PersonTasks => false,
     }
+}
+
+fn proposal_update(
+    store: &mut Store,
+    range: &reads::Range,
+    update: tasks::Update,
+    number: u64,
+    spent: &mut Spent,
+) -> Result<Option<reads::Row>, Failure> {
+    let Some((reads::Group::Updates, filter)) = selection(&range.scope) else {
+        spent.rows = spent.rows.checked_sub(1).ok_or(Failure::Cut)?;
+        return Ok(None);
+    };
+    let value =
+        joins::get(store, &core::Key::Tasks(tasks::Key::DecidedProposal(number)), spent)?.ok_or(Failure::Corrupt)?;
+    let core::Record::Tasks(tasks::Stored::DecidedProposal(proposal)) = &value else { return Err(Failure::Corrupt) };
+    if proposal.proposer != range.party
+        || proposal.proposer != update.party
+        || proposal.number != number
+        || proposal.first() != update.task
+    {
+        return Err(Failure::Corrupt);
+    }
+    if (filter.project.is_some() && filter.project != Some(proposal.project))
+        || (filter.goal.is_some() && filter.goal != Some(proposal.first()))
+    {
+        spent.rows = spent.rows.checked_sub(1).ok_or(Failure::Cut)?;
+        return Ok(None);
+    }
+    let proposer = documents::Proposer::Party(proposal.proposer);
+    let decision = core::Key::Core(core::CoreKey::ProposalDecision { proposer, proposal: number });
+    let mut row = joins::row(store, value, None, Some(decision), spent)?;
+    row.inbox = Some(documents::Cursor::Inbox {
+        task: update.task,
+        object: documents::InboxObject::Proposal { proposer, number },
+        at: Some(update.at),
+    });
+    Ok(Some(row))
 }
 
 fn joined(
@@ -176,6 +214,12 @@ fn joined(
     let selection = selection(&range.scope);
     if let Some((group, _filter)) = selection {
         let update = update(&value).ok_or(Failure::Corrupt)?;
+        match update.object {
+            tasks::UpdateObject::Proposal { proposal } => {
+                return proposal_update(store, range, update, proposal.value(), spent);
+            }
+            tasks::UpdateObject::Result | tasks::UpdateObject::Reply { .. } => {}
+        }
         if !group_keeps(group, update.object) {
             spent.rows = spent.rows.checked_sub(1).ok_or(Failure::Cut)?;
             return Ok(None);
@@ -209,6 +253,7 @@ fn joined(
         }
         let update = update(&value).ok_or(Failure::Corrupt)?;
         let (object, at) = match update.object {
+            tasks::UpdateObject::Proposal { .. } => unreachable!("party proposal joined separately"),
             tasks::UpdateObject::Result => {
                 (documents::InboxObject::Result { position: owner.result_position }, owner.ended_at)
             }

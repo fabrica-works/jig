@@ -495,15 +495,21 @@ pub(super) fn proposal(
             }
             let since = match value.state {
                 tasks::PersonProposalState::Pending { since } => since,
-                tasks::PersonProposalState::Accepted { .. } | tasks::PersonProposalState::Rejected { .. } => {
+                tasks::PersonProposalState::Accepted { .. }
+                | tasks::PersonProposalState::Rejected { .. }
+                | tasks::PersonProposalState::Withdrawn { .. } => {
                     return Err(Missing::Ended);
                 }
             };
             let mut batch = List::with_capacity(limits.documents.lines);
-            batch.push(proposed(limits, &value.goal)?).expect("one goal member");
+            for member in value.batch() {
+                if batch.push(proposed(limits, member)?).is_err() {
+                    return Err(Missing::TooLarge);
+                }
+            }
             (
                 value.project,
-                super::small::text(&value.goal.spec.words, limits.documents.text_bytes),
+                super::small::text(&value.reason, limits.documents.text_bytes),
                 ProposalAction::Batch(batch),
                 true,
                 ProposalWaiting {

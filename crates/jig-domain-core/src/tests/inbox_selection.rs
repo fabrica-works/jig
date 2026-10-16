@@ -340,15 +340,21 @@ fn a_party_proposals_stored_goal_context_uses_only_its_supplied_original_goal() 
         number: u64::MAX,
         proposer: 1,
         project: 1,
-        goal: new_row(&core, u64::MAX - 1, tasks::Funder::Pool { project: 1, person: 1, period: 1 }, Some(4)),
+        action: tasks::PersonAction::Batch(Box::new([new_row(
+            &core,
+            u64::MAX - 1,
+            tasks::Funder::Pool { project: 1, person: 1, period: 1 },
+            Some(4),
+        )])),
+        reason: Box::from(b"proposed batch".as_slice()),
         state: tasks::PersonProposalState::Pending { since: Wall::from_nanos(7) },
     };
     assert!(!core.person_proposal_entries(&proposal).is_empty());
-    for goal in [None, Some(proposal.goal.number), Some(99)] {
+    for goal in [None, Some(proposal.first()), Some(99)] {
         let mut row = stored_row(Record::Tasks(tasks::Stored::PersonProposal(Box::new(proposal.clone()))), None);
         row.ancestors = Box::new([99]);
         row.inbox = Some(Cursor::Inbox {
-            task: proposal.goal.number,
+            task: proposal.first(),
             object: InboxObject::Proposal { proposer: Proposer::Party(1), number: proposal.number },
             at: Some(Wall::from_nanos(7)),
         });
@@ -358,12 +364,9 @@ fn a_party_proposals_stored_goal_context_uses_only_its_supplied_original_goal() 
         };
         assert_eq!(page.rows.len(), u32::from(goal != Some(99)));
         if let Some(reads::PageRow::Inbox(entry)) = page.rows.get(0) {
-            assert_eq!(entry.task, TaskLink::Stored { number: proposal.goal.number, status: None });
+            assert_eq!(entry.task, TaskLink::Stored { number: proposal.first(), status: None });
             assert_eq!(entry.object, InboxObject::Proposal { proposer: Proposer::Party(1), number: u64::MAX });
-            assert_eq!(
-                page.inbox_selection.as_ref().unwrap().get(0).unwrap().goals.as_slice(),
-                &[proposal.goal.number]
-            );
+            assert_eq!(page.inbox_selection.as_ref().unwrap().get(0).unwrap().goals.as_slice(), &[proposal.first()]);
         }
     }
 }

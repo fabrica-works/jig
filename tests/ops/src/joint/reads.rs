@@ -132,6 +132,7 @@ fn candidate(store: &Store, range: &reads::Range, value: &core::Record) -> Optio
             };
             let mut value = row(store, value, task);
             let object = match update.object {
+                tasks::UpdateObject::Proposal { .. } => return None,
                 tasks::UpdateObject::Result => documents::InboxObject::Result { position: task.result_position },
                 tasks::UpdateObject::Reply { message, activity } => {
                     let record = store.rows.get(&root::Key::Core(core::Key::Tasks(tasks::Key::Activity {

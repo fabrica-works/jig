@@ -33,6 +33,8 @@ pub fn limits(domain: &core::Limits) -> Option<wire::Limits> {
         operation_move_reason: people.words,
         operation_message_words: people.words,
         ask_create_batch: people.batch,
+        action_batch_members: people.batch,
+        ask_propose_reason: people.words,
         member_words: people.words,
         member_parameters: 0,
         member_dependencies: 0,

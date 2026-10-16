@@ -74,7 +74,8 @@ pub(crate) fn sources() -> Vec<(client::Read, reads::Historical)> {
         number: u64::MAX,
         proposer: u64::MAX,
         project: u32::MAX,
-        goal: raw_goal(),
+        action: tasks::PersonAction::Batch(Box::new([raw_goal()])),
+        reason: Box::from(b"proposed batch".as_slice()),
         state: tasks::PersonProposalState::Pending { since: Wall::EPOCH },
     };
     let values = vec![
@@ -216,7 +217,8 @@ fn historical_raw_person_goal_keeps_all_four_counters_authority_parameters_and_l
 fn historical_unadmitted_recurrence_is_refused_before_copying_any_raw_goal_field() {
     let (query, mut source) = sources().remove(2);
     let reads::Past::PersonProposal { proposal, .. } = &mut source.value else { panic!("person source") };
-    proposal.goal.recurring = Some(Box::new(tasks::RecurringTemplate {
+    let tasks::PersonAction::Batch(batch) = &mut proposal.action;
+    batch.first_mut().expect("proposal member").recurring = Some(Box::new(tasks::RecurringTemplate {
         key: 0,
         batch: Box::new([]),
         overlap: tasks::RecurringOverlap::Wait,
@@ -234,7 +236,10 @@ fn historical_original_query_and_all_nested_companion_identities_are_checked_bef
         match &mut wrong.value {
             reads::Past::Task { result, .. } | reads::Past::PersonTask { result, .. } => result.task.number = 0,
             reads::Past::Proposal(proposal) => proposal.proposer = 1,
-            reads::Past::PersonProposal { proposal, .. } => proposal.goal.project = 0,
+            reads::Past::PersonProposal { proposal, .. } => {
+                let tasks::PersonAction::Batch(batch) = &mut proposal.action;
+                batch.first_mut().expect("proposal member").project = 0;
+            }
             reads::Past::Escalation { decision, .. } => decision.task = 0,
             reads::Past::Question { question, .. } => question.message = 0,
             reads::Past::Reply(_) | reads::Past::Turn(_) => unreachable!("six object fixtures"),
@@ -396,6 +401,7 @@ fn historical_person_proposal_states_keep_the_independent_whole_decision_and_cre
             };
             assert_eq!(proposal.goal.numbers.reserved, 7);
             match &state {
+                tasks::PersonProposalState::Withdrawn { .. } => unreachable!("v8 has no withdrawn state"),
                 tasks::PersonProposalState::Pending { since } => {
                     assert_eq!(proposal.state, client::OwnerPersonProposalState::Pending { since: *since });
                 }

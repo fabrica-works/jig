@@ -16,6 +16,7 @@ pub(crate) struct Inputs {
     pub role: people::Role,
     pub members: Box<[tasks::New]>,
     pub given: Option<people::Given>,
+    pub proposal: Option<(Box<[u8]>, u32)>,
     pub ids: Box<[u64]>,
     pub at: usize,
     pub row: Option<Box<tasks::TaskRecord>>,
@@ -39,15 +40,7 @@ pub(super) fn begin(
         }
     }
     if ids.is_empty() {
-        begin_creation(
-            core,
-            env,
-            out,
-            work,
-            request,
-            CreationKind::Batch { person: flight.person, given: flight.given, stubs: Box::new([]) },
-            flight.members,
-        );
+        begin_creation(core, env, out, work, request, kind(&mut flight, Box::new([])), flight.members);
         return;
     }
     flight.ids = ids.into_boxed();
@@ -145,14 +138,14 @@ pub(super) fn loaded(
         ask(out, request, &flight);
         assert!(core.creating_inputs.insert(request, flight).is_ok(), "continuing input load");
     } else {
-        begin_creation(
-            core,
-            env,
-            out,
-            work,
-            request,
-            CreationKind::Batch { person: flight.person, given: flight.given, stubs: flight.stubs.into_boxed() },
-            flight.members,
-        );
+        let stubs = core::mem::replace(&mut flight.stubs, List::with_capacity(0)).into_boxed();
+        begin_creation(core, env, out, work, request, kind(&mut flight, stubs), flight.members);
+    }
+}
+
+fn kind(flight: &mut Inputs, stubs: Box<[tasks::Stub]>) -> CreationKind {
+    match flight.proposal.take() {
+        Some((reason, to)) => CreationKind::Propose { person: flight.person, reason, to, stubs },
+        None => CreationKind::Batch { person: flight.person, given: flight.given, stubs },
     }
 }

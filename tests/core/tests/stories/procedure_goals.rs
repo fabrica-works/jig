@@ -122,8 +122,9 @@ fn a_procedure_goal_commits_before_delivery_and_replays_its_exact_owner_facts() 
 fn a_procedure_goal_proposal_restores_and_accepts_the_original_executor() {
     let mut world = jig_core_world::stories::offers::world(216, None);
     world.hold_procedures = true;
-    ask(&mut world, 90, goal(300));
-    let Some(people::Reply::Outcome(people::Outcome::GoalProposed { proposal })) = world.people_answers.last().copied()
+    ask(&mut world, 90, jig_core_world::fixtures::propose_goal(goal(300)));
+    let Some(people::Reply::Outcome(people::Outcome::Proposed { proposal, to: 0 })) =
+        world.people_answers.last().copied()
     else {
         panic!("procedure proposal: {:?}", world.people_answers)
     };
@@ -133,17 +134,23 @@ fn a_procedure_goal_proposal_restores_and_accepts_the_original_executor() {
         panic!("retained proposal")
     };
     let row = row.clone();
-    assert_eq!(row.goal.executor, tasks::Executor::Procedure { connector: 1, code: 1 });
-    assert_eq!(row.goal.tracked, Some(7));
-    assert_eq!(row.goal.authority.tools, tasks::Tools(0));
+    assert_eq!(
+        row.batch().first().expect("proposed member").executor,
+        tasks::Executor::Procedure { connector: 1, code: 1 }
+    );
+    assert_eq!(row.batch().first().expect("proposed member").tracked, Some(7));
+    assert_eq!(row.batch().first().expect("proposed member").authority.tools, tasks::Tools(0));
     assert!(world.procedure_inputs.is_empty());
     world.restart_with(jig_core_world::stories::offers::world_configuration(216));
     assert_eq!(
         world.store.rows.get(&key),
         Some(&root::Record::Core(core::Record::Tasks(tasks::Stored::PersonProposal(row.clone()))))
     );
-    ask(&mut world, 90, goal(300));
-    assert_eq!(world.people_answers.last(), Some(&people::Reply::Outcome(people::Outcome::GoalProposed { proposal })));
+    ask(&mut world, 90, jig_core_world::fixtures::propose_goal(goal(300)));
+    assert_eq!(
+        world.people_answers.last(),
+        Some(&people::Reply::Outcome(people::Outcome::Proposed { proposal, to: 0 }))
+    );
     ask(
         &mut world,
         91,
@@ -186,16 +193,13 @@ fn a_procedure_goal_proposal_restores_and_accepts_the_original_executor() {
         "acceptance: {:?}",
         world.people_answers
     );
-    let made = live_row(&world, row.goal.number);
-    assert_eq!(made.executor, row.goal.executor);
-    assert_eq!(made.tracked, row.goal.tracked);
-    assert_eq!(made.spec, row.goal.spec);
-    assert_eq!(made.authority, row.goal.authority);
+    let made = live_row(&world, row.batch().first().expect("proposed member").number);
+    assert_eq!(made.executor, row.batch().first().expect("proposed member").executor);
+    assert_eq!(made.tracked, row.batch().first().expect("proposed member").tracked);
+    assert_eq!(made.spec, row.batch().first().expect("proposed member").spec);
+    assert_eq!(made.authority, row.batch().first().expect("proposed member").authority);
     assert_eq!(made.numbers.budget, 300);
-    assert!(
-        world
-            .procedure_inputs
-            .iter()
-            .any(|(_, connector, code, context)| *connector == 1 && *code == 1 && context.task == row.goal.number)
-    );
+    assert!(world.procedure_inputs.iter().any(|(_, connector, code, context)| *connector == 1
+        && *code == 1
+        && context.task == row.batch().first().expect("proposed member").number));
 }

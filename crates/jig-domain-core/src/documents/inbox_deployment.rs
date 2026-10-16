@@ -75,7 +75,7 @@ fn object(core: &Core, task: u64, kind: people::EntryKind) -> InboxObject {
         people::EntryKind::Question { message } => InboxObject::Question { message },
         people::EntryKind::Proposal { number } => {
             let proposer = match core.tasks.person_proposals().get(&number) {
-                Some(row) if row.goal.number == task => Proposer::Party(row.proposer),
+                Some(row) if row.first() == task => Proposer::Party(row.proposer),
                 Some(_) | None => Proposer::Task(task),
             };
             InboxObject::Proposal { proposer, number }

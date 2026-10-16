@@ -78,10 +78,6 @@ fn owner(value: &p::Outcome, limits: &w::Limits) -> Result<w::OwnerOutcome, w::P
             limits,
             w::OwnerOutcomeGoalStartedParts { task: *task },
         )?),
-        p::Outcome::GoalProposed { proposal } => w::OwnerOutcome::GoalProposed(w::OwnerOutcomeGoalProposed::new(
-            limits,
-            w::OwnerOutcomeGoalProposedParts { proposal: *proposal },
-        )?),
         p::Outcome::Stopped { task } => {
             w::OwnerOutcome::Stopped(w::OwnerOutcomeStopped::new(limits, w::OwnerOutcomeStoppedParts { task: *task })?)
         }
@@ -186,6 +182,8 @@ fn owner(value: &p::Outcome, limits: &w::Limits) -> Result<w::OwnerOutcome, w::P
         p::Outcome::Compound { .. }
         | p::Outcome::CompoundRefused { .. }
         | p::Outcome::Created { .. }
+        | p::Outcome::Proposed { .. }
+        | p::Outcome::Withdrawn { .. }
         | p::Outcome::Applied { .. }
         | p::Outcome::Again(_)
         | p::Outcome::SignedOut

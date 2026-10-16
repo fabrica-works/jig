@@ -22,6 +22,9 @@ pub fn index_key(scope: &Scope, party: u64, cursor: documents::Cursor, activity:
         documents::InboxObject::Reply { message } => {
             tasks::UpdateObject::Reply { message: tasks::Newest::of(message), activity: tasks::Newest::of(activity?) }
         }
+        documents::InboxObject::Proposal { proposer: Proposer::Party(proposer), number } if proposer == party => {
+            tasks::UpdateObject::Proposal { proposal: tasks::Newest::of(number) }
+        }
         documents::InboxObject::Question { .. }
         | documents::InboxObject::Proposal { .. }
         | documents::InboxObject::Escalation { .. }
@@ -66,12 +69,16 @@ pub(super) fn inbox_position(
 
 /// Verify the index's party and its joins before projecting an update.
 pub(super) fn valid_update(party: u64, row: &super::Row) -> bool {
+    if proposal_position(row).is_some() {
+        return valid_proposal_update(party, row);
+    }
     let crate::Record::Tasks(tasks::Stored::Update(update)) = &row.value else { return false };
     let Some(owner) = &row.owner else { return false };
     if update.party != party || update.task != owner.number {
         return false;
     }
     let (object, at) = match update.object {
+        tasks::UpdateObject::Proposal { .. } => return false,
         tasks::UpdateObject::Result => {
             if let Some(at) = owner.ended_at
                 && at != update.at
@@ -313,4 +320,53 @@ pub(super) fn ended_delegate_row(
         }
     }
     Ok(Some(super::PageRow::EndedDelegate(documents::ended_delegate_from_row(limits, owner)?)))
+}
+
+fn valid_proposal_update(party: u64, row: &super::Row) -> bool {
+    let crate::Record::Tasks(tasks::Stored::DecidedProposal(proposal)) = &row.value else { return false };
+    let Some(crate::Record::Core(crate::CoreRecord::ProposalDecision(decision))) = &row.related else { return false };
+    if party != proposal.proposer
+        || decision.proposer != Proposer::Party(party)
+        || decision.proposal != proposal.number
+        || decision.project != proposal.project
+    {
+        return false;
+    }
+    let valid = match proposal.state {
+        tasks::PersonProposalState::Accepted { by: tasks::Party::Person(by) } => {
+            decision.by == by && decision.choice == jig_domain_people::ProposalChoice::Accepted
+        }
+        tasks::PersonProposalState::Rejected { by: tasks::Party::Person(by), at, .. } => {
+            decision.by == by && decision.at == at && decision.choice == jig_domain_people::ProposalChoice::Rejected
+        }
+        tasks::PersonProposalState::Withdrawn { at } => {
+            decision.by == party && decision.at == at && decision.choice == jig_domain_people::ProposalChoice::Withdrawn
+        }
+        tasks::PersonProposalState::Pending { .. }
+        | tasks::PersonProposalState::Accepted { by: tasks::Party::Task(_) | tasks::Party::Deployment { .. } }
+        | tasks::PersonProposalState::Rejected {
+            by: tasks::Party::Task(_) | tasks::Party::Deployment { .. }, ..
+        } => false,
+    };
+    valid
+        && row.inbox
+            == Some(documents::Cursor::Inbox {
+                task: proposal.first(),
+                object: documents::InboxObject::Proposal { proposer: Proposer::Party(party), number: proposal.number },
+                at: Some(decision.at),
+            })
+}
+
+pub(super) fn proposal_position(row: &super::Row) -> Option<Position> {
+    let crate::Record::Tasks(tasks::Stored::DecidedProposal(proposal)) = &row.value else { return None };
+    let Some(documents::Cursor::Inbox { at: Some(at), .. }) = row.inbox else { return None };
+    Some(Position::Owner(Key::Tasks(
+        tasks::Update {
+            party: proposal.proposer,
+            at,
+            task: proposal.first(),
+            object: tasks::UpdateObject::Proposal { proposal: tasks::Newest::of(proposal.number) },
+        }
+        .key(),
+    )))
 }

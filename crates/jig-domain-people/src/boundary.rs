@@ -3,7 +3,7 @@
 //! routed flight ends with `Decided`; the root commits before releasing replies.
 //! These values contain no credential secrets, task internals or protocol bytes.
 
-use crate::{Refusal, ReplyRef};
+use crate::{Refusal, ReplyRef, Seen};
 use alloc::boxed::Box;
 use skein_lib::{Duration, List, ReplyTo, Token, Wall};
 
@@ -142,15 +142,6 @@ pub struct Seed {
     pub role: Role,
 }
 
-/// A party's requested read position (domain/people.md, section 6).
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub enum Seen {
-    /// Results committed through this position.
-    Results { through: u64 },
-    /// Replies of one chat through this position.
-    Chat { task: u64, through: u64 },
-}
-
 /// Exact addressed work by kind, beyond the recent inbox cache (client/domain/pages.md, 2).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Needs {
@@ -248,6 +239,10 @@ pub enum Ask {
     MakeService { project: u32, name: Box<[u8]>, role: Role },
     /// Adopt a connector resource as a durable keyed owner request.
     Adopt { project: u32, adoption: Adoption },
+    /// Propose a batch to the role named by the project's policy.
+    Propose { project: u32, action: crate::Action, reason: Box<[u8]> },
+    /// Withdraw this party's own pending proposal.
+    Withdraw { project: u32, proposal: u64 },
     /// Start a tracked goal at the requested charter or procedure, budget and priority.
     SetGoal {
         project: u32,
@@ -424,8 +419,10 @@ pub enum Outcome {
     Adopted { project: u32 },
     /// One tracked goal was durably created within the caller's allotment.
     GoalStarted { task: u64 },
-    /// A tracked goal awaits the policy role's budget decision.
-    GoalProposed { proposal: u64 },
+    /// An explicit proposal awaits the named policy role.
+    Proposed { proposal: u64, to: u32 },
+    /// This party withdrew its pending proposal.
+    Withdrawn { proposal: u64 },
     /// A person stopped one live task for a later release or decision.
     Stopped { task: u64 },
     /// A person cancelled one task and its descendants.

@@ -282,6 +282,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
             )?)?
             .checked_mul(2)?,
     )?)?;
+    total = total.checked_add(bytes(limits.people.pending.checked_mul(2)?, u64::from(limits.people.words))?)?;
     total = total.checked_add(new_task)?;
     total = total.checked_add(bytes(
         limits.fleet.calls.checked_add(limits.load_slots)?,

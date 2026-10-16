@@ -22,7 +22,7 @@ pub(super) fn create_request(
     mut creation: Creation,
 ) {
     let request = creation.request;
-    match checked(core, env, &mut creation) {
+    match checked(core, env, &mut creation, false) {
         Ok((members, given)) => {
             party_inputs::begin(
                 core,
@@ -35,6 +35,7 @@ pub(super) fn create_request(
                     role: creation.role,
                     members,
                     given,
+                    proposal: None,
                     ids: Box::new([]),
                     at: 0,
                     row: None,
@@ -46,18 +47,19 @@ pub(super) fn create_request(
         Err(why) => pool_refused(work, request, why),
     }
 }
-fn checked(
+pub(super) fn checked(
     core: &mut Core,
     env: &Env<Limits>,
     creation: &mut Creation,
+    proposing: bool,
 ) -> Result<(Box<[tasks::New]>, Option<people::Given>), people::Refusal> {
-    let allowed = budget(core, creation)?;
+    let allowed = if proposing { None } else { budget(core, creation)? };
     let Creation { person, project, role, batch, .. } = &*creation;
     well_formed(batch)?;
     if let Some(at) = cycle(batch) {
         return Err(people::Refusal::NotWellFormed { at, why: people::Malformed::Cycle });
     }
-    if !core.authority.escalations_held(*project, role.number()) {
+    if !proposing && !core.authority.escalations_held(*project, role.number()) {
         return Err(people::Refusal::NoEscalationHolder);
     }
     let mut delegates = List::with_capacity(env.limits.people.batch);
@@ -80,36 +82,43 @@ fn checked(
             .expect("admitted batch");
         members.push(new).expect("admitted batch");
     }
-    let (_, pool) = core.goal_pool(*project, *person);
-    let ask = authority::PersonAsk {
-        project: *project,
-        role: role.number(),
-        pool: crate::translate::authority_numbers(pool),
-        tasks_left: env.limits.tasks.tree_tasks,
-        request: authority::PersonRequest::Create(delegates.into_boxed()),
-    };
-    let mut findings = Queue::with_capacity(authority::max_out(core.authority.limits()).expect("authority output"));
-    let checked = authority::check_request(&core.authority, &ask, &mut findings);
-    if checked.answer != authority::Answer::Allow {
-        let mut refusal = core.request_refusal(&ask, checked.answer, &mut findings);
-        if let people::Refusal::Authority { lacking: people::Lack::TaskKind { executor }, .. } = &mut refusal
-            && let Some(policy) = core.authority.role(*project, role.number())
-        {
-            for (member, delegate) in batch.iter().zip(delegates_for(&ask)) {
-                if !policy.authority.delegation.kinds.contains(&delegate.executor) {
-                    *executor = Some(member.executor);
-                    break;
+    if !core.authority.escalations_held(*project, role.number()) {
+        return Err(people::Refusal::NoEscalationHolder);
+    }
+    if proposing {
+        super::propose::allowed(core, *project, delegates.into_boxed())?;
+    } else {
+        let (_, pool) = core.goal_pool(*project, *person);
+        let ask = authority::PersonAsk {
+            project: *project,
+            role: role.number(),
+            pool: crate::translate::authority_numbers(pool),
+            tasks_left: env.limits.tasks.tree_tasks,
+            request: authority::PersonRequest::Create(delegates.into_boxed()),
+        };
+        let mut findings = Queue::with_capacity(authority::max_out(core.authority.limits()).expect("authority output"));
+        let checked = authority::check_request(&core.authority, &ask, &mut findings);
+        if checked.answer != authority::Answer::Allow {
+            let mut refusal = core.request_refusal(&ask, checked.answer, &mut findings);
+            if let people::Refusal::Authority { lacking: people::Lack::TaskKind { executor }, .. } = &mut refusal
+                && let Some(policy) = core.authority.role(*project, role.number())
+            {
+                for (member, delegate) in batch.iter().zip(delegates_for(&ask)) {
+                    if !policy.authority.delegation.kinds.contains(&delegate.executor) {
+                        *executor = Some(member.executor);
+                        break;
+                    }
                 }
             }
+            return Err(refusal);
         }
-        return Err(refusal);
-    }
-    let policy = core.authority.policy(*project).expect("checked project");
-    if core.period_budget(*project) > policy.period_spend {
-        return Err(people::Refusal::Authority {
-            lacking: people::Lack::Budget { needs: core.period_budget(*project), left: policy.period_spend },
-            proposable: None,
-        });
+        let policy = core.authority.policy(*project).expect("checked project");
+        if core.period_budget(*project) > policy.period_spend {
+            return Err(people::Refusal::Authority {
+                lacking: people::Lack::Budget { needs: core.period_budget(*project), left: policy.period_spend },
+                proposable: None,
+            });
+        }
     }
     for _ in &members {
         crate::fresh(&mut core.counters, crate::Family::Task)
