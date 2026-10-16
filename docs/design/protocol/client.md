@@ -553,8 +553,9 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
 - **Stored before sent.** The transport answers each `Save` and `Erase`
   `Stored` or `NotStored`. A request's exchange never leaves before its
   record is stored: the client sends it only once its `Save` is answered
-  `Stored`. `NotStored` (a quota full, a disk failing) is the request
-  not sent, answered *not kept*.
+  `Stored`. `NotStored` (a quota full, a disk failing) is each request
+  whose record that write was the last to carry not sent, parked or not,
+  answered *not kept* (`../client/domain/client.md`, section 11).
 - **Read at start,** the records the application's shell loaded handed
   to `jig-client` as it starts, each to the request table; one of a
   version the client does not read is dropped, and the application told,

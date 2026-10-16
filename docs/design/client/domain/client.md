@@ -288,6 +288,8 @@ handles, as every presentation does (sections 7 and 8).
   - *retires it past the retention* `me` states (contract.md, 3.1): a
     request first sent longer ago than the retention, less a margin, is
     never sent again, and is answered unknown;
+  - *retires it not kept* when the last write that carried its record
+    is not stored, whatever its state, parked included (section 11);
   - *is bounded:* requests held, and their bytes, a family's included. A
     `Send` past them is answered at once, refused by the client's limit,
     and never queued.
@@ -565,8 +567,16 @@ for any presentation of a chat or of any agent task's activity.
 - **Kept before sent.** A request's record leaves in a `Save`, and the
   client gives the request's first `Exchange` only once the transport
   says `Stored`. `NotStored` (a quota full, a disk failing) retires the
-  requests the write carried, unsent, each answered *not kept*. So a
-  restart never loses a request the engine may have made.
+  requests the write carried, unsent, each answered *not kept*, by its
+  key (skein's `lib.md`, 12, not kept): parked, or with its `Exchange`
+  waiting for the write, since a parked request's record leaves at its
+  admission too. Its erase leaves as any retired request's, since an
+  earlier write may hold its record; if that erase is not stored either,
+  a restart tells the request `Kept` again, under its key. A record is
+  whole in each write, so a request whose record a later write carries
+  again is decided by that later write, and one whose record the write
+  did not carry is sent once its own write is stored. So a restart never
+  loses a request the engine may have made.
 - **Restored at `Start { kept }`,** before any other event: each record
   admitted to the table under its key, parked until the link is live,
   its party confirmed and the retention known; and each told to the
