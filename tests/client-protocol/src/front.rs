@@ -124,6 +124,7 @@ impl Side {
                         Event::First(client::first::Event::Read { read: original, result })
                     }
                     jig_client_domain::Readout::Family { .. } => panic!("unknown family read"),
+                    jig_client_domain::Readout::Limit => unreachable!("the link does not limit domain reads"),
                 }
             }
             link::Request::Hello { family: None, versions } => {

@@ -6,6 +6,7 @@ mod boundary;
 pub mod contract;
 mod domain;
 pub mod limits;
+mod reads;
 mod requests;
 mod watches;
 /// The small-store version of keyed client request records.

@@ -25,8 +25,13 @@ pub enum Watchable {
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Readout {
+    /// Refused by the client's bound on reads in flight.
+    Limit,
     Jig(contract::ReadResult),
-    Family { family: u16, record: Option<Box<[u8]>> },
+    Family {
+        family: u16,
+        record: Option<Box<[u8]>>,
+    },
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Answered {
@@ -76,6 +81,7 @@ pub enum Event {
     Send { key: Key, request: Ask },
     Watch { handle: Handle, subject: Watchable },
     Unwatch { handle: Handle },
+    Read { handle: Handle, read: Readable },
     Up { up: Up },
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -84,6 +90,7 @@ pub enum Up {
     Watched { watch: Token, event: contract::WatchEvent },
     FamilyDelivered { watch: Token, record: Family },
     WatchEnded { watch: Token, end: contract::WatchEnd },
+    ReadDone { read: Token, result: Readout },
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Request {
@@ -97,6 +104,7 @@ pub enum Down {
     Send { attempt: Token, key: RequestKey, request: Ask },
     Open { watch: Token, subject: Watchable },
     Close { watch: Token },
+    Read { read: Token, what: Readable },
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Told {
@@ -106,6 +114,7 @@ pub enum Told {
     Dropped { count: u32 },
     Changed { handle: Handle },
     Ended { handle: Handle, why: Why },
+    Page { handle: Handle, page: Readout },
 }
 
 /// The application's stable request name, kept beside its wire key.

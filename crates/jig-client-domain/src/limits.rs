@@ -12,6 +12,7 @@ pub struct Limits {
     pub ask_bytes: u64,
     pub handles: u32,
     pub watches: u32,
+    pub reads: u32,
     pub document_bytes: u64,
     pub backoff: Backoff,
 }
@@ -50,6 +51,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(1)?;
     let own = Map::<Handle, HandleState>::worst_case(limits.handles)?
         .checked_add(Map::<u64, Watch>::worst_case(limits.watches)?)?;
+    let own = own.checked_add(Map::<Handle, skein_lib::Token>::worst_case(limits.reads)?)?;
     let own = own
         .checked_add(List::<Handle>::worst_case(limits.handles)?)?
         .checked_add(List::<u64>::worst_case(limits.watches)?)?;

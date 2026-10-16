@@ -11,6 +11,7 @@ pub(crate) struct HandleState {
 pub struct Domain {
     pub(crate) handles: Map<Handle, HandleState>,
     pub(crate) watches: Map<u64, Watch>,
+    pub(crate) reads: Map<Handle, Token>,
     pub(crate) next: u64,
     pub(crate) rng: Rng,
     pub(crate) scratch: List<Handle>,
@@ -26,6 +27,7 @@ impl Domain {
         Self {
             handles: Map::with_capacity(limits.handles),
             watches: Map::with_capacity(limits.watches),
+            reads: Map::with_capacity(limits.reads),
             next: 1,
             rng: Rng::new(seed),
             scratch: List::with_capacity(limits.handles),
@@ -49,7 +51,7 @@ impl Domain {
     }
     pub(crate) fn token(&mut self) -> Token {
         let name = self.next;
-        self.next = self.next.checked_add(1).expect("watch names never wrap");
+        self.next = self.next.checked_add(1).expect("client names never wrap");
         Token::new(name)
     }
     pub(crate) fn watch(&mut self, env: &Env<Limits>, handle: Handle, subject: Watchable, out: &mut Queue<Request>) {
@@ -119,6 +121,7 @@ impl Domain {
         id
     }
     pub(crate) fn unwatch(&mut self, handle: Handle, out: &mut Queue<Request>) {
+        self.reads.remove(&handle);
         let Some(held) = self.handles.remove(&handle) else {
             return;
         };
@@ -155,7 +158,9 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::Send { key, request } => domain.send(env, key, request, out),
         Event::Watch { handle, subject } => domain.watch(env, handle, subject, out),
         Event::Unwatch { handle } => domain.unwatch(handle, out),
+        Event::Read { handle, read } => domain.read(env, handle, read, out),
         Event::Up { up } => match up {
+            crate::Up::ReadDone { read, result } => domain.read_done(read, result, out),
             crate::Up::Answer { attempt, envelope, answer, why } => {
                 domain.answer(env, attempt, envelope, answer, why, out);
             }

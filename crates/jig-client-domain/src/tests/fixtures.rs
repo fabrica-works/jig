@@ -3,6 +3,8 @@ use alloc::boxed::Box;
 use skein_lib::{Duration, Env, List, Queue, Time, Token, Wall};
 pub(crate) const ME: Handle = Handle { asker: Asker::JIG, number: 1 };
 pub(crate) const TASK: Handle = Handle { asker: Asker::JIG, number: 2 };
+pub(crate) const PAGE: Handle = Handle { asker: Asker::JIG, number: 3 };
+pub(crate) const PROJECT: u32 = 1;
 pub(crate) const OTHER: Handle = Handle { asker: Asker::JIG, number: 5 };
 pub(crate) const SUBJECT_TASK: u64 = 9;
 pub(crate) const OTHER_SUBJECT: u64 = 10;
@@ -20,6 +22,7 @@ pub(crate) fn limits() -> Limits {
         },
         ask_bytes: 16384,
         handles: 8,
+        reads: 8,              // tests/client/src/test.rs:32
         watches: 8,            // tests/client/src/test.rs:23
         document_bytes: 65536, // tests/client/src/test.rs:38
         backoff: Backoff {
@@ -247,5 +250,19 @@ impl Client {
         }
         self.told();
         attempt.unwrap()
+    }
+}
+
+pub(crate) fn project(project: u32) -> Readable {
+    Readable::Jig(contract::Read::Project { project })
+}
+impl Client {
+    pub(crate) fn read(&mut self, handle: Handle, read: Readable) -> Token {
+        self.step(Event::Read { handle, read });
+        let downs = self.downs();
+        let [Down::Read { read, .. }] = downs.as_ref() else {
+            panic!("one read");
+        };
+        *read
     }
 }
