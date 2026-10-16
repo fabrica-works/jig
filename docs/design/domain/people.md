@@ -285,6 +285,12 @@ The operations as the client sends them are
   - *All or none:* they commit in one decision. The request has one key
     and one answer: all made, or refused, naming the first operation that
     failed and why, and nothing of it made.
+  - *Numbered by place:* its operations take consecutive message
+    numbers, one each, in the request's order, and the answer names the
+    first, so the operation at place *i* took the first plus *i*: a
+    `Message`'s words are numbered so, and an operation that adds nothing
+    to its task's inbox leaves its number unused. Nothing more of an
+    operation is answered (`../client/domain/contract.md`, 3.4).
   - *Revisions:* each operation names its revision where it would alone;
     a change of priority alone names none, and the first commit decides.
   - *Bounded* by operations per request, a limit of this child's.

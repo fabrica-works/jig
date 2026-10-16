@@ -263,8 +263,8 @@ this environment) is the application's (`../../domain/people.md`, 5.1):
 - **One keyed request, `Compound { project, operations }`:** a list of
   operations, admitted in order and committed in one decision, all or
   none. It has one key and one answer: done, with each operation's
-  outcome in order; or refused, naming the first operation that failed,
-  by its place in the list, and why.
+  outcome in order (below); or refused, naming the first operation that
+  failed, by its place in the list, and why.
 - **What it may hold:** `Cancel`, with or without a grace; `Move`;
   `Amend`, priority included; `Release`; `Message`; `Stop`. Creating,
   proposing, withdrawing, deciding, answering, taking, handing back,
@@ -283,6 +283,20 @@ this environment) is the application's (`../../domain/people.md`, 5.1):
   is counted across all of them (a move's reservation and the rest);
   each names its revision where it would alone, and a priority-only
   `Amend` names none, the first commit deciding.
+- **Each operation's outcome: made, with a message number.** Its
+  operations take consecutive message numbers, one each, in the
+  request's order, and the answer names the first: the operation at
+  place *i* took the first plus *i*. A `Message`'s words have that
+  number in its task's inbox, as a lone `Message`'s answer names
+  theirs. What another operation adds to its task's inbox, if anything,
+  has its number too; one that adds nothing leaves its number unused.
+  So a client finds each operation's number by its place alone, without
+  knowing what each kind adds.
+- **Nothing more of an operation is answered,** as nothing more is when
+  it is alone. What it changed (a grace's end, a spec's revision, a
+  requester and the reservation moved, a hold lifted) is in its task's
+  documents, as after the operation alone, and a later decision names
+  the revision a document gave (5.2).
 - **Its worst case:** its decision is priced as the limit times the
   costliest operation it may hold (a cancel of a whole tree, within
   tasks per tree), summed into the engine's worst case with the rest, as
@@ -371,8 +385,9 @@ Every request has one answer, of one of these kinds:
 - **done,** with its outcome: what was made (the tasks' numbers, the
   `AsAllowed` budget, if any, with what it was given; a word's message
   number; a
-  proposal's number), or what was decided; for a compound request, each
-  operation's outcome in order; and, when another party decided first,
+  proposal's number), or what was decided; for a compound request, its
+  operations made, in order, and the first of the message numbers they
+  took, one each (3.4); and, when another party decided first,
   who, how and when;
 - **refused,** with its facts, and for a compound request the place of
   the first operation that failed:
@@ -857,7 +872,9 @@ Changes this design asks of `../../domain/`, adopted there with it
 2. **The compound request** (3.4): the people child's limit on
    operations per request; operations admitted in order, one pool
    counted across them, committed in one decision or refused naming the
-   first that failed; and the tasks child's limit of goals per project,
+   first that failed; done, answered with the first of the message
+   numbers its operations took, one each in order; and the tasks
+   child's limit of goals per project,
    the live tracked tasks of one project, refused at the entrance as
    live tasks per project are (`../../domain/tasks.md`, section 11).
 3. **Proposing explicit** (3.5): a party's create or amendment beyond

@@ -539,8 +539,10 @@ for any presentation of a chat or of any agent task's activity.
 - **A model the application holds,** `Thread`: step code with limits of
   its own, fed what the client gives: the pages of the task's activity
   read (section 7), the task's document and its run's text from their
-  handles (8.1 and 8.3), and the task's pending `Message` requests with
-  their answers (section 6). It merges, in order, committed turns, the
+  handles (8.1 and 8.3), and the task's pending `Message`s with their
+  answers (section 6), each alone or at its place in a compound
+  request, whose answer numbers its words by that place (contract.md,
+  3.4). It merges, in order, committed turns, the
   party's words, work summaries, proposals and provisional text, across
   windows and gaps. It sends nothing and reads nothing itself.
 - **Committed, read in pages from the end.** A task's activity is a list
