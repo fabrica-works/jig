@@ -96,7 +96,7 @@ impl Harness {
             other @ (Request::Abandon { .. }
             | Request::Answer { .. }
             | Request::Read { .. }
-            | Request::OpenStream
+            | Request::OpenStream { .. }
             | Request::CloseStream
             | Request::Watch { .. }
             | Request::FamilyDelivery { .. }
@@ -106,6 +106,7 @@ impl Harness {
             | Request::Remove { .. }
             | Request::Kept { .. }
             | Request::Dropped { .. }
+            | Request::Signing { .. }
             | Request::ServiceCredential { .. }
             | Request::Fact { .. }) => {
                 panic!("expected exchange: {other:?}")
@@ -130,7 +131,7 @@ impl Harness {
                 | Request::Abandon { .. }
                 | Request::Answer { .. }
                 | Request::Read { .. }
-                | Request::OpenStream
+                | Request::OpenStream { .. }
                 | Request::CloseStream
                 | Request::Watch { .. }
                 | Request::FamilyDelivery { .. }
@@ -140,6 +141,7 @@ impl Harness {
                 | Request::Remove { .. }
                 | Request::Kept { .. }
                 | Request::Dropped { .. }
+                | Request::Signing { .. }
                 | Request::ServiceCredential { .. }
                 | Request::Fact { .. } => {}
             }
@@ -162,7 +164,7 @@ impl Harness {
                 Request::Exchange { .. }
                 | Request::Abandon { .. }
                 | Request::Read { .. }
-                | Request::OpenStream
+                | Request::OpenStream { .. }
                 | Request::CloseStream
                 | Request::Watch { .. }
                 | Request::FamilyDelivery { .. }
@@ -172,6 +174,7 @@ impl Harness {
                 | Request::Remove { .. }
                 | Request::Kept { .. }
                 | Request::Dropped { .. }
+                | Request::Signing { .. }
                 | Request::ServiceCredential { .. }
                 | Request::Fact { .. } => {}
             }
@@ -230,3 +233,46 @@ pub use link_deliveries::*;
 
 mod link_store;
 pub use link_store::*;
+
+impl Harness {
+    pub fn sign_in(&mut self, with: With) -> Option<Token> {
+        self.link.step(Time::ZERO, Event::SignIn { with }, &mut self.out);
+        for request in &self.out {
+            if let Request::Exchange { exchange, .. } = request {
+                return Some(*exchange);
+            }
+        }
+        None
+    }
+    pub fn credentials(&self) -> skein_lib::List<Option<skein_lib::Secret>> {
+        let mut values = skein_lib::List::with_capacity(32);
+        for request in &self.out {
+            if let Request::Exchange { credential, .. } = request {
+                values.push(credential.clone()).expect("output bound");
+            }
+        }
+        values
+    }
+    pub fn sign_out(&mut self) -> Token {
+        self.out = Queue::with_capacity(32);
+        self.link.step(Time::ZERO, Event::SignOut, &mut self.out);
+        for request in &self.out {
+            if let Request::Exchange { exchange, .. } = request {
+                return *exchange;
+            }
+        }
+        unreachable!("sign-out exchange")
+    }
+}
+pub fn signed_in(party: u64, token: &[u8; 40]) -> Box<[u8]> {
+    let record = w::SignInAnswer::SignedIn(
+        w::SignedIn::new(
+            &limits().wire,
+            w::SignedInParts { token: skein_lib::Secret::new(Box::from(*token)), party, expires: 10 },
+        )
+        .unwrap(),
+    );
+    let mut writer = Writer::new(usize::try_from(record.measure()).unwrap());
+    record.encode(&mut writer).unwrap();
+    writer.finish()
+}

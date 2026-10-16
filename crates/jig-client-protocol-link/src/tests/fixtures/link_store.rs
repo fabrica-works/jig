@@ -191,12 +191,13 @@ impl Harness {
                 | Request::Abandon { .. }
                 | Request::Answer { .. }
                 | Request::Read { .. }
-                | Request::OpenStream
+                | Request::OpenStream { .. }
                 | Request::CloseStream
                 | Request::Watch { .. }
                 | Request::FamilyDelivery { .. }
                 | Request::Ended { .. }
                 | Request::Hello { .. }
+                | Request::Signing { .. }
                 | Request::ServiceCredential { .. }
                 | Request::Fact { .. } => {}
             }
@@ -215,12 +216,13 @@ impl Harness {
                 | Request::Abandon { .. }
                 | Request::Answer { .. }
                 | Request::Read { .. }
-                | Request::OpenStream
+                | Request::OpenStream { .. }
                 | Request::CloseStream
                 | Request::Watch { .. }
                 | Request::FamilyDelivery { .. }
                 | Request::Ended { .. }
                 | Request::Hello { .. }
+                | Request::Signing { .. }
                 | Request::ServiceCredential { .. }
                 | Request::Fact { .. } => {}
             }

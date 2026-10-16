@@ -1,9 +1,10 @@
 //! The client's unchanged people and referee, over link and shell machines.
 use crate::{engine::Engine, family, fixtures, net::Net};
 use jig_client_protocol_link::{self as link, Link};
-use jig_client_shell_native::{Conn, Connections, Signing};
+use jig_client_shell_native::{Conn, Connections};
 use jig_client_test_domain::{self as client, Event, JigOut, Request};
 use jig_client_world::{ClientId, Front, FrontFault, Test, harness::Observed};
+use link::Signing;
 use skein_lib::{
     Queue, Time, Token, Wall,
     stream::{Down, Up},
@@ -20,8 +21,9 @@ pub(super) struct Side {
     pending: Vec<Request>,
     callbacks: Vec<Event>,
     pub(super) authenticated: bool,
-    signing_out: Option<Token>,
+    signing_out: bool,
     signing_link: Option<Box<[u8]>>,
+    signing: Vec<Signing>,
     next: u64,
     routes: BTreeMap<Token, (bool, Token)>,
     watched: BTreeMap<(bool, Token), Token>,
@@ -39,8 +41,9 @@ impl Side {
             pending: Vec::new(),
             callbacks: Vec::new(),
             authenticated: false,
-            signing_out: None,
+            signing_out: false,
             signing_link: None,
+            signing: Vec::new(),
             next: 0,
             routes: BTreeMap::new(),
             watched: BTreeMap::new(),
@@ -126,9 +129,10 @@ impl Side {
             link::Request::Hello { family: None, versions } => Event::Jig(jig_domain_client::Event::Hello { versions }),
             transport @ (link::Request::Exchange { .. }
             | link::Request::Abandon { .. }
-            | link::Request::OpenStream
+            | link::Request::OpenStream { .. }
             | link::Request::CloseStream) => return Err(transport),
-            ignored @ (link::Request::Write { .. }
+            ignored @ (link::Request::Signing { .. }
+            | link::Request::Write { .. }
             | link::Request::Remove { .. }
             | link::Request::Kept { .. }
             | link::Request::Dropped { .. }
@@ -320,6 +324,10 @@ impl Protocol {
                 }
                 while let Some(request) = side.out.pop() {
                     active = true;
+                    if let link::Request::Signing { signing } = request {
+                        side.signing.push(signing);
+                        continue;
+                    }
                     match side.callback(request) {
                         Ok(event) => {
                             self.engine.rules.domain(&event).expect("no secret in a client domain event");
@@ -331,36 +339,37 @@ impl Protocol {
                 }
                 self.callbacks.extend(side.callbacks.drain(..).map(|event| (*client, event)));
                 side.connections.take(now, &mut side.up, &mut side.below);
-                while let Some(signing) = side.connections.signing() {
+                for signing in std::mem::take(&mut side.signing) {
                     active = true;
                     match signing {
                         Signing::SignedIn { .. } => {
                             side.authenticated = true;
                             side.signing_link = None;
-                            if let Some(secret) = side.connections.token() {
+                            if let Some(secret) = side.link.credential() {
                                 self.engine.rules.secret(secret.expose());
                             }
                             for request in std::mem::take(&mut side.pending) {
                                 side.wire(now, request);
                             }
                         }
-                        Signing::SignedOut { .. } => {
+                        Signing::SignedOut => {
                             side.authenticated = false;
                             side.connections.down(now, link::Request::CloseStream, &mut side.below);
                             side.event(now, link::Event::StreamEnded);
-                            side.signing_out = None;
+                            side.signing_out = false;
                             self.callbacks.push((*client, Event::SignedOut));
                         }
-                        Signing::Refused { exchange } if side.signing_out != Some(exchange) => {
+                        Signing::Refused if !side.signing_out => {
                             if side.signing_link.as_ref().is_some_and(|old| old != &self.engine.link) {
                                 side.signing_link = Some(self.engine.link.clone());
-                                side.connections.sign_in(&self.engine.link).expect("new printed link");
+                                let secret = side.connections.printed(&self.engine.link).expect("new printed link");
+                                side.event(now, link::Event::SignIn { with: link::With::Link(secret) });
                                 side.connections.take(now, &mut side.up, &mut side.below);
                             }
                         }
-                        Signing::Again { exchange } | Signing::Lost { exchange } | Signing::Refused { exchange } => {
-                            if side.signing_out == Some(exchange) {
-                                side.signing_out = None;
+                        Signing::Again | Signing::Lost | Signing::Refused => {
+                            if side.signing_out {
+                                side.signing_out = false;
                                 self.callbacks.push((*client, Event::Jig(jig_domain_client::Event::SignOutLost)));
                             }
                         }
@@ -438,12 +447,14 @@ impl Front<Test> for Protocol {
         self.last_client = Some(client);
         let side = self.clients.get_mut(&client).expect("bound client");
         side.signing_link = Some(self.engine.link.clone());
-        side.connections.sign_in(&self.engine.link).expect("engine's actual printed link");
+        let secret = side.connections.printed(&self.engine.link).expect("engine's printed link");
+        side.event(now, link::Event::SignIn { with: link::With::Link(secret) });
         side.connections.take(now, &mut side.up, &mut side.below);
     }
     fn sign_out(&mut self, client: ClientId, now: Time, _wall: Wall) {
         let side = self.clients.get_mut(&client).expect("bound client");
-        side.signing_out = Some(side.connections.sign_out());
+        side.signing_out = true;
+        side.event(now, link::Event::SignOut);
         side.connections.take(now, &mut side.up, &mut side.below);
     }
 }

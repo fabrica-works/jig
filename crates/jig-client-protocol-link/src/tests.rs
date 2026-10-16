@@ -18,3 +18,5 @@ fn the_client_version_matches_its_wire_version() {
 }
 
 mod store;
+
+mod sign_in;

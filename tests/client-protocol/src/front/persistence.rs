@@ -97,7 +97,9 @@ impl Protocol {
         let mut side = Side::new();
         let old = self.clients.get(&client).expect("bound side");
         side.authenticated = old.authenticated;
-        side.connections.set_token(old.connections.token().map(|token| token.expose().into()));
+        if let Some(credential) = old.link.credential() {
+            side.event(now, link::Event::SignIn { with: link::With::Held(credential.clone()) });
+        }
         // Connection names survive the shell restart so late bytes cannot name a new socket.
         self.net.retire(client);
         self.clients.insert(client, side);

@@ -36,6 +36,7 @@ impl Peer {
             Time::ZERO,
             link::Request::Exchange {
                 exchange: Token::new(42),
+                credential: Some(Secret::new(Box::new(TOKEN))),
                 path: b"/jig/v1/request",
                 body: Box::from(b"ask".as_slice()),
             },
@@ -59,17 +60,9 @@ impl Peer {
         self.drive();
     }
 }
-fn printed() -> Vec<u8> {
-    let mut writer = Writer::new(43);
-    base64::encode(Alphabet::Url, &[3; 32], &mut writer).expect("short secret");
-    let mut link = b"http://127.0.0.1:8080/jig/v1/sign-in/link?secret=".to_vec();
-    link.extend_from_slice(&writer.finish());
-    link
-}
 #[test]
 fn an_exchange_carries_the_bearer_token() {
     let mut peer = Peer::new();
-    peer.shell.set_token(Some(Box::new(TOKEN)));
     peer.exchange();
     peer.respond(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok");
     let text = std::str::from_utf8(&peer.wire.received).expect("HTTP request");
@@ -113,7 +106,7 @@ fn a_connection_cut_mid_body_fails_the_exchange() {
 #[test]
 fn the_stream_s_bytes_reach_the_link_in_order() {
     let mut peer = Peer::new();
-    peer.shell.down(Time::ZERO, link::Request::OpenStream, &mut peer.below);
+    peer.shell.down(Time::ZERO, link::Request::OpenStream { credential: None }, &mut peer.below);
     peer.respond(b"HTTP/1.1 200 OK\r\n\r\ndata: first\n\ndata: second\n\n");
     assert!(matches!(peer.up.pop(), Some(link::Event::StreamOpened { status: 200 })));
     let mut bytes = Vec::new();
@@ -136,83 +129,9 @@ fn a_link_of_another_form_is_refused() {
         ("address", b"http://example/".as_slice(), Unlinked::Address),
         ("short secret", b"http://127.0.0.1:8080/jig/v1/sign-in/link?secret=AA".as_slice(), Unlinked::NoSecret),
     ] {
-        assert_eq!(shell.sign_in(text), Err(expected), "{label}");
+        assert_eq!(shell.printed(text), Err(expected), "{label}");
     }
 }
-fn record(value: &jig_client_protocol_wire::v7::SignInAnswer) -> Box<[u8]> {
-    let mut writer = Writer::new(usize::try_from(value.measure()).expect("short record"));
-    value.encode(&mut writer).expect("measured record");
-    writer.finish()
-}
-#[test]
-fn a_sign_in_keeps_its_token_only_after_a_whole_answer() {
-    use jig_client_protocol_wire::v7 as w;
-    let mut peer = Peer::new();
-    let exchange = peer.shell.sign_in(&printed()).expect("printed link");
-    let body = record(&w::SignInAnswer::SignedIn(
-        w::SignedIn::new(&w::CEILINGS, w::SignedInParts { token: Secret::new(Box::new(TOKEN)), party: 1, expires: 10 })
-            .expect("token fits"),
-    ));
-    let head = format!("HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n", body.len());
-    peer.respond(head.as_bytes());
-    assert!(peer.shell.token().is_none());
-    peer.respond(&body);
-    assert_eq!(peer.shell.signing(), Some(Signing::SignedIn { exchange, party: 1 }));
-    assert_eq!(peer.shell.token().expect("shell-owned token").expose(), &TOKEN);
-}
-#[test]
-fn a_not_ready_signing_exchange_takes_nothing_and_can_be_sent_again() {
-    use jig_client_protocol_wire::v7 as w;
-    for (label, sign_out) in [("sign in", false), ("sign out", true)] {
-        let mut peer = Peer::new();
-        peer.shell.set_token(Some(Box::new(TOKEN)));
-        let exchange =
-            if sign_out { peer.shell.sign_out() } else { peer.shell.sign_in(&printed()).expect("printed link") };
-        let body = if sign_out {
-            let mut writer = Writer::new(1);
-            w::SignOutAnswer::NotReady.encode(&mut writer).expect("one byte");
-            writer.finish()
-        } else {
-            record(&w::SignInAnswer::NotReady)
-        };
-        peer.respond(b"HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\n");
-        peer.respond(&body);
-        assert_eq!(peer.shell.signing(), Some(Signing::Again { exchange }), "{label}");
-        assert_eq!(peer.shell.token().expect("kept token").expose(), &TOKEN, "{label}");
-        if sign_out {
-            peer.shell.sign_out();
-        } else {
-            assert!(peer.shell.sign_in(&printed()).is_ok(), "{label}");
-        }
-    }
-}
-#[test]
-fn a_whole_sign_out_answer_clears_the_shell_token() {
-    let mut peer = Peer::new();
-    peer.shell.set_token(Some(Box::new(TOKEN)));
-    let exchange = peer.shell.sign_out();
-    peer.respond(b"HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\n\x00");
-    assert_eq!(peer.shell.signing(), Some(Signing::SignedOut { exchange }));
-    assert!(peer.shell.token().is_none());
-}
-#[test]
-fn a_lost_sign_out_keeps_the_shell_token() {
-    for (label, response) in [
-        ("cut", b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n\x00".as_slice()),
-        ("bad record", b"HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\n\xff".as_slice()),
-        ("bad status", b"HTTP/1.1 503 Busy\r\nContent-Length: 0\r\n\r\n".as_slice()),
-    ] {
-        let mut peer = Peer::new();
-        peer.shell.set_token(Some(Box::new(TOKEN)));
-        let exchange = peer.shell.sign_out();
-        peer.respond(response);
-        peer.wire.eof = true;
-        peer.drive();
-        assert_eq!(peer.shell.signing(), Some(Signing::Lost { exchange }), "{label}");
-        assert_eq!(peer.shell.token().expect("original token").expose(), &TOKEN, "{label}");
-    }
-}
-
 #[derive(Clone, Copy)]
 enum FileCase {
     KeepToken,
@@ -244,12 +163,9 @@ impl Disk {
         self.started = true;
         match self.case {
             FileCase::KeepToken => {
-                self.shell.connections.set_token(Some(Box::new(TOKEN)));
-                self.shell.files.credential(Box::new(TOKEN));
-                self.shell.saving_signing = Some(Signing::SignedIn { exchange: Token::new(42), party: 1 });
+                self.shell.keep(Some(Secret::new(Box::new(TOKEN))));
             }
             FileCase::ReloadToken => {
-                self.token = self.shell.connections.token().map(|token| token.expose().to_vec());
                 self.closing = true;
             }
             FileCase::Store => {
@@ -257,6 +173,7 @@ impl Disk {
                     .down(link::Request::Write { key: b"key".as_slice().into(), record: b"pending".as_slice().into() });
                 self.shell.down(link::Request::Exchange {
                     exchange: Token::new(42),
+                    credential: Some(Secret::new(Box::new(TOKEN))),
                     path: b"/jig/v1/request",
                     body: b"ask".as_slice().into(),
                 });
@@ -267,10 +184,13 @@ impl Disk {
 impl skein_shell::Host for Disk {
     fn iterate(&mut self, now: Time, wall: skein_lib::Wall) {
         self.shell.iterate(now, wall);
-        if !self.started && self.shell.loaded().is_some() {
+        if !self.started
+            && let Some((credential, _)) = self.shell.loaded()
+        {
+            self.token = credential.map(|token| token.expose().to_vec());
             self.start();
         }
-        if self.shell.signing().is_some() {
+        if self.shell.kept().is_some() {
             self.closing = true;
         }
         while let Some(event) = self.shell.events().pop() {
@@ -281,7 +201,9 @@ impl skein_shell::Host for Disk {
                     self.closing = true;
                 }
                 link::Event::Failed { .. } => self.closing = true,
-                other @ (link::Event::Start { .. }
+                other @ (link::Event::SignIn { .. }
+                | link::Event::SignOut
+                | link::Event::Start { .. }
                 | link::Event::Save { .. }
                 | link::Event::Erase { .. }
                 | link::Event::Send { .. }

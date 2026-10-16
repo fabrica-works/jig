@@ -66,6 +66,10 @@ pub enum Erased {
 }
 #[derive(Debug)]
 pub enum Event {
+    SignIn {
+        with: With,
+    },
+    SignOut,
     Start {
         versions: List<StoreVersion>,
         kept: List<StoreRead>,
@@ -135,6 +139,7 @@ pub enum Request {
     /// A POST; its shell adds the bearer and content type.
     Exchange {
         exchange: Token,
+        credential: Option<Secret>,
         path: &'static [u8],
         body: Box<[u8]>,
     },
@@ -151,7 +156,12 @@ pub enum Request {
         party: u64,
         credential: Secret,
     },
-    OpenStream,
+    OpenStream {
+        credential: Option<Secret>,
+    },
+    Signing {
+        signing: Signing,
+    },
     CloseStream,
     Watch {
         watch: Token,
@@ -185,4 +195,19 @@ pub enum Fact {
     UndecodableEvent,
     StreamDropped,
     UndecodableStore,
+}
+
+/// Authentication held by the link (client/domain/client.md, 12).
+#[derive(Debug, PartialEq, Eq)]
+pub enum With {
+    Link(Secret),
+    Held(Secret),
+}
+#[derive(Debug, PartialEq, Eq)]
+pub enum Signing {
+    SignedIn { party: u64 },
+    Again,
+    Refused,
+    Lost,
+    SignedOut,
 }

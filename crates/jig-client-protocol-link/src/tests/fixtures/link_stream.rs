@@ -92,7 +92,7 @@ impl Harness {
     pub fn opening(&self) -> (Token, u64) {
         for request in &self.out {
             match request {
-                Request::Exchange { exchange, path, body } if *path == b"/jig/v1/watch" => {
+                Request::Exchange { exchange, path, body, .. } if *path == b"/jig/v1/watch" => {
                     let record = w::Open::decode(&limits().wire, &mut Reader::new(body)).unwrap();
                     return (*exchange, record.watch());
                 }
@@ -100,7 +100,7 @@ impl Harness {
                 | Request::Abandon { .. }
                 | Request::Answer { .. }
                 | Request::Read { .. }
-                | Request::OpenStream
+                | Request::OpenStream { .. }
                 | Request::CloseStream
                 | Request::Watch { .. }
                 | Request::FamilyDelivery { .. }
@@ -110,6 +110,7 @@ impl Harness {
                 | Request::Remove { .. }
                 | Request::Kept { .. }
                 | Request::Dropped { .. }
+                | Request::Signing { .. }
                 | Request::ServiceCredential { .. }
                 | Request::Fact { .. } => {}
             }
@@ -124,7 +125,7 @@ impl Harness {
                 | Request::Abandon { .. }
                 | Request::Answer { .. }
                 | Request::Read { .. }
-                | Request::OpenStream
+                | Request::OpenStream { .. }
                 | Request::CloseStream
                 | Request::Watch { .. }
                 | Request::FamilyDelivery { .. }
@@ -134,6 +135,7 @@ impl Harness {
                 | Request::Remove { .. }
                 | Request::Kept { .. }
                 | Request::Dropped { .. }
+                | Request::Signing { .. }
                 | Request::ServiceCredential { .. }
                 | Request::Fact { .. } => {}
             }
@@ -149,7 +151,7 @@ impl Harness {
                 | Request::Abandon { .. }
                 | Request::Answer { .. }
                 | Request::Read { .. }
-                | Request::OpenStream
+                | Request::OpenStream { .. }
                 | Request::CloseStream
                 | Request::Watch { .. }
                 | Request::FamilyDelivery { .. }
@@ -158,6 +160,7 @@ impl Harness {
                 | Request::Remove { .. }
                 | Request::Kept { .. }
                 | Request::Dropped { .. }
+                | Request::Signing { .. }
                 | Request::ServiceCredential { .. }
                 | Request::Fact { .. } => {}
             }
@@ -172,7 +175,7 @@ impl Harness {
             | Request::Abandon { .. }
             | Request::Answer { .. }
             | Request::Read { .. }
-            | Request::OpenStream
+            | Request::OpenStream { .. }
             | Request::CloseStream
             | Request::Watch { .. }
             | Request::FamilyDelivery { .. }
@@ -182,6 +185,7 @@ impl Harness {
             | Request::Remove { .. }
             | Request::Kept { .. }
             | Request::Dropped { .. }
+            | Request::Signing { .. }
             | Request::ServiceCredential { .. }
             | Request::Fact { .. }) => panic!("no close: {other:?}"),
         }
@@ -201,7 +205,7 @@ impl Harness {
                 | Request::Abandon { .. }
                 | Request::Answer { .. }
                 | Request::Read { .. }
-                | Request::OpenStream
+                | Request::OpenStream { .. }
                 | Request::CloseStream
                 | Request::Watch { .. }
                 | Request::FamilyDelivery { .. }
@@ -211,6 +215,7 @@ impl Harness {
                 | Request::Remove { .. }
                 | Request::Kept { .. }
                 | Request::Dropped { .. }
+                | Request::Signing { .. }
                 | Request::ServiceCredential { .. }
                 | Request::Fact { .. } => {}
             }
@@ -242,7 +247,7 @@ impl Harness {
                 | Request::Abandon { .. }
                 | Request::Answer { .. }
                 | Request::Read { .. }
-                | Request::OpenStream
+                | Request::OpenStream { .. }
                 | Request::CloseStream
                 | Request::Watch { .. }
                 | Request::FamilyDelivery { .. }
@@ -252,6 +257,7 @@ impl Harness {
                 | Request::Remove { .. }
                 | Request::Kept { .. }
                 | Request::Dropped { .. }
+                | Request::Signing { .. }
                 | Request::ServiceCredential { .. }
                 | Request::Fact { .. } => {}
             }

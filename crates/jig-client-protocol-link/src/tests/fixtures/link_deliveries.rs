@@ -118,7 +118,7 @@ impl Harness {
                 | Request::Abandon { .. }
                 | Request::Answer { .. }
                 | Request::Read { .. }
-                | Request::OpenStream
+                | Request::OpenStream { .. }
                 | Request::CloseStream
                 | Request::Watch { .. }
                 | Request::FamilyDelivery { .. }
@@ -128,6 +128,7 @@ impl Harness {
                 | Request::Remove { .. }
                 | Request::Kept { .. }
                 | Request::Dropped { .. }
+                | Request::Signing { .. }
                 | Request::ServiceCredential { .. }
                 | Request::Fact { .. } => {}
             }

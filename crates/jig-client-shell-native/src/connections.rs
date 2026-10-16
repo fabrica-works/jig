@@ -1,5 +1,5 @@
 //! io-free HTTP machines, with shell-owned authentication (protocol/client.md, 4).
-use crate::{Signing, Unlinked, sign_in};
+use crate::{Unlinked, sign_in};
 use jig_client_protocol_link::boundary as link;
 use skein_http::{Header, Method, client as http};
 use skein_lib::{
@@ -20,10 +20,8 @@ pub struct Limits {
 enum Owner {
     Link(Token),
     Stream,
-    SignIn(Token),
-    SignOut(Token),
 }
-type Pending = (Owner, &'static [u8], Box<[u8]>);
+type Pending = (Owner, &'static [u8], Box<[u8]>, Option<Secret>);
 struct Exchange {
     owner: Owner,
     machine: http::Client,
@@ -39,12 +37,10 @@ struct Exchange {
 pub struct Connections {
     limits: Limits,
     host: String,
-    token: Option<Secret>,
     next: u32,
     exchanges: BTreeMap<Conn, Exchange>,
     pending: VecDeque<Pending>,
     events: VecDeque<link::Event>,
-    signing: VecDeque<Signing>,
 }
 impl Connections {
     #[must_use]
@@ -56,20 +52,11 @@ impl Connections {
         Self {
             limits: *limits,
             host: "localhost".to_owned(),
-            token: None,
             next: 1,
             exchanges: BTreeMap::new(),
             pending: VecDeque::new(),
             events: VecDeque::new(),
-            signing: VecDeque::new(),
         }
-    }
-    pub fn set_token(&mut self, token: Option<Box<[u8]>>) {
-        self.token = token.map(Secret::new);
-    }
-    #[must_use]
-    pub fn token(&self) -> Option<&Secret> {
-        self.token.as_ref()
     }
     #[must_use]
     pub fn host(&self) -> &str {
@@ -77,44 +64,36 @@ impl Connections {
     }
     /// # Errors
     /// Refuses any link outside the printed HTTP link's form.
-    pub fn sign_in(&mut self, link: &[u8]) -> Result<Token, Unlinked> {
-        let (host, body) = sign_in::parse(link)?;
+    pub fn printed(&mut self, link: &[u8]) -> Result<Secret, Unlinked> {
+        let (host, secret) = sign_in::parse(link)?;
         if self.host != "localhost" && self.host != host {
             return Err(Unlinked::Address);
         }
         self.host = host;
-        let exchange = Token::new(u64::from(self.name().0));
-        self.enqueue(Owner::SignIn(exchange), b"/jig/v1/sign-in/link", body);
-        Ok(exchange)
-    }
-    pub fn sign_out(&mut self) -> Token {
-        let exchange = Token::new(u64::from(self.name().0));
-        self.enqueue(Owner::SignOut(exchange), b"/jig/v1/sign-out", Box::new([]));
-        exchange
-    }
-    pub fn signing(&mut self) -> Option<Signing> {
-        self.signing.pop_front()
+        Ok(secret)
     }
     fn name(&mut self) -> Conn {
         let conn = Conn(self.next);
         self.next = self.next.checked_add(1).expect("finite connection namespace");
         conn
     }
-    fn enqueue(&mut self, owner: Owner, path: &'static [u8], body: Box<[u8]>) {
+    fn enqueue(&mut self, owner: Owner, path: &'static [u8], body: Box<[u8]>, credential: Option<Secret>) {
         if self.pending.len() + self.exchanges.values().filter(|value| !matches!(value.owner, Owner::Stream)).count()
             >= usize::try_from(self.limits.exchanges).expect("u32 fits")
         {
             self.failed(owner);
         } else {
-            self.pending.push_back((owner, path, body));
+            self.pending.push_back((owner, path, body, credential));
         }
     }
     pub fn down(&mut self, now: Time, request: link::Request, below: &mut Queue<(Conn, stream::Down)>) {
         match request {
-            link::Request::Exchange { exchange, path, body } => self.enqueue(Owner::Link(exchange), path, body),
-            link::Request::OpenStream => {
+            link::Request::Exchange { exchange, path, body, credential } => {
+                self.enqueue(Owner::Link(exchange), path, body, credential);
+            }
+            link::Request::OpenStream { credential } => {
                 if !self.exchanges.values().any(|value| matches!(value.owner, Owner::Stream)) {
-                    self.start(now, Owner::Stream, b"/jig/v1/stream", Box::new([]), below);
+                    self.start(now, Owner::Stream, b"/jig/v1/stream", Box::new([]), credential, below);
                 }
             }
             link::Request::Abandon { exchange } => self.close(now, Some(exchange), below),
@@ -124,6 +103,7 @@ impl Connections {
             | link::Request::Kept { .. }
             | link::Request::Dropped { .. }
             | link::Request::Answer { .. }
+            | link::Request::Signing { .. }
             | link::Request::ServiceCredential { .. }
             | link::Request::Watch { .. }
             | link::Request::FamilyDelivery { .. }
@@ -141,14 +121,22 @@ impl Connections {
         }
     }
     fn flush(&mut self, now: Time, below: &mut Queue<(Conn, Down)>) {
-        while let Some((owner, path, body)) = self.pending.pop_front() {
-            self.start(now, owner, path, body, below);
+        while let Some((owner, path, body, credential)) = self.pending.pop_front() {
+            self.start(now, owner, path, body, credential, below);
         }
     }
     fn env(&self, now: Time) -> Env<http::Limits> {
         Env { now, wall: Wall::EPOCH, limits: self.limits.http }
     }
-    fn start(&mut self, now: Time, owner: Owner, path: &[u8], body: Box<[u8]>, below: &mut Queue<(Conn, Down)>) {
+    fn start(
+        &mut self,
+        now: Time,
+        owner: Owner,
+        path: &[u8],
+        body: Box<[u8]>,
+        credential: Option<Secret>,
+        below: &mut Queue<(Conn, Down)>,
+    ) {
         if body.len() > usize::try_from(self.limits.body_bytes).expect("u32 fits") {
             self.failed(owner);
             return;
@@ -162,9 +150,7 @@ impl Connections {
                 value: b"application/octet-stream".as_slice().into(),
             });
         }
-        if !matches!(owner, Owner::SignIn(_))
-            && let Some(token) = &self.token
-        {
+        if let Some(token) = credential {
             let size = base64::encoded_len(Alphabet::Url, u32::try_from(token.len()).expect("short token"))
                 .expect("short bearer");
             let mut writer = skein_lib::Writer::new(usize::try_from(size).expect("u32 fits"));
@@ -285,13 +271,6 @@ impl Connections {
                             body: std::mem::take(&mut value.body).into_boxed_slice(),
                         }),
                         Owner::Stream => self.events.push_back(link::Event::StreamEnded),
-                        Owner::SignIn(exchange) | Owner::SignOut(exchange) => self.signing.push_back(sign_in::answer(
-                            exchange,
-                            value.status,
-                            &value.body,
-                            matches!(value.owner, Owner::SignOut(_)),
-                            &mut self.token,
-                        )),
                     }
                     value.terminal = true;
                 }
@@ -367,7 +346,6 @@ impl Connections {
         match owner {
             Owner::Link(exchange) => self.events.push_back(link::Event::Failed { exchange }),
             Owner::Stream => self.events.push_back(link::Event::StreamEnded),
-            Owner::SignIn(exchange) | Owner::SignOut(exchange) => self.signing.push_back(Signing::Lost { exchange }),
         }
     }
     pub(crate) fn close_all(&mut self, now: Time, below: &mut Queue<(Conn, Down)>) {
@@ -381,13 +359,12 @@ impl Connections {
         }
         self.pending.clear();
         self.events.clear();
-        self.signing.clear();
     }
     fn close(&mut self, now: Time, exchange: Option<Token>, below: &mut Queue<(Conn, Down)>) {
         let conn = self.exchanges.iter().find_map(|(conn, value)| match value.owner {
             Owner::Link(token) if Some(token) == exchange => Some(*conn),
             Owner::Stream if exchange.is_none() => Some(*conn),
-            Owner::Link(_) | Owner::Stream | Owner::SignIn(_) | Owner::SignOut(_) => None,
+            Owner::Link(_) | Owner::Stream => None,
         });
         if let Some(conn) = conn {
             let mut value = self.exchanges.remove(&conn).expect("live connection");

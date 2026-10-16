@@ -183,7 +183,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(crate::watches::worst_case(limits)?)?
         .checked_add(skein_lib::List::<skein_lib::Token>::worst_case(limits.client.watches)?)?
         .checked_add(crate::stream::worst_case(limits)?)?
-        .checked_add(crate::store::worst_case(limits)?)
+        .checked_add(crate::store::worst_case(limits)?)?
+        .checked_add(40)
 }
 
 pub(crate) fn max_out(limits: &Limits) -> Option<u32> {

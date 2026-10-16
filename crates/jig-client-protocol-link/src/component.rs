@@ -2,17 +2,19 @@
 use crate::{Answered, Ask, Event, Fact, Family, Limits, Readable, Readout, Request, Unusable, Watchable, translate};
 use alloc::boxed::Box;
 use jig_client_protocol_wire::{self as wire, v7 as w};
-use skein_lib::{Map, Queue, Reader, RequestEnvelope, RequestKey, Time, Token, Writer};
+use skein_lib::{Map, Queue, Reader, RequestEnvelope, RequestKey, Secret, Time, Token, Writer};
 #[derive(Debug)]
 pub(crate) struct Attempt {
-    token: Token,
-    owner: w::Owner,
-    version: u32,
-    until: Time,
-    kind: ExchangeKind,
+    pub(super) token: Token,
+    pub(super) owner: w::Owner,
+    pub(super) version: u32,
+    pub(super) until: Time,
+    pub(super) kind: ExchangeKind,
 }
 #[derive(Clone, Copy, Debug)]
-enum ExchangeKind {
+pub(super) enum ExchangeKind {
+    SignIn,
+    SignOut { generation: u64 },
     Attempt,
     Read,
     WatchOpen { name: u64 },
@@ -25,7 +27,9 @@ enum ExchangeKind {
 pub struct Link {
     pub(super) limits: Limits,
     pub(super) attempts: Map<Token, Attempt>,
-    next: u64,
+    pub(super) next: u64,
+    pub(super) credential: Option<Secret>,
+    pub(super) generation: u64,
     stream: Option<crate::stream::Stream>,
     watches: crate::watches::Watches,
     pub(super) store: crate::store::Store,
@@ -38,6 +42,8 @@ impl Link {
             store: crate::store::Store::new(limits),
             attempts: Map::with_capacity(limits.exchanges),
             next: 1,
+            credential: None,
+            generation: 0,
             stream: None,
             watches: crate::watches::Watches::new(limits),
         })
@@ -70,6 +76,8 @@ impl Link {
     }
     pub fn step(&mut self, now: Time, event: Event, out: &mut Queue<Request>) {
         match event {
+            Event::SignIn { with } => self.sign_in(now, with, out),
+            Event::SignOut => self.sign_out(now, out),
             Event::Start { versions, kept } => self.start_store(versions, kept, out),
             Event::Save { record } => self.save(record, out),
             Event::Erase { key } => self.erase(key, out),
@@ -180,6 +188,10 @@ impl Link {
     fn answered(&mut self, exchange: Token, status: u16, body: &[u8], out: &mut Queue<Request>) {
         let Some(attempt) = self.attempts.remove(&exchange) else { return };
         match attempt.kind {
+            ExchangeKind::SignIn | ExchangeKind::SignOut { .. } => {
+                self.signing_answer(attempt.kind, status, body, out);
+                return;
+            }
             ExchangeKind::Attempt => {}
             ExchangeKind::WatchOpen { name } | ExchangeKind::WatchClose { name } => {
                 self.watch_answer(attempt, name, status, body, out);
@@ -287,6 +299,9 @@ fn read_none(read: Token, owner: &w::Owner, why: jig_domain_client::contract::Re
 fn failed(attempt: Attempt, out: &mut Queue<Request>) {
     match attempt.kind {
         ExchangeKind::Attempt => lost(attempt.token, out),
+        ExchangeKind::SignIn | ExchangeKind::SignOut { .. } => {
+            out.push(Request::Signing { signing: crate::Signing::Lost });
+        }
         ExchangeKind::WatchOpen { .. } | ExchangeKind::WatchClose { .. } => {
             unreachable!("watch failure belongs to its map")
         }
@@ -349,7 +364,7 @@ impl Link {
         match &self.stream {
             None => {
                 self.stream = Some(crate::stream::Stream::new(&self.limits, now));
-                out.push(Request::OpenStream);
+                out.push(Request::OpenStream { credential: self.credential.clone() });
             }
             Some(stream) => {
                 if stream.name.is_some() {
@@ -424,7 +439,7 @@ impl Link {
                         tokens.push(*exchange).expect("bounded exchanges");
                     }
                 }
-                ExchangeKind::Attempt | ExchangeKind::Read => {}
+                ExchangeKind::Attempt | ExchangeKind::Read | ExchangeKind::SignIn | ExchangeKind::SignOut { .. } => {}
             }
         }
         for exchange in &tokens {
@@ -484,7 +499,9 @@ impl Link {
                     Err(_) => self.failure(attempt, out),
                 }
             }
-            ExchangeKind::Attempt | ExchangeKind::Read => unreachable!("watch exchange kind"),
+            ExchangeKind::Attempt | ExchangeKind::Read | ExchangeKind::SignIn | ExchangeKind::SignOut { .. } => {
+                unreachable!("watch exchange kind")
+            }
         }
     }
     pub(super) fn failure(&mut self, attempt: Attempt, out: &mut Queue<Request>) {
@@ -501,6 +518,10 @@ impl Link {
                 if self.watches.named(name) == Some(attempt.token) {
                     self.watches.end(attempt.token, jig_domain_client::contract::WatchEnd::Dropped, out);
                 }
+            }
+            ExchangeKind::SignOut { generation } if generation != self.generation => {}
+            ExchangeKind::SignIn | ExchangeKind::SignOut { .. } => {
+                out.push(Request::Signing { signing: crate::Signing::Lost });
             }
             ExchangeKind::Attempt | ExchangeKind::Read => failed(attempt, out),
         }

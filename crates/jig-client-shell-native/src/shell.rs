@@ -1,12 +1,12 @@
 //! Connections on sockets, with private durable storage (protocol/client.md, 12).
-use crate::{Conn, Connections, Limits, Signing, Unlinked, files::Files};
+use crate::{Conn, Connections, Limits, Unlinked, files::Files};
 use jig_client_protocol_link::boundary as link;
 use skein_io::{
     self as io,
     kernel::{Complete, Fd, Submit},
 };
 use skein_lib::{
-    Env, Queue, Time, Token, Wall,
+    Env, Queue, Secret, Time, Token, Wall,
     stream::{Down, Fault, Up},
 };
 use std::collections::{BTreeMap, VecDeque};
@@ -35,10 +35,6 @@ pub struct Shell {
     below: Queue<(Conn, Down)>,
     events: Queue<link::Event>,
     held: VecDeque<link::Request>,
-    signing: VecDeque<Signing>,
-    pub(super) saving_signing: Option<Signing>,
-    printed: Option<Box<[u8]>>,
-    signing_out: Option<()>,
     closing: bool,
     max: u32,
     body_bytes: u32,
@@ -68,10 +64,6 @@ impl Shell {
             below: Queue::with_capacity(room),
             events: Queue::with_capacity(room),
             held: VecDeque::new(),
-            signing: VecDeque::new(),
-            saving_signing: None,
-            printed: None,
-            signing_out: None,
             closing: false,
             max,
             body_bytes: settings.limits.body_bytes,
@@ -82,35 +74,36 @@ impl Shell {
         self.files.adopt(root, user, seed);
     }
     /// Read records once, after the private token and small store have loaded.
-    pub fn loaded(&mut self) -> Option<Vec<link::StoreRead>> {
-        self.files.loaded()
+    pub fn loaded(&mut self) -> Option<(Option<Secret>, Vec<link::StoreRead>)> {
+        let records = self.files.loaded()?;
+        Some((self.files.token(), records))
     }
     pub fn events(&mut self) -> &mut Queue<link::Event> {
         &mut self.events
     }
-    pub fn signing(&mut self) -> Option<Signing> {
-        self.signing.pop_front()
+    /// Keep a credential in the private file; `kept` reports its durability.
+    pub fn keep(&mut self, credential: Option<Secret>) {
+        self.files.credential(credential.map_or_else(|| Box::new([]) as Box<[u8]>, |value| value.expose().into()));
+    }
+    pub fn kept(&mut self) -> Option<bool> {
+        self.files.credential_written.take()
     }
     /// # Errors
-    /// Refuses a link whose address differs from this shell's configured engine.
-    pub fn sign_in(&mut self, printed: &[u8]) -> Result<(), Unlinked> {
+    /// Refuses a printed link whose address differs from the configured engine.
+    pub fn sign_in(&mut self, printed: &[u8]) -> Result<Secret, Unlinked> {
         let (host, _) = crate::sign_in::parse(printed)?;
         let addr = host.parse().map_err(|_| Unlinked::Address)?;
         if self.engine != io::Addr::Ip(addr) {
             return Err(Unlinked::Address);
         }
-        self.printed = Some(printed.into());
-        Ok(())
-    }
-    pub fn sign_out(&mut self) {
-        self.signing_out = Some(());
+        self.connections.printed(printed)
     }
     /// Route one link output; call iterate after the whole step's outputs.
     pub fn down(&mut self, request: link::Request) {
         match request {
             link::Request::Write { key, record } => self.files.edit(key, Some(record)),
             link::Request::Remove { key } => self.files.edit(key, None),
-            request @ (link::Request::Exchange { .. } | link::Request::OpenStream) => {
+            request @ (link::Request::Exchange { .. } | link::Request::OpenStream { .. }) => {
                 assert!(self.held.len() < usize::try_from(self.max * 64).expect("held bound"), "step output bound");
                 self.held.push_back(request);
             }
@@ -120,6 +113,7 @@ impl Shell {
             link::Request::Kept { .. }
             | link::Request::Dropped { .. }
             | link::Request::Answer { .. }
+            | link::Request::Signing { .. }
             | link::Request::ServiceCredential { .. }
             | link::Request::Watch { .. }
             | link::Request::FamilyDelivery { .. }
@@ -239,9 +233,6 @@ impl Shell {
             self.socket_event(event);
         }
         self.files.progress(now);
-        if let Some(token) = self.files.token() {
-            self.connections.set_token(Some(token.expose().into()));
-        }
         if let Some(ok) = self.files.written.take() {
             self.events.push(if ok { link::Event::Written } else { link::Event::WriteFailed });
             if !ok {
@@ -249,45 +240,18 @@ impl Shell {
                     if let link::Request::Exchange { exchange, .. } = request {
                         self.events.push(link::Event::Failed { exchange });
                     } else {
-                        assert!(matches!(request, link::Request::OpenStream), "only exchanges and streams held");
+                        assert!(matches!(request, link::Request::OpenStream { .. }), "only exchanges and streams held");
                         self.events.push(link::Event::StreamEnded);
                     }
                 }
             }
         }
-        if let Some(ok) = self.files.credential_written.take() {
-            let signing = self.saving_signing.take().expect("signing persistence");
-            if ok {
-                self.signing.push_back(signing);
-            } else {
-                self.connections.set_token(None);
-                self.signing.push_back(Signing::Lost { exchange: signing_token(&signing) });
-            }
-        }
         if self.files.ready() && !self.closing {
-            if self.signing_out.take().is_some() {
-                self.connections.sign_out();
-            }
-            if let Some(printed) = self.printed.take() {
-                self.connections.sign_in(&printed).expect("checked link");
-            }
             while let Some(request) = self.held.pop_front() {
                 self.connections.down(now, request, &mut self.below);
             }
         }
         self.connections.take(now, &mut self.events, &mut self.below);
-        if self.saving_signing.is_none()
-            && let Some(signing) = self.connections.signing()
-        {
-            if matches!(signing, Signing::SignedIn { .. } | Signing::SignedOut { .. }) {
-                let bytes =
-                    self.connections.token().map_or_else(|| Box::new([]) as Box<[u8]>, |token| token.expose().into());
-                self.files.credential(bytes);
-                self.saving_signing = Some(signing);
-            } else {
-                self.signing.push_back(signing);
-            }
-        }
         self.pump();
         if self.closing {
             self.held.clear();
@@ -318,9 +282,7 @@ impl Shell {
             || !self.complete.is_empty()
             || !self.raw.is_empty()
             || self.files.pending()
-            || (!self.closing
-                && self.files.ready()
-                && (!self.held.is_empty() || self.printed.is_some() || self.signing_out.is_some()))
+            || (!self.closing && self.files.ready() && !self.held.is_empty())
             || self.sockets.values().any(|s| s.connected && !s.below.is_empty())
     }
     #[must_use]
@@ -355,14 +317,5 @@ impl Shell {
                     + u64::from(self.body_bytes)
                     + 1024)
             + u64::from(self.max) * u64::from(self.env.limits.intake)
-    }
-}
-fn signing_token(signing: &Signing) -> Token {
-    match signing {
-        Signing::SignedIn { exchange, .. }
-        | Signing::SignedOut { exchange }
-        | Signing::Again { exchange }
-        | Signing::Lost { exchange }
-        | Signing::Refused { exchange } => *exchange,
     }
 }

@@ -10,6 +10,7 @@ struct Held {
     path: &'static [u8],
     body: Box<[u8]>,
     tracked: bool,
+    credential: Option<skein_lib::Secret>,
 }
 #[derive(Debug)]
 pub(super) struct Store {
@@ -30,7 +31,7 @@ pub(super) fn worst_case(limits: &Limits) -> Option<u64> {
     let capacity = limits.exchanges.checked_add(1)?;
     let body = core::cmp::max(w::Keyed::worst_case_bytes(&limits.wire)?, w::Open::worst_case_bytes(&limits.wire)?);
     let body = core::cmp::max(body, w::Owned::worst_case_bytes(&limits.wire)?);
-    Queue::<Held>::worst_case(capacity)?.checked_add(body.checked_mul(u64::from(capacity))?)
+    Queue::<Held>::worst_case(capacity)?.checked_add(body.checked_add(40)?.checked_mul(u64::from(capacity))?)
 }
 pub(super) fn records(limits: &Limits) -> Option<u32> {
     limits.client.records.checked_add(limits.client.kept)?.checked_add(limits.client.parts)
@@ -181,10 +182,16 @@ impl Link {
                     self.failure(attempt, out);
                 }
             } else {
-                self.store.held.push(Held { exchange, path, body, tracked: self.attempts.contains_key(&exchange) });
+                self.store.held.push(Held {
+                    exchange,
+                    path,
+                    body,
+                    tracked: self.attempts.contains_key(&exchange),
+                    credential: self.credential.clone(),
+                });
             }
         } else {
-            out.push(Request::Exchange { exchange, path, body });
+            out.push(Request::Exchange { exchange, path, body, credential: self.credential.clone() });
         }
     }
     fn gather(&mut self, out: &mut Queue<Request>) {
@@ -192,20 +199,21 @@ impl Link {
         let count = out.len();
         for _ in 0..count {
             match out.pop().expect("counted step outputs") {
-                Request::Exchange { exchange, path, body } => self.exchange(exchange, path, body, out),
+                Request::Exchange { exchange, path, body, .. } => self.exchange(exchange, path, body, out),
                 value @ (Request::Write { .. }
                 | Request::Remove { .. }
                 | Request::Kept { .. }
                 | Request::Dropped { .. }
                 | Request::Abandon { .. }
                 | Request::Answer { .. }
-                | Request::OpenStream
+                | Request::OpenStream { .. }
                 | Request::CloseStream
                 | Request::Watch { .. }
                 | Request::FamilyDelivery { .. }
                 | Request::Ended { .. }
                 | Request::Hello { .. }
                 | Request::Read { .. }
+                | Request::Signing { .. }
                 | Request::ServiceCredential { .. }
                 | Request::Fact { .. }) => out.push(value),
             }
@@ -257,7 +265,12 @@ impl Link {
         for _ in 0..self.store.held.capacity() {
             let Some(value) = self.store.held.pop() else { break };
             if !value.tracked || self.attempts.contains_key(&value.exchange) {
-                out.push(Request::Exchange { exchange: value.exchange, path: value.path, body: value.body });
+                out.push(Request::Exchange {
+                    exchange: value.exchange,
+                    path: value.path,
+                    body: value.body,
+                    credential: value.credential,
+                });
             }
         }
     }

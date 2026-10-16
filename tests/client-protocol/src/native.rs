@@ -1,10 +1,11 @@
 //! The test application's native client over simulated or real io.
 use crate::{family, front::Side};
 use jig_client_protocol_link as link;
-use jig_client_shell_native::{Settings, Shell, Signing};
+use jig_client_shell_native::{Settings, Shell};
 use jig_client_test_domain::{self as client, Request};
 use jig_client_world::{App, Test};
 use jig_domain_client::address::{Address, TaskSection};
+use link::Signing;
 use skein_fake_person::{Doing, Find, Next, Person, Step, TreeFace};
 use skein_io::kernel::{Complete, Fd, Submit};
 use skein_lib::{Duration, Env, Queue, RequestRecord, Time, Wall};
@@ -77,6 +78,7 @@ pub enum Received {
 /// A native client as a process of a skein world.
 pub struct NativeClient {
     shell: Shell,
+    saving_signing: Option<Signing>,
     terminal: Option<skein_ui_text::Terminal>,
     #[expect(clippy::disallowed_types, reason = "scenario input hands inherited pipes to the host between iterations")]
     pipes: core::cell::Cell<Option<(Fd, Fd)>>,
@@ -112,6 +114,7 @@ impl NativeClient {
             pipes: None.into(),
             complete,
             shell,
+            saving_signing: None,
             side: Side::new(),
             root,
             view,
@@ -133,7 +136,20 @@ impl NativeClient {
     /// # Errors
     /// Refuses a link outside the configured loopback engine's address.
     pub fn sign_in(&mut self, printed: &[u8]) -> Result<(), jig_client_shell_native::Unlinked> {
-        self.shell.sign_in(printed)
+        let secret = self.shell.sign_in(printed)?;
+        self.side.event(self.env.now, link::Event::SignIn { with: link::With::Link(secret) });
+        Ok(())
+    }
+    fn signing(&mut self, signing: Signing) {
+        match signing {
+            Signing::SignedIn { party } => {
+                self.received.push(Received::SignedIn { person: party });
+                self.signed_in += 1;
+                self.side.authenticated = true;
+            }
+            Signing::SignedOut => self.callback(client::Event::SignedOut),
+            other @ (Signing::Again | Signing::Lost | Signing::Refused) => panic!("native sign in failed: {other:?}"),
+        }
     }
     fn callback(&mut self, event: client::Event) {
         match &event {
@@ -233,7 +249,7 @@ impl NativeClient {
                         self.callback(Test::went(address));
                     }
                 }
-                Request::SignOut => self.shell.sign_out(),
+                Request::SignOut => self.side.event(self.env.now, link::Event::SignOut),
                 Request::SignIn { .. } => panic!("printed link supplied by caller"),
                 request @ (Request::Send { .. } | Request::Jig(_) | Request::First(_) | Request::Fact { .. }) => {
                     if let Request::Send { attempt, key, .. } = &request {
@@ -244,6 +260,15 @@ impl NativeClient {
             }
         }
         while let Some(request) = self.side.out.pop() {
+            if let link::Request::Signing { signing } = request {
+                if matches!(signing, Signing::SignedIn { .. } | Signing::SignedOut) {
+                    self.shell.keep(self.side.link.credential().cloned());
+                    self.saving_signing = Some(signing);
+                } else {
+                    self.signing(signing);
+                }
+                continue;
+            }
             if let link::Request::Kept { record } = request {
                 self.kept(record);
             } else {
@@ -298,7 +323,11 @@ impl Host for NativeClient {
             }
         }
         self.shell.iterate(now, wall);
-        if let Some(kept) = self.shell.loaded() {
+        if let Some((credential, kept)) = self.shell.loaded() {
+            if let Some(credential) = credential {
+                self.side.event(now, link::Event::SignIn { with: link::With::Held(credential) });
+                self.side.authenticated = true;
+            }
             self.side.event(
                 now,
                 link::Event::Start {
@@ -314,18 +343,9 @@ impl Host for NativeClient {
                 },
             );
         }
-        while let Some(signing) = self.shell.signing() {
-            match signing {
-                Signing::SignedIn { party, .. } => {
-                    self.received.push(Received::SignedIn { person: party });
-                    self.signed_in += 1;
-                    self.side.authenticated = true;
-                }
-                Signing::SignedOut { .. } => self.callback(client::Event::SignedOut),
-                other @ (Signing::Again { .. } | Signing::Lost { .. } | Signing::Refused { .. }) => {
-                    panic!("native sign in failed: {other:?}")
-                }
-            }
+        if let Some(ok) = self.shell.kept() {
+            let signing = self.saving_signing.take().expect("pending credential");
+            self.signing(if ok { signing } else { Signing::Lost });
         }
         while let Some(event) = self.shell.events().pop() {
             self.side.event(now, event);

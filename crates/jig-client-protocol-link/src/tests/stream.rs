@@ -64,14 +64,14 @@ fn a_second_watch_uses_the_stream_already_opened() {
     let mut harness = fixtures::Harness::streaming(fixtures::frame_subject());
     harness.clear();
     harness.open(Token::new(42), fixtures::family_subject());
-    assert!(!harness.has(&Request::OpenStream));
+    assert!(!harness.has(&Request::OpenStream { credential: None }));
 }
 #[test]
 fn an_opening_waits_for_the_stream_s_name() {
     let mut harness = fixtures::Harness::new(&fixtures::limits());
     harness.open(fixtures::WATCH, fixtures::frame_subject());
     assert_eq!(harness.out.len(), 1);
-    assert!(harness.has(&Request::OpenStream));
+    assert!(harness.has(&Request::OpenStream { credential: None }));
 }
 #[test]
 fn a_watch_s_opening_answer_is_handed_up() {
