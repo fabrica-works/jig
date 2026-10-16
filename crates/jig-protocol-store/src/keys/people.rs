@@ -16,6 +16,11 @@ pub(super) fn write(writer: &mut KeyWriter, key: &Key) {
             writer.u64(*party);
             writer.u64(*task);
         }
+        Key::EndedRead { task, party } => {
+            writer.tag(7);
+            writer.u64(*task);
+            writer.u64(*party);
+        }
         Key::SignIn(number) => {
             writer.tag(3);
             writer.u64(*number);
@@ -42,6 +47,7 @@ pub(super) fn read(reader: &mut KeyReader<'_>) -> Option<Key> {
         0 => Key::Person(reader.u64()?),
         1 => Key::ReadResults { party: reader.u64()? },
         2 => Key::ReadChat { party: reader.u64()?, task: reader.u64()? },
+        7 => Key::EndedRead { task: reader.u64()?, party: reader.u64()? },
         3 => Key::SignIn(reader.u64()?),
         4 => Key::Roles(u32::try_from(reader.u64()?).ok()?),
         5 => Key::Policy(u32::try_from(reader.u64()?).ok()?),

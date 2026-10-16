@@ -1,4 +1,6 @@
 //! Each range's intervals against its predicate (protocol/store.md, 4.3).
+const PARTY: u64 = 1;
+const TASK: u64 = 2;
 use super::fixtures;
 use crate::{intervals, keys};
 use alloc::boxed::Box;
@@ -28,7 +30,7 @@ fn each_restart_range_holds_the_keys_it_admits_and_no_others() {
 }
 #[test]
 fn the_restart_reads_its_ranges_in_the_cores_order() {
-    let expected = [&[1, 0, 0][..], &[1, 2], &[1, 1, 0], &[1, 0, 1]];
+    let expected = [&[1, 0, 0][..], &[1, 2, 0], &[1, 1, 0], &[1, 0, 1]];
     for (range, start) in RestoreRange::LIVE.into_iter().zip(expected) {
         let actual = intervals::restore(&range);
         assert_eq!(actual.first().expect("one live interval").start.as_ref(), start);
@@ -209,15 +211,23 @@ fn the_census_holds_the_keys_it_admits_and_no_others() {
         let bytes = key_bytes(&key);
         for (range, intervals) in &mappings {
             assert_eq!(range.admits(&key), fixtures::within(intervals, &bytes), "{range:?}, {key:?}");
+            if let RestoreRange::Census(census) = range
+                && let Some(index) = census.interval(&key)
+            {
+                assert!(fixtures::within(
+                    core::slice::from_ref(&intervals[usize::try_from(index).expect("bounded interval")]),
+                    &bytes
+                ));
+            }
         }
     }
 }
 
 #[test]
-fn the_census_reads_conversations_then_results_in_listed_order() {
+fn the_census_reads_ended_read_positions_then_results_in_listed_order() {
     let ranges = intervals::restore(&RestoreRange::Census(census()));
     let starts: [&[u8]; 4] = [
-        &[1, 1, 15],
+        &[1, 2, 7],
         &[1, 1, 13, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 1, 0],
         &[1, 1, 13, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         &[1, 1, 13, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0],
@@ -249,4 +259,14 @@ fn a_requesters_delegates_interval_holds_its_edges_only() {
             assert_eq!(admitted, fixtures::within(core::slice::from_ref(interval), &bytes), "{requester}, {key:?}");
         }
     }
+}
+
+#[test]
+fn the_people_restore_range_stops_before_ended_read_positions() {
+    let ranges = intervals::restore(&RestoreRange::People);
+    assert_eq!(ranges[0].end.as_deref(), Some([keys::JIG, 2, 7].as_slice()));
+    assert!(!fixtures::within(
+        &ranges,
+        &key_bytes(&Key::People(jig_domain_people::Key::EndedRead { task: TASK, party: PARTY }))
+    ));
 }

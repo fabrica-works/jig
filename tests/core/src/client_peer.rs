@@ -109,6 +109,7 @@ impl ClientPeer {
                 | core::Held::Refuse { .. }
                 | core::Held::TurnBusy { .. }
                 | core::Held::StopRun { .. }
+                | core::Held::Load(..)
                 | core::Held::NotesLoad { .. }
                 | core::Held::NotesWritten { .. }
                 | core::Held::NotesDeleted { .. } => false,
@@ -154,6 +155,7 @@ impl ClientPeer {
             | core::Now::PrepareAgent { .. }
             | core::Now::StartPreparation { .. }
             | core::Now::SeenChat { .. }
+            | core::Now::LoadEndedRead { .. }
             | core::Now::HistoricalProposal { .. }
             | core::Now::HistoricalPersonTask { .. }
             | core::Now::PartyInputs { .. }

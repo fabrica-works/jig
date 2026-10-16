@@ -226,6 +226,7 @@ fn full_chat_positions_and_replies_fit(limits: Limits) {
                 task: u64::from(limits.inbox_tasks) + (party - 1) * u64::from(limits.projects) + u64::from(project),
                 last_reply: 1,
                 live: false,
+                seen: None,
                 replies: Box::new([]),
             });
         }
@@ -261,6 +262,7 @@ fn full_chat_positions_and_replies_fit(limits: Limits) {
             task,
             last_reply: u64::from(limits.inbox_recipients) + 1,
             live: true,
+            seen: None,
             replies,
         });
         restored.event(Event::Waiting { task, entries });

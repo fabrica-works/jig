@@ -13,6 +13,7 @@ pub(super) fn candidate(store: &Store, project: u32, value: &core::Record) -> Op
         ancestors: Box::new([]),
         related: None,
         unjoined: None,
+        ended_read: None,
         linked: Box::new([]),
         inbox: None,
     })

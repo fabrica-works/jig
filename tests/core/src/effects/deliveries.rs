@@ -157,6 +157,7 @@ impl World {
                     ask: self.initial_ask.clone(),
                 })));
             }
+            root::Delivery::Core(core::Held::Load(load)) => self.store.ask(jig_test_store::StoreOut::Now(*load)),
             root::Delivery::Core(core::Held::NotesLoad { owner, range }) => {
                 self.store.ask(StoreOut::NotesLoad { owner, range });
             }

@@ -376,6 +376,7 @@ pub fn room(limits: &Limits, event: &Event) -> Option<JournalRoom> {
         | Event::Activate { .. }
         | Event::PreparedAgent { .. }
         | Event::Forget { .. }
+        | Event::EndedReadLoaded { .. }
         | Event::SeenChatLoaded { .. }
         | Event::HistoricalProposal { .. }
         | Event::HistoricalPersonTask { .. }
@@ -538,6 +539,12 @@ fn step_one(core: &mut Core, env: &Env<Limits>, event: Event, work: &mut Queue<E
             route_prepared_agent(core, context, transcript_waiter, busy)
         }
         Event::Forget { owner } => crate::forget::forget(core, env, work, &owner),
+        Event::EndedReadLoaded { request, task, party, through, busy } => crate::ended_marks::loaded(
+            core,
+            env,
+            work,
+            crate::ended_marks::Answer { request, task, party, through, busy },
+        ),
         Event::SeenChatLoaded { request, row, busy } => {
             crate::inbox::seen_chat_loaded(core, env, work, request, row, busy)
         }
@@ -631,4 +638,13 @@ pub fn fire(core: &mut Core, env: &Env<Limits>, timer: Timer) -> Requests {
             made_outputs(core, env, out)
         }
     }
+}
+
+pub(crate) fn tag_ended_mark(
+    core: &mut Core,
+    env: &Env<Limits>,
+    child: Queue<people::Request>,
+    work: &mut Queue<Event>,
+) -> Requests {
+    people_routes::tag_people(core, env, child, work)
 }

@@ -685,6 +685,7 @@ impl Session {
                 | core::Held::Refuse { .. }
                 | core::Held::TurnBusy { .. }
                 | core::Held::StopRun { .. }
+                | core::Held::Load(..)
                 | core::Held::NotesLoad { .. }
                 | core::Held::NotesWritten { .. }
                 | core::Held::NotesDeleted { .. },
@@ -700,11 +701,7 @@ impl Session {
             | root::Delivery::System { .. }
             | root::Delivery::LostRead { .. }
             | root::Delivery::Procedure { .. }) => {
-                assert!(
-                    !jig_core_world::client_peer::ClientPeer::accepts(&other),
-                    "all released peer variants are explicitly routed"
-                );
-                return Err(Invalid::InternalPacket);
+                return unrouted_delivery(&other);
             }
         }
         Ok(())
@@ -772,6 +769,7 @@ impl Session {
             | core::Now::PrepareAgent { .. }
             | core::Now::StartPreparation { .. }
             | core::Now::SeenChat { .. }
+            | core::Now::LoadEndedRead { .. }
             | core::Now::HistoricalProposal { .. }
             | core::Now::HistoricalPersonTask { .. }
             | core::Now::PartyInputs { .. }
@@ -906,6 +904,14 @@ impl Session {
             self.driver.send(now, wall, root::Event::Core(core::Event::Unwatch { watcher }));
         }
     }
+}
+
+fn unrouted_delivery(other: &root::Delivery) -> Result<(), Invalid> {
+    assert!(
+        !jig_core_world::client_peer::ClientPeer::accepts(other),
+        "all released peer variants are explicitly routed"
+    );
+    Err(Invalid::InternalPacket)
 }
 
 #[cfg(test)]

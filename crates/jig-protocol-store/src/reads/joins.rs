@@ -108,6 +108,7 @@ pub(super) fn row(
         ancestors: ancestors.into_boxed(),
         related,
         unjoined: None,
+        ended_read: None,
         linked: linked.into_boxed(),
         inbox: None,
     };

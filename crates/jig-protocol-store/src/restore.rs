@@ -66,28 +66,31 @@ fn restore_page(store: &mut Store, range: Restore, after: Option<&Cursor>, rows:
         }
     };
     let walked = pages::walk(store, &ranges, after, rows)?;
-    let mut found = List::with_capacity(u32::try_from(walked.rows.len()).ok()?);
+    let mut found = List::with_capacity(rows);
     let mut used = 0_u64;
     let mut cursor = after.cloned().unwrap_or(Cursor { interval: 0, after: Box::new([]) });
     for item in walked.rows {
-        let (row, size) = decode(store, item.row)?;
+        let (row, joined, size) = decode(store, item.row)?;
         let total = used.checked_add(size)?;
-        if total > bytes {
+        if total > bytes || found.room() < if joined.is_some() { 2 } else { 1 } {
             return Some(Restored { rows: found.into_boxed(), next: Some(cursor) });
         }
         used = total;
         cursor = item.cursor;
-        found.push(row).expect("bounded by walked rows");
+        found.push(row).expect("bounded restore rows");
+        if let Some(joined) = joined {
+            found.push(joined).expect("pair room checked");
+        }
     }
     Some(Restored { rows: found.into_boxed(), next: walked.next })
 }
 
-fn decode(store: &mut Store, row: skein_kv::Row) -> Option<(Row, u64)> {
+fn decode(store: &mut Store, row: skein_kv::Row) -> Option<(Row, Option<Row>, u64)> {
     let (row, size) = pages::decode(store, row)?;
     let task = match &row {
         Row::Jig(Record::Tasks(tasks::Stored::Result(row))) => row.task,
-        Row::Jig(Record::Tasks(tasks::Stored::ConversationOldest(row))) => row.task,
-        Row::Jig(_) | Row::Application { .. } => return Some((row, size)),
+        Row::Jig(Record::People(jig_domain_people::Stored::EndedRead { task, .. })) => *task,
+        Row::Jig(_) | Row::Application { .. } => return Some((row, None, size)),
     };
     let key = Key::Tasks(tasks::Key::Ended(task));
     let mut above = Queue::with_capacity(skein_kv::MAX_OUT.above);
@@ -105,7 +108,12 @@ fn decode(store: &mut Store, row: skein_kv::Row) -> Option<(Row, u64)> {
     if record.key() != key {
         return None;
     }
-    Some((Row::Jig(record), u64::try_from(value.len()).ok()?))
+    let owner_size = u64::try_from(value.len()).ok()?;
+    if let Row::Jig(Record::People(jig_domain_people::Stored::EndedRead { .. })) = row {
+        Some((row, Some(Row::Jig(record)), size.checked_add(owner_size)?))
+    } else {
+        Some((Row::Jig(record), None, owner_size))
+    }
 }
 
 fn people_interval(range: &Restore) -> Option<u32> {

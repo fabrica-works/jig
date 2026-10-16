@@ -191,6 +191,7 @@ fn joined(
             ancestors: Box::new([]),
             related: None,
             unjoined: None,
+            ended_read: None,
             linked: Box::new([]),
             inbox: None,
         };
@@ -217,7 +218,23 @@ fn joined(
         };
         inbox = Some(documents::Cursor::Inbox { task: number, object, at });
     }
+    let ended_read = if owner.flags.conversation
+        && let tasks::Phase::Ended(_) = owner.phase
+    {
+        match joins::get(
+            store,
+            &core::Key::People(jig_domain_people::Key::EndedRead { task: owner.number, party: range.party }),
+            spent,
+        )? {
+            Some(core::Record::People(jig_domain_people::Stored::EndedRead { through, .. })) => Some(through),
+            Some(_) => return Err(Failure::Corrupt),
+            None => None,
+        }
+    } else {
+        None
+    };
     let mut row = joins::row(store, value, Some(&owner), related, spent)?;
+    row.ended_read = ended_read;
     row.inbox = inbox;
     if let Some((_group, reads::Filter { goal: Some(goal), .. })) = selection
         && number != goal

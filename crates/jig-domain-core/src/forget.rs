@@ -92,15 +92,8 @@ pub(crate) fn forget(
     owner: &Owner,
 ) -> crate::Requests {
     let mut out = Queue::with_capacity(8);
-    let reading = Reading {
-        results: core.people.results_seen(owner.party).unwrap_or(0),
-        turns: core.people.chat_seen(owner.party, owner.task),
-        named: core.tasks.stub(owner.task).is_some(),
-    };
-    if core.people.ready()
-        && owner.result_position <= core.counters.deployment().messages
-        && let Some(party) = forgets(owner, reading)
-    {
+    if core.people.ready() && owner.result_position <= core.counters.deployment().messages {
+        let party = owner.party;
         work.push(crate::Event::People(people::Event::Forget {
             project: owner.project,
             task: owner.task,

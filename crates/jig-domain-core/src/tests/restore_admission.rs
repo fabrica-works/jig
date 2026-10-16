@@ -1,5 +1,7 @@
 //! Restoration precedes deployment allocation and transient admission
 //! (`domain/engine.md`, 5 and 6; `client/domain/contract.md`, 3.1 and 4).
+const PARTY: u64 = 1;
+const OTHER_TASK: u64 = 3;
 use super::*;
 
 const UTF8_IDENTITY_WORDS: (&[u8], &[u8]) = (b"~\0\x01", b"\0^!");
@@ -320,9 +322,9 @@ fn an_ended_chat_handed_twice_to_the_census_changes_nothing() {
     let (mut core, env) = census_fixture();
     let _census = core.census(&env.limits);
     let chat = ended_census_chat();
-    assert!(core.restore_inbox_row(&env.limits, &chat));
+    assert!(core.restore_inbox_row(&env.limits, &Record::Tasks(chat.clone())));
     let before = core.people.counts(&env.limits.people, 1).expect("party counts");
-    assert!(core.restore_inbox_row(&env.limits, &chat));
+    assert!(core.restore_inbox_row(&env.limits, &Record::Tasks(chat.clone())));
     assert_eq!(core.people.counts(&env.limits.people, 1), Some(before));
     assert_eq!(core.people.cached_results(1).expect("party results").len(), 1);
     let _next = core.restart_done(RestartStep::LoadInbox);
@@ -353,4 +355,15 @@ fn restore_census_people(core: &mut Core, env: &Env<Limits>) {
     }
     people::step(&mut core.people, &people_env, people::Event::Restored, &mut out);
     assert!(out.is_empty());
+}
+
+#[test]
+fn a_census_position_followed_by_another_task_is_refused() {
+    let (mut core, env) = census_fixture();
+    let _census = core.census(&env.limits);
+    assert!(core.restore_inbox_row(
+        &env.limits,
+        &Record::People(people::Stored::EndedRead { task: OTHER_TASK, party: PARTY, through: 0 })
+    ));
+    assert!(!core.restore_inbox_row(&env.limits, &Record::Tasks(ended_census_chat())));
 }

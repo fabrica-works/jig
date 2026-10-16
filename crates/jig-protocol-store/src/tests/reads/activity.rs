@@ -153,6 +153,7 @@ fn line_cost(value: core::Record) -> u64 {
         ancestors: Box::new([]),
         related: None,
         unjoined: None,
+        ended_read: None,
         linked: Box::new([]),
         inbox: None,
     }

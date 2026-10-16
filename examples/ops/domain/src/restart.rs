@@ -119,7 +119,7 @@ pub(crate) fn store(
         }
         Store::Restore(record) => {
             let valid = if domain.core.restart_step() == Some(core::RestartStep::LoadInbox) {
-                if let Record::Core(core::Record::Tasks(row)) = record {
+                if let Record::Core(row) = record {
                     domain.core.restore_inbox_row(&env.limits.core, &row)
                 } else {
                     false

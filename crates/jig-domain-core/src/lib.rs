@@ -30,6 +30,7 @@ mod escalation;
 pub mod waits;
 pub use effects::{EffectKey, EffectOrigin, EffectPurpose, effect_worst_case};
 mod chats;
+mod ended_marks;
 pub mod forget;
 mod funding;
 mod goal_of;
@@ -233,6 +234,8 @@ pub struct Core {
     pub(crate) stopping: bool,
     pub(crate) draining: Option<bool>,
     pub(crate) census_progress: Map<u64, inbox::Progress>,
+    pub(crate) census_position: Option<(u64, u64, u64)>,
+    pub(crate) ended_marks: Map<Token, ended_marks::Loaded>,
     pub(crate) archived_chats: Map<u64, inbox::ArchivedChat>,
     pub(crate) application_input: Option<(u16, Token)>,
     pub(crate) task_capacity_mark: u64,
@@ -532,6 +535,8 @@ impl Core {
             stopping: false,
             draining: None,
             census_progress: Map::with_capacity(limits.people.people),
+            census_position: None,
+            ended_marks: Map::with_capacity(limits.people.pending),
             archived_chats: Map::with_capacity(
                 limits
                     .people

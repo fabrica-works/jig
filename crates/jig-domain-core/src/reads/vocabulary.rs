@@ -200,6 +200,8 @@ pub struct Row {
     pub related: Option<Record>,
     /// A page turn whose bytes could not be carried (store.md, 7.3).
     pub unjoined: Option<UnjoinedTurn>,
+    /// The ended read position joined for this ended conversation's requester party.
+    pub ended_read: Option<u64>,
     /// Existing ancestor, dependency and ended-subtree rows requested by this query.
     pub linked: Box<[Box<tasks::TaskRecord>]>,
     /// The selected reference when an owner row has several waiting objects.

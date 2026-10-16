@@ -1,4 +1,5 @@
 //! A task's retention class decides what its reading erases (people.md, 6).
+const CHAT_MARK: u8 = 63;
 use jig_core_world::{
     effects::World,
     stories::reads::{forgettable_world, request, world},
@@ -83,4 +84,52 @@ fn a_results_mark_forgets_in_the_commit_that_moves_its_position() {
     assert!(erases[0].contains(&root::Write::Save(root::Record::Core(core::Record::People(
         people::Stored::ReadResults { party: PARTY, through },
     )))));
+}
+
+#[test]
+fn a_conversation_read_before_a_restart_is_forgotten_by_its_results_mark() {
+    let mut world = forgettable_world(837);
+    let (task, through) = finish(&mut world);
+    request(&mut world, MARK_TURNS, people::Ask::MarkSeen { seen: people::Seen::Chat { task, through: 1 } });
+    world.restart(837, false);
+    request(&mut world, MARK_RESULTS, people::Ask::MarkSeen { seen: people::Seen::Results { through } });
+    assert!(!world.store.rows.contains_key(&ended(task)));
+    assert!(
+        !world
+            .store
+            .rows
+            .contains_key(&root::Key::Core(core::Key::People(people::Key::EndedRead { task, party: PARTY })))
+    );
+}
+#[test]
+fn a_results_mark_while_a_chat_mark_loads_is_busy() {
+    let mut world = forgettable_world(838);
+    let (task, through) = finish(&mut world);
+    request(&mut world, MARK_TURNS, people::Ask::MarkSeen { seen: people::Seen::Chat { task, through: 1 } });
+    world.store_delay = 3;
+    let chat = jig_core_world::stories::reads::request_event(
+        &world,
+        CHAT_MARK,
+        people::Ask::MarkSeen { seen: people::Seen::Chat { task, through: 1 } },
+    );
+    let results = jig_core_world::stories::reads::request_event(
+        &world,
+        MARK_RESULTS,
+        people::Ask::MarkSeen { seen: people::Seen::Results { through } },
+    );
+    world.send_all(vec![chat, results]);
+    assert!(
+        world.people_answers.contains(&people::Reply::Again(people::Again::Busy)),
+        "answers: {:?}; rejected inputs: {:?}",
+        world.people_answers,
+        world.busy_events
+    );
+    request(&mut world, MARK_RESULTS, people::Ask::MarkSeen { seen: people::Seen::Results { through } });
+    assert!(!world.store.rows.contains_key(&ended(task)));
+    assert!(
+        !world
+            .store
+            .rows
+            .contains_key(&root::Key::Core(core::Key::People(people::Key::EndedRead { task, party: PARTY })))
+    );
 }

@@ -736,6 +736,8 @@ pub(super) fn tag_tasks(
                                             .then_some(people::Forgettable {
                                                 label: task.label,
                                                 listed: task.flags.listed,
+                                                turns_read: core.people.chat_seen(person, task.number).unwrap_or(0)
+                                                    >= task.last_reply,
                                                 last_reply: task.flags.conversation.then_some(task.last_reply),
                                             }),
                                     },
@@ -795,6 +797,10 @@ pub(super) fn tag_tasks(
                 };
                 crate::indexes::save(core, &record, &mut out);
                 if let tasks::Stored::Live(task) | tasks::Stored::Ended(task) = &record {
+                    let seen = match core.conversation_requester(task) {
+                        Some(party) => core.people.chat_seen(party, task.number),
+                        None => None,
+                    };
                     if let Some(party) = core.conversation_requester(task) {
                         let live = match &record {
                             tasks::Stored::Live(_) => true,
@@ -828,13 +834,14 @@ pub(super) fn tag_tasks(
                                 task: task.number,
                                 last_reply: task.last_reply,
                                 live,
+                                seen: None,
                                 replies: crate::inbox::reply_refs(&env.limits, task, party),
                             },
                             &mut out,
                         );
                     }
                     if let tasks::Stored::Ended(_) = &record {
-                        core.cache_archived_chat(&env.limits, task);
+                        core.cache_archived_chat(&env.limits, task, seen);
                     }
                     match task.phase {
                         tasks::Phase::Ended(_) => {

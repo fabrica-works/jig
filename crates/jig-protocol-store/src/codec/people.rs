@@ -122,6 +122,10 @@ pub fn encode(row: &domain::Stored, limits: &wire::Limits) -> Result<Box<[u8]>, 
             limits,
             wire::StoredReadChatParts { party: *party, task: *task, through: *through },
         )?),
+        domain::Stored::EndedRead { task, party, through } => wire::Value::EndedRead(wire::EndedRead::new(
+            limits,
+            wire::EndedReadParts { task: *task, party: *party, through: *through },
+        )?),
         domain::Stored::SignIn { number, person, expires } => wire::Value::SignIn(wire::StoredSignIn::new(
             limits,
             wire::StoredSignInParts { number: *number, person: *person, expires: expires.as_nanos() },
@@ -163,6 +167,10 @@ pub fn decode(bytes: &[u8], limits: &wire::Limits) -> Result<domain::Stored, wir
         wire::Value::ReadChat(value) => {
             let wire::StoredReadChatParts { party, task, through } = value.into_parts();
             domain::Stored::ReadChat { party, task, through }
+        }
+        wire::Value::EndedRead(value) => {
+            let wire::EndedReadParts { task, party, through } = value.into_parts();
+            domain::Stored::EndedRead { task, party, through }
         }
         wire::Value::SignIn(value) => {
             let wire::StoredSignInParts { number, person, expires } = value.into_parts();

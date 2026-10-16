@@ -323,6 +323,7 @@ impl World {
                     }
                     root::Request::Now(
                         now @ (core::Now::SeenChat { .. }
+                        | core::Now::LoadEndedRead { .. }
                         | core::Now::HistoricalPersonTask { .. }
                         | core::Now::PartyInputs { .. }
                         | core::Now::HistoricalProposal { .. }
@@ -609,8 +610,14 @@ impl World {
     }
 
     pub fn end(&mut self, end: tasks::End, cumulative: u64) {
+        let event = self.end_event(end, cumulative);
+        self.send(event);
+    }
+
+    #[must_use]
+    pub fn end_event(&self, end: tasks::End, cumulative: u64) -> root::Event {
         let assignment = self.assigned.as_ref().expect("assigned chat");
-        self.send(root::Event::Answer {
+        root::Event::Answer {
             read: self.last_read,
             refused: Box::new([]),
             channel: Token::new(7),
@@ -618,7 +625,7 @@ impl World {
             attempt: assignment.attempt,
             cumulative,
             end,
-        });
+        }
     }
 
     pub fn host_call(&mut self, name: &[u8], tool: &[u8], input: &[u8], writes: bool) -> Token {

@@ -90,6 +90,7 @@ pub(super) fn route_core(
                 | core::Held::Refuse { .. }
                 | core::Held::TurnBusy { .. }
                 | core::Held::StopRun { .. }
+                | core::Held::Load(..)
                 | core::Held::NotesLoad { .. }
                 | core::Held::NotesWritten { .. }
                 | core::Held::NotesDeleted { .. }) => hold(decision, crate::link::down(domain, Delivery::Core(other))),
@@ -523,6 +524,7 @@ fn route_now(
         }
 
         other @ (core::Now::SeenChat { .. }
+        | core::Now::LoadEndedRead { .. }
         | core::Now::HistoricalPersonTask { .. }
         | core::Now::PartyInputs { .. }
         | core::Now::HistoricalProposal { .. }

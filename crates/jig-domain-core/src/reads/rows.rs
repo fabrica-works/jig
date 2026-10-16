@@ -1212,11 +1212,11 @@ fn reply_update(
         tasks::Line::Turn { reply, .. } => {
             if core.conversation_requester(owner) != Some(party)
                 || *reply > owner.last_reply
-                || *reply <= core.people.chat_seen(party, owner.number).unwrap_or(0)
+                || *reply <= row.ended_read.unwrap_or(core.people.chat_seen(party, owner.number).unwrap_or(0))
             {
                 return Ok(None);
             }
-            (*reply, Some(Box::new(documents::conversation_from_row(core, limits, party, owner)?)))
+            (*reply, Some(Box::new(documents::conversation_from_row(core, limits, party, owner, row.ended_read)?)))
         }
         tasks::Line::Notified { recipient: tasks::Party::Person(recipient), word } if *recipient == party => {
             if word.number <= core.people.results_seen(party).unwrap_or(0) {

@@ -68,6 +68,7 @@ fn joined_row(
         ancestors: ancestors.into(),
         related,
         unjoined: None,
+        ended_read: None,
         linked: linked.into_values().collect(),
         inbox: None,
     }
@@ -124,6 +125,7 @@ fn candidate(store: &Store, range: &reads::Range, value: &core::Record) -> Optio
                     ancestors: Box::new([]),
                     related: None,
                     unjoined: None,
+                    ended_read: None,
                     linked: Box::new([]),
                     inbox: None,
                 });
@@ -153,6 +155,7 @@ fn candidate(store: &Store, range: &reads::Range, value: &core::Record) -> Optio
                 ancestors: Box::new([]),
                 related: None,
                 unjoined: None,
+                ended_read: None,
                 linked: Box::new([]),
                 inbox: None,
             })

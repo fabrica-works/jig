@@ -47,7 +47,9 @@ impl World {
                 Up::Restore(row) => {
                     let (step, count) = self.restoring.as_mut().expect("one restart flight");
                     *count += 1;
-                    if *step == core::RestartStep::LoadInbox {
+                    if *step == core::RestartStep::LoadInbox
+                        && let root::Record::Core(core::Record::Tasks(jig_domain_tasks::Stored::Ended(_))) = row
+                    {
                         self.census_ended += 1;
                     }
                     if self.tracing && *count % 2 == 0 {

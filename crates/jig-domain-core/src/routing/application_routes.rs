@@ -191,6 +191,7 @@ impl Core {
             },
             people::Stored::Person { .. }
             | people::Stored::ReadResults { .. }
+            | people::Stored::EndedRead { .. }
             | people::Stored::ReadChat { .. }
             | people::Stored::SignIn { .. }
             | people::Stored::Roles { .. }

@@ -1,3 +1,8 @@
+const FIRST_GOAL: u8 = 151;
+const CHAT: u8 = 152;
+const TURN: u32 = 1;
+const BEFORE: u64 = 153;
+const AFTER: u64 = 154;
 use jig_core_world::effects::World;
 use jig_domain_core as core;
 use jig_domain_fleet as fleet;
@@ -636,4 +641,25 @@ fn a_generation_renewed_before_a_waiting_chat_is_placed_reaches_its_host() {
     assert_eq!(world.assigned.as_ref().expect("resumed assignment").grants[0].generation, 1);
     assert_eq!(received(&world).generation, 2);
     assert!(world.grant_follows_assignment());
+}
+
+#[test]
+fn a_restart_keeps_an_unread_goal_older_than_an_unread_chat() {
+    let mut world = census_world(839);
+    finish_census_task(&mut world, 0);
+    let goal = census_goal(&mut world, FIRST_GOAL);
+    jig_core_world::stories::reads::request(
+        &mut world,
+        CHAT,
+        jig_domain_people::Ask::StartChat { project: 1, words: b"newer chat".as_slice().into() },
+    );
+    let chat = world.assigned.as_ref().expect("chat").task;
+    world.turn(TURN, 1, None, b"reply");
+    finish_census_task(&mut world, 1);
+    let updates = census_updates(&mut world, BEFORE);
+    world.restart(839, false);
+    let results = census_unread_results(&mut world);
+    assert!(results.contains(&goal));
+    assert_eq!(results[0], chat);
+    assert_eq!(census_updates(&mut world, AFTER), updates);
 }

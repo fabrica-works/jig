@@ -358,6 +358,7 @@ fn saved_answer(rows: &[Request]) -> Stored {
                 Stored::Answer { .. } => Some(record.clone()),
                 Stored::Person { .. }
                 | Stored::ReadResults { .. }
+                | Stored::EndedRead { .. }
                 | Stored::ReadChat { .. }
                 | Stored::SignIn { .. }
                 | Stored::Roles { .. }
@@ -930,6 +931,7 @@ fn is_answer(request: &Request) -> bool {
             Stored::Answer { .. } => true,
             Stored::Person { .. }
             | Stored::ReadResults { .. }
+            | Stored::EndedRead { .. }
             | Stored::ReadChat { .. }
             | Stored::SignIn { .. }
             | Stored::Roles { .. }
@@ -951,6 +953,7 @@ fn is_roles(request: &Request) -> bool {
             Stored::Roles { .. } => true,
             Stored::Person { .. }
             | Stored::ReadResults { .. }
+            | Stored::EndedRead { .. }
             | Stored::ReadChat { .. }
             | Stored::SignIn { .. }
             | Stored::Answer { .. }
@@ -1525,7 +1528,15 @@ fn inbox_counts_follow_current_project_roles_without_losing_archived_census() {
     for project in [1, 2] {
         test.send(Event::Roles { project, holdings: Box::new([Holding { person: 1, role: Role::Member }]) });
     }
-    test.send(Event::ChatState { party: 1, project: 2, task: 9, last_reply: 3, live: false, replies: Box::new([]) });
+    test.send(Event::ChatState {
+        party: 1,
+        project: 2,
+        task: 9,
+        last_reply: 3,
+        live: false,
+        seen: None,
+        replies: Box::new([]),
+    });
     test.d.remember_result(
         &LIMITS,
         1,
@@ -1598,3 +1609,5 @@ mod create;
 
 mod application_scope;
 mod fixtures;
+
+mod ended;

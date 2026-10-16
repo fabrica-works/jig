@@ -14,15 +14,20 @@ pub struct Census {
 impl Census {
     #[must_use]
     pub fn admits(&self, key: &Key) -> bool {
+        self.interval(key).is_some()
+    }
+    /// The admitted key's place in the ordered census walk.
+    #[must_use]
+    pub fn interval(&self, key: &Key) -> Option<u32> {
         match key {
-            Key::Tasks(tasks::Key::ConversationOldest { .. }) => true,
+            Key::People(jig_domain_people::Key::EndedRead { .. }) => Some(0),
             Key::Tasks(tasks::Key::Result { party, position }) => {
-                for read in &self.results {
+                for (index, read) in self.results.iter().enumerate() {
                     if read.party == *party && *position > read.after {
-                        return true;
+                        return u32::try_from(index).ok()?.checked_add(1);
                     }
                 }
-                false
+                None
             }
             Key::Tasks(
                 tasks::Key::Live(_)
@@ -38,6 +43,7 @@ impl Census {
                 | tasks::Key::Milestone { .. }
                 | tasks::Key::Activity { .. }
                 | tasks::Key::Update { .. }
+                | tasks::Key::ConversationOldest { .. }
                 | tasks::Key::ConversationNewest { .. }
                 | tasks::Key::Goal { .. }
                 | tasks::Key::EndedByParty { .. }
@@ -46,8 +52,16 @@ impl Census {
                 | tasks::Key::Delegate { .. },
             )
             | Key::Core(_)
-            | Key::People(_)
-            | Key::Notes(_) => false,
+            | Key::People(
+                jig_domain_people::Key::Person(_)
+                | jig_domain_people::Key::ReadChat { .. }
+                | jig_domain_people::Key::ReadResults { .. }
+                | jig_domain_people::Key::SignIn(_)
+                | jig_domain_people::Key::Roles(_)
+                | jig_domain_people::Key::Policy(_)
+                | jig_domain_people::Key::Answer(_),
+            )
+            | Key::Notes(_) => None,
         }
     }
 }

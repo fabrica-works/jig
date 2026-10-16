@@ -129,6 +129,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
             )?)?;
     let mut total = crate::inbox::worst_case(limits)?
         .checked_add(crate::inbox::census_worst_case(limits)?)?
+        .checked_add(Map::<skein_lib::Token, crate::ended_marks::Loaded>::worst_case(limits.people.pending)?)?
         .checked_add(crate::effect_worst_case(limits)?)?
         .checked_add(crate::conversation_worst_case(limits)?)?
         .checked_add(crate::reads::worst_case(limits)?)?

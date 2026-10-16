@@ -56,6 +56,7 @@ fn an_owner_of_a_cached_result_is_the_owner_of_its_record() {
         forgettable: Some(jig_domain_people::Forgettable {
             label: row.label,
             listed: row.flags.listed,
+            turns_read: true,
             last_reply: Some(row.last_reply),
         }),
     };

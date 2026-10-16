@@ -65,9 +65,12 @@ pub use batch::{
     Budget, Contract, Dependency, FieldRule, Flags, Given, Member, Retention, TaskExecutor, Verdict, member_bytes,
 };
 mod boundary;
+mod results;
+pub use results::{Forgettable, ReplyRef, ResultRef, Update};
 mod capacity;
 mod decisions;
 mod domain;
+pub use domain::EndedMark;
 mod facts;
 mod limits;
 mod policy_value;
@@ -80,10 +83,10 @@ pub use amendment::{
     ResourceScope, ResultsWake, Spec, Tracking, WakePolicy, WakeRule, amendment_bytes, authority_bytes,
 };
 pub use boundary::{
-    Adoption, Ask, Counts, Disposal, Entry, EntryKind, EscalationChoice, EscalationDecision, Event, Forgettable,
-    GoalExecutor, Holding, Identity, IdentityKey, InitialOwner, Keep, Key, Kind, Needs, NoteChange, NoteScope, Outcome,
-    PersonResult, ProjectRole, ProposalChoice, ProposalDecision, Proposer, Reply, ReplyRef, Request, RequestKey,
-    ResourceName, ResourceRole, ResultRef, Role, Seed, Seen, Stored, Update, Whom,
+    Adoption, Ask, Counts, Disposal, Entry, EntryKind, EscalationChoice, EscalationDecision, Event, GoalExecutor,
+    Holding, Identity, IdentityKey, InitialOwner, Keep, Key, Kind, Needs, NoteChange, NoteScope, Outcome, PersonResult,
+    ProjectRole, ProposalChoice, ProposalDecision, Proposer, Reply, Request, RequestKey, ResourceName, ResourceRole,
+    Role, Seed, Seen, Stored, Whom,
 };
 pub use capacity::{CapacityAction, CapacityCause, CapacityRefusal};
 pub use decisions::{FailureClass, HoldReason, Moved};

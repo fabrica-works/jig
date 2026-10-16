@@ -200,7 +200,13 @@ pub(super) fn conversation_row(
     if !ended || core.tasks.task(owner.number).is_some() {
         return Ok(None);
     }
-    Ok(Some(super::PageRow::Conversation(documents::conversation_from_row(core, limits, range.party, owner)?)))
+    Ok(Some(super::PageRow::Conversation(documents::conversation_from_row(
+        core,
+        limits,
+        range.party,
+        owner,
+        row.ended_read,
+    )?)))
 }
 
 /// The goal index carries its full ended census; its owner is a point join.

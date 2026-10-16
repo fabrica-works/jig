@@ -389,11 +389,20 @@ fn matches_notice(kind: EntryKind) -> bool {
     }
 }
 
-fn chat_state(domain: &mut Domain, party: u64, project: u32, task: u64, last_reply: u64, live: bool) {
+struct State {
+    party: u64,
+    project: u32,
+    task: u64,
+    last_reply: u64,
+    live: bool,
+    seen: Option<u64>,
+}
+fn chat_state(domain: &mut Domain, state: State) {
+    let State { party, project, task, last_reply, live, seen } = state;
     if !domain.ready() || !domain.people.contains_key(&party) || !domain.has_project(project) {
         return;
     }
-    let seen = *domain.chats_seen.get(&(party, task)).unwrap_or(&0);
+    let seen = seen.unwrap_or(*domain.chats_seen.get(&(party, task)).unwrap_or(&0));
     let old = match domain.chat_totals.get(&task) {
         Some(old) => {
             assert!(
@@ -706,15 +715,21 @@ pub(super) fn chat_state_event(
     task: u64,
     last_reply: u64,
     live: bool,
+    seen: Option<u64>,
     replies: Box<[ReplyRef]>,
+    out: &mut Queue<Request>,
 ) {
-    chat_state(domain, party, project, task, last_reply, live);
+    let through = seen.unwrap_or(*domain.chats_seen.get(&(party, task)).unwrap_or(&0));
+    chat_state(domain, State { party, project, task, last_reply, live, seen });
     assert!(
         replies.len() <= usize::try_from(env.limits.inbox_recipients).expect("reply projection bound"),
         "bounded owner hints"
     );
     for reply in replies {
         cache_update(domain, &env.limits, party, Update::ChatReply(reply));
+    }
+    if !live {
+        super::ended::ended_state(domain, party, task, through, seen.is_none(), out);
     }
 }
 
@@ -724,26 +739,14 @@ pub(super) fn forget_event(
     task: u64,
     project: u32,
     party: Option<u64>,
-    last_reply: u64,
+    _last_reply: u64,
     out: &mut Queue<Request>,
 ) {
     if let Some(party) = party
         && domain.people.contains_key(&party)
         && domain.has_project(project)
     {
-        let _old = domain.chat_totals.remove(&task);
-        let unread = last_reply.saturating_sub(*domain.chats_seen.get(&(party, task)).unwrap_or(&0));
-        let count = *domain.chat_updates.get(&(party, project)).unwrap_or(&0);
-        assert!(
-            domain
-                .chat_updates
-                .insert(
-                    (party, project),
-                    count.checked_sub(u128::from(unread)).expect("forgotten archive counted until this decision")
-                )
-                .is_ok(),
-            "known party census"
-        );
+        out.push(Request::Erase { key: Key::EndedRead { task, party } });
     }
     forget_chat(domain, &env.limits, task, out);
 }

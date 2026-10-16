@@ -1,3 +1,8 @@
+const SIGN_IN: u64 = 10;
+const CREATE: u8 = 31;
+const FIRST_MARK: u8 = 32;
+const SECOND_MARK: u8 = 33;
+const LAST_REPLY: u64 = 2;
 use jig_domain_people::{
     Again, Ask, Entry, EntryKind, Holding, IdentityKey, InitialOwner, Outcome, ProposalChoice, ProposalDecision,
     Proposer, Refusal, Reply, Role, Seed, Whom,
@@ -739,4 +744,43 @@ fn unread_updates_past_the_limit_are_said_as_more() {
     world.commit_all();
     assert_eq!(world.counts(person), jig_domain_people::Counts { needs: 0, unread: limit, more_unread: false });
     world.assert_settled();
+}
+
+#[test]
+fn a_conversations_read_position_moves_to_the_ended_family_and_reads_back_after_a_restart() {
+    let mut world = World::new(Settings::calm(840));
+    let person = member(&mut world);
+    let call = world.ask(SIGN_IN, [CREATE; 16], b"hello");
+    world.commit_all();
+    let Some(Reply::Outcome(Outcome::Started { task })) = world.reply(call) else { panic!("chat made") };
+    world.waiting(
+        task,
+        Box::new([Entry {
+            task,
+            project: 1,
+            whom: Whom::Person(person),
+            kind: EntryKind::ChatReply { message: LAST_REPLY },
+            at: skein_lib::Wall::EPOCH,
+        }]),
+    );
+    let first = world.request(
+        SIGN_IN,
+        [FIRST_MARK; 16],
+        Ask::MarkSeen { seen: jig_domain_people::Seen::Chat { task, through: 1 } },
+    );
+    world.commit_all();
+    assert!(world.reply(first).is_some());
+    world.end_conversation(person, task, LAST_REPLY);
+    world.commit_all();
+    world.restart();
+    assert_eq!(world.chat_seen(person, task), 0);
+    let seen = jig_domain_people::Seen::Chat { task, through: LAST_REPLY };
+    let second = world.request(SIGN_IN, [SECOND_MARK; 16], Ask::MarkSeen { seen });
+    world.commit_all();
+    assert_eq!(world.reply(second), Some(Reply::Outcome(Outcome::MarkedSeen { seen })));
+    assert_eq!(
+        world.records().get(&jig_domain_people::Key::EndedRead { task, party: person }),
+        Some(&jig_domain_people::Stored::EndedRead { task, party: person, through: LAST_REPLY })
+    );
+    assert!(!world.records().contains_key(&jig_domain_people::Key::ReadChat { task, party: person }));
 }

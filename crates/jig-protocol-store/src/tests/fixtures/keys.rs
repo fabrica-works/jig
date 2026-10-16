@@ -57,13 +57,14 @@ pub fn core_key(rng: &mut Rng) -> CoreKey {
     }
 }
 pub fn people_key(rng: &mut Rng) -> people::Key {
-    match rng.below(7) {
+    match rng.below(8) {
         0 => people::Key::Person(number(rng)),
         1 => people::Key::ReadResults { party: number(rng) },
         2 => people::Key::ReadChat { party: number(rng), task: number(rng) },
         3 => people::Key::SignIn(number(rng)),
         4 => people::Key::Roles(narrow(rng)),
         5 => people::Key::Policy(narrow(rng)),
+        7 => people::Key::EndedRead { task: number(rng), party: number(rng) },
         _ => {
             let mut key = [0; 16];
             for byte in &mut key {

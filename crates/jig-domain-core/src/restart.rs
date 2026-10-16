@@ -168,6 +168,9 @@ impl Core {
                 RestartStep::LoadInbox
             }
             RestartStep::LoadInbox => {
+                if self.census_position.is_some() {
+                    return self.restart_refuse();
+                }
                 self.census_progress = skein_lib::Map::with_capacity(self.census_progress.capacity());
                 match self.connectors.first() {
                     Some(&connector) => RestartStep::RestoreConnector { connector },

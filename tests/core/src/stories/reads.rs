@@ -111,12 +111,18 @@ fn read_world(seed: u64, reply_bound: Option<u32>, rows: u32, initial: Option<pe
 }
 
 pub fn request(world: &mut World, number: u8, ask: people::Ask) {
-    world.send(root::Event::Core(core::Event::People(people::Event::Ask {
+    let event = request_event(world, number, ask);
+    world.send(event);
+}
+
+#[must_use]
+pub fn request_event(world: &World, number: u8, ask: people::Ask) -> root::Event {
+    root::Event::Core(core::Event::People(people::Event::Ask {
         reply_to: ReplyTo::new(Token::new(30_000 + u64::from(number))),
         sign_in: world.sign_in.expect("signed in"),
         key: [number; 16],
         ask,
-    })));
+    }))
 }
 
 #[must_use]

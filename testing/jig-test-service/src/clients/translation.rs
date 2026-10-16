@@ -34,6 +34,7 @@ pub(crate) fn to_component(held: core::Held) -> Option<kit::Event> {
         | core::Held::Refuse { .. }
         | core::Held::TurnBusy { .. }
         | core::Held::StopRun { .. }
+        | core::Held::Load(..)
         | core::Held::NotesLoad { .. }
         | core::Held::NotesWritten { .. }
         | core::Held::NotesDeleted { .. } => None,
@@ -74,6 +75,7 @@ pub(crate) fn immediate(now: core::Now, admission: &mut Option<Token>) -> Option
         | core::Now::PrepareAgent { .. }
         | core::Now::StartPreparation { .. }
         | core::Now::SeenChat { .. }
+        | core::Now::LoadEndedRead { .. }
         | core::Now::HistoricalProposal { .. }
         | core::Now::HistoricalPersonTask { .. }
         | core::Now::PartyInputs { .. }
@@ -160,6 +162,7 @@ pub(crate) fn watcher(value: &core::Event) -> Option<Token> {
         | core::Event::Activate { .. }
         | core::Event::PreparedAgent { .. }
         | core::Event::Forget { .. }
+        | core::Event::EndedReadLoaded { .. }
         | core::Event::SeenChatLoaded { .. }
         | core::Event::HistoricalProposal { .. }
         | core::Event::HistoricalPersonTask { .. }
@@ -234,6 +237,7 @@ pub(crate) fn starting(value: core::Event) -> Option<kit::Event> {
         | core::Event::Activate { .. }
         | core::Event::PreparedAgent { .. }
         | core::Event::Forget { .. }
+        | core::Event::EndedReadLoaded { .. }
         | core::Event::SeenChatLoaded { .. }
         | core::Event::HistoricalProposal { .. }
         | core::Event::HistoricalPersonTask { .. }

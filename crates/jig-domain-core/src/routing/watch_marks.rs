@@ -253,6 +253,7 @@ pub(super) fn touch_people_row(core: &mut Core, row: &people::Stored) {
     match row {
         people::Stored::Person { number, .. }
         | people::Stored::ReadResults { party: number, .. }
+        | people::Stored::EndedRead { party: number, .. }
         | people::Stored::ReadChat { party: number, .. } => {
             core.touch_party(*number);
         }

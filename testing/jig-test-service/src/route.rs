@@ -153,6 +153,7 @@ pub(super) fn system(engine: &mut Engine, number: u16) -> &mut crate::system::Sy
 fn immediate(engine: &mut Engine, now: core::Now) {
     match now {
         value @ (core::Now::SeenChat { .. }
+        | core::Now::LoadEndedRead { .. }
         | core::Now::HistoricalPersonTask { .. }
         | core::Now::PartyInputs { .. }
         | core::Now::HistoricalProposal { .. }
@@ -210,6 +211,7 @@ fn immediate(engine: &mut Engine, now: core::Now) {
 fn core_held(engine: &mut Engine, held: core::Held) {
     match held {
         core::Held::Drained => stop::drained(engine),
+        core::Held::Load(load) => immediate(engine, *load),
         core::Held::ReadLoad { load, range } => {
             crate::store::request(engine, jig_test_store::StoreOut::ReadLoad { load, range });
         }

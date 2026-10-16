@@ -687,6 +687,7 @@ impl Joint {
                 | core::Held::Refuse { .. }
                 | core::Held::TurnBusy { .. }
                 | core::Held::StopRun { .. }
+                | core::Held::Load(..)
                 | core::Held::NotesLoad { .. }
                 | core::Held::NotesWritten { .. }
                 | core::Held::NotesDeleted { .. },
@@ -714,6 +715,7 @@ impl Joint {
                 | core::Now::PrepareAgent { .. }
                 | core::Now::StartPreparation { .. }
                 | core::Now::SeenChat { .. }
+                | core::Now::LoadEndedRead { .. }
                 | core::Now::HistoricalProposal { .. }
                 | core::Now::HistoricalPersonTask { .. }
                 | core::Now::PartyInputs { .. }

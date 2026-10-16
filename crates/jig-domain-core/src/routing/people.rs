@@ -134,6 +134,7 @@ pub(super) fn tag_people(
                     people::Key::Answer(_) => core.touch_deployment(),
                     people::Key::Person(_)
                     | people::Key::ReadResults { .. }
+                    | people::Key::EndedRead { .. }
                     | people::Key::ReadChat { .. }
                     | people::Key::SignIn(_)
                     | people::Key::Roles(_)
@@ -271,6 +272,19 @@ pub(super) fn tag_people(
                     ),
                     people::Ask::MarkSeen { seen } => match seen {
                         people::Seen::Results { through } => {
+                            let mut loading = false;
+                            for result in core.people.cached_results(person).unwrap_or(&[]) {
+                                loading |= result.position <= through
+                                    && result.forgettable.is_some()
+                                    && core.people.chat_mark_loading(result.task, request);
+                            }
+                            if loading {
+                                work.push(Event::People(people::Event::Decided {
+                                    request,
+                                    outcome: people::Outcome::Again(people::Again::Busy),
+                                }));
+                                continue;
+                            }
                             work.push(Event::People(people::Event::Decided {
                                 request,
                                 outcome: people::Outcome::MarkedSeen { seen },
@@ -280,9 +294,31 @@ pub(super) fn tag_people(
                                     && core.tasks.task(result.task).is_none()
                                     && let Some(owner) = crate::forget::Owner::of_result(person, result)
                                 {
-                                    work.push(Event::Forget { owner });
+                                    let turns = if result.forgettable.expect("forgettable owner").turns_read {
+                                        owner.last_reply
+                                    } else {
+                                        None
+                                    };
+                                    if crate::forget::forgets(
+                                        &owner,
+                                        crate::forget::Reading {
+                                            results: through,
+                                            turns,
+                                            named: core.tasks.stub(owner.task).is_some(),
+                                        },
+                                    )
+                                    .is_some()
+                                    {
+                                        work.push(Event::Forget { owner });
+                                    }
                                 }
                             }
+                        }
+                        people::Seen::Chat { task, .. } if core.people.chat_mark_loading(task, request) => {
+                            work.push(Event::People(people::Event::Decided {
+                                request,
+                                outcome: people::Outcome::Again(people::Again::Busy),
+                            }));
                         }
                         people::Seen::Chat { task, .. } => match core.tasks.task(task) {
                             Some(row) => {
@@ -303,7 +339,12 @@ pub(super) fn tag_people(
                                     }));
                                 }
                             }
-                            None => out.push(Request::Now(Box::new(Now::SeenChat { request, task }))),
+                            None => {
+                                out.push(Request::Held(Box::new(Held::Load(Box::new(Now::SeenChat {
+                                    request,
+                                    task,
+                                })))));
+                            }
                         },
                     },
                     people::Ask::StartChat { words, .. } => begin_chat_creation(

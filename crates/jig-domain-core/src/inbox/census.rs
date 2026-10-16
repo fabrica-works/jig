@@ -34,6 +34,7 @@ impl Core {
                         task: row.number,
                         last_reply: row.last_reply,
                         live: true,
+                        seen: None,
                         replies: super::reply_refs(limits, row, party),
                     },
                     &mut out,
@@ -71,33 +72,27 @@ impl Core {
 
 impl Core {
     #[must_use]
-    pub fn restore_inbox_row(&mut self, limits: &Limits, record: &jig_domain_tasks::Stored) -> bool {
+    pub fn restore_inbox_row(&mut self, limits: &Limits, record: &crate::Record) -> bool {
         use jig_domain_tasks as tasks;
         if self.restart_step() != Some(crate::RestartStep::LoadInbox) || !self.people.ready() {
             return false;
         }
-        let row = match record {
-            tasks::Stored::Ended(row) => row,
-            tasks::Stored::Live(_)
-            | tasks::Stored::PersonProposal(_)
-            | tasks::Stored::Activity(_)
-            | tasks::Stored::History(_)
-            | tasks::Stored::Milestone(_)
-            | tasks::Stored::Stub(_)
-            | tasks::Stored::Ledger(_)
-            | tasks::Stored::ClosedLedger(_)
-            | tasks::Stored::DecidedProposal(_)
-            | tasks::Stored::Writer(_)
-            | tasks::Stored::Pool(_)
-            | tasks::Stored::Update(_)
-            | tasks::Stored::Result(_)
-            | tasks::Stored::ConversationNewest(_)
-            | tasks::Stored::Goal(_)
-            | tasks::Stored::EndedByParty(_)
-            | tasks::Stored::EndedByProject(_)
-            | tasks::Stored::EndedDelegate(_)
-            | tasks::Stored::Delegate(_)
-            | tasks::Stored::ConversationOldest(_) => return false,
+        if let crate::Record::People(people::Stored::EndedRead { task, party, through }) = record {
+            if self.census_position.is_some() {
+                return false;
+            }
+            self.census_position = Some((*task, *party, *through));
+            return true;
+        }
+        let crate::Record::Tasks(tasks::Stored::Ended(row)) = record else { return false };
+        let seen = match self.census_position.take() {
+            Some((task, party, through))
+                if task == row.number && row.requester == tasks::Party::Person(party) && row.flags.conversation =>
+            {
+                Some(through)
+            }
+            Some(_) => return false,
+            None => None,
         };
         if !super::matches_ended(&row.phase) || !super::valid_header(self, limits, row) {
             return false;
@@ -113,14 +108,9 @@ impl Core {
                 if row.result_position == 0 || row.result_position > self.counters.deployment().messages {
                     return false;
                 }
-                let after = self.people.results_seen(party).expect("known restored party");
                 let progress = self.census_progress.get_mut(&party).expect("party census initialised");
-                let mark = if row.result_position > after {
-                    &mut progress.unread_result
-                } else {
-                    &mut progress.read_conversation
-                };
-                let position = if row.result_position > after { row.result_position } else { row.number };
+                let mark = if seen.is_none() { &mut progress.unread_result } else { &mut progress.read_conversation };
+                let position = if seen.is_none() { row.result_position } else { row.number };
                 if position <= *mark {
                     return true;
                 }
@@ -137,12 +127,16 @@ impl Core {
                             people::Forgettable {
                                 label: row.label,
                                 listed: row.flags.listed,
+                                turns_read: match seen {
+                                    Some(through) => through >= row.last_reply,
+                                    None => false,
+                                },
                                 last_reply: row.flags.conversation.then_some(row.last_reply),
                             },
                         ),
                     },
                 );
-                if self.conversation_requester(row).is_some() {
+                if let Some(through) = seen {
                     people::step(
                         &mut self.people,
                         &env,
@@ -152,6 +146,7 @@ impl Core {
                             task: row.number,
                             last_reply: row.last_reply,
                             live: false,
+                            seen: Some(through),
                             replies: super::reply_refs(limits, row, party),
                         },
                         &mut out,
@@ -160,7 +155,9 @@ impl Core {
             }
             tasks::Party::Task(_) | tasks::Party::Deployment { .. } => {}
         }
-        self.cache_archived_chat(limits, row);
+        if seen.is_some() || !self.archived_chats.contains_key(&row.number) {
+            self.cache_archived_chat(limits, row, seen);
+        }
         out.is_empty()
     }
 }

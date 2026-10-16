@@ -173,7 +173,7 @@ fn inbox_reply(
         return Ok(None);
     }
     match core.tasks.task(task) {
-        Some(row) => Ok(Some(Box::new(conversation_from_row(core, limits, party, row)?))),
+        Some(row) => Ok(Some(Box::new(conversation_from_row(core, limits, party, row, None)?))),
         None => match archived_conversation(core, limits, party, task) {
             Some(line) => Ok(Some(Box::new(line))),
             None => Ok(None),
@@ -294,11 +294,12 @@ pub fn conversation_from_row(
     limits: &Limits,
     party: u64,
     row: &tasks::TaskRecord,
+    seen: Option<u64>,
 ) -> Result<ConversationLine, Missing> {
     if core.conversation_requester(row) != Some(party) || core.people.role(party, row.project).is_none() {
         return Err(Missing::NotAllowed);
     }
-    let seen = core.people.chat_seen(party, row.number).ok_or(Missing::Unknown)?;
+    let seen = seen.unwrap_or(core.people.chat_seen(party, row.number).ok_or(Missing::Unknown)?);
     let unread = row.last_reply.saturating_sub(seen);
     let count = u32::try_from(unread.min(u64::from(limits.people.inbox_entries))).expect("capped replies");
     Ok(ConversationLine {
@@ -344,7 +345,7 @@ pub(super) fn conversations(
             more = true;
             break;
         }
-        lines.push(conversation_from_row(core, limits, party, row)?).expect("bounded conversation rows");
+        lines.push(conversation_from_row(core, limits, party, row, None)?).expect("bounded conversation rows");
         next = Some(Cursor::Number { number: row.number });
     }
     Ok(Conversations { lines, next: if more { next } else { None } })

@@ -1,3 +1,5 @@
+#[path = "ended.rs"]
+mod ended;
 use crate::referee::{People, RouteKind, Seen, Stimulus};
 use jig_domain_people::{
     self as people, Again, Ask, Domain, Entry, Event, Holding, Identity, IdentityKey, InitialOwner, Key, Lack, Limits,
@@ -141,6 +143,7 @@ pub struct World {
     owners: Box<[InitialOwner]>,
     records: BTreeMap<Key, Stored>,
     durable_tasks: BTreeMap<RequestKey, u64>,
+    ended_chats: BTreeMap<u64, (u64, u64)>,
     proposals: BTreeMap<(people::Proposer, u64), Winner>,
     holds: BTreeMap<u64, (u64, people::HoldReason)>,
     pub sayings: BTreeMap<u64, (u64, Box<[u8]>, bool)>,
@@ -190,6 +193,7 @@ impl World {
             owners,
             records: BTreeMap::new(),
             durable_tasks: BTreeMap::new(),
+            ended_chats: BTreeMap::new(),
             proposals: BTreeMap::new(),
             holds: BTreeMap::new(),
             sayings: BTreeMap::new(),
@@ -358,6 +362,7 @@ impl World {
                 task,
                 last_reply: message,
                 live: true,
+                seen: None,
                 replies: Box::new([]),
             });
         }
@@ -426,6 +431,7 @@ impl World {
                 Stored::SignIn { .. }
                 | Stored::Person { .. }
                 | Stored::ReadResults { .. }
+                | Stored::EndedRead { .. }
                 | Stored::ReadChat { .. }
                 | Stored::Roles { .. }
                 | Stored::Answer { .. }
@@ -561,6 +567,12 @@ impl World {
                                 } else {
                                     Outcome::Refused(Refusal::Role { held: self.domain.role(person, 1) })
                                 };
+                                if allowed
+                                    && let people::Seen::Chat { task, .. } = seen
+                                    && self.mark_ended(request, person, task)
+                                {
+                                    continue;
+                                }
                                 people::step(
                                     &mut self.domain,
                                     &self.env,
@@ -931,10 +943,11 @@ impl World {
         self.deferred.clear();
         self.issued = self.durable;
         self.domain = Domain::new(&self.env.limits, self.owners.clone(), 1);
-        for record in self.records.values().cloned().collect::<Vec<_>>() {
+        for record in self.records.values().filter(|record| record.key().live()).cloned().collect::<Vec<_>>() {
             self.send(Event::Restore { record });
         }
         self.send(Event::Restored);
+        self.restore_ended();
         self.stats.restarts += 1;
     }
 

@@ -249,7 +249,7 @@ impl Continuation {
                                     parameters: Box::new([]),
                                     inputs: Box::new([]),
                                 }),
-                                ..crate::fixtures::person_unchanged(b"party evidence")
+                                ..jig_core_world::fixtures::person_unchanged(b"party evidence")
                             },
                         },
                     );

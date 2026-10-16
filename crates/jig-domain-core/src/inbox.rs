@@ -114,7 +114,7 @@ impl Core {
         }
     }
     /// Keep whole committed archive facts only while the shared recent prefix may deliver them.
-    pub(crate) fn cache_archived_chat(&mut self, limits: &Limits, row: &tasks::TaskRecord) {
+    pub(crate) fn cache_archived_chat(&mut self, limits: &Limits, row: &tasks::TaskRecord, seen: Option<u64>) {
         let party = match row.requester {
             tasks::Party::Person(party) => party,
             tasks::Party::Task(_) | tasks::Party::Deployment { .. } => return,
@@ -123,7 +123,10 @@ impl Core {
             return;
         }
         let line = if self.conversation_requester(row) == Some(party) && row.last_reply > 0 {
-            Some(crate::documents::conversation_from_row(self, limits, party, row).expect("authorized archive owner"))
+            Some(
+                crate::documents::conversation_from_row(self, limits, party, row, seen)
+                    .expect("authorized archive owner"),
+            )
         } else {
             None
         };
@@ -372,15 +375,27 @@ pub(crate) fn seen_chat_loaded(
                 outcome: people::Outcome::Refused(people::Refusal::Role { held: core.people.role(party, row.project) }),
             }
         } else {
-            work.push(crate::Event::People(people::Event::ChatSeen {
+            assert!(
+                core.ended_marks
+                    .insert(
+                        request,
+                        crate::ended_marks::Loaded {
+                            task,
+                            party,
+                            project: row.project,
+                            last_reply: row.last_reply,
+                            owner: crate::forget::Owner::of_row(&row),
+                        }
+                    )
+                    .is_ok(),
+                "one header per pending mark"
+            );
+            let mut out = skein_lib::Queue::with_capacity(2);
+            out.push(crate::Request::Held(Box::new(crate::Held::Load(Box::new(crate::Now::LoadEndedRead {
                 request,
-                project: row.project,
-                last_reply: row.last_reply,
-            }));
-            if let Some(owner) = crate::forget::Owner::of_row(&row) {
-                work.push(crate::Event::Forget { owner });
-            }
-            let mut out = skein_lib::Queue::with_capacity(1);
+                task,
+                party,
+            })))));
             out.push(crate::Request::Decided);
             return crate::Requests::Out(out);
         }

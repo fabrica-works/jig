@@ -425,7 +425,14 @@ impl Application for Ops {
                         .collect()
                 };
                 let rows = if matches!(range, root::Range::Census(_)) {
-                    rows.into_iter().filter_map(|row| census_owner(store, &row)).collect()
+                    let mut rows = rows;
+                    if let root::Range::Census(census) = &range {
+                        rows.sort_by_key(|row| match row.key() {
+                            root::Key::Core(key) => census.interval(&key),
+                            root::Key::Observability(_) | root::Key::Infrastructure(_) => None,
+                        });
+                    }
+                    rows.into_iter().flat_map(|row| census_owner(store, &row)).collect()
                 } else {
                     rows
                 };
@@ -1068,13 +1075,20 @@ impl Peers {
     }
 }
 
-fn census_owner(store: &Store, row: &root::Record) -> Option<root::Record> {
+fn census_owner(store: &Store, row: &root::Record) -> Vec<root::Record> {
     let task = match row {
         root::Record::Core(core::Record::Tasks(tasks::Stored::Result(row))) => row.task,
-        root::Record::Core(core::Record::Tasks(tasks::Stored::ConversationOldest(row))) => row.task,
-        root::Record::Core(_) | root::Record::Observability(_) | root::Record::Infrastructure(_) => return None,
+        root::Record::Core(core::Record::People(jig_domain_people::Stored::EndedRead { task, .. })) => *task,
+        root::Record::Core(_) | root::Record::Observability(_) | root::Record::Infrastructure(_) => return Vec::new(),
     };
-    store.rows.get(&root::Key::Core(core::Key::Tasks(tasks::Key::Ended(task)))).cloned()
+    let mut rows = Vec::new();
+    if let root::Record::Core(core::Record::People(jig_domain_people::Stored::EndedRead { .. })) = row {
+        rows.push(row.clone());
+    }
+    if let Some(owner) = store.rows.get(&root::Key::Core(core::Key::Tasks(tasks::Key::Ended(task)))) {
+        rows.push(owner.clone());
+    }
+    rows
 }
 
 mod funding;

@@ -11,7 +11,7 @@ use skein_lib::List;
 pub fn restore(range: &RestoreRange) -> Box<[Range]> {
     Box::new([match range {
         RestoreRange::Deployment => Range::prefix(&[keys::JIG, 0, 0]),
-        RestoreRange::People => Range::prefix(&[keys::JIG, 2]),
+        RestoreRange::People => Range { start: Box::new([keys::JIG, 2, 0]), end: Some(Box::new([keys::JIG, 2, 7])) },
         RestoreRange::Tasks => Range { start: Box::new([keys::JIG, 1, 0]), end: Some(Box::new([keys::JIG, 1, 6])) },
         RestoreRange::Core => Range { start: Box::new([keys::JIG, 0, 1]), end: Some(Box::new([keys::JIG, 0, 4])) },
         RestoreRange::Census(census) => return census_ranges(census),
@@ -24,7 +24,7 @@ fn census_ranges(census: &core::Census) -> Box<[Range]> {
         .checked_add(1)
         .expect("census parties and conversation family");
     let mut ranges = List::with_capacity(capacity);
-    ranges.push(Range::prefix(&[keys::JIG, 1, 15])).expect("one conversation family");
+    ranges.push(Range::prefix(&[keys::JIG, 2, 7])).expect("one conversation family");
     for read in &census.results {
         let mut range = numbered_prefix(&[keys::JIG, 1, 13], read.party);
         let key = core::Key::Tasks(jig_domain_tasks::Key::Result { party: read.party, position: read.after });

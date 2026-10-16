@@ -980,7 +980,7 @@ pub use census::inbox_census;
 #[must_use]
 pub fn restore_record(domain: &mut Domain, env: &Env<Limits>, record: Record) -> bool {
     if domain.core.restart_step() == Some(core::RestartStep::LoadInbox) {
-        return if let Record::Core(core::Record::Tasks(row)) = record {
+        return if let Record::Core(row) = record {
             domain.core.restore_inbox_row(&env.limits.core, &row)
         } else {
             false

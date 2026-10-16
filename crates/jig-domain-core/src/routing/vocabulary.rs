@@ -128,6 +128,8 @@ pub enum Write {
 pub enum Held {
     /// Every earlier commit is durable when the journal releases this terminal.
     Drained,
+    /// A point load sent once every earlier commit is durable.
+    Load(Box<Now>),
     /// Assemble the connector-owned document prepared for this delivery in the same decision.
     ApplicationDelivery { watcher: Token, connector: u16, subject: Token },
     /// Drop the connector-owned subject binding and deliver its paced ending.
@@ -261,6 +263,8 @@ pub enum Now {
     StartPreparation { task: u64, transcript_waiter: Option<Token>, from: Option<(u64, u32)> },
     /// Load one proposal decision that has left live task memory.
     SeenChat { request: Token, task: u64 },
+    /// Load the durable position of one ended conversation for its mark.
+    LoadEndedRead { request: Token, task: u64, party: u64 },
     /// Load one proposal decision that has left live task memory.
     HistoricalProposal { request: Token, person: u64, project: u32, proposer: people::Proposer, proposal: u64 },
     /// Load the ended owner row for a person-task act whose live row is gone.
@@ -501,6 +505,8 @@ pub enum Event {
     Forget { owner: crate::forget::Owner },
     /// Return the ended owner header for an authenticated chat mark.
     SeenChatLoaded { request: Token, row: Option<Box<tasks::TaskRecord>>, busy: bool },
+    /// The ended position loaded for an authenticated mark, zero if absent.
+    EndedReadLoaded { request: Token, task: u64, party: u64, through: u64, busy: bool },
     /// One archived proposal decision, translated from the root's store row.
     HistoricalProposal {
         request: Token,

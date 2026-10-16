@@ -109,6 +109,7 @@ pub(crate) fn gate(core: &mut Core, event: Event) -> Result<Event, Requests> {
         | Event::AcceptedTurn { .. }
         | Event::RefusedPayload { .. }
         | Event::Forget { .. }
+        | Event::EndedReadLoaded { .. }
         | Event::SeenChatLoaded { .. }
         | Event::HistoricalProposal { .. }
         | Event::HistoricalPersonTask { .. }

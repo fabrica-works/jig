@@ -432,6 +432,7 @@ impl Application for Testing {
                 Delivery::Now(
                     now @ (core::Now::StartPreparation { from: Some(_), .. }
                     | core::Now::SeenChat { .. }
+                    | core::Now::LoadEndedRead { .. }
                     | core::Now::HistoricalPersonTask { .. }
                     | core::Now::PartyInputs { .. }
                     | core::Now::HistoricalProposal { .. }
@@ -527,6 +528,10 @@ impl Application for Testing {
                         signal: connector::ProcedureSignal::Activate,
                     },
                 })]
+            }
+            root::Delivery::Core(core::Held::Load(load)) => {
+                store.ask(StoreOut::Now(*load));
+                Vec::new()
             }
             root::Delivery::Core(core::Held::NotesLoad { owner, range }) => {
                 store.ask(StoreOut::NotesLoad { owner, range });
@@ -634,5 +639,3 @@ pub mod replay;
 pub mod scenarios;
 
 pub mod negative;
-
-mod fixtures;

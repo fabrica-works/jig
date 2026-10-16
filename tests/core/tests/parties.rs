@@ -155,11 +155,9 @@ const PARAMETER: u32 = 13;
 const WRITE_KIND: u16 = 5;
 
 fn finish(world: &mut World) {
-    world.end(
-        tasks::End::Finished { result: tasks::TaskResult::Report { words: Box::new([]) }, cancel_delegates: false },
-        0,
-    );
+    jig_core_world::fixtures::finish_chat(world, 0, b"");
 }
+
 fn person_world(seed: u64) -> World {
     jig_core_world::stories::offers::world_with_policy(seed, Some(people::Role::Member), |limits, rules, policy| {
         limits.core.people.batch = 2;

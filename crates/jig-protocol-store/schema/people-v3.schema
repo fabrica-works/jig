@@ -137,6 +137,7 @@ enum Ask { create: AskCreate, close: AskClose, mark_seen: AskMarkSeen, applicati
 record StoredPerson { number: u64 identity: Identity }
 record StoredReadResults { party: u64 through: u64 }
 record StoredReadChat { party: u64 task: u64 through: u64 }
+record EndedRead { task: u64 party: u64 through: u64 }
 record StoredSignIn { number: u64 person: u64 expires: u64 }
 record StoredRoles { project: u32 holdings: list 1024 Holding }
 record StoredPolicy { project: u32 value: PolicyValue }
@@ -218,5 +219,5 @@ record Given { task: u64 amount: u64 }
 record OutcomeCreated { first: u64 last: u64 given: option Given }
 enum Outcome { created: OutcomeCreated, closing: OutcomeClosing, marked_seen: OutcomeMarkedSeen, applied: OutcomeApplied, again: OutcomeAgain, signed_out, note_edited: OutcomeNoteEdited, service_made: OutcomeServiceMade, adopted: OutcomeAdopted, goal_started: OutcomeGoalStarted, goal_proposed: OutcomeGoalProposed, stopped: OutcomeStopped, cancelled: OutcomeCancelled, released: OutcomeReleased, person_taken: OutcomePersonTaken, person_handed_back: OutcomePersonHandedBack, person_answered: OutcomePersonAnswered, moved: OutcomeMoved, proposal_decided: OutcomeProposalDecided, said: OutcomeSaid, question_answered: OutcomeQuestionAnswered, prioritised: OutcomePrioritised, amended: OutcomeAmended, amend_proposed: OutcomeAmendProposed, roles_set: OutcomeRolesSet, policy_changed: OutcomePolicyChanged, pool_set: OutcomePoolSet, escalation_decided: OutcomeEscalationDecided, started: OutcomeStarted, refused: OutcomeRefused }
 record StoredAnswer { key: RequestKey ask: Ask outcome: Outcome at: u64 }
-enum Value { person: StoredPerson, read_results: StoredReadResults, read_chat: StoredReadChat, sign_in: StoredSignIn, roles: StoredRoles, policy: StoredPolicy, answer: StoredAnswer }
+enum Value { person: StoredPerson, read_results: StoredReadResults, read_chat: StoredReadChat, sign_in: StoredSignIn, roles: StoredRoles, policy: StoredPolicy, answer: StoredAnswer, ended_read: EndedRead }
 versioned record Row { value: Value }

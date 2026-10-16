@@ -3,7 +3,7 @@
 //! routed flight ends with `Decided`; the root commits before releasing replies.
 //! These values contain no credential secrets, task internals or protocol bytes.
 
-use crate::Refusal;
+use crate::{Refusal, ReplyRef};
 use alloc::boxed::Box;
 use skein_lib::{Duration, List, ReplyTo, Token, Wall};
 
@@ -140,41 +140,6 @@ pub struct Seed {
     pub identity: IdentityKey,
     pub candidate: u64,
     pub role: Role,
-}
-
-/// One derived unread result reference; its words remain in the ended task.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub struct ResultRef {
-    pub task: u64,
-    pub project: u32,
-    pub at: Wall,
-    /// Root-issued order in which task results committed.
-    pub position: u64,
-    pub forgettable: Option<Forgettable>,
-}
-
-/// Cached fields needed to erase an unread result in its mark's decision.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub struct Forgettable {
-    pub label: u32,
-    pub listed: bool,
-    /// The last turn for a conversation, absent for other tasks.
-    pub last_reply: Option<u64>,
-}
-
-/// One opaque committed reply's exact immutable activity identity.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub struct ReplyRef {
-    pub entry: Entry,
-    pub activity: u64,
-}
-
-/// A globally ordered recent update; content remains in its owner.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub enum Update {
-    Result(ResultRef),
-    Reply(Entry),
-    ChatReply(ReplyRef),
 }
 
 /// A party's requested read position (domain/people.md, section 6).
@@ -561,13 +526,24 @@ pub enum Key {
     Policy(u32),
     /// Logical completed-key record.
     Answer(RequestKey),
+    /// Ended positions are point reads, never restored at start.
+    EndedRead { task: u64, party: u64 },
 }
 
 impl Key {
-    /// Every people family is restored at start (protocol/store.md, 7.2).
+    /// Ended positions are read on demand (protocol/store.md, 7.2).
     #[must_use]
     pub const fn live(&self) -> bool {
-        true
+        match self {
+            Self::EndedRead { .. } => false,
+            Self::Person(_)
+            | Self::ReadResults { .. }
+            | Self::ReadChat { .. }
+            | Self::SignIn(_)
+            | Self::Roles(_)
+            | Self::Policy(_)
+            | Self::Answer(_) => true,
+        }
     }
 }
 
@@ -586,6 +562,8 @@ pub enum Stored {
     ReadResults { party: u64, through: u64 },
     /// Monotonic replies position, erased once an ended chat and its replies are gone.
     ReadChat { party: u64, task: u64, through: u64 },
+    /// An ended conversation's position, joined on demand.
+    EndedRead { task: u64, party: u64, through: u64 },
     /// Persistent secret-free sign-in; expired restored entries are erased when restore completes.
     SignIn {
         /** Root-issued sign-in number; at most `Limits::sign_ins` sign-in records are retained. */
@@ -627,6 +605,7 @@ impl Stored {
             Stored::Person { number, .. } => Key::Person(*number),
             Stored::ReadResults { party, .. } => Key::ReadResults { party: *party },
             Stored::ReadChat { party, task, .. } => Key::ReadChat { party: *party, task: *task },
+            Stored::EndedRead { task, party, .. } => Key::EndedRead { task: *task, party: *party },
             Stored::SignIn { number, .. } => Key::SignIn(*number),
             Stored::Roles { project, .. } => Key::Roles(*project),
             Stored::Policy { project, .. } => Key::Policy(*project),
@@ -644,7 +623,15 @@ impl Stored {
 )]
 pub enum Event {
     /// Authentic committed chat header; live headers replace their previous contribution.
-    ChatState { party: u64, project: u32, task: u64, last_reply: u64, live: bool, replies: Box<[ReplyRef]> },
+    ChatState {
+        party: u64,
+        project: u32,
+        task: u64,
+        last_reply: u64,
+        live: bool,
+        seen: Option<u64>,
+        replies: Box<[ReplyRef]>,
+    },
     /// Authorized keyed chat mark, with the owner's complete reply count.
     ChatSeen { request: Token, project: u32, last_reply: u64 },
     /// The owner forgot an ended chat and its reply references; retire its positions.

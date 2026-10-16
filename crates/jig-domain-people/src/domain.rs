@@ -5,8 +5,11 @@
 //! count every live task projection independently of the entry cache. Root owns policy, task creation
 //! and durability; this child never performs IO or retains credential secrets.
 
+#[path = "ended.rs"]
+mod ended;
 #[path = "inbox.rs"]
 mod inbox;
+pub use ended::EndedMark;
 mod parties;
 use inbox::{chat_seen_decision, mark_seen, prune_unheld_roles, replace_waiting};
 
@@ -420,8 +423,8 @@ pub fn max_out(limits: &Limits) -> u32 {
 /// targets for keyed replay.
 pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     match event {
-        Event::ChatState { party, project, task, last_reply, live, replies } => {
-            inbox::chat_state_event(domain, env, party, project, task, last_reply, live, replies);
+        Event::ChatState { party, project, task, last_reply, live, seen, replies } => {
+            inbox::chat_state_event(domain, env, party, project, task, last_reply, live, seen, replies, out);
         }
         Event::ChatSeen { request, project, last_reply } => {
             chat_seen_decision(domain, env, request, project, last_reply, out);
@@ -1495,6 +1498,20 @@ fn save_answer(
 }
 
 fn decided(domain: &mut Domain, env: &Env<Limits>, id: Id<Pending>, outcome: Outcome, out: &mut Queue<Request>) {
+    let party = domain.pending.get(id).expect("pending decision").key.person;
+    if let Outcome::MarkedSeen { seen } = outcome {
+        mark_seen(domain, &env.limits, party, seen, out);
+    }
+    answer_decided(domain, env, id, outcome, out);
+}
+
+pub(super) fn answer_decided(
+    domain: &mut Domain,
+    env: &Env<Limits>,
+    id: Id<Pending>,
+    outcome: Outcome,
+    out: &mut Queue<Request>,
+) {
     let flight = domain.pending.get_mut(id).expect("root returns each routed request exactly once");
     let key = flight.key;
     let ask = flight.ask.clone();
@@ -1503,38 +1520,6 @@ fn decided(domain: &mut Domain, env: &Env<Limits>, id: Id<Pending>, outcome: Out
     let removed = domain.flights.remove(&key);
     assert!(removed == Some(id), "flight has one key index");
 
-    match outcome {
-        Outcome::MarkedSeen { seen } => mark_seen(domain, &env.limits, key.person, seen, out),
-        Outcome::Applied { .. }
-        | Outcome::NoteEdited { .. }
-        | Outcome::ServiceMade { .. }
-        | Outcome::Adopted { .. }
-        | Outcome::RolesSet { .. }
-        | Outcome::PolicyChanged { .. }
-        | Outcome::PoolSet { .. }
-        | Outcome::Started { .. }
-        | Outcome::Said { .. }
-        | Outcome::QuestionAnswered { .. }
-        | Outcome::Prioritised { .. }
-        | Outcome::Amended { .. }
-        | Outcome::AmendProposed { .. }
-        | Outcome::Moved { .. }
-        | Outcome::Closing { .. }
-        | Outcome::Stopped { .. }
-        | Outcome::Cancelled { .. }
-        | Outcome::Released { .. }
-        | Outcome::Created { .. }
-        | Outcome::GoalStarted { .. }
-        | Outcome::GoalProposed { .. }
-        | Outcome::PersonTaken { .. }
-        | Outcome::PersonHandedBack { .. }
-        | Outcome::PersonAnswered { .. }
-        | Outcome::EscalationDecided { .. }
-        | Outcome::ProposalDecided { .. }
-        | Outcome::Refused(_)
-        | Outcome::Again(_)
-        | Outcome::SignedOut => {}
-    }
     match outcome {
         // A refused admission is retryable with the same key, including
         // pressure reported by tasks or another child through the root.
@@ -1608,7 +1593,7 @@ fn restore(domain: &mut Domain, env: &Env<Limits>, record: Stored, out: &mut Que
         Stored::Roles { project, holdings } => {
             valid_roles(domain, &env.limits, *project, holdings).is_ok() && !domain.roles.contains_key(project)
         }
-        Stored::Policy { .. } => false,
+        Stored::Policy { .. } | Stored::EndedRead { .. } => false,
         Stored::Answer { key, ask, outcome, at } => {
             valid_ask(&env.limits, ask)
                 && valid_answer_shape(ask, *outcome)
@@ -1641,7 +1626,9 @@ fn restore(domain: &mut Domain, env: &Env<Limits>, record: Stored, out: &mut Que
             let saved = domain.roles.insert(project, holdings);
             assert!(saved.is_ok(), "restored roles admitted");
         }
-        Stored::Policy { .. } => unreachable!("root restores policy into authority"),
+        Stored::Policy { .. } | Stored::EndedRead { .. } => {
+            unreachable!("root does not restore on-demand records into people")
+        }
         Stored::Answer { key, ask, outcome, at } => {
             if answer_expiry(at, &env.limits) <= env.wall {
                 out.push(Request::Erase { key: Key::Answer(key) });

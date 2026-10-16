@@ -245,6 +245,7 @@ fn core_held(
     work: &mut Queue<Work>,
 ) {
     match value {
+        core::Held::Load(load) => held(decision, Output::CoreLoad(*load)),
         core::Held::ApplicationDelivery { .. } => unreachable!("document assembly owns this synchronous output"),
         core::Held::ApplicationWatchEnded { watcher, connector, subject, why } => {
             crate::client_documents::forget(domain, connector, subject, work);
@@ -1373,6 +1374,7 @@ fn core_now(domain: &mut Domain, env: &Env<Limits>, value: core::Now, work: &mut
             work.push(Work::Core(core::Event::RefusedPayload { request, problem, payload }));
         }
         load @ (core::Now::SeenChat { .. }
+        | core::Now::LoadEndedRead { .. }
         | core::Now::HistoricalProposal { .. }
         | core::Now::HistoricalEscalation { .. }
         | core::Now::HistoricalPersonTask { .. }

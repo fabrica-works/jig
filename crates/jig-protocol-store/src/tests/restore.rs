@@ -243,13 +243,16 @@ fn the_census_hands_up_conversations_before_result_rows() {
         &mut store,
         Box::new([
             fixtures::header(3),
-            fixtures::save(fixtures::conversation_index(ALICE, LIVE)),
+            fixtures::save(ended_position(LIVE)),
             fixtures::save(fixtures::ended_task(LIVE)),
         ]),
     );
-    let (rows, next) = page(restore(&mut store, census(), None, 2, 65_536));
+    let (rows, next) = page(restore(&mut store, census(), None, 3, 65_536));
     assert_eq!(next, None);
-    assert_eq!(jig_rows(rows).as_ref(), &[fixtures::ended_task(LIVE), fixtures::ended_task(ENDED)]);
+    assert_eq!(
+        jig_rows(rows).as_ref(),
+        &[ended_position(LIVE), fixtures::ended_task(LIVE), fixtures::ended_task(ENDED)]
+    );
 }
 
 #[test]
@@ -313,4 +316,60 @@ fn a_maximum_length_keys_cursor_resumes_without_refusal() {
     let (rows, next) = page(restore(&mut store, Restore::Application(ranges), next, 1, 64));
     assert_eq!(next, None);
     assert_eq!(application_keys(rows).as_ref(), &[Box::from(b"a2".as_slice())]);
+}
+
+const SECOND_ENDED: u64 = ENDED + 1;
+fn ended_position(task: u64) -> Record {
+    Record::People(jig_domain_people::Stored::EndedRead { task, party: ALICE, through: 1 })
+}
+fn positions_store() -> Store {
+    let mut store = fixtures::opened();
+    fixtures::committed(
+        &mut store,
+        Box::new([
+            fixtures::header(1),
+            fixtures::save(ended_position(ENDED)),
+            fixtures::save(fixtures::ended_task(ENDED)),
+        ]),
+    );
+    fixtures::committed(
+        &mut store,
+        Box::new([
+            fixtures::header(2),
+            fixtures::save(ended_position(SECOND_ENDED)),
+            fixtures::save(fixtures::ended_task(SECOND_ENDED)),
+        ]),
+    );
+    store
+}
+#[test]
+fn the_census_hands_up_an_ended_read_position_then_its_task() {
+    let mut store = positions_store();
+    let (rows, next) = page(restore(&mut store, census(), None, 4, 65_536));
+    assert_eq!(next, None);
+    assert_eq!(
+        jig_rows(rows).as_ref(),
+        &[
+            ended_position(ENDED),
+            fixtures::ended_task(ENDED),
+            ended_position(SECOND_ENDED),
+            fixtures::ended_task(SECOND_ENDED)
+        ]
+    );
+}
+#[test]
+fn the_census_never_parts_an_ended_read_position_from_its_task() {
+    let mut store = positions_store();
+    let (rows, next) = page(restore(&mut store, census(), None, 3, 65_536));
+    assert_eq!(jig_rows(rows).as_ref(), &[ended_position(ENDED), fixtures::ended_task(ENDED)]);
+    assert_eq!(
+        next,
+        Some(Cursor {
+            interval: 0,
+            after: keys::encode(&ended_position(ENDED).key(), fixtures::KEY_LIMIT).expect("position key")
+        })
+    );
+    let (rows, next) = page(restore(&mut store, census(), None, 1, 65_536));
+    assert!(rows.is_empty());
+    assert!(next.is_some());
 }

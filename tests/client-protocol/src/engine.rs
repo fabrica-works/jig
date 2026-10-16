@@ -270,6 +270,7 @@ fn held_event(held: core::Held) -> Option<Event> {
         | core::Held::Refuse { .. }
         | core::Held::TurnBusy { .. }
         | core::Held::StopRun { .. }
+        | core::Held::Load(..)
         | core::Held::NotesLoad { .. }
         | core::Held::NotesWritten { .. }
         | core::Held::NotesDeleted { .. } => return None,
@@ -304,6 +305,7 @@ fn now_event(now: core::Now) -> Option<Event> {
         | core::Now::PrepareAgent { .. }
         | core::Now::StartPreparation { .. }
         | core::Now::SeenChat { .. }
+        | core::Now::LoadEndedRead { .. }
         | core::Now::HistoricalProposal { .. }
         | core::Now::HistoricalPersonTask { .. }
         | core::Now::PartyInputs { .. }
@@ -363,6 +365,7 @@ fn watcher(event: &core::Event) -> Option<Token> {
         | core::Event::Activate { .. }
         | core::Event::PreparedAgent { .. }
         | core::Event::Forget { .. }
+        | core::Event::EndedReadLoaded { .. }
         | core::Event::SeenChatLoaded { .. }
         | core::Event::HistoricalProposal { .. }
         | core::Event::HistoricalPersonTask { .. }

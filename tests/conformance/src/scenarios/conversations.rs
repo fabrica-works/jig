@@ -121,8 +121,8 @@ pub(super) fn check_ending(world: &World) -> Result<(), Violation> {
     let kept = world.peers.children[0];
     let forgotten = world.peers.children[1];
     check(
-        world.store.rows.get(&root::Key::Core(core::Key::People(people::Key::ReadChat { party: PARTY, task: kept })))
-            == Some(&root::Record::Core(core::Record::People(people::Stored::ReadChat {
+        world.store.rows.get(&root::Key::Core(core::Key::People(people::Key::EndedRead { party: PARTY, task: kept })))
+            == Some(&root::Record::Core(core::Record::People(people::Stored::EndedRead {
                 party: PARTY,
                 task: kept,
                 through: 1,
@@ -138,7 +138,7 @@ pub(super) fn check_ending(world: &World) -> Result<(), Violation> {
                     | tasks::Key::EndedByParty { task, .. }
                     | tasks::Key::EndedByProject { task, .. },
                 )
-                | core::Key::People(people::Key::ReadChat { task, .. }),
+                | core::Key::People(people::Key::ReadChat { task, .. } | people::Key::EndedRead { task, .. }),
             ) => *task != forgotten,
             root::Key::Core(core::Key::Tasks(
                 tasks::Key::Update { task, object: tasks::UpdateObject::Result, .. }
