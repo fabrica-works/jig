@@ -161,7 +161,9 @@ the application's main (its shell)
     *kept* or *forgotten once read* (`../domain/tasks.md`, section 3);
   - the label: an opaque 32-bit number, which jig gives no meaning;
   - the grace its helper cancels with, or none.
-- **jig's defaults,** which an application keeps, changes or drops:
+- **jig's defaults,** which an application keeps, changes or drops, by
+  writing them in its `templates` member or leaving them out (section
+  10):
 
 | Field | chat (template 1) | goal (template 2) |
 |---|---|---|
@@ -361,9 +363,12 @@ secret, and every credential its runs need comes with their assignments
   whose members are all required, `null` where it has none: `number`;
   `name`; `executor`, `{"charter": n}` or `"chosen"`; `contract`,
   `{"report": {"words": n}}`, `{"verdict": {"choices": [{"code": c,
-  "words": n}]}}` or `{"change": {"connector": c, "kind": k, "words":
-  n}}`, a connector's result (an approval names a state its procedure
-  gives, so no template makes one); `shallower`, the levels of
+  "words": n, "followups": n, "fields": [{"name": s, "max": n}]}]}}`
+  (each choice's code, its words' most bytes, the most follow-up tasks
+  it may propose, and each field it requires, with its value's most
+  bytes: `../domain/tasks.md`, section 3) or `{"change": {"connector":
+  c, "kind": k, "words": n}}`, a connector's result (an approval names
+  a state its procedure gives, so no template makes one); `shallower`, the levels of
   delegation its authority is below the creator's role; `budget`,
   `{"amount": n}`, `{"as_allowed": cap}`, the cap a number or `null`, or
   `"given"`; `deadline`, `"none"`, `{"span_ms": n}` or `"given"`;
@@ -373,7 +378,14 @@ secret, and every credential its runs need comes with their assignments
   "executor": {"charter": 1}, "contract": {"report": {"words": 512}},
   "shallower": 1, "budget": {"as_allowed": null}, "deadline": "none",
   "tracked": null, "conversation": true, "listed": false, "retention":
-  "kept", "label": 1, "grace_ms": 5000}`.
+  "kept", "label": 1, "grace_ms": 5000}`; jig's goal: `{"number": 2,
+  "name": "goal", "executor": "chosen", "contract": {"report":
+  {"words": 512}}, "shallower": 1, "budget": "given", "deadline":
+  "given", "tracked": {"priority": 1}, "conversation": false, "listed":
+  true, "retention": "kept", "label": 2, "grace_ms": null}`. jig's
+  defaults are written, never implied: the `templates` member holds
+  each template the engine has, jig's among them, and an application
+  drops one of jig's by leaving it out (3.1).
 - **A policy's override of a template,** in its `templates` list, is one
   JSON object: `template`, its number; and `executor`, `budget`,
   `deadline` and `priority`, each in the template's form (`priority` a
