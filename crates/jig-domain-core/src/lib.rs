@@ -30,6 +30,7 @@ mod escalation;
 pub mod waits;
 pub use effects::{EffectKey, EffectOrigin, EffectPurpose, effect_worst_case};
 mod chats;
+pub mod forget;
 mod funding;
 mod goal_of;
 mod goals;

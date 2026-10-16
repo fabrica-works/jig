@@ -523,7 +523,6 @@ fn route_now(
         }
 
         other @ (core::Now::SeenChat { .. }
-        | core::Now::LoadEndedChat { .. }
         | core::Now::HistoricalPersonTask { .. }
         | core::Now::PartyInputs { .. }
         | core::Now::HistoricalProposal { .. }

@@ -325,7 +325,7 @@ impl World {
         self.domain.remember_result(
             &self.env.limits,
             person,
-            people::ResultRef { task, project: 1, at: self.env.wall, position },
+            people::ResultRef { task, project: 1, at: self.env.wall, position, forgettable: None },
         );
     }
 
@@ -345,7 +345,7 @@ impl World {
     }
 
     pub fn forget_chat(&mut self, task: u64) {
-        self.send(Event::ForgetChat { task, project: 1, party: None, last_reply: 0 });
+        self.send(Event::Forget { task, project: 1, party: None, last_reply: 0 });
     }
 
     pub fn waiting(&mut self, task: u64, entries: Box<[Entry]>) {

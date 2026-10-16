@@ -195,7 +195,7 @@ fn updates_page_from_the_index_newest_first_after_restart() {
 
 #[test]
 fn a_forgotten_chats_result_leaves_the_updates_index() {
-    let mut world = world(781);
+    let mut world = jig_core_world::stories::reads::forgettable_world(781);
     let task = world.assigned.as_ref().expect("chat").task;
     world.turn(1, 1, None, b"reply");
     request(&mut world, 71, people::Ask::MarkSeen { seen: people::Seen::Chat { task, through: 1 } });
@@ -306,7 +306,7 @@ fn conversations_page_both_ways_from_the_index() {
 }
 #[test]
 fn a_forgotten_chat_leaves_both_conversation_families() {
-    let mut world = world(784);
+    let mut world = jig_core_world::stories::reads::forgettable_world(784);
     let task = world.assigned.as_ref().expect("chat").task;
     world.turn(1, 1, None, b"reply");
     world.end(
@@ -346,7 +346,7 @@ fn result_position(world: &jig_core_world::effects::World, task: u64) -> u64 {
 }
 
 fn a_read_after_the_sign_in_ended_is_answered_signed_out() {
-    let mut world = world(784);
+    let mut world = jig_core_world::stories::reads::forgettable_world(784);
     end_sign_in(&mut world);
     ask(&mut world, 800, reads::Read::Frame);
     assert_eq!(latest(&world), &reads::Answer::None(reads::Why::SignedOut));

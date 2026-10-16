@@ -164,7 +164,6 @@ fn window(now: core::Now) -> Option<(u64, u64, u32)> {
         | core::Now::Activate { .. }
         | core::Now::PrepareAgent { .. }
         | core::Now::StartPreparation { from: None, .. }
-        | core::Now::LoadEndedChat { .. }
         | core::Now::CompleteBrief { .. }
         | core::Now::BriefCorePlanned { .. }
         | core::Now::WorkspaceRequest { .. }

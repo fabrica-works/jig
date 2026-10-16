@@ -150,6 +150,16 @@ pub struct ResultRef {
     pub at: Wall,
     /// Root-issued order in which task results committed.
     pub position: u64,
+    pub forgettable: Option<Forgettable>,
+}
+
+/// Cached fields needed to erase an unread result in its mark's decision.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Forgettable {
+    pub label: u32,
+    pub listed: bool,
+    /// The last turn for a conversation, absent for other tasks.
+    pub last_reply: Option<u64>,
 }
 
 /// One opaque committed reply's exact immutable activity identity.
@@ -637,7 +647,7 @@ pub enum Event {
     /// Authorized keyed chat mark, with the owner's complete reply count.
     ChatSeen { request: Token, project: u32, last_reply: u64 },
     /// The owner forgot an ended chat and its reply references; retire its positions.
-    ForgetChat { task: u64, project: u32, party: Option<u64>, last_reply: u64 },
+    Forget { task: u64, project: u32, party: Option<u64>, last_reply: u64 },
     /// Apply an authorized owner request to make a service with a fresh party number.
     MakeService { request: Token, person: u64 },
     /// Add previously unknown collaborators and their first project role in one decision.

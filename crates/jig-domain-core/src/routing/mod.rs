@@ -375,7 +375,7 @@ pub fn room(limits: &Limits, event: &Event) -> Option<JournalRoom> {
         | Event::RefusedPayload { .. }
         | Event::Activate { .. }
         | Event::PreparedAgent { .. }
-        | Event::ForgetChat { .. }
+        | Event::Forget { .. }
         | Event::SeenChatLoaded { .. }
         | Event::HistoricalProposal { .. }
         | Event::HistoricalPersonTask { .. }
@@ -537,7 +537,7 @@ fn step_one(core: &mut Core, env: &Env<Limits>, event: Event, work: &mut Queue<E
         Event::PreparedAgent { context, transcript_waiter, busy } => {
             route_prepared_agent(core, context, transcript_waiter, busy)
         }
-        Event::ForgetChat { row } => crate::inbox::forget_chat(core, env, work, &row),
+        Event::Forget { owner } => crate::forget::forget(core, env, work, &owner),
         Event::SeenChatLoaded { request, row, busy } => {
             crate::inbox::seen_chat_loaded(core, env, work, request, row, busy)
         }

@@ -60,6 +60,7 @@ pub struct World {
     pub projections: Vec<(usize, u16, core::ProjectionFeed)>,
     pub hold_projection_settlements: bool,
     pub sign_in: Option<u64>,
+    pub initial_ask: people::Ask,
     pub people_answers: Vec<people::Reply>,
     pub application_answers: Vec<(Token, u16, connector::ApplicationOutcome)>,
     pub procedure: Option<u64>,
@@ -321,8 +322,7 @@ impl World {
                         self.account_request(request);
                     }
                     root::Request::Now(
-                        now @ (core::Now::LoadEndedChat { .. }
-                        | core::Now::SeenChat { .. }
+                        now @ (core::Now::SeenChat { .. }
                         | core::Now::HistoricalPersonTask { .. }
                         | core::Now::PartyInputs { .. }
                         | core::Now::HistoricalProposal { .. }

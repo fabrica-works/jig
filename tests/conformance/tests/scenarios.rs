@@ -80,3 +80,11 @@ fn a_sign_in_past_its_lifetime_is_answered_signed_out() {
 fn racing_decisions_chosen_effect_admission_and_completion_cut_ends_the_story() {
     chosen_cut(Scenario::RacingDecisions);
 }
+
+#[test]
+fn conversation_ends_while_read_chosen_cut_ends_the_story() {
+    const RESULTS_COMMIT: u64 = 17;
+    run::<Testing>(Scenario::ConversationEndsWhileRead, Cut::AfterCommit(RESULTS_COMMIT), 757)
+        .expect("results mark and forget survive their commit cut")
+        .expect("application binds the conversation story");
+}

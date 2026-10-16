@@ -426,8 +426,8 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::ChatSeen { request, project, last_reply } => {
             chat_seen_decision(domain, env, request, project, last_reply, out);
         }
-        Event::ForgetChat { task, project, party, last_reply } => {
-            inbox::forget_chat_event(domain, env, task, project, party, last_reply, out);
+        Event::Forget { task, project, party, last_reply } => {
+            inbox::forget_event(domain, env, task, project, party, last_reply, out);
         }
         Event::MakeService { request, person } => make_service(domain, env, request, person, out),
         Event::Seed { project, collaborators } => seed(domain, &env.limits, project, &collaborators, out),

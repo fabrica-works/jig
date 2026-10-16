@@ -102,3 +102,19 @@ pub(crate) fn restore_conversation_seen(core: &mut Core, limits: &Limits, party:
     people::step(&mut core.people, &env, people::Event::Restored, &mut out);
     assert!(core.people.ready());
 }
+
+/// An ended report whose result and two replies can be marked read.
+pub(crate) fn ended_report(number: u64, requester: tasks::Party) -> tasks::TaskRecord {
+    let (mut core, limits) = tree_core();
+    let new = new_row(&core, number, tasks::Funder::Period { project: 1, period: 1 }, None);
+    make_batch(&mut core, &limits, tasks::Party::Person(1), Box::new([new]));
+    let mut row = core.tasks.task(number).expect("fixture task").clone();
+    row.requester = requester;
+    row.flags = tasks::Flags { conversation: true, listed: false, retention: tasks::Retention::ForgottenOnceRead };
+    row.phase =
+        tasks::Phase::Ended(tasks::Ending::Done(tasks::TaskResult::Report { words: b"done".as_slice().into() }));
+    row.ended_at = Some(Wall::from_nanos(1));
+    row.result_position = 7;
+    row.last_reply = 2;
+    row
+}

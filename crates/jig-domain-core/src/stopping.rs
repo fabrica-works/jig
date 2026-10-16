@@ -108,7 +108,7 @@ pub(crate) fn gate(core: &mut Core, event: Event) -> Result<Event, Requests> {
         | Event::AnswerPayload { .. }
         | Event::AcceptedTurn { .. }
         | Event::RefusedPayload { .. }
-        | Event::ForgetChat { .. }
+        | Event::Forget { .. }
         | Event::SeenChatLoaded { .. }
         | Event::HistoricalProposal { .. }
         | Event::HistoricalPersonTask { .. }
@@ -127,7 +127,7 @@ fn people_gate(event: people::Event) -> Result<Event, Requests> {
         people::Event::Ask { reply_to, .. } | people::Event::SignOut { reply_to, .. } => Err(party(reply_to)),
         people::Event::ChatSeen { .. } => Err(empty()),
         event @ (people::Event::ChatState { .. }
-        | people::Event::ForgetChat { .. }
+        | people::Event::Forget { .. }
         | people::Event::MakeService { .. }
         | people::Event::Seed { .. }
         | people::Event::Waiting { .. }

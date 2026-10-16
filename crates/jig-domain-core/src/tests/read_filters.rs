@@ -227,7 +227,7 @@ fn each_inbox_kind_selects_its_owner_objects_and_the_cursor_keeps_that_kind() {
     core.people.remember_result(
         &limits.people,
         1,
-        people::ResultRef { task: 100, project: 1, at: Wall::from_nanos(6), position: 1 },
+        people::ResultRef { task: 100, project: 1, at: Wall::from_nanos(6), position: 1, forgettable: None },
     );
     for (group, expected) in [
         (reads::Group::Proposals, InboxObject::Proposal { proposer: Proposer::Task(1), number: 1 }),

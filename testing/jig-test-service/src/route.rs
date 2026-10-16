@@ -153,7 +153,6 @@ pub(super) fn system(engine: &mut Engine, number: u16) -> &mut crate::system::Sy
 fn immediate(engine: &mut Engine, now: core::Now) {
     match now {
         value @ (core::Now::SeenChat { .. }
-        | core::Now::LoadEndedChat { .. }
         | core::Now::HistoricalPersonTask { .. }
         | core::Now::PartyInputs { .. }
         | core::Now::HistoricalProposal { .. }

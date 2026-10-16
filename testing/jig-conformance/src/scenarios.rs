@@ -24,10 +24,12 @@ pub enum Scenario {
     RunBudget,
     /// A party and a run amend one task against the same revision.
     RacingDecisions,
+    /// Conversations end and restart while their requesting party reads.
+    ConversationEndsWhileRead,
 }
 
 /// Every shared story, in a stable order for focused cuts and sweeps.
-pub const ALL: [Scenario; 9] = [
+pub const ALL: [Scenario; 10] = [
     Scenario::LateCopy,
     Scenario::OtherHand,
     Scenario::UncertainRestarts,
@@ -37,6 +39,7 @@ pub const ALL: [Scenario; 9] = [
     Scenario::StandingTask,
     Scenario::RunBudget,
     Scenario::RacingDecisions,
+    Scenario::ConversationEndsWhileRead,
 ];
 
 /// One scenario action, translated at the application's outside boundaries.
@@ -82,6 +85,16 @@ pub enum Action {
     PartyAmend,
     /// A run amends the same spec revision.
     RunAmend,
+    /// Create an explicitly flagged conversation.
+    Conversation { forgettable: bool },
+    /// Commit one turn in each conversation.
+    Turn,
+    /// Mark both conversations' turns.
+    MarkTurns,
+    /// Finish both conversations.
+    EndConversations,
+    /// Mark their results.
+    MarkResults,
 }
 
 /// An application adds kind/resource bindings and outside story checks to its
@@ -115,6 +128,35 @@ pub enum Step {
 #[must_use]
 pub fn program(scenario: Scenario) -> Vec<Step> {
     let mut steps = vec![Step::Drain, Step::Action(Action::Ready), Step::Drain];
+    if scenario == Scenario::ConversationEndsWhileRead {
+        steps.extend([
+            Step::Action(Action::Conversation { forgettable: false }),
+            Step::Drain,
+            Step::Action(Action::Conversation { forgettable: true }),
+            Step::Drain,
+            Step::Advance(6_000_000_000),
+            Step::Drain,
+            Step::Advance(1_000_000_000),
+            Step::Drain,
+            Step::Action(Action::Turn),
+            Step::Drain,
+            Step::Action(Action::MarkTurns),
+            Step::Drain,
+            Step::Crash,
+            Step::Drain,
+            Step::Action(Action::EndConversations),
+            Step::Drain,
+            Step::Crash,
+            Step::Drain,
+            Step::Action(Action::MarkTurns),
+            Step::Drain,
+            Step::Action(Action::MarkResults),
+            Step::Drain,
+            Step::Crash,
+            Step::Drain,
+        ]);
+        return steps;
+    }
     let actions: &[Action] = match scenario {
         Scenario::LateCopy => &[Action::Late, Action::Effect(1)],
         Scenario::OtherHand => &[Action::Late, Action::Effect(1), Action::OtherHand],
@@ -143,6 +185,7 @@ pub fn program(scenario: Scenario) -> Vec<Step> {
         }
         Scenario::RunBudget => &[Action::Resume],
         Scenario::RacingDecisions => &[Action::PartyAmend, Action::RunAmend],
+        Scenario::ConversationEndsWhileRead => unreachable!("conversation program returned"),
     };
     for &action in actions {
         steps.extend([Step::Action(action), Step::Drain]);
@@ -176,7 +219,11 @@ pub fn program(scenario: Scenario) -> Vec<Step> {
             }
             steps.push(Step::Drain);
         }
-        Scenario::ShrinkingPool | Scenario::StandingTask | Scenario::RunBudget | Scenario::RacingDecisions => {}
+        Scenario::ShrinkingPool
+        | Scenario::StandingTask
+        | Scenario::RunBudget
+        | Scenario::RacingDecisions
+        | Scenario::ConversationEndsWhileRead => {}
     }
     steps
 }

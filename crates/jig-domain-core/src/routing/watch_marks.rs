@@ -307,7 +307,7 @@ pub(super) fn touch_people_event(core: &mut Core, limits: &Limits, event: &peopl
                 core.touch_party(party);
             }
         }
-        people::Event::ForgetChat { party, .. } => {
+        people::Event::Forget { party, .. } => {
             if let Some(party) = party {
                 core.touch_party(*party);
             }

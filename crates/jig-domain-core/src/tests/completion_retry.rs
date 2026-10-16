@@ -43,7 +43,6 @@ fn current_stream(out: &[Request]) -> &Request {
                 | Now::Activate { .. }
                 | Now::PrepareAgent { .. }
                 | Now::StartPreparation { .. }
-                | Now::LoadEndedChat { .. }
                 | Now::SeenChat { .. }
                 | Now::HistoricalProposal { .. }
                 | Now::HistoricalPersonTask { .. }

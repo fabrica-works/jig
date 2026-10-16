@@ -64,6 +64,9 @@ impl Config {
             limits.core.people.inbox_recipients = 24;
             jig_core_world::world::edit_role(&mut config.core, |role| role.authority.budget.spend = 80);
         }
+        if self.scenario == Some(Scenario::ConversationEndsWhileRead) {
+            limits.core.fleet.slots = 3;
+        }
         if self.scenario == Some(Scenario::StandingTask) {
             limits.core.tasks.tasks = 5;
             limits.core.tasks.project_tasks = 5;
@@ -213,6 +216,12 @@ impl Application for Testing {
 
     fn peers(config: &Config, _: u64) -> Neighbours {
         let script = || match config.scenario {
+            Some(Scenario::ConversationEndsWhileRead) => Box::new([
+                Script::Wait,
+                Script::Turn { body: b"conversation turn".as_slice().into(), cost: 1, read: None },
+                Script::Wait,
+                Script::Finish { report: b"conversation done".as_slice().into() },
+            ]) as Box<[Script]>,
             Some(Scenario::ShrinkingPool) => {
                 Box::new([Script::Wait, Script::Finish { report: b"pool done".as_slice().into() }]) as Box<[Script]>
             }
@@ -426,8 +435,7 @@ impl Application for Testing {
                     | core::Now::HistoricalPersonTask { .. }
                     | core::Now::PartyInputs { .. }
                     | core::Now::HistoricalProposal { .. }
-                    | core::Now::HistoricalEscalation { .. }
-                    | core::Now::LoadEndedChat { .. }),
+                    | core::Now::HistoricalEscalation { .. }),
                 ) => {
                     store.ask(StoreOut::Now(now));
                     Vec::new()

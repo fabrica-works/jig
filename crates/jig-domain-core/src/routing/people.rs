@@ -35,7 +35,7 @@ pub(super) fn route_people(
         }
         core.seed_owners = Box::new([]);
     }
-    if let people::Event::ForgetChat { task, .. } = &event {
+    if let people::Event::Forget { task, .. } = &event {
         drop(core.archived_chats.remove(task));
     }
     let event = match event {
@@ -52,7 +52,7 @@ pub(super) fn route_people(
         }
         other @ (people::Event::ChatState { .. }
         | people::Event::ChatSeen { .. }
-        | people::Event::ForgetChat { .. }
+        | people::Event::Forget { .. }
         | people::Event::MakeService { .. }
         | people::Event::Seed { .. }
         | people::Event::Waiting { .. }
@@ -270,14 +270,17 @@ pub(super) fn tag_people(
                         deadline,
                     ),
                     people::Ask::MarkSeen { seen } => match seen {
-                        people::Seen::Results { .. } => {
+                        people::Seen::Results { through } => {
                             work.push(Event::People(people::Event::Decided {
                                 request,
                                 outcome: people::Outcome::MarkedSeen { seen },
                             }));
-                            for (task, _) in core.people.marked_chats(person).into_boxed() {
-                                if core.tasks.task(task).is_none() {
-                                    out.push(Request::Now(Box::new(Now::LoadEndedChat { task })));
+                            for result in core.people.cached_results(person).unwrap_or(&[]) {
+                                if result.position <= through
+                                    && core.tasks.task(result.task).is_none()
+                                    && let Some(owner) = crate::forget::Owner::of_result(person, result)
+                                {
+                                    work.push(Event::Forget { owner });
                                 }
                             }
                         }

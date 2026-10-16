@@ -87,7 +87,11 @@ fn only_keyed_mark_seen_moves_results_and_restores_the_position() {
     test.signin(1, 10, identity(0, 1));
     test.send(Event::Roles { project: 1, holdings: Box::new([Holding { person: 1, role: Role::Member }]) });
     for (task, position) in [(4, 4), (3, 3), (1, 1), (2, 2)] {
-        test.d.remember_result(&LIMITS, 1, ResultRef { task, project: 1, at: Wall::EPOCH, position });
+        test.d.remember_result(
+            &LIMITS,
+            1,
+            ResultRef { task, project: 1, at: Wall::EPOCH, position, forgettable: None },
+        );
     }
     assert_eq!(test.d.cached_results(1).unwrap().len(), 3, "one overflow witness beyond the count limit");
     assert_eq!(test.d.counts(&LIMITS, 1), Some(Counts { needs: 0, unread: 2, more_unread: true }));
@@ -96,7 +100,10 @@ fn only_keyed_mark_seen_moves_results_and_restores_the_position() {
     let request = route(&test.request(10, 1, Ask::MarkSeen { seen }));
     let outputs = test.send(Event::Decided { request, outcome: Outcome::MarkedSeen { seen } });
     assert_eq!(test.d.results_seen(1), Some(3));
-    assert_eq!(test.d.cached_results(1), Some(&[ResultRef { task: 4, project: 1, at: Wall::EPOCH, position: 4 }][..]));
+    assert_eq!(
+        test.d.cached_results(1),
+        Some(&[ResultRef { task: 4, project: 1, at: Wall::EPOCH, position: 4, forgettable: None }][..])
+    );
     assert!(outputs.contains(&Request::Save { record: Stored::ReadResults { party: 1, through: 3 } }));
     assert_eq!(reply(&test.request(10, 1, Ask::MarkSeen { seen })), Reply::Outcome(Outcome::MarkedSeen { seen }));
     let backwards = Seen::Results { through: 1 };
@@ -1541,16 +1548,30 @@ fn inbox_counts_follow_current_project_roles_without_losing_archived_census() {
         test.send(Event::Roles { project, holdings: Box::new([Holding { person: 1, role: Role::Member }]) });
     }
     test.send(Event::ChatState { party: 1, project: 2, task: 9, last_reply: 3, live: false, replies: Box::new([]) });
-    test.d.remember_result(&LIMITS, 1, ResultRef { task: 7, project: 2, at: Wall::from_nanos(7), position: 7 });
-    test.d.remember_result(&LIMITS, 1, ResultRef { task: 8, project: 1, at: Wall::from_nanos(8), position: 8 });
+    test.d.remember_result(
+        &LIMITS,
+        1,
+        ResultRef { task: 7, project: 2, at: Wall::from_nanos(7), position: 7, forgettable: None },
+    );
+    test.d.remember_result(
+        &LIMITS,
+        1,
+        ResultRef { task: 8, project: 1, at: Wall::from_nanos(8), position: 8, forgettable: None },
+    );
     assert_eq!(test.d.counts(&LIMITS, 1), Some(Counts { needs: 0, unread: 2, more_unread: true }));
     test.send(Event::Roles { project: 2, holdings: Box::new([]) });
     assert_eq!(test.d.counts(&LIMITS, 1), Some(Counts { needs: 0, unread: 1, more_unread: false }));
     test.send(Event::Roles { project: 2, holdings: Box::new([Holding { person: 1, role: Role::Member }]) });
     assert_eq!(test.d.counts(&LIMITS, 1), Some(Counts { needs: 0, unread: 2, more_unread: true }));
     let updates = test.d.cached_updates(&LIMITS, 1).expect("known party");
-    assert_eq!(updates[0], Update::Result(ResultRef { task: 8, project: 1, at: Wall::from_nanos(8), position: 8 }));
-    assert_eq!(updates[1], Update::Result(ResultRef { task: 7, project: 2, at: Wall::from_nanos(7), position: 7 }));
+    assert_eq!(
+        updates[0],
+        Update::Result(ResultRef { task: 8, project: 1, at: Wall::from_nanos(8), position: 8, forgettable: None })
+    );
+    assert_eq!(
+        updates[1],
+        Update::Result(ResultRef { task: 7, project: 2, at: Wall::from_nanos(7), position: 7, forgettable: None })
+    );
 }
 
 mod need_counts;
@@ -1592,8 +1613,6 @@ fn a_proposal_makers_kind_is_kept_in_its_key_and_restored_answer() {
         assert_eq!(reply(&test.request(10, 1, other_ask)), Reply::Refused(Refusal::KeyConflict));
     }
 }
-
-mod marked_chats;
 
 mod utf8;
 

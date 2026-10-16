@@ -154,7 +154,7 @@ impl World {
                     reply_to: ReplyTo::new(Token::new(102)),
                     sign_in,
                     key: [5; 16],
-                    ask: people::Ask::StartChat { project: 1, words: b"make an effect".as_slice().into() },
+                    ask: self.initial_ask.clone(),
                 })));
             }
             root::Delivery::Core(core::Held::NotesLoad { owner, range }) => {

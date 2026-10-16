@@ -304,7 +304,6 @@ fn now_event(now: core::Now) -> Option<Event> {
         | core::Now::PrepareAgent { .. }
         | core::Now::StartPreparation { .. }
         | core::Now::SeenChat { .. }
-        | core::Now::LoadEndedChat { .. }
         | core::Now::HistoricalProposal { .. }
         | core::Now::HistoricalPersonTask { .. }
         | core::Now::PartyInputs { .. }
@@ -363,7 +362,7 @@ fn watcher(event: &core::Event) -> Option<Token> {
         | core::Event::RefusedPayload { .. }
         | core::Event::Activate { .. }
         | core::Event::PreparedAgent { .. }
-        | core::Event::ForgetChat { .. }
+        | core::Event::Forget { .. }
         | core::Event::SeenChatLoaded { .. }
         | core::Event::HistoricalProposal { .. }
         | core::Event::HistoricalPersonTask { .. }

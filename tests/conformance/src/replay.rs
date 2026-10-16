@@ -149,7 +149,8 @@ fn cuts_traced(
             Ok(())
         });
         if let Err(error) = result {
-            hook_failure.replace(Some(error));
+            hook_failure
+                .replace(Some(Violation { promise: error.promise, why: format!("snapshot cut {cut}: {}", error.why) }));
         }
     });
     finish(&mut world, scenario, seed, Position::default(), &position)?;

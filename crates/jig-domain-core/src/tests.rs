@@ -1576,12 +1576,12 @@ fn documents_cached_inbox_results_preserve_positions_project_and_time() {
     core.people.remember_result(
         &limits.people,
         1,
-        people::ResultRef { task: 100, project: 1, at: Wall::from_nanos(30), position: 30 },
+        people::ResultRef { task: 100, project: 1, at: Wall::from_nanos(30), position: 30, forgettable: None },
     );
     core.people.remember_result(
         &limits.people,
         1,
-        people::ResultRef { task: 99, project: 1, at: Wall::from_nanos(31), position: 31 },
+        people::ResultRef { task: 99, project: 1, at: Wall::from_nanos(31), position: 31, forgettable: None },
     );
     let Document::Inbox(inbox) =
         make(&core, &limits, 1, &Subject::Inbox { party: 1 }, &Window { rows: 2, after: None }).unwrap()
@@ -3015,3 +3015,5 @@ mod brief_revisions;
 mod escalation_holder;
 
 mod templates;
+
+mod forget;

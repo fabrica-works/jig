@@ -494,7 +494,7 @@ fn a_restart_reads_no_ended_task_whose_result_was_read() {
     let through = census_result(&world, first).result_position;
     census_mark_results(&mut world, through, 104);
     world.restart(790, false);
-    assert_eq!(world.census_ended, 2);
+    assert_eq!(world.census_ended, 3);
     assert!(world.store.rows.contains_key(&census_ended_key(first)));
 }
 fn census_updates(world: &mut World, reply: u64) -> core::documents::Count {

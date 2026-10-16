@@ -377,7 +377,9 @@ pub(crate) fn seen_chat_loaded(
                 project: row.project,
                 last_reply: row.last_reply,
             }));
-            work.push(crate::Event::ForgetChat { row });
+            if let Some(owner) = crate::forget::Owner::of_row(&row) {
+                work.push(crate::Event::Forget { owner });
+            }
             let mut out = skein_lib::Queue::with_capacity(1);
             out.push(crate::Request::Decided);
             return crate::Requests::Out(out);
@@ -395,50 +397,4 @@ fn matches_ended(phase: &tasks::Phase) -> bool {
         tasks::Phase::Ended(_) => true,
         tasks::Phase::Waiting | tasks::Phase::Active(_) | tasks::Phase::Closing(_) | tasks::Phase::Held { .. } => false,
     }
-}
-
-/// Forget the ended owner only after every update has been read. The marker erase
-/// and owner erase share the root's journal decision; linked archives without an
-/// owner become unreadable and can be collected by the store's retention pass.
-pub(crate) fn forget_chat(
-    core: &mut Core,
-    env: &skein_lib::Env<Limits>,
-    work: &mut skein_lib::Queue<crate::Event>,
-    row: &tasks::TaskRecord,
-) -> crate::Requests {
-    let mut out = skein_lib::Queue::with_capacity(6);
-    if matches_ended(&row.phase)
-        && core.people.ready()
-        && valid_header(core, &env.limits, row)
-        && row.ended_at.is_some()
-        && row.result_position > 0
-        && row.result_position <= core.counters.deployment().messages
-        && let Some(party) = core.conversation_requester(row)
-        && core.people.chat_seen(party, row.number).unwrap_or(0) >= row.last_reply
-        && core.people.results_seen(party).unwrap_or(0) >= row.result_position
-    {
-        work.push(crate::Event::People(people::Event::ForgetChat {
-            project: row.project,
-            task: row.number,
-            party: Some(party),
-            last_reply: row.last_reply,
-        }));
-        out.push(crate::Request::Write(crate::Write::Erase(crate::Key::Tasks(tasks::Key::Ended(row.number)))));
-        let update = tasks::Update {
-            party,
-            at: row.ended_at.expect("validated end time"),
-            task: row.number,
-            object: tasks::UpdateObject::Result,
-        };
-        out.push(crate::Request::Write(crate::Write::Erase(crate::Key::Tasks(update.key()))));
-        for key in [
-            tasks::Key::Result { party, position: row.result_position },
-            tasks::Key::ConversationNewest { party, task: tasks::Newest::of(row.number) },
-            tasks::Key::ConversationOldest { party, task: row.number },
-        ] {
-            out.push(crate::Request::Write(crate::Write::Erase(crate::Key::Tasks(key))));
-        }
-    }
-    out.push(crate::Request::Decided);
-    crate::Requests::Out(out)
 }

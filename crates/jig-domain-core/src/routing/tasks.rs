@@ -732,6 +732,12 @@ pub(super) fn tag_tasks(
                                         project: task.project,
                                         at: task.ended_at.expect("ended row has its durable time"),
                                         position,
+                                        forgettable: (task.flags.retention == tasks::Retention::ForgottenOnceRead)
+                                            .then_some(people::Forgettable {
+                                                label: task.label,
+                                                listed: task.flags.listed,
+                                                last_reply: task.flags.conversation.then_some(task.last_reply),
+                                            }),
                                     },
                                 );
                             }

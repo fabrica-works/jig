@@ -9,18 +9,78 @@ use jig_domain_tasks as tasks;
 use jig_test_domain as root;
 use skein_lib::{Duration, ReplyTo, Token};
 
+const DELEGATE: u64 = core::ToolFamilies::JIG.delegate.0;
+
 #[must_use]
 pub fn world(seed: u64) -> World {
-    read_world(seed, None, 2)
+    read_world(seed, None, 2, None)
 }
 
 /// A read fixture with a chosen bounded live page size.
 #[must_use]
 pub fn world_with_rows(seed: u64, rows: u32) -> World {
-    read_world(seed, None, rows)
+    read_world(seed, None, rows, None)
 }
 
-fn read_world(seed: u64, reply_bound: Option<u32>, rows: u32) -> World {
+/// A conversation whose retention releases its durable owner after both marks.
+#[must_use]
+pub fn forgettable_world(seed: u64) -> World {
+    let world = read_world(seed, None, 2, Some(forgettable_conversation()));
+    assert!(world.assigned.is_some(), "initial conversation assigned: {:?}", world.people_answers);
+    world
+}
+
+/// The initial authenticated conversation request, shared by read stories.
+#[must_use]
+pub fn forgettable_conversation() -> people::Ask {
+    people::Ask::Create { project: 1, batch: Box::new([conversation_member(true)]) }
+}
+
+/// One explicitly flagged conversation under the world's agent charter.
+#[must_use]
+pub fn conversation_member(forgettable: bool) -> people::Member {
+    people::Member {
+        executor: people::TaskExecutor::Agent { charter: 1 },
+        words: b"make an effect".as_slice().into(),
+        parameters: Box::new([]),
+        inputs: Box::new([]),
+        named: Box::new([]),
+        budget: people::Budget::Named,
+        contract: people::Contract::Report { words: 128 },
+        authority: people::Authority {
+            tools: DELEGATE,
+            grants: Box::new([]),
+            delegation: people::Delegation {
+                kinds: Box::new([people::Executor::Charter(1), people::Executor::Procedure(1)]),
+                tasks: 1,
+                depth: 1,
+            },
+            spend: 100,
+            deadline: None,
+            notes: 0,
+            note_resources: Box::new([]),
+        },
+        wake: people::WakePolicy {
+            words: people::WakeRule::Immediate,
+            notices: people::WakeRule::Immediate,
+            news: people::WakeRule::Immediate,
+            results: people::ResultsWake::LastOrFailure,
+            questions: true,
+            answers: true,
+            timers: true,
+        },
+        dependencies: Box::new([]),
+        tracked: None,
+        label: 1,
+        flags: people::Flags {
+            conversation: true,
+            listed: false,
+            retention: if forgettable { people::Retention::ForgottenOnceRead } else { people::Retention::Kept },
+        },
+    }
+}
+
+fn read_world(seed: u64, reply_bound: Option<u32>, rows: u32, initial: Option<people::Ask>) -> World {
     let (configuration, mut limits) = crate::effects::fixture(seed, false);
     if let Some(bound) = reply_bound {
         limits.core.tasks.inbox_messages = bound;
@@ -42,7 +102,10 @@ fn read_world(seed: u64, reply_bound: Option<u32>, rows: u32) -> World {
     limits.journal.commits = 2;
     limits.journal.writes = room.writes + connectors;
     limits.journal.held = (room.held + connectors) * 2;
-    let mut world = World::configured(seed, false, configuration, limits);
+    let mut world = match initial {
+        Some(initial) => World::configured_with(seed, false, configuration, limits, initial),
+        None => World::configured(seed, false, configuration, limits),
+    };
     world.reads = Some(Parties::new(world.store.applied));
     world
 }
@@ -82,7 +145,7 @@ pub fn conversation(world: &mut World, task: u64, first: u64) -> Vec<tasks::Acti
 
 /// A temporal cache prefix must remain a prefix even when a later turn has an earlier wall time.
 pub fn a_backward_wall_correction_keeps_reply_paging_whole_after_restart() {
-    let mut world = read_world(766, Some(2), 2);
+    let mut world = read_world(766, Some(2), 2, None);
     let task = world.assigned.as_ref().expect("chat").task;
     world.advance(Duration::from_secs(2));
     world.turn(1, 1, None, b"before correction one");

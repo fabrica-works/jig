@@ -23,7 +23,13 @@ fn lines(world: &World, task: u64) -> Vec<tasks::ActivityLine> {
 #[expect(clippy::too_many_lines, reason = "one real-store story keeps its complete run and archive assertions")]
 fn a_chat_s_activity_holds_the_person_s_words_its_turns_and_its_delegate_s_result() {
     let (configuration, limits) = jig_core_world::faults::plan_fixture(506);
-    let mut world = World::configured(506, false, configuration, limits);
+    let mut world = World::configured_with(
+        506,
+        false,
+        configuration,
+        limits,
+        jig_core_world::stories::reads::forgettable_conversation(),
+    );
     let parent = world.assignments[0];
     world.turn(1, 2, None, b"the first committed turn");
     world.send(root::Event::Core(core::Event::People(people::Event::Ask {
@@ -241,7 +247,7 @@ fn a_chat_ended_with_its_result_unread_keeps_its_read_position() {
 
 #[test]
 fn marking_an_ended_chats_replies_after_its_result_forgets_it() {
-    let mut world = jig_core_world::stories::reads::world(508);
+    let mut world = jig_core_world::stories::reads::forgettable_world(508);
     let task = world.assigned.as_ref().expect("chat").task;
     world.turn(1, 1, None, b"reply");
     finish_chat(&mut world);

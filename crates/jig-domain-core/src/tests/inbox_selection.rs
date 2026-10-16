@@ -202,7 +202,13 @@ fn inbox_context_keeps_all_six_raw_objects_groups_counts_and_full_width_identiti
     core.people.remember_result(
         &limits.people,
         1,
-        people::ResultRef { task: u64::MAX, project: 1, at: Wall::from_nanos(u64::MAX), position: u64::MAX },
+        people::ResultRef {
+            task: u64::MAX,
+            project: 1,
+            at: Wall::from_nanos(u64::MAX),
+            position: u64::MAX,
+            forgettable: None,
+        },
     );
     let value = inbox(&core, &limits, 16);
     assert_eq!(

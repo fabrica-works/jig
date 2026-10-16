@@ -1,4 +1,5 @@
 //! The shared scenarios bound to two test connectors and independent hosts.
+mod conversations;
 use crate::{Config, Testing, actions::World};
 use jig_conformance::referee::{Promise, Violation};
 use jig_conformance::scenarios::{Action, Scenario, ScenarioApplication};
@@ -97,7 +98,12 @@ fn ended(world: &World, task: u64) -> bool {
 
 impl ScenarioApplication for Testing {
     fn configuration(scenario: Scenario, seed: u64) -> Option<Config> {
-        Some(Config::new(seed, false, if scenario == Scenario::ShrinkingPool { 3 } else { 2 }, Some(scenario)))
+        Some(Config::new(
+            seed,
+            false,
+            if matches!(scenario, Scenario::ShrinkingPool | Scenario::ConversationEndsWhileRead) { 3 } else { 2 },
+            Some(scenario),
+        ))
     }
 
     fn action(world: &mut World, action: Action) -> Result<(), Violation> {
@@ -111,6 +117,7 @@ impl ScenarioApplication for Testing {
     fn check(world: &World, scenario: Scenario) -> Result<(), Violation> {
         let applied = world.systems[0].observed().iter().filter(|effect| effect.applied).count();
         match scenario {
+            Scenario::ConversationEndsWhileRead => conversations::check_ending(world),
             Scenario::RacingDecisions => crate::actions::check_racing_decisions(world),
             Scenario::LateCopy => check(
                 applied == 1 && world.systems[0].observed().len() == 2,
@@ -204,6 +211,18 @@ impl Continuation {
     pub(crate) fn advance(&mut self, world: &mut World) -> Result<bool, Violation> {
         loop {
             match self.action {
+                Action::Conversation { .. } | Action::Turn | Action::MarkTurns | Action::MarkResults => {
+                    conversations::action(world, self.action);
+                    return Ok(false);
+                }
+                Action::EndConversations => {
+                    if self.phase < 2 {
+                        conversations::finish(world, usize::from(self.phase));
+                        self.phase += 1;
+                        return Ok(true);
+                    }
+                    return Ok(false);
+                }
                 Action::PartyAmend => {
                     if self.phase == 0 {
                         crate::actions::prepare_racing_decisions(world);
@@ -617,7 +636,12 @@ fn atomic(world: &mut World, action: Action) -> Result<(), Violation> {
             );
         }
 
-        Action::Ready
+        Action::Conversation { .. }
+        | Action::Turn
+        | Action::MarkTurns
+        | Action::EndConversations
+        | Action::MarkResults
+        | Action::Ready
         | Action::FillPool
         | Action::FinishHolder(_)
         | Action::Propose

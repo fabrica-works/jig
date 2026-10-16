@@ -96,6 +96,24 @@ impl World {
         configuration: root::Config,
         limits: root::Limits,
     ) -> World {
+        Self::configured_with(
+            seed,
+            requirement,
+            configuration,
+            limits,
+            people::Ask::StartChat { project: 1, words: b"make an effect".as_slice().into() },
+        )
+    }
+
+    /// Choose the initial authenticated task request.
+    #[must_use]
+    pub fn configured_with(
+        seed: u64,
+        requirement: bool,
+        configuration: root::Config,
+        limits: root::Limits,
+        initial: people::Ask,
+    ) -> World {
         // This domain only journals roles before the exact effect configuration
         // is installed and restored below; its bootstrap needs no effect grants.
         let mut bootstrap = crate::world::config(seed);
@@ -107,6 +125,7 @@ impl World {
             authority::step(&mut bootstrap.core.authority, authority::Event::Policy { project: 1, policy }, &mut facts);
         }
         let mut world = Self::empty(bootstrap, &limits);
+        world.initial_ask = initial;
         world.send(root::Event::Core(core::Event::People(people::Event::Roles { project: 1, holdings: Box::new([]) })));
         let projects: Vec<_> = configuration
             .core
@@ -192,6 +211,7 @@ impl World {
             projections: Vec::new(),
             hold_projection_settlements: false,
             sign_in: None,
+            initial_ask: people::Ask::StartChat { project: 1, words: b"make an effect".as_slice().into() },
             people_answers: Vec::new(),
             application_answers: Vec::new(),
             procedure: None,

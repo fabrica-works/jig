@@ -128,7 +128,19 @@ impl Core {
                 self.people.remember_result(
                     &limits.people,
                     party,
-                    people::ResultRef { task: row.number, project: row.project, at, position: row.result_position },
+                    people::ResultRef {
+                        task: row.number,
+                        project: row.project,
+                        at,
+                        position: row.result_position,
+                        forgettable: (row.flags.retention == tasks::Retention::ForgottenOnceRead).then_some(
+                            people::Forgettable {
+                                label: row.label,
+                                listed: row.flags.listed,
+                                last_reply: row.flags.conversation.then_some(row.last_reply),
+                            },
+                        ),
+                    },
                 );
                 if self.conversation_requester(row).is_some() {
                     people::step(

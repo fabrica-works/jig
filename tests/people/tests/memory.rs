@@ -132,7 +132,13 @@ fn full_people_roles_signins_pending_waiters_answers_and_expiry_fit() {
                 test.domain.remember_result(
                     &limits,
                     party,
-                    jig_domain_people::ResultRef { task: position, project: 1, at: Wall::EPOCH, position },
+                    jig_domain_people::ResultRef {
+                        task: position,
+                        project: 1,
+                        at: Wall::EPOCH,
+                        position,
+                        forgettable: None,
+                    },
                 );
                 test.drain();
             }
@@ -204,7 +210,13 @@ fn full_chat_positions_and_replies_fit(limits: Limits) {
                 restored.domain.remember_result(
                     &limits,
                     party,
-                    jig_domain_people::ResultRef { task: number, project, at: Wall::EPOCH, position: number },
+                    jig_domain_people::ResultRef {
+                        task: number,
+                        project,
+                        at: Wall::EPOCH,
+                        position: number,
+                        forgettable: None,
+                    },
                 );
                 restored.drain();
             }
@@ -254,6 +266,6 @@ fn full_chat_positions_and_replies_fit(limits: Limits) {
         restored.event(Event::Waiting { task, entries });
     }
     for task in 1..=u64::from(limits.inbox_tasks) {
-        restored.event(Event::ForgetChat { task, project: 1, party: None, last_reply: 0 });
+        restored.event(Event::Forget { task, project: 1, party: None, last_reply: 0 });
     }
 }

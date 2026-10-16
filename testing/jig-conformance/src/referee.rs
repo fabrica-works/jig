@@ -342,6 +342,7 @@ pub struct Referee {
     applications: application::Applications,
     pub policy: Policy,
     last: Snapshot,
+    ended_budgets: BTreeMap<u64, u64>,
     commit: u64,
     drained: Option<u64>,
     drained_receipts: Option<BTreeSet<Receipt>>,
@@ -375,6 +376,7 @@ impl Referee {
             applications: application::Applications::default(),
             policy,
             last: Snapshot::default(),
+            ended_budgets: BTreeMap::new(),
             commit: 0,
             drained: None,
             drained_receipts: None,
@@ -641,6 +643,11 @@ impl Referee {
         }
         for key in snapshot.held_effects.iter().chain(&snapshot.settled_effects) {
             self.uncertain.remove(key);
+        }
+        for (task, row) in &self.last.tasks {
+            if row.closed() && !snapshot.tasks.contains_key(task) {
+                self.ended_budgets.insert(*task, row.budget);
+            }
         }
         self.commit = number;
         self.last = snapshot;
@@ -940,7 +947,9 @@ impl Referee {
                     self.last
                         .tasks
                         .get(&task)
-                        .is_some_and(|row| row.budget.checked_add(lost_bound).is_some_and(|maximum| spent <= maximum)),
+                        .map(|row| row.budget)
+                        .or_else(|| self.ended_budgets.get(&task).copied())
+                        .is_some_and(|budget| budget.checked_add(lost_bound).is_some_and(|maximum| spent <= maximum)),
                     Promise::Spend,
                     "independent spend exceeds budget plus lost unacknowledged turns",
                 )?;
