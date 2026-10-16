@@ -66,8 +66,8 @@ impl Link {
             Event::Start { versions, kept } => self.start_store(versions, kept, out),
             Event::Save { record } => self.save(record, out),
             Event::Erase { key } => self.erase(key, out),
-            Event::Written => self.written(out),
-            Event::WriteFailed => self.write_failed(out),
+            Event::Stored => self.written(out),
+            Event::NotStored => self.write_failed(out),
             Event::Open { watch, subject } => self.open(now, watch, subject, out),
             Event::Continue { watch, subject } => {
                 self.forget(watch, out);

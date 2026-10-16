@@ -22,6 +22,8 @@ pub(super) struct Engine {
     truth: Truth,
     observed: Vec<Observed>,
     ticked: Option<Time>,
+    pub offered: BTreeMap<Token, u64>,
+    pub taken: BTreeMap<Token, u64>,
 }
 impl Engine {
     pub fn bounded(seed: u64, limits: &root::Limits) -> Self {
@@ -53,6 +55,8 @@ impl Engine {
             truth,
             observed: Vec::new(),
             ticked: None,
+            offered: BTreeMap::new(),
+            taken: BTreeMap::new(),
         }
     }
     pub fn clock(&mut self, now: Time, wall: Wall) {
@@ -101,6 +105,9 @@ impl Engine {
         None
     }
     fn apply(&mut self, mut event: root::Event) {
+        if let root::Event::Core(core::Event::Delivered { watcher }) = &event {
+            *self.taken.entry(*watcher).or_default() += 1;
+        }
         self.rules.domain(&event).expect("no authentication secret in a root input");
         let to = if let root::Event::Core(
             core::Event::SignIn { reply_to, .. }
@@ -169,6 +176,9 @@ impl Engine {
                     self.event(Event::Application(clients::FromApplication::Read { reply, family: number, record }));
                 }
                 root::Delivery::Core(held) => {
+                    if let core::Held::Delivery { watcher, .. } = &held {
+                        *self.offered.entry(*watcher).or_default() += 1;
+                    }
                     if let Some(event) = held_event(held) {
                         self.event(event);
                     }

@@ -6,6 +6,7 @@ mod boundary;
 pub mod contract;
 mod domain;
 pub mod limits;
+mod link;
 mod reads;
 mod requests;
 mod text;

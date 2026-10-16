@@ -170,8 +170,9 @@ impl Disk {
                 self.closing = true;
             }
             FileCase::Store => {
-                self.shell
-                    .down(link::Request::Write { key: b"key".as_slice().into(), record: b"pending".as_slice().into() });
+                self.shell.down(link::Request::Save {
+                    record: link::Record { key: b"key".as_slice().into(), bytes: b"pending".as_slice().into() },
+                });
                 self.shell.down(link::Request::Exchange {
                     exchange: Token::new(EXCHANGE),
                     credential: Some(Secret::new(Box::new(TOKEN))),
@@ -195,8 +196,8 @@ impl skein_shell::Host for Disk {
         }
         while let Some(event) = self.shell.events().pop() {
             match event {
-                link::Event::Written => self.writes += 1,
-                link::Event::WriteFailed => {
+                link::Event::Stored => self.writes += 1,
+                link::Event::NotStored => {
                     self.failures += 1;
                     self.closing = true;
                 }

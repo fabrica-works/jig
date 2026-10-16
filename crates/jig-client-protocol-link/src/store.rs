@@ -1,5 +1,5 @@
 //! Durability before exchanges, and owner-versioned restoration (protocol/client.md, 10).
-use crate::{Erased, Fact, Keeper, Limits, Link, Message, Request, Saved, StoreRead, StoreVersion, translate};
+use crate::{Erased, Fact, Keeper, Limits, Link, Message, Record, Request, Saved, StoreVersion, translate};
 use alloc::boxed::Box;
 use jig_client_protocol_wire::v8 as w;
 use jig_domain_client::store::StoreKey;
@@ -200,8 +200,8 @@ impl Link {
         for _ in 0..count {
             match out.pop().expect("counted step outputs") {
                 Request::Exchange { exchange, message, .. } => self.exchange(exchange, message, out),
-                value @ (Request::Write { .. }
-                | Request::Remove { .. }
+                value @ (Request::Save { .. }
+                | Request::Erase { .. }
                 | Request::Kept { .. }
                 | Request::Dropped { .. }
                 | Request::Answer { .. }
@@ -234,7 +234,7 @@ impl Link {
         }
         let key = key(&record);
         match encoded(&record, &self.limits) {
-            Ok(record) => out.push(Request::Write { key, record }),
+            Ok(bytes) => out.push(Request::Save { record: Record { key, bytes } }),
             Err(_) => {
                 self.write_failed(out);
                 self.store.failed = true;
@@ -256,7 +256,7 @@ impl Link {
             out.push(Request::Fact { fact: Fact::UndecodableStore });
             return;
         }
-        out.push(Request::Remove { key: erased(key) });
+        out.push(Request::Erase { key: erased(key) });
     }
     pub(super) fn written(&mut self, out: &mut Queue<Request>) {
         self.store.waiting = false;
@@ -282,12 +282,7 @@ impl Link {
             }
         }
     }
-    pub(super) fn start_store(
-        &mut self,
-        versions: List<StoreVersion>,
-        kept: List<StoreRead>,
-        out: &mut Queue<Request>,
-    ) {
+    pub(super) fn start_store(&mut self, versions: List<StoreVersion>, kept: List<Record>, out: &mut Queue<Request>) {
         let bound = records(&self.limits).expect("validated store input bound");
         if kept.len() > bound || versions.len() > bound.checked_add(2).expect("validated keeper input bound") {
             out.push(Request::Fact { fact: Fact::UndecodableStore });
@@ -305,8 +300,8 @@ impl Link {
                 out.push(Request::Fact { fact: Fact::UndecodableStore });
                 continue;
             }
-            let mut reader = Reader::new(&entry.record);
-            let result = if u64::try_from(entry.record.len()).expect("bounded bytes fit u64")
+            let mut reader = Reader::new(&entry.bytes);
+            let result = if u64::try_from(entry.bytes.len()).expect("bounded bytes fit u64")
                 > self.limits.client.document_bytes
             {
                 Err(translate::too_large())

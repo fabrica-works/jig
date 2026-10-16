@@ -134,21 +134,21 @@ pub fn saved_table(ask: c::Ask) -> Saved {
 pub fn saved_family() -> Saved {
     Saved::Family { family: 19, version: 7, key: b"owner-key".as_slice().into(), bytes: Box::from([255, 0, 1]) }
 }
-pub fn store_read(value: Saved) -> StoreRead {
+pub fn store_read(value: Saved) -> Record {
     let mut harness = Harness::new(&limits());
     harness.save(value);
     stored(&harness)
 }
-pub fn stored(harness: &Harness) -> StoreRead {
+pub fn stored(harness: &Harness) -> Record {
     for value in &harness.out {
-        if let Request::Write { key, record } = value {
-            return StoreRead { key: key.clone(), record: record.clone() };
+        if let Request::Save { record: Record { key, bytes: record } } = value {
+            return Record { key: key.clone(), bytes: record.clone() };
         }
     }
     panic!("one store write")
 }
-pub fn other_store_version(mut value: StoreRead) -> StoreRead {
-    let record = w::Kept::decode(&limits().wire, &mut Reader::new(&value.record)).unwrap();
+pub fn other_store_version(mut value: Record) -> Record {
+    let record = w::Kept::decode(&limits().wire, &mut Reader::new(&value.bytes)).unwrap();
     let record = w::Kept::new(
         &limits().wire,
         w::KeptParts { keeper: record.keeper().clone(), store_version: u16::MAX, record: record.record().into() },
@@ -156,14 +156,14 @@ pub fn other_store_version(mut value: StoreRead) -> StoreRead {
     .unwrap();
     let mut writer = Writer::new(usize::try_from(record.measure()).unwrap());
     record.encode(&mut writer).unwrap();
-    value.record = writer.finish();
+    value.bytes = writer.finish();
     value
 }
 impl Harness {
     pub fn save(&mut self, value: Saved) {
         self.link.step(Time::ZERO, Event::Save { record: value }, &mut self.out);
     }
-    pub fn start_store(&mut self, versions: List<StoreVersion>, kept: List<StoreRead>) {
+    pub fn start_store(&mut self, versions: List<StoreVersion>, kept: List<Record>) {
         self.link.step(Time::ZERO, Event::Start { versions, kept }, &mut self.out);
     }
     pub fn send_kept(&mut self, attempt: Token) {
@@ -174,10 +174,10 @@ impl Harness {
         );
     }
     pub fn written(&mut self) {
-        self.link.step(Time::ZERO, Event::Written, &mut self.out);
+        self.link.step(Time::ZERO, Event::Stored, &mut self.out);
     }
     pub fn write_failed(&mut self) {
-        self.link.step(Time::ZERO, Event::WriteFailed, &mut self.out);
+        self.link.step(Time::ZERO, Event::NotStored, &mut self.out);
     }
     pub fn exchanges(&self) -> u32 {
         let mut count = 0_u32;
@@ -185,8 +185,8 @@ impl Harness {
             match value {
                 Request::Exchange { .. } => count = count.saturating_add(1),
                 Request::Kept { .. }
-                | Request::Write { .. }
-                | Request::Remove { .. }
+                | Request::Save { .. }
+                | Request::Erase { .. }
                 | Request::Dropped { .. }
                 | Request::Answer { .. }
                 | Request::Read { .. }
@@ -209,8 +209,8 @@ impl Harness {
                 Request::Kept { record } if record == expected => return true,
                 Request::Kept { .. }
                 | Request::Exchange { .. }
-                | Request::Write { .. }
-                | Request::Remove { .. }
+                | Request::Save { .. }
+                | Request::Erase { .. }
                 | Request::Dropped { .. }
                 | Request::Answer { .. }
                 | Request::Read { .. }
@@ -277,7 +277,7 @@ pub fn saved_places() -> List<Saved> {
     }
     saved
 }
-pub fn one_store_read(value: StoreRead) -> List<StoreRead> {
+pub fn one_store_read(value: Record) -> List<Record> {
     list([value])
 }
 

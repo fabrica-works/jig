@@ -17,6 +17,7 @@ pub struct Domain {
     pub(crate) scratch: List<Handle>,
     due: List<u64>,
     started: bool,
+    pub(crate) link: crate::Link,
     pub(crate) table: RequestTable<crate::Key, crate::Held>,
     pub(crate) requests: Map<crate::Key, crate::requests::PendingRequest>,
 }
@@ -33,6 +34,7 @@ impl Domain {
             scratch: List::with_capacity(limits.handles),
             due: List::with_capacity(limits.watches),
             started: false,
+            link: crate::Link::SignedOut,
             table: RequestTable::new(&limits.requests, seed),
             requests: Map::with_capacity(limits.requests.requests),
         }
@@ -152,14 +154,19 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::Start { kept } => {
             assert!(!domain.started, "start once");
             domain.started = true;
-            domain.restore(env, kept, out);
-            domain.open(Watchable::Jig(crate::contract::Subject::Frame), true, out);
+            domain.restore_record(env, kept, out);
         }
         Event::Send { key, request } => domain.send(env, key, request, out),
         Event::Watch { handle, subject } => domain.watch(env, handle, subject, out),
         Event::Unwatch { handle } => domain.unwatch(handle, out),
         Event::Read { handle, read } => domain.read(env, handle, read, out),
         Event::Up { up } => match up {
+            crate::Up::SignedIn => domain.signed_in(out),
+            crate::Up::Served { served } => {
+                if !served {
+                    domain.set_link(crate::Link::OutOfDate, out);
+                }
+            }
             crate::Up::ReadDone { read, result } => domain.read_done(read, result, out),
             crate::Up::Answer { attempt, envelope, answer, why } => {
                 domain.answer(env, attempt, envelope, answer, why, out);

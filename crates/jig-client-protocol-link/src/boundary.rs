@@ -16,10 +16,10 @@ pub struct StoreVersion {
     pub version: u16,
 }
 /// A record the shell read with its keeper-tagged storage key.
-#[derive(Debug)]
-pub struct StoreRead {
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Record {
     pub key: Box<[u8]>,
-    pub record: Box<[u8]>,
+    pub bytes: Box<[u8]>,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Saved {
@@ -41,7 +41,7 @@ pub enum Event {
     SignOut,
     Start {
         versions: List<StoreVersion>,
-        kept: List<StoreRead>,
+        kept: List<Record>,
     },
     Save {
         record: Saved,
@@ -50,9 +50,9 @@ pub enum Event {
         key: Erased,
     },
     /// Every write and removal of this step is durable.
-    Written,
+    Stored,
     /// This step's writes failed; withhold and fail its held exchanges.
-    WriteFailed,
+    NotStored,
     Send {
         attempt: Token,
         key: RequestKey,
@@ -87,11 +87,10 @@ pub enum Event {
 }
 #[derive(Debug, PartialEq, Eq)]
 pub enum Request {
-    Write {
-        key: Box<[u8]>,
-        record: Box<[u8]>,
+    Save {
+        record: Record,
     },
-    Remove {
+    Erase {
         key: Box<[u8]>,
     },
     Kept {

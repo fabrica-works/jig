@@ -34,13 +34,13 @@ pub(super) fn encode(records: &[client::store::Record]) -> Bytes {
     for record in records {
         link.step(Time::ZERO, link::Event::Save { record: saved(record.clone()) }, &mut out);
         while let Some(request) = out.pop() {
-            if let link::Request::Write { key, record } = request {
+            if let link::Request::Save { record: link::Record { key, bytes: record } } = request {
                 bytes.push((key, record));
             } else {
                 panic!("save must write its record");
             }
         }
-        link.step(Time::ZERO, link::Event::Written, &mut out);
+        link.step(Time::ZERO, link::Event::Stored, &mut out);
     }
     bytes
 }
@@ -84,7 +84,7 @@ pub(super) fn decode(bytes: &Bytes) -> Vec<client::store::Record> {
     ]);
     let mut kept = List::with_capacity(u32::try_from(bytes.len()).expect("bounded small store"));
     for (key, record) in bytes {
-        kept.push(link::StoreRead { key: key.clone(), record: record.clone() }).expect("exact store capacity");
+        kept.push(link::Record { key: key.clone(), bytes: record.clone() }).expect("exact store capacity");
     }
     let mut out = Queue::with_capacity(256);
     link.step(Time::ZERO, link::Event::Start { versions, kept }, &mut out);

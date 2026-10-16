@@ -58,7 +58,7 @@ fn a_step_s_writes_leave_before_its_exchanges() {
     let mut harness = pending_write(fixtures::saved_draft());
     assert_eq!(harness.exchanges(), 0);
     harness.written();
-    let Some(Request::Write { .. }) = harness.out.iter().next() else { panic!("write leaves first") };
+    let Some(Request::Save { .. }) = harness.out.iter().next() else { panic!("write leaves first") };
     assert_eq!(harness.exchanges(), 1);
 }
 #[test]
@@ -68,7 +68,7 @@ fn a_write_gathers_exchanges_already_in_the_step_s_output_queue() {
     harness.save(fixtures::saved_draft());
     assert_eq!(harness.exchanges(), 0);
     harness.written();
-    let Some(Request::Write { .. }) = harness.out.iter().next() else { panic!("write leaves first") };
+    let Some(Request::Save { .. }) = harness.out.iter().next() else { panic!("write leaves first") };
     assert_eq!(harness.exchanges(), 1);
 }
 #[test]
@@ -109,13 +109,13 @@ fn an_erased_key_waits_for_durability_before_the_step_s_exchange() {
     harness.send_kept(fixtures::ATTEMPT);
     assert_eq!(harness.exchanges(), 0);
     harness.written();
-    let Some(Request::Remove { .. }) = harness.out.iter().next() else { panic!("erase leaves first") };
+    let Some(Request::Erase { .. }) = harness.out.iter().next() else { panic!("erase leaves first") };
     assert_eq!(harness.exchanges(), 1);
 }
 #[test]
 fn malformed_kept_bytes_drop_the_owner_and_are_reported() {
     let mut entry = fixtures::store_read(fixtures::saved_draft());
-    entry.record = Box::from([255]);
+    entry.bytes = Box::from([255]);
     let mut harness = fixtures::Harness::new(&fixtures::limits());
     harness.start_store(fixtures::store_versions(), fixtures::one_store_read(entry));
     assert!(harness.has(&Request::Dropped { keeper: Keeper::Jig }));

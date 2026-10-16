@@ -16,6 +16,16 @@ pub struct Limits {
     pub turn_bytes: u32,
     pub document_bytes: u64,
     pub backoff: Backoff,
+    pub rows: u32,
+    pub text: u32,
+    pub projects: u32,
+    pub charters: u32,
+    pub fields: u32,
+    pub delegates: u32,
+    pub records: u32,
+    pub kept: u32,
+    pub parts: u32,
+    pub heartbeat: Duration,
 }
 #[must_use]
 pub fn max_out(limits: &Limits) -> u32 {

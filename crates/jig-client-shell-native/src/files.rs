@@ -74,12 +74,12 @@ impl Files {
     pub(crate) fn token(&mut self) -> Option<Secret> {
         self.token.take()
     }
-    pub(crate) fn loaded(&mut self) -> Option<Vec<jig_client_protocol_link::StoreRead>> {
+    pub(crate) fn loaded(&mut self) -> Option<Vec<jig_client_protocol_link::Record>> {
         self.loaded.take()?;
         Some(
             self.records
                 .iter()
-                .map(|(key, record)| jig_client_protocol_link::StoreRead { key: key.clone(), record: record.clone() })
+                .map(|(key, record)| jig_client_protocol_link::Record { key: key.clone(), bytes: record.clone() })
                 .collect(),
         )
     }

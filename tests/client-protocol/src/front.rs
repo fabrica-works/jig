@@ -134,8 +134,8 @@ impl Side {
             | link::Request::OpenStream { .. }
             | link::Request::CloseStream) => return Err(transport),
             ignored @ (link::Request::Signing { .. }
-            | link::Request::Write { .. }
-            | link::Request::Remove { .. }
+            | link::Request::Save { .. }
+            | link::Request::Erase { .. }
             | link::Request::Kept { .. }
             | link::Request::Dropped { .. }
             | link::Request::Hello { family: Some(_), .. }

@@ -197,6 +197,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "jig-client"
+version = "0.0.0"
+dependencies = [
+ "jig-client-domain",
+ "jig-client-protocol-link",
+ "jig-client-protocol-wire",
+ "jig-client-test-records",
+ "skein-lib",
+]
+
+[[package]]
 name = "jig-client-domain"
 version = "0.0.0"
 dependencies = [
@@ -237,6 +248,7 @@ dependencies = [
 name = "jig-client-protocol-world"
 version = "0.0.0"
 dependencies = [
+ "jig-client",
  "jig-client-domain",
  "jig-client-protocol-http",
  "jig-client-protocol-link",

@@ -27,6 +27,16 @@ pub(crate) fn limits() -> Limits {
             margin: Duration::from_secs(1),
         },
         ask_bytes: 16384,
+        rows: 2,
+        text: 32,
+        projects: 2,
+        charters: 2,
+        fields: 4,
+        delegates: 2,
+        records: 2,
+        kept: 4,
+        parts: 8,
+        heartbeat: Duration::from_millis(100),
         handles: 8,
         turn_bytes: 32,        // tests/client/src/test.rs:42
         reads: 8,              // tests/client/src/test.rs:32
@@ -58,13 +68,17 @@ pub(crate) struct Client {
 }
 impl Client {
     pub(crate) fn new(limits: Limits) -> Self {
-        Self {
+        let mut client = Self {
             domain: Domain::new(&limits, 7),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
             out: Queue::with_capacity(max_out(&limits)),
             downs: List::with_capacity(max_out(&limits)),
             told: List::with_capacity(max_out(&limits)),
-        }
+        };
+        client.step(Event::Up { up: Up::SignedIn });
+        client.told();
+        client.downs();
+        client
     }
     pub(crate) fn started() -> Self {
         let mut client = Self::new(limits());
@@ -245,6 +259,7 @@ impl Client {
     pub(crate) fn live() -> Self {
         let mut c = Self::started();
         c.step(Event::Up { up: me(PARTY, Duration::from_secs(1)) });
+        c.told();
         c
     }
     pub(crate) fn send(&mut self) -> Token {

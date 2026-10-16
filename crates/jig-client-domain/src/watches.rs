@@ -20,7 +20,9 @@ pub(crate) struct Watch {
 impl Domain {
     pub(crate) fn up(&mut self, env: &Env<Limits>, up: Up, out: &mut Queue<Request>) {
         let name = match &up {
-            Up::Answer { .. } | Up::ReadDone { .. } => unreachable!("watch events only"),
+            Up::SignedIn | Up::Served { .. } | Up::Answer { .. } | Up::ReadDone { .. } => {
+                unreachable!("watch events only")
+            }
             Up::Watched { watch, .. } | Up::FamilyDelivered { watch, .. } | Up::WatchEnded { watch, .. } => *watch,
         };
         let mut found = None;
@@ -33,7 +35,9 @@ impl Domain {
             return;
         };
         match up {
-            Up::Answer { .. } | Up::ReadDone { .. } => unreachable!("watch events only"),
+            Up::SignedIn | Up::Served { .. } | Up::Answer { .. } | Up::ReadDone { .. } => {
+                unreachable!("watch events only")
+            }
             Up::Watched { event, .. } => match event {
                 WatchEvent::Delivered(value) => self.deliver(env, id, Latest::Jig(value), out),
                 WatchEvent::Opened | WatchEvent::Alive => {}
@@ -76,6 +80,9 @@ impl Domain {
         w.latest = Some(latest);
         w.state = State::Live;
         w.span = None;
+        if w.own {
+            self.set_link(crate::Link::Live, out);
+        }
         self.select_handles(id);
         for index in 0..self.scratch.len() {
             let handle = *self.scratch.get(index).expect("selected handle");
@@ -119,6 +126,9 @@ impl Domain {
             Some(_) => {
                 w.state = State::Ended;
             }
+        }
+        if w.own && why.is_none() {
+            self.set_link(crate::Link::Offline, out);
         }
         self.select_handles(id);
         for index in 0..self.scratch.len() {

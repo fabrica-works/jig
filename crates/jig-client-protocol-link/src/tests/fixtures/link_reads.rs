@@ -32,8 +32,8 @@ impl Harness {
             | Request::FamilyDelivery { .. }
             | Request::Ended { .. }
             | Request::Hello { .. }
-            | Request::Write { .. }
-            | Request::Remove { .. }
+            | Request::Save { .. }
+            | Request::Erase { .. }
             | Request::Kept { .. }
             | Request::Dropped { .. }
             | Request::Signing { .. }
@@ -66,8 +66,8 @@ impl Harness {
                 | Request::FamilyDelivery { .. }
                 | Request::Ended { .. }
                 | Request::Hello { .. }
-                | Request::Write { .. }
-                | Request::Remove { .. }
+                | Request::Save { .. }
+                | Request::Erase { .. }
                 | Request::Kept { .. }
                 | Request::Dropped { .. }
                 | Request::Signing { .. }
@@ -91,8 +91,8 @@ impl Harness {
                 | Request::FamilyDelivery { .. }
                 | Request::Ended { .. }
                 | Request::Hello { .. }
-                | Request::Write { .. }
-                | Request::Remove { .. }
+                | Request::Save { .. }
+                | Request::Erase { .. }
                 | Request::Kept { .. }
                 | Request::Dropped { .. }
                 | Request::Signing { .. }

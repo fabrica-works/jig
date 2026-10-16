@@ -140,7 +140,8 @@ fn client_domain_depends_on_foundation_alone() {
 fn client_step(name: &str) -> bool {
     matches!(
         name,
-        "jig-domain-client"
+        "jig-client"
+            | "jig-domain-client"
             | "jig-client-domain"
             | "jig-client-view"
             | "jig-protocol-transcript"
@@ -465,7 +466,8 @@ fn client_engine_breaches(manifests: &[CrateManifest]) -> Vec<String> {
         if !matches!(
             manifest.name.as_deref(),
             Some(
-                "jig-domain-client"
+                "jig-client"
+                    | "jig-domain-client"
                     | "jig-client-view"
                     | "jig-client-protocol-wire"
                     | "jig-client-protocol-link"
@@ -693,4 +695,13 @@ fn client_step_crates_link_no_http_but_the_mapping() {
         .map(|m| m.path.display().to_string())
         .collect();
     assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+#[test]
+fn client_crate_links_only_its_domain_link_and_foundation() {
+    let clients: Vec<_> = manifests().into_iter().filter(|m| m.name.as_deref() == Some("jig-client")).collect();
+    assert_eq!(clients.len(), 1, "one client");
+    let mut dependencies = clients[0].dependencies.clone();
+    dependencies.sort();
+    assert_eq!(dependencies, ["jig-client-domain", "jig-client-protocol-link", "skein-lib"]);
 }

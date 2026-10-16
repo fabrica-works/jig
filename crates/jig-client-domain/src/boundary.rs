@@ -86,6 +86,8 @@ pub enum Event {
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Up {
+    SignedIn,
+    Served { served: bool },
     Answer { attempt: Token, envelope: RequestEnvelope, answer: Option<Answered>, why: Option<Retry> },
     Watched { watch: Token, event: contract::WatchEvent },
     FamilyDelivered { watch: Token, record: Family },
@@ -109,6 +111,7 @@ pub enum Down {
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Told {
+    Link { link: Link },
     Pending { key: Key },
     Answered { key: Key, outcome: Outcome },
     Kept { key: Key, request: Ask },
@@ -156,4 +159,14 @@ pub struct Pending {
     pub progress: Progress,
     pub party: u64,
     pub owner: Option<u16>,
+}
+
+/// The stream and the client-owned watch of me (client/domain/client.md, 8.2).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Link {
+    SignedOut,
+    Starting,
+    Live,
+    Offline,
+    OutOfDate,
 }

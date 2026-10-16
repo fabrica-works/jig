@@ -109,8 +109,8 @@ impl Connections {
                 }
             }
             link::Request::CloseStream => self.close(now, None, below),
-            link::Request::Write { .. }
-            | link::Request::Remove { .. }
+            link::Request::Save { .. }
+            | link::Request::Erase { .. }
             | link::Request::Kept { .. }
             | link::Request::Dropped { .. }
             | link::Request::Answer { .. }

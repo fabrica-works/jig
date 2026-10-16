@@ -1,35 +1,33 @@
 use super::*;
-use jig_domain_client::limits::Backoff;
+use jig_client_domain::Backoff;
 use skein_lib::{Duration, RequestKey, Writer};
 pub const ATTEMPT: Token = Token::new(17);
 pub const KEY: RequestKey = [9; 16];
 pub const SERVICE_CREDENTIAL: [u8; 40] = [7; 40];
-const CLIENT: jig_domain_client::Limits = jig_domain_client::Limits {
+const CLIENT: jig_client_domain::Limits = jig_client_domain::Limits {
     watches: 4,
-    notices: 2,
-    notice_life: Duration::from_secs(5),
-    linger: Duration::from_secs(5),
-    save_delay: Duration::from_secs(1),
-    intents: 2,
+    handles: 8,
+    turn_bytes: 32,
+    ask_bytes: 16384,
+    requests: skein_lib::RequestLimits {
+        requests: 4,
+        bytes: 65536,
+        out: 16,
+        first: Duration::from_nanos(10),
+        most: Duration::from_nanos(80),
+        margin: Duration::from_secs(1),
+    },
     fields: 4,
-    providers: 2,
-    objects: 2,
-    sources: 8,
     reads: 4,
     parts: 8,
     delegates: 2,
     document_bytes: 65536,
     records: 2,
     kept: 4,
-    drafts: 1,
     projects: 2,
-    roles: 2,
     charters: 2,
     text: 32,
     rows: 2,
-    conversation_words: 2,
-    navigation_entries: 8,
-    updates_count: 99,
     backoff: Backoff { first: Duration::from_nanos(10), most: Duration::from_nanos(80) },
     heartbeat: Duration::from_nanos(100),
 };
@@ -101,8 +99,8 @@ impl Harness {
             | Request::FamilyDelivery { .. }
             | Request::Ended { .. }
             | Request::Hello { .. }
-            | Request::Write { .. }
-            | Request::Remove { .. }
+            | Request::Save { .. }
+            | Request::Erase { .. }
             | Request::Kept { .. }
             | Request::Dropped { .. }
             | Request::Signing { .. }
@@ -135,8 +133,8 @@ impl Harness {
                 | Request::FamilyDelivery { .. }
                 | Request::Ended { .. }
                 | Request::Hello { .. }
-                | Request::Write { .. }
-                | Request::Remove { .. }
+                | Request::Save { .. }
+                | Request::Erase { .. }
                 | Request::Kept { .. }
                 | Request::Dropped { .. }
                 | Request::Signing { .. }
@@ -167,8 +165,8 @@ impl Harness {
                 | Request::FamilyDelivery { .. }
                 | Request::Ended { .. }
                 | Request::Hello { .. }
-                | Request::Write { .. }
-                | Request::Remove { .. }
+                | Request::Save { .. }
+                | Request::Erase { .. }
                 | Request::Kept { .. }
                 | Request::Dropped { .. }
                 | Request::Signing { .. }

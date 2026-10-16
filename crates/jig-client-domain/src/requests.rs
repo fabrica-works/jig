@@ -23,7 +23,11 @@ impl Domain {
                 let Some(crate::Latest::Jig(contract::Delivery::Frame(frame))) = &w.latest else {
                     continue;
                 };
-                return Some((frame.party.number, frame.retention, w.state == State::Live));
+                return Some((
+                    frame.party.number,
+                    frame.retention,
+                    w.state == State::Live && self.link == crate::Link::Live,
+                ));
             }
         }
         None
@@ -49,7 +53,8 @@ impl Domain {
             Err(_) => tell(out, Told::Answered { key, outcome: Outcome::Limit }),
         }
     }
-    pub(crate) fn restore(&mut self, env: &Env<Limits>, kept: List<RequestRecord<Held>>, out: &mut Queue<Request>) {
+    /// Restores decoded records from the small store (client/domain/client.md, 11).
+    pub fn restore_record(&mut self, env: &Env<Limits>, kept: List<RequestRecord<Held>>, out: &mut Queue<Request>) {
         let mut dropped = 0_u32;
         for record in kept.into_boxed() {
             let key = record.request.key;

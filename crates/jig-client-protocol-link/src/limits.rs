@@ -4,7 +4,7 @@ use jig_client_protocol_wire::v8 as w;
 use skein_lib::{Duration, Map};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
-    pub client: jig_domain_client::Limits,
+    pub client: jig_client_domain::Limits,
     pub exchanges: u32,
     pub wire: w::Limits,
 }
@@ -13,7 +13,7 @@ pub enum Unusable {
     Limits,
 }
 impl Limits {
-    pub fn new(client: jig_domain_client::Limits, exchanges: u32) -> Result<Self, Unusable> {
+    pub fn new(client: jig_client_domain::Limits, exchanges: u32) -> Result<Self, Unusable> {
         let wire = wire(&client).ok_or(Unusable::Limits)?;
         let value = Self { client, exchanges, wire };
         worst_case(&value).ok_or(Unusable::Limits)?;
@@ -21,7 +21,7 @@ impl Limits {
     }
 }
 #[expect(clippy::too_many_lines, reason = "the generated field bounds are assigned together at construction")]
-fn wire(client: &jig_domain_client::Limits) -> Option<w::Limits> {
+fn wire(client: &jig_client_domain::Limits) -> Option<w::Limits> {
     let mut wire = w::CEILINGS;
     wire.owned_record = u32::try_from(client.document_bytes).ok()?;
     wire.document_text_bytes = client.text;
@@ -180,7 +180,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(40)
 }
 
-pub(crate) fn max_out(limits: &Limits) -> Option<u32> {
+#[must_use]
+pub fn max_out(limits: &Limits) -> Option<u32> {
     let per_event = limits.client.watches.checked_mul(3)?.checked_add(limits.exchanges)?.checked_add(20)?;
     per_event.checked_add(limits.exchanges.checked_mul(2)?)?.checked_add(crate::store::records(limits)?.checked_mul(2)?)
 }

@@ -75,7 +75,7 @@ impl Shell {
         self.files.adopt(root, user, seed);
     }
     /// Read records once, after the private token and small store have loaded.
-    pub fn loaded(&mut self) -> Option<(Option<Secret>, Vec<link::StoreRead>)> {
+    pub fn loaded(&mut self) -> Option<(Option<Secret>, Vec<link::Record>)> {
         let records = self.files.loaded()?;
         Some((self.files.token(), records))
     }
@@ -103,8 +103,8 @@ impl Shell {
     /// Route one link output; call iterate after the whole step's outputs.
     pub fn down(&mut self, request: link::Request) {
         match request {
-            link::Request::Write { key, record } => self.files.edit(key, Some(record)),
-            link::Request::Remove { key } => self.files.edit(key, None),
+            link::Request::Save { record } => self.files.edit(record.key, Some(record.bytes)),
+            link::Request::Erase { key } => self.files.edit(key, None),
             request @ (link::Request::Exchange { .. } | link::Request::OpenStream { .. }) => {
                 assert!(self.held.len() < usize::try_from(self.max * 64).expect("held bound"), "step output bound");
                 self.held.push_back(request);
@@ -236,7 +236,7 @@ impl Shell {
         }
         self.files.progress(now);
         if let Some(ok) = self.files.written.take() {
-            self.events.push(if ok { link::Event::Written } else { link::Event::WriteFailed });
+            self.events.push(if ok { link::Event::Stored } else { link::Event::NotStored });
             if !ok {
                 while let Some(request) = self.held.pop_front() {
                     if let link::Request::Exchange { exchange, .. } = request {

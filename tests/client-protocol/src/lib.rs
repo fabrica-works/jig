@@ -1,5 +1,6 @@
 //! Client stories through native HTTP bytes (protocol/client.md, 14).
 #![forbid(unsafe_code)]
+pub mod client;
 mod engine;
 pub mod family;
 pub mod fixtures;

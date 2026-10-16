@@ -101,7 +101,7 @@ pub fn connections_limits() -> jig_client_shell_native::Limits {
 }
 #[must_use]
 pub fn link_limits() -> jig_client_protocol_link::Limits {
-    jig_client_protocol_link::Limits::new(jig_client_world::test::limits().jig, 8).expect("bounded link")
+    jig_client_protocol_link::Limits::new(domain_limits(), 8).expect("bounded link")
 }
 #[must_use]
 pub fn sign_in_then(
@@ -125,4 +125,30 @@ pub fn family_world(seed: u64) -> World<Test, Protocol> {
     let resource = configuration.first.resources.first().expect("configured first object").path.clone();
     world.front().adopt_family_resource(resource);
     world
+}
+
+#[must_use]
+pub fn domain_limits() -> jig_client_domain::Limits {
+    let profile = jig_client_world::test::limits();
+    let jig = profile.jig;
+    jig_client_domain::Limits {
+        requests: profile.table,
+        ask_bytes: 16384,
+        handles: 8,
+        watches: jig.watches,
+        reads: jig.reads,
+        turn_bytes: 32,
+        document_bytes: jig.document_bytes,
+        backoff: jig_client_domain::Backoff { first: jig.backoff.first, most: jig.backoff.most },
+        rows: jig.rows,
+        text: jig.text,
+        projects: jig.projects,
+        charters: jig.charters,
+        fields: jig.fields,
+        delegates: jig.delegates,
+        records: jig.records,
+        kept: jig.kept,
+        parts: jig.parts,
+        heartbeat: jig.heartbeat,
+    }
 }
