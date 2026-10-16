@@ -345,10 +345,21 @@ root for one step at a time, and the root asks the store:
   projections, run proofs, calls, agents' conversations). It is a fixed
   list of intervals, in that order, paged and handed up typed;
 - **the inbox's census,** a step of its own once people's read positions
-  are restored: the results' index from each party's read position over
-  results (4.4), and the family of ended read positions, one row per
-  ended conversation not yet erased (7.4), each row joined to its ended
-  task's record by a point read; never every ended task (section 15);
+  are restored: the family of ended read positions, one row per ended
+  conversation not yet erased (7.4), then the results' index from each
+  party's read position over results (4.4), parties in the census's
+  order; each row joined to its ended task's record by a point read;
+  never every ended task (section 15). The census:
+  - hands up an ended read position, then its task's record, and a
+    result's row only as its task's record;
+  - never parts a position from its record: a page counts both against
+    the asker's rows and bytes, and ends before a pair that does not
+    fit, so a root asks the census for at least two rows;
+  - goes on from the last index row's key. The census places each key
+    it admits in the walk's order (`Census::interval`), so that a root
+    that keeps its own cursors finds the interval to go on from (4.3);
+  - restores each ended task once per party, whichever part names it:
+    neither part's progress skips a row of the other;
 - **each connector's live ranges,** as the application's byte intervals,
   handed up as bytes for its codecs;
 - **what the core never restores** (turns, terminals, history, ended
