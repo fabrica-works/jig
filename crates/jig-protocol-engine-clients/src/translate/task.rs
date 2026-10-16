@@ -275,6 +275,7 @@ pub fn delegates_pieces(rows: &List<w::LiveDelegate>, bound: u32, path: w::Path)
     pieces(&encoded, bound, path)
 }
 pub fn document(value: &d::Task, limits: &w::Limits) -> Result<w::Task, w::Problem> {
+    // waits_on is carried by the document wire in jig 22.
     if value.project != value.chip.details.project
         || value.executor != value.chip.details.executor
         || value.words != value.spec.words

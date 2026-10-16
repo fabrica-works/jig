@@ -58,6 +58,7 @@ pub use task_tree::{
     ResourceLine, ResultValue, Task, TaskLink, Tree, TreeRow, task_from_row,
 };
 
+pub use crate::waits::WaitsOn;
 use crate::{Core, Limits};
 use alloc::boxed::Box;
 use jig_domain_people as people;
@@ -456,7 +457,9 @@ pub fn document_with_context_worst_case(limits: &Limits) -> Option<u64> {
 /// Peak scratch allocated while constructing party/deployment pages. Child
 /// accessors copy bounded shallow facts only; documents themselves are separate.
 pub(crate) fn document_scratch_worst_case(limits: &Limits) -> Option<u64> {
-    Some(deployment::scratch_worst_case(limits)?.max(project_tasks::scratch_worst_case(limits)?))
+    let waits = List::<u64>::worst_case(limits.tasks.tree_tasks)?
+        .checked_add(List::<people::Entry>::worst_case(crate::inbox::waiting_capacity(limits)?)?)?;
+    Some(deployment::scratch_worst_case(limits)?.max(project_tasks::scratch_worst_case(limits)?).max(waits))
 }
 
 /// Join volatile live observations to a loaded owner row. The reader checks

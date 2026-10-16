@@ -129,6 +129,7 @@ pub fn hold() -> d::HoldLine {
 }
 pub fn task_with_hold() -> d::Task {
     d::Task {
+        waits_on: d::WaitsOn::Nothing,
         chip: chip(),
         acts: List::with_capacity(0),
         project: 7,

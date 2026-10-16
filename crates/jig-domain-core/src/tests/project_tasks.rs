@@ -34,26 +34,8 @@ fn fixture() -> (Core, Limits) {
         } else {
             Box::new([new_row(&core, number, tasks::Funder::Period { project: 1, period: 1 }, None)])
         };
-        let mut out = Queue::with_capacity(tasks::max_out(&limits.tasks));
-        tasks::step(
-            &mut core.tasks,
-            &Env { now: Time::ZERO, wall: Wall::from_nanos(when), limits: limits.tasks },
-            tasks::Event::Make {
-                reply_to: ReplyTo::new(Token::new(number)),
-                creator: tasks::Party::Person(creator),
-                batch,
-            },
-            &mut out,
-        );
-        let mut observed = List::with_capacity(out.len());
-        while let Some(request) = out.pop() {
-            if let tasks::Request::Save { record: tasks::Stored::Live(row) } = &request {
-                let mut projections = Queue::with_capacity(room_max(&limits).expect("projection room").writes);
-                projections::save(&mut core, &limits, row, &mut projections);
-            }
-            observed.push(request).expect("observed outputs");
-        }
-        assert!(core.tasks.task(number).is_some(), "task {number}: {observed:?}");
+        fixtures::make_batch_at(&mut core, &limits, tasks::Party::Person(creator), batch, Wall::from_nanos(when));
+        assert!(core.tasks.task(number).is_some(), "task {number}");
     }
     (core, limits)
 }

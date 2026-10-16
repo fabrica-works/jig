@@ -180,6 +180,7 @@ pub enum Parameter {
 /// A task page's header, overview, funding, authority and current held decision.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Task {
+    pub waits_on: super::WaitsOn,
     pub chip: Chip,
     pub acts: List<crate::acts::Offered>,
     pub project: u32,
@@ -759,6 +760,7 @@ pub fn task_from_row(core: &Core, limits: &Limits, party: u64, row: &tasks::Task
         }
     }
     Ok(Task {
+        waits_on: core.waits_on(limits, row.number),
         acts,
         chip: super::small::chip_with_core(core, limits, row)?,
         project: row.project,

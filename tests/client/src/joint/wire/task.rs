@@ -112,6 +112,7 @@ pub(crate) mod tests {
         let mut delegates = List::with_capacity(4);
         delegates.push(documents::LiveDelegate { chip: chip.clone(), takeover_budget: u64::MAX }).expect("source room");
         documents::Task {
+            waits_on: documents::WaitsOn::Nothing,
             project: chip.details.project,
             executor: chip.details.executor,
             requester: tasks::Party::Deployment { project: 0 },

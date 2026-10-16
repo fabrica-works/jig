@@ -2951,6 +2951,7 @@ mod project_period_watches;
 
 mod fixtures;
 mod reserve;
+mod waits;
 
 mod charters;
 
