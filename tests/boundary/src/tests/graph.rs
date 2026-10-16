@@ -621,3 +621,41 @@ fn the_identity_dependency_is_allowed_for_the_test_service_alone() {
         assert_eq!(test_worker_smith_breaches(&[manifest]), expected, "{label}");
     }
 }
+
+/// Client crates outside the prefix until the client's restructuring removes them.
+const PENDING: [&str; 1] = ["jig-domain-client"];
+
+#[test]
+fn client_crates_carry_the_client_prefix() {
+    let allowed = [
+        "jig-protocol-engine-clients",
+        "jig-protocol-engine-clients-http",
+        "jig-engine-clients-world",
+        "jig-fake-parties",
+        "jig-protocol-transcript",
+        "jig-test",
+        "jig-test-service",
+        "jig-one-process-world",
+        "jig-ops-world",
+    ];
+    assert_eq!(crate::client_names::breaches(&kit_root(), "jig", &allowed), PENDING);
+}
+
+#[test]
+fn a_crate_on_the_client_without_the_prefix_is_reported() {
+    let page = parse_manifest(
+        PathBuf::from("fixture/page/Cargo.toml"),
+        "[package]\nname = \"jig-page\"\n[dependencies]\njig-client.workspace = true\n",
+    );
+    let client = parse_manifest(PathBuf::from("fixture/client/Cargo.toml"), "[package]\nname = \"jig-client\"\n");
+    assert_eq!(crate::client_names::of(&[page, client], "jig", &[]), ["jig-page"]);
+}
+
+#[test]
+fn a_crate_named_as_a_view_without_the_prefix_is_reported() {
+    let page = parse_manifest(
+        PathBuf::from("fixture/page/Cargo.toml"),
+        "[package]\nname = \"jig-pages-view\"\n[dependencies]\nskein-lib.workspace = true\n",
+    );
+    assert_eq!(crate::client_names::of(&[page], "jig", &[]), ["jig-pages-view"]);
+}
