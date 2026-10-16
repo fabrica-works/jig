@@ -332,6 +332,7 @@ impl Clients {
             | root::Event::Credential { .. }
             | root::Event::Connector { .. }
             | root::Event::ProjectionEffect { .. }
+            | root::Event::TopicCall { .. }
             | root::Event::EffectCall { .. }
             | root::Event::CallAnswered { .. }
             | root::Event::Text { .. }
@@ -442,6 +443,7 @@ impl Clients {
             | root::Event::Credential { .. }
             | root::Event::Connector { .. }
             | root::Event::ProjectionEffect { .. }
+            | root::Event::TopicCall { .. }
             | root::Event::EffectCall { .. }
             | root::Event::CallAnswered { .. }
             | root::Event::Text { .. }

@@ -166,6 +166,7 @@ pub(crate) fn watcher(value: &core::Event) -> Option<Token> {
         | core::Event::HistoricalPersonTask { .. }
         | core::Event::HistoricalEscalation { .. }
         | core::Event::NamedAnswer { .. }
+        | core::Event::SubscribeTopic { .. }
         | core::Event::NamedAction { .. }
         | core::Event::DelegateValidated { .. }
         | core::Event::DelegateInputFailed { .. }
@@ -238,6 +239,7 @@ pub(crate) fn starting(value: core::Event) -> Option<kit::Event> {
         | core::Event::HistoricalPersonTask { .. }
         | core::Event::HistoricalEscalation { .. }
         | core::Event::NamedAnswer { .. }
+        | core::Event::SubscribeTopic { .. }
         | core::Event::NamedAction { .. }
         | core::Event::DelegateValidated { .. }
         | core::Event::DelegateInputFailed { .. }

@@ -74,7 +74,7 @@ fn domain() -> Domain {
                 },
             ]),
             pools: Box::from([PoolSpec { path: pool(), slots: 2 }]),
-            topics: Box::from([TopicSpec { topic: 7 }]),
+            topics: Box::from([TopicSpec { topic: 7, offered: true, resources: Box::new([service()]) }]),
             deployment: [1; 16],
             kinds: Box::from([]),
             requirements: Box::from([crate::RequirementSpec {
@@ -431,6 +431,8 @@ fn restored_records_rebuild_adoptions_names_topics_and_pool_slots() {
                 | Request::Adopted { .. }
                 | Request::Slots { .. }
                 | Request::Drift { .. }
+                | Request::Topic { .. }
+                | Request::TopicRefused { .. }
                 | Request::News { .. }
                 | Request::Erase { .. }
                 | Request::Verdict { .. }
@@ -508,4 +510,23 @@ fn a_prepared_client_subject_checks_its_actual_scope_and_echoes_only_its_owner_n
     let [Request::ReadAnswered { answer: Err(DocumentMissing::Unknown), .. }] = out.as_ref() else {
         panic!("forgotten name is unknown")
     };
+}
+
+#[test]
+fn an_offered_topic_names_the_resources_it_concerns() {
+    let mut domain = domain();
+    let env = Env { now: Time::ZERO, wall: Wall::from_nanos(1), limits: LIMITS };
+    let mut out = Queue::with_capacity(MAX_OUT);
+    step(&mut domain, &env, Event::DescribeTopic { token: skein_lib::Token::new(81), topic: 7 }, &mut out);
+    assert_eq!(out.pop(), Some(Request::Topic { token: skein_lib::Token::new(81), resources: Box::new([service()]) }));
+}
+
+#[test]
+fn a_topic_not_offered_to_agents_is_refused() {
+    let mut domain = domain();
+    domain.config.topics[0].offered = false;
+    let env = Env { now: Time::ZERO, wall: Wall::from_nanos(1), limits: LIMITS };
+    let mut out = Queue::with_capacity(MAX_OUT);
+    step(&mut domain, &env, Event::DescribeTopic { token: skein_lib::Token::new(82), topic: 7 }, &mut out);
+    assert_eq!(out.pop(), Some(Request::TopicRefused { token: skein_lib::Token::new(82) }));
 }

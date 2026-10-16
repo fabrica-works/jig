@@ -259,12 +259,16 @@ fn route_ask(
             }
         }
         core::Ask::ProjectGoal { feed } => hold(decision, Delivery::Projection { connector: number, feed }),
-        core::Ask::ForgetProjection { .. }
+        core::Ask::EndTopic { task, .. } => crate::topics::sync(domain, number, task, work),
+        core::Ask::SubscriptionDone { request, key, subscription } => {
+            crate::topics::subscribed(domain, number, request, key, subscription, work);
+        }
+        core::Ask::UnsubscriptionDone { request, key } => {
+            crate::topics::unsubscribed(domain, number, request, key, work);
+        }
+        core::Ask::DropSubscription { .. }
+        | core::Ask::ForgetProjection { .. }
         | core::Ask::Hold { .. }
-        | core::Ask::EndTopic { .. }
-        | core::Ask::SubscriptionDone { .. }
-        | core::Ask::UnsubscriptionDone { .. }
-        | core::Ask::DropSubscription { .. }
         | core::Ask::RepairRefused { .. }
         | core::Ask::DelegateRefused { .. } => {}
     }
@@ -547,6 +551,13 @@ pub(super) fn route_connector(
             connector::Request::Document { watcher, subject, document } => {
                 crate::client_documents::document(domain, env, decision, number, watcher, subject, document, work);
             }
+            connector::Request::Topic { token, resources } => {
+                crate::topics::described(domain, number, token, Some(resources), work);
+            }
+            connector::Request::TopicRefused { token } => crate::topics::described(domain, number, token, None, work),
+            connector::Request::News { topic, subscribers } => {
+                crate::topics::news(domain, number, topic, subscribers, work);
+            }
             connector::Request::ReadAnswered { .. } => unreachable!("client read completes in its synchronous route"),
             connector::Request::Marked { subjects } => {
                 work.push(Work::Core(core::Event::Marked { connector: number, subjects }));
@@ -748,7 +759,6 @@ pub(super) fn route_connector(
             | connector::Request::Adopted { project: _, resource: _, result: _ }
             | connector::Request::Unknown { task: _, resource: _ }
             | connector::Request::Refused { task: _ }
-            | connector::Request::News { topic: _, subscribers: _ }
             | connector::Request::Changed { resource: _ }
             | connector::Request::Answer { token: _, bytes: _ }
             | connector::Request::Ready { token: _, size: _ }

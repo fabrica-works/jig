@@ -14,6 +14,7 @@ pub(super) fn defer(domain: &mut Domain, event: Event) -> Result<Event, ()> {
         | Event::ConnectorTimer { .. }
         | Event::WriterRead { .. }
         | Event::ProjectionEffect { .. }
+        | Event::TopicCall { .. }
         | Event::EffectCall { .. }) => {
             domain.busy.push(Box::new(event));
             Err(())

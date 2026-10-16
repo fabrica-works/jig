@@ -90,6 +90,7 @@ impl Parties {
             | root::Event::RestartDone(_)
             | root::Event::ConnectorTimer { .. }
             | root::Event::ProjectionEffect { .. }
+            | root::Event::TopicCall { .. }
             | root::Event::EffectCall { .. }
             | root::Event::CallAnswered { .. }
             | root::Event::TranscriptLoaded { .. } => {}

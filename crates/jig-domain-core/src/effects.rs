@@ -397,8 +397,12 @@ pub(crate) fn connector(
         connector::Event::PoolSlots { name, slots } => {
             work.push(Event::Tasks(tasks::Event::Slots { pool: name, slots }));
         }
+        connector::Event::News { task, subscription, class, words, .. } => {
+            if let Some(event) = core.connector_news(task, subscription, class, words, env.wall) {
+                work.push(Event::Tasks(event));
+            }
+        }
         connector::Event::Procedure { .. }
-        | connector::Event::News { .. }
         | connector::Event::SectionReady { .. }
         | connector::Event::WorkspaceReady { .. }
         | connector::Event::Adopted { .. }

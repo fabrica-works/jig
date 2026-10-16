@@ -164,6 +164,8 @@ pub(crate) fn read(
             | connector::Request::Adopted { .. }
             | connector::Request::Slots { .. }
             | connector::Request::Drift { .. }
+            | connector::Request::Topic { .. }
+            | connector::Request::TopicRefused { .. }
             | connector::Request::News { .. }
             | connector::Request::Save { .. }
             | connector::Request::Erase { .. }) => {

@@ -86,6 +86,9 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(u64::from(limits.pools).checked_mul(path_bytes)?)?
         .checked_add(u64::from(limits.resources).checked_mul(path_bytes)?)?
         .checked_add(List::<crate::TopicSpec>::worst_case(limits.topics)?)?
+        .checked_add(
+            path_bytes.checked_mul(u64::from(limits.resources_per_task))?.checked_mul(u64::from(limits.topics))?,
+        )?
         .checked_add(List::<crate::KindSpec>::worst_case(limits.kinds)?)?
         .checked_add(List::<crate::RequirementSpec>::worst_case(limits.requirements)?)?
         .checked_add(List::<crate::ProcedureSpec>::worst_case(limits.procedures)?)?

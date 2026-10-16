@@ -649,3 +649,34 @@ impl Core {
         )
     }
 }
+
+impl Core {
+    /// An offered topic needs subscribe and a read grant on every described resource.
+    pub fn topic_admit(
+        &self,
+        key: crate::CallKey,
+        resources: &[authority::Effect],
+        findings: &mut Queue<authority::Finding>,
+    ) -> authority::Answer {
+        let Some(context) = self.tasks.delegation(key.task) else { return authority::Answer::Refuse };
+        if resources.is_empty() {
+            return authority::Answer::Refuse;
+        }
+        for resource in resources {
+            let answer = authority::check_call(
+                &self.authority,
+                &authority::CallAsk {
+                    project: context.project,
+                    authority: translate::authority_value(&context.authority),
+                    family: self.settings.tools.subscribe,
+                    call: authority::Call::Read(resource.clone()),
+                },
+                findings,
+            );
+            if answer != authority::Answer::Allow {
+                return answer;
+            }
+        }
+        authority::Answer::Allow
+    }
+}

@@ -404,6 +404,7 @@ impl Observer {
             | root::Event::Connector { .. }
             | root::Event::ProjectionEffect { .. }
             | root::Event::CallAnswered { .. }
+            | root::Event::TopicCall { .. }
             | root::Event::EffectCall { .. }
             | root::Event::TranscriptLoaded { .. }
             | root::Event::Committed { .. }

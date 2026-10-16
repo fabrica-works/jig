@@ -1,4 +1,5 @@
 use jig_core_world::effects::{World, fixture};
+use jig_core_world::fixtures::live_row;
 use jig_domain_authority as authority;
 use jig_domain_core as core;
 use jig_domain_notes as notes;
@@ -911,13 +912,6 @@ fn a_context_adoption_still_refuses_effects_after_a_cold_restart() {
         answer: authority::Answer::Refuse, findings,
     })) if findings.contains(&authority::Finding::ResourceAccess)));
     assert!(world.systems[0].observed().is_empty());
-}
-
-fn live_row(world: &World, task: u64) -> &tasks::TaskRecord {
-    match world.store.rows.get(&root::Key::Core(core::Key::Tasks(tasks::Key::Live(task)))) {
-        Some(root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row)))) => row,
-        row => panic!("live task row missing: {row:?}"),
-    }
 }
 
 fn amendment(words: &[u8]) -> people::Amendment {

@@ -448,6 +448,12 @@ pub(super) enum Work {
         number: u16,
         event: connector::Event,
     },
+    TopicCall {
+        to: ReplyTo,
+        key: core::CallKey,
+        number: u16,
+        topic: u16,
+    },
     EffectCall {
         to: ReplyTo,
         key: core::CallKey,

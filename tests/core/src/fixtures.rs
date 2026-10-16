@@ -19,3 +19,15 @@ pub fn bounds() -> jig_domain_fleet::Bounds {
         unacknowledged: u32::MAX,
     }
 }
+
+#[must_use]
+pub fn live_row(world: &crate::effects::World, task: u64) -> &jig_domain_tasks::TaskRecord {
+    match world
+        .store
+        .rows
+        .get(&jig_test_domain::Key::Core(jig_domain_core::Key::Tasks(jig_domain_tasks::Key::Live(task))))
+    {
+        Some(jig_test_domain::Record::Core(jig_domain_core::Record::Tasks(jig_domain_tasks::Stored::Live(row)))) => row,
+        row => panic!("live task row missing: {row:?}"),
+    }
+}

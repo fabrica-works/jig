@@ -33,6 +33,7 @@ pub fn try_step(domain: &mut Domain, env: &Env<Limits>, event: Event) -> Result<
         | Event::WriterRead { .. }
         | Event::RestartBegin
         | Event::ProjectionEffect { .. }
+        | Event::TopicCall { .. }
         | Event::EffectCall { .. }
         | Event::Timer(_)
         | Event::Core(_)
@@ -69,6 +70,7 @@ fn room(env: &Env<Limits>, event: &Event) -> JournalRoom {
         | Event::Committed { .. }
         | Event::Failed { .. }
         | Event::ProjectionEffect { .. }
+        | Event::TopicCall { .. }
         | Event::EffectCall { .. }
         | Event::Timer(_)
         | Event::Credential { .. }

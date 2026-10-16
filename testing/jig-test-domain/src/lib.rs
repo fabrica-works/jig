@@ -221,6 +221,13 @@ pub enum Event {
         number: u16,
         effect: connector::Effect,
     },
+    /// A decoded call for an offered topic.
+    TopicCall {
+        to: ReplyTo,
+        key: core::CallKey,
+        number: u16,
+        topic: u16,
+    },
     /// A decoded named effect call, whose payload stays with its connector.
     EffectCall {
         to: ReplyTo,
@@ -321,6 +328,7 @@ pub struct Domain {
     briefs: Map<u64, Box<[jig_domain_brief::GatherPlaced]>>,
     workspace_writes: Map<u64, Box<[tasks::Name]>>,
     procedure_steps: Map<u64, (u64, u16)>,
+    topic_calls: Map<Token, (ReplyTo, core::CallKey, u16)>,
     effects: Map<Token, connector::Effect>,
     effect_procedures: Map<Token, u64>,
     outbox_procedures: Map<u64, u16>,
@@ -397,6 +405,7 @@ impl Domain {
             briefs: Map::with_capacity(limits.core.tasks.tasks),
             workspace_writes: Map::with_capacity(limits.core.tasks.tasks),
             procedure_steps: Map::with_capacity(limits.core.tasks.tasks),
+            topic_calls: Map::with_capacity(limits.core.call_records),
             effects: Map::with_capacity(
                 limits.core.call_records.checked_add(limits.core.tasks.tasks).expect("effect room"),
             ),
@@ -469,28 +478,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event) {
             let request = domain.core.restart_done(step);
             decide(domain, env, Work::Restart(request));
         }
-        Event::TranscriptLoaded { task, rows, done } => {
-            if !domain.core.transcripts.contains_key(&task) {
-                return;
-            }
-            if rows.len() > usize::try_from(env.limits.core.resume_bytes).expect("u32 fits usize") {
-                return;
-            }
-            for row in rows {
-                if !domain.core.append_transcript(task, row) {
-                    decide(domain, env, Work::Core(core::Event::PreparationFailed { task }));
-                    return;
-                }
-            }
-            if done {
-                let event = if domain.core.transcript_readable(task) {
-                    core::Event::StartBrief { task }
-                } else {
-                    core::Event::TranscriptUnread { task }
-                };
-                decide(domain, env, Work::Core(event));
-            }
-        }
+        Event::TranscriptLoaded { task, rows, done } => transcript_loaded(domain, env, task, rows, done),
         Event::Committed { number, fill } => {
             domain.journal.committed(number);
             let _filled = core::step(
@@ -503,6 +491,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event) {
         Event::ProjectionEffect { goal, number, effect } => {
             decide(domain, env, Work::ProjectionEffect { goal, number, effect });
         }
+        Event::TopicCall { to, key, number, topic } => decide(domain, env, Work::TopicCall { to, key, number, topic }),
         Event::EffectCall { to, key, number, effect, deadline, proposal } => {
             decide(domain, env, Work::EffectCall { to, key, number, effect, deadline, proposal });
         }
@@ -548,6 +537,29 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event) {
     }
 }
 
+fn transcript_loaded(domain: &mut Domain, env: &Env<Limits>, task: u64, rows: Box<[core::TurnRecord]>, done: bool) {
+    if !domain.core.transcripts.contains_key(&task) {
+        return;
+    }
+    if rows.len() > usize::try_from(env.limits.core.resume_bytes).expect("u32 fits usize") {
+        return;
+    }
+    for row in rows {
+        if !domain.core.append_transcript(task, row) {
+            decide(domain, env, Work::Core(core::Event::PreparationFailed { task }));
+            return;
+        }
+    }
+    if done {
+        let event = if domain.core.transcript_readable(task) {
+            core::Event::StartBrief { task }
+        } else {
+            core::Event::TranscriptUnread { task }
+        };
+        decide(domain, env, Work::Core(event));
+    }
+}
+
 #[expect(clippy::too_many_lines, reason = "one bounded decision routes the complete root work vocabulary")]
 fn decide(domain: &mut Domain, env: &Env<Limits>, first: Work) {
     let core_room = match &first {
@@ -566,6 +578,7 @@ fn decide(domain: &mut Domain, env: &Env<Limits>, first: Work) {
         | Work::ConnectorResume { .. }
         | Work::ConnectorFire { .. }
         | Work::ProjectionEffect { .. }
+        | Work::TopicCall { .. }
         | Work::EffectCall { .. }
         | Work::Turn { .. }
         | Work::Answer { .. }
@@ -692,6 +705,7 @@ fn decide(domain: &mut Domain, env: &Env<Limits>, first: Work) {
                     origin: core::EffectOrigin::Projection { goal, entry: None },
                 }));
             }
+            Work::TopicCall { to, key, number, topic } => topics::start(domain, to, key, number, topic, &mut work),
             Work::EffectCall { to, key, number, effect, deadline, proposal } => {
                 let owner = effect_payload(domain, effect);
                 let origin = match proposal {
@@ -946,6 +960,7 @@ mod messages;
 mod routes;
 #[cfg(test)]
 mod tests;
+mod topics;
 use messages::Payload;
 mod stopping;
 use routes::{route_connector, route_core};
@@ -1071,7 +1086,9 @@ fn restore_connector(domain: &mut Domain, env: &Env<Limits>, number: u16, record
                     return false;
                 }
             }
-            connector::Request::Document { .. }
+            connector::Request::Topic { .. }
+            | connector::Request::TopicRefused { .. }
+            | connector::Request::Document { .. }
             | connector::Request::ReadAnswered { .. }
             | connector::Request::Marked { .. }
             | connector::Request::Closed { .. }

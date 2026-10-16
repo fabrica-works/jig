@@ -278,8 +278,12 @@ pub struct PoolSpec {
 }
 
 /// A subject on which tasks may receive classified news.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct TopicSpec {
+    /// Whether an agent may ask to subscribe.
+    pub offered: bool,
+    /// Resources the topic concerns, checked as reads.
+    pub resources: Box<[Path]>,
     /// The connector-local topic number.
     pub topic: u16,
 }
@@ -546,6 +550,8 @@ pub enum Event {
     Unnamed { task: u64 },
     /// Add a resource to a project under the deployment's terms.
     Adopt { project: u32, resource: Path, role: ResourceRole },
+    /// Describe an offered topic for a run call.
+    DescribeTopic { token: Token, topic: u16 },
     /// A task starts receiving a topic, with its own classification thresholds.
     Subscribe { task: u64, topic: u16, wake_at: u16, keep_at: u16 },
     /// A task stops receiving a topic.
@@ -680,6 +686,10 @@ impl Record {
 /// What the connector asks its root to route or commit.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Request {
+    /// An offered topic names every read resource.
+    Topic { token: Token, resources: Box<[Path]> },
+    /// This topic is not offered to agents.
+    TopicRefused { token: Token },
     /// Complete a due delivery from this owner's current state.
     Document { watcher: Token, subject: Token, document: Result<crate::ClientDocument, crate::DocumentMissing> },
     /// One client read answer; the root holds it until durable.

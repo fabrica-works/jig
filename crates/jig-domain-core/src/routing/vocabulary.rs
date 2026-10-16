@@ -372,6 +372,8 @@ pub enum Event {
     EffectStart { owner: Token, connector: u16, origin: crate::EffectOrigin },
     /// Connector handoffs and outbox outcomes in the core vocabulary.
     EffectConnector(crate::connector::Event),
+    /// Subscribe to an offered connector topic after checking every read resource.
+    SubscribeTopic { to: ReplyTo, key: CallKey, connector: u16, topic: u64, resources: Box<[authority::Effect]> },
     /// Release effect answers whose absolute answer deadline has passed.
     EffectDeadline,
     /// Allocate the person and session named by a new party sign-in.

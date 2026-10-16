@@ -76,7 +76,7 @@ pub fn config(seed: u8) -> Config {
             },
         ]),
         pools: Box::from([PoolSpec { path: path(seed, 2), slots: 2 }]),
-        topics: Box::from([TopicSpec { topic: kind(seed, 1) }]),
+        topics: Box::from([TopicSpec { topic: kind(seed, 1), offered: true, resources: Box::new([path(seed, 1)]) }]),
         kinds: Box::from([
             KindSpec { kind: kind(seed, 1), form: Form::Creation, recovery: Recovery::Keyed, price: Some(3) },
             KindSpec { kind: kind(seed, 2), form: Form::Transition, recovery: Recovery::Conditional, price: Some(4) },
@@ -177,6 +177,8 @@ impl World {
                 | Request::Adopted { .. }
                 | Request::Slots { .. }
                 | Request::Drift { .. }
+                | Request::Topic { .. }
+                | Request::TopicRefused { .. }
                 | Request::News { .. }
                 | Request::ApplicationDone { .. }
                 | Request::ApplicationAgain { .. }
@@ -258,6 +260,8 @@ impl World {
                 | Request::Adopted { .. }
                 | Request::Slots { .. }
                 | Request::Drift { .. }
+                | Request::Topic { .. }
+                | Request::TopicRefused { .. }
                 | Request::News { .. }
                 | Request::Save { .. }
                 | Request::Erase { .. }

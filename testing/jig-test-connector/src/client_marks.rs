@@ -187,6 +187,8 @@ pub(crate) fn collect(domain: &Domain, env: &Env<Limits>, out: &mut Queue<Reques
                 | Request::Adopted { .. }
                 | Request::Slots { .. }
                 | Request::Drift { .. }
+                | Request::Topic { .. }
+                | Request::TopicRefused { .. }
                 | Request::News { .. } => false,
             };
             if touched && !subjects.as_slice().contains(token) {

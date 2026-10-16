@@ -59,6 +59,7 @@ mod run_delegation;
 mod run_payloads;
 mod run_preparation;
 mod runs;
+mod topics;
 mod turns;
 use turns::route_accepted_turn;
 #[path = "tasks.rs"]
@@ -323,6 +324,7 @@ pub fn room(limits: &Limits, event: &Event) -> Option<JournalRoom> {
         | Event::ApplicationPart { .. }
         | Event::ApplicationFinished { .. }
         | Event::EffectStart { .. }
+        | Event::SubscribeTopic { .. }
         | Event::EffectConnector(_)
         | Event::EffectDeadline
         | Event::SignIn { .. }
@@ -443,6 +445,9 @@ fn step_one(core: &mut Core, env: &Env<Limits>, event: Event, work: &mut Queue<E
         Event::SettledCall { to, key, call } => crate::conversation::settle(core, &env.limits, to, key, call),
         Event::EffectStart { owner, connector, origin } => crate::effects::start(core, env, owner, connector, origin),
         Event::EffectConnector(event) => crate::effects::connector(core, env, work, event),
+        Event::SubscribeTopic { to, key, connector, topic, resources } => {
+            topics::subscribe(core, env, work, to, key, connector, topic, &resources)
+        }
         Event::EffectDeadline => crate::effects::deadline(core, env),
         Event::SignIn { reply_to, identity } => sign_in(core, env, work, reply_to, identity),
         Event::ReadLoaded { load, result } => crate::reads::loaded(core, env, load, result),

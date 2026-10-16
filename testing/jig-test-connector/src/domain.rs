@@ -32,6 +32,17 @@ pub struct Domain {
 }
 
 impl Domain {
+    /// The connector's existing topic interests for one task.
+    #[must_use]
+    pub fn subscribed_topics(&self, task: u64) -> Box<[u16]> {
+        let mut topics = List::with_capacity(u32::try_from(self.config.topics.len()).expect("configured topics fit"));
+        for ((topic, subscriber), _) in &self.subscriptions {
+            if *subscriber == task {
+                topics.push(*topic).expect("one interest per topic and task");
+            }
+        }
+        topics.into_boxed()
+    }
     /// Builds a connector from the world's seed-derived configuration.
     #[must_use]
     pub fn new(config: Config, limits: &Limits) -> Domain {
@@ -84,6 +95,13 @@ impl Domain {
             assert!(same == 1, "resource paths are unique");
         }
         for topic in &config.topics {
+            assert!(
+                u32::try_from(topic.resources.len()).unwrap_or(u32::MAX) <= limits.resources_per_task,
+                "topic resources fit"
+            );
+            for resource in &topic.resources {
+                assert!(valid_path(resource, limits), "topic resource path fits");
+            }
             let mut same = 0_u32;
             for other in &config.topics {
                 if other.topic == topic.topic {
@@ -210,6 +228,18 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::Names { task, project, resources } => names(domain, env, task, project, resources, out),
         Event::Unnamed { task } => unnamed(domain, task, out),
         Event::Adopt { project, resource, role } => adopt(domain, env, project, resource, role, out),
+        Event::DescribeTopic { token, topic } => {
+            let mut resources = None;
+            for spec in &domain.config.topics {
+                if spec.topic == topic && spec.offered {
+                    resources = Some(spec.resources.clone());
+                }
+            }
+            match resources {
+                Some(resources) => out.push(Request::Topic { token, resources }),
+                None => out.push(Request::TopicRefused { token }),
+            }
+        }
         Event::Subscribe { task, topic, wake_at, keep_at } => {
             subscribe(domain, env, task, topic, wake_at, keep_at, out);
         }

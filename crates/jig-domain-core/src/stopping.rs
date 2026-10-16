@@ -91,6 +91,7 @@ pub(crate) fn gate(core: &mut Core, event: Event) -> Result<Event, Requests> {
         | Event::ApplicationFinished { .. }
         | Event::ProjectionSettled { .. }
         | Event::EffectStart { .. }
+        | Event::SubscribeTopic { .. }
         | Event::EffectConnector(_)
         | Event::EffectDeadline
         | Event::Unwatch { .. }

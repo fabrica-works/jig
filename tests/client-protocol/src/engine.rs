@@ -359,6 +359,7 @@ fn watcher(event: &core::Event) -> Option<Token> {
         | core::Event::HistoricalPersonTask { .. }
         | core::Event::HistoricalEscalation { .. }
         | core::Event::NamedAnswer { .. }
+        | core::Event::SubscribeTopic { .. }
         | core::Event::NamedAction { .. }
         | core::Event::DelegateValidated { .. }
         | core::Event::DelegateInputFailed { .. }
