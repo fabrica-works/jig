@@ -305,12 +305,15 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
                     .checked_add(proposal_payload)?
                     .checked_add(u64::try_from(size_of::<crate::RecurringState>()).ok()?)?
                     .checked_add(u64::from(limits.batch).checked_mul(8)?)?
-                    // One private last-published row distinguishes unchanged saves.
-                    .checked_mul(2)?
+                    // Last-published row and atomic procedure admission snapshot.
+                    .checked_mul(3)?
                     .checked_add(u64::try_from(size_of::<crate::TaskRecord>()).ok()?)?,
             )?,
         )?
         .checked_add(u64::from(limits.charters).checked_mul(4)?)?
+        // Atomic procedure admission saves every live row and finite balance.
+        .checked_add(List::<crate::TaskRecord>::worst_case(limits.tasks)?)?
+        .checked_add(List::<(crate::Funder, crate::Numbers)>::worst_case(limits.funders)?)?
         // Bounded graph/admission and traversal snapshots; no recursive walk.
         .checked_add(List::<u64>::worst_case(limits.tasks.max(limits.batch))?.checked_mul(3)?)?
         .checked_add(List::<u32>::worst_case(limits.batch)?)?

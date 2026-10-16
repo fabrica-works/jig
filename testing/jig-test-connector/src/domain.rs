@@ -7,6 +7,8 @@ use crate::{
     ResourceRole, ResourceSpec, SystemEvent,
 };
 
+pub(crate) type DelegateOutcome = (u64, Option<u64>, Box<[(u64, u64)]>);
+
 /// Four judges, a fact change, drift, a procedure save and one client mark fit.
 pub const MAX_OUT: u32 = 9;
 
@@ -24,7 +26,7 @@ pub struct Domain {
     pub(crate) judges: Map<Token, crate::requirements::Question>,
     pub(crate) procedures: Map<u64, crate::ProcedureState>,
     pub(crate) results: Map<u64, u16>,
-    delegate_outcomes: Map<u64, (u64, Option<u64>)>,
+    pub(crate) delegate_outcomes: Map<u64, DelegateOutcome>,
     pub(crate) values: Map<Token, crate::values::Payload>,
     pub(crate) outbox: Outbox,
     restart_settling: bool,
@@ -204,13 +206,11 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::Procedure { project, task, number, resource, signal } => {
             crate::procedures::step(domain, env, project, task, number, resource, signal, out);
         }
-        Event::ProcedureDelegateOutcome { task, step, child } => {
-            if domain.delegate_outcomes.contains_key(&task) || domain.delegate_outcomes.len() < env.limits.tasks {
-                domain.delegate_outcomes.insert(task, (step, child)).expect("delegate outcome capacity checked");
-                out.push(Request::Save { record: Record::ProcedureDelegateOutcome { task, step, child } });
-            } else {
-                out.push(Request::Refused { task });
-            }
+        Event::StepMade { task, step, first, revisions } => {
+            crate::procedures::made(domain, env, task, step, first, revisions, out);
+        }
+        Event::StepRefused { task, step, why } => {
+            crate::procedures::refused(domain, env, task, step, why, out);
         }
         Event::Read { token, read } => crate::values::read(domain, env, token, read, out),
         Event::Gather { token, task, budget } => crate::values::gather(domain, env, token, task, budget, out),
@@ -500,8 +500,8 @@ fn restore(domain: &mut Domain, record: Record, out: &mut Queue<Request>) {
         Record::Procedure(state) => {
             domain.procedures.insert(state.task, state).expect("restored procedure fits");
         }
-        Record::ProcedureDelegateOutcome { task, step, child } => {
-            domain.delegate_outcomes.insert(task, (step, child)).expect("restored delegate outcome fits");
+        Record::ProcedureDelegateOutcome { task, step, child, revisions } => {
+            domain.delegate_outcomes.insert(task, (step, child, revisions)).expect("restored delegate outcome fits");
         }
         Record::Result { task, code } => {
             domain.results.insert(task, code).expect("restored result fits");

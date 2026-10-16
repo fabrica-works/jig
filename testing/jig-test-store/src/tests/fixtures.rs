@@ -99,7 +99,7 @@ fn procedure() -> d::Record {
     })
 }
 fn delegate_outcome() -> d::Record {
-    d::Record::ProcedureDelegateOutcome { task: 1, step: 2, child: Some(3) }
+    d::Record::ProcedureDelegateOutcome { task: 1, step: 2, child: Some(3), revisions: Box::new([]) }
 }
 fn result() -> d::Record {
     d::Record::Result { task: 1, code: 2 }

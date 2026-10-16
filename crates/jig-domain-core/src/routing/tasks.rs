@@ -37,6 +37,10 @@ pub(super) fn tag_tasks(
     for _ in 0..route_room {
         let Some(next) = pending.pop() else { break };
         let request = match next {
+            tasks::Request::ProcedureRefused { task, step, problem } => {
+                super::procedure_steps::append_problem(core, task, step, problem, &mut out);
+                continue;
+            }
             tasks::Request::Erase { key } => Request::Write(Write::Erase(Key::Tasks(key))),
             tasks::Request::Relay { task, .. } => {
                 let Some(relay) = crate::relays::next(core, task, env.limits.tasks.run_inbox) else { continue };
@@ -644,7 +648,9 @@ pub(super) fn tag_tasks(
                                 Ask::UnsubscriptionDone { request, key } => {
                                     Ask::UnsubscriptionDone { request: *request, key: *key }
                                 }
-                                Ask::Hold { .. }
+                                Ask::StepMade { .. }
+                                | Ask::StepRefused { .. }
+                                | Ask::Hold { .. }
                                 | Ask::EndTopic { .. }
                                 | Ask::Gather { .. }
                                 | Ask::CutTo { .. }
@@ -1374,6 +1380,9 @@ pub(super) fn route_tasks(
     work: &mut Queue<Event>,
     event: tasks::Event,
 ) -> Requests {
+    if let tasks::Event::Procedure { task, step, .. } = &event {
+        return super::procedure_steps::apply(core, env, *task, *step, event);
+    }
     let mut out = Queue::with_capacity(tasks::max_out(&env.limits.tasks));
     if let tasks::Event::Make { batch, .. } = &event {
         let mut tracked = 0_u32;

@@ -1,5 +1,5 @@
 use jig_core_world::effects::{World, fixture};
-use jig_core_world::fixtures::live_row;
+use jig_core_world::fixtures::{live_row, member};
 use jig_domain_authority as authority;
 use jig_domain_core as core;
 use jig_domain_notes as notes;
@@ -63,22 +63,6 @@ fn delegate(world: &mut World, run: (u64, u64), completion: u32, member: core::D
         panic!("delegation was not admitted");
     };
     numbers[0]
-}
-
-fn member(world: &World, executor: tasks::Executor, words: &[u8]) -> core::Delegate {
-    let mut authority = world.assigned.as_ref().expect("task assigned").run.authority.clone();
-    authority.budget.spend = 20;
-    authority.delegation =
-        tasks::Delegation { kinds: Box::new([tasks::AuthorityExecutor::Charter(1)]), tasks: 1, depth: 1 };
-    core::Delegate {
-        executor,
-        spec: tasks::Spec { words: words.into(), parameters: Box::new([]), inputs: Box::new([]) },
-        contract: tasks::Contract::Report { words: 128 },
-        authority,
-        symbolic_grants: Box::new([]),
-        dependencies: Box::new([]),
-        wake: tasks::WakePolicy::DEFAULT,
-    }
 }
 
 fn plan_world(seed: u64) -> World {
@@ -1610,7 +1594,7 @@ fn an_approval_reaches_its_asking_procedure_connector_as_the_whole_durable_input
         step: *step,
         connector: *connector,
         code: u32::from(*code),
-        action: core::ProcedureAction::Delegate(Box::new([child])),
+        decision: core::ProcedureStep { batch: Box::new([child]), ..core::ProcedureStep::new(core::StepEnd::Wait) },
     }));
     let task = *live_row(&world, parent).delegates.first().expect("person delegate");
     ask(&mut world, 81, people::Ask::TakePerson { project: 1, task });
@@ -1788,10 +1772,15 @@ fn a_procedure_delegate_identity_is_committed_with_its_child_by_the_actual_conne
         step,
         connector: number,
         code: u32::from(code),
-        action: core::ProcedureAction::Delegate(Box::new([child])),
+        decision: core::ProcedureStep { batch: Box::new([child]), ..core::ProcedureStep::new(core::StepEnd::Wait) },
     }));
     let child = *live_row(&world, parent).delegates.first().expect("committed child");
-    let record = connector::Record::ProcedureDelegateOutcome { task: parent, step, child: Some(child) };
+    let record = connector::Record::ProcedureDelegateOutcome {
+        task: parent,
+        step,
+        child: Some(child),
+        revisions: Box::new([(child, 0)]),
+    };
     assert_eq!(
         world.store.rows.get(&root::Key::Connector { number: 2, key: record.key() }),
         Some(&root::Record::Connector { number: 2, record: record.clone() })
@@ -1820,10 +1809,11 @@ fn a_refused_procedure_delegation_retains_the_exact_none_outcome() {
         step,
         connector: number,
         code: u32::from(code),
-        action: core::ProcedureAction::Delegate(Box::new([child])),
+        decision: core::ProcedureStep { batch: Box::new([child]), ..core::ProcedureStep::new(core::StepEnd::Wait) },
     }));
     assert!(live_row(&world, parent).delegates.is_empty());
-    let record = connector::Record::ProcedureDelegateOutcome { task: parent, step, child: None };
+    let record =
+        connector::Record::ProcedureDelegateOutcome { task: parent, step, child: None, revisions: Box::new([]) };
     assert_eq!(
         world.store.rows.get(&root::Key::Connector { number: 2, key: record.key() }),
         Some(&root::Record::Connector { number: 2, record })
@@ -1861,7 +1851,7 @@ fn procedure_delegate_outcomes_without_a_live_procedure_owner_are_not_routed() {
             step: u64::MAX,
             connector: 2,
             code: 1,
-            action: core::ProcedureAction::Delegate(Box::new([])),
+            decision: core::ProcedureStep { batch: Box::new([]), ..core::ProcedureStep::new(core::StepEnd::Wait) },
         }));
     }
     assert!(!world.store.rows.values().any(|row| matches!(

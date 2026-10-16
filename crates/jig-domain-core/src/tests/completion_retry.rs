@@ -53,7 +53,6 @@ fn current_stream(out: &[Request]) -> &Request {
                 | Now::RunPreparationFailed { .. }
                 | Now::RunPrepared { .. }
                 | Now::HistoricalEscalation { .. }
-                | Now::ProcedureDelegateOutcome { .. }
                 | Now::RestoreRefused => {}
             },
             Request::Write(..) | Request::Ask { .. } | Request::Held(..) | Request::Decided => {}

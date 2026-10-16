@@ -1,4 +1,6 @@
 //! Shared host bounds for the domain world.
+use jig_domain_core as core;
+use jig_domain_tasks as tasks;
 pub const WORKSPACE_CREDENTIAL: u32 = 7;
 pub const CREDENTIAL_RESOURCE: u64 = 1;
 #[must_use]
@@ -111,4 +113,21 @@ pub fn ask_as(world: &mut crate::effects::World, sign_in: u64, key: u8, ask: jig
         key: [key; 16],
         ask,
     })));
+}
+
+#[must_use]
+pub fn member(world: &crate::effects::World, executor: tasks::Executor, words: &[u8]) -> core::Delegate {
+    let mut authority = world.assigned.as_ref().expect("task assigned").run.authority.clone();
+    authority.budget.spend = 20;
+    authority.delegation =
+        tasks::Delegation { kinds: Box::new([tasks::AuthorityExecutor::Charter(1)]), tasks: 1, depth: 1 };
+    core::Delegate {
+        executor,
+        spec: tasks::Spec { words: words.into(), parameters: Box::new([]), inputs: Box::new([]) },
+        contract: tasks::Contract::Report { words: 128 },
+        authority,
+        symbolic_grants: Box::new([]),
+        dependencies: Box::new([]),
+        wake: tasks::WakePolicy::DEFAULT,
+    }
 }

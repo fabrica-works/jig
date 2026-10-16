@@ -341,21 +341,22 @@ fn a_persons_retry_preserves_the_previous_attempt_deadline_across_restart() {
 fn procedure_delegate_outcomes_are_bounded_replayed_updated_and_erased() {
     let mut world = World::new(3);
     for task in 1..=8 {
-        let requests = world.event(Event::ProcedureDelegateOutcome { task, step: task + 20, child: Some(task + 100) });
+        let requests =
+            world.event(Event::StepMade { task, step: task + 20, first: Some(task + 100), revisions: Box::new([]) });
         assert!(matches!(requests.as_slice(), [Request::Save { .. }]));
     }
     assert_eq!(
-        world.event(Event::ProcedureDelegateOutcome { task: 9, step: 29, child: None }),
+        world.event(Event::StepMade { task: 9, step: 29, first: None, revisions: Box::new([]) }),
         vec![Request::Refused { task: 9 }]
     );
     world.cold_restart();
     assert_eq!(
-        world.event(Event::ProcedureDelegateOutcome { task: 9, step: 30, child: None }),
+        world.event(Event::StepMade { task: 9, step: 30, first: None, revisions: Box::new([]) }),
         vec![Request::Refused { task: 9 }]
     );
-    let record = Record::ProcedureDelegateOutcome { task: 1, step: 99, child: None };
+    let record = Record::ProcedureDelegateOutcome { task: 1, step: 99, child: None, revisions: Box::new([]) };
     assert_eq!(
-        world.event(Event::ProcedureDelegateOutcome { task: 1, step: 99, child: None }),
+        world.event(Event::StepMade { task: 1, step: 99, first: None, revisions: Box::new([]) }),
         vec![Request::Save { record: record.clone() }]
     );
     assert_eq!(world.records.get(&record.key()), Some(&record));
@@ -365,7 +366,7 @@ fn procedure_delegate_outcomes_are_bounded_replayed_updated_and_erased() {
     );
     assert!(!world.records.contains_key(&record.key()));
     assert!(matches!(
-        world.event(Event::ProcedureDelegateOutcome { task: 9, step: 30, child: None }).as_slice(),
+        world.event(Event::StepMade { task: 9, step: 30, first: None, revisions: Box::new([]) }).as_slice(),
         [Request::Save { .. }]
     ));
 }

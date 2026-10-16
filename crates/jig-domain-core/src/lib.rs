@@ -20,7 +20,10 @@ pub use brief_text::{BriefPart, BriefTextLimits, note_index_text, read_brief_par
 pub mod connector;
 mod delegation;
 pub use amendments::TaskAmendDenied;
-pub use delegation::{Delegate, Dependency, ProcedureAction, resolved_delegate_authority, symbolic_grants};
+pub use delegation::{
+    Delegate, Dependency, ProcedureStep, StepAmendment, StepEnd, StepMessage, resolved_delegate_authority,
+    symbolic_grants,
+};
 pub mod documents;
 mod effects;
 mod escalation;
@@ -60,7 +63,8 @@ mod sibling_routes;
 pub use numbers::{Counters, Deployment, Family, fresh};
 pub use routing::{
     Ask, CoreBriefBudgets, EscalationChoice, Event, Held, Limits, NamedAction, Now, PayloadRefusal, ProposalChoice,
-    Request, Requests, Timer, ToolKind, WatchRefusal, Write, fire, resume_fleet, room, room_max, step, want_accounts,
+    Request, Requests, StepRefusal, Timer, ToolKind, WatchRefusal, Write, fire, resume_fleet, room, room_max, step,
+    want_accounts,
 };
 pub use sibling_routes::{MadeRoute, PersonMessage, SentRoute};
 mod conversation;

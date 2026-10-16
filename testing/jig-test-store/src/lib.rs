@@ -35,6 +35,7 @@ pub fn application(limits: &connector::Limits) -> jig_protocol_store::sizes::App
 }
 fn bounds(limits: &connector::Limits) -> Option<v1::Limits> {
     let mut bounds = v1::CEILINGS;
+    bounds.record_procedure_delegate_outcome_revisions = limits.tasks;
     bounds.segment_bytes = limits.segment_bytes;
     bounds.resource_path_segments = limits.path_segments;
     bounds.effect_resources = limits.resources_per_effect;

@@ -499,17 +499,38 @@ pub enum SystemEvent {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Event {
     /// Retain this root-minted name in the application's own vocabulary.
-    DocumentPrepare { token: Token, subject: crate::ClientSubject },
+    DocumentPrepare {
+        token: Token,
+        subject: crate::ClientSubject,
+    },
     /// The paced watch ended; forget its owner binding.
-    DocumentForget { subject: Token },
+    DocumentForget {
+        subject: Token,
+    },
     /// Make the current whole document for one due delivery.
-    Document { watcher: Token, scope: crate::ClientScope, subject: Token, party: u64, window: crate::ClientWindow },
+    Document {
+        watcher: Token,
+        scope: crate::ClientScope,
+        subject: Token,
+        party: u64,
+        window: crate::ClientWindow,
+    },
     /// Answer one admitted client read in the same decision.
-    ReadDocument { scope: crate::ClientScope, read: Token, party: u64, window: crate::ClientWindow },
+    ReadDocument {
+        scope: crate::ClientScope,
+        read: Token,
+        party: u64,
+        window: crate::ClientWindow,
+    },
     /// The root leaves a decoded application value with this owner before admission.
-    ApplicationPrepare { owner: Token, value: crate::ApplicationRequest },
+    ApplicationPrepare {
+        owner: Token,
+        value: crate::ApplicationRequest,
+    },
     /// Drop an unconsumed prepared value after keyed admission.
-    ApplicationDrop { owner: Token },
+    ApplicationDrop {
+        owner: Token,
+    },
     /// Decide a newly admitted request within the current decision.
     Application {
         request: Token,
@@ -521,61 +542,155 @@ pub enum Event {
         retention: Duration,
     },
     /// The party's requested core part has settled.
-    ApplicationCore { request: Token, answer: crate::ApplicationCoreAnswer },
+    ApplicationCore {
+        request: Token,
+        answer: crate::ApplicationCoreAnswer,
+    },
     /// Settle sent effects and withdraw unsent entries before acknowledging closure.
-    Close { task: u64 },
+    Close {
+        task: u64,
+    },
     /// The core refused this step's effect, or its outbox settled.
-    EffectDecision { task: u64, made: bool },
+    EffectDecision {
+        task: u64,
+        made: bool,
+    },
     /// Ask the connector to judge the named state on its facts.
-    Judge { token: Token, requirement: u16, resources: Box<[Path]>, state: u64 },
+    Judge {
+        token: Token,
+        requirement: u16,
+        resources: Box<[Path]>,
+        state: u64,
+    },
     /// Create, wake or answer a connector-owned procedure task.
-    Procedure { project: u32, task: u64, number: u16, resource: Path, signal: ProcedureSignal },
+    Procedure {
+        project: u32,
+        task: u64,
+        number: u16,
+        resource: Path,
+        signal: ProcedureSignal,
+    },
     /// The core's first delegated child, returned in the creating decision.
-    ProcedureDelegateOutcome { task: u64, step: u64, child: Option<u64> },
+    StepMade {
+        task: u64,
+        step: u64,
+        first: Option<u64>,
+        revisions: Box<[(u64, u64)]>,
+    },
+    StepRefused {
+        task: u64,
+        step: u64,
+        why: StepRefusal,
+    },
     /// Serve an ephemeral read.
-    Read { token: Token, read: Read },
+    Read {
+        token: Token,
+        read: Read,
+    },
     /// Gather a brief section for one task.
-    Gather { token: Token, task: u64, budget: u32 },
+    Gather {
+        token: Token,
+        task: u64,
+        budget: u32,
+    },
     /// Cut a gathered section to a smaller size.
-    Cut { token: Token, size: u32 },
+    Cut {
+        token: Token,
+        size: u32,
+    },
     /// Gather workspace items for an assignment.
-    Items { token: Token, task: u64 },
+    Items {
+        token: Token,
+        task: u64,
+    },
     /// Transfer a staged section or items exactly once.
-    HandOver { token: Token },
+    HandOver {
+        token: Token,
+    },
     /// The root asks for one ordered recovery phase.
     Restart(RestartStep),
     /// A live task names resources.
-    Names { task: u64, project: u32, resources: Box<[Path]> },
+    Names {
+        task: u64,
+        project: u32,
+        resources: Box<[Path]>,
+    },
     /// A task no longer names resources.
-    Unnamed { task: u64 },
+    Unnamed {
+        task: u64,
+    },
     /// Add a resource to a project under the deployment's terms.
-    Adopt { project: u32, resource: Path, role: ResourceRole },
+    Adopt {
+        project: u32,
+        resource: Path,
+        role: ResourceRole,
+    },
     /// Describe an offered topic for a run call.
-    DescribeTopic { token: Token, topic: u16 },
+    DescribeTopic {
+        token: Token,
+        topic: u16,
+    },
     /// A task starts receiving a topic, with its own classification thresholds.
-    Subscribe { task: u64, topic: u16, wake_at: u16, keep_at: u16 },
+    Subscribe {
+        task: u64,
+        topic: u16,
+        wake_at: u16,
+        keep_at: u16,
+    },
     /// A task stops receiving a topic.
-    Unsubscribe { task: u64, topic: u16 },
+    Unsubscribe {
+        task: u64,
+        topic: u16,
+    },
     /// Describe and stage an effect until the core has checked it.
-    Describe { token: Token, effect: Effect },
+    Describe {
+        token: Token,
+        effect: Effect,
+    },
     /// Keep a checked effect under a deployment-scoped key.
-    Keep { token: Token, entry: u64, task: u64, key: Key },
+    Keep {
+        token: Token,
+        entry: u64,
+        task: u64,
+        key: Key,
+    },
     /// Stage a previously committed proposed effect for a fresh decision.
-    DescribeProposal { token: Token, number: u64 },
+    DescribeProposal {
+        token: Token,
+        number: u64,
+    },
     /// Keep a proposal payload, with no permission to make it.
-    KeepProposal { token: Token, number: u64, task: u64, project: u32 },
+    KeepProposal {
+        token: Token,
+        number: u64,
+        task: u64,
+        project: u32,
+    },
     /// Erase a terminal proposal's payload.
-    DropProposal { number: u64 },
+    DropProposal {
+        number: u64,
+    },
     /// Drop a staged effect after a refusal.
-    Drop { token: Token },
+    Drop {
+        token: Token,
+    },
     /// The journal released an entry after its first save committed.
-    Make { entry: u64 },
+    Make {
+        entry: u64,
+    },
     /// A party resolves a held unrecoverable entry in the core release decision.
-    Resolve { entry: u64, repeat: bool },
+    Resolve {
+        entry: u64,
+        repeat: bool,
+    },
     /// Cancel an entry that has never been sent.
-    Withdraw { entry: u64 },
+    Withdraw {
+        entry: u64,
+    },
     /// Restore one previously committed record before work resumes.
-    Restore { record: Record },
+    Restore {
+        record: Record,
+    },
     /// The connector's system reported a change.
     System(SystemEvent),
 }
@@ -645,7 +760,7 @@ pub enum Record {
     /// Parameters and state of one procedure task.
     Procedure(ProcedureState),
     /// Exact delegate identity retained in the child's creation decision.
-    ProcedureDelegateOutcome { task: u64, step: u64, child: Option<u64> },
+    ProcedureDelegateOutcome { task: u64, step: u64, child: Option<u64>, revisions: Box<[(u64, u64)]> },
     /// A completed connector-owned result.
     Result { task: u64, code: u16 },
     /// A live task's names and project.
@@ -754,4 +869,11 @@ pub enum Request {
     Save { record: Record },
     /// Erase a record with the decision that removed it.
     Erase { key: RecordKey },
+}
+
+/// The connector retries a spec amendment with the current revision.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum StepRefusal {
+    Moved { revision: u64 },
+    Refused,
 }

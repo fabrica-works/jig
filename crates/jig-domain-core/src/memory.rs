@@ -105,7 +105,10 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     {
         return None;
     }
-    let pending = bytes(limits.tasks.tasks.checked_mul(limits.tasks.batch)?, task_carrier(limits)?)?;
+    let pending = bytes(
+        limits.tasks.tasks.checked_mul(limits.tasks.batch)?,
+        task_carrier(limits)?.checked_mul(2)?.checked_add(u64::from(limits.tasks.message_bytes).checked_mul(2)?)?,
+    )?;
     let route = crate::routing::room_max(limits)?;
     let children = [
         tasks::worst_case(&limits.tasks)?,

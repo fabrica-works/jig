@@ -44,7 +44,6 @@ pub fn key(now: &Now) -> Option<Key> {
         | Now::WorkspaceRequest { .. }
         | Now::RunPreparationFailed { .. }
         | Now::RunPrepared { .. }
-        | Now::ProcedureDelegateOutcome { .. }
         | Now::RestoreRefused => None,
     }
 }
@@ -104,7 +103,6 @@ pub fn answer(now: Now, row: Option<Record>) -> Option<core::Event> {
         | Now::WorkspaceRequest { .. }
         | Now::RunPreparationFailed { .. }
         | Now::RunPrepared { .. }
-        | Now::ProcedureDelegateOutcome { .. }
         | Now::RestoreRefused => return None,
     })
 }

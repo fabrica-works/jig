@@ -380,6 +380,10 @@ fn core_ask(
     work: &mut Queue<Work>,
 ) {
     match ask {
+        core::Ask::StepMade { task, step, first: Some(first), .. } => {
+            crate::steps::made(number, task, step, Some(first), work);
+        }
+        core::Ask::StepRefused { task, step, .. } => crate::steps::made(number, task, step, None, work),
         core::Ask::DropDocument { subject } => crate::client_documents::forget(domain, number, subject, work),
         core::Ask::Document { watcher, scope, subject, party, window: _ } => {
             crate::client_documents::ask_document(domain, number, watcher, scope, subject, party, work);
@@ -467,7 +471,7 @@ fn core_ask(
                             step,
                             connector: number,
                             code,
-                            action: core::ProcedureAction::Hold(tasks::Hold::Procedure),
+                            decision: core::ProcedureStep::new(core::StepEnd::Hold(tasks::Hold::Procedure)),
                         })),
                     }
                     child(decision, Released::Procedure { task, step, connector: number, code });
@@ -533,7 +537,7 @@ fn core_ask(
                         step,
                         connector: number,
                         code,
-                        action: core::ProcedureAction::Hold(tasks::Hold::Procedure),
+                        decision: core::ProcedureStep::new(core::StepEnd::Hold(tasks::Hold::Procedure)),
                     })),
                 },
                 None => {}
@@ -622,7 +626,8 @@ fn core_ask(
         // These proof-of-concept connectors provide no projection, brief
         // section, adoption, workspace or writer-handoff state. A copying
         // application fills these arms when its connectors expose it.
-        core::Ask::ForgetProjection { .. }
+        core::Ask::StepMade { first: None, .. }
+        | core::Ask::ForgetProjection { .. }
         | core::Ask::Adopt { .. }
         | core::Ask::Hold { .. }
         | core::Ask::EndTopic { .. }
@@ -915,14 +920,16 @@ pub(crate) fn infrastructure_out(
                         step,
                         connector,
                         code,
-                        action: core::ProcedureAction::Wait,
+                        decision: core::ProcedureStep::new(core::StepEnd::Wait),
                     })),
                     infrastructure::StepDecision::Finish => work.push(Work::Core(core::Event::ProcedureStep {
                         task,
                         step,
                         connector,
                         code,
-                        action: core::ProcedureAction::Result(tasks::TaskResult::Report { words: Box::new([]) }),
+                        decision: core::ProcedureStep::new(core::StepEnd::Result(tasks::TaskResult::Report {
+                            words: Box::new([]),
+                        })),
                     })),
                     infrastructure::StepDecision::FinishReport { words } => {
                         work.push(Work::Core(core::Event::ProcedureStep {
@@ -930,7 +937,9 @@ pub(crate) fn infrastructure_out(
                             step,
                             connector,
                             code,
-                            action: core::ProcedureAction::Result(tasks::TaskResult::Report { words }),
+                            decision: core::ProcedureStep::new(core::StepEnd::Result(tasks::TaskResult::Report {
+                                words,
+                            })),
                         }));
                     }
                     infrastructure::StepDecision::Hold { .. } => work.push(Work::Core(core::Event::ProcedureStep {
@@ -938,7 +947,7 @@ pub(crate) fn infrastructure_out(
                         step,
                         connector,
                         code,
-                        action: core::ProcedureAction::Hold(tasks::Hold::Effects),
+                        decision: core::ProcedureStep::new(core::StepEnd::Hold(tasks::Hold::Effects)),
                     })),
                 }
             }
@@ -1155,18 +1164,22 @@ pub(crate) fn observability_out(
                 let action = match chosen {
                     observability::WatchDecision::Triage { delegate, alerts } => {
                         match translate::triage(&delegate, &alerts) {
-                            Some(batch) => core::ProcedureAction::Delegate(batch),
-                            None => core::ProcedureAction::Hold(tasks::Hold::Procedure),
+                            Some(batch) => {
+                                core::ProcedureStep { batch, ..core::ProcedureStep::new(core::StepEnd::Wait) }
+                            }
+                            None => core::ProcedureStep::new(core::StepEnd::Hold(tasks::Hold::Procedure)),
                         }
                     }
                     observability::WatchDecision::Lead { delegate } => match translate::lead(&delegate) {
-                        Some(batch) => core::ProcedureAction::Delegate(batch),
-                        None => core::ProcedureAction::Hold(tasks::Hold::Procedure),
+                        Some(batch) => core::ProcedureStep { batch, ..core::ProcedureStep::new(core::StepEnd::Wait) },
+                        None => core::ProcedureStep::new(core::StepEnd::Hold(tasks::Hold::Procedure)),
                     },
-                    observability::WatchDecision::Wait => core::ProcedureAction::Wait,
-                    observability::WatchDecision::Hold => core::ProcedureAction::Hold(tasks::Hold::Procedure),
+                    observability::WatchDecision::Wait => core::ProcedureStep::new(core::StepEnd::Wait),
+                    observability::WatchDecision::Hold => {
+                        core::ProcedureStep::new(core::StepEnd::Hold(tasks::Hold::Procedure))
+                    }
                 };
-                work.push(Work::Core(core::Event::ProcedureStep { task, step, connector, code, action }));
+                work.push(Work::Core(core::Event::ProcedureStep { task, step, connector, code, decision: action }));
             }
             observability::Request::WakeProcedure { task } => {
                 child(decision, Released::Core(core::Event::Tasks(tasks::Event::WakeProcedure { task })));
@@ -1177,10 +1190,16 @@ pub(crate) fn observability_out(
             observability::Request::Triage { watch, delegate, alerts, .. } => {
                 let Some((step, connector, code)) = domain.procedures.remove(&watch) else { continue };
                 let action = match translate::triage(&delegate, &alerts) {
-                    Some(batch) => core::ProcedureAction::Delegate(batch),
-                    None => core::ProcedureAction::Hold(tasks::Hold::Procedure),
+                    Some(batch) => core::ProcedureStep { batch, ..core::ProcedureStep::new(core::StepEnd::Wait) },
+                    None => core::ProcedureStep::new(core::StepEnd::Hold(tasks::Hold::Procedure)),
                 };
-                work.push(Work::Core(core::Event::ProcedureStep { task: watch, step, connector, code, action }));
+                work.push(Work::Core(core::Event::ProcedureStep {
+                    task: watch,
+                    step,
+                    connector,
+                    code,
+                    decision: action,
+                }));
             }
             observability::Request::Changed { service } => {
                 let resource =
@@ -1353,34 +1372,7 @@ fn core_now(domain: &mut Domain, env: &Env<Limits>, value: core::Now, work: &mut
         | core::Now::HistoricalPersonTask { .. }) => {
             now(domain, Output::CoreLoad(load));
         }
-        core::Now::ProcedureDelegateOutcome { task, step, child } => {
-            let connector = match domain.core.tasks.task(task) {
-                Some(row) => match row.executor {
-                    tasks::Executor::Procedure { connector, .. } => Some(connector),
-                    tasks::Executor::Agent { .. } | tasks::Executor::Person(_) => None,
-                },
-                None => None,
-            };
-            if let Some(number) = connector {
-                match jig_ops_domain_connectors::connector(number) {
-                    Some(Connector::Observability) => {
-                        work.push(Work::Observability(observability::Event::ProcedureDelegateOutcome {
-                            task,
-                            step,
-                            child,
-                        }));
-                    }
-                    Some(Connector::Infrastructure) => {
-                        work.push(Work::Infrastructure(infrastructure::Event::ProcedureDelegateOutcome {
-                            task,
-                            step,
-                            child,
-                        }));
-                    }
-                    None => {}
-                }
-            }
-        }
+
         core::Now::RestoreRefused => {
             let _request = domain.core.restart_refuse();
         }

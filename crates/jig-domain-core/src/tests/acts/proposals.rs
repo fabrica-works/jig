@@ -75,7 +75,10 @@ fn a_procedure_step_proposing_what_nobody_may_accept_is_refused() {
     };
     assert_eq!(owner, Token::new(121));
     let Some(Event::Tasks(tasks::Event::Procedure {
-        task: 1, step: 1, decision: tasks::ProcedureDecision::Wait, ..
+        task: 1,
+        step: 1,
+        decision: tasks::ProcedureDecision { end: tasks::ProcedureEnd::Wait, .. },
+        ..
     })) = work.pop()
     else {
         unreachable!("the refused procedure step waits");

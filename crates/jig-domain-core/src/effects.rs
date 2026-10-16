@@ -1259,7 +1259,7 @@ pub(crate) fn procedure_proposed(
         task: route.task,
         step: route.step,
         read: core.tasks.procedure_offered(route.task),
-        decision: tasks::ProcedureDecision::Wait,
+        decision: tasks::ProcedureDecision::new(tasks::ProcedureEnd::Wait),
     })
 }
 
@@ -1269,7 +1269,7 @@ fn procedure_wait(core: &Core, work: &mut Queue<Event>, task: u64, step: u64) {
         task,
         step,
         read: core.tasks.procedure_offered(task),
-        decision: tasks::ProcedureDecision::Wait,
+        decision: tasks::ProcedureDecision::new(tasks::ProcedureEnd::Wait),
     }));
 }
 

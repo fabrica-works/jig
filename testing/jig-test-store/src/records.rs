@@ -280,13 +280,9 @@ fn encode_record(value: &d::Record) -> w::Value {
             w::RecordProcedure::new(&w::CEILINGS, w::RecordProcedureParts { value: encode_procedure_state(value) })
                 .expect("admitted fields fit schema"),
         ),
-        d::Record::ProcedureDelegateOutcome { task, step, child } => w::Value::ProcedureDelegateOutcome(
-            w::RecordProcedureDelegateOutcome::new(
-                &w::CEILINGS,
-                w::RecordProcedureDelegateOutcomeParts { task: *task, step: *step, child: *child },
-            )
-            .expect("admitted fields fit schema"),
-        ),
+        d::Record::ProcedureDelegateOutcome { task, step, child, revisions } => {
+            encode_step(*task, *step, *child, revisions)
+        }
         d::Record::Result { task, code } => w::Value::Result(
             w::RecordResult::new(&w::CEILINGS, w::RecordResultParts { task: *task, code: *code })
                 .expect("admitted fields fit schema"),
@@ -356,8 +352,17 @@ fn decode_record(value: w::Value, limits: &d::Limits) -> Result<d::Record, Undec
             d::Record::Procedure(decode_procedure_state(value, limits)?)
         }
         w::Value::ProcedureDelegateOutcome(value) => {
-            let w::RecordProcedureDelegateOutcomeParts { task, step, child } = value.into_parts();
-            d::Record::ProcedureDelegateOutcome { task, step, child }
+            let w::RecordProcedureDelegateOutcomeParts { task, step, child, revisions } = value.into_parts();
+            if revisions.len() > limits.tasks {
+                return Err(Undecodable);
+            }
+            let mut decoded = List::with_capacity(revisions.len());
+            for value in revisions.into_boxed() {
+                let w::SpecRevisionParts { task, revision } = value.into_parts();
+                decoded.push((task, revision)).expect("one revision per entry");
+            }
+            let revisions = decoded.into_boxed();
+            d::Record::ProcedureDelegateOutcome { task, step, child, revisions }
         }
         w::Value::Result(value) => {
             let w::RecordResultParts { task, code } = value.into_parts();
@@ -419,4 +424,23 @@ fn decode_path(path: w::ResourcePath, limits: &d::Limits) -> Result<d::Path, Und
         segments.push(segment.into_parts().bytes).expect("same count");
     }
     d::Path::new(segments, limits.segment_bytes).ok_or(Undecodable)
+}
+
+fn encode_step(task: u64, step: u64, child: Option<u64>, revisions: &[(u64, u64)]) -> w::Value {
+    let mut encoded = List::with_capacity(u32::try_from(revisions.len()).expect("bounded revisions"));
+    for (task, revision) in revisions {
+        encoded
+            .push(
+                w::SpecRevision::new(&w::CEILINGS, w::SpecRevisionParts { task: *task, revision: *revision })
+                    .expect("revision fits"),
+            )
+            .expect("one revision per entry");
+    }
+    w::Value::ProcedureDelegateOutcome(
+        w::RecordProcedureDelegateOutcome::new(
+            &w::CEILINGS,
+            w::RecordProcedureDelegateOutcomeParts { task, step, child, revisions: encoded },
+        )
+        .expect("admitted fields fit schema"),
+    )
 }

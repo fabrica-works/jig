@@ -42,7 +42,8 @@ record ApplicationOutcomeRole { held: u32 }
 record RecordApplicationObject { object: u64 now: ApplicationObject }
 record RecordProposal { number: u64 task: u64 project: u32 effect: Effect }
 record RecordProcedure { value: ProcedureState }
-record RecordProcedureDelegateOutcome { task: u64 step: u64 child: option u64 }
+record SpecRevision { task: u64 revision: u64 }
+record RecordProcedureDelegateOutcome { task: u64 step: u64 child: option u64 revisions: list 65536 SpecRevision }
 record RecordResult { task: u64 code: u16 }
 record RecordTask { task: u64 project: u32 resources: list 64 ResourcePath }
 record RecordAdoption { project: u32 path: ResourcePath role: ResourceRole }

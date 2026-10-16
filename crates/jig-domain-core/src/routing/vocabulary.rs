@@ -1,6 +1,6 @@
 //! The core's vocabulary toward its root (`domain/engine.md`, section 4).
 
-use crate::{CallKey, CallPart, Delegate, EscalationDecisionRecord, Key, ProcedureAction, Record, RunCharter};
+use crate::{CallKey, CallPart, Delegate, EscalationDecisionRecord, Key, ProcedureStep, Record, RunCharter};
 use alloc::boxed::Box;
 use jig_domain_accounts as accounts;
 use jig_domain_authority as authority;
@@ -31,6 +31,11 @@ pub enum Request {
 /// A question or retained-section command for a numbered connector.
 #[derive(Debug)]
 pub enum Ask {
+    /// The complete procedure step committed with these spec revisions.
+    StepMade { task: u64, step: u64, first: Option<u64>, revisions: Box<[(u64, u64)]> },
+    /// No part of the procedure step committed.
+    StepRefused { task: u64, step: u64, why: StepRefusal },
+
     /// Discard the connector-owned binding of a refused application watch or read.
     DropDocument { subject: Token },
     /// Make a connector's current document, then complete the views' Make within this decision.
@@ -286,7 +291,6 @@ pub enum Now {
     /// Load one held-chat decision that has left live task memory.
     HistoricalEscalation { request: Token, person: u64, project: u32, task: u64, revision: u64 },
     /// The first child admitted from a connector procedure's batch, if any.
-    ProcedureDelegateOutcome { task: u64, step: u64, child: Option<u64> },
     /// A restored task row was refused; the root must fail startup.
     RestoreRefused,
 }
@@ -539,7 +543,7 @@ pub enum Event {
     /// One connector's procedure batch holdings in requested order.
     ProcedureHoldings { task: u64, step: u64, connector: u16, holdings: Option<Box<[Box<[tasks::Holding]>]>> },
     /// A numbered connector's procedure choice in the core's vocabulary.
-    ProcedureStep { task: u64, step: u64, connector: u16, code: u32, action: ProcedureAction },
+    ProcedureStep { task: u64, step: u64, connector: u16, code: u32, decision: ProcedureStep },
     /// A gathered section.
     Brief(brief::GatherEvent),
     /// One numbered connector's answer to a task-holdings handoff.
@@ -697,4 +701,12 @@ pub enum Timer {
     Account,
     /// Live view deadline.
     View,
+}
+
+/// Why an entire connector-owned procedure step was refused.
+#[derive(PartialEq, Eq, Debug)]
+pub enum StepRefusal {
+    Moved { task: u64, now: people::Moved },
+    Refused(tasks::Problem),
+    Denied { answer: authority::Answer, findings: Box<[authority::Finding]> },
 }

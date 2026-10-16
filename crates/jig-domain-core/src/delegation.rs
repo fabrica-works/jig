@@ -36,11 +36,39 @@ pub struct Delegate {
 
 /// A connector-owned procedure's chosen task action before core admission.
 #[derive(PartialEq, Eq, Debug)]
-pub enum ProcedureAction {
-    Delegate(Box<[Delegate]>),
+pub struct ProcedureStep {
+    pub batch: Box<[Delegate]>,
+    pub amendments: Box<[StepAmendment]>,
+    pub messages: Box<[StepMessage]>,
+    pub end: StepEnd,
+}
+
+#[derive(PartialEq, Eq, Debug)]
+pub struct StepAmendment {
+    pub task: u64,
+    pub revision: u64,
+    pub amendment: tasks::Amendment,
+}
+
+#[derive(PartialEq, Eq, Debug)]
+pub struct StepMessage {
+    pub target: u64,
+    pub kind: tasks::MessageKind,
+    pub words: Box<[u8]>,
+}
+
+#[derive(PartialEq, Eq, Debug)]
+pub enum StepEnd {
     Result(tasks::TaskResult),
     Hold(tasks::Hold),
     Wait,
+}
+
+impl ProcedureStep {
+    #[must_use]
+    pub fn new(end: StepEnd) -> Self {
+        Self { batch: Box::new([]), amendments: Box::new([]), messages: Box::new([]), end }
+    }
 }
 
 impl Core {

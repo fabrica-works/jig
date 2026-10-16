@@ -303,7 +303,6 @@ fn now_event(now: core::Now) -> Option<Event> {
         | core::Now::RunPreparationFailed { .. }
         | core::Now::RunPrepared { .. }
         | core::Now::HistoricalEscalation { .. }
-        | core::Now::ProcedureDelegateOutcome { .. }
         | core::Now::RestoreRefused => return None,
     })
 }

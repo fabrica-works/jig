@@ -3,13 +3,15 @@
 //! executor identity, live topology, result contract and the step's offered inbox fence. It never
 //! knows connector facts or effects. A due step may make one whole batch,
 //! finish after its delegates, hold, or wait for changed facts.
+#![expect(clippy::result_large_err, reason = "bounded owner refusal carries exact capacity diagnostics inline")]
 use crate::domain::{Domain, make, publish, record, refused, task_mut};
 use crate::{
-    Active, Closing, Ending, Executor, Limits, Party, Phase, ProcedureDecision, Refusal, Request, Stage, TaskResult,
+    Active, Closing, Ending, Executor, Limits, Party, Phase, ProcedureDecision, ProcedureEnd, Refusal, Request, Stage,
+    TaskResult,
 };
 use skein_lib::{Env, Queue, ReplyTo};
 
-#[expect(clippy::too_many_arguments, reason = "a procedure decision carries its offered inbox fence")]
+#[expect(clippy::too_many_arguments, reason = "one fenced procedure decision")]
 pub(crate) fn stepped(
     domain: &mut Domain,
     env: &Env<Limits>,
@@ -20,6 +22,39 @@ pub(crate) fn stepped(
     decision: ProcedureDecision,
     out: &mut Queue<Request>,
 ) {
+    let token = to.into_token();
+    let mut requests = Queue::with_capacity(crate::max_out(&env.limits));
+    apply(domain, env, Fence { to: ReplyTo::new(token), number, step, read }, decision, &mut requests);
+    let mut terminal = false;
+    for _ in 0..requests.len() {
+        let request = requests.pop().expect("step output count");
+        if let Request::Done { .. } | Request::Sent { .. } = &request {
+            continue;
+        }
+        if let Request::Refused { problem, .. } = request {
+            terminal = true;
+            out.push(Request::ProcedureRefused { task: number, step, problem });
+        } else {
+            if let Request::Made { .. } = &request {
+                terminal = true;
+            }
+            out.push(request);
+        }
+    }
+    if !terminal {
+        out.push(Request::Done { reply_to: ReplyTo::new(token) });
+    }
+}
+
+struct Fence {
+    to: ReplyTo,
+    number: u64,
+    step: u64,
+    read: Option<u64>,
+}
+
+fn apply(domain: &mut Domain, env: &Env<Limits>, fence: Fence, decision: ProcedureDecision, out: &mut Queue<Request>) {
+    let Fence { to, number, step, read } = fence;
     if !domain.ready() {
         return refused(to, Some(number), Refusal::NotReady, out);
     }
@@ -36,36 +71,47 @@ pub(crate) fn stepped(
     if read != domain.procedure_offered(number) {
         return refused(to, Some(number), Refusal::Read, out);
     }
-    match &decision {
-        ProcedureDecision::Delegate(batch) => {
-            if let Err(problem) = crate::batch::check(domain, &env.limits, Party::Task(number), batch) {
-                return crate::capacity::refused(domain, env, to, problem, out);
-            }
-        }
-        ProcedureDecision::Result(result) => {
-            if !task.delegates.is_empty() {
-                return out.push(Request::Refused {
-                    reply_to: to,
-                    problem: crate::Problem::live_delegates(number, &task.delegates),
-                });
-            }
-            if !crate::run::valid_result(&task.contract, result, &env.limits) {
-                return refused(to, Some(number), Refusal::Contract, out);
-            }
-        }
-        ProcedureDecision::Hold(_) | ProcedureDecision::Wait => {}
+    if let Err(problem) = check(domain, env, number, &decision) {
+        return crate::capacity::refused(domain, env, to, problem, out);
     }
     let live = task_mut(domain, number).expect("procedure step preflighted");
     live.record.attempt = step;
     crate::inbox::take(&mut live.record, read, &[]);
     live.procedure_offered = None;
-    match decision {
-        ProcedureDecision::Delegate(batch) => {
-            task_mut(domain, number).expect("procedure task live").record.phase = Phase::Active(Active::Idle);
-            publish(domain, env, number, out);
-            make(domain, env, to, Party::Task(number), batch, out);
-        }
-        ProcedureDecision::Result(result) => {
+    task_mut(domain, number).expect("procedure task live").record.phase = Phase::Active(Active::Idle);
+    let made = !decision.batch.is_empty();
+    if made {
+        make(domain, env, to, Party::Task(number), decision.batch, out);
+    }
+    for part in decision.amendments {
+        crate::control::amend(
+            domain,
+            env,
+            ReplyTo::new(skein_lib::Token::new(u64::MAX - 1)),
+            Party::Task(number),
+            part.task,
+            part.message,
+            part.stop_run,
+            part.amendment,
+            out,
+        );
+    }
+    let project = record(domain, number).expect("procedure task live").project;
+    for part in decision.messages {
+        crate::inbox::message(
+            domain,
+            env,
+            ReplyTo::new(skein_lib::Token::new(u64::MAX - 1)),
+            project,
+            part.task,
+            part.word,
+            false,
+            false,
+            out,
+        );
+    }
+    match decision.end {
+        ProcedureEnd::Result(result) => {
             let ending = match result {
                 TaskResult::Failure { reason } => Ending::Failed { reason },
                 TaskResult::Approved { .. }
@@ -76,17 +122,93 @@ pub(crate) fn stepped(
             task_mut(domain, number).expect("procedure task live").record.phase =
                 Phase::Closing(Closing { stage: Stage::Delegates, ending });
             publish(domain, env, number, out);
-            out.push(Request::Done { reply_to: to });
         }
-        ProcedureDecision::Hold(why) => {
-            crate::run::hold(domain, env, number, why, out);
-            out.push(Request::Done { reply_to: to });
-        }
-        ProcedureDecision::Wait => {
-            task_mut(domain, number).expect("procedure task live").record.phase = Phase::Active(Active::Idle);
-            publish(domain, env, number, out);
-            out.push(Request::Done { reply_to: to });
-        }
+        ProcedureEnd::Hold(why) => crate::run::hold(domain, env, number, why, out),
+        ProcedureEnd::Wait => publish(domain, env, number, out),
     }
     crate::wake::after_step(domain, env, number, out);
+}
+
+fn problem(task: u64, why: Refusal) -> crate::Problem {
+    crate::Problem { task: Some(task), why, blocked_by: None, capacity: None }
+}
+
+fn check(
+    domain: &mut Domain,
+    env: &Env<Limits>,
+    number: u64,
+    decision: &ProcedureDecision,
+) -> Result<(), crate::Problem> {
+    let task = record(domain, number).expect("step task checked");
+    if decision.amendments.len() > usize::try_from(env.limits.batch).expect("batch fits")
+        || decision.messages.len() > usize::try_from(env.limits.batch).expect("batch fits")
+    {
+        return Err(problem(number, Refusal::Batch));
+    }
+    if let ProcedureEnd::Result(result) = &decision.end {
+        if !task.delegates.is_empty() || !decision.batch.is_empty() {
+            return Err(crate::Problem::live_delegates(number, &task.delegates));
+        }
+        if !crate::run::valid_result(&task.contract, result, &env.limits) {
+            return Err(problem(number, Refusal::Contract));
+        }
+    }
+    if !decision.batch.is_empty() {
+        crate::batch::check(domain, &env.limits, Party::Task(number), &decision.batch)?;
+    }
+    // Stage only the admission fields; no lifecycle, timer, history or output changes escape preflight.
+    let mut rows = skein_lib::List::with_capacity(env.limits.tasks);
+    for (number, _) in &domain.names {
+        rows.push((*number, record(domain, *number).expect("live task").clone())).expect("bounded preview");
+    }
+    let mut funding = skein_lib::List::with_capacity(env.limits.funders);
+    for (funder, row) in &domain.funding {
+        funding.push((*funder, row.numbers)).expect("bounded funding preview");
+    }
+    let result = check_parts(domain, env, number, decision);
+    for (number, row) in rows.into_boxed() {
+        task_mut(domain, number).expect("preview keeps live tasks").record = row;
+    }
+    for (funder, numbers) in funding.into_boxed() {
+        domain.funding.get_mut(&funder).expect("preview keeps funders").numbers = numbers;
+    }
+    result
+}
+
+fn check_parts(
+    domain: &mut Domain,
+    env: &Env<Limits>,
+    number: u64,
+    decision: &ProcedureDecision,
+) -> Result<(), crate::Problem> {
+    let project = record(domain, number).expect("step task checked").project;
+    let parent = &mut task_mut(domain, number).expect("step task checked").record;
+    let mut delegates = skein_lib::List::with_capacity(env.limits.delegates);
+    let mut goals = 0_u32;
+    for task in &parent.delegates {
+        delegates.push(*task).expect("bounded delegates");
+    }
+    for task in &decision.batch {
+        if task.tracked.is_some() {
+            goals = goals.checked_add(1).expect("batch fits u32");
+        }
+        delegates.push(task.number).expect("batch preflighted");
+        parent.numbers.reserved = parent.numbers.reserved.checked_add(task.numbers.budget).expect("batch preflighted");
+    }
+    parent.delegates = delegates.into_boxed();
+    for part in &decision.amendments {
+        if let Err(why) = crate::control::preview_amend(domain, env, Party::Task(number), part) {
+            return Err(problem(part.task, why));
+        }
+        if let Err(why) = crate::goals::room(domain, project, goals, &env.limits) {
+            return Err(problem(part.task, why));
+        }
+    }
+    for part in &decision.messages {
+        if part.word.from != Party::Task(number) {
+            return Err(problem(part.task, Refusal::Reference));
+        }
+        crate::inbox::preview_message(domain, env, project, part.task, part.word.clone())?;
+    }
+    Ok(())
 }

@@ -274,15 +274,39 @@ pub struct RecurringState {
 /// One procedure decision. Each step commits its task changes with the owner's state.
 /// (domain/tasks.md, section 5.3).
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub enum ProcedureDecision {
-    /// Make one checked batch of direct delegates and wait for their results.
-    Delegate(Box<[New]>),
-    /// Finish with a contract-checked result after live delegates have ended.
+pub struct ProcedureDecision {
+    pub batch: Box<[New]>,
+    pub amendments: Box<[ProcedureAmendment]>,
+    pub messages: Box<[ProcedureMessage]>,
+    pub end: ProcedureEnd,
+}
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct ProcedureAmendment {
+    pub task: u64,
+    pub message: u64,
+    pub stop_run: bool,
+    pub amendment: crate::Amendment,
+}
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct ProcedureMessage {
+    pub task: u64,
+    pub word: Word,
+}
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum ProcedureEnd {
     Result(TaskResult),
-    /// Preserve the current task and route a decision upward.
     Hold(Hold),
-    /// The current facts need no change; wait until they change.
     Wait,
+}
+
+impl ProcedureDecision {
+    #[must_use]
+    pub fn new(end: ProcedureEnd) -> Self {
+        Self { batch: Box::new([]), amendments: Box::new([]), messages: Box::new([]), end }
+    }
 }
 
 /// Bounded semantic parameter carrier; tasks does not interpret names or resources, and the
@@ -1553,6 +1577,8 @@ pub enum Event {
 /// saves/erases with effects and delays outward replies until durability. (domain/tasks.md, section 5).
 #[derive(PartialEq, Eq, Debug)]
 pub enum Request {
+    /// No part of this procedure step changed task state.
+    ProcedureRefused { task: u64, step: u64, problem: Problem },
     /// The complete requested set became held in this commit.
     Taken { task: u64, holdings: Box<[Holding]> },
     /// One task entered or changed position in a resource's waiting queue.

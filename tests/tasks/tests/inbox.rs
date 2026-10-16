@@ -328,7 +328,7 @@ fn procedure_watch(seed: u64, count: u32, age: u64) -> World {
         task: 1,
         step: 1,
         read: None,
-        decision: jig_domain_tasks::ProcedureDecision::Wait,
+        decision: jig_domain_tasks::ProcedureDecision::new(jig_domain_tasks::ProcedureEnd::Wait),
     });
     assert_eq!(world.replies[&call], Reply::Done);
     assert_eq!(world.record(1).phase, Phase::Active(Active::Idle));
@@ -424,7 +424,15 @@ fn a_procedures_step_takes_its_storm_and_a_later_result_steps_it_on_the_result_a
     }
     let offered = world.contexts[&1].inbox.last().expect("offered storm").number;
     assert_eq!(offered, 3);
-    assert_eq!(procedure_step(&mut world, 2, Some(offered), jig_domain_tasks::ProcedureDecision::Wait), Reply::Done);
+    assert_eq!(
+        procedure_step(
+            &mut world,
+            2,
+            Some(offered),
+            jig_domain_tasks::ProcedureDecision::new(jig_domain_tasks::ProcedureEnd::Wait)
+        ),
+        Reply::Done
+    );
     assert!(world.record(1).inbox.is_empty());
     assert_eq!(world.record(1).phase, Phase::Active(Active::Idle));
     world.restart();
@@ -437,7 +445,15 @@ fn a_procedures_step_takes_its_storm_and_a_later_result_steps_it_on_the_result_a
     assert_eq!(inbox.len(), 1);
     assert!(matches!(inbox[0].kind, MessageKind::Result(_)));
     let read = Some(inbox[0].number);
-    assert_eq!(procedure_step(&mut world, 3, read, jig_domain_tasks::ProcedureDecision::Wait), Reply::Done);
+    assert_eq!(
+        procedure_step(
+            &mut world,
+            3,
+            read,
+            jig_domain_tasks::ProcedureDecision::new(jig_domain_tasks::ProcedureEnd::Wait)
+        ),
+        Reply::Done
+    );
     assert!(world.record(1).inbox.is_empty());
     assert_eq!(world.record(1).phase, Phase::Active(Active::Idle));
 }
@@ -453,13 +469,29 @@ fn a_result_arriving_after_a_procedures_offer_survives_its_step() {
     world.finish(2);
     world.settle(2);
     assert_eq!(world.record(1).inbox.len(), 2);
-    assert_eq!(procedure_step(&mut world, 2, Some(3), jig_domain_tasks::ProcedureDecision::Wait), Reply::Done);
+    assert_eq!(
+        procedure_step(
+            &mut world,
+            2,
+            Some(3),
+            jig_domain_tasks::ProcedureDecision::new(jig_domain_tasks::ProcedureEnd::Wait)
+        ),
+        Reply::Done
+    );
     assert_eq!(world.record(1).phase, Phase::Active(Active::Due));
     assert_eq!(world.contexts[&1].previous_attempt, 2);
     assert_eq!(world.contexts[&1].inbox.len(), 1);
     assert!(matches!(world.contexts[&1].inbox[0].kind, MessageKind::Result(_)));
     let read = Some(world.contexts[&1].inbox[0].number);
-    assert_eq!(procedure_step(&mut world, 3, read, jig_domain_tasks::ProcedureDecision::Wait), Reply::Done);
+    assert_eq!(
+        procedure_step(
+            &mut world,
+            3,
+            read,
+            jig_domain_tasks::ProcedureDecision::new(jig_domain_tasks::ProcedureEnd::Wait)
+        ),
+        Reply::Done
+    );
     assert!(world.record(1).inbox.is_empty());
     assert_eq!(world.record(1).phase, Phase::Active(Active::Idle));
 }
@@ -472,20 +504,36 @@ fn a_refused_procedure_step_takes_nothing_and_restart_offers_the_unread_storm_ag
     }
     let before = world.record(1).clone();
     assert!(matches!(
-        procedure_step(&mut world, 2, Some(4), jig_domain_tasks::ProcedureDecision::Wait),
+        procedure_step(&mut world, 2, Some(4), jig_domain_tasks::ProcedureDecision::new(jig_domain_tasks::ProcedureEnd::Wait)),
         Reply::Refused(problem) if problem.why == Refusal::Read
     ));
     assert_eq!(world.record(1), &before);
     let invalid = task(1, &[]);
     assert!(matches!(
-        procedure_step(&mut world, 2, Some(3), jig_domain_tasks::ProcedureDecision::Delegate(Box::new([invalid]))),
+        procedure_step(
+            &mut world,
+            2,
+            Some(3),
+            jig_domain_tasks::ProcedureDecision {
+                batch: Box::new([invalid]),
+                ..jig_domain_tasks::ProcedureDecision::new(jig_domain_tasks::ProcedureEnd::Wait)
+            }
+        ),
         Reply::Refused(_)
     ));
     assert_eq!(world.record(1), &before);
     world.restart();
     assert_eq!(world.record(1), &before);
     assert_eq!(world.contexts[&1].inbox.last().expect("unread storm").number, 3);
-    assert_eq!(procedure_step(&mut world, 2, Some(3), jig_domain_tasks::ProcedureDecision::Wait), Reply::Done);
+    assert_eq!(
+        procedure_step(
+            &mut world,
+            2,
+            Some(3),
+            jig_domain_tasks::ProcedureDecision::new(jig_domain_tasks::ProcedureEnd::Wait)
+        ),
+        Reply::Done
+    );
     assert!(world.record(1).inbox.is_empty());
 }
 
@@ -495,7 +543,15 @@ fn news_arriving_after_a_procedures_offer_waits_for_its_own_batch() {
     for number in 1..=4 {
         procedure_news(&mut world, number);
     }
-    assert_eq!(procedure_step(&mut world, 2, Some(3), jig_domain_tasks::ProcedureDecision::Wait), Reply::Done);
+    assert_eq!(
+        procedure_step(
+            &mut world,
+            2,
+            Some(3),
+            jig_domain_tasks::ProcedureDecision::new(jig_domain_tasks::ProcedureEnd::Wait)
+        ),
+        Reply::Done
+    );
     assert_eq!(world.record(1).phase, Phase::Active(Active::Idle));
     assert_eq!(world.record(1).inbox[0].number, 4);
     assert_eq!(world.record(1).inbox[0].hits, 1);
@@ -504,7 +560,15 @@ fn news_arriving_after_a_procedures_offer_waits_for_its_own_batch() {
     procedure_news(&mut world, 6);
     assert_eq!(world.record(1).phase, Phase::Active(Active::Due));
     assert_eq!(world.contexts[&1].inbox[0].hits, 3);
-    assert_eq!(procedure_step(&mut world, 3, Some(6), jig_domain_tasks::ProcedureDecision::Wait), Reply::Done);
+    assert_eq!(
+        procedure_step(
+            &mut world,
+            3,
+            Some(6),
+            jig_domain_tasks::ProcedureDecision::new(jig_domain_tasks::ProcedureEnd::Wait)
+        ),
+        Reply::Done
+    );
     assert!(world.record(1).inbox.is_empty());
 }
 
@@ -516,7 +580,15 @@ fn the_referee_rejects_a_procedure_keeping_its_prefix_or_taking_later_words() {
     }
     say(&mut world, 4);
     let before = world.records.clone();
-    assert_eq!(procedure_step(&mut world, 2, Some(3), jig_domain_tasks::ProcedureDecision::Wait), Reply::Done);
+    assert_eq!(
+        procedure_step(
+            &mut world,
+            2,
+            Some(3),
+            jig_domain_tasks::ProcedureDecision::new(jig_domain_tasks::ProcedureEnd::Wait)
+        ),
+        Reply::Done
+    );
     for corruption in 0..3 {
         let mut rows = if corruption == 2 { before.clone() } else { world.records.clone() };
         let jig_domain_tasks::Stored::Live(task) =

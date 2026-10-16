@@ -111,6 +111,11 @@ fn route_ask(
     work: &mut Queue<Work>,
 ) {
     match ask {
+        core::Ask::StepMade { task, step, first, revisions } => {
+            work.push(Work::Connector { number, event: connector::Event::StepMade { task, step, first, revisions } });
+        }
+        core::Ask::StepRefused { task, step, why } => crate::steps::refused(number, task, step, why, work),
+
         core::Ask::DropDocument { subject } => {
             if number == 1 || number == 2 {
                 work.push(Work::Connector { number, event: connector::Event::DocumentForget { subject } });
@@ -515,16 +520,7 @@ fn route_now(
         core::Now::RestoreRefused => {
             unreachable!("this route awaits the testing application's scripted peer");
         }
-        core::Now::ProcedureDelegateOutcome { task, step, child } => {
-            if let Some(parent) = domain.core.tasks.task(task)
-                && let tasks::Executor::Procedure { connector: number, .. } = parent.executor
-            {
-                work.push(Work::Connector {
-                    number,
-                    event: connector::Event::ProcedureDelegateOutcome { task, step, child },
-                });
-            }
-        }
+
         other @ (core::Now::SeenChat { .. }
         | core::Now::LoadEndedChat { .. }
         | core::Now::HistoricalPersonTask { .. }
@@ -635,42 +631,15 @@ pub(super) fn route_connector(
             }
             connector::Request::Step { task, decision: step } => {
                 let (numbered_step, code) = domain.procedure_steps.remove(&task).expect("procedure chose a step");
-                let action = match step {
-                    connector::StepDecision::Finish { result: connector::ProcedureResult::Succeeded } => {
-                        core::ProcedureAction::Result(tasks::TaskResult::Report { words: Box::new([]) })
-                    }
-                    connector::StepDecision::Finish { result: connector::ProcedureResult::Local { code } } => {
-                        core::ProcedureAction::Result(tasks::TaskResult::Change {
-                            connector: number,
-                            kind: code,
-                            resource: 0,
-                            words: Box::new([]),
-                        })
-                    }
-                    connector::StepDecision::Wait { .. } | connector::StepDecision::Stall => {
-                        core::ProcedureAction::Wait
-                    }
-                    connector::StepDecision::Hold { .. } => core::ProcedureAction::Hold(tasks::Hold::Effects),
-                    connector::StepDecision::Effect(effect) => {
-                        let owner = crate::effect_payload(domain, effect);
-                        assert!(domain.effect_procedures.insert(owner, task).is_ok(), "one procedure effect flight");
-                        work.push(Work::Core(core::Event::EffectStart {
-                            owner,
-                            connector: number,
-                            origin: core::EffectOrigin::Procedure { task, step: numbered_step, entry: None },
-                        }));
-                        continue;
-                    }
-                    connector::StepDecision::Delegate { .. } | connector::StepDecision::Propose { .. } => {
-                        unreachable!("effect and delegation scripts enter in the next session")
-                    }
+                let Some(action) = crate::steps::translate(domain, task, numbered_step, number, step, work) else {
+                    continue;
                 };
                 work.push(Work::Core(core::Event::ProcedureStep {
                     task,
                     step: numbered_step,
                     connector: number,
                     code: u32::from(code),
-                    action,
+                    decision: action,
                 }));
             }
             connector::Request::System(call) => hold(decision, Delivery::System { connector: number, call }),

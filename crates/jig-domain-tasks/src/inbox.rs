@@ -1,5 +1,6 @@
 //! Bounded task messages and atomic turn reads (domain/tasks.md, section 8.2).
-use crate::domain::{Domain, publish, record, refused, task_mut};
+#![expect(clippy::result_large_err, reason = "bounded owner refusal carries exact capacity diagnostics inline")]
+use crate::domain::{Domain, publish, record, task_mut};
 use crate::{Limits, MessageKind, NewsClass, Party, Phase, QuestionCredit, Refusal, Request, Word};
 use alloc::boxed::Box;
 use skein_lib::{Env, List, Queue, ReplyTo};
@@ -174,24 +175,28 @@ pub(crate) fn room(domain: &Domain, limits: &Limits, task: u64, count: u32, byte
         && total_bytes <= usize::try_from(limits.inbox_bytes).expect("u32 fits usize")
 }
 
-#[expect(clippy::too_many_arguments, reason = "one message entrance carries its atomic release choice")]
+pub(crate) struct CheckedMessage {
+    pub(crate) prepared: Prepared,
+    answer: Option<u64>,
+    released: bool,
+    sender: Party,
+}
+
 #[expect(clippy::too_many_lines, reason = "one inbox entrance preflights message and answer credits before mutation")]
-pub(crate) fn message(
-    domain: &mut Domain,
+pub(crate) fn check_message(
+    domain: &Domain,
     env: &Env<Limits>,
-    to: ReplyTo,
     project: u32,
     number: u64,
     word: Word,
     release: bool,
     authorized: bool,
-    out: &mut Queue<Request>,
-) {
+) -> Result<CheckedMessage, crate::Problem> {
     if !domain.ready() {
-        return refused(to, Some(number), Refusal::NotReady, out);
+        return Err(crate::Problem { task: Some(number), why: Refusal::NotReady, blocked_by: None, capacity: None });
     }
     let Some(task) = record(domain, number) else {
-        return refused(to, Some(number), Refusal::Unknown, out);
+        return Err(crate::Problem { task: Some(number), why: Refusal::Unknown, blocked_by: None, capacity: None });
     };
     let requester = match word.from {
         Party::Person(person) => task.requester == Party::Person(person) || authorized && person != 0,
@@ -212,7 +217,7 @@ pub(crate) fn message(
         | MessageKind::News { .. } => false,
     };
     if task.project != project || !requester || !sendable {
-        return refused(to, Some(number), Refusal::State, out);
+        return Err(crate::Problem { task: Some(number), why: Refusal::State, blocked_by: None, capacity: None });
     }
     let available = match task.phase {
         Phase::Active(_) | Phase::Waiting | Phase::Held { was: crate::Was::Waiting | crate::Was::Active(_), .. } => {
@@ -231,14 +236,14 @@ pub(crate) fn message(
         Party::Task(_) | Party::Deployment { .. } => false,
     };
     if !available || person_waiting {
-        return refused(to, Some(number), Refusal::State, out);
+        return Err(crate::Problem { task: Some(number), why: Refusal::State, blocked_by: None, capacity: None });
     }
     if word.number == 0
         || word.number <= task.last_message
         || word.words.is_empty()
         || word.words.len() > usize::try_from(env.limits.message_bytes).expect("u32 fits usize")
     {
-        return refused(to, Some(number), Refusal::Read, out);
+        return Err(crate::Problem { task: Some(number), why: Refusal::Read, blocked_by: None, capacity: None });
     }
     let answer = match word.kind {
         MessageKind::Words | MessageKind::Question => None,
@@ -270,7 +275,12 @@ pub(crate) fn message(
                 Party::Deployment { .. } => false,
             };
             if !valid {
-                return refused(to, Some(number), Refusal::Reference, out);
+                return Err(crate::Problem {
+                    task: Some(number),
+                    why: Refusal::Reference,
+                    blocked_by: None,
+                    capacity: None,
+                });
             }
             match word.from {
                 Party::Task(_) => Some(question),
@@ -299,7 +309,7 @@ pub(crate) fn message(
             Party::Task(_) | Party::Deployment { .. } => false,
         };
     if released && task.revision == u64::MAX {
-        return refused(to, Some(number), Refusal::State, out);
+        return Err(crate::Problem { task: Some(number), why: Refusal::State, blocked_by: None, capacity: None });
     }
     let sender = word.from;
     let admission = match answer {
@@ -313,25 +323,48 @@ pub(crate) fn message(
         cause: crate::capacity::inbox(number, &env.limits),
     };
     let Some(prepared) = prepare(domain, &env.limits, number, word, admission) else {
-        return crate::capacity::refuse(domain, env, to, Some(number), Refusal::Busy, capacity, out);
+        return Err(crate::Problem::capacity(Some(number), Refusal::Busy, capacity));
     };
     if prepared.word.kind == MessageKind::Question {
         let source = match prepared.word.from {
             Party::Task(source) => source,
-            Party::Person(_) | Party::Deployment { .. } => return refused(to, Some(number), Refusal::Reference, out),
+            Party::Person(_) | Party::Deployment { .. } => {
+                return Err(crate::Problem {
+                    task: Some(number),
+                    why: Refusal::Reference,
+                    blocked_by: None,
+                    capacity: None,
+                });
+            }
         };
         if !room(domain, &env.limits, source, 1, usize::try_from(env.limits.message_bytes).expect("u32 fits usize")) {
-            return crate::capacity::refuse(
-                domain,
-                env,
-                to,
+            return Err(crate::Problem::capacity(
                 Some(source),
                 Refusal::Busy,
                 crate::Capacity { cause: crate::capacity::inbox(source, &env.limits), ..capacity },
-                out,
-            );
+            ));
         }
     }
+    Ok(CheckedMessage { prepared, answer, released, sender })
+}
+
+#[expect(clippy::too_many_arguments, reason = "one message entrance carries its atomic release choice")]
+pub(crate) fn message(
+    domain: &mut Domain,
+    env: &Env<Limits>,
+    to: ReplyTo,
+    project: u32,
+    number: u64,
+    word: Word,
+    release: bool,
+    authorized: bool,
+    out: &mut Queue<Request>,
+) {
+    let checked = match check_message(domain, env, project, number, word, release, authorized) {
+        Ok(checked) => checked,
+        Err(problem) => return crate::capacity::refused(domain, env, to, problem, out),
+    };
+    let CheckedMessage { prepared, answer, released, sender } = checked;
     let task = task_mut(domain, number).expect("admitted task still live");
     task.record.last_activity = env.wall;
     task.record.last_message = prepared.word.number;
@@ -516,4 +549,40 @@ pub(crate) fn finish_word(task: &crate::TaskRecord, message: u64) -> bool {
         Some(grace) => grace.message == message,
         None => false,
     }
+}
+
+/// Project inbox admission and answer credits without publishing a step part.
+pub(crate) fn preview_message(
+    domain: &mut Domain,
+    env: &Env<Limits>,
+    project: u32,
+    number: u64,
+    word: Word,
+) -> Result<(), crate::Problem> {
+    let checked = check_message(domain, env, project, number, word, false, false)?;
+    let row = &mut task_mut(domain, number).expect("message checked").record;
+    row.last_message = checked.prepared.word.number;
+    row.inbox = checked.prepared.inbox;
+    if let Some(question) = checked.answer {
+        let mut credits = List::with_capacity(env.limits.inbox_messages);
+        for credit in &row.questions {
+            if credit.number != question {
+                credits.push(*credit).expect("credit subset");
+            }
+        }
+        row.questions = credits.into_boxed();
+    }
+    if checked.prepared.word.kind == MessageKind::Question {
+        let Party::Task(source) = checked.sender else { unreachable!("question source checked") };
+        let row = &mut task_mut(domain, source).expect("referenced source").record;
+        let mut credits = List::with_capacity(env.limits.inbox_messages);
+        for credit in &row.questions {
+            credits.push(*credit).expect("bounded credits");
+        }
+        credits
+            .push(QuestionCredit { number: checked.prepared.word.number, answerer: number })
+            .expect("question checked");
+        row.questions = credits.into_boxed();
+    }
+    Ok(())
 }

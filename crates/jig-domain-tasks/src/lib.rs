@@ -116,10 +116,10 @@ pub use boundary::{
     Accepted, Active, Cause, Closing, Contract, DelegateState, DelegationContext, End, Ending, Event, Executor,
     FieldRule, Hold, HoldKind, HoldSource, Holding, InvalidResult, Key, Kind, MessageKind, Name, New, NewsClass,
     NoticeState, Parameter, Party, PersonAddress, PersonAnswer, PersonStallNotice, PersonWait, Phase, PoolSlots,
-    Problem, ProcedureDecision, QuestionCredit, RecurringOverlap, RecurringState, RecurringTemplate, Refusal,
-    ReplyHint, Request, ResourceAccess, ResultField, ResultFollowups, ResultKind, ResultsWake, Revisions, RunContext,
-    SavedResource, Spec, Stage, Status, Stored, Stub, Subscription, SubscriptionKind, Taken, TaskRecord, TaskResult,
-    Verdict, WakePolicy, WakeRule, Was, Word, Writer, WriterSlot,
+    Problem, ProcedureAmendment, ProcedureDecision, ProcedureEnd, ProcedureMessage, QuestionCredit, RecurringOverlap,
+    RecurringState, RecurringTemplate, Refusal, ReplyHint, Request, ResourceAccess, ResultField, ResultFollowups,
+    ResultKind, ResultsWake, Revisions, RunContext, SavedResource, Spec, Stage, Status, Stored, Stub, Subscription,
+    SubscriptionKind, Taken, TaskRecord, TaskResult, Verdict, WakePolicy, WakeRule, Was, Word, Writer, WriterSlot,
 };
 pub use capacity::{Capacity, CapacityAction, CapacityCause, CapacityRefusal};
 pub use chat::{Disposal, Keep};

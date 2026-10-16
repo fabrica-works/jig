@@ -40,7 +40,7 @@ use task_routes::{
 use view_routes::{made_outputs, open, route_view};
 pub use vocabulary::{
     Ask, CoreBriefBudgets, EscalationChoice, Event, Held, HoldingsNeed, Limits, NamedAction, Now, PayloadRefusal,
-    ProposalChoice, Request, Requests, Timer, ToolKind, WatchRefusal, Write,
+    ProposalChoice, Request, Requests, StepRefusal, Timer, ToolKind, WatchRefusal, Write,
 };
 pub(crate) use watch_marks::finish_watches;
 
@@ -54,6 +54,7 @@ mod party_controls;
 mod party_decisions;
 #[path = "people.rs"]
 mod people_routes;
+mod procedure_steps;
 pub(crate) mod refusals;
 mod run_delegation;
 mod run_payloads;
@@ -133,6 +134,7 @@ enum BatchKind {
 
 #[derive(Debug)]
 pub(crate) struct ProcedureCreation {
+    decision: tasks::ProcedureDecision,
     members: Box<[tasks::New]>,
     remaining: u32,
     answered: List<u16>,
@@ -545,7 +547,7 @@ fn step_one(core: &mut Core, env: &Env<Limits>, event: Event, work: &mut Queue<E
         Event::DelegateHoldings { request, connector, holdings } => {
             delegate_holdings(core, env, work, request, connector, holdings)
         }
-        Event::ProcedureStep { task, step, connector, code, action } => {
+        Event::ProcedureStep { task, step, connector, code, decision: action } => {
             procedure_step(core, env, work, task, step, connector, code, action)
         }
         Event::ProcedureHoldings { task, step, connector, holdings } => {

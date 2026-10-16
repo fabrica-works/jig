@@ -50,8 +50,8 @@ pub use boundary::{
     Adoption, ApplyResult, Attempt, Class, Classed, Config, Description, Effect, EffectPhase, Event, Fact, Form, Hold,
     HoldMode, Item, Key, KindSpec, Looked, Named, Origin, OutboxEntry, Outcome, Path, PoolSpec, ProcedureAction,
     ProcedureResult, ProcedureSignal, ProcedureSpec, ProcedureState, Read, Record, RecordKey, Recovery, Request,
-    RequirementSpec, ResourceRole, ResourceSpec, RestartStep, StepDecision, SystemEvent, SystemRequest, TopicSpec,
-    Verdict,
+    RequirementSpec, ResourceRole, ResourceSpec, RestartStep, StepDecision, StepRefusal, SystemEvent, SystemRequest,
+    TopicSpec, Verdict,
 };
 pub use domain::{Domain, MAX_OUT, closing_ready, fire, next_deadline, resume, step};
 pub use limits::{Limits, worst_case};

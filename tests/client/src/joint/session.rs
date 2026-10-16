@@ -781,7 +781,6 @@ impl Session {
             | core::Now::RunPreparationFailed { .. }
             | core::Now::RunPrepared { .. }
             | core::Now::HistoricalEscalation { .. }
-            | core::Now::ProcedureDelegateOutcome { .. }
             | core::Now::RestoreRefused) => {
                 assert!(
                     !jig_core_world::client_peer::ClientPeer::immediate(&other),

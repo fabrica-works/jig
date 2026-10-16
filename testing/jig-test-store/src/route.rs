@@ -170,7 +170,6 @@ fn window(now: core::Now) -> Option<(u64, u64, u32)> {
         | core::Now::WorkspaceRequest { .. }
         | core::Now::RunPreparationFailed { .. }
         | core::Now::RunPrepared { .. }
-        | core::Now::ProcedureDelegateOutcome { .. }
         | core::Now::RestoreRefused
         | core::Now::SeenChat { .. }
         | core::Now::HistoricalPersonTask { .. }

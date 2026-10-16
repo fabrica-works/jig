@@ -4,6 +4,14 @@ use jig_domain_tasks::{
 use jig_tasks_world::{LIMITS, Reply, World, task};
 use skein_lib::ReplyTo;
 
+const REQUESTER: u64 = 9;
+const ROOT: u64 = 1;
+const PROCEDURE: u64 = 2;
+const CHILD: u64 = 3;
+const NEXT_CHILD: u64 = 4;
+const AMENDMENT: u64 = 10;
+const MESSAGE: u64 = 11;
+
 fn step(world: &mut World, task: u64, step: u64, decision: ProcedureDecision) -> Reply {
     let reply_to = world.to();
     let key = reply_to.into_token().raw();
@@ -23,14 +31,27 @@ fn a_procedure_steps_through_delegates_to_its_result() {
     assert_eq!(world.record(2).phase, Phase::Active(Active::Due));
     let mut child = task(3, &[]);
     child.funder = Funder::Task(2);
-    assert_eq!(step(&mut world, 2, 1, ProcedureDecision::Delegate(Box::new([child]))), Reply::Made(vec![3]));
+    assert_eq!(
+        step(
+            &mut world,
+            2,
+            1,
+            ProcedureDecision { batch: Box::new([child]), ..ProcedureDecision::new(tasks::ProcedureEnd::Wait) }
+        ),
+        Reply::Made(vec![3])
+    );
     assert_eq!(world.record(2).phase, Phase::Active(Active::Idle));
     world.claim(3, 3);
     world.terminal(3, End::Finished { result: TaskResult::Report { words: Box::new([7]) }, cancel_delegates: false });
     world.settle(3);
     assert_eq!(world.record(2).phase, Phase::Active(Active::Due));
     assert_eq!(
-        step(&mut world, 2, 2, ProcedureDecision::Result(TaskResult::Report { words: Box::new([8]) })),
+        step(
+            &mut world,
+            2,
+            2,
+            ProcedureDecision::new(tasks::ProcedureEnd::Result(TaskResult::Report { words: Box::new([8]) }))
+        ),
         Reply::Done
     );
     world.settle(2);
@@ -39,5 +60,132 @@ fn a_procedure_steps_through_delegates_to_its_result() {
     );
     let before = world.records.clone();
     world.restart();
+    assert_eq!(world.records, before);
+}
+
+fn procedure_with_child() -> World {
+    let mut world = World::new(202, LIMITS);
+    world.make(Party::Person(REQUESTER), vec![task(ROOT, &[])]);
+    let mut procedure = task(PROCEDURE, &[]);
+    procedure.executor = Executor::Procedure { connector: 1, code: 1 };
+    procedure.funder = Funder::Task(ROOT);
+    world.make(Party::Task(ROOT), vec![procedure]);
+    let mut child = task(CHILD, &[]);
+    child.funder = Funder::Task(PROCEDURE);
+    step(
+        &mut world,
+        PROCEDURE,
+        1,
+        ProcedureDecision { batch: Box::new([child]), ..ProcedureDecision::new(tasks::ProcedureEnd::Wait) },
+    );
+    world.send(Event::WakeProcedure { task: PROCEDURE });
+    world
+}
+
+fn amendment() -> tasks::ProcedureAmendment {
+    tasks::ProcedureAmendment {
+        task: CHILD,
+        message: AMENDMENT,
+        stop_run: false,
+        amendment: tasks::Amendment {
+            tracked: None,
+            addressed: None,
+            instructions: None,
+            release: None,
+            spec: Some(tasks::Spec {
+                words: b"amended".as_slice().into(),
+                parameters: Box::new([]),
+                inputs: Box::new([]),
+            }),
+            wake: None,
+            dependencies: None,
+            authority: None,
+            reason: b"evidence".as_slice().into(),
+        },
+    }
+}
+
+fn message(words: &[u8]) -> tasks::ProcedureMessage {
+    tasks::ProcedureMessage {
+        task: CHILD,
+        word: tasks::Word {
+            number: MESSAGE,
+            from: Party::Task(PROCEDURE),
+            kind: tasks::MessageKind::Words,
+            words: words.into(),
+            at: skein_lib::Wall::EPOCH,
+            hits: 1,
+            eligible: true,
+        },
+    }
+}
+
+#[test]
+fn a_step_amending_and_messaging_commits_as_one_decision() {
+    let mut world = procedure_with_child();
+    let decision = ProcedureDecision {
+        amendments: Box::new([amendment()]),
+        messages: Box::new([message(b"hello")]),
+        ..ProcedureDecision::new(tasks::ProcedureEnd::Wait)
+    };
+    assert_eq!(step(&mut world, PROCEDURE, 2, decision), Reply::Done);
+    assert_eq!(world.record(CHILD).spec.words.as_ref(), b"amended");
+    assert_eq!(world.record(CHILD).revisions.spec, 1);
+    assert_eq!(
+        world.record(CHILD).inbox.iter().find(|word| word.number == MESSAGE).expect("step message").words.as_ref(),
+        b"hello"
+    );
+    let before = world.records.clone();
+    world.restart();
+    assert_eq!(world.records, before);
+}
+
+#[test]
+fn a_step_with_one_refused_part_changes_nothing() {
+    let mut world = procedure_with_child();
+    let before = world.records.clone();
+    let decision = ProcedureDecision {
+        amendments: Box::new([amendment()]),
+        messages: Box::new([message(b"")]),
+        ..ProcedureDecision::new(tasks::ProcedureEnd::Wait)
+    };
+    assert_eq!(
+        step(&mut world, PROCEDURE, 2, decision),
+        Reply::Refused(tasks::Problem {
+            task: Some(CHILD),
+            why: tasks::Refusal::Read,
+            blocked_by: None,
+            capacity: None,
+        })
+    );
+    assert_eq!(world.records, before);
+}
+
+#[test]
+fn a_step_counts_its_batch_before_admitting_a_tracking_amendment() {
+    let mut world = procedure_with_child();
+    world.env.limits.project_goals = 1;
+    let mut child = task(NEXT_CHILD, &[]);
+    child.funder = Funder::Task(PROCEDURE);
+    child.numbers.budget = 0;
+    child.authority.budget.spend = 0;
+    child.tracked = Some(1);
+    let mut part = amendment();
+    part.amendment.tracked = Some(tasks::Tracking::Tracked { priority: 2 });
+    let before = world.records.clone();
+    let decision = ProcedureDecision {
+        batch: Box::new([child]),
+        amendments: Box::new([part]),
+        ..ProcedureDecision::new(tasks::ProcedureEnd::Wait)
+    };
+    assert_eq!(
+        step(&mut world, PROCEDURE, 2, decision),
+        Reply::Refused(tasks::Problem {
+            task: Some(CHILD),
+            why: tasks::Refusal::Goals,
+            blocked_by: None,
+            capacity: None,
+        })
+    );
     assert_eq!(world.records, before);
 }

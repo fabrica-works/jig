@@ -197,35 +197,39 @@ fn save_history(domain: &mut Domain, mut row: History, out: &mut Queue<Request>)
     out.push(Request::Save { record: Stored::History(row) });
 }
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "one root-fenced amendment carries task, caller, message and stop decision"
-)]
+pub(crate) struct CheckedAmendment {
+    releasing: bool,
+    changed: bool,
+    person_changed: bool,
+    attempt: Option<u64>,
+    pub(crate) prepared: crate::inbox::Prepared,
+}
+
 #[expect(clippy::too_many_lines, reason = "whole amendment preflight and mutation remain together")]
-pub(crate) fn amend(
-    domain: &mut Domain,
+pub(crate) fn check_amend(
+    domain: &Domain,
     env: &Env<Limits>,
-    to: ReplyTo,
     by: Party,
     number: u64,
     message: u64,
     stop_run: bool,
-    amendment: Amendment,
-    out: &mut Queue<Request>,
-) {
-    let to = match entrance(domain, to, number) {
-        Ok(to) => to,
-        Err((to, why)) => return refused(to, Some(number), why, out),
-    };
+    amendment: &Amendment,
+) -> Result<CheckedAmendment, Refusal> {
+    if !domain.ready() {
+        return Err(Refusal::NotReady);
+    }
+    if record(domain, number).is_none() {
+        return Err(Refusal::Unknown);
+    }
     if !allowed(domain, number, by, env.limits.tasks) {
-        return refused(to, Some(number), Refusal::Reference, out);
+        return Err(Refusal::Reference);
     }
     let old = record(domain, number).expect("entrance found task");
     if let Some(Tracking::Tracked { .. }) = amendment.tracked
         && old.tracked.is_none()
         && let Err(why) = crate::goals::room(domain, old.project, 1, &env.limits)
     {
-        return refused(to, Some(number), why, out);
+        return Err(why);
     }
     let releasing = match old.phase {
         Phase::Held { .. } => amendment.release == Some(old.revisions.hold),
@@ -234,12 +238,12 @@ pub(crate) fn amend(
     if releasing {
         match old.phase {
             Phase::Held { why: crate::Hold::Uncertain { .. }, .. } => {
-                return refused(to, Some(number), Refusal::AuthorityShape, out);
+                return Err(Refusal::AuthorityShape);
             }
             Phase::Held { .. } | Phase::Waiting | Phase::Active(_) | Phase::Closing(_) | Phase::Ended(_) => {}
         }
         if old.revision.checked_add(2).is_none() {
-            return refused(to, Some(number), Refusal::State, out);
+            return Err(Refusal::State);
         }
     }
     let mutable = match old.phase {
@@ -247,29 +251,25 @@ pub(crate) fn amend(
         Phase::Closing(_) | Phase::Held { was: Was::Closing(_), .. } | Phase::Ended(_) => false,
     };
     if !mutable {
-        return refused(to, Some(number), Refusal::State, out);
+        return Err(Refusal::State);
     }
     if old.revision == u64::MAX || message == 0 || message <= old.last_message {
-        return refused(to, Some(number), Refusal::Read, out);
+        return Err(Refusal::Read);
     }
     if amendment.reason.len() > usize::try_from(env.limits.message_bytes).expect("u32 fits usize") {
-        return refused(to, Some(number), Refusal::Read, out);
+        return Err(Refusal::Read);
     }
-    if let Err(why) = address_admit(old, &amendment.addressed) {
-        return refused(to, Some(number), why, out);
-    }
-    if let Err(why) = instruction_admit(&env.limits, old.executor, &amendment.instructions) {
-        return refused(to, Some(number), why, out);
-    }
+    address_admit(old, &amendment.addressed)?;
+    instruction_admit(&env.limits, old.executor, &amendment.instructions)?;
     if let Some(spec) = &amendment.spec
         && (!crate::batch::valid_spec(&env.limits, spec) || !spec.inputs.is_empty())
     {
-        return refused(to, Some(number), Refusal::Spec, out);
+        return Err(Refusal::Spec);
     }
     if let Some(wake) = &amendment.wake
         && !crate::wake::valid(wake)
     {
-        return refused(to, Some(number), Refusal::Read, out);
+        return Err(Refusal::Read);
     }
     if let Some(dependencies) = &amendment.dependencies {
         let waiting = match old.phase {
@@ -280,28 +280,28 @@ pub(crate) fn amend(
             | Phase::Ended(_) => false,
         };
         if !waiting || dependencies.len() > usize::try_from(env.limits.dependencies).expect("u32 fits usize") {
-            return refused(to, Some(number), Refusal::Dependencies, out);
+            return Err(Refusal::Dependencies);
         }
         for (at, dependency) in dependencies.iter().enumerate() {
             if !crate::batch::contains(&old.dependencies, *dependency) {
-                return refused(to, Some(number), Refusal::Dependencies, out);
+                return Err(Refusal::Dependencies);
             }
             for earlier in dependencies.iter().take(at) {
                 if earlier == dependency {
-                    return refused(to, Some(number), Refusal::Dependencies, out);
+                    return Err(Refusal::Dependencies);
                 }
             }
         }
     }
     if let Some(authority) = &amendment.authority {
         if !crate::batch::valid_authority(&env.limits, authority) {
-            return refused(to, Some(number), Refusal::AuthorityShape, out);
+            return Err(Refusal::AuthorityShape);
         }
         if !crate::funders::can_resize(domain, number, authority.budget.spend) {
-            return refused(to, Some(number), Refusal::Funding, out);
+            return Err(Refusal::Funding);
         }
     } else if stop_run {
-        return refused(to, Some(number), Refusal::State, out);
+        return Err(Refusal::State);
     }
     let spec_changed = match &amendment.spec {
         Some(spec) => *spec != old.spec,
@@ -334,7 +334,7 @@ pub(crate) fn amend(
         crate::Executor::Agent { .. } | crate::Executor::Procedure { .. } => false,
     };
     if (changed && old.revisions.spec == u64::MAX) || (person_changed && old.revisions.person == u64::MAX) {
-        return refused(to, Some(number), Refusal::State, out);
+        return Err(Refusal::State);
     }
     let attempt = if stop_run { crate::run::run_attempt(&old.phase) } else { None };
     let next_revision = old.revision.checked_add(1).expect("revision preflighted");
@@ -350,9 +350,34 @@ pub(crate) fn amend(
         hits: 1,
         eligible: true,
     };
-    let before = settings(old);
+
     let prepared = crate::inbox::prepare(domain, &env.limits, number, word, crate::inbox::Admission::Merged)
         .expect("authenticated amendment has a merged inbox slot");
+    Ok(CheckedAmendment { releasing, changed, person_changed, attempt, prepared })
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "one root-fenced amendment carries task, caller, message and stop decision"
+)]
+pub(crate) fn amend(
+    domain: &mut Domain,
+    env: &Env<Limits>,
+    to: ReplyTo,
+    by: Party,
+    number: u64,
+    message: u64,
+    stop_run: bool,
+    amendment: Amendment,
+    out: &mut Queue<Request>,
+) {
+    let checked = match check_amend(domain, env, by, number, message, stop_run, &amendment) {
+        Ok(checked) => checked,
+        Err(why) => return refused(to, Some(number), why, out),
+    };
+    let CheckedAmendment { releasing, changed, person_changed, attempt, prepared } = checked;
+    let old = record(domain, number).expect("amendment preflighted");
+    let before = settings(old);
     if let Some(authority) = &amendment.authority
         && authority.budget.spend != old.numbers.budget
     {
@@ -680,5 +705,71 @@ pub(crate) fn release(
         },
         Phase::Waiting | Phase::Active(_) | Phase::Held { .. } | Phase::Ended(_) => {}
     }
+    Ok(())
+}
+
+/// Project the admission fields used by the remaining parts of an atomic step.
+pub(crate) fn preview_amend(
+    domain: &mut Domain,
+    env: &Env<Limits>,
+    by: Party,
+    part: &crate::ProcedureAmendment,
+) -> Result<(), Refusal> {
+    let checked = check_amend(domain, env, by, part.task, part.message, part.stop_run, &part.amendment)?;
+    let old = record(domain, part.task).expect("amendment checked");
+    if let Some(authority) = &part.amendment.authority {
+        let budget = authority.budget.spend;
+        let old_budget = old.numbers.budget;
+        let funder = old.funder;
+        let source = match funder {
+            crate::Funder::Task(number) => &mut task_mut(domain, number).expect("live funder").record.numbers,
+            crate::Funder::Pool { .. } | crate::Funder::Period { .. } | crate::Funder::Recurring { .. } => {
+                &mut domain.funding.get_mut(&funder).expect("live source").numbers
+            }
+        };
+        source.reserved = source
+            .reserved
+            .checked_sub(old_budget)
+            .expect("reservation checked")
+            .checked_add(budget)
+            .expect("resize checked");
+        task_mut(domain, part.task).expect("live task").record.numbers.budget = budget;
+    }
+    let row = &mut task_mut(domain, part.task).expect("amendment checked").record;
+    let amendment = &part.amendment;
+    if let Some(tracked) = amendment.tracked {
+        row.tracked = match tracked {
+            Tracking::Tracked { priority } => Some(priority),
+            Tracking::Untracked => None,
+        };
+    }
+    if let Some(change) = amendment.addressed {
+        row.executor = crate::Executor::Person(change.address);
+        row.taken_by = None;
+    }
+    if let Some(instructions) = &amendment.instructions {
+        row.instructions = Some(instructions.clone());
+    }
+    if let Some(spec) = &amendment.spec {
+        row.spec = spec.clone();
+    }
+    if let Some(wake) = &amendment.wake {
+        row.wake = *wake;
+    }
+    if let Some(dependencies) = &amendment.dependencies {
+        row.dependencies.clone_from(dependencies);
+    }
+    if let Some(authority) = &amendment.authority {
+        row.authority = authority.clone();
+    }
+    row.revision = row.revision.checked_add(1).expect("revision checked");
+    if checked.changed {
+        row.revisions.spec = row.revisions.spec.checked_add(1).expect("spec revision checked");
+    }
+    if checked.person_changed {
+        row.revisions.person = row.revisions.person.checked_add(1).expect("person revision checked");
+    }
+    row.last_message = part.message;
+    row.inbox = checked.prepared.inbox;
     Ok(())
 }

@@ -723,7 +723,6 @@ impl Joint {
                 | core::Now::RunPreparationFailed { .. }
                 | core::Now::RunPrepared { .. }
                 | core::Now::HistoricalEscalation { .. }
-                | core::Now::ProcedureDelegateOutcome { .. }
                 | core::Now::RestoreRefused,
             )
             | root::Output::IncidentAssociationRefused { .. }

@@ -203,7 +203,6 @@ fn immediate(engine: &mut Engine, now: core::Now) {
         | core::Now::WorkspaceRequest { .. }
         | core::Now::RunPreparationFailed { .. }
         | core::Now::RunPrepared { .. }
-        | core::Now::ProcedureDelegateOutcome { .. }
         | core::Now::RestoreRefused => stop::invalid_restore(engine),
     }
 }

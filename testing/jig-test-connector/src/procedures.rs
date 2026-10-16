@@ -216,3 +216,41 @@ pub(crate) fn effect_decided(domain: &mut Domain, task: u64, made: bool, out: &m
         Some(_) | None => {}
     }
 }
+
+pub(crate) fn made(
+    domain: &mut Domain,
+    env: &Env<Limits>,
+    task: u64,
+    step: u64,
+    child: Option<u64>,
+    revisions: Box<[(u64, u64)]>,
+    out: &mut Queue<Request>,
+) {
+    if revisions.len() > usize::try_from(env.limits.tasks).expect("bounded revisions") {
+        return;
+    }
+    if domain.delegate_outcomes.contains_key(&task) || domain.delegate_outcomes.len() < env.limits.tasks {
+        domain.delegate_outcomes.insert(task, (step, child, revisions.clone())).expect("outcome capacity checked");
+        out.push(Request::Save { record: Record::ProcedureDelegateOutcome { task, step, child, revisions } });
+    } else {
+        out.push(Request::Refused { task });
+    }
+}
+
+pub(crate) fn refused(
+    domain: &mut Domain,
+    env: &Env<Limits>,
+    task: u64,
+    step: u64,
+    why: crate::StepRefusal,
+    out: &mut Queue<Request>,
+) {
+    let revisions: Box<[(u64, u64)]> = match why {
+        crate::StepRefusal::Moved { revision } => match domain.delegate_outcomes.get(&task) {
+            Some((_, Some(child), _)) => Box::new([(*child, revision)]),
+            Some((_, None, _)) | None => Box::new([]),
+        },
+        crate::StepRefusal::Refused => Box::new([]),
+    };
+    made(domain, env, task, step, None, revisions, out);
+}

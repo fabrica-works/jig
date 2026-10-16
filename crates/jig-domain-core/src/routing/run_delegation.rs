@@ -6,8 +6,7 @@ use super::HoldingsNeed;
 use super::runs::{call_decision, named_propose, proposal_refused};
 use super::{BatchKind, DelegateCreation, ProcedureCreation};
 use crate::{
-    Ask, CallKey, CallPart, Core, Delegate, Dependency, Event, Limits, Now, ProcedureAction, Request, Requests,
-    ToolKind,
+    Ask, CallKey, CallPart, Core, Delegate, Dependency, Event, Limits, ProcedureStep, Request, Requests, ToolKind,
 };
 use alloc::boxed::Box;
 use jig_domain_tasks as tasks;
@@ -360,13 +359,6 @@ pub(super) fn propose_batch(
     Requests::Out(out)
 }
 
-pub(super) fn procedure_refused(task: u64, step: u64) -> Requests {
-    let mut out = Queue::with_capacity(2);
-    out.push(Request::Now(Box::new(Now::ProcedureDelegateOutcome { task, step, child: None })));
-    out.push(Request::Decided);
-    Requests::Out(out)
-}
-
 #[expect(
     clippy::too_many_lines,
     clippy::too_many_arguments,
@@ -380,35 +372,59 @@ pub(super) fn procedure_step(
     step: u64,
     connector: u16,
     procedure_code: u32,
-    action: ProcedureAction,
+    decision: ProcedureStep,
 ) -> Requests {
-    let mut out = Queue::with_capacity(
-        u32::try_from(core.connectors.len())
-            .expect("bounded connectors")
-            .checked_add(1)
-            .expect("procedure handoff room"),
-    );
     if core.tasks.procedure_due(task) != Some((connector, procedure_code, step)) {
-        if match &action {
-            ProcedureAction::Delegate(_) => true,
-            ProcedureAction::Result(_) | ProcedureAction::Hold(_) | ProcedureAction::Wait => false,
-        } {
-            return procedure_refused(task, step);
+        if !decision.batch.is_empty() {
+            return super::procedure_steps::refused(
+                core,
+                task,
+                step,
+                super::procedure_steps::problem(task, tasks::Refusal::Attempt),
+            );
         }
+        let mut out = Queue::with_capacity(1);
         out.push(Request::Decided);
         return Requests::Out(out);
     }
-    match action {
-        ProcedureAction::Delegate(batch) => {
+    let parts = match super::procedure_steps::parts(core, env, task, &decision) {
+        Ok(parts) => parts,
+        Err(why) => return super::procedure_steps::refused(core, task, step, why),
+    };
+    let batch = decision.batch;
+    let mut out = Queue::with_capacity(
+        u32::try_from(core.connectors.len()).expect("bounded connectors").checked_add(1).expect("handoff room"),
+    );
+    match batch.as_ref() {
+        [] => {
+            work.push(Event::Tasks(tasks::Event::Procedure {
+                reply_to: ReplyTo::new(Token::new(u64::MAX)),
+                task,
+                step,
+                read: core.tasks.procedure_offered(task),
+                decision: parts,
+            }));
+        }
+        [_, ..] => {
             if !core.procedure_batch_admit(&env.limits.tasks, task, &batch) {
-                return procedure_refused(task, step);
+                return super::procedure_steps::refused(
+                    core,
+                    task,
+                    step,
+                    super::procedure_steps::problem(task, tasks::Refusal::Batch),
+                );
             }
             let context = core.tasks.delegation(task).expect("admitted procedure owner");
             let root = core.tasks.root(task).expect("procedure task live");
             let mut numbers = List::with_capacity(env.limits.tasks.batch);
             for _ in &batch {
                 let Some(number) = crate::fresh(&mut core.counters, crate::Family::Task) else {
-                    return procedure_refused(task, step);
+                    return super::procedure_steps::refused(
+                        core,
+                        task,
+                        step,
+                        super::procedure_steps::problem(task, tasks::Refusal::Batch),
+                    );
                 };
                 numbers.push(number).expect("bounded procedure task IDs");
             }
@@ -421,13 +437,23 @@ pub(super) fn procedure_step(
                         Dependency::Batch(index) => match numbers.get(index) {
                             Some(number) => *number,
                             None => {
-                                return procedure_refused(task, step);
+                                return super::procedure_steps::refused(
+                                    core,
+                                    task,
+                                    step,
+                                    super::procedure_steps::problem(task, tasks::Refusal::Batch),
+                                );
                             }
                         },
                         Dependency::Existing(number) => number,
                     };
                     if dependencies.push(number).is_err() {
-                        return procedure_refused(task, step);
+                        return super::procedure_steps::refused(
+                            core,
+                            task,
+                            step,
+                            super::procedure_steps::problem(task, tasks::Refusal::Batch),
+                        );
                     }
                 }
                 let number = *numbers.get(at).expect("one ID per member");
@@ -437,7 +463,12 @@ pub(super) fn procedure_step(
                     number,
                     core.authority.limits(),
                 ) else {
-                    return procedure_refused(task, step);
+                    return super::procedure_steps::refused(
+                        core,
+                        task,
+                        step,
+                        super::procedure_steps::problem(task, tasks::Refusal::Batch),
+                    );
                 };
                 created
                     .push(tasks::New {
@@ -484,6 +515,7 @@ pub(super) fn procedure_step(
                     .insert(
                         (task, step),
                         ProcedureCreation {
+                            decision: parts,
                             members,
                             remaining,
                             answered: List::with_capacity(remaining),
@@ -500,33 +532,11 @@ pub(super) fn procedure_step(
                 });
             }
         }
-        ProcedureAction::Result(result) => work.push(Event::Tasks(tasks::Event::Procedure {
-            reply_to: ReplyTo::new(Token::new(u64::MAX)),
-            task,
-            step,
-            read: core.tasks.procedure_offered(task),
-            decision: tasks::ProcedureDecision::Result(result),
-        })),
-        ProcedureAction::Hold(why) => work.push(Event::Tasks(tasks::Event::Procedure {
-            reply_to: ReplyTo::new(Token::new(u64::MAX)),
-            task,
-            step,
-            read: core.tasks.procedure_offered(task),
-            decision: tasks::ProcedureDecision::Hold(why),
-        })),
-        ProcedureAction::Wait => work.push(Event::Tasks(tasks::Event::Procedure {
-            reply_to: ReplyTo::new(Token::new(u64::MAX)),
-            task,
-            step,
-            read: core.tasks.procedure_offered(task),
-            decision: tasks::ProcedureDecision::Wait,
-        })),
     }
     out.push(Request::Decided);
     Requests::Out(out)
 }
 
-#[expect(clippy::manual_map, reason = "step code does not use closures")]
 pub(super) fn procedure_holdings(
     core: &mut Core,
     env: &Env<Limits>,
@@ -566,24 +576,23 @@ pub(super) fn procedure_holdings(
     let mut out = Queue::with_capacity(2);
     if flight.remaining == 0 {
         let flight = core.creating_procedures.remove(&(task, step)).expect("completed procedure holdings");
-        let child = if flight.failed {
-            None
-        } else {
-            match flight.members.first() {
-                Some(member) => Some(member.number),
-                None => None,
-            }
-        };
-        out.push(Request::Now(Box::new(Now::ProcedureDelegateOutcome { task, step, child })));
-        if !flight.failed {
-            work.push(Event::Tasks(tasks::Event::Procedure {
-                reply_to: ReplyTo::new(Token::new(u64::MAX)),
+        if flight.failed {
+            return super::procedure_steps::refused(
+                core,
                 task,
                 step,
-                read: core.tasks.procedure_offered(task),
-                decision: tasks::ProcedureDecision::Delegate(flight.members),
-            }));
+                super::procedure_steps::problem(task, tasks::Refusal::Holds),
+            );
         }
+        let mut decision = flight.decision;
+        decision.batch = flight.members;
+        work.push(Event::Tasks(tasks::Event::Procedure {
+            reply_to: ReplyTo::new(Token::new(u64::MAX)),
+            task,
+            step,
+            read: core.tasks.procedure_offered(task),
+            decision,
+        }));
     }
     out.push(Request::Decided);
     Requests::Out(out)

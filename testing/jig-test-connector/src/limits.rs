@@ -73,7 +73,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(List::<Token>::worst_case(limits.values)?)?
         .checked_add(Map::<u64, Record>::worst_case(limits.tasks)?)?
         .checked_add(Map::<u64, ()>::worst_case(limits.tasks)?)?
-        .checked_add(Map::<u64, (u64, Option<u64>)>::worst_case(limits.tasks)?)?
+        .checked_add(Map::<u64, crate::domain::DelegateOutcome>::worst_case(limits.tasks)?)?
+        .checked_add(u64::from(limits.tasks).checked_mul(u64::from(limits.tasks))?.checked_mul(16)?)?
         .checked_add(Map::<(u32, Path), ResourceRole>::worst_case(limits.adoptions)?)?
         .checked_add(Map::<(u16, u64), (u16, u16)>::worst_case(limits.subscriptions)?)?
         .checked_add(Map::<Path, u32>::worst_case(limits.pools)?)?

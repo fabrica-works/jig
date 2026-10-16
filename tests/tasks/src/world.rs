@@ -368,6 +368,7 @@ impl World {
             | Request::ProposalStalled { .. }
             | Request::EscalationStalled { .. }
             | Request::Made { .. }
+            | Request::ProcedureRefused { .. }
             | Request::Refused { .. }
             | Request::Done { .. }
             | Request::Acknowledged { .. }
@@ -531,10 +532,24 @@ impl World {
         if let Event::Procedure { task, step, read, .. } = &event {
             self.accounting_referee.procedure(*task, *step, *read);
         }
+        let (event, procedure_reply) = if let Event::Procedure { reply_to, task, step, read, decision } = event {
+            let token = reply_to.into_token();
+            (Event::Procedure { reply_to: ReplyTo::new(token), task, step, read, decision }, Some(token))
+        } else {
+            (event, None)
+        };
         self.remember_input(&event);
         self.trace.input(self.env.now, &event);
         tasks::step(&mut self.domain, &self.env, event, &mut self.out);
         while let Some(request) = self.out.pop() {
+            let request = if let Request::ProcedureRefused { problem, .. } = request {
+                Request::Refused {
+                    reply_to: ReplyTo::new(procedure_reply.expect("procedure refusal has its input")),
+                    problem,
+                }
+            } else {
+                request
+            };
             self.route_hint(&request);
             if let Request::EscalationNeeded { context } = &request {
                 tasks::step(
@@ -619,6 +634,7 @@ impl World {
                 | Request::Waiting { .. }
                 | Request::Made { .. }
                 | Request::RecurringDue { .. }
+                | Request::ProcedureRefused { .. }
                 | Request::Refused { .. }
                 | Request::Done { .. }
                 | Request::Acknowledged { accepted: Accepted::Already, .. }
@@ -726,6 +742,7 @@ impl World {
                     }
                 }
                 Request::Refused { reply_to, problem } => self.reply(reply_to, Reply::Refused(problem)),
+                Request::ProcedureRefused { .. } => unreachable!("stage translates procedure terminal"),
                 Request::Acknowledged { reply_to, accepted, .. } => self.reply(reply_to, Reply::Acknowledged(accepted)),
                 Request::TurnAcknowledged { reply_to, accepted, .. } => self.reply(reply_to, Reply::Turn(accepted)),
                 Request::Activate { context } => {

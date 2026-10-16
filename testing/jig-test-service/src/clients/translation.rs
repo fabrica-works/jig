@@ -83,7 +83,6 @@ pub(crate) fn immediate(now: core::Now, admission: &mut Option<Token>) -> Option
         | core::Now::RunPreparationFailed { .. }
         | core::Now::RunPrepared { .. }
         | core::Now::HistoricalEscalation { .. }
-        | core::Now::ProcedureDelegateOutcome { .. }
         | core::Now::RestoreRefused => None,
     }
 }

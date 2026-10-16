@@ -240,7 +240,9 @@ fn a_plan_of_reports_a_choice_and_procedure_tasks_runs_in_dependency_order() {
         task: 3,
         step: 1,
         read: None,
-        decision: jig_domain_tasks::ProcedureDecision::Result(TaskResult::Report { words: Box::new([8]) }),
+        decision: jig_domain_tasks::ProcedureDecision::new(jig_domain_tasks::ProcedureEnd::Result(
+            TaskResult::Report { words: Box::new([8]) },
+        )),
     });
     assert_eq!(w.replies[&key], Reply::Done);
     w.settle(3);
