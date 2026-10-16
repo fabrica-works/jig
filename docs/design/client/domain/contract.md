@@ -573,6 +573,14 @@ unsent, for its owner's version (section 8).
   same after a restart.
 - **Bounded:** each document within its limits, in bytes and windows,
   never in rows sized for one client's screen.
+- **A path crosses whole.** A resource's path and a pattern are names,
+  compared segment by segment (`../../domain/authority.md`, section 4),
+  and the client acts on them as they are (a filter by a resource, a
+  draft's pattern). A document carries each whole, with as many
+  segments as the engine admits in a name (the most of its authority's
+  and its tasks' bounds on a name's segments): the engine never cuts
+  one, nor refuses a document for one. A document's bound on its short
+  lists is not a path's.
 - **Texts are UTF-8,** words for showing. A source's text is UTF-8 where
   it enters the engine: a party's words, refused at their request's
   entrance when they are not; an identity's login and name, refused

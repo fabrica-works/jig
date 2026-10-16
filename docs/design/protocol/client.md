@@ -158,8 +158,8 @@ the shell: fetch, skein's HTTP client, a socket            skein's HTTP server, 
   exhaustive both ways, as the channel's are (`channel.md`, section 3).
 - **Documents are decoded whole,** into the client's types, and checked
   against the client's limits before they reach `jig-client-domain`: a
-  document past its bytes, rows or texts is refused at decoding, as too
-  large, never cut silently (`../client/domain/client.md`, section 16).
+  document past its bytes, rows, a path's segments or texts is refused
+  at decoding, as too large, never cut silently (`../client/domain/client.md`, section 16).
   The wire's generated worst cases price each document at the client's
   limits.
 - **A document's nested collections cross as pieces.** The client bounds

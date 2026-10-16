@@ -470,6 +470,14 @@ buffer, with skein-lib's decimal for numbers. What is jig's:
   platform, or as the person chose it.
 - **Names are copied in,** never translated: a task's title, a party's
   name, a resource's words.
+- **A long path is shown cut.** A resource's path and a pattern print
+  their segments as their bytes, copied in. When the phrase before them
+  and their segments would pass a node's text, the view leaves out the
+  first segments, shows in their place the mark `…`, a phrase of jig's
+  an application may override, and then the last segments that fit, the
+  last one always. Only what is shown is cut: what the view acts on (a
+  filter by a resource, a draft's pattern) takes the whole path the
+  client holds (client.md, section 16).
 - **A shell's own words.** The words jig's look gives the browser's
   parts (a credential shown once, the application failed) are jig's
   phrases, in the person's language (`../../protocol/browser.md`, 3.3
@@ -520,7 +528,11 @@ worst case adds to skein-ui's.
 
 Each of jig's parts, sections and pages has a companion that counts the
 most nodes it may build with every window full and every text at its
-most bytes, and the largest page is the tree's capacity. A page showing
+most bytes, and the largest page is the tree's capacity. A node's text
+holds at least the phrase before a path, the mark and one segment at its
+most bytes, so a path's node stays within it whatever its segments
+(section 7), and the client's bound on a path's segments adds nothing to
+the tree's limits. A page showing
 sections together counts their sum, so the limits take the arrangement:
 `limits::of` and `limits::compose` count jig's pages with the sections
 the application's `Arrangement` adds beside each place's own. A
