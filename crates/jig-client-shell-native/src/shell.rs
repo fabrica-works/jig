@@ -243,7 +243,7 @@ impl Shell {
                         self.events.push(link::Event::Lost { exchange });
                     } else {
                         assert!(matches!(request, link::Request::OpenStream { .. }), "only exchanges and streams held");
-                        self.events.push(link::Event::StreamEnded);
+                        self.events.push(link::Event::StreamGone);
                     }
                 }
             }
@@ -312,6 +312,7 @@ impl Shell {
     #[must_use]
     pub fn worst_case(&self) -> u64 {
         io::worst_case(&self.env.limits).expect("io memory")
+            + self.connections.stream_memory()
             + u64::from(self.max)
                 * 256
                 * (u64::from(self.env.limits.intake)

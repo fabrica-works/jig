@@ -80,14 +80,10 @@ pub enum Event {
     Close {
         watch: Token,
     },
-    StreamOpened {
-        status: u16,
+    Streamed {
+        message: Streamed,
     },
-    /// A body piece of at most `Limits::stream_chunk` bytes.
-    StreamBytes {
-        bytes: Box<[u8]>,
-    },
-    StreamEnded,
+    StreamGone,
 }
 #[derive(Debug, PartialEq, Eq)]
 pub enum Request {
@@ -192,4 +188,13 @@ pub enum Message {
 pub enum Heard {
     Reply { exchange: Token, message: Box<[u8]> },
     Lost { exchange: Token },
+    Streamed { message: Streamed },
+    StreamGone,
+}
+
+/// One whole message cut by the transport from its stream.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Streamed {
+    Record(Box<[u8]>),
+    Heartbeat,
 }

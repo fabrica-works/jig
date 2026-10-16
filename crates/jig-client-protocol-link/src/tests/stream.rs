@@ -10,35 +10,10 @@ fn the_hello_s_family_range_reaches_its_owner() {
     assert!(harness.has(&Request::Hello { family: Some(19), versions: c::VersionRange { first: 23, last: 23 } }));
 }
 #[test]
-fn the_stream_s_body_cut_at_each_byte_reads_the_same_events() {
-    let bytes = fixtures::whole_stream();
-    for cut in 0..=bytes.len() {
-        let mut harness = fixtures::Harness::new(&fixtures::limits());
-        harness.open(fixtures::WATCH, fixtures::family_subject());
-        harness.stream_bytes(bytes.get(..cut).unwrap());
-        harness.stream_bytes(bytes.get(cut..).unwrap());
-        harness.expected_family();
-    }
-}
-#[test]
-fn an_events_data_read_as_it_arrives_decodes_the_same_whatever_its_cuts() {
-    let bytes = fixtures::whole_stream();
-    for size in [bytes.len(), 1] {
-        let mut harness = fixtures::Harness::new(&fixtures::limits());
-        harness.open(fixtures::WATCH, fixtures::family_subject());
-        for piece in bytes.chunks(size) {
-            harness.stream_bytes(piece);
-        }
-        harness.expected_family();
-        assert_eq!(harness.ended(fixtures::WATCH), Some(c::WatchEnd::Closed));
-        assert_eq!(harness.closed_count(), 1);
-    }
-}
-#[test]
 fn a_delivery_before_its_opening_s_answer_admits_it() {
     let mut harness = fixtures::Harness::streaming(fixtures::family_subject());
     let (exchange, name) = harness.opening();
-    harness.stream_bytes(&fixtures::family_delivery(name));
+    harness.stream_record(&fixtures::family_delivery(name));
     harness.answer(exchange, &fixtures::open_answer(&w::OpenAnswer::Admitted));
     assert!(harness.has(&Request::Watch { watch: fixtures::WATCH, event: c::WatchEvent::Opened }));
     harness.expected_family();
@@ -47,17 +22,9 @@ fn a_delivery_before_its_opening_s_answer_admits_it() {
 fn silence_past_twice_the_heartbeat_drops_each_watch() {
     let mut harness = fixtures::Harness::new(&fixtures::limits());
     let watch = harness.open(fixtures::WATCH, fixtures::frame_subject());
-    harness.stream_bytes(&fixtures::hello_event(fixtures::HEARTBEAT));
+    harness.stream_record(&fixtures::hello_event(fixtures::HEARTBEAT));
     harness.advance(fixtures::past_two_heartbeats());
     assert_eq!(harness.ended(watch), Some(c::WatchEnd::Dropped));
-}
-#[test]
-fn malformed_base64_drops_the_stream_and_is_reported() {
-    let mut harness = fixtures::Harness::streaming(fixtures::frame_subject());
-    harness.stream_bytes(b"data: !!!!\n\n");
-    assert_eq!(harness.ended(fixtures::WATCH), Some(c::WatchEnd::Dropped));
-    assert!(harness.has(&Request::Fact { fact: Fact::UndecodableEvent }));
-    assert!(harness.has(&Request::CloseStream));
 }
 #[test]
 fn a_second_watch_uses_the_stream_already_opened() {
@@ -103,7 +70,7 @@ fn a_close_s_answer_and_stream_ending_yield_one_terminal() {
     let (_, name) = harness.opening();
     let close = harness.close();
     harness.answer(close, &fixtures::close_answer());
-    harness.stream_bytes(&fixtures::ending(name, w::WatchEnd::Closed));
+    harness.stream_record(&fixtures::ending(name, w::WatchEnd::Closed));
     assert_eq!(harness.ended(fixtures::WATCH), Some(c::WatchEnd::Closed));
     assert_eq!(harness.closed_count(), 1);
 }
@@ -112,15 +79,15 @@ fn a_stream_ending_before_the_close_answer_yields_one_terminal() {
     let mut harness = fixtures::Harness::streaming(fixtures::frame_subject());
     let (_, name) = harness.opening();
     let close = harness.close();
-    harness.stream_bytes(&fixtures::ending(name, w::WatchEnd::Closed));
+    harness.stream_record(&fixtures::ending(name, w::WatchEnd::Closed));
     harness.answer(close, &fixtures::close_answer());
     assert_eq!(harness.closed_count(), 1);
 }
 #[test]
-fn a_heartbeat_comment_keeps_each_watch_alive() {
+fn a_heartbeat_keeps_each_watch_alive() {
     let mut harness = fixtures::Harness::streaming(fixtures::frame_subject());
     harness.clear();
-    harness.stream_at(Time::from_nanos(150), b": heartbeat\n\n");
+    harness.link.step(Time::from_nanos(150), Event::Streamed { message: Streamed::Heartbeat }, &mut harness.out);
     harness.advance(fixtures::past_two_heartbeats());
     assert_eq!(harness.ended(fixtures::WATCH), None);
     assert!(harness.has(&Request::Watch { watch: fixtures::WATCH, event: c::WatchEvent::Alive }));
@@ -134,34 +101,34 @@ fn the_stream_is_live_at_exactly_twice_the_heartbeat() {
 #[test]
 fn a_duplicate_hello_drops_the_stream() {
     let mut harness = fixtures::Harness::streaming(fixtures::frame_subject());
-    harness.stream_bytes(&fixtures::hello_event(fixtures::HEARTBEAT));
+    harness.stream_record(&fixtures::hello_event(fixtures::HEARTBEAT));
     assert_eq!(harness.ended(fixtures::WATCH), Some(c::WatchEnd::Dropped));
 }
 #[test]
 fn a_delivery_before_the_hello_drops_the_stream() {
     let mut harness = fixtures::Harness::new(&fixtures::limits());
     harness.open(fixtures::WATCH, fixtures::family_subject());
-    harness.stream_bytes(&fixtures::family_delivery(1));
+    harness.stream_record(&fixtures::family_delivery(1));
     assert_eq!(harness.ended(fixtures::WATCH), Some(c::WatchEnd::Dropped));
 }
 #[test]
 fn a_new_opening_never_takes_the_old_wire_name() {
     let mut harness = fixtures::Harness::streaming(fixtures::family_subject());
     let (_, old) = harness.opening();
-    harness.stream_bytes(&fixtures::ending(old, w::WatchEnd::Closed));
+    harness.stream_record(&fixtures::ending(old, w::WatchEnd::Closed));
     harness.clear();
     harness.open(fixtures::WATCH, fixtures::family_subject());
     let (_, new) = harness.opening();
     assert_ne!(old, new);
-    harness.stream_bytes(&fixtures::family_delivery(old));
+    harness.stream_record(&fixtures::family_delivery(old));
     assert!(!harness.has(&Request::FamilyDelivery { watch: fixtures::WATCH, record: fixtures::family_read() }));
 }
 #[test]
 fn a_stream_end_drops_all_watches_once() {
     let mut harness = fixtures::Harness::streaming(fixtures::frame_subject());
     harness.open(Token::new(42), fixtures::family_subject());
-    harness.link.step(Time::ZERO, Event::StreamEnded, &mut harness.out);
-    harness.link.step(Time::ZERO, Event::StreamEnded, &mut harness.out);
+    harness.link.step(Time::ZERO, Event::StreamGone, &mut harness.out);
+    harness.link.step(Time::ZERO, Event::StreamGone, &mut harness.out);
     assert_eq!(harness.ended(fixtures::WATCH), Some(c::WatchEnd::Dropped));
     assert_eq!(harness.ended(Token::new(42)), Some(c::WatchEnd::Dropped));
     assert_eq!(harness.closed_count(), 2);
@@ -169,7 +136,7 @@ fn a_stream_end_drops_all_watches_once() {
 #[test]
 fn a_stream_drop_tells_the_engine_which_stream_is_gone() {
     let mut harness = fixtures::Harness::streaming(fixtures::frame_subject());
-    harness.link.step(Time::ZERO, Event::StreamEnded, &mut harness.out);
+    harness.link.step(Time::ZERO, Event::StreamGone, &mut harness.out);
     assert_eq!(harness.gone_name(), fixtures::STREAM);
 }
 #[test]
@@ -177,7 +144,7 @@ fn a_close_before_the_hello_ends_without_an_exchange() {
     let mut harness = fixtures::Harness::new(&fixtures::limits());
     harness.open(fixtures::WATCH, fixtures::frame_subject());
     harness.link.step(Time::ZERO, Event::Close { watch: fixtures::WATCH }, &mut harness.out);
-    harness.stream_bytes(&fixtures::hello_event(fixtures::HEARTBEAT));
+    harness.stream_record(&fixtures::hello_event(fixtures::HEARTBEAT));
     assert_eq!(harness.closed_count(), 1);
     assert_eq!(harness.ended(fixtures::WATCH), Some(c::WatchEnd::Closed));
 }
@@ -201,7 +168,7 @@ fn a_continued_watch_has_a_fresh_name_and_retains_its_run_offset() {
     let (_, new) = harness.opening();
     assert_ne!(old, new);
     harness.assert_run_subject();
-    harness.stream_bytes(&fixtures::ending(old, w::WatchEnd::Closed));
+    harness.stream_record(&fixtures::ending(old, w::WatchEnd::Closed));
     assert_eq!(harness.ended(fixtures::WATCH), None);
 }
 #[test]
@@ -217,7 +184,7 @@ fn a_lost_opening_drops_its_watch() {
 fn a_delivery_whose_owner_differs_drops_the_stream() {
     let mut harness = fixtures::Harness::streaming(fixtures::frame_subject());
     let (_, name) = harness.opening();
-    harness.stream_bytes(&fixtures::family_delivery(name));
+    harness.stream_record(&fixtures::family_delivery(name));
     assert_eq!(harness.ended(fixtures::WATCH), Some(c::WatchEnd::Dropped));
     assert!(harness.has(&Request::Fact { fact: Fact::UndecodableEvent }));
 }
@@ -225,7 +192,7 @@ fn a_delivery_whose_owner_differs_drops_the_stream() {
 fn a_run_s_text_is_handed_up_with_its_offsets() {
     let mut harness = fixtures::Harness::streaming(fixtures::frame_subject());
     let (_, name) = harness.opening();
-    harness.stream_bytes(&fixtures::run_event(name));
+    harness.stream_record(&fixtures::run_event(name));
     assert_eq!(harness.delivered(), Some(&c::Delivery::Run(Box::new(fixtures::run_text_expected()))));
 }
 #[test]
@@ -239,7 +206,7 @@ fn each_jig_delivery_reaches_the_domain_with_its_variant() {
 fn a_jig_delivery_before_the_opening_answer_admits_it() {
     let mut harness = fixtures::Harness::streaming(fixtures::frame_subject());
     let (exchange, name) = harness.opening();
-    harness.stream_bytes(&fixtures::jig_delivery(&w::DeliveryValue::Frame(fixtures::frame_record()), name));
+    harness.stream_record(&fixtures::jig_delivery(&w::DeliveryValue::Frame(fixtures::frame_record()), name));
     harness.answer(exchange, &fixtures::open_answer(&w::OpenAnswer::Admitted));
     assert_eq!(harness.delivered(), Some(&c::Delivery::Frame(Box::new(fixtures::frame()))));
 }
@@ -292,4 +259,13 @@ fn an_owner_inbox_delivery_one_row_over_the_limit_is_refused() {
 fn an_owner_tree_delivery_one_row_over_the_limit_is_refused() {
     let bytes = fixtures::encoded_delivery(&fixtures::owner_tree_with_rows(3));
     assert_eq!(translate::watches::delivery(&bytes, &fixtures::limits()), Err(Undecodable::TooLarge));
+}
+
+#[test]
+fn a_malformed_stream_record_drops_the_stream_and_is_reported() {
+    let mut harness = fixtures::Harness::streaming(fixtures::frame_subject());
+    harness.stream_record(&[255]);
+    assert_eq!(harness.ended(fixtures::WATCH), Some(c::WatchEnd::Dropped));
+    assert!(harness.has(&Request::Fact { fact: Fact::UndecodableEvent }));
+    assert!(harness.has(&Request::CloseStream));
 }

@@ -21,3 +21,15 @@ pub(crate) fn messages() -> [Message; 7] {
         Message::SignOut,
     ]
 }
+
+pub(crate) const RECORDS: [&[u8]; 3] = [b"first", b"second", b"last"];
+pub(crate) const WHOLE_STREAM: &[u8] = b"data: Zmlyc3Q=\n\ndata: c2Vjb25k\n\ndata: bGFzdA==\n\n";
+pub(crate) fn stream_limits() -> crate::Limits {
+    crate::Limits { record: 64, chunk: 1024 }
+}
+pub(crate) fn reader() -> (crate::Stream, skein_lib::Queue<jig_client_protocol_link::Heard>) {
+    let mut stream = crate::Stream::new(&stream_limits());
+    let mut out = skein_lib::Queue::with_capacity(64);
+    stream.opened(200, &mut out);
+    (stream, out)
+}

@@ -1,17 +1,16 @@
 //! Incremental SSE and canonical base64 framing (protocol/client.md, 4 and 7).
-use crate::{Limits, Undecodable, translate};
-use jig_client_protocol_wire::v7 as w;
+use crate::Limits;
+use jig_client_protocol_link::{Heard, Streamed};
 use skein_http::sse;
 use skein_lib::base64::{Alphabet, Decoder};
 use skein_lib::stream::{Down, Read, Up};
-use skein_lib::{Duration, Env, Queue, Reader, Time, Wall, bytes};
+use skein_lib::{Env, Queue, Time, Wall, bytes};
 
-pub(crate) struct Stream {
+#[derive(Debug)]
+pub struct Stream {
     reader: sse::Reader,
     decoder: Decoder,
-    pub(crate) name: Option<[u8; 16]>,
-    last_read: Time,
-    heartbeat: Duration,
+    active: bool,
     env: Env<sse::Limits>,
     above: Queue<sse::Event>,
     below: Queue<Down>,
@@ -20,15 +19,14 @@ pub(crate) struct Stream {
     comment: bool,
 }
 impl Stream {
-    pub(crate) fn new(limits: &Limits, now: Time) -> Self {
-        let (decoded, framing) = bounds(limits).expect("validated stream bounds");
+    #[must_use]
+    pub fn new(limits: &Limits) -> Self {
+        let (decoded, framing) = bounds(*limits).expect("validated stream bounds");
         let mut stream = Self {
             reader: sse::Reader::new(&framing),
             decoder: Decoder::new(Alphabet::Standard, decoded),
-            name: None,
-            last_read: now,
-            heartbeat: limits.client.heartbeat,
-            env: Env { now, wall: Wall::EPOCH, limits: framing },
+            active: true,
+            env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: framing },
             above: Queue::with_capacity(2),
             below: Queue::with_capacity(2),
             decoded,
@@ -38,26 +36,39 @@ impl Stream {
         stream.demand(sse::Request::Next);
         stream
     }
-    pub(crate) fn deadline(&self) -> Time {
-        self.last_read.saturating_add(self.heartbeat.saturating_mul(2)).saturating_add(Duration::from_nanos(1))
-    }
-    pub(crate) fn hello(&mut self, hello: &w::Hello) -> Result<(), Undecodable> {
-        if self.name.is_some() || hello.heartbeat() == Duration::ZERO {
-            return Err(Undecodable::Malformed);
+    pub fn opened(&mut self, status: u16, out: &mut Queue<Heard>) {
+        if status != 200 {
+            self.ended(out);
         }
-        self.name = Some(*hello.stream());
-        self.heartbeat = hello.heartbeat();
-        Ok(())
     }
-    pub(crate) fn progress(&mut self, now: Time) {
-        self.last_read = now;
+    pub fn ended(&mut self, out: &mut Queue<Heard>) {
+        if self.active {
+            self.active = false;
+            out.push(Heard::StreamGone);
+        }
+    }
+    pub fn body(&mut self, piece: &[u8], out: &mut Queue<Heard>) {
+        if !self.active {
+            return;
+        }
+        if piece.len() > usize::try_from(self.env.limits.chunk).expect("u32 fits") {
+            self.ended(out);
+            return;
+        }
+        let mut at = 0_usize;
+        for _ in 0..piece.len() {
+            if at == piece.len() || !self.active {
+                break;
+            }
+            let line = line_piece(piece.get(at..).expect("within body"), self.env.limits.chunk);
+            at = at.checked_add(line.len()).expect("bounded body");
+            if self.piece(line, out).is_err() {
+                self.ended(out);
+            }
+        }
     }
     /// The reader's line scans are split at their first ending, within its chunk bound.
-    pub(crate) fn piece(
-        &mut self,
-        piece: &[u8],
-        limits: &Limits,
-    ) -> Result<(Option<w::StreamEvent>, bool), Undecodable> {
+    fn piece(&mut self, piece: &[u8], out: &mut Queue<Heard>) -> Result<(), ()> {
         if self.line_start {
             self.comment = piece.first() == Some(&b':');
             self.line_start = false;
@@ -69,34 +80,32 @@ impl Stream {
             self.comment = false;
         }
         sse::up(&mut self.reader, &self.env, Up::Bytes(bytes::copy_of(piece)), &mut self.above, &mut self.below);
-        let mut record = None;
         for _ in 0..self.env.limits.chunk.saturating_mul(3).saturating_add(8) {
             let Some(event) = self.above.pop() else { break };
             match event {
                 sse::Event::Opened => self.data(),
                 sse::Event::Data(Up::Bytes(piece)) => {
-                    self.decoder.push(&piece).or(Err(Undecodable::Malformed))?;
+                    self.decoder.push(&piece).or(Err(()))?;
                     self.data();
                 }
                 sse::Event::Data(Up::End) => {}
                 sse::Event::Dispatched(_) => {
                     let decoder = core::mem::replace(&mut self.decoder, Decoder::new(Alphabet::Standard, self.decoded));
-                    let body = decoder.finish().or(Err(Undecodable::Malformed))?;
-                    let receiving = translate::pages::receiving(limits)?;
-                    record = Some(
-                        w::StreamEvent::decode(&receiving.wire, &mut Reader::new(&body))
-                            .or(Err(Undecodable::Malformed))?,
-                    );
+                    let body = decoder.finish().or(Err(()))?;
+                    out.push(Heard::Streamed { message: Streamed::Record(body) });
                     self.demand(sse::Request::Next);
                 }
                 sse::Event::Data(Up::Failed(_)) | sse::Event::Failed(_) | sse::Event::Ended => {
-                    return Err(Undecodable::Malformed);
+                    return Err(());
                 }
                 sse::Event::Data(Up::Room) | sse::Event::Closed => unreachable!("reader is read-only and active"),
             }
         }
         self.clear_demands();
-        Ok((record, heartbeat))
+        if heartbeat {
+            out.push(Heard::Streamed { message: Streamed::Heartbeat });
+        }
+        Ok(())
     }
     fn data(&mut self) {
         self.demand(sse::Request::Data(Down::Demand { read: Read::Arrived { max: self.env.limits.chunk }, room: 0 }));
@@ -115,17 +124,32 @@ impl Stream {
         }
     }
 }
-pub(crate) fn bounds(limits: &Limits) -> Option<(u32, sse::Limits)> {
-    let decoded = u32::try_from(limits.client.document_bytes).ok()?.checked_add(512)?;
+fn bounds(limits: Limits) -> Option<(u32, sse::Limits)> {
+    if limits.record == 0 || limits.chunk == 0 {
+        return None;
+    }
+    let decoded = limits.record;
     let encoded = skein_lib::base64::encoded_len(Alphabet::Standard, decoded)?;
     let event = encoded.checked_add(256)?;
-    Some((decoded, sse::Limits { line: event, event, field: 64, chunk: 1024 }))
+    Some((decoded, sse::Limits { line: event, event, field: 64, chunk: limits.chunk }))
 }
-pub(crate) fn worst_case(limits: &Limits) -> Option<u64> {
-    let (decoded, framing) = bounds(limits)?;
+#[must_use]
+pub fn worst_case(limits: &Limits) -> Option<u64> {
+    let (decoded, framing) = bounds(*limits)?;
     sse::worst_case(&framing)?
         .checked_add(u64::from(framing.chunk))?
         .checked_add(u64::from(decoded).checked_mul(2)?)?
         .checked_add(Queue::<sse::Event>::worst_case(2)?)?
         .checked_add(Queue::<Down>::worst_case(2)?)
+}
+
+fn line_piece(bytes: &[u8], chunk: u32) -> &[u8] {
+    let maximum = core::cmp::min(bytes.len(), usize::try_from(chunk).expect("u32 fits usize"));
+    let piece = bytes.get(..maximum).expect("bounded scan");
+    for (at, byte) in piece.iter().enumerate() {
+        if *byte == b'\r' || *byte == b'\n' {
+            return piece.get(..at.saturating_add(1)).expect("scan stops at ending");
+        }
+    }
+    piece
 }

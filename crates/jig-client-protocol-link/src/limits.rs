@@ -13,11 +13,6 @@ pub enum Unusable {
     Limits,
 }
 impl Limits {
-    /// The most body bytes the shell hands in one `StreamBytes` event.
-    #[must_use]
-    pub const fn stream_chunk(&self) -> u32 {
-        1024
-    }
     pub fn new(client: jig_domain_client::Limits, exchanges: u32) -> Result<Self, Unusable> {
         let wire = wire(&client).ok_or(Unusable::Limits)?;
         let value = Self { client, exchanges, wire };
@@ -181,17 +176,11 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     map.checked_add(skein_lib::List::<skein_lib::Token>::worst_case(limits.exchanges)?)?
         .checked_add(crate::watches::worst_case(limits)?)?
         .checked_add(skein_lib::List::<skein_lib::Token>::worst_case(limits.client.watches)?)?
-        .checked_add(crate::stream::worst_case(limits)?)?
         .checked_add(crate::store::worst_case(limits)?)?
         .checked_add(40)
 }
 
 pub(crate) fn max_out(limits: &Limits) -> Option<u32> {
-    crate::stream::bounds(limits)?;
     let per_event = limits.client.watches.checked_mul(3)?.checked_add(limits.exchanges)?.checked_add(20)?;
-    limits
-        .stream_chunk()
-        .checked_mul(per_event)?
-        .checked_add(limits.exchanges.checked_mul(2)?)?
-        .checked_add(crate::store::records(limits)?.checked_mul(2)?)
+    per_event.checked_add(limits.exchanges.checked_mul(2)?)?.checked_add(crate::store::records(limits)?.checked_mul(2)?)
 }

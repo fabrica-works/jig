@@ -139,7 +139,7 @@ fn client_link_depends_only_on_client_vocabulary_and_foundation() {
     let link =
         manifests().into_iter().find(|m| m.name.as_deref() == Some("jig-client-protocol-link")).expect("link manifest");
     assert!(link.dependencies.iter().all(|name| {
-        ["skein-lib", "skein-codec", "skein-http", "jig-client-domain", "jig-domain-client", "jig-client-protocol-wire"]
+        ["skein-lib", "skein-codec", "jig-client-domain", "jig-domain-client", "jig-client-protocol-wire"]
             .contains(&name.as_str())
             || name == "jig-protocol-transcript"
     }));

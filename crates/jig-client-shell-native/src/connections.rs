@@ -25,6 +25,7 @@ type Pending = (Owner, Call);
 struct Exchange {
     owner: Owner,
     until: Time,
+    stream: Option<mapping::Stream>,
     machine: http::Client,
     events: Queue<http::Event>,
     below: Queue<Down>,
@@ -38,6 +39,7 @@ struct Exchange {
 pub struct Connections {
     limits: Limits,
     mapping: Mapping,
+    heard: Queue<link::Heard>,
     host: String,
     next: u32,
     exchanges: BTreeMap<Conn, Exchange>,
@@ -57,6 +59,9 @@ impl Connections {
         Self {
             limits: *limits,
             mapping: Mapping::new(b"/jig").expect("default mapping"),
+            heard: Queue::with_capacity(
+                limits.http.read.checked_mul(3).and_then(|v| v.checked_add(8)).expect("bounded stream outputs"),
+            ),
             host: "localhost".to_owned(),
             next: 1,
             exchanges: BTreeMap::new(),
@@ -132,6 +137,18 @@ impl Connections {
             self.start(now, owner, call, below);
         }
     }
+    fn stream_limits(&self) -> mapping::Limits {
+        mapping::Limits {
+            record: self.limits.body_bytes.checked_add(512).expect("bounded stream record"),
+            chunk: self.limits.http.read,
+        }
+    }
+    pub(crate) fn stream_memory(&self) -> u64 {
+        mapping::worst_case(&self.stream_limits())
+            .expect("stream memory")
+            .checked_add(Queue::<link::Heard>::worst_case(self.heard.capacity()).expect("stream output queue"))
+            .expect("stream memory fits")
+    }
     fn env(&self, now: Time) -> Env<http::Limits> {
         Env { now, wall: Wall::EPOCH, limits: self.limits.http }
     }
@@ -147,6 +164,11 @@ impl Connections {
         let mut value = Exchange {
             owner,
             until: now.saturating_add(self.limits.deadline),
+            stream: if matches!(owner, Owner::Stream) {
+                Some(mapping::Stream::new(&self.stream_limits()))
+            } else {
+                None
+            },
             machine: http::Client::new(&self.limits.http),
             events: Queue::with_capacity(8),
             below: Queue::with_capacity(8),
@@ -227,17 +249,21 @@ impl Connections {
                     value.status = response.status;
                     value.remaining =
                         if let http::Framing::Length(length) = response.framing { Some(length) } else { None };
-                    if matches!(value.owner, Owner::Stream) {
-                        self.events.push_back(link::Event::StreamOpened { status: value.status });
+                    if let Some(stream) = &mut value.stream {
+                        stream.opened(value.status, &mut self.heard);
+                        value.terminal = self.hear();
                     }
-                    Self::read(&env, &mut value);
+                    if !value.terminal {
+                        Self::read(&env, &mut value);
+                    }
                 }
                 http::Event::Body(Up::Bytes(bytes)) => {
                     if let Some(remaining) = &mut value.remaining {
                         *remaining -= u64::try_from(bytes.len()).expect("bounded read");
                     }
-                    if matches!(value.owner, Owner::Stream) {
-                        self.events.push_back(link::Event::StreamBytes { bytes });
+                    if let Some(stream) = &mut value.stream {
+                        stream.body(&bytes, &mut self.heard);
+                        value.terminal = self.hear();
                     } else if value.body.len() + bytes.len()
                         <= usize::try_from(self.limits.body_bytes).expect("u32 fits")
                     {
@@ -259,15 +285,14 @@ impl Connections {
                                     value.status,
                                     std::mem::take(&mut value.body).into_boxed_slice(),
                                 );
-                                self.events.push_back(match heard {
-                                    link::Heard::Reply { exchange, message } => {
-                                        link::Event::Reply { exchange, message }
-                                    }
-                                    link::Heard::Lost { exchange } => link::Event::Lost { exchange },
-                                });
+                                self.heard.push(heard);
+                                self.hear();
                             }
                         }
-                        Owner::Stream => self.events.push_back(link::Event::StreamEnded),
+                        Owner::Stream => {
+                            value.stream.as_mut().expect("stream owner").ended(&mut self.heard);
+                            self.hear();
+                        }
                     }
                     value.terminal = true;
                 }
@@ -339,10 +364,25 @@ impl Connections {
             &mut value.below,
         );
     }
+    fn hear(&mut self) -> bool {
+        let mut gone = false;
+        while let Some(heard) = self.heard.pop() {
+            self.events.push_back(match heard {
+                link::Heard::Reply { exchange, message } => link::Event::Reply { exchange, message },
+                link::Heard::Lost { exchange } => link::Event::Lost { exchange },
+                link::Heard::Streamed { message } => link::Event::Streamed { message },
+                link::Heard::StreamGone => {
+                    gone = true;
+                    link::Event::StreamGone
+                }
+            });
+        }
+        gone
+    }
     fn failed(&mut self, owner: Owner) {
         match owner {
             Owner::Link(exchange) => self.events.push_back(link::Event::Lost { exchange }),
-            Owner::Stream => self.events.push_back(link::Event::StreamEnded),
+            Owner::Stream => self.events.push_back(link::Event::StreamGone),
         }
     }
     #[must_use]

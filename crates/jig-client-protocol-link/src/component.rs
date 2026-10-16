@@ -1,5 +1,5 @@
 //! One bounded exchange per request-table attempt (protocol/client.md, 5).
-use crate::{Event, Fact, Limits, Message, Request, Unusable, translate};
+use crate::{Event, Fact, Limits, Message, Request, Streamed, Unusable, translate};
 use alloc::boxed::Box;
 use jig_client_domain::{Answered, Ask, Family, Readable, Readout, Watchable};
 use jig_client_protocol_wire::{self as wire, v7 as w};
@@ -20,17 +20,14 @@ pub(super) enum ExchangeKind {
     WatchOpen { name: u64 },
     WatchClose { name: u64 },
 }
-#[expect(
-    missing_debug_implementations,
-    reason = "the owned SSE reader and base64 decoder are opaque foundation machines"
-)]
+#[derive(Debug)]
 pub struct Link {
     pub(super) limits: Limits,
     pub(super) attempts: Map<Token, Attempt>,
     pub(super) next: u64,
     pub(super) credential: Option<Secret>,
     pub(super) generation: u64,
-    stream: Option<crate::stream::Stream>,
+    stream: Option<crate::silence::Silence>,
     watches: crate::watches::Watches,
     pub(super) store: crate::store::Store,
 }
@@ -55,7 +52,7 @@ impl Link {
     #[must_use]
     pub fn next_deadline(&self) -> Option<Time> {
         let Some(stream) = &self.stream else { return None };
-        Some(stream.deadline())
+        Some(stream.silence())
     }
     pub fn reclaim(&mut self) {}
     #[must_use]
@@ -77,13 +74,8 @@ impl Link {
                 self.open(now, watch, Watchable::Jig(subject), out);
             }
             Event::Close { watch } => self.close(now, watch, out),
-            Event::StreamOpened { status } => {
-                if status != 200 {
-                    self.drop_stream(now, out);
-                }
-            }
-            Event::StreamBytes { bytes } => self.stream_bytes(now, &bytes, out),
-            Event::StreamEnded => self.drop_stream(now, out),
+            Event::Streamed { message } => self.streamed(now, message, out),
+            Event::StreamGone => self.drop_stream(now, out),
             Event::Send { attempt, key, ask } => self.send(now, attempt, key, ask, out),
             Event::Read { read, what } => self.read(now, read, what, out),
             Event::Reply { exchange, message } => self.answered(exchange, &message, out),
@@ -96,7 +88,7 @@ impl Link {
     }
     pub fn fire(&mut self, now: Time, out: &mut Queue<Request>) {
         if let Some(stream) = &self.stream
-            && now >= stream.deadline()
+            && now >= stream.silence()
         {
             self.drop_stream(now, out);
         }
@@ -325,7 +317,7 @@ impl Link {
         self.watches.0.insert(watch, opening).expect("checked watch capacity");
         match &self.stream {
             None => {
-                self.stream = Some(crate::stream::Stream::new(&self.limits, now));
+                self.stream = Some(crate::silence::Silence::new(self.limits.client.heartbeat, now));
                 out.push(Request::OpenStream { credential: self.credential.clone() });
             }
             Some(stream) => {
@@ -481,44 +473,28 @@ impl Link {
             ExchangeKind::Attempt | ExchangeKind::Read => failed(attempt, out),
         }
     }
-    fn stream_bytes(&mut self, now: Time, bytes: &[u8], out: &mut Queue<Request>) {
+    fn streamed(&mut self, now: Time, message: Streamed, out: &mut Queue<Request>) {
         let Some(stream) = &mut self.stream else { return };
-        if bytes.len() > usize::try_from(self.limits.stream_chunk()).expect("u32 fits usize") {
-            out.push(Request::Fact { fact: Fact::UndecodableEvent });
-            self.drop_stream(now, out);
-            return;
-        }
-        if bytes.is_empty() {
-            return;
-        }
         stream.progress(now);
-        let mut at = 0_usize;
-        for _ in 0..bytes.len() {
-            if at == bytes.len() {
-                break;
+        let result = match message {
+            Streamed::Heartbeat => {
+                self.watches.alive(out);
+                return;
             }
-            let remaining = bytes.get(at..).expect("remaining stream bytes");
-            let piece = line_piece(remaining, self.limits.stream_chunk());
-            at = at.checked_add(piece.len()).expect("piece within input");
-            let Some(stream) = &mut self.stream else { break };
-            let result = stream.piece(piece, &self.limits);
-            let result = match result {
-                Ok((record, heartbeat)) => {
-                    if heartbeat {
-                        self.watches.alive(out);
-                    }
-                    match record {
-                        Some(record) => self.stream_event(now, record, out),
-                        None => Ok(()),
+            Streamed::Record(record) => match translate::pages::receiving(&self.limits) {
+                Ok(receiving) => {
+                    let mut reader = Reader::new(&record);
+                    match w::StreamEvent::decode(&receiving.wire, &mut reader) {
+                        Ok(record) if reader.remaining() == 0 => self.stream_event(now, record, out),
+                        Ok(_) | Err(_) => Err(crate::Undecodable::Malformed),
                     }
                 }
                 Err(problem) => Err(problem),
-            };
-            if result.is_err() {
-                out.push(Request::Fact { fact: Fact::UndecodableEvent });
-                self.drop_stream(now, out);
-                break;
-            }
+            },
+        };
+        if result.is_err() {
+            out.push(Request::Fact { fact: Fact::UndecodableEvent });
+            self.drop_stream(now, out);
         }
     }
     fn stream_event(
@@ -619,15 +595,4 @@ impl Link {
         out.push(Request::CloseStream);
         out.push(Request::Fact { fact: Fact::StreamDropped });
     }
-}
-
-fn line_piece(bytes: &[u8], chunk: u32) -> &[u8] {
-    let maximum = core::cmp::min(bytes.len(), usize::try_from(chunk).expect("u32 fits usize"));
-    let piece = bytes.get(..maximum).expect("bounded scan");
-    for (at, byte) in piece.iter().enumerate() {
-        if *byte == b'\r' || *byte == b'\n' {
-            return piece.get(..at.saturating_add(1)).expect("scan stops at ending");
-        }
-    }
-    piece
 }

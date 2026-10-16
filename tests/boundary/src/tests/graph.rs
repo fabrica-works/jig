@@ -683,3 +683,14 @@ fn client_domain_crate_links_only_the_foundation() {
     assert_eq!(domains.len(), 1, "one client domain");
     assert_eq!(domains[0].dependencies, ["skein-lib"]);
 }
+
+#[test]
+fn client_step_crates_link_no_http_but_the_mapping() {
+    let failures: Vec<_> = manifests()
+        .into_iter()
+        .filter(|m| m.name.as_deref().is_some_and(client_step) && m.name.as_deref() != Some("jig-client-protocol-http"))
+        .filter(|m| m.dependencies.iter().any(|d| d == "skein-http"))
+        .map(|m| m.path.display().to_string())
+        .collect();
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}

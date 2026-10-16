@@ -356,7 +356,7 @@ impl Protocol {
                         Signing::SignedOut => {
                             side.authenticated = false;
                             side.connections.down(now, link::Request::CloseStream, &mut side.below);
-                            side.event(now, link::Event::StreamEnded);
+                            side.event(now, link::Event::StreamGone);
                             side.signing_out = false;
                             self.callbacks.push((*client, Event::SignedOut));
                         }

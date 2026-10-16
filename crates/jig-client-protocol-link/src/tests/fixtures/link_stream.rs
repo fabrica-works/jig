@@ -1,5 +1,5 @@
 use super::*;
-use skein_lib::{List, base64};
+use skein_lib::List;
 pub const WATCH: Token = Token::new(41);
 pub const HEARTBEAT: Duration = Duration::from_nanos(100);
 pub const STREAM: [u8; 16] = [7; 16];
@@ -33,13 +33,7 @@ pub fn hello_event(heartbeat: Duration) -> Box<[u8]> {
 pub fn event_bytes(value: &w::StreamEvent) -> Box<[u8]> {
     let mut binary = Writer::new(usize::try_from(value.measure()).unwrap());
     value.encode(&mut binary).unwrap();
-    let binary = binary.finish();
-    let length = base64::encoded_len(base64::Alphabet::Standard, value.measure()).unwrap();
-    let mut text = Writer::new(usize::try_from(length.checked_add(8).unwrap()).unwrap());
-    text.put(b"data: ").unwrap();
-    base64::encode(base64::Alphabet::Standard, &binary, &mut text).unwrap();
-    text.put(b"\n\n").unwrap();
-    text.finish()
+    binary.finish()
 }
 pub fn family_delivery(name: u64) -> Box<[u8]> {
     let lim = limits().wire;
@@ -76,14 +70,13 @@ impl Harness {
     pub fn streaming(subject: Watchable) -> Self {
         let mut harness = Self::new(&limits());
         harness.open(WATCH, subject);
-        harness.link.step(Time::ZERO, Event::StreamOpened { status: 200 }, &mut harness.out);
-        harness.stream_bytes(&hello_event(HEARTBEAT));
+        harness.stream_record(&hello_event(HEARTBEAT));
         harness
     }
     pub fn stream_at(&mut self, now: Time, bytes: &[u8]) {
-        self.link.step(now, Event::StreamBytes { bytes: Box::from(bytes) }, &mut self.out);
+        self.link.step(now, Event::Streamed { message: Streamed::Record(Box::from(bytes)) }, &mut self.out);
     }
-    pub fn stream_bytes(&mut self, bytes: &[u8]) {
+    pub fn stream_record(&mut self, bytes: &[u8]) {
         self.stream_at(Time::ZERO, bytes);
     }
     pub fn advance(&mut self, now: Time) {
@@ -258,15 +251,4 @@ impl Harness {
         }
         panic!("no run opening")
     }
-}
-
-pub fn whole_stream() -> Box<[u8]> {
-    let hello = hello_event(HEARTBEAT);
-    let delivery = family_delivery(1);
-    let end = ending(1, w::WatchEnd::Closed);
-    let mut writer = Writer::new(hello.len().checked_add(delivery.len()).unwrap().checked_add(end.len()).unwrap());
-    writer.put(&hello).unwrap();
-    writer.put(&delivery).unwrap();
-    writer.put(&end).unwrap();
-    writer.finish()
 }

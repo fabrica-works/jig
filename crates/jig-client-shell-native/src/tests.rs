@@ -109,15 +109,14 @@ fn a_connection_cut_mid_body_fails_the_exchange() {
 fn the_stream_s_bytes_reach_the_link_in_order() {
     let mut peer = Peer::new();
     peer.shell.down(Time::ZERO, link::Request::OpenStream { credential: None }, &mut peer.below);
-    peer.respond(b"HTTP/1.1 200 OK\r\n\r\ndata: first\n\ndata: second\n\n");
-    assert!(matches!(peer.up.pop(), Some(link::Event::StreamOpened { status: 200 })));
+    peer.respond(b"HTTP/1.1 200 OK\r\n\r\ndata: Zmlyc3Q=\n\ndata: c2Vjb25k\n\n");
     let mut bytes = Vec::new();
     while let Some(event) = peer.up.pop() {
-        if let link::Event::StreamBytes { bytes: part } = event {
+        if let link::Event::Streamed { message: link::Streamed::Record(part) } = event {
             bytes.extend_from_slice(&part);
         }
     }
-    assert_eq!(bytes, b"data: first\n\ndata: second\n\n");
+    assert_eq!(bytes, b"firstsecond");
     peer.shell.down(Time::ZERO, link::Request::CloseStream, &mut peer.below);
     peer.drive();
     assert!(peer.wire.finished);
@@ -213,9 +212,8 @@ impl skein_shell::Host for Disk {
                 | link::Event::Open { .. }
                 | link::Event::Continue { .. }
                 | link::Event::Close { .. }
-                | link::Event::StreamOpened { .. }
-                | link::Event::StreamBytes { .. }
-                | link::Event::StreamEnded) => panic!("file fixture event {other:?}"),
+                | link::Event::Streamed { .. }
+                | link::Event::StreamGone) => panic!("file fixture event {other:?}"),
             }
         }
         for submit in self.shell.submissions().iter() {

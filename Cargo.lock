@@ -222,7 +222,6 @@ dependencies = [
  "jig-domain-client",
  "jig-protocol-transcript",
  "skein-codec",
- "skein-http",
  "skein-lib",
 ]
 

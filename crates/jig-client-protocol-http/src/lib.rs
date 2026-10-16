@@ -4,10 +4,12 @@
 extern crate alloc;
 mod call;
 mod printed;
+mod stream;
 use alloc::boxed::Box;
 pub use call::{Call, answered, exchange, stream};
 pub use printed::{Printed, Unlinked, printed};
 use skein_lib::bytes;
+pub use stream::{Stream, worst_case};
 #[derive(Debug, PartialEq, Eq)]
 pub struct Mapping {
     prefix: Box<[u8]>,
@@ -26,3 +28,10 @@ impl Mapping {
 }
 #[cfg(test)]
 mod tests;
+
+/// Receiving limits for the transport's stream reader.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Limits {
+    pub record: u32,
+    pub chunk: u32,
+}

@@ -117,5 +117,5 @@ fn malformed_piece_lengths_in_a_final_refusal_are_lost_and_reported() {
 fn an_invalid_client_limit_literal_is_refused() {
     let mut invalid = fixtures::limits();
     invalid.wire.owned_record = 16_777_217;
-    assert_eq!(Link::new(&invalid).err().expect("invalid link limits"), Unusable::Limits);
+    assert_eq!(Link::new(&invalid).expect_err("invalid link limits"), Unusable::Limits);
 }

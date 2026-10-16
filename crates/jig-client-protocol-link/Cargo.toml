@@ -8,7 +8,6 @@ publish.workspace = true
 [dependencies]
 jig-client-domain.workspace = true
 skein-lib.workspace = true
-skein-http.workspace = true
 skein-codec.workspace = true
 jig-domain-client = { path = "../jig-domain-client" }
 jig-client-protocol-wire = { path = "../jig-client-protocol-wire" }
