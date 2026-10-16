@@ -215,6 +215,7 @@ pub(super) fn live_before(core: &Core, env: &Env<Limits>, party: u64, before: Op
             | PageRow::Milestone(_)
             | PageRow::Activity { .. }
             | PageRow::Inbox(_)
+            | PageRow::Line(_)
             | PageRow::Goal(_)
             | PageRow::Note(_)
             | PageRow::Spend(_) => unreachable!("live tail row"),

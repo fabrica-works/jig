@@ -285,6 +285,7 @@ fn put_scope(w: &mut Writer, value: &reads::Scope) -> Option<()> {
         reads::Scope::Conversations => {
             w.byte(12)?;
         }
+        reads::Scope::Tasks { .. } => return None,
         reads::Scope::Goals { project } => {
             w.byte(13)?;
             w.u32(*project)?;

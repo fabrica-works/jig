@@ -23,6 +23,7 @@ pub(super) fn activity(
             | reads::PageRow::Milestone(_)
             | reads::PageRow::Inbox(_)
             | reads::PageRow::Conversation(_)
+            | reads::PageRow::Line(_)
             | reads::PageRow::Goal(_)
             | reads::PageRow::Note(_)
             | reads::PageRow::Spend(_) => return Err(invalid),
@@ -72,6 +73,7 @@ pub(super) fn history(
             | reads::PageRow::Activity { .. }
             | reads::PageRow::Inbox(_)
             | reads::PageRow::Conversation(_)
+            | reads::PageRow::Line(_)
             | reads::PageRow::Goal(_)
             | reads::PageRow::Note(_)
             | reads::PageRow::Spend(_) => return Err(invalid),
@@ -110,6 +112,7 @@ pub(super) fn inbox(
             | reads::PageRow::Milestone(_)
             | reads::PageRow::Activity { .. }
             | reads::PageRow::Conversation(_)
+            | reads::PageRow::Line(_)
             | reads::PageRow::Goal(_)
             | reads::PageRow::Note(_)
             | reads::PageRow::Spend(_) => return Err(invalid),
@@ -154,6 +157,7 @@ pub(super) fn conversations(
             | reads::PageRow::Milestone(_)
             | reads::PageRow::Activity { .. }
             | reads::PageRow::Inbox(_)
+            | reads::PageRow::Line(_)
             | reads::PageRow::Goal(_)
             | reads::PageRow::Note(_)
             | reads::PageRow::Spend(_) => return Err(invalid),
@@ -188,7 +192,8 @@ pub(super) fn goals(
     for row in &page.rows {
         let value = match row {
             reads::PageRow::Goal(value) => value,
-            reads::PageRow::EndedDelegate(_)
+            reads::PageRow::Line(_)
+            | reads::PageRow::EndedDelegate(_)
             | reads::PageRow::History(_)
             | reads::PageRow::Milestone(_)
             | reads::PageRow::Activity { .. }
@@ -234,6 +239,7 @@ pub(super) fn ended(
             | reads::PageRow::Activity { .. }
             | reads::PageRow::Inbox(_)
             | reads::PageRow::Conversation(_)
+            | reads::PageRow::Line(_)
             | reads::PageRow::Goal(_)
             | reads::PageRow::Note(_)
             | reads::PageRow::Spend(_) => return Err(invalid),
@@ -288,6 +294,7 @@ pub(super) fn spend(
             | reads::PageRow::Activity { .. }
             | reads::PageRow::Inbox(_)
             | reads::PageRow::Conversation(_)
+            | reads::PageRow::Line(_)
             | reads::PageRow::Goal(_)
             | reads::PageRow::Note(_) => return Err(invalid),
         };
@@ -326,6 +333,7 @@ pub(super) fn notes(
             | reads::PageRow::Activity { .. }
             | reads::PageRow::Inbox(_)
             | reads::PageRow::Conversation(_)
+            | reads::PageRow::Line(_)
             | reads::PageRow::Goal(_)
             | reads::PageRow::Spend(_) => return Err(invalid),
         };

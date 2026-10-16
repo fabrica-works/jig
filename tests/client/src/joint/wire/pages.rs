@@ -157,6 +157,7 @@ pub fn history_page(
             | reads::PageRow::Activity { .. }
             | reads::PageRow::Inbox(_)
             | reads::PageRow::Conversation(_)
+            | reads::PageRow::Line(_)
             | reads::PageRow::Goal(_)
             | reads::PageRow::Note(_)
             | reads::PageRow::Spend(_) => return Err(Invalid::Identity),
@@ -195,6 +196,7 @@ pub fn activity_page_with_codec(
             | reads::PageRow::Milestone(_)
             | reads::PageRow::Inbox(_)
             | reads::PageRow::Conversation(_)
+            | reads::PageRow::Line(_)
             | reads::PageRow::Goal(_)
             | reads::PageRow::Note(_)
             | reads::PageRow::Spend(_) => return Err(Invalid::Identity),
@@ -235,6 +237,7 @@ pub fn notes_page(
             | reads::PageRow::Activity { .. }
             | reads::PageRow::Inbox(_)
             | reads::PageRow::Conversation(_)
+            | reads::PageRow::Line(_)
             | reads::PageRow::Goal(_)
             | reads::PageRow::Spend(_) => return Err(Invalid::Identity),
         };

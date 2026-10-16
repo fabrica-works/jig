@@ -687,6 +687,7 @@ fn subtree_history(world: &mut jig_core_world::effects::World, task: u64) -> Vec
                 | reads::PageRow::Activity { .. }
                 | reads::PageRow::Inbox(_)
                 | reads::PageRow::Conversation(_)
+                | reads::PageRow::Line(_)
                 | reads::PageRow::Goal(_)
                 | reads::PageRow::Note(_)
                 | reads::PageRow::Spend(_) => panic!("history family"),

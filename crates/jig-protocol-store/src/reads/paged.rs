@@ -209,6 +209,7 @@ pub(super) fn notes(store: &mut Store, range: &reads::Range, spent: &mut Spent) 
             | reads::Scope::Activity { .. }
             | reads::Scope::Inbox { .. }
             | reads::Scope::Conversations
+            | reads::Scope::Tasks { .. }
             | reads::Scope::Goals { .. }
             | reads::Scope::Spend { .. } => return Err(Failure::Corrupt),
         };

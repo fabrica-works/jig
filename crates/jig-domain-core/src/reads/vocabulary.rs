@@ -59,6 +59,8 @@ pub struct Filter {
 /// Identity of a store query, independent of its continuation.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Scope {
+    /// A task query's live group; no stored range yet.
+    Tasks { query: documents::TaskQuery },
     /// One retained task.
     Task { task: u64 },
     /// One immutable proposal and its final routing.
@@ -123,6 +125,8 @@ pub enum Cursor {
 /// One document or bounded page, without a request key.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Read {
+    /// A task query's live group, in its requested order.
+    Tasks { query: documents::TaskQuery, from: Option<Cursor> },
     /// A connector-owned document within the client's stated role scope.
     Application {
         scope: documents::ApplicationScope,
@@ -275,6 +279,8 @@ pub enum PageTurn {
 /// One semantic row of a read page.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum PageRow {
+    /// The common task line.
+    Line(documents::TaskLine),
     /// An ended delegate's status and outcome.
     EndedDelegate(documents::EndedDelegate),
     /// A semantic task change.

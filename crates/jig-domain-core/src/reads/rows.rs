@@ -20,6 +20,7 @@ fn note_project(scope: &notes::Scope) -> u32 {
 
 pub(super) fn scope_allowed(core: &Core, party: u64, scope: &Scope) -> bool {
     match scope {
+        Scope::Tasks { .. } => false,
         Scope::Goals { project } | Scope::Notes { project } | Scope::Spend { project } => {
             core.people.role(party, *project).is_some()
         }
@@ -116,6 +117,7 @@ pub(super) fn needs_store(read: &Read, document: &Document) -> bool {
             | Read::History { .. }
             | Read::Activity { .. }
             | Read::Conversations { .. }
+            | Read::Tasks { .. }
             | Read::Goals { .. }
             | Read::Project { .. }
             | Read::Notes { .. }
@@ -165,6 +167,7 @@ pub(super) fn live_page(core: &Core, limits: &Limits, party: u64, read: &Read, d
                 | Read::History { .. }
                 | Read::Activity { .. }
                 | Read::Conversations { .. }
+                | Read::Tasks { .. }
                 | Read::Goals { .. }
                 | Read::Project { .. }
                 | Read::Notes { .. }
@@ -253,10 +256,23 @@ pub(super) fn live_page(core: &Core, limits: &Limits, party: u64, read: &Read, d
             }
             return Answer::Page(Box::new(Page { rows, before, next: Some(next), cut: false, inbox_selection: None }));
         }
+        Document::Lines(value) => {
+            for row in value.lines.into_boxed() {
+                rows.push(PageRow::Line(row)).expect("live query lines fit");
+            }
+            let next = match value.next {
+                Some(after) => {
+                    Some(Cursor::Live { scope: Scope::Tasks { query: value.query }, after, store_after: None })
+                }
+                None => None,
+            };
+            return Answer::Page(Box::new(Page { rows, before: None, next, cut: false, inbox_selection: None }));
+        }
         Document::Goals(value) => {
             let project = match read {
                 Read::Goals { project, .. } => project,
-                Read::Frame
+                Read::Tasks { .. }
+                | Read::Frame
                 | Read::Task { .. }
                 | Read::Proposal { .. }
                 | Read::Escalation { .. }
@@ -293,7 +309,6 @@ pub(super) fn live_page(core: &Core, limits: &Limits, party: u64, read: &Read, d
         | Document::PersonTask(_)
         | Document::Result(_)
         | Document::Project(_)
-        | Document::Lines(_)
         | Document::Tasks(_)
         | Document::Note(_)
         | Document::Deployment(_)) => return Answer::Document(Box::new(document)),
@@ -348,6 +363,7 @@ fn is_page(scope: &Scope) -> bool {
         | Scope::Activity { .. }
         | Scope::Inbox { .. }
         | Scope::Conversations
+        | Scope::Tasks { .. }
         | Scope::Goals { .. }
         | Scope::Notes { .. }
         | Scope::ScopedNotes { .. }
@@ -567,6 +583,7 @@ fn object(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Optio
                 | Scope::Activity { .. }
                 | Scope::Inbox { .. }
                 | Scope::Conversations
+                | Scope::Tasks { .. }
                 | Scope::Goals { .. }
                 | Scope::Notes { .. }
                 | Scope::ScopedNotes { .. }
@@ -802,6 +819,7 @@ fn object(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Optio
         | Scope::Activity { .. }
         | Scope::Inbox { .. }
         | Scope::Conversations
+        | Scope::Tasks { .. }
         | Scope::Goals { .. }
         | Scope::Notes { .. }
         | Scope::ScopedNotes { .. }
@@ -917,7 +935,8 @@ fn page_row(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Opt
         | Scope::PersonTask { .. }
         | Scope::Result { .. }
         | Scope::Reply { .. }
-        | Scope::Turn { .. } => Ok(None),
+        | Scope::Turn { .. }
+        | Scope::Tasks { .. } => Ok(None),
     }
 }
 
@@ -936,6 +955,7 @@ fn inbox_contexts(scope: &Scope, rows: u32) -> Option<List<documents::InboxSelec
         | Scope::History { .. }
         | Scope::Activity { .. }
         | Scope::Conversations
+        | Scope::Tasks { .. }
         | Scope::Goals { .. }
         | Scope::Notes { .. }
         | Scope::ScopedNotes { .. }
@@ -1410,6 +1430,7 @@ pub(super) fn position_allowed(scope: &Scope, position: &Position) -> bool {
             | Scope::History { .. }
             | Scope::Activity { .. }
             | Scope::Conversations
+            | Scope::Tasks { .. }
             | Scope::Goals { .. }
             | Scope::Notes { .. }
             | Scope::ScopedNotes { .. }
@@ -1445,6 +1466,7 @@ pub(super) fn position_allowed(scope: &Scope, position: &Position) -> bool {
                     | KeyKind::Unsupported => false,
                 },
                 Scope::Conversations => super::indexed::conversation_position(position, true).is_some(),
+                Scope::Tasks { .. } => false,
                 Scope::Goals { project } => match key {
                     Key::Tasks(tasks::Key::Goal { project: owner, .. }) => owner == project,
                     Key::Tasks(_) | Key::Core(_) | Key::People(_) | Key::Notes(_) => false,

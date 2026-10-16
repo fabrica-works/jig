@@ -46,6 +46,7 @@ fn numbers(page: &reads::Page) -> Box<[u64]> {
             | reads::PageRow::Milestone(_)
             | reads::PageRow::Activity { .. }
             | reads::PageRow::Inbox(_)
+            | reads::PageRow::Line(_)
             | reads::PageRow::Goal(_)
             | reads::PageRow::Note(_)
             | reads::PageRow::Spend(_) => panic!("only conversation rows"),

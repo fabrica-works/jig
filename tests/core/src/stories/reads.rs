@@ -11,17 +11,23 @@ use skein_lib::{Duration, ReplyTo, Token};
 
 #[must_use]
 pub fn world(seed: u64) -> World {
-    read_world(seed, None)
+    read_world(seed, None, 2)
 }
 
-fn read_world(seed: u64, reply_bound: Option<u32>) -> World {
+/// A read fixture with a chosen bounded live page size.
+#[must_use]
+pub fn world_with_rows(seed: u64, rows: u32) -> World {
+    read_world(seed, None, rows)
+}
+
+fn read_world(seed: u64, reply_bound: Option<u32>, rows: u32) -> World {
     let (configuration, mut limits) = crate::effects::fixture(seed, false);
     if let Some(bound) = reply_bound {
         limits.core.tasks.inbox_messages = bound;
         limits.core.tasks.run_inbox = bound;
         limits.core.people.inbox_entries = bound;
     }
-    limits.core.documents.rows = 2;
+    limits.core.documents.rows = rows;
     if reply_bound.is_none() {
         limits.core.people.inbox_entries = 1;
     }
@@ -76,7 +82,7 @@ pub fn conversation(world: &mut World, task: u64, first: u64) -> Vec<tasks::Acti
 
 /// A temporal cache prefix must remain a prefix even when a later turn has an earlier wall time.
 pub fn a_backward_wall_correction_keeps_reply_paging_whole_after_restart() {
-    let mut world = read_world(766, Some(2));
+    let mut world = read_world(766, Some(2), 2);
     let task = world.assigned.as_ref().expect("chat").task;
     world.advance(Duration::from_secs(2));
     world.turn(1, 1, None, b"before correction one");

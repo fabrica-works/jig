@@ -24,7 +24,8 @@ pub fn page(read: &reads::Read, page: &reads::Page, limits: &w::Limits) -> Resul
         reads::Read::EndedDelegates { .. } => documents::ended(page, before, after, limits)?,
         reads::Read::Spend { project, .. } => documents::spend(*project, page, before, after, limits)?,
         reads::Read::Notes { .. } | reads::Read::ScopedNotes { .. } => documents::notes(page, before, after, limits)?,
-        reads::Read::Application { .. }
+        reads::Read::Tasks { .. }
+        | reads::Read::Application { .. }
         | reads::Read::Frame
         | reads::Read::Task { .. }
         | reads::Read::Proposal { .. }
@@ -53,6 +54,7 @@ fn check_edges(read: &reads::Read, page: &reads::Page) -> Result<(), w::Problem>
                     reads::Read::EndedDelegates { task, .. } => reads::Scope::EndedDelegates { task: *task },
                     reads::Read::Inbox { group, filter, .. } => reads::Scope::Inbox { group: *group, filter: *filter },
                     reads::Read::Conversations { .. } => reads::Scope::Conversations,
+                    reads::Read::Tasks { query, .. } => reads::Scope::Tasks { query: *query },
                     reads::Read::Goals { project, .. } => reads::Scope::Goals { project: *project },
                     reads::Read::Spend { project, .. } => reads::Scope::Spend { project: *project },
                     reads::Read::Notes { project, .. } => reads::Scope::Notes { project: *project },
@@ -92,6 +94,7 @@ fn check_edges(read: &reads::Read, page: &reads::Page) -> Result<(), w::Problem>
                 | reads::Read::History { .. }
                 | reads::Read::Activity { .. }
                 | reads::Read::Inbox { .. }
+                | reads::Read::Tasks { .. }
                 | reads::Read::Goals { .. }
                 | reads::Read::Spend { .. }
                 | reads::Read::Project { .. }

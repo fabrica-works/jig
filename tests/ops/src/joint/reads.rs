@@ -180,7 +180,8 @@ fn candidate(store: &Store, range: &reads::Range, value: &core::Record) -> Optio
                 | reads::Group::PersonTasks,
             ..
         }
-        | reads::Scope::Spend { .. } => None,
+        | reads::Scope::Spend { .. }
+        | reads::Scope::Tasks { .. } => None,
     }
 }
 
@@ -231,6 +232,7 @@ fn point(store: &Store, scope: &reads::Scope) -> Option<reads::Row> {
         | reads::Scope::Activity { .. }
         | reads::Scope::Inbox { .. }
         | reads::Scope::Conversations
+        | reads::Scope::Tasks { .. }
         | reads::Scope::Goals { .. }
         | reads::Scope::Notes { .. }
         | reads::Scope::ScopedNotes { .. }
@@ -392,6 +394,7 @@ fn index_bounds(range: &reads::Range) -> Option<(root::Key, root::Key)> {
         }
         | reads::Scope::Notes { .. }
         | reads::Scope::ScopedNotes { .. }
-        | reads::Scope::Spend { .. } => None,
+        | reads::Scope::Spend { .. }
+        | reads::Scope::Tasks { .. } => None,
     }
 }

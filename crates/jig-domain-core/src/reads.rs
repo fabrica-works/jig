@@ -92,7 +92,8 @@ pub fn admits(party: u64, scope: &Scope, key: &crate::Key) -> bool {
             ) => *owner == party,
             Key::Tasks(_) | Key::Core(_) | Key::People(_) | Key::Notes(_) => false,
         },
-        Scope::Proposal { proposer: Proposer::Task(_), .. }
+        Scope::Tasks { .. }
+        | Scope::Proposal { proposer: Proposer::Task(_), .. }
         | Scope::Escalation { .. }
         | Scope::Question { .. }
         | Scope::Turn { .. }
@@ -135,6 +136,7 @@ pub(crate) fn scope(read: &Read) -> Option<Scope> {
         Read::Activity { task, .. } => Some(Scope::Activity { task: *task }),
         Read::Inbox { group, filter, .. } => Some(Scope::Inbox { group: *group, filter: *filter }),
         Read::Conversations { .. } => Some(Scope::Conversations),
+        Read::Tasks { query, .. } => Some(Scope::Tasks { query: *query }),
         Read::Goals { project, .. } => Some(Scope::Goals { project: *project }),
         Read::Notes { project, .. } => Some(Scope::Notes { project: *project }),
         Read::ScopedNotes { scope, description, .. } => {
@@ -151,6 +153,7 @@ fn cursor(read: &Read) -> Option<&Cursor> {
         | Read::History { from, .. }
         | Read::Inbox { from, .. }
         | Read::Conversations { from }
+        | Read::Tasks { from, .. }
         | Read::Goals { from, .. }
         | Read::Notes { from, .. }
         | Read::ScopedNotes { from, .. }
@@ -184,6 +187,7 @@ fn subject(read: &Read, party: u64) -> Option<Subject> {
         Read::Deployment => Some(Subject::Deployment),
         Read::Inbox { .. } => Some(Subject::Inbox { party }),
         Read::Conversations { .. } => Some(Subject::Conversations { party }),
+        Read::Tasks { query, .. } => Some(Subject::Query { query: *query }),
         Read::Goals { project, .. } => Some(Subject::Goals { project: *project }),
         Read::Application { .. }
         | Read::EndedDelegates { .. }
@@ -213,6 +217,7 @@ fn backwards(scope: &Scope) -> bool {
             ..
         }
         | Scope::Inbox { group: Group::Updates | Group::Results | Group::Replies, .. }
+        | Scope::Tasks { .. }
         | Scope::Goals { .. }
         | Scope::Notes { .. }
         | Scope::ScopedNotes { .. }
@@ -243,6 +248,7 @@ fn refused_application(reply: ReplyTo, read: &Read, why: Why) -> Requests {
         | Read::Activity { .. }
         | Read::Inbox { .. }
         | Read::Conversations { .. }
+        | Read::Tasks { .. }
         | Read::Goals { .. }
         | Read::Notes { .. }
         | Read::ScopedNotes { .. }
@@ -286,6 +292,7 @@ pub(crate) fn start(core: &mut Core, env: &Env<Limits>, reply: ReplyTo, sign_in:
         | Read::Activity { .. }
         | Read::Inbox { .. }
         | Read::Conversations { .. }
+        | Read::Tasks { .. }
         | Read::Goals { .. }
         | Read::Notes { .. }
         | Read::ScopedNotes { .. }
@@ -321,6 +328,7 @@ fn bounded_query(read: &Read, limits: &Limits) -> bool {
         | Read::Activity { .. }
         | Read::Inbox { .. }
         | Read::Conversations { .. }
+        | Read::Tasks { .. }
         | Read::Goals { .. }
         | Read::Project { .. }
         | Read::Notes { .. }
@@ -369,6 +377,7 @@ fn read_start(read: &Read, party: u64) -> Option<ReadStart> {
             reverse_live = true;
         }
         Some(Cursor::ConversationsStart) if target != Some(Scope::Conversations) => return None,
+        Some(Cursor::Store { scope: Scope::Tasks { .. }, .. }) => return None,
         Some(Cursor::Store { scope, after }) => {
             if Some(scope) != target.as_ref() {
                 return None;

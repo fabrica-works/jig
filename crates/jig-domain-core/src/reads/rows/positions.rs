@@ -17,6 +17,7 @@ fn subtree(scope: &Scope) -> bool {
         | Scope::Activity { .. }
         | Scope::Inbox { .. }
         | Scope::Conversations
+        | Scope::Tasks { .. }
         | Scope::Goals { .. }
         | Scope::Notes { .. }
         | Scope::ScopedNotes { .. }

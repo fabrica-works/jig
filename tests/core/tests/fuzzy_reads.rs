@@ -8,6 +8,8 @@ use jig_domain_people as people;
 use jig_test_domain as root;
 use skein_lib::{ReplyTo, Rng, Token};
 
+const QUERY_READ: u64 = 4;
+
 #[test]
 fn seeded_reads_wait_for_prior_commits_and_keep_receipts_across_restart_cuts() {
     for seed in 801..=812 {
@@ -40,7 +42,9 @@ fn seeded_reads_wait_for_prior_commits_and_keep_receipts_across_restart_cuts() {
             ask(&mut world, 3, reads::Read::Activity { task, before: None });
             let reads::Answer::Page(page) = latest(&world) else { panic!("durable owner page") };
             assert!(page.rows.len() <= 2);
-            assert_eq!(world.reads.as_ref().expect("party").receipts.len(), observed + 2);
+            ask(&mut world, QUERY_READ, reads::Read::Tasks { query: jig_core_world::fixtures::OWN_TASKS, from: None });
+            assert_eq!(jig_core_world::fixtures::query_numbers(&world), [task]);
+            assert_eq!(world.reads.as_ref().expect("party").receipts.len(), observed + 3);
         });
         assert!(replay.is_ok(), "read crash replay seed {seed}");
     }

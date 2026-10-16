@@ -51,11 +51,11 @@ fn a_query_naming_no_project_admits_only_the_requester_themself() {
         (Some(tasks::Party::Deployment { project: 1 }), Err(Missing::Unknown)),
     ] {
         let query = TaskQuery { project: None, requester, ..ALL };
-        let actual = match lines(&core, &limits, REQUESTER, &query, &window()) {
+        let answer = match lines(&core, &limits, REQUESTER, &query, &window()) {
             Ok(_) => Ok(()),
             Err(why) => Err(why),
         };
-        assert_eq!(actual, expected, "{requester:?}");
+        assert_eq!(answer, expected, "{requester:?}");
     }
     let mine = TaskQuery { project: None, requester: Some(tasks::Party::Person(REQUESTER)), ..ALL };
     assert_eq!(lines(&core, &limits, REQUESTER, &mine, &window()).unwrap().lines.get(0).unwrap().chip.number, FIRST);

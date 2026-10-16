@@ -54,3 +54,16 @@ pub fn notices_world(seed: u64) -> crate::effects::World {
     limits.core.tasks.inbox_bytes = 256;
     crate::effects::World::configured(seed, false, config, limits)
 }
+
+/// Task numbers in a live query page, retaining its requested order.
+#[must_use]
+pub fn query_numbers(world: &crate::effects::World) -> Vec<u64> {
+    let jig_domain_core::reads::Answer::Page(page) = crate::reads::latest(world) else { panic!("query page") };
+    page.rows
+        .iter()
+        .map(|row| {
+            let jig_domain_core::reads::PageRow::Line(line) = row else { panic!("task line") };
+            line.chip.number
+        })
+        .collect()
+}
