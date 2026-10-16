@@ -2,10 +2,8 @@
 //! Entries keep only addresses and opaque application numbers; application page
 //! contents belong to their owner. The latest frame decides availability, without
 //! interpreting roles. See client/domain/pages.md, 2, and root.md, 5–6.
-use crate::{
-    address::{Address, Place},
-    contract::{Frame, PartyKind},
-};
+use crate::address::{Address, Place};
+use jig_client_domain::contract::{Frame, PartyKind};
 use skein_lib::List;
 
 /// One navigation destination, translated by the application's root.

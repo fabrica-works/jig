@@ -12,7 +12,7 @@
 extern crate alloc;
 
 use alloc::boxed::Box;
-use jig_domain_client::contract::{Block, Call, Message, Speaker, Text, Turn, TurnLimits, Usage};
+use jig_client_domain::contract::{Block, Call, Message, Speaker, Text, Turn, TurnLimits, Usage};
 use skein_lib::{List, Reader};
 use smith_transcript::v3 as smith;
 

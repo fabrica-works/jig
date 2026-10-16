@@ -2,7 +2,7 @@
 //! Includes every list's allocated capacity and every opaque segment/end byte.
 use crate::{Bounds, payload::Payload};
 use core::mem::size_of;
-use jig_domain_client::contract::{
+use jig_client_domain::contract::{
     OwnerAuthority, OwnerAuthorityDocument, OwnerAuthorityExecutor, OwnerDelegation, OwnerGrant, OwnerPattern,
     OwnerPatternEnd, OwnerResourceScope,
 };

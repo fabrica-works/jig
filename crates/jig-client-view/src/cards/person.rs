@@ -5,10 +5,10 @@ use crate::{JigBindings, JigMeaning};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run, State};
 
+use jig_client_domain::contract::{OptionLine, PersonContract};
 use jig_domain_client::{
     Domain,
     action::Act,
-    contract::{OptionLine, PersonContract},
     fields::Purpose,
     objects::{Object, person_task::facts},
 };

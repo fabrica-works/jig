@@ -6,11 +6,8 @@
 use crate::family::{self, Document, Kind, Scope, Subject};
 pub use crate::family::{Answer, Ask, ReadResult, WatchEnd, WatchEvent};
 use alloc::boxed::Box;
-use jig_domain_client::{
-    contract::{Part, Revision},
-    frame::FrameShown,
-    link::Link,
-};
+use jig_client_domain::contract::{Part, Revision};
+use jig_domain_client::{frame::FrameShown, link::Link};
 use skein_lib::{Env, Id, List, Map, Queue, RequestProgress, Slab, Time, Token};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Address {
@@ -68,7 +65,7 @@ pub enum Request {
     Save { record: Record },
     Send { request: Token, scope: u64, ask: Ask },
     Out(Out),
-    ShowObjects { objects: List<jig_domain_client::contract::ObjectKey> },
+    ShowObjects { objects: List<jig_client_domain::contract::ObjectKey> },
     ShowSections { sections: List<jig_domain_client::pages::Section> },
     ObjectsLeft,
 }
@@ -815,7 +812,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     >::worst_case(
         limits.objects,
     )?)?;
-    let payload = List::<jig_domain_client::contract::ProposalKey>::worst_case(limits.rows)?
+    let payload = List::<jig_client_domain::contract::ProposalKey>::worst_case(limits.rows)?
         .max(crate::connector_bounds::document_worst_case(&limits.connector)?);
     total = total.checked_add(u64::from(limits.objects.checked_mul(2)?).checked_mul(payload)?)?;
     total = total
@@ -826,7 +823,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     total = total
         .checked_add(List::<Subject>::worst_case(limits.objects)?)?
         .checked_add(List::<Id<Watching>>::worst_case(limits.watches)?)?;
-    total.checked_add(List::<jig_domain_client::contract::ObjectKey>::worst_case(limits.rows.checked_add(1)?)?)
+    total.checked_add(List::<jig_client_domain::contract::ObjectKey>::worst_case(limits.rows.checked_add(1)?)?)
 }
 #[must_use]
 pub fn max_out(limits: &Limits) -> u32 {
@@ -953,7 +950,7 @@ fn progress_changed(
 
 fn part_fits(part: &Part, rows: u32, text: u32) -> bool {
     match part {
-        Part::Resource { path, .. } => jig_domain_client::contract::resource_path_fits(path, rows, text),
+        Part::Resource { path, .. } => jig_client_domain::contract::resource_path_fits(path, rows, text),
         Part::Connector { .. }
         | Part::Kind { .. }
         | Part::Panel { .. }

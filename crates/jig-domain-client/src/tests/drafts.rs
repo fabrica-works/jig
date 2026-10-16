@@ -10,12 +10,12 @@ use crate::{
     address::{Address, Place},
     boundary::Offset,
     confirm::Missing,
-    contract::*,
     fields::Purpose,
     intents::Progress,
     objects::{Body, Object, Source},
     store::{Record, StoreKey},
 };
+use jig_client_domain::contract::*;
 use skein_lib::{Duration, Env, Id, List, Queue, Time, Token, Wall};
 fn install(domain: &mut Domain, document: Task) -> Id<Object> {
     let key = ObjectKey::Task(document.chip.task);
@@ -198,7 +198,7 @@ fn check_drafts_survive_pages_and_restart_evict_oldest_untouched_and_coalesce_on
         },
     );
     let Request::Open { watch, .. } = first[0] else { panic!("frame") };
-    custom(&mut domain, limits, Time::ZERO, Event::Hello { versions: VersionRange { first: 7, last: 7 } });
+    custom(&mut domain, limits, Time::ZERO, Event::Hello { served: true });
     custom(
         &mut domain,
         limits,
@@ -241,7 +241,7 @@ fn check_drafts_survive_pages_and_restart_evict_oldest_untouched_and_coalesce_on
     );
     assert!(restarted.fields().get(Purpose::Composer { task: 8 }).is_none());
     let Request::Open { watch, .. } = rows[0] else { panic!("frame") };
-    custom(&mut restarted, limits, Time::ZERO, Event::Hello { versions: VersionRange { first: 7, last: 7 } });
+    custom(&mut restarted, limits, Time::ZERO, Event::Hello { served: true });
     custom(
         &mut restarted,
         limits,

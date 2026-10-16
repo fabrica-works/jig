@@ -6,9 +6,10 @@ use super::{
     wire,
 };
 use crate::harness::ClientId;
+use jig_client_domain::contract as client;
 use jig_client_scripted_engine as admission;
 use jig_client_test_domain::{Answered, Event, connector_values::ConnectorLimits, family};
-use jig_domain_client::{Limits, contract as client};
+use jig_domain_client::Limits;
 use jig_domain_people as people;
 use jig_test_connector::ApplicationOutcome;
 use skein_lib::{RequestEnvelope, Token, Wall};

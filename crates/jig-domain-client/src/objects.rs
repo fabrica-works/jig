@@ -13,12 +13,11 @@
 //! | deciding | durable answer | refused or leaving | notice only if hidden |
 //! | leaving/looking | terminal document | leaving/ended | linger armed |
 //! | leaving | linger expires | gone | nothing |
-use crate::{
-    contract::{Chip, Ending, Escalation, ObjectKey, Outcome, PersonTask, Proposal, Question, Refusal, Result, Task},
-    intents::Progress,
-    watches::Watch,
-};
+use crate::{intents::Progress, watches::Watch};
 use alloc::boxed::Box;
+use jig_client_domain::contract::{
+    Chip, Ending, Escalation, ObjectKey, Outcome, PersonTask, Proposal, Question, Refusal, Result, Task,
+};
 use skein_lib::{Id, List, Map, Set, Slab, Time, Token};
 pub mod answer;
 pub mod escalation;
@@ -45,26 +44,26 @@ pub enum Body {
     /// The full task document.
     Task(Box<Task>),
     /// Whole historical owner facts for the original object identity.
-    Historical(Box<crate::contract::OwnerHistorical>),
+    Historical(Box<jig_client_domain::contract::OwnerHistorical>),
     /// A proposal document.
     Proposal(Box<Proposal>),
-    OwnerProposal(Box<crate::contract::OwnerProposal>),
+    OwnerProposal(Box<jig_client_domain::contract::OwnerProposal>),
     /// A held task escalation.
     Escalation(Box<Escalation>),
     /// A task owner’s whole escalation document.
-    OwnerEscalation(Box<crate::contract::OwnerEscalation>),
+    OwnerEscalation(Box<jig_client_domain::contract::OwnerEscalation>),
     /// A question.
     Question(Box<Question>),
     /// A person task.
     PersonTask(Box<PersonTask>),
     /// Pending owner person work.
-    OwnerPersonTask(Box<crate::contract::OwnerPersonTask>),
+    OwnerPersonTask(Box<jig_client_domain::contract::OwnerPersonTask>),
     /// A result.
     Result(Box<Result>),
     /// A note and the routing project of its page.
     Note {
         project: u32,
-        document: Box<crate::contract::Note>,
+        document: Box<jig_client_domain::contract::Note>,
     },
 }
 /// Why a card leaves, with durable facts preserved for its view.
@@ -77,9 +76,9 @@ pub enum Left {
     /// Its terminal document says how it ended.
     Ended { how: Ending },
     /// Its task owner supplies the complete ending independently of a result document.
-    OwnerEnded { how: Box<crate::contract::OwnerChipEnding> },
+    OwnerEnded { how: Box<jig_client_domain::contract::OwnerChipEnding> },
     /// Its whole historical terminal facts, independent of subsequent body refreshes.
-    Historical { facts: Box<crate::contract::OwnerHistorical> },
+    Historical { facts: Box<jig_client_domain::contract::OwnerHistorical> },
     /// Its terminal facts are no longer available.
     Unknown,
 }
@@ -96,7 +95,7 @@ pub enum Card {
     /// Refused, with facts kept on its card.
     Refused { refusal: Refusal },
     /// Retention ended without an answer; inspect the current object before acting again.
-    Unknown { act: crate::contract::ActKind, look: crate::contract::Read },
+    Unknown { act: jig_client_domain::contract::ActKind, look: jig_client_domain::contract::Read },
     /// Ended and still shown until its linger expires.
     Leaving { how: Left, until: Time },
 }
@@ -109,7 +108,7 @@ pub struct Object {
     pub sources: Set<Source>,
     pub card: Card,
     /// The last durable answer, also kept when the object remains open.
-    pub answer: Option<crate::contract::Answer>,
+    pub answer: Option<jig_client_domain::contract::Answer>,
     /// Whether this card belongs to the current page, even after a source drops it.
     pub shown: bool,
     /// Navigation facts for an unread reply on this chat.
@@ -237,12 +236,16 @@ impl Objects {
         match &body {
             Body::Historical(value) => {
                 let project = match &value.value {
-                    crate::contract::OwnerHistoricalValue::Task { document, .. } => Some(document.project),
-                    crate::contract::OwnerHistoricalValue::PersonProposal { proposal, .. } => Some(proposal.project),
-                    crate::contract::OwnerHistoricalValue::Escalation { task, .. } => Some(task.project),
-                    crate::contract::OwnerHistoricalValue::PersonTask { document, .. } => document.project(),
-                    crate::contract::OwnerHistoricalValue::Proposal(_)
-                    | crate::contract::OwnerHistoricalValue::Question { .. } => None,
+                    jig_client_domain::contract::OwnerHistoricalValue::Task { document, .. } => Some(document.project),
+                    jig_client_domain::contract::OwnerHistoricalValue::PersonProposal { proposal, .. } => {
+                        Some(proposal.project)
+                    }
+                    jig_client_domain::contract::OwnerHistoricalValue::Escalation { task, .. } => Some(task.project),
+                    jig_client_domain::contract::OwnerHistoricalValue::PersonTask { document, .. } => {
+                        document.project()
+                    }
+                    jig_client_domain::contract::OwnerHistoricalValue::Proposal(_)
+                    | jig_client_domain::contract::OwnerHistoricalValue::Question { .. } => None,
                 };
                 if let Some(project) = project {
                     object.project = Some(project);
@@ -399,7 +402,12 @@ impl Objects {
         }
     }
     /// Holds a note from its bounded page as a card with its own recalled revision.
-    pub fn note(&mut self, project: u32, source: Source, document: crate::contract::Note) -> Option<Id<Object>> {
+    pub fn note(
+        &mut self,
+        project: u32,
+        source: Source,
+        document: jig_client_domain::contract::Note,
+    ) -> Option<Id<Object>> {
         let key = ObjectKey::Note { project, note: document.number };
         let id = self.name(key, source)?;
         let stored = self.put(key, Body::Note { project, document: Box::new(document) });
@@ -407,7 +415,7 @@ impl Objects {
         Some(id)
     }
     /// Attaches a chat's reply navigation without replacing its task facts or card.
-    pub fn reply(&mut self, source: Source, line: crate::contract::ConversationLine) -> Option<Id<Object>> {
+    pub fn reply(&mut self, source: Source, line: jig_client_domain::contract::ConversationLine) -> Option<Id<Object>> {
         let key = ObjectKey::Task(line.chip.task);
         let Some(reply) = result::Reply::from_line(line) else {
             if let Some(id) = self.find(key) {
@@ -465,8 +473,8 @@ pub fn stops_waiting(key: ObjectKey, outcome: &Outcome) -> bool {
     }
 }
 
-fn delivered_name(value: &crate::contract::Delivery, key: ObjectKey) -> Option<bool> {
-    use crate::contract::Delivery;
+fn delivered_name(value: &jig_client_domain::contract::Delivery, key: ObjectKey) -> Option<bool> {
+    use jig_client_domain::contract::Delivery;
     match value {
         Delivery::OwnerProject(_)
         | Delivery::Frame(_)
@@ -568,28 +576,28 @@ fn delivered_name(value: &crate::contract::Delivery, key: ObjectKey) -> Option<b
     }
 }
 /// Protects disappearing cards before the source replacement prunes its names.
-pub(crate) fn dropping(domain: &mut crate::Domain, watch: Id<Watch>, value: &crate::contract::Delivery) {
+pub(crate) fn dropping(domain: &mut crate::Domain, watch: Id<Watch>, value: &jig_client_domain::contract::Delivery) {
     match value {
-        crate::contract::Delivery::Conversations(_) => {
+        jig_client_domain::contract::Delivery::Conversations(_) => {
             if !domain.conversation_rows.edges.reaches(crate::action::End::Before) {
                 return;
             }
         }
-        crate::contract::Delivery::Frame(_)
-        | crate::contract::Delivery::Run(_)
-        | crate::contract::Delivery::RunState(_)
-        | crate::contract::Delivery::Deployment(_)
-        | crate::contract::Delivery::OwnerDeployment(_)
-        | crate::contract::Delivery::Task(_)
-        | crate::contract::Delivery::Tree(_)
-        | crate::contract::Delivery::OwnerTree(_)
-        | crate::contract::Delivery::OwnerProject(_)
-        | crate::contract::Delivery::OwnerProposal(_)
-        | crate::contract::Delivery::Chips(_)
-        | crate::contract::Delivery::Inbox(_)
-        | crate::contract::Delivery::OwnerInbox(_)
-        | crate::contract::Delivery::Goals(_)
-        | crate::contract::Delivery::Tasks(_) => {}
+        jig_client_domain::contract::Delivery::Frame(_)
+        | jig_client_domain::contract::Delivery::Run(_)
+        | jig_client_domain::contract::Delivery::RunState(_)
+        | jig_client_domain::contract::Delivery::Deployment(_)
+        | jig_client_domain::contract::Delivery::OwnerDeployment(_)
+        | jig_client_domain::contract::Delivery::Task(_)
+        | jig_client_domain::contract::Delivery::Tree(_)
+        | jig_client_domain::contract::Delivery::OwnerTree(_)
+        | jig_client_domain::contract::Delivery::OwnerProject(_)
+        | jig_client_domain::contract::Delivery::OwnerProposal(_)
+        | jig_client_domain::contract::Delivery::Chips(_)
+        | jig_client_domain::contract::Delivery::Inbox(_)
+        | jig_client_domain::contract::Delivery::OwnerInbox(_)
+        | jig_client_domain::contract::Delivery::Goals(_)
+        | jig_client_domain::contract::Delivery::Tasks(_) => {}
     }
     let source = Source::Watch(watch);
     for (key, id) in &domain.objects.index {
@@ -621,8 +629,8 @@ pub(crate) fn ending_source(domain: &mut crate::Domain, watch: Id<Watch>) {
         }
     }
 }
-pub(crate) fn document_read(key: ObjectKey) -> crate::contract::Read {
-    use crate::contract::Read;
+pub(crate) fn document_read(key: ObjectKey) -> jig_client_domain::contract::Read {
+    use jig_client_domain::contract::Read;
     match key {
         ObjectKey::Task(task) => Read::Task { task },
         ObjectKey::Proposal(proposal) => Read::Proposal { proposal },
@@ -630,9 +638,11 @@ pub(crate) fn document_read(key: ObjectKey) -> crate::contract::Read {
         ObjectKey::Question { task, message } => Read::Question { task, message },
         ObjectKey::PersonTask(task) => Read::PersonTask { task },
         ObjectKey::Result(task) => Read::Result { task },
-        ObjectKey::Note { project, .. } => {
-            Read::Notes { scope: crate::contract::NoteScope::Project(project), description: None, after: None }
-        }
+        ObjectKey::Note { project, .. } => Read::Notes {
+            scope: jig_client_domain::contract::NoteScope::Project(project),
+            description: None,
+            after: None,
+        },
     }
 }
 /// Requests terminal facts for leaving cards, without inventing an ending.
@@ -656,7 +666,7 @@ pub(crate) fn read_dropped(domain: &mut crate::Domain, out: &mut skein_lib::Queu
                 let read = domain.reads.ask(domain.generation, Source::Card(*id), what, out);
                 if read.is_none() {
                     domain.objects.slab.get_mut(*id).expect("indexed object exists").card =
-                        Card::Refused { refusal: Refusal::Limit { which: crate::contract::Limit::Reads } };
+                        Card::Refused { refusal: Refusal::Limit { which: jig_client_domain::contract::Limit::Reads } };
                 }
             }
         }
@@ -664,8 +674,8 @@ pub(crate) fn read_dropped(domain: &mut crate::Domain, out: &mut skein_lib::Queu
     domain.changed();
 }
 /// Recognises a terminal read owned by a lingering card.
-fn read_key(what: &crate::contract::Read) -> Option<ObjectKey> {
-    use crate::contract::Read;
+fn read_key(what: &jig_client_domain::contract::Read) -> Option<ObjectKey> {
+    use jig_client_domain::contract::Read;
     match what {
         Read::Task { task } => Some(ObjectKey::Task(*task)),
         Read::Proposal { proposal } => Some(ObjectKey::Proposal(*proposal)),
@@ -723,10 +733,10 @@ pub(crate) fn read_card(
     domain: &mut crate::Domain,
     env: &skein_lib::Env<crate::Limits>,
     token: Token,
-    result: crate::contract::ReadResult,
+    result: jig_client_domain::contract::ReadResult,
     out: &mut skein_lib::Queue<crate::Request>,
 ) {
-    use crate::contract::{ReadNone, ReadResult};
+    use jig_client_domain::contract::{ReadNone, ReadResult};
     if let Some(value) = historical_read(&result) {
         let Some(read) = domain.reads.slab.get(Id::from_token(token)) else {
             return;
@@ -861,8 +871,10 @@ fn finish_read_card(domain: &mut crate::Domain, id: Id<Object>, leaving: bool, r
     domain.changed();
 }
 /// The supplied whole historical value, without interpreting any other read.
-pub(crate) fn historical_read(result: &crate::contract::ReadResult) -> Option<&crate::contract::OwnerHistorical> {
-    use crate::contract::{ReadResult, ReadValue};
+pub(crate) fn historical_read(
+    result: &jig_client_domain::contract::ReadResult,
+) -> Option<&jig_client_domain::contract::OwnerHistorical> {
+    use jig_client_domain::contract::{ReadResult, ReadValue};
     match result {
         ReadResult::Value(value) => match value {
             ReadValue::Historical(value) => Some(value),
@@ -895,8 +907,8 @@ pub(crate) fn historical_read(result: &crate::contract::ReadResult) -> Option<&c
         ReadResult::None(_) => None,
     }
 }
-fn read_body(key: ObjectKey, value: crate::contract::ReadValue) -> Option<Body> {
-    use crate::contract::ReadValue;
+fn read_body(key: ObjectKey, value: jig_client_domain::contract::ReadValue) -> Option<Body> {
+    use jig_client_domain::contract::ReadValue;
     match value {
         ReadValue::Historical(value) => {
             if value.matches(key) {
@@ -1006,8 +1018,12 @@ impl Body {
     pub fn terminal(&self) -> Option<Left> {
         match self {
             Self::Task(task) => match &task.result {
-                Some(crate::contract::TaskResult::Ending(how)) => Some(Left::OwnerEnded { how: how.clone() }),
-                Some(crate::contract::TaskResult::Document(result)) => Some(Left::Ended { how: result.ending.clone() }),
+                Some(jig_client_domain::contract::TaskResult::Ending(how)) => {
+                    Some(Left::OwnerEnded { how: how.clone() })
+                }
+                Some(jig_client_domain::contract::TaskResult::Document(result)) => {
+                    Some(Left::Ended { how: result.ending.clone() })
+                }
                 None => None,
             },
             Self::Historical(value) => {
@@ -1037,8 +1053,8 @@ impl Body {
     pub fn ending(&self) -> Option<&Ending> {
         match self {
             Self::Task(task) => match &task.result {
-                Some(crate::contract::TaskResult::Document(result)) => Some(&result.ending),
-                Some(crate::contract::TaskResult::Ending(_)) | None => None,
+                Some(jig_client_domain::contract::TaskResult::Document(result)) => Some(&result.ending),
+                Some(jig_client_domain::contract::TaskResult::Ending(_)) | None => None,
             },
             Self::Proposal(proposal) => proposal.ending.as_ref(),
             Self::Question(question) => question.ending.as_ref(),
@@ -1062,10 +1078,10 @@ pub struct Context {
     pub project: u32,
 }
 /// Copies bounded inbox routing facts before its delivery is consumed.
-pub(crate) fn contexts(value: &crate::contract::Delivery, capacity: u32) -> List<Context> {
+pub(crate) fn contexts(value: &jig_client_domain::contract::Delivery, capacity: u32) -> List<Context> {
     let mut rows = List::with_capacity(capacity);
     match value {
-        crate::contract::Delivery::OwnerInbox(inbox) => {
+        jig_client_domain::contract::Delivery::OwnerInbox(inbox) => {
             for entries in [&inbox.needs, &inbox.updates] {
                 for entry in entries {
                     if let Some(project) = entry.project
@@ -1076,33 +1092,33 @@ pub(crate) fn contexts(value: &crate::contract::Delivery, capacity: u32) -> List
                 }
             }
         }
-        crate::contract::Delivery::Inbox(inbox) => {
+        jig_client_domain::contract::Delivery::Inbox(inbox) => {
             for entry in &inbox.entries {
                 if rows.push(Context { object: entry.object, project: entry.project }).is_err() {
                     break;
                 }
             }
         }
-        crate::contract::Delivery::Tasks(tasks) => {
+        jig_client_domain::contract::Delivery::Tasks(tasks) => {
             for row in &tasks.rows {
                 if rows.push(Context { object: ObjectKey::Task(row.chip.task), project: tasks.project }).is_err() {
                     break;
                 }
             }
         }
-        crate::contract::Delivery::Frame(_)
-        | crate::contract::Delivery::Task(_)
-        | crate::contract::Delivery::OwnerProject(_)
-        | crate::contract::Delivery::OwnerProposal(_)
-        | crate::contract::Delivery::Tree(_)
-        | crate::contract::Delivery::OwnerTree(_)
-        | crate::contract::Delivery::Chips(_)
-        | crate::contract::Delivery::Goals(_)
-        | crate::contract::Delivery::Conversations(_)
-        | crate::contract::Delivery::Run(_)
-        | crate::contract::Delivery::RunState(_)
-        | crate::contract::Delivery::Deployment(_)
-        | crate::contract::Delivery::OwnerDeployment(_) => {}
+        jig_client_domain::contract::Delivery::Frame(_)
+        | jig_client_domain::contract::Delivery::Task(_)
+        | jig_client_domain::contract::Delivery::OwnerProject(_)
+        | jig_client_domain::contract::Delivery::OwnerProposal(_)
+        | jig_client_domain::contract::Delivery::Tree(_)
+        | jig_client_domain::contract::Delivery::OwnerTree(_)
+        | jig_client_domain::contract::Delivery::Chips(_)
+        | jig_client_domain::contract::Delivery::Goals(_)
+        | jig_client_domain::contract::Delivery::Conversations(_)
+        | jig_client_domain::contract::Delivery::Run(_)
+        | jig_client_domain::contract::Delivery::RunState(_)
+        | jig_client_domain::contract::Delivery::Deployment(_)
+        | jig_client_domain::contract::Delivery::OwnerDeployment(_) => {}
     }
     rows
 }

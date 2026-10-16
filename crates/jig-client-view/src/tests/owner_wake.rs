@@ -6,7 +6,7 @@ use skein_ui::phrases::{
 };
 use skein_ui::{Builder, Role, Tree};
 
-use jig_domain_client::contract::{
+use jig_client_domain::contract::{
     OwnerWakePolicy, ResultsWake, Subscription, SubscriptionKind, Subscriptions, WakeRule,
 };
 use skein_lib::{Duration, List, Wall};

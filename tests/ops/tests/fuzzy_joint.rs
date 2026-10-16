@@ -565,7 +565,7 @@ fn assert_durable_end(
                 pool: environment.pool.clone(),
                 name: environment.name.clone(),
             },
-            revision: jig_domain_client::contract::Revision { value: 0 },
+            revision: jig_client_domain::contract::Revision { value: 0 },
             until: 1_209_600,
         })
         .expect("the protocol hash includes all supplied owner facts, independent of the local view handle");

@@ -13,9 +13,9 @@
 //! | retention expired | unknown, inspect address | notice if hidden |
 use crate::{
     Domain, Request,
-    contract::{ActKind, Answer, Limit, ObjectKey, Refusal},
     objects::{Card, Object, Source},
 };
+use jig_client_domain::contract::{ActKind, Answer, Limit, ObjectKey, Refusal};
 use skein_lib::{Id, Queue};
 /// The useful next actions from a factual refusal, never an authority judgment.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -106,7 +106,7 @@ fn current_facts(domain: &mut Domain, id: Id<Object>, out: &mut Queue<Request>) 
         crate::notices::show(domain, crate::notices::Kind::Refused(Limit::Reads));
     }
 }
-fn stops_waiting(key: ObjectKey, act: ActKind, outcome: &crate::contract::Outcome) -> bool {
+fn stops_waiting(key: ObjectKey, act: ActKind, outcome: &jig_client_domain::contract::Outcome) -> bool {
     if act == ActKind::Take || act == ActKind::HandBack {
         return false;
     }

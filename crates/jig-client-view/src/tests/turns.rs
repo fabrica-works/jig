@@ -10,11 +10,11 @@ use super::{
     work_pages::{entered, list, part},
 };
 use crate::words::Words;
+use jig_client_domain::contract::*;
 use jig_domain_client::{
     Domain, Event, Request,
     action::Act,
     address::{Address, TaskSection},
-    contract::*,
     fields::Purpose,
 };
 use skein_lib::{Token, Wall};

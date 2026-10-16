@@ -1,7 +1,7 @@
 //! Scalar configured order rows; the surrounding list prices its full capacity.
 use super::Payload;
 use crate::Bounds;
-use jig_domain_client::contract::OwnerKindImplication;
+use jig_client_domain::contract::OwnerKindImplication;
 
 impl Payload for OwnerKindImplication {
     fn heap(&self, _bounds: &Bounds) -> Option<u64> {

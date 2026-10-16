@@ -1,4 +1,4 @@
-use crate::contract::*;
+use jig_client_domain::contract::*;
 use skein_lib::{List, Wall};
 
 pub(super) fn details() -> OwnerChipDetails {

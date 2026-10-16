@@ -2,13 +2,8 @@
 //! Reads use the page generation's activity source; stale terminals stay outside
 //! this module. The root only carries the resulting reads, names and parts.
 //! See client/domain/client.md, 10, and contract.md, 6 and 7.3.
-use crate::{
-    Domain, Request,
-    action::End,
-    contract::{ActivityPage, Executor, Limit, Read, RunText, Runtime, Subject, Task},
-    objects::Source,
-    watches::Watch,
-};
+use crate::{Domain, Request, action::End, objects::Source, watches::Watch};
+use jig_client_domain::contract::{ActivityPage, Executor, Limit, Read, RunText, Runtime, Subject, Task};
 use skein_lib::{Env, Id, Queue, Token};
 /// The activity window binding, independent of a watch's slab token.
 pub const ACTIVITY_WINDOW: u64 = 1;
@@ -47,9 +42,9 @@ pub(crate) fn document(domain: &mut Domain, task: &Task, out: &mut Queue<Request
             Runtime::Running { .. } | Runtime::WaitingForWords { .. } => false,
             Runtime::Closing(value) => closing_finished(value.stage),
             Runtime::Held { was } => match was {
-                Some(crate::contract::HeldRuntime::Waiting) => true,
-                Some(crate::contract::HeldRuntime::Active(value)) => active_finished(&value.stage),
-                Some(crate::contract::HeldRuntime::Closing(value)) => closing_finished(value.stage),
+                Some(jig_client_domain::contract::HeldRuntime::Waiting) => true,
+                Some(jig_client_domain::contract::HeldRuntime::Active(value)) => active_finished(&value.stage),
+                Some(jig_client_domain::contract::HeldRuntime::Closing(value)) => closing_finished(value.stage),
                 None => false,
             },
             Runtime::Waiting { .. }
@@ -61,19 +56,21 @@ pub(crate) fn document(domain: &mut Domain, task: &Task, out: &mut Queue<Request
             | Runtime::Ended => true,
         },
         None => match task.chip.details.as_ref() {
-            crate::contract::ChipPhase::Owner { phase, details } => owner_finished(phase, details.hold.as_ref()),
-            crate::contract::ChipPhase::Waiting { .. }
-            | crate::contract::ChipPhase::Idle { .. }
-            | crate::contract::ChipPhase::Starting
-            | crate::contract::ChipPhase::Active(_)
-            | crate::contract::ChipPhase::Running { .. }
-            | crate::contract::ChipPhase::WaitingForWords { .. }
-            | crate::contract::ChipPhase::BackingOff { .. }
-            | crate::contract::ChipPhase::Procedure { .. }
-            | crate::contract::ChipPhase::Person { .. }
-            | crate::contract::ChipPhase::Closing(_)
-            | crate::contract::ChipPhase::Held { .. }
-            | crate::contract::ChipPhase::Ended { .. } => false,
+            jig_client_domain::contract::ChipPhase::Owner { phase, details } => {
+                owner_finished(phase, details.hold.as_ref())
+            }
+            jig_client_domain::contract::ChipPhase::Waiting { .. }
+            | jig_client_domain::contract::ChipPhase::Idle { .. }
+            | jig_client_domain::contract::ChipPhase::Starting
+            | jig_client_domain::contract::ChipPhase::Active(_)
+            | jig_client_domain::contract::ChipPhase::Running { .. }
+            | jig_client_domain::contract::ChipPhase::WaitingForWords { .. }
+            | jig_client_domain::contract::ChipPhase::BackingOff { .. }
+            | jig_client_domain::contract::ChipPhase::Procedure { .. }
+            | jig_client_domain::contract::ChipPhase::Person { .. }
+            | jig_client_domain::contract::ChipPhase::Closing(_)
+            | jig_client_domain::contract::ChipPhase::Held { .. }
+            | jig_client_domain::contract::ChipPhase::Ended { .. } => false,
         },
     };
     let what = domain.conversation.moved(task.activity);
@@ -100,12 +97,14 @@ fn working_set(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Queue<Re
     let keys = domain.conversation.names(env.limits.objects);
     for key in &keys {
         match key {
-            crate::contract::ObjectKey::Task(_) | crate::contract::ObjectKey::Result(_) => continue,
-            crate::contract::ObjectKey::Proposal(_)
-            | crate::contract::ObjectKey::Escalation(_)
-            | crate::contract::ObjectKey::Question { .. }
-            | crate::contract::ObjectKey::PersonTask(_)
-            | crate::contract::ObjectKey::Note { .. } => {}
+            jig_client_domain::contract::ObjectKey::Task(_) | jig_client_domain::contract::ObjectKey::Result(_) => {
+                continue;
+            }
+            jig_client_domain::contract::ObjectKey::Proposal(_)
+            | jig_client_domain::contract::ObjectKey::Escalation(_)
+            | jig_client_domain::contract::ObjectKey::Question { .. }
+            | jig_client_domain::contract::ObjectKey::PersonTask(_)
+            | jig_client_domain::contract::ObjectKey::Note { .. } => {}
         }
         let Some(id) = domain.objects.find(*key) else {
             continue;
@@ -118,43 +117,47 @@ fn working_set(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Queue<Re
     let parts = domain.conversation.parts(env.limits.parts);
     crate::pages::routing::parts(domain, env, parts.as_slice(), out);
 }
-fn active_finished(stage: &crate::contract::RunStage) -> bool {
+fn active_finished(stage: &jig_client_domain::contract::RunStage) -> bool {
     match stage {
-        crate::contract::RunStage::Claimed { .. } | crate::contract::RunStage::Running { .. } => false,
-        crate::contract::RunStage::Idle
-        | crate::contract::RunStage::Due
-        | crate::contract::RunStage::Preparing
-        | crate::contract::RunStage::BackingOff { .. } => true,
+        jig_client_domain::contract::RunStage::Claimed { .. }
+        | jig_client_domain::contract::RunStage::Running { .. } => false,
+        jig_client_domain::contract::RunStage::Idle
+        | jig_client_domain::contract::RunStage::Due
+        | jig_client_domain::contract::RunStage::Preparing
+        | jig_client_domain::contract::RunStage::BackingOff { .. } => true,
     }
 }
 // Absence of the joined closing stage is not evidence that the live run ended.
-fn closing_finished(stage: Option<crate::contract::ClosingStage>) -> bool {
+fn closing_finished(stage: Option<jig_client_domain::contract::ClosingStage>) -> bool {
     match stage {
-        None | Some(crate::contract::ClosingStage::Run { .. }) => false,
+        None | Some(jig_client_domain::contract::ClosingStage::Run { .. }) => false,
         Some(
-            crate::contract::ClosingStage::Delegates
-            | crate::contract::ClosingStage::Effects
-            | crate::contract::ClosingStage::Releases
-            | crate::contract::ClosingStage::Settled,
+            jig_client_domain::contract::ClosingStage::Delegates
+            | jig_client_domain::contract::ClosingStage::Effects
+            | jig_client_domain::contract::ClosingStage::Releases
+            | jig_client_domain::contract::ClosingStage::Settled,
         ) => true,
     }
 }
 // Only the supplied lifecycle and prior stages attest whether the live run finished.
-fn owner_finished(phase: &crate::contract::OwnerChipPhase, hold: Option<&crate::contract::OwnerChipHold>) -> bool {
+fn owner_finished(
+    phase: &jig_client_domain::contract::OwnerChipPhase,
+    hold: Option<&jig_client_domain::contract::OwnerChipHold>,
+) -> bool {
     match phase {
-        crate::contract::OwnerChipPhase::Active(stage) => active_finished(stage),
-        crate::contract::OwnerChipPhase::Closing(stage) => closing_finished(Some(*stage)),
-        crate::contract::OwnerChipPhase::Held { .. } => match hold {
+        jig_client_domain::contract::OwnerChipPhase::Active(stage) => active_finished(stage),
+        jig_client_domain::contract::OwnerChipPhase::Closing(stage) => closing_finished(Some(*stage)),
+        jig_client_domain::contract::OwnerChipPhase::Held { .. } => match hold {
             Some(hold) => match hold.before {
-                crate::contract::OwnerPriorPhase::Waiting => true,
-                crate::contract::OwnerPriorPhase::Active(stage) => active_finished(&stage),
-                crate::contract::OwnerPriorPhase::Closing(stage) => closing_finished(Some(stage)),
+                jig_client_domain::contract::OwnerPriorPhase::Waiting => true,
+                jig_client_domain::contract::OwnerPriorPhase::Active(stage) => active_finished(&stage),
+                jig_client_domain::contract::OwnerPriorPhase::Closing(stage) => closing_finished(Some(stage)),
             },
             None => false,
         },
-        crate::contract::OwnerChipPhase::Waiting { .. }
-        | crate::contract::OwnerChipPhase::Person { .. }
-        | crate::contract::OwnerChipPhase::Ended => true,
+        jig_client_domain::contract::OwnerChipPhase::Waiting { .. }
+        | jig_client_domain::contract::OwnerChipPhase::Person { .. }
+        | jig_client_domain::contract::OwnerChipPhase::Ended => true,
     }
 }
 fn finish(domain: &mut Domain) {
@@ -224,7 +227,7 @@ pub(crate) fn fold(domain: &mut Domain, name: super::CallName, open: bool) {
 }
 
 /// Raw provider identities never match a committed transcript call number.
-pub(crate) fn fold_current(domain: &mut Domain, identity: crate::contract::CallIdentity, open: bool) {
+pub(crate) fn fold_current(domain: &mut Domain, identity: jig_client_domain::contract::CallIdentity, open: bool) {
     let fold = if open { super::Fold::Open } else { super::Fold::Folded };
     if domain.conversation.set_current_fold(identity, fold) {
         domain.changed();
@@ -237,7 +240,7 @@ pub(crate) fn run_state(
     domain: &mut Domain,
     env: &Env<crate::Limits>,
     watch: Id<Watch>,
-    value: crate::contract::RunState,
+    value: jig_client_domain::contract::RunState,
     out: &mut Queue<Request>,
 ) {
     let Some(following) = domain.watches.get(watch) else {

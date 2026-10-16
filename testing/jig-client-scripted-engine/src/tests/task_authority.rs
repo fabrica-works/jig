@@ -2,7 +2,7 @@
 use super::*;
 use crate::payload::{self, Payload};
 use core::mem::size_of;
-use jig_domain_client::contract::OwnerKindImplication;
+use jig_client_domain::contract::OwnerKindImplication;
 
 fn supplied() -> OwnerAuthorityDocument {
     let mut segments = List::with_capacity(2);
@@ -87,7 +87,7 @@ fn amendment_receiving_prices_reserved_kind_order_rows_and_refuses_the_whole_ove
             implications.push(entry).unwrap();
             implications.push(entry).unwrap();
         }
-        let value = jig_domain_client::contract::Bounds::Amend {
+        let value = jig_client_domain::contract::Bounds::Amend {
             budget_left: u64::MAX,
             grants: row.authority.grants.clone(),
             implications,
@@ -97,14 +97,14 @@ fn amendment_receiving_prices_reserved_kind_order_rows_and_refuses_the_whole_ove
         let before = value.clone();
         let mut bounds = Bounds { rows: 2, text: 32, document_bytes: u64::MAX, ..Bounds::default() };
         let bytes =
-            u64::try_from(size_of::<jig_domain_client::contract::Bounds>()).unwrap() + value.heap(&bounds).unwrap();
+            u64::try_from(size_of::<jig_client_domain::contract::Bounds>()).unwrap() + value.heap(&bounds).unwrap();
         bounds.document_bytes = bytes;
         assert!(payload::fits(&value, &bounds));
         bounds.document_bytes -= 1;
         assert!(!payload::fits(&value, &bounds));
         bounds.document_bytes = u64::MAX;
         let mut oversized = value.clone();
-        let jig_domain_client::contract::Bounds::Amend { implications, .. } = &mut oversized else {
+        let jig_client_domain::contract::Bounds::Amend { implications, .. } = &mut oversized else {
             panic!("whole offer")
         };
         *implications = List::with_capacity(3);
@@ -112,7 +112,7 @@ fn amendment_receiving_prices_reserved_kind_order_rows_and_refuses_the_whole_ove
         bounds.rows = 1;
         assert!(!payload::fits(&value, &bounds));
         assert_eq!(value, before);
-        let jig_domain_client::contract::Bounds::Amend { implications, .. } = value else { panic!("whole offer") };
+        let jig_client_domain::contract::Bounds::Amend { implications, .. } = value else { panic!("whole offer") };
         assert_eq!(implications.capacity(), 2);
         assert_eq!(implications.len(), if filled { 2 } else { 0 });
     }

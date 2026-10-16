@@ -7,10 +7,10 @@ use crate::words::Words;
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role};
 
+use jig_client_domain::contract::Chip;
 use jig_domain_client::{
     Domain,
     action::Act,
-    contract::Chip,
     objects::{Card, Left, Object},
 };
 use skein_lib::{Id, List};
@@ -197,10 +197,10 @@ pub fn card(
                     words.text(b, JigPhrase::NoteReferencesCut, &[]);
                 }
                 match document.writer {
-                    jig_domain_client::contract::NoteAuthor::Party { party } => {
+                    jig_client_domain::contract::NoteAuthor::Party { party } => {
                         words.text(b, JigPhrase::NoteWriterParty, &[Hole::Number(party)]);
                     }
-                    jig_domain_client::contract::NoteAuthor::Task { task, attempt } => {
+                    jig_client_domain::contract::NoteAuthor::Task { task, attempt } => {
                         words.text(b, JigPhrase::NoteWriterTask, &[Hole::Number(task), Hole::Number(attempt)]);
                     }
                 }
@@ -253,7 +253,7 @@ fn received_card(
     None
 }
 /// A refusal without a current object remains a named card of its whole facts.
-pub fn refusal(b: &mut Builder, refusal: &jig_domain_client::contract::Refusal, words: &Words) {
+pub fn refusal(b: &mut Builder, refusal: &jig_client_domain::contract::Refusal, words: &Words) {
     b.open(Role::Region);
     b.name(&words.say(JigPhrase::Refused, &[]));
     words.refusal(b, refusal);

@@ -1,7 +1,8 @@
 //! Reads wait for one terminal and retain abandoned obligations until it arrives.
 //! A full slab refuses in place. A receipt from an old generation is discarded,
 //! never routed into a new page. See client/domain/client.md, 7.
-use crate::{boundary::Request, contract::Read, facts::Fact, objects::Source};
+use crate::{boundary::Request, facts::Fact, objects::Source};
+use jig_client_domain::contract::Read;
 use skein_lib::{Id, Map, Queue, Slab, Token};
 
 /// One read obligation, whose document is expected by its source.
@@ -51,7 +52,7 @@ impl Reads {
                 Some(id)
             }
             Err(_) => {
-                out.push(Request::Fact { fact: Fact::Refused { which: crate::contract::Limit::Reads } });
+                out.push(Request::Fact { fact: Fact::Refused { which: jig_client_domain::contract::Limit::Reads } });
                 None
             }
         }

@@ -1,12 +1,12 @@
 //! Committed inbox facts for the renderer's page goldens.
 use super::{held_chat, proposal_world, task, text};
 use crate::{Scripted, Test, World, test};
-use jig_client_scripted_engine::{Change, Rows, Source};
-use jig_domain_client::contract::{
+use jig_client_domain::contract::{
     self as c, Actor, ConversationLine, Count, DocumentText, Ending, Executor, InboxEntry, InboxGroup, InboxReadGroup,
     Needs, ObjectKey, OwnerEscalation, OwnerRequester, PersonContract, PersonTask, Phase, Question, Read, ReadValue,
     Recipient, ResultValue, Revision, Runtime,
 };
+use jig_client_scripted_engine::{Change, Rows, Source};
 use skein_lib::{Time, Wall};
 /// Enough distinct objects for an inbox containing every entry kind.
 #[must_use]

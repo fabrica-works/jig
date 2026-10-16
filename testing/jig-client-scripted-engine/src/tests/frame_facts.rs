@@ -3,7 +3,7 @@ use crate::{
     Bounds,
     payload::{Payload, fits},
 };
-use jig_domain_client::contract::*;
+use jig_client_domain::contract::*;
 use skein_lib::{List, Wall};
 #[test]
 fn frame_prices_all_reserved_memberships_offers_and_optional_document_text() {

@@ -2,7 +2,7 @@
 //! Every reserved list, chip, dependency and cursor allocation is charged.
 use crate::{Bounds, payload::Payload};
 use core::mem::size_of;
-use jig_domain_client::contract::{OwnerTree, OwnerTreeFold, OwnerTreeRow};
+use jig_client_domain::contract::{OwnerTree, OwnerTreeFold, OwnerTreeRow};
 impl Payload for OwnerTreeRow {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         self.chip.heap(bounds)?.checked_add(self.proposals.heap(bounds)?)?.checked_add(self.dependencies.heap(bounds)?)

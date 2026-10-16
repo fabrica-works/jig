@@ -4,7 +4,7 @@ use crate::{
     store::{Key, Record},
 };
 use alloc::boxed::Box;
-use jig_domain_client::contract::{Ask as JigAsk, Read, Subject};
+use jig_client_domain::contract::{Ask as JigAsk, Read, Subject};
 use skein_lib::{List, RequestEnvelope, RequestKey, Token};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Ask {
@@ -13,7 +13,7 @@ pub enum Ask {
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Answered {
-    Jig(jig_domain_client::contract::Answer),
+    Jig(jig_client_domain::contract::Answer),
     First(first::Answer),
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -37,7 +37,7 @@ pub enum JigOut {
     Open { watch: Token, subject: Subject },
     Continue { watch: Token, subject: Subject },
     Close { watch: Token },
-    Answered { asked: Token, answer: jig_domain_client::contract::Answer },
+    Answered { asked: Token, answer: jig_client_domain::contract::Answer },
     Unknown { asked: Token },
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

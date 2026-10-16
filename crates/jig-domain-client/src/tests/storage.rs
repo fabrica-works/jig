@@ -3,11 +3,11 @@ use crate::{
     Domain, Event, Request,
     action::End,
     address::{Address, Place, TaskSection},
-    contract::*,
     objects::{Card, Objects, Source},
     reads::Reads,
     windows::*,
 };
+use jig_client_domain::contract::*;
 use skein_lib::{List, Queue, Time, Token, Wall};
 
 fn rows<T>(values: impl IntoIterator<Item = T>) -> List<T> {

@@ -1,7 +1,7 @@
 //! One malformed archive among committed turns, decoded by the joint translation.
 use super::{chat_ready, text};
 use crate::{Scripted, Test, World, joint::wire::activity, test::list};
-use jig_domain_client::contract::*;
+use jig_client_domain::contract::*;
 use skein_lib::Wall;
 
 fn readable(number: u32, words: &[u8]) -> ActivityLine {

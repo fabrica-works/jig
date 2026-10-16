@@ -4,8 +4,8 @@ use skein_lib::{Time, Wall};
 use skein_world::domain::heap::Counting;
 #[global_allocator]
 static HEAP: Counting = Counting;
-fn full_contract() -> jig_domain_client::contract::TaskContractDocument {
-    use jig_domain_client::contract::{FieldRule, TaskContractDocument, VerdictChoice};
+fn full_contract() -> jig_client_domain::contract::TaskContractDocument {
+    use jig_client_domain::contract::{FieldRule, TaskContractDocument, VerdictChoice};
     let fields = jig_client_world::test::list([
         FieldRule { name: vec![0xff; 32].into_boxed_slice(), max: u32::MAX },
         FieldRule { name: vec![0xfe; 32].into_boxed_slice(), max: u32::MAX },
@@ -13,8 +13,8 @@ fn full_contract() -> jig_domain_client::contract::TaskContractDocument {
     let choice = VerdictChoice { code: u32::MAX, words: u32::MAX, followups: u32::MAX, fields };
     TaskContractDocument::Verdict { choices: jig_client_world::test::list([choice.clone(), choice]), cut: true }
 }
-fn full_authority() -> jig_domain_client::contract::OwnerAuthorityDocument {
-    use jig_domain_client::contract::{
+fn full_authority() -> jig_client_domain::contract::OwnerAuthorityDocument {
+    use jig_client_domain::contract::{
         OwnerAuthority, OwnerAuthorityDocument, OwnerAuthorityExecutor, OwnerDelegation, OwnerGrant, OwnerPattern,
         OwnerPatternEnd, OwnerResourceScope,
     };
@@ -44,65 +44,65 @@ fn full_authority() -> jig_domain_client::contract::OwnerAuthorityDocument {
         cut: true,
     }
 }
-fn full_task() -> jig_domain_client::contract::Task {
+fn full_task() -> jig_client_domain::contract::Task {
     let mut task = stories::task();
     task.goal = Some(u64::MAX);
-    task.budget = jig_domain_client::contract::OwnerBudget {
-        numbers: jig_domain_client::contract::OwnerNumbers {
+    task.budget = jig_client_domain::contract::OwnerBudget {
+        numbers: jig_client_domain::contract::OwnerNumbers {
             budget: u64::MAX,
             spent: u64::MAX,
             spent_below: u64::MAX,
             reserved: u64::MAX,
         },
         left: u64::MAX,
-        funder: jig_domain_client::contract::Funder::Pool { project: u32::MAX, person: u64::MAX, period: u64::MAX },
+        funder: jig_client_domain::contract::Funder::Pool { project: u32::MAX, person: u64::MAX, period: u64::MAX },
         deadline: Some(skein_lib::Wall::from_nanos(u64::MAX)),
     };
     task.result_contract = full_contract();
     task.authority = full_authority();
-    task.chip.title = jig_domain_client::contract::DocumentText::complete(stories::text(&[b't'; 32]));
+    task.chip.title = jig_client_domain::contract::DocumentText::complete(stories::text(&[b't'; 32]));
     task.lineage = jig_client_world::test::list([8, 7]);
     task.subscriptions.entries = jig_client_world::test::list([
-        jig_domain_client::contract::Subscription {
+        jig_client_domain::contract::Subscription {
             number: 1,
-            kind: jig_domain_client::contract::SubscriptionKind::Topic {
+            kind: jig_client_domain::contract::SubscriptionKind::Topic {
                 connector: jig_client_test_domain::FIRST,
                 topic: 1,
             },
         },
-        jig_domain_client::contract::Subscription {
+        jig_client_domain::contract::Subscription {
             number: 2,
-            kind: jig_domain_client::contract::SubscriptionKind::Topic {
+            kind: jig_client_domain::contract::SubscriptionKind::Topic {
                 connector: jig_client_test_domain::SECOND,
                 topic: 2,
             },
         },
     ]);
     task.context.as_mut().expect("supplied task context").parts = jig_client_world::test::list(
-        (1..=8).map(|n| jig_domain_client::contract::Part::Panel { connector: jig_client_test_domain::FIRST, task: n }),
+        (1..=8).map(|n| jig_client_domain::contract::Part::Panel { connector: jig_client_test_domain::FIRST, task: n }),
     );
     task.resources = jig_client_world::test::list((1..=8).map(|n| {
-        jig_domain_client::contract::TaskResource::Part(jig_domain_client::contract::Part::Panel {
+        jig_client_domain::contract::TaskResource::Part(jig_client_domain::contract::Part::Panel {
             connector: jig_client_test_domain::SECOND,
             task: n,
         })
     }));
     task.spec.specification.words.bytes = stories::text(&[b's'; 32]);
-    task.instructions = Some(jig_domain_client::contract::DocumentText::complete(stories::text(&[b'i'; 32])));
+    task.instructions = Some(jig_client_domain::contract::DocumentText::complete(stories::text(&[b'i'; 32])));
     task.dependencies = jig_client_world::test::list([
-        jig_domain_client::contract::OwnerTaskLink::Live(task.chip.clone()),
-        jig_domain_client::contract::OwnerTaskLink::Live(task.chip.clone()),
+        jig_client_domain::contract::OwnerTaskLink::Live(task.chip.clone()),
+        jig_client_domain::contract::OwnerTaskLink::Live(task.chip.clone()),
     ]);
     task.references = task.dependencies.clone();
     task.inputs = task.dependencies.clone();
     task.lineage_chips = jig_client_world::test::list([task.chip.clone(), task.chip.clone()]);
     task.delegates = jig_client_world::test::list([
-        jig_domain_client::contract::LiveDelegate { chip: task.chip.clone(), takeover_budget: 1 },
-        jig_domain_client::contract::LiveDelegate { chip: task.chip.clone(), takeover_budget: 1 },
+        jig_client_domain::contract::LiveDelegate { chip: task.chip.clone(), takeover_budget: 1 },
+        jig_client_domain::contract::LiveDelegate { chip: task.chip.clone(), takeover_budget: 1 },
     ]);
     task.context.as_mut().expect("supplied task context").writer_slots = jig_client_world::test::list([
-        jig_domain_client::contract::WriterSlot {
-            resource: jig_domain_client::contract::Part::Resource {
+        jig_client_domain::contract::WriterSlot {
+            resource: jig_client_domain::contract::Part::Resource {
                 connector: jig_client_test_domain::FIRST,
                 path: {
                     let mut rows = skein_lib::List::with_capacity(1);
@@ -114,8 +114,8 @@ fn full_task() -> jig_domain_client::contract::Task {
             task: 9,
             attempt: Some(1),
         },
-        jig_domain_client::contract::WriterSlot {
-            resource: jig_domain_client::contract::Part::Resource {
+        jig_client_domain::contract::WriterSlot {
+            resource: jig_client_domain::contract::Part::Resource {
                 connector: jig_client_test_domain::FIRST,
                 path: {
                     let mut rows = skein_lib::List::with_capacity(1);
@@ -140,30 +140,30 @@ fn full_world() -> jig_client_world::World<jig_client_world::Test, jig_client_wo
             Wall::EPOCH,
             jig_client_scripted_engine::Change::Object {
                 project: 1,
-                key: jig_domain_client::contract::ObjectKey::Task(9),
-                value: jig_domain_client::contract::ReadValue::Task(Box::new(task)),
+                key: jig_client_domain::contract::ObjectKey::Task(9),
+                value: jig_client_domain::contract::ReadValue::Task(Box::new(task)),
             },
         )
         .expect("full task fits");
     let mut frame = stories::frame(7);
-    frame.party.name = jig_domain_client::contract::DocumentText::complete(stories::text(&[b'p'; 32]));
-    frame.party.login = jig_domain_client::contract::DocumentText::complete(stories::text(&[b'l'; 32]));
+    frame.party.name = jig_client_domain::contract::DocumentText::complete(stories::text(&[b'p'; 32]));
+    frame.party.login = jig_client_domain::contract::DocumentText::complete(stories::text(&[b'l'; 32]));
     let mut project = frame.projects.iter().next().expect("project exists").clone();
-    project.name = Some(jig_domain_client::contract::DocumentText::complete(stories::text(&[b'p'; 32])));
-    project.role = jig_domain_client::contract::HeldRole::Policy { role: 1 };
+    project.name = Some(jig_client_domain::contract::DocumentText::complete(stories::text(&[b'p'; 32])));
+    project.role = jig_client_domain::contract::HeldRole::Policy { role: 1 };
     let mut other = project.clone();
     other.project = 2;
-    other.role = jig_domain_client::contract::HeldRole::Policy { role: 2 };
+    other.role = jig_client_domain::contract::HeldRole::Policy { role: 2 };
     frame.projects = jig_client_world::test::list([project, other]);
     let mut offer = frame.charters.iter().next().expect("charter offers exist").clone();
     offer.chats = jig_client_world::test::list([
-        jig_domain_client::contract::Charter {
+        jig_client_domain::contract::Charter {
             number: 1,
-            name: Some(jig_domain_client::contract::DocumentText::complete(stories::text(&[b'c'; 32]))),
+            name: Some(jig_client_domain::contract::DocumentText::complete(stories::text(&[b'c'; 32]))),
         },
-        jig_domain_client::contract::Charter {
+        jig_client_domain::contract::Charter {
             number: 2,
-            name: Some(jig_domain_client::contract::DocumentText::complete(stories::text(&[b'c'; 32]))),
+            name: Some(jig_client_domain::contract::DocumentText::complete(stories::text(&[b'c'; 32]))),
         },
     ]);
     offer.goals = offer.chats.clone();
@@ -184,7 +184,7 @@ fn full_world() -> jig_client_world::World<jig_client_world::Test, jig_client_wo
             subject,
             jig_client_test_domain::family::Document::Part(jig_client_test_domain::family::PartDocument {
                 subject,
-                revision: jig_domain_client::contract::Revision { value: 1 },
+                revision: jig_client_domain::contract::Revision { value: 1 },
                 value: n,
                 parameters: None,
             }),
@@ -199,7 +199,7 @@ fn full_world() -> jig_client_world::World<jig_client_world::Test, jig_client_wo
         jig_client_test_domain::family::Document::Item(jig_client_test_domain::family::Item {
             project: 1,
             key: 1,
-            revision: jig_domain_client::contract::Revision { value: 1 },
+            revision: jig_client_domain::contract::Revision { value: 1 },
             state: jig_client_test_domain::family::ItemState::Ready,
             value: 1,
             task: 9,

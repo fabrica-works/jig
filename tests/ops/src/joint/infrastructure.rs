@@ -410,7 +410,7 @@ pub fn ask(
 }
 #[must_use]
 pub fn answer(value: source::ApplicationOutcome) -> jig_ops_client_domain::infrastructure::Answer {
-    use jig_domain_client::contract::Revision;
+    use jig_client_domain::contract::Revision;
     use jig_ops_client_domain::infrastructure::{Answer, documents::Refusal};
     match value {
         source::ApplicationOutcome::MovedEnd { environment, now } => Answer::NativeMovedEnd {
@@ -433,7 +433,7 @@ pub fn answer(value: source::ApplicationOutcome) -> jig_ops_client_domain::infra
 #[cfg(test)]
 mod tests {
     use super::*;
-    use jig_domain_client::contract::Revision;
+    use jig_client_domain::contract::Revision;
     use jig_ops_client_domain::infrastructure::{Answer, Ask, documents::Refusal};
     use skein_lib::Token;
     #[test]

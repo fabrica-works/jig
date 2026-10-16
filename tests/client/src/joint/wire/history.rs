@@ -2,7 +2,8 @@
 //! Source positions, revisions, stored overrides and optional clocks are copied
 //! independently; no present-day state supplies historical missing facts.
 use super::{chips, owner, results};
-use jig_domain_client::{Limits, contract as client};
+use jig_client_domain::contract as client;
+use jig_domain_client::Limits;
 use jig_domain_core::documents;
 use jig_domain_tasks as tasks;
 

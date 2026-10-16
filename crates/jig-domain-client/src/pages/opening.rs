@@ -3,10 +3,10 @@ use super::routing::{open_once, read};
 use crate::{
     Domain, Request,
     address::{ProjectSection, TaskSection},
-    contract::{self, Read, Subject},
     pages::{Section, project},
     watches::Owner,
 };
+use jig_client_domain::contract::{self, Read, Subject};
 use skein_lib::{Env, Queue};
 
 pub(crate) fn section(

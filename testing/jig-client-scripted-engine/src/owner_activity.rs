@@ -2,7 +2,7 @@
 //! Every reserved field row and opaque byte is priced; no clipped value is returned.
 use crate::{Bounds, payload::Payload};
 use core::mem::size_of;
-use jig_domain_client::contract::{
+use jig_client_domain::contract::{
     OwnerActivity, OwnerActivityLine, OwnerMessageKind, OwnerWord, OwnerWordResult, ResultField, Text,
 };
 use skein_lib::List;

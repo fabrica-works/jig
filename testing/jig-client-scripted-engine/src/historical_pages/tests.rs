@@ -1,6 +1,6 @@
 use super::*;
 use crate::Bounds;
-use jig_domain_client::contract::*;
+use jig_client_domain::contract::*;
 use skein_lib::{List, Wall};
 fn doc(value: &[u8]) -> DocumentText {
     DocumentText { bytes: Text::new(Box::from(value), 8).expect("fixture fits"), cut: true }

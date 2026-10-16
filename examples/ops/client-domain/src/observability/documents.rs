@@ -2,7 +2,7 @@
 //! Replace: incident/service vocabulary and the application objects its pages name.
 //! Observability owns incident history and health (examples.md, 3 and 8).
 use alloc::boxed::Box;
-use jig_domain_client::contract::{ObjectKey, Part, ProposalKey, Revision};
+use jig_client_domain::contract::{ObjectKey, Part, ProposalKey, Revision};
 use skein_lib::{List, Wall};
 /// Scope supplied with every read and watch.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -326,8 +326,8 @@ pub fn subject(part: &Part, scope: Scope) -> Option<Subject> {
         Part::Effect { proposal, .. } => Kind::Effect(*proposal),
         Part::Outbox { scope, entry, .. } => {
             let scope = match scope {
-                jig_domain_client::contract::PartScope::Project(project) => Scope::Project(*project),
-                jig_domain_client::contract::PartScope::Deployment => Scope::Deployment,
+                jig_client_domain::contract::PartScope::Project(project) => Scope::Project(*project),
+                jig_client_domain::contract::PartScope::Deployment => Scope::Deployment,
             };
             return Some(Subject { scope, kind: Kind::Outbox(*entry) });
         }

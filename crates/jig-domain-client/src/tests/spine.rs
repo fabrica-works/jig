@@ -2,14 +2,13 @@ use crate::{Domain, Event, Limits, Request, fire, max_out, step};
 use crate::{
     address::{Address, Place},
     boundary::Offset,
-    contract::{
-        Count, Delivery, DocumentText, Frame, FrameParty, HeldRole, Inbox, Needs, PartyKind, VersionRange, WatchEnd,
-        WatchEvent,
-    },
     limits::Backoff,
     link::Link,
     pages::Page,
     store::Record,
+};
+use jig_client_domain::contract::{
+    Count, Delivery, DocumentText, Frame, FrameParty, HeldRole, Inbox, Needs, PartyKind, WatchEnd, WatchEvent,
 };
 use skein_lib::{Duration, Env, List, Queue, Time, Token, Wall};
 
@@ -76,7 +75,7 @@ pub(super) fn drive(domain: &mut Domain, now: Time, event: Event) -> Box<[Reques
     };
     step(domain, &env(now), event, &mut out);
     if starting {
-        step(domain, &env(now), Event::Hello { versions: VersionRange { first: 7, last: 7 } }, &mut out);
+        step(domain, &env(now), Event::Hello { served: true }, &mut out);
     }
     drain(out)
 }
@@ -101,8 +100,10 @@ pub(super) fn frame(party: u64) -> Frame {
         party: FrameParty {
             number: party,
             kind: PartyKind::Person,
-            login: DocumentText::complete(crate::contract::Text::new(Box::from(*b"fixture-login"), 32).unwrap()),
-            name: DocumentText::complete(crate::contract::Text::new(Box::from(*b"Pat"), 32).unwrap()),
+            login: DocumentText::complete(
+                jig_client_domain::contract::Text::new(Box::from(*b"fixture-login"), 32).unwrap(),
+            ),
+            name: DocumentText::complete(jig_client_domain::contract::Text::new(Box::from(*b"Pat"), 32).unwrap()),
         },
         projects: List::with_capacity(0),
         needs: needs(),
@@ -150,7 +151,7 @@ fn start_opens_only_the_frame_and_takes_nothing_before_it() {
     let Request::Open { subject, .. } = &opened[0] else {
         unreachable!("start opens a watch");
     };
-    assert_eq!(*subject, crate::contract::Subject::Frame);
+    assert_eq!(*subject, jig_client_domain::contract::Subject::Frame);
     assert_eq!(domain.page(), &Page::Starting);
     assert_eq!(domain.link(), Link::Starting);
     assert_eq!(domain.offset().minutes, -60_i32);
@@ -175,7 +176,10 @@ fn frame_confirms_its_party_and_link_changes_once_each_way() {
     );
     assert_eq!(domain.notices().ids().len(), 1);
     let retry = domain.next_deadline().unwrap();
-    assert_eq!(tick(&mut domain, retry).as_ref(), &[Request::Open { watch, subject: crate::contract::Subject::Frame }]);
+    assert_eq!(
+        tick(&mut domain, retry).as_ref(),
+        &[Request::Open { watch, subject: jig_client_domain::contract::Subject::Frame }]
+    );
     assert_eq!(
         delivered(&mut domain, retry, watch, frame(7)).as_ref(),
         &[Request::Retention { retention: Duration::from_secs(1000) }, Request::Link { link: Link::Live }]
@@ -196,7 +200,10 @@ fn silence_waits_for_the_old_terminal_before_it_reopens() {
     assert!(drive(&mut domain, Time::from_nanos(1000), Event::Ended { watch, end: WatchEnd::Closed }).is_empty());
     let retry = domain.next_deadline().unwrap();
     assert!(retry >= Time::from_nanos(1010) && retry <= Time::from_nanos(1012));
-    assert_eq!(tick(&mut domain, retry).as_ref(), &[Request::Open { watch, subject: crate::contract::Subject::Frame }]);
+    assert_eq!(
+        tick(&mut domain, retry).as_ref(),
+        &[Request::Open { watch, subject: jig_client_domain::contract::Subject::Frame }]
+    );
 }
 
 #[test]
@@ -285,7 +292,7 @@ fn a_different_party_keeps_the_previous_partys_work_hidden_until_they_return() {
 fn an_unsupported_version_parks_work_and_never_sends_a_new_engine_request() {
     let mut domain = Domain::new(&LIMITS, 5);
     let watch = start(&mut domain, List::with_capacity(0));
-    let refused = drive(&mut domain, Time::ZERO, Event::Hello { versions: VersionRange { first: 2, last: 3 } });
+    let refused = drive(&mut domain, Time::ZERO, Event::Hello { served: false });
     assert_eq!(
         refused.as_ref(),
         &[Request::Close { watch }, Request::Link { link: Link::Offline }, Request::Confirmed { party: None }]
@@ -390,7 +397,7 @@ fn own_kept_requests_do_not_hide_work_or_override_kept_draft_guard() {
         version: crate::store::STORE_VERSION,
         party: 8,
         task: 9,
-        words: crate::contract::Text::new(Box::from(*b"old"), LIMITS.text).unwrap(),
+        words: jig_client_domain::contract::Text::new(Box::from(*b"old"), LIMITS.text).unwrap(),
         touched: 1,
     })
     .unwrap();
@@ -410,10 +417,10 @@ fn work_page(domain: &Domain) -> bool {
     }
 }
 
-pub(super) fn party(number: u64) -> crate::contract::Party {
-    crate::contract::Party {
+pub(super) fn party(number: u64) -> jig_client_domain::contract::Party {
+    jig_client_domain::contract::Party {
         number,
         kind: PartyKind::Person,
-        name: crate::contract::Text::new(Box::from(*b"Pat"), 32).unwrap(),
+        name: jig_client_domain::contract::Text::new(Box::from(*b"Pat"), 32).unwrap(),
     }
 }

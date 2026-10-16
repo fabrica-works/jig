@@ -2,7 +2,8 @@
 //! The source owner supplies current effective instructions and no separate
 //! `TaskContext`. Repeated specification facts must agree before admission.
 use super::{chips, documents::Invalid, offers, owner, results};
-use jig_domain_client::{Limits, contract as client};
+use jig_client_domain::contract as client;
+use jig_domain_client::Limits;
 use jig_domain_core::documents;
 
 /// # Errors

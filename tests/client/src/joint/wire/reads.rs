@@ -1,7 +1,7 @@
 //! Read selectors retain their owner query and opaque continuation whole
 //! (client/domain/contract.md, 6). The engine owns cursor/query admission.
 //! Note selectors preserve explicit project scope and whole literal patterns.
-use jig_domain_client::contract as client;
+use jig_client_domain::contract as client;
 use jig_domain_core::reads;
 use jig_domain_notes as notes;
 use jig_domain_people as people;

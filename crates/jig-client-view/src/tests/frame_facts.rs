@@ -3,7 +3,8 @@ use super::cards::{CLIENT, contains, document, drive, limits, start, text, words
 use crate::{JigBindings, Owner, phrases::jig::JigPhrase};
 use skein_ui::{Builder, Role, SlotRef, Tree};
 
-use jig_domain_client::{Domain, Event, contract::*};
+use jig_client_domain::contract::*;
+use jig_domain_client::{Domain, Event};
 use skein_lib::{List, Token, Wall};
 fn tree(domain: &Domain) -> Tree {
     frame_tree(domain, words())

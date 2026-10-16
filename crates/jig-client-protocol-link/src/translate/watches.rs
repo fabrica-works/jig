@@ -2,8 +2,8 @@
 use super::{documents, live, objects, pages};
 use crate::{Limits, Undecodable, Watchable};
 use alloc::boxed::Box;
+use jig_client_domain::contract as c;
 use jig_client_protocol_wire::{VERSION, v7 as w};
-use jig_domain_client::contract as c;
 use skein_lib::{List, Reader, Writer};
 
 pub fn subject(value: &c::Subject, limits: &w::Limits) -> Result<w::Subject, w::Problem> {

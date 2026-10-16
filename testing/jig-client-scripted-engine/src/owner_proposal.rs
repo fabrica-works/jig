@@ -2,7 +2,7 @@
 //! Every allocated list slot, box and opaque byte is priced before admission.
 use crate::{Bounds, payload::Payload};
 use core::mem::size_of;
-use jig_domain_client::contract::{
+use jig_client_domain::contract::{
     OwnerFundingOffer, OwnerHistoryHolder, OwnerProposal, OwnerProposalAction, OwnerProposalWaiting,
 };
 impl Payload for OwnerProposalWaiting {

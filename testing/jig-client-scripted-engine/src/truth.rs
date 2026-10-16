@@ -1,7 +1,7 @@
 //! The story's starting documents and atomic changes; contract.md, 5.
 //! Documents carry offers, revisions, terminal facts and parts in the client's vocabulary.
 use crate::{Bounds, Invalid, Source, payload};
-use jig_domain_client::contract::{Answer, Ask, Deployment, Frame, Note, ObjectKey, Project, ReadValue, Tree};
+use jig_client_domain::contract::{Answer, Ask, Deployment, Frame, Note, ObjectKey, Project, ReadValue, Tree};
 use std::collections::BTreeMap;
 
 /// Client documents indexed by their identities, with parties and sign-ins.
@@ -14,14 +14,14 @@ pub struct Truth {
     pub object_projects: BTreeMap<ObjectKey, u32>,
     pub projects: BTreeMap<u32, Project>,
     /// Whole authentic projects, independent of ordinary fixtures.
-    pub owner_projects: BTreeMap<u32, jig_domain_client::contract::OwnerProject>,
+    pub owner_projects: BTreeMap<u32, jig_client_domain::contract::OwnerProject>,
     pub deployment: Option<Deployment>,
     /// Whole deployment diagnostics supplied by their owner.
-    pub owner_deployment: Option<jig_domain_client::contract::OwnerDeployment>,
+    pub owner_deployment: Option<jig_client_domain::contract::OwnerDeployment>,
     pub notes: BTreeMap<u64, Note>,
     pub sources: Vec<Source>,
     pub results_seen: BTreeMap<u64, u64>,
-    pub replies_seen: BTreeMap<u64, Vec<jig_domain_client::contract::ReplyPosition>>,
+    pub replies_seen: BTreeMap<u64, Vec<jig_client_domain::contract::ReplyPosition>>,
     pub trees: BTreeMap<u64, Tree>,
 }
 
@@ -49,13 +49,13 @@ pub enum Change {
     /// Replace deployment hosts, accounts and capacities.
     Deployment(Deployment),
     /// Replace whole owner deployment facts and bounded diagnostics.
-    OwnerDeployment(jig_domain_client::contract::OwnerDeployment),
+    OwnerDeployment(jig_client_domain::contract::OwnerDeployment),
     /// Replace the retained rows of one scoped read; rows may span many protocol pages.
     Source(Source),
     /// Replace the authoritative subtree, including folded counts.
     Tree(Tree),
     /// Replace committed inbox read positions for a party.
-    Seen { party: u64, results: u64, replies: Vec<jig_domain_client::contract::ReplyPosition> },
+    Seen { party: u64, results: u64, replies: Vec<jig_client_domain::contract::ReplyPosition> },
 }
 impl Change {
     pub(crate) fn validate(&self, bounds: &Bounds) -> core::result::Result<(), Invalid> {
@@ -143,7 +143,7 @@ impl Truth {
             Change::Source(source) => {
                 self.sources.retain(|old| old.party != source.party || old.read != source.read);
                 self.sources.push(source.clone());
-                if let (jig_domain_client::contract::Read::Activity { task, .. }, crate::Rows::Activity(rows)) =
+                if let (jig_client_domain::contract::Read::Activity { task, .. }, crate::Rows::Activity(rows)) =
                     (&source.read, &source.rows)
                     && let Some(ReadValue::Task(doc)) = self.objects.get_mut(&ObjectKey::Task(*task))
                 {
@@ -237,7 +237,7 @@ impl Rule {
 #[derive(Clone, Debug)]
 pub struct Script {
     /// Jig owner range stated by the scripted protocol stream hello.
-    pub versions: jig_domain_client::contract::VersionRange,
+    pub versions: jig_client_domain::contract::VersionRange,
     pub truth: Truth,
     pub bounds: Bounds,
     pub rules: Vec<Rule>,
@@ -245,10 +245,7 @@ pub struct Script {
 impl Default for Script {
     fn default() -> Self {
         Self {
-            versions: jig_domain_client::contract::VersionRange {
-                first: jig_domain_client::contract::CLIENT_VERSION,
-                last: jig_domain_client::contract::CLIENT_VERSION,
-            },
+            versions: jig_client_domain::contract::VersionRange { first: 7, last: 7 },
             truth: Truth::default(),
             bounds: Bounds::default(),
             rules: Vec::new(),

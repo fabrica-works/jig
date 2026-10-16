@@ -2,7 +2,7 @@
 //! domain/tasks.md, 7). No shortened value is returned on a bound failure.
 use crate::{Bounds, payload::Payload};
 use core::mem::size_of;
-use jig_domain_client::contract::{OwnerAmendmentState, OwnerAuthorityDocument, ParameterDocument};
+use jig_client_domain::contract::{OwnerAmendmentState, OwnerAuthorityDocument, ParameterDocument};
 use skein_lib::List;
 
 impl Payload for OwnerAmendmentState {

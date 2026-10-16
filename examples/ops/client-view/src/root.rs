@@ -249,7 +249,7 @@ fn task_page(
     b.close();
     jig_client_view::after_page(b, client, words, bindings);
 }
-fn infrastructure_part(bindings: &JigBindings, token: skein_lib::Token) -> Option<jig_domain_client::contract::Part> {
+fn infrastructure_part(bindings: &JigBindings, token: skein_lib::Token) -> Option<jig_client_domain::contract::Part> {
     match bindings.part(token) {
         Some(part) => Some(part.clone()),
         None => match bindings.owner_part(token) {

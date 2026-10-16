@@ -5,9 +5,9 @@ use crate::words::Words;
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role};
 
+use jig_client_domain::contract::{Amendment, ProposalAction, ProposedTask};
 use jig_domain_client::{
     Domain,
-    contract::{Amendment, ProposalAction, ProposedTask},
     objects::{Object, proposal::facts},
 };
 use skein_lib::Id;
@@ -132,9 +132,9 @@ pub fn amendment(b: &mut Builder, change: &Amendment, words: &Words, _bindings: 
 }
 
 /// A named person revision and exact closed destination; the ask owns its project scope.
-pub(crate) fn address_change(b: &mut Builder, change: &jig_domain_client::contract::AddressChange, words: &Words) {
+pub(crate) fn address_change(b: &mut Builder, change: &jig_client_domain::contract::AddressChange, words: &Words) {
     words.text(b, JigPhrase::PersonAddressRevision, &[Hole::Number(change.revision.value)]);
-    crate::proposed_task::executor(b, jig_domain_client::contract::OwnerExecutor::Person(change.address), words);
+    crate::proposed_task::executor(b, jig_client_domain::contract::OwnerExecutor::Person(change.address), words);
 }
 
 /// The same keyed card for the independently supplied pending owner document.

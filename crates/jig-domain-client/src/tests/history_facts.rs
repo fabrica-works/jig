@@ -3,9 +3,9 @@ use crate::{
     Domain, Event, Request,
     action::{Act, End},
     address::{Address, Place, TaskSection},
-    contract::*,
     windows::{Edge, Edges, HistoryWindow},
 };
+use jig_client_domain::contract::*;
 use skein_lib::{List, Time, Token, Wall};
 
 fn text(bytes: &[u8]) -> Text {

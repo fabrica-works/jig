@@ -1,6 +1,6 @@
 //! Routing facts from retained outcomes (client/domain/contract.md, 4).
 //! Classification never rewrites the whole durable answer or joins missing facts.
-use crate::contract::{Made, Outcome, OwnerOutcome};
+use jig_client_domain::contract::{Made, Outcome, OwnerOutcome};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Route {

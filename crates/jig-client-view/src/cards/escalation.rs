@@ -5,9 +5,9 @@ use crate::words::Words;
 use skein_ui::Builder;
 use skein_ui::phrases::Hole;
 
+use jig_client_domain::contract::{Hold, Phase, SpendLine};
 use jig_domain_client::{
     Domain,
-    contract::{Hold, Phase, SpendLine},
     objects::{Body, Object},
 };
 use skein_lib::{Id, List};

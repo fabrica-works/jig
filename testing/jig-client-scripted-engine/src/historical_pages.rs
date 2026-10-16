@@ -3,7 +3,7 @@
 //! without converting the owner's records into another document.
 use crate::{Bounds, payload::Payload};
 use core::mem::size_of;
-use jig_domain_client::contract::{
+use jig_client_domain::contract::{
     OwnerEndedDelegate, OwnerEndedPage, OwnerFundingRecord, OwnerPeriodTimes, OwnerSpendPage,
 };
 impl Payload for OwnerEndedDelegate {
@@ -65,11 +65,11 @@ pub fn worst_case(bounds: &Bounds) -> Option<u64> {
 
 /// Inline receiving vocabulary and boxed historical page storage together.
 #[must_use]
-pub fn read_bytes(value: &jig_domain_client::contract::ReadValue, bounds: &Bounds) -> Option<u64> {
-    u64::try_from(size_of::<jig_domain_client::contract::ReadValue>()).ok()?.checked_add(value.heap(bounds)?)
+pub fn read_bytes(value: &jig_client_domain::contract::ReadValue, bounds: &Bounds) -> Option<u64> {
+    u64::try_from(size_of::<jig_client_domain::contract::ReadValue>()).ok()?.checked_add(value.heap(bounds)?)
 }
 #[must_use]
-pub fn read_fits(value: &jig_domain_client::contract::ReadValue, bounds: &Bounds) -> bool {
+pub fn read_fits(value: &jig_client_domain::contract::ReadValue, bounds: &Bounds) -> bool {
     crate::payload::fits(value, bounds)
 }
 #[cfg(test)]

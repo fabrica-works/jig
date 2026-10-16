@@ -2,9 +2,9 @@
 use crate::{JigBindings, phrases::jig::JigPhrase, words::Words};
 use skein_ui::Builder;
 
+use jig_client_domain::contract::OwnerRequester;
 use jig_domain_client::{
     Domain,
-    contract::OwnerRequester,
     fields::Purpose,
     objects::{Object, question::facts},
 };

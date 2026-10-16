@@ -5,7 +5,7 @@
 )]
 use super::cards::{CLIENT, contains, shared_words};
 use crate::JigBindings;
-use jig_domain_client::contract::*;
+use jig_client_domain::contract::*;
 use skein_lib::List;
 use skein_ui::{Builder, Role};
 fn list<T>(values: impl IntoIterator<Item = T>) -> List<T> {

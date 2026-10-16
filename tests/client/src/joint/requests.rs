@@ -224,7 +224,7 @@ mod tests {
     fn real_request_dispatch_waits_for_the_supplied_session_without_consuming_native_names() {
         let (mut driver, now, wall) = driver();
         let value =
-            Request::Jig(JigOut::Open { watch: Token::new(71), subject: jig_domain_client::contract::Subject::Frame });
+            Request::Jig(JigOut::Open { watch: Token::new(71), subject: jig_client_domain::contract::Subject::Frame });
         assert_eq!(
             send(&mut driver, ClientId(0), now, wall, &value, &crate::test::limits().jig),
             Err(Invalid::Session)
@@ -233,7 +233,7 @@ mod tests {
         assert!(driver.poll(now, wall).is_empty());
         assert_eq!(
             value,
-            Request::Jig(JigOut::Open { watch: Token::new(71), subject: jig_domain_client::contract::Subject::Frame })
+            Request::Jig(JigOut::Open { watch: Token::new(71), subject: jig_client_domain::contract::Subject::Frame })
         );
     }
 
@@ -257,7 +257,7 @@ mod tests {
         let request = Request::Send {
             attempt,
             key,
-            ask: Ask::Jig(Box::new(jig_domain_client::contract::Ask::Stop { project: 1, task: u64::MAX })),
+            ask: Ask::Jig(Box::new(jig_client_domain::contract::Ask::Stop { project: 1, task: u64::MAX })),
         };
         driver.world.cut = Some(jig_core_world::effects::Cut::Submitted(driver.world.store.applied + 1));
         send(&mut driver, ClientId(0), now, wall, &request, &crate::test::limits().jig)

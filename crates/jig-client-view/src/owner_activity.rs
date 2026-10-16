@@ -6,13 +6,11 @@ use crate::words::Words;
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
-use jig_domain_client::{
-    Limits,
-    contract::{
-        HoldFailure, OwnerActivity, OwnerActivityLine, OwnerFailureTries, OwnerMessageKind, OwnerMessageProposalKind,
-        OwnerNewsClass, OwnerNoticeState, OwnerRequester, OwnerRunEnd, OwnerRunWhy, OwnerWord, OwnerWordResult, Text,
-    },
+use jig_client_domain::contract::{
+    HoldFailure, OwnerActivity, OwnerActivityLine, OwnerFailureTries, OwnerMessageKind, OwnerMessageProposalKind,
+    OwnerNewsClass, OwnerNoticeState, OwnerRequester, OwnerRunEnd, OwnerRunWhy, OwnerWord, OwnerWordResult, Text,
 };
+use jig_domain_client::Limits;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ActivityFragment {

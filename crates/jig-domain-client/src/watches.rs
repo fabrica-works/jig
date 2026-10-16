@@ -12,7 +12,7 @@
 //! | any active | leave | closing | close if an attempt is live |
 //! | closing | terminal | closed | retire |
 //! | any | unknown/not allowed/subject ended | closed | retire |
-use crate::contract::Subject;
+use jig_client_domain::contract::Subject;
 
 /// The owner that receives a watch document.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

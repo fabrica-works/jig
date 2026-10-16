@@ -1,8 +1,8 @@
 use super::*;
 use crate::Bounds;
 use crate::Decision as ApplicationDecision;
-use jig_domain_client::contract::Decision;
-use jig_domain_client::contract::*;
+use jig_client_domain::contract::Decision;
+use jig_client_domain::contract::*;
 use skein_lib::List;
 mod frame_facts;
 mod owner_project;
@@ -386,7 +386,7 @@ fn task() -> Task {
         result: None,
         delegates: list(vec![]),
 
-        context: Some(Box::new(jig_domain_client::contract::TaskContext {
+        context: Some(Box::new(jig_client_domain::contract::TaskContext {
             escalation: None,
             parts: list(vec![]),
             closing: None,
@@ -738,7 +738,7 @@ fn scenario_byte_bound_pages_and_watch_windows() {
     setup.truth.sources.push(Source {
         party: 1,
         read: Read::Inbox {
-            group: jig_domain_client::contract::InboxReadGroup::Updates,
+            group: jig_client_domain::contract::InboxReadGroup::Updates,
             project: None,
             kind: None,
             goal: None,
@@ -798,14 +798,14 @@ fn scenario_all_read_shapes_and_reverse_activity() {
         Read::Ended { task: 8, after: None },
         Read::History { task: 8, subtree: true, after: None },
         Read::Inbox {
-            group: jig_domain_client::contract::InboxReadGroup::Updates,
+            group: jig_client_domain::contract::InboxReadGroup::Updates,
             kind: Some(InboxGroup::Replies),
             goal: None,
             project: None,
             after: None,
         },
         Read::Inbox {
-            group: jig_domain_client::contract::InboxReadGroup::Needs,
+            group: jig_client_domain::contract::InboxReadGroup::Needs,
             project: Some(1),
             kind: Some(InboxGroup::Questions),
             goal: None,
@@ -863,7 +863,7 @@ fn scenario_reply_identity() {
     setup.truth.sources.push(Source {
         party: 1,
         read: Read::Inbox {
-            group: jig_domain_client::contract::InboxReadGroup::Updates,
+            group: jig_client_domain::contract::InboxReadGroup::Updates,
             project: None,
             kind: None,
             goal: None,
@@ -921,7 +921,7 @@ fn overlong_resource_grant() -> OwnerGrant {
 }
 
 fn bounded_offer_payloads_and_predictions() {
-    use jig_domain_client::contract::Bounds as DraftBounds;
+    use jig_client_domain::contract::Bounds as DraftBounds;
     closing_connector_payload_bounds();
     let mut direct = owner_authority();
     direct.authority.spend = 110;
@@ -985,7 +985,7 @@ fn bounded_offer_payloads_and_predictions() {
 }
 
 fn oversized_bounded_offer_payloads() {
-    use jig_domain_client::contract::Bounds as DraftBounds;
+    use jig_client_domain::contract::Bounds as DraftBounds;
     for variant in 0..6 {
         let mut setup = live_script();
         let mut row = task();
@@ -1110,7 +1110,7 @@ fn collective_policy_recipients_accept_any_listed_role_and_price_the_whole_list(
         let recipient = Recipient::Roles { project: 1, roles: List::with_capacity(33) };
         row.acts.get_mut(0).unwrap().admission = if bounded {
             Admission::Bounded {
-                within: jig_domain_client::contract::Bounds::Goal {
+                within: jig_client_domain::contract::Bounds::Goal {
                     pool_left: 10,
                     procedures: List::with_capacity(0),
                     charters: list(vec![1]),
@@ -1325,8 +1325,8 @@ fn approved_documents_preserve_opaque_state_optional_words_and_exact_byte_bounds
     assert!(!crate::payload::fits(&failure, &bounds));
 }
 
-fn specification(words: jig_domain_client::contract::Text) -> jig_domain_client::contract::SpecificationDocument {
-    jig_domain_client::contract::SpecificationDocument::complete(jig_domain_client::contract::Specification {
+fn specification(words: jig_client_domain::contract::Text) -> jig_client_domain::contract::SpecificationDocument {
+    jig_client_domain::contract::SpecificationDocument::complete(jig_client_domain::contract::Specification {
         words,
         parameters: List::with_capacity(0),
         inputs: List::with_capacity(0),
@@ -1550,7 +1550,7 @@ fn goals_read_from_start_includes_live_and_ended_while_watch_is_live() {
 fn procedure_goal_bounds_price_allocated_pairs_and_judge_the_exact_executor() {
     let exact = GoalExecutor::Procedure { connector: u16::MAX, code: u32::MAX };
     let offer = Admission::Bounded {
-        within: jig_domain_client::contract::Bounds::Goal {
+        within: jig_client_domain::contract::Bounds::Goal {
             pool_left: 100,
             charters: list(vec![]),
             procedures: list(vec![
@@ -1575,7 +1575,7 @@ fn procedure_goal_bounds_price_allocated_pairs_and_judge_the_exact_executor() {
     bounds.rows = 1;
     assert!(!crate::payload::fits(&offer, &bounds));
     let mut room = offer.clone();
-    let Admission::Bounded { within: jig_domain_client::contract::Bounds::Goal { procedures, .. }, .. } = &mut room
+    let Admission::Bounded { within: jig_client_domain::contract::Bounds::Goal { procedures, .. }, .. } = &mut room
     else {
         panic!("goal bounds");
     };
@@ -1894,7 +1894,7 @@ fn result_document_loss_and_raw_change_paths_are_admitted_whole_at_exact_allocat
 fn result_metadata_boxes_price_unfilled_delegate_and_followup_capacity_without_inventing_a_wall() {
     use crate::payload::Payload;
     let mut bounds = Bounds { rows: 4, document_bytes: u64::MAX, ..Bounds::default() };
-    let mut result = jig_domain_client::contract::Result {
+    let mut result = jig_client_domain::contract::Result {
         task: task().chip,
         ending: Ending::Done,
         value: None,
@@ -1902,7 +1902,7 @@ fn result_metadata_boxes_price_unfilled_delegate_and_followup_capacity_without_i
         details: None,
         acts: list(vec![]),
     };
-    let base = u64::try_from(core::mem::size_of::<jig_domain_client::contract::Result>()).unwrap()
+    let base = u64::try_from(core::mem::size_of::<jig_client_domain::contract::Result>()).unwrap()
         + result.heap(&bounds).unwrap();
     result.details = Some(Box::new(ResultDetails {
         contract: TaskContractDocument::Report { words: u32::MAX },
@@ -2034,8 +2034,8 @@ fn live_raw_calls_price_both_texts_whole_and_refuse_without_replacing_retained_r
     assert!(!crate::payload::fits(&rich, &bounds));
 }
 
-fn current_identity(id: &[u8]) -> jig_domain_client::contract::CallIdentity {
-    jig_domain_client::contract::CallIdentity {
+fn current_identity(id: &[u8]) -> jig_client_domain::contract::CallIdentity {
+    jig_client_domain::contract::CallIdentity {
         owner: skein_lib::Token::new(u64::MAX),
         sequence: u32::MAX,
         retry: u32::MAX,

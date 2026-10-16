@@ -3,11 +3,11 @@ use super::{cards, owner_history as fixture};
 use crate::{JigBindings, Owner, words::Words};
 use skein_ui::{Builder, Key, Role, Tree};
 
+use jig_client_domain::contract::*;
 use jig_domain_client::{
     Domain, Event, Request,
     address::{Address, TaskSection},
     boundary::Offset,
-    contract::*,
 };
 use skein_lib::{Env, List, Queue, Time, Token, Wall};
 fn drive(domain: &mut Domain, event: Event) -> List<Request> {
@@ -86,7 +86,7 @@ fn populated() -> Domain {
         },
     );
     let Request::Open { watch, subject: Subject::Frame } = out.as_slice()[0] else { panic!("explicit frame watch") };
-    drive(&mut domain, Event::Hello { versions: VersionRange { first: 7, last: 7 } });
+    drive(&mut domain, Event::Hello { served: true });
     let mut frame = cards::document();
     frame.party.login = DocumentText::complete(cards::text(b"login"));
     let opened =

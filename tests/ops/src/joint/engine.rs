@@ -168,7 +168,7 @@ impl Application for OpsApplication {
         let versions = config.limits().core.documents.versions;
         Peers {
             conformance: Ops::peers(config, seed),
-            transport: Transport::new(jig_domain_client::contract::VersionRange {
+            transport: Transport::new(jig_client_domain::contract::VersionRange {
                 first: versions.minimum,
                 last: versions.maximum,
             }),

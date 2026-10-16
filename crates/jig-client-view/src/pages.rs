@@ -64,7 +64,7 @@ pub fn excess(b: &mut Builder, client: &Domain, words: &Words) {
                 words.status(b, JigPhrase::MoreRows, &[]);
             }
             if let Some(which) = refused {
-                words.refusal(b, &jig_domain_client::contract::Refusal::Limit { which: *which });
+                words.refusal(b, &jig_client_domain::contract::Refusal::Limit { which: *which });
             }
         }
         jig_domain_client::pages::Page::Starting
@@ -76,13 +76,13 @@ pub fn excess(b: &mut Builder, client: &Domain, words: &Words) {
     }
 }
 
-pub(crate) fn object_key(object: jig_domain_client::contract::ObjectKey) -> skein_ui::Key {
-    use jig_domain_client::contract::ObjectKey;
+pub(crate) fn object_key(object: jig_client_domain::contract::ObjectKey) -> skein_ui::Key {
+    use jig_client_domain::contract::ObjectKey;
     let (kind, a, b) = match object {
         ObjectKey::Task(task) => (0, task, 0),
         ObjectKey::Proposal(key) => match key.proposer {
-            jig_domain_client::contract::Proposer::Task(task) => (1, task, key.number),
-            jig_domain_client::contract::Proposer::Party(party) => (29, party, key.number),
+            jig_client_domain::contract::Proposer::Task(task) => (1, task, key.number),
+            jig_client_domain::contract::Proposer::Party(party) => (29, party, key.number),
         },
         ObjectKey::Escalation(task) => (2, task, 0),
         ObjectKey::Question { task, message } => (3, task, message),
@@ -208,7 +208,7 @@ pub fn after_page(b: &mut Builder, client: &Domain, words: &Words, bindings: &mu
 
 pub(crate) fn scratch(limits: &skein_ui::Limits) -> Option<u64> {
     crate::sections::task::scratch(limits.depth)?
-        .checked_add(skein_lib::List::<jig_domain_client::contract::Part>::worst_case(limits.slots)?)?
+        .checked_add(skein_lib::List::<jig_client_domain::contract::Part>::worst_case(limits.slots)?)?
         .checked_add(u64::from(limits.slots).checked_mul(u64::from(limits.text_per_node))?.checked_mul(2)?)?
         .checked_add(skein_lib::List::<u8>::worst_case(limits.text_per_node)?)
 }

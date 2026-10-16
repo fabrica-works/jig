@@ -10,10 +10,10 @@ use super::{
 use crate::{
     Event, Request,
     action::Act,
-    contract::*,
     fields::Purpose,
     objects::{self, Body, Card, Source},
 };
+use jig_client_domain::contract::*;
 use skein_lib::{List, Time, Wall};
 fn value(maker: Proposer, offered: ActKind) -> OwnerProposal {
     let mut acts = List::with_capacity(2);

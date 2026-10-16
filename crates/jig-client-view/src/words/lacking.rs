@@ -1,7 +1,7 @@
 //! Only supplied authority facts are said; client/domain/contract.md, 4.
 use super::Words;
 use crate::phrases::jig::JigPhrase;
-use jig_domain_client::contract::Lacking;
+use jig_client_domain::contract::Lacking;
 use skein_ui::Builder;
 use skein_ui::phrases::Hole;
 impl Words {

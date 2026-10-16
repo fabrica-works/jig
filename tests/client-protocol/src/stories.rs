@@ -112,7 +112,7 @@ pub fn transient_request(seed: u64, fault: jig_client_world::FrontFault) {
     let request = |attempt| Request::Send {
         attempt,
         key: [62; 16],
-        ask: Ask::Jig(Box::new(jig_domain_client::contract::Ask::Stop { project: 1, task: u64::MAX })),
+        ask: Ask::Jig(Box::new(jig_client_domain::contract::Ask::Stop { project: 1, task: u64::MAX })),
     };
     Front::<Test>::wire(&mut protocol, client, Time::ZERO, fixtures::wall(Time::ZERO), request(Token::new(31)));
     let events = Front::<Test>::poll(&mut protocol, Time::ZERO, fixtures::wall(Time::ZERO));

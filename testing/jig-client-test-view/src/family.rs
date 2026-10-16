@@ -4,12 +4,12 @@ use crate::{
     drawing,
     words::{Word, Words},
 };
+use jig_client_domain::contract::{ObjectKey, Part, Proposer};
 use jig_client_test_domain::{
     family::{Document, ItemState, Kind, Scope, Subject},
     first::{self, Card, Value},
 };
 use jig_client_view::Owner;
-use jig_domain_client::contract::{ObjectKey, Part, Proposer};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Key, Role, SlotRef, State};
 
@@ -262,7 +262,7 @@ fn owner_object_form(
     words: &Words,
     bindings: &mut Bindings,
 ) {
-    let revision = jig_domain_client::contract::Revision { value: now.revision };
+    let revision = jig_client_domain::contract::Revision { value: now.revision };
     b.open(Role::TextField);
     b.name(&words.say(Word::Parameters, &[]));
     b.value(Decimal::of(object.draft.unwrap_or(now.value)).as_bytes(), now.revision);

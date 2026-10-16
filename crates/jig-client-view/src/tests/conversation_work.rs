@@ -6,10 +6,10 @@
 )]
 use super::cards::{CLIENT, contains, text};
 use crate::{owner_chip, owner_chip_words::ChipPhrase as P, words::Words};
+use jig_client_domain::contract::*;
 use jig_domain_client::{
     Domain, Request,
     address::{Address, TaskSection},
-    contract::*,
 };
 use skein_lib::{Token, Wall, bytes::copy_of};
 use skein_ui::{Builder, Tree};

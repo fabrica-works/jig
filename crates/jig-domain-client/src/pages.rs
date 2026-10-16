@@ -1,9 +1,7 @@
 //! One page at a time, with a generation and its watch freshness.
 //! Reads, object sources and parts belong to the current generation. See client/domain/client.md, 5 and 8.2.
-use crate::{
-    address::{Address, ProjectSection, TaskSection},
-    contract::Limit,
-};
+use crate::address::{Address, ProjectSection, TaskSection};
+use jig_client_domain::contract::Limit;
 use skein_lib::List;
 pub mod conversations;
 pub mod deployment;
@@ -21,7 +19,7 @@ pub mod task;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Section {
     /// One inbox group and its project filter.
-    Inbox { group: crate::contract::InboxReadGroup, project: Option<u32> },
+    Inbox { group: jig_client_domain::contract::InboxReadGroup, project: Option<u32> },
     /// The party's chats in a project or any.
     Conversations { project: Option<u32> },
     /// One section of one task.
@@ -112,5 +110,5 @@ pub enum IntentPurpose {
     /// A goal made or proposed from the project board.
     SetGoal,
     /// One explicitly opened read position.
-    Seen(crate::contract::Seen),
+    Seen(jig_client_domain::contract::Seen),
 }

@@ -7,13 +7,13 @@ use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role};
 
 use alloc::boxed::Box;
+use jig_client_domain::contract::{
+    AddressChange, Amendment, Executor, PersonAddress, Recipient, ResultsWake, Revision, Task, Text, WakeRule,
+};
 use jig_domain_client::{
     Domain,
     action::Act,
     confirm::Confirmation,
-    contract::{
-        AddressChange, Amendment, Executor, PersonAddress, Recipient, ResultsWake, Revision, Task, Text, WakeRule,
-    },
     objects::{Body, Object},
 };
 /// The one property replaced by an input's whole value.
@@ -297,7 +297,7 @@ fn loss(b: &mut Builder, object: &Object, words: &Words) {
         words.text(b, JigPhrase::SpecificationCut, &[]);
     }
 }
-fn numbers(chips: &skein_lib::List<jig_domain_client::contract::OwnerTaskLink>) -> skein_lib::List<u64> {
+fn numbers(chips: &skein_lib::List<jig_client_domain::contract::OwnerTaskLink>) -> skein_lib::List<u64> {
     let mut numbers = skein_lib::List::with_capacity(chips.capacity());
     for chip in chips {
         numbers.push(chip.number()).expect("one number per supplied reference fits");

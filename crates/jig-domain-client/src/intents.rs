@@ -1,8 +1,8 @@
 //! Intents remain until the root table gives their one durable answer.
 //! Joining, progress and the terminal belong here; object policy is jig 21.
 //! See client/domain/client.md, 6, and client/domain/root.md, 11.
-use crate::contract::Ask;
 use alloc::boxed::Box;
+use jig_client_domain::contract::Ask;
 use skein_lib::Token;
 /// What the root table says about an intent.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -27,11 +27,8 @@ pub struct ByValue {
     pub ask: Box<Ask>,
 }
 
-use crate::{
-    boundary::Request,
-    contract::{ActKind, Answer, Limit, ObjectKey},
-    facts::Fact,
-};
+use crate::{boundary::Request, facts::Fact};
+use jig_client_domain::contract::{ActKind, Answer, Limit, ObjectKey};
 use skein_lib::{Id, Map, Queue, Slab};
 /// The owner to which one terminal is applied.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -181,7 +178,7 @@ pub fn send_card(
     let joined = domain.intents.joined(scope, origin).is_some();
     if !joined && let Some(which) = crate::conversation::sending::admission(domain, scope, &ask) {
         domain.objects.get_mut(object_id).expect("named card exists").card =
-            crate::objects::Card::Refused { refusal: crate::contract::Refusal::Limit { which } };
+            crate::objects::Card::Refused { refusal: jig_client_domain::contract::Refusal::Limit { which } };
         out.push(Request::Fact { fact: Fact::Refused { which } });
         domain.changed();
         return None;
@@ -215,8 +212,9 @@ pub fn send_card(
             Some(id.token())
         }
         None => {
-            domain.objects.get_mut(object_id).expect("named card exists").card =
-                crate::objects::Card::Refused { refusal: crate::contract::Refusal::Limit { which: Limit::Requests } };
+            domain.objects.get_mut(object_id).expect("named card exists").card = crate::objects::Card::Refused {
+                refusal: jig_client_domain::contract::Refusal::Limit { which: Limit::Requests },
+            };
             domain.changed();
             None
         }
@@ -226,7 +224,7 @@ pub(crate) fn by_value(domain: &mut crate::Domain, value: ByValue, out: &mut Que
     if domain.blocked {
         out.push(Request::Answered {
             asked: value.asked,
-            answer: Answer::Refused(crate::contract::Refusal::NotOffered),
+            answer: Answer::Refused(jig_client_domain::contract::Refusal::NotOffered),
         });
         return;
     }
@@ -236,7 +234,7 @@ pub(crate) fn by_value(domain: &mut crate::Domain, value: ByValue, out: &mut Que
     {
         out.push(Request::Answered {
             asked: value.asked,
-            answer: Answer::Refused(crate::contract::Refusal::Limit { which }),
+            answer: Answer::Refused(jig_client_domain::contract::Refusal::Limit { which }),
         });
         return;
     }
@@ -244,7 +242,7 @@ pub(crate) fn by_value(domain: &mut crate::Domain, value: ByValue, out: &mut Que
         Some(id) => crate::conversation::sending::pending(domain, id),
         None => out.push(Request::Answered {
             asked: value.asked,
-            answer: Answer::Refused(crate::contract::Refusal::Limit { which: Limit::Requests }),
+            answer: Answer::Refused(jig_client_domain::contract::Refusal::Limit { which: Limit::Requests }),
         }),
     }
 }

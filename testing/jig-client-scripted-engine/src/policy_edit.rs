@@ -2,7 +2,7 @@
 //! Reuses exact authority pricing and retains every allocated list capacity.
 use crate::{Bounds, payload::Payload};
 use core::mem::size_of;
-use jig_domain_client::contract::{PolicyEdit, PolicyEditRole, PolicyPermission, PolicyRequirement};
+use jig_client_domain::contract::{PolicyEdit, PolicyEditRole, PolicyPermission, PolicyRequirement};
 
 impl Payload for PolicyEditRole {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {

@@ -58,7 +58,7 @@ pub fn party(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut Jig
     match &client.frame().document {
         Some(frame) => {
             crate::frame_facts::identity(b, words, &frame.party);
-            if frame.party.kind == jig_domain_client::contract::PartyKind::Person {
+            if frame.party.kind == jig_client_domain::contract::PartyKind::Person {
                 control(b, words, bindings, Role::Button, JigPhrase::SignOut, &[], Act::SignOut);
             }
         }
@@ -167,7 +167,7 @@ pub fn control(
 
 fn membership(
     b: &mut Builder,
-    project: &jig_domain_client::contract::ProjectRole,
+    project: &jig_client_domain::contract::ProjectRole,
     selected_project: Option<u32>,
     words: &Words,
     bindings: &mut JigBindings,

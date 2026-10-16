@@ -2,7 +2,7 @@
 //! All allocated capacities, links, reply boxes and opaque bytes are charged.
 use crate::{Bounds, payload::Payload};
 use core::mem::size_of;
-use jig_domain_client::contract::{
+use jig_client_domain::contract::{
     InboxDocument, InboxRow, OwnerInbox, OwnerInboxCursor, OwnerInboxEntry, OwnerInboxObject, OwnerInboxPage,
     OwnerInboxSelection,
 };

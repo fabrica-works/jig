@@ -7,15 +7,10 @@
     reason = "test fixtures collect observed root outputs and locate their variants"
 )]
 use crate::{Address, Answered, Ask, Domain, Event, JigOut, Limits, Request, infrastructure, new, step, take};
-use jig_domain_client::{
-    boundary::Offset,
-    contract::{
-        self, Answer, Delivery, DocumentText, Frame, FrameParty, HeldRole, Needs, Outcome, PartyKind, VersionRange,
-        WatchEnd, WatchEvent,
-    },
-    limits::Backoff,
-    link::Link,
+use jig_client_domain::contract::{
+    self, Answer, Delivery, DocumentText, Frame, FrameParty, HeldRole, Needs, Outcome, PartyKind, WatchEnd, WatchEvent,
 };
+use jig_domain_client::{boundary::Offset, limits::Backoff, link::Link};
 use skein_lib::{Duration, Env, List, Queue, RequestEnvelope, RequestLimits, Time, Token, Wall};
 const JIG: jig_domain_client::Limits = jig_domain_client::Limits {
     watches: 4,
@@ -117,7 +112,7 @@ fn start(root: &mut Domain, kept: List<crate::store::Record>) -> Token {
         .unwrap()
 }
 fn confirm(root: &mut Domain, watch: Token, party: u64) {
-    drive(root, Event::Jig(jig_domain_client::Event::Hello { versions: VersionRange { first: 7, last: 7 } }));
+    drive(root, Event::Jig(jig_domain_client::Event::Hello { served: true }));
     // Explicit synthetic identity and empty offers, supplied independently of the party's display name.
     let frame = Frame {
         party: FrameParty {

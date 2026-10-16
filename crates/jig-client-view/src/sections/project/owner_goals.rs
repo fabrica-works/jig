@@ -5,16 +5,12 @@ use crate::{JigBindings, JigMeaning, cards};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, State};
 
-use jig_domain_client::{
-    Domain,
-    action::Act,
-    contract::{ActKind, Admission, Bounds, Funder, GoalExecutor, OwnerProject},
-    fields::Purpose,
-};
+use jig_client_domain::contract::{ActKind, Admission, Bounds, Funder, GoalExecutor, OwnerProject};
+use jig_domain_client::{Domain, action::Act, fields::Purpose};
 
 /// The goal renderer traverses bounded choices and recipients; both have independent row bounds.
 pub(super) fn offer_fits(value: &Admission, limits: &jig_domain_client::Limits) -> Option<()> {
-    use jig_domain_client::contract::{Beyond, Recipient};
+    use jig_client_domain::contract::{Beyond, Recipient};
     let recipient = match value {
         Admission::Bounded { within, beyond } => {
             match within {
@@ -209,7 +205,7 @@ fn inputs(
     if let Some(at) = form.deadline {
         words.deadline(b, at);
     }
-    match jig_domain_client::contract::admission::goal(admission, form.executor, form.budget, form.deadline) {
+    match jig_client_domain::contract::admission::goal(admission, form.executor, form.budget, form.deadline) {
         Admission::Proposed { to } => {
             words.text(b, if form.budget > pool_left { JigPhrase::GoalPropose } else { JigPhrase::WillPropose }, &[]);
             cards::common::recipient(b, &to, words);

@@ -16,3 +16,9 @@ pub use limits::{Limits, Unusable, worst_case};
 pub use translate::Undecodable;
 #[cfg(test)]
 mod tests;
+
+/// Whether the engine serves this client's wire version (protocol/client.md, 9).
+#[must_use]
+pub const fn serves(versions: jig_client_domain::contract::VersionRange) -> bool {
+    versions.contains(jig_client_protocol_wire::VERSION)
+}

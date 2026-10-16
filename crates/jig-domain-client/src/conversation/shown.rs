@@ -1,10 +1,8 @@
 //! Literal cards drawn by the conversation (view.md, 4 and 9).
 //! Task-page proposals remain beside the log unless that exact shared key
 //! already has a card in a supplied turn, live call or decision.
-use crate::{
-    contract::{Activity, ArchivedTurn, Block, LiveCall, ObjectKey, Turn, TurnRead},
-    conversation::Conversation,
-};
+use crate::conversation::Conversation;
+use jig_client_domain::contract::{Activity, ArchivedTurn, Block, LiveCall, ObjectKey, Turn, TurnRead};
 
 impl Conversation {
     /// Whether a shown conversation line or live call shows this object (view.md, 4.1).

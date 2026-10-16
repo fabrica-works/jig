@@ -1,7 +1,8 @@
 //! The shared frame, last delivered facts and selected address.
 //! The frame confirms party and retention, and answers siblings within a step.
 //! See client/domain/client.md, 3 and 8.
-use crate::{address::Address, contract::Frame, link::Link};
+use crate::{address::Address, link::Link};
+use jig_client_domain::contract::Frame;
 /// A sibling hand off of who is signed in and where.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct FrameShown {
@@ -60,7 +61,7 @@ pub fn fits(frame: &Frame, limits: &crate::Limits) -> bool {
     }
     true
 }
-fn name_fits(name: Option<&crate::contract::DocumentText>, text: u32) -> bool {
+fn name_fits(name: Option<&jig_client_domain::contract::DocumentText>, text: u32) -> bool {
     match name {
         Some(name) => name.bytes.fits(text),
         None => true,
@@ -74,7 +75,7 @@ pub struct Summary {
     pub needs: u64,
     /// Independently supplied owner total, alongside the sum of supplied kinds.
     pub needs_total: u32,
-    pub updates: crate::contract::Count,
+    pub updates: jig_client_domain::contract::Count,
     pub project: Option<u32>,
     pub link: Link,
     pub behind: bool,
@@ -87,7 +88,7 @@ impl FrameState {
             party: None,
             needs: 0,
             needs_total: 0,
-            updates: crate::contract::Count { value: 0, limited: false },
+            updates: jig_client_domain::contract::Count { value: 0, limited: false },
             project: None,
             link,
             behind,
@@ -102,7 +103,7 @@ impl FrameState {
                 .expect("three u32 counts fit u64")
                 .checked_add(u64::from(frame.needs.person_tasks))
                 .expect("four u32 counts fit u64");
-            summary.updates = crate::contract::Count {
+            summary.updates = jig_client_domain::contract::Count {
                 value: frame.updates.value.min(limit),
                 limited: frame.updates.limited || frame.updates.value > limit,
             };

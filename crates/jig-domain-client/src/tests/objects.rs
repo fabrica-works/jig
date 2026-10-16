@@ -1,10 +1,10 @@
 use super::spine::{LIMITS, delivered, drain, drive, env, frame, open_token, start};
 use crate::{
     Domain, Event, Request,
-    contract::*,
     intents::{Progress, send_card},
     objects::{self, Card, Left, Source},
 };
+use jig_client_domain::contract::*;
 use skein_lib::{List, Queue, Time, Token, Wall};
 pub(super) fn text(bytes: &[u8]) -> Text {
     Text::new(Box::from(bytes), 32).unwrap()

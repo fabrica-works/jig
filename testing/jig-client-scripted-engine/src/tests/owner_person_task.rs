@@ -1,6 +1,6 @@
 use super::script;
 use crate::{Change, Engine, Invalid, Up};
-use jig_domain_client::contract::*;
+use jig_client_domain::contract::*;
 use skein_lib::{Time, Token, Wall};
 #[test]
 fn person_owner_public_read_preserves_whole_optional_results_and_original_object_identity() {

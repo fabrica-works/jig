@@ -3,10 +3,10 @@
 //! jig's watches and reads. No application value is held here (root.md, section 7).
 use crate::{
     Domain, Request,
-    contract::{self, Delivery, ObjectKey, Part, Read, ReadResult, ReadValue, Subject},
     objects::{Body, Source},
     watches::Owner,
 };
+use jig_client_domain::contract::{self, Delivery, ObjectKey, Part, Read, ReadResult, ReadValue, Subject};
 use skein_lib::{Env, List, Queue};
 pub(crate) const WINDOW: u16 = u16::MAX;
 fn source(domain: &Domain) -> Source {

@@ -6,7 +6,7 @@ use skein_ui::Limits;
 use skein_ui::phrases::{Invalid, PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat};
 use skein_ui::{Builder, Tree};
 
-use jig_domain_client::contract::*;
+use jig_client_domain::contract::*;
 use skein_lib::{List, Wall, bytes::copy_of};
 fn text(bytes: &[u8]) -> Text {
     Text::new(copy_of(bytes), u32::try_from(bytes.len()).unwrap()).unwrap()

@@ -6,10 +6,10 @@
 )]
 use super::cards::{CLIENT, contains, document, drive, start, text, words};
 use crate::JigBindings;
+use jig_client_domain::contract::*;
 use jig_domain_client::{
     Domain, Event, Request,
     address::{Address, Place},
-    contract::*,
     pages::Page,
 };
 use skein_lib::{List, Token};
@@ -65,7 +65,7 @@ pub(super) fn special_pages(words: &crate::words::Words) {
         Some(jig_domain_client::action::Act::SignIn { provider: 3 })
     );
     let (mut d, f) = start();
-    drive(&mut d, Event::Hello { versions: VersionRange { first: 2, last: 2 } });
+    drive(&mut d, Event::Hello { served: false });
     assert!(deliver(&mut d, f, Delivery::Frame(Box::new(document()))).is_empty());
     assert!(contains(&build(&d, 2, words).0, b"update or reload"));
     let mut d = Domain::new(&CLIENT, 9);

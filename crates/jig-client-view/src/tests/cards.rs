@@ -9,12 +9,12 @@ use crate::phrases::english;
 use crate::phrases::jig::{JigPhrase, shapes};
 use crate::words::Words;
 use crate::{JigBindings, JigMeaning, Owner, decode};
+use jig_client_domain::contract::*;
 use jig_domain_client::{
     Domain, Event, Request,
     action::Act as Action,
     address::Address,
     boundary::Offset,
-    contract::*,
     intents::Progress,
     limits::Backoff,
     objects::{Card, Left, Source},
@@ -106,7 +106,7 @@ pub(super) fn drive(d: &mut Domain, event: Event) -> Vec<Request> {
         jig_domain_client::step(
             d,
             &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: CLIENT },
-            Event::Hello { versions: VersionRange { first: 7, last: 7 } },
+            Event::Hello { served: true },
             &mut q,
         );
     }

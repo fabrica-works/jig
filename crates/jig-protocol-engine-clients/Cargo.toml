@@ -26,6 +26,7 @@ jig-domain-views.workspace = true
 workspace = true
 
 [dev-dependencies]
-jig-client-protocol-link = {path = "../jig-client-protocol-link"}
 jig-domain-client = {path = "../jig-domain-client"}
+jig-client-protocol-link = {path = "../jig-client-protocol-link"}
+jig-client-domain.workspace = true
 jig-client-test-records = {path = "../../testing/jig-client-test-records"}

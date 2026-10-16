@@ -10,9 +10,9 @@ use crate::{
     Domain, Event, Request,
     action::Act,
     address::{Address, Place, TaskSection},
-    contract::*,
     pages::task::PlanFilter,
 };
+use jig_client_domain::contract::*;
 use skein_lib::{Env, List, Queue, Time, Token, Wall};
 fn limits() -> crate::Limits {
     crate::Limits { objects: 8, reads: 8, ..LIMITS }

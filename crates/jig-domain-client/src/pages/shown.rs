@@ -14,7 +14,7 @@ impl Domain {
         }
         match section {
             Section::Task { task, section } => {
-                if let Some(id) = self.objects.find(crate::contract::ObjectKey::Task(task)) {
+                if let Some(id) = self.objects.find(jig_client_domain::contract::ObjectKey::Task(task)) {
                     match &self.objects.get(id).expect("named task exists").body {
                         Some(Body::Task(task)) => return super::task::offered(&super::task::offers(task), section),
                         Some(
@@ -220,7 +220,7 @@ pub(crate) fn show(
     }
     if overlong {
         domain.section_context = u32::MAX;
-        super::routing::refuse(domain, crate::contract::Limit::Objects);
+        super::routing::refuse(domain, jig_client_domain::contract::Limit::Objects);
     }
     let owner = owner(domain);
     for (id, ()) in &domain.watch_ids {
@@ -240,7 +240,7 @@ pub(crate) fn show(
     }
     if previous != domain.sections {
         if let Some(task) = domain.shown_task() {
-            context_subject(domain, &crate::contract::Subject::Task { task });
+            context_subject(domain, &jig_client_domain::contract::Subject::Task { task });
         }
         super::task::document(domain, env, out);
         domain.section_context = u32::MAX;
@@ -248,7 +248,7 @@ pub(crate) fn show(
     }
 }
 
-pub(crate) fn needed(domain: &Domain, subject: &crate::contract::Subject) -> bool {
+pub(crate) fn needed(domain: &Domain, subject: &jig_client_domain::contract::Subject) -> bool {
     for section in domain.sections() {
         if uses(*section, subject) {
             return true;
@@ -256,8 +256,8 @@ pub(crate) fn needed(domain: &Domain, subject: &crate::contract::Subject) -> boo
     }
     false
 }
-fn uses(section: Section, subject: &crate::contract::Subject) -> bool {
-    use crate::contract::Subject;
+fn uses(section: Section, subject: &jig_client_domain::contract::Subject) -> bool {
+    use jig_client_domain::contract::Subject;
     match subject {
         Subject::Frame => false,
         Subject::Task { task } => match section {
@@ -302,7 +302,7 @@ fn uses(section: Section, subject: &crate::contract::Subject) -> bool {
 pub struct SectionStatus {
     pub behind: bool,
     pub excess: u32,
-    pub refused: Option<crate::contract::Limit>,
+    pub refused: Option<jig_client_domain::contract::Limit>,
     pub missing: bool,
 }
 impl Domain {
@@ -328,7 +328,7 @@ impl Domain {
         Some(status)
     }
 }
-pub(crate) fn context_subject(domain: &mut Domain, subject: &crate::contract::Subject) {
+pub(crate) fn context_subject(domain: &mut Domain, subject: &jig_client_domain::contract::Subject) {
     domain.section_context = 0;
     for (index, section) in domain.sections.as_slice().iter().enumerate() {
         if uses(*section, subject) {
@@ -346,7 +346,12 @@ fn context_section(domain: &mut Domain, section: Section) {
         }
     }
 }
-pub(crate) fn status(domain: &mut Domain, refused: Option<crate::contract::Limit>, excess: Option<u32>, missing: bool) {
+pub(crate) fn status(
+    domain: &mut Domain,
+    refused: Option<jig_client_domain::contract::Limit>,
+    excess: Option<u32>,
+    missing: bool,
+) {
     for index in 0..domain.section_statuses.len() {
         let value = domain.section_statuses.get_mut(index).expect("section status exists");
         if domain.section_context & 1_u32.checked_shl(index).expect("nineteen sections fit") != 0 {
@@ -361,8 +366,8 @@ pub(crate) fn status(domain: &mut Domain, refused: Option<crate::contract::Limit
     }
 }
 
-pub(crate) fn context_read(domain: &mut Domain, what: &crate::contract::Read) {
-    use crate::contract::{Read, Subject};
+pub(crate) fn context_read(domain: &mut Domain, what: &jig_client_domain::contract::Read) {
+    use jig_client_domain::contract::{Read, Subject};
     let section = match what {
         Read::Task { task } => {
             context_subject(domain, &Subject::Task { task: *task });

@@ -7,11 +7,11 @@ use crate::{JigBindings, JigMeaning, JigStyle};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run, State};
 
+use jig_client_domain::contract::{ActKind, Hold, HoldReason, Impact, ObjectKey, OwnerChipHold, TaskHold};
 use jig_domain_client::{
     Domain,
     action::Act,
     confirm::{Confirmation, Missing},
-    contract::{ActKind, Hold, HoldReason, Impact, ObjectKey, OwnerChipHold, TaskHold},
     fields::Purpose,
     objects::{Body, Object},
 };
@@ -312,7 +312,7 @@ fn action(
         | ActKind::ChangePolicy
         | ActKind::SetRoles
         | ActKind::MakeService
-        | ActKind::SetPool => words.refusal(b, &jig_domain_client::contract::Refusal::NotOffered),
+        | ActKind::SetPool => words.refusal(b, &jig_client_domain::contract::Refusal::NotOffered),
     }
 }
 fn held(object: &Object) -> bool {
@@ -366,7 +366,7 @@ fn release_object(b: &mut Builder, client: &Domain, object: &Object, words: &Wor
 fn release_owner(b: &mut Builder, facts: &OwnerChipHold, words: &Words, bindings: &mut JigBindings) {
     crate::owner_chip::hold(b, facts, words, bindings);
     words.text(b, JigPhrase::OwnerHoldRelease, &[]);
-    if let jig_domain_client::contract::HoldCategory::Uncertain { .. } = facts.reason {
+    if let jig_client_domain::contract::HoldCategory::Uncertain { .. } = facts.reason {
         words.text(b, JigPhrase::EngineFollowsChoice, &[]);
         crate::frame::control(
             b,
@@ -428,7 +428,7 @@ pub fn impact_words(b: &mut Builder, impact: &Impact, words: &Words) {
     words.text(b, JigPhrase::SettlingEffects, &[Hole::Number(u64::from(impact.effects_settling))]);
 }
 fn release(b: &mut Builder, client: &Domain, facts: &Hold, words: &Words, bindings: &mut JigBindings) {
-    let closing = facts.before == jig_domain_client::contract::Phase::Closing;
+    let closing = facts.before == jig_client_domain::contract::Phase::Closing;
     if closing {
         words.text(b, JigPhrase::ContinueClosing, &[]);
     }
@@ -535,12 +535,12 @@ fn delegates(
         );
         for disposal in &open.choices.disposals {
             match disposal {
-                jig_domain_client::contract::Disposal::Cancel { task } => {
+                jig_client_domain::contract::Disposal::Cancel { task } => {
                     if *task == delegate.chip.task {
                         words.text(b, JigPhrase::DelegateCancel, &[Hole::Number(*task)]);
                     }
                 }
-                jig_domain_client::contract::Disposal::TakeOver { task } => {
+                jig_client_domain::contract::Disposal::TakeOver { task } => {
                     if *task == delegate.chip.task {
                         words.text(
                             b,

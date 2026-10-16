@@ -2,7 +2,8 @@
 use crate::{JigBindings, words::Words};
 use skein_ui::Builder;
 
-use jig_domain_client::{Domain, contract::TaskResult};
+use jig_client_domain::contract::TaskResult;
+use jig_domain_client::Domain;
 
 pub(crate) fn render(b: &mut Builder, client: &Domain, value: &TaskResult, words: &Words, bindings: &mut JigBindings) {
     match value {

@@ -164,11 +164,11 @@ pub(crate) fn slots(view: &mut View<'_>, root: &Domain, b: &mut Builder) {
 fn second(
     b: &mut Builder,
     root: &Domain,
-    part: &jig_domain_client::contract::Part,
+    part: &jig_client_domain::contract::Part,
     words: &words::Words,
     jig: &jig_client_view::words::Words,
 ) {
-    use jig_domain_client::contract::Part;
+    use jig_client_domain::contract::Part;
     use skein_ui::phrases::Hole;
     if !root.second().contains(part) {
         words.status(b, words::Word::Unshowable, &[]);

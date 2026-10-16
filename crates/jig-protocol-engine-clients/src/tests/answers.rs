@@ -158,8 +158,8 @@ fn done_ending_round_trips(limits: &w::Limits) {
     .expect("owned final");
     assert_eq!(
         jig_client_protocol_link::translate::answers::answer(w::Answer::FinalAnswer(owned), &f::client_limits()),
-        Ok(jig_domain_client::contract::Answer::Refused(jig_domain_client::contract::Refusal::Ended {
-            how: jig_domain_client::contract::Ending::Done
+        Ok(jig_client_domain::contract::Answer::Refused(jig_client_domain::contract::Refusal::Ended {
+            how: jig_client_domain::contract::Ending::Done
         }))
     );
 }

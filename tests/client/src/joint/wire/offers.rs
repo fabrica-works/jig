@@ -1,6 +1,7 @@
 //! Exact offered acts, holder identities and supported draft bounds (contract.md, 5.3).
 use super::{owner, refusals};
-use jig_domain_client::{Limits, contract as client};
+use jig_client_domain::contract as client;
+use jig_domain_client::Limits;
 use jig_domain_core::acts;
 use skein_lib::List;
 

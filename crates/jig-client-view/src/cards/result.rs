@@ -5,10 +5,10 @@ use crate::words::{Words, name};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
+use jig_client_domain::contract::{Result as ResultDocument, ResultValue};
 use jig_domain_client::{
     Domain,
     action::Act,
-    contract::{Result as ResultDocument, ResultValue},
     objects::{Object, result::facts as document},
 };
 use skein_lib::Id;
@@ -69,7 +69,7 @@ pub fn value_nodes(b: &mut Builder, client: &Domain, value: &ResultValue, words:
                 super::chip::chip(b, client, task, words, bindings);
             }
             if let Some(key) = proposal
-                && let Some(id) = client.objects().find(jig_domain_client::contract::ObjectKey::Proposal(*key))
+                && let Some(id) = client.objects().find(jig_client_domain::contract::ObjectKey::Proposal(*key))
             {
                 super::proposal::proposal(b, client, id, &super::Place::Conversation, words, bindings);
             }
@@ -103,8 +103,8 @@ pub fn value_nodes(b: &mut Builder, client: &Domain, value: &ResultValue, words:
 fn verdict_payload(
     b: &mut Builder,
     verdict: u32,
-    explanation: &jig_domain_client::contract::DocumentText,
-    fields: &skein_lib::List<jig_domain_client::contract::ResultField>,
+    explanation: &jig_client_domain::contract::DocumentText,
+    fields: &skein_lib::List<jig_client_domain::contract::ResultField>,
     words: &Words,
 ) {
     words.text(b, JigPhrase::Verdict, &[Hole::Number(u64::from(verdict))]);

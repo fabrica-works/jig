@@ -2,8 +2,9 @@
 //! Normal Run state remains independent of provisional text and its Continue
 //! cursor. Receiving admission prices the complete envelope before it is fed.
 use super::{chips, cursor, inbox, offers, owner, results, rows, watches};
+use jig_client_domain::contract as client;
 use jig_client_scripted_engine as admission;
-use jig_domain_client::{Limits, contract as client};
+use jig_domain_client::Limits;
 use jig_domain_core::documents;
 use jig_domain_views as views;
 

@@ -5,9 +5,9 @@ use super::{
 use crate::{
     Domain, Event, Request,
     address::{Address, Place},
-    contract::*,
     objects::Body,
 };
+use jig_client_domain::contract::*;
 use skein_lib::{Env, List, Queue, Time, Token, Wall};
 
 fn source(maker: Proposer, part: OwnerPart) -> OwnerProposal {

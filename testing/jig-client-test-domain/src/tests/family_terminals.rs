@@ -9,10 +9,8 @@ use crate::{
     family::{self, Document, Item, ItemState, Kind, Scope, Subject},
     first::{self, FamilyTerminal as T},
 };
-use jig_domain_client::{
-    contract::{Part, ProposalKey, Proposer, Revision},
-    link::Link,
-};
+use jig_client_domain::contract::{Part, ProposalKey, Proposer, Revision};
+use jig_domain_client::link::Link;
 use skein_lib::{Duration, Env, List, Queue, Time, Token, Wall};
 fn limits() -> first::Limits {
     first::Limits {

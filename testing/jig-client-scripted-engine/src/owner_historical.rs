@@ -3,7 +3,7 @@
 //! historical source is shortened to another current document projection.
 use crate::{Bounds, payload::Payload};
 use core::mem::size_of;
-use jig_domain_client::contract::{
+use jig_client_domain::contract::{
     OwnerEscalationDecision, OwnerEscalationDecisionRecord, OwnerGoalHolding, OwnerHistorical, OwnerHistoricalValue,
     OwnerPersonProposal, OwnerPersonProposalGoal, OwnerPersonProposalState, OwnerProposalDecision,
 };

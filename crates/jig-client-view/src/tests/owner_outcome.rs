@@ -3,7 +3,7 @@ use skein_ui::Limits;
 use skein_ui::phrases::{Hole, HoleKind, Invalid, Language, PhraseLimits, Phrasebook, Segment};
 use skein_ui::{Builder, Role, Tree};
 
-use jig_domain_client::contract::{
+use jig_client_domain::contract::{
     OwnerEscalationChoice, OwnerOutcome, OwnerProposalChoice, ProposalKey, Proposer, Revision, Seen,
 };
 use skein_lib::{Wall, bytes::copy_of};
@@ -439,7 +439,7 @@ fn durable_answer_rendering_keeps_every_owner_fact_within_the_existing_notice_en
     };
     for (value, expected) in max_cases() {
         let mut builder = Builder::new(&limits);
-        words.outcome(&mut builder, &jig_domain_client::contract::Outcome::Owner(value));
+        words.outcome(&mut builder, &jig_client_domain::contract::Outcome::Owner(value));
         let tree = builder.finish();
         expect_lines(&tree, expected);
         assert!(tree.len() <= required.nodes);

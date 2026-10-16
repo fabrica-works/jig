@@ -1,9 +1,10 @@
 //! Starting truth and person's scripts shared by focused and random worlds.
 #![allow(clippy::wildcard_imports, reason = "world adapters translate the complete owner vocabulary")]
 use crate::{Scripted, Settings, Test, World, scripted::Family, test::list};
+use jig_client_domain::contract::*;
 use jig_client_scripted_engine::{Bounds, Script, Truth};
 use jig_client_test_domain::Address as RootAddress;
-use jig_domain_client::{address::Address, contract::*};
+use jig_domain_client::address::Address;
 use skein_lib::{Duration, Wall};
 pub mod client_construction;
 pub mod person_confirmation;
@@ -214,7 +215,7 @@ pub fn task() -> Task {
         result: None,
         delegates: list([]),
 
-        context: Some(Box::new(jig_domain_client::contract::TaskContext {
+        context: Some(Box::new(jig_client_domain::contract::TaskContext {
             escalation: None,
             parts: list([]),
             closing: None,
@@ -492,7 +493,7 @@ fn proposal_fixture(seed: u64, delegate_chip: bool) -> World<Test, Scripted> {
         jig_client_scripted_engine::Change::Source(jig_client_scripted_engine::Source {
             party: 7,
             read: Read::Inbox {
-                group: jig_domain_client::contract::InboxReadGroup::Needs,
+                group: jig_client_domain::contract::InboxReadGroup::Needs,
                 project: None,
                 kind: None,
                 goal: None,
@@ -607,7 +608,7 @@ fn accepted_proposal(world: &mut World<Test, Scripted>, p: &Proposal) {
         jig_client_scripted_engine::Change::Source(jig_client_scripted_engine::Source {
             party: 7,
             read: Read::Inbox {
-                group: jig_domain_client::contract::InboxReadGroup::Needs,
+                group: jig_client_domain::contract::InboxReadGroup::Needs,
                 project: None,
                 kind: None,
                 goal: None,
@@ -689,7 +690,7 @@ pub fn goal_world(seed: u64) -> World<Test, Scripted> {
     doc.acts = list([Offered {
         act: ActKind::SetGoal,
         admission: Admission::Bounded {
-            within: jig_domain_client::contract::Bounds::Goal {
+            within: jig_client_domain::contract::Bounds::Goal {
                 pool_left: 1,
                 procedures: list([]),
                 charters: list([1]),
@@ -746,7 +747,7 @@ pub fn procedure_goal_world(seed: u64) -> World<Test, Scripted> {
     doc.acts = list([Offered {
         act: ActKind::SetGoal,
         admission: Admission::Bounded {
-            within: jig_domain_client::contract::Bounds::Goal {
+            within: jig_client_domain::contract::Bounds::Goal {
                 pool_left: 1,
                 procedures: list([GoalProcedure { connector: 2, code: 7 }]),
                 charters: list([]),
@@ -915,7 +916,7 @@ pub fn reported(mut task: Task, report: &[u8]) -> Task {
     task.context.as_mut().expect("supplied task context").runtime = Runtime::Ended;
     task.acts = list([]);
     task.proposals = list([]);
-    task.result = Some(jig_domain_client::contract::TaskResult::Document(Box::new(Result {
+    task.result = Some(jig_client_domain::contract::TaskResult::Document(Box::new(Result {
         task: task.chip.clone(),
         ending: Ending::Done,
         value: Some(ResultValue::Report(DocumentText::complete(text(report)))),
@@ -927,8 +928,8 @@ pub fn reported(mut task: Task, report: &[u8]) -> Task {
     task
 }
 
-fn specification(words: jig_domain_client::contract::Text) -> jig_domain_client::contract::SpecificationDocument {
-    jig_domain_client::contract::SpecificationDocument::complete(jig_domain_client::contract::Specification {
+fn specification(words: jig_client_domain::contract::Text) -> jig_client_domain::contract::SpecificationDocument {
+    jig_client_domain::contract::SpecificationDocument::complete(jig_client_domain::contract::Specification {
         words,
         parameters: skein_lib::List::with_capacity(0),
         inputs: skein_lib::List::with_capacity(0),

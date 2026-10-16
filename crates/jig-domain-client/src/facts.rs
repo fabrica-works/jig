@@ -1,6 +1,6 @@
 //! Content free observations for operators and worlds.
 //! See client/domain/client.md, 4.2; fact emission must never change decisions.
-use crate::contract::Limit;
+use jig_client_domain::contract::Limit;
 /// One diagnostic observation without person words.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Fact {

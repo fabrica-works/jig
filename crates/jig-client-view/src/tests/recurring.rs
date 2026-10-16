@@ -8,11 +8,11 @@ use super::{
     pages::{build, named_binding},
     work_pages::{entered, list, project_doc},
 };
+use jig_client_domain::contract::*;
 use jig_domain_client::{
     Event, Request,
     action::Act,
     address::{Address, ProjectSection},
-    contract::*,
 };
 
 #[test]

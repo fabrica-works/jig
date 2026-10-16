@@ -37,7 +37,7 @@ pub struct Joint {
     last_client: Option<ClientId>,
     last_watch: Option<(ClientId, Token)>,
     last_attempt: Option<(ClientId, Token)>,
-    version_fault: Option<jig_domain_client::contract::VersionRange>,
+    version_fault: Option<jig_client_domain::contract::VersionRange>,
     restart_configuration: Option<fn() -> jig_test_domain::Config>,
     busy_pressure: Option<fn() -> jig_fake_parties::Party>,
     not_ready_restore: Option<(fn() -> jig_test_domain::Config, Duration)>,
@@ -75,7 +75,7 @@ impl Joint {
     }
 
     /// Configure the actual incompatible served range for a version fault.
-    pub fn version_fault(&mut self, versions: jig_domain_client::contract::VersionRange) {
+    pub fn version_fault(&mut self, versions: jig_client_domain::contract::VersionRange) {
         self.version_fault = Some(versions);
     }
 
@@ -239,8 +239,8 @@ impl Front<Test> for Joint {
 mod tests {
     use super::*;
     use crate::joint::engine::Driver;
+    use jig_client_domain::contract as client;
     use jig_core_world::peers::Peers;
-    use jig_domain_client::contract as client;
     use jig_domain_people as people;
 
     fn clock(now: Time) -> Wall {
@@ -589,10 +589,11 @@ mod tests {
         front.version_fault(supplied);
         Front::<Test>::fault(&mut front, Time::ZERO, FrontFault::Versions);
         let callbacks = Front::<Test>::poll(&mut front, Time::ZERO, clock(Time::ZERO));
-        assert!(
-            matches!(callbacks.as_slice(), [(ClientId(0), Event::Jig(jig_domain_client::Event::Hello { versions }))] if *versions == supplied)
-        );
-        assert_eq!(front.session.driver.transport.hello(), jig_domain_client::Event::Hello { versions: supplied });
+        assert!(matches!(
+            callbacks.as_slice(),
+            [(ClientId(0), Event::Jig(jig_domain_client::Event::Hello { served: false }))]
+        ));
+        assert_eq!(front.session.driver.transport.hello(), jig_domain_client::Event::Hello { served: false });
         assert_eq!(front.session.driver.world.store.rows, rows);
         assert!(Front::<Test>::observed(&mut front).is_empty());
     }

@@ -1,8 +1,8 @@
-use jig_client_scripted_engine::{Bounds, owner_authority as price};
-use jig_domain_client::contract::{
+use jig_client_domain::contract::{
     OwnerAuthority, OwnerAuthorityDocument, OwnerAuthorityExecutor, OwnerDelegation, OwnerGrant, OwnerPattern,
     OwnerPatternEnd, OwnerResourceScope,
 };
+use jig_client_scripted_engine::{Bounds, owner_authority as price};
 use skein_lib::{List, Wall};
 use skein_world::domain::heap::{Counting, Meter};
 #[global_allocator]

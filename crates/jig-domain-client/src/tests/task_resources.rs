@@ -5,9 +5,9 @@ use super::{
 use crate::{
     Event, Request,
     address::{Address, Place, TaskSection},
-    contract::*,
     objects::Body,
 };
+use jig_client_domain::contract::*;
 use skein_lib::{List, Time};
 
 #[test]

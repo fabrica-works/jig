@@ -126,7 +126,7 @@ fn owner_escalation_normal_read_preserves_offer_order_recursive_admissions_and_b
     row.acts.get_mut(1).unwrap().admission =
         Admission::Proposed { to: Recipient::Roles { project: u32::MAX, roles: list(vec![u32::MAX, 0]) } };
     row.acts.get_mut(3).unwrap().admission = Admission::Bounded {
-        within: jig_domain_client::contract::Bounds::Amend {
+        within: jig_client_domain::contract::Bounds::Amend {
             budget_left: u64::MAX,
             implications: List::with_capacity(2),
             grants: List::with_capacity(2),
@@ -176,7 +176,7 @@ fn owner_escalation_normal_read_preserves_offer_order_recursive_admissions_and_b
     assert_eq!(received.acts.capacity(), MAX_OFFERED_ACTS);
     assert_eq!(received.task.acts.capacity(), MAX_OFFERED_ACTS);
     assert_eq!(received.acts.iter().map(|offer| offer.act).collect::<Vec<_>>(), kinds);
-    let Admission::Bounded { within: jig_domain_client::contract::Bounds::Amend { implications, .. }, .. } =
+    let Admission::Bounded { within: jig_client_domain::contract::Bounds::Amend { implications, .. }, .. } =
         &mut row.acts.get_mut(3).unwrap().admission
     else {
         panic!("supplied amendment");

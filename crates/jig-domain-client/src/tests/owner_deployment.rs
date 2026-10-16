@@ -10,9 +10,9 @@ use super::spine::{LIMITS, delivered, drive, frame, open_token, start};
 use crate::{
     Domain, Event, Request,
     address::{Address, Place},
-    contract::*,
     pages::Page,
 };
+use jig_client_domain::contract::*;
 use skein_lib::{Duration, List, Time, Token};
 
 fn document() -> OwnerDeployment {

@@ -1,7 +1,7 @@
 //! Recursive admission for deployment-owned documents (contract.md, 5.3).
 use crate::{Bounds, payload::Payload};
 use core::mem::size_of;
-use jig_domain_client::contract::{
+use jig_client_domain::contract::{
     OwnerAccount, OwnerAccountState, OwnerAttemptState, OwnerCapacity, OwnerDeployment, OwnerHelloRefusal,
     OwnerHelloRefusalLine, OwnerHost, OwnerHostKind, OwnerHostRun, OwnerPersonCapacityAction, OwnerPersonCapacityCause,
     OwnerPersonCapacityRefusal, OwnerProjectCapacity, OwnerRequestKey, OwnerRunLocation, OwnerTaskCapacityAction,

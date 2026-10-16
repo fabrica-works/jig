@@ -14,9 +14,6 @@ use crate::{
     Domain, Request,
     action::End,
     address::{Address, Place, TaskSection},
-    contract::{
-        self, Answer, Ask, ConversationLine, InboxGroup, InboxReadGroup, Limit, ObjectKey, Read, Refusal, Seen, Text,
-    },
     fields::Purpose,
     intents::Origin,
     objects::{Body, Source},
@@ -24,6 +21,9 @@ use crate::{
     windows::{Edge, Edges},
 };
 use alloc::boxed::Box;
+use jig_client_domain::contract::{
+    self, Answer, Ask, ConversationLine, InboxGroup, InboxReadGroup, Limit, ObjectKey, Read, Refusal, Seen, Text,
+};
 use skein_lib::{Env, List, Queue, Token};
 /// First-words submission and its refusal, held apart from the list window.
 #[derive(Debug)]

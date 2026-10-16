@@ -10,11 +10,11 @@ use crate::{
     Domain, Event, Request,
     action::Act,
     address::{Address, Place, ProjectSection},
-    contract::*,
     intents::Progress,
     pages::project::owner_form,
 };
 use alloc::vec::Vec;
+use jig_client_domain::contract::*;
 use skein_lib::{List, Time, Token, bytes::copy_of};
 fn list<T>(cap: u32, rows: impl IntoIterator<Item = T>) -> List<T> {
     let mut out = List::with_capacity(cap);

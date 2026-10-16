@@ -1,9 +1,7 @@
 //! Calls share one chip watch for their named tasks, independently of immutable
 //! object reads and the page header's task watch. See client/domain/objects.md, 10.
-use crate::{
-    Domain, Request,
-    contract::{Limit, ObjectKey, Subject},
-};
+use crate::{Domain, Request};
+use jig_client_domain::contract::{Limit, ObjectKey, Subject};
 use skein_lib::{Env, List, Queue};
 
 /// Changes membership after closing the previous watch obligation.

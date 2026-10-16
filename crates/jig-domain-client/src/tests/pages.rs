@@ -6,13 +6,13 @@ use super::spine::{LIMITS, delivered, drive, frame, open_token, start};
 use crate::{
     Domain, Event, Request,
     address::{Address, Place, ProjectSection, TaskSection},
-    contract::*,
     link::Link,
     pages::{
         Arrangement, Page, Section,
         navigation::{Destination, Navigation},
     },
 };
+use jig_client_domain::contract::*;
 use skein_lib::{List, Time};
 fn text(value: &[u8]) -> Text {
     Text::new(Box::from(value), LIMITS.text).unwrap()
@@ -195,7 +195,7 @@ fn non_work_pages_follow_their_causes_and_missing_tasks_do_not_reveal_visibility
     }
     let mut old = Domain::new(&LIMITS, 6);
     let f = start(&mut old, List::with_capacity(0));
-    drive(&mut old, Time::ZERO, Event::Hello { versions: VersionRange { first: 2, last: 2 } });
+    drive(&mut old, Time::ZERO, Event::Hello { served: false });
     assert!(delivered(&mut old, Time::ZERO, f, frame(7)).is_empty());
     assert_eq!(old.page(), &Page::OutOfDate);
     let mut other = Domain::new(&LIMITS, 7);
@@ -1735,7 +1735,7 @@ fn check_inbox_group_pages_keep_orders_cursors_and_live_precedence() {
             offset: crate::boundary::Offset { minutes: 0 },
         },
     ));
-    send(&mut domain, Event::Hello { versions: VersionRange { first: 7, last: 7 } });
+    send(&mut domain, Event::Hello { served: true });
     let entered =
         send(&mut domain, Event::Watch { watch: f, event: WatchEvent::Delivered(Delivery::Frame(Box::new(frame(7)))) });
     let watch = open_token(&entered);

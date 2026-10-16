@@ -9,9 +9,9 @@ use skein_ui::{Act, Binding, number};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum JigMeaning {
     /// One typed Project settings field, preserving other whole channels.
-    ProjectSetting { ask: Box<jig_domain_client::contract::Ask>, field: crate::owner_project::Field },
+    ProjectSetting { ask: Box<jig_client_domain::contract::Ask>, field: crate::owner_project::Field },
     /// A new service name, after an explicit supplied role choice.
-    ProjectServiceName { project: u32, role: jig_domain_client::contract::HeldRole },
+    ProjectServiceName { project: u32, role: jig_client_domain::contract::HeldRole },
     /// An explicit budget for one supplied party in the configured target.
     ProjectPoolBudget { project: u32, party: u64 },
     /// Pressing, submitting or toggling asks this already typed action.
@@ -24,8 +24,8 @@ pub enum JigMeaning {
     Priority,
     /// Source values and selected replacements kept separately for one named field.
     Amendment {
-        before: Box<jig_domain_client::contract::Amendment>,
-        change: Box<jig_domain_client::contract::Amendment>,
+        before: Box<jig_client_domain::contract::Amendment>,
+        change: Box<jig_client_domain::contract::Amendment>,
         field: crate::confirmation::amendment::Field,
     },
     /// A typed project goal form field.
@@ -36,9 +36,9 @@ pub enum JigMeaning {
     /// Description search changes the current note scope only.
     NoteSearch { filter: jig_domain_client::pages::project::NoteFilter },
     /// A connector-owned part referred to by a slot, never an actionable node.
-    Part(jig_domain_client::contract::Part),
+    Part(jig_client_domain::contract::Part),
     /// A whole exact owner reference, with literal path segment boundaries.
-    OwnerPart(jig_domain_client::contract::OwnerPart),
+    OwnerPart(jig_client_domain::contract::OwnerPart),
 }
 #[derive(Debug)]
 struct Entry {
@@ -74,7 +74,7 @@ impl JigBindings {
     }
     /// Resolve a part slot's token for its connector's view root.
     #[must_use]
-    pub fn part(&self, token: Token) -> Option<&jig_domain_client::contract::Part> {
+    pub fn part(&self, token: Token) -> Option<&jig_client_domain::contract::Part> {
         for entry in &self.entries {
             if entry.token == token {
                 match &entry.meaning {
@@ -97,7 +97,7 @@ impl JigBindings {
     }
     /// Resolve an exact reference slot's raw key; scope is supplied by its producer.
     #[must_use]
-    pub fn owner_part(&self, token: Token) -> Option<&jig_domain_client::contract::OwnerPart> {
+    pub fn owner_part(&self, token: Token) -> Option<&jig_client_domain::contract::OwnerPart> {
         for entry in &self.entries {
             if entry.token == token {
                 match &entry.meaning {
@@ -192,7 +192,7 @@ pub fn decode(view: &mut JigBindings, token: Token, act: Act) -> Option<jig_doma
                 JigMeaning::Part(_) | JigMeaning::OwnerPart(_) => None,
                 JigMeaning::ProjectPoolBudget { project, party } => match act {
                     Act::Input { value } => Some(jig_domain_client::pages::project::owner_form::action(
-                        jig_domain_client::contract::Ask::SetPool {
+                        jig_client_domain::contract::Ask::SetPool {
                             project: *project,
                             party: *party,
                             budget: number(&value)?,
@@ -202,10 +202,10 @@ pub fn decode(view: &mut JigBindings, token: Token, act: Act) -> Option<jig_doma
                 },
                 JigMeaning::ProjectServiceName { project, role } => match act {
                     Act::Input { value } => Some(jig_domain_client::pages::project::owner_form::action(
-                        jig_domain_client::contract::Ask::MakeService {
+                        jig_client_domain::contract::Ask::MakeService {
                             project: *project,
                             role: *role,
-                            name: jig_domain_client::contract::Text::new(value, view.text_limit).ok()?,
+                            name: jig_client_domain::contract::Text::new(value, view.text_limit).ok()?,
                         },
                     )),
                     Act::Press | Act::Submit | Act::Toggle | Act::Drawing { .. } => None,
@@ -225,7 +225,7 @@ pub fn decode(view: &mut JigBindings, token: Token, act: Act) -> Option<jig_doma
                             description: if value.is_empty() {
                                 None
                             } else {
-                                Some(jig_domain_client::contract::Text::new(value, view.text_limit).ok()?)
+                                Some(jig_client_domain::contract::Text::new(value, view.text_limit).ok()?)
                             },
                         },
                     }),
@@ -249,7 +249,7 @@ pub fn decode(view: &mut JigBindings, token: Token, act: Act) -> Option<jig_doma
                 },
                 JigMeaning::Field(field) => match act {
                     Act::Input { value } => {
-                        let text = jig_domain_client::contract::Text::new(value, view.text_limit).ok()?;
+                        let text = jig_client_domain::contract::Text::new(value, view.text_limit).ok()?;
                         Some(jig_domain_client::action::Act::Edit { field: *field, text })
                     }
                     Act::Submit => Some(jig_domain_client::action::Act::Submit { field: *field }),

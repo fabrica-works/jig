@@ -3,7 +3,7 @@
 //! the shared Funder pricing belongs to the proposed-task vocabulary.
 use crate::{Bounds, payload::Payload};
 use core::mem::size_of;
-use jig_domain_client::contract::{OwnerBudget, OwnerNumbers, PoolLedger};
+use jig_client_domain::contract::{OwnerBudget, OwnerNumbers, PoolLedger};
 
 impl Payload for OwnerNumbers {
     fn heap(&self, _bounds: &Bounds) -> Option<u64> {

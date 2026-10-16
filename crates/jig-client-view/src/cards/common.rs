@@ -5,10 +5,10 @@ use crate::{JigBindings, JigMeaning, Owner};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run, SlotRef};
 
+use jig_client_domain::contract::{ActKind, Admission, Authority, Budget, Offered, Part, Passed, Recipient, TakenBy};
 use jig_domain_client::{
     Domain,
     action::Act,
-    contract::{ActKind, Admission, Authority, Budget, Offered, Part, Passed, Recipient, TakenBy},
     fields::Purpose,
     objects::{Card, Object},
 };
@@ -100,19 +100,19 @@ pub fn part(b: &mut Builder, part: &Part, words: &Words, bindings: &mut JigBindi
 /// The connector's words fill a name-only part; effect details remain in its task panel.
 pub fn closing(
     b: &mut Builder,
-    closing: &jig_domain_client::contract::Closing,
+    closing: &jig_client_domain::contract::Closing,
     words: &Words,
     bindings: &mut JigBindings,
 ) {
     words.text(b, JigPhrase::Closing, &[Hole::Number(u64::from(closing.delegates))]);
     match closing.stage {
-        Some(jig_domain_client::contract::ClosingStage::Run { attempt }) => {
+        Some(jig_client_domain::contract::ClosingStage::Run { attempt }) => {
             words.text(b, JigPhrase::ClosingRun, &[Hole::Number(attempt)]);
         }
-        Some(jig_domain_client::contract::ClosingStage::Delegates) => words.text(b, JigPhrase::ClosingDelegates, &[]),
-        Some(jig_domain_client::contract::ClosingStage::Effects) => words.text(b, JigPhrase::ClosingStageEffects, &[]),
-        Some(jig_domain_client::contract::ClosingStage::Releases) => words.text(b, JigPhrase::ClosingReleases, &[]),
-        Some(jig_domain_client::contract::ClosingStage::Settled) => words.text(b, JigPhrase::ClosingSettled, &[]),
+        Some(jig_client_domain::contract::ClosingStage::Delegates) => words.text(b, JigPhrase::ClosingDelegates, &[]),
+        Some(jig_client_domain::contract::ClosingStage::Effects) => words.text(b, JigPhrase::ClosingStageEffects, &[]),
+        Some(jig_client_domain::contract::ClosingStage::Releases) => words.text(b, JigPhrase::ClosingReleases, &[]),
+        Some(jig_client_domain::contract::ClosingStage::Settled) => words.text(b, JigPhrase::ClosingSettled, &[]),
         None => words.text(b, JigPhrase::ClosingStageUnknown, &[]),
     }
     if let Some(ending) = &closing.ending {
@@ -127,7 +127,7 @@ pub fn closing(
             for connector in connectors {
                 words.text(b, JigPhrase::ClosingConnector, &[]);
                 part(b, &Part::Connector { connector: *connector }, words, bindings);
-                if closing.stage == Some(jig_domain_client::contract::ClosingStage::Effects) {
+                if closing.stage == Some(jig_client_domain::contract::ClosingStage::Effects) {
                     words.text(b, JigPhrase::ClosingEffects, &[]);
                 }
             }
@@ -183,16 +183,16 @@ pub fn authority(b: &mut Builder, facts: &Authority, words: &Words, bindings: &m
     }
     for scope in &facts.note_scopes {
         match scope {
-            jig_domain_client::contract::NoteScope::Deployment => words.text(b, JigPhrase::Deployment, &[]),
-            jig_domain_client::contract::NoteScope::Project(project) => {
+            jig_client_domain::contract::NoteScope::Deployment => words.text(b, JigPhrase::Deployment, &[]),
+            jig_client_domain::contract::NoteScope::Project(project) => {
                 words.text(b, JigPhrase::ContextProject, &[Hole::Number(u64::from(*project))]);
             }
-            jig_domain_client::contract::NoteScope::Resource { project, connector, pattern } => {
+            jig_client_domain::contract::NoteScope::Resource { project, connector, pattern } => {
                 words.text(b, JigPhrase::ContextProject, &[Hole::Number(u64::from(*project))]);
                 words.text(b, JigPhrase::PartConnector, &[Hole::Number(u64::from(*connector))]);
                 crate::owner_authority::pattern(b, words, pattern);
             }
-            jig_domain_client::contract::NoteScope::Goal { project, goal } => {
+            jig_client_domain::contract::NoteScope::Goal { project, goal } => {
                 words.text(b, JigPhrase::ContextProject, &[Hole::Number(u64::from(*project))]);
                 words.text(b, JigPhrase::TaskPage, &[Hole::Number(*goal)]);
             }
@@ -252,8 +252,8 @@ pub fn answering(client: &Domain, object: Id<Object>) -> bool {
 pub fn answer(b: &mut Builder, object: &Object, words: &Words) {
     if let Some(answer) = &object.answer {
         match answer {
-            jig_domain_client::contract::Answer::Done(outcome) => words.outcome(b, outcome),
-            jig_domain_client::contract::Answer::Refused(why) => words.refusal(b, why),
+            jig_client_domain::contract::Answer::Done(outcome) => words.outcome(b, outcome),
+            jig_client_domain::contract::Answer::Refused(why) => words.refusal(b, why),
         }
     }
 }

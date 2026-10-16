@@ -9,7 +9,8 @@ use crate::{JigBindings, owner_historical as view};
 use skein_ui::Limits;
 use skein_ui::{Builder, Role, Tree};
 
-use jig_domain_client::{Domain, contract::*};
+use jig_client_domain::contract::*;
+use jig_domain_client::Domain;
 use skein_lib::{List, Wall};
 fn task() -> Task {
     let mut task = super::cards_objects::task_doc(&[ActKind::Cancel]);
@@ -350,7 +351,7 @@ fn presence(mask: u8) {
             |request| if let Request::Open { watch, subject: Subject::Frame } = request { Some(*watch) } else { None },
         )
         .unwrap();
-    step(&mut domain, &l, Event::Hello { versions: VersionRange { first: CLIENT_VERSION, last: CLIENT_VERSION } });
+    step(&mut domain, &l, Event::Hello { served: true });
     step(
         &mut domain,
         &l,

@@ -27,7 +27,7 @@ mod reads;
 mod requests;
 mod truth;
 mod watches;
-use jig_domain_client::contract::{Answer, Ask, ReadResult, WatchEnd, WatchEvent};
+use jig_client_domain::contract::{Answer, Ask, ReadResult, WatchEnd, WatchEvent};
 pub use reads::{Rows, Source};
 use skein_lib::{Duration, Time, Token, Wall};
 use std::collections::{BTreeMap, BTreeSet};
@@ -104,11 +104,11 @@ pub enum Up<A: Application = NoApplication> {
     ApplicationAnswer {
         attempt: Token,
         envelope: Envelope,
-        answer: Option<Result<A::Answer, jig_domain_client::contract::Refusal>>,
+        answer: Option<Result<A::Answer, jig_client_domain::contract::Refusal>>,
     },
     ApplicationRead {
         token: Token,
-        terminal: Result<A::Document, jig_domain_client::contract::ReadNone>,
+        terminal: Result<A::Document, jig_client_domain::contract::ReadNone>,
     },
     App {
         watch: Token,
@@ -156,7 +156,7 @@ enum RequestIdentity {
 #[derive(Debug, Clone)]
 enum Retained<A: Application> {
     Jig(Answer),
-    Application(Result<A::Answer, jig_domain_client::contract::Refusal>),
+    Application(Result<A::Answer, jig_client_domain::contract::Refusal>),
 }
 #[derive(Debug)]
 struct Due<A: Application> {
@@ -169,7 +169,7 @@ struct Due<A: Application> {
 #[derive(Debug)]
 pub struct Engine<A: Application = NoApplication> {
     bounds: Bounds,
-    versions: jig_domain_client::contract::VersionRange,
+    versions: jig_client_domain::contract::VersionRange,
     truth: Truth,
     durable_truth: Truth,
     rules: Vec<Rule>,
@@ -244,7 +244,7 @@ impl<A: Application> Engine<A> {
     }
     /// Configured range for the stream hello, independent of Frame and commits.
     #[must_use]
-    pub fn versions(&self) -> jig_domain_client::contract::VersionRange {
+    pub fn versions(&self) -> jig_client_domain::contract::VersionRange {
         self.versions
     }
     /// The injected seed, for replay ledgers.
@@ -341,7 +341,7 @@ impl<A: Application> Engine<A> {
             self.durable_application = pending.application;
             for change in &pending.commit.changes {
                 if let Change::Source(Source {
-                    read: jig_domain_client::contract::Read::Activity { task, .. },
+                    read: jig_client_domain::contract::Read::Activity { task, .. },
                     rows: Rows::Activity(rows),
                     ..
                 }) = change

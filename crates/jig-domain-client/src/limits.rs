@@ -1,13 +1,9 @@
 //! Container capacities and byte bounds owned by the client.
 //! Every retained container is sized from these at new; jig 21–23 add their
 //! own entities. See client/domain/client.md, 14.
-use crate::{
-    contract::{Charter, Frame, ProjectRole},
-    domain::Timer,
-    store::Record,
-    watches::Watch,
-};
+use crate::{domain::Timer, store::Record, watches::Watch};
 use core::mem::size_of;
+use jig_client_domain::contract::{Charter, Frame, ProjectRole};
 use skein_lib::{Deadlines, Duration, Id, List, Map, Slab};
 
 /// Backoff spans: double the first up to most, with seeded bounded jitter.
@@ -83,7 +79,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         return None;
     }
     let mut total = Slab::<Watch>::worst_case(limits.watches)?;
-    total = total.checked_add(List::<crate::contract::ObjectKey>::worst_case(tree_names(limits)?)?)?;
+    total = total.checked_add(List::<jig_client_domain::contract::ObjectKey>::worst_case(tree_names(limits)?)?)?;
     total = total.checked_add(List::<crate::pages::Section>::worst_case(crate::pages::MOST_SECTIONS)?)?;
     total = total.checked_add(List::<crate::pages::SectionStatus>::worst_case(crate::pages::MOST_SECTIONS)?)?;
     total = total.checked_add(crate::application::worst_case(limits)?)?;
@@ -115,7 +111,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     total = total.checked_add(u64::try_from(size_of::<Frame>()).ok()?)?;
     total = total.checked_add(u64::from(limits.text).checked_mul(2)?)?;
     total = total.checked_add(List::<ProjectRole>::worst_case(limits.projects)?)?;
-    total = total.checked_add(List::<crate::contract::OfferedCharters>::worst_case(limits.projects)?)?;
+    total = total.checked_add(List::<jig_client_domain::contract::OfferedCharters>::worst_case(limits.projects)?)?;
     let charters = List::<Charter>::worst_case(limits.charters)?
         .checked_add(u64::from(limits.charters).checked_mul(u64::from(limits.text))?)?
         .checked_mul(2)?;

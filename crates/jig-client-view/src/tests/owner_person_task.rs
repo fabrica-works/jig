@@ -12,7 +12,8 @@ use skein_ui::Limits;
 use skein_ui::phrases::{Invalid, PhraseLimits, Phrasebook, Segment};
 use skein_ui::{Builder, Role, State, Tree};
 
-use jig_domain_client::{Domain, Event, action::Act, contract::*, fields::Purpose};
+use jig_client_domain::contract::*;
+use jig_domain_client::{Domain, Event, action::Act, fields::Purpose};
 use skein_lib::{Duration, List, Wall, bytes::copy_of};
 fn rows<T>(values: impl IntoIterator<Item = T>) -> List<T> {
     let values: Vec<_> = values.into_iter().collect();

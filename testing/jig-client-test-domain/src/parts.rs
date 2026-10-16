@@ -1,13 +1,13 @@
 //! A part routes by its connector, without reading the application's value.
 use crate::{Domain, Fact, Limits, Request, first, owner::Connector, route};
-use jig_domain_client::contract::Part;
+use jig_client_domain::contract::Part;
 use skein_lib::{Env, Queue};
 pub(crate) fn show(
     root: &mut Domain,
     env: &Env<Limits>,
     part: Part,
     generation: u32,
-    scope: jig_domain_client::contract::PartScope,
+    scope: jig_client_domain::contract::PartScope,
     out: &mut Queue<Request>,
 ) {
     let number = connector(&part);
@@ -19,8 +19,8 @@ pub(crate) fn show(
                 part,
                 generation,
                 scope: match scope {
-                    jig_domain_client::contract::PartScope::Project(project) => crate::family::Scope::Project(project),
-                    jig_domain_client::contract::PartScope::Deployment => crate::family::Scope::Deployment,
+                    jig_client_domain::contract::PartScope::Project(project) => crate::family::Scope::Project(project),
+                    jig_client_domain::contract::PartScope::Deployment => crate::family::Scope::Deployment,
                 },
             },
             out,

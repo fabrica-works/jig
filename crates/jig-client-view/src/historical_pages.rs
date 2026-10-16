@@ -9,10 +9,8 @@ use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
 use alloc::boxed::Box;
-use jig_domain_client::{
-    Domain, Limits,
-    contract::{Chip, ChipPhase, Cursor, Funder, OwnerChipEnding, OwnerEndedPage, OwnerSpendPage},
-};
+use jig_client_domain::contract::{Chip, ChipPhase, Cursor, Funder, OwnerChipEnding, OwnerEndedPage, OwnerSpendPage};
+use jig_domain_client::{Domain, Limits};
 
 /// Finite tree storage for one whole retained page fragment.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

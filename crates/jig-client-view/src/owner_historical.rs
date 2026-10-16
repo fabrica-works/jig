@@ -8,15 +8,13 @@ use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
 use alloc::boxed::Box;
-use jig_domain_client::{
-    Domain, Limits,
-    contract::{
-        Chip, ChipPhase, OwnerEscalationDecision, OwnerGoalHolding, OwnerHistorical, OwnerHistoricalValue,
-        OwnerMessageProposalKind, OwnerPattern, OwnerPatternEnd, OwnerPersonProposalGoal, OwnerPersonProposalState,
-        OwnerProposalChoice, OwnerProposalDecision, OwnerRequester, OwnerTaskLink, Parameter, ParameterDocument,
-        Proposer, Result, Specification, Task, TaskContractDocument, TaskResource, TaskResult, Text,
-    },
+use jig_client_domain::contract::{
+    Chip, ChipPhase, OwnerEscalationDecision, OwnerGoalHolding, OwnerHistorical, OwnerHistoricalValue,
+    OwnerMessageProposalKind, OwnerPattern, OwnerPatternEnd, OwnerPersonProposalGoal, OwnerPersonProposalState,
+    OwnerProposalChoice, OwnerProposalDecision, OwnerRequester, OwnerTaskLink, Parameter, ParameterDocument, Proposer,
+    Result, Specification, Task, TaskContractDocument, TaskResource, TaskResult, Text,
 };
+use jig_domain_client::{Domain, Limits};
 use skein_lib::{Id, Wall};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

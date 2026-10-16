@@ -3,7 +3,6 @@ use crate::{
     Domain, Event, Request,
     action::Act,
     address::{Address, Place},
-    contract::*,
     fields::{Fields, Purpose},
     intents::{ByValue, Progress, send_card},
     objects::{Card, Source},
@@ -11,6 +10,7 @@ use crate::{
     signin::Provider,
     store::{self, Record, STORE_VERSION, StoreKey},
 };
+use jig_client_domain::contract::*;
 use skein_lib::{Id, List, Queue, Time, Token};
 fn text(bytes: &[u8]) -> Text {
     Text::new(Box::from(bytes), 64).unwrap()

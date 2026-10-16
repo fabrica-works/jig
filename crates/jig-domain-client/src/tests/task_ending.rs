@@ -4,9 +4,9 @@ use super::{
 };
 use crate::{
     Event,
-    contract::*,
     objects::{Body, Card, Left},
 };
+use jig_client_domain::contract::*;
 use skein_lib::{Queue, Time, Wall};
 
 #[test]

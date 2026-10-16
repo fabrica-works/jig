@@ -5,10 +5,10 @@ use super::{
 use crate::{
     Event, Request,
     action::Act,
-    contract::*,
     fields::Purpose,
     objects::{self, Body, Source},
 };
+use jig_client_domain::contract::*;
 use skein_lib::{List, Time, Wall};
 
 #[test]

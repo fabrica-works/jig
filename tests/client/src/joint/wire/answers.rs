@@ -2,7 +2,7 @@
 //! The caller retains the original reply route and releases held answers only
 //! after the engine's actual commit. Translation itself attests no durability.
 use super::{outcomes, refusals};
-use jig_domain_client::contract as client;
+use jig_client_domain::contract as client;
 use jig_domain_people as people;
 use skein_lib::{RequestEnvelope, Token, Wall};
 

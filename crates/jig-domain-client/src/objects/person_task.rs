@@ -4,7 +4,7 @@ use super::{Body, Object};
 use alloc::boxed::Box;
 /// Reads the document without copying the working set's one object.
 #[must_use]
-pub fn facts(object: &Object) -> Option<&crate::contract::PersonTask> {
+pub fn facts(object: &Object) -> Option<&jig_client_domain::contract::PersonTask> {
     match &object.body {
         Some(Body::PersonTask(document)) => Some(document),
         Some(
@@ -25,7 +25,7 @@ pub fn facts(object: &Object) -> Option<&crate::contract::PersonTask> {
 }
 /// Names only the independently decidable facts on this card.
 #[must_use]
-pub fn revision(object: &Object) -> Option<crate::contract::Revision> {
+pub fn revision(object: &Object) -> Option<jig_client_domain::contract::Revision> {
     if let Some(document) = owner_facts(object) {
         return Some(document.revision);
     }
@@ -35,7 +35,7 @@ pub fn revision(object: &Object) -> Option<crate::contract::Revision> {
 
 /// The separate pending owner envelope in this working-set object.
 #[must_use]
-pub fn owner_facts(object: &Object) -> Option<&crate::contract::OwnerPersonTask> {
+pub fn owner_facts(object: &Object) -> Option<&jig_client_domain::contract::OwnerPersonTask> {
     match &object.body {
         Some(Body::OwnerPersonTask(document)) => Some(document),
         Some(
@@ -58,14 +58,12 @@ pub fn owner_facts(object: &Object) -> Option<&crate::contract::OwnerPersonTask>
 #[expect(clippy::manual_map, reason = "the strict step subset uses explicit Option matches without closures")]
 #[must_use]
 pub fn answer(
-    document: &crate::contract::OwnerPersonTask,
+    document: &jig_client_domain::contract::OwnerPersonTask,
     option: Option<u32>,
     fields: &crate::fields::Fields,
-) -> Option<crate::contract::PersonAnswer> {
-    use crate::{
-        contract::{PersonAnswer, TaskContractDocument, Text},
-        fields::Purpose,
-    };
+) -> Option<jig_client_domain::contract::PersonAnswer> {
+    use crate::fields::Purpose;
+    use jig_client_domain::contract::{PersonAnswer, TaskContractDocument, Text};
     match &document.contract {
         TaskContractDocument::Approval { state, .. } => Some(PersonAnswer::Approved {
             state: state.clone(),

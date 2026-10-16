@@ -1,8 +1,8 @@
 //! One shared authentic core/worker/client fixture, with externally supplied seeds and bounds.
 use super::{Joint, engine::Driver, session::Session};
 use crate::{Settings, Test, World};
+use jig_client_domain::contract as client;
 use jig_core_world::peers::Peers;
-use jig_domain_client::contract as client;
 use jig_domain_people as people;
 use jig_fake_workers::{Script, Worker};
 use skein_lib::{Duration, Time, Wall};

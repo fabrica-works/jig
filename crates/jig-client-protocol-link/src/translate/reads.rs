@@ -3,9 +3,9 @@ use super::asks::{wire_note_scope, wire_proposal_key};
 use super::{Undecodable, documents, objects, pages};
 use crate::{Limits, Readable};
 use alloc::boxed::Box;
+use jig_client_domain::contract as c;
 use jig_client_protocol_wire::VERSION;
 use jig_client_protocol_wire::v7 as w;
-use jig_domain_client::contract as c;
 use skein_lib::{Reader, Writer, bytes};
 
 #[expect(clippy::manual_map, reason = "step code matches optional fields without closures")]

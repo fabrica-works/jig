@@ -1,11 +1,9 @@
 //! Deployment facts and connector part references, only for its admitted page.
 //! Hosts, accounts and capacity are whole owner documents. No connector value is
 //! kept. See client/domain/pages.md, 7, and client/domain/root.md, 6.
-use crate::{
-    Domain, Request,
-    contract::{Deployment, OwnerDeployment, Part},
-};
+use crate::{Domain, Request};
 use alloc::boxed::Box;
+use jig_client_domain::contract::{Deployment, OwnerDeployment, Part};
 use skein_lib::{Env, List, Queue};
 /// Latest deployment document for the admitted page.
 #[derive(Debug)]

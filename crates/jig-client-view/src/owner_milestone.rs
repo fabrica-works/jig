@@ -6,10 +6,8 @@ use crate::words::Words;
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
-use jig_domain_client::{
-    Domain, Limits,
-    contract::{ClosingStage, OwnerChipEnding, OwnerMilestoneLine, OwnerMilestonePhase, RunStage},
-};
+use jig_client_domain::contract::{ClosingStage, OwnerChipEnding, OwnerMilestoneLine, OwnerMilestonePhase, RunStage};
+use jig_domain_client::{Domain, Limits};
 
 /// Checked storage for one whole milestone and its nested result/source fragments.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

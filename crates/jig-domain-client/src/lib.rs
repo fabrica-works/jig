@@ -12,7 +12,6 @@ pub mod application;
 pub mod boundary;
 pub(crate) mod clock;
 pub mod confirm;
-pub mod contract;
 pub mod conversation;
 pub mod domain;
 pub mod drafts;

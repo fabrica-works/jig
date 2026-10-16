@@ -1,7 +1,7 @@
 //! Family meanings are rebuilt with each tree; no token is reused (view.md, 5).
+use jig_client_domain::contract::{ObjectKey, Revision};
 use jig_client_test_domain::first;
 use jig_client_view::Owner;
-use jig_domain_client::contract::{ObjectKey, Revision};
 use skein_lib::{List, Token};
 use skein_ui::{Act, Binding};
 #[derive(Clone, Debug, PartialEq, Eq)]

@@ -3,7 +3,7 @@
 //! the party's shared key space. Every hook entrance and output is validated;
 //! application changes and jig changes become durable in the same numbered commit.
 use crate::{Bounds, Change, Engine, Envelope, Invalid, Keyed, RequestIdentity, Retained, Truth, Up};
-use jig_domain_client::contract::{ReadNone, Refusal, WatchEnd};
+use jig_client_domain::contract::{ReadNone, Refusal, WatchEnd};
 use skein_lib::{Time, Token, Wall};
 use std::fmt::Debug;
 
@@ -85,7 +85,7 @@ pub struct ApplicationCommit<A: Application> {
     pub digest: Option<[u8; 32]>,
     pub ask: Option<A::Ask>,
     pub answer: Option<Result<A::Answer, Refusal>>,
-    pub requests: Vec<jig_domain_client::contract::Ask>,
+    pub requests: Vec<jig_client_domain::contract::Ask>,
     pub state: A,
 }
 #[derive(Debug)]
@@ -233,7 +233,7 @@ impl<A: Application> Engine<A> {
         party: u64,
         wall: Wall,
         changes: &[Change],
-    ) -> Result<(Vec<jig_domain_client::contract::Ask>, Vec<Change>), Judged> {
+    ) -> Result<(Vec<jig_client_domain::contract::Ask>, Vec<Change>), Judged> {
         let original = self.truth.clone();
         let mut requests = Vec::new();
         let mut effects = Vec::new();
@@ -248,11 +248,11 @@ impl<A: Application> Engine<A> {
             }
             let result = self.decide(party, ask, wall);
             match result {
-                Ok((jig_domain_client::contract::Answer::Done(_), changes)) => {
+                Ok((jig_client_domain::contract::Answer::Done(_), changes)) => {
                     requests.push((**ask).clone());
                     effects.extend(changes);
                 }
-                Ok((jig_domain_client::contract::Answer::Refused(refusal), _)) => {
+                Ok((jig_client_domain::contract::Answer::Refused(refusal), _)) => {
                     self.truth = original;
                     return Err(Judged::Refused(refusal));
                 }
@@ -426,7 +426,7 @@ impl<A: Application> Engine<A> {
                 ready: now.saturating_add(self.slow),
             },
         );
-        self.queue(now, 0, Up::Watch { token, event: jig_domain_client::contract::WatchEvent::Opened });
+        self.queue(now, 0, Up::Watch { token, event: jig_client_domain::contract::WatchEvent::Opened });
         Ok(())
     }
     pub(crate) fn end_application_watch(&mut self, now: Time, token: Token, why: WatchEnd, commit: u64) {
@@ -475,9 +475,9 @@ impl<A: Application> Engine<A> {
             if now >= watch.heard.saturating_add(self.bounds.heartbeat) {
                 watch.heard = now;
                 if !self.due.iter().any(
-                    |due| matches!(due.up,Up::Watch { token:id,event:jig_domain_client::contract::WatchEvent::Alive } if id==token),
+                    |due| matches!(due.up,Up::Watch { token:id,event:jig_client_domain::contract::WatchEvent::Alive } if id==token),
                 ) {
-                    self.queue(now, 0, Up::Watch { token,event:jig_domain_client::contract::WatchEvent::Alive });
+                    self.queue(now, 0, Up::Watch { token,event:jig_client_domain::contract::WatchEvent::Alive });
                 }
             }
             self.application_watches.insert(token, watch);

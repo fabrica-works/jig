@@ -1,7 +1,7 @@
 //! Requests are decided once in the party's key space and released after durability.
 //! Revision and decided-first checks precede scripted outcomes; contract.md, 3–4.
 use crate::{Engine, Envelope, Invalid, Keyed, RequestIdentity, Retained, Up, payload};
-use jig_domain_client::contract::{
+use jig_client_domain::contract::{
     ActKind, Actor, Admission, Answer, Ask, ChipPhase, CurrentHold, Decision, Ending, Moved, ObjectKey, Offered,
     Outcome, OwnerRequester, Phase, ReadValue, Recipient, Refusal, Revision, Runtime, TaskHold,
 };
@@ -278,18 +278,18 @@ impl<A: crate::Application> Engine<A> {
         let prediction = admission.map(|offer| match offer {
             Admission::Bounded { .. } => match ask {
                 Ask::SetGoal { executor, budget, deadline, .. } => {
-                    jig_domain_client::contract::admission::goal(offer, *executor, *budget, *deadline)
+                    jig_client_domain::contract::admission::goal(offer, *executor, *budget, *deadline)
                 }
                 Ask::Amend { task, change, .. } => match self.truth.objects.get(&ObjectKey::Task(*task)) {
                     Some(ReadValue::Task(before)) => {
-                        jig_domain_client::contract::admission::amendment(offer, change, &before.authority)
+                        jig_client_domain::contract::admission::amendment(offer, change, &before.authority)
                     }
                     _ => match self.truth.objects.get(&ObjectKey::Escalation(*task)) {
                         Some(ReadValue::OwnerEscalation(before)) => {
-                            jig_domain_client::contract::admission::amendment(offer, change, &before.task.authority)
+                            jig_client_domain::contract::admission::amendment(offer, change, &before.task.authority)
                         }
                         Some(ReadValue::Escalation(before)) => {
-                            jig_domain_client::contract::admission::amendment(offer, change, &before.steering.authority)
+                            jig_client_domain::contract::admission::amendment(offer, change, &before.steering.authority)
                         }
                         _ => Admission::Refused(Refusal::Unknown),
                     },
@@ -400,7 +400,7 @@ impl<A: crate::Application> Engine<A> {
             let mut value = self.truth.objects.get(&key).expect("target checked").clone();
             // Terminal Party labels have no loss carrier; retain the exact actor
             // number and only a complete supplied optional name. Frame keeps its cut.
-            let label = by.name.whole().map(|name| jig_domain_client::contract::Party {
+            let label = by.name.whole().map(|name| jig_client_domain::contract::Party {
                 number: by.number,
                 kind: by.kind,
                 name,
@@ -456,13 +456,13 @@ pub(crate) fn recipient(truth: &crate::Truth, party: u64, to: &Recipient) -> boo
         Recipient::Party(number) => *number == party,
         Recipient::Role { project, role } => truth.frames.get(&party).is_some_and(|frame| {
             frame.projects.iter().any(|p| {
-                p.project == *project && p.role == jig_domain_client::contract::HeldRole::Policy { role: *role }
+                p.project == *project && p.role == jig_client_domain::contract::HeldRole::Policy { role: *role }
             })
         }),
         Recipient::Roles { project, roles } => truth.frames.get(&party).is_some_and(|frame| {
             frame.projects.iter().any(|p| {
                 p.project == *project
-                    && roles.iter().any(|role| p.role == jig_domain_client::contract::HeldRole::Policy { role: *role })
+                    && roles.iter().any(|role| p.role == jig_client_domain::contract::HeldRole::Policy { role: *role })
             })
         }),
         Recipient::Task(task) => truth.objects.get(&ObjectKey::Task(*task)).is_some_and(|value| {
@@ -509,8 +509,8 @@ fn task_hold_reason(value: &TaskHold) -> CurrentHold {
 fn ending(value: &ReadValue) -> Option<Ending> {
     match value {
         ReadValue::Task(v) => match v.result.as_ref()? {
-            jig_domain_client::contract::TaskResult::Document(result) => Some(result.ending.clone()),
-            jig_domain_client::contract::TaskResult::Ending(ending) => Some(Ending::Task(ending.clone())),
+            jig_client_domain::contract::TaskResult::Document(result) => Some(result.ending.clone()),
+            jig_client_domain::contract::TaskResult::Ending(ending) => Some(Ending::Task(ending.clone())),
         },
         ReadValue::Proposal(v) => v.ending.clone(),
         ReadValue::Escalation(v) => v.ending.clone(),

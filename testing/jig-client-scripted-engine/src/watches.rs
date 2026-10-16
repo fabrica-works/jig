@@ -1,6 +1,6 @@
 //! One in-flight document and a dirty mark per watch; contract.md, 7.
 use crate::{Engine, Invalid, Rows, Up, payload, reads::list};
-use jig_domain_client::contract::{
+use jig_client_domain::contract::{
     Call, Conversations, Delivery, Goals, Inbox, LiveCall, ObjectKey, OwnerRequester, Phase, ProvisionalTurnName, Read,
     ReadValue, RunState, RunText, Subject, TaskLine, Tasks, Text, TurnName, WatchEnd, WatchEvent,
 };
@@ -230,8 +230,8 @@ impl<A: crate::Application> Engine<A> {
             Subject::Inbox { window } => {
                 let mut entries = Vec::new();
                 for group in [
-                    jig_domain_client::contract::InboxReadGroup::Needs,
-                    jig_domain_client::contract::InboxReadGroup::Updates,
+                    jig_client_domain::contract::InboxReadGroup::Needs,
+                    jig_client_domain::contract::InboxReadGroup::Updates,
                 ] {
                     let read = Read::Inbox { group, project: None, kind: None, goal: None, after: None };
                     let Rows::Inbox(rows) = self.rows_for(party, &read) else {
@@ -517,7 +517,7 @@ fn shorten<T: Clone>(rows: &mut skein_lib::List<T>) -> bool {
     *rows = list(&copy[..copy.len() - 1]);
     true
 }
-fn fold(counts: &mut jig_domain_client::contract::PhaseCounts, phase: Phase) {
+fn fold(counts: &mut jig_client_domain::contract::PhaseCounts, phase: Phase) {
     let count = match phase {
         Phase::Waiting | Phase::Idle | Phase::Due | Phase::Preparing | Phase::Claimed | Phase::BackingOff => {
             &mut counts.waiting

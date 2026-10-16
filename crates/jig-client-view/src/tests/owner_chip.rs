@@ -6,7 +6,8 @@ use skein_ui::Limits;
 use skein_ui::phrases::{Invalid, PhraseLimits, Segment};
 use skein_ui::{Builder, Tree};
 
-use jig_domain_client::{Domain, contract::*};
+use jig_client_domain::contract::*;
+use jig_domain_client::Domain;
 use skein_lib::{Duration, List, Token, Wall, bytes::copy_of};
 fn doc(bytes: &[u8], cut: bool) -> DocumentText {
     DocumentText { bytes: Text::new(copy_of(bytes), 256).unwrap(), cut }

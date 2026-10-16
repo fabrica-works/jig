@@ -635,7 +635,7 @@ fn connector_values_view_exact_core_refusals_cover_all_admission_categories_and_
 #[test]
 fn connector_values_view_all_sparse_authority_categories_keep_absent_requested_facts_absent() {
     use application_core::{Lack, Refusal};
-    use jig_domain_client::contract::{Lacking, Refusal as ClientRefusal};
+    use jig_client_domain::contract::{Lacking, Refusal as ClientRefusal};
     let words = words::english(64).unwrap();
     let cases = [
         (Lack::Approver, b"Proposal approval authority is missing".as_slice()),

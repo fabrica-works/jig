@@ -5,8 +5,8 @@ use super::{
 };
 use crate::Limits;
 use crate::translate::{piece_problem, too_large};
+use jig_client_domain::contract as c;
 use jig_client_protocol_wire::v7 as w;
-use jig_domain_client::contract as c;
 use skein_lib::Map;
 use skein_lib::{List, Reader, Wall, bytes};
 pub(crate) fn funder(value: &w::Funder, _limits: &Limits) -> c::Funder {

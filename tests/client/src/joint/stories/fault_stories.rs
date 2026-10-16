@@ -361,6 +361,6 @@ fn a_watch_ended_as_the_engine_stops_reaches_the_client_as_stopping() {
     callbacks.extend(world.front().session.poll(now, wall).expect("pending watch terminal"));
     assert!(callbacks.iter().any(|(owner, event)| matches!(event,
         jig_client_test_domain::Event::Jig(jig_domain_client::Event::Ended {
-            end: jig_domain_client::contract::WatchEnd::Stopping, ..
+            end: jig_client_domain::contract::WatchEnd::Stopping, ..
         }) if *owner == client)));
 }

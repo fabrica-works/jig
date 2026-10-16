@@ -14,10 +14,12 @@
 use crate::{
     Domain, Request,
     address::TaskSection,
-    contract::{self, Executor, Limit, ObjectKey, Part, Phase, PhaseCounts, ProposalKey, Read, Task, Tree, TreeNode},
     objects::{Body, Object, Source},
 };
 use alloc::boxed::Box;
+use jig_client_domain::contract::{
+    self, Executor, Limit, ObjectKey, Part, Phase, PhaseCounts, ProposalKey, Read, Task, Tree, TreeNode,
+};
 use skein_lib::{Env, Id, List, Map, Queue, Token};
 /// Which plan rows a person has asked to see.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

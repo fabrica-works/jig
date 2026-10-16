@@ -66,8 +66,8 @@ pub fn restored(bytes: &[u8]) -> Option<first::Record> {
     Some(first::Record::Place { version, party, address: first::Address { project, item } })
 }
 #[must_use]
-pub fn end(value: jig_domain_client::contract::WatchEnd) -> first::WatchEnd {
-    use jig_domain_client::contract::WatchEnd as w;
+pub fn end(value: jig_client_domain::contract::WatchEnd) -> first::WatchEnd {
+    use jig_client_domain::contract::WatchEnd as w;
     match value {
         w::Closed => first::WatchEnd::Closed,
         w::Dropped => first::WatchEnd::Dropped,
@@ -91,8 +91,8 @@ pub fn read_result(subject: d::Subject, bytes: &[u8]) -> first::ReadResult {
 }
 
 #[must_use]
-pub fn read_none(value: &jig_domain_client::contract::ReadResult) -> first::ReadResult {
-    use jig_domain_client::contract::{ReadNone, ReadResult};
+pub fn read_none(value: &jig_client_domain::contract::ReadResult) -> first::ReadResult {
+    use jig_client_domain::contract::{ReadNone, ReadResult};
     match value {
         ReadResult::None(ReadNone::Unknown | ReadNone::Gone) => first::ReadResult::Unknown,
         ReadResult::None(ReadNone::Refused) => first::ReadResult::NotAllowed,

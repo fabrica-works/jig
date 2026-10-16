@@ -1,6 +1,6 @@
 //! Owner routing and shell exchanges (protocol/client.md, 2 and 5).
 use alloc::boxed::Box;
-use jig_domain_client::contract;
+use jig_client_domain::contract;
 use skein_lib::{List, RequestEnvelope, RequestKey, RequestRecord, Secret, Token};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Family {

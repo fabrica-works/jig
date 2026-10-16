@@ -5,12 +5,8 @@ use crate::{JigBindings, cards};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, State};
 
-use jig_domain_client::{
-    Domain,
-    action::Act,
-    contract::{ObjectKey, TreeNode},
-    pages::task::PlanFilter,
-};
+use jig_client_domain::contract::{ObjectKey, TreeNode};
+use jig_domain_client::{Domain, action::Act, pages::task::PlanFilter};
 use skein_lib::{Set, Stack};
 #[derive(Clone, Copy, Debug)]
 enum Visit {

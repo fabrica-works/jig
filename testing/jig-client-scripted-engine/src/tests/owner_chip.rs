@@ -1,5 +1,5 @@
 use crate::{Bounds, owner_chip as pricing};
-use jig_domain_client::contract::*;
+use jig_client_domain::contract::*;
 use skein_lib::{Duration, List, Token, Wall};
 fn doc(bytes: &[u8], cut: bool) -> DocumentText {
     DocumentText { bytes: Text::new(bytes.into(), 4096).unwrap(), cut }

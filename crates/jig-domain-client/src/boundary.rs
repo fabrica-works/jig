@@ -4,7 +4,6 @@
 use crate::{
     action::Act,
     address::{Address, Place},
-    contract::{Answer, Ask, Part, Read, ReadResult, Subject, WatchEnd, WatchEvent},
     facts::Fact,
     frame::FrameShown,
     intents::{ByValue, Progress},
@@ -12,6 +11,7 @@ use crate::{
     store::{Record, StoreKey},
 };
 use alloc::boxed::Box;
+use jig_client_domain::contract::{Answer, Ask, Part, Read, ReadResult, Subject, WatchEnd, WatchEvent};
 use skein_lib::{Duration, List, Token};
 /// The person offset from universal time, in minutes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -24,8 +24,8 @@ pub struct Offset {
 pub enum Event {
     /// Start with this domain records and display time offset.
     Start { address: Address, kept: List<Record>, offset: Offset },
-    /// Jig's served range supplied by the protocol stream hello, independently of Frame.
-    Hello { versions: crate::contract::VersionRange },
+    /// Whether the link's hello serves this client, independently of Frame.
+    Hello { served: bool },
     /// Restored table requests, counted once per scope after Start.
     Kept { scope: u64, requests: u32 },
     /// One restored request retired, with or without a known outcome.
@@ -47,7 +47,7 @@ pub enum Event {
     /// The one terminal of a watch.
     Ended { watch: Token, end: WatchEnd },
     /// An application page names jig objects for the current page generation.
-    ShowObjects { objects: List<crate::contract::ObjectKey> },
+    ShowObjects { objects: List<jig_client_domain::contract::ObjectKey> },
     /// An application page names jig sections for the current generation.
     ShowSections { sections: List<crate::pages::Section> },
     /// The application page stopped naming jig objects.
@@ -87,7 +87,7 @@ pub enum Request {
     /// Sign in and come back to an address.
     SignIn { provider: u16, back: Address },
     /// Have the part owner show its value.
-    ShowPart { part: Part, generation: u32, scope: crate::contract::PartScope },
+    ShowPart { part: Part, generation: u32, scope: jig_client_domain::contract::PartScope },
     /// The old page no longer shows its parts.
     PartsLeft { generation: u32 },
     /// Tell siblings and the table the shared link.

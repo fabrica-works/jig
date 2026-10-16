@@ -5,11 +5,11 @@ use crate::{JigBindings, cards};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
+use jig_client_domain::contract::{ObjectKey, Project};
 use jig_domain_client::{
     Domain,
     action::Act,
     address::{Address, ProjectSection},
-    contract::{ObjectKey, Project},
 };
 pub mod goals;
 mod notes;
@@ -261,8 +261,8 @@ fn settings(
 fn period(
     b: &mut Builder,
     number: u64,
-    budget: &jig_domain_client::contract::Budget,
-    pools: &skein_lib::List<jig_domain_client::contract::Pool>,
+    budget: &jig_client_domain::contract::Budget,
+    pools: &skein_lib::List<jig_client_domain::contract::Pool>,
     words: &Words,
 ) {
     words.text(b, JigPhrase::Period, &[Hole::Number(number)]);
@@ -275,7 +275,7 @@ fn period(
 fn task_spend(
     b: &mut Builder,
     client: &Domain,
-    tasks: &skein_lib::List<jig_domain_client::contract::TaskSpend>,
+    tasks: &skein_lib::List<jig_client_domain::contract::TaskSpend>,
     words: &Words,
     bindings: &mut JigBindings,
 ) {
@@ -300,10 +300,10 @@ fn inbox_cards(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut J
                 client,
                 id,
                 &match entry {
-                    jig_domain_client::contract::InboxRow::Entry(value) => {
+                    jig_client_domain::contract::InboxRow::Entry(value) => {
                         cards::Place::Inbox { lineage: value.lineage.clone() }
                     }
-                    jig_domain_client::contract::InboxRow::Owner(_) => cards::Place::Elsewhere,
+                    jig_client_domain::contract::InboxRow::Owner(_) => cards::Place::Elsewhere,
                 },
                 words,
                 bindings,

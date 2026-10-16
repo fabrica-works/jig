@@ -5,10 +5,8 @@ use crate::words::Words;
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
-use jig_domain_client::{
-    Domain,
-    contract::{Block, Speaker, TurnName, TurnProblem, TurnRead},
-};
+use jig_client_domain::contract::{Block, Speaker, TurnName, TurnProblem, TurnRead};
+use jig_domain_client::Domain;
 pub(super) fn turn(
     b: &mut Builder,
     client: &Domain,

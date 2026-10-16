@@ -2,10 +2,10 @@
 use crate::{
     Domain,
     address::TaskSection,
-    contract::ObjectKey,
     objects::{Card, Object},
     pages::Section,
 };
+use jig_client_domain::contract::ObjectKey;
 use skein_lib::Id;
 impl Domain {
     /// Whether the page still owes this object's card.

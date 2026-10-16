@@ -1,7 +1,7 @@
 //! Exact request translation (client/domain/contract.md, 3).
 //! Whole supplied fields preserve independent revisions and optional edits.
 use super::request_arguments;
-use jig_domain_client::contract as client;
+use jig_client_domain::contract as client;
 use jig_domain_people as people;
 use skein_lib::List;
 

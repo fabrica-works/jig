@@ -1,11 +1,8 @@
 //! Notes are handles into the shared objects. Corrections and deletions use jig
 //! 21's revision-checked confirmations; moved reads update the same handle.
 //! Scope and description are source filters. See client/domain/pages.md, 6.4.
-use crate::{
-    Domain, Request,
-    contract::{Limit, ObjectKey, Read},
-    objects::Source,
-};
+use crate::{Domain, Request, objects::Source};
+use jig_client_domain::contract::{Limit, ObjectKey, Read};
 use skein_lib::{List, Queue};
 pub(crate) fn filter(domain: &mut Domain, filter: super::NoteFilter, out: &mut Queue<Request>) {
     if super::number(domain).is_none() {
@@ -25,7 +22,7 @@ pub(crate) fn filter(domain: &mut Domain, filter: super::NoteFilter, out: &mut Q
     );
     domain.changed();
 }
-pub(crate) fn page(domain: &mut Domain, source: Source, page: crate::contract::NotePage) {
+pub(crate) fn page(domain: &mut Domain, source: Source, page: jig_client_domain::contract::NotePage) {
     let Some(project) = super::number(domain) else {
         return;
     };

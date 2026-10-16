@@ -6,8 +6,8 @@ use crate::{
     Domain, Event, Request,
     action::{Act, End},
     address::{Address, Place, ProjectSection, TaskSection},
-    contract::*,
 };
+use jig_client_domain::contract::*;
 use skein_lib::{List, Time, Token, Wall};
 fn cursor(bytes: &[u8]) -> Cursor {
     Cursor::new(Box::from(bytes), 1024).expect("bounded opaque cursor")

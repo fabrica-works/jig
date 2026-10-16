@@ -11,9 +11,9 @@ use crate::JigBindings;
 use crate::phrases::english;
 use crate::phrases::jig::{JigPhrase, shapes};
 use crate::words::Words;
+use jig_client_domain::contract::*;
 use jig_domain_client::{
     Domain,
-    contract::*,
     objects::{Object, question::facts},
 };
 use skein_lib::{Id, List, Wall, bytes::copy_of};

@@ -10,7 +10,8 @@ use crate::{JigBindings, owner_project as view};
 use skein_ui::phrases::{PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat};
 use skein_ui::{Builder, Role, Tree};
 
-use jig_domain_client::{Domain, contract::*};
+use jig_client_domain::contract::*;
+use jig_domain_client::Domain;
 use skein_lib::{
     Duration, List, Wall,
     bytes::{copy_of, find},
@@ -511,7 +512,7 @@ fn check_owner_project_real_page_decodes_whole_role_edits_preserves_prior_channe
             offset: jig_domain_client::boundary::Offset { minutes: 0 },
         },
     );
-    native_drive(&mut d, Event::Hello { versions: VersionRange { first: 7, last: 7 } });
+    native_drive(&mut d, Event::Hello { served: true });
     let f = opened
         .iter()
         .find_map(|r| match r {
@@ -691,7 +692,7 @@ fn native_owner_at(value: OwnerProject, section: jig_domain_client::address::Pro
             offset: jig_domain_client::boundary::Offset { minutes: 0 },
         },
     );
-    native_drive(&mut domain, Event::Hello { versions: VersionRange { first: 7, last: 7 } });
+    native_drive(&mut domain, Event::Hello { served: true });
     let watch = out
         .iter()
         .find_map(|request| match request {
@@ -1068,7 +1069,7 @@ fn native_historical_project() -> (Domain, OwnerSpendPage) {
             offset: jig_domain_client::boundary::Offset { minutes: 0 },
         },
     );
-    native_drive(&mut domain, Event::Hello { versions: VersionRange { first: 7, last: 7 } });
+    native_drive(&mut domain, Event::Hello { served: true });
     let watch = start
         .iter()
         .find_map(|request| match request {

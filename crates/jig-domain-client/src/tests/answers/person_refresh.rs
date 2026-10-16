@@ -5,10 +5,10 @@ use super::super::{
 use super::{answered, install, read_token};
 use crate::{
     Event, Request,
-    contract::*,
     intents::send_card,
     objects::{Body, Card, Source},
 };
+use jig_client_domain::contract::*;
 use skein_lib::{List, Queue, Time, Token};
 
 fn document(taken_by: Option<u64>, offered: &[ActKind]) -> OwnerPersonTask {

@@ -2,9 +2,9 @@ use super::spine::{LIMITS, delivered, frame, start};
 use crate::{
     Domain,
     address::Address,
-    contract::*,
     pages::navigation::{Destination, Navigation},
 };
+use jig_client_domain::contract::*;
 use skein_lib::{List, Time};
 fn text(bytes: &[u8]) -> DocumentText {
     DocumentText::complete(Text::new(bytes.into(), 32).unwrap())

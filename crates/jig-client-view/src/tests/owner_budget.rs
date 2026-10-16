@@ -6,7 +6,7 @@ use skein_ui::Limits;
 use skein_ui::phrases::{Invalid, PhraseId, PhraseLimits, Phrasebook, Segment, WallFormat};
 use skein_ui::{Builder, Tree};
 
-use jig_domain_client::contract::{Funder, OwnerBudget, OwnerNumbers, PoolLedger};
+use jig_client_domain::contract::{Funder, OwnerBudget, OwnerNumbers, PoolLedger};
 use skein_lib::{Wall, bytes::copy_of};
 
 fn numbers() -> OwnerNumbers {

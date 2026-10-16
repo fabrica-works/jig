@@ -11,11 +11,11 @@ use super::{
 use crate::{JigBindings, words::Words};
 use skein_ui::{Role, Tree};
 
+use jig_client_domain::contract::*;
 use jig_domain_client::{
     Domain, Event, Request,
     action::Act,
     address::{Address, Place, ProjectSection, TaskSection},
-    contract::*,
 };
 use skein_lib::{List, Wall};
 pub(super) fn list<T>(values: impl IntoIterator<Item = T>) -> List<T> {
@@ -159,7 +159,7 @@ fn plan_folds(words: &Words) {
     deliver(
         &mut d,
         tree_watch,
-        Delivery::Tree(Box::new(jig_domain_client::contract::Tree {
+        Delivery::Tree(Box::new(jig_client_domain::contract::Tree {
             task: 8,
             nodes: list([node(9, None), node(10, Some(9))]),
             folded: PhaseCounts { done: 3, ..counts() },

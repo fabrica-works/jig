@@ -6,11 +6,11 @@ use super::{
 use crate::{
     Domain, Event, Request,
     action::Act,
-    contract::*,
     intents::{ByValue, Progress, send_card},
     notices::Kind,
     objects::{Body, Card, Left, Object, Source, answer::recovery},
 };
+use jig_client_domain::contract::*;
 use skein_lib::{Id, Queue, Time, Token, Wall};
 mod person_refresh;
 fn install(domain: &mut Domain, body: Body) -> Id<Object> {

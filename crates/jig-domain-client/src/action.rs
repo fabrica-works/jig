@@ -1,19 +1,16 @@
 //! Acts decoded by the view, owned by this domain; client/domain/client.md, 4.1.
 //! Jig 21 adds object act parameters and confirmations; jig 22 adds page filters.
-use crate::{
-    address::Address,
-    contract::{ActKind, InboxGroup, Text},
-    fields::Purpose,
-};
+use crate::{address::Address, fields::Purpose};
 use alloc::boxed::Box;
+use jig_client_domain::contract::{ActKind, InboxGroup, Text};
 use skein_lib::Token;
 /// A person action already decoded from the semantic tree.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Act {
     /// Review one whole settings replacement against the supplied Project owner.
-    ProjectSettings { ask: Box<crate::contract::Ask> },
+    ProjectSettings { ask: Box<jig_client_domain::contract::Ask> },
     /// Choose a service role before supplying its explicit name.
-    ProjectServiceRole { role: crate::contract::HeldRole },
+    ProjectServiceRole { role: jig_client_domain::contract::HeldRole },
     /// Go to a jig page.
     Go { address: Address },
     /// Edit a field.
@@ -31,7 +28,7 @@ pub enum Act {
     /// Choose a live delegate's disposal when closing a chat.
     Dispose { task: u64, take_over: bool },
     /// Supply the task amendment in the open confirmation.
-    Change { change: Box<crate::contract::Amendment> },
+    Change { change: Box<jig_client_domain::contract::Amendment> },
     /// Write words and release a task stopped by this party in the same request.
     WriteRelease { release: bool },
     /// Set the one goal priority in the open confirmation.
@@ -49,7 +46,7 @@ pub enum Act {
     /// Open or fold the details of a committed turn call.
     FoldCall { name: crate::conversation::CallName, open: bool },
     /// Open or fold a supplied opaque provisional call, by equality only.
-    FoldCurrentCall { identity: crate::contract::CallIdentity, open: bool },
+    FoldCurrentCall { identity: jig_client_domain::contract::CallIdentity, open: bool },
     /// Filter an inbox group.
     Filter { group: InboxGroup, project: Option<u32> },
     /// Read more at a window end.
@@ -65,7 +62,7 @@ pub enum Act {
     /// Choose the new goal charter, budget, deadline and priority.
     GoalForm { form: crate::pages::project::goals::GoalForm },
     /// Filter the project live task source.
-    FilterTasks { filter: crate::contract::TaskFilter },
+    FilterTasks { filter: jig_client_domain::contract::TaskFilter },
     /// Select note scope and description search.
     FilterNotes { filter: crate::pages::project::NoteFilter },
     /// Select held or live plan rows.

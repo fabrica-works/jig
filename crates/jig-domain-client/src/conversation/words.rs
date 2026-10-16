@@ -11,7 +11,7 @@
 //! | being sent | refused or unknown | absent; the draft owner keeps the words |
 //! | sent | committed read-through | read |
 //! | absent | activity words | sent or read |
-use crate::contract::{Activity, ActivityPage, FrameParty, Party, Text};
+use jig_client_domain::contract::{Activity, ActivityPage, FrameParty, Party, Text};
 use skein_lib::{List, Token};
 /// Where a person's words are relative to the engine's committed turns.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

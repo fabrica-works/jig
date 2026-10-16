@@ -1,9 +1,10 @@
 //! Opaque shell token routes and the finite Ops protocol adapter, beside the shared world.
 #![allow(clippy::wildcard_imports, reason = "adapter exhaustively translates owner boundary vocabularies")]
 use super::{Document, Ops, OpsScript, Subject};
+use jig_client_domain::contract::*;
 use jig_client_scripted_engine::{self as engine, ApplicationScope, Envelope, Up};
 use jig_client_world::{harness::*, observe};
-use jig_domain_client::{self as client, contract::*};
+use jig_domain_client::{self as client};
 use jig_ops_client_domain::{self as domain, Event, JigOut, Request, infrastructure as infra, observability as obs};
 use jig_ops_domain_connectors::{Connector, number};
 use sha2::{Digest, Sha256};
@@ -361,7 +362,7 @@ impl Front<Ops> for Scripted {
         self.recover(now, wall);
         let mut delivered: Vec<_> = std::mem::take(&mut self.hellos)
             .into_iter()
-            .map(|client| (client, Event::Jig(client::Event::Hello { versions: self.engine.versions() })))
+            .map(|client| (client, Event::Jig(client::Event::Hello { served: self.engine.versions().contains(7) })))
             .collect();
         delivered.append(&mut self.shell);
         for up in self.engine.poll(now) {
@@ -400,7 +401,7 @@ impl Front<Ops> for Scripted {
                         domain::Answered::Infrastructure(match result {
                             Ok(answer) => answer,
                             Err(refusal) => infra::Answer::EntranceRefused(
-                                client::contract::EntranceRefusal::new(refusal)
+                                jig_client_domain::contract::EntranceRefusal::new(refusal)
                                     .expect("scripted engine supplies bounded entrance facts"),
                             ),
                         })
@@ -579,21 +580,21 @@ impl Front<Ops> for Scripted {
     }
 }
 struct SubjectRun {
-    turn: Option<client::contract::ProvisionalTurnName>,
+    turn: Option<jig_client_domain::contract::ProvisionalTurnName>,
     offset: u32,
 }
-fn run_position(subject: &client::contract::Subject) -> SubjectRun {
+fn run_position(subject: &jig_client_domain::contract::Subject) -> SubjectRun {
     match subject {
-        client::contract::Subject::Run { turn, offset, .. } => SubjectRun { turn: *turn, offset: *offset },
-        client::contract::Subject::Frame
-        | client::contract::Subject::Task { .. }
-        | client::contract::Subject::Tree { .. }
-        | client::contract::Subject::Chips { .. }
-        | client::contract::Subject::Inbox { .. }
-        | client::contract::Subject::Goals { .. }
-        | client::contract::Subject::Tasks { .. }
-        | client::contract::Subject::Conversations
-        | client::contract::Subject::Deployment => unreachable!("only run watches continue"),
+        jig_client_domain::contract::Subject::Run { turn, offset, .. } => SubjectRun { turn: *turn, offset: *offset },
+        jig_client_domain::contract::Subject::Frame
+        | jig_client_domain::contract::Subject::Task { .. }
+        | jig_client_domain::contract::Subject::Tree { .. }
+        | jig_client_domain::contract::Subject::Chips { .. }
+        | jig_client_domain::contract::Subject::Inbox { .. }
+        | jig_client_domain::contract::Subject::Goals { .. }
+        | jig_client_domain::contract::Subject::Tasks { .. }
+        | jig_client_domain::contract::Subject::Conversations
+        | jig_client_domain::contract::Subject::Deployment => unreachable!("only run watches continue"),
     }
 }
 fn source_facts(source: &engine::Source, commit: u64, out: &mut Vec<Observed>) {

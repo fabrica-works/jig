@@ -1,9 +1,9 @@
 //! Shared jig observations and the Test application's family vocabulary.
 #![allow(clippy::wildcard_imports, reason = "boundary adapter covers the owner vocabulary")]
 use crate::harness::{CardKey, CardSeen, Receipt, Seen, Sent};
+use jig_client_domain::contract::*;
 use jig_client_test_domain::{self as domain, Event, Request, family};
 use jig_client_view::Owner;
-use jig_domain_client::contract::*;
 use skein_fake_person::{Face, Find, Found, TreeFace};
 use skein_lib::{RequestEnvelope, Token};
 use skein_ui::{Key, NodeId, Role, Tree};
@@ -200,8 +200,8 @@ pub fn received(event: &Event) -> Vec<Receipt> {
 pub fn jig_received(event: &jig_domain_client::Event) -> Vec<Receipt> {
     match event {
         jig_domain_client::Event::Start { .. } => vec![Receipt::Started],
-        jig_domain_client::Event::Hello { versions } => {
-            if versions.contains(jig_domain_client::contract::CLIENT_VERSION) {
+        jig_domain_client::Event::Hello { served } => {
+            if *served {
                 vec![]
             } else {
                 vec![Receipt::OutOfDate]
@@ -494,7 +494,7 @@ mod tests {
     }
     #[test]
     fn public_observations_keep_equal_task_and_party_proposal_cards_and_requests_distinct() {
-        use jig_domain_client::contract::{Ask, Decision, ObjectKey, ProposalKey, Proposer};
+        use jig_client_domain::contract::{Ask, Decision, ObjectKey, ProposalKey, Proposer};
         let limits = skein_ui::Limits {
             nodes: 16,
             depth: 4,
@@ -547,8 +547,8 @@ mod tests {
     #[test]
     fn public_owner_answer_receipts_keep_original_attempt_envelope_and_exact_message_ids() {
         use super::{Receipt, received};
+        use jig_client_domain::contract::{Answer, Outcome, OwnerOutcome};
         use jig_client_test_domain::{Answered, Event};
-        use jig_domain_client::contract::{Answer, Outcome, OwnerOutcome};
         use skein_lib::{RequestEnvelope, Token};
         let cases = [
             (OwnerOutcome::Said { task: u64::MAX, message: 37, released: false }, Some((u64::MAX, 37))),

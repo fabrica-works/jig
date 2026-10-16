@@ -2,7 +2,7 @@
 //! (client/domain/contract.md, 5.3). These helpers reuse the kit's existing
 //! recursive allocation accounting; they neither interpret nor clip values.
 use crate::{Bounds, Invalid, payload};
-use jig_domain_client::contract::{ActivityLine, Answer, Delivery, Frame, ReadValue};
+use jig_client_domain::contract::{ActivityLine, Answer, Delivery, Frame, ReadValue};
 
 /// Admit a complete frame, including every allocated nested list and text.
 pub fn admit_frame(value: &Frame, bounds: &Bounds) -> Result<(), Invalid> {

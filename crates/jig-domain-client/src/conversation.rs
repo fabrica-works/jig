@@ -15,12 +15,12 @@
 //! | any read | failed | idle | nothing |
 use crate::{
     action::End,
-    contract::{
-        Activity, ActivityLine, ActivityPage, ArchivedTurn, Block, CallIdentity, Cursor, LiveCall, ObjectKey, Part,
-        ProvisionalTurnName, Read, RunState, RunText, Text, TurnName, TurnRead,
-    },
     objects::{Objects, Source},
     windows::{Edge, Edges, TurnWindow},
+};
+use jig_client_domain::contract::{
+    Activity, ActivityLine, ActivityPage, ArchivedTurn, Block, CallIdentity, Cursor, LiveCall, ObjectKey, Part,
+    ProvisionalTurnName, Read, RunState, RunText, Text, TurnName, TurnRead,
 };
 use skein_lib::{List, Map, Wall, Writer};
 pub(crate) mod chips;
@@ -480,15 +480,17 @@ impl Conversation {
                 Activity::Result { result } => {
                     if let Some(value) = &result.value {
                         match value {
-                            crate::contract::ResultValue::Connector { part, .. } => add_part(&mut parts, part),
-                            crate::contract::ResultValue::Report(_)
-                            | crate::contract::ResultValue::Verdict { .. }
-                            | crate::contract::ResultValue::OwnerVerdict { .. }
-                            | crate::contract::ResultValue::Change { .. }
-                            | crate::contract::ResultValue::Choice { .. }
-                            | crate::contract::ResultValue::Approved { .. }
-                            | crate::contract::ResultValue::Failure(_)
-                            | crate::contract::ResultValue::Words(_) => {}
+                            jig_client_domain::contract::ResultValue::Connector { part, .. } => {
+                                add_part(&mut parts, part);
+                            }
+                            jig_client_domain::contract::ResultValue::Report(_)
+                            | jig_client_domain::contract::ResultValue::Verdict { .. }
+                            | jig_client_domain::contract::ResultValue::OwnerVerdict { .. }
+                            | jig_client_domain::contract::ResultValue::Change { .. }
+                            | jig_client_domain::contract::ResultValue::Choice { .. }
+                            | jig_client_domain::contract::ResultValue::Approved { .. }
+                            | jig_client_domain::contract::ResultValue::Failure(_)
+                            | jig_client_domain::contract::ResultValue::Words(_) => {}
                         }
                     }
                 }

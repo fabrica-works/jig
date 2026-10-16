@@ -5,13 +5,8 @@ use crate::{JigBindings, JigMeaning, cards};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, State};
 
-use jig_domain_client::{
-    Domain,
-    action::Act,
-    contract::{ActKind, Admission, Bounds, GoalExecutor, GoalLine, ObjectKey, Project},
-    fields::Purpose,
-    pages::project::goals::GoalForm,
-};
+use jig_client_domain::contract::{ActKind, Admission, Bounds, GoalExecutor, GoalLine, ObjectKey, Project};
+use jig_domain_client::{Domain, action::Act, fields::Purpose, pages::project::goals::GoalForm};
 /// The one typed form property changed by an input's complete value.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Field {
@@ -269,7 +264,7 @@ fn inputs(b: &mut Builder, client: &Domain, doc: &Project, words: &Words, bindin
         }
         match offered {
             Some(Admission::Bounded { .. }) => {
-                match jig_domain_client::contract::admission::goal(
+                match jig_client_domain::contract::admission::goal(
                     offered.expect("bounded offer above"),
                     form.executor,
                     form.budget,

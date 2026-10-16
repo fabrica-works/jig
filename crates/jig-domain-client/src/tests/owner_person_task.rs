@@ -11,10 +11,10 @@ use crate::{
     Domain, Event, Request,
     action::Act,
     confirm::Missing,
-    contract::*,
     fields::Purpose,
     objects::{Body, Card, Left, Object, Source},
 };
+use jig_client_domain::contract::*;
 use skein_lib::{Duration, Id, List, Queue, Time, Wall};
 fn values<T>(items: impl IntoIterator<Item = T>) -> List<T> {
     let items: Vec<_> = items.into_iter().collect();

@@ -6,13 +6,8 @@ use crate::words::Words;
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role};
 
-use jig_domain_client::{
-    Domain,
-    action::Act,
-    contract::{Answer, ObjectKey, Seen},
-    notices::Kind,
-    pages::IntentPurpose,
-};
+use jig_client_domain::contract::{Answer, ObjectKey, Seen};
+use jig_domain_client::{Domain, action::Act, notices::Kind, pages::IntentPurpose};
 /// Build each visible notice as a named status, with one oldest-notice dismissal.
 pub fn notices(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
     if client.notices().ids().is_empty() {
@@ -65,7 +60,7 @@ pub fn facts(b: &mut Builder, kind: &Kind, words: &Words) {
             }
             words.text(b, JigPhrase::UnknownAction, &[]);
         }
-        Kind::Refused(which) => words.refusal(b, &jig_domain_client::contract::Refusal::Limit { which: *which }),
+        Kind::Refused(which) => words.refusal(b, &jig_client_domain::contract::Refusal::Limit { which: *which }),
     }
     b.close();
 }

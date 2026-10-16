@@ -14,6 +14,7 @@ members = [
     "crates/jig-client-protocol-wire",
     "tests/client-wire",
     "crates/jig-domain-client",
+    "crates/jig-client-domain",
     "crates/jig-protocol-transcript",
     "crates/jig-client-view",
     "crates/jig-domain-core",
@@ -87,6 +88,7 @@ rust-version = "1.95"
 publish = false
 
 [workspace.dependencies]
+jig-client-domain = { path = "crates/jig-client-domain" }
 smith-local-service = { git = "https://github.com/forgetic/smith.git" }
 jig-client-protocol-link = { path = "crates/jig-client-protocol-link" }
 

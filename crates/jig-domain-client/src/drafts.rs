@@ -11,11 +11,11 @@
 //! | words refused/unknown, or later edit | retained | none |
 use crate::{
     Domain, Request,
-    contract::{Answer, Ask, Limit, Text},
     fields::Purpose,
     store::{Record, STORE_VERSION, StoreKey},
 };
 use alloc::boxed::Box;
+use jig_client_domain::contract::{Answer, Ask, Limit, Text};
 use skein_lib::{List, Queue};
 /// One draft's whole words and persistent ordering, owned by one party.
 #[derive(Debug)]

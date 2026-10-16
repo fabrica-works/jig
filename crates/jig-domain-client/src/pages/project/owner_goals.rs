@@ -1,10 +1,7 @@
 //! Goal admission from genuine whole Project offers; pages.md, 6.2.
 //! The engine's bounded offer and Frame facts remain independent source values.
-use crate::{
-    Domain,
-    contract::{ActKind, Admission, Bounds, Funder, GoalExecutor},
-    pages::project::goals::GoalForm,
-};
+use crate::{Domain, pages::project::goals::GoalForm};
+use jig_client_domain::contract::{ActKind, Admission, Bounds, Funder, GoalExecutor};
 /// Preserve the original goal confirmation protocol without a fabricated Project.
 pub(crate) fn prediction(domain: &Domain, form: GoalForm, scope: u64) -> Option<(Admission, u64)> {
     let doc = domain.project_page.owner.as_ref()?;
@@ -26,7 +23,10 @@ pub(crate) fn prediction(domain: &Domain, form: GoalForm, scope: u64) -> Option<
         Admission::Allowed | Admission::Proposed { .. } | Admission::Refused(_) => None,
     };
     if let Some(pool_left) = bounded_pool {
-        return Some((crate::contract::admission::goal(offer, form.executor, form.budget, form.deadline), pool_left));
+        return Some((
+            jig_client_domain::contract::admission::goal(offer, form.executor, form.budget, form.deadline),
+            pool_left,
+        ));
     }
     let mut pool = None;
     let mut listed = false;
@@ -68,10 +68,10 @@ pub(crate) fn prediction(domain: &Domain, form: GoalForm, scope: u64) -> Option<
     let pool = pool?;
     match offer {
         Admission::Allowed | Admission::Proposed { .. } if !listed => {
-            Some((Admission::Refused(crate::contract::Refusal::NotOffered), pool))
+            Some((Admission::Refused(jig_client_domain::contract::Refusal::NotOffered), pool))
         }
         Admission::Allowed | Admission::Proposed { .. } | Admission::Refused(_) | Admission::Bounded { .. } => {
-            Some((crate::contract::admission::goal(offer, form.executor, form.budget, form.deadline), pool))
+            Some((jig_client_domain::contract::admission::goal(offer, form.executor, form.budget, form.deadline), pool))
         }
     }
 }

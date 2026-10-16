@@ -2,10 +2,10 @@ use super::{objects, spine::drive};
 use crate::{
     Domain, Event, Request,
     address::{Address, Place, TaskSection},
-    contract::*,
     objects::Body,
     pages::Page,
 };
+use jig_client_domain::contract::*;
 use skein_lib::{List, Time, Token};
 
 fn task_watch(domain: &mut Domain, task: u64) -> Token {

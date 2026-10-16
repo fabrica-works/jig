@@ -2,7 +2,7 @@
 //! Counts every reserved list element, optional envelope and nested raw byte.
 use crate::{Bounds, payload::Payload};
 use core::mem::size_of;
-use jig_domain_client::contract::{
+use jig_client_domain::contract::{
     OwnerChipDetails, OwnerChipEnding, OwnerChipHold, OwnerChipObservation, OwnerChipWork, OwnerPersonWait,
     OwnerResourceLine,
 };
@@ -34,7 +34,7 @@ impl Payload for OwnerPersonWait {
 }
 impl Payload for OwnerChipHold {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
-        use jig_domain_client::contract::OwnerHoldEscalation;
+        use jig_client_domain::contract::OwnerHoldEscalation;
         let escalation = match &self.escalation {
             Some(OwnerHoldEscalation::Rejected { reason, .. }) => reason.heap(bounds)?,
             Some(OwnerHoldEscalation::Routing | OwnerHoldEscalation::Waiting { .. }) | None => 0,

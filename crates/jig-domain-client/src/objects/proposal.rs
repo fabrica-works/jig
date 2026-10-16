@@ -3,7 +3,7 @@
 use super::{Body, Object};
 /// Reads the document without copying the working set's one object.
 #[must_use]
-pub fn facts(object: &Object) -> Option<&crate::contract::Proposal> {
+pub fn facts(object: &Object) -> Option<&jig_client_domain::contract::Proposal> {
     match &object.body {
         Some(Body::Proposal(document)) => Some(document),
         Some(
@@ -24,7 +24,7 @@ pub fn facts(object: &Object) -> Option<&crate::contract::Proposal> {
 }
 /// Pending owner facts share the original typed proposal identity.
 #[must_use]
-pub fn owner_facts(object: &Object) -> Option<&crate::contract::OwnerProposal> {
+pub fn owner_facts(object: &Object) -> Option<&jig_client_domain::contract::OwnerProposal> {
     match &object.body {
         Some(Body::OwnerProposal(document)) => Some(document),
         Some(

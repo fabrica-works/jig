@@ -154,7 +154,7 @@ fn nested() -> List<Offered> {
         Offered {
             act: ActKind::SetGoal,
             admission: Admission::Bounded {
-                within: jig_domain_client::contract::Bounds::Goal {
+                within: jig_client_domain::contract::Bounds::Goal {
                     pool_left: u64::MAX,
                     charters: list(vec![u32::MAX, 0]),
                     procedures: list(vec![GoalProcedure { connector: u16::MAX, code: u32::MAX }; 2]),
@@ -169,7 +169,7 @@ fn nested() -> List<Offered> {
         Offered {
             act: ActKind::Amend,
             admission: Admission::Bounded {
-                within: jig_domain_client::contract::Bounds::Amend {
+                within: jig_client_domain::contract::Bounds::Amend {
                     budget_left: u64::MAX,
                     grants: authority.authority.grants.clone(),
                     implications: list(vec![
@@ -227,7 +227,7 @@ fn nested_offer_lists_and_unused_paged_rows_keep_their_original_independent_boun
         value.acts = nested();
         match dimension {
             0 => {
-                let Admission::Bounded { within: jig_domain_client::contract::Bounds::Goal { charters, .. }, .. } =
+                let Admission::Bounded { within: jig_client_domain::contract::Bounds::Goal { charters, .. }, .. } =
                     &mut value.acts.get_mut(0).unwrap().admission
                 else {
                     panic!("goal")
@@ -244,7 +244,7 @@ fn nested_offer_lists_and_unused_paged_rows_keep_their_original_independent_boun
             }
             2 => {
                 let Admission::Bounded {
-                    within: jig_domain_client::contract::Bounds::Amend { implications, .. }, ..
+                    within: jig_client_domain::contract::Bounds::Amend { implications, .. }, ..
                 } = &mut value.acts.get_mut(1).unwrap().admission
                 else {
                     panic!("amend")
@@ -252,7 +252,7 @@ fn nested_offer_lists_and_unused_paged_rows_keep_their_original_independent_boun
                 *implications = List::with_capacity(3);
             }
             3 => {
-                let Admission::Bounded { within: jig_domain_client::contract::Bounds::Amend { grants, .. }, .. } =
+                let Admission::Bounded { within: jig_client_domain::contract::Bounds::Amend { grants, .. }, .. } =
                     &mut value.acts.get_mut(1).unwrap().admission
                 else {
                     panic!("grants")

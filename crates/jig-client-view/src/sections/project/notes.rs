@@ -6,12 +6,8 @@ use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, State};
 
 use alloc::boxed::Box;
-use jig_domain_client::{
-    Domain,
-    action::Act,
-    contract::{NoteScope, Part},
-    pages::project::NoteFilter,
-};
+use jig_client_domain::contract::{NoteScope, Part};
+use jig_domain_client::{Domain, action::Act, pages::project::NoteFilter};
 pub(super) fn notes(b: &mut Builder, client: &Domain, project: u32, words: &Words, bindings: &mut JigBindings) {
     b.open(Role::Search);
     b.region(crate::regions::JigRegion::NotesSearch.region());
@@ -37,7 +33,7 @@ pub(super) fn notes(b: &mut Builder, client: &Domain, project: u32, words: &Word
         for part in &doc.resources {
             match part {
                 Part::Resource { connector, path } => {
-                    if let Some(pattern) = jig_domain_client::contract::exact_resource_pattern(path) {
+                    if let Some(pattern) = jig_client_domain::contract::exact_resource_pattern(path) {
                         scope_choice(
                             b,
                             words,

@@ -7,8 +7,6 @@ pub struct VersionRange {
     pub last: u32,
 }
 
-/// This client's jig document and ask version.
-pub const CLIENT_VERSION: u32 = 7;
 impl VersionRange {
     /// Whether this version falls within a valid inclusive range.
     #[must_use]

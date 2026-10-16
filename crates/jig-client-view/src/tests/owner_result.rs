@@ -9,14 +9,11 @@ use skein_ui::Limits;
 use skein_ui::phrases::{Invalid, Language, PhraseLimits, Phrasebook, Segment, WallFormat};
 use skein_ui::{Builder, Tree};
 
-use jig_domain_client::{
-    Domain,
-    contract::{
-        Chip, ChipPhase, Executor, OwnerExecutor, OwnerPart, OwnerPartKey, OwnerPartKind, OwnerRequester,
-        OwnerTaskLink, OwnerTaskStatus, PersonAddress, Phase, ProposalKey, Proposer, ResultDetails,
-        TaskContractDocument, Text,
-    },
+use jig_client_domain::contract::{
+    Chip, ChipPhase, Executor, OwnerExecutor, OwnerPart, OwnerPartKey, OwnerPartKind, OwnerRequester, OwnerTaskLink,
+    OwnerTaskStatus, PersonAddress, Phase, ProposalKey, Proposer, ResultDetails, TaskContractDocument, Text,
 };
+use jig_domain_client::Domain;
 use skein_lib::{List, Wall, bytes::copy_of};
 
 fn client_limits() -> jig_domain_client::Limits {
@@ -51,7 +48,7 @@ fn words() -> Words {
 fn chip() -> Chip {
     Chip {
         task: u64::MAX,
-        title: jig_domain_client::contract::DocumentText::complete(Text::new(copy_of(b"supplied title"), 128).unwrap()),
+        title: jig_client_domain::contract::DocumentText::complete(Text::new(copy_of(b"supplied title"), 128).unwrap()),
         executor: Executor::Agent { charter: u32::MAX },
         phase: Phase::Due,
         details: Box::new(ChipPhase::Starting),

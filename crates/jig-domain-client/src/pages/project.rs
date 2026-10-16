@@ -14,10 +14,10 @@ use crate::{
     Domain, Request,
     action::End,
     address::ProjectSection,
-    contract::{self, Cursor, GoalLine, NoteScope, Part, Project, Read, TaskFilter, TaskLine, Text},
     objects::{Object, Source},
 };
 use alloc::boxed::Box;
+use jig_client_domain::contract::{self, Cursor, GoalLine, NoteScope, Part, Project, Read, TaskFilter, TaskLine, Text};
 use skein_lib::{Env, Id, List, Queue, Token};
 pub mod goals;
 pub mod notes;

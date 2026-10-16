@@ -2,8 +2,8 @@
 //! (client/domain/testing.md, sections 5–6; domain/people.md, section 11).
 use super::{Joint, engine::Driver, session::Session};
 use crate::{Settings, Test, Until, World};
+use jig_client_domain::contract as client;
 use jig_core_world::peers::Peers;
-use jig_domain_client::contract as client;
 use jig_domain_people as people;
 use jig_fake_workers::{Script, Worker};
 use skein_fake_person::{Find, Step};

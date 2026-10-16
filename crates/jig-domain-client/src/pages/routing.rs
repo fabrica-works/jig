@@ -4,7 +4,6 @@ use crate::{
     Domain, Request,
     action::End,
     address::{Address, Place},
-    contract::{self, Delivery, Limit, ObjectKey, Part, PartyKind, Read, ReadResult, ReadValue, Subject},
     facts::Fact,
     objects::{Body, Source},
     pages::{Page, Section},
@@ -12,6 +11,9 @@ use crate::{
     windows::{Edge, Edges},
 };
 use alloc::boxed::Box;
+use jig_client_domain::contract::{
+    self, Delivery, Limit, ObjectKey, Part, PartyKind, Read, ReadResult, ReadValue, Subject,
+};
 use skein_lib::{Env, Id, List, Queue, Token};
 
 fn blank_edges() -> Edges {

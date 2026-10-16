@@ -1,7 +1,7 @@
 //! Display translation of sparse owner refusals (contract.md, 4; view.md, 7).
 //! Absent facts remain absent. The exact terminal remains in `ConnectorAnswer`.
+use jig_client_domain::contract as client;
 use jig_client_test_domain::connector_values::application_core as owner;
-use jig_domain_client::contract as client;
 
 pub(super) fn refusal(value: owner::Refusal) -> Option<client::Refusal> {
     Some(match value {

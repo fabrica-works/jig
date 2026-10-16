@@ -1,5 +1,5 @@
 //! Vocabulary invariants; behaviour step tests land with the spine.
-use crate::contract::{Text, VersionRange};
+use jig_client_domain::contract::{Text, VersionRange};
 use skein_lib::List;
 #[test]
 fn text_refuses_bytes_past_the_owner_bound() {

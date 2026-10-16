@@ -4,7 +4,7 @@ use crate::owner_wake_words::WakePhrase;
 use skein_ui::phrases::{Hole, Phrasebook};
 use skein_ui::{Builder, Role, Run};
 
-use jig_domain_client::contract::{OwnerWakePolicy, ResultsWake, SubscriptionKind, Subscriptions, WakeRule};
+use jig_client_domain::contract::{OwnerWakePolicy, ResultsWake, SubscriptionKind, Subscriptions, WakeRule};
 
 fn text(b: &mut Builder, book: &Phrasebook, language: u16, phrase: WakePhrase, holes: &[Hole]) {
     let saying = book.say(language, phrase.id(), holes).expect("wake phrases and typed holes were checked");

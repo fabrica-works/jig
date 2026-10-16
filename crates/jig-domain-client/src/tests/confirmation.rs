@@ -7,10 +7,10 @@ use crate::{
     action::Act,
     acts,
     confirm::Missing,
-    contract::*,
     fields::Purpose,
     objects::{Body, Card, Object, Source},
 };
+use jig_client_domain::contract::*;
 use skein_lib::{Id, List, Queue, Time, Wall};
 fn offered(act: ActKind, admission: Admission) -> List<Offered> {
     let mut rows = List::with_capacity(1);

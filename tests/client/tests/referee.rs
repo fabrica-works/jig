@@ -331,7 +331,7 @@ fn the_test_clients_family_revision_and_durable_outcome_are_observed() {
         family::Document::Item(family::Item {
             project: 1,
             key: 1,
-            revision: jig_domain_client::contract::Revision { value: 7 },
+            revision: jig_client_domain::contract::Revision { value: 7 },
             state: family::ItemState::Ready,
             value: 1,
             task: 9,
@@ -363,8 +363,8 @@ fn the_test_clients_family_revision_and_durable_outcome_are_observed() {
 
 #[test]
 fn the_test_clients_sent_words_are_found_in_committed_activity() {
+    use jig_client_domain::contract::{Activity, ActivityLine, Answer, Ask, Made, Outcome, Read};
     use jig_client_world::stories;
-    use jig_domain_client::contract::{Activity, ActivityLine, Answer, Ask, Made, Outcome, Read};
     let mut w = stories::chat_ready(21);
     w.front()
         .engine
@@ -481,23 +481,21 @@ fn a_tree_breaking_the_outline_fails_the_referee() {
     );
 }
 
-const WATCH_ENDS: &[jig_domain_client::contract::WatchEnd] = &[
-    jig_domain_client::contract::WatchEnd::Closed,
-    jig_domain_client::contract::WatchEnd::Dropped,
-    jig_domain_client::contract::WatchEnd::Busy,
-    jig_domain_client::contract::WatchEnd::Stopping,
-    jig_domain_client::contract::WatchEnd::Unknown,
-    jig_domain_client::contract::WatchEnd::NotAllowed,
-    jig_domain_client::contract::WatchEnd::SubjectEnded,
-    jig_domain_client::contract::WatchEnd::SignedOut,
+const WATCH_ENDS: &[jig_client_domain::contract::WatchEnd] = &[
+    jig_client_domain::contract::WatchEnd::Closed,
+    jig_client_domain::contract::WatchEnd::Dropped,
+    jig_client_domain::contract::WatchEnd::Busy,
+    jig_client_domain::contract::WatchEnd::Stopping,
+    jig_client_domain::contract::WatchEnd::Unknown,
+    jig_client_domain::contract::WatchEnd::NotAllowed,
+    jig_client_domain::contract::WatchEnd::SubjectEnded,
+    jig_client_domain::contract::WatchEnd::SignedOut,
 ];
 #[test]
 fn a_frame_after_its_watchs_end_is_no_evidence() {
+    use jig_client_domain::contract::{Delivery, WatchEvent};
     use jig_client_world::observe::jig_received;
-    use jig_domain_client::{
-        Event,
-        contract::{Delivery, WatchEvent},
-    };
+    use jig_domain_client::Event;
     const WATCH: Token = Token::new(1);
     for end in WATCH_ENDS {
         let span = Duration::from_millis(10);

@@ -4,7 +4,8 @@ use skein_ui::Limits;
 use skein_ui::phrases::{Hole, Invalid, PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat};
 use skein_ui::{Builder, Tree};
 
-use jig_domain_client::{Domain, contract::*};
+use jig_client_domain::contract::*;
+use jig_domain_client::Domain;
 use skein_lib::{
     List, Wall,
     bytes::{copy_of, find},

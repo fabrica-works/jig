@@ -1,6 +1,7 @@
 //! This domain's records, separate from the root request table records.
 //! Records restore, save and erase under this owner; client/domain/client.md, 11.
-use crate::{address::Address, contract::Text};
+use crate::address::Address;
+use jig_client_domain::contract::Text;
 /// A key owned by this domain in the small store.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum StoreKey {
@@ -19,7 +20,8 @@ pub enum Record {
     Draft { version: u16, party: u64, task: u64, words: Text, touched: u64 },
 }
 
-use crate::{Domain, Request, contract::Limit, facts::Fact};
+use crate::{Domain, Request, facts::Fact};
+use jig_client_domain::contract::Limit;
 use skein_lib::{List, Queue};
 /// Version of this domain's small-store vocabulary.
 pub const STORE_VERSION: u16 = 2;

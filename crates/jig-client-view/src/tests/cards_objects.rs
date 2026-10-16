@@ -10,7 +10,8 @@ use crate::{JigBindings, cards, decode};
 use skein_ui::Act;
 use skein_ui::{Builder, Role, State, Tree};
 
-use jig_domain_client::{Domain, Event, Request, action::Act as Action, contract::*, fields::Purpose, objects::Object};
+use jig_client_domain::contract::*;
+use jig_domain_client::{Domain, Event, Request, action::Act as Action, fields::Purpose, objects::Object};
 use skein_lib::{Duration, Id, List, Wall};
 
 fn list<T>(rows: impl IntoIterator<Item = T>) -> List<T> {

@@ -1,6 +1,6 @@
 //! Sign in providers are configured by the application and secrets stay below.
 //! Sign-out parks via the root and return reopens the frame; client/domain/client.md, 12.
-use crate::contract::Text;
+use jig_client_domain::contract::Text;
 /// A configured provider number and display name.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Provider {
@@ -8,7 +8,8 @@ pub struct Provider {
     pub name: Text,
 }
 
-use crate::{Domain, Request, contract::Subject, pages::Page, watches::Owner};
+use crate::{Domain, Request, pages::Page, watches::Owner};
+use jig_client_domain::contract::Subject;
 use skein_lib::{Env, List, Queue};
 /// Providers installed by the application before start, and a return awaiting
 /// the old frame's terminal. Credentials never cross this state.

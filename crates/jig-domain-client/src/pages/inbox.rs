@@ -3,14 +3,12 @@
 //! cursors. Needs sort oldest first and updates newest first. Reading results
 //! asks the keyed table to mark the newest displayed position once per opening.
 //! See client/domain/pages.md, 3, and contract.md, 3.2 and 6–7.
-use crate::{
-    address::{Address, ProjectSection},
-    contract::{
-        Count, Cursor, InboxDocument, InboxEntry, InboxGroup, InboxPage, InboxReadGroup, InboxRow, Needs, ObjectKey,
-        OwnerInbox, OwnerInboxEntry, OwnerInboxPage, OwnerInboxSelection, Read,
-    },
-};
+use crate::address::{Address, ProjectSection};
 use alloc::boxed::Box;
+use jig_client_domain::contract::{
+    Count, Cursor, InboxDocument, InboxEntry, InboxGroup, InboxPage, InboxReadGroup, InboxRow, Needs, ObjectKey,
+    OwnerInbox, OwnerInboxEntry, OwnerInboxPage, OwnerInboxSelection, Read,
+};
 use skein_lib::List;
 /// An inbox filter, shared by live rows and historical reads.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -98,7 +96,7 @@ pub struct Inbox {
     pub live_more: bool,
     pub needs_window: InboxWindow,
     pub updates_window: InboxWindow,
-    pub refusal: Option<crate::contract::Refusal>,
+    pub refusal: Option<jig_client_domain::contract::Refusal>,
     pub opening_updates: bool,
     pub marked_results: u64,
     /// The committed read position; pending mark-seen requests do not advance it.
@@ -384,8 +382,8 @@ pub const fn address(key: ObjectKey) -> Option<Address> {
         | ObjectKey::Result(task)
         | ObjectKey::Question { task, .. } => task,
         ObjectKey::Proposal(proposal) => match proposal.proposer {
-            crate::contract::Proposer::Task(task) => task,
-            crate::contract::Proposer::Party(_) => return None,
+            jig_client_domain::contract::Proposer::Task(task) => task,
+            jig_client_domain::contract::Proposer::Party(_) => return None,
         },
         ObjectKey::Note { project, .. } => return Some(Address::Project { project, section: ProjectSection::Notes }),
     };

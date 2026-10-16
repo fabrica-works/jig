@@ -1,6 +1,6 @@
 use super::*;
 use crate::Bounds;
-use jig_domain_client::contract::*;
+use jig_client_domain::contract::*;
 use skein_lib::{Duration, List};
 fn pattern() -> OwnerPattern {
     let mut segments = List::with_capacity(3);

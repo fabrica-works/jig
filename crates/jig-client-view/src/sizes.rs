@@ -29,7 +29,7 @@ fn outcome(limits: &Limits) -> Option<u32> {
 #[must_use]
 pub fn offered_nodes(limits: &Limits) -> Option<u32> {
     // Each offer is a two-node control or its label plus a whole refusal.
-    jig_domain_client::contract::MAX_OFFERED_ACTS.checked_mul(outcome(limits)?.checked_add(1)?.max(2))
+    jig_client_domain::contract::MAX_OFFERED_ACTS.checked_mul(outcome(limits)?.checked_add(1)?.max(2))
 }
 /// One chip, including each retained dependency at most once for this call.
 #[must_use]

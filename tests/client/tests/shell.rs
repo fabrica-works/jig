@@ -30,7 +30,7 @@ fn a_failed_store_stops_the_steps_keyed_sends_and_notifies_the_table() {
             ask: jig_domain_client::intents::ByValue {
                 asked: skein_lib::Token::new(99),
                 scope: 7,
-                ask: Box::new(jig_domain_client::contract::Ask::StartChat {
+                ask: Box::new(jig_client_domain::contract::Ask::StartChat {
                     project: 1,
                     words: stories::text(b"Hello"),
                 }),

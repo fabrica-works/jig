@@ -4,13 +4,13 @@ use crate::{
     action::Act,
     address::{Address, Place},
     boundary::Offset,
-    contract::*,
     fields::Purpose,
     intents::{ByValue, send_card},
     notices::{self, Kind},
     objects::Source,
     store::{self, Record, STORE_VERSION},
 };
+use jig_client_domain::contract::*;
 use skein_lib::{Duration, Env, List, Queue, Time, Token, Wall};
 fn limits() -> Limits {
     Limits { heartbeat: Duration::from_secs(3600), ..LIMITS }
@@ -39,12 +39,7 @@ fn drive(domain: &mut Domain, limits: &Limits, now: Time, event: Event) -> Box<[
     };
     crate::step(domain, &Env { now, wall: Wall::EPOCH, limits: *limits }, event, &mut out);
     if starting {
-        crate::step(
-            domain,
-            &Env { now, wall: Wall::EPOCH, limits: *limits },
-            Event::Hello { versions: VersionRange { first: 7, last: 7 } },
-            &mut out,
-        );
+        crate::step(domain, &Env { now, wall: Wall::EPOCH, limits: *limits }, Event::Hello { served: true }, &mut out);
     }
     drain(out)
 }

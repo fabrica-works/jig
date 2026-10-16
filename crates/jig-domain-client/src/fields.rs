@@ -1,6 +1,6 @@
 //! Fields retain text and count domain writes; client/domain/client.md, 9.
 //! Jig 21 adds draft and confirmation policies. Person edits never advance writes.
-use crate::contract::Text;
+use jig_client_domain::contract::Text;
 /// Why a person is typing into a field.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Purpose {
@@ -31,7 +31,7 @@ pub struct Field {
     pub writes: u64,
 }
 
-use crate::contract::Limit;
+use jig_client_domain::contract::Limit;
 use skein_lib::Map;
 /// A bounded set of purposes, shared by pages and confirmations.
 #[derive(Debug)]

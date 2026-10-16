@@ -6,7 +6,7 @@ use crate::words::Words;
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Run};
 
-use jig_domain_client::contract::{ActiveRun, HeldRuntime, RetryNotice, RunStage, RunWork};
+use jig_client_domain::contract::{ActiveRun, HeldRuntime, RetryNotice, RunStage, RunWork};
 
 pub(crate) fn active(b: &mut Builder, value: &ActiveRun, words: &Words) {
     match value.stage {

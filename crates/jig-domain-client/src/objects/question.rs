@@ -3,7 +3,7 @@
 use super::{Body, Object};
 /// Reads the document without copying the working set's one object.
 #[must_use]
-pub fn facts(object: &Object) -> Option<&crate::contract::Question> {
+pub fn facts(object: &Object) -> Option<&jig_client_domain::contract::Question> {
     match &object.body {
         Some(Body::Question(document)) => Some(document),
         Some(

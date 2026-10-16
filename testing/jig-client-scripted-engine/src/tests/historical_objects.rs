@@ -1,5 +1,5 @@
 use crate::{Bounds, owner_historical};
-use jig_domain_client::contract::*;
+use jig_client_domain::contract::*;
 use skein_lib::{List, Wall};
 
 fn goal() -> OwnerPersonProposalGoal {

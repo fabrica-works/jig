@@ -1,14 +1,14 @@
 //! Keep: the child/table routing shape and exhaustive owner variants.
 //! Replace: Ops connector sides, family addresses and application vocabulary.
 use crate::{Domain, Fact, Limits, Request, infrastructure, observability, route};
-use jig_domain_client::contract::Part;
+use jig_client_domain::contract::Part;
 use skein_lib::{Env, Queue};
 pub(crate) fn show(
     root: &mut Domain,
     env: &Env<Limits>,
     part: Part,
     generation: u32,
-    scope: jig_domain_client::contract::PartScope,
+    scope: jig_client_domain::contract::PartScope,
     out: &mut Queue<Request>,
 ) {
     let number = connector(&part);
@@ -20,8 +20,8 @@ pub(crate) fn show(
                 part,
                 generation,
                 scope: match scope {
-                    jig_domain_client::contract::PartScope::Project(project) => infrastructure::Scope::Project(project),
-                    jig_domain_client::contract::PartScope::Deployment => infrastructure::Scope::Deployment,
+                    jig_client_domain::contract::PartScope::Project(project) => infrastructure::Scope::Project(project),
+                    jig_client_domain::contract::PartScope::Deployment => infrastructure::Scope::Deployment,
                 },
             },
             out,
@@ -34,10 +34,10 @@ pub(crate) fn show(
                     part,
                     generation,
                     scope: match scope {
-                        jig_domain_client::contract::PartScope::Project(project) => {
+                        jig_client_domain::contract::PartScope::Project(project) => {
                             observability::Scope::Project(project)
                         }
-                        jig_domain_client::contract::PartScope::Deployment => observability::Scope::Deployment,
+                        jig_client_domain::contract::PartScope::Deployment => observability::Scope::Deployment,
                     },
                 },
                 out,

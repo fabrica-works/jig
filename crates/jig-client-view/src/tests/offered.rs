@@ -9,7 +9,8 @@ use crate::{JigBindings, cards, decode};
 use skein_ui::Act;
 use skein_ui::{Builder, Role};
 
-use jig_domain_client::{action::Act as Action, contract::*};
+use jig_client_domain::contract::*;
+use jig_domain_client::action::Act as Action;
 use skein_lib::{List, Wall};
 
 const KINDS: [ActKind; 25] = [

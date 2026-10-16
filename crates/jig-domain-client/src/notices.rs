@@ -1,12 +1,8 @@
 //! Short-lived outcomes with no card, on monotonic deadlines.
 //! Notices never decide whether a request was made. The root table's answer
 //! remains its one durable answer. See client/domain/client.md, 13.
-use crate::{
-    Domain,
-    contract::{Answer, Limit, ObjectKey},
-    domain::Timer,
-    link::Link,
-};
+use crate::{Domain, domain::Timer, link::Link};
+use jig_client_domain::contract::{Answer, Limit, ObjectKey};
 use skein_lib::{Duration, Id, Map, Slab, Time, Token};
 /// Facts the view phrases as a short-lived notice.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -20,7 +16,7 @@ pub enum Kind {
     /// A durable page request answer whose page no longer shows it.
     PageAnswer { answer: Answer },
     /// A table retention expired for a card no longer shown.
-    Unknown { object: ObjectKey, act: crate::contract::ActKind },
+    Unknown { object: ObjectKey, act: jig_client_domain::contract::ActKind },
     /// A page request expired without a known outcome.
     PageUnknown { purpose: crate::pages::IntentPurpose },
     /// A refusal with no page or card to show it on.

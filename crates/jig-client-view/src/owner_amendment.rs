@@ -5,13 +5,11 @@ use crate::words::Words;
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
-use jig_domain_client::{
-    Limits,
-    contract::{
-        DocumentText, OwnerAmendmentState, OwnerAuthorityDocument, OwnerPattern, OwnerPatternEnd, ParameterDocument,
-        PersonAddress,
-    },
+use jig_client_domain::contract::{
+    DocumentText, OwnerAmendmentState, OwnerAuthorityDocument, OwnerPattern, OwnerPatternEnd, ParameterDocument,
+    PersonAddress,
 };
+use jig_domain_client::Limits;
 
 /// Storage for a whole standalone state, including all nested fragments.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

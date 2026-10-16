@@ -5,10 +5,8 @@ use crate::{JigBindings, cards};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Run};
 
-use jig_domain_client::{
-    Domain,
-    contract::{Activity, RunBeginning, RunEnding},
-};
+use jig_client_domain::contract::{Activity, RunBeginning, RunEnding};
+use jig_domain_client::Domain;
 pub(super) fn activity(b: &mut Builder, client: &Domain, value: &Activity, words: &Words, bindings: &mut JigBindings) {
     match value {
         Activity::Owner { source, decoded } => {
@@ -58,7 +56,7 @@ pub(super) fn activity(b: &mut Builder, client: &Domain, value: &Activity, words
             words.amount(b, *spent);
         }
         Activity::Result { result } => {
-            if let Some(id) = client.objects().find(jig_domain_client::contract::ObjectKey::Result(result.task.task)) {
+            if let Some(id) = client.objects().find(jig_client_domain::contract::ObjectKey::Result(result.task.task)) {
                 cards::card(b, client, id, &cards::Place::Conversation, words, bindings);
             } else {
                 cards::result::facts(b, client, result, words, bindings);

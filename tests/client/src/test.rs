@@ -1,9 +1,10 @@
 //! Concrete test-application adapter; application vocabulary is read only here.
 #![allow(clippy::wildcard_imports, reason = "world adapters translate the complete owner vocabulary")]
 use crate::harness::*;
+use jig_client_domain::contract::*;
 use jig_client_test_domain::{self as domain, Address, Event, JigOut, Request, first};
 use jig_client_test_view as view;
-use jig_domain_client::{boundary::Offset, contract::*};
+use jig_domain_client::boundary::Offset;
 use skein_lib::{Duration, Env, List, Queue, RequestEnvelope, RequestLimits, Time};
 use skein_ui::Act;
 use skein_ui::{NodeId, Patch, Tree};

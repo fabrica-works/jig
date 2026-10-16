@@ -41,7 +41,7 @@ pub fn card(
         )
         | None => return false,
     };
-    if document.acts.capacity() > jig_domain_client::contract::MAX_OFFERED_ACTS {
+    if document.acts.capacity() > jig_client_domain::contract::MAX_OFFERED_ACTS {
         return false;
     }
     if !super::open(b, client, object, place, &words.say(JigPhrase::Escalation, &[]), words, bindings) {

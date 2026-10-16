@@ -1,7 +1,7 @@
 //! Live watches preserve their exact owner subject, window and run position
 //! (client/domain/contract.md, 7). The sign-in supplies the authenticated party;
 //! translation does not choose visibility or reinterpret a role's project.
-use jig_domain_client::contract as client;
+use jig_client_domain::contract as client;
 use jig_domain_core::{Event, WatchRefusal, documents};
 use jig_domain_tasks as tasks;
 use jig_domain_views as views;

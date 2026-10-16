@@ -1,6 +1,7 @@
 //! P and Q's supplied owner facts and public-tree observations.
 #![allow(clippy::wildcard_imports, reason = "finite story fixtures enumerate the complete client vocabulary")]
 use super::{Document, Ops, OpsScript, Scripted, Subject};
+use jig_client_domain::contract::*;
 use jig_client_scripted_engine::{Bounds, Script, Truth};
 use jig_client_view::Owner;
 use jig_client_world::{
@@ -9,10 +10,7 @@ use jig_client_world::{
     observe,
     stories::{frame, party, proposal, task, text},
 };
-use jig_domain_client::{
-    address::{Address as JigAddress, TaskSection},
-    contract::*,
-};
+use jig_domain_client::address::{Address as JigAddress, TaskSection};
 use jig_ops_client_domain::{Address, infrastructure as infra, observability as obs};
 use jig_ops_domain_connectors::{Connector, number};
 use skein_fake_person::{Face, Find, Found, TreeFace};
@@ -321,7 +319,7 @@ fn configured(seed: u64, truth: Truth, ops: OpsScript, rules: Vec<jig_client_scr
         Settings { seed, ..Settings::default() },
         Scripted::new(
             Script {
-                versions: VersionRange { first: CLIENT_VERSION, last: CLIENT_VERSION },
+                versions: VersionRange { first: 7, last: 7 },
                 truth,
                 bounds: Bounds {
                     text: 32,

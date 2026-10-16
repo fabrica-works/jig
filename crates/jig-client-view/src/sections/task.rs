@@ -5,11 +5,11 @@ use crate::{JigBindings, cards};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role};
 
+use jig_client_domain::contract::{Executor, ObjectKey, Task};
 use jig_domain_client::{
     Domain,
     action::Act,
     address::{Address, TaskSection},
-    contract::{Executor, ObjectKey, Task},
     objects::Body,
 };
 mod history;
@@ -208,10 +208,10 @@ fn slots(b: &mut Builder, doc: &Task, section: TaskSection, words: &Words, bindi
         TaskSection::Overview | TaskSection::Panels => {
             for resource in &doc.resources {
                 match resource {
-                    jig_domain_client::contract::TaskResource::Owner(value) => {
+                    jig_client_domain::contract::TaskResource::Owner(value) => {
                         crate::owner_chip::resource(b, value, words, bindings);
                     }
-                    jig_domain_client::contract::TaskResource::Part(_) => {}
+                    jig_client_domain::contract::TaskResource::Part(_) => {}
                 }
             }
         }
@@ -219,7 +219,7 @@ fn slots(b: &mut Builder, doc: &Task, section: TaskSection, words: &Words, bindi
     }
 }
 pub(crate) fn overview(b: &mut Builder, client: &Domain, doc: &Task, words: &Words, bindings: &mut JigBindings) {
-    if let jig_domain_client::contract::ChipPhase::Owner { details, .. } = doc.chip.details.as_ref() {
+    if let jig_client_domain::contract::ChipPhase::Owner { details, .. } = doc.chip.details.as_ref() {
         crate::owner_chip::render(b, details, client, words, bindings);
     }
     crate::specification::document(b, &doc.spec, words);
@@ -282,15 +282,15 @@ pub(crate) fn overview(b: &mut Builder, client: &Domain, doc: &Task, words: &Wor
 fn task_link(
     b: &mut Builder,
     client: &Domain,
-    link: &jig_domain_client::contract::OwnerTaskLink,
+    link: &jig_client_domain::contract::OwnerTaskLink,
     words: &Words,
     bindings: &mut JigBindings,
 ) {
     crate::owner_result::link(b, client, link, words, bindings);
     match link {
-        jig_domain_client::contract::OwnerTaskLink::Live(_)
-        | jig_domain_client::contract::OwnerTaskLink::Retained { .. } => {}
-        jig_domain_client::contract::OwnerTaskLink::Stored { number, .. } => crate::frame::control(
+        jig_client_domain::contract::OwnerTaskLink::Live(_)
+        | jig_client_domain::contract::OwnerTaskLink::Retained { .. } => {}
+        jig_client_domain::contract::OwnerTaskLink::Stored { number, .. } => crate::frame::control(
             b,
             words,
             bindings,
@@ -302,7 +302,7 @@ fn task_link(
     }
 }
 fn activity(b: &mut Builder, client: &Domain, doc: &Task, words: &Words, bindings: &mut JigBindings) {
-    use jig_domain_client::contract::ChipPhase;
+    use jig_client_domain::contract::ChipPhase;
     match doc.chip.executor {
         Executor::Agent { .. } => {
             match doc.chip.details.as_ref() {

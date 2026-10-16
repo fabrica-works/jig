@@ -2,8 +2,8 @@
 //! These routes retain original shell tokens and authenticated session numbers.
 //! They do not inspect engine tasks, choose outcomes, or own request durability.
 use crate::harness::ClientId;
+use jig_client_domain::contract::{Read, Subject, VersionRange};
 use jig_client_test_domain::family;
-use jig_domain_client::contract::{Read, Subject, VersionRange};
 use jig_domain_core::{Event, documents::ApplicationScope};
 use jig_domain_people as people;
 use skein_lib::{ReplyTo, Token};
@@ -124,7 +124,7 @@ impl Transport {
 
     #[must_use]
     pub fn hello(&self) -> jig_domain_client::Event {
-        jig_domain_client::Event::Hello { versions: self.versions }
+        jig_domain_client::Event::Hello { served: jig_client_protocol_link::serves(self.versions) }
     }
 
     /// Replace only the protocol's configured served range, supplied outside Frame.
@@ -404,7 +404,7 @@ mod tests {
 
     #[test]
     fn normal_run_taken_and_provisional_continue_release_only_their_original_independent_flights() {
-        use jig_domain_client::contract::ProvisionalTurnName;
+        use jig_client_domain::contract::ProvisionalTurnName;
         let mut front = Transport::new(VersionRange { first: 7, last: 7 });
         front.bind(ClientId(0), 7, identity(b"same"));
         front.bind(ClientId(1), 7, identity(b"same"));
@@ -512,7 +512,7 @@ mod tests {
         let what = Read::Goals {
             project: u32::MAX,
             after: Some(
-                jig_domain_client::contract::Cursor::new(Box::from(UTF8_TEXTS[0]), 2).expect("whole opaque cursor"),
+                jig_client_domain::contract::Cursor::new(Box::from(UTF8_TEXTS[0]), 2).expect("whole opaque cursor"),
             ),
         };
         let jig = Reply::Read { client: ClientId(0), read: native, what: what.clone() };
@@ -530,7 +530,7 @@ mod tests {
             Read::Goals {
                 project: u32::MAX,
                 after: Some(
-                    jig_domain_client::contract::Cursor::new(Box::from(UTF8_TEXTS[0]), 2)
+                    jig_client_domain::contract::Cursor::new(Box::from(UTF8_TEXTS[0]), 2)
                         .expect("original whole cursor")
                 )
             }
@@ -545,7 +545,7 @@ mod tests {
         let mut front = Transport::new(versions);
         let supplied = identity(&[255, b'/', 0]);
         front.bind(ClientId(0), u64::MAX, supplied.clone());
-        assert_eq!(front.hello(), jig_domain_client::Event::Hello { versions });
+        assert_eq!(front.hello(), jig_domain_client::Event::Hello { served: false });
         assert_eq!(front.sign_in(ClientId(0)), None);
         let Event::SignIn { reply_to, identity: actual } = front.start_sign_in(ClientId(0)) else {
             panic!("authentic sign-in input")

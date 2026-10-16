@@ -15,7 +15,6 @@ use crate::{
     action::Act,
     address::{Address, Place},
     boundary::{Event, Offset, Request},
-    contract::{Delivery, Frame, Limit, Subject, VersionRange, WatchEnd, WatchEvent},
     facts::Fact,
     frame::{FrameShown, FrameState},
     limits::Limits,
@@ -24,6 +23,7 @@ use crate::{
     store::Record,
     watches::{Following, Owner, Watch},
 };
+use jig_client_domain::contract::{Delivery, Frame, Limit, Subject, WatchEnd, WatchEvent};
 use skein_lib::{Deadlines, Duration, Env, Id, List, Map, Queue, Rng, Slab, Time, Token, Wall};
 
 mod owed;
@@ -62,7 +62,7 @@ pub struct Domain {
     pub(crate) fields: crate::fields::Fields,
     pub(crate) signin: crate::signin::SignIn,
     pub(crate) blocked: bool,
-    pub(crate) versions: Option<VersionRange>,
+    pub(crate) versions: Option<bool>,
     pub(crate) frame: FrameState,
     pub(crate) link: Link,
     pub(crate) page: Page,
@@ -221,7 +221,7 @@ impl Domain {
         let mut summary = self.frame.summary(self.address, self.link, self.page_behind_value(), self.updates_count);
         match self.address {
             Address::Task { task, .. } => {
-                if let Some(id) = self.objects.find(crate::contract::ObjectKey::Task(task))
+                if let Some(id) = self.objects.find(jig_client_domain::contract::ObjectKey::Task(task))
                     && let Some(object) = self.objects.get(id)
                 {
                     match &object.body {
@@ -283,7 +283,7 @@ impl Domain {
         crate::clock::sync(self);
     }
     /// An object policy leaves a card visible for the configured linger.
-    pub fn leave(&mut self, id: Id<crate::objects::Object>, ending: crate::contract::Ending) -> bool {
+    pub fn leave(&mut self, id: Id<crate::objects::Object>, ending: jig_client_domain::contract::Ending) -> bool {
         let Some(object) = self.objects.get_mut(id) else {
             return false;
         };
@@ -294,7 +294,11 @@ impl Domain {
         true
     }
     /// Keeps the durable outcome on a card until its configured linger ends.
-    pub fn leave_answer(&mut self, id: Id<crate::objects::Object>, outcome: crate::contract::Outcome) -> bool {
+    pub fn leave_answer(
+        &mut self,
+        id: Id<crate::objects::Object>,
+        outcome: jig_client_domain::contract::Outcome,
+    ) -> bool {
         let Some(object) = self.objects.get_mut(id) else {
             return false;
         };
@@ -330,7 +334,11 @@ impl Domain {
         &self.fields
     }
     /// Writes a field from domain policy and advances the view's shown count.
-    pub fn write_field(&mut self, purpose: crate::fields::Purpose, text: crate::contract::Text) -> Result<(), Limit> {
+    pub fn write_field(
+        &mut self,
+        purpose: crate::fields::Purpose,
+        text: jig_client_domain::contract::Text,
+    ) -> Result<(), Limit> {
         self.fields.write(purpose, text)?;
         self.changed();
         Ok(())
@@ -625,7 +633,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
     domain.now = env.now;
     domain.wall = env.wall;
     match event {
-        Event::Hello { versions } => crate::versions::hello(domain, env, versions, out),
+        Event::Hello { served } => crate::versions::hello(domain, env, served, out),
         Event::Frame { asked } => frame_answer(domain, asked, out),
         Event::Watch { watch, event } => watch_event(domain, env, Id::from_token(watch), event, out),
         Event::Ended { watch, end } => watch_end(domain, env, Id::from_token(watch), end, out),
@@ -736,8 +744,8 @@ fn act_event(domain: &mut Domain, env: &Env<Limits>, act: Act, out: &mut Queue<R
             }
         }
         Act::Submit { field: crate::fields::Purpose::Composer { task } } => {
-            if let Some(id) = domain.objects.find(crate::contract::ObjectKey::Task(task)) {
-                crate::confirm::open(domain, env, id, crate::contract::ActKind::Write);
+            if let Some(id) = domain.objects.find(jig_client_domain::contract::ObjectKey::Task(task)) {
+                crate::confirm::open(domain, env, id, jig_client_domain::contract::ActKind::Write);
             }
         }
         Act::WriteRelease { release } => crate::confirm::write_release(domain, release),
@@ -934,8 +942,8 @@ pub(crate) fn frame_delivery(domain: &mut Domain, env: &Env<Limits>, frame: Fram
         return;
     }
     domain.signin.service = match frame.party.kind {
-        crate::contract::PartyKind::Service => true,
-        crate::contract::PartyKind::Person => false,
+        jig_client_domain::contract::PartyKind::Service => true,
+        jig_client_domain::contract::PartyKind::Person => false,
     };
     let first = domain.frame.document.is_none();
     let party = frame.party.number;
@@ -1147,8 +1155,8 @@ fn terminal_watch(domain: &mut Domain, id: Id<Watch>, end: WatchEnd, out: &mut Q
 pub(crate) const FINAL_TASK_READ: u16 = 24;
 // A watch terminal ends its obligation, while its final task remains readable.
 fn read_final_task(domain: &mut Domain, watch: Id<Watch>, task: u64, generation: u32, out: &mut Queue<Request>) {
-    let key = crate::contract::ObjectKey::Task(task);
-    let what = crate::contract::Read::Task { task };
+    let key = jig_client_domain::contract::ObjectKey::Task(task);
+    let what = jig_client_domain::contract::Read::Task { task };
     let source = crate::objects::Source::Window { generation, number: FINAL_TASK_READ };
     // Transfer this source's slot, including at a one-source limit.
     if let Some(id) = domain.objects.find(key) {

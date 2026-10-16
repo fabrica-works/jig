@@ -5,7 +5,7 @@
     reason = "fixtures inspect public tree nodes and observed boundary outputs"
 )]
 use crate::{Limits, View, build, words};
-use jig_domain_client::contract::*;
+use jig_client_domain::contract::*;
 use jig_ops_client_domain::{self as root, Address, Domain, Event, JigOut, Request, infrastructure, observability};
 use skein_lib::{Duration, Env, List, Queue, RequestLimits, Time, Wall};
 const JIG: jig_domain_client::Limits = jig_domain_client::Limits {
@@ -99,7 +99,7 @@ fn ready() -> Domain {
             _ => None,
         })
         .unwrap();
-    drive(&mut root, Event::Jig(jig_domain_client::Event::Hello { versions: VersionRange { first: 7, last: 7 } }));
+    drive(&mut root, Event::Jig(jig_domain_client::Event::Hello { served: true }));
     // Explicit synthetic identity and empty offers, supplied independently of the party's display name.
     let frame = Frame {
         party: FrameParty {

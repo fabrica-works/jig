@@ -71,9 +71,9 @@ impl Script {
 pub enum Received {
     SignedIn { person: u64 },
     Sent { attempt: skein_lib::Token, key: skein_lib::RequestKey },
-    Answer { attempt: skein_lib::Token, answer: jig_domain_client::contract::Answer },
-    Delivery(jig_domain_client::contract::Delivery),
-    Read(jig_domain_client::contract::ReadResult),
+    Answer { attempt: skein_lib::Token, answer: jig_client_domain::contract::Answer },
+    Delivery(jig_client_domain::contract::Delivery),
+    Read(jig_client_domain::contract::ReadResult),
 }
 /// A native client as a process of a skein world.
 pub struct NativeClient {
@@ -157,7 +157,7 @@ impl NativeClient {
                 self.received.push(Received::Answer { attempt: *attempt, answer: answer.clone() });
             }
             client::Event::Jig(jig_domain_client::Event::Watch {
-                event: jig_domain_client::contract::WatchEvent::Delivered(delivery),
+                event: jig_client_domain::contract::WatchEvent::Delivered(delivery),
                 ..
             }) => self.received.push(Received::Delivery(delivery.clone())),
             client::Event::Jig(jig_domain_client::Event::Read { result, .. }) => {
@@ -174,9 +174,9 @@ impl NativeClient {
         if matches!(
             &event,
             client::Event::Answer {
-                answer: Some(client::Answered::Jig(jig_domain_client::contract::Answer::Done(
-                    jig_domain_client::contract::Outcome::Owner(
-                        jig_domain_client::contract::OwnerOutcome::Started { .. }
+                answer: Some(client::Answered::Jig(jig_client_domain::contract::Answer::Done(
+                    jig_client_domain::contract::Outcome::Owner(
+                        jig_client_domain::contract::OwnerOutcome::Started { .. }
                     )
                 ))),
                 ..

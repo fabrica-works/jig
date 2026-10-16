@@ -2,7 +2,7 @@
 //! Busy/not-ready arm one unmade attempt; loss preserves the key; restart drops
 //! undurable snapshots and provisional text, retaining durable answers by key.
 use crate::{Application, Engine, Envelope, Up};
-use jig_domain_client::contract::{ReadNone, ReadResult, VersionRange, WatchEnd, WatchEvent};
+use jig_client_domain::contract::{ReadNone, ReadResult, VersionRange, WatchEnd, WatchEvent};
 use skein_lib::{Duration, Time, Token};
 
 /// Transport and engine faults chosen by a scenario or seeded world.

@@ -58,7 +58,7 @@ fn restored(saved: link::Saved) -> client::store::Record {
                         client::Ask::First(client::first::Ask::ChangeObject {
                             project: decoded.project,
                             object: decoded.value.object,
-                            revision: jig_domain_client::contract::Revision { value: decoded.value.revision },
+                            revision: jig_client_domain::contract::Revision { value: decoded.value.revision },
                             value: decoded.value.value,
                         })
                     }

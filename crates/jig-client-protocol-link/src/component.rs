@@ -160,15 +160,15 @@ impl Link {
             ),
         };
         if self.attempts.len() == self.attempts.capacity() {
-            read_none(read, &owner, jig_domain_client::contract::ReadNone::Unreachable, out);
+            read_none(read, &owner, jig_client_domain::contract::ReadNone::Unreachable, out);
             return;
         }
         let Some(next) = self.next.checked_add(1) else {
-            read_none(read, &owner, jig_domain_client::contract::ReadNone::Unreachable, out);
+            read_none(read, &owner, jig_client_domain::contract::ReadNone::Unreachable, out);
             return;
         };
         let Ok(record) = translate::reads::owned(what, &self.limits.wire) else {
-            read_none(read, &owner, jig_domain_client::contract::ReadNone::Unreachable, out);
+            read_none(read, &owner, jig_client_domain::contract::ReadNone::Unreachable, out);
             return;
         };
         let exchange = Token::new(self.next);
@@ -281,7 +281,7 @@ fn read_value(attempt: &Attempt, record: w::Owned, limits: &Limits) -> Result<Re
     match record.owner() {
         w::Owner::Jig => {
             let value = translate::reads::value(record.record(), limits)?;
-            Ok(Readout::Jig(jig_domain_client::contract::ReadResult::Value(value)))
+            Ok(Readout::Jig(jig_client_domain::contract::ReadResult::Value(value)))
         }
         w::Owner::Family(owner) => {
             let family = owner.number();
@@ -289,9 +289,9 @@ fn read_value(attempt: &Attempt, record: w::Owned, limits: &Limits) -> Result<Re
         }
     }
 }
-fn read_none(read: Token, owner: &w::Owner, why: jig_domain_client::contract::ReadNone, out: &mut Queue<Request>) {
+fn read_none(read: Token, owner: &w::Owner, why: jig_client_domain::contract::ReadNone, out: &mut Queue<Request>) {
     let result = match owner {
-        w::Owner::Jig => Readout::Jig(jig_domain_client::contract::ReadResult::None(why)),
+        w::Owner::Jig => Readout::Jig(jig_client_domain::contract::ReadResult::None(why)),
         w::Owner::Family(owner) => Readout::Family { family: owner.number(), record: None },
     };
     out.push(Request::Read { read, result });
@@ -306,7 +306,7 @@ fn failed(attempt: Attempt, out: &mut Queue<Request>) {
             unreachable!("watch failure belongs to its map")
         }
         ExchangeKind::Read => {
-            read_none(attempt.token, &attempt.owner, jig_domain_client::contract::ReadNone::Unreachable, out);
+            read_none(attempt.token, &attempt.owner, jig_client_domain::contract::ReadNone::Unreachable, out);
         }
     }
 }
@@ -341,15 +341,15 @@ impl Link {
             return;
         }
         if self.watches.0.len() == self.watches.0.capacity() {
-            out.push(Request::Ended { watch, end: jig_domain_client::contract::WatchEnd::Busy });
+            out.push(Request::Ended { watch, end: jig_client_domain::contract::WatchEnd::Busy });
             return;
         }
         let Ok(subject) = translate::watches::owned(subject, &self.limits.wire) else {
-            out.push(Request::Ended { watch, end: jig_domain_client::contract::WatchEnd::Dropped });
+            out.push(Request::Ended { watch, end: jig_client_domain::contract::WatchEnd::Dropped });
             return;
         };
         let Some(name) = self.token() else {
-            out.push(Request::Ended { watch, end: jig_domain_client::contract::WatchEnd::Dropped });
+            out.push(Request::Ended { watch, end: jig_client_domain::contract::WatchEnd::Dropped });
             return;
         };
         let opening = crate::watches::Opening {
@@ -377,11 +377,11 @@ impl Link {
         let Some(stream) = &self.stream else { return };
         let Some(stream) = stream.name else { return };
         if self.attempts.len() == self.attempts.capacity() {
-            self.watches.end(watch, jig_domain_client::contract::WatchEnd::Busy, out);
+            self.watches.end(watch, jig_client_domain::contract::WatchEnd::Busy, out);
             return;
         }
         let Some(exchange) = self.token() else {
-            self.watches.end(watch, jig_domain_client::contract::WatchEnd::Dropped, out);
+            self.watches.end(watch, jig_client_domain::contract::WatchEnd::Dropped, out);
             return;
         };
         let opening = self.watches.0.get_mut(&watch).expect("pending opening");
@@ -406,7 +406,7 @@ impl Link {
             return;
         }
         if opening.subject.is_some() {
-            self.watches.end(watch, jig_domain_client::contract::WatchEnd::Closed, out);
+            self.watches.end(watch, jig_client_domain::contract::WatchEnd::Closed, out);
             return;
         }
         let name = opening.name;
@@ -414,7 +414,7 @@ impl Link {
         let stream = stream.name.expect("sent opening has hello");
         self.cancel_open(watch, name, out);
         if self.attempts.len() == self.attempts.capacity() {
-            self.watches.end(watch, jig_domain_client::contract::WatchEnd::Dropped, out);
+            self.watches.end(watch, jig_client_domain::contract::WatchEnd::Dropped, out);
             return;
         }
         let Some(exchange) = self.token() else { return self.drop_stream(now, out) };
@@ -491,10 +491,10 @@ impl Link {
             ExchangeKind::WatchClose { .. } => {
                 match w::CloseAnswer::decode(&self.limits.wire, &mut Reader::new(body)) {
                     Ok(w::CloseAnswer::Closed) => {
-                        self.watches.end(attempt.token, jig_domain_client::contract::WatchEnd::Closed, out);
+                        self.watches.end(attempt.token, jig_client_domain::contract::WatchEnd::Closed, out);
                     }
                     Ok(w::CloseAnswer::SignedOut) => {
-                        self.watches.end(attempt.token, jig_domain_client::contract::WatchEnd::SignedOut, out);
+                        self.watches.end(attempt.token, jig_client_domain::contract::WatchEnd::SignedOut, out);
                     }
                     Err(_) => self.failure(attempt, out),
                 }
@@ -511,12 +511,12 @@ impl Link {
                     && opening.name == name
                     && !opening.live
                 {
-                    self.watches.end(attempt.token, jig_domain_client::contract::WatchEnd::Dropped, out);
+                    self.watches.end(attempt.token, jig_client_domain::contract::WatchEnd::Dropped, out);
                 }
             }
             ExchangeKind::WatchClose { name } => {
                 if self.watches.named(name) == Some(attempt.token) {
-                    self.watches.end(attempt.token, jig_domain_client::contract::WatchEnd::Dropped, out);
+                    self.watches.end(attempt.token, jig_client_domain::contract::WatchEnd::Dropped, out);
                 }
             }
             ExchangeKind::SignOut { generation } if generation != self.generation => {}
@@ -586,7 +586,7 @@ impl Link {
                     };
                     out.push(Request::Hello {
                         family,
-                        versions: jig_domain_client::contract::VersionRange {
+                        versions: jig_client_domain::contract::VersionRange {
                             first: served.first(),
                             last: served.last(),
                         },
@@ -631,8 +631,8 @@ impl Link {
                         self.watches.opened(watch, out);
                         out.push(Request::Watch {
                             watch,
-                            event: jig_domain_client::contract::WatchEvent::Delivered(
-                                jig_domain_client::contract::Delivery::Run(Box::new(value)),
+                            event: jig_client_domain::contract::WatchEvent::Delivered(
+                                jig_client_domain::contract::Delivery::Run(Box::new(value)),
                             ),
                         });
                     }
@@ -651,7 +651,7 @@ impl Link {
         for watch in &watches {
             let name = self.watches.0.get(watch).expect("collected watch").name;
             self.cancel_open(*watch, name, out);
-            self.watches.end(*watch, jig_domain_client::contract::WatchEnd::Dropped, out);
+            self.watches.end(*watch, jig_client_domain::contract::WatchEnd::Dropped, out);
         }
         if let Some(stream) = stream.name
             && let Some(exchange) = self.token()

@@ -1,9 +1,9 @@
 //! Token routing between a client root and scripted engine. No root state is read.
 #![allow(clippy::wildcard_imports, reason = "world adapters translate the complete owner vocabulary")]
 use crate::{harness::*, test::Test};
+use jig_client_domain::contract::*;
 use jig_client_scripted_engine::{self as engine, Application, ApplicationValue, Decision, Envelope, Truth, Up};
 use jig_client_test_domain::{self as domain, Ask, Event, JigOut, Request, family, first};
-use jig_domain_client::contract::*;
 use sha2::{Digest, Sha256};
 use skein_lib::{RequestEnvelope, Time, Token, Wall};
 use skein_world::domain::Ledger;
@@ -152,7 +152,9 @@ impl Scripted {
     fn hello_events(&mut self) -> Vec<(ClientId, Event)> {
         std::mem::take(&mut self.hellos)
             .into_iter()
-            .map(|client| (client, Event::Jig(jig_domain_client::Event::Hello { versions: self.engine.versions() })))
+            .map(|client| {
+                (client, Event::Jig(jig_domain_client::Event::Hello { served: self.engine.versions().contains(7) }))
+            })
             .collect()
     }
     /// Installs a checked story and its application documents.

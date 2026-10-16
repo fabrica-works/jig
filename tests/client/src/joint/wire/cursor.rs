@@ -2,7 +2,7 @@
 //! The protocol layer interprets the bytes; the client only echoes them
 //! (client/domain/contract.md, 6). No live cursor table owns continuation state.
 mod index;
-use jig_domain_client::contract::Cursor;
+use jig_client_domain::contract::Cursor;
 use jig_domain_core::{CallKey, CoreKey, Key, ProjectionKey, documents, reads};
 use jig_domain_notes as notes;
 use jig_domain_people as people;
@@ -952,7 +952,7 @@ mod tests {
             assert_eq!(decode(&saved, length), Some(source.clone()));
             assert!(belongs_to(&source, &reads::Scope::Conversations));
             assert!(!belongs_to(&source, &reads::Scope::Goals { project: 0 }));
-            let request = jig_domain_client::contract::Read::Conversations { after: Some(saved) };
+            let request = jig_client_domain::contract::Read::Conversations { after: Some(saved) };
             assert_eq!(
                 super::super::reads::read(&request, length).expect("original query"),
                 reads::Read::Conversations { from: Some(source) }

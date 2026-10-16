@@ -9,7 +9,8 @@ use crate::words::Words;
 use skein_ui::phrases::{Hole, Invalid, PhraseLimits, Phrasebook, Segment};
 use skein_ui::{Builder, Role, Tree};
 
-use jig_domain_client::{Domain, Event, Request, contract::*};
+use jig_client_domain::contract::*;
+use jig_domain_client::{Domain, Event, Request};
 use skein_lib::{List, bytes::copy_of};
 fn words(selected: bool) -> Words {
     let english = crate::phrases::english::language();

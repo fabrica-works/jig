@@ -1,6 +1,6 @@
 //! Retained rows and scoped opaque cursors; contract.md, 6.
 use crate::{Bounds, Engine, Invalid, Up, payload};
-use jig_domain_client::contract::{
+use jig_client_domain::contract::{
     ActivityLine, ActivityPage, ConversationLine, ConversationPage, Cursor, GoalLine, GoalPage, HistoryPage,
     HistoryRow, InboxEntry, InboxGroup, InboxPage, InboxReadGroup, Note, NotePage, NoteScope, ObjectKey, ObjectPage,
     Read, ReadNone, ReadResult, ReadValue, Result, SpendPage, SpendPeriod,

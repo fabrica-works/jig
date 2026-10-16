@@ -8,15 +8,10 @@ use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run, State};
 
 use alloc::boxed::Box;
-use jig_domain_client::{
-    Domain, Limits,
-    action::Act,
-    contract::{
-        Chip, ChipPhase, OwnerPersonTask, OwnerTaskLink, ParameterDocument, PersonAddress, TaskContractDocument,
-    },
-    fields::Purpose,
-    objects::Object,
+use jig_client_domain::contract::{
+    Chip, ChipPhase, OwnerPersonTask, OwnerTaskLink, ParameterDocument, PersonAddress, TaskContractDocument,
 };
+use jig_domain_client::{Domain, Limits, action::Act, fields::Purpose, objects::Object};
 use skein_lib::Id;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PersonFragment {
@@ -125,7 +120,7 @@ fn contract_fits(contract: &TaskContractDocument, l: &Limits) -> Option<()> {
 /// keep their existing envelopes rather than expanding through task pages.
 #[must_use]
 pub fn required(value: &OwnerPersonTask, l: &Limits, words: &Words) -> Option<PersonFragment> {
-    if value.results.capacity() > l.rows || value.acts.capacity() > jig_domain_client::contract::MAX_OFFERED_ACTS {
+    if value.results.capacity() > l.rows || value.acts.capacity() > jig_client_domain::contract::MAX_OFFERED_ACTS {
         return None;
     }
     chip_fits(&value.task, l, words)?;
@@ -148,7 +143,7 @@ pub fn required(value: &OwnerPersonTask, l: &Limits, words: &Words) -> Option<Pe
         link_fits(&shown.task, l, words)?;
         if let Some(result) = &shown.result {
             chip_fits(&result.task, l, words)?;
-            if result.acts.capacity() > jig_domain_client::contract::MAX_OFFERED_ACTS {
+            if result.acts.capacity() > jig_client_domain::contract::MAX_OFFERED_ACTS {
                 return None;
             }
             if let Some(value) = &result.value {

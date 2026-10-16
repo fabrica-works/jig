@@ -2,8 +2,8 @@
 //! These ordinary observations never decide or manufacture an offer.
 use super::packets::Incoming;
 use crate::ClientId;
+use jig_client_domain::contract as client;
 use jig_client_test_domain::Event;
-use jig_domain_client::contract as client;
 use jig_domain_core::{documents, reads};
 use skein_lib::List;
 use std::collections::BTreeMap;

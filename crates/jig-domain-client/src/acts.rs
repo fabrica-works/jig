@@ -4,14 +4,14 @@
 //! that the person opened. See client/domain/objects.md, 2, 4–9 and 11.
 use crate::{
     confirm::Confirmation,
-    contract::{
-        ActKind, Admission, Ask, Decision, Note, ObjectKey, Offered, PersonAnswer, PersonContract, Priority, Refusal,
-        Revision, Text,
-    },
     fields::{Fields, Purpose},
     objects::{Body, Object},
 };
 use alloc::boxed::Box;
+use jig_client_domain::contract::{
+    ActKind, Admission, Ask, Decision, Note, ObjectKey, Offered, PersonAnswer, PersonContract, Priority, Refusal,
+    Revision, Text,
+};
 use skein_lib::List;
 /// Returns the engine's admission, or not offered when its document has no such act.
 #[must_use]

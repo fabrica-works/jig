@@ -8,9 +8,9 @@
 use super::spine::{LIMITS, delivered, drive, frame, open_token, start};
 use crate::{
     Domain, Event, Request,
-    contract::*,
     pages::inbox::{Filter, Inbox as PageInbox},
 };
+use jig_client_domain::contract::*;
 use skein_lib::{List, Time, Token, Wall};
 fn list<T>(values: impl IntoIterator<Item = T>) -> List<T> {
     let values: Vec<_> = values.into_iter().collect();

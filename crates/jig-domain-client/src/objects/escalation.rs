@@ -3,7 +3,7 @@
 use super::{Body, Object};
 /// Reads the document without copying the working set's one object.
 #[must_use]
-pub fn facts(object: &Object) -> Option<&crate::contract::Escalation> {
+pub fn facts(object: &Object) -> Option<&jig_client_domain::contract::Escalation> {
     match &object.body {
         Some(Body::Escalation(document)) => Some(document),
         Some(
@@ -24,7 +24,7 @@ pub fn facts(object: &Object) -> Option<&crate::contract::Escalation> {
 }
 /// Names only the independently decidable facts on this card.
 #[must_use]
-pub fn revision(object: &Object) -> Option<crate::contract::Revision> {
+pub fn revision(object: &Object) -> Option<jig_client_domain::contract::Revision> {
     let document = facts(object)?;
     Some(document.hold.revision)
 }

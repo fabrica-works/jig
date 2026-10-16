@@ -73,9 +73,9 @@ impl Side {
                 let (is_family, original) = *self.routes.get(&watch).expect("live watch route");
                 if is_family {
                     let event = match event {
-                        jig_domain_client::contract::WatchEvent::Opened => client::first::WatchEvent::Opened,
-                        jig_domain_client::contract::WatchEvent::Alive => client::first::WatchEvent::Alive,
-                        jig_domain_client::contract::WatchEvent::Delivered(_) => panic!("jig delivery to family route"),
+                        jig_client_domain::contract::WatchEvent::Opened => client::first::WatchEvent::Opened,
+                        jig_client_domain::contract::WatchEvent::Alive => client::first::WatchEvent::Alive,
+                        jig_client_domain::contract::WatchEvent::Delivered(_) => panic!("jig delivery to family route"),
                     };
                     Event::First(client::first::Event::Watch { watch: original, event })
                 } else {
@@ -126,7 +126,9 @@ impl Side {
                     link::Readout::Family { .. } => panic!("unknown family read"),
                 }
             }
-            link::Request::Hello { family: None, versions } => Event::Jig(jig_domain_client::Event::Hello { versions }),
+            link::Request::Hello { family: None, versions } => {
+                Event::Jig(jig_domain_client::Event::Hello { served: link::serves(versions) })
+            }
             transport @ (link::Request::Exchange { .. }
             | link::Request::Abandon { .. }
             | link::Request::OpenStream { .. }
@@ -468,7 +470,7 @@ fn count(
     if matches!(
         event,
         Event::Jig(jig_domain_client::Event::Watch {
-            event: jig_domain_client::contract::WatchEvent::Delivered(_),
+            event: jig_client_domain::contract::WatchEvent::Delivered(_),
             ..
         })
     ) {

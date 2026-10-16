@@ -1,19 +1,14 @@
 //! Whole supplied settings baselines and one keyed edit; pages.md, 6.5.
 //! This form never computes policy. Only explicit offered requests are eligible.
-use crate::{
-    Domain, Request,
-    action::Act,
-    contract::{ActKind, Admission, Ask, OwnerProject, PolicyEdit, Refusal},
-    intents::Origin,
-    pages::IntentPurpose,
-};
+use crate::{Domain, Request, action::Act, intents::Origin, pages::IntentPurpose};
 use alloc::boxed::Box;
+use jig_client_domain::contract::{ActKind, Admission, Ask, OwnerProject, PolicyEdit, Refusal};
 use skein_lib::{Queue, Token};
 /// One unsent review and the independent pending keyed request.
 #[derive(Debug)]
 pub struct Form {
     pub review: Option<Box<Ask>>,
-    pub service_role: Option<crate::contract::HeldRole>,
+    pub service_role: Option<jig_client_domain::contract::HeldRole>,
     pub pool_period: Option<u64>,
     pub before: Option<Box<Ask>>,
     pub pending: Option<Token>,
@@ -62,7 +57,7 @@ pub fn supported(doc: &OwnerProject, ask: &Ask) -> bool {
     false
 }
 /// An explicit role choice has no implicit service name or request.
-pub(crate) fn service_role(domain: &mut Domain, role: crate::contract::HeldRole) {
+pub(crate) fn service_role(domain: &mut Domain, role: jig_client_domain::contract::HeldRole) {
     if domain.blocked || domain.project_page.settings.pending.is_some() {
         return;
     }
@@ -73,7 +68,7 @@ pub(crate) fn service_role(domain: &mut Domain, role: crate::contract::HeldRole)
         return;
     }
     match role {
-        crate::contract::HeldRole::Policy { role } => {
+        jig_client_domain::contract::HeldRole::Policy { role } => {
             let mut supplied = false;
             for row in &doc.policy.roles {
                 if row.number == role {
@@ -85,10 +80,10 @@ pub(crate) fn service_role(domain: &mut Domain, role: crate::contract::HeldRole)
                 return;
             }
         }
-        crate::contract::HeldRole::Owner
-        | crate::contract::HeldRole::Maintainer
-        | crate::contract::HeldRole::Member
-        | crate::contract::HeldRole::Observer => {}
+        jig_client_domain::contract::HeldRole::Owner
+        | jig_client_domain::contract::HeldRole::Maintainer
+        | jig_client_domain::contract::HeldRole::Member
+        | jig_client_domain::contract::HeldRole::Observer => {}
     }
     domain.project_page.settings.service_role = Some(role);
     domain.project_page.settings.review = None;
@@ -148,7 +143,7 @@ pub fn baseline(doc: &OwnerProject, ask: &Ask) -> Option<Ask> {
                         }
                     }
                     let row = source?;
-                    PolicyEdit::Role(crate::contract::PolicyEditRole {
+                    PolicyEdit::Role(jig_client_domain::contract::PolicyEditRole {
                         number: row.number,
                         authority: row.authority.whole()?,
                         period_spend: row.period_spend,
@@ -169,22 +164,22 @@ pub fn baseline(doc: &OwnerProject, ask: &Ask) -> Option<Ask> {
         Ask::SetRoles { .. } => {
             let mut holdings = skein_lib::List::with_capacity(doc.members.capacity());
             for row in &doc.members {
-                holdings.push(crate::contract::Holding { party: row.party, role: row.role }).ok()?;
+                holdings.push(jig_client_domain::contract::Holding { party: row.party, role: row.role }).ok()?;
             }
             Some(Ask::SetRoles { project: doc.number, holdings })
         }
         Ask::SetPool { party, .. } => {
             for pool in &doc.configured_pools {
                 match pool.source {
-                    crate::contract::Funder::Pool { project, person, period }
+                    jig_client_domain::contract::Funder::Pool { project, person, period }
                         if project == doc.number && person == *party && period == doc.configured_period =>
                     {
                         return Some(Ask::SetPool { project: doc.number, party: *party, budget: pool.numbers.budget });
                     }
-                    crate::contract::Funder::Pool { .. }
-                    | crate::contract::Funder::Task(_)
-                    | crate::contract::Funder::Period { .. }
-                    | crate::contract::Funder::Recurring { .. } => {}
+                    jig_client_domain::contract::Funder::Pool { .. }
+                    | jig_client_domain::contract::Funder::Task(_)
+                    | jig_client_domain::contract::Funder::Period { .. }
+                    | jig_client_domain::contract::Funder::Recurring { .. } => {}
                 }
             }
             None
@@ -321,7 +316,7 @@ pub(crate) fn send(domain: &mut Domain, out: &mut Queue<Request>) {
     };
     domain.changed();
 }
-pub(crate) fn answered(domain: &mut Domain, request: Token, answer: crate::contract::Answer) {
+pub(crate) fn answered(domain: &mut Domain, request: Token, answer: jig_client_domain::contract::Answer) {
     if domain.project_page.settings.pending == Some(request) {
         domain.project_page.settings.pending = None;
         crate::notices::show(domain, crate::notices::Kind::PageAnswer { answer });

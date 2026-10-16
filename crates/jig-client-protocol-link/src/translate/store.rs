@@ -2,11 +2,9 @@
 use super::{answers, documents, pages, too_large};
 use crate::{Ask, Family, Limits};
 use alloc::boxed::Box;
+use jig_client_domain::contract as c;
 use jig_client_protocol_wire::{self as wire, v7 as w};
-use jig_domain_client::{
-    address::{Address, ProjectSection, TaskSection},
-    contract as c,
-};
+use jig_domain_client::address::{Address, ProjectSection, TaskSection};
 use skein_lib::{List, Reader, RequestRecord, Wall, Writer, bytes};
 
 fn project_section(value: ProjectSection) -> w::ProjectSection {

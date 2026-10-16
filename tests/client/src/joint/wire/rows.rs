@@ -2,7 +2,8 @@
 //! A row without runtime or changed time remains without those facts; joined
 //! chip metadata and cached replies never substitute for them.
 use super::{chips, owner};
-use jig_domain_client::{Limits, contract as client};
+use jig_client_domain::contract as client;
+use jig_domain_client::Limits;
 use jig_domain_core::documents;
 
 /// # Errors

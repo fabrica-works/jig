@@ -188,6 +188,6 @@ fn two_tabs_pressing_the_same_card_receive_the_first_decision() {
     assert_eq!(w.front().engine.commits().iter().filter(|c| c.key.is_some()).count(), 2);
     assert!(w.front().engine.commits().iter().any(|c| matches!(
         c.answer,
-        Some(jig_domain_client::contract::Answer::Done(jig_domain_client::contract::Outcome::DecidedFirst { .. }))
+        Some(jig_client_domain::contract::Answer::Done(jig_client_domain::contract::Outcome::DecidedFirst { .. }))
     )));
 }

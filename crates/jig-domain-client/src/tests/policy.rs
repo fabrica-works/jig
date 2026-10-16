@@ -1,5 +1,6 @@
 use super::spine::{LIMITS, delivered, drive, frame, start};
-use crate::{Domain, Event, Request, contract::*, intents::ByValue};
+use crate::{Domain, Event, Request, intents::ByValue};
+use jig_client_domain::contract::*;
 use skein_lib::{List, Time, Token};
 #[test]
 fn a_whole_policy_edit_enters_as_one_request_and_a_duplicate_joins_that_request() {

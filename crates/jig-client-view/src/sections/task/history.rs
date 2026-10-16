@@ -5,11 +5,8 @@ use crate::words::Words;
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
-use jig_domain_client::{
-    Domain,
-    action::Act,
-    contract::{HistoryChange, HistoryRow},
-};
+use jig_client_domain::contract::{HistoryChange, HistoryRow};
+use jig_domain_client::{Domain, action::Act};
 pub(super) fn history(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
     for (subtree, phrase) in [(false, JigPhrase::OwnHistory), (true, JigPhrase::SubtreeHistory)] {
         crate::pages::work::control(
@@ -61,7 +58,7 @@ fn task_link(b: &mut Builder, task: u64, words: &Words, bindings: &mut JigBindin
         Act::Go { address: jig_domain_client::address::Address::task(task) },
     );
 }
-fn line(b: &mut Builder, row: &jig_domain_client::contract::HistoryLine, words: &Words, bindings: &mut JigBindings) {
+fn line(b: &mut Builder, row: &jig_client_domain::contract::HistoryLine, words: &Words, bindings: &mut JigBindings) {
     b.key(skein_ui::Key { owner: crate::Owner::Jig.opaque(), kind: 21, a: row.task, b: row.position });
     crate::frame::control(
         b,

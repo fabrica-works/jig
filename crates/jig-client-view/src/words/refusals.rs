@@ -1,7 +1,7 @@
 //! Durable engine categories and complete refusal facts; client/domain/contract.md, 4.
 use super::Words;
 use crate::phrases::jig::JigPhrase;
-use jig_domain_client::contract::{AdmissionLimit, CurrentHold, DisposalIssue, HeldRole, Limit, Moved, Refusal};
+use jig_client_domain::contract::{AdmissionLimit, CurrentHold, DisposalIssue, HeldRole, Limit, Moved, Refusal};
 use skein_ui::Builder;
 use skein_ui::phrases::Hole;
 impl Words {

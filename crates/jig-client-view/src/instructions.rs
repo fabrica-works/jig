@@ -2,10 +2,8 @@
 use crate::{phrases::jig::JigPhrase, words::Words};
 use skein_ui::Builder;
 
-use jig_domain_client::{
-    Limits,
-    contract::{DocumentText, Text},
-};
+use jig_client_domain::contract::{DocumentText, Text};
+use jig_domain_client::Limits;
 
 /// Show the supplied text, its own loss, known empty text or absence.
 pub(crate) fn document(b: &mut Builder, value: Option<&DocumentText>, words: &Words) {

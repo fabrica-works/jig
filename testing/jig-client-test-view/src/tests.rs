@@ -10,9 +10,9 @@ mod native_effect;
 mod native_hold;
 mod world_limits;
 use crate::{Limits, View, build, decode, words};
+use jig_client_domain::contract::*;
 use jig_client_test_domain::{Address, Domain, Event, JigOut, Place, Request, family, first};
 use jig_client_view::Owner;
-use jig_domain_client::contract::*;
 use skein_ui::Act;
 use skein_ui::{NodeId, Patch, Role};
 
@@ -116,7 +116,7 @@ fn ready() -> Domain {
             _ => None,
         })
         .unwrap();
-    drive(&mut root, Event::Jig(jig_domain_client::Event::Hello { versions: VersionRange { first: 7, last: 7 } }));
+    drive(&mut root, Event::Jig(jig_domain_client::Event::Hello { served: true }));
     drive(
         &mut root,
         Event::Jig(jig_domain_client::Event::Watch {
@@ -583,7 +583,7 @@ fn check_outbox_family_keys_keep_scope_entry_and_effect_proposal_distinct() {
     for scope in [PartScope::Project(3), PartScope::Project(4), PartScope::Deployment] {
         parts.push(Part::Outbox { connector: jig_client_test_domain::FIRST, scope, entry }).unwrap();
     }
-    drive(&mut root, Event::Jig(jig_domain_client::Event::Hello { versions: VersionRange { first: 7, last: 7 } }));
+    drive(&mut root, Event::Jig(jig_domain_client::Event::Hello { served: true }));
     drive(
         &mut root,
         Event::Jig(jig_domain_client::Event::Watch {

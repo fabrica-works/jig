@@ -12,15 +12,15 @@
 //! | open | dismiss/navigation | closed; prior card | nothing |
 use crate::{
     Domain, Request, acts,
-    contract::{
-        ActKind, Admission, Amendment, Disposal, HoldReason, Limit, ObjectKey, PersonContract, Recipient, Refusal,
-        Revision, Text,
-    },
     fields::Purpose,
     intents::Progress,
     objects::{Body, Card, Object},
 };
 use alloc::boxed::Box;
+use jig_client_domain::contract::{
+    ActKind, Admission, Amendment, Disposal, HoldReason, Limit, ObjectKey, PersonContract, Recipient, Refusal,
+    Revision, Text,
+};
 use skein_lib::{Env, Id, List, Queue};
 /// The person choices, bounded independently of the incoming document.
 #[derive(Debug)]
@@ -430,7 +430,7 @@ fn draft_admission(object: &Object, open: &Confirmation) -> Admission {
                 )
                 | None => return Admission::Refused(Refusal::NotOffered),
             };
-            crate::contract::admission::amendment(&offer, change, before)
+            jig_client_domain::contract::admission::amendment(&offer, change, before)
         }
         ActKind::Write
         | ActKind::Answer
@@ -461,13 +461,13 @@ fn draft_admission(object: &Object, open: &Confirmation) -> Admission {
 fn owner_answer_missing(
     domain: &Domain,
     open: &Confirmation,
-    document: &crate::contract::OwnerPersonTask,
+    document: &jig_client_domain::contract::OwnerPersonTask,
 ) -> Option<Missing> {
     if crate::objects::person_task::answer(document, open.choices.option, &domain.fields).is_some() {
         return None;
     }
     Some(match &document.contract {
-        crate::contract::TaskContractDocument::Verdict { choices, .. } => {
+        jig_client_domain::contract::TaskContractDocument::Verdict { choices, .. } => {
             let mut selectable = false;
             if let Some(option) = open.choices.option {
                 for choice in choices {
@@ -478,9 +478,11 @@ fn owner_answer_missing(
             }
             if selectable { Missing::Words { field: Purpose::Reason } } else { Missing::Choice }
         }
-        crate::contract::TaskContractDocument::Report { .. } => Missing::Words { field: Purpose::Answer },
-        crate::contract::TaskContractDocument::Approval { .. }
-        | crate::contract::TaskContractDocument::Change { .. } => Missing::Refused { why: Refusal::NotOffered },
+        jig_client_domain::contract::TaskContractDocument::Report { .. } => Missing::Words { field: Purpose::Answer },
+        jig_client_domain::contract::TaskContractDocument::Approval { .. }
+        | jig_client_domain::contract::TaskContractDocument::Change { .. } => {
+            Missing::Refused { why: Refusal::NotOffered }
+        }
     })
 }
 fn missing(domain: &Domain, open: &Confirmation, object: &Object) -> Option<Missing> {

@@ -32,7 +32,7 @@ fn status(b: &mut Builder, client: &Domain, words: &Words, section: Section) {
             words.status(b, JigPhrase::MoreRows, &[]);
         }
         if let Some(which) = status.refused {
-            words.refusal(b, &jig_domain_client::contract::Refusal::Limit { which });
+            words.refusal(b, &jig_client_domain::contract::Refusal::Limit { which });
         }
         if status.missing {
             words.status(b, JigPhrase::MissingPage, &[]);

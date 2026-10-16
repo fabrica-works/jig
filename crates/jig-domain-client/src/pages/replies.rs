@@ -4,9 +4,9 @@
 //! and objects.md, 8. Task documents and card policy stay in the shared objects.
 use crate::{
     Domain, Request,
-    contract::{ConversationLine, InboxGroup, Limit, ObjectKey, Subject},
     objects::{Body, Context, Source},
 };
+use jig_client_domain::contract::{ConversationLine, InboxGroup, Limit, ObjectKey, Subject};
 use skein_lib::{Env, List, Queue};
 
 /// A page watch owns the displayed window even when a read slides its rows.

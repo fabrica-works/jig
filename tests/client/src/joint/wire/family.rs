@@ -176,7 +176,7 @@ pub fn document(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use jig_domain_client::contract::{ProposalKey, Proposer, Revision};
+    use jig_client_domain::contract::{ProposalKey, Proposer, Revision};
     use skein_lib::List;
 
     #[test]

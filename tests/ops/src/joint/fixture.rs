@@ -118,7 +118,7 @@ fn world_for(seed: u64, story: Story) -> World<Client, Joint> {
     let codec = jig_protocol_transcript::Limits {
         smith: smith_transcript::v3::CEILINGS,
         bytes: 32768,
-        turn: jig_domain_client::contract::TurnLimits { messages: 32, blocks: 32, text: 8192 },
+        turn: jig_client_domain::contract::TurnLimits { messages: 32, blocks: 32, text: 8192 },
     };
     let front = Joint::for_story(seed, limits(), codec, story);
     let mut world = World::new(

@@ -5,9 +5,9 @@ use super::{
 use crate::{
     Event,
     action::Act,
-    contract::*,
     objects::{Body, Card, Left, Source},
 };
+use jig_client_domain::contract::*;
 use skein_lib::{Time, Wall};
 fn question(terminal: bool) -> OwnerHistorical {
     let q = objects::question();

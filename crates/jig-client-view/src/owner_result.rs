@@ -6,10 +6,8 @@ use crate::words::Words;
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
-use jig_domain_client::{
-    Domain,
-    contract::{OwnerRequester, OwnerTaskLink, OwnerTaskStatus, Proposer, ResultDetails},
-};
+use jig_client_domain::contract::{OwnerRequester, OwnerTaskLink, OwnerTaskStatus, Proposer, ResultDetails};
+use jig_domain_client::Domain;
 
 fn text(b: &mut Builder, words: &Words, phrase: ResultPhrase, holes: &[Hole]) {
     let saying = words.book.say(words.language, phrase.id(), holes).expect("result words and typed holes checked");

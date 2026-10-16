@@ -5,9 +5,9 @@
 use crate::{JigBindings, Owner, phrases::jig::JigPhrase, words::Words};
 use skein_ui::{Builder, Key, Role, Run};
 
+use jig_client_domain::contract::{LiveCall, Party, TurnName};
 use jig_domain_client::{
     Domain,
-    contract::{LiveCall, Party, TurnName},
     conversation::{Conversation, Words as WordState},
 };
 mod activity;
@@ -156,7 +156,7 @@ fn turn_key(name: TurnName) -> Key {
 }
 
 fn party(b: &mut Builder, by: &Party, words: &Words) {
-    words.actor(b, jig_domain_client::contract::Actor::Party(by.number));
+    words.actor(b, jig_client_domain::contract::Actor::Party(by.number));
     b.text(Run::Plain, by.name.bytes());
 }
 fn word_state(b: &mut Builder, state: WordState, words: &Words) {

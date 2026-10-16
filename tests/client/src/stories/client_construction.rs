@@ -1,7 +1,7 @@
 //! Different receiving bounds in one shell loop (client/domain/testing.md, 4).
 use crate::{Scripted, Settings, Test, World, scripted::Family, test};
+use jig_client_domain::contract::{DocumentText, ObjectKey, ReadValue, Text, VersionRange};
 use jig_client_scripted_engine::{Bounds, Script, Truth};
-use jig_domain_client::contract::{DocumentText, ObjectKey, ReadValue, Text, VersionRange};
 use skein_lib::{Duration, Wall};
 
 /// A supplied frame name past the default 32-byte receiving bound.

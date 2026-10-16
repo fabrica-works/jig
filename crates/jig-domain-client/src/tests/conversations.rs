@@ -1,11 +1,11 @@
 use crate::{
-    contract::{
-        Activity, ActivityLine, ActivityPage, Block, Call, Cursor, Message, ObjectKey, ProvisionalTurnName, Read,
-        RunBeginning, RunText, Speaker, Text, Turn, TurnName, TurnRead, Usage,
-    },
     conversation::{CallName, Conversation, Fold},
     objects::{Objects, Source},
     windows::Edge,
+};
+use jig_client_domain::contract::{
+    Activity, ActivityLine, ActivityPage, Block, Call, Cursor, Message, ObjectKey, ProvisionalTurnName, Read,
+    RunBeginning, RunText, Speaker, Text, Turn, TurnName, TurnRead, Usage,
 };
 use skein_lib::{List, Wall};
 fn text(bytes: &[u8]) -> Text {
@@ -228,8 +228,8 @@ fn routed_conversation() {
     use crate::{
         Domain, Event, Request,
         address::{Address, Place, TaskSection},
-        contract::{Delivery, ReadResult, ReadValue, Runtime, WatchEvent},
     };
+    use jig_client_domain::contract::{Delivery, ReadResult, ReadValue, Runtime, WatchEvent};
     use skein_lib::Time;
     let mut domain = Domain::new(&LIMITS, 21);
     let f = start(&mut domain, List::with_capacity(0));
@@ -242,7 +242,7 @@ fn routed_conversation() {
     );
     let task_watch = open_token(&opened);
     let mut document = super::confirmation::task();
-    document.chip.executor = crate::contract::Executor::Agent { charter: 1 };
+    document.chip.executor = jig_client_domain::contract::Executor::Agent { charter: 1 };
     document.context.as_mut().expect("supplied task context").runtime =
         Runtime::Running { attempt: 1, since: Wall::EPOCH, tool: None };
     document.activity = 1;
@@ -261,7 +261,7 @@ fn routed_conversation() {
     );
     assert_eq!(domain.turn_rows().rows.len(), 1);
     let mut live_call = stream(1, 0, 3, b"one", false);
-    live_call.call = Some(crate::contract::LiveCall::Decoded(engine_call()));
+    live_call.call = Some(jig_client_domain::contract::LiveCall::Decoded(engine_call()));
     let requests = drive(
         &mut domain,
         Time::ZERO,
@@ -272,7 +272,7 @@ fn routed_conversation() {
         if let Request::Continue {
             watch,
             subject:
-                crate::contract::Subject::Run {
+                jig_client_domain::contract::Subject::Run {
                     turn: Some(ProvisionalTurnName { retry: 0, attempt: 1, number: 1 }),
                     offset: 3,
                     ..
@@ -326,15 +326,12 @@ fn routed_conversation() {
 }
 fn routed_scroll_and_end(
     domain: &mut crate::Domain,
-    mut document: crate::contract::Task,
+    mut document: jig_client_domain::contract::Task,
     task_watch: skein_lib::Token,
 ) {
     use super::spine::drive;
-    use crate::{
-        Event, Request,
-        action::Act,
-        contract::{Delivery, ReadResult, ReadValue, Runtime, WatchEvent},
-    };
+    use crate::{Event, Request, action::Act};
+    use jig_client_domain::contract::{Delivery, ReadResult, ReadValue, Runtime, WatchEvent};
     use skein_lib::{Time, Token};
     let name = CallName { attempt: 1, turn: 1, call: 7 };
     drive(domain, Time::ZERO, Event::Act { act: Act::FoldCall { name, open: true } });
@@ -438,9 +435,9 @@ fn routed_words_join_the_original_request_and_clear_the_composer_only_once() {
     use crate::{
         Event,
         address::{Address, Place, TaskSection},
-        contract::*,
         fields::Purpose,
     };
+    use jig_client_domain::contract::*;
     use skein_lib::{Queue, Time, Token};
     let (mut domain, _) = super::objects::live();
     drive(
@@ -500,7 +497,8 @@ fn submit_words(domain: &mut crate::Domain, words: &[u8]) -> skein_lib::Token {
 }
 fn routed_later_words(domain: &mut crate::Domain) {
     use super::spine::drive;
-    use crate::{Event, action::Act, contract::*, fields::Purpose};
+    use crate::{Event, action::Act, fields::Purpose};
+    use jig_client_domain::contract::*;
     use skein_lib::Time;
     let request = submit_words(domain, b"second");
     let field = Purpose::Composer { task: 8 };
@@ -534,7 +532,7 @@ fn program_words(domain: &mut crate::Domain) -> Box<[crate::Request]> {
             ask: crate::intents::ByValue {
                 asked: skein_lib::Token::new(77),
                 scope: 7,
-                ask: Box::new(crate::contract::Ask::Write {
+                ask: Box::new(jig_client_domain::contract::Ask::Write {
                     project: 1,
                     task: 8,
                     words: text(b"program"),
@@ -582,8 +580,8 @@ fn calls_share_a_chip_watch_and_deliveries_keep_the_same_task_card_live() {
     use crate::{
         Event, Request,
         address::{Address, Place, TaskSection},
-        contract::*,
     };
+    use jig_client_domain::contract::*;
     use skein_lib::{Time, Token};
     let (mut domain, inbox) = super::objects::live();
     drive(
@@ -658,7 +656,8 @@ fn calls_share_a_chip_watch_and_deliveries_keep_the_same_task_card_live() {
 }
 fn changed_chip_membership(domain: &mut crate::Domain, old: skein_lib::Token) -> skein_lib::Token {
     use super::spine::{LIMITS, drive};
-    use crate::{Event, Request, contract::*};
+    use crate::{Event, Request};
+    use jig_client_domain::contract::*;
     use skein_lib::{Queue, Time, Token};
     let mut rows = List::with_capacity(2);
     for position in [4_u32, 3] {
@@ -721,9 +720,9 @@ fn owner_said_receipts_join_only_the_pending_task_and_preserve_later_composer_ed
         Event,
         action::Act,
         address::{Address, Place, TaskSection},
-        contract::*,
         fields::Purpose,
     };
+    use jig_client_domain::contract::*;
     use skein_lib::Time;
     for later in [false, true] {
         for released in [false, true] {
@@ -785,7 +784,7 @@ fn owner_said_receipts_join_only_the_pending_task_and_preserve_later_composer_ed
 
 #[test]
 fn raw_live_calls_keep_optional_wall_literals_cut_and_full_identity_without_made_values() {
-    use crate::contract::{CurrentCall, LiveCall};
+    use jig_client_domain::contract::{CurrentCall, LiveCall};
     let mut c = Conversation::new(9, 4);
     let name = ProvisionalTurnName { attempt: u64::MAX, number: u32::MAX - 1, retry: 0 };
     let mut value = stream(name.number, 0, 3, b"one", false);
@@ -808,7 +807,7 @@ fn raw_live_calls_keep_optional_wall_literals_cut_and_full_identity_without_made
     let call = current_identity(UTF8_TEXTS[0]);
     assert!(c.set_current_fold(call.clone(), Fold::Open));
     assert!(!c.set_current_fold(
-        crate::contract::CallIdentity { owner: skein_lib::Token::new(1), ..call.clone() },
+        jig_client_domain::contract::CallIdentity { owner: skein_lib::Token::new(1), ..call.clone() },
         Fold::Open
     ));
     assert!(!c.set_fold(CallName { attempt: name.attempt, turn: name.number, call: u64::MAX }, Fold::Open));
@@ -857,8 +856,8 @@ fn raw_live_calls_keep_optional_wall_literals_cut_and_full_identity_without_made
     assert!(reloaded.live.is_empty(), "provisional facts are read again after reload");
 }
 
-fn current_identity(id: &[u8]) -> crate::contract::CallIdentity {
-    crate::contract::CallIdentity {
+fn current_identity(id: &[u8]) -> jig_client_domain::contract::CallIdentity {
+    jig_client_domain::contract::CallIdentity {
         owner: skein_lib::Token::new(u64::MAX),
         sequence: u32::MAX,
         retry: u32::MAX,
@@ -868,7 +867,7 @@ fn current_identity(id: &[u8]) -> crate::contract::CallIdentity {
 
 #[test]
 fn opaque_current_calls_replace_by_full_owner_completion_and_id_without_numeric_matching() {
-    use crate::contract::{CallIdentity, CurrentCall, LiveCall};
+    use jig_client_domain::contract::{CallIdentity, CurrentCall, LiveCall};
     let mut c = Conversation::new(9, 4);
     let identity = current_identity(UTF8_TEXTS[3]);
     let mut value = stream(1, 0, 3, b"one", false);
@@ -921,7 +920,7 @@ fn opaque_current_calls_replace_by_full_owner_completion_and_id_without_numeric_
 
 #[test]
 fn whole_run_state_keeps_call_only_and_postcommit_facts_without_a_synthetic_turn() {
-    use crate::contract::{CurrentCall, LiveCall, RunState};
+    use jig_client_domain::contract::{CurrentCall, LiveCall, RunState};
     let mut c = Conversation::new(9, 4);
     let identity = current_identity(UTF8_TEXTS[6]);
     let call = CurrentCall {
@@ -986,7 +985,7 @@ fn whole_run_state_keeps_call_only_and_postcommit_facts_without_a_synthetic_turn
 
 #[test]
 fn whole_current_call_replacement_copies_each_supplied_current_clock_without_a_history_ledger() {
-    use crate::contract::{CurrentCall, RunState};
+    use jig_client_domain::contract::{CurrentCall, RunState};
     let mut c = Conversation::new(9, 4);
     let a = CurrentCall {
         identity: current_identity(UTF8_TEXTS[7]),
@@ -1133,8 +1132,8 @@ fn reopened_current_retry_preserves_other_uncommitted_turns_and_fences_stale_ret
 
 #[test]
 fn owner_archive_reference_keeps_committed_read_and_local_author_separate_from_raw_sender() {
-    use crate::contract::{OwnerActivity, OwnerActivityLine, OwnerMessageKind, OwnerRequester};
     use crate::conversation::words::{KeptWords, Words};
+    use jig_client_domain::contract::{OwnerActivity, OwnerActivityLine, OwnerMessageKind, OwnerRequester};
     use skein_lib::Token;
     let mut kept = KeptWords::new(2);
     let request = Token::new(77);

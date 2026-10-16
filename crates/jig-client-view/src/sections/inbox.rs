@@ -5,13 +5,13 @@ use crate::{JigBindings, cards};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
+use jig_client_domain::contract::{
+    InboxDocument, InboxGroup, InboxReadGroup, InboxRow, OwnerInboxEntry, OwnerInboxObject, Proposer, Recipient,
+};
 use jig_domain_client::{
     Domain,
     action::Act,
     action::End,
-    contract::{
-        InboxDocument, InboxGroup, InboxReadGroup, InboxRow, OwnerInboxEntry, OwnerInboxObject, Proposer, Recipient,
-    },
     pages::inbox::{Filter, needs},
 };
 /// The inbox's filters and counts while either group is shown.
@@ -208,7 +208,7 @@ fn filters(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBi
     }
 }
 
-fn unread(entry: &jig_domain_client::contract::InboxEntry, results_seen: u64) -> bool {
+fn unread(entry: &jig_client_domain::contract::InboxEntry, results_seen: u64) -> bool {
     match entry.group {
         InboxGroup::Results => entry.position > results_seen,
         InboxGroup::Replies => match &entry.reply {
@@ -224,7 +224,7 @@ fn supplied_entry(
     client: &Domain,
     words: &Words,
     bindings: &mut JigBindings,
-    entry: &jig_domain_client::contract::InboxEntry,
+    entry: &jig_client_domain::contract::InboxEntry,
     group: bool,
 ) {
     b.key(crate::pages::object_key(entry.object));

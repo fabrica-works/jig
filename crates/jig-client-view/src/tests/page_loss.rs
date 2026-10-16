@@ -8,11 +8,11 @@ use super::{
     pages::{build, deliver},
     work_pages::{entered, list, project_doc, task},
 };
+use jig_client_domain::contract::*;
 use jig_domain_client::{
     Domain, Event, Request,
     action::Act,
     address::{Address, Place, ProjectSection, TaskSection},
-    contract::*,
 };
 use skein_lib::{List, Token};
 

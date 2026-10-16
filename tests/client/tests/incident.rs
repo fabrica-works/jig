@@ -1,11 +1,9 @@
 //! The two independent incident journeys of pages.md, section 10.
+use jig_client_domain::contract::*;
 use jig_client_scripted_engine::{Change, Rows, Source};
 use jig_client_test_domain::{Address as RootAddress, family};
 use jig_client_world::{Scripted, Test, Until, World, stories};
-use jig_domain_client::{
-    address::{Address, TaskSection},
-    contract::*,
-};
+use jig_domain_client::address::{Address, TaskSection};
 use skein_fake_person::{Find, Step};
 use skein_lib::{Duration, Wall};
 use skein_ui::Role;
@@ -28,7 +26,7 @@ fn finish(w: &mut World<Test, Scripted>, withdrawn: bool) {
     item.revision.value += 1;
     let mut delegate = stories::task();
     delegate.chip.task = 10;
-    delegate.chip.title = jig_domain_client::contract::DocumentText::complete(stories::text(b"Delegate ten"));
+    delegate.chip.title = jig_client_domain::contract::DocumentText::complete(stories::text(b"Delegate ten"));
     let lead = stories::reported(stories::task(), b"Incident resolved");
     let delegate = stories::reported(delegate, if withdrawn { b"Already healthy by hand" } else { b"Service healthy" });
     let mut proposal = stories::proposal();
@@ -61,7 +59,7 @@ fn finish(w: &mut World<Test, Scripted>, withdrawn: bool) {
                 Change::Source(Source {
                     party: 7,
                     read: Read::Inbox {
-                        group: jig_domain_client::contract::InboxReadGroup::Needs,
+                        group: jig_client_domain::contract::InboxReadGroup::Needs,
                         project: None,
                         kind: None,
                         goal: None,

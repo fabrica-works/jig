@@ -3,7 +3,7 @@
 use super::{Body, Object};
 /// Reads the document without copying the working set's one object.
 #[must_use]
-pub fn facts(object: &Object) -> Option<&crate::contract::Result> {
+pub fn facts(object: &Object) -> Option<&jig_client_domain::contract::Result> {
     match &object.body {
         Some(Body::Result(document)) => Some(document),
         Some(
@@ -27,13 +27,13 @@ pub fn facts(object: &Object) -> Option<&crate::contract::Result> {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Reply {
     pub chat: u64,
-    pub first_words: crate::contract::DocumentText,
+    pub first_words: jig_client_domain::contract::DocumentText,
     pub first_unread: u64,
 }
 impl Reply {
     /// Keeps whole words and checks the first unread position before ownership.
     #[must_use]
-    pub fn from_line(line: crate::contract::ConversationLine) -> Option<Self> {
+    pub fn from_line(line: jig_client_domain::contract::ConversationLine) -> Option<Self> {
         if line.last_reply <= line.seen {
             return None;
         }

@@ -228,11 +228,11 @@ fn a_goal_beyond_the_allotment_is_proposed_as_the_confirmation_said() {
         let requests: Vec<_> = commits.iter().filter_map(|c| c.ask.as_ref()).collect();
         assert_eq!(requests.len(), 1);
         assert!(
-            matches!(requests[0], jig_domain_client::contract::Ask::SetGoal { budget: 2, spec, .. } if spec.bytes() == b"Resolve incident")
+            matches!(requests[0], jig_client_domain::contract::Ask::SetGoal { budget: 2, spec, .. } if spec.bytes() == b"Resolve incident")
         );
         assert!(matches!(
             commits.iter().find(|c| c.key.is_some()).expect("incident fixture fits and exists").answer,
-            Some(jig_domain_client::contract::Answer::Done(jig_domain_client::contract::Outcome::Proposed { .. }))
+            Some(jig_client_domain::contract::Answer::Done(jig_client_domain::contract::Outcome::Proposed { .. }))
         ));
     }
 }
@@ -272,10 +272,10 @@ fn a_procedure_only_goal_form_confirms_and_sends_the_supplied_executor_once() {
         assert_eq!(requests.len(), 1);
         assert_eq!(
             requests[0],
-            &jig_domain_client::contract::Ask::SetGoal {
+            &jig_client_domain::contract::Ask::SetGoal {
                 project: 1,
                 spec: stories::text(b"Resolve incident"),
-                executor: jig_domain_client::contract::GoalExecutor::Procedure { connector: 2, code: 7 },
+                executor: jig_client_domain::contract::GoalExecutor::Procedure { connector: 2, code: 7 },
                 budget: 2,
                 priority: 0,
                 deadline: None,
@@ -283,7 +283,7 @@ fn a_procedure_only_goal_form_confirms_and_sends_the_supplied_executor_once() {
         );
         assert!(matches!(
             commits.iter().find(|c| c.key.is_some()).expect("the procedure goal has one keyed commit").answer,
-            Some(jig_domain_client::contract::Answer::Done(jig_domain_client::contract::Outcome::Proposed { .. }))
+            Some(jig_client_domain::contract::Answer::Done(jig_client_domain::contract::Outcome::Proposed { .. }))
         ));
     }
 }

@@ -14,10 +14,10 @@ use crate::{JigBindings, owner_deployment as view};
 use skein_ui::phrases::{Invalid, PhraseLimits, Phrasebook, Segment};
 use skein_ui::{Builder, Role, Tree};
 
+use jig_client_domain::contract::*;
 use jig_domain_client::{
     Domain, Event, Request,
     address::{Address, Place},
-    contract::*,
 };
 use skein_lib::{Duration, List, Wall, bytes::copy_of};
 fn list<T>(values: Vec<T>) -> List<T> {

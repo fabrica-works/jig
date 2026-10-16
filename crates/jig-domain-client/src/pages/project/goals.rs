@@ -12,14 +12,14 @@
 use crate::{
     Domain, Request,
     address::{Address, Place},
-    contract::{
-        ActKind, Admission, Answer, Ask, Bounds, GoalExecutor, GoalLine, Outcome, Phase, Recipient, Refusal, Text,
-    },
     fields::Purpose,
     intents::Origin,
     pages::IntentPurpose,
 };
 use alloc::boxed::Box;
+use jig_client_domain::contract::{
+    ActKind, Admission, Answer, Ask, Bounds, GoalExecutor, GoalLine, Outcome, Phase, Recipient, Refusal, Text,
+};
 use skein_lib::{Env, List, Queue, Token, Wall};
 /// Goal options chosen from the project's offered executors and party pool.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -176,7 +176,7 @@ fn prediction(domain: &Domain, form: GoalForm, scope: u64) -> Option<(Admission,
             }
         }
     }
-    Some((crate::contract::admission::goal(&admission, form.executor, form.budget, form.deadline), pool?))
+    Some((jig_client_domain::contract::admission::goal(&admission, form.executor, form.budget, form.deadline), pool?))
 }
 /// Refresh an unsent draft when the supplied project facts move.
 pub(crate) fn sync(domain: &mut Domain) {
@@ -236,7 +236,10 @@ pub(crate) fn send(domain: &mut Domain, out: &mut Queue<Request>) {
                 Some(Submission { request: id.token(), scope: open.scope, form: open.form, words: open.words });
             domain.project_page.form.refusal = None;
         }
-        None => domain.project_page.form.refusal = Some(Refusal::Limit { which: crate::contract::Limit::Requests }),
+        None => {
+            domain.project_page.form.refusal =
+                Some(Refusal::Limit { which: jig_client_domain::contract::Limit::Requests });
+        }
     }
     domain.changed();
 }

@@ -1,6 +1,6 @@
 use super::{list, specification, task, text};
 use crate::{Bounds, payload::fits};
-use jig_domain_client::contract::*;
+use jig_client_domain::contract::*;
 use skein_lib::Wall;
 
 fn template(number: u64, words: &[u8]) -> ProposedTask {

@@ -1,8 +1,8 @@
 //! Field-for-field client contract translation (protocol/client.md, 3 and 5).
 use crate::translate::too_large;
 use alloc::boxed::Box;
+use jig_client_domain::contract as c;
 use jig_client_protocol_wire::v7 as w;
-use jig_domain_client::contract as c;
 use skein_lib::{List, Writer, bytes};
 pub(crate) fn wire_revision(value: c::Revision, limits: &w::Limits) -> Result<w::Revision, w::Problem> {
     w::Revision::new(limits, w::RevisionParts { value: value.value })

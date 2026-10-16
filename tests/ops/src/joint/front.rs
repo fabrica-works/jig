@@ -523,11 +523,11 @@ impl Joint {
                                 },
                             )
                             .expect("whole entrance refusal admission");
-                            let jig_domain_client::contract::Answer::Refused(why) = answer else {
+                            let jig_client_domain::contract::Answer::Refused(why) = answer else {
                                 panic!("application entrance terminal")
                             };
                             client::Answered::Infrastructure(infra::Answer::EntranceRefused(
-                                jig_domain_client::contract::EntranceRefusal::new(why).expect("whole entrance refusal"),
+                                jig_client_domain::contract::EntranceRefusal::new(why).expect("whole entrance refusal"),
                             ))
                         });
                         if envelope == skein_lib::RequestEnvelope::SignedOut {
@@ -930,7 +930,7 @@ impl Front<super::fixture::Client> for Joint {
         match event {
             client::Event::Jig(jig_domain_client::Event::Watch {
                 watch,
-                event: jig_domain_client::contract::WatchEvent::Delivered(_),
+                event: jig_client_domain::contract::WatchEvent::Delivered(_),
             }) => {
                 if let Some(core::Event::Delivered { watcher }) = self.engine.peers.transport.taken(client, *watch) {
                     self.engine.peers.protocol.consumed(watcher);
