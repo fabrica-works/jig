@@ -489,14 +489,15 @@ party (`../domain/people.md`, section 6):
 
 **An owner erased first.** When a task's record is erased before the
 records its index rows name, as a task forgotten once read is
-(`../domain/people.md`, section 6; 11.1), its decision erases the rows
-its record names whole: its result's update, its rows in the ended
-indexes, and its ended read position. Its replies' updates stay, since a
-conversation's replies are unbounded, a decision is bounded, and the
-task's record names only its newest; they go when retention erases the
-reply lines they name (11.1). Until then a page skips a row whose owner
-is gone, counting it within its bounds, so nothing of a forgotten task
-shows and no reply read comes back unread.
+(`../domain/people.md`, section 6; 11.1), its decision, the read mark's
+that reads it or retention's next pass, erases the rows its record names
+whole: its result's update, its rows in the ended indexes, and its ended
+read position. Its replies' updates stay, since a conversation's replies
+are unbounded, a decision is bounded, and the task's record names only
+its newest; they go when retention erases the reply lines they name
+(11.1). Until then a page skips a row whose owner is gone, counting it
+within its bounds, so nothing of a forgotten task shows and no reply
+read comes back unread.
 
 **Reading backwards:** a family whose positions are dense (activity)
 reads newest first by computing forward intervals from its last
@@ -676,8 +677,10 @@ was made (`../domain/tasks.md`, section 3):
   has ended, its requester has read its result and, for a conversation,
   its turns, and no live task names it (`../domain/people.md`, section
   6): its record, its rows in the ended indexes, its result's update and
-  its read position erased in one decision (7.4). A task whose requester
-  is not a party is kept, whatever its class.
+  its read position erased in one decision (7.4): that of the read mark
+  that reads it, while its party's inbox holds it, or of retention's
+  next pass. A task whose requester is not a party is kept, whatever its
+  class.
 - **A forgotten task's remains go** at retention's next pass, whatever
   their age: its activity, history, terminals and transcript, and its
   replies' rows in its requester's updates (7.4). Nothing reads them,
@@ -786,9 +789,10 @@ Each within jig's suites' budgets (`../../development/workflow.md`).
   6. **retention:** by each task's retention class, summaries of ended
      tasks kept, transcripts dropped, answered keys expired, and the
      remains of tasks forgotten once read collected, each on the
-     domain's timer (11.1); a task forgotten once read is forgotten by
-     the read mark that reads it while its party's inbox holds it, and
-     by retention's pass otherwise (`../domain/people.md`, section 6);
+     domain's timer (11.1); a task forgotten once read is forgotten in
+     the decision of the read mark that reads it while its party's inbox
+     holds it, and by retention's pass otherwise (`../domain/people.md`,
+     section 6);
   7. **keys for single reads:** a question's line and its answer's, an
      escalation's hold, and a task's proposal's row in its proposer's
      history, each named by its position in its task's record, as a

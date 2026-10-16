@@ -377,9 +377,17 @@ entry naming the task or proposal it is and its project:
     result and, for a conversation, its turns, and no live task names it,
     its record and its read position are erased in one decision, so no
     restart sees one without the other, and nothing read comes back
-    unread. The `Seen` after which it is read forgets it, in its own
-    decision, while the party's inbox holds it (the bound below);
-    retention's next pass forgets one it holds no longer. Its other
+    unread. The `Seen` after which it is read forgets it, while the
+    party's inbox holds it (the bound below), in the `Seen`'s own
+    decision: the mark and the erase commit together, so no restart sees
+    the task read and not forgotten. A `Seen` over results loads nothing
+    for it: the inbox's entry for an unread result carries what its
+    forget needs (the task's class, its label and listing, and, for a
+    conversation, its last turn and whether its turns are read). A
+    `Seen` over an ended conversation's turns loads its record and its
+    position before it is decided, and forgets in that decision.
+    Retention's next pass forgets the others: one the inbox no longer
+    held when it was read, or one a live task named then. Its other
     remains go at retention's next pass (`../protocol/store.md`, 7.4 and
     11.1). A task whose requester is not a party is kept, whatever its
     class: no party reads it.
