@@ -1328,6 +1328,8 @@ pub(super) fn route_connector_repair(
         reply_to: ReplyTo::new(Token::new(u64::MAX - 3)),
         creator: tasks::Party::Deployment { project: seed.project },
         batch: Box::new([tasks::New {
+            label: 0,
+            flags: jig_domain_tasks::Flags::PLAIN,
             number: seed.number,
             project: seed.project,
             executor,

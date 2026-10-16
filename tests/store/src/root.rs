@@ -235,6 +235,9 @@ pub fn header(commits: u64) -> core::Record {
 #[must_use]
 pub fn live_task(number: u64) -> core::Record {
     core::Record::Tasks(tasks::Stored::Live(Box::new(tasks::TaskRecord {
+        label: 0,
+        flags: jig_domain_tasks::Flags::PLAIN,
+        last_activity: skein_lib::Wall::EPOCH,
         ended_below: tasks::Endings { done: 0, failed: 0, cancelled: 0 },
         question_lines: Box::new([]),
         hold: 0,

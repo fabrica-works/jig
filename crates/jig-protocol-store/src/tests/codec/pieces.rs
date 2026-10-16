@@ -1,7 +1,7 @@
 //! Byte-summed pieces preserve the domain's admissions (codec.md, 3).
 use super::fixtures;
 use crate::codec::{people, tasks};
-use crate::{people_v2, tasks_v2};
+use crate::{people_v2, tasks_v3};
 use jig_domain_people as person;
 use jig_domain_tasks as task;
 use skein_lib::{List, Reader, Writer};
@@ -72,7 +72,7 @@ fn a_whole_amendment_admits_its_full_sum_and_refuses_one_byte_past_it() {
     assert_eq!(people::policy::decode_amendment(forged, &limits), Err(people_problem()), "decoded past_sum");
 }
 
-fn task_limits() -> tasks_v2::Limits {
+fn task_limits() -> tasks_v3::Limits {
     let mut domain = fixtures::TASKS_LIMITS;
     domain.result_bytes = 512;
     tasks::limits(&domain).expect("test-sized byte sum")
@@ -86,14 +86,14 @@ fn fields(count: usize) -> Box<[task::ResultField]> {
 }
 fn saved_fields(
     fields: &[task::ResultField],
-    limits: &tasks_v2::Limits,
-) -> Result<Box<[task::ResultField]>, tasks_v2::Problem> {
+    limits: &tasks_v3::Limits,
+) -> Result<Box<[task::ResultField]>, tasks_v3::Problem> {
     let value = task::TaskResult::Verdict { code: 7, fields: fields.into(), words: Box::new([]) };
     let encoded = tasks::phase::result(&value, limits)?;
     let mut out = Writer::new(usize::try_from(encoded.measure()).expect("measured size"));
     encoded.encode(&mut out).expect("measured verdict");
     let bytes = out.finish();
-    let decoded = tasks_v2::TaskResult::decode(limits, &mut Reader::new(&bytes))?;
+    let decoded = tasks_v3::TaskResult::decode(limits, &mut Reader::new(&bytes))?;
     match tasks::phase::read_result(decoded, limits)? {
         task::TaskResult::Verdict { fields, .. } => Ok(fields),
         task::TaskResult::Approved { .. }
@@ -114,7 +114,7 @@ fn verdict_fields_round_trip_at_the_domain_sum_and_refuse_one_past_it() {
         } else {
             assert_eq!(
                 saved,
-                Err(tasks_v2::Problem { path: tasks_v2::Path::TaskResultTag, reason: skein_codec::Reason::Bound }),
+                Err(tasks_v3::Problem { path: tasks_v3::Path::TaskResultTag, reason: skein_codec::Reason::Bound }),
                 "{label}"
             );
         }
@@ -126,7 +126,7 @@ fn the_encoded_piece_bound_holds_a_verdict_at_the_domain_sum_exactly() {
     let limits = task_limits();
     let value = task::TaskResult::Verdict { code: 7, fields: fields(512), words: Box::new([]) };
     let encoded = tasks::phase::result(&value, &limits).expect("domain sum fits");
-    let tasks_v2::TaskResult::Verdict(encoded) = encoded else { unreachable!("verdict fixture") };
+    let tasks_v3::TaskResult::Verdict(encoded) = encoded else { unreachable!("verdict fixture") };
     assert_eq!(encoded.fields().len(), 6656);
     assert_eq!(limits.verdict_result_fields, 6656);
     assert_eq!(limits.verdict_fields, 6656);

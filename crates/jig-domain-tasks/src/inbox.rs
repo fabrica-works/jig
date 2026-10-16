@@ -323,6 +323,7 @@ pub(crate) fn message(
         }
     }
     let task = task_mut(domain, number).expect("admitted task still live");
+    task.record.last_activity = env.wall;
     task.record.last_message = prepared.word.number;
     task.record.inbox = prepared.inbox;
     crate::activity::message(&mut task.record, &prepared.activity_word, env.limits.inbox_messages, out);
@@ -401,6 +402,7 @@ pub(crate) fn delegate_result(
     let prepared = prepare(domain, &env.limits, number, word, Admission::RoomKept)
         .expect("committed delegate result keeps a slot");
     let task = task_mut(domain, number).expect("requester remains live");
+    task.record.last_activity = env.wall;
     task.record.last_message = prepared.word.number;
     task.record.inbox = prepared.inbox;
     crate::activity::message(&mut task.record, &prepared.activity_word, env.limits.inbox_messages, out);
@@ -423,6 +425,7 @@ pub(crate) fn proposal_decision(
     let prepared = prepare(domain, &env.limits, number, word, Admission::RoomKept)
         .expect("committed proposal decision keeps a slot");
     let task = task_mut(domain, number).expect("proposal's live proposer");
+    task.record.last_activity = env.wall;
     task.record.last_message = prepared.word.number;
     task.record.inbox = prepared.inbox;
     crate::activity::message(&mut task.record, &prepared.activity_word, env.limits.inbox_messages, out);

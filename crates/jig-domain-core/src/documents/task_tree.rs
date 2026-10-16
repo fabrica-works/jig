@@ -181,6 +181,9 @@ pub enum Parameter {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Task {
     pub waits_on: super::WaitsOn,
+    pub label: u32,
+    pub flags: tasks::Flags,
+    pub last_activity: Wall,
     pub chip: Chip,
     pub acts: List<crate::acts::Offered>,
     pub project: u32,
@@ -761,6 +764,9 @@ pub fn task_from_row(core: &Core, limits: &Limits, party: u64, row: &tasks::Task
     }
     Ok(Task {
         waits_on: core.waits_on(limits, row.number),
+        label: row.label,
+        flags: row.flags,
+        last_activity: row.last_activity,
         acts,
         chip: super::small::chip_with_core(core, limits, row)?,
         project: row.project,

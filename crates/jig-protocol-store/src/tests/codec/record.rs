@@ -1,6 +1,6 @@
 //! Complete durable tasks and all remaining row kinds (protocol/store.md, 5.1).
 use super::{bound_problem, fixtures, saved_tasks, tasks_limits};
-use crate::{codec::tasks, tasks_v2 as wire};
+use crate::{codec::tasks, tasks_v3 as wire};
 use jig_domain_tasks as domain;
 use skein_lib::{Duration, Token, Wall};
 
@@ -22,6 +22,14 @@ fn current_record() -> domain::TaskRecord {
     record
 }
 
+fn a_task_records_label_flags_and_last_activity_read_back() {
+    let mut record = current_record();
+    record.label = 0x0102_0304;
+    record.flags = domain::Flags { conversation: false, listed: true, retention: domain::Retention::ForgottenOnceRead };
+    record.last_activity = Wall::from_nanos(9_000_000_000);
+    let row = live_record(record);
+    assert_eq!(saved_tasks(&row), Ok(row));
+}
 fn a_live_task_record_reads_back_whole() {
     let row = domain::Stored::Live(Box::new(fixtures::task_record()));
     assert_eq!(saved_tasks(&row), Ok(row));
@@ -322,6 +330,10 @@ fn table<const N: usize>(cases: [Case; N]) {
 #[test]
 fn task_records_read_back_as_written() {
     table([
+        (
+            "a_task_records_label_flags_and_last_activity_read_back",
+            a_task_records_label_flags_and_last_activity_read_back,
+        ),
         ("an_ended_task_with_its_result_reads_back", an_ended_task_with_its_result_reads_back),
         ("an_activity_line_of_each_kind_reads_back", an_activity_line_of_each_kind_reads_back),
         ("each_terminal_activity_kind_reads_back", each_terminal_activity_kind_reads_back),

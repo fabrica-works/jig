@@ -17,6 +17,9 @@ pub fn task_record() -> jig_domain_tasks::TaskRecord {
     use skein_lib::{Duration, Wall};
     let new = task_creation(17);
     task::TaskRecord {
+        label: 7,
+        flags: task::Flags { conversation: true, listed: false, retention: task::Retention::Kept },
+        last_activity: Wall::from_nanos(19),
         ended_below: task::Endings { done: 3, failed: 5, cancelled: 7 },
         question_lines: Box::new([task::QuestionLine {
             message: 5,
@@ -42,13 +45,7 @@ pub fn task_record() -> jig_domain_tasks::TaskRecord {
         narrowing: true,
         result_position: 31,
         last_reply: 37,
-        replies: Box::new([task::ReplyHint {
-            number: 37,
-            activity: 29,
-            attempt: 3,
-            turn: 5,
-            at: Wall::from_nanos(41),
-        }]),
+        replies: reply_hints(),
         escalation: task::Escalation::Waiting {
             revision: 3,
             holder: task::EscalationHolder::Role { project: 3, role: 7 },
@@ -112,4 +109,14 @@ pub fn task_record() -> jig_domain_tasks::TaskRecord {
         refusals: 127,
         phase: task_phase(),
     }
+}
+
+fn reply_hints() -> Box<[jig_domain_tasks::ReplyHint]> {
+    Box::new([jig_domain_tasks::ReplyHint {
+        number: 37,
+        activity: 29,
+        attempt: 3,
+        turn: 5,
+        at: skein_lib::Wall::from_nanos(41),
+    }])
 }

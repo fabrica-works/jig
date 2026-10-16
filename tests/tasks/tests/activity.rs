@@ -108,3 +108,61 @@ fn a_task_s_activity_survives_its_words_being_taken_and_a_restart() {
     assert_eq!(world.live(), 0);
     assert_eq!(lines(&world, 1), after);
 }
+
+#[test]
+fn a_tasks_label_and_flags_are_kept_as_made() {
+    let mut world = World::new(331, LIMITS);
+    let mut made = task(1, &[]);
+    made.label = 7;
+    let flags = jig_domain_tasks::Flags {
+        conversation: true,
+        listed: false,
+        retention: jig_domain_tasks::Retention::ForgottenOnceRead,
+    };
+    made.flags = flags;
+    assert_eq!(world.make(Party::Person(9), vec![made]), Reply::Made(vec![1]));
+    world.claim(1, 7);
+    world.restart();
+    assert_eq!(world.record(1).label, 7);
+    assert_eq!(world.record(1).flags, flags);
+}
+
+#[test]
+fn a_tasks_last_activity_is_when_it_was_made() {
+    let mut world = World::new(332, LIMITS);
+    world.env.wall = Wall::from_nanos(500);
+    assert_eq!(world.make(Party::Person(9), vec![task(1, &[])]), Reply::Made(vec![1]));
+    assert_eq!(world.record(1).last_activity, Wall::from_nanos(500));
+}
+
+#[test]
+fn a_tasks_last_activity_moves_when_it_hears_words() {
+    let mut world = World::new(333, LIMITS);
+    world.make(Party::Person(9), vec![task(1, &[])]);
+    world.env.wall = Wall::from_nanos(500);
+    write(&mut world, 1, b"heard later");
+    assert_eq!(world.record(1).last_activity, Wall::from_nanos(500));
+}
+
+#[test]
+fn a_tasks_last_activity_moves_when_its_run_commits_a_turn() {
+    let mut world = World::new(334, LIMITS);
+    world.make(Party::Person(9), vec![task(1, &[])]);
+    write(&mut world, 1, b"heard earlier");
+    world.claim(1, 7);
+    world.env.wall = Wall::from_nanos(500);
+    take(&mut world, 1, 1, 3);
+    assert_eq!(world.record(1).last_activity, Wall::from_nanos(500));
+}
+
+#[test]
+fn a_requesters_last_activity_moves_when_a_delegate_ends() {
+    let mut world = World::new(335, LIMITS);
+    world.make(Party::Person(9), vec![task(1, &[])]);
+    assert_eq!(world.make(Party::Task(1), vec![task(2, &[])]), Reply::Made(vec![2]));
+    world.claim(2, 7);
+    world.env.wall = Wall::from_nanos(500);
+    world.finish(2);
+    world.settle(2);
+    assert_eq!(world.record(1).last_activity, Wall::from_nanos(500));
+}

@@ -194,6 +194,8 @@ pub fn creation_spec() -> jig_domain_tasks::Spec {
 pub fn task_creation(number: u64) -> jig_domain_tasks::New {
     use jig_domain_tasks::{Executor, Funder, Holding, New, Numbers};
     New {
+        label: 7,
+        flags: jig_domain_tasks::Flags::PLAIN,
         number,
         project: 3,
         executor: Executor::Agent { charter: 11 },

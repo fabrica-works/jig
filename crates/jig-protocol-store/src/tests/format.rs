@@ -32,8 +32,8 @@ fn check(store: &skein_kv::Limits) -> Result<sizes::Sizes, sizes::SizeRefusal> {
 fn a_format_row_of_another_tasks_version_is_refused_naming_tasks() {
     let wanted = format::current(fixtures::APPLICATION.version, fixtures::DEPLOYMENT);
     let mut found = wanted;
-    found.tasks = 3;
-    assert_eq!(format::check(&found, &wanted), Err(OpenRefusal::Format { family: Family::Tasks, found: 3, wanted: 2 }));
+    found.tasks = 2;
+    assert_eq!(format::check(&found, &wanted), Err(OpenRefusal::Format { family: Family::Tasks, found: 2, wanted: 3 }));
 }
 #[test]
 fn a_format_row_of_another_deployment_is_refused() {
@@ -50,7 +50,7 @@ fn another_family_is_refused_naming_the_first_difference() {
     let wanted = wanted();
     for (family, found) in [
         (Family::Component, codec::component::Format { component: 2, core: 4, ..wanted }),
-        (Family::Core, codec::component::Format { core: 4, tasks: 2, ..wanted }),
+        (Family::Core, codec::component::Format { core: 4, tasks: 3, ..wanted }),
         (Family::People, codec::component::Format { people: 3, notes: 2, ..wanted }),
         (Family::Notes, codec::component::Format { notes: 2, application: 2, ..wanted }),
         (Family::Application, codec::component::Format { application: 2, deployment: [9; 16], ..wanted }),

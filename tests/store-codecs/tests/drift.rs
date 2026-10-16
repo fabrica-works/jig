@@ -43,7 +43,7 @@ fn the_component_familys_code_and_goldens_have_no_drift() {
 
 #[test]
 fn the_tasks_familys_code_and_goldens_have_no_drift() {
-    check("tasks", 2);
+    check("tasks", 3);
 }
 
 #[test]

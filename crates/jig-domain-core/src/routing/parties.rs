@@ -167,6 +167,8 @@ pub(super) fn begin_goal_creation(
         return;
     };
     let new = tasks::New {
+        label: 0,
+        flags: tasks::Flags { conversation: false, listed: true, retention: tasks::Retention::Kept },
         number,
         project,
         executor: match executor {
@@ -224,6 +226,8 @@ pub(super) fn begin_chat_creation(
     };
     let given = core.chat_authority(project, person, role, env.limits.tasks.tree_tasks);
     let new = tasks::New {
+        label: 0,
+        flags: tasks::Flags { conversation: true, listed: false, retention: tasks::Retention::Kept },
         number,
         project,
         executor: tasks::Executor::Agent { charter: core.settings.chat },

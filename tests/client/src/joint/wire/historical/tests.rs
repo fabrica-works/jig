@@ -6,6 +6,8 @@ pub(crate) fn limits() -> Limits {
 }
 fn raw_goal() -> tasks::New {
     tasks::New {
+        label: 0,
+        flags: jig_domain_tasks::Flags::PLAIN,
         number: u64::MAX,
         project: u32::MAX,
         executor: tasks::Executor::Procedure { connector: u16::MAX, code: u32::MAX },

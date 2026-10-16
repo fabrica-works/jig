@@ -759,6 +759,10 @@ pub struct Kind {
 /// capacity and finite reservations before mutation. (domain/tasks.md, sections 3–4).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct New {
+    /// Opaque application label, immutable after creation.
+    pub label: u32,
+    /// Immutable engine flags.
+    pub flags: crate::Flags,
     /// Fresh never-reused task number supplied by the root; live or within-batch duplicates refuse.
     pub number: u64,
     /// Policy project authenticated by root and checked against creator/project structural limits.
@@ -842,6 +846,12 @@ pub struct ReplyHint {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 #[expect(clippy::struct_excessive_bools, reason = "independent durable lifecycle facts are explicit")]
 pub struct TaskRecord {
+    /// Opaque application label, immutable after creation.
+    pub label: u32,
+    /// Immutable engine flags.
+    pub flags: crate::Flags,
+    /// Last words heard, turn committed or delegate ended; creation until then.
+    pub last_activity: Wall,
     /// Lifetime ended descendants, summed as each delegate ends; counts saturate.
     pub ended_below: crate::Endings,
     /// Newest question and answer activity positions, at most `inbox_messages`.

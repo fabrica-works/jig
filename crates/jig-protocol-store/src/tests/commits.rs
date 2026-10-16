@@ -84,7 +84,7 @@ fn a_first_commit_puts_the_format_row_with_its_header() {
         codec::component::Format {
             component: 1,
             core: 3,
-            tasks: 2,
+            tasks: 3,
             people: 2,
             notes: 1,
             application: 1,

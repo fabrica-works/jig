@@ -1,6 +1,6 @@
 //! Task lifecycle values and bounded creation templates (protocol/store.md, 5.1).
 use super::value;
-use crate::tasks_v2 as wire;
+use crate::tasks_v3 as wire;
 use alloc::boxed::Box;
 use jig_domain_tasks as domain;
 use skein_lib::{List, Wall};
@@ -489,6 +489,8 @@ pub(super) fn read_references(source: List<wire::Number>) -> Box<[u64]> {
 }
 fn member(source: &domain::New, limits: &wire::Limits) -> Result<wire::Member, wire::Problem> {
     let domain::New {
+        label,
+        flags,
         number,
         project,
         executor,
@@ -513,6 +515,8 @@ fn member(source: &domain::New, limits: &wire::Limits) -> Result<wire::Member, w
     wire::Member::new(
         limits,
         wire::MemberParts {
+            label: *label,
+            flags: self::flags(*flags, limits)?,
             number: *number,
             project: *project,
             executor: value::executor(*executor, limits)?,
@@ -530,6 +534,8 @@ fn member(source: &domain::New, limits: &wire::Limits) -> Result<wire::Member, w
 }
 fn read_member(source: wire::Member, limits: &wire::Limits) -> Result<domain::New, wire::Problem> {
     let wire::MemberParts {
+        label,
+        flags,
         number,
         project,
         executor,
@@ -548,6 +554,8 @@ fn read_member(source: wire::Member, limits: &wire::Limits) -> Result<domain::Ne
         resources.push(read_holding(resource, limits)?).expect("same number of holdings");
     }
     Ok(domain::New {
+        label,
+        flags: read_flags(flags),
         number,
         project,
         executor: value::read_executor(executor),
@@ -731,4 +739,22 @@ fn read_optional_source(
 }
 fn problem(path: wire::Path) -> wire::Problem {
     wire::Problem { path, reason: skein_codec::Reason::Bound }
+}
+
+/// Translate immutable task flags to their durable form.
+pub(super) fn flags(source: domain::Flags, limits: &wire::Limits) -> Result<wire::Flags, wire::Problem> {
+    let retention = match source.retention {
+        domain::Retention::Kept => wire::Retention::Kept,
+        domain::Retention::ForgottenOnceRead => wire::Retention::ForgottenOnceRead,
+    };
+    wire::Flags::new(limits, wire::FlagsParts { conversation: source.conversation, listed: source.listed, retention })
+}
+/// Read immutable task flags.
+pub(super) fn read_flags(source: wire::Flags) -> domain::Flags {
+    let source = source.into_parts();
+    let retention = match source.retention {
+        wire::Retention::Kept => domain::Retention::Kept,
+        wire::Retention::ForgottenOnceRead => domain::Retention::ForgottenOnceRead,
+    };
+    domain::Flags { conversation: source.conversation, listed: source.listed, retention }
 }

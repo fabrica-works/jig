@@ -1157,6 +1157,9 @@ pub(crate) fn make_admitted(
             published: None,
             procedure_offered: None,
             record: TaskRecord {
+                label: new.label,
+                flags: new.flags,
+                last_activity: env.wall,
                 ended_below: crate::Endings::ZERO,
                 question_lines: Box::new([]),
                 hold: 0,

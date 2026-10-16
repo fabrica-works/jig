@@ -75,6 +75,8 @@ fn authority() -> Authority {
 #[must_use]
 pub(super) fn task(number: u64, dependencies: &[u64]) -> New {
     New {
+        label: 0,
+        flags: crate::Flags::PLAIN,
         number,
         project: 1,
         executor: Executor::Agent { charter: 1 },

@@ -87,6 +87,7 @@ pub(crate) fn turn(
         return refused(to, Some(number), Refusal::Turn, out);
     }
     let task = &mut task_mut(domain, number).expect("turn admitted").record;
+    task.last_activity = environment.wall;
     task.turn = turn;
     crate::inbox::take(task, read, refusals);
     task.ever_turned = true;

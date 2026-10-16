@@ -113,6 +113,9 @@ pub(crate) mod tests {
         delegates.push(documents::LiveDelegate { chip: chip.clone(), takeover_budget: u64::MAX }).expect("source room");
         documents::Task {
             waits_on: documents::WaitsOn::Nothing,
+            label: 0,
+            flags: tasks::Flags::PLAIN,
+            last_activity: skein_lib::Wall::EPOCH,
             project: chip.details.project,
             executor: chip.details.executor,
             requester: tasks::Party::Deployment { project: 0 },

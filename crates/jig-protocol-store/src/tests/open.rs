@@ -87,8 +87,8 @@ fn a_store_of_another_deployment_refuses_to_open() {
 
 #[test]
 fn a_store_of_another_tasks_version_refuses_naming_tasks() {
-    let mut store = planted(&[version_put(3, 3), fixtures::header_put(fixtures::DEPLOYMENT, 1)]);
-    assert_refusal(&open(&mut store), OpenRefusal::Format { family: Family::Tasks, found: 3, wanted: 2 });
+    let mut store = planted(&[version_put(2, 3), fixtures::header_put(fixtures::DEPLOYMENT, 1)]);
+    assert_refusal(&open(&mut store), OpenRefusal::Format { family: Family::Tasks, found: 2, wanted: 3 });
 }
 
 #[test]

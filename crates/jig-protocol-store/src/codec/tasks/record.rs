@@ -1,6 +1,6 @@
 //! Durable task values translated exhaustively (protocol/store.md, 5.1).
 use super::{activity, index, phase, proposals, state, value};
-use crate::tasks_v2 as wire;
+use crate::tasks_v3 as wire;
 use alloc::boxed::Box;
 use jig_domain_tasks as domain;
 use skein_lib::{List, Wall};
@@ -320,6 +320,7 @@ fn task_history(source: &domain::TaskRecord, limits: &wire::Limits) -> Result<wi
     wire::TaskHistory::new(
         limits,
         wire::TaskHistoryParts {
+            last_activity: source.last_activity.as_nanos(),
             ended_below: index::endings(&source.ended_below, limits)?,
             question_lines: question_lines(&source.question_lines, limits)?,
             hold: source.hold,
@@ -366,6 +367,8 @@ fn task_definition(source: &domain::TaskRecord, limits: &wire::Limits) -> Result
     wire::TaskDefinition::new(
         limits,
         wire::TaskDefinitionParts {
+            label: source.label,
+            flags: phase::flags(source.flags, limits)?,
             root: source.root,
             depth: source.depth,
             executor: value::executor(source.executor, limits)?,
@@ -433,6 +436,9 @@ pub fn read_task_record(source: wire::TaskRecord, limits: &wire::Limits) -> Resu
     let interests = interests.into_parts();
     let outcome = outcome.into_parts();
     Ok(domain::TaskRecord {
+        label: definition.label,
+        flags: phase::read_flags(definition.flags),
+        last_activity: Wall::from_nanos(history.last_activity),
         ended_below: index::read_endings(history.ended_below, limits)?,
         question_lines: read_question_lines(history.question_lines, limits)?,
         hold: history.hold,

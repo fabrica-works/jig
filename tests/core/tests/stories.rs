@@ -175,6 +175,8 @@ fn a_recurring_task_creates_one_batch_per_period_after_the_reset() {
             key: 1,
             overlap: tasks::RecurringOverlap::Skip,
             batch: Box::new([tasks::New {
+                label: 0,
+                flags: jig_domain_tasks::Flags::PLAIN,
                 number: 1,
                 project: 1,
                 executor: tasks::Executor::Agent { charter: 1 },
@@ -751,6 +753,8 @@ fn a_batch_waits_without_creating_a_task_or_reserving_funding_until_its_resource
         reply_to: ReplyTo::new(Token::new(u64::MAX - 3)),
         creator: tasks::Party::Task(parent.0),
         batch: Box::new([tasks::New {
+            label: 0,
+            flags: jig_domain_tasks::Flags::PLAIN,
             number: 100,
             project: 1,
             executor: member.executor,

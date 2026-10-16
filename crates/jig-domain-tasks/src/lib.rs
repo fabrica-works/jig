@@ -73,6 +73,8 @@ mod domain;
 mod escalation;
 mod facts;
 mod failures;
+mod flags;
+pub use flags::{Flags, Retention};
 mod funders;
 mod hold_origin;
 mod holds;

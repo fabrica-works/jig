@@ -71,6 +71,8 @@ pub fn authority() -> Authority {
 #[must_use]
 pub fn task(number: u64, dependencies: &[u64]) -> New {
     New {
+        label: 0,
+        flags: jig_domain_tasks::Flags::PLAIN,
         number,
         project: 1,
         executor: Executor::Agent { charter: 1 },

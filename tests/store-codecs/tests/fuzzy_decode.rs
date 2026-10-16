@@ -39,12 +39,10 @@ fn arbitrary(seed: u64, check: fn(&[u8])) {
     }
 }
 fn mutated(family: &str, seed: u64, check: fn(&[u8])) {
-    let version = if family == "core" {
-        "v3"
-    } else if matches!(family, "tasks" | "people") {
-        "v2"
-    } else {
-        "v1"
+    let version = match family {
+        "core" | "tasks" => "v3",
+        "people" => "v2",
+        _ => "v1",
     };
     let root =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../crates/jig-protocol-store/golden").join(family).join(version);
@@ -90,8 +88,8 @@ fn mutated_component_goldens_never_panic() {
 }
 
 fn tasks(bytes: &[u8]) {
-    use jig_protocol_store::tasks_v2;
-    if let Ok(row) = tasks_v2::Row::decode(&tasks_v2::CEILINGS, &mut Reader::new(bytes)) {
+    use jig_protocol_store::tasks_v3;
+    if let Ok(row) = tasks_v3::Row::decode(&tasks_v3::CEILINGS, &mut Reader::new(bytes)) {
         let mut writer = Writer::new(usize::try_from(row.measure()).expect("measured length"));
         row.encode(&mut writer).expect("measured room");
         assert_eq!(writer.finish().as_ref(), bytes);
@@ -141,10 +139,10 @@ fn mutated_core_goldens_never_panic() {
 }
 
 fn frames(bytes: &[u8]) {
-    use jig_protocol_store::{codec, core_v3, notes_v1, tasks_v2, transcripts::frame};
+    use jig_protocol_store::{codec, core_v3, notes_v1, tasks_v3, transcripts::frame};
     let limits = codec::Limits {
         core: core_v3::CEILINGS,
-        tasks: tasks_v2::CEILINGS,
+        tasks: tasks_v3::CEILINGS,
         people: people_v2::CEILINGS,
         notes: notes_v1::CEILINGS,
     };
@@ -158,10 +156,10 @@ fn arbitrary_frames_never_panic_and_round_trip_when_they_decode() {
 }
 #[test]
 fn mutated_and_short_frames_never_panic() {
-    use jig_protocol_store::{codec, core_v3, notes_v1, tasks_v2, transcripts::frame};
+    use jig_protocol_store::{codec, core_v3, notes_v1, tasks_v3, transcripts::frame};
     let limits = codec::Limits {
         core: core_v3::CEILINGS,
-        tasks: tasks_v2::CEILINGS,
+        tasks: tasks_v3::CEILINGS,
         people: people_v2::CEILINGS,
         notes: notes_v1::CEILINGS,
     };
