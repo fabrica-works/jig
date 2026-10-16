@@ -9,11 +9,11 @@ use super::{
     truth::Truth,
 };
 use crate::harness::{ClientId, Observed};
+use jig_client_test_domain::{Event, Limits, Request};
 use jig_domain_client::contract as client;
 use jig_domain_core as core;
 use jig_domain_people as people;
 use jig_test_domain as root;
-use jig_test_domain_client::{Event, Limits, Request};
 use skein_lib::{Duration, Time, Wall};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
@@ -404,16 +404,16 @@ impl Session {
             Err(requests::Invalid::Session) => {
                 if self.unsigned.contains(&client) {
                     let event = match &request {
-                        Request::Jig(jig_test_domain_client::JigOut::Open { watch, .. }) => {
+                        Request::Jig(jig_client_test_domain::JigOut::Open { watch, .. }) => {
                             Some(Event::Jig(jig_domain_client::Event::Ended {
                                 watch: *watch,
                                 end: client::WatchEnd::SignedOut,
                             }))
                         }
-                        Request::First(jig_test_domain_client::first::Out::Open { watch, .. }) => {
-                            Some(Event::First(jig_test_domain_client::first::Event::Ended {
+                        Request::First(jig_client_test_domain::first::Out::Open { watch, .. }) => {
+                            Some(Event::First(jig_client_test_domain::first::Event::Ended {
                                 watch: *watch,
-                                end: jig_test_domain_client::family::WatchEnd::SignedOut,
+                                end: jig_client_test_domain::family::WatchEnd::SignedOut,
                             }))
                         }
                         Request::Send { .. }
@@ -444,7 +444,7 @@ impl Session {
                 if matches!(
                     event,
                     Event::Jig(jig_domain_client::Event::Watch { .. } | jig_domain_client::Event::Ended { .. })
-                        | Event::First(jig_test_domain_client::first::Event::Watch { .. })
+                        | Event::First(jig_client_test_domain::first::Event::Watch { .. })
                 ) {
                     self.stream_event(client, now);
                 }
@@ -504,9 +504,9 @@ impl Session {
                     event: client::WatchEvent::Alive,
                 }),
                 super::transport::Watched::Application { .. } => {
-                    Event::First(jig_test_domain_client::first::Event::Watch {
+                    Event::First(jig_client_test_domain::first::Event::Watch {
                         watch: watch.native,
-                        event: jig_test_domain_client::family::WatchEvent::Alive,
+                        event: jig_client_test_domain::family::WatchEvent::Alive,
                     })
                 }
             };
@@ -871,9 +871,9 @@ impl Session {
                 self.driver.send(now, wall, root::Event::Core(event));
             }
         }
-        if let Event::First(jig_test_domain_client::first::Event::Watch {
+        if let Event::First(jig_client_test_domain::first::Event::Watch {
             watch,
-            event: jig_test_domain_client::family::WatchEvent::Delivered(_),
+            event: jig_client_test_domain::family::WatchEvent::Delivered(_),
         }) = event
             && let Some(watcher) = self.driver.transport.application_watch_token(client, *watch)
         {
@@ -947,7 +947,7 @@ mod tests {
         }
     }
     fn frame(watch: Token) -> Request {
-        Request::Jig(jig_test_domain_client::JigOut::Open { watch, subject: client::Subject::Frame })
+        Request::Jig(jig_client_test_domain::JigOut::Open { watch, subject: client::Subject::Frame })
     }
 
     #[test]
@@ -986,7 +986,7 @@ mod tests {
         session.send(client, now, wall, frame(native)).expect("actual owner watch");
         let original = session.driver.transport.watch_token(client, native).expect("original route");
         session
-            .send(client, now, wall, Request::Jig(jig_test_domain_client::JigOut::Close { watch: native }))
+            .send(client, now, wall, Request::Jig(jig_client_test_domain::JigOut::Close { watch: native }))
             .expect("actual close");
         let mut callbacks = session.poll(now, wall).expect("discard late body and finish actual flight");
         callbacks.extend(session.poll(now, wall).expect("actual owning terminal"));
@@ -1057,7 +1057,7 @@ mod tests {
         assert_eq!(session.driver.world.commits.len(), commits);
         assert!(session.driver.transport.taken(client, Token::new(0)).is_some(), "Alive did not ACK the normal flight");
         session
-            .send(client, due, wall, Request::Jig(jig_test_domain_client::JigOut::Close { watch: Token::new(0) }))
+            .send(client, due, wall, Request::Jig(jig_client_test_domain::JigOut::Close { watch: Token::new(0) }))
             .expect("close original watch");
         let _ = session.poll(due, wall).expect("original close");
         let next = due.saturating_add(Duration::from_millis(50));
@@ -1220,7 +1220,7 @@ mod tests {
                 ClientId(0),
                 now,
                 wall,
-                Request::Jig(jig_test_domain_client::JigOut::Open {
+                Request::Jig(jig_client_test_domain::JigOut::Open {
                     watch: native,
                     subject: client::Subject::Run { task: u64::MAX, turn: None, offset: 0 },
                 }),
@@ -1358,7 +1358,7 @@ mod tests {
         let request = |attempt| Request::Send {
             attempt,
             key,
-            ask: jig_test_domain_client::Ask::Jig(Box::new(client::Ask::Stop { project: 1, task: u64::MAX })),
+            ask: jig_client_test_domain::Ask::Jig(Box::new(client::Ask::Stop { project: 1, task: u64::MAX })),
         };
         session.send(ClientId(0), now, wall, request(Token::new(31))).expect("actual owner submit");
         assert!(session.driver.world.stopped, "existing Failed completion stops the real root");
@@ -1406,7 +1406,7 @@ mod tests {
         let request = |attempt| Request::Send {
             attempt,
             key,
-            ask: jig_test_domain_client::Ask::Jig(Box::new(client::Ask::Stop { project: 1, task: u64::MAX })),
+            ask: jig_client_test_domain::Ask::Jig(Box::new(client::Ask::Stop { project: 1, task: u64::MAX })),
         };
         session.lose_answer(ClientId(0), first);
         session.send(ClientId(0), now, wall, request(first)).expect("owner receives whole original ask");
@@ -1472,7 +1472,7 @@ mod tests {
         let request = |attempt| Request::Send {
             attempt,
             key,
-            ask: jig_test_domain_client::Ask::Jig(Box::new(client::Ask::Stop { project: 1, task: u64::MAX })),
+            ask: jig_client_test_domain::Ask::Jig(Box::new(client::Ask::Stop { project: 1, task: u64::MAX })),
         };
         let first = Token::new(311);
         session.send(ClientId(0), now, wall, request(first)).expect("actual original attempt");
@@ -1516,7 +1516,7 @@ mod tests {
         session.poll(now, wall).expect("actual sibling authentication");
         let native = Token::new(u64::MAX);
         let open =
-            || Request::Jig(jig_test_domain_client::JigOut::Open { watch: native, subject: client::Subject::Frame });
+            || Request::Jig(jig_client_test_domain::JigOut::Open { watch: native, subject: client::Subject::Frame });
         for client in [ClientId(0), ClientId(1)] {
             session.send(client, now, wall, open()).expect("original frame watch");
         }

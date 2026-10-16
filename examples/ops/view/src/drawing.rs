@@ -1,8 +1,8 @@
 //! Keep: owner-written bounded data and readable fallback (view.md, 3).
 //! Replace: observability's error-rate drawing.
 use crate::words::{Word, Words};
+use jig_client_view::Owner;
 use jig_ops_domain_client::observability::documents::Incident;
-use jig_view::Owner;
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, DrawingKind, Run};
 

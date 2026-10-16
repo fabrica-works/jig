@@ -676,7 +676,7 @@ impl<A: App, F: Front<A>> World<A, F> {
             );
             Act::Input { value: words }
         } else {
-            skein_ui_text::render(tree, b"jig", Some(jig_view::regions::JigRegion::Link.region()), print);
+            skein_ui_text::render(tree, b"jig", Some(jig_client_view::regions::JigRegion::Link.region()), print);
             if tree.find(node).is_some_and(|n| n.states.as_slice().contains(&skein_ui::State::SubmitsOnEnter))
                 && let Act::Input { value } = act
             {

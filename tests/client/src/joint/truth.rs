@@ -147,11 +147,11 @@ fn facts(rows: &BTreeMap<root::Key, root::Record>) -> (BTreeSet<CardKey>, WordIm
             ..
         } = record
         {
-            let subject = jig_test_domain_client::family::Subject {
-                scope: jig_test_domain_client::family::Scope::Project(*project),
-                kind: jig_test_domain_client::family::Kind::OwnerEffect(*proposal),
+            let subject = jig_client_test_domain::family::Subject {
+                scope: jig_client_test_domain::family::Scope::Project(*project),
+                kind: jig_client_test_domain::family::Kind::OwnerEffect(*proposal),
             };
-            waiting.insert(CardKey::of(jig_test_view::family_key(&subject)));
+            waiting.insert(CardKey::of(jig_client_test_view::family_key(&subject)));
         }
     }
     (waiting, words, ended)
@@ -254,13 +254,13 @@ mod tests {
     }
     #[test]
     fn connector_departure_truth_joins_only_its_supplied_project_and_raw_owner_reference() {
-        let subject = jig_test_domain_client::family::Subject {
-            scope: jig_test_domain_client::family::Scope::Project(u32::MAX),
-            kind: jig_test_domain_client::family::Kind::OwnerEffect(u64::MAX),
+        let subject = jig_client_test_domain::family::Subject {
+            scope: jig_client_test_domain::family::Scope::Project(u32::MAX),
+            kind: jig_client_test_domain::family::Kind::OwnerEffect(u64::MAX),
         };
-        let expected = CardKey::of(jig_test_view::family_key(&subject));
+        let expected = CardKey::of(jig_client_test_view::family_key(&subject));
         let proposal = root::Record::Connector {
-            number: jig_test_domain_client::FIRST,
+            number: jig_client_test_domain::FIRST,
             record: jig_test_connector::Record::Proposal {
                 number: u64::MAX,
                 task: 7,
@@ -276,7 +276,7 @@ mod tests {
             },
         };
         let task = root::Record::Connector {
-            number: jig_test_domain_client::FIRST,
+            number: jig_client_test_domain::FIRST,
             record: jig_test_connector::Record::Task { task: 7, project: u32::MAX, resources: Box::new([]) },
         };
         let mut truth = Truth::after(image(0, vec![proposal.clone(), task.clone()]).rows);
@@ -287,9 +287,9 @@ mod tests {
         );
         assert_ne!(
             expected,
-            CardKey::of(jig_test_view::family_key(&jig_test_domain_client::family::Subject {
-                scope: jig_test_domain_client::family::Scope::Deployment,
-                kind: jig_test_domain_client::family::Kind::OwnerEffect(u64::MAX),
+            CardKey::of(jig_client_test_view::family_key(&jig_client_test_domain::family::Subject {
+                scope: jig_client_test_domain::family::Scope::Deployment,
+                kind: jig_client_test_domain::family::Kind::OwnerEffect(u64::MAX),
             }))
         );
         assert_eq!(

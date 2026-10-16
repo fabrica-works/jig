@@ -1,11 +1,11 @@
 //! The two independent incident journeys of pages.md, section 10.
+use jig_client_scripted_engine::{Change, Rows, Source};
+use jig_client_test_domain::{Address as RootAddress, family};
 use jig_client_world::{Scripted, Test, Until, World, stories};
 use jig_domain_client::{
     address::{Address, TaskSection},
     contract::*,
 };
-use jig_scripted_engine::{Change, Rows, Source};
-use jig_test_domain_client::{Address as RootAddress, family};
 use skein_fake_person::{Find, Step};
 use skein_lib::{Duration, Wall};
 use skein_ui::Role;
@@ -47,7 +47,7 @@ fn finish(w: &mut World<Test, Scripted>, withdrawn: bool) {
         .act_application(
             now,
             Wall::EPOCH,
-            jig_test_domain_client::FIRST,
+            jig_client_test_domain::FIRST,
             1,
             state,
             vec![
@@ -118,7 +118,7 @@ fn resolved_incident(seed: u64) {
     part.value = 32;
     w.front()
         .engine
-        .act_application(now, Wall::EPOCH, jig_test_domain_client::FIRST, 1, state, vec![])
+        .act_application(now, Wall::EPOCH, jig_client_test_domain::FIRST, 1, state, vec![])
         .expect("incident fixture fits and exists");
     w.person(c, vec![see(b"Value: 32")]);
     w.run(Until::Done);

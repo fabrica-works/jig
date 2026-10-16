@@ -1,8 +1,8 @@
+use jig_client_scripted_engine::{Bounds, owner_authority as price};
 use jig_domain_client::contract::{
     OwnerAuthority, OwnerAuthorityDocument, OwnerAuthorityExecutor, OwnerDelegation, OwnerGrant, OwnerPattern,
     OwnerPatternEnd, OwnerResourceScope,
 };
-use jig_scripted_engine::{Bounds, owner_authority as price};
 use skein_lib::{List, Wall};
 use skein_world::domain::heap::{Counting, Meter};
 #[global_allocator]
@@ -117,8 +117,8 @@ fn authority_document_cut_is_separate_from_whole_payload_and_keeps_exact_codes()
 
 #[test]
 fn saturated_owner_authority_renderer_and_words_fit_composed_heap_envelopes() {
-    use jig_view::owner_authority as view;
-    use jig_view::owner_authority_words::{self as words, OwnerAuthorityWords};
+    use jig_client_view::owner_authority as view;
+    use jig_client_view::owner_authority_words::{self as words, OwnerAuthorityWords};
     use skein_ui::Builder;
     use skein_ui::Limits;
     use skein_ui::phrases::PhraseLimits;
@@ -154,7 +154,7 @@ fn saturated_owner_authority_renderer_and_words_fit_composed_heap_envelopes() {
     view::document(&mut builder, &value, &words);
     let tree = builder.finish();
     assert_eq!(tree.len(), 59);
-    assert!(meter.held() <= jig_view::limits::jig_worst_case(&limits).expect("tree heap envelope"));
+    assert!(meter.held() <= jig_client_view::limits::jig_worst_case(&limits).expect("tree heap envelope"));
     assert_eq!(
         tree.nodes().iter().flat_map(|n| &n.text).filter(|r| r.text.as_ref() == b"a/b\0").count(),
         6,

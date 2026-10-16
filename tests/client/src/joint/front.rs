@@ -6,8 +6,8 @@ use crate::{
     harness::{ClientId, Front, FrontFault, Observed},
     test::Test,
 };
+use jig_client_test_domain::{Event, JigOut, Request, first};
 use jig_domain_people::Identity;
-use jig_test_domain_client::{Event, JigOut, Request, first};
 use skein_lib::{Duration, Time, Token, Wall};
 use std::collections::BTreeMap;
 
@@ -436,7 +436,7 @@ mod tests {
         let request = |attempt| Request::Send {
             attempt,
             key: [62; 16],
-            ask: jig_test_domain_client::Ask::Jig(Box::new(client::Ask::Stop { project: 1, task: u64::MAX })),
+            ask: jig_client_test_domain::Ask::Jig(Box::new(client::Ask::Stop { project: 1, task: u64::MAX })),
         };
         Front::<Test>::wire(&mut front, ClientId(0), Time::ZERO, clock(Time::ZERO), request(Token::new(31)));
         let peer = front.session.driver.world.client_peer.as_ref().expect("registered protocol peer");
@@ -534,7 +534,7 @@ mod tests {
         let request = |attempt| Request::Send {
             attempt,
             key: [63; 16],
-            ask: jig_test_domain_client::Ask::Jig(Box::new(client::Ask::Stop { project: 1, task: u64::MAX })),
+            ask: jig_client_test_domain::Ask::Jig(Box::new(client::Ask::Stop { project: 1, task: u64::MAX })),
         };
         Front::<Test>::wire(&mut front, ClientId(0), Time::ZERO, clock(Time::ZERO), request(Token::new(41)));
         assert!(front.session.driver.world.client_peer.as_ref().expect("actual protocol peer").delivered.iter().any(

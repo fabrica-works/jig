@@ -1,5 +1,5 @@
+use jig_client_views_world::World;
 use jig_domain_views::{End, Event, Refusal, Request};
-use jig_views_world::World;
 use skein_lib::Token;
 #[test]
 fn changes_while_a_delivery_is_in_flight_make_one_next_delivery() {
@@ -109,16 +109,16 @@ fn bounded_stream_text_says_which_prefix_was_cut() {
 #[test]
 fn replay_and_dropped_facts_change_no_delivery() {
     fn run(seed: u64) -> Vec<String> {
-        let mut world = World::seeded(jig_views_world::LIMITS, seed);
+        let mut world = World::seeded(jig_client_views_world::LIMITS, seed);
         world.watch(1, 7);
         world.changed(7);
         world.settle();
         world.log().to_vec()
     }
     assert_eq!(run(19), run(19));
-    let mut quiet = jig_views_world::LIMITS;
+    let mut quiet = jig_client_views_world::LIMITS;
     quiet.facts = 0;
-    let mut a = World::new(jig_views_world::LIMITS);
+    let mut a = World::new(jig_client_views_world::LIMITS);
     let mut b = World::new(quiet);
     assert_eq!(a.watch(1, 7), b.watch(1, 7));
     assert_eq!(a.changed(7), b.changed(7));

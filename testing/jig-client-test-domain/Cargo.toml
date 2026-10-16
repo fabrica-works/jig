@@ -1,0 +1,13 @@
+[package]
+name = "jig-client-test-domain"
+description = "The test application client root with two connector sides"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+[dependencies]
+skein-lib.workspace = true
+jig-domain-client.workspace = true
+jig-test-connector.workspace = true
+[lints]
+workspace = true

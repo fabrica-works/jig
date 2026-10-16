@@ -1,9 +1,9 @@
 //! Starting truth and person's scripts shared by focused and random worlds.
 #![allow(clippy::wildcard_imports, reason = "world adapters translate the complete owner vocabulary")]
 use crate::{Scripted, Settings, Test, World, scripted::Family, test::list};
+use jig_client_scripted_engine::{Bounds, Script, Truth};
+use jig_client_test_domain::Address as RootAddress;
 use jig_domain_client::{address::Address, contract::*};
-use jig_scripted_engine::{Bounds, Script, Truth};
-use jig_test_domain_client::Address as RootAddress;
 use skein_lib::{Duration, Wall};
 pub mod client_construction;
 pub mod person_confirmation;
@@ -169,7 +169,7 @@ pub fn task() -> Task {
             executor: Executor::Agent { charter: 1 },
             phase: Phase::Running,
             details: Box::new(ChipPhase::Procedure {
-                panel: Part::Panel { connector: jig_test_domain_client::FIRST, task: 9 },
+                panel: Part::Panel { connector: jig_client_test_domain::FIRST, task: 9 },
             }),
         },
         goal: None,
@@ -250,15 +250,15 @@ pub fn chat_world(seed: u64) -> World<Test, Scripted> {
     world
         .front()
         .engine
-        .script(jig_scripted_engine::Rule {
+        .script(jig_client_scripted_engine::Rule {
             party: Some(7),
             ask: Ask::StartChat { project: 1, words: text(b"Hello") },
             answer: Answer::Done(Outcome::Made { what: Made::Chat { task: 9 } }),
             changes: vec![
-                jig_scripted_engine::Change::Source(jig_scripted_engine::Source {
+                jig_client_scripted_engine::Change::Source(jig_client_scripted_engine::Source {
                     party: 7,
                     read: Read::Conversations { after: None },
-                    rows: jig_scripted_engine::Rows::Conversations(vec![ConversationLine {
+                    rows: jig_client_scripted_engine::Rows::Conversations(vec![ConversationLine {
                         cached_replies: 0,
                         runtime: Some(task.context.as_ref().expect("supplied task context").runtime.clone()),
                         delegates: 0,
@@ -272,7 +272,7 @@ pub fn chat_world(seed: u64) -> World<Test, Scripted> {
                         changed: Some(Wall::EPOCH),
                     }]),
                 }),
-                jig_scripted_engine::Change::Object {
+                jig_client_scripted_engine::Change::Object {
                     project: 1,
                     key: ObjectKey::Task(9),
                     value: ReadValue::Task(Box::new(task)),
@@ -303,7 +303,7 @@ pub fn chat_ready(seed: u64) -> World<Test, Scripted> {
         .act(
             now,
             Wall::EPOCH,
-            jig_scripted_engine::Change::Object {
+            jig_client_scripted_engine::Change::Object {
                 project: 1,
                 key: ObjectKey::Task(9),
                 value: ReadValue::Task(Box::new(task())),
@@ -332,7 +332,7 @@ pub fn project() -> Project {
         last_batch: list([8, 9]),
         cut: false,
     };
-    let part = Part::Project { connector: jig_test_domain_client::FIRST, project: 1 };
+    let part = Part::Project { connector: jig_client_test_domain::FIRST, project: 1 };
     Project {
         period: 3,
         spend_lines: list([TaskSpend { chip: task.chip.clone(), spent: 5 }, TaskSpend { chip: task.chip, spent: 6 }]),
@@ -392,8 +392,8 @@ pub fn deployment() -> Deployment {
         proposals: 2,
         refusals: list([Refusal::Limit { which: Limit::Objects }, Refusal::Limit { which: Limit::Reads }]),
         parts: list([
-            Part::Deployment { connector: jig_test_domain_client::FIRST },
-            Part::Deployment { connector: jig_test_domain_client::SECOND },
+            Part::Deployment { connector: jig_client_test_domain::FIRST },
+            Part::Deployment { connector: jig_client_test_domain::SECOND },
         ]),
     }
 }
@@ -408,7 +408,7 @@ pub fn proposal() -> Proposal {
         proposer: Proposer::Task(10),
         why: text(b"Resolve the incident"),
         action: ProposalAction::Effect {
-            part: Part::Effect { connector: jig_test_domain_client::FIRST, proposal: key },
+            part: Part::Effect { connector: jig_client_test_domain::FIRST, proposal: key },
         },
         needs: authority(),
         funding: budget(),
@@ -432,14 +432,14 @@ pub fn arranged_proposal_world(seed: u64) -> World<Test, Scripted> {
     lead.proposals = list([proposal().key]);
     let context = lead.context.as_mut().expect("task fixture supplies context");
     context.impact.tasks.running = 1;
-    context.parts = list([Part::Panel { connector: jig_test_domain_client::FIRST, task: 9 }]);
+    context.parts = list([Part::Panel { connector: jig_client_test_domain::FIRST, task: 9 }]);
     world
         .front()
         .engine
         .act(
             skein_lib::Time::ZERO,
             Wall::EPOCH,
-            jig_scripted_engine::Change::Object {
+            jig_client_scripted_engine::Change::Object {
                 project: 1,
                 key: ObjectKey::Task(9),
                 value: ReadValue::Task(Box::new(lead)),
@@ -464,7 +464,7 @@ pub fn arranged_proposal_world(seed: u64) -> World<Test, Scripted> {
     world
         .front()
         .engine
-        .act(skein_lib::Time::ZERO, Wall::EPOCH, jig_scripted_engine::Change::Tree(tree))
+        .act(skein_lib::Time::ZERO, Wall::EPOCH, jig_client_scripted_engine::Change::Tree(tree))
         .expect("arranged plan fits");
     accepted_proposal(&mut world, &proposal());
     world
@@ -479,17 +479,17 @@ fn proposal_fixture(seed: u64, delegate_chip: bool) -> World<Test, Scripted> {
         lead.context.as_mut().expect("supplied task context").impact.tasks.running = 1;
     }
     for change in [
-        jig_scripted_engine::Change::Object {
+        jig_client_scripted_engine::Change::Object {
             project: 1,
             key: ObjectKey::Task(9),
             value: ReadValue::Task(Box::new(lead)),
         },
-        jig_scripted_engine::Change::Object {
+        jig_client_scripted_engine::Change::Object {
             project: 1,
             key: ObjectKey::Proposal(p.key),
             value: ReadValue::Proposal(Box::new(p.clone())),
         },
-        jig_scripted_engine::Change::Source(jig_scripted_engine::Source {
+        jig_client_scripted_engine::Change::Source(jig_client_scripted_engine::Source {
             party: 7,
             read: Read::Inbox {
                 group: jig_domain_client::contract::InboxReadGroup::Needs,
@@ -498,7 +498,7 @@ fn proposal_fixture(seed: u64, delegate_chip: bool) -> World<Test, Scripted> {
                 goal: None,
                 after: None,
             },
-            rows: jig_scripted_engine::Rows::Inbox(vec![InboxEntry {
+            rows: jig_client_scripted_engine::Rows::Inbox(vec![InboxEntry {
                 reply: None,
                 lineage: list([]),
                 goal: None,
@@ -542,10 +542,10 @@ fn proposal_fixture(seed: u64, delegate_chip: bool) -> World<Test, Scripted> {
         .act(
             skein_lib::Time::ZERO,
             Wall::EPOCH,
-            jig_scripted_engine::Change::Source(jig_scripted_engine::Source {
+            jig_client_scripted_engine::Change::Source(jig_client_scripted_engine::Source {
                 party: 7,
                 read: Read::Activity { task: 9, before: None },
-                rows: jig_scripted_engine::Rows::Activity(vec![ActivityLine {
+                rows: jig_client_scripted_engine::Rows::Activity(vec![ActivityLine {
                     position: 1,
                     at: Wall::EPOCH,
                     event: Activity::Turn { name: TurnName { attempt: 1, number: 1 }, turn: TurnRead::Decoded(turn) },
@@ -581,7 +581,7 @@ fn accepted_proposal(world: &mut World<Test, Scripted>, p: &Proposal) {
         .expect("fixture truth is present")
         .clone();
     let mut after = before;
-    if let jig_scripted_engine::Rows::Activity(rows) = &mut after.rows {
+    if let jig_client_scripted_engine::Rows::Activity(rows) = &mut after.rows {
         rows.push(ActivityLine {
             position: 2,
             at: Wall::EPOCH,
@@ -593,18 +593,18 @@ fn accepted_proposal(world: &mut World<Test, Scripted>, p: &Proposal) {
         });
     }
     let mut changes = vec![
-        jig_scripted_engine::Change::Object {
+        jig_client_scripted_engine::Change::Object {
             project: 1,
             key: ObjectKey::Proposal(p.key),
             value: ReadValue::Proposal(Box::new(decided)),
         },
-        jig_scripted_engine::Change::Object {
+        jig_client_scripted_engine::Change::Object {
             project: 1,
             key: ObjectKey::Task(9),
             value: ReadValue::Task(Box::new(lead)),
         },
-        jig_scripted_engine::Change::Source(after),
-        jig_scripted_engine::Change::Source(jig_scripted_engine::Source {
+        jig_client_scripted_engine::Change::Source(after),
+        jig_client_scripted_engine::Change::Source(jig_client_scripted_engine::Source {
             party: 7,
             read: Read::Inbox {
                 group: jig_domain_client::contract::InboxReadGroup::Needs,
@@ -613,7 +613,7 @@ fn accepted_proposal(world: &mut World<Test, Scripted>, p: &Proposal) {
                 goal: None,
                 after: None,
             },
-            rows: jig_scripted_engine::Rows::Inbox(vec![]),
+            rows: jig_client_scripted_engine::Rows::Inbox(vec![]),
         }),
     ];
     if let Some(tree) = world.front().engine.truth().trees.get(&9) {
@@ -621,12 +621,12 @@ fn accepted_proposal(world: &mut World<Test, Scripted>, p: &Proposal) {
         for index in 0..tree.nodes.len() {
             tree.nodes.get_mut(index).expect("bounded tree row exists").proposals.clear();
         }
-        changes.push(jig_scripted_engine::Change::Tree(tree));
+        changes.push(jig_client_scripted_engine::Change::Tree(tree));
     }
     world
         .front()
         .engine
-        .script(jig_scripted_engine::Rule {
+        .script(jig_client_scripted_engine::Rule {
             party: Some(7),
             ask: Ask::DecideProposal { project: 1, proposal: p.key, decision: Decision::Accepted },
             answer: Answer::Done(Outcome::Decided { by: Actor::Party(7), how: Decision::Accepted, at: Wall::EPOCH }),
@@ -660,7 +660,7 @@ pub fn held_chat(seed: u64) -> World<Test, Scripted> {
         .act(
             skein_lib::Time::ZERO,
             Wall::EPOCH,
-            jig_scripted_engine::Change::Object {
+            jig_client_scripted_engine::Change::Object {
                 project: 1,
                 key: ObjectKey::Task(9),
                 value: ReadValue::Task(Box::new(held)),
@@ -704,13 +704,13 @@ pub fn goal_world(seed: u64) -> World<Test, Scripted> {
     world
         .front()
         .engine
-        .act(skein_lib::Time::ZERO, Wall::EPOCH, jig_scripted_engine::Change::Project(Box::new(doc)))
+        .act(skein_lib::Time::ZERO, Wall::EPOCH, jig_client_scripted_engine::Change::Project(Box::new(doc)))
         .expect("project facts fit");
     let p = proposal();
     world
         .front()
         .engine
-        .script(jig_scripted_engine::Rule {
+        .script(jig_client_scripted_engine::Rule {
             party: Some(7),
             ask: Ask::SetGoal {
                 project: 1,
@@ -721,7 +721,7 @@ pub fn goal_world(seed: u64) -> World<Test, Scripted> {
                 deadline: None,
             },
             answer: Answer::Done(Outcome::Proposed { proposal: p.key }),
-            changes: vec![jig_scripted_engine::Change::Object {
+            changes: vec![jig_client_scripted_engine::Change::Object {
                 project: 1,
                 key: ObjectKey::Proposal(p.key),
                 value: ReadValue::Proposal(Box::new(p)),
@@ -740,7 +740,7 @@ pub fn procedure_goal_world(seed: u64) -> World<Test, Scripted> {
     world
         .front()
         .engine
-        .act(skein_lib::Time::ZERO, Wall::EPOCH, jig_scripted_engine::Change::Frame(procedure_frame))
+        .act(skein_lib::Time::ZERO, Wall::EPOCH, jig_client_scripted_engine::Change::Frame(procedure_frame))
         .expect("procedure-only frame fits");
     let mut doc = project();
     doc.acts = list([Offered {
@@ -761,7 +761,7 @@ pub fn procedure_goal_world(seed: u64) -> World<Test, Scripted> {
     world
         .front()
         .engine
-        .act(skein_lib::Time::ZERO, Wall::EPOCH, jig_scripted_engine::Change::Project(Box::new(doc)))
+        .act(skein_lib::Time::ZERO, Wall::EPOCH, jig_client_scripted_engine::Change::Project(Box::new(doc)))
         .expect("project facts fit");
     let mut p = proposal();
     p.key = ProposalKey { proposer: Proposer::Party(7), number: 1 };
@@ -781,7 +781,7 @@ pub fn procedure_goal_world(seed: u64) -> World<Test, Scripted> {
     world
         .front()
         .engine
-        .script(jig_scripted_engine::Rule {
+        .script(jig_client_scripted_engine::Rule {
             party: Some(7),
             ask: Ask::SetGoal {
                 project: 1,
@@ -792,7 +792,7 @@ pub fn procedure_goal_world(seed: u64) -> World<Test, Scripted> {
                 deadline: None,
             },
             answer: Answer::Done(Outcome::Proposed { proposal: p.key }),
-            changes: vec![jig_scripted_engine::Change::Object {
+            changes: vec![jig_client_scripted_engine::Change::Object {
                 project: 1,
                 key: ObjectKey::Proposal(p.key),
                 value: ReadValue::Proposal(Box::new(p)),
@@ -807,10 +807,10 @@ fn incident_delegate() -> Task {
     delegate.chip.task = 10;
     delegate.chip.title = DocumentText::complete(text(b"Delegate ten"));
     delegate.chip.details =
-        Box::new(ChipPhase::Procedure { panel: Part::Panel { connector: jig_test_domain_client::FIRST, task: 10 } });
+        Box::new(ChipPhase::Procedure { panel: Part::Panel { connector: jig_client_test_domain::FIRST, task: 10 } });
     delegate.requester = OwnerRequester::Task(9);
     delegate.context.as_mut().expect("supplied task context").parts =
-        list([Part::Panel { connector: jig_test_domain_client::FIRST, task: 10 }]);
+        list([Part::Panel { connector: jig_client_test_domain::FIRST, task: 10 }]);
     delegate.proposals = list([proposal().key]);
     delegate
 }
@@ -825,7 +825,7 @@ pub fn two_plans_world(seed: u64) -> World<Test, Scripted> {
     incident_world_with_second(seed, Some(10))
 }
 fn incident_world_with_second(seed: u64, second: Option<u64>) -> World<Test, Scripted> {
-    use jig_test_domain_client::family as f;
+    use jig_client_test_domain::family as f;
     let mut world = proposal_fixture(seed, true);
     let delegate = incident_delegate();
     let mut lead = task();
@@ -834,17 +834,17 @@ fn incident_world_with_second(seed: u64, second: Option<u64>) -> World<Test, Scr
     let counts =
         PhaseCounts { ended: 0, waiting: 0, running: 2, held: 0, closing: 0, done: 0, failed: 0, cancelled: 0 };
     for change in [
-        jig_scripted_engine::Change::Object {
+        jig_client_scripted_engine::Change::Object {
             project: 1,
             key: ObjectKey::Task(9),
             value: ReadValue::Task(Box::new(lead.clone())),
         },
-        jig_scripted_engine::Change::Object {
+        jig_client_scripted_engine::Change::Object {
             project: 1,
             key: ObjectKey::Task(10),
             value: ReadValue::Task(Box::new(delegate.clone())),
         },
-        jig_scripted_engine::Change::Tree(Tree {
+        jig_client_scripted_engine::Change::Tree(Tree {
             task: 9,
             nodes: list([
                 TreeNode {
@@ -898,14 +898,14 @@ fn incident_world_with_second(seed: u64, second: Option<u64>) -> World<Test, Scr
     world
         .front()
         .engine
-        .act_application(skein_lib::Time::ZERO, Wall::EPOCH, jig_test_domain_client::FIRST, 1, family, vec![])
+        .act_application(skein_lib::Time::ZERO, Wall::EPOCH, jig_client_test_domain::FIRST, 1, family, vec![])
         .expect("incident family fits");
     world
 }
 /// The application's family incident address.
 #[must_use]
 pub fn incident() -> RootAddress {
-    RootAddress::First(jig_test_domain_client::first::Address { project: 1, item: 1 })
+    RootAddress::First(jig_client_test_domain::first::Address { project: 1, item: 1 })
 }
 /// Complete a scripted task with its whole final report.
 #[must_use]

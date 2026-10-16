@@ -289,13 +289,13 @@ pub(crate) mod tests {
             panic!("supplied whole hold")
         };
         assert_eq!(hold.revision, 17);
-        let bounds = jig_scripted_engine::Bounds {
+        let bounds = jig_client_scripted_engine::Bounds {
             rows: limits.rows,
             text: limits.text,
             document_bytes: limits.document_bytes,
-            ..jig_scripted_engine::Bounds::default()
+            ..jig_client_scripted_engine::Bounds::default()
         };
-        let bytes = jig_scripted_engine::owner_proposal::bytes(&native, &bounds)
+        let bytes = jig_client_scripted_engine::owner_proposal::bytes(&native, &bounds)
             .expect("independent whole payload pricing")
             .checked_add(u64::try_from(size_of::<client::ReadValue>()).expect("read envelope"))
             .expect("whole read bytes");

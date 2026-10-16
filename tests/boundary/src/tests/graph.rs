@@ -102,7 +102,7 @@ fn host_hub_links_only_skein() {
 #[test]
 fn client_view_links_only_its_domain_and_foundation() {
     let views: Vec<_> =
-        manifests().into_iter().filter(|manifest| manifest.name.as_deref() == Some("jig-view")).collect();
+        manifests().into_iter().filter(|manifest| manifest.name.as_deref() == Some("jig-client-view")).collect();
     assert_eq!(views.len(), 1, "the client view has one manifest");
     let failures: Vec<_> = views
         .into_iter()
@@ -139,12 +139,12 @@ fn client_step(name: &str) -> bool {
     matches!(
         name,
         "jig-domain-client"
-            | "jig-view"
+            | "jig-client-view"
             | "jig-protocol-transcript"
             | "jig-client-protocol-wire"
             | "jig-client-protocol-link"
-            | "jig-test-domain-client"
-            | "jig-test-view"
+            | "jig-client-test-domain"
+            | "jig-client-test-view"
             | "jig-ops-domain-connectors"
             | "jig-ops-domain-client"
             | "jig-ops-view"
@@ -174,13 +174,13 @@ fn client_and_engine_step_crates_share_no_dependencies() {
 #[test]
 fn client_roles_cover_step_crates_and_exclude_the_world() {
     assert!(client_step("jig-domain-client"));
-    assert!(client_step("jig-view"));
+    assert!(client_step("jig-client-view"));
     assert!(client_step("jig-protocol-transcript"));
-    assert!(client_step("jig-test-domain-client"));
-    assert!(client_step("jig-test-view"));
+    assert!(client_step("jig-client-test-domain"));
+    assert!(client_step("jig-client-test-view"));
     assert!(client_step("jig-ops-domain-connectors"));
     assert!(!client_step("jig-client-world"));
-    assert!(!client_step("jig-scripted-engine"));
+    assert!(!client_step("jig-client-scripted-engine"));
 }
 
 /// Only the below-domain transcript translator links Smith (client/domain/README.md, 2).
@@ -214,8 +214,10 @@ fn client_transcript_is_the_client_only_smith_link() {
 
 #[test]
 fn scripted_engine_links_only_the_client_and_foundation() {
-    let engines: Vec<_> =
-        manifests().into_iter().filter(|manifest| manifest.name.as_deref() == Some("jig-scripted-engine")).collect();
+    let engines: Vec<_> = manifests()
+        .into_iter()
+        .filter(|manifest| manifest.name.as_deref() == Some("jig-client-scripted-engine"))
+        .collect();
     assert_eq!(engines.len(), 1);
     for manifest in engines {
         assert!(
@@ -229,7 +231,7 @@ fn scripted_engine_links_only_the_client_and_foundation() {
 #[test]
 fn test_client_domain_links_only_its_child_owner_vocabulary_and_foundation() {
     let roots: Vec<_> =
-        manifests().into_iter().filter(|manifest| manifest.name.as_deref() == Some("jig-test-domain-client")).collect();
+        manifests().into_iter().filter(|manifest| manifest.name.as_deref() == Some("jig-client-test-domain")).collect();
     assert_eq!(roots.len(), 1, "one test application client domain");
     let mut dependencies = roots[0].dependencies.clone();
     dependencies.sort();
@@ -238,7 +240,7 @@ fn test_client_domain_links_only_its_child_owner_vocabulary_and_foundation() {
         ["jig-domain-client", "jig-test-connector", "skein-lib"],
         "the client root depends only on its client child, pure owner vocabulary and foundation"
     );
-    let source = fs::read_to_string(kit_root().join("testing/jig-test-domain-client/src/lib.rs"))
+    let source = fs::read_to_string(kit_root().join("testing/jig-client-test-domain/src/lib.rs"))
         .expect("root source is readable");
     assert!(source.contains("cfg_attr(not(test), no_std)"), "the client root is step code");
     assert!(source.contains("forbid(unsafe_code)"), "the client root forbids unsafe code");
@@ -250,7 +252,7 @@ fn test_connector_vocabulary_and_client_value_kit_keep_their_exact_roles() {
     let all = manifests();
     for (name, expected) in [
         ("jig-test-connector", vec!["skein-lib"]),
-        ("jig-test-client-kit", vec!["jig-test-connector", "jig-test-domain-client", "skein-lib"]),
+        ("jig-client-test-kit", vec!["jig-client-test-domain", "jig-test-connector", "skein-lib"]),
     ] {
         let selected: Vec<_> = all.iter().filter(|manifest| manifest.name.as_deref() == Some(name)).collect();
         assert_eq!(selected.len(), 1, "one exact {name} role");
@@ -263,13 +265,16 @@ fn test_connector_vocabulary_and_client_value_kit_keep_their_exact_roles() {
 #[test]
 fn test_client_view_links_only_client_children_and_foundation() {
     let roots: Vec<_> =
-        manifests().into_iter().filter(|manifest| manifest.name.as_deref() == Some("jig-test-view")).collect();
+        manifests().into_iter().filter(|manifest| manifest.name.as_deref() == Some("jig-client-test-view")).collect();
     assert_eq!(roots.len(), 1, "one test application client view");
     let mut dependencies = roots[0].dependencies.clone();
     dependencies.sort();
-    assert_eq!(dependencies, ["jig-domain-client", "jig-test-domain-client", "jig-view", "skein-lib", "skein-ui"]);
-    let source =
-        fs::read_to_string(kit_root().join("testing/jig-test-view/src/lib.rs")).expect("view source is readable");
+    assert_eq!(
+        dependencies,
+        ["jig-client-test-domain", "jig-client-view", "jig-domain-client", "skein-lib", "skein-ui"]
+    );
+    let source = fs::read_to_string(kit_root().join("testing/jig-client-test-view/src/lib.rs"))
+        .expect("view source is readable");
     assert!(source.contains("cfg_attr(not(test), no_std)"), "the view root is step code");
     assert!(source.contains("forbid(unsafe_code)"), "the view root forbids unsafe code");
 }
@@ -287,13 +292,13 @@ fn client_world_joins_only_the_client_and_test_roles() {
                 // Whole committed turns use the existing below-domain codec.
                 "jig-protocol-transcript",
                 "smith-transcript",
-                "jig-view",
+                "jig-client-view",
                 "skein-ui",
                 "skein-ui-text",
-                "jig-test-domain-client",
-                "jig-test-view",
+                "jig-client-test-domain",
+                "jig-client-test-view",
                 "skein-fake-person",
-                "jig-scripted-engine",
+                "jig-client-scripted-engine",
                 // The real joint world joins the core and pure test connector
                 // (client/domain/testing.md, 5); client step crates stay separate.
                 "jig-domain-core",
@@ -311,7 +316,7 @@ fn client_world_joins_only_the_client_and_test_roles() {
                 "jig-fake-workers",
                 "jig-test-domain",
                 "jig-test-connector",
-                "jig-test-client-kit",
+                "jig-client-test-kit",
                 "sha2"
             ]
             .contains(&d.as_str())),
@@ -355,10 +360,10 @@ fn ops_client_view_is_step_code_with_only_client_and_connector_vocabulary() {
     assert_eq!(
         dependencies,
         [
+            "jig-client-view",
             "jig-domain-client",
             "jig-ops-domain-client",
             "jig-ops-domain-connectors",
-            "jig-view",
             "skein-lib",
             "skein-ui"
         ]
@@ -396,7 +401,7 @@ fn smith_breaches(manifests: &[CrateManifest]) -> Vec<String> {
         let name = manifest.name.as_deref().unwrap_or("");
         if !(name.starts_with("jig-domain-")
             || name.starts_with("jig-protocol-")
-            || name == "jig-view"
+            || name == "jig-client-view"
             || name.starts_with("jig-client-shell-")
             || (name.starts_with("jig-client-protocol-") && !name.ends_with("-world")))
         {
@@ -444,7 +449,7 @@ fn client_engine_breaches(manifests: &[CrateManifest]) -> Vec<String> {
             manifest.name.as_deref(),
             Some(
                 "jig-domain-client"
-                    | "jig-view"
+                    | "jig-client-view"
                     | "jig-client-protocol-wire"
                     | "jig-client-protocol-link"
                     | "jig-client-shell-native"

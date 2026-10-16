@@ -1,7 +1,7 @@
 //! Keep: checked phrase data beside jig's phrasebook (view.md, section 7).
 //! Replace: the application's closed English vocabulary.
 use alloc::boxed::Box;
-use jig_view::Owner;
+use jig_client_view::Owner;
 use skein_ui::phrases::{
     Form, Hole, HoleKind, HoleShape, Invalid, Language, Phrase, PhraseId, PhraseLimits, PhraseShape, Phrasebook,
     PluralClass, PluralRule, Segment, SpanUnit, WallFormat,

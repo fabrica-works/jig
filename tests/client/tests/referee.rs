@@ -1,6 +1,6 @@
 //! Faulty client and front run through real callbacks, trees, patches and people.
+use jig_client_view::Owner;
 use jig_client_world::{Until, harness::*};
-use jig_view::Owner;
 use skein_fake_person::{Face, Find, Found, Step, TreeFace};
 use skein_ui::{Act, Binding};
 use skein_ui::{Key, NodeId, Patch, Role, Run, Tree, View};
@@ -75,9 +75,9 @@ impl<const BAD: u8> App for Broken<BAD> {
         b.open(Role::Page);
         b.open(Role::Banner);
         for region in [
-            jig_view::regions::JigRegion::Link,
-            jig_view::regions::JigRegion::Needs,
-            jig_view::regions::JigRegion::Party,
+            jig_client_view::regions::JigRegion::Link,
+            jig_client_view::regions::JigRegion::Needs,
+            jig_client_view::regions::JigRegion::Party,
         ] {
             b.open(Role::Region);
             b.region(region.region());
@@ -322,7 +322,7 @@ fn recovered_truth_without_an_online_view_misses_its_deadline() {
 
 #[test]
 fn the_test_clients_family_revision_and_durable_outcome_are_observed() {
-    use jig_test_domain_client::family;
+    use jig_client_test_domain::family;
     let mut w = jig_client_world::stories::chat_ready(20);
     let subject = family::Subject { scope: family::Scope::Project(1), kind: family::Kind::Item(1) };
     let mut state = jig_client_world::scripted::Family::default();
@@ -342,11 +342,11 @@ fn the_test_clients_family_revision_and_durable_outcome_are_observed() {
     );
     w.front()
         .engine
-        .act_application(Time::ZERO, Wall::EPOCH, jig_test_domain_client::FIRST, 1, state, vec![])
+        .act_application(Time::ZERO, Wall::EPOCH, jig_client_test_domain::FIRST, 1, state, vec![])
         .expect("family fixture fits");
     let c = w.client(
         7,
-        jig_test_domain_client::Address::First(jig_test_domain_client::first::Address { project: 1, item: 1 }),
+        jig_client_test_domain::Address::First(jig_client_test_domain::first::Address { project: 1, item: 1 }),
     );
     w.person(
         c,
@@ -368,14 +368,14 @@ fn the_test_clients_sent_words_are_found_in_committed_activity() {
     let mut w = stories::chat_ready(21);
     w.front()
         .engine
-        .script(jig_scripted_engine::Rule {
+        .script(jig_client_scripted_engine::Rule {
             party: Some(7),
             ask: Ask::Write { project: 1, task: 9, words: stories::text(b"Words"), release: false },
             answer: Answer::Done(Outcome::Made { what: Made::Words { task: 9, message: 1 } }),
-            changes: vec![jig_scripted_engine::Change::Source(jig_scripted_engine::Source {
+            changes: vec![jig_client_scripted_engine::Change::Source(jig_client_scripted_engine::Source {
                 party: 7,
                 read: Read::Activity { task: 9, before: None },
-                rows: jig_scripted_engine::Rows::Activity(vec![ActivityLine {
+                rows: jig_client_scripted_engine::Rows::Activity(vec![ActivityLine {
                     position: 1,
                     at: Wall::EPOCH,
                     event: Activity::Words { by: stories::party(7), message: 1, words: stories::text(b"Words") },

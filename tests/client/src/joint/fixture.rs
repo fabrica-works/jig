@@ -86,7 +86,7 @@ pub(super) fn seeded_world_with_receiving(
     body: Box<[u8]>,
     configure: fn(&mut Joint),
     bounds: fn(&mut jig_test_domain::Limits),
-    receiving: jig_test_domain_client::Limits,
+    receiving: jig_client_test_domain::Limits,
 ) -> World<Test, Joint> {
     let mut owner = jig_core_world::world::limits();
     bounds(&mut owner);

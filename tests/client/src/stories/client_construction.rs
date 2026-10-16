@@ -1,14 +1,14 @@
 //! Different receiving bounds in one shell loop (client/domain/testing.md, 4).
 use crate::{Scripted, Settings, Test, World, scripted::Family, test};
+use jig_client_scripted_engine::{Bounds, Script, Truth};
 use jig_domain_client::contract::{DocumentText, ObjectKey, ReadValue, Text, VersionRange};
-use jig_scripted_engine::{Bounds, Script, Truth};
 use skein_lib::{Duration, Wall};
 
 /// A supplied frame name past the default 32-byte receiving bound.
 pub const NAME: &[u8] = b"Pat with a supplied name longer than the default receiving bound";
 /// The root, view and callback limits declared by this fixture.
 #[must_use]
-pub fn limits() -> jig_test_domain_client::Limits {
+pub fn limits() -> jig_client_test_domain::Limits {
     let mut limits = test::limits();
     limits.jig.text = 128;
     limits.first.text = 128;
@@ -16,7 +16,7 @@ pub fn limits() -> jig_test_domain_client::Limits {
 }
 /// Constructs both sides of the client with the fixture's declared bounds.
 #[must_use]
-pub fn client(seed: u64) -> (jig_test_domain_client::Domain, jig_test_view::View<'static>) {
+pub fn client(seed: u64) -> (jig_client_test_domain::Domain, jig_client_test_view::View<'static>) {
     test::new(&limits(), seed)
 }
 /// Supplies one wide frame and one ordinary frame to independent clients.
@@ -58,7 +58,7 @@ pub fn world(settings: Settings) -> World<Test, Scripted> {
         .act(
             now,
             Wall::EPOCH,
-            jig_scripted_engine::Change::Object {
+            jig_client_scripted_engine::Change::Object {
                 project: 1,
                 key: ObjectKey::Task(9),
                 value: ReadValue::Task(Box::new(super::task())),

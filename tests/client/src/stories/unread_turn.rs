@@ -54,10 +54,10 @@ pub fn world(seed: u64) -> World<Test, Scripted> {
         .act(
             skein_lib::Time::ZERO,
             Wall::EPOCH,
-            jig_scripted_engine::Change::Source(jig_scripted_engine::Source {
+            jig_client_scripted_engine::Change::Source(jig_client_scripted_engine::Source {
                 party: 7,
                 read: Read::Activity { task: 9, before: None },
-                rows: jig_scripted_engine::Rows::Activity(vec![
+                rows: jig_client_scripted_engine::Rows::Activity(vec![
                     readable(3, b"After the malformed turn"),
                     unread,
                     readable(1, b"Before the malformed turn"),
@@ -70,13 +70,13 @@ pub fn world(seed: u64) -> World<Test, Scripted> {
 
 /// Three rows keep both neighbouring turns in the same bounded window.
 #[must_use]
-pub fn limits() -> jig_test_domain_client::Limits {
+pub fn limits() -> jig_client_test_domain::Limits {
     let mut limits = crate::test::limits();
     limits.jig.rows = 3;
     limits
 }
 /// Builds the root and view with the story's receiving bounds.
 #[must_use]
-pub fn client(seed: u64) -> (jig_test_domain_client::Domain, jig_test_view::View<'static>) {
+pub fn client(seed: u64) -> (jig_client_test_domain::Domain, jig_client_test_view::View<'static>) {
     crate::test::new(&limits(), seed)
 }

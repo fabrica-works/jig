@@ -1,5 +1,5 @@
+use jig_client_scripted_engine::{Bounds, owner_budget as price};
 use jig_domain_client::contract::{Funder, OwnerBudget, OwnerNumbers, PoolLedger};
-use jig_scripted_engine::{Bounds, owner_budget as price};
 use skein_lib::Wall;
 use skein_world::domain::heap::{Counting, Meter};
 #[global_allocator]
@@ -69,8 +69,8 @@ fn ledger_parent_state_and_period_options_survive_whole_value_pricing() {
 }
 #[test]
 fn maximal_budget_and_ledger_fragments_fit_tree_and_checked_words_heap_bounds() {
-    use jig_view::owner_budget as view;
-    use jig_view::owner_budget_words::{self as data, OwnerBudgetWords};
+    use jig_client_view::owner_budget as view;
+    use jig_client_view::owner_budget_words::{self as data, OwnerBudgetWords};
     use skein_ui::Builder;
     use skein_ui::Limits;
     use skein_ui::phrases::PhraseLimits;
@@ -151,6 +151,6 @@ fn maximal_budget_and_ledger_fragments_fit_tree_and_checked_words_heap_bounds() 
                 "all owner accounting values retain their full width in both fragments"
             );
         }
-        assert!(meter.held() <= jig_view::limits::jig_worst_case(&limits).expect("tree heap envelope"));
+        assert!(meter.held() <= jig_client_view::limits::jig_worst_case(&limits).expect("tree heap envelope"));
     }
 }

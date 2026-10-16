@@ -69,7 +69,7 @@ fn a_configured_deployment_owner_reads_capacity_account_and_connector_facts_from
 
 fn configured_deployment_owner_reads_capacity_account_and_connector_facts() {
     let mut world = world();
-    let client = world.client(1, jig_test_domain_client::Address::Jig(jig_domain_client::address::Address::Deployment));
+    let client = world.client(1, jig_client_test_domain::Address::Jig(jig_domain_client::address::Address::Deployment));
     let within = Duration::from_secs(1);
     world.person(
         client,
@@ -102,9 +102,9 @@ fn configured_deployment_owner_reads_capacity_account_and_connector_facts() {
         .skip(start + 1)
         .take(region.size as usize - 1)
         .filter_map(|node| node.slot)
-        .map(|slot| match jig_view::Owner::from_opaque(slot.owner) {
-            Some(jig_view::Owner::Application { number: connector }) => connector,
-            other @ (Some(jig_view::Owner::Jig) | None) => {
+        .map(|slot| match jig_client_view::Owner::from_opaque(slot.owner) {
+            Some(jig_client_view::Owner::Application { number: connector }) => connector,
+            other @ (Some(jig_client_view::Owner::Jig) | None) => {
                 panic!("connector catalogue slot has its actual side owner: {other:?}")
             }
         })

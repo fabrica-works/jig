@@ -1,5 +1,5 @@
+use jig_client_views_world::LIMITS;
 use jig_domain_views::{self as views, Call, Domain, Event, Follow, Made, TurnName, Window};
-use jig_views_world::LIMITS;
 use skein_lib::{Env, List, Queue, Time, Token, Wall};
 use skein_world::domain::heap::{self, Meter};
 #[global_allocator]

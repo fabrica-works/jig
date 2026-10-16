@@ -1,5 +1,5 @@
+use jig_client_views_world::{LIMITS, World};
 use jig_domain_views::{Call, Event, Follow, TurnName};
-use jig_views_world::{LIMITS, World};
 use skein_lib::{Rng, Token, Wall};
 use std::boxed::Box;
 fn run(seed: u64) -> Vec<String> {

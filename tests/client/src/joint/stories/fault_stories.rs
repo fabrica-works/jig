@@ -5,7 +5,7 @@ fn enable_tracing(world: &mut World<Test, Joint>) {
     world.front().session.driver.world.enable_tracing();
 }
 
-fn start() -> Vec<Step<jig_test_domain_client::Address>> {
+fn start() -> Vec<Step<jig_client_test_domain::Address>> {
     let within = Duration::from_secs(1);
     vec![
         Step::See { find: Find::exactly_named(Role::Button, b"Sign in with Test"), within },
@@ -37,7 +37,7 @@ fn a_draft_kept_across_a_reload_stays_unsent_on_the_actual_engine() {
     assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed, "{outcome:?}");
     assert!(outcome.judged.0 > 0);
     assert!(world.kept(client).iter().any(|record| matches!(record,
-        jig_test_domain_client::store::Record::Jig(jig_domain_client::store::Record::Draft { words, .. })
+        jig_client_test_domain::store::Record::Jig(jig_domain_client::store::Record::Draft { words, .. })
         if words.bytes() == b"Unsent draft")));
     assert!(
         world
@@ -360,7 +360,7 @@ fn a_watch_ended_as_the_engine_stops_reaches_the_client_as_stopping() {
     let mut callbacks = world.front().session.poll(now, wall).expect("stopping watch terminals");
     callbacks.extend(world.front().session.poll(now, wall).expect("pending watch terminal"));
     assert!(callbacks.iter().any(|(owner, event)| matches!(event,
-        jig_test_domain_client::Event::Jig(jig_domain_client::Event::Ended {
+        jig_client_test_domain::Event::Jig(jig_domain_client::Event::Ended {
             end: jig_domain_client::contract::WatchEnd::Stopping, ..
         }) if *owner == client)));
 }

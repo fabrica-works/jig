@@ -2,9 +2,9 @@
 use crate::{family, front::Side};
 use jig_client_protocol_link as link;
 use jig_client_shell_native::{Settings, Shell, Signing};
+use jig_client_test_domain::{self as client, Request};
 use jig_client_world::{App, Test};
 use jig_domain_client::address::{Address, TaskSection};
-use jig_test_domain_client::{self as client, Request};
 use skein_fake_person::{Doing, Find, Next, Person, Step, TreeFace};
 use skein_io::kernel::{Complete, Fd, Submit};
 use skein_lib::{Duration, Env, Queue, RequestRecord, Time, Wall};
@@ -83,7 +83,7 @@ pub struct NativeClient {
     complete: Queue<Complete>,
     side: Side,
     root: client::Domain,
-    view: jig_test_view::View<'static>,
+    view: jig_client_test_view::View<'static>,
     person: Person<client::Address>,
     env: Env<client::Limits>,
     out: Queue<Request>,

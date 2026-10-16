@@ -1,10 +1,10 @@
 //! The application's actual scoped owner values (client/domain/root.md, 6–7).
 //! This source uses the actual whole family consumer; it remains unregistered and unexecuted until the coherent wire increment.
-use jig_test_connector::{ApplicationOutcome, ApplicationRequest, ClientDocument, ClientScope, ClientSubject};
-use jig_test_domain_client::{
+use jig_client_test_domain::{
     connector_values::{ConnectorAnswer, ConnectorDocument, ConnectorLimits},
     family,
 };
+use jig_test_connector::{ApplicationOutcome, ApplicationRequest, ClientDocument, ClientScope, ClientSubject};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Invalid {
@@ -167,7 +167,7 @@ pub fn document(
         return Err(Invalid::Identity);
     }
     let result = ConnectorDocument { subject: original, value: Box::new(value) };
-    if !jig_test_client_kit::connector_values::document_fits(&result, limits) {
+    if !jig_client_test_kit::connector_values::document_fits(&result, limits) {
         return Err(Invalid::TooLarge);
     }
     Ok(result)

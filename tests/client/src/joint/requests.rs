@@ -7,12 +7,12 @@ use super::{
     wire,
 };
 use crate::harness::ClientId;
+use jig_client_test_domain::{Ask, JigOut, Request, first};
 use jig_domain_client::Limits;
 use jig_domain_core::{self as core, documents::ApplicationScope};
 use jig_domain_people as people;
 use jig_test_connector::ApplicationRequest;
 use jig_test_domain as root;
-use jig_test_domain_client::{Ask, JigOut, Request, first};
 use sha2::{Digest, Sha256};
 use skein_lib::{Time, Wall};
 

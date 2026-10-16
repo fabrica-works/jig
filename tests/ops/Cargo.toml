@@ -37,14 +37,14 @@ jig-ops-domain-connectors.workspace = true
 jig-ops-domain-client.workspace = true
 jig-ops-view.workspace = true
 jig-domain-client.workspace = true
-jig-view.workspace = true
+jig-client-view.workspace = true
 jig-client-world.workspace = true
 jig-test-domain.workspace = true
-jig-test-domain-client.workspace = true
+jig-client-test-domain.workspace = true
 jig-protocol-transcript.workspace = true
 jig-domain-views.workspace = true
 skein-fake-person.workspace = true
-jig-scripted-engine.workspace = true
+jig-client-scripted-engine.workspace = true
 
 [lints.rust]
 unsafe_code = "forbid"

@@ -1,9 +1,9 @@
 //! Immutable activity, whole admitted words and page-carried archives
 //! (client/domain/contract.md, 5 and 7; domain/engine.md, 5.4 and 7.2).
 use super::{chips, owner, results, turns};
+use jig_client_scripted_engine as admission;
 use jig_domain_client::{Limits, contract as client};
 use jig_domain_tasks as tasks;
-use jig_scripted_engine as admission;
 use skein_lib::List;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

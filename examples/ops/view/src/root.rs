@@ -6,9 +6,9 @@ use crate::{
     infrastructure, observability,
     words::{self, Word},
 };
+use jig_client_view::{JigBindings, Owner};
 use jig_ops_domain_client::Domain;
 use jig_ops_domain_connectors::Connector;
-use jig_view::{JigBindings, Owner};
 use skein_ui::Act;
 use skein_ui::{Builder, NodeId, Patch, Role, Tree};
 
@@ -17,7 +17,7 @@ use skein_lib::Queue;
 #[derive(Debug)]
 pub struct View {
     render: skein_ui::View,
-    words: jig_view::words::Words,
+    words: jig_client_view::words::Words,
     observability_words: words::Words,
     infrastructure_words: words::Words,
     jig: JigBindings,
@@ -32,7 +32,7 @@ impl View {
     pub fn new(
         limits: &Limits,
         domain: &jig_ops_domain_client::Limits,
-        words: jig_view::words::Words,
+        words: jig_client_view::words::Words,
         observability_words: words::Words,
         infrastructure_words: words::Words,
         project: u32,
@@ -93,7 +93,7 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
     builder.open(Role::Page);
     if let Some(task) = arranged_task(root.jig()) {
         task_page(&mut builder, root.jig(), task, &view.words, &mut view.jig);
-    } else if !jig_view::jig(&mut builder, root.jig(), observability::NAV, &view.words, &mut view.jig) {
+    } else if !jig_client_view::jig(&mut builder, root.jig(), observability::NAV, &view.words, &mut view.jig) {
         builder.open(Role::Main);
         if root.observability().address().is_some() {
             observability::page(&mut builder, root.observability(), &view.observability_words, &mut view.observability);
@@ -107,7 +107,7 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
             );
         }
         builder.close();
-        jig_view::after_page(&mut builder, root.jig(), &view.words, &mut view.jig);
+        jig_client_view::after_page(&mut builder, root.jig(), &view.words, &mut view.jig);
     }
     builder.close();
     for pass in 0..2 {
@@ -121,18 +121,18 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
                     };
                     match key {
                         Some(key) => match root.jig().objects().find(key) {
-                            Some(id) => jig_view::cards::card(
+                            Some(id) => jig_client_view::cards::card(
                                 &mut fragment,
                                 root.jig(),
                                 id,
-                                &jig_view::cards::Place::Elsewhere,
+                                &jig_client_view::cards::Place::Elsewhere,
                                 &view.words,
                                 &mut view.jig,
                             ),
                             None => false,
                         },
                         None => match view.observability.section(slot.reference.token) {
-                            Some(section) => jig_view::sections::section(
+                            Some(section) => jig_client_view::sections::section(
                                 &mut fragment,
                                 root.jig(),
                                 &view.words,
@@ -226,28 +226,28 @@ fn task_page(
     b: &mut Builder,
     client: &jig_domain_client::Domain,
     task: u64,
-    words: &jig_view::words::Words,
+    words: &jig_client_view::words::Words,
     bindings: &mut JigBindings,
 ) {
+    use jig_client_view::phrases::jig::JigPhrase;
     use jig_domain_client::{address::TaskSection, pages::Section};
-    use jig_view::phrases::jig::JigPhrase;
     use skein_ui::phrases::Hole;
-    jig_view::frame::banner(b, client, words, bindings);
-    jig_view::frame::navigation(b, client, observability::NAV, words, bindings);
+    jig_client_view::frame::banner(b, client, words, bindings);
+    jig_client_view::frame::navigation(b, client, observability::NAV, words, bindings);
     b.open(Role::Main);
-    jig_view::pages::heading(b, words, JigPhrase::TaskPage, &[Hole::Number(task)]);
-    jig_view::sections::task::header(b, client, words, bindings);
+    jig_client_view::pages::heading(b, words, JigPhrase::TaskPage, &[Hole::Number(task)]);
+    jig_client_view::sections::task::header(b, client, words, bindings);
     for section in [TaskSection::Overview, TaskSection::Activity, TaskSection::Plan, TaskSection::History] {
-        jig_view::sections::section(b, client, words, bindings, Section::Task { task, section });
+        jig_client_view::sections::section(b, client, words, bindings, Section::Task { task, section });
     }
-    jig_view::pages::excess(b, client, words);
+    jig_client_view::pages::excess(b, client, words);
     b.close();
     b.open(Role::Complementary);
     for section in [TaskSection::Budget, TaskSection::Panels] {
-        jig_view::sections::section(b, client, words, bindings, Section::Task { task, section });
+        jig_client_view::sections::section(b, client, words, bindings, Section::Task { task, section });
     }
     b.close();
-    jig_view::after_page(b, client, words, bindings);
+    jig_client_view::after_page(b, client, words, bindings);
 }
 fn infrastructure_part(bindings: &JigBindings, token: skein_lib::Token) -> Option<jig_domain_client::contract::Part> {
     match bindings.part(token) {
@@ -263,7 +263,7 @@ fn infrastructure_part(bindings: &JigBindings, token: skein_lib::Token) -> Optio
 pub fn decode(view: &mut View, node: NodeId, act: Act) -> Option<Action> {
     let bound = view.render.act(node, act)?;
     match Owner::from_opaque(bound.binding.owner) {
-        Some(Owner::Jig) => match jig_view::decode(&mut view.jig, bound.binding.token, bound.act) {
+        Some(Owner::Jig) => match jig_client_view::decode(&mut view.jig, bound.binding.token, bound.act) {
             Some(value) => Some(Action::Jig(value)),
             None => None,
         },

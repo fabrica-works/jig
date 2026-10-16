@@ -34,7 +34,7 @@ fn view(current: Option<&[u8]>, retained: &[u8]) -> View {
     builder.close();
     if let Some(current) = current {
         builder.open(Role::Region);
-        builder.region(jig_view::regions::JigRegion::Link.region());
+        builder.region(jig_client_view::regions::JigRegion::Link.region());
         status(&mut builder, current);
         builder.close();
         builder.open(Role::Navigation);

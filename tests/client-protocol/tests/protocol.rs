@@ -22,7 +22,7 @@ fn a_person_s_part_request_is_answered_from_the_connector_s_outcome() {
         fixtures::sign_in_then(vec![
             Step::See { find: Find::text(b"Signed in as Person"), within: skein_lib::Duration::from_secs(1) },
             Step::Go {
-                address: jig_test_domain_client::Address::First(jig_test_domain_client::first::Address {
+                address: jig_client_test_domain::Address::First(jig_client_test_domain::first::Address {
                     project: 1,
                     item: 1,
                 }),
@@ -44,7 +44,7 @@ fn a_person_s_part_request_is_answered_from_the_connector_s_outcome() {
 
 #[test]
 fn a_family_place_record_round_trips_through_its_owner_s_small_store_bytes() {
-    use jig_test_domain_client::first::{Address, Record};
+    use jig_client_test_domain::first::{Address, Record};
     for (label, value) in [
         ("ordinary", Record::Place { version: 1, party: 1, address: Address { project: 2, item: 3 } }),
         (
@@ -80,7 +80,7 @@ fn a_slow_reader_gets_fewer_deliveries_and_others_are_answered() {
     let (mut world, first) = bytes::two_clients(fixtures::SEED);
     let second = world.client(
         1,
-        jig_test_domain_client::Address::Jig(jig_domain_client::address::Address::Task {
+        jig_client_test_domain::Address::Jig(jig_domain_client::address::Address::Task {
             task: 1,
             section: jig_domain_client::address::TaskSection::Activity,
         }),
@@ -201,7 +201,7 @@ fn pending_stop(world: &mut jig_client_protocol_world::stories::Story, client: j
     world.fault(jig_client_world::FrontFault::NoAnswer);
     jig_client_protocol_world::stories::submit_stop(world, client);
     assert!(
-        world.kept(client).iter().any(|record| matches!(record, jig_test_domain_client::store::Record::Table { .. })),
+        world.kept(client).iter().any(|record| matches!(record, jig_client_test_domain::store::Record::Table { .. })),
         "the request remains in the small store"
     );
 }

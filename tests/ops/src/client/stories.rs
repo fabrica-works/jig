@@ -1,6 +1,8 @@
 //! P and Q's supplied owner facts and public-tree observations.
 #![allow(clippy::wildcard_imports, reason = "finite story fixtures enumerate the complete client vocabulary")]
 use super::{Document, Ops, OpsScript, Scripted, Subject};
+use jig_client_scripted_engine::{Bounds, Script, Truth};
+use jig_client_view::Owner;
 use jig_client_world::{
     Settings, World,
     harness::{CardKey, CardSeen, Seen},
@@ -13,8 +15,6 @@ use jig_domain_client::{
 };
 use jig_ops_domain_client::{Address, infrastructure as infra, observability as obs};
 use jig_ops_domain_connectors::{Connector, number};
-use jig_scripted_engine::{Bounds, Script, Truth};
-use jig_view::Owner;
 use skein_fake_person::{Face, Find, Found, TreeFace};
 use skein_lib::{Duration, Wall};
 use skein_ui::{Role, Tree as ViewTree};
@@ -195,10 +195,10 @@ pub fn incident_world(seed: u64) -> ClientWorld {
             held_below: 0,
         },
     );
-    truth.sources.push(jig_scripted_engine::Source {
+    truth.sources.push(jig_client_scripted_engine::Source {
         party: 7,
         read: Read::Activity { task: 9, before: None },
-        rows: jig_scripted_engine::Rows::Activity(vec![ActivityLine {
+        rows: jig_client_scripted_engine::Rows::Activity(vec![ActivityLine {
             position: 1,
             at: Wall::EPOCH,
             event: Activity::Turn {
@@ -224,10 +224,10 @@ pub fn incident_world(seed: u64) -> ClientWorld {
             },
         }]),
     });
-    truth.sources.push(jig_scripted_engine::Source {
+    truth.sources.push(jig_client_scripted_engine::Source {
         party: 7,
         read: Read::Inbox { group: InboxReadGroup::Needs, project: None, kind: None, goal: None, after: None },
-        rows: jig_scripted_engine::Rows::Inbox(vec![InboxEntry {
+        rows: jig_client_scripted_engine::Rows::Inbox(vec![InboxEntry {
             reply: None,
             lineage: list([]),
             goal: None,
@@ -297,26 +297,26 @@ pub fn incident_world(seed: u64) -> ClientWorld {
     let mut decided = p.clone();
     decided.ending =
         Some(Ending::Decided { by: 7, party: Some(party(7)), how: Some(Decision::Accepted), at: Wall::EPOCH });
-    let rule = jig_scripted_engine::Rule {
+    let rule = jig_client_scripted_engine::Rule {
         party: Some(7),
         ask: Ask::DecideProposal { project: 1, proposal: p.key, decision: Decision::Accepted },
         answer: Answer::Done(Outcome::Decided { by: Actor::Party(7), how: Decision::Accepted, at: Wall::EPOCH }),
         changes: vec![
-            jig_scripted_engine::Change::Object {
+            jig_client_scripted_engine::Change::Object {
                 project: 1,
                 key: ObjectKey::Proposal(p.key),
                 value: ReadValue::Proposal(Box::new(decided)),
             },
-            jig_scripted_engine::Change::Source(jig_scripted_engine::Source {
+            jig_client_scripted_engine::Change::Source(jig_client_scripted_engine::Source {
                 party: 7,
                 read: Read::Inbox { group: InboxReadGroup::Needs, project: None, kind: None, goal: None, after: None },
-                rows: jig_scripted_engine::Rows::Inbox(vec![]),
+                rows: jig_client_scripted_engine::Rows::Inbox(vec![]),
             }),
         ],
     };
     configured(seed, truth, ops, vec![rule])
 }
-fn configured(seed: u64, truth: Truth, ops: OpsScript, rules: Vec<jig_scripted_engine::Rule>) -> ClientWorld {
+fn configured(seed: u64, truth: Truth, ops: OpsScript, rules: Vec<jig_client_scripted_engine::Rule>) -> ClientWorld {
     World::new(
         Settings { seed, ..Settings::default() },
         Scripted::new(
@@ -386,15 +386,15 @@ pub fn environment_world(seed: u64) -> ClientWorld {
     let mut accepted = p.clone();
     accepted.ending =
         Some(Ending::Decided { by: 7, party: Some(party(7)), how: Some(Decision::Accepted), at: Wall::EPOCH });
-    let rule = jig_scripted_engine::Rule {
+    let rule = jig_client_scripted_engine::Rule {
         party: Some(7),
         ask,
         answer: Answer::Done(Outcome::Made { what: Made::Chat { task: 9 } }),
         changes: vec![
-            jig_scripted_engine::Change::Source(jig_scripted_engine::Source {
+            jig_client_scripted_engine::Change::Source(jig_client_scripted_engine::Source {
                 party: 7,
                 read: Read::Activity { task: 9, before: None },
-                rows: jig_scripted_engine::Rows::Activity(vec![ActivityLine {
+                rows: jig_client_scripted_engine::Rows::Activity(vec![ActivityLine {
                     position: 1,
                     at: Wall::EPOCH,
                     event: Activity::Turn {
@@ -420,20 +420,20 @@ pub fn environment_world(seed: u64) -> ClientWorld {
                     },
                 }]),
             }),
-            jig_scripted_engine::Change::Object {
+            jig_client_scripted_engine::Change::Object {
                 project: 1,
                 key: ObjectKey::Task(9),
                 value: ReadValue::Task(Box::new(chat)),
             },
-            jig_scripted_engine::Change::Object {
+            jig_client_scripted_engine::Change::Object {
                 project: 1,
                 key: ObjectKey::Proposal(p.key),
                 value: ReadValue::Proposal(Box::new(p.clone())),
             },
-            jig_scripted_engine::Change::Source(jig_scripted_engine::Source {
+            jig_client_scripted_engine::Change::Source(jig_client_scripted_engine::Source {
                 party: 7,
                 read: Read::Conversations { after: None },
-                rows: jig_scripted_engine::Rows::Conversations(vec![ConversationLine {
+                rows: jig_client_scripted_engine::Rows::Conversations(vec![ConversationLine {
                     chip: {
                         let mut chip = task().chip;
                         chip.title = DocumentText::complete(text(b"Q staging chat"));
@@ -453,11 +453,11 @@ pub fn environment_world(seed: u64) -> ClientWorld {
             }),
         ],
     };
-    let accept = jig_scripted_engine::Rule {
+    let accept = jig_client_scripted_engine::Rule {
         party: Some(7),
         ask: Ask::DecideProposal { project: 1, proposal: p.key, decision: Decision::Accepted },
         answer: Answer::Done(Outcome::Decided { by: Actor::Party(7), how: Decision::Accepted, at: Wall::EPOCH }),
-        changes: vec![jig_scripted_engine::Change::Object {
+        changes: vec![jig_client_scripted_engine::Change::Object {
             project: 1,
             key: ObjectKey::Proposal(p.key),
             value: ReadValue::Proposal(Box::new(accepted)),
@@ -542,7 +542,7 @@ pub fn resolve(world: &mut ClientWorld) {
             number(Connector::Observability),
             1,
             ops,
-            vec![jig_scripted_engine::Change::Object {
+            vec![jig_client_scripted_engine::Change::Object {
                 project: 1,
                 key: ObjectKey::Task(9),
                 value: ReadValue::Task(Box::new(lead)),

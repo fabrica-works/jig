@@ -2,10 +2,10 @@
 //! These routes retain original shell tokens and authenticated session numbers.
 //! They do not inspect engine tasks, choose outcomes, or own request durability.
 use crate::harness::ClientId;
+use jig_client_test_domain::family;
 use jig_domain_client::contract::{Read, Subject, VersionRange};
 use jig_domain_core::{Event, documents::ApplicationScope};
 use jig_domain_people as people;
-use jig_test_domain_client::family;
 use skein_lib::{ReplyTo, Token};
 use std::collections::{BTreeMap, BTreeSet};
 

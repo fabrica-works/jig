@@ -1,16 +1,16 @@
 //! Committed inbox facts for the renderer's page goldens.
 use super::{held_chat, proposal_world, task, text};
 use crate::{Scripted, Test, World, test};
+use jig_client_scripted_engine::{Change, Rows, Source};
 use jig_domain_client::contract::{
     self as c, Actor, ConversationLine, Count, DocumentText, Ending, Executor, InboxEntry, InboxGroup, InboxReadGroup,
     Needs, ObjectKey, OwnerEscalation, OwnerRequester, PersonContract, PersonTask, Phase, Question, Read, ReadValue,
     Recipient, ResultValue, Revision, Runtime,
 };
-use jig_scripted_engine::{Change, Rows, Source};
 use skein_lib::{Time, Wall};
 /// Enough distinct objects for an inbox containing every entry kind.
 #[must_use]
-pub fn limits() -> jig_test_domain_client::Limits {
+pub fn limits() -> jig_client_test_domain::Limits {
     let mut limits = test::limits();
     limits.jig.objects = 8;
     limits.jig.watches = 16;
@@ -19,7 +19,7 @@ pub fn limits() -> jig_test_domain_client::Limits {
     limits
 }
 #[must_use]
-pub fn client(seed: u64) -> (jig_test_domain_client::Domain, jig_test_view::View<'static>) {
+pub fn client(seed: u64) -> (jig_client_test_domain::Domain, jig_client_test_view::View<'static>) {
     test::new(&limits(), seed)
 }
 /// One row of each inbox kind, with its real card document.

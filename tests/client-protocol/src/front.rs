@@ -2,8 +2,8 @@
 use crate::{engine::Engine, family, fixtures, net::Net};
 use jig_client_protocol_link::{self as link, Link};
 use jig_client_shell_native::{Conn, Connections, Signing};
+use jig_client_test_domain::{self as client, Event, JigOut, Request};
 use jig_client_world::{ClientId, Front, FrontFault, Test, harness::Observed};
-use jig_test_domain_client::{self as client, Event, JigOut, Request};
 use skein_lib::{
     Queue, Time, Token, Wall,
     stream::{Down, Up},

@@ -72,7 +72,7 @@ fn a_note_written_corrected_by_a_person_and_recalled() {
         member,
         vec![
             Step::Go {
-                address: jig_test_domain_client::Address::Jig(jig_domain_client::address::Address::Project {
+                address: jig_client_test_domain::Address::Jig(jig_domain_client::address::Address::Project {
                     project: 1,
                     section: jig_domain_client::address::ProjectSection::Notes,
                 }),
@@ -279,7 +279,7 @@ fn a_delegate_held_past_its_tries_is_escalated_to_a_person_and_released() {
     assert_eq!(attempts.len(), 3, "two failures then the person's released activation");
 }
 
-fn drift_limits() -> jig_test_domain_client::Limits {
+fn drift_limits() -> jig_client_test_domain::Limits {
     let mut limits = receiving_limits();
     limits.first.connector.paths = 2;
     limits.first.connector.segments = 2;
@@ -287,7 +287,7 @@ fn drift_limits() -> jig_test_domain_client::Limits {
     limits
 }
 
-fn drift_client(seed: u64) -> (jig_test_domain_client::Domain, jig_test_view::View<'static>) {
+fn drift_client(seed: u64) -> (jig_client_test_domain::Domain, jig_client_test_view::View<'static>) {
     crate::test::new(&drift_limits(), seed)
 }
 

@@ -1,14 +1,14 @@
 //! Actual connector documents fill the procedure, effect and Hold slots.
 use super::*;
 
-fn family_limits() -> jig_test_domain_client::Limits {
+fn family_limits() -> jig_client_test_domain::Limits {
     let mut limits = receiving_limits();
     limits.first.connector.paths = 2;
     limits.first.connector.segments = 2;
     limits.first.connector.segment_bytes = 16;
     limits
 }
-fn family_client(seed: u64) -> (jig_test_domain_client::Domain, jig_test_view::View<'static>) {
+fn family_client(seed: u64) -> (jig_client_test_domain::Domain, jig_client_test_view::View<'static>) {
     crate::test::new(&family_limits(), seed)
 }
 
@@ -42,7 +42,7 @@ fn a_persons_procedure_goal_shows_the_actual_live_connector_panel_on_its_task_pa
     let mut world = configured_with_bounds(8524, vec![], 1, procedure_configuration, family_limits());
     let owner = world.client_with(
         1,
-        jig_test_domain_client::Address::Jig(jig_domain_client::address::Address::Project {
+        jig_client_test_domain::Address::Jig(jig_domain_client::address::Address::Project {
             project: 1,
             section: jig_domain_client::address::ProjectSection::Goals,
         }),
@@ -106,7 +106,7 @@ fn a_persons_procedure_goal_shows_the_actual_live_connector_panel_on_its_task_pa
         owner,
         vec![
             Step::Go {
-                address: jig_test_domain_client::Address::Jig(jig_domain_client::address::Address::Task {
+                address: jig_client_test_domain::Address::Jig(jig_domain_client::address::Address::Task {
                     task,
                     section: jig_domain_client::address::TaskSection::Activity,
                 }),

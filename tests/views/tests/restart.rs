@@ -1,5 +1,5 @@
+use jig_client_views_world::World;
 use jig_domain_views::{End, Follow, TurnName};
-use jig_views_world::World;
 use skein_lib::Token;
 #[test]
 fn a_restart_drops_every_watch_and_tells_the_parent_every_token_ended() {

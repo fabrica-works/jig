@@ -8,7 +8,11 @@ fn signing_in_and_starting_a_chat() {
     let mut w = stories::chat_world(1);
     w.front()
         .engine
-        .act(skein_lib::Time::ZERO, skein_lib::Wall::EPOCH, jig_scripted_engine::Change::SignedOut { sign_in: 7 })
+        .act(
+            skein_lib::Time::ZERO,
+            skein_lib::Wall::EPOCH,
+            jig_client_scripted_engine::Change::SignedOut { sign_in: 7 },
+        )
         .expect("sign out");
     let c = w.client(7, stories::conversation());
     w.person(
@@ -45,7 +49,7 @@ fn a_draft_is_kept_across_a_reload() {
         ],
     );
     w.run(Until::Done);
-    assert!(w.kept(c).iter().any(|r| matches!(r,jig_test_domain_client::store::Record::Jig(jig_domain_client::store::Record::Draft { words,.. }) if words.bytes()==b"Unsent draft")));
+    assert!(w.kept(c).iter().any(|r| matches!(r,jig_client_test_domain::store::Record::Jig(jig_domain_client::store::Record::Draft { words,.. }) if words.bytes()==b"Unsent draft")));
     assert!(w.tree(c).nodes().iter().any(|n| n.value.as_ref().is_some_and(|v| v.text.as_ref() == b"Unsent draft")));
 }
 
@@ -197,7 +201,7 @@ fn a_goal_beyond_the_allotment_is_proposed_as_the_confirmation_said() {
         let mut w = stories::goal_world(seed);
         let c = w.client(
             7,
-            jig_test_domain_client::Address::Jig(jig_domain_client::address::Address::Project {
+            jig_client_test_domain::Address::Jig(jig_domain_client::address::Address::Project {
                 project: 1,
                 section: jig_domain_client::address::ProjectSection::Goals,
             }),
@@ -239,7 +243,7 @@ fn a_procedure_only_goal_form_confirms_and_sends_the_supplied_executor_once() {
         let mut w = stories::procedure_goal_world(seed);
         let c = w.client(
             7,
-            jig_test_domain_client::Address::Jig(jig_domain_client::address::Address::Project {
+            jig_client_test_domain::Address::Jig(jig_domain_client::address::Address::Project {
                 project: 1,
                 section: jig_domain_client::address::ProjectSection::Goals,
             }),

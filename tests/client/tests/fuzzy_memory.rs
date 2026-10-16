@@ -66,24 +66,24 @@ fn full_task() -> jig_domain_client::contract::Task {
         jig_domain_client::contract::Subscription {
             number: 1,
             kind: jig_domain_client::contract::SubscriptionKind::Topic {
-                connector: jig_test_domain_client::FIRST,
+                connector: jig_client_test_domain::FIRST,
                 topic: 1,
             },
         },
         jig_domain_client::contract::Subscription {
             number: 2,
             kind: jig_domain_client::contract::SubscriptionKind::Topic {
-                connector: jig_test_domain_client::SECOND,
+                connector: jig_client_test_domain::SECOND,
                 topic: 2,
             },
         },
     ]);
     task.context.as_mut().expect("supplied task context").parts = jig_client_world::test::list(
-        (1..=8).map(|n| jig_domain_client::contract::Part::Panel { connector: jig_test_domain_client::FIRST, task: n }),
+        (1..=8).map(|n| jig_domain_client::contract::Part::Panel { connector: jig_client_test_domain::FIRST, task: n }),
     );
     task.resources = jig_client_world::test::list((1..=8).map(|n| {
         jig_domain_client::contract::TaskResource::Part(jig_domain_client::contract::Part::Panel {
-            connector: jig_test_domain_client::SECOND,
+            connector: jig_client_test_domain::SECOND,
             task: n,
         })
     }));
@@ -103,7 +103,7 @@ fn full_task() -> jig_domain_client::contract::Task {
     task.context.as_mut().expect("supplied task context").writer_slots = jig_client_world::test::list([
         jig_domain_client::contract::WriterSlot {
             resource: jig_domain_client::contract::Part::Resource {
-                connector: jig_test_domain_client::FIRST,
+                connector: jig_client_test_domain::FIRST,
                 path: {
                     let mut rows = skein_lib::List::with_capacity(1);
                     rows.push(stories::text(&[b'r'; 32]).into_bytes())
@@ -116,7 +116,7 @@ fn full_task() -> jig_domain_client::contract::Task {
         },
         jig_domain_client::contract::WriterSlot {
             resource: jig_domain_client::contract::Part::Resource {
-                connector: jig_test_domain_client::FIRST,
+                connector: jig_client_test_domain::FIRST,
                 path: {
                     let mut rows = skein_lib::List::with_capacity(1);
                     rows.push(stories::text(&[b'r'; 32]).into_bytes())
@@ -138,7 +138,7 @@ fn full_world() -> jig_client_world::World<jig_client_world::Test, jig_client_wo
         .act(
             Time::ZERO,
             Wall::EPOCH,
-            jig_scripted_engine::Change::Object {
+            jig_client_scripted_engine::Change::Object {
                 project: 1,
                 key: jig_domain_client::contract::ObjectKey::Task(9),
                 value: jig_domain_client::contract::ReadValue::Task(Box::new(task)),
@@ -170,16 +170,19 @@ fn full_world() -> jig_client_world::World<jig_client_world::Test, jig_client_wo
     let mut other_offer = offer.clone();
     other_offer.project = 2;
     frame.charters = jig_client_world::test::list([offer, other_offer]);
-    w.front().engine.act(Time::ZERO, Wall::EPOCH, jig_scripted_engine::Change::Frame(frame)).expect("full frame fits");
+    w.front()
+        .engine
+        .act(Time::ZERO, Wall::EPOCH, jig_client_scripted_engine::Change::Frame(frame))
+        .expect("full frame fits");
     let mut family = jig_client_world::scripted::Family::default();
     for n in 1..=8 {
-        let subject = jig_test_domain_client::family::Subject {
-            scope: jig_test_domain_client::family::Scope::Project(1),
-            kind: jig_test_domain_client::family::Kind::Panel(n),
+        let subject = jig_client_test_domain::family::Subject {
+            scope: jig_client_test_domain::family::Scope::Project(1),
+            kind: jig_client_test_domain::family::Kind::Panel(n),
         };
         family.documents.insert(
             subject,
-            jig_test_domain_client::family::Document::Part(jig_test_domain_client::family::PartDocument {
+            jig_client_test_domain::family::Document::Part(jig_client_test_domain::family::PartDocument {
                 subject,
                 revision: jig_domain_client::contract::Revision { value: 1 },
                 value: n,
@@ -187,17 +190,17 @@ fn full_world() -> jig_client_world::World<jig_client_world::Test, jig_client_wo
             }),
         );
     }
-    let subject = jig_test_domain_client::family::Subject {
-        scope: jig_test_domain_client::family::Scope::Project(1),
-        kind: jig_test_domain_client::family::Kind::Item(1),
+    let subject = jig_client_test_domain::family::Subject {
+        scope: jig_client_test_domain::family::Scope::Project(1),
+        kind: jig_client_test_domain::family::Kind::Item(1),
     };
     family.documents.insert(
         subject,
-        jig_test_domain_client::family::Document::Item(jig_test_domain_client::family::Item {
+        jig_client_test_domain::family::Document::Item(jig_client_test_domain::family::Item {
             project: 1,
             key: 1,
             revision: jig_domain_client::contract::Revision { value: 1 },
-            state: jig_test_domain_client::family::ItemState::Ready,
+            state: jig_client_test_domain::family::ItemState::Ready,
             value: 1,
             task: 9,
             second: None,
@@ -207,11 +210,11 @@ fn full_world() -> jig_client_world::World<jig_client_world::Test, jig_client_wo
     );
     w.front()
         .engine
-        .act_application(Time::ZERO, Wall::EPOCH, jig_test_domain_client::FIRST, 1, family, vec![])
+        .act_application(Time::ZERO, Wall::EPOCH, jig_client_test_domain::FIRST, 1, family, vec![])
         .expect("full family fits");
     for change in [
-        jig_scripted_engine::Change::Project(Box::new(stories::project())),
-        jig_scripted_engine::Change::Deployment(stories::deployment()),
+        jig_client_scripted_engine::Change::Project(Box::new(stories::project())),
+        jig_client_scripted_engine::Change::Deployment(stories::deployment()),
     ] {
         w.front().engine.act(Time::ZERO, Wall::EPOCH, change).expect("full page fixture fits");
     }
@@ -225,12 +228,12 @@ fn full_documents_tabs_and_all_page_kinds_fit_the_client_and_view_worst_cases() 
     w.run(Until::Time(Time::from_nanos(50_000_000)));
     let mut addresses = vec![
         stories::conversation(),
-        jig_test_domain_client::Address::Jig(Address::Deployment),
-        jig_test_domain_client::Address::First(jig_test_domain_client::first::Address { project: 1, item: 1 }),
+        jig_client_test_domain::Address::Jig(Address::Deployment),
+        jig_client_test_domain::Address::First(jig_client_test_domain::first::Address { project: 1, item: 1 }),
     ];
     addresses.extend(
         [T::Overview, T::Activity, T::Plan, T::History, T::Budget, T::Panels]
-            .map(|section| jig_test_domain_client::Address::Jig(Address::Task { task: 9, section })),
+            .map(|section| jig_client_test_domain::Address::Jig(Address::Task { task: 9, section })),
     );
     addresses.extend(
         [
@@ -245,7 +248,7 @@ fn full_documents_tabs_and_all_page_kinds_fit_the_client_and_view_worst_cases() 
             P::Spend,
             P::Recurring,
         ]
-        .map(|section| jig_test_domain_client::Address::Jig(Address::Project { project: 1, section })),
+        .map(|section| jig_client_test_domain::Address::Jig(Address::Project { project: 1, section })),
     );
     for address in addresses {
         let task = address == stories::chat();
@@ -272,7 +275,7 @@ fn full_documents_tabs_and_all_page_kinds_fit_the_client_and_view_worst_cases() 
     ] {
         w.event(
             c,
-            jig_test_domain_client::Event::Jig(jig_domain_client::Event::Act {
+            jig_client_test_domain::Event::Jig(jig_domain_client::Event::Act {
                 act: jig_domain_client::action::Act::Edit { field, text: stories::text(&[b'f'; 32]) },
             }),
         );
@@ -280,7 +283,7 @@ fn full_documents_tabs_and_all_page_kinds_fit_the_client_and_view_worst_cases() 
     // The added owner count reaches every distinct restored-scope slot too.
     let counted = w.client(7, stories::inbox());
     for scope in [7, 8, 9, 10] {
-        w.event(counted, jig_test_domain_client::Event::Jig(jig_domain_client::Event::Kept { scope, requests: 1 }));
+        w.event(counted, jig_client_test_domain::Event::Jig(jig_domain_client::Event::Kept { scope, requests: 1 }));
     }
     let result = w.run(Until::Steps(2));
     eprintln!("full client fixture: heap peak {} bytes, bound {} bytes", result.heap_peak, result.heap_bound);

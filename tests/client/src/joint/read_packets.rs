@@ -5,9 +5,9 @@ use super::{
     transport::{Reply, Transport},
     wire,
 };
+use jig_client_test_domain::Event;
 use jig_domain_client::{Limits, contract as client};
 use jig_domain_core::{documents, reads};
-use jig_test_domain_client::Event;
 use skein_lib::Token;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

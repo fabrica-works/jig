@@ -1,5 +1,5 @@
 [package]
-name = "jig-views-world"
+name = "jig-client-views-world"
 description = "The views child domain's world: a parent and scripted watchers"
 version.workspace = true
 edition.workspace = true

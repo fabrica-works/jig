@@ -1,5 +1,6 @@
 //! Ops root/view shell adapter; observations come from public requests and trees.
 #![allow(clippy::wildcard_imports, reason = "the adapter translates complete owner vocabularies")]
+use jig_client_view::Owner;
 use jig_client_world::harness::Seen;
 use jig_client_world::{harness::*, observe};
 use jig_domain_client::contract::Outcome;
@@ -9,7 +10,6 @@ use jig_ops_domain_client::{
 };
 use jig_ops_domain_connectors::{Connector, number};
 use jig_ops_view as view;
-use jig_view::Owner;
 use skein_ui::Act;
 use skein_ui::{NodeId, Patch, Role, Tree};
 
@@ -90,7 +90,7 @@ pub fn limits() -> domain::Limits {
         },
     }
 }
-type Books = (jig_view::words::Words, view::words::Words, view::words::Words);
+type Books = (jig_client_view::words::Words, view::words::Words, view::words::Words);
 type BookCache = Mutex<BTreeMap<(u32, u32, u32), Books>>;
 fn phrasebooks(limits: &domain::Limits) -> Books {
     static BOOKS: OnceLock<BookCache> = OnceLock::new();
@@ -99,8 +99,8 @@ fn phrasebooks(limits: &domain::Limits) -> Books {
         .entry((limits.jig.text, limits.observability.text, limits.infrastructure.text))
         .or_insert_with(|| {
             (
-                jig_view::words::Words {
-                    book: jig_view::phrases::english::english(limits.jig.text).expect("English fits"),
+                jig_client_view::words::Words {
+                    book: jig_client_view::phrases::english::english(limits.jig.text).expect("English fits"),
                     language: 0,
                     offset_minutes: 0,
                 },
@@ -116,7 +116,7 @@ fn phrasebooks(limits: &domain::Limits) -> Books {
 // Builder checks catch a fixture growing beyond these bounds.
 fn view_bounds(
     limits: &domain::Limits,
-    jig: &jig_view::words::Words,
+    jig: &jig_client_view::words::Words,
     obs: &view::words::Words,
     infra: &view::words::Words,
 ) -> view::Limits {
@@ -309,7 +309,7 @@ impl App for Ops {
                 attempt: *attempt,
                 key: *key,
                 card: Some(CardKey::of(skein_ui::Key {
-                    owner: (jig_view::Owner::Application { number: 2 }).opaque(),
+                    owner: (jig_client_view::Owner::Application { number: 2 }).opaque(),
                     kind: 12,
                     a: 0,
                     b: object.raw(),

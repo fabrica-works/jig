@@ -382,7 +382,7 @@ fn a_person_signs_out_and_a_later_request_is_answered_signed_out() {
     );
     let callbacks = session.poll(now, super::clock(now)).expect("actual engine terminal");
     assert!(callbacks.iter().any(|(owner, event)| *owner == client && matches!(event,
-        jig_test_domain_client::Event::Answer { attempt: actual, envelope: skein_lib::RequestEnvelope::SignedOut, answer: None } if *actual == attempt)));
+        jig_client_test_domain::Event::Answer { attempt: actual, envelope: skein_lib::RequestEnvelope::SignedOut, answer: None } if *actual == attempt)));
     assert!(session.driver.world.store.rows.values().all(|row| !matches!(row,
         jig_test_domain::Record::Core(jig_domain_core::Record::People(people::Stored::SignIn { number, .. })) if *number == sign_in)));
 }

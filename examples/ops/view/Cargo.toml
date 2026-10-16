@@ -10,7 +10,7 @@ skein-ui.workspace = true
 skein-lib.workspace = true
 jig-domain-client.workspace = true
 jig-ops-domain-connectors.workspace = true
-jig-view.workspace = true
+jig-client-view.workspace = true
 jig-ops-domain-client.workspace = true
 [lints]
 workspace = true

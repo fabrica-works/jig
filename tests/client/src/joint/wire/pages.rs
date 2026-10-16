@@ -1,9 +1,9 @@
 //! Whole retained read pages with original query identity and opaque continuation
 //! (client/domain/contract.md, 6). The supplied page loss remains independent of row and cursor facts.
 use super::{activity, cursor, history, inbox, notes, owner, rows};
+use jig_client_scripted_engine as admission;
 use jig_domain_client::{Limits, contract as client};
 use jig_domain_core::reads;
-use jig_scripted_engine as admission;
 use skein_lib::List;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

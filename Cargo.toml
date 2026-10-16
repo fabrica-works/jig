@@ -15,7 +15,7 @@ members = [
     "tests/client-wire",
     "crates/jig-domain-client",
     "crates/jig-protocol-transcript",
-    "crates/jig-view",
+    "crates/jig-client-view",
     "crates/jig-domain-core",
     "crates/jig-domain-accounts",
     "crates/jig-protocol-accounts",
@@ -26,16 +26,16 @@ members = [
     "testing/jig-test-worker",
     "testing/jig-test-service",
     "testing/jig-client-test-protocol-wire",
-    "testing/jig-test-domain-client",
-    "testing/jig-test-client-kit",
-    "testing/jig-test-view",
+    "testing/jig-client-test-domain",
+    "testing/jig-client-test-kit",
+    "testing/jig-client-test-view",
     "testing/jig-conformance",
     "tests/conformance",
     "tests/client",
     "testing/jig-fake-store",
     "testing/jig-fake-workers",
     "testing/jig-fake-parties",
-    "testing/jig-scripted-engine",
+    "testing/jig-client-scripted-engine",
     "testing/jig-test-system",
     "testing/jig-ops-fake-production",
     "examples/ops/domain-connectors",
@@ -131,10 +131,10 @@ jig-protocol-tools = { path = "crates/jig-protocol-tools" }
 jig-client-world = { path = "tests/client" }
 jig-domain-client = { path = "crates/jig-domain-client" }
 jig-protocol-transcript = { path = "crates/jig-protocol-transcript" }
-jig-view = { path = "crates/jig-view" }
+jig-client-view = { path = "crates/jig-client-view" }
 skein-ui-text = { git = "https://github.com/forgetic/skein.git" }
 skein-fake-person = { git = "https://github.com/forgetic/skein.git" }
-jig-scripted-engine = { path = "testing/jig-scripted-engine" }
+jig-client-scripted-engine = { path = "testing/jig-client-scripted-engine" }
 skein-codec = { git = "https://github.com/forgetic/skein.git" }
 skein-codegen = { git = "https://github.com/forgetic/skein.git" }
 skein-heap = { git = "https://github.com/forgetic/skein.git" }
@@ -155,9 +155,9 @@ jig-test-store = { path = "testing/jig-test-store" }
 jig-test-store-files = { path = "testing/jig-test-store-files" }
 jig-test-connector-world = { path = "tests/test-connector" }
 jig-test-domain = { path = "testing/jig-test-domain" }
-jig-test-domain-client = { path = "testing/jig-test-domain-client" }
-jig-test-client-kit = { path = "testing/jig-test-client-kit" }
-jig-test-view = { path = "testing/jig-test-view" }
+jig-client-test-domain = { path = "testing/jig-client-test-domain" }
+jig-client-test-kit = { path = "testing/jig-client-test-kit" }
+jig-client-test-view = { path = "testing/jig-client-test-view" }
 jig-conformance = { path = "testing/jig-conformance" }
 jig-fake-store = { path = "testing/jig-fake-store" }
 jig-fake-workers = { path = "testing/jig-fake-workers" }

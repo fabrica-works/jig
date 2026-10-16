@@ -224,7 +224,10 @@ dependencies = [
  "jig-client-protocol-link",
  "jig-client-protocol-wire",
  "jig-client-shell-native",
+ "jig-client-test-domain",
  "jig-client-test-protocol-wire",
+ "jig-client-test-view",
+ "jig-client-view",
  "jig-client-world",
  "jig-core-world",
  "jig-domain-client",
@@ -237,10 +240,7 @@ dependencies = [
  "jig-protocol-engine-clients",
  "jig-test-connector",
  "jig-test-domain",
- "jig-test-domain-client",
  "jig-test-service",
- "jig-test-view",
- "jig-view",
  "skein-fake-machine",
  "skein-fake-person",
  "skein-http",
@@ -251,6 +251,14 @@ dependencies = [
  "skein-ui",
  "skein-ui-text",
  "skein-world",
+]
+
+[[package]]
+name = "jig-client-scripted-engine"
+version = "0.0.0"
+dependencies = [
+ "jig-domain-client",
+ "skein-lib",
 ]
 
 [[package]]
@@ -266,6 +274,24 @@ dependencies = [
  "skein-shell",
  "skein-sim",
  "skein-world",
+]
+
+[[package]]
+name = "jig-client-test-domain"
+version = "0.0.0"
+dependencies = [
+ "jig-domain-client",
+ "jig-test-connector",
+ "skein-lib",
+]
+
+[[package]]
+name = "jig-client-test-kit"
+version = "0.0.0"
+dependencies = [
+ "jig-client-test-domain",
+ "jig-test-connector",
+ "skein-lib",
 ]
 
 [[package]]
@@ -286,6 +312,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "jig-client-test-view"
+version = "0.0.0"
+dependencies = [
+ "jig-client-test-domain",
+ "jig-client-view",
+ "jig-domain-client",
+ "skein-lib",
+ "skein-ui",
+]
+
+[[package]]
+name = "jig-client-view"
+version = "0.0.0"
+dependencies = [
+ "jig-domain-client",
+ "skein-lib",
+ "skein-ui",
+]
+
+[[package]]
+name = "jig-client-views-world"
+version = "0.0.0"
+dependencies = [
+ "jig-domain-views",
+ "skein-lib",
+ "skein-world",
+]
+
+[[package]]
 name = "jig-client-wire-world"
 version = "0.0.0"
 dependencies = [
@@ -299,6 +354,11 @@ dependencies = [
 name = "jig-client-world"
 version = "0.0.0"
 dependencies = [
+ "jig-client-scripted-engine",
+ "jig-client-test-domain",
+ "jig-client-test-kit",
+ "jig-client-test-view",
+ "jig-client-view",
  "jig-core-world",
  "jig-domain-accounts",
  "jig-domain-authority",
@@ -312,13 +372,8 @@ dependencies = [
  "jig-fake-parties",
  "jig-fake-workers",
  "jig-protocol-transcript",
- "jig-scripted-engine",
- "jig-test-client-kit",
  "jig-test-connector",
  "jig-test-domain",
- "jig-test-domain-client",
- "jig-test-view",
- "jig-view",
  "sha2",
  "skein-fake-person",
  "skein-lib",
@@ -667,10 +722,10 @@ version = "0.0.0"
 name = "jig-ops-view"
 version = "0.0.0"
 dependencies = [
+ "jig-client-view",
  "jig-domain-client",
  "jig-ops-domain-client",
  "jig-ops-domain-connectors",
- "jig-view",
  "skein-lib",
  "skein-ui",
 ]
@@ -679,6 +734,9 @@ dependencies = [
 name = "jig-ops-world"
 version = "0.0.0"
 dependencies = [
+ "jig-client-scripted-engine",
+ "jig-client-test-domain",
+ "jig-client-view",
  "jig-client-world",
  "jig-conformance",
  "jig-core-world",
@@ -703,11 +761,8 @@ dependencies = [
  "jig-protocol-charter",
  "jig-protocol-tools",
  "jig-protocol-transcript",
- "jig-scripted-engine",
  "jig-test-domain",
- "jig-test-domain-client",
  "jig-test-system",
- "jig-view",
  "sha2",
  "skein-fake-person",
  "skein-json",
@@ -896,14 +951,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "jig-scripted-engine"
-version = "0.0.0"
-dependencies = [
- "jig-domain-client",
- "skein-lib",
-]
-
-[[package]]
 name = "jig-store-codecs-world"
 version = "0.0.0"
 dependencies = [
@@ -978,15 +1025,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "jig-test-client-kit"
-version = "0.0.0"
-dependencies = [
- "jig-test-connector",
- "jig-test-domain-client",
- "skein-lib",
-]
-
-[[package]]
 name = "jig-test-connector"
 version = "0.0.0"
 dependencies = [
@@ -1020,15 +1058,6 @@ dependencies = [
  "jig-protocol-config",
  "jig-test-connector",
  "jig-test-connector-world",
- "skein-lib",
-]
-
-[[package]]
-name = "jig-test-domain-client"
-version = "0.0.0"
-dependencies = [
- "jig-domain-client",
- "jig-test-connector",
  "skein-lib",
 ]
 
@@ -1123,17 +1152,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "jig-test-view"
-version = "0.0.0"
-dependencies = [
- "jig-domain-client",
- "jig-test-domain-client",
- "jig-view",
- "skein-lib",
- "skein-ui",
-]
-
-[[package]]
 name = "jig-test-worker"
 version = "0.0.0"
 dependencies = [
@@ -1147,24 +1165,6 @@ dependencies = [
  "smith-host-domain",
  "smith-protocol-channel",
  "smith-transcript",
-]
-
-[[package]]
-name = "jig-view"
-version = "0.0.0"
-dependencies = [
- "jig-domain-client",
- "skein-lib",
- "skein-ui",
-]
-
-[[package]]
-name = "jig-views-world"
-version = "0.0.0"
-dependencies = [
- "jig-domain-views",
- "skein-lib",
- "skein-world",
 ]
 
 [[package]]

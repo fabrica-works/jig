@@ -126,22 +126,22 @@ impl Joint {
         match packet {
             Incoming::Callback { client, event } => {
                 let event = match event {
-                    jig_test_domain_client::Event::Jig(value) => client::Event::Jig(value),
-                    jig_test_domain_client::Event::Answer { attempt, envelope, answer } => client::Event::Answer {
+                    jig_client_test_domain::Event::Jig(value) => client::Event::Jig(value),
+                    jig_client_test_domain::Event::Answer { attempt, envelope, answer } => client::Event::Answer {
                         attempt,
                         envelope,
                         answer: answer.map(|answer| match answer {
-                            jig_test_domain_client::Answered::Jig(value) => client::Answered::Jig(value),
-                            jig_test_domain_client::Answered::First(_) => {
+                            jig_client_test_domain::Answered::Jig(value) => client::Answered::Jig(value),
+                            jig_client_test_domain::Answered::First(_) => {
                                 panic!("Ops never registers first-owner replies")
                             }
                         }),
                     },
-                    jig_test_domain_client::Event::SignedOut => client::Event::SignedOut,
-                    jig_test_domain_client::Event::First(_)
-                    | jig_test_domain_client::Event::Start { .. }
-                    | jig_test_domain_client::Event::Went { .. }
-                    | jig_test_domain_client::Event::Act { .. } => panic!("45 protocol emits only its jig owner"),
+                    jig_client_test_domain::Event::SignedOut => client::Event::SignedOut,
+                    jig_client_test_domain::Event::First(_)
+                    | jig_client_test_domain::Event::Start { .. }
+                    | jig_client_test_domain::Event::Went { .. }
+                    | jig_client_test_domain::Event::Act { .. } => panic!("45 protocol emits only its jig owner"),
                 };
                 self.callbacks.push((client, event));
             }
@@ -513,13 +513,13 @@ impl Joint {
                         let (envelope, body) =
                             wire::answers::keyed(wire::answers::reply(reply)).expect("original keyed disposition");
                         let answer = body.map(|answer| {
-                            jig_scripted_engine::admit_answer(
+                            jig_client_scripted_engine::admit_answer(
                                 &answer,
-                                &jig_scripted_engine::Bounds {
+                                &jig_client_scripted_engine::Bounds {
                                     rows: self.limits.jig.rows,
                                     text: self.limits.jig.text,
                                     document_bytes: self.limits.jig.document_bytes,
-                                    ..jig_scripted_engine::Bounds::default()
+                                    ..jig_client_scripted_engine::Bounds::default()
                                 },
                             )
                             .expect("whole entrance refusal admission");

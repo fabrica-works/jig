@@ -4,7 +4,7 @@ use super::*;
 use jig_fake_parties::{Act, Party, Role as PartyRole};
 use jig_fake_workers::Call;
 
-fn receiving_limits() -> jig_test_domain_client::Limits {
+fn receiving_limits() -> jig_client_test_domain::Limits {
     let mut limits = crate::test::limits();
     limits.jig.text = 128;
     limits.jig.rows = 2;
@@ -16,17 +16,17 @@ fn receiving_limits() -> jig_test_domain_client::Limits {
     limits
 }
 
-fn choice_limits() -> jig_test_domain_client::Limits {
+fn choice_limits() -> jig_client_test_domain::Limits {
     let mut limits = receiving_limits();
     limits.jig.text = 128;
     limits.first.text = 128;
     limits
 }
-fn choice_client(seed: u64) -> (jig_test_domain_client::Domain, jig_test_view::View<'static>) {
+fn choice_client(seed: u64) -> (jig_client_test_domain::Domain, jig_client_test_view::View<'static>) {
     crate::test::new(&choice_limits(), seed)
 }
 
-fn client(seed: u64) -> (jig_test_domain_client::Domain, jig_test_view::View<'static>) {
+fn client(seed: u64) -> (jig_client_test_domain::Domain, jig_client_test_view::View<'static>) {
     crate::test::new(&receiving_limits(), seed)
 }
 
@@ -56,7 +56,7 @@ fn configured_with_bounds(
     scripts: Vec<Box<[Script]>>,
     slots: u32,
     configure: fn(&mut jig_test_domain::Config, &jig_test_domain::Limits),
-    receiving: jig_test_domain_client::Limits,
+    receiving: jig_client_test_domain::Limits,
 ) -> World<Test, Joint> {
     let (mut configuration, mut owner) = jig_core_world::peers::fixture(seed, 0);
     configuration.core.owners = Box::new([]);
@@ -159,7 +159,7 @@ fn configured_with_bounds(
     World::new(Settings { seed, ..Settings::default() }, front)
 }
 
-fn start(words: &[u8]) -> Vec<Step<jig_test_domain_client::Address>> {
+fn start(words: &[u8]) -> Vec<Step<jig_client_test_domain::Address>> {
     let within = Duration::from_secs(1);
     vec![
         Step::See { find: Find::named(Role::Button, b"Sign in with Test"), within },
@@ -246,7 +246,7 @@ fn a_person_answers_a_choice_between_two_reports() {
     world.person(
         member,
         vec![Step::Go {
-            address: jig_test_domain_client::Address::Jig(jig_domain_client::address::Address::Project {
+            address: jig_client_test_domain::Address::Jig(jig_domain_client::address::Address::Project {
                 project: 1,
                 section: jig_domain_client::address::ProjectSection::Overview,
             }),

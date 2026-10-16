@@ -1,8 +1,8 @@
 //! Keep: owner-tagged bounded bindings, rebuilt each tree (view.md, 5).
 //! Replace: application actions and family document identities.
+use jig_client_view::Owner;
 use jig_domain_client::contract::{ObjectKey, Revision};
 use jig_ops_domain_client::{Action, infrastructure};
-use jig_view::Owner;
 use skein_lib::{List, Token};
 use skein_ui::{Act, Binding};
 #[derive(Clone, Debug, PartialEq, Eq)]

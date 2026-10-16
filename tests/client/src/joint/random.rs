@@ -75,13 +75,13 @@ fn answers(world: &mut World<Test, Joint>) -> usize {
         })
         .count()
 }
-fn receiving() -> jig_test_domain_client::Limits {
+fn receiving() -> jig_client_test_domain::Limits {
     let mut limits = crate::test::limits();
     limits.jig.text = 128;
     limits.first.text = 128;
     limits
 }
-fn client(seed: u64) -> (jig_test_domain_client::Domain, jig_test_view::View<'static>) {
+fn client(seed: u64) -> (jig_client_test_domain::Domain, jig_client_test_view::View<'static>) {
     crate::test::new(&receiving(), seed)
 }
 fn ready(seed: u64) -> (World<Test, Joint>, crate::ClientId) {

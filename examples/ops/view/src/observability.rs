@@ -5,6 +5,7 @@ use crate::{
     drawing,
     words::{Word, Words},
 };
+use jig_client_view::Owner;
 use jig_domain_client::contract::{ObjectKey, Part, Proposer};
 use jig_ops_domain_client::{
     Action,
@@ -13,7 +14,6 @@ use jig_ops_domain_client::{
         documents::{Document, Incident, Kind, Scope, State, Subject},
     },
 };
-use jig_view::Owner;
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Key, Role, Run, SlotRef};
 
@@ -247,7 +247,7 @@ pub fn part(
         Part::Resource { path, .. } => {
             words.text(builder, Word::Resource, &[Hole::Name(skein_lib::bytes::copy_of(b""))]);
             for segment in path {
-                jig_view::literal_segment::render(builder, segment);
+                jig_client_view::literal_segment::render(builder, segment);
             }
         }
         Part::Kind { kind, .. } => words.text(builder, Word::Kind, &[Hole::Number(u64::from(*kind))]),

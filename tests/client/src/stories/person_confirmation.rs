@@ -179,11 +179,11 @@ fn document(form: Form) -> ReadValue {
 pub fn world(seed: u64, form: Form) -> World<Test, Scripted> {
     let mut world = super::world(seed);
     for change in [
-        jig_scripted_engine::Change::Object { project: 1, key: ObjectKey::PersonTask(9), value: document(form) },
-        jig_scripted_engine::Change::Source(jig_scripted_engine::Source {
+        jig_client_scripted_engine::Change::Object { project: 1, key: ObjectKey::PersonTask(9), value: document(form) },
+        jig_client_scripted_engine::Change::Source(jig_client_scripted_engine::Source {
             party: 7,
             read: Read::Inbox { group: InboxReadGroup::Needs, project: None, kind: None, goal: None, after: None },
-            rows: jig_scripted_engine::Rows::Inbox(vec![InboxEntry {
+            rows: jig_client_scripted_engine::Rows::Inbox(vec![InboxEntry {
                 reply: None,
                 lineage: list([]),
                 goal: None,
@@ -202,7 +202,7 @@ pub fn world(seed: u64, form: Form) -> World<Test, Scripted> {
     world
         .front()
         .engine
-        .script(jig_scripted_engine::Rule {
+        .script(jig_client_scripted_engine::Rule {
             party: Some(7),
             ask: form.ask(),
             answer: Answer::Done(Outcome::Owner(OwnerOutcome::PersonAnswered { task: 9 })),

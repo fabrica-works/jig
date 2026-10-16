@@ -103,9 +103,9 @@ impl CardKey {
     #[must_use]
     pub fn of(key: skein_ui::Key) -> Self {
         let mut bytes = Vec::new();
-        match jig_view::Owner::from_opaque(key.owner) {
-            Some(jig_view::Owner::Jig) => bytes.extend_from_slice(&[0, 0, 0]),
-            Some(jig_view::Owner::Application { number: connector }) => {
+        match jig_client_view::Owner::from_opaque(key.owner) {
+            Some(jig_client_view::Owner::Jig) => bytes.extend_from_slice(&[0, 0, 0]),
+            Some(jig_client_view::Owner::Application { number: connector }) => {
                 bytes.push(1);
                 bytes.extend_from_slice(&connector.to_le_bytes());
             }

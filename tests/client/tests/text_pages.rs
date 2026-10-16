@@ -1,6 +1,6 @@
+use jig_client_test_domain::{Address as RootAddress, Event, Place};
 use jig_client_world::{ClientId, Fault, FrontFault, Scripted, Test, Until, World, stories};
 use jig_domain_client::address::{Address, ProjectSection};
-use jig_test_domain_client::{Address as RootAddress, Event, Place};
 use skein_fake_person::{Find, Step};
 use skein_lib::{Duration, Time, Wall};
 use skein_ui::Act;
@@ -9,7 +9,7 @@ type PageWorld = World<Test, Scripted>;
 fn print(w: &PageWorld, c: ClientId, label: &str, golden: &[u8]) {
     let (_, view) = jig_client_world::test::new(&jig_client_world::test::limits(), 0);
     let mut print = skein_ui_text::Print::new(&view.limits().tree).expect("print fits");
-    skein_ui_text::render(w.tree(c), b"jig", Some(jig_view::regions::JigRegion::Link.region()), &mut print);
+    skein_ui_text::render(w.tree(c), b"jig", Some(jig_client_view::regions::JigRegion::Link.region()), &mut print);
     assert_eq!(print.text.as_slice(), golden, "{label}");
 }
 fn settle(w: &mut PageWorld, c: ClientId) {
@@ -47,7 +47,7 @@ fn the_deployment_prints_as_its_golden_text() {
     let mut w = stories::world(94);
     w.front()
         .engine
-        .act(Time::ZERO, Wall::EPOCH, jig_scripted_engine::Change::Deployment(stories::deployment()))
+        .act(Time::ZERO, Wall::EPOCH, jig_client_scripted_engine::Change::Deployment(stories::deployment()))
         .expect("deployment fits");
     ready(w, RootAddress::Jig(Address::Deployment), "deployment", include_bytes!("golden/deployment.txt"));
 }
@@ -71,7 +71,7 @@ fn special(page: &str) -> (PageWorld, ClientId) {
     if page == "signing_in" {
         w.front()
             .engine
-            .act(Time::ZERO, Wall::EPOCH, jig_scripted_engine::Change::SignedOut { sign_in: 7 })
+            .act(Time::ZERO, Wall::EPOCH, jig_client_scripted_engine::Change::SignedOut { sign_in: 7 })
             .expect("sign out");
     }
     let c = w.client(7, stories::conversation());

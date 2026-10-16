@@ -7,7 +7,7 @@ use skein_ui::Role;
 pub const SEEDS: &[u64] = &[8510, 8511];
 pub type Story = World<Test, Protocol>;
 #[must_use]
-pub fn start() -> Vec<Step<jig_test_domain_client::Address>> {
+pub fn start() -> Vec<Step<jig_client_test_domain::Address>> {
     let mut steps = fixtures::sign_in_then(stories::start_chat_steps());
     steps.push(Step::See { find: Find::text(b"Hello"), within: Duration::from_secs(2) });
     steps.push(Step::See { find: Find::exactly_named(Role::Button, b"Stop"), within: Duration::from_secs(1) });
@@ -97,8 +97,8 @@ pub fn two_clients(seed: u64) -> (Story, ClientId) {
 }
 
 pub fn transient_request(seed: u64, fault: jig_client_world::FrontFault) {
+    use jig_client_test_domain::{Ask, Event, Request};
     use jig_client_world::Front;
-    use jig_test_domain_client::{Ask, Event, Request};
     use skein_lib::{RequestEnvelope, Token};
     let mut limits = fixtures::owner_limits();
     limits.core.people.requests = 1;

@@ -1,9 +1,9 @@
 //! Concrete test-application adapter; application vocabulary is read only here.
 #![allow(clippy::wildcard_imports, reason = "world adapters translate the complete owner vocabulary")]
 use crate::harness::*;
+use jig_client_test_domain::{self as domain, Address, Event, JigOut, Request, first};
+use jig_client_test_view as view;
 use jig_domain_client::{boundary::Offset, contract::*};
-use jig_test_domain_client::{self as domain, Address, Event, JigOut, Request, first};
-use jig_test_view as view;
 use skein_lib::{Duration, Env, List, Queue, RequestEnvelope, RequestLimits, Time};
 use skein_ui::Act;
 use skein_ui::{NodeId, Patch, Tree};
@@ -15,8 +15,8 @@ use std::{
 pub struct Test;
 /// Returns the small focused-world capacities.
 #[must_use]
-pub fn limits() -> jig_test_domain_client::Limits {
-    jig_test_domain_client::Limits {
+pub fn limits() -> jig_client_test_domain::Limits {
+    jig_client_test_domain::Limits {
         jig: jig_domain_client::Limits {
             watches: 8,
             notices: 2,
@@ -50,7 +50,7 @@ pub fn limits() -> jig_test_domain_client::Limits {
             heartbeat: Duration::from_millis(100),
         },
         first: first::Limits {
-            connector: jig_test_domain_client::connector_values::ConnectorLimits {
+            connector: jig_client_test_domain::connector_values::ConnectorLimits {
                 rows: 4,
                 paths: 0,
                 segments: 0,
@@ -90,7 +90,7 @@ pub fn list<T>(rows: impl IntoIterator<Item = T>) -> List<T> {
 }
 
 // Checked immutable books and envelopes are shared by every equal fixture.
-type Books = (jig_view::words::Words, view::words::Words);
+type Books = (jig_client_view::words::Words, view::words::Words);
 fn phrasebooks(limits: &domain::Limits) -> &'static Books {
     static BOOKS: OnceLock<Mutex<BTreeMap<(u32, u32), &'static Books>>> = OnceLock::new();
     let mut books = BOOKS.get_or_init(|| Mutex::new(BTreeMap::new())).lock().expect("fixture books lock");

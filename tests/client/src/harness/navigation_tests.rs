@@ -5,8 +5,8 @@ use crate::{
     harness::{Front, FrontFault, Observed},
     test::Test,
 };
+use jig_client_test_domain::{Address, Event, Place, Request};
 use jig_domain_client::address::ProjectSection;
-use jig_test_domain_client::{Address, Event, Place, Request};
 use skein_lib::{Time, Wall};
 use skein_world::domain::{Span, Verdict};
 

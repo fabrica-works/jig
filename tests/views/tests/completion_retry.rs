@@ -1,5 +1,5 @@
+use jig_client_views_world::World;
 use jig_domain_views::{End, Event, Follow, Request, TurnName};
-use jig_views_world::World;
 use skein_lib::Token;
 
 fn name(retry: u32) -> TurnName {
@@ -45,7 +45,7 @@ fn a_worlds_sole_watcher_reopens_from_an_unwatched_retry_without_a_replay_source
 
 #[test]
 fn world_run_admission_survives_detach_and_late_text_starts_when_an_ended_run_frees_room() {
-    let mut limits = jig_views_world::LIMITS;
+    let mut limits = jig_client_views_world::LIMITS;
     limits.runs = 1;
     let mut world = World::new(limits);
     world.text(7, name(0), b"first", None);

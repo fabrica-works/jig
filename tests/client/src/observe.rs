@@ -1,9 +1,9 @@
 //! Shared jig observations and the Test application's family vocabulary.
 #![allow(clippy::wildcard_imports, reason = "boundary adapter covers the owner vocabulary")]
 use crate::harness::{CardKey, CardSeen, Receipt, Seen, Sent};
+use jig_client_test_domain::{self as domain, Event, Request, family};
+use jig_client_view::Owner;
 use jig_domain_client::contract::*;
-use jig_test_domain_client::{self as domain, Event, Request, family};
-use jig_view::Owner;
 use skein_fake_person::{Face, Find, Found, TreeFace};
 use skein_lib::{RequestEnvelope, Token};
 use skein_ui::{Key, NodeId, Role, Tree};
@@ -31,7 +31,7 @@ pub fn sent(request: &Request) -> Option<Sent> {
     };
     let (card, revision, words) = match ask {
         domain::Ask::First(family::Ask::Touch { project, item, revision, .. }) => (
-            Some(CardKey::of(jig_test_view::family_key(&family::Subject {
+            Some(CardKey::of(jig_client_test_view::family_key(&family::Subject {
                 scope: family::Scope::Project(*project),
                 kind: family::Kind::Item(*item),
             }))),
@@ -39,7 +39,7 @@ pub fn sent(request: &Request) -> Option<Sent> {
             None,
         ),
         domain::Ask::First(family::Ask::ChangeObject { project, object, revision, .. }) => (
-            Some(CardKey::of(jig_test_view::family_key(&family::Subject {
+            Some(CardKey::of(jig_client_test_view::family_key(&family::Subject {
                 scope: family::Scope::Project(*project),
                 kind: family::Kind::Item(*object),
             }))),
@@ -158,7 +158,7 @@ fn family(doc: &family::Document) -> Receipt {
         family::Document::Connector(_) => doc.revision(),
     };
     Receipt::Card {
-        key: CardKey::of(jig_test_view::family_key(&doc.subject())),
+        key: CardKey::of(jig_client_test_view::family_key(&doc.subject())),
         revisions: revision.map_or_else(Vec::new, |revision| vec![(0, revision.value)]),
     }
 }
@@ -315,7 +315,7 @@ pub fn jig_seen(tree: &Tree) -> Vec<Seen> {
 }
 fn frame_link(tree: &Tree) -> Option<bool> {
     let (at, frame) = tree.nodes().iter().enumerate().find(|(_, node)| {
-        node.role == Role::Region && node.region == Some(jig_view::regions::JigRegion::Link.region())
+        node.role == Role::Region && node.region == Some(jig_client_view::regions::JigRegion::Link.region())
     })?;
     let end = at + usize::try_from(frame.size).expect("frame subtree");
     let mut child = at + 1;
@@ -547,8 +547,8 @@ mod tests {
     #[test]
     fn public_owner_answer_receipts_keep_original_attempt_envelope_and_exact_message_ids() {
         use super::{Receipt, received};
+        use jig_client_test_domain::{Answered, Event};
         use jig_domain_client::contract::{Answer, Outcome, OwnerOutcome};
-        use jig_test_domain_client::{Answered, Event};
         use skein_lib::{RequestEnvelope, Token};
         let cases = [
             (OwnerOutcome::Said { task: u64::MAX, message: 37, released: false }, Some((u64::MAX, 37))),

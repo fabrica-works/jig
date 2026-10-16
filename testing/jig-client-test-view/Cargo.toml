@@ -1,0 +1,15 @@
+[package]
+name = "jig-client-test-view"
+description = "The test application view root and connector-owned family fragments"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+[dependencies]
+skein-ui.workspace = true
+skein-lib.workspace = true
+jig-domain-client.workspace = true
+jig-client-view.workspace = true
+jig-client-test-domain.workspace = true
+[lints]
+workspace = true

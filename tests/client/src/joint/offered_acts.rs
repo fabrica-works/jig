@@ -10,10 +10,10 @@ pub(super) fn task(world: &mut World<Test, Joint>, client: crate::ClientId, numb
         assert_eq!(packet.source.len(), packet.native.len());
         (packet.source.clone(), packet.native_task.chip.title.bytes().to_vec())
     };
-    let words = jig_test_view::connector_values_words::english(32).expect("fixture English");
+    let words = jig_client_test_view::connector_values_words::english(32).expect("fixture English");
     let title = words.say(
-        jig_view::phrases::jig::JigPhrase::ChipNumber,
-        &[skein_ui::phrases::Hole::Number(number), jig_view::words::name(&title)],
+        jig_client_view::phrases::jig::JigPhrase::ChipNumber,
+        &[skein_ui::phrases::Hole::Number(number), jig_client_view::words::name(&title)],
     );
     let tree = world.tree(client);
     let card = match TreeFace::new(tree).find(&Find::exactly_named(Role::Region, &title)) {

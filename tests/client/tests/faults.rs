@@ -82,7 +82,7 @@ fn a_double_press_emits_one_decision() {
 fn a_reload_retains_the_request_before_resending() {
     let (mut w, c) = prepared(37);
     begin(&mut w, c);
-    assert!(w.kept(c).iter().any(|r| matches!(r, jig_test_domain_client::store::Record::Table { .. })));
+    assert!(w.kept(c).iter().any(|r| matches!(r, jig_client_test_domain::store::Record::Table { .. })));
     w.fault(Fault::Reload { client: c });
     finish(&mut w, c);
 }
@@ -143,14 +143,14 @@ fn another_party_keeps_the_original_partys_work_parked_and_hidden() {
     let now = w.now();
     w.front()
         .engine
-        .act(now, Wall::EPOCH, jig_scripted_engine::Change::Frame(stories::frame(8)))
+        .act(now, Wall::EPOCH, jig_client_scripted_engine::Change::Frame(stories::frame(8)))
         .expect("second party");
     w.run(Until::Time(now.saturating_add(Duration::from_millis(10))));
     begin(&mut w, c);
     w.fault(Fault::OtherParty { client: c, party: 8 });
     w.person(c, vec![Step::See { find: Find::text(b"Someone else's work"), within: Duration::from_secs(1) }]);
     w.run(Until::Done);
-    assert!(w.kept(c).iter().any(|r| matches!(r, jig_test_domain_client::store::Record::Table { .. })));
+    assert!(w.kept(c).iter().any(|r| matches!(r, jig_client_test_domain::store::Record::Table { .. })));
     w.sign_as(c, 7);
     finish(&mut w, c);
 }

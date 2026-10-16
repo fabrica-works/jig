@@ -127,14 +127,14 @@ fn ready() -> Domain {
     );
     root
 }
-fn phrasebooks() -> (jig_view::words::Words, words::Words, words::Words) {
-    static WORDS: std::sync::OnceLock<(jig_view::words::Words, words::Words, words::Words)> =
+fn phrasebooks() -> (jig_client_view::words::Words, words::Words, words::Words) {
+    static WORDS: std::sync::OnceLock<(jig_client_view::words::Words, words::Words, words::Words)> =
         std::sync::OnceLock::new();
     WORDS
         .get_or_init(|| {
             (
-                jig_view::words::Words {
-                    book: jig_view::phrases::english::english(32).unwrap(),
+                jig_client_view::words::Words {
+                    book: jig_client_view::phrases::english::english(32).unwrap(),
                     language: 0,
                     offset_minutes: 0,
                 },
@@ -374,7 +374,7 @@ fn public_effect_fragments_keep_equal_task_and_party_makers_separate() {
     build(&mut view, &root, &mut patches);
     for kind in [5, 10] {
         let expected = skein_ui::Key {
-            owner: (jig_view::Owner::Application { number: 2 }).opaque(),
+            owner: (jig_client_view::Owner::Application { number: 2 }).opaque(),
             kind,
             a: u64::MAX,
             b: u64::MAX,
@@ -539,7 +539,7 @@ fn arranged_task_view(section: jig_domain_client::address::TaskSection) -> View 
 
 #[test]
 fn an_ops_task_page_puts_budget_and_panels_in_an_aside() {
-    use jig_view::regions::JigRegion;
+    use jig_client_view::regions::JigRegion;
     use skein_ui::Role;
     let view = arranged_task_view(jig_domain_client::address::TaskSection::Plan);
     let (index, aside) = view.tree().nodes().iter().enumerate().find(|(_, n)| n.role == Role::Complementary).unwrap();
@@ -556,7 +556,7 @@ fn an_ops_task_page_puts_budget_and_panels_in_an_aside() {
 
 #[test]
 fn an_ops_task_page_marks_the_addresss_own_section_current() {
-    use jig_view::regions::JigRegion;
+    use jig_client_view::regions::JigRegion;
     let view = arranged_task_view(jig_domain_client::address::TaskSection::Plan);
     let rows = [
         (JigRegion::TaskOverview, &[][..]),
@@ -668,7 +668,7 @@ fn the_incident_page_fills_its_leads_plan_in_a_section_slot() {
             .tree()
             .nodes()
             .iter()
-            .filter(|node| node.region == Some(jig_view::regions::JigRegion::TaskPlan.region()))
+            .filter(|node| node.region == Some(jig_client_view::regions::JigRegion::TaskPlan.region()))
             .collect();
         assert_eq!(plans.len(), 1, "native={native}");
         assert_eq!(plans[0].name.as_deref(), Some(b"Plan".as_slice()), "native={native}");
@@ -902,8 +902,8 @@ fn moving_an_environment_end_names_the_end_revision_and_waits_for_the_final_enve
 }
 #[test]
 fn extreme_capacity_and_wall_overflow_are_refused_before_building() {
-    let jig = jig_view::words::Words {
-        book: jig_view::phrases::english::english(32).unwrap(),
+    let jig = jig_client_view::words::Words {
+        book: jig_client_view::phrases::english::english(32).unwrap(),
         language: 0,
         offset_minutes: 0,
     };
@@ -1109,8 +1109,12 @@ fn actual_outbox_entries_render_from_their_explicit_scope_and_keep_proposal_keys
             PartScope::Project(project) => u64::from(project),
             PartScope::Deployment => u64::MAX,
         };
-        let expected_key =
-            skein_ui::Key { owner: (jig_view::Owner::Application { number: 2 }).opaque(), kind: 6, a: value, b: 17 };
+        let expected_key = skein_ui::Key {
+            owner: (jig_client_view::Owner::Application { number: 2 }).opaque(),
+            kind: 6,
+            a: value,
+            b: 17,
+        };
         assert!(view.tree().nodes().iter().any(|node| node.key == Some(expected_key)));
         assert!(contains(&view, b"Outbox entry 17"));
         assert!(contains(&view, b"Sent"));
@@ -1178,7 +1182,7 @@ fn resource_slots_preserve_whole_opaque_segments_and_distinct_equal_concatenatio
     assert!(tree_limits.slots <= envelope.slots);
     assert!(tree_limits.text_per_node >= 128);
     let mut builder = skein_ui::Builder::new(&tree_limits);
-    let mut jig_bindings = jig_view::JigBindings::new(16, JIG.text);
+    let mut jig_bindings = jig_client_view::JigBindings::new(16, JIG.text);
     let mut obs_bindings = crate::bindings::Bindings::new(16, 32, 1);
     let mut infra_bindings = crate::bindings::Bindings::new(16, 32, 2);
     let mut obs = observability::Side::new(&domain_limits.observability, 63);
@@ -1222,7 +1226,7 @@ fn resource_slots_preserve_whole_opaque_segments_and_distinct_equal_concatenatio
                 assert!(infra.contains(&part, 11));
                 assert!(out.is_empty());
             }
-            jig_view::cards::common::part(&mut builder, &part, &jig_words, &mut jig_bindings);
+            jig_client_view::cards::common::part(&mut builder, &part, &jig_words, &mut jig_bindings);
             expected.push(part);
         }
     }
@@ -1233,10 +1237,10 @@ fn resource_slots_preserve_whole_opaque_segments_and_distinct_equal_concatenatio
     for (slot, part) in slots.iter().zip(&expected) {
         assert_eq!(jig_bindings.part(slot.reference.token), Some(part));
         let mut fragment = skein_ui::Builder::new(&tree_limits);
-        if slot.reference.owner == ((jig_view::Owner::Application { number: 1 }).opaque()) {
+        if slot.reference.owner == ((jig_client_view::Owner::Application { number: 1 }).opaque()) {
             crate::observability::part(&mut fragment, &obs, part, 11, &obs_words, &mut obs_bindings);
         } else {
-            assert_eq!(slot.reference.owner, (jig_view::Owner::Application { number: 2 }).opaque());
+            assert_eq!(slot.reference.owner, (jig_client_view::Owner::Application { number: 2 }).opaque());
             crate::infrastructure::part(&mut fragment, &infra, part, 11, &infra_words, &jig_words, &mut infra_bindings);
         }
         builder.splice(slot.id, fragment);

@@ -26,7 +26,7 @@ fn a_failed_store_stops_the_steps_keyed_sends_and_notifies_the_table() {
     w.fail_store();
     w.event(
         c,
-        jig_test_domain_client::Event::Jig(jig_domain_client::Event::Ask {
+        jig_client_test_domain::Event::Jig(jig_domain_client::Event::Ask {
             ask: jig_domain_client::intents::ByValue {
                 asked: skein_lib::Token::new(99),
                 scope: 7,
@@ -45,7 +45,7 @@ fn a_failed_store_stops_the_steps_keyed_sends_and_notifies_the_table() {
         "same key retries after lost envelope"
     );
     assert!(
-        w.kept(c).iter().all(|r| !matches!(r, jig_test_domain_client::store::Record::Table { .. })),
+        w.kept(c).iter().all(|r| !matches!(r, jig_client_test_domain::store::Record::Table { .. })),
         "answered keys are erased"
     );
 }

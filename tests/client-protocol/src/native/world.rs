@@ -233,7 +233,7 @@ fn run_mode(seed: u64, script: Script, terminal: bool) -> (Outcome, Box<[u8]>) {
                         name: b"jig".as_slice().into(),
                         longest: 1024,
                         interval: Duration::from_millis(1),
-                        status: Some(jig_view::regions::JigRegion::Link.region()),
+                        status: Some(jig_client_view::regions::JigRegion::Link.region()),
                     },
                     &super::Test::view_limits(&client.view),
                 )

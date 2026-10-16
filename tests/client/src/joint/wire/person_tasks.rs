@@ -145,14 +145,14 @@ pub(crate) mod tests {
         let original = source.clone();
         let limits = Limits { rows: 8, ..super::super::rows::tests::limits() };
         let value = super::super::documents::person_task_read(&source, &limits).expect("whole read");
-        let bounds = jig_scripted_engine::Bounds {
+        let bounds = jig_client_scripted_engine::Bounds {
             text: limits.text,
             rows: limits.rows,
             document_bytes: limits.document_bytes,
-            ..jig_scripted_engine::Bounds::default()
+            ..jig_client_scripted_engine::Bounds::default()
         };
         let client::ReadValue::OwnerPersonTask(actual) = &value else { panic!("genuine person work") };
-        let bytes = jig_scripted_engine::owner_person_task::bytes(actual, &bounds).expect("whole reserved heap")
+        let bytes = jig_client_scripted_engine::owner_person_task::bytes(actual, &bounds).expect("whole reserved heap")
             + u64::try_from(core::mem::size_of::<client::ReadValue>()).expect("inline envelope");
         assert_eq!(
             super::super::documents::person_task_read(&source, &Limits { document_bytes: bytes, ..limits }),

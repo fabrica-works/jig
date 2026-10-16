@@ -1,5 +1,5 @@
+use jig_client_views_world::World;
 use jig_domain_views::{Event, Follow, Request, TurnName};
-use jig_views_world::World;
 use skein_lib::Token;
 #[test]
 fn a_second_delivery_in_flight_fails_the_referee() {

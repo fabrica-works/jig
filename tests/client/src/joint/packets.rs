@@ -6,11 +6,11 @@ use super::{
     wire,
 };
 use crate::harness::ClientId;
+use jig_client_scripted_engine as admission;
+use jig_client_test_domain::{Answered, Event, connector_values::ConnectorLimits, family};
 use jig_domain_client::{Limits, contract as client};
 use jig_domain_people as people;
-use jig_scripted_engine as admission;
 use jig_test_connector::ApplicationOutcome;
-use jig_test_domain_client::{Answered, Event, connector_values::ConnectorLimits, family};
 use skein_lib::{RequestEnvelope, Token, Wall};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -218,7 +218,7 @@ fn terminal(transport: &mut Transport, watcher: Token, end: client::WatchEnd) ->
                 client::WatchEnd::Stopping => family::WatchEnd::Stopping,
                 client::WatchEnd::Busy => family::WatchEnd::Busy,
             };
-            Event::First(jig_test_domain_client::first::Event::Ended { watch: route.native, end })
+            Event::First(jig_client_test_domain::first::Event::Ended { watch: route.native, end })
         }
     };
     if end == client::WatchEnd::SignedOut {
@@ -241,7 +241,7 @@ pub fn application_document(
 ) -> Result<Incoming, Invalid> {
     let route = transport.watch(watcher).ok_or(Invalid::MissingRoute)?.clone();
     let Watched::Application { subject, scope } = route.subject else { return Err(Invalid::OwnerRoute) };
-    if connector != jig_test_domain_client::FIRST {
+    if connector != jig_client_test_domain::FIRST {
         return Err(Invalid::OwnerRoute);
     }
     let supplied_scope = match subject.scope {
@@ -255,7 +255,7 @@ pub fn application_document(
     assert!(transport.delivered(watcher, Pace::Document), "validated original application route");
     Ok(Incoming::Callback {
         client: route.client,
-        event: Event::First(jig_test_domain_client::first::Event::Watch {
+        event: Event::First(jig_client_test_domain::first::Event::Watch {
             watch: route.native,
             event: family::WatchEvent::Delivered(family::Document::Connector(value)),
         }),
@@ -276,7 +276,7 @@ pub fn application_read(
     else {
         return Err(Invalid::OwnerRoute);
     };
-    if connector != jig_test_domain_client::FIRST {
+    if connector != jig_client_test_domain::FIRST {
         return Err(Invalid::OwnerRoute);
     }
     let result = match source {
@@ -287,7 +287,7 @@ pub fn application_read(
         Err(jig_test_connector::DocumentMissing::NotAllowed) => family::ReadResult::NotAllowed,
     };
     transport.take_reply(to).expect("validated original read route");
-    Ok(Incoming::Callback { client, event: Event::First(jig_test_domain_client::first::Event::Read { read, result }) })
+    Ok(Incoming::Callback { client, event: Event::First(jig_client_test_domain::first::Event::Read { read, result }) })
 }
 
 /// Translate the actual people owner reply, preserving its native route on failure.
@@ -381,7 +381,7 @@ pub fn application_reply(
     let client = *client;
     let attempt = *attempt;
     let answer = wire::family::answer(outcome);
-    if !jig_test_domain_client::connector_bounds::answer_fits(&answer, limits) {
+    if !jig_client_test_domain::connector_bounds::answer_fits(&answer, limits) {
         return Err(Invalid::Payload);
     }
     transport.take_reply(to).expect("validated original reply route");
@@ -979,7 +979,7 @@ mod tests {
             application_document(
                 &mut transport,
                 watcher,
-                jig_test_domain_client::FIRST,
+                jig_client_test_domain::FIRST,
                 jig_test_connector::ClientDocument::Result { task: 1, code: u16::MAX },
                 &limits
             ),
@@ -989,14 +989,14 @@ mod tests {
         let Incoming::Callback {
             client: ClientId(0),
             event:
-                Event::First(jig_test_domain_client::first::Event::Watch {
+                Event::First(jig_client_test_domain::first::Event::Watch {
                     watch,
                     event: family::WatchEvent::Delivered(family::Document::Connector(value)),
                 }),
         } = application_document(
             &mut transport,
             watcher,
-            jig_test_domain_client::FIRST,
+            jig_client_test_domain::FIRST,
             jig_test_connector::ClientDocument::Result { task: u64::MAX, code: u16::MAX },
             &limits,
         )
@@ -1036,8 +1036,8 @@ mod tests {
             assert!(transport.reply(token).is_some());
             let Incoming::Callback {
                 client: ClientId(0),
-                event: Event::First(jig_test_domain_client::first::Event::Read { read: actual, result }),
-            } = application_read(&mut transport, token, jig_test_domain_client::FIRST, Err(source), &limits)
+                event: Event::First(jig_client_test_domain::first::Event::Read { read: actual, result }),
+            } = application_read(&mut transport, token, jig_client_test_domain::FIRST, Err(source), &limits)
                 .expect("exact owner terminal")
             else {
                 panic!("original application read")
@@ -1047,7 +1047,7 @@ mod tests {
             assert!(transport.reply(token).is_none());
             assert!(transport.reply(other).is_some());
             assert!(matches!(
-                application_read(&mut transport, token, jig_test_domain_client::FIRST, Err(source), &limits),
+                application_read(&mut transport, token, jig_client_test_domain::FIRST, Err(source), &limits),
                 Err(Invalid::MissingRoute)
             ));
         }
@@ -1084,7 +1084,7 @@ mod tests {
             );
             let Incoming::Callback {
                 client: ClientId(0),
-                event: Event::First(jig_test_domain_client::first::Event::Ended { watch, end }),
+                event: Event::First(jig_client_test_domain::first::Event::Ended { watch, end }),
             } = terminal(&mut transport, original, source).expect("exact terminal")
             else {
                 panic!("original application watch")
