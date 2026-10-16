@@ -282,7 +282,8 @@ fn admission(core: &Core, env: &Env<Limits>, party: u64, subject: &Subject, wind
             if !core.connectors.as_ref().contains(connector) {
                 return Some(WatchRefusal::Unknown);
             }
-            if *scope != documents::ApplicationScope::Own && core.people.role(party, scope.project()).is_none() {
+            if *scope != jig_domain_people::ApplicationScope::Own && core.people.role(party, scope.project()).is_none()
+            {
                 return Some(WatchRefusal::NotAllowed);
             }
             if window.rows > env.limits.documents.rows {
@@ -333,7 +334,10 @@ fn named_subject(subject: Watched, party: u64) -> Subject {
     }
 }
 
-fn application_subject(core: &Core, watcher: Token) -> Option<(u16, Token, documents::ApplicationScope, u64, Window)> {
+fn application_subject(
+    core: &Core,
+    watcher: Token,
+) -> Option<(u16, Token, jig_domain_people::ApplicationScope, u64, Window)> {
     let binding = core.view_subjects.get(&watcher)?;
     let subject = &core.view_names.get(binding.subject)?.subject;
     match subject {

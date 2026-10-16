@@ -570,7 +570,14 @@ fn assert_durable_end(
         })
         .expect("the protocol hash includes all supplied owner facts, independent of the local view handle");
     assert_eq!(request.revision, 0, "Q named the owner's seen end revision");
-    assert_eq!(markers[0].1.as_ref(), &jig_domain_people::Ask::Application { project: 1, connector: 2, digest });
+    assert_eq!(
+        markers[0].1.as_ref(),
+        &jig_domain_people::Ask::Application {
+            scope: jig_domain_people::ApplicationScope::Project(1),
+            connector: 2,
+            digest
+        }
+    );
     assert!(front.environment_documents.iter().any(|document| matches!(document,
         infra::ClientDocument::Environment {
             environment: found, fact, end_revision: 0, end: None, ..

@@ -31,7 +31,7 @@ fn ask(sign_in: u64, key: u8, value: connector::ApplicationRequest) -> root::Eve
         reply_to: ReplyTo::new(Token::new(600 + u64::from(key))),
         sign_in,
         key: [key; 16],
-        project: 1,
+        scope: jig_domain_people::ApplicationScope::Project(1),
         number: 2,
         digest: Sha256::digest(bytes).into(),
         value,

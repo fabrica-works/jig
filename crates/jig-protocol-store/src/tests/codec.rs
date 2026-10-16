@@ -3,6 +3,9 @@ use super::fixtures;
 use crate::codec::{component, notes};
 use jig_domain_notes as domain;
 
+const PROJECT: u32 = 1;
+const CONNECTOR: u16 = 7;
+
 fn a_notes_entry_reads_back_as_it_was_saved() {
     notes_round_trip(domain::Record::Entry(fixtures::note_entry()));
 }
@@ -716,4 +719,12 @@ fn a_moved_call_part_round_trips_through_the_core_family() {
 #[test]
 fn a_revised_call_part_round_trips_through_the_core_family() {
     core_round_trip(fixtures::calls::call(jig_domain_core::CallPart::Revised { task: 1, revision: 2 }));
+}
+
+#[test]
+fn an_application_ask_round_trips_each_scope_through_the_people_family() {
+    use jig_domain_people::{ApplicationScope, Ask};
+    for scope in [ApplicationScope::Project(PROJECT), ApplicationScope::Deployment, ApplicationScope::Own] {
+        ask_round_trip(Ask::Application { scope, connector: CONNECTOR, digest: [8; 32] });
+    }
 }

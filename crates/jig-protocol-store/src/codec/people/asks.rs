@@ -363,9 +363,13 @@ pub fn encode_ask(value: &domain::Ask, limits: &wire::Limits) -> Result<wire::As
             limits,
             wire::AskMarkSeenParts { seen: encode_seen(seen, limits)? },
         )?),
-        domain::Ask::Application { project, connector, digest } => wire::Ask::Application(wire::AskApplication::new(
+        domain::Ask::Application { scope, connector, digest } => wire::Ask::Application(wire::AskApplication::new(
             limits,
-            wire::AskApplicationParts { project: *project, connector: *connector, digest: *digest },
+            wire::AskApplicationParts {
+                scope: encode_application_scope(*scope, limits)?,
+                connector: *connector,
+                digest: *digest,
+            },
         )?),
         domain::Ask::EditNote { project, name, scope, change } => wire::Ask::EditNote(wire::AskEditNote::new(
             limits,
@@ -522,8 +526,8 @@ pub fn decode_ask(value: wire::Ask, limits: &wire::Limits) -> Result<domain::Ask
             domain::Ask::MarkSeen { seen: decode_seen(seen) }
         }
         wire::Ask::Application(value) => {
-            let wire::AskApplicationParts { project, connector, digest } = value.into_parts();
-            domain::Ask::Application { project, connector, digest }
+            let wire::AskApplicationParts { scope, connector, digest } = value.into_parts();
+            domain::Ask::Application { scope: decode_application_scope(scope), connector, digest }
         }
         wire::Ask::EditNote(value) => {
             let wire::AskEditNoteParts { project, name, scope, change } = value.into_parts();
@@ -673,4 +677,24 @@ fn decode_ask_prioritise_goals(values: List<wire::Priority>) -> Box<[(u64, u32)]
             .expect("same number of members");
     }
     result.into_boxed()
+}
+
+fn encode_application_scope(
+    scope: domain::ApplicationScope,
+    limits: &wire::Limits,
+) -> Result<wire::ApplicationScope, wire::Problem> {
+    Ok(match scope {
+        domain::ApplicationScope::Project(project) => {
+            wire::ApplicationScope::Project(wire::ScopeProject::new(limits, wire::ScopeProjectParts { project })?)
+        }
+        domain::ApplicationScope::Deployment => wire::ApplicationScope::Deployment,
+        domain::ApplicationScope::Own => wire::ApplicationScope::Own,
+    })
+}
+fn decode_application_scope(scope: wire::ApplicationScope) -> domain::ApplicationScope {
+    match scope {
+        wire::ApplicationScope::Project(project) => domain::ApplicationScope::Project(project.into_parts().project),
+        wire::ApplicationScope::Deployment => domain::ApplicationScope::Deployment,
+        wire::ApplicationScope::Own => domain::ApplicationScope::Own,
+    }
 }

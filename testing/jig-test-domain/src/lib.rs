@@ -165,7 +165,7 @@ pub enum Event {
     WatchApplication {
         watcher: Token,
         sign_in: u64,
-        scope: core::documents::ApplicationScope,
+        scope: jig_domain_people::ApplicationScope,
         number: u16,
         subject: connector::ClientSubject,
         window: core::documents::Window,
@@ -174,7 +174,7 @@ pub enum Event {
     ReadApplication {
         reply: ReplyTo,
         sign_in: u64,
-        scope: core::documents::ApplicationScope,
+        scope: jig_domain_people::ApplicationScope,
         number: u16,
         subject: connector::ClientSubject,
         window: core::documents::Window,
@@ -184,7 +184,7 @@ pub enum Event {
         reply_to: ReplyTo,
         sign_in: u64,
         key: [u8; 16],
-        project: u32,
+        scope: jig_domain_people::ApplicationScope,
         number: u16,
         digest: [u8; 32],
         value: connector::ApplicationRequest,
@@ -460,8 +460,8 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event) {
         Event::Link { channel, link } => decide(domain, env, Work::Link { channel, link }),
         Event::ResultRead { payload, end } => link::read(domain, env, payload, end),
         Event::Stop => decide(domain, env, Work::Core(core::Event::Stopping)),
-        Event::Application { reply_to, sign_in, key, project, number, digest, value } => {
-            decide(domain, env, Work::Application { reply_to, sign_in, key, project, number, digest, value });
+        Event::Application { reply_to, sign_in, key, scope, number, digest, value } => {
+            decide(domain, env, Work::Application { reply_to, sign_in, key, scope, number, digest, value });
         }
         Event::ConnectorTimer { number } => decide(domain, env, Work::ConnectorFire { number }),
         Event::WriterRead { connector, resource, event } => {
@@ -634,7 +634,7 @@ fn decide(domain: &mut Domain, env: &Env<Limits>, first: Work) {
                     read: core::reads::Read::Application { scope, connector: number, read: token, window },
                 }));
             }
-            Work::Application { reply_to, sign_in, key, project, number, digest, value } => {
+            Work::Application { reply_to, sign_in, key, scope, number, digest, value } => {
                 let owner = Token::new(domain.next_payload);
                 domain.next_payload = domain.next_payload.checked_add(1).expect("root token room");
                 if number == 1 || number == 2 {
@@ -644,7 +644,7 @@ fn decide(domain: &mut Domain, env: &Env<Limits>, first: Work) {
                     reply_to,
                     sign_in,
                     key,
-                    project,
+                    scope,
                     connector: number,
                     digest,
                     owner,

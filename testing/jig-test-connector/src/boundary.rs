@@ -547,8 +547,8 @@ pub enum Event {
         token: Token,
         owner: Token,
         person: u64,
-        project: u32,
-        role: u32,
+        scope: crate::ClientScope,
+        role: Option<u32>,
         retention: Duration,
     },
     /// The party's requested core part has settled.

@@ -360,7 +360,7 @@ pub(super) enum Work {
     WatchApplication {
         watcher: Token,
         sign_in: u64,
-        scope: core::documents::ApplicationScope,
+        scope: jig_domain_people::ApplicationScope,
         number: u16,
         subject: connector::ClientSubject,
         window: core::documents::Window,
@@ -368,7 +368,7 @@ pub(super) enum Work {
     ReadApplication {
         reply: ReplyTo,
         sign_in: u64,
-        scope: core::documents::ApplicationScope,
+        scope: jig_domain_people::ApplicationScope,
         number: u16,
         subject: connector::ClientSubject,
         window: core::documents::Window,
@@ -377,7 +377,7 @@ pub(super) enum Work {
         reply_to: ReplyTo,
         sign_in: u64,
         key: [u8; 16],
-        project: u32,
+        scope: jig_domain_people::ApplicationScope,
         number: u16,
         digest: [u8; 32],
         value: connector::ApplicationRequest,

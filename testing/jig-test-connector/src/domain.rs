@@ -190,8 +190,8 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         }
         Event::ApplicationPrepare { owner, value } => domain.application.prepare(owner, value),
         Event::ApplicationDrop { owner } => domain.application.drop(owner),
-        Event::Application { request, token, owner, person, project, role, retention } => {
-            crate::application::decide(domain, env, request, token, owner, person, project, role, retention, out);
+        Event::Application { request, token, owner, person, scope, role, retention } => {
+            crate::application::decide(domain, env, request, token, owner, person, scope, role, retention, out);
         }
         Event::ApplicationCore { request, answer } => {
             crate::application::core_answer(domain, env, request, answer, out);

@@ -129,7 +129,7 @@ pub enum Read {
     Tasks { query: documents::TaskQuery, from: Option<Cursor> },
     /// A connector-owned document within the client's stated role scope.
     Application {
-        scope: documents::ApplicationScope,
+        scope: jig_domain_people::ApplicationScope,
         connector: u16,
         read: skein_lib::Token,
         window: documents::Window,

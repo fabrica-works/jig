@@ -564,7 +564,7 @@ pub fn world(seed: u64, automatic: bool) -> crate::effects::World {
 pub fn application(
     world: &mut crate::effects::World,
     watcher: u64,
-    scope: core::documents::ApplicationScope,
+    scope: jig_domain_people::ApplicationScope,
     number: u16,
     subject: jig_test_connector::ClientSubject,
 ) {

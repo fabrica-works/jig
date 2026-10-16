@@ -60,8 +60,8 @@ fn a_watched_connector_subject_is_delivered_whole_after_each_change() {
             token: owner,
             owner,
             person: 1,
-            project: 1,
-            role: 0,
+            scope: connector::ClientScope::Project(1),
+            role: Some(0),
             retention: Duration::from_nanos(100),
         });
         assert!(marked(&requests, subject));

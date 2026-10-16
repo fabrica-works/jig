@@ -3,10 +3,17 @@ use jig_core_world::{
     effects::{Cut, World},
     reads, watches,
 };
-use jig_domain_core::{self as core, documents::ApplicationScope};
+use jig_domain_core as core;
+use jig_domain_people::ApplicationScope;
 use jig_test_connector::{self as connector, ClientDocument, ClientSubject};
 use jig_test_domain as root;
 use skein_lib::{ReplyTo, Token};
+
+const PROJECT: u32 = 1;
+const CONNECTOR: u16 = 1;
+const OBJECT: u64 = 1;
+const OWN_REQUEST: u64 = 40001;
+const OWN_KEY: u8 = 17;
 
 const OWN_WATCHER: u64 = 56;
 const DEPLOYMENT_WATCHER: u64 = 57;
@@ -39,7 +46,7 @@ fn change(world: &mut World, revision: u8, value: u64) {
         reply_to: ReplyTo::new(Token::new(40_000 + u64::from(revision))),
         sign_in: world.sign_in.expect("story fixture supplies this value"),
         key: [revision + 1; 16],
-        project: 1,
+        scope: jig_domain_people::ApplicationScope::Project(1),
         number: 1,
         digest: [revision + 1; 32],
         value: connector::ApplicationRequest { object: 1, revision: u64::from(revision), value, release: None },
@@ -243,4 +250,34 @@ fn an_application_read_carries_its_window_to_the_connector() {
     let Ok(ClientDocument::Project { resources, .. }) = &receipt.3 else { panic!("project rows") };
     assert_eq!(resources.len(), 1);
     assert_eq!(resources.get(0).expect("second resource").path, path);
+}
+
+#[test]
+fn an_own_scope_application_request_reaches_its_connector_with_no_role() {
+    let mut world = world(887);
+    world.send(root::Event::Core(core::Event::People(jig_domain_people::Event::Roles {
+        project: PROJECT,
+        holdings: Box::new([]),
+    })));
+    world.send(root::Event::Application {
+        reply_to: ReplyTo::new(Token::new(OWN_REQUEST)),
+        sign_in: world.sign_in.expect("signed in"),
+        key: [OWN_KEY; 16],
+        scope: ApplicationScope::Own,
+        number: CONNECTOR,
+        digest: [8; 32],
+        value: connector::ApplicationRequest { object: OBJECT, revision: 0, value: 42, release: None },
+    });
+    assert_eq!(
+        world.application_answers,
+        vec![(
+            Token::new(OWN_REQUEST),
+            CONNECTOR,
+            connector::ApplicationOutcome::Changed {
+                object: OBJECT,
+                now: connector::ApplicationObject { revision: 1, value: 42 }
+            }
+        )]
+    );
+    world.watches.as_ref().expect("watch parties").finish();
 }

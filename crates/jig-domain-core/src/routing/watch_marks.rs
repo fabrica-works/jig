@@ -4,9 +4,10 @@
 //! no state snapshots and coalesce in a set. Once projection handoffs finish,
 //! the views child asks for documents from the decision's final live state.
 
-use crate::documents::{self, ApplicationScope, Proposer, Subject};
+use crate::documents::{self, Proposer, Subject};
 use crate::{Core, Limits, Request, Requests};
 use jig_domain_people as people;
+use jig_domain_people::ApplicationScope;
 use jig_domain_tasks as tasks;
 use jig_domain_views as views;
 use skein_lib::{Env, List, Queue, Set};

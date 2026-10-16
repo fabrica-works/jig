@@ -247,8 +247,8 @@ pub fn application_document(
         return Err(Invalid::OwnerRoute);
     }
     let supplied_scope = match subject.scope {
-        family::Scope::Project(project) => jig_domain_core::documents::ApplicationScope::Project(project),
-        family::Scope::Deployment => jig_domain_core::documents::ApplicationScope::Deployment,
+        family::Scope::Project(project) => jig_domain_people::ApplicationScope::Project(project),
+        family::Scope::Deployment => jig_domain_people::ApplicationScope::Deployment,
     };
     if supplied_scope != scope {
         return Err(Invalid::OwnerRoute);
@@ -959,12 +959,12 @@ mod tests {
         let watcher = transport.open(
             ClientId(0),
             native,
-            Watched::Application { subject, scope: jig_domain_core::documents::ApplicationScope::Project(u32::MAX) },
+            Watched::Application { subject, scope: jig_domain_people::ApplicationScope::Project(u32::MAX) },
         );
         let other = transport.open(
             ClientId(1),
             native,
-            Watched::Application { subject, scope: jig_domain_core::documents::ApplicationScope::Project(u32::MAX) },
+            Watched::Application { subject, scope: jig_domain_people::ApplicationScope::Project(u32::MAX) },
         );
         let limits = crate::test::limits().first.connector;
         assert!(matches!(
@@ -1073,7 +1073,7 @@ mod tests {
                 native,
                 Watched::Application {
                     subject: application_subject(),
-                    scope: jig_domain_core::documents::ApplicationScope::Project(u32::MAX),
+                    scope: jig_domain_people::ApplicationScope::Project(u32::MAX),
                 },
             );
             let other = transport.open(
@@ -1081,7 +1081,7 @@ mod tests {
                 native,
                 Watched::Application {
                     subject: application_subject(),
-                    scope: jig_domain_core::documents::ApplicationScope::Project(u32::MAX),
+                    scope: jig_domain_people::ApplicationScope::Project(u32::MAX),
                 },
             );
             let Incoming::Callback {

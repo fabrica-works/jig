@@ -503,7 +503,7 @@ fn connector_documents_and_reads_share_the_last_connector_commit_barrier() {
         Event::WatchApplication {
             watcher: Token::new(501),
             sign_in: 10,
-            scope: core::documents::ApplicationScope::Project(1),
+            scope: jig_domain_people::ApplicationScope::Project(1),
             subject: subject.clone(),
             window: core::documents::Window { rows: 1, after: None },
         },
@@ -515,7 +515,7 @@ fn connector_documents_and_reads_share_the_last_connector_commit_barrier() {
         Event::ReadApplication {
             reply: ReplyTo::new(Token::new(502)),
             sign_in: 10,
-            scope: core::documents::ApplicationScope::Project(1),
+            scope: jig_domain_people::ApplicationScope::Project(1),
             subject,
         },
     );
@@ -560,7 +560,7 @@ fn connector_documents_and_reads_share_the_last_connector_commit_barrier() {
         Event::WatchApplication {
             watcher: Token::new(503),
             sign_in: 10,
-            scope: core::documents::ApplicationScope::Project(1),
+            scope: jig_domain_people::ApplicationScope::Project(1),
             subject: crate::ClientSubject::Observability(observability::ClientSubject::Service { project: 2, service }),
             window: core::documents::Window { rows: 1, after: None },
         },

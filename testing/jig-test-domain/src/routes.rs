@@ -144,7 +144,7 @@ fn route_ask(
             window,
             work,
         ),
-        core::Ask::Application { request, token, owner, person, project, role, retention } => {
+        core::Ask::Application { request, token, owner, person, scope, role, retention } => {
             work.push(Work::Connector {
                 number,
                 event: connector::Event::Application {
@@ -152,8 +152,8 @@ fn route_ask(
                     token,
                     owner,
                     person,
-                    project,
-                    role: role.number(),
+                    scope: crate::client_documents::scope(scope),
+                    role: crate::client_documents::role_number(role),
                     retention,
                 },
             });

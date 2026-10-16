@@ -112,8 +112,8 @@ pub(crate) fn decide(
     token: Token,
     owner: Token,
     _person: u64,
-    project: u32,
-    role: u32,
+    scope: crate::ClientScope,
+    role: Option<u32>,
     retention: Duration,
     out: &mut Queue<Request>,
 ) {
@@ -136,7 +136,9 @@ pub(crate) fn decide(
         return busy(request, out);
     }
     let pending = Pending { request: value, token, retention };
-    if role > 2 {
+    if let Some(role) = role
+        && role > 2
+    {
         return finish(domain, env, request, pending, ApplicationOutcome::Role { held: role }, out);
     }
     if domain.specification_resource(value.object).is_none() {
@@ -153,6 +155,10 @@ pub(crate) fn decide(
     match value.release {
         Some(release) => {
             assert!(domain.application.pending.insert(request, pending).is_ok(), "reserved application part");
+            let project = match scope {
+                crate::ClientScope::Project(project) => project,
+                crate::ClientScope::Deployment | crate::ClientScope::Own => 0,
+            };
             out.push(Request::ApplicationRelease { request, project, release });
         }
         None => changed(domain, env, request, pending, out),

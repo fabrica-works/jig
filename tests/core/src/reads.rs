@@ -180,7 +180,7 @@ pub fn ask(world: &mut World, number: u64, read: reads::Read) {
 pub fn application(
     world: &mut World,
     number: u64,
-    scope: jig_domain_core::documents::ApplicationScope,
+    scope: jig_domain_people::ApplicationScope,
     connector: u16,
     subject: jig_test_connector::ClientSubject,
 ) {
@@ -197,7 +197,7 @@ pub fn application(
 pub fn application_window(
     world: &mut World,
     number: u64,
-    scope: jig_domain_core::documents::ApplicationScope,
+    scope: jig_domain_people::ApplicationScope,
     connector: u16,
     subject: jig_test_connector::ClientSubject,
     window: jig_domain_core::documents::Window,

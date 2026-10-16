@@ -35,18 +35,18 @@ pub(crate) fn forget(_domain: &Domain, number: u16, subject: Token, work: &mut Q
     }
 }
 
-fn infrastructure_scope(scope: core::documents::ApplicationScope) -> infrastructure::ClientScope {
+fn infrastructure_scope(scope: jig_domain_people::ApplicationScope) -> infrastructure::ClientScope {
     match scope {
-        core::documents::ApplicationScope::Project(project) => infrastructure::ClientScope::Project(project),
-        core::documents::ApplicationScope::Deployment => infrastructure::ClientScope::Deployment,
-        core::documents::ApplicationScope::Own => unreachable!("own document refused before translation"),
+        jig_domain_people::ApplicationScope::Project(project) => infrastructure::ClientScope::Project(project),
+        jig_domain_people::ApplicationScope::Deployment => infrastructure::ClientScope::Deployment,
+        jig_domain_people::ApplicationScope::Own => unreachable!("own document refused before translation"),
     }
 }
-fn observability_scope(scope: core::documents::ApplicationScope) -> observability::ClientScope {
+fn observability_scope(scope: jig_domain_people::ApplicationScope) -> observability::ClientScope {
     match scope {
-        core::documents::ApplicationScope::Project(project) => observability::ClientScope::Project(project),
-        core::documents::ApplicationScope::Deployment => observability::ClientScope::Deployment,
-        core::documents::ApplicationScope::Own => unreachable!("own document refused before translation"),
+        jig_domain_people::ApplicationScope::Project(project) => observability::ClientScope::Project(project),
+        jig_domain_people::ApplicationScope::Deployment => observability::ClientScope::Deployment,
+        jig_domain_people::ApplicationScope::Own => unreachable!("own document refused before translation"),
     }
 }
 
@@ -54,12 +54,12 @@ pub(crate) fn ask_document(
     _domain: &Domain,
     number: u16,
     watcher: Token,
-    scope: core::documents::ApplicationScope,
+    scope: jig_domain_people::ApplicationScope,
     subject: Token,
     party: u64,
     work: &mut Queue<Work>,
 ) {
-    if scope == core::documents::ApplicationScope::Own {
+    if scope == jig_domain_people::ApplicationScope::Own {
         work.push(Work::Core(core::Event::View(jig_domain_views::Event::Made {
             watcher,
             outcome: jig_domain_views::Made::Gone { why: jig_domain_views::End::Gone },
@@ -180,12 +180,12 @@ pub(crate) fn read(
     decision: &mut Decision<Write, Output>,
     number: u16,
     reply: ReplyTo,
-    scope: core::documents::ApplicationScope,
+    scope: jig_domain_people::ApplicationScope,
     read: Token,
     party: u64,
     work: &mut Queue<Work>,
 ) {
-    if scope == core::documents::ApplicationScope::Own {
+    if scope == jig_domain_people::ApplicationScope::Own {
         forget(domain, number, read, work);
         held(decision, Output::ApplicationRead { reply, answer: Err(ClientMissing::Unknown) });
         return;

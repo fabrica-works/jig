@@ -20,16 +20,17 @@
 //! Ready requests share person-scoped keys across sign-ins: identical pending
 //! copies join bounded waiters, saved copies replay the outcome, and conflicting
 //! payloads refuse (domain/people.md, sections 3 and 5.1).
-//! Application requests carry only project, connector and the supplied 32-byte
+//! Application requests carry only scope, connector and the supplied 32-byte
 //! digest. Their saved `Applied` result names the connector's outcome by token;
 //! the connector owns its value and revision checks (client/domain/contract.md,
 //! section 3.3). They share every key, waiter, pending and retention bound with
-//! jig's requests. Any held project role admits them; connector policy decides
+//! jig's requests. A role in their scope admits them, or the sign-in alone for
+//! the party's own; connector policy decides
 //! whether that role may make the request.
 //!
 //! | Key state | Event | Next state | Emits |
 //! | --- | --- | --- | --- |
-//! | Absent | Authenticated application ask with a project role | Flight | Route |
+//! | Absent | Authenticated application ask admitted by its scope | Flight | Route |
 //! | Flight | Same metadata and digest | Flight | Joins bounded waiter |
 //! | Flight | Another ask or digest | Flight | Key conflict |
 //! | Flight | Applied token | Kept | Save and each waiter's reply marker |
@@ -54,6 +55,8 @@
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 extern crate alloc;
+mod scope;
+pub use scope::ApplicationScope;
 mod templates;
 pub use templates::{TemplateBudget, TemplateDeadline, TemplateExecutor, TemplateOverride};
 mod amendment;

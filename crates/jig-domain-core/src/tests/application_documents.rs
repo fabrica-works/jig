@@ -1,6 +1,6 @@
 //! Application subjects use core admission and the existing pacing entry points.
 use super::*;
-use crate::documents::ApplicationScope;
+use jig_domain_people::ApplicationScope;
 
 fn application_subject(scope: ApplicationScope) -> Watched {
     Watched::Application { scope, connector: 1, subject: Token::new(500) }

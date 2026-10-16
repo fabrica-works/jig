@@ -107,7 +107,9 @@ record Member { executor: TaskExecutor words: bytes 8192 parameters: bytes 65536
 record AskCreate { project: u32 batch: list 8 Member }
 record AskClose { project: u32 chat: u64 disposals: list 1024 Disposal }
 record AskMarkSeen { seen: Seen }
-record AskApplication { project: u32 connector: u16 digest: fixed 32 }
+record ScopeProject { project: u32 }
+enum ApplicationScope { project: ScopeProject, deployment, own }
+record AskApplication { scope: ApplicationScope connector: u16 digest: fixed 32 }
 record AskEditNote { project: u32 name: u64 scope: NoteScope change: NoteChange }
 record AskMakeService { project: u32 name: bytes 8192 role: Role }
 record AskAdopt { project: u32 adoption: Adoption }

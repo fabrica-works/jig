@@ -11,7 +11,11 @@ fn restored_application_tokens_cannot_exceed_the_deployments_allocations() {
     let token = fresh(&mut core.counters, Family::Application).expect("application token");
     let mut record = people::Stored::Answer {
         key: people::RequestKey { person: 1, key: [1; 16] },
-        ask: Box::new(people::Ask::Application { project: 1, connector, digest: [1; 32] }),
+        ask: Box::new(people::Ask::Application {
+            scope: jig_domain_people::ApplicationScope::Project(1),
+            connector,
+            digest: [1; 32],
+        }),
         outcome: people::Outcome::Applied { connector, token: Token::new(token.checked_add(1).expect("next token")) },
         at: Wall::EPOCH,
     };

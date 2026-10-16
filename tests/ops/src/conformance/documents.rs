@@ -101,7 +101,7 @@ pub fn poll(peers: &mut Peers, store: &Store) -> Vec<Input<root::Event, root::Re
             events.push(Input::Event(root::Event::WatchApplication {
                 watcher: Token::new(watcher),
                 sign_in,
-                scope: core::documents::ApplicationScope::Project(1),
+                scope: jig_domain_people::ApplicationScope::Project(1),
                 subject,
                 window: core::documents::Window { rows: 1, after: None },
             }));

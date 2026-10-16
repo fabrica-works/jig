@@ -18,11 +18,11 @@ pub(crate) fn window(value: core::documents::Window) -> connector::ClientWindow 
     }
 }
 
-pub(crate) fn scope(value: core::documents::ApplicationScope) -> connector::ClientScope {
+pub(crate) fn scope(value: jig_domain_people::ApplicationScope) -> connector::ClientScope {
     match value {
-        core::documents::ApplicationScope::Project(project) => connector::ClientScope::Project(project),
-        core::documents::ApplicationScope::Deployment => connector::ClientScope::Deployment,
-        core::documents::ApplicationScope::Own => connector::ClientScope::Own,
+        jig_domain_people::ApplicationScope::Project(project) => connector::ClientScope::Project(project),
+        jig_domain_people::ApplicationScope::Deployment => connector::ClientScope::Deployment,
+        jig_domain_people::ApplicationScope::Own => connector::ClientScope::Own,
     }
 }
 
@@ -189,4 +189,9 @@ pub(crate) fn read(
         }
     }
     assert!(reply.is_none(), "the connector answers within the decision");
+}
+
+pub(crate) fn role_number(role: Option<jig_domain_people::Role>) -> Option<u32> {
+    let role = role?;
+    Some(role.number())
 }

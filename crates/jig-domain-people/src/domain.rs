@@ -912,9 +912,12 @@ fn end_signin(domain: &mut Domain, number: u64, out: &mut Queue<Request>) {
 
 fn project(ask: &Ask) -> u32 {
     match ask {
+        Ask::Application { scope, .. } => match scope {
+            crate::ApplicationScope::Project(project) => *project,
+            crate::ApplicationScope::Own | crate::ApplicationScope::Deployment => 0,
+        },
         Ask::MarkSeen { .. } => 0,
         Ask::Close { project, .. }
-        | Ask::Application { project, .. }
         | Ask::EditNote { project, .. }
         | Ask::MakeService { project, .. }
         | Ask::Adopt { project, .. }
@@ -1431,7 +1434,11 @@ fn admit_ask(
         return again(to, Again::Busy, out);
     }
     let project = project(&ask);
-    let role = role(domain, key.person, project);
+    let role = if let Ask::Application { scope: crate::ApplicationScope::Own, .. } = &ask {
+        None
+    } else {
+        role(domain, key.person, project)
+    };
     let refusal = admission(domain, key.person, project, role, &ask);
     if let Some(refusal) = refusal {
         let outcome = Outcome::Refused(refusal);
@@ -1789,7 +1796,10 @@ pub fn application_part(domain: &mut Domain, env: &Env<Limits>, request: Token, 
     let id = Id::from_token(request);
     let flight = domain.pending.get(id).ok_or(Outcome::Refused(Refusal::Unknown))?;
     let application_project = match &flight.ask {
-        Ask::Application { project, .. } => *project,
+        Ask::Application { scope, .. } => match scope {
+            crate::ApplicationScope::Project(project) => *project,
+            crate::ApplicationScope::Own | crate::ApplicationScope::Deployment => 0,
+        },
         Ask::Close { .. }
         | Ask::MarkSeen { .. }
         | Ask::MakeService { .. }
@@ -1861,8 +1871,8 @@ pub fn application_part(domain: &mut Domain, env: &Env<Limits>, request: Token, 
 
 fn admission(domain: &Domain, person: u64, _project: u32, role: Option<Role>, ask: &Ask) -> Option<Refusal> {
     match ask {
-        Ask::Application { .. } => {
-            if role.is_some() {
+        Ask::Application { scope, .. } => {
+            if *scope == crate::ApplicationScope::Own || role.is_some() {
                 None
             } else {
                 Some(Refusal::Role { held: None })

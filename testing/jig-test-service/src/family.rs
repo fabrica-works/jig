@@ -144,7 +144,7 @@ pub fn to_root(
                 reply_to,
                 sign_in,
                 key,
-                project: decoded.project,
+                scope: jig_domain_people::ApplicationScope::Project(decoded.project),
                 number: family,
                 digest,
                 value: decoded.value,
@@ -188,8 +188,8 @@ pub fn to_root(
         }
     }
 }
-fn scope(subject: d::ClientSubject) -> jig_domain_core::documents::ApplicationScope {
-    use jig_domain_core::documents::ApplicationScope;
+fn scope(subject: d::ClientSubject) -> jig_domain_people::ApplicationScope {
+    use jig_domain_people::ApplicationScope;
     match subject {
         d::ClientSubject::Object { project, .. }
         | d::ClientSubject::Panel { project, .. }

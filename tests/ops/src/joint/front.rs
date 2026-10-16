@@ -303,7 +303,7 @@ impl Subject {
         }
     }
 }
-fn subject_route(subject: Subject) -> Result<(core::documents::ApplicationScope, root::ClientSubject), &'static str> {
+fn subject_route(subject: Subject) -> Result<(jig_domain_people::ApplicationScope, root::ClientSubject), &'static str> {
     match subject {
         Subject::Infrastructure(subject) => {
             use jig_ops_domain_infrastructure::ClientSubject as S;
@@ -343,8 +343,8 @@ fn subject_route(subject: Subject) -> Result<(core::documents::ApplicationScope,
                 }
             };
             let scope = match subject.scope {
-                infra::Scope::Project(project) => core::documents::ApplicationScope::Project(project),
-                infra::Scope::Deployment => core::documents::ApplicationScope::Deployment,
+                infra::Scope::Project(project) => jig_domain_people::ApplicationScope::Project(project),
+                infra::Scope::Deployment => jig_domain_people::ApplicationScope::Deployment,
             };
             Ok((scope, root::ClientSubject::Infrastructure(owner)))
         }
@@ -375,8 +375,8 @@ fn subject_route(subject: Subject) -> Result<(core::documents::ApplicationScope,
                 }
             };
             let scope = match subject.scope {
-                obs::Scope::Project(project) => core::documents::ApplicationScope::Project(project),
-                obs::Scope::Deployment => core::documents::ApplicationScope::Deployment,
+                obs::Scope::Project(project) => jig_domain_people::ApplicationScope::Project(project),
+                obs::Scope::Deployment => jig_domain_people::ApplicationScope::Deployment,
             };
             Ok((scope, root::ClientSubject::Observability(owner)))
         }

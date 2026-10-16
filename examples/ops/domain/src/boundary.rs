@@ -55,12 +55,12 @@ pub enum Event {
     WatchApplication {
         watcher: Token,
         sign_in: u64,
-        scope: core::documents::ApplicationScope,
+        scope: jig_domain_people::ApplicationScope,
         subject: ClientSubject,
         window: core::documents::Window,
     },
     /// Read a typed connector document without a key.
-    ReadApplication { reply: ReplyTo, sign_in: u64, scope: core::documents::ApplicationScope, subject: ClientSubject },
+    ReadApplication { reply: ReplyTo, sign_in: u64, scope: jig_domain_people::ApplicationScope, subject: ClientSubject },
     /// A decoded infrastructure request with its protocol encoding's digest.
     Application {
         reply_to: ReplyTo,

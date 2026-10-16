@@ -28,8 +28,8 @@ fn decide(world: &mut World, token: u64, role: u32, value: connector::Applicatio
         token: Token::new(token),
         owner,
         person: 1,
-        project: 1,
-        role,
+        scope: connector::ClientScope::Project(1),
+        role: Some(role),
         retention: Duration::from_nanos(100),
     })
 }

@@ -130,7 +130,7 @@ fn event_in(
                 reply_to,
                 sign_in,
                 key,
-                project,
+                scope: jig_domain_people::ApplicationScope::Project(project),
                 connector: jig_ops_domain_connectors::number(Connector::Infrastructure),
                 digest,
                 owner,
@@ -391,7 +391,14 @@ fn core_ask(
         core::Ask::Read { reply, scope, read, party, window: _ } => {
             crate::client_documents::read(domain, env, decision, number, reply, scope, read, party, work);
         }
-        core::Ask::Application { request, token, owner, person, project, role, retention } => {
+        core::Ask::Application { request, token, owner, person, scope, role, retention } => {
+            let (jig_domain_people::ApplicationScope::Project(project), Some(role)) = (scope, role) else {
+                work.push(Work::Core(core::Event::People(jig_domain_people::Event::Decided {
+                    request,
+                    outcome: jig_domain_people::Outcome::Refused(jig_domain_people::Refusal::NotOffered),
+                })));
+                return;
+            };
             assert!(number == jig_ops_domain_connectors::number(Connector::Infrastructure), "application owner");
             work.push(Work::Infrastructure(infrastructure::Event::Application {
                 request,

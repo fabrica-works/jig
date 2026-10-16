@@ -35,7 +35,7 @@ fn application_parts_use_party_admission_and_preserve_the_original_key() {
     let mut test = Test::new(LIMITS);
     test.signin(1, 10, identity(0, 1));
     test.send(Event::Roles { project: 1, holdings: Box::new([Holding { person: 1, role: Role::Observer }]) });
-    let ask = Ask::Application { project: 1, connector: 7, digest: [8; 32] };
+    let ask = Ask::Application { scope: ApplicationScope::Project(1), connector: 7, digest: [8; 32] };
     let request = route(&test.request(10, 1, ask.clone()));
     let observer_part = Ask::SetPool { project: 1, person: 1, budget: 20 };
     assert_eq!(
@@ -1232,7 +1232,7 @@ fn retry_and_signed_out_answers_cannot_restore_as_completed_keys() {
 }
 
 fn application(digest: u8) -> Ask {
-    Ask::Application { project: 1, connector: 2, digest: [digest; 32] }
+    Ask::Application { scope: ApplicationScope::Project(1), connector: 2, digest: [digest; 32] }
 }
 
 #[test]
@@ -1598,3 +1598,5 @@ mod marked_chats;
 mod utf8;
 
 mod create;
+
+mod application_scope;

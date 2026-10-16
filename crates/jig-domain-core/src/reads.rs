@@ -265,7 +265,8 @@ pub(crate) fn start(core: &mut Core, env: &Env<Limits>, reply: ReplyTo, sign_in:
     };
     match &read {
         Read::Application { scope, connector, read: name, window } => {
-            if (*scope != documents::ApplicationScope::Own && core.people.role(party, scope.project()).is_none())
+            if (*scope != jig_domain_people::ApplicationScope::Own
+                && core.people.role(party, scope.project()).is_none())
                 || !core.connectors.as_ref().contains(connector)
             {
                 return refused_application(reply, &read, Why::Unknown);

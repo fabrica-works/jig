@@ -47,6 +47,7 @@ pub(super) fn route_people(
                 people::application_part_done(&mut core.people, request);
                 return super::application_routes::answer(flight.connector, request, outcome);
             }
+            let _finished = core.applications.remove(&request);
             people::Event::Decided { request, outcome }
         }
         other @ (people::Event::ChatState { .. }
@@ -198,17 +199,9 @@ pub(super) fn tag_people(
                     continue;
                 }
                 match *ask {
-                    people::Ask::Application { connector, .. } => {
+                    people::Ask::Application { scope, connector, .. } => {
                         super::application_routes::admitted(
-                            core,
-                            env,
-                            work,
-                            &mut out,
-                            request,
-                            connector,
-                            person,
-                            project,
-                            role.expect("application membership admitted"),
+                            core, env, work, &mut out, request, connector, person, scope, role,
                         );
                     }
                     ask @ (people::Ask::TakePerson { .. }

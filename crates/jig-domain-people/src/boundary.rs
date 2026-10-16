@@ -264,7 +264,7 @@ pub enum Ask {
     /// Mark results or one chat's replies seen under this party's key.
     MarkSeen { seen: Seen },
     /// Application-owned request metadata; the root carries the value, and the protocol supplies its digest.
-    Application { project: u32, connector: u16, digest: [u8; 32] },
+    Application { scope: crate::ApplicationScope, connector: u16, digest: [u8; 32] },
     /// Correct or delete a note whose scope the party's project role permits.
     EditNote { project: u32, name: u64, scope: Box<NoteScope>, change: Box<NoteChange> },
     /// Make a deployment service in a project with a role and display name.

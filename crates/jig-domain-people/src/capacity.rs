@@ -91,7 +91,6 @@ pub(crate) fn action(ask: &Ask) -> CapacityAction {
 pub(crate) fn project(ask: &Ask) -> Option<u32> {
     match ask {
         Ask::Close { project, .. }
-        | Ask::Application { project, .. }
         | Ask::EditNote { project, .. }
         | Ask::MakeService { project, .. }
         | Ask::Adopt { project, .. }
@@ -114,6 +113,11 @@ pub(crate) fn project(ask: &Ask) -> Option<u32> {
         | Ask::Release { project, .. }
         | Ask::Create { project, .. }
         | Ask::SetGoal { project, .. } => Some(*project),
+        Ask::Application { scope, .. } => match scope {
+            crate::ApplicationScope::Own => None,
+            crate::ApplicationScope::Project(project) => Some(*project),
+            crate::ApplicationScope::Deployment => Some(0),
+        },
         Ask::MarkSeen { .. } => None,
     }
 }

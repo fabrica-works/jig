@@ -4,8 +4,9 @@
 use crate::harness::ClientId;
 use jig_client_domain::contract::{Read, Subject, VersionRange};
 use jig_client_test_domain::family;
-use jig_domain_core::{Event, documents::ApplicationScope};
+use jig_domain_core::Event;
 use jig_domain_people as people;
+use jig_domain_people::ApplicationScope;
 use skein_lib::{ReplyTo, Token};
 use std::collections::{BTreeMap, BTreeSet};
 

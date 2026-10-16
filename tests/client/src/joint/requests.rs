@@ -9,8 +9,9 @@ use super::{
 use crate::harness::ClientId;
 use jig_client_test_domain::{Ask, JigOut, Request, first};
 use jig_domain_client::Limits;
-use jig_domain_core::{self as core, documents::ApplicationScope};
+use jig_domain_core as core;
 use jig_domain_people as people;
+use jig_domain_people::ApplicationScope;
 use jig_test_connector::ApplicationRequest;
 use jig_test_domain as root;
 use sha2::{Digest, Sha256};
@@ -153,7 +154,15 @@ fn keyed(
                 key,
                 owner: KeyedOwner::Application { connector: number },
             });
-            root::Event::Application { reply_to, sign_in, key, project, number, digest, value }
+            root::Event::Application {
+                reply_to,
+                sign_in,
+                key,
+                scope: ApplicationScope::Project(project),
+                number,
+                digest,
+                value,
+            }
         }
     })
 }

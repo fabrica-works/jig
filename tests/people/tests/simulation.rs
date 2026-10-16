@@ -475,7 +475,11 @@ fn an_amendment_on_a_spec_amended_meanwhile_is_refused_with_its_revision() {
 
 fn application(words: &[u8]) -> Ask {
     use sha2::{Digest, Sha256};
-    Ask::Application { project: 1, connector: 2, digest: Sha256::digest(words).into() }
+    Ask::Application {
+        scope: jig_domain_people::ApplicationScope::Project(1),
+        connector: 2,
+        digest: Sha256::digest(words).into(),
+    }
 }
 
 #[test]

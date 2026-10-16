@@ -41,7 +41,7 @@ pub enum Ask {
     /// Make a connector's current document, then complete the views' Make within this decision.
     Document {
         watcher: Token,
-        scope: crate::documents::ApplicationScope,
+        scope: jig_domain_people::ApplicationScope,
         subject: Token,
         party: u64,
         window: crate::documents::Window,
@@ -49,7 +49,7 @@ pub enum Ask {
     /// Answer an admitted connector read; the root holds its typed answer in this decision.
     Read {
         reply: ReplyTo,
-        scope: crate::documents::ApplicationScope,
+        scope: jig_domain_people::ApplicationScope,
         read: Token,
         party: u64,
         window: crate::documents::Window,
@@ -60,8 +60,8 @@ pub enum Ask {
         token: Token,
         owner: Token,
         person: u64,
-        project: u32,
-        role: people::Role,
+        scope: jig_domain_people::ApplicationScope,
+        role: Option<people::Role>,
         retention: skein_lib::Duration,
     },
     /// Discard a prepared value after admission; deciding consumes it first.
@@ -375,7 +375,7 @@ pub enum Event {
         reply_to: ReplyTo,
         sign_in: u64,
         key: [u8; 16],
-        project: u32,
+        scope: jig_domain_people::ApplicationScope,
         connector: u16,
         digest: [u8; 32],
         owner: Token,

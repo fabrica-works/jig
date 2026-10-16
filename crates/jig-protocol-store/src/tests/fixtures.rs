@@ -488,7 +488,7 @@ pub fn people_asks() -> Box<[people::Ask]> {
         Ask::Create { project: 1, batch: Box::new([person]) },
         Ask::Close { project: 1, chat: 2, disposals },
         Ask::MarkSeen { seen: people::Seen::Chat { task: 2, through: 3 } },
-        Ask::Application { project: 1, connector: 2, digest: [3; 32] },
+        Ask::Application { scope: jig_domain_people::ApplicationScope::Project(1), connector: 2, digest: [3; 32] },
         Ask::EditNote {
             project: 1,
             name: 2,

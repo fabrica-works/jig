@@ -20,7 +20,7 @@ pub(super) fn start(
     reply_to: ReplyTo,
     sign_in: u64,
     key: [u8; 16],
-    project: u32,
+    scope: people::ApplicationScope,
     connector: u16,
     digest: [u8; 32],
     owner: Token,
@@ -31,7 +31,7 @@ pub(super) fn start(
         core,
         env,
         work,
-        people::Event::Ask { reply_to, sign_in, key, ask: people::Ask::Application { project, connector, digest } },
+        people::Event::Ask { reply_to, sign_in, key, ask: people::Ask::Application { scope, connector, digest } },
     );
     core.application_input = None;
     if core.connectors.contains(&connector) {
@@ -49,8 +49,8 @@ pub(super) fn admitted(
     request: Token,
     connector: u16,
     person: u64,
-    project: u32,
-    role: people::Role,
+    scope: people::ApplicationScope,
+    role: Option<people::Role>,
 ) {
     let input = core.application_input.take();
     let owner = match input {
@@ -82,7 +82,7 @@ pub(super) fn admitted(
             token,
             owner,
             person,
-            project,
+            scope,
             role,
             retention: env.limits.people.request_retention,
         },
