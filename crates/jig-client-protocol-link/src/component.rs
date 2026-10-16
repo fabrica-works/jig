@@ -1,8 +1,7 @@
 //! One bounded exchange per request-table attempt (protocol/client.md, 5).
-use crate::{
-    Answered, Ask, Event, Fact, Family, Limits, Message, Readable, Readout, Request, Unusable, Watchable, translate,
-};
+use crate::{Event, Fact, Limits, Message, Request, Unusable, translate};
 use alloc::boxed::Box;
+use jig_client_domain::{Answered, Ask, Family, Readable, Readout, Watchable};
 use jig_client_protocol_wire::{self as wire, v7 as w};
 use skein_lib::{Map, Queue, Reader, RequestEnvelope, RequestKey, Secret, Time, Token, Writer};
 #[derive(Debug)]

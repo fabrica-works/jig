@@ -1,38 +1,7 @@
 //! Owner routing and shell exchanges (protocol/client.md, 2 and 5).
 use alloc::boxed::Box;
-use jig_client_domain::contract;
+use jig_client_domain::{Answered, Ask, Family, Readable, Readout, Watchable, contract};
 use skein_lib::{List, RequestEnvelope, RequestKey, RequestRecord, Secret, Token};
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Family {
-    pub family: u16,
-    pub version: u32,
-    pub bytes: Box<[u8]>,
-}
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Ask {
-    Jig(Box<contract::Ask>),
-    Family(Family),
-}
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Readable {
-    Jig(contract::Read),
-    Family(Family),
-}
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Watchable {
-    Jig(contract::Subject),
-    Family(Family),
-}
-#[derive(Debug, PartialEq, Eq)]
-pub enum Readout {
-    Jig(contract::ReadResult),
-    Family { family: u16, record: Option<Box<[u8]>> },
-}
-#[derive(Debug, PartialEq, Eq)]
-pub enum Answered {
-    Jig(contract::Answer),
-    Family(Family),
-}
 /// The owner of a small-store record (protocol/client.md, 10).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Keeper {

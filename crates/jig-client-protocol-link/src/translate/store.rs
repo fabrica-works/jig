@@ -1,8 +1,9 @@
 //! The small store's owner records (protocol/client.md, 10).
 use super::{answers, documents, pages, too_large};
-use crate::{Ask, Family, Limits};
+use crate::Limits;
 use alloc::boxed::Box;
 use jig_client_domain::contract as c;
+use jig_client_domain::{Ask, Family};
 use jig_client_protocol_wire::{self as wire, v7 as w};
 use jig_domain_client::address::{Address, ProjectSection, TaskSection};
 use skein_lib::{List, Reader, RequestRecord, Wall, Writer, bytes};

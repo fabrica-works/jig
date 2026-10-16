@@ -199,8 +199,8 @@ impl NativeClient {
                     scope: record.scope,
                     first_sent: record.first_sent,
                     request: match record.request {
-                        link::Ask::Jig(ask) => client::Ask::Jig(ask),
-                        link::Ask::Family(_) => panic!("chat script restores jig requests"),
+                        jig_client_domain::Ask::Jig(ask) => client::Ask::Jig(ask),
+                        jig_client_domain::Ask::Family(_) => panic!("chat script restores jig requests"),
                     },
                 },
             },
@@ -220,8 +220,10 @@ impl NativeClient {
                     scope: record.scope,
                     first_sent: record.first_sent,
                     request: match record.request {
-                        client::Ask::Jig(ask) => link::Ask::Jig(ask),
-                        client::Ask::First(ask) => link::Ask::Family(family::request(&ask).expect("family request")),
+                        client::Ask::Jig(ask) => jig_client_domain::Ask::Jig(ask),
+                        client::Ask::First(ask) => {
+                            jig_client_domain::Ask::Family(family::request(&ask).expect("family request"))
+                        }
                     },
                 },
             },

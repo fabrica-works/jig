@@ -15,8 +15,10 @@ fn saved(record: client::store::Record) -> link::Saved {
                 scope: record.scope,
                 first_sent: record.first_sent,
                 request: match record.request {
-                    client::Ask::Jig(value) => link::Ask::Jig(value),
-                    client::Ask::First(value) => link::Ask::Family(family::request(&value).expect("family ask")),
+                    client::Ask::Jig(value) => jig_client_domain::Ask::Jig(value),
+                    client::Ask::First(value) => {
+                        jig_client_domain::Ask::Family(family::request(&value).expect("family ask"))
+                    }
                 },
             },
         },
@@ -50,8 +52,8 @@ fn restored(saved: link::Saved) -> client::store::Record {
                 scope: record.scope,
                 first_sent: record.first_sent,
                 request: match record.request {
-                    link::Ask::Jig(value) => client::Ask::Jig(value),
-                    link::Ask::Family(value) => {
+                    jig_client_domain::Ask::Jig(value) => client::Ask::Jig(value),
+                    jig_client_domain::Ask::Family(value) => {
                         let decoded =
                             jig_test_service::family::request(&value.bytes, &fixtures::owner_limits().connector)
                                 .expect("family ask");

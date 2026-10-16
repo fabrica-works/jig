@@ -65,8 +65,8 @@ impl Side {
                 attempt,
                 envelope,
                 answer: answer.and_then(|answer| match answer {
-                    link::Answered::Jig(answer) => Some(client::Answered::Jig(answer)),
-                    link::Answered::Family(record) => family::answer(&record).map(client::Answered::First),
+                    jig_client_domain::Answered::Jig(answer) => Some(client::Answered::Jig(answer)),
+                    jig_client_domain::Answered::Family(record) => family::answer(&record).map(client::Answered::First),
                 }),
             },
             link::Request::Watch { watch, event } => {
@@ -105,7 +105,7 @@ impl Side {
             link::Request::Read { read, result } => {
                 let (is_family, original) = self.routes.remove(&read).expect("original read route");
                 match result {
-                    link::Readout::Jig(result) => {
+                    jig_client_domain::Readout::Jig(result) => {
                         if is_family {
                             self.subjects.remove(&read);
                             Event::First(client::first::Event::Read {
@@ -116,14 +116,14 @@ impl Side {
                             Event::Jig(jig_domain_client::Event::Read { read: original, result })
                         }
                     }
-                    link::Readout::Family { family: 1, record } => {
+                    jig_client_domain::Readout::Family { family: 1, record } => {
                         assert!(is_family);
                         let subject = self.subjects.remove(&read).expect("original read subject");
                         let result = record
                             .map_or(client::first::ReadResult::Unknown, |record| family::read_result(subject, &record));
                         Event::First(client::first::Event::Read { read: original, result })
                     }
-                    link::Readout::Family { .. } => panic!("unknown family read"),
+                    jig_client_domain::Readout::Family { .. } => panic!("unknown family read"),
                 }
             }
             link::Request::Hello { family: None, versions } => {
@@ -149,16 +149,16 @@ impl Side {
         }
         let event = match request {
             Request::Send { attempt, key, ask: client::Ask::Jig(ask) } => {
-                link::Event::Send { attempt, key, ask: link::Ask::Jig(ask) }
+                link::Event::Send { attempt, key, ask: jig_client_domain::Ask::Jig(ask) }
             }
             Request::Jig(JigOut::Read { read, what }) => {
                 let read = self.route(false, read);
-                link::Event::Read { read, what: link::Readable::Jig(what) }
+                link::Event::Read { read, what: jig_client_domain::Readable::Jig(what) }
             }
             Request::Jig(JigOut::Open { watch, subject }) => {
                 let routed = self.route(false, watch);
                 self.watched.insert((false, watch), routed);
-                link::Event::Open { watch: routed, subject: link::Watchable::Jig(subject) }
+                link::Event::Open { watch: routed, subject: jig_client_domain::Watchable::Jig(subject) }
             }
             Request::Jig(JigOut::Continue { watch, subject }) => {
                 let watch = *self.watched.get(&(false, watch)).expect("live jig watch");
@@ -177,7 +177,7 @@ impl Side {
                     });
                     return;
                 };
-                link::Event::Send { attempt, key, ask: link::Ask::Family(ask) }
+                link::Event::Send { attempt, key, ask: jig_client_domain::Ask::Family(ask) }
             }
             Request::First(client::first::Out::Read { read, subject }) => {
                 let Ok(what) = family::read(subject) else {
@@ -189,7 +189,7 @@ impl Side {
                 };
                 let read = self.route(true, read);
                 self.subjects.insert(read, subject);
-                link::Event::Read { read, what: link::Readable::Family(what) }
+                link::Event::Read { read, what: jig_client_domain::Readable::Family(what) }
             }
             Request::First(client::first::Out::Open { watch, subject }) => {
                 let Ok(record) = family::subject(subject) else {
@@ -202,7 +202,7 @@ impl Side {
                 let routed = self.route(true, watch);
                 self.watched.insert((true, watch), routed);
                 self.subjects.insert(routed, subject);
-                link::Event::Open { watch: routed, subject: link::Watchable::Family(record) }
+                link::Event::Open { watch: routed, subject: jig_client_domain::Watchable::Family(record) }
             }
             Request::First(client::first::Out::Close { watch }) => {
                 let Some(watch) = self.watched.remove(&(true, watch)) else { return };

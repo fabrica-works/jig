@@ -1,8 +1,9 @@
 //! One read per exchange with opaque cursor bytes (protocol/client.md, 6).
 use super::asks::{wire_note_scope, wire_proposal_key};
 use super::{Undecodable, documents, objects, pages};
-use crate::{Limits, Readable};
+use crate::Limits;
 use alloc::boxed::Box;
+use jig_client_domain::Readable;
 use jig_client_domain::contract as c;
 use jig_client_protocol_wire::VERSION;
 use jig_client_protocol_wire::v7 as w;

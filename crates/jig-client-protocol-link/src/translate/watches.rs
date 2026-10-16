@@ -1,7 +1,8 @@
 //! Watch subjects and terminal reasons (protocol/client.md, 7).
 use super::{documents, live, objects, pages};
-use crate::{Limits, Undecodable, Watchable};
+use crate::{Limits, Undecodable};
 use alloc::boxed::Box;
+use jig_client_domain::Watchable;
 use jig_client_domain::contract as c;
 use jig_client_protocol_wire::{VERSION, v7 as w};
 use skein_lib::{List, Reader, Writer};
