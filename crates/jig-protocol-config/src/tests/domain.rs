@@ -49,6 +49,34 @@ fn the_small_engine_document_parses_whole() {
     assert_eq!(engine.deployment.seed, Some(7));
     assert_eq!(engine.providers.len(), 2);
 }
+
+#[test]
+fn operations_below_delegates_plus_one_refuse_the_start() {
+    refuses(
+        br#""profile": "small""#,
+        br#""profile": "small", "overrides": {"people.operations": 4, "tasks.project_goals": 4}"#,
+        What::Operations { operations: 4, delegates: 4, goals: 4 },
+    );
+}
+
+#[test]
+fn operations_below_goals_per_project_refuse_the_start() {
+    refuses(
+        br#""profile": "small""#,
+        br#""profile": "small", "overrides": {"people.operations": 7}"#,
+        What::Operations { operations: 7, delegates: 4, goals: 8 },
+    );
+}
+
+#[test]
+fn the_shipped_profiles_hold_operations_per_request() {
+    for (profile, expected) in [(crate::Profile::Small, (8, 4, 8)), (crate::Profile::Standard, (16, 8, 16))] {
+        let limits = crate::profile(profile).core;
+        assert_eq!((limits.people.operations, limits.tasks.delegates, limits.tasks.project_goals), expected);
+        assert!(limits.people.operations > limits.tasks.delegates, "{profile:?}");
+        assert!(limits.people.operations >= limits.tasks.project_goals, "{profile:?}");
+    }
+}
 #[test]
 fn the_cores_config_takes_the_charters_and_projects() {
     let core = core_config(fixtures::ENGINE_SMALL);

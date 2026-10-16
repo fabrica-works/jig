@@ -26,3 +26,16 @@ fn a_template_grace_past_the_tasks_limit_refuses_the_service_start() {
     let found = crate::named(&document).expect_err("template grace");
     assert_eq!(found.problems.get(0).expect("problem").what, What::Grace { template: 1 });
 }
+
+#[test]
+fn a_service_whose_operations_cannot_close_a_conversation_is_refused() {
+    let document = fixtures::with(
+        &fixtures::engine_document(),
+        br#""overrides": {"#,
+        br#""overrides": {"people.operations":4,"tasks.delegates":4,"#,
+    );
+    let found = crate::named(&document).expect_err("operations per request");
+    let problem = found.problems.get(0).expect("problem");
+    assert_eq!(problem.path, Path::root().member(b"engine").member(b"limits"));
+    assert_eq!(problem.what, What::Operations { operations: 4, delegates: 4, goals: 8 });
+}

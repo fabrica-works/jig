@@ -160,8 +160,23 @@ pub(crate) fn items(document: &Document, at: u32, max: u32, path: &Path, problem
         }
     }
 }
+fn operations(limits: &jig_domain_core::Limits, problems: &mut Problems) {
+    if u64::from(limits.people.operations)
+        < (u64::from(limits.tasks.delegates) + 1).max(u64::from(limits.tasks.project_goals))
+    {
+        problems.push(
+            Path::root().member(b"limits"),
+            What::Operations {
+                operations: limits.people.operations,
+                delegates: limits.tasks.delegates,
+                goals: limits.tasks.project_goals,
+            },
+        );
+    }
+}
 pub(crate) fn whole(engine: &crate::Engine, problems: &mut Problems) {
     let limits = &engine.limits.core;
+    operations(limits, problems);
     if limits.people.words > limits.tasks.message_bytes
         || limits.tasks.result_bytes > limits.tasks.message_bytes
         || limits.tasks.message_bytes < 24

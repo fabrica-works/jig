@@ -52,6 +52,7 @@ pub enum What {
     Budget { charter: u32 },
     Accounts { charter: u32 },
     Grace { template: u32 },
+    Operations { operations: u32, delegates: u32, goals: u32 },
     Message,
     Silence,
     StopBound,
