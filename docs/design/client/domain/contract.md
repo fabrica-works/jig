@@ -771,9 +771,10 @@ commit, so they leave through the journal's door (`../../README.md`,
   another turn's; a later retry replaces the earlier retries of its turn.
 - **Committed turns are not in it.** A turn's committed form reaches the
   client only through its task's activity, read once the task's document
-  says the activity has moved, and held until durable (section 6). The
-  client keeps a turn's provisional text until then (client.md,
-  section 10).
+  says the activity has moved, and held until durable (section 6).
+  `jig_client::thread` keeps a turn's provisional text until then
+  (client.md, section 10); the client's watch holds only the turn being
+  written (client.md, 8.3).
 - **Past its bound,** the text is cut from its start, at a character's
   boundary, and the delivery says so; the turn, once committed, has it
   all.

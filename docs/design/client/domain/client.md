@@ -466,11 +466,21 @@ handles, as every presentation does (sections 7 and 8).
   within it and its completion's retry; that retry's text so far; and
   the call it is making; all provisional, and marked so (contract.md,
   7.3).
-- **Read from an offset.** The client keeps the text it holds of the
-  turn being written, within the bound on a provisional turn's bytes,
-  takes each delivery's text past its offset, and says `Text { handle }`.
-  Text of a later turn never resets an earlier one's; a later retry of
-  the same turn takes the place of its earlier retries' text.
+- **Read from an offset, one turn at a time.** The client keeps the
+  text it holds of the turn being written, within the bound on a
+  provisional turn's bytes, takes each delivery's text past its offset,
+  and says `Text { handle }`. It holds that one turn alone, the newest
+  delivered: a delivery naming a later turn, or a later retry of the
+  same turn, takes the place of what it holds, from its own offset; one
+  naming an earlier turn, or an earlier retry, changes nothing, and
+  nothing is told. Names are ordered by attempt, then number, then
+  retry.
+- **Text of a later turn never resets an earlier one's.** A later turn's
+  text starts under its own name: it is never appended to the earlier
+  turn's, nor taken as that text cut back to its start, and what the
+  application read under the earlier turn's name stays that turn's.
+  Keeping each turn's text until its committed turn takes its place is
+  the thread's (section 10), fed the run's text at each `Text`.
 - **Opened again,** the watch starts from the beginning of the turn being
   written: the client keeps what it holds, and takes what lies past it.
 - **Committed turns are not in it.** A turn reaches the application
@@ -527,9 +537,11 @@ for any presentation of a chat or of any agent task's activity.
   turn is read in its place.
 - **Live, then committed.** While a run is live, its text is the
   thread's provisional line, kept under the turn's name until the
-  committed turn of the same attempt and number takes its place. A turn
-  lost with its host never commits: its provisional text is dropped when
-  the run ends, and the next run starts after the last committed turn.
+  committed turn of the same attempt and number takes its place: the
+  thread keeps each turn's line, since the client holds only the turn
+  being written (8.3). A turn lost with its host never commits: its
+  provisional text is dropped when the run ends, and the next run
+  starts after the last committed turn.
 - **A person's words, in three states:** being sent, while their
   `Message` is pending; sent, once its answer names their message in
   the task's inbox; read, once a committed turn says it read through
