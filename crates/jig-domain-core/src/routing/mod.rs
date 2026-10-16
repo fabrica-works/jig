@@ -6,6 +6,7 @@
 
 pub(crate) mod application_routes;
 mod create;
+pub(crate) mod party_inputs;
 
 use crate::{CallKey, CallPart, Core, RoutedCall};
 use alloc::boxed::Box;
@@ -102,9 +103,18 @@ pub(crate) struct PersonEscalation {
 
 #[derive(Debug)]
 pub(super) enum CreationKind {
-    Batch { person: u64 },
+    Batch { person: u64, given: Option<people::Given>, stubs: Box<[tasks::Stub]> },
     Goal { person: u64, direct: bool },
     Chat { person: u64 },
+}
+
+/// A party's batch waiting for the task child's make result.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct Made {
+    pub first: u64,
+    pub goal: Option<bool>,
+    pub given: Option<people::Given>,
+    pub stubs: Box<[tasks::Stub]>,
 }
 
 /// One person task pending all numbered connector holdings in this decision.
@@ -369,6 +379,7 @@ pub fn room(limits: &Limits, event: &Event) -> Option<JournalRoom> {
         | Event::SeenChatLoaded { .. }
         | Event::HistoricalProposal { .. }
         | Event::HistoricalPersonTask { .. }
+        | Event::PartyInputsLoaded { .. }
         | Event::HistoricalEscalation { .. }
         | Event::NamedAnswer { .. }
         | Event::NamedAction { .. }
@@ -532,6 +543,11 @@ fn step_one(core: &mut Core, env: &Env<Limits>, event: Event, work: &mut Queue<E
         }
         Event::HistoricalProposal { request, person, project, proposer, proposal, row, busy } => {
             route_historical_proposal(core, work, request, person, project, proposer, proposal, row, busy)
+        }
+        Event::PartyInputsLoaded { request, row, busy } => {
+            let mut out = Queue::with_capacity(route_room(&env.limits));
+            party_inputs::loaded(core, env, &mut out, work, party_inputs::Loaded { request, row, busy });
+            Requests::Out(out)
         }
         Event::HistoricalPersonTask { request, person, project, task, row, busy } => {
             let outcome = core.person_task_ended(person, project, task, row, busy);

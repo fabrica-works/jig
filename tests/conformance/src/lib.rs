@@ -424,6 +424,7 @@ impl Application for Testing {
                     now @ (core::Now::StartPreparation { from: Some(_), .. }
                     | core::Now::SeenChat { .. }
                     | core::Now::HistoricalPersonTask { .. }
+                    | core::Now::PartyInputs { .. }
                     | core::Now::HistoricalProposal { .. }
                     | core::Now::HistoricalEscalation { .. }
                     | core::Now::LoadEndedChat { .. }),

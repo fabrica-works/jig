@@ -324,6 +324,7 @@ impl World {
                         now @ (core::Now::LoadEndedChat { .. }
                         | core::Now::SeenChat { .. }
                         | core::Now::HistoricalPersonTask { .. }
+                        | core::Now::PartyInputs { .. }
                         | core::Now::HistoricalProposal { .. }
                         | core::Now::HistoricalEscalation { .. }),
                     ) => self.store.ask(StoreOut::Now(now)),

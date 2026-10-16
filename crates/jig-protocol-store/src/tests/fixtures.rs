@@ -450,6 +450,9 @@ pub fn people_member() -> people::Member {
         executor: people::TaskExecutor::Agent { charter: 3 },
         words: b"a task".as_slice().into(),
         parameters: Box::new([]),
+        inputs: Box::new([]),
+        budget: people::Budget::Named,
+        named: Box::new([]),
         contract: people::Contract::Report { words: 17 },
         authority: people_authority(),
         wake: people::WakePolicy {
@@ -471,8 +474,18 @@ pub fn people_asks() -> Box<[people::Ask]> {
     use people::{Ask, Proposer};
     let mut disposals = skein_lib::List::with_capacity(1);
     disposals.push(people::Disposal { task: 2, keep: people::Keep::MakeMine }).expect("one disposal");
+    let mut procedure = people_member();
+    procedure.executor = people::TaskExecutor::Procedure { connector: 1, code: 1 };
+    procedure.contract = people::Contract::Change { connector: 1, kind: 5, words: 17 };
+    procedure.inputs = Box::new([2]);
+    procedure.budget = people::Budget::AsAllowed { cap: Some(30) };
+    procedure.dependencies = Box::new([people::Dependency::Batch(0), people::Dependency::Existing(2)]);
+    procedure.named = procedure.authority.grants.clone();
+    let mut person = people_member();
+    person.executor = people::TaskExecutor::Person(people::PersonAddress::Role(2));
     Box::new([
-        Ask::Create { project: 1, batch: Box::new([people_member(), people_member()]) },
+        Ask::Create { project: 1, batch: Box::new([people_member(), procedure]) },
+        Ask::Create { project: 1, batch: Box::new([person]) },
         Ask::Close { project: 1, chat: 2, disposals },
         Ask::MarkSeen { seen: people::Seen::Chat { task: 2, through: 3 } },
         Ask::Application { project: 1, connector: 2, digest: [3; 32] },

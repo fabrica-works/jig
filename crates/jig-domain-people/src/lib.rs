@@ -58,7 +58,9 @@ mod templates;
 pub use templates::{TemplateBudget, TemplateDeadline, TemplateExecutor, TemplateOverride};
 mod amendment;
 mod batch;
-pub use batch::{Contract, FieldRule, Flags, Member, Retention, TaskExecutor, Verdict, member_bytes};
+pub use batch::{
+    Budget, Contract, Dependency, FieldRule, Flags, Given, Member, Retention, TaskExecutor, Verdict, member_bytes,
+};
 mod boundary;
 mod capacity;
 mod decisions;

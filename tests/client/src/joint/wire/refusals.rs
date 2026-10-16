@@ -39,7 +39,7 @@ pub fn lack(value: people::Lack) -> client::Lacking {
         people::Lack::Budget { needs, left } => client::Lacking::Budget { needed: needs, left },
         people::Lack::Grant { kind } => client::Lacking::GrantKind { kind },
         people::Lack::Funding => client::Lacking::Funding,
-        people::Lack::TaskKind => client::Lacking::TaskKind { executor: None },
+        people::Lack::TaskKind { .. } => client::Lacking::TaskKind { executor: None },
         people::Lack::Depth { most } => client::Lacking::Depth { needed: None, allowed: most },
         people::Lack::Deadline => client::Lacking::Deadline { asked: None, latest: None },
         people::Lack::Tasks { left } => client::Lacking::Tasks { needed: None, left },
@@ -191,7 +191,7 @@ mod tests {
             assert!(client::EntranceRefusal::new(actual).is_ok());
         }
         for proposable in [None, Some(false), Some(true)] {
-            let source = people::Refusal::Authority { lacking: people::Lack::TaskKind, proposable };
+            let source = people::Refusal::Authority { lacking: people::Lack::TaskKind { executor: None }, proposable };
             assert_eq!(
                 refusal(source),
                 client::Refusal::Authority { lacking: client::Lacking::TaskKind { executor: None }, proposable }

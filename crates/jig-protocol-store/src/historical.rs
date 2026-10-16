@@ -6,6 +6,7 @@ use jig_domain_tasks as tasks;
 #[must_use]
 pub fn key(now: &Now) -> Option<Key> {
     match now {
+        Now::PartyInputs { tasks, .. } => Some(Key::Tasks(tasks::Key::Ended(*tasks.first()?))),
         Now::LoadEndedChat { task } | Now::SeenChat { task, .. } | Now::HistoricalPersonTask { task, .. } => {
             Some(Key::Tasks(tasks::Key::Ended(*task)))
         }
@@ -51,6 +52,7 @@ pub fn key(now: &Now) -> Option<Key> {
 #[must_use]
 pub fn answer(now: Now, row: Option<Record>) -> Option<core::Event> {
     Some(match now {
+        Now::PartyInputs { request, .. } => core::Event::PartyInputsLoaded { request, row: ended(row), busy: false },
         Now::LoadEndedChat { .. } => core::Event::ForgetChat { row: ended(row)? },
         Now::SeenChat { request, .. } => core::Event::SeenChatLoaded { request, row: ended(row), busy: false },
         Now::HistoricalPersonTask { request, person, project, task } => {

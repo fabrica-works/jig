@@ -171,6 +171,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         size_of::<crate::routing::NoteRoute>(),
         size_of::<crate::CallPart>(),
         size_of::<crate::routing::Creation>(),
+        size_of::<crate::routing::party_inputs::Inputs>(),
         size_of::<crate::routing::DelegateCreation>(),
         size_of::<crate::routing::ProcedureCreation>(),
         size_of::<crate::run::Transcript>(),
@@ -192,6 +193,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         limits.people.pending,     // moves
         limits.people.pending,     // person tasks
         limits.people.pending,     // person escalations
+        limits.people.pending,     // pending input loads
         limits.people.pending,     // creations
         limits.call_records,       // delegate creations
         limits.tasks.tasks,        // procedure creations
@@ -258,6 +260,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .people
         .pending
         .checked_mul(limits.people.batch.max(1))?
+        .checked_mul(2)?
         .checked_add(limits.call_records.checked_mul(task.batch)?)?
         .checked_add(task.tasks.checked_mul(task.batch)?)?;
     total = total.checked_add(bytes(creations, new_task)?)?;
@@ -267,6 +270,15 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         sizeof(size_of::<tasks::Proposal>())?
             .checked_add(bytes(task.batch, new_task)?)?
             .checked_add(u64::from(task.message_bytes))?,
+    )?)?;
+    total = total.checked_add(bytes(
+        limits.people.pending,
+        new_task
+            .checked_add(bytes(
+                limits.people.batch.checked_mul(task.inputs)?,
+                sizeof(size_of::<u64>())?.checked_add(sizeof(size_of::<tasks::Stub>())?)?,
+            )?)?
+            .checked_mul(2)?,
     )?)?;
     total = total.checked_add(new_task)?;
     total = total.checked_add(bytes(

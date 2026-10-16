@@ -118,7 +118,7 @@ fn filled(why: Refusal) -> bool {
             Lack::Approver
             | Lack::Grant { .. }
             | Lack::Funding
-            | Lack::TaskKind
+            | Lack::TaskKind { .. }
             | Lack::Depth { .. }
             | Lack::Deadline
             | Lack::Tasks { .. }

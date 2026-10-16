@@ -8,7 +8,7 @@ use facts::{
 };
 pub(super) fn encode_outcome(value: &domain::Outcome, limits: &wire::Limits) -> Result<wire::Outcome, wire::Problem> {
     Ok(match value {
-        domain::Outcome::Created { first, last } => encode_created(*first, *last, limits)?,
+        domain::Outcome::Created { first, last, given } => encode_created(*first, *last, *given, limits)?,
         domain::Outcome::Closing { chat, cancelled, kept } => {
             wire::Outcome::Closing(encode_closing(*chat, *cancelled, *kept, limits)?)
         }
@@ -316,13 +316,36 @@ fn marked_seen(seen: &domain::Seen, limits: &wire::Limits) -> Result<wire::Outco
     wire::OutcomeMarkedSeen::new(limits, wire::OutcomeMarkedSeenParts { seen: super::asks::encode_seen(seen, limits)? })
 }
 
-fn encode_created(first: u64, last: u64, limits: &wire::Limits) -> Result<wire::Outcome, wire::Problem> {
-    Ok(wire::Outcome::Created(wire::OutcomeCreated::new(limits, wire::OutcomeCreatedParts { first, last })?))
+fn encode_created(
+    first: u64,
+    last: u64,
+    given: Option<domain::Given>,
+    limits: &wire::Limits,
+) -> Result<wire::Outcome, wire::Problem> {
+    Ok(wire::Outcome::Created(wire::OutcomeCreated::new(
+        limits,
+        wire::OutcomeCreatedParts {
+            first,
+            last,
+            given: match given {
+                Some(domain::Given { task, amount }) => {
+                    Some(wire::Given::new(limits, wire::GivenParts { task, amount })?)
+                }
+                None => None,
+            },
+        },
+    )?))
 }
 fn decode_created(value: wire::OutcomeCreated) -> domain::Outcome {
-    let wire::OutcomeCreatedParts { first, last } = value.into_parts();
-    domain::Outcome::Created { first, last }
+    let wire::OutcomeCreatedParts { first, last, given } = value.into_parts();
+    let mut amount = None;
+    if let Some(value) = given {
+        let wire::GivenParts { task, amount: value } = value.into_parts();
+        amount = Some(domain::Given { task, amount: value });
+    }
+    domain::Outcome::Created { first, last, given: amount }
 }
+
 fn decode_marked_seen(value: wire::OutcomeMarkedSeen) -> domain::Outcome {
     let wire::OutcomeMarkedSeenParts { seen } = value.into_parts();
     domain::Outcome::MarkedSeen { seen: super::asks::decode_seen(seen) }

@@ -26,7 +26,15 @@ pub(super) fn refusal(value: people::Refusal) -> application::Refusal {
         people::Refusal::Moved { now } => application::Refusal::Moved { now: moved(now) },
         people::Refusal::Ended { how } => application::Refusal::Ended { how: ending(how) },
         people::Refusal::Taken { by } => application::Refusal::Taken { by },
-        people::Refusal::NotWellFormed { .. } => application::Refusal::Limit { which: application::LimitKind::Cycle },
+        people::Refusal::NotWellFormed { why: people::Malformed::Cycle, .. } => {
+            application::Refusal::Limit { which: application::LimitKind::Cycle }
+        }
+        people::Refusal::NotWellFormed { why: people::Malformed::AsAllowedTwice, .. } => {
+            application::Refusal::Limit { which: application::LimitKind::Batch }
+        }
+        people::Refusal::NotWellFormed { why: people::Malformed::Conversation, .. } => {
+            application::Refusal::Limit { which: application::LimitKind::Spec }
+        }
         people::Refusal::NotWaiting => application::Refusal::NotWaiting,
         people::Refusal::NoFurther => application::Refusal::NoFurther,
         people::Refusal::Unknown => application::Refusal::Unknown,
@@ -42,7 +50,7 @@ pub(super) fn lack(value: people::Lack) -> application::Lack {
         people::Lack::Budget { needs, left } => application::Lack::Budget { needs, left },
         people::Lack::Grant { kind } => application::Lack::Grant { kind },
         people::Lack::Funding => application::Lack::Funding,
-        people::Lack::TaskKind => application::Lack::TaskKind,
+        people::Lack::TaskKind { .. } => application::Lack::TaskKind,
         people::Lack::Depth { most } => application::Lack::Depth { most },
         people::Lack::Deadline => application::Lack::Deadline,
         people::Lack::Tasks { left } => application::Lack::Tasks { left },

@@ -523,6 +523,7 @@ impl World {
                 }
                 root::Request::Now(
                     now @ (core::Now::HistoricalPersonTask { .. }
+                    | core::Now::PartyInputs { .. }
                     | core::Now::HistoricalProposal { .. }
                     | core::Now::HistoricalEscalation { .. }
                     | core::Now::SeenChat { .. }

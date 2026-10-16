@@ -615,7 +615,15 @@ fn party_refusal(why: people::Refusal) -> parties::Refusal {
             },
         },
         people::Refusal::Taken { by } => parties::Refusal::Taken { by },
-        people::Refusal::NotWellFormed { .. } => parties::Refusal::Limit { which: parties::LimitKind::Cycle },
+        people::Refusal::NotWellFormed { why: people::Malformed::Cycle, .. } => {
+            parties::Refusal::Limit { which: parties::LimitKind::Cycle }
+        }
+        people::Refusal::NotWellFormed { why: people::Malformed::AsAllowedTwice, .. } => {
+            parties::Refusal::Limit { which: parties::LimitKind::Batch }
+        }
+        people::Refusal::NotWellFormed { why: people::Malformed::Conversation, .. } => {
+            parties::Refusal::Limit { which: parties::LimitKind::Spec }
+        }
         people::Refusal::NotWaiting => parties::Refusal::NotWaiting,
         people::Refusal::NoFurther => parties::Refusal::NoFurther,
         people::Refusal::Unknown => parties::Refusal::Unknown,
@@ -630,7 +638,7 @@ fn party_lack(value: people::Lack) -> parties::Lack {
         people::Lack::Budget { needs, left } => parties::Lack::Budget { needs, left },
         people::Lack::Grant { kind } => parties::Lack::Grant { kind },
         people::Lack::Funding => parties::Lack::Funding,
-        people::Lack::TaskKind => parties::Lack::TaskKind,
+        people::Lack::TaskKind { .. } => parties::Lack::TaskKind,
         people::Lack::Depth { most } => parties::Lack::Depth { most },
         people::Lack::Deadline => parties::Lack::Deadline,
         people::Lack::Tasks { left } => parties::Lack::Tasks { left },

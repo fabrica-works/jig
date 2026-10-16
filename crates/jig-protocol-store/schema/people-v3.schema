@@ -87,15 +87,23 @@ enum ResultsWake { never, each, last_or_failure }
 record WakePolicy { words: WakeRule notices: WakeRule news: WakeRule results: ResultsWake questions: bool answers: bool timers: bool }
 record Amendment { addressed: option AddressChange instructions: option bytes 8192 spec: option Spec wake: option WakePolicy dependencies: option bytes 65536 authority: option Authority reason: bytes 8192 }
 record TaskExecutorAgent { charter: u32 }
-enum TaskExecutor { agent: TaskExecutorAgent }
+record TaskExecutorProcedure { connector: u16 code: u32 }
+record TaskExecutorPerson { address: PersonAddress }
+enum TaskExecutor { agent: TaskExecutorAgent, procedure: TaskExecutorProcedure, person: TaskExecutorPerson }
+record BudgetAsAllowed { cap: option u64 }
+enum Budget { named, as_allowed: BudgetAsAllowed }
+record DependencyBatch { at: u32 }
+record DependencyExisting { task: u64 }
+enum Dependency { batch: DependencyBatch, existing: DependencyExisting }
 record FieldRule { name: bytes 8192 max: u32 }
 record Verdict { code: u32 words: u32 followups: u32 fields: bytes 65536 }
 record ContractReport { words: u32 }
 record ContractVerdict { choices: bytes 65536 }
-enum Contract { report: ContractReport, verdict: ContractVerdict }
+record ContractChange { connector: u16 kind: u16 words: u32 }
+enum Contract { report: ContractReport, verdict: ContractVerdict, change: ContractChange }
 enum Retention { kept, forgotten_once_read }
 record Flags { conversation: bool listed: bool retention: Retention }
-record Member { executor: TaskExecutor words: bytes 8192 parameters: bytes 65536 contract: Contract authority: Authority wake: WakePolicy dependencies: bytes 65536 tracked: option u32 label: u32 flags: Flags }
+record Member { executor: TaskExecutor words: bytes 8192 parameters: bytes 65536 inputs: bytes 65536 contract: Contract authority: Authority budget: Budget wake: WakePolicy dependencies: bytes 65536 named: bytes 65536 tracked: option u32 label: u32 flags: Flags }
 record AskCreate { project: u32 batch: list 8 Member }
 record AskClose { project: u32 chat: u64 disposals: list 1024 Disposal }
 record AskMarkSeen { seen: Seen }
@@ -157,7 +165,8 @@ record LackAgain { required: bool }
 record LackRequired { connector: u16 kind: u16 }
 record LackFailed { connector: u16 kind: u16 }
 record LackUnguarded { connector: u16 kind: u16 }
-enum Lack { approver, budget: LackBudget, grant: LackGrant, funding, task_kind, depth: LackDepth, deadline, tasks: LackTasks, tool, scope, reference, resource_access, resource_unavailable, shape, again: LackAgain, account, writer, required: LackRequired, failed: LackFailed, unguarded: LackUnguarded }
+record LackTaskKind { executor: option TaskExecutor }
+enum Lack { approver, budget: LackBudget, grant: LackGrant, funding, task_kind: LackTaskKind, depth: LackDepth, deadline, tasks: LackTasks, tool, scope, reference, resource_access, resource_unavailable, shape, again: LackAgain, account, writer, required: LackRequired, failed: LackFailed, unguarded: LackUnguarded }
 enum LimitKind { words, identity, roles, arithmetic, duplicate, empty, batch, project_live_tasks, live_tasks, tree, depth, delegates, subscription, dependencies, cycle, spec, contract, authority, inputs, attempts, live_delegates, restore, read, turn, hold_kind, hold_taken, holds, inbox_full, notes, revision, question, priority, policy, resource, service }
 record RefusalDisposal { task: u64 issue: DisposalIssue }
 record RefusalRole { held: option Role }
@@ -166,7 +175,7 @@ record RefusalLimit { which: LimitKind }
 record RefusalMoved { now: Moved }
 record RefusalEnded { how: Ending }
 record RefusalTaken { by: u64 }
-enum Malformed { cycle }
+enum Malformed { cycle, as_allowed_twice, conversation }
 record RefusalNotWellFormed { at: u32 why: Malformed }
 enum Refusal { not_well_formed: RefusalNotWellFormed, disposal: RefusalDisposal, role: RefusalRole, authority: RefusalAuthority, limit: RefusalLimit, moved: RefusalMoved, ended: RefusalEnded, taken: RefusalTaken, not_waiting, no_further, unknown, not_offered, key_conflict, no_escalation_holder }
 enum ProposalChoice { accepted, rejected, passed, withdrawn, stale }
@@ -199,7 +208,8 @@ record OutcomePoolSet { project: u32 person: u64 }
 record OutcomeEscalationDecided { task: u64 revision: u64 by: u64 at: u64 choice: EscalationChoice }
 record OutcomeStarted { task: u64 }
 record OutcomeRefused { value: Refusal }
-record OutcomeCreated { first: u64 last: u64 }
+record Given { task: u64 amount: u64 }
+record OutcomeCreated { first: u64 last: u64 given: option Given }
 enum Outcome { created: OutcomeCreated, closing: OutcomeClosing, marked_seen: OutcomeMarkedSeen, applied: OutcomeApplied, again: OutcomeAgain, signed_out, note_edited: OutcomeNoteEdited, service_made: OutcomeServiceMade, adopted: OutcomeAdopted, goal_started: OutcomeGoalStarted, goal_proposed: OutcomeGoalProposed, stopped: OutcomeStopped, cancelled: OutcomeCancelled, released: OutcomeReleased, person_taken: OutcomePersonTaken, person_handed_back: OutcomePersonHandedBack, person_answered: OutcomePersonAnswered, moved: OutcomeMoved, proposal_decided: OutcomeProposalDecided, said: OutcomeSaid, question_answered: OutcomeQuestionAnswered, prioritised: OutcomePrioritised, amended: OutcomeAmended, amend_proposed: OutcomeAmendProposed, roles_set: OutcomeRolesSet, policy_changed: OutcomePolicyChanged, pool_set: OutcomePoolSet, escalation_decided: OutcomeEscalationDecided, started: OutcomeStarted, refused: OutcomeRefused }
 record StoredAnswer { key: RequestKey ask: Ask outcome: Outcome at: u64 }
 enum Value { person: StoredPerson, read_results: StoredReadResults, read_chat: StoredReadChat, sign_in: StoredSignIn, roles: StoredRoles, policy: StoredPolicy, answer: StoredAnswer }

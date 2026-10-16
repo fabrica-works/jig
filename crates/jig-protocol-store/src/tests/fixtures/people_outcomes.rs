@@ -63,7 +63,8 @@ pub fn lack_values() -> Box<[domain::Lack]> {
         domain::Lack::Budget { needs: 2, left: 3 },
         domain::Lack::Grant { kind: 2 },
         domain::Lack::Funding,
-        domain::Lack::TaskKind,
+        domain::Lack::TaskKind { executor: None },
+        domain::Lack::TaskKind { executor: Some(domain::TaskExecutor::Person(domain::PersonAddress::Person(2))) },
         domain::Lack::Depth { most: 2 },
         domain::Lack::Deadline,
         domain::Lack::Tasks { left: 2 },
@@ -123,6 +124,8 @@ pub fn limit_kind_values() -> Box<[domain::LimitKind]> {
 pub fn refusal_values() -> Box<[domain::Refusal]> {
     Box::new([
         domain::Refusal::NotWellFormed { at: 0, why: domain::Malformed::Cycle },
+        domain::Refusal::NotWellFormed { at: 1, why: domain::Malformed::AsAllowedTwice },
+        domain::Refusal::NotWellFormed { at: 0, why: domain::Malformed::Conversation },
         domain::Refusal::Disposal { task: 2, issue: domain::DisposalIssue::Repeated },
         domain::Refusal::Role { held: Some(domain::Role::Policy { role: 7 }) },
         domain::Refusal::Authority { lacking: domain::Lack::Budget { needs: 17, left: 11 }, proposable: Some(true) },
@@ -154,7 +157,8 @@ pub fn escalation_choice_values() -> Box<[domain::EscalationChoice]> {
 }
 pub fn outcome_values() -> Box<[domain::Outcome]> {
     Box::new([
-        domain::Outcome::Created { first: 2, last: 3 },
+        domain::Outcome::Created { first: 2, last: 3, given: None },
+        domain::Outcome::Created { first: 2, last: 3, given: Some(domain::Given { task: 3, amount: 70 }) },
         domain::Outcome::Closing { chat: 2, cancelled: 3, kept: 4 },
         domain::Outcome::MarkedSeen { seen: domain::Seen::Chat { task: 3, through: 7 } },
         domain::Outcome::Applied { connector: 2, token: Token::new(17) },

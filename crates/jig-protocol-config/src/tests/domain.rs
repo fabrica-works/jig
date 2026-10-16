@@ -166,7 +166,7 @@ fn a_message_bound_below_a_delegate_result_is_refused() {
 fn memory_below_the_components_sum_is_refused() {
     let document = fixtures::with(fixtures::ENGINE_SMALL, br#""memory_bytes": 17179869184"#, br#""memory_bytes": 1"#);
     let problems = fixtures::engine(&document).unwrap_err();
-    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 14_554_503_431 });
+    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 14_557_353_447 });
 }
 fn instruction_file(files: &[crate::File]) -> &crate::File {
     for file in files {

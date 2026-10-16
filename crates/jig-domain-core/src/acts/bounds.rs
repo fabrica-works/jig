@@ -318,16 +318,8 @@ pub(crate) fn amendment_admit(
     standing::role(core, project, role, super::Act::Amend)?;
     let Some(context) = core.tasks.delegation(task) else { return Err(people::Refusal::Unknown) };
     let Some(role) = role else { return Err(people::Refusal::Role { held: None }) };
-    let any_task = match role {
-        people::Role::Owner | people::Role::Maintainer => true,
-        people::Role::Member | people::Role::Observer => false,
-        people::Role::Policy { .. } => match core.authority.role(project, role.number()) {
-            Some(policy) => policy.requests.allows(authority::RequestKind::Amend),
-            None => false,
-        },
-    };
     let standing = core.person_tree(person, task, depth);
-    if context.project != project || !any_task && !standing {
+    if !core.reaches(person, role, project, task, depth) {
         return Err(people::Refusal::Unknown);
     }
     let Some(role_policy) = core.authority.role(project, role.number()) else {

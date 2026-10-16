@@ -398,7 +398,21 @@ pub(super) fn tag_tasks(
                             pending.push(follow.pop().expect("made output count"));
                         }
                     }
-                    crate::MadeRoute::Person(event) => append_people(core, env, *event, &mut out),
+                    crate::MadeRoute::Person { event, stubs } => {
+                        for stub in stubs {
+                            let mut follow = Queue::with_capacity(room);
+                            tasks::step(
+                                &mut core.tasks,
+                                &Env { now: env.now, wall: env.wall, limits: env.limits.tasks },
+                                tasks::Event::RememberStub { stub },
+                                &mut follow,
+                            );
+                            for _ in 0..follow.len() {
+                                pending.push(follow.pop().expect("stub output count"));
+                            }
+                        }
+                        append_people(core, env, *event, &mut out);
+                    }
                     crate::MadeRoute::Delegated { key, tasks, stubs } => {
                         for stub in stubs {
                             let mut follow = Queue::with_capacity(room);

@@ -423,7 +423,7 @@ pub enum EscalationChoice {
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Outcome {
     /// The batch was made in order.
-    Created { first: u64, last: u64 },
+    Created { first: u64, last: u64, given: Option<crate::Given> },
     /// The whole chat-close decision was kept.
     Closing { chat: u64, cancelled: u32, kept: u32 },
     /// The named read position was accepted; it never moves backwards.

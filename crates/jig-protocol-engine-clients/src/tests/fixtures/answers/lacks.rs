@@ -25,7 +25,7 @@ pub fn lacks() -> [(p::Lack, w::Lacking); 20] {
             ),
         ),
         (
-            p::Lack::TaskKind,
+            p::Lack::TaskKind { executor: None },
             w::Lacking::TaskKind(
                 w::LackingTaskKind::new(&limits, w::LackingTaskKindParts { executor: None }).expect("lack"),
             ),

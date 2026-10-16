@@ -44,7 +44,9 @@ fn task_answer(core: &Core, task: Option<u64>, why: tasks::Refusal) -> people::O
             },
             None => people::Refusal::Unknown,
         },
-        tasks::Refusal::Executor => people::Refusal::Authority { proposable: None, lacking: people::Lack::TaskKind },
+        tasks::Refusal::Executor => {
+            people::Refusal::Authority { proposable: None, lacking: people::Lack::TaskKind { executor: None } }
+        }
         tasks::Refusal::Reference => people::Refusal::Authority { proposable: None, lacking: people::Lack::Reference },
         tasks::Refusal::Funding => people::Refusal::Authority { proposable: None, lacking: people::Lack::Funding },
         tasks::Refusal::AuthorityShape => people::Refusal::Authority { proposable: None, lacking: people::Lack::Shape },

@@ -43,7 +43,7 @@ pub enum MadeRoute {
     /// A person proposal needs its semantic task decision.
     PersonProposal(tasks::Event),
     /// A person request receives its keyed result.
-    Person(Box<people::Event>),
+    Person { event: Box<people::Event>, stubs: Box<[tasks::Stub]> },
     /// A named run call receives its batch, after remembering historical stubs.
     Delegated { key: CallKey, tasks: Box<[u64]>, stubs: Box<[tasks::Stub]> },
 }
@@ -274,21 +274,26 @@ impl Core {
         match self.delegating.remove(&request) {
             Some((key, stubs)) => MadeRoute::Delegated { key, tasks, stubs },
             None => {
-                let (expected, goal) = self.made.remove(&request).expect("pending make route");
+                let crate::routing::Made { first: expected, goal, given, stubs } =
+                    self.made.remove(&request).expect("pending make route");
                 if goal.is_some() {
                     assert!(tasks.as_ref() == [expected], "one person task created");
                 }
-                MadeRoute::Person(Box::new(people::Event::Decided {
-                    request,
-                    outcome: match goal {
-                        Some(true) => people::Outcome::GoalStarted { task: expected },
-                        Some(false) => people::Outcome::Started { task: expected },
-                        None => people::Outcome::Created {
-                            first: expected,
-                            last: *tasks.last().expect("nonempty created batch"),
+                MadeRoute::Person {
+                    stubs,
+                    event: Box::new(people::Event::Decided {
+                        request,
+                        outcome: match goal {
+                            Some(true) => people::Outcome::GoalStarted { task: expected },
+                            Some(false) => people::Outcome::Started { task: expected },
+                            None => people::Outcome::Created {
+                                first: expected,
+                                given,
+                                last: *tasks.last().expect("nonempty created batch"),
+                            },
                         },
-                    },
-                }))
+                    }),
+                }
             }
         }
     }

@@ -45,6 +45,8 @@ pub enum Refusal {
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Malformed {
     Cycle,
+    AsAllowedTwice,
+    Conversation,
 }
 
 /// Authority missing from a party's request.
@@ -59,7 +61,7 @@ pub enum Lack {
     /// No valid funding relation supports the requested reservation.
     Funding,
     /// The requested executor is not allowed.
-    TaskKind,
+    TaskKind { executor: Option<crate::TaskExecutor> },
     /// Descendant depth exceeds this maximum.
     Depth { most: u32 },
     /// The deadline is past or later than permitted.

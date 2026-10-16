@@ -302,6 +302,11 @@ fn check_members(
                     known = true;
                 }
             }
+            if let Party::Person(_) = creator
+                && let Some(row) = record(domain, *dependency)
+            {
+                known = row.project == new.project;
+            }
             if !known && let Some(parent) = parent {
                 for delegate in &parent.delegates {
                     if delegate == dependency && domain.names.contains_key(dependency) {

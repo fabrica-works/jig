@@ -39,7 +39,7 @@ impl Core {
                 } else if lacks.grants {
                     people::Lack::Grant { kind: request_grant(&ask.request, cap, &self.authority.rules().implies) }
                 } else if lacks.executors {
-                    people::Lack::TaskKind
+                    people::Lack::TaskKind { executor: None }
                 } else if lacks.tools {
                     people::Lack::Tool
                 } else if lacks.notes {
@@ -66,7 +66,7 @@ impl Core {
                 },
             },
             authority::Finding::Executor { .. } => {
-                people::Refusal::Authority { proposable: None, lacking: people::Lack::TaskKind }
+                people::Refusal::Authority { proposable: None, lacking: people::Lack::TaskKind { executor: None } }
             }
             authority::Finding::Grant { source } => people::Refusal::Authority {
                 proposable: None,

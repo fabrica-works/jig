@@ -173,6 +173,7 @@ fn window(now: core::Now) -> Option<(u64, u64, u32)> {
         | core::Now::RestoreRefused
         | core::Now::SeenChat { .. }
         | core::Now::HistoricalPersonTask { .. }
+        | core::Now::PartyInputs { .. }
         | core::Now::HistoricalProposal { .. }
         | core::Now::HistoricalEscalation { .. } => None,
     }

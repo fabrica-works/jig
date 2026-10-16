@@ -307,6 +307,7 @@ fn now_event(now: core::Now) -> Option<Event> {
         | core::Now::LoadEndedChat { .. }
         | core::Now::HistoricalProposal { .. }
         | core::Now::HistoricalPersonTask { .. }
+        | core::Now::PartyInputs { .. }
         | core::Now::CompleteBrief { .. }
         | core::Now::BriefCorePlanned { .. }
         | core::Now::WorkspaceRequest { .. }
@@ -366,6 +367,7 @@ fn watcher(event: &core::Event) -> Option<Token> {
         | core::Event::SeenChatLoaded { .. }
         | core::Event::HistoricalProposal { .. }
         | core::Event::HistoricalPersonTask { .. }
+        | core::Event::PartyInputsLoaded { .. }
         | core::Event::HistoricalEscalation { .. }
         | core::Event::NamedAnswer { .. }
         | core::Event::SubscribeTopic { .. }

@@ -7,6 +7,9 @@ fn member(words: &[u8]) -> Member {
         executor: TaskExecutor::Agent { charter: 1 },
         words: words.into(),
         parameters: Box::new([]),
+        inputs: Box::new([]),
+        budget: Budget::Named,
+        named: Box::new([]),
         contract: Contract::Report { words: 8 },
         authority: Authority {
             tools: NO_TOOLS,
@@ -41,8 +44,11 @@ fn a_members_create_routes_once_to_the_core() {
     let request = route(&rows);
     assert_eq!(rows.len(), 1);
     assert!(test.request(SIGN_IN, 1, ask.clone()).is_empty());
-    test.send(Event::Decided { request, outcome: Outcome::Created { first: PARTY, last: PARTY } });
-    assert_eq!(reply(&test.request(SIGN_IN, 1, ask)), Reply::Outcome(Outcome::Created { first: PARTY, last: PARTY }));
+    test.send(Event::Decided { request, outcome: Outcome::Created { first: PARTY, last: PARTY, given: None } });
+    assert_eq!(
+        reply(&test.request(SIGN_IN, 1, ask)),
+        Reply::Outcome(Outcome::Created { first: PARTY, last: PARTY, given: None })
+    );
 }
 #[test]
 fn an_observers_create_is_refused_by_role() {

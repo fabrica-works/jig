@@ -775,6 +775,7 @@ impl Session {
             | core::Now::SeenChat { .. }
             | core::Now::HistoricalProposal { .. }
             | core::Now::HistoricalPersonTask { .. }
+            | core::Now::PartyInputs { .. }
             | core::Now::CompleteBrief { .. }
             | core::Now::BriefCorePlanned { .. }
             | core::Now::WorkspaceRequest { .. }

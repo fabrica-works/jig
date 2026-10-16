@@ -9,6 +9,8 @@ pub(super) const EMPTY: wire::Limits = wire::Limits {
     member_words: 0,
     member_parameters: 0,
     member_dependencies: 0,
+    member_inputs: 0,
+    member_named: 0,
     field_rule_name: 0,
     verdict_fields: 0,
     contract_verdict_choices: 0,

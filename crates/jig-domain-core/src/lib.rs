@@ -248,7 +248,7 @@ pub struct Core {
     /// Historical dependency results held for preparation.
     pub dependency_results: Map<u64, Box<[HistoricalResult]>>,
     /// Numbered task creation flights.
-    pub made: Map<Token, (u64, Option<bool>)>,
+    pub(crate) made: Map<Token, routing::Made>,
     /// Goal proposal decisions in flight.
     pub goal_routes: Map<Token, GoalRoute>,
     /// Delegations awaiting input checks.
@@ -266,6 +266,7 @@ pub struct Core {
     /// Authenticated person escalation choices awaiting task semantics.
     pub(crate) person_escalations: Map<Token, routing::PersonEscalation>,
     /// Person task creations waiting for connector-owned resource holdings.
+    pub(crate) creating_inputs: Map<Token, routing::party_inputs::Inputs>,
     pub(crate) creating: Map<Token, routing::Creation>,
     pub(crate) resource_roles: Map<resources::Key, connector::ResourceRole>,
     pub(crate) resource_roles_full: bool,
@@ -560,6 +561,7 @@ impl Core {
             moving: Map::with_capacity(limits.people.pending),
             person_tasks: Map::with_capacity(limits.people.pending),
             person_escalations: Map::with_capacity(limits.people.pending),
+            creating_inputs: Map::with_capacity(limits.people.pending),
             creating: Map::with_capacity(limits.people.pending),
             resource_roles: Map::with_capacity(limits.tasks.resource_reports),
             resource_roles_full: false,
@@ -661,6 +663,7 @@ impl Core {
             && self.routing_people_proposals.is_empty()
             && self.awaiting_resources.is_empty()
             && self.made.is_empty()
+            && self.creating_inputs.is_empty()
             && self.goal_routes.is_empty()
             && self.delegating.is_empty()
             && self.ending_positions.is_empty()

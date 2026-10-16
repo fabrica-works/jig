@@ -77,6 +77,7 @@ pub(crate) fn immediate(now: core::Now, admission: &mut Option<Token>) -> Option
         | core::Now::LoadEndedChat { .. }
         | core::Now::HistoricalProposal { .. }
         | core::Now::HistoricalPersonTask { .. }
+        | core::Now::PartyInputs { .. }
         | core::Now::CompleteBrief { .. }
         | core::Now::BriefCorePlanned { .. }
         | core::Now::WorkspaceRequest { .. }
@@ -163,6 +164,7 @@ pub(crate) fn watcher(value: &core::Event) -> Option<Token> {
         | core::Event::SeenChatLoaded { .. }
         | core::Event::HistoricalProposal { .. }
         | core::Event::HistoricalPersonTask { .. }
+        | core::Event::PartyInputsLoaded { .. }
         | core::Event::HistoricalEscalation { .. }
         | core::Event::NamedAnswer { .. }
         | core::Event::SubscribeTopic { .. }
@@ -236,6 +238,7 @@ pub(crate) fn starting(value: core::Event) -> Option<kit::Event> {
         | core::Event::SeenChatLoaded { .. }
         | core::Event::HistoricalProposal { .. }
         | core::Event::HistoricalPersonTask { .. }
+        | core::Event::PartyInputsLoaded { .. }
         | core::Event::HistoricalEscalation { .. }
         | core::Event::NamedAnswer { .. }
         | core::Event::SubscribeTopic { .. }

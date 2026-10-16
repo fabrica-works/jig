@@ -1,5 +1,5 @@
 //! A party's batch (domain/tasks.md, sections 3 and 4).
-use crate::{Authority, Parameter, WakePolicy};
+use crate::{Authority, Grant, Parameter, PersonAddress, WakePolicy};
 use alloc::boxed::Box;
 /// One root requested by a party, mirroring the tasks child's New.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -7,10 +7,13 @@ pub struct Member {
     pub executor: TaskExecutor,
     pub words: Box<[u8]>,
     pub parameters: Box<[Parameter]>,
+    pub inputs: Box<[u64]>,
     pub contract: Contract,
     pub authority: Authority,
+    pub budget: Budget,
     pub wake: WakePolicy,
-    pub dependencies: Box<[u32]>,
+    pub dependencies: Box<[Dependency]>,
+    pub named: Box<[Grant]>,
     pub tracked: Option<u32>,
     pub label: u32,
     pub flags: Flags,
@@ -19,12 +22,33 @@ pub struct Member {
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum TaskExecutor {
     Agent { charter: u32 },
+    Procedure { connector: u16, code: u32 },
+    Person(PersonAddress),
 }
 /// The member's result contract, mirroring tasks' contracts.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Contract {
     Report { words: u32 },
+    Change { connector: u16, kind: u16, words: u32 },
     Verdict { choices: Box<[Verdict]> },
+}
+/// How much of the party's available budget to give a member.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum Budget {
+    Named,
+    AsAllowed { cap: Option<u64> },
+}
+/// A dependency within the batch or the party's reach.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum Dependency {
+    Batch(u32),
+    Existing(u64),
+}
+/// The resolved amount of a member whose budget was `AsAllowed`.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Given {
+    pub task: u64,
+    pub amount: u64,
 }
 /// One allowed verdict.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -63,7 +87,15 @@ pub fn member_bytes(member: &Member) -> Option<u64> {
     total = total.checked_add(
         u64::try_from(member.parameters.len()).ok()?.checked_mul(u64::try_from(size_of::<Parameter>()).ok()?)?,
     )?;
-    total = total.checked_add(u64::try_from(member.dependencies.len()).ok()?.checked_mul(4)?)?;
+    total = total.checked_add(
+        u64::try_from(member.dependencies.len()).ok()?.checked_mul(u64::try_from(size_of::<Dependency>()).ok()?)?,
+    )?;
+    total = total.checked_add(u64::try_from(member.inputs.len()).ok()?.checked_mul(8)?)?;
+    let mut named = member.authority.clone();
+    named.grants.clone_from(&member.named);
+    named.delegation.kinds = Box::new([]);
+    named.note_resources = Box::new([]);
+    total = total.checked_add(crate::authority_bytes(&named)?)?;
     for parameter in &member.parameters {
         match parameter {
             Parameter::Bytes { value, .. } => total = total.checked_add(u64::try_from(value.len()).ok()?)?,
@@ -71,7 +103,7 @@ pub fn member_bytes(member: &Member) -> Option<u64> {
         }
     }
     match &member.contract {
-        Contract::Report { .. } => {}
+        Contract::Report { .. } | Contract::Change { .. } => {}
         Contract::Verdict { choices } => {
             total = total.checked_add(
                 u64::try_from(choices.len()).ok()?.checked_mul(u64::try_from(size_of::<Verdict>()).ok()?)?,

@@ -227,7 +227,15 @@ pub(super) fn encode_lack(value: &domain::Lack, limits: &wire::Limits) -> Result
             wire::Lack::Grant(wire::LackGrant::new(limits, wire::LackGrantParts { kind: *kind })?)
         }
         domain::Lack::Funding => wire::Lack::Funding,
-        domain::Lack::TaskKind => wire::Lack::TaskKind,
+        domain::Lack::TaskKind { executor } => wire::Lack::TaskKind(wire::LackTaskKind::new(
+            limits,
+            wire::LackTaskKindParts {
+                executor: match executor {
+                    Some(executor) => Some(super::super::batch::parts::encode_executor(*executor, limits)?),
+                    None => None,
+                },
+            },
+        )?),
         domain::Lack::Depth { most } => {
             wire::Lack::Depth(wire::LackDepth::new(limits, wire::LackDepthParts { most: *most })?)
         }
@@ -272,7 +280,13 @@ pub(super) fn decode_lack(value: wire::Lack) -> domain::Lack {
             domain::Lack::Grant { kind }
         }
         wire::Lack::Funding => domain::Lack::Funding,
-        wire::Lack::TaskKind => domain::Lack::TaskKind,
+        wire::Lack::TaskKind(value) => {
+            let mut executor = None;
+            if let Some(value) = value.into_parts().executor {
+                executor = Some(super::super::batch::parts::decode_executor(value));
+            }
+            domain::Lack::TaskKind { executor }
+        }
         wire::Lack::Depth(value) => {
             let wire::LackDepthParts { most } = value.into_parts();
             domain::Lack::Depth { most }
@@ -394,6 +408,8 @@ pub(super) fn encode_refusal(value: &domain::Refusal, limits: &wire::Limits) -> 
                 at: *at,
                 why: match why {
                     domain::Malformed::Cycle => wire::Malformed::Cycle,
+                    domain::Malformed::AsAllowedTwice => wire::Malformed::AsAllowedTwice,
+                    domain::Malformed::Conversation => wire::Malformed::Conversation,
                 },
             },
         )?),
@@ -445,6 +461,8 @@ pub(super) fn decode_refusal(value: wire::Refusal) -> domain::Refusal {
                 at,
                 why: match why {
                     wire::Malformed::Cycle => domain::Malformed::Cycle,
+                    wire::Malformed::AsAllowedTwice => domain::Malformed::AsAllowedTwice,
+                    wire::Malformed::Conversation => domain::Malformed::Conversation,
                 },
             }
         }

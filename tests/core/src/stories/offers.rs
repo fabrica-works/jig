@@ -24,6 +24,15 @@ pub fn world(seed: u64, role: Option<people::Role>) -> World {
 
 #[must_use]
 pub fn world_with(seed: u64, role: Option<people::Role>, edit: impl FnOnce(&mut root::Limits)) -> World {
+    world_with_policy(seed, role, |limits, _, _| edit(limits))
+}
+/// Edit the story's policy and limits before the world is configured.
+#[must_use]
+pub fn world_with_policy(
+    seed: u64,
+    role: Option<people::Role>,
+    edit: impl FnOnce(&mut root::Limits, &mut authority::Rules, &mut authority::Policy),
+) -> World {
     let (mut configuration, mut limits) = fixture(seed, false);
     if let Some(held) = role {
         limits.core.authority.roles = 2;
@@ -45,10 +54,10 @@ pub fn world_with(seed: u64, role: Option<people::Role>, edit: impl FnOnce(&mut 
         role.authority.delegation.tasks = 2;
         role.authority.delegation.depth = 2;
     });
-    edit(&mut limits);
-    let policy = configuration.core.authority.policy(1).expect("fixture policy").clone();
-    let mut domain = authority::Domain::new(configuration.core.authority.rules().clone(), limits.core.authority)
-        .expect("edited authority bounds");
+    let mut policy = configuration.core.authority.policy(1).expect("fixture policy").clone();
+    let mut rules = configuration.core.authority.rules().clone();
+    edit(&mut limits, &mut rules, &mut policy);
+    let mut domain = authority::Domain::new(rules, limits.core.authority).expect("edited authority bounds");
     let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
     authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut facts);
     assert_eq!(facts.pop(), Some(authority::PolicyFact::Added { project: 1 }));

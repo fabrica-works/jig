@@ -338,7 +338,7 @@ pub(super) fn created_holdings(
 
 fn finish_creation(core: &mut Core, env: &Env<Limits>, work: &mut Queue<Event>, request: Token, creating: Creation) {
     let person = match creating.kind {
-        CreationKind::Batch { person } => Some(person),
+        CreationKind::Batch { person, .. } => Some(person),
         CreationKind::Goal { .. } | CreationKind::Chat { .. } => None,
     };
     if let Some(person) = person {
@@ -350,7 +350,11 @@ fn finish_creation(core: &mut Core, env: &Env<Limits>, work: &mut Queue<Event>, 
         if let Some(event) = pool {
             work.push(Event::Tasks(event));
         }
-        assert!(core.made.insert(request, (first, None)) == Ok(None), "one batch make flight");
+        let CreationKind::Batch { given, stubs, .. } = creating.kind else { unreachable!("batch creation") };
+        assert!(
+            core.made.insert(request, super::Made { first, goal: None, given, stubs }).is_ok(),
+            "one batch make flight"
+        );
         work.push(Event::Tasks(tasks::Event::Make {
             reply_to: ReplyTo::new(request),
             creator: tasks::Party::Person(person),
@@ -369,7 +373,13 @@ fn finish_creation(core: &mut Core, env: &Env<Limits>, work: &mut Queue<Event>, 
             if let Some(event) = pool {
                 work.push(Event::Tasks(event));
             }
-            assert!(core.made.insert(request, (new.number, Some(true))) == Ok(None), "one goal make flight");
+            assert!(
+                core.made.insert(
+                    request,
+                    super::Made { first: new.number, goal: Some(true), given: None, stubs: Box::new([]) }
+                ) == Ok(None),
+                "one goal make flight"
+            );
             work.push(Event::Tasks(tasks::Event::Make {
                 reply_to: ReplyTo::new(request),
                 creator: tasks::Party::Person(person),
@@ -397,7 +407,13 @@ fn finish_creation(core: &mut Core, env: &Env<Limits>, work: &mut Queue<Event>, 
             }));
         }
         CreationKind::Chat { person } => {
-            assert!(core.made.insert(request, (new.number, Some(false))) == Ok(None), "one chat make flight");
+            assert!(
+                core.made.insert(
+                    request,
+                    super::Made { first: new.number, goal: Some(false), given: None, stubs: Box::new([]) }
+                ) == Ok(None),
+                "one chat make flight"
+            );
             work.push(Event::Tasks(tasks::Event::Make {
                 reply_to: ReplyTo::new(request),
                 creator: tasks::Party::Person(person),

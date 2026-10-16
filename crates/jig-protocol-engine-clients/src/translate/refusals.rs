@@ -70,7 +70,7 @@ fn lack(value: p::Lack, limits: &w::Limits) -> Result<w::Lacking, w::Problem> {
         p::Lack::Grant { kind } => {
             w::Lacking::GrantKind(w::LackingGrantKind::new(limits, w::LackingGrantKindParts { kind })?)
         }
-        p::Lack::TaskKind => {
+        p::Lack::TaskKind { .. } => {
             w::Lacking::TaskKind(w::LackingTaskKind::new(limits, w::LackingTaskKindParts { executor: None })?)
         }
         p::Lack::Depth { most } => {

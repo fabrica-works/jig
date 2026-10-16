@@ -1330,7 +1330,7 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
         Outcome::NoteEdited { name } => expected == Expected::Note(name),
         Outcome::ServiceMade { person } => expected == Expected::Service && person != 0,
         Outcome::Adopted { project } => expected == Expected::Adoption(project),
-        Outcome::Created { first, last } => expected == Expected::Create && first != 0 && last >= first,
+        Outcome::Created { first, last, .. } => expected == Expected::Create && first != 0 && last >= first,
         Outcome::GoalStarted { task } => expected == Expected::Goal && task != 0,
         Outcome::GoalProposed { proposal } => expected == Expected::Goal && proposal != 0,
         Outcome::Stopped { task } => expected == Expected::Stop(task),

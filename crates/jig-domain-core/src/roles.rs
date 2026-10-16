@@ -193,6 +193,23 @@ impl Core {
         }
     }
 
+    /// Whether a party may name this live task within its project.
+    #[must_use]
+    pub fn reaches(&self, person: u64, role: people::Role, project: u32, task: u64, depth: u32) -> bool {
+        let Some(context) = self.tasks.delegation(task) else { return false };
+        context.project == project && (self.reaches_project(role, project) || self.person_tree(person, task, depth))
+    }
+    pub(crate) fn reaches_project(&self, role: people::Role, project: u32) -> bool {
+        match role {
+            people::Role::Owner | people::Role::Maintainer => true,
+            people::Role::Member | people::Role::Observer => false,
+            people::Role::Policy { .. } => match self.authority.role(project, role.number()) {
+                Some(policy) => policy.requests.allows(authority::RequestKind::Amend),
+                None => false,
+            },
+        }
+    }
+
     /// Whether a person is the requesting ancestor of a live task.
     #[must_use]
     pub fn person_tree(&self, person: u64, task: u64, depth: u32) -> bool {

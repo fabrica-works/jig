@@ -31,6 +31,8 @@ pub fn limits(domain: &core::Limits) -> Option<wire::Limits> {
         member_words: people.words,
         member_parameters: 0,
         member_dependencies: 0,
+        member_inputs: 0,
+        member_named: 0,
         field_rule_name: people.amendment_bytes,
         verdict_fields: 0,
         contract_verdict_choices: 0,
@@ -87,6 +89,8 @@ pub fn limits(domain: &core::Limits) -> Option<wire::Limits> {
     derive_shared(domain, &mut limits)?;
     derive_amendment(domain, &mut limits)?;
     limits.member_parameters = limits.spec_parameters;
+    limits.member_inputs = limits.spec_inputs;
+    limits.member_named = limits.authority_grants;
     limits.member_dependencies = people.amendment_bytes.checked_mul(3)?;
     limits.verdict_fields = piece_bound(
         people.amendment_bytes,
