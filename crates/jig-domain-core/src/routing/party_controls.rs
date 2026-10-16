@@ -248,34 +248,12 @@ pub(super) fn release_request(
                 | people::Ask::DecideEscalation { .. }
                 | people::Ask::StartChat { .. } => unreachable!("release route owns its ask"),
             };
-            if let Err(why) = core.hold_revision(task, revision) {
-                pool_refused(work, request, why);
-                return;
-            }
-            let required = match core.tasks.task(task).expect("release task admitted").phase {
-                tasks::Phase::Held { why: tasks::Hold::Uncertain { .. }, .. } => true,
-                tasks::Phase::Held { .. }
-                | tasks::Phase::Waiting
-                | tasks::Phase::Active(_)
-                | tasks::Phase::Closing(_)
-                | tasks::Phase::Ended(_) => false,
-            };
-            if required != again.is_some() {
-                pool_refused(
-                    work,
-                    request,
-                    people::Refusal::Authority { proposable: None, lacking: people::Lack::Again { required } },
-                );
-                return;
-            }
-            let message = if again == Some(false) {
-                let Some(message) = crate::fresh(&mut core.counters, crate::Family::Message) else {
-                    pool_refused(work, request, people::Refusal::Limit { which: people::LimitKind::Arithmetic });
+            let message = match core.release_admit(task, revision, again) {
+                Ok(message) => message,
+                Err(why) => {
+                    pool_refused(work, request, why);
                     return;
-                };
-                Some(message)
-            } else {
-                None
+                }
             };
             assert!(core.person_tasks.insert(request, PersonTaskRoute::Release(task)) == Ok(None), "one release route");
             work.push(Event::Tasks(tasks::Event::Control {

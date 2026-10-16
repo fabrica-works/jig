@@ -452,8 +452,8 @@ pub(super) fn tag_tasks(
             tasks::Request::EscalationDecided { reply_to, task, revision, outcome } if task_escalation => {
                 let token = reply_to.into_token();
                 let route = core.routing_calls.remove(&token).expect("task escalation decision route");
-                let (key, named, current) = match route {
-                    RoutedCall::Escalation { key, task, revision } => (key, task, revision),
+                let (key, named, current, passed_up) = match route {
+                    RoutedCall::Escalation { key, task, revision, passed_up } => (key, task, revision, passed_up),
                     RoutedCall::Propose { .. }
                     | RoutedCall::Decide { .. }
                     | RoutedCall::Withdraw { .. }
@@ -470,7 +470,15 @@ pub(super) fn tag_tasks(
                     &mut out,
                     ReplyTo::new(token),
                     key,
-                    CallPart::EscalationDecided { task, revision, outcome },
+                    match outcome {
+                        tasks::EscalationOutcome::Passed { .. } if passed_up => CallPart::PassedUp { task },
+                        tasks::EscalationOutcome::Released
+                        | tasks::EscalationOutcome::Rejected
+                        | tasks::EscalationOutcome::Passed { .. }
+                        | tasks::EscalationOutcome::Stale
+                        | tasks::EscalationOutcome::NoFurther
+                        | tasks::EscalationOutcome::Limit => CallPart::EscalationDecided { task, revision, outcome },
+                    },
                 );
                 continue;
             }

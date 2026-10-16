@@ -410,7 +410,7 @@ fn family(name: &[u8]) -> u64 {
         b"delegate" => jig.delegate.0,
         b"message" | b"introduce" => jig.message.0,
         b"cancel" | b"release" | b"amend" => jig.control.0,
-        b"decide" | b"withdraw" | b"decide_escalation" => jig.decide.0,
+        b"decide" | b"withdraw" => jig.decide.0,
         b"propose" => jig.propose.0,
         b"subscribe" | b"unsubscribe" => jig.subscribe.0,
         b"note" => jig.note.0,

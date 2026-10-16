@@ -316,16 +316,28 @@ pub(super) fn named_escalation(
             return escalation_refused(core, to, key, task, tasks::Refusal::State);
         }
     };
+    if let Err(jig_domain_people::Refusal::Moved { now }) = core.hold_revision(task, revision) {
+        let mut out = Queue::with_capacity(3);
+        call_decision(core, &mut out, to, key, CallPart::Moved { task, now });
+        out.push(Request::Decided);
+        return Requests::Out(out);
+    }
     if current != revision || holder != tasks::EscalationHolder::Task(key.task) {
         return escalation_refused(core, to, key, task, tasks::Refusal::Reference);
     }
     let role = core.people.role(context.requester, context.project);
+    let mut passed_up = false;
     let semantic = match choice {
         EscalationChoice::Release => {
-            if core.escalation_recipient(&env.limits, &context, role) != Some(holder) {
-                return escalation_refused(core, to, key, task, tasks::Refusal::Funding);
+            if core.escalation_recipient(&env.limits, &context, role) == Some(holder) {
+                tasks::EscalationDecision::Release
+            } else {
+                let Some(next) = core.escalation_recipient_after(&env.limits, &context, role, Some(holder)) else {
+                    return escalation_refused(core, to, key, task, tasks::Refusal::Funding);
+                };
+                passed_up = true;
+                tasks::EscalationDecision::Pass { holder: next }
             }
-            tasks::EscalationDecision::Release
         }
         EscalationChoice::Reject { reason } => tasks::EscalationDecision::Reject { reason },
         EscalationChoice::Pass => {
@@ -344,7 +356,10 @@ pub(super) fn named_escalation(
     };
     let token = to.into_token();
     assert!(core.pending_calls.insert(key, true).is_ok(), "task escalation call room reserved");
-    assert!(core.routing_calls.insert(token, RoutedCall::Escalation { key, task, revision }) == Ok(None), "one route");
+    assert!(
+        core.routing_calls.insert(token, RoutedCall::Escalation { key, task, revision, passed_up }) == Ok(None),
+        "one route"
+    );
     work.push(Event::TaskEscalation(tasks::Event::DecideEscalation {
         reply_to: ReplyTo::new(token),
         task,
@@ -480,6 +495,57 @@ pub(super) fn named_action(
                 reply_to: ReplyTo::new(token),
                 task: key.task,
                 subscription,
+            }));
+        }
+        NamedAction::Release { target, revision, again } => {
+            let message = match core.release_admit(target, revision, again) {
+                Ok(message) => message,
+                Err(why) => {
+                    let part = match why {
+                        jig_domain_people::Refusal::Moved { now } => CallPart::Moved { task: target, now },
+                        jig_domain_people::Refusal::Authority {
+                            lacking: jig_domain_people::Lack::Again { required },
+                            ..
+                        } => CallPart::Again { task: target, required },
+                        why @ (jig_domain_people::Refusal::Unknown | jig_domain_people::Refusal::Limit { .. }) => {
+                            CallPart::ControlRefused(tasks::Problem {
+                                task: Some(target),
+                                why: if why == jig_domain_people::Refusal::Unknown {
+                                    tasks::Refusal::Unknown
+                                } else {
+                                    tasks::Refusal::Busy
+                                },
+                                blocked_by: None,
+                                capacity: None,
+                            })
+                        }
+                        jig_domain_people::Refusal::Disposal { .. }
+                        | jig_domain_people::Refusal::Role { .. }
+                        | jig_domain_people::Refusal::Authority { .. }
+                        | jig_domain_people::Refusal::Ended { .. }
+                        | jig_domain_people::Refusal::Taken { .. }
+                        | jig_domain_people::Refusal::NotWaiting
+                        | jig_domain_people::Refusal::NoFurther
+                        | jig_domain_people::Refusal::NotOffered
+                        | jig_domain_people::Refusal::KeyConflict => unreachable!(
+                            "shared release admission returns revision, again, unknown or arithmetic refusals"
+                        ),
+                    };
+                    call_decision(core, &mut out, ReplyTo::new(token), key, part);
+                    out.push(Request::Decided);
+                    return Requests::Out(out);
+                }
+            };
+            assert!(core.pending_calls.insert(key, true).is_ok(), "call record room reserved");
+            assert!(
+                core.routing_calls.insert(token, RoutedCall::Control { key, target, revised: true }) == Ok(None),
+                "one live routed call"
+            );
+            work.push(Event::Tasks(tasks::Event::Control {
+                reply_to: ReplyTo::new(token),
+                by: tasks::Party::Task(key.task),
+                task: target,
+                control: tasks::Control::Release { again, message },
             }));
         }
         NamedAction::Control { target, control } => {
@@ -633,7 +699,7 @@ pub(super) fn named_tool_kind(action: &NamedAction) -> ToolKind {
         NamedAction::Message { target, .. } => ToolKind::Message { target: *target },
         NamedAction::Introduce { left, .. } => ToolKind::Message { target: *left },
         NamedAction::Subscribe { .. } | NamedAction::Unsubscribe { .. } => ToolKind::Subscribe,
-        NamedAction::Control { .. } | NamedAction::Amend { .. } => ToolKind::Control,
+        NamedAction::Control { .. } | NamedAction::Amend { .. } | NamedAction::Release { .. } => ToolKind::Control,
         NamedAction::DecideEscalation { .. }
         | NamedAction::WithdrawProposal { .. }
         | NamedAction::DecideProposal { .. } => ToolKind::Decide,

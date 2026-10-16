@@ -19,10 +19,7 @@ fn a_cancel_call_decodes_to_its_named_action() {
 #[test]
 fn a_release_call_decodes_to_its_named_action() {
     match crate::decode(b"release", fixtures::RELEASE, &fixtures::LIMITS) {
-        Decoded::Action(core::NamedAction::Control {
-            target: 3,
-            control: jig_domain_tasks::Control::Release { .. },
-        }) => {}
+        Decoded::Action(core::NamedAction::Release { target: 3, revision: 1, again: Some(false) }) => {}
         other @ (Decoded::Action(_) | Decoded::Delegate(_) | Decoded::Problem(_) | Decoded::NotMine) => {
             panic!("unexpected decoded input {other:?}")
         }
@@ -91,7 +88,7 @@ fn a_amend_call_decodes_to_its_named_action() {
 
 #[test]
 fn a_decide_escalation_call_decodes_to_its_named_action() {
-    match crate::decode(b"decide_escalation", fixtures::DECIDE_ESCALATION, &fixtures::LIMITS) {
+    match crate::decode(b"decide", fixtures::DECIDE_ESCALATION, &fixtures::LIMITS) {
         Decoded::Action(core::NamedAction::DecideEscalation { task: 3, revision: 1, .. }) => {}
         other @ (Decoded::Action(_) | Decoded::Delegate(_) | Decoded::Problem(_) | Decoded::NotMine) => {
             panic!("unexpected decoded input {other:?}")
@@ -331,11 +328,6 @@ fn the_amend_schema_parses_and_names_its_decoders_fields() {
 }
 
 #[test]
-fn the_decide_escalation_schema_parses_and_names_its_decoders_fields() {
-    schema(b"decide_escalation");
-}
-
-#[test]
 fn the_propose_schema_parses_and_names_its_decoders_fields() {
     schema(b"propose");
 }
@@ -419,4 +411,47 @@ fn a_moved_answer_names_the_hold_and_its_reason() {
     });
     assert_eq!(answer.text.as_ref(), b"Moved: task 7 is held at hold revision 3 now, for its budget");
     assert!(answer.error);
+}
+
+#[test]
+fn a_release_call_names_the_hold_revision_and_again() {
+    let Decoded::Action(core::NamedAction::Release { target, revision, again }) =
+        crate::decode(b"release", fixtures::RELEASE, &fixtures::LIMITS)
+    else {
+        panic!("release")
+    };
+    assert_eq!((target, revision, again), (fixtures::TARGET, 1, Some(false)));
+}
+#[test]
+fn a_decide_call_names_an_escalation_by_its_hold_revision() {
+    let Decoded::Action(core::NamedAction::DecideEscalation {
+        task,
+        revision,
+        choice: core::EscalationChoice::Release,
+    }) = crate::decode(b"decide", fixtures::DECIDE_ESCALATION, &fixtures::LIMITS)
+    else {
+        panic!("escalation")
+    };
+    assert_eq!((task, revision), (fixtures::TARGET, 1));
+}
+#[test]
+fn a_decide_call_names_a_proposal_by_its_proposer_and_number() {
+    let Decoded::Action(core::NamedAction::DecideProposal { proposer, proposal, choice: core::ProposalChoice::Accept }) =
+        crate::decode(b"decide", fixtures::DECIDE, &fixtures::LIMITS)
+    else {
+        panic!("proposal")
+    };
+    assert_eq!((proposer, proposal), (fixtures::TARGET, fixtures::PROPOSAL));
+}
+#[test]
+fn decide_escalation_is_no_longer_a_declared_tool() {
+    for tool in crate::declarations() {
+        assert_ne!(tool.name, b"decide_escalation");
+    }
+    match crate::decode(b"decide_escalation", b"{}", &fixtures::LIMITS) {
+        Decoded::NotMine => {}
+        other @ (Decoded::Action(_) | Decoded::Delegate(_) | Decoded::Problem(_)) => {
+            panic!("removed tool decoded: {other:?}")
+        }
+    }
 }

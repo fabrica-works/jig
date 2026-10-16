@@ -99,6 +99,22 @@ pub fn render(part: &CallPart) -> Rendered {
             false,
         ),
         CallPart::Moved { task, now } => moved(*task, now),
+        CallPart::Again { task, required } => text(
+            &[
+                b"Refused: task ",
+                Decimal::of(*task).as_bytes(),
+                if *required {
+                    b" holds an effect whose outcome is uncertain; say again: true or false"
+                } else {
+                    b" holds no uncertain effect; leave again out"
+                },
+            ],
+            true,
+        ),
+        CallPart::PassedUp { task } => text(
+            &[b"Beyond your authority: task ", Decimal::of(*task).as_bytes(), b"'s escalation was passed up"],
+            false,
+        ),
         CallPart::Unavailable => text(&[b"Unavailable"], true),
     }
 }

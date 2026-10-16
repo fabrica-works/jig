@@ -104,6 +104,8 @@ pub(super) fn encode_call_part(value: &domain::CallPart, limits: &Limits) -> Res
                 wire::CallPartProposalRefusedParts { value: encode_task_problem(value, limits)? },
             )?)
         }
+        domain::CallPart::Again { task, required } => encode_again(*task, *required, limits)?,
+        domain::CallPart::PassedUp { task } => encode_passed_up(*task, limits)?,
         domain::CallPart::Controlled => wire::CallPart::Controlled,
         domain::CallPart::Revised { task, revision } => wire::CallPart::Revised(wire::CallPartRevised::new(
             &limits.core,
@@ -208,6 +210,8 @@ pub(super) fn decode_call_part(value: wire::CallPart, limits: &Limits) -> Result
             let wire::CallPartProposalRefusedParts { value } = value.into_parts();
             domain::CallPart::ProposalRefused(decode_task_problem(value, limits)?)
         }
+        wire::CallPart::Again(value) => decode_again(value),
+        wire::CallPart::PassedUp(value) => decode_passed_up(value),
         wire::CallPart::Controlled => domain::CallPart::Controlled,
         wire::CallPart::Revised(value) => decode_revised(value),
         wire::CallPart::Moved(value) => decode_moved(value),
@@ -591,4 +595,19 @@ fn decode_revised(value: wire::CallPartRevised) -> domain::CallPart {
 fn decode_moved(value: wire::CallPartMoved) -> domain::CallPart {
     let wire::CallPartMovedParts { task, now } = value.into_parts();
     domain::CallPart::Moved { task, now: moved::decode_moved(now) }
+}
+
+fn encode_again(task: u64, required: bool, limits: &Limits) -> Result<wire::CallPart, wire::Problem> {
+    Ok(wire::CallPart::Again(wire::CallPartAgain::new(&limits.core, wire::CallPartAgainParts { task, required })?))
+}
+fn encode_passed_up(task: u64, limits: &Limits) -> Result<wire::CallPart, wire::Problem> {
+    Ok(wire::CallPart::PassedUp(wire::CallPartPassedUp::new(&limits.core, wire::CallPartPassedUpParts { task })?))
+}
+fn decode_again(value: wire::CallPartAgain) -> domain::CallPart {
+    let wire::CallPartAgainParts { task, required } = value.into_parts();
+    domain::CallPart::Again { task, required }
+}
+fn decode_passed_up(value: wire::CallPartPassedUp) -> domain::CallPart {
+    let wire::CallPartPassedUpParts { task } = value.into_parts();
+    domain::CallPart::PassedUp { task }
 }

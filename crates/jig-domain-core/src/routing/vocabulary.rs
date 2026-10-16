@@ -585,6 +585,12 @@ pub enum NamedAction {
         target: u64,
         control: tasks::Control,
     },
+    /// Release a delegate naming the hold the caller saw.
+    Release {
+        target: u64,
+        revision: u64,
+        again: Option<bool>,
+    },
     Amend {
         target: u64,
         revision: u64,

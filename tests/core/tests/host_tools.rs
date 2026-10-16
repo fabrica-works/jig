@@ -1,4 +1,6 @@
 use jig_core_world::effects::World;
+const CHILD: u64 = 2;
+const EFFECT: u64 = 1;
 use jig_domain_core as core;
 use jig_domain_fleet as fleet;
 use jig_test_domain as root;
@@ -136,4 +138,75 @@ fn agents_tools_scenario_family() {
             assert_eq!(world.reached_cut, Some(cut), "{} reaches its cut", story.name);
         }
     }
+}
+
+#[test]
+fn a_release_naming_an_old_hold_revision_is_answered_moved() {
+    let story = jig_core_world::agents_tools::STORIES
+        .iter()
+        .find(|story| story.name == "release moved")
+        .expect("release story");
+    (story.run)(&mut World::new(178, false), None);
+}
+#[test]
+fn a_release_naming_its_hold_revision_lifts_the_hold() {
+    let mut world = World::new(179, false);
+    world.hold_procedures = true;
+    world.delegate();
+    world.send(root::Event::Core(core::Event::Tasks(jig_domain_tasks::Event::Hold {
+        task: CHILD,
+        why: jig_domain_tasks::Hold::Budget,
+    })));
+    world.tool_call(b"release", format!(r#"{{"target":{CHILD},"revision":1}}"#).as_bytes(), true);
+    assert_eq!(
+        answer(&world),
+        &core::SettledAnswer::Host {
+            error: false,
+            body: format!("Done: task {CHILD} is at spec revision 0").as_bytes().into()
+        }
+    );
+    assert_ne!(jig_core_world::fixtures::live_row(&world, CHILD).revisions.hold, 0);
+    assert!(!matches!(jig_core_world::fixtures::live_row(&world, CHILD).phase, jig_domain_tasks::Phase::Held { .. }));
+}
+#[test]
+fn a_release_of_an_uncertain_effect_without_again_is_refused() {
+    let mut world = World::new(180, false);
+    world.hold_procedures = true;
+    world.delegate();
+    world.send(root::Event::Core(core::Event::Tasks(jig_domain_tasks::Event::Hold {
+        task: CHILD,
+        why: jig_domain_tasks::Hold::Uncertain { entry: EFFECT },
+    })));
+    world.tool_call(b"release", format!(r#"{{"target":{CHILD},"revision":1}}"#).as_bytes(), true);
+    assert_eq!(
+        answer(&world),
+        &core::SettledAnswer::Host {
+            error: true,
+            body: format!("Refused: task {CHILD} holds an effect whose outcome is uncertain; say again: true or false")
+                .as_bytes()
+                .into()
+        }
+    );
+    assert_eq!(jig_core_world::fixtures::live_row(&world, CHILD).revisions.hold, 1);
+}
+#[test]
+fn a_decide_naming_an_old_escalation_revision_is_answered_moved() {
+    let mut world = World::new(181, false);
+    world.hold_procedures = true;
+    world.delegate();
+    for why in [jig_domain_tasks::Hold::Stopped, jig_domain_tasks::Hold::Budget] {
+        world.send(root::Event::Core(core::Event::Tasks(jig_domain_tasks::Event::Hold { task: CHILD, why })));
+    }
+    world.tool_call(
+        b"decide",
+        format!(r#"{{"kind":"escalation","task":{CHILD},"revision":1,"decision":"release"}}"#).as_bytes(),
+        true,
+    );
+    assert_eq!(
+        answer(&world),
+        &core::SettledAnswer::Host {
+            error: true,
+            body: format!("Moved: task {CHILD} is held at hold revision 2 now, for its budget").as_bytes().into()
+        }
+    );
 }

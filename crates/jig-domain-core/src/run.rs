@@ -347,7 +347,7 @@ pub struct RunCharter {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum RoutedCall {
-    Escalation { key: CallKey, task: u64, revision: u64 },
+    Escalation { key: CallKey, task: u64, revision: u64, passed_up: bool },
     Propose { key: CallKey, proposal: u64 },
     Decide { key: CallKey, proposal: u64 },
     Withdraw { key: CallKey, proposal: u64 },

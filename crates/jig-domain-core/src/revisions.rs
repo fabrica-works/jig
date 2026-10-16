@@ -7,6 +7,35 @@ use jig_domain_people as people;
 use jig_domain_tasks as tasks;
 
 impl Core {
+    /// Shared release admission, in the party route's original order.
+    pub(crate) fn release_admit(
+        &mut self,
+        task: u64,
+        revision: u64,
+        again: Option<bool>,
+    ) -> Result<Option<u64>, people::Refusal> {
+        self.hold_revision(task, revision)?;
+        let required = match self.tasks.task(task).ok_or(people::Refusal::Unknown)?.phase {
+            tasks::Phase::Held { why: tasks::Hold::Uncertain { .. }, .. } => true,
+            tasks::Phase::Held { .. }
+            | tasks::Phase::Waiting
+            | tasks::Phase::Active(_)
+            | tasks::Phase::Closing(_)
+            | tasks::Phase::Ended(_) => false,
+        };
+        if required != again.is_some() {
+            return Err(people::Refusal::Authority { proposable: None, lacking: people::Lack::Again { required } });
+        }
+        if again == Some(false) {
+            match crate::fresh(&mut self.counters, crate::Family::Message) {
+                Some(message) => Ok(Some(message)),
+                None => Err(people::Refusal::Limit { which: people::LimitKind::Arithmetic }),
+            }
+        } else {
+            Ok(None)
+        }
+    }
+
     /// Acceptance also records the proposal decision after the amendment and optional release.
     pub(crate) fn amendment_accept_revision(
         &self,

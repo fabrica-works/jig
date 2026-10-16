@@ -460,6 +460,8 @@ impl Core {
                     | CallPart::NoteRefused(_)
                     | CallPart::Revised { .. }
                     | CallPart::Moved { .. }
+                    | CallPart::Again { .. }
+                    | CallPart::PassedUp { .. }
                     | CallPart::Unavailable,
                 )
                 | None => {}

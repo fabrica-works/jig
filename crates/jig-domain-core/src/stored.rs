@@ -18,6 +18,10 @@ use skein_lib::Wall;
 /// answers for calls routed among its children (domain/engine.md, 7.3).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum CallPart {
+    /// A release must name again exactly when its effect is uncertain.
+    Again { task: u64, required: bool },
+    /// An escalation release exceeded this holder's authority and passed up.
+    PassedUp { task: u64 },
     /// A control committed; the spec revision a following amendment names.
     Revised { task: u64, revision: u64 },
     /// The named revision moved; the caller must decide against this value.
@@ -85,7 +89,10 @@ impl CallPart {
         authority_limits: &jig_domain_authority::Limits,
     ) -> bool {
         match self {
-            CallPart::Revised { task, .. } | CallPart::Moved { task, .. } => *task != 0 && *task <= deployment.tasks,
+            CallPart::Again { task, .. }
+            | CallPart::PassedUp { task }
+            | CallPart::Revised { task, .. }
+            | CallPart::Moved { task, .. } => *task != 0 && *task <= deployment.tasks,
             CallPart::Effect { entry, .. } => *entry != 0 && *entry <= deployment.connector_rows,
             CallPart::Connector { .. }
             | CallPart::Unavailable

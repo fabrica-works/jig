@@ -30,9 +30,13 @@ fn read(tool: &[u8], input: &[u8], limits: &Limits) -> Result<Decoded, Problem> 
             target: value.required(b"target")?.number()?,
             control: tasks::Control::Cancel { reason: value.required(b"reason")?.text()? },
         },
-        b"release" => core::NamedAction::Control {
+        b"release" => core::NamedAction::Release {
             target: value.required(b"target")?.number()?,
-            control: tasks::Control::Release { again: None, message: None },
+            revision: value.required(b"revision")?.number()?,
+            again: match value.field(b"again")? {
+                Some(value) => Some(value.boolean()?),
+                None => None,
+            },
         },
         b"introduce" => core::NamedAction::Introduce {
             left: value.required(b"left")?.number()?,
@@ -45,32 +49,35 @@ fn read(tool: &[u8], input: &[u8], limits: &Limits) -> Result<Decoded, Problem> 
             revision: value.required(b"revision")?.number()?,
             amendment: nested::amendment(value.required(b"amendment")?)?,
         },
-        b"decide" => {
-            let choice = match value.required(b"decision")?.text()?.as_ref() {
-                b"accept" => core::ProposalChoice::Accept,
-                b"reject" => core::ProposalChoice::Reject { reason: value.required(b"reason")?.text()? },
-                b"pass" => core::ProposalChoice::Pass,
-                _ => return Err(Problem { field: b"decision", why: Why::Range }),
-            };
-            core::NamedAction::DecideProposal {
-                proposer: value.required(b"proposer")?.number()?,
-                proposal: value.required(b"proposal")?.number()?,
-                choice,
+        b"decide" => match value.required(b"kind")?.text()?.as_ref() {
+            b"proposal" => {
+                let choice = match value.required(b"decision")?.text()?.as_ref() {
+                    b"accept" => core::ProposalChoice::Accept,
+                    b"reject" => core::ProposalChoice::Reject { reason: value.required(b"reason")?.text()? },
+                    b"pass" => core::ProposalChoice::Pass,
+                    _ => return Err(Problem { field: b"decision", why: Why::Range }),
+                };
+                core::NamedAction::DecideProposal {
+                    proposer: value.required(b"proposer")?.number()?,
+                    proposal: value.required(b"proposal")?.number()?,
+                    choice,
+                }
             }
-        }
-        b"decide_escalation" => {
-            let choice = match value.required(b"decision")?.text()?.as_ref() {
-                b"release" => core::EscalationChoice::Release,
-                b"reject" => core::EscalationChoice::Reject { reason: value.required(b"reason")?.text()? },
-                b"pass" => core::EscalationChoice::Pass,
-                _ => return Err(Problem { field: b"decision", why: Why::Range }),
-            };
-            core::NamedAction::DecideEscalation {
-                task: value.required(b"task")?.number()?,
-                revision: value.required(b"revision")?.number()?,
-                choice,
+            b"escalation" => {
+                let choice = match value.required(b"decision")?.text()?.as_ref() {
+                    b"release" => core::EscalationChoice::Release,
+                    b"reject" => core::EscalationChoice::Reject { reason: value.required(b"reason")?.text()? },
+                    b"pass" => core::EscalationChoice::Pass,
+                    _ => return Err(Problem { field: b"decision", why: Why::Range }),
+                };
+                core::NamedAction::DecideEscalation {
+                    task: value.required(b"task")?.number()?,
+                    revision: value.required(b"revision")?.number()?,
+                    choice,
+                }
             }
-        }
+            _ => return Err(Problem { field: b"kind", why: Why::Range }),
+        },
         b"subscribe" => {
             let kind = match value.required(b"kind")?.text()?.as_ref() {
                 b"task" => tasks::SubscriptionKind::Task {
