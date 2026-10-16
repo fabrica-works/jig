@@ -349,7 +349,8 @@ entry naming the task or proposal it is and its project:
   each party's read positions, one over results and one per conversation
   over its turns, moved by their `Seen` (5.1), never by a read.
 - **A conversation** is a task its creator flagged so (tasks.md,
-  section 3): its turns are entries for its requester, while that
+  section 3), whatever its charter, tracked or not (tasks.md, section
+  7): its turns are entries for its requester, while that
   requester is a party, with their read position and an unread count.
   One position per conversation, its requester's: a move to another
   party erases the old requester's in the same decision, and starts the

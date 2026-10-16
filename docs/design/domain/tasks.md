@@ -514,7 +514,10 @@ tasks holding it: a quota cut, a machine gone.
   that commit, with all a goal has (core.md, 6.2). One it untracks is no
   goal from that commit: the core ends its goals' topics, and its
   projections write their last, as when a goal closes (connectors.md,
-  section 8).
+  section 8). Neither touches its flags, so a conversation stays one:
+  tracked, its turns are still entries for its requester, with their
+  read position and unread count (section 3; people.md, section 6). No
+  tracking is refused for a task's being a conversation.
 - **A decision names what it saw.** An amendment names its task's spec's
   revision, and a release its hold's (5.5), whoever makes it: a party,
   as their client showed it (`../client/domain/contract.md`, 5.2); a
@@ -552,7 +555,12 @@ tasks holding it: a quota cut, a machine gone.
   kept with the task, on a timer of the tasks child's, so a restart
   keeps it. A task that cannot finish on its own, waiting or held, is
   cancelled at once. A cancel made during a grace ends the task no later
-  than that grace would: one without a grace cancels it at once.
+  than that grace would: one without a grace cancels it at once. One with
+  a grace asks nothing more, since a task is asked to finish once, by
+  the first. If its grace ends sooner, the task's grace now ends with
+  it, and the task is then cancelled with this later cancel's maker and
+  reason, since that cancel is what ends it. If its grace ends no sooner,
+  nothing of the task changes.
 - **Moving a task.** A party may make themselves the requester of a live
   task they may amend, so that it outlives the task that asked for it, as
   a goal outlives the chat it came from. Its reservation moves to their
@@ -607,7 +615,8 @@ are entries of its own (section 9), which always wake it.
   - *room kept:* one result from each live delegate, one answer to each
     open question it asked, one decision on each of its pending
     proposals, and a cancel, its grace's ask to finish taking the same
-    room, so none of them can be refused;
+    room, one ask in a task's life (section 7), so none of them can be
+    refused;
   - *merged:* news of one subscription with the news of it already
     waiting, since news is a hint to read afresh; notices likewise; a new
     amendment with one still waiting; timers;

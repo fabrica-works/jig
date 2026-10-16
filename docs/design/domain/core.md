@@ -322,8 +322,9 @@ application keeps, changes or drops. The engine's behaviour above turns
 on the mark, never on the template.
 
 Any task may be tracked; most are not. A chat, a triage or a repair is
-not a goal; an incident, or "give the payments team a staging
-environment", may be.
+made untracked; an incident, or "give the payments team a staging
+environment", may be made tracked. A conversation tracked later stays a
+conversation (tasks.md, section 7).
 
 ## 7. Plans and coordinators
 
