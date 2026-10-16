@@ -98,11 +98,8 @@ impl Core {
             return Err(self.request_refusal(&ask, &mut findings));
         }
         let Some(policy) = self.authority.policy(project) else { unreachable!("checked project policy") };
-        if match policy.escalation_role {
-            Some(role) => role > 3,
-            None => true,
-        } {
-            return Err(people::Refusal::NotOffered);
+        if !self.authority.escalations_held(project, role.number()) {
+            return Err(people::Refusal::NoEscalationHolder);
         }
         if self.period_budget(project) > policy.period_spend {
             return Err(people::Refusal::Authority {

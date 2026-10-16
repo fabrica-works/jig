@@ -95,7 +95,7 @@ pub fn holds() -> [(p::HoldReason, w::HoldCategory); 21] {
         ),
     ]
 }
-pub fn refusals() -> [(p::Refusal, w::Refusal); 8] {
+pub fn refusals() -> [(p::Refusal, w::Refusal); 9] {
     let limits = wire();
     [
         (p::Refusal::NotWaiting, w::Refusal::NotWaiting),
@@ -103,6 +103,7 @@ pub fn refusals() -> [(p::Refusal, w::Refusal); 8] {
         (p::Refusal::Unknown, w::Refusal::Unknown),
         (p::Refusal::NotOffered, w::Refusal::NotOffered),
         (p::Refusal::KeyConflict, w::Refusal::KeyConflict),
+        (p::Refusal::NoEscalationHolder, w::Refusal::NotOffered),
         (
             p::Refusal::Taken { by: 7 },
             w::Refusal::Taken(w::RefusalTaken::new(&limits, w::RefusalTakenParts { by: 7 }).expect("taken")),

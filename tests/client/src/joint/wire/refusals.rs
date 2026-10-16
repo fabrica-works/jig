@@ -26,7 +26,7 @@ pub fn refusal(value: people::Refusal) -> client::Refusal {
         people::Refusal::NotWaiting => client::Refusal::NotWaiting,
         people::Refusal::NoFurther => client::Refusal::NoFurther,
         people::Refusal::Unknown => client::Refusal::Unknown,
-        people::Refusal::NotOffered => client::Refusal::NotOffered,
+        people::Refusal::NotOffered | people::Refusal::NoEscalationHolder => client::Refusal::NotOffered,
         people::Refusal::KeyConflict => client::Refusal::KeyConflict,
     }
 }
@@ -182,6 +182,7 @@ mod tests {
             (people::Refusal::Unknown, client::Refusal::Unknown),
             (people::Refusal::NotOffered, client::Refusal::NotOffered),
             (people::Refusal::KeyConflict, client::Refusal::KeyConflict),
+            (people::Refusal::NoEscalationHolder, client::Refusal::NotOffered),
         ];
         for (source, expected) in cases {
             let actual = refusal(source);

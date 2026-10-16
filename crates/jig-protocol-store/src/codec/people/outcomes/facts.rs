@@ -425,6 +425,7 @@ pub(super) fn encode_refusal(value: &domain::Refusal, limits: &wire::Limits) -> 
         domain::Refusal::Unknown => wire::Refusal::Unknown,
         domain::Refusal::NotOffered => wire::Refusal::NotOffered,
         domain::Refusal::KeyConflict => wire::Refusal::KeyConflict,
+        domain::Refusal::NoEscalationHolder => wire::Refusal::NoEscalationHolder,
     })
 }
 pub(super) fn decode_refusal(value: wire::Refusal) -> domain::Refusal {
@@ -470,6 +471,7 @@ pub(super) fn decode_refusal(value: wire::Refusal) -> domain::Refusal {
         wire::Refusal::Unknown => domain::Refusal::Unknown,
         wire::Refusal::NotOffered => domain::Refusal::NotOffered,
         wire::Refusal::KeyConflict => domain::Refusal::KeyConflict,
+        wire::Refusal::NoEscalationHolder => domain::Refusal::NoEscalationHolder,
     }
 }
 pub(super) fn encode_proposal_choice(value: domain::ProposalChoice, _limits: &wire::Limits) -> wire::ProposalChoice {

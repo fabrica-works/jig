@@ -211,6 +211,14 @@ pub(super) fn person_proposal_accept(
             unreachable!("effect accepted through its connector")
         }
         tasks::ProposalAction::Batch(mut batch) => {
+            let held = match core.people.role(person, proposal.project) {
+                Some(role) => core.authority.escalations_held(proposal.project, role.number()),
+                None => false,
+            };
+            if proposal.as_holder && !held {
+                pool_refused(work, request, people::Refusal::NoEscalationHolder);
+                return;
+            }
             let creator =
                 if proposal.as_holder { tasks::Party::Person(person) } else { tasks::Party::Task(proposal.proposer) };
             let (period, pool) = core.goal_open_pool(proposal.project, person);

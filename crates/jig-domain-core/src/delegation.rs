@@ -166,13 +166,7 @@ impl Core {
         match executor {
             tasks::Executor::Agent { charter } => Some(authority::Executor::Charter(charter)),
             tasks::Executor::Procedure { code, .. } => Some(authority::Executor::Procedure(code)),
-            tasks::Executor::Person(tasks::PersonAddress::Role(role)) => {
-                if role <= 3 {
-                    Some(authority::Executor::Role(role))
-                } else {
-                    None
-                }
-            }
+            tasks::Executor::Person(tasks::PersonAddress::Role(role)) => Some(authority::Executor::Role(role)),
             tasks::Executor::Person(tasks::PersonAddress::Person(person)) => {
                 let holding = self.people.role(person, project)?;
                 Some(authority::Executor::Role(holding.number()))

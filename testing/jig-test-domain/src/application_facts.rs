@@ -29,7 +29,7 @@ pub(super) fn refusal(value: people::Refusal) -> application::Refusal {
         people::Refusal::NotWaiting => application::Refusal::NotWaiting,
         people::Refusal::NoFurther => application::Refusal::NoFurther,
         people::Refusal::Unknown => application::Refusal::Unknown,
-        people::Refusal::NotOffered => application::Refusal::NotOffered,
+        people::Refusal::NotOffered | people::Refusal::NoEscalationHolder => application::Refusal::NotOffered,
         people::Refusal::KeyConflict => application::Refusal::KeyConflict,
     }
 }

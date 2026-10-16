@@ -51,7 +51,7 @@ fn another_family_is_refused_naming_the_first_difference() {
     for (family, found) in [
         (Family::Component, codec::component::Format { component: 2, core: 4, ..wanted }),
         (Family::Core, codec::component::Format { core: 4, tasks: 3, ..wanted }),
-        (Family::People, codec::component::Format { people: 3, notes: 2, ..wanted }),
+        (Family::People, codec::component::Format { people: 4, notes: 2, ..wanted }),
         (Family::Notes, codec::component::Format { notes: 2, application: 2, ..wanted }),
         (Family::Application, codec::component::Format { application: 2, deployment: [9; 16], ..wanted }),
     ] {
@@ -59,20 +59,8 @@ fn another_family_is_refused_naming_the_first_difference() {
             format::check(&found, &wanted),
             Err(OpenRefusal::Format {
                 family,
-                found: if family == Family::Core {
-                    4
-                } else if family == Family::People {
-                    3
-                } else {
-                    2
-                },
-                wanted: if family == Family::Core {
-                    3
-                } else if family == Family::People {
-                    2
-                } else {
-                    1
-                }
+                found: if family == Family::Core || family == Family::People { 4 } else { 2 },
+                wanted: if family == Family::Core || family == Family::People { 3 } else { 1 }
             })
         );
     }

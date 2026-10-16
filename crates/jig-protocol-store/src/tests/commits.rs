@@ -85,7 +85,7 @@ fn a_first_commit_puts_the_format_row_with_its_header() {
             component: 1,
             core: 3,
             tasks: 3,
-            people: 2,
+            people: 3,
             notes: 1,
             application: 1,
             deployment: fixtures::DEPLOYMENT,

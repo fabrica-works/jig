@@ -1197,6 +1197,7 @@ fn every_final_refusal_keeps_its_facts_under_the_key_when_roles_and_time_change(
         Refusal::Unknown,
         Refusal::NotOffered,
         Refusal::KeyConflict,
+        Refusal::NoEscalationHolder,
     ] {
         let mut test = Test::new(LIMITS);
         test.member();

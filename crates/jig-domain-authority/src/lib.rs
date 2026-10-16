@@ -33,6 +33,7 @@ extern crate alloc;
 mod boundary;
 mod check;
 mod domain;
+mod holders;
 mod limits;
 mod numbers;
 mod order;
@@ -40,7 +41,11 @@ mod rules;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
+mod tests_fixtures;
+#[cfg(test)]
 mod tests_numbers;
+#[cfg(test)]
+mod tests_party;
 #[cfg(test)]
 mod tests_policy;
 mod value;

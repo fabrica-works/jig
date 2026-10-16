@@ -1,5 +1,5 @@
 //! Arbitrary and mutated family bytes (protocol/store.md, sections 5.1 and 14).
-use jig_protocol_store::{component_v1, notes_v1, people_v2};
+use jig_protocol_store::{component_v1, notes_v1, people_v3};
 use skein_lib::{Reader, Rng, Writer};
 use std::{fs, path::Path};
 
@@ -40,8 +40,7 @@ fn arbitrary(seed: u64, check: fn(&[u8])) {
 }
 fn mutated(family: &str, seed: u64, check: fn(&[u8])) {
     let version = match family {
-        "core" | "tasks" => "v3",
-        "people" => "v2",
+        "core" | "tasks" | "people" => "v3",
         _ => "v1",
     };
     let root =
@@ -105,7 +104,7 @@ fn mutated_tasks_goldens_never_panic() {
 }
 
 fn people(bytes: &[u8]) {
-    if let Ok(row) = people_v2::Row::decode(&people_v2::CEILINGS, &mut Reader::new(bytes)) {
+    if let Ok(row) = people_v3::Row::decode(&people_v3::CEILINGS, &mut Reader::new(bytes)) {
         let mut writer = Writer::new(usize::try_from(row.measure()).expect("measured length"));
         row.encode(&mut writer).expect("measured room");
         assert_eq!(writer.finish().as_ref(), bytes);
@@ -143,7 +142,7 @@ fn frames(bytes: &[u8]) {
     let limits = codec::Limits {
         core: core_v3::CEILINGS,
         tasks: tasks_v3::CEILINGS,
-        people: people_v2::CEILINGS,
+        people: people_v3::CEILINGS,
         notes: notes_v1::CEILINGS,
     };
     if let Ok(turn) = frame::decode(bytes, &limits) {
@@ -160,7 +159,7 @@ fn mutated_and_short_frames_never_panic() {
     let limits = codec::Limits {
         core: core_v3::CEILINGS,
         tasks: tasks_v3::CEILINGS,
-        people: people_v2::CEILINGS,
+        people: people_v3::CEILINGS,
         notes: notes_v1::CEILINGS,
     };
     let turn = core_v3::TurnRecord::new(

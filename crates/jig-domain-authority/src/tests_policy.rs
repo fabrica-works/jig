@@ -7,115 +7,14 @@ use core::mem::{size_of, size_of_val};
 use skein_lib::{Duration, Map, Queue, Wall, bytes::copy_of};
 
 use crate::{
-    Action, Answer, Authority, BatchAsk, Budget, Call, CallAsk, Delegate, Delegation, Domain, Effect, EffectAccess,
-    EffectAsk, EffectResource, Event, FITS_MAX_OUT, Finding, Given, Grant, Guard, Holder, Implication, Implies, Judge,
-    Lack, Last, Limits, Name, Numbers, POLICY_MAX_OUT, Pattern, PersonAsk, PersonRequest, Policy, PolicyFact,
-    PolicyRefusal, ProposalKind, Proposals, Requests, Requirement, Role, Rules, RunAsk, Scopes, Source, Tools, Verdict,
-    Write, Writer, at_most, check_batch, check_call, check_effect, check_request, check_run, covers, fits, max_out,
-    needs, resolve_task_grants, step, worst_case,
+    Action, Answer, Authority, BatchAsk, Call, CallAsk, Delegate, Domain, Effect, EffectAccess, EffectAsk,
+    EffectResource, Event, FITS_MAX_OUT, Finding, Given, Grant, Guard, Holder, Implication, Judge, Lack, Last, Limits,
+    Name, Numbers, Pattern, PersonAsk, PersonRequest, Policy, PolicyFact, PolicyRefusal, ProposalKind, Proposals,
+    Requests, Requirement, RunAsk, Scopes, Source, Tools, Verdict, Write, Writer, at_most, check_batch, check_call,
+    check_effect, check_request, check_run, covers, fits, max_out, needs, resolve_task_grants, worst_case,
 };
 
-const LIMITS: Limits = Limits {
-    projects: 2,
-    roles: 2,
-    requirements: 2,
-    facts: 4,
-    grants: 3,
-    executors: 3,
-    segments: 4,
-    segment_bytes: 8,
-    implications: 3,
-    batch: 3,
-    accounts: 2,
-    writes: 2,
-};
-
-fn numbers(budget: u64) -> Numbers {
-    Numbers { budget, spent: 0, spent_below: 0, reserved: 0 }
-}
-
-fn pattern() -> Pattern {
-    Pattern { segments: Box::new([]), last: Last::Open(copy_of(b"")) }
-}
-
-fn authority() -> Authority {
-    Authority {
-        tools: Tools(u64::MAX),
-        grants: Box::new([Grant { connector: 1, kind: 3, pattern: pattern() }]),
-        delegation: Delegation {
-            kinds: Box::new([crate::Executor::Charter(1), crate::Executor::Procedure(2), crate::Executor::Role(3)]),
-            tasks: 10,
-            depth: 5,
-        },
-        budget: Budget { spend: 100, deadline: None },
-        notes: Scopes(7),
-        note_resources: Box::new([crate::ResourceScope { connector: 1, pattern: pattern() }]),
-    }
-}
-
-fn requirement(fact: u16) -> Requirement {
-    Requirement {
-        connector: 1,
-        kind: 1,
-        pattern: pattern(),
-        judge: Judge { connector: 1, requirement: fact, parameters: 0 },
-        guard: Guard::Observed { freshness: Duration::from_secs(1) },
-        must_be_guarded: false,
-    }
-}
-
-fn rules(ceiling: Authority) -> Rules {
-    Rules {
-        ceiling,
-        period_spend: 1_000,
-        minimum_run_spend: 1,
-        maximum_run_spend: 80,
-        implies: Implies::new(
-            Box::new([
-                Implication { connector: 1, kind: 3, implies: 2 },
-                Implication { connector: 1, kind: 2, implies: 1 },
-                Implication { connector: 1, kind: 3, implies: 1 },
-            ]),
-            3,
-        )
-        .unwrap(),
-        requirements: Box::new([requirement(7)]),
-    }
-}
-
-fn role(ceiling: Authority) -> Role {
-    Role { number: 7, authority: ceiling, period_spend: 100, requests: Requests::ALL, decides: Proposals::ALL }
-}
-
-fn policy(ceiling: Authority) -> Policy {
-    Policy {
-        projections: Box::new([]),
-        escalation_role: None,
-        roles: Box::new([role(ceiling.clone())]),
-        ceiling,
-        period_spend: 500,
-        requirements: Box::new([requirement(8)]),
-    }
-}
-
-fn apply(domain: &mut Domain, event: Event) -> PolicyFact {
-    let mut out = Queue::with_capacity(POLICY_MAX_OUT);
-    step(domain, event, &mut out);
-    out.pop().unwrap()
-}
-
-fn domain_with(deployment: Authority, project: Authority) -> Domain {
-    let mut domain = Domain::new(rules(deployment), LIMITS).unwrap();
-    assert_eq!(
-        apply(&mut domain, Event::Policy { project: 1, policy: policy(project) }),
-        PolicyFact::Added { project: 1 }
-    );
-    domain
-}
-
-fn domain() -> Domain {
-    domain_with(authority(), authority())
-}
+use crate::tests_fixtures::*;
 
 fn findings(domain: &Domain) -> Queue<Finding> {
     Queue::with_capacity(max_out(domain.limits()).unwrap())

@@ -35,6 +35,8 @@ pub enum Refusal {
     NotOffered,
     /// This party's key names another ask.
     KeyConflict,
+    /// The root's requester has nobody to hold its escalations (domain/people.md, 5.1).
+    NoEscalationHolder,
 }
 
 /// Authority missing from a party's request.

@@ -456,7 +456,7 @@ fn supported_task(task: &jig_domain_tasks::TaskRecord, core: &Core) -> bool {
         tasks::Executor::Agent { charter } => core.charter(charter).is_some(),
         tasks::Executor::Procedure { code, .. } => code != 0,
         tasks::Executor::Person(tasks::PersonAddress::Person(person)) => person != 0,
-        tasks::Executor::Person(tasks::PersonAddress::Role(role)) => role <= 3,
+        tasks::Executor::Person(tasks::PersonAddress::Role(_)) => true,
     };
     task.number != 0 && task.result_position == 0 && executor
 }

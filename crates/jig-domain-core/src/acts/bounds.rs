@@ -229,6 +229,9 @@ pub(crate) fn goal_start(
     tasks_left: u32,
 ) -> Result<crate::GoalStart, people::Refusal> {
     standing::role(core, project, Some(role), super::Act::SetGoal)?;
+    if !core.authority.escalations_held(project, role.number()) {
+        return Err(people::Refusal::NoEscalationHolder);
+    }
     let Some(policy) = core.authority.policy(project) else { return Err(people::Refusal::Unknown) };
     let Some(role_policy) = core.authority.role(project, role.number()) else {
         return Err(people::Refusal::Role { held: Some(role) });

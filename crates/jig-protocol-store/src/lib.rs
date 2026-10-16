@@ -115,7 +115,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     let codec = codec::limits(&limits.core)?;
     let decoded = core_v3::Row::worst_case_heap(&codec.core)?
         .checked_add(tasks_v3::Row::worst_case_heap(&codec.tasks)?)?
-        .checked_add(people_v2::Row::worst_case_heap(&codec.people)?)?
+        .checked_add(people_v3::Row::worst_case_heap(&codec.people)?)?
         .checked_add(notes_v1::Row::worst_case_heap(&codec.notes)?)?
         .checked_add(u64::try_from(size_of::<jig_domain_tasks::TaskRecord>()).ok()?)?
         .checked_mul(2)?;
@@ -201,8 +201,8 @@ pub mod component_v1;
 #[path = "generated/notes_v1.rs"]
 pub mod notes_v1;
 #[rustfmt::skip]
-#[path = "generated/people_v2.rs"]
-pub mod people_v2;
+#[path = "generated/people_v3.rs"]
+pub mod people_v3;
 #[rustfmt::skip]
 #[path = "generated/tasks_v3.rs"]
 pub mod tasks_v3;

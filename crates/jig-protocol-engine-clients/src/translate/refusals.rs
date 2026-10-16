@@ -36,7 +36,7 @@ pub(crate) fn refusal(value: p::Refusal, limits: &w::Limits) -> Result<w::Refusa
         p::Refusal::NotWaiting => w::Refusal::NotWaiting,
         p::Refusal::NoFurther => w::Refusal::NoFurther,
         p::Refusal::Unknown => w::Refusal::Unknown,
-        p::Refusal::NotOffered => w::Refusal::NotOffered,
+        p::Refusal::NotOffered | p::Refusal::NoEscalationHolder => w::Refusal::NotOffered,
         p::Refusal::KeyConflict => w::Refusal::KeyConflict,
     })
 }

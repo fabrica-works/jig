@@ -447,7 +447,7 @@ fn core_limits() -> jig_domain_core::Limits {
     fixtures::CORE_LIMITS
 }
 
-fn people_limits() -> crate::people_v2::Limits {
+fn people_limits() -> crate::people_v3::Limits {
     crate::codec::people::limits(&core_limits()).expect("within people's ceilings")
 }
 
@@ -463,7 +463,7 @@ fn ask_round_trip(ask: jig_domain_people::Ask) {
     let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("bounded length"));
     value.encode(&mut writer).expect("measured room");
     let bytes = writer.finish();
-    let read = crate::people_v2::Ask::decode(&limits, &mut skein_lib::Reader::new(&bytes)).expect("saved ask");
+    let read = crate::people_v3::Ask::decode(&limits, &mut skein_lib::Reader::new(&bytes)).expect("saved ask");
     assert_eq!(crate::codec::people::decode_ask(read, &limits), Ok(ask));
 }
 
@@ -537,8 +537,8 @@ fn a_person_identity_field_past_its_limit_is_refused() {
     identity.key.subject = Box::new([0; 33]);
     assert_eq!(
         crate::codec::people::encode(&jig_domain_people::Stored::Person { number: 1, identity }, &people_limits()),
-        Err(crate::people_v2::Problem {
-            path: crate::people_v2::Path::IdentityKeySubject,
+        Err(crate::people_v3::Problem {
+            path: crate::people_v3::Path::IdentityKeySubject,
             reason: skein_codec::Reason::Bound
         })
     );
@@ -548,11 +548,11 @@ fn a_people_row_of_another_version_does_not_decode() {
     let limits = people_limits();
     let row = jig_domain_people::Stored::ReadResults { party: 1, through: 2 };
     let mut bytes = crate::codec::people::encode(&row, &limits).expect("fixed row");
-    *bytes.get_mut(1).expect("version prefix") = 3;
+    *bytes.get_mut(1).expect("version prefix") = 4;
     assert_eq!(
         crate::codec::people::decode(&bytes, &limits),
-        Err(crate::people_v2::Problem {
-            path: crate::people_v2::Path::RowVersion,
+        Err(crate::people_v3::Problem {
+            path: crate::people_v3::Path::RowVersion,
             reason: skein_codec::Reason::Version
         })
     );

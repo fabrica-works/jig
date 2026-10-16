@@ -136,6 +136,7 @@ pub fn refusal_values() -> Box<[domain::Refusal]> {
         domain::Refusal::Unknown,
         domain::Refusal::NotOffered,
         domain::Refusal::KeyConflict,
+        domain::Refusal::NoEscalationHolder,
     ])
 }
 pub fn proposal_choice_values() -> Box<[domain::ProposalChoice]> {

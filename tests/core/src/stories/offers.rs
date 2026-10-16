@@ -88,6 +88,18 @@ pub fn no_acceptor_fixture(seed: u64) -> (root::Config, root::Limits) {
     (configuration, limits)
 }
 
+/// A member's roots have no holder until policy gives that role the decision.
+#[must_use]
+pub fn no_holder_fixture(seed: u64) -> (root::Config, root::Limits) {
+    let (mut configuration, limits) = no_acceptor_fixture(seed);
+    let mut policy = configuration.core.authority.policy(1).expect("configured policy").clone();
+    policy.escalation_role = None;
+    let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
+    authority::step(&mut configuration.core.authority, authority::Event::Policy { project: 1, policy }, &mut out);
+    assert_eq!(out.pop(), Some(authority::PolicyFact::Changed { project: 1 }));
+    (configuration, limits)
+}
+
 #[must_use]
 pub fn goal(budget: u64) -> people::Ask {
     people::Ask::SetGoal {
