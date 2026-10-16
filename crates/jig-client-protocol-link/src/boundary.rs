@@ -163,6 +163,8 @@ pub enum Fact {
 /// Authentication held by the link (client/domain/client.md, 12).
 #[derive(Debug, PartialEq, Eq)]
 pub enum With {
+    Service(Secret),
+    Transport,
     Link(Secret),
     Held(Secret),
 }
@@ -184,6 +186,7 @@ pub enum Message {
     Unwatch(Box<[u8]>),
     StreamGone(Box<[u8]>),
     SignInLink(Box<[u8]>),
+    SignInService,
     SignOut,
 }
 /// A transport exchange's terminal outcome.

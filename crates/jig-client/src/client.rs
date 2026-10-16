@@ -6,7 +6,7 @@ use crate::{
 use alloc::boxed::Box;
 use jig_client_domain::{self as domain, Down, Up};
 use jig_client_protocol_link as link;
-use skein_lib::{Env, List, Queue, Secret, Time, Token, Wall};
+use skein_lib::{Duration, Env, List, Queue, Rng, Secret, Time, Token, Wall};
 #[derive(Debug)]
 pub enum Event {
     Start { kept: List<Record> },
@@ -48,6 +48,12 @@ pub struct Client {
     domain_out: Queue<domain::Request>,
     link_out: Queue<link::Request>,
     store: crate::store::Store,
+    service: Option<Secret>,
+    signing_until: Option<Time>,
+    signing_span: Option<Duration>,
+    signing_out: bool,
+    sign_out_lost: bool,
+    rng: Rng,
     saves: List<Record>,
     erases: List<Box<[u8]>>,
 }
@@ -70,6 +76,12 @@ impl Client {
             domain_out: Queue::with_capacity(bound),
             link_out: Queue::with_capacity(bound),
             store: crate::store::Store::new(limits.domain.requests.requests),
+            service: None,
+            signing_until: None,
+            signing_span: None,
+            signing_out: false,
+            sign_out_lost: false,
+            rng: Rng::new(seed),
             saves: List::with_capacity(bound),
             erases: List::with_capacity(bound),
         })
@@ -95,16 +107,28 @@ impl Client {
             Event::Read { handle, read } => self.domain_step(&env, domain::Event::Read { handle, read }),
             Event::Send { key, request } => self.domain_step(&env, domain::Event::Send { key, request }),
             Event::SignIn { with } => {
+                self.service = match &with {
+                    With::Service(credential) if credential.len() == 40 => Some(credential.clone()),
+                    With::Service(_) | With::Held(_) | With::Link(_) | With::Transport => None,
+                };
+                self.signing_until = None;
+                self.signing_span = None;
+                self.signing_out = false;
+                self.sign_out_lost = false;
                 let held = match &with {
-                    With::Held(_) => true,
-                    With::Link(_) => false,
+                    With::Held(_) | With::Transport => true,
+                    With::Link(_) | With::Service(_) => false,
                 };
                 self.link.step(now, link::Event::SignIn { with }, &mut self.link_out);
                 if held {
                     self.up(&env, Up::SignedIn);
                 }
             }
-            Event::SignOut => self.link.step(now, link::Event::SignOut, &mut self.link_out),
+            Event::SignOut => {
+                self.signing_out = true;
+                self.sign_out_lost = false;
+                self.link.step(now, link::Event::SignOut, &mut self.link_out);
+            }
             Event::Reply { exchange, message } => {
                 self.link.step(now, link::Event::Reply { exchange, message }, &mut self.link_out);
             }
@@ -118,6 +142,18 @@ impl Client {
     }
     pub fn fire(&mut self, now: Time, wall: Wall, out: &mut Queue<Request>) {
         let env = Env { now, wall, limits: self.limits.domain };
+        if let Some(until) = self.signing_until
+            && now >= until
+        {
+            self.signing_until = None;
+            if let Some(credential) = &self.service {
+                self.link.step(
+                    now,
+                    link::Event::SignIn { with: With::Service(credential.clone()) },
+                    &mut self.link_out,
+                );
+            }
+        }
         self.link.fire(now, &mut self.link_out);
         self.drain(&env, out);
         if self.domain.link() != Link::OutOfDate {
@@ -130,7 +166,7 @@ impl Client {
         if self.domain.link() == Link::OutOfDate {
             return None;
         }
-        domain::next_deadline(&self.domain).into_iter().chain(self.link.next_deadline()).min()
+        domain::next_deadline(&self.domain).into_iter().chain(self.link.next_deadline()).chain(self.signing_until).min()
     }
     pub fn reclaim(&mut self) {
         domain::reclaim(&mut self.domain);
@@ -154,8 +190,42 @@ impl Client {
             state: self.domain.link(),
             party: self.domain.party(),
             not_served: &[],
-            sign_out_lost: false,
+            sign_out_lost: self.sign_out_lost,
             credential: self.link.credential(),
+        }
+    }
+    fn signing(&mut self, env: &Env<DomainLimits>, signing: link::Signing) {
+        match signing {
+            link::Signing::SignedIn { .. } => {
+                self.service = None;
+                self.signing_until = None;
+                self.signing_out = false;
+                self.sign_out_lost = false;
+                self.up(env, Up::SignedIn);
+            }
+            link::Signing::SignedOut => {
+                self.service = None;
+                self.signing_until = None;
+                self.signing_out = false;
+                self.sign_out_lost = false;
+                self.up(env, Up::SignedOut);
+            }
+            link::Signing::Again if !self.signing_out && self.service.is_some() => {
+                let span = match self.signing_span {
+                    Some(span) => core::cmp::min(span.saturating_mul(2), env.limits.backoff.most),
+                    None => env.limits.backoff.first,
+                };
+                self.signing_span = Some(span);
+                let nanos = span.as_nanos();
+                self.signing_until =
+                    Some(env.now.saturating_add(Duration::from_nanos(self.rng.between(nanos.div_euclid(2), nanos))));
+            }
+            link::Signing::Again | link::Signing::Lost | link::Signing::Refused => {
+                self.sign_out_lost = self.signing_out;
+                self.signing_out = false;
+                self.service = None;
+                self.signing_until = None;
+            }
         }
     }
     fn store_answer(&mut self, env: &Env<DomainLimits>, stored: bool) {
@@ -252,7 +322,7 @@ impl Client {
             link::Request::Hello { family: None, versions } => {
                 self.up(env, Up::Served { served: link::serves(versions) });
             }
-            link::Request::Signing { signing: link::Signing::SignedIn { .. } } => self.up(env, Up::SignedIn),
+            link::Request::Signing { signing } => self.signing(env, signing),
             link::Request::Kept { record: link::Saved::Table { record, .. } } => {
                 let mut kept = List::with_capacity(1);
                 kept.push(record).expect("one restored record");
@@ -262,10 +332,7 @@ impl Client {
             link::Request::Hello { family: Some(_), .. }
             | link::Request::Fact { .. }
             | link::Request::ServiceCredential { .. }
-            | link::Request::Kept { record: link::Saved::Jig(_) | link::Saved::Family { .. } }
-            | link::Request::Signing {
-                signing: link::Signing::Again | link::Signing::Refused | link::Signing::Lost | link::Signing::SignedOut,
-            } => {}
+            | link::Request::Kept { record: link::Saved::Jig(_) | link::Saved::Family { .. } } => {}
         }
     }
 }

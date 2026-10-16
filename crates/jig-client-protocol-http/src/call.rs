@@ -24,6 +24,7 @@ pub fn exchange(mapping: &Mapping, credential: Option<&Secret>, message: Message
         Message::Unwatch(body) => (b"/v1/unwatch".as_slice(), body),
         Message::StreamGone(body) => (b"/v1/stream-gone".as_slice(), body),
         Message::SignInLink(body) => (b"/v1/sign-in/link".as_slice(), body),
+        Message::SignInService => (b"/v1/sign-in/deployment".as_slice(), Box::new([])),
         Message::SignOut => (b"/v1/sign-out".as_slice(), Box::new([])),
     };
     call(mapping, credential, Method::Post, route, body)

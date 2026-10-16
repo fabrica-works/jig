@@ -170,7 +170,11 @@ impl Link {
     pub(super) fn exchange(&mut self, exchange: Token, message: Message, out: &mut Queue<Request>) {
         let tracked = match &message {
             Message::Request(_) | Message::Read(_) | Message::Watch(_) => true,
-            Message::Unwatch(_) | Message::StreamGone(_) | Message::SignInLink(_) | Message::SignOut => false,
+            Message::Unwatch(_)
+            | Message::StreamGone(_)
+            | Message::SignInLink(_)
+            | Message::SignInService
+            | Message::SignOut => false,
         };
         if !self.attempts.contains_key(&exchange) && tracked {
             return;
@@ -182,6 +186,7 @@ impl Link {
             | Message::Unwatch(_)
             | Message::StreamGone(_)
             | Message::SignInLink(_)
+            | Message::SignInService
             | Message::SignOut => false,
         };
         if !keyed {

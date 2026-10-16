@@ -6,13 +6,14 @@ mod fixtures;
 mod stream;
 use fixtures::{credential, mapping};
 const EXCHANGE: u64 = 11;
-const ROUTES: [&[u8]; 7] = [
+const ROUTES: [&[u8]; 8] = [
     b"/jig/v1/request",
     b"/jig/v1/read",
     b"/jig/v1/watch",
     b"/jig/v1/unwatch",
     b"/jig/v1/stream-gone",
     b"/jig/v1/sign-in/link",
+    b"/jig/v1/sign-in/deployment",
     b"/jig/v1/sign-out",
 ];
 const STATUSES: [u16; 4] = [201, 401, 500, 503];

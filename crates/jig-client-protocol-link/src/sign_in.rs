@@ -10,11 +10,23 @@ impl Link {
     pub fn credential(&self) -> Option<&Secret> {
         self.credential.as_ref()
     }
-    pub(super) fn sign_in(&mut self, now: Time, with: With, out: &mut Queue<Request>) {
+    pub(super) fn sign_in(&mut self, _now: Time, with: With, out: &mut Queue<Request>) {
         match with {
             With::Held(credential) => {
+                self.end_sign_in(out);
                 self.generation = self.generation.saturating_add(1);
                 self.credential = Some(credential);
+            }
+            With::Transport => {
+                self.end_sign_in(out);
+                self.generation = self.generation.saturating_add(1);
+            }
+            With::Service(credential) => {
+                if credential.len() != 40 {
+                    out.push(Request::Signing { signing: Signing::Refused });
+                    return;
+                }
+                self.signing_exchange(ExchangeKind::SignIn, Message::SignInService, Some(credential), out);
             }
             With::Link(secret) => {
                 let Ok(record) = w::LinkSignIn::new(
@@ -26,14 +38,30 @@ impl Link {
                 };
                 let mut writer = Writer::new(usize::try_from(record.measure()).expect("short sign-in"));
                 record.encode(&mut writer).expect("measured sign-in");
-                self.signing_exchange(now, ExchangeKind::SignIn, Message::SignInLink(writer.finish()), out);
+                self.signing_exchange(
+                    ExchangeKind::SignIn,
+                    Message::SignInLink(writer.finish()),
+                    self.credential.clone(),
+                    out,
+                );
             }
         }
     }
-    pub(super) fn sign_out(&mut self, now: Time, out: &mut Queue<Request>) {
-        self.signing_exchange(now, ExchangeKind::SignOut { generation: self.generation }, Message::SignOut, out);
+    pub(super) fn sign_out(&mut self, _now: Time, out: &mut Queue<Request>) {
+        self.signing_exchange(
+            ExchangeKind::SignOut { generation: self.generation },
+            Message::SignOut,
+            self.credential.clone(),
+            out,
+        );
     }
-    fn signing_exchange(&mut self, _now: Time, kind: ExchangeKind, message: Message, out: &mut Queue<Request>) {
+    fn signing_exchange(
+        &mut self,
+        kind: ExchangeKind,
+        message: Message,
+        credential: Option<Secret>,
+        out: &mut Queue<Request>,
+    ) {
         let Some(next) = self.next.checked_add(1) else {
             out.push(Request::Signing { signing: Signing::Lost });
             return;
@@ -50,7 +78,7 @@ impl Link {
                 Attempt { token: exchange, owner: w::Owner::Jig, version: jig_client_protocol_wire::VERSION, kind },
             )
             .expect("checked exchange capacity");
-        self.exchange(exchange, message, out);
+        out.push(Request::Exchange { exchange, credential, message });
     }
     pub(super) fn signing_answer(&mut self, kind: ExchangeKind, body: &[u8], out: &mut Queue<Request>) {
         match kind {
@@ -68,6 +96,7 @@ impl Link {
                 ExchangeKind::SignIn => match w::SignInAnswer::decode(&self.limits.wire, &mut reader) {
                     Ok(w::SignInAnswer::SignedIn(value)) if reader.remaining() == 0 && value.token().len() == 40 => {
                         let fields = value.into_parts();
+                        self.end_sign_in(out);
                         self.credential = Some(fields.token);
                         self.generation = self.generation.saturating_add(1);
                         Signing::SignedIn { party: fields.party }
@@ -78,7 +107,7 @@ impl Link {
                 },
                 ExchangeKind::SignOut { .. } => match w::SignOutAnswer::decode(&self.limits.wire, &mut reader) {
                     Ok(w::SignOutAnswer::SignedOut) if reader.remaining() == 0 => {
-                        self.credential = None;
+                        self.end_sign_in(out);
                         Signing::SignedOut
                     }
                     Ok(w::SignOutAnswer::NotReady) if reader.remaining() == 0 => Signing::Again,

@@ -20,7 +20,12 @@ pub(crate) struct Watch {
 impl Domain {
     pub(crate) fn up(&mut self, env: &Env<Limits>, up: Up, out: &mut Queue<Request>) {
         let name = match &up {
-            Up::SignedIn | Up::NotKept { .. } | Up::Served { .. } | Up::Answer { .. } | Up::ReadDone { .. } => {
+            Up::SignedIn
+            | Up::SignedOut
+            | Up::NotKept { .. }
+            | Up::Served { .. }
+            | Up::Answer { .. }
+            | Up::ReadDone { .. } => {
                 unreachable!("watch events only")
             }
             Up::Watched { watch, .. } | Up::FamilyDelivered { watch, .. } | Up::WatchEnded { watch, .. } => *watch,
@@ -35,7 +40,12 @@ impl Domain {
             return;
         };
         match up {
-            Up::SignedIn | Up::NotKept { .. } | Up::Served { .. } | Up::Answer { .. } | Up::ReadDone { .. } => {
+            Up::SignedIn
+            | Up::SignedOut
+            | Up::NotKept { .. }
+            | Up::Served { .. }
+            | Up::Answer { .. }
+            | Up::ReadDone { .. } => {
                 unreachable!("watch events only")
             }
             Up::Watched { event, .. } => match event {

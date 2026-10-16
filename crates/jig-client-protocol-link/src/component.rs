@@ -221,11 +221,19 @@ impl Link {
                 }
             }
         };
+        if envelope == RequestEnvelope::SignedOut {
+            self.end_sign_in(out);
+            out.push(Request::Signing { signing: crate::Signing::SignedOut });
+        }
         out.push(Request::Answer { attempt: attempt.token, envelope, answer: None, why });
     }
-    fn read_answer(&self, attempt: Attempt, body: &[u8], out: &mut Queue<Request>) {
+    fn read_answer(&mut self, attempt: Attempt, body: &[u8], out: &mut Queue<Request>) {
         let result = match w::ReadAnswer::decode(&self.limits.wire, &mut Reader::new(body)) {
             Ok(w::ReadAnswer::None(record)) => {
+                if record.value() == &w::ReadNone::SignedOut {
+                    self.end_sign_in(out);
+                    out.push(Request::Signing { signing: crate::Signing::SignedOut });
+                }
                 read_none(attempt.token, &attempt.owner, translate::reads::none(record.value()), out);
                 return;
             }
@@ -444,7 +452,12 @@ impl Link {
             ExchangeKind::WatchOpen { .. } => match w::OpenAnswer::decode(&self.limits.wire, &mut Reader::new(body)) {
                 Ok(w::OpenAnswer::Admitted) => self.watches.opened(attempt.token, out),
                 Ok(w::OpenAnswer::Refused(why)) => {
-                    self.watches.end(attempt.token, translate::watches::refused(why.why()), out);
+                    let end = translate::watches::refused(why.why());
+                    self.watches.end(attempt.token, end, out);
+                    if end == jig_client_domain::contract::WatchEnd::SignedOut {
+                        self.end_sign_in(out);
+                        out.push(Request::Signing { signing: crate::Signing::SignedOut });
+                    }
                 }
                 Err(_) => self.failure(attempt, out),
             },
@@ -455,6 +468,8 @@ impl Link {
                     }
                     Ok(w::CloseAnswer::SignedOut) => {
                         self.watches.end(attempt.token, jig_client_domain::contract::WatchEnd::SignedOut, out);
+                        self.end_sign_in(out);
+                        out.push(Request::Signing { signing: crate::Signing::SignedOut });
                     }
                     Err(_) => self.failure(attempt, out),
                 }
@@ -558,7 +573,12 @@ impl Link {
                 }
                 if let Some(watch) = self.watches.named(value.watch()) {
                     self.cancel_open(watch, value.watch(), out);
-                    self.watches.end(watch, translate::watches::ended(value.why()), out);
+                    let end = translate::watches::ended(value.why());
+                    self.watches.end(watch, end, out);
+                    if end == jig_client_domain::contract::WatchEnd::SignedOut {
+                        self.end_sign_in(out);
+                        out.push(Request::Signing { signing: crate::Signing::SignedOut });
+                    }
                 }
             }
             w::StreamEvent::Text(value) => {
@@ -585,6 +605,20 @@ impl Link {
         }
         self.watches.alive(out);
         Ok(())
+    }
+    pub(super) fn end_sign_in(&mut self, out: &mut Queue<Request>) {
+        self.credential = None;
+        while let Some((key, _)) = (&self.attempts).into_iter().next() {
+            let key = *key;
+            self.attempts.remove(&key);
+        }
+        while let Some((watch, _)) = (&self.watches.0).into_iter().next() {
+            let watch = *watch;
+            self.watches.end(watch, jig_client_domain::contract::WatchEnd::SignedOut, out);
+        }
+        if self.stream.take().is_some() {
+            out.push(Request::CloseStream);
+        }
     }
     fn drop_stream(&mut self, _now: Time, out: &mut Queue<Request>) {
         let Some(stream) = self.stream.take() else { return };

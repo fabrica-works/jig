@@ -87,6 +87,7 @@ pub enum Event {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Up {
     SignedIn,
+    SignedOut,
     NotKept { key: RequestKey },
     Served { served: bool },
     Answer { attempt: Token, envelope: RequestEnvelope, answer: Option<Answered>, why: Option<Retry> },

@@ -158,3 +158,18 @@ fn a_keyed_exchange_before_its_store_is_caught() {
         Err("keyed exchange left before its record was stored")
     );
 }
+
+#[test]
+fn a_client_signed_out_with_a_stop_parked_sends_it_once_signed_in_again() {
+    let mut story = Story::live(fixtures::SEED);
+    story.event(jig_client::Event::SignOut);
+    story.send(STOP, Ask::Jig(Box::new(contract::Ask::Stop { project: 1, task: 9 })));
+    assert!(story.run_until(|s| s.client.link().state == Link::SignedOut, Duration::from_secs(1)));
+    assert_eq!(story.client.pending(STOP).expect("kept stop").progress, jig_client::Progress::Parked);
+    assert_eq!(story.made(fixtures::FIRST_OWNER), 0);
+    story.sign_in();
+    assert!(story.run_until(|s| !s.answered(STOP).is_empty(), Duration::from_secs(1)));
+    assert_eq!(story.client.link().party, Some(fixtures::FIRST_OWNER));
+    assert_eq!(story.answered(STOP).len(), 1);
+    assert_eq!(story.made(fixtures::FIRST_OWNER), 1);
+}

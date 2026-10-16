@@ -235,8 +235,14 @@ impl Story {
         story
     }
     pub fn sign_in(&mut self) {
-        let secret = self.front.connections.printed(&self.engine.link).expect("engine's printed link");
+        let printed = self.engine.link.clone();
+        let secret = self.front.connections.printed(&printed).expect("engine's printed link");
         self.event(Event::SignIn { with: client::With::Link(secret) });
+        self.advance();
+        if self.client.link().state == Link::SignedOut && self.engine.link != printed {
+            let secret = self.front.connections.printed(&self.engine.link).expect("fresh printed link");
+            self.event(Event::SignIn { with: client::With::Link(secret) });
+        }
     }
     pub fn watch(&mut self, handle: Handle, subject: Watchable) {
         self.front.subjects.insert(handle, subject.clone());

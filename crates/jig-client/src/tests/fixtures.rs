@@ -93,12 +93,34 @@ impl Client {
     }
     pub fn with_kept(kept: List<Record>) -> Self {
         let limits = limits();
+        Self::with_limits(limits, kept, max_out(&limits))
+    }
+    fn with_limits(limits: Limits, kept: List<Record>, outputs: u32) -> Self {
         let mut c = Self {
             machine: crate::Client::new(&limits, 7).unwrap(),
-            out: Queue::with_capacity(max_out(&limits)),
-            requests: List::with_capacity(max_out(&limits)),
+            out: Queue::with_capacity(outputs),
+            requests: List::with_capacity(outputs),
         };
         c.step(Event::Start { kept });
+        c
+    }
+    pub fn narrow_signed_in() -> Self {
+        let limits = limits();
+        let limits = Limits {
+            domain: DomainLimits {
+                handles: 1,
+                watches: 2,
+                reads: 1,
+                records: 1,
+                kept: 1,
+                parts: 1,
+                requests: skein_lib::RequestLimits { requests: 1, out: 2, ..limits.domain.requests },
+                ..limits.domain
+            },
+            exchanges: 5,
+        };
+        let mut c = Self::with_limits(limits, List::with_capacity(0), 16);
+        c.sign_in();
         c
     }
     pub fn signed_in() -> Self {
@@ -196,4 +218,113 @@ pub fn answers(requests: &[Request]) -> List<(Key, Outcome)> {
         }
     }
     answers
+}
+
+pub const CREDENTIAL: [u8; 40] = [7; 40];
+pub const SERVICE_CREDENTIAL: [u8; 40] = [8; 40];
+pub const NEW_CREDENTIAL: [u8; 40] = [9; 40];
+pub fn credential(bytes: &[u8; 40]) -> Secret {
+    Secret::new(Box::new(*bytes))
+}
+pub fn signed_in(credential: &[u8; 40]) -> Box<[u8]> {
+    let record = w::SignInAnswer::SignedIn(
+        w::SignedIn::new(
+            &w::CEILINGS,
+            w::SignedInParts { token: self::credential(credential), party: PARTY, expires: 10 },
+        )
+        .unwrap(),
+    );
+    let mut out = Writer::new(usize::try_from(record.measure()).unwrap());
+    record.encode(&mut out).unwrap();
+    out.finish()
+}
+pub fn sign_in_answer(record: &w::SignInAnswer) -> Box<[u8]> {
+    let mut out = Writer::new(usize::try_from(record.measure()).unwrap());
+    record.encode(&mut out).unwrap();
+    out.finish()
+}
+pub fn sign_out_answer(record: &w::SignOutAnswer) -> Box<[u8]> {
+    let mut out = Writer::new(usize::try_from(record.measure()).unwrap());
+    record.encode(&mut out).unwrap();
+    out.finish()
+}
+pub fn ended(requests: &[Request]) -> List<(Handle, Why)> {
+    let mut ended = List::with_capacity(max_out(&limits()));
+    for request in requests {
+        if let Request::Told { told: Told::Ended { handle, why } } = request {
+            ended.push((*handle, *why)).unwrap();
+        }
+    }
+    ended
+}
+impl Client {
+    pub fn fire(&mut self, now: Time) {
+        self.requests.clear();
+        self.machine.fire(now, Wall::EPOCH, &mut self.out);
+        while let Some(request) = self.out.pop() {
+            self.requests.push(request).unwrap();
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum SigningTerminal {
+    Request,
+    Read,
+    Watch,
+    Stream,
+    SignOut,
+}
+pub const SIGNING_TERMINALS: [SigningTerminal; 5] = [
+    SigningTerminal::Request,
+    SigningTerminal::Read,
+    SigningTerminal::Watch,
+    SigningTerminal::Stream,
+    SigningTerminal::SignOut,
+];
+pub struct SigningExchanges {
+    pub request: Token,
+    pub read: Token,
+    pub opening: Token,
+    pub watch: u64,
+}
+impl Client {
+    pub fn signed_out_by(&mut self, terminal: SigningTerminal, exchanges: &SigningExchanges) {
+        let (exchange, message) = match terminal {
+            SigningTerminal::Request => (exchanges.request, answer(&w::Answer::SignedOut)),
+            SigningTerminal::Read => {
+                let record = w::ReadAnswer::None(
+                    w::ReadAnswerNone::new(&w::CEILINGS, w::ReadAnswerNoneParts { value: w::ReadNone::SignedOut })
+                        .unwrap(),
+                );
+                let mut out = Writer::new(usize::try_from(record.measure()).unwrap());
+                record.encode(&mut out).unwrap();
+                (exchanges.read, out.finish())
+            }
+            SigningTerminal::Watch => {
+                let record = w::OpenAnswer::Refused(
+                    w::OpenAnswerRefused::new(
+                        &w::CEILINGS,
+                        w::OpenAnswerRefusedParts { why: w::WatchRefusal::SignedOut },
+                    )
+                    .unwrap(),
+                );
+                let mut out = Writer::new(usize::try_from(record.measure()).unwrap());
+                record.encode(&mut out).unwrap();
+                (exchanges.opening, out.finish())
+            }
+            SigningTerminal::Stream => {
+                self.stream(event(&w::StreamEvent::Ended(
+                    w::Ended::new(&w::CEILINGS, w::EndedParts { watch: exchanges.watch, why: w::WatchEnd::SignedOut })
+                        .unwrap(),
+                )));
+                return;
+            }
+            SigningTerminal::SignOut => {
+                self.step(Event::SignOut);
+                (self.exchange(), sign_out_answer(&w::SignOutAnswer::SignedOut))
+            }
+        };
+        self.step(Event::Reply { exchange, message });
+    }
 }

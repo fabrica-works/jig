@@ -27,6 +27,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(jig_client_protocol_link::worst_case(&link)?)?
         .checked_add(Queue::<jig_client_domain::Request>::worst_case(bound)?)?
         .checked_add(Queue::<jig_client_protocol_link::Request>::worst_case(bound)?)?
+        .checked_add(40)?
         .checked_add(Map::<RequestKey, u64>::worst_case(limits.domain.requests.requests)?)?
         .checked_add(List::<crate::Record>::worst_case(bound)?)?
         .checked_add(List::<Box<[u8]>>::worst_case(bound)?)?
