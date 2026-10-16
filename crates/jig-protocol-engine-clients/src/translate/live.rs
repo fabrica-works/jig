@@ -152,7 +152,7 @@ pub fn goals(project: u32, value: &d::Goals, limits: &w::Limits) -> Result<w::Go
     let rows = goal_pieces(&rows, limits.goals_rows, w::Path::GoalsRows)?;
     w::Goals::new(limits, w::GoalsParts { project, rows, more: value.next.is_some() })
 }
-pub fn task_line(value: &d::TaskLine, limits: &w::Limits) -> Result<w::TaskLine, w::Problem> {
+pub fn task_line(value: &d::ProjectTaskLine, limits: &w::Limits) -> Result<w::TaskLine, w::Problem> {
     w::TaskLine::new(
         limits,
         w::TaskLineParts {

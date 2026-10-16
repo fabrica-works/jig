@@ -233,7 +233,8 @@ impl Parties {
         for consumer in self.consumers.values_mut() {
             let touched = writes.iter().any(|write| match write {
                 root::Write::Save(root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row)))) => {
-                    task_subject(&consumer.subject, row.number)
+                    query_subject(&consumer.subject, row)
+                        || task_subject(&consumer.subject, row.number)
                         || matches!(&consumer.subject, Watched::Jig(Subject::Project { project } | Subject::Tasks { project, .. }) if *project == row.project)
                         || match row.requester {
                             tasks::Party::Person(party) => party_subject(&consumer.subject, party),
@@ -241,7 +242,8 @@ impl Parties {
                         }
                 }
                 root::Write::Save(root::Record::Core(core::Record::Tasks(tasks::Stored::Ended(row)))) => {
-                    task_subject(&consumer.subject, row.number)
+                    query_subject(&consumer.subject, row)
+                        || task_subject(&consumer.subject, row.number)
                         || matches!(&consumer.subject, Watched::Jig(Subject::Project { project } | Subject::Tasks { project, .. }) if *project == row.project)
                         || match row.requester {
                             tasks::Party::Person(party) => party_subject(&consumer.subject, party),
@@ -337,7 +339,8 @@ impl Parties {
                             self.task_projects.insert(line.chip.number, value.project);
                         }
                     }
-                    Document::Frame(_)
+                    Document::Lines(_)
+                    | Document::Frame(_)
                     | Document::Tree(_)
                     | Document::Chips(_)
                     | Document::Inbox(_)
@@ -444,6 +447,7 @@ fn task_subject(watched: &Watched, task: u64) -> bool {
         Subject::Frame { .. }
         | Subject::Inbox { .. }
         | Subject::Goals { .. }
+        | Subject::Query { .. }
         | Subject::Tasks { .. }
         | Subject::Conversations { .. }
         | Subject::Deployment
@@ -467,6 +471,7 @@ fn project_subject(
         Subject::Project { project: owned }
         | Subject::Goals { project: owned }
         | Subject::Tasks { project: owned, .. } => *owned == project,
+        Subject::Query { query } => query.project == Some(project),
         Subject::Note { .. } => true,
         Subject::Task { task }
         | Subject::Tree { task }
@@ -514,6 +519,7 @@ fn party_subject(watched: &Watched, party: u64) -> bool {
         | Subject::Run { .. }
         | Subject::Chips { .. }
         | Subject::Goals { .. }
+        | Subject::Query { .. }
         | Subject::Tasks { .. }
         | Subject::Conversations { .. }
         | Subject::Deployment
@@ -606,8 +612,22 @@ pub(crate) fn named_subject(value: &core::documents::Watched, party: u64) -> Sub
         W::Inbox => Subject::Inbox { party },
         W::Goals { project } => Subject::Goals { project: *project },
         W::Tasks { project, filter } => Subject::Tasks { project: *project, filter: *filter },
+        W::Query { query } => Subject::Query { query: *query },
         W::Conversations => Subject::Conversations { party },
         W::Run { task } => Subject::Run { task: *task },
         W::Deployment => Subject::Deployment,
     }
+}
+
+fn query_subject(watched: &Watched, row: &tasks::TaskRecord) -> bool {
+    use core::documents::ExecutorKind;
+    let Watched::Jig(Subject::Query { query }) = watched else { return false };
+    let kind = match row.executor {
+        tasks::Executor::Agent { .. } => ExecutorKind::Agent,
+        tasks::Executor::Procedure { .. } => ExecutorKind::Procedure,
+        tasks::Executor::Person(_) => ExecutorKind::Person,
+    };
+    query.project.is_none_or(|key| key == row.project)
+        && query.label.is_none_or(|key| key == row.label)
+        && query.executor.is_none_or(|key| key == kind)
 }

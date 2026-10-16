@@ -623,7 +623,7 @@ pub(crate) mod tests {
             asked_by_me: true,
         };
         let mut rows = List::with_capacity(3);
-        rows.push(documents::TaskLine {
+        rows.push(documents::ProjectTaskLine {
             chip: chips::tests::source_chip(),
             goal: Some(0),
             requester: jig_domain_tasks::Party::Deployment { project: u32::MAX },

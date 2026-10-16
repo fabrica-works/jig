@@ -16,6 +16,7 @@ fn seeded_parties_take_frame_chat_tree_and_inbox_deliveries_at_their_own_pace() 
             let assignment = world.assigned.as_ref().expect("assignment");
             let (task, attempt) = (assignment.task, assignment.attempt);
             open(&mut world, 5, Watched::Run { task });
+            open(&mut world, 6, Watched::Query { query: jig_core_world::fixtures::OWN_TASKS });
             world.store_delay = u32::try_from(rng.below(6)).expect("small delay");
             let mut burst = Vec::new();
             for turn in 1..=3 {

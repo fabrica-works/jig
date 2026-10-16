@@ -65,7 +65,8 @@ pub(super) fn admit(core: &Core, limits: &Limits, party: u64, act: Act, object: 
                 Admission::Refused(people::Refusal::NotOffered)
             }
         }
-        documents::Subject::Tasks { .. }
+        documents::Subject::Query { .. }
+        | documents::Subject::Tasks { .. }
         | documents::Subject::Note { .. }
         | documents::Subject::Application { .. }
         | documents::Subject::Tree { .. }

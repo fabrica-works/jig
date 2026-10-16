@@ -1,6 +1,6 @@
 //! What a task waits on, from its live subtree and the entries in it.
 use super::*;
-use fixtures::make_batch;
+use fixtures::{make_batch, restore};
 
 fn pair() -> (Core, Limits) {
     let (mut core, limits) = tree_core();
@@ -9,15 +9,6 @@ fn pair() -> (Core, Limits) {
     let child = new_row(&core, 2, tasks::Funder::Task(1), None);
     make_batch(&mut core, &limits, tasks::Party::Task(1), Box::new([child]));
     (core, limits)
-}
-
-fn restore(core: &mut Core, limits: &Limits, rows: Box<[tasks::TaskRecord]>) {
-    core.tasks = tasks::Domain::new(&limits.tasks, 17, Box::new([1]));
-    for row in rows {
-        let number = row.number;
-        send_task(core, limits, tasks::Event::Restore { record: tasks::Stored::Live(Box::new(row)) });
-        assert!(core.tasks.task(number).is_some(), "restored task {number}");
-    }
 }
 
 fn question(number: u64, at: u64) -> tasks::Word {

@@ -51,7 +51,7 @@ pub struct TaskFilter {
 
 /// One live task's context beside its chip.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
-pub struct TaskLine {
+pub struct ProjectTaskLine {
     pub chip: Chip,
     pub goal: Option<u64>,
     pub requester: tasks::Party,
@@ -64,7 +64,7 @@ pub struct TaskLine {
 pub struct Tasks {
     pub project: u32,
     pub filter: TaskFilter,
-    pub rows: List<TaskLine>,
+    pub rows: List<ProjectTaskLine>,
     pub more: bool,
 }
 
@@ -139,7 +139,7 @@ pub(super) fn make(
             break;
         }
         let row = core.tasks.task(*number).expect("ordered live task");
-        rows.push(TaskLine {
+        rows.push(ProjectTaskLine {
             chip: super::small::chip_with_core(core, limits, row)?,
             goal: core.goal_of(row),
             requester: row.requester,
@@ -152,7 +152,7 @@ pub(super) fn make(
 }
 
 pub(super) fn worst_case(limits: &DocumentLimits) -> Option<u64> {
-    List::<TaskLine>::worst_case(limits.rows)?
+    List::<ProjectTaskLine>::worst_case(limits.rows)?
         .checked_add(u64::from(limits.rows).checked_mul(super::chip_heap_worst_case(limits)?)?)
 }
 pub(super) fn scratch_worst_case(limits: &Limits) -> Option<u64> {

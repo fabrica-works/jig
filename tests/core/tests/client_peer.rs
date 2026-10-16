@@ -129,3 +129,58 @@ fn a_client_watch_refusal_is_immediate_without_a_store_commit() {
     assert!(world.client_peer.as_ref().expect("client peer").now.iter().any(|receipt| matches!(receipt,
         core::Now::WatchRefused { watcher: refused, .. } if *refused == watcher)));
 }
+
+const QUERY_WATCHER: u64 = 45_106;
+const CANCEL_REPLY: u64 = 45_107;
+
+#[test]
+fn a_watched_task_query_is_delivered_again_when_its_task_ends() {
+    let (mut world, sign_in) = client_world();
+    chat(&mut world, sign_in);
+    let task = world.assignments.first().expect("chat assignment").0;
+    let requester = jig_core_world::fixtures::live_row(&world, task).requester;
+    let query =
+        documents::TaskQuery { project: Some(1), requester: Some(requester), ..jig_core_world::fixtures::OWN_TASKS };
+    world.client_peer.as_mut().expect("configured fixture").delivered.clear();
+    world.send(root::Event::Core(core::Event::Watch {
+        watcher: Token::new(QUERY_WATCHER),
+        sign_in,
+        subject: documents::Watched::Query { query },
+        window: documents::Window { rows: 8, after: None },
+    }));
+    let (_, root::Delivery::Core(core::Held::Delivery { document, .. })) =
+        world.client_peer.as_ref().expect("configured fixture").delivered.last().expect("initial query")
+    else {
+        panic!("query delivery")
+    };
+    let documents::Document::Lines(value) = document.as_ref() else { panic!("task lines") };
+    assert_eq!(value.lines.get(0).expect("configured fixture").chip.number, task);
+    world.send(root::Event::Core(core::Event::Delivered { watcher: Token::new(QUERY_WATCHER) }));
+    world.client_peer.as_mut().expect("configured fixture").delivered.clear();
+    let before = world.store.applied;
+    world.send(root::Event::Core(core::Event::People(people::Event::Ask {
+        reply_to: ReplyTo::new(Token::new(CANCEL_REPLY)),
+        sign_in,
+        key: [47; 16],
+        ask: people::Ask::Cancel { project: 1, task, reason: Box::from(&b"finished"[..]) },
+    })));
+    world.send(root::Event::Core(core::Event::Delivered { watcher: Token::new(QUERY_WATCHER) }));
+    let (durable, root::Delivery::Core(core::Held::Delivery { document, .. })) = world
+        .client_peer
+        .as_ref()
+        .expect("configured fixture")
+        .delivered
+        .iter()
+        .rev()
+        .find(|(_, value)| {
+            matches!(value,
+            root::Delivery::Core(core::Held::Delivery { watcher, .. }) if watcher.raw() == QUERY_WATCHER)
+        })
+        .expect("changed query")
+    else {
+        panic!("query delivery")
+    };
+    let documents::Document::Lines(value) = document.as_ref() else { panic!("task lines") };
+    assert!(value.lines.is_empty());
+    assert!(*durable > before, "the removal followed its commit");
+}

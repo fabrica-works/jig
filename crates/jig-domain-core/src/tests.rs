@@ -1845,6 +1845,7 @@ fn watch_admission_checks_each_subjects_project_or_owner() {
             | Watched::Tree { .. }
             | Watched::Chips { .. }
             | Watched::Goals { .. }
+            | Watched::Query { .. }
             | Watched::Tasks { .. }
             | Watched::Run { .. }
             | Watched::Deployment
@@ -2993,3 +2994,4 @@ mod read_activity;
 mod own_watches;
 
 mod goal_of;
+mod task_query;

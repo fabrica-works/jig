@@ -31,3 +31,18 @@ pub fn live_row(world: &crate::effects::World, task: u64) -> &jig_domain_tasks::
         row => panic!("live task row missing: {row:?}"),
     }
 }
+
+pub const QUERY_REQUESTER: u64 = 1;
+
+/// A requesting party's task query, shared by the independent watch stories.
+pub const OWN_TASKS: jig_domain_core::documents::TaskQuery = jig_domain_core::documents::TaskQuery {
+    project: None,
+    requester: Some(jig_domain_tasks::Party::Person(QUERY_REQUESTER)),
+    root: None,
+    parent: None,
+    label: None,
+    phase: None,
+    executor: None,
+    tracked: None,
+    order: jig_domain_core::documents::QueryOrder::Number,
+};

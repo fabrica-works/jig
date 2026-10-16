@@ -37,7 +37,11 @@ mod objects;
 mod offers;
 mod project_note;
 mod project_tasks;
-pub use project_tasks::{TaskFilter, TaskLine, TaskPhase, Tasks};
+pub use project_tasks::{ProjectTaskLine, TaskFilter, TaskPhase, Tasks};
+mod task_lines;
+pub use task_lines::{ConversationRead, TaskLine, task_line};
+pub mod task_query;
+pub use task_query::{Lines, PhaseClass, QueryOrder, TaskQuery, lines};
 mod small;
 pub use objects::{
     AmendmentChange, AmendmentState, EndedDelegate, Escalation, FundingOffer, HistoryLine, MilestoneLine,
@@ -127,6 +131,8 @@ pub enum Subject {
     Goals { project: u32 },
     /// Filtered live tasks in one project, newest change first.
     Tasks { project: u32, filter: TaskFilter },
+    /// A fixed task query, independent of any application shape.
+    Query { query: TaskQuery },
     /// The party's live chats.
     Conversations { party: u64 },
     /// A task's current attempt.
@@ -161,6 +167,7 @@ pub enum Watched {
     Inbox,
     Goals { project: u32 },
     Tasks { project: u32, filter: TaskFilter },
+    Query { query: TaskQuery },
     Conversations,
     Run { task: u64 },
     Deployment,
@@ -321,6 +328,8 @@ pub enum Document {
     Goals(Goals),
     /// A filtered live project task list.
     Tasks(Tasks),
+    /// A query window over live tasks.
+    Lines(Lines),
     /// A pending immutable proposal.
     Proposal(Box<Proposal>),
     /// A held task and its preserved story.
@@ -387,6 +396,7 @@ pub fn make(core: &Core, limits: &Limits, party: u64, subject: &Subject, window:
         Subject::Tasks { project, filter } => {
             Ok(Document::Tasks(project_tasks::make(core, limits, party, *project, filter, window)?))
         }
+        Subject::Query { query } => Ok(Document::Lines(lines(core, limits, party, query, window)?)),
         Subject::Inbox { party: owner } => {
             if *owner != party {
                 return Err(Missing::NotAllowed);
@@ -448,6 +458,7 @@ pub fn document_worst_case(limits: &DocumentLimits) -> Option<u64> {
             .max(u64::from(limits.text_bytes).checked_mul(3)?)
             .max(task_tree::worst_case(limits)?)
             .max(project_tasks::worst_case(limits)?)
+            .max(task_query::worst_case(limits)?)
             .max(objects::worst_case(limits)?)
             .max(project_note::worst_case(limits)?)
             .max(deployment::worst_case(limits)?),
@@ -466,7 +477,11 @@ pub fn document_with_context_worst_case(limits: &Limits) -> Option<u64> {
 pub(crate) fn document_scratch_worst_case(limits: &Limits) -> Option<u64> {
     let waits = List::<u64>::worst_case(limits.tasks.tree_tasks)?
         .checked_add(List::<people::Entry>::worst_case(crate::inbox::waiting_capacity(limits)?)?)?;
-    Some(deployment::scratch_worst_case(limits)?.max(project_tasks::scratch_worst_case(limits)?).max(waits))
+    Some(
+        deployment::scratch_worst_case(limits)?
+            .max(project_tasks::scratch_worst_case(limits)?)
+            .max(task_query::scratch_worst_case(limits)?.checked_add(waits)?),
+    )
 }
 
 /// Join volatile live observations to a loaded owner row. The reader checks

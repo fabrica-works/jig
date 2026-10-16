@@ -112,6 +112,7 @@ pub fn document(answer: &reads::Answer, limits: &w::Limits) -> Result<w::ReadVal
             | d::Document::Run(_)
             | d::Document::Tree(_)
             | d::Document::Goals(_)
+            | d::Document::Lines(_)
             | d::Document::Tasks(_)
             | d::Document::Note(_)
             | d::Document::Inbox(_)

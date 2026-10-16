@@ -23,21 +23,16 @@ pub fn needs() -> jig_domain_fleet::Needs {
 }
 
 /// Make one bounded batch and apply its projection saves to the unit core.
-pub(crate) fn make_batch(
-    core: &mut super::Core,
-    limits: &super::Limits,
-    creator: super::tasks::Party,
-    batch: Box<[super::tasks::New]>,
-) {
-    make_batch_at(core, limits, creator, batch, super::Wall::EPOCH);
+pub(crate) fn make_batch(core: &mut Core, limits: &Limits, creator: tasks::Party, batch: Box<[tasks::New]>) {
+    make_batch_at(core, limits, creator, batch, Wall::EPOCH);
 }
 
 pub(crate) fn make_batch_at(
-    core: &mut super::Core,
-    limits: &super::Limits,
-    creator: super::tasks::Party,
-    batch: Box<[super::tasks::New]>,
-    wall: super::Wall,
+    core: &mut Core,
+    limits: &Limits,
+    creator: tasks::Party,
+    batch: Box<[tasks::New]>,
+    wall: Wall,
 ) {
     use super::{Env, Queue, ReplyTo, Time, Token, projections, room_max, tasks};
     let mut out = Queue::with_capacity(tasks::max_out(&limits.tasks));
@@ -52,5 +47,36 @@ pub(crate) fn make_batch_at(
             let mut projections = Queue::with_capacity(room_max(limits).expect("projection room").writes);
             projections::save(core, limits, &row, &mut projections);
         }
+    }
+}
+
+use super::*;
+
+pub(crate) fn query_fixture() -> (Core, Limits) {
+    let (mut core, mut limits) = tree_core();
+    let (auth, auth_limits) = watch_core();
+    core.people = auth.people;
+    limits.people = auth_limits.people;
+    for (number, when, creator) in [(1, 10, 1), (3, 20, 2)] {
+        let batch: Box<[tasks::New]> = if number == 1 {
+            let first = new_row(&core, 1, tasks::Funder::Period { project: 1, period: 1 }, Some(1));
+            let mut second = new_row(&core, 2, tasks::Funder::Period { project: 1, period: 1 }, None);
+            second.dependencies = Box::new([1]);
+            Box::new([first, second])
+        } else {
+            Box::new([new_row(&core, number, tasks::Funder::Period { project: 1, period: 1 }, None)])
+        };
+        make_batch_at(&mut core, &limits, tasks::Party::Person(creator), batch, Wall::from_nanos(when));
+        assert!(core.tasks.task(number).is_some(), "task {number}");
+    }
+    (core, limits)
+}
+
+pub(crate) fn restore(core: &mut Core, limits: &Limits, rows: Box<[tasks::TaskRecord]>) {
+    core.tasks = tasks::Domain::new(&limits.tasks, 17, Box::new([1]));
+    for row in rows {
+        let number = row.number;
+        send_task(core, limits, tasks::Event::Restore { record: tasks::Stored::Live(Box::new(row)) });
+        assert!(core.tasks.task(number).is_some(), "restored task {number}");
     }
 }

@@ -20,29 +20,10 @@ fn rows(core: &Core, limits: &Limits, filter: TaskFilter, window: Window) -> Tas
     };
     value
 }
-fn fixture() -> (Core, Limits) {
-    let (mut core, mut limits) = tree_core();
-    let (auth, auth_limits) = watch_core();
-    core.people = auth.people;
-    limits.people = auth_limits.people;
-    for (number, when, creator) in [(1, 10, 1), (3, 20, 2)] {
-        let batch: Box<[tasks::New]> = if number == 1 {
-            let first = new_row(&core, 1, tasks::Funder::Period { project: 1, period: 1 }, Some(1));
-            let mut second = new_row(&core, 2, tasks::Funder::Period { project: 1, period: 1 }, None);
-            second.dependencies = Box::new([1]);
-            Box::new([first, second])
-        } else {
-            Box::new([new_row(&core, number, tasks::Funder::Period { project: 1, period: 1 }, None)])
-        };
-        fixtures::make_batch_at(&mut core, &limits, tasks::Party::Person(creator), batch, Wall::from_nanos(when));
-        assert!(core.tasks.task(number).is_some(), "task {number}");
-    }
-    (core, limits)
-}
 
 #[test]
 fn project_tasks_filter_owner_facts_and_page_in_last_change_order() {
-    let (core, limits) = fixture();
+    let (core, limits) = fixtures::query_fixture();
     let first = rows(&core, &limits, ALL, window());
     assert_eq!(first.rows.len(), 1);
     assert_eq!(first.rows.get(0).expect("first").chip.number, 3);
@@ -84,7 +65,7 @@ fn project_tasks_filter_owner_facts_and_page_in_last_change_order() {
 
 #[test]
 fn filtered_task_watches_coalesce_enter_leave_and_ending_then_revoke_visibility() {
-    let (mut core, limits) = fixture();
+    let (mut core, limits) = fixtures::query_fixture();
     let watcher = Token::new(30);
     let filter = TaskFilter { phase: Some(TaskPhase::Held), ..ALL };
     let initial = watch_outputs(
@@ -144,7 +125,7 @@ fn filtered_task_watches_coalesce_enter_leave_and_ending_then_revoke_visibility(
 
 #[test]
 fn supplied_ended_filter_preserves_its_owner_facts_and_returns_an_empty_live_project_list() {
-    let (core, limits) = fixture();
+    let (core, limits) = fixtures::query_fixture();
     let owner =
         TaskFilter { executor: Some(tasks::Executor::Agent { charter: 1 }), goal: Some(1), asked_by_me: true, ..ALL };
     let live = rows(&core, &limits, owner, window());
@@ -174,7 +155,7 @@ fn supplied_ended_filter_preserves_its_owner_facts_and_returns_an_empty_live_pro
 
 #[test]
 fn an_ended_task_watch_stays_empty_when_a_live_task_ends() {
-    let (mut core, limits) = fixture();
+    let (mut core, limits) = fixtures::query_fixture();
     let watcher = Token::new(30);
     let filter = TaskFilter { phase: Some(TaskPhase::Ended), ..ALL };
     let initial = watch_outputs(

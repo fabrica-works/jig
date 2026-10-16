@@ -105,3 +105,51 @@ fn waiting(row: &tasks::TaskRecord, entries: &mut Vec<Waiting>) {
         }
     }
 }
+
+/// Select and order live task numbers using only durable owner rows.
+#[must_use]
+pub fn lines(rows: &BTreeMap<root::Key, root::Record>, party: u64, query: &core::documents::TaskQuery) -> Vec<u64> {
+    use core::documents::{ExecutorKind, PhaseClass, QueryOrder};
+    let mut selected: Vec<_> = rows
+        .values()
+        .filter_map(|record| {
+            let root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row))) = record else { return None };
+            let class = match row.phase {
+                tasks::Phase::Active(_) => PhaseClass::Working,
+                tasks::Phase::Waiting => PhaseClass::Waiting,
+                tasks::Phase::Held { .. } => PhaseClass::Held,
+                tasks::Phase::Closing(_) => PhaseClass::Closing,
+                tasks::Phase::Ended(_) => return None,
+            };
+            let kind = match row.executor {
+                tasks::Executor::Agent { .. } => ExecutorKind::Agent,
+                tasks::Executor::Procedure { .. } => ExecutorKind::Procedure,
+                tasks::Executor::Person(_) => ExecutorKind::Person,
+            };
+            let parent = match row.requester {
+                tasks::Party::Task(number) => Some(number),
+                tasks::Party::Person(_) | tasks::Party::Deployment { .. } => None,
+            };
+            let matches = query.project.is_none_or(|key| key == row.project)
+                && query.requester.is_none_or(|key| key == row.requester)
+                && query.root.is_none_or(|key| key == row.root)
+                && query.parent.is_none_or(|key| Some(key) == parent)
+                && query.label.is_none_or(|key| key == row.label)
+                && query.phase.is_none_or(|key| key == class)
+                && query.executor.is_none_or(|key| key == kind)
+                && query.tracked.is_none_or(|key| key == row.tracked.is_some())
+                && (query.project.is_some() || query.requester == Some(tasks::Party::Person(party)));
+            matches.then_some(row.as_ref())
+        })
+        .collect();
+    selected.sort_by(|a, b| {
+        let order = match query.order {
+            QueryOrder::Number | QueryOrder::Ended => std::cmp::Ordering::Equal,
+            QueryOrder::Changed => b.changed.cmp(&a.changed),
+            QueryOrder::Activity => b.last_activity.cmp(&a.last_activity),
+            QueryOrder::Priority => (a.tracked.is_none(), a.tracked).cmp(&(b.tracked.is_none(), b.tracked)),
+        };
+        order.then(a.number.cmp(&b.number))
+    });
+    selected.into_iter().map(|row| row.number).collect()
+}

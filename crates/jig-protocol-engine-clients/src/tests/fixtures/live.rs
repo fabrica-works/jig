@@ -85,7 +85,7 @@ pub fn tasks_document() -> d::Tasks {
             goal: Some(19),
             asked_by_me: true,
         },
-        rows: list([d::TaskLine {
+        rows: list([d::ProjectTaskLine {
             chip: chip(),
             goal: Some(19),
             requester: t::Party::Person(23),

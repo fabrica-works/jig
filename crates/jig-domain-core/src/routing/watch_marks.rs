@@ -4,7 +4,7 @@
 //! no state snapshots and coalesce in a set. Once projection handoffs finish,
 //! the views child asks for documents from the decision's final live state.
 
-use crate::documents::{ApplicationScope, Proposer, Subject};
+use crate::documents::{self, ApplicationScope, Proposer, Subject};
 use crate::{Core, Limits, Request, Requests};
 use jig_domain_people as people;
 use jig_domain_tasks as tasks;
@@ -29,6 +29,7 @@ impl Core {
                 | Subject::Tree { .. }
                 | Subject::Chips { .. }
                 | Subject::Goals { .. }
+                | Subject::Query { .. }
                 | Subject::Tasks { .. }
                 | Subject::Run { .. }
                 | Subject::Deployment
@@ -59,6 +60,7 @@ impl Core {
                 | Subject::Chips { .. }
                 | Subject::Inbox { .. }
                 | Subject::Goals { .. }
+                | Subject::Query { .. }
                 | Subject::Tasks { .. }
                 | Subject::Conversations { .. }
                 | Subject::Run { .. }
@@ -89,6 +91,7 @@ impl Core {
                 | Subject::Chips { .. }
                 | Subject::Inbox { .. }
                 | Subject::Goals { .. }
+                | Subject::Query { .. }
                 | Subject::Tasks { .. }
                 | Subject::Conversations { .. }
                 | Subject::Run { .. }
@@ -129,6 +132,7 @@ impl Core {
                 | Subject::Goals { project: owned }
                 | Subject::Tasks { project: owned, .. } => *owned == project,
                 // Store-only note names do not retain their scope in this core.
+                Subject::Query { query } => query.project == Some(project),
                 Subject::Note { .. } => true,
                 Subject::Task { task }
                 | Subject::Tree { task }
@@ -220,6 +224,15 @@ pub(super) fn touch_task(core: &mut Core, limits: &Limits, row: &tasks::TaskReco
             | Subject::Result { task }
             | Subject::Proposal { proposer: Proposer::Task(task), .. } => *task == row.number,
             Subject::Project { project } | Subject::Tasks { project, .. } => *project == row.project,
+            Subject::Query { query } => {
+                let mut matches = documents::task_query::may_touch(query, row);
+                for number in &trees {
+                    if let Some(ancestor) = core.tasks.task(*number) {
+                        matches |= documents::task_query::may_touch(query, ancestor);
+                    }
+                }
+                matches
+            }
             Subject::Chips { tasks } => tasks.as_slice().contains(&row.number),
             Subject::Goals { project } => *project == row.project && goal,
             Subject::Conversations { party } => owner == Some(*party),
@@ -443,6 +456,10 @@ fn visibility_end(core: &Core, binding: &crate::WatchBinding) -> Option<views::E
         Subject::Goals { project } | Subject::Tasks { project, .. } => {
             if core.people.role(binding.party, *project).is_some() { None } else { Some(views::End::NotAllowed) }
         }
+        Subject::Query { query } => match documents::task_query::admission(core, binding.party, query) {
+            Ok(()) => None,
+            Err(_) => Some(views::End::NotAllowed),
+        },
         Subject::Deployment => {
             if core.people.role(binding.party, 0).is_some() {
                 None

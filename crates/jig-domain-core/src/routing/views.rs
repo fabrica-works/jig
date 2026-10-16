@@ -121,6 +121,7 @@ fn refused_subject(watcher: Token, subject: &Subject, why: WatchRefusal) -> Requ
         | Subject::Chips { .. }
         | Subject::Inbox { .. }
         | Subject::Goals { .. }
+        | Subject::Query { .. }
         | Subject::Tasks { .. }
         | Subject::Conversations { .. }
         | Subject::Run { .. }
@@ -151,6 +152,7 @@ pub(super) fn open(
         | Watched::Chips { .. }
         | Watched::Inbox
         | Watched::Goals { .. }
+        | Watched::Query { .. }
         | Watched::Tasks { .. }
         | Watched::Conversations
         | Watched::Deployment
@@ -199,6 +201,7 @@ fn open_follow(
             | Watched::Chips { .. }
             | Watched::Inbox
             | Watched::Goals { .. }
+            | Watched::Query { .. }
             | Watched::Tasks { .. }
             | Watched::Conversations
             | Watched::Run { .. }
@@ -225,6 +228,7 @@ fn open_follow(
         | Subject::Tree { .. }
         | Subject::Inbox { .. }
         | Subject::Goals { .. }
+        | Subject::Query { .. }
         | Subject::Tasks { .. }
         | Subject::Conversations { .. }
         | Subject::Run { .. }
@@ -292,6 +296,7 @@ fn admission(core: &Core, env: &Env<Limits>, party: u64, subject: &Subject, wind
         | Subject::Chips { .. }
         | Subject::Inbox { .. }
         | Subject::Goals { .. }
+        | Subject::Query { .. }
         | Subject::Tasks { .. }
         | Subject::Conversations { .. }
         | Subject::Run { .. }
@@ -321,6 +326,7 @@ fn named_subject(subject: Watched, party: u64) -> Subject {
         Watched::Inbox => Subject::Inbox { party },
         Watched::Goals { project } => Subject::Goals { project },
         Watched::Tasks { project, filter } => Subject::Tasks { project, filter },
+        Watched::Query { query } => Subject::Query { query },
         Watched::Conversations => Subject::Conversations { party },
         Watched::Run { task } => Subject::Run { task },
         Watched::Deployment => Subject::Deployment,
@@ -340,6 +346,7 @@ fn application_subject(core: &Core, watcher: Token) -> Option<(u16, Token, docum
         | Subject::Chips { .. }
         | Subject::Inbox { .. }
         | Subject::Goals { .. }
+        | Subject::Query { .. }
         | Subject::Tasks { .. }
         | Subject::Conversations { .. }
         | Subject::Run { .. }
@@ -368,6 +375,7 @@ pub(super) fn marked(core: &mut Core, connector: u16, subjects: List<Token>) -> 
             | Subject::Chips { .. }
             | Subject::Inbox { .. }
             | Subject::Goals { .. }
+            | Subject::Query { .. }
             | Subject::Tasks { .. }
             | Subject::Conversations { .. }
             | Subject::Run { .. }
@@ -431,6 +439,7 @@ fn watch_document(
         | Subject::Tree { .. }
         | Subject::Inbox { .. }
         | Subject::Goals { .. }
+        | Subject::Query { .. }
         | Subject::Tasks { .. }
         | Subject::Conversations { .. }
         | Subject::Run { .. }
@@ -545,6 +554,7 @@ fn changed_run(core: &mut Core, env: &Env<Limits>, run: Token, out: &mut Queue<R
             | Subject::Chips { .. }
             | Subject::Inbox { .. }
             | Subject::Goals { .. }
+            | Subject::Query { .. }
             | Subject::Tasks { .. }
             | Subject::Conversations { .. }
             | Subject::Run { .. }

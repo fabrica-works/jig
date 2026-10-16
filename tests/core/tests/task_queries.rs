@@ -96,3 +96,116 @@ fn me_reads_the_pool_left_in_its_creating_bounds() {
     let Some(core::acts::Bounds::Goal { pool_left, .. }) = &project.creating else { panic!("creating") };
     assert_eq!(*pool_left, 200);
 }
+
+const QUERY_PARENT: u64 = 1;
+const QUERY_FIRST_WATCHER: u64 = 100;
+const QUERY_FENCE_WATCHER: u64 = 90;
+use jig_core_world::fixtures::QUERY_REQUESTER;
+const QUERY_TABLE: [documents::TaskQuery; 6] = [
+    jig_core_world::fixtures::OWN_TASKS,
+    documents::TaskQuery {
+        project: Some(1),
+        requester: None,
+        root: Some(QUERY_PARENT),
+        order: documents::QueryOrder::Changed,
+        ..jig_core_world::fixtures::OWN_TASKS
+    },
+    documents::TaskQuery {
+        project: Some(1),
+        requester: None,
+        parent: Some(QUERY_PARENT),
+        order: documents::QueryOrder::Activity,
+        ..jig_core_world::fixtures::OWN_TASKS
+    },
+    documents::TaskQuery {
+        project: Some(1),
+        label: Some(0),
+        tracked: Some(false),
+        order: documents::QueryOrder::Priority,
+        ..jig_core_world::fixtures::OWN_TASKS
+    },
+    documents::TaskQuery {
+        project: Some(1),
+        requester: None,
+        executor: Some(documents::ExecutorKind::Agent),
+        phase: Some(documents::PhaseClass::Held),
+        ..jig_core_world::fixtures::OWN_TASKS
+    },
+    documents::TaskQuery {
+        project: Some(1),
+        requester: None,
+        order: documents::QueryOrder::Ended,
+        ..jig_core_world::fixtures::OWN_TASKS
+    },
+];
+
+#[test]
+fn a_task_querys_lines_match_the_reference_over_the_stores_tasks() {
+    let mut world = world(1204);
+    let parent = world.assigned.as_ref().expect("configured fixture").task;
+    delegate_question(&mut world, parent);
+    request(&mut world, 1, people::Ask::Stop { project: 1, task: parent });
+    world.watches = Some(jig_core_world::watches::Parties::new(
+        1204,
+        world.store.applied,
+        false,
+        world.sign_in.expect("configured fixture"),
+    ));
+    for (offset, query) in QUERY_TABLE.into_iter().enumerate() {
+        let expected = jig_core_world::reference::lines(&world.store.rows, QUERY_REQUESTER, &query);
+        let mut actual = Vec::new();
+        let mut after = None;
+        for page in 0..4 {
+            let watcher = QUERY_FIRST_WATCHER + u64::try_from(offset * 4 + page).expect("configured fixture");
+            world.send(root::Event::Core(core::Event::Watch {
+                watcher: Token::new(watcher),
+                sign_in: world.sign_in.expect("configured fixture"),
+                subject: documents::Watched::Query { query },
+                window: documents::Window { rows: 1, after },
+            }));
+            let documents::Document::Lines(value) = jig_core_world::watches::latest(&world, watcher) else {
+                panic!("query")
+            };
+            actual.extend(value.lines.iter().map(|line| line.chip.number));
+            after = value.next;
+            world.send(root::Event::Core(core::Event::Unwatch { watcher: Token::new(watcher) }));
+            world.send(root::Event::Core(core::Event::Delivered { watcher: Token::new(watcher) }));
+            if after.is_none() {
+                break;
+            }
+        }
+        assert_eq!(actual, expected, "query {query:?}");
+    }
+}
+
+#[test]
+fn a_watched_task_querys_deliveries_each_follow_their_commit() {
+    let mut world = jig_core_world::watches::world(1205, false);
+    jig_core_world::watches::open(
+        &mut world,
+        QUERY_FENCE_WATCHER,
+        documents::Watched::Query { query: jig_core_world::fixtures::OWN_TASKS },
+    );
+    world.send(root::Event::Core(core::Event::Delivered { watcher: Token::new(QUERY_FENCE_WATCHER) }));
+    world.store.fault(jig_core_world::Fault::Hold { commits: 1 });
+    let received = world.watches.as_ref().expect("configured fixture").deliveries.len();
+    world.turn(1, 1, None, b"a committed reply");
+    assert_eq!(world.watches.as_ref().expect("configured fixture").deliveries.len(), received);
+    let commit = world.store.release_held().expect("held commit");
+    world.send(root::Event::Committed { number: commit, fill: 0 });
+    let (_, durable, document) = world
+        .watches
+        .as_ref()
+        .expect("configured fixture")
+        .deliveries
+        .iter()
+        .rev()
+        .find(|(watcher, _, _)| *watcher == QUERY_FENCE_WATCHER)
+        .expect("query update");
+    assert!(*durable >= commit);
+    let documents::Document::Lines(value) = document else { panic!("query") };
+    assert_eq!(
+        value.lines.get(0).expect("configured fixture").conversation.as_ref().expect("configured fixture").unread,
+        documents::Count::Known(1)
+    );
+}

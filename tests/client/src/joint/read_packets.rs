@@ -37,12 +37,7 @@ pub fn read_with_codec(
     let client = *client;
     let read = *read;
     let result = match answer {
-        reads::Answer::None(why) => client::ReadResult::None(match why {
-            reads::Why::Unknown => client::ReadNone::Unknown,
-            reads::Why::Busy => client::ReadNone::Busy,
-            reads::Why::Gone => client::ReadNone::Gone,
-            reads::Why::SignedOut => client::ReadNone::SignedOut,
-        }),
+        reads::Answer::None(why) => client::ReadResult::None(missing(*why)),
         reads::Answer::Page(value) => {
             let value = match what {
                 client::Read::Activity { task, .. } => {
@@ -121,6 +116,7 @@ pub fn read_with_codec(
             | documents::Document::Run(_)
             | documents::Document::Tree(_)
             | documents::Document::Goals(_)
+            | documents::Document::Lines(_)
             | documents::Document::Tasks(_)
             | documents::Document::Note(_)
             | documents::Document::Inbox(_)
@@ -709,3 +705,12 @@ mod deployment_tests;
 #[cfg(test)]
 #[path = "historical_packets.rs"]
 mod historical_tests;
+
+fn missing(why: reads::Why) -> client::ReadNone {
+    match why {
+        reads::Why::Unknown => client::ReadNone::Unknown,
+        reads::Why::Busy => client::ReadNone::Busy,
+        reads::Why::Gone => client::ReadNone::Gone,
+        reads::Why::SignedOut => client::ReadNone::SignedOut,
+    }
+}
