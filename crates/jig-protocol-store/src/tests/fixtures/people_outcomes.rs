@@ -119,6 +119,8 @@ pub fn limit_kind_values() -> Box<[domain::LimitKind]> {
         domain::LimitKind::Policy,
         domain::LimitKind::Resource,
         domain::LimitKind::Service,
+        domain::LimitKind::Grace,
+        domain::LimitKind::Goals,
     ])
 }
 pub fn refusal_values() -> Box<[domain::Refusal]> {

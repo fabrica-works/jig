@@ -303,7 +303,7 @@ fn cancel_case(limits: &w::Limits) -> (w::Ask, people::Ask) {
             w::Cancel::new(limits, w::CancelParts { project: 3, task: 8, reason: Box::from(b"cancel".as_slice()) })
                 .expect("Cancel"),
         ),
-        p::Ask::Cancel { project: 3, task: 8, reason: Box::from(b"cancel".as_slice()) },
+        p::Ask::Cancel { project: 3, task: 8, reason: Box::from(b"cancel".as_slice()), grace: None },
     )
 }
 fn take_over_case(limits: &w::Limits) -> (w::Ask, people::Ask) {
@@ -796,3 +796,18 @@ pub use watches::*;
 #[path = "fixtures/closing.rs"]
 mod closing;
 pub use closing::*;
+
+/// An amendment retaining every field, with the supplied explanation.
+#[must_use]
+pub fn person_unchanged(reason: &[u8]) -> jig_domain_people::Amendment {
+    jig_domain_people::Amendment {
+        tracked: None,
+        addressed: None,
+        instructions: None,
+        spec: None,
+        wake: None,
+        dependencies: None,
+        authority: None,
+        reason: reason.into(),
+    }
+}

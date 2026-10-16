@@ -21,15 +21,7 @@ pub fn row(w: &World, task: u64) -> &tasks::TaskRecord {
 }
 #[must_use]
 pub fn change(words: &[u8]) -> people::Amendment {
-    people::Amendment {
-        addressed: None,
-        instructions: Some(words.into()),
-        spec: None,
-        wake: None,
-        dependencies: None,
-        authority: None,
-        reason: b"new evidence".as_slice().into(),
-    }
+    people::Amendment { instructions: Some(words.into()), ..crate::fixtures::person_unchanged(b"new evidence") }
 }
 #[must_use]
 pub fn task_document(w: &mut World, task: u64, request: u64) -> documents::Task {

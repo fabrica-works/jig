@@ -81,6 +81,11 @@ pub enum Ask {
         words: Box<[u8]>,
         release: bool,
     },
+    /// Cancel a task, allowing it a grace to finish.
+    Cancel {
+        task: Task,
+        grace: Option<Duration>,
+    },
     /// Stop a current run.
     Stop {
         task: Task,
@@ -402,6 +407,7 @@ impl Party {
             }
             Ask::Say { task, words, release, .. } => Ask::Say { task: self.task(task)?, words, release },
             Ask::SeeChat { task, through } => Ask::SeeChat { task: self.task(task)?, through },
+            Ask::Cancel { task, grace } => Ask::Cancel { task: self.task(task)?, grace },
             Ask::Stop { task } => Ask::Stop { task: self.task(task)? },
             Ask::Release { task, revision, again } => Ask::Release { task: self.task(task)?, revision, again },
             Ask::Take { task } => Ask::Take { task: self.task(task)? },

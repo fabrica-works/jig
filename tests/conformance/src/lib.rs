@@ -634,3 +634,5 @@ pub mod replay;
 pub mod scenarios;
 
 pub mod negative;
+
+mod fixtures;

@@ -170,6 +170,10 @@ pub enum LimitKind {
     Question,
     /// The priority batch exceeds its bounds.
     Priority,
+    /// The cancel grace exceeds its span.
+    Grace,
+    /// The project has no room for another goal.
+    Goals,
     /// The policy payload exceeds its bounds.
     Policy,
     /// The resource payload exceeds its bounds.

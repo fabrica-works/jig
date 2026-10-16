@@ -5,3 +5,5 @@
 pub mod referee;
 mod world;
 pub use world::{ENDINGS, LIMITS, Settings, Stats, World, identity};
+
+pub mod fixtures;

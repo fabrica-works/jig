@@ -76,15 +76,7 @@ fn complete_policy_recipients_and_authority_refuse_a_shortened_receiving_form() 
         project: 1,
         task: 2,
         revision: core.tasks.task(2).unwrap().revisions.spec,
-        amendment: people::Amendment {
-            addressed: None,
-            instructions: None,
-            spec: None,
-            wake: None,
-            dependencies: None,
-            authority: None,
-            reason: Box::new([]),
-        },
+        amendment: fixtures::person_unchanged(b""),
         release: None,
     };
     assert_eq!(crate::acts::request(&core, &limits, 1, 1, Some(people::Role::Owner), &request), Ok(()));
@@ -144,7 +136,7 @@ fn cancellation_during_closing_and_release_of_a_held_closing_task_keep_the_owner
             1,
             1,
             Some(people::Role::Owner),
-            &people::Ask::Cancel { project: 1, task: 3, reason: b"cancel closing".as_slice().into() }
+            &people::Ask::Cancel { project: 1, task: 3, reason: b"cancel closing".as_slice().into(), grace: None }
         ),
         Ok(())
     );

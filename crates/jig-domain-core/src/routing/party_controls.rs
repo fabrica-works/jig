@@ -34,7 +34,7 @@ pub(super) fn amend_route(
                 return;
             }
         };
-    if let Err(why) = core.spec_revision(task, revision) {
+    if let Err(why) = core.party_amend_revision(task, revision, &amendment) {
         pool_refused(work, request, why);
         return;
     }
@@ -143,7 +143,7 @@ pub(super) fn stop_request(
     role: Option<people::Role>,
     ask: people::Ask,
 ) {
-    match core.control_admit(&ask, person, project, role, env.limits.tasks.depth, env.limits.tasks.result_bytes) {
+    match core.control_admit(&ask, person, project, role, &env.limits.tasks) {
         Ok(task) => {
             work.push(Event::Tasks(tasks::Event::Hold { task, why: tasks::Hold::StoppedBy { party: person } }));
             work.push(Event::People(people::Event::Decided { request, outcome: people::Outcome::Stopped { task } }));
@@ -165,10 +165,9 @@ pub(super) fn cancel_request(
     role: Option<people::Role>,
     ask: people::Ask,
 ) {
-    let admitted =
-        core.control_admit(&ask, person, project, role, env.limits.tasks.depth, env.limits.tasks.result_bytes);
-    let reason = match ask {
-        people::Ask::Cancel { reason, .. } => reason,
+    let admitted = core.control_admit(&ask, person, project, role, &env.limits.tasks);
+    let (reason, grace) = match ask {
+        people::Ask::Cancel { reason, grace, .. } => (reason, grace),
         people::Ask::MarkSeen { .. }
         | people::Ask::Close { .. }
         | people::Ask::Application { .. }
@@ -196,12 +195,21 @@ pub(super) fn cancel_request(
     };
     match admitted {
         Ok(task) => {
+            let message = if grace.is_some() {
+                let Some(message) = crate::fresh(&mut core.counters, crate::Family::Message) else {
+                    pool_refused(work, request, people::Refusal::Limit { which: people::LimitKind::Arithmetic });
+                    return;
+                };
+                Some(message)
+            } else {
+                None
+            };
             assert!(core.person_tasks.insert(request, PersonTaskRoute::Cancel(task)) == Ok(None), "one cancel route");
             work.push(Event::Tasks(tasks::Event::Control {
                 reply_to: ReplyTo::new(request),
                 by: tasks::Party::Person(person),
                 task,
-                control: tasks::Control::Cancel { reason, grace: None, message: None },
+                control: tasks::Control::Cancel { reason, grace, message },
             }));
         }
         Err(why) => {
@@ -221,7 +229,7 @@ pub(super) fn release_request(
     role: Option<people::Role>,
     ask: people::Ask,
 ) {
-    match core.control_admit(&ask, person, project, role, env.limits.tasks.depth, env.limits.tasks.result_bytes) {
+    match core.control_admit(&ask, person, project, role, &env.limits.tasks) {
         Ok(task) => {
             let (revision, again) = match ask {
                 people::Ask::Release { revision, again, .. } => (revision, again),

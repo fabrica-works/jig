@@ -37,7 +37,11 @@ fn a_read_waits_for_the_commit_in_flight_before_it() {
 fn a_task_read_after_it_ended_says_how_and_by_whom() {
     let mut world = world(762);
     let task = world.assigned.as_ref().expect("chat").task;
-    request(&mut world, 2, people::Ask::Cancel { project: 1, task, reason: b"withdrawn".as_slice().into() });
+    request(
+        &mut world,
+        2,
+        people::Ask::Cancel { project: 1, task, reason: b"withdrawn".as_slice().into(), grace: None },
+    );
     world.end(tasks::End::Parked, 0);
     ask(&mut world, 2, reads::Read::Task { task });
     let reads::Answer::Historical(value) = latest(&world) else { panic!("retained task") };
@@ -455,7 +459,7 @@ fn an_escalation_read_shows_its_latest_decision_and_its_hold() {
             decision: people::EscalationDecision::Reject { reason: b"stay stopped".as_slice().into() },
         },
     );
-    request(&mut world, 94, people::Ask::Cancel { project: 1, task, reason: b"end".as_slice().into() });
+    request(&mut world, 94, people::Ask::Cancel { project: 1, task, reason: b"end".as_slice().into(), grace: None });
     ask(&mut world, 902, reads::Read::Escalation { task });
     let reads::Past::Escalation { decision, hold, .. } = past(&world) else { panic!("escalation") };
     assert_eq!(decision.revision, 1);

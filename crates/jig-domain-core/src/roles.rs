@@ -120,8 +120,7 @@ impl Core {
         person: u64,
         project: u32,
         role: Option<people::Role>,
-        depth: u32,
-        result_bytes: u32,
+        limits: &tasks::Limits,
     ) -> Result<u64, people::Refusal> {
         let (task, kind, reason_len) = match ask {
             people::Ask::Stop { task, .. } => (*task, authority::RequestKind::Cancel, 0),
@@ -150,6 +149,11 @@ impl Core {
             | people::Ask::Create { .. }
             | people::Ask::SetGoal { .. } => unreachable!("control route owns its ask"),
         };
+        if let people::Ask::Cancel { grace: Some(span), .. } = ask
+            && *span > limits.grace
+        {
+            return Err(people::Refusal::Limit { which: people::LimitKind::Grace });
+        }
         let Some(context) = self.tasks.delegation(task) else { return Err(people::Refusal::Unknown) };
         let Some(holding) = role else { return Err(people::Refusal::Role { held: None }) };
         let any_task = match holding {
@@ -160,7 +164,7 @@ impl Core {
                 None => false,
             },
         };
-        let standing = self.person_tree(person, task, depth);
+        let standing = self.person_tree(person, task, limits.depth);
         if context.project != project || !any_task && !standing {
             return Err(people::Refusal::Unknown);
         }
@@ -186,7 +190,7 @@ impl Core {
         if checked.answer != authority::Answer::Allow {
             return Err(self.request_refusal(&ask, checked.answer, &mut findings));
         }
-        if reason_len > usize::try_from(result_bytes).expect("u32 fits usize") {
+        if reason_len > usize::try_from(limits.result_bytes).expect("u32 fits usize") {
             Err(people::Refusal::Limit { which: people::LimitKind::Words })
         } else {
             Ok(task)

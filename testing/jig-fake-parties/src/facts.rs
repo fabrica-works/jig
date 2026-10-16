@@ -162,6 +162,10 @@ pub enum LimitKind {
     Resource,
     /// The service payload exceeds its bounds.
     Service,
+    /// The cancel grace exceeds its span.
+    Grace,
+    /// The project has no room for another goal.
+    Goals,
 }
 
 /// A party in an ending fact, independent of the tasks child's vocabulary.

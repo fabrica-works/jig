@@ -77,7 +77,7 @@ mod tests;
 mod words;
 pub use amendment::{
     AddressChange, Amendment, Authority, Delegation, Executor, Grant, Last, Parameter, Pattern, PersonAddress,
-    ResourceScope, ResultsWake, Spec, WakePolicy, WakeRule, amendment_bytes, authority_bytes,
+    ResourceScope, ResultsWake, Spec, Tracking, WakePolicy, WakeRule, amendment_bytes, authority_bytes,
 };
 pub use boundary::{
     Adoption, Ask, Counts, Disposal, Entry, EntryKind, EscalationChoice, EscalationDecision, Event, Forgettable,

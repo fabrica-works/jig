@@ -118,3 +118,32 @@ pub(crate) fn ended_report(number: u64, requester: tasks::Party) -> tasks::TaskR
     row.last_reply = 2;
     row
 }
+
+pub(crate) fn unchanged(reason: &[u8]) -> tasks::Amendment {
+    tasks::Amendment {
+        tracked: None,
+        addressed: None,
+        instructions: None,
+        spec: None,
+        wake: None,
+        dependencies: None,
+        authority: None,
+        release: None,
+        reason: reason.into(),
+    }
+}
+
+/// An amendment retaining every field, with the supplied explanation.
+#[must_use]
+pub(crate) fn person_unchanged(reason: &[u8]) -> jig_domain_people::Amendment {
+    jig_domain_people::Amendment {
+        tracked: None,
+        addressed: None,
+        instructions: None,
+        spec: None,
+        wake: None,
+        dependencies: None,
+        authority: None,
+        reason: reason.into(),
+    }
+}

@@ -316,6 +316,9 @@ pub(crate) fn amendment_admit(
     limits: &tasks::Limits,
 ) -> Result<(bool, bool), people::Refusal> {
     standing::role(core, project, role, super::Act::Amend)?;
+    if amendment.tracked.is_some() {
+        standing::role(core, project, role, super::Act::Prioritise)?;
+    }
     let Some(context) = core.tasks.delegation(task) else { return Err(people::Refusal::Unknown) };
     let Some(role) = role else { return Err(people::Refusal::Role { held: None }) };
     let standing = core.person_tree(person, task, depth);

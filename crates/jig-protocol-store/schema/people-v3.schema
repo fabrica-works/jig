@@ -85,7 +85,9 @@ record WakeRuleBatch { count: u32 age: u64 }
 enum WakeRule { never, immediate, batch: WakeRuleBatch }
 enum ResultsWake { never, each, last_or_failure }
 record WakePolicy { words: WakeRule notices: WakeRule news: WakeRule results: ResultsWake questions: bool answers: bool timers: bool }
-record Amendment { addressed: option AddressChange instructions: option bytes 8192 spec: option Spec wake: option WakePolicy dependencies: option bytes 65536 authority: option Authority reason: bytes 8192 }
+record TrackingTracked { priority: u32 }
+enum Tracking { tracked: TrackingTracked, untracked }
+record Amendment { tracked: option Tracking addressed: option AddressChange instructions: option bytes 8192 spec: option Spec wake: option WakePolicy dependencies: option bytes 65536 authority: option Authority reason: bytes 8192 }
 record TaskExecutorAgent { charter: u32 }
 record TaskExecutorProcedure { connector: u16 code: u32 }
 record TaskExecutorPerson { address: PersonAddress }
@@ -115,7 +117,7 @@ record AskMakeService { project: u32 name: bytes 8192 role: Role }
 record AskAdopt { project: u32 adoption: Adoption }
 record AskSetGoal { project: u32 spec: bytes 8192 executor: GoalExecutor budget: u64 priority: u32 deadline: option u64 }
 record AskStop { project: u32 task: u64 }
-record AskCancel { project: u32 task: u64 reason: bytes 8192 }
+record AskCancel { project: u32 task: u64 reason: bytes 8192 grace: option u64 }
 record AskRelease { project: u32 task: u64 revision: u64 again: option bool }
 record AskTakePerson { project: u32 task: u64 }
 record AskHandBackPerson { project: u32 task: u64 }
@@ -169,7 +171,7 @@ record LackFailed { connector: u16 kind: u16 }
 record LackUnguarded { connector: u16 kind: u16 }
 record LackTaskKind { executor: option TaskExecutor }
 enum Lack { approver, budget: LackBudget, grant: LackGrant, funding, task_kind: LackTaskKind, depth: LackDepth, deadline, tasks: LackTasks, tool, scope, reference, resource_access, resource_unavailable, shape, again: LackAgain, account, writer, required: LackRequired, failed: LackFailed, unguarded: LackUnguarded }
-enum LimitKind { words, identity, roles, arithmetic, duplicate, empty, batch, project_live_tasks, live_tasks, tree, depth, delegates, subscription, dependencies, cycle, spec, contract, authority, inputs, attempts, live_delegates, restore, read, turn, hold_kind, hold_taken, holds, inbox_full, notes, revision, question, priority, policy, resource, service }
+enum LimitKind { words, identity, roles, arithmetic, duplicate, empty, batch, project_live_tasks, live_tasks, tree, depth, delegates, subscription, dependencies, cycle, spec, contract, authority, inputs, attempts, live_delegates, restore, read, turn, hold_kind, hold_taken, holds, inbox_full, notes, revision, question, priority, policy, resource, service, grace, goals }
 record RefusalDisposal { task: u64 issue: DisposalIssue }
 record RefusalRole { held: option Role }
 record AccepterRole { role: u32 }

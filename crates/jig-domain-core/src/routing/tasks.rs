@@ -1407,6 +1407,16 @@ pub(super) fn route_tasks(
         return super::procedure_steps::apply(core, env, *task, *step, event);
     }
     let mut out = Queue::with_capacity(tasks::max_out(&env.limits.tasks));
+    if let tasks::Event::Amend { task, amendment, .. } = &event
+        && let Some(tasks::Tracking::Tracked { .. }) = amendment.tracked
+        && let Some(row) = core.tasks.task(*task)
+        && row.tracked.is_none()
+        && core.projections.len() >= env.limits.tasks.tasks
+    {
+        let tasks::Event::Amend { task, reply_to, .. } = event else { unreachable!("checked amendment") };
+        out.push(tasks::Request::Refused { reply_to, problem: tasks::Problem::new(Some(task), tasks::Refusal::Goals) });
+        return tag_tasks(core, env, out, tasks::max_out(&env.limits.tasks), false, false, false);
+    }
     if let tasks::Event::Make { batch, .. } = &event {
         let mut tracked = 0_u32;
         for row in batch {

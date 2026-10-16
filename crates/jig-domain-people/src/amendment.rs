@@ -8,6 +8,8 @@ use skein_lib::{Duration, Wall};
 /// A person's whole optional task edit and bounded explanation.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Amendment {
+    /// Track at a priority, or untrack, by a maintainer.
+    pub tracked: Option<Tracking>,
     /// Re-address a person task, naming its displayed person-task revision.
     pub addressed: Option<AddressChange>,
     /// Replace the agent task's instructions; an empty value clears them.
@@ -17,6 +19,15 @@ pub struct Amendment {
     pub dependencies: Option<Box<[u64]>>,
     pub authority: Option<Authority>,
     pub reason: Box<[u8]>,
+}
+
+/// Whether a task is tracked at a priority.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Tracking {
+    /// A goal at this priority.
+    Tracked { priority: u32 },
+    /// No goal from this decision.
+    Untracked,
 }
 
 /// A person task's whole address replacement and independent decision revision.

@@ -78,7 +78,7 @@ pub(crate) fn ask(record: w::Ask, limits: &w::Limits) -> Result<p::Ask, Untransl
         }
         w::Ask::Cancel(value) => {
             let v = value.into_parts();
-            p::Ask::Cancel { project: v.project, task: v.task, reason: v.reason }
+            p::Ask::Cancel { project: v.project, task: v.task, reason: v.reason, grace: None }
         }
         w::Ask::TakeOver(value) => {
             let v = value.into_parts();
@@ -337,6 +337,7 @@ fn amendment(value: w::Amendment, reason: Box<[u8]>, limits: &w::Limits) -> Resu
         None => None,
     };
     Ok(p::Amendment {
+        tracked: None,
         addressed: match v.addressed {
             Some(value) => Some(address(value)),
             None => None,

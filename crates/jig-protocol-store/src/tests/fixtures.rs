@@ -419,6 +419,7 @@ pub fn people_policy() -> people::PolicyValue {
 
 pub fn people_amendment() -> people::Amendment {
     people::Amendment {
+        tracked: Some(people::Tracking::Tracked { priority: 7 }),
         addressed: Some(people::AddressChange { revision: 7, address: people::PersonAddress::Role(4) }),
         instructions: Some(Box::new([0, 255])),
         spec: Some(people::Spec {
@@ -441,7 +442,7 @@ pub fn people_amendment() -> people::Amendment {
         }),
         dependencies: Some(Box::new([9])),
         authority: Some(people_authority()),
-        reason: Box::new([2]),
+        ..person_unchanged(&[2])
     }
 }
 
@@ -518,7 +519,7 @@ pub fn people_asks() -> Box<[people::Ask]> {
             deadline: Some(skein_lib::Wall::from_nanos(5)),
         },
         Ask::Stop { project: 1, task: 2 },
-        Ask::Cancel { project: 1, task: 2, reason: Box::new([3]) },
+        Ask::Cancel { project: 1, task: 2, reason: Box::new([3]), grace: Some(skein_lib::Duration::from_secs(5)) },
         Ask::Release { project: 1, task: 2, revision: 3, again: Some(true) },
         Ask::TakePerson { project: 1, task: 2 },
         Ask::HandBackPerson { project: 1, task: 2 },
@@ -673,3 +674,18 @@ pub use store::{
 
 pub use store::limits as store_limits;
 pub use store::{Answer, events, opened_with_transcripts, script, written};
+
+/// An amendment retaining every field, with the supplied explanation.
+#[must_use]
+pub fn person_unchanged(reason: &[u8]) -> jig_domain_people::Amendment {
+    jig_domain_people::Amendment {
+        tracked: None,
+        addressed: None,
+        instructions: None,
+        spec: None,
+        wake: None,
+        dependencies: None,
+        authority: None,
+        reason: reason.into(),
+    }
+}

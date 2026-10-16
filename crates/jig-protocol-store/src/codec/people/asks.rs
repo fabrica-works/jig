@@ -407,9 +407,17 @@ pub fn encode_ask(value: &domain::Ask, limits: &wire::Limits) -> Result<wire::As
         domain::Ask::Stop { project, task } => {
             wire::Ask::Stop(wire::AskStop::new(limits, wire::AskStopParts { project: *project, task: *task })?)
         }
-        domain::Ask::Cancel { project, task, reason } => wire::Ask::Cancel(wire::AskCancel::new(
+        domain::Ask::Cancel { project, task, reason, grace } => wire::Ask::Cancel(wire::AskCancel::new(
             limits,
-            wire::AskCancelParts { project: *project, task: *task, reason: reason.clone() },
+            wire::AskCancelParts {
+                project: *project,
+                task: *task,
+                reason: reason.clone(),
+                grace: match grace {
+                    Some(span) => Some(span.as_nanos()),
+                    None => None,
+                },
+            },
         )?),
         domain::Ask::Release { project, task, revision, again } => wire::Ask::Release(wire::AskRelease::new(
             limits,
@@ -565,8 +573,16 @@ pub fn decode_ask(value: wire::Ask, limits: &wire::Limits) -> Result<domain::Ask
             domain::Ask::Stop { project, task }
         }
         wire::Ask::Cancel(value) => {
-            let wire::AskCancelParts { project, task, reason } = value.into_parts();
-            domain::Ask::Cancel { project, task, reason }
+            let wire::AskCancelParts { project, task, reason, grace } = value.into_parts();
+            domain::Ask::Cancel {
+                project,
+                task,
+                reason,
+                grace: match grace {
+                    Some(span) => Some(skein_lib::Duration::from_nanos(span)),
+                    None => None,
+                },
+            }
         }
         wire::Ask::Release(value) => {
             let wire::AskReleaseParts { project, task, revision, again } = value.into_parts();

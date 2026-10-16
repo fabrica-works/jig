@@ -214,6 +214,12 @@ impl Peers {
                     parties::Ask::Say { task, words, release, .. } => {
                         people::Ask::Say { project, task: task_number(task), words, release }
                     }
+                    parties::Ask::Cancel { task, grace } => people::Ask::Cancel {
+                        project,
+                        task: task_number(task),
+                        reason: b"cancelled".as_slice().into(),
+                        grace,
+                    },
                     parties::Ask::Stop { task } => people::Ask::Stop { project, task: task_number(task) },
                     parties::Ask::Release { task, revision, again } => {
                         people::Ask::Release { project, task: task_number(task), revision, again }
@@ -698,6 +704,8 @@ fn party_limit(value: people::LimitKind) -> parties::LimitKind {
         people::LimitKind::Priority => parties::LimitKind::Priority,
         people::LimitKind::Policy => parties::LimitKind::Policy,
         people::LimitKind::Resource => parties::LimitKind::Resource,
+        people::LimitKind::Grace => parties::LimitKind::Grace,
+        people::LimitKind::Goals => parties::LimitKind::Goals,
         people::LimitKind::Service => parties::LimitKind::Service,
     }
 }

@@ -137,3 +137,18 @@ pub fn refusal(world: &crate::effects::World, why: jig_domain_people::Refusal) {
     use jig_domain_people as people;
     assert_eq!(world.people_answers.last(), Some(&people::Reply::Outcome(people::Outcome::Refused(why))));
 }
+
+/// A person's amendment retaining each field.
+#[must_use]
+pub fn person_unchanged(reason: &[u8]) -> jig_domain_people::Amendment {
+    jig_domain_people::Amendment {
+        tracked: None,
+        addressed: None,
+        instructions: None,
+        spec: None,
+        wake: None,
+        dependencies: None,
+        authority: None,
+        reason: reason.into(),
+    }
+}

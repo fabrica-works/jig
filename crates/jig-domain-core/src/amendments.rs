@@ -78,6 +78,36 @@ impl Core {
         Ok(stop_run)
     }
 
+    /// A priority alone does not compare the task's specification revision.
+    pub(crate) fn party_amend_revision(
+        &self,
+        task: u64,
+        revision: u64,
+        amendment: &tasks::Amendment,
+    ) -> Result<(), people::Refusal> {
+        let tracked = match self.tasks.task(task) {
+            Some(row) => row.tracked.is_some(),
+            None => false,
+        };
+        let priority = match amendment.tracked {
+            Some(tasks::Tracking::Tracked { .. }) => true,
+            Some(tasks::Tracking::Untracked) | None => false,
+        };
+        if priority
+            && tracked
+            && amendment.addressed.is_none()
+            && amendment.instructions.is_none()
+            && amendment.spec.is_none()
+            && amendment.wake.is_none()
+            && amendment.dependencies.is_none()
+            && amendment.authority.is_none()
+        {
+            Ok(())
+        } else {
+            self.spec_revision(task, revision)
+        }
+    }
+
     /// Return whether to stop a current run and whether widening must be
     /// offered to a policy holder as a proposal.
     #[expect(clippy::too_many_arguments, reason = "one amendment carries its authenticated party, task and limits")]
@@ -206,7 +236,11 @@ pub(crate) fn granted(value: people::Authority, limits: &tasks::Limits) -> Optio
 #[expect(clippy::manual_map, reason = "the step subset spells out both option cases without a closure")]
 pub(crate) fn translate(value: people::Amendment, limits: &tasks::Limits) -> Option<tasks::Amendment> {
     Some(tasks::Amendment {
-        tracked: None,
+        tracked: match value.tracked {
+            Some(people::Tracking::Tracked { priority }) => Some(tasks::Tracking::Tracked { priority }),
+            Some(people::Tracking::Untracked) => Some(tasks::Tracking::Untracked),
+            None => None,
+        },
         addressed: match value.addressed {
             Some(change) => Some(tasks::AddressChange {
                 revision: change.revision,

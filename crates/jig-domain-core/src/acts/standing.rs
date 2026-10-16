@@ -12,8 +12,10 @@ pub(crate) fn role(core: &Core, project: u32, held: Option<people::Role>, act: A
             if held == Some(people::Role::Owner) { Ok(()) } else { Err(people::Refusal::Role { held }) }
         }
         Act::Prioritise => match held {
-            Some(people::Role::Owner | people::Role::Maintainer | people::Role::Policy { .. }) => Ok(()),
-            Some(people::Role::Member | people::Role::Observer) | None => Err(people::Refusal::Role { held }),
+            Some(people::Role::Owner | people::Role::Maintainer) => Ok(()),
+            Some(people::Role::Member | people::Role::Observer | people::Role::Policy { .. }) | None => {
+                Err(people::Refusal::Role { held })
+            }
         },
         Act::Write
         | Act::Answer

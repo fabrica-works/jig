@@ -1136,21 +1136,7 @@ fn a_decisions_revision_is_part_of_its_keyed_payload_and_moved_facts_replay() {
     let asks = [
         Ask::Release { project: 1, task: 7, revision: 1, again: None },
         Ask::AnswerPerson { project: 1, task: 7, revision: 1, result: PersonResult::Report { words: Box::new([1]) } },
-        Ask::Amend {
-            release: None,
-            project: 1,
-            task: 7,
-            revision: 1,
-            amendment: Amendment {
-                addressed: None,
-                instructions: None,
-                spec: None,
-                wake: None,
-                dependencies: None,
-                authority: None,
-                reason: Box::new([]),
-            },
-        },
+        Ask::Amend { release: None, project: 1, task: 7, revision: 1, amendment: fixtures::unchanged(b"") },
     ];
     let facts = [
         Moved::Hold { revision: 2, reason: HoldReason::Budget },
@@ -1402,15 +1388,7 @@ fn a_role_need_leaves_every_holders_count_when_one_acts() {
 fn an_amendment_answer_keeps_the_release_fact_and_named_hold_in_its_key() {
     let mut test = Test::new(LIMITS);
     test.member();
-    let change = Amendment {
-        addressed: None,
-        instructions: None,
-        spec: None,
-        wake: None,
-        dependencies: None,
-        authority: None,
-        reason: Box::new([]),
-    };
+    let change = fixtures::unchanged(b"");
     let ask = Ask::Amend { project: 1, task: 7, revision: 1, amendment: change.clone(), release: Some(2) };
     let request = route(&test.request(10, 1, ask.clone()));
     let outcome = Outcome::Amended { task: 7, released: true };
@@ -1619,3 +1597,4 @@ mod utf8;
 mod create;
 
 mod application_scope;
+mod fixtures;

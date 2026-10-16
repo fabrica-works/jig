@@ -38,7 +38,9 @@ pub(super) fn admit(core: &Core, limits: &Limits, party: u64, act: Act, number: 
         Act::Stop | Act::Cancel | Act::Release => {
             let ask = match act {
                 Act::Stop => people::Ask::Stop { project: row.project, task: number },
-                Act::Cancel => people::Ask::Cancel { project: row.project, task: number, reason: Box::new([]) },
+                Act::Cancel => {
+                    people::Ask::Cancel { project: row.project, task: number, reason: Box::new([]), grace: None }
+                }
                 Act::Release => people::Ask::Release {
                     project: row.project,
                     task: number,
@@ -68,9 +70,7 @@ pub(super) fn admit(core: &Core, limits: &Limits, party: u64, act: Act, number: 
                 | Act::MakeService
                 | Act::SetPool => unreachable!("control act selected"),
             };
-            if let Err(why) =
-                core.control_admit(&ask, party, row.project, held, limits.tasks.depth, limits.tasks.result_bytes)
-            {
+            if let Err(why) = core.control_admit(&ask, party, row.project, held, &limits.tasks) {
                 return Admission::Refused(why);
             }
             if act == Act::Stop

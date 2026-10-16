@@ -60,7 +60,7 @@ pub fn ask(value: &client::Ask) -> Result<people::Ask, Invalid> {
         }
         client::Ask::Stop { project, task } => people::Ask::Stop { project: *project, task: *task },
         client::Ask::Cancel { project, task, reason } => {
-            people::Ask::Cancel { project: *project, task: *task, reason: Box::from(reason.bytes()) }
+            people::Ask::Cancel { project: *project, task: *task, reason: Box::from(reason.bytes()), grace: None }
         }
         client::Ask::Close { project, chat, disposals } => {
             let mut result = List::with_capacity(disposals.capacity());
@@ -114,6 +114,7 @@ pub fn ask(value: &client::Ask) -> Result<people::Ask, Invalid> {
             task: *task,
             revision: revision.value,
             amendment: people::Amendment {
+                tracked: None,
                 addressed: change.addressed.map(|value| people::AddressChange {
                     revision: value.revision.value,
                     address: match value.address {

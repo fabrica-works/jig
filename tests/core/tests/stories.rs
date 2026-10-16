@@ -308,7 +308,11 @@ fn a_goal_cancelled_with_live_runs_and_an_effect_in_flight_closes_deepest_first(
     world.call(1, 9301);
     assert_eq!(world.pending_writes.len(), 1, "the effect is committed and in flight");
     assert_eq!(world.call_key(1).task, grandchild);
-    ask(&mut world, 45, people::Ask::Cancel { project: 1, task: child, reason: b"goal withdrawn".as_slice().into() });
+    ask(
+        &mut world,
+        45,
+        people::Ask::Cancel { project: 1, task: child, reason: b"goal withdrawn".as_slice().into(), grace: None },
+    );
     assert_eq!(world.cancellations, [grandchild_run, child_run]);
     for run in [grandchild_run, child_run] {
         world.send(root::Event::Answer {
@@ -906,13 +910,8 @@ fn a_context_adoption_still_refuses_effects_after_a_cold_restart() {
 
 fn amendment(words: &[u8]) -> people::Amendment {
     people::Amendment {
-        addressed: None,
-        instructions: None,
         spec: Some(people::Spec { words: words.into(), parameters: Box::new([]), inputs: Box::new([]) }),
-        wake: None,
-        dependencies: None,
-        authority: None,
-        reason: b"new evidence".as_slice().into(),
+        ..jig_core_world::fixtures::person_unchanged(b"new evidence")
     }
 }
 
@@ -1029,7 +1028,7 @@ fn a_party_deciding_a_cancelled_task_hears_who_cancelled_it_and_when() {
         tasks::Party::Person(person) => person,
         tasks::Party::Task(_) | tasks::Party::Deployment { .. } => panic!("person's chat"),
     };
-    ask(&mut world, 58, people::Ask::Cancel { project: 1, task, reason: b"finished".as_slice().into() });
+    ask(&mut world, 58, people::Ask::Cancel { project: 1, task, reason: b"finished".as_slice().into(), grace: None });
     let tasks::Phase::Closing(tasks::Closing { ending: tasks::Ending::Cancelled { at, .. }, .. }) =
         &live_row(&world, task).phase
     else {

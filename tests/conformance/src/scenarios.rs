@@ -244,17 +244,12 @@ impl Continuation {
                             revision: 0,
                             release: None,
                             amendment: people::Amendment {
-                                addressed: None,
-                                instructions: None,
-                                wake: None,
-                                dependencies: None,
-                                authority: None,
-                                reason: b"party evidence".as_slice().into(),
                                 spec: Some(people::Spec {
                                     words: b"party choice".as_slice().into(),
                                     parameters: Box::new([]),
                                     inputs: Box::new([]),
                                 }),
+                                ..crate::fixtures::person_unchanged(b"party evidence")
                             },
                         },
                     );

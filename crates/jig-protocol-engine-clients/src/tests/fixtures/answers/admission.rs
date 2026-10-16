@@ -21,7 +21,7 @@ pub fn admission_0() -> [(p::LimitKind, w::AdmissionLimit); 18] {
         (p::LimitKind::Authority, w::AdmissionLimit::Authority),
     ]
 }
-pub fn admission_1() -> [(p::LimitKind, w::AdmissionLimit); 17] {
+pub fn admission_1() -> [(p::LimitKind, w::AdmissionLimit); 19] {
     [
         (p::LimitKind::Inputs, w::AdmissionLimit::Inputs),
         (p::LimitKind::Attempts, w::AdmissionLimit::Attempts),
@@ -40,6 +40,8 @@ pub fn admission_1() -> [(p::LimitKind, w::AdmissionLimit); 17] {
         (p::LimitKind::Policy, w::AdmissionLimit::Policy),
         (p::LimitKind::Resource, w::AdmissionLimit::Resource),
         (p::LimitKind::Service, w::AdmissionLimit::Service),
+        (p::LimitKind::Grace, w::AdmissionLimit::Spec),
+        (p::LimitKind::Goals, w::AdmissionLimit::ProjectLiveTasks),
     ]
 }
 pub fn admission_refusal(which: w::AdmissionLimit) -> w::Refusal {

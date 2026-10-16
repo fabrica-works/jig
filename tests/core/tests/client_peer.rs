@@ -162,7 +162,7 @@ fn a_watched_task_query_is_delivered_again_when_its_task_ends() {
         reply_to: ReplyTo::new(Token::new(CANCEL_REPLY)),
         sign_in,
         key: [47; 16],
-        ask: people::Ask::Cancel { project: 1, task, reason: Box::from(&b"finished"[..]) },
+        ask: people::Ask::Cancel { project: 1, task, reason: Box::from(&b"finished"[..]), grace: None },
     })));
     world.send(root::Event::Core(core::Event::Delivered { watcher: Token::new(QUERY_WATCHER) }));
     let (durable, root::Delivery::Core(core::Held::Delivery { document, .. })) = world

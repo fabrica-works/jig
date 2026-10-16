@@ -468,7 +468,7 @@ fn task_controls_owner_changes_priorities_and_note_scopes_share_their_judges() {
     set_role_authority(&mut core.authority, given);
     for (act, ask, number) in [
         (Act::Stop, people::Ask::Stop { project: 1, task: 2 }, 2),
-        (Act::Cancel, people::Ask::Cancel { project: 1, task: 2, reason: b"done".as_slice().into() }, 2),
+        (Act::Cancel, people::Ask::Cancel { project: 1, task: 2, reason: b"done".as_slice().into(), grace: None }, 2),
         (
             Act::Release,
             people::Ask::Release {
@@ -481,10 +481,7 @@ fn task_controls_owner_changes_priorities_and_note_scopes_share_their_judges() {
         ),
     ] {
         assert_eq!(offers::admit(&core, &limits, 1, act, &Subject::Task { task: number }), Admission::Allowed);
-        assert_eq!(
-            core.control_admit(&ask, 1, 1, Some(people::Role::Owner), limits.tasks.depth, limits.tasks.result_bytes),
-            Ok(number)
-        );
+        assert_eq!(core.control_admit(&ask, 1, 1, Some(people::Role::Owner), &limits.tasks), Ok(number));
     }
     let why = people::Refusal::Authority {
         lacking: people::Lack::Tasks { left: 3 },
@@ -990,3 +987,5 @@ mod kind_order;
 mod escalation;
 
 mod proposals;
+
+mod tracking;

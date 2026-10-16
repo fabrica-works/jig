@@ -52,13 +52,9 @@ fn an_amendment_record_keeps_its_release_and_reason() {
                 revision: 6,
                 release: expected_release,
                 amendment: p::Amendment {
-                    addressed: None,
                     instructions: Some(Box::new([])),
-                    spec: None,
-                    wake: None,
                     dependencies: Some(Box::new([])),
-                    authority: None,
-                    reason: Box::from(reason)
+                    ..f::person_unchanged(reason)
                 }
             })
         );

@@ -591,10 +591,17 @@ pub(crate) fn encode_amendment(
     limits: &wire::Limits,
 ) -> Result<wire::Amendment, wire::Problem> {
     check_amendment(value, limits)?;
-    let domain::Amendment { addressed, instructions, spec, wake, dependencies, authority, reason } = value;
+    let domain::Amendment { tracked, addressed, instructions, spec, wake, dependencies, authority, reason } = value;
     wire::Amendment::new(
         limits,
         wire::AmendmentParts {
+            tracked: match tracked {
+                Some(domain::Tracking::Tracked { priority }) => Some(wire::Tracking::Tracked(
+                    wire::TrackingTracked::new(limits, wire::TrackingTrackedParts { priority: *priority })?,
+                )),
+                Some(domain::Tracking::Untracked) => Some(wire::Tracking::Untracked),
+                None => None,
+            },
             addressed: match addressed {
                 Some(value) => Some(encode_address_change(value, limits)?),
                 None => None,
@@ -630,9 +637,16 @@ pub(crate) fn decode_amendment(
     value: wire::Amendment,
     limits: &wire::Limits,
 ) -> Result<domain::Amendment, wire::Problem> {
-    let wire::AmendmentParts { addressed, instructions, spec, wake, dependencies, authority, reason } =
+    let wire::AmendmentParts { tracked, addressed, instructions, spec, wake, dependencies, authority, reason } =
         value.into_parts();
     let value = domain::Amendment {
+        tracked: match tracked {
+            Some(wire::Tracking::Tracked(value)) => {
+                Some(domain::Tracking::Tracked { priority: value.into_parts().priority })
+            }
+            Some(wire::Tracking::Untracked) => Some(domain::Tracking::Untracked),
+            None => None,
+        },
         addressed: match addressed {
             Some(value) => Some(decode_address_change(value)),
             None => None,

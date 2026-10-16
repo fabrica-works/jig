@@ -5,7 +5,7 @@
 
 use crate::Refusal;
 use alloc::boxed::Box;
-use skein_lib::{List, ReplyTo, Token, Wall};
+use skein_lib::{Duration, List, ReplyTo, Token, Wall};
 
 /// A task-derived recipient, retained only as a bounded inbox reference.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
@@ -292,8 +292,8 @@ pub enum Ask {
     },
     /// Hold a live run for this person's decision, cancelling its current claim.
     Stop { project: u32, task: u64 },
-    /// Cancel a task and its descendants with a bounded reason.
-    Cancel { project: u32, task: u64, reason: Box<[u8]> },
+    /// Cancel a task and its descendants with a bounded reason, at once or after a grace.
+    Cancel { project: u32, task: u64, reason: Box<[u8]>, grace: Option<Duration> },
     /// Lift a held task's cause and rejudge it.
     Release { project: u32, task: u64, revision: u64, again: Option<bool> },
     /// Claim one role-addressed person task for this authenticated person.
@@ -313,6 +313,7 @@ pub enum Ask {
     /// Set the priorities of a bounded set of current project goals together.
     Prioritise { project: u32, goals: Box<[(u64, u32)]> },
     /// Amend a live task this person may steer, after root policy and funding checks.
+    /// A priority-only edit of a tracked task names spec revision zero.
     Amend { project: u32, task: u64, revision: u64, amendment: crate::Amendment, release: Option<u64> },
     /// Authenticated Owner's complete project roster replacement; root checks Policy permission and
     /// held-recipient preflight before applying it.

@@ -446,17 +446,12 @@ fn an_amendment_on_a_spec_amended_meanwhile_is_refused_with_its_revision() {
         task: 7,
         revision: 1,
         amendment: jig_domain_people::Amendment {
-            addressed: None,
-            instructions: None,
             spec: Some(jig_domain_people::Spec {
                 words: b"new words".as_slice().into(),
                 parameters: Box::new([]),
                 inputs: Box::new([]),
             }),
-            wake: None,
-            dependencies: None,
-            authority: None,
-            reason: b"new evidence".as_slice().into(),
+            ..jig_people_world::fixtures::person_unchanged(b"new evidence")
         },
     };
     let call = world.request(10, [8; 16], ask.clone());
@@ -576,17 +571,12 @@ fn an_uncertain_effect_released_without_making_it_again_tells_its_executor() {
 
 fn edit() -> jig_domain_people::Amendment {
     jig_domain_people::Amendment {
-        addressed: None,
-        instructions: None,
         spec: Some(jig_domain_people::Spec {
             words: b"changed".as_slice().into(),
             parameters: Box::new([]),
             inputs: Box::new([]),
         }),
-        wake: None,
-        dependencies: None,
-        authority: None,
-        reason: b"evidence".as_slice().into(),
+        ..jig_people_world::fixtures::person_unchanged(b"evidence")
     }
 }
 
