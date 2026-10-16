@@ -155,8 +155,9 @@ pub(crate) fn save(core: &mut Core, limits: &Limits, row: &tasks::TaskRecord, ou
             )
             .expect("tracked projection room admitted");
     }
-    let Some(state) = core.projections.get_mut(&row.root) else { return };
-    if row.number == row.root {
+    let Some(number) = core.goal_of(row) else { return };
+    let Some(state) = core.projections.get_mut(&number) else { return };
+    if row.number == number {
         let next = goal(row);
         state.changed |= state.goal != next;
         state.goal = next;
@@ -186,7 +187,7 @@ pub(crate) fn save(core: &mut Core, limits: &Limits, row: &tasks::TaskRecord, ou
     write(
         out,
         ProjectionRecord::Task {
-            goal: row.root,
+            goal: number,
             task: ProjectionTask {
                 number: row.number,
                 requester: row.requester,
@@ -205,8 +206,11 @@ pub(crate) fn history(
     milestone: ProjectionMilestone,
     out: &mut Queue<Request>,
 ) {
-    let root = match core.tasks.root(task) {
-        Some(root) => root,
+    let root = match core.tasks.task(task) {
+        Some(row) => {
+            let Some(goal) = core.goal_of(row) else { return };
+            goal
+        }
         None => {
             let mut root = None;
             for (number, projection) in &core.projections {

@@ -171,7 +171,9 @@ impl Core {
                 let scope = match scope {
                     notes::Scope::Deployment => authority::NoteScope::Deployment,
                     notes::Scope::Project { project } if project == task.project => authority::NoteScope::Project,
-                    notes::Scope::Goal { project, goal } if project == task.project && goal == task.root => {
+                    notes::Scope::Goal { project, goal }
+                        if project == task.project && Some(goal) == self.goal_of(task) =>
+                    {
                         authority::NoteScope::Goal
                     }
                     notes::Scope::Resources { project, connector, pattern } if project == task.project => {
@@ -250,7 +252,7 @@ impl Core {
         match scope {
             notes::Scope::Deployment => true,
             notes::Scope::Project { project } | notes::Scope::Resources { project, .. } => *project == row.project,
-            notes::Scope::Goal { project, goal } => *project == row.project && *goal == row.root,
+            notes::Scope::Goal { project, goal } => *project == row.project && Some(*goal) == self.goal_of(row),
         }
     }
 }

@@ -221,7 +221,9 @@ pub(super) fn start_brief(core: &mut Core, env: &Env<Limits>, work: &mut Queue<E
         return Requests::Out(out);
     }
     let mut scopes = List::with_capacity(env.limits.notes.scopes);
-    scopes.push(notes::Scope::Goal { project: context.project, goal: current.root }).expect("goal scope room");
+    if let Some(goal) = core.goal_of(current) {
+        scopes.push(notes::Scope::Goal { project: context.project, goal }).expect("goal scope room");
+    }
     scopes.push(notes::Scope::Project { project: context.project }).expect("project scope room");
     scopes.push(notes::Scope::Deployment).expect("deployment scope room");
     for resource in &context.authority.note_resources {

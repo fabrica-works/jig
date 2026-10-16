@@ -190,11 +190,7 @@ pub(super) fn touch_task(core: &mut Core, limits: &Limits, row: &tasks::TaskReco
             tasks::Party::Person(_) | tasks::Party::Deployment { .. } => break,
         };
     }
-    let goal = row.tracked.is_some()
-        || match core.tasks.task(row.root) {
-            Some(root) => root.tracked.is_some(),
-            None => false,
-        };
+    let goal = core.goal_of(row).is_some();
     let root = match core.tasks.task(row.root) {
         Some(root) => root,
         None => row,

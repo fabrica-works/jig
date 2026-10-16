@@ -2991,3 +2991,5 @@ use funding_fixtures::set_role_authority;
 mod read_activity;
 
 mod own_watches;
+
+mod goal_of;

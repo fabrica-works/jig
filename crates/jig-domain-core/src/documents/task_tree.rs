@@ -654,7 +654,7 @@ pub fn task_from_row(core: &Core, limits: &Limits, party: u64, row: &tasks::Task
     let mut lineage = List::with_capacity(limits.documents.lines);
     let mut ancestor = row.requester;
     let mut cut = false;
-    let mut goal = if row.tracked.is_some() { Some(row.number) } else { None };
+    let goal = core.goal_of(row);
     for _ in 0..limits.tasks.depth {
         match ancestor {
             tasks::Party::Task(parent) => {
@@ -666,9 +666,6 @@ pub fn task_from_row(core: &Core, limits: &Limits, party: u64, row: &tasks::Task
                     }
                     Err(why @ (Missing::NotAllowed | Missing::TooLarge)) => return Err(why),
                 };
-                if parent_row.tracked.is_some() {
-                    goal = Some(parent);
-                }
                 if lineage.room() > 0 {
                     lineage.push(super::small::chip(core, limits, party, parent)?).expect("lineage room checked");
                 } else {

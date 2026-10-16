@@ -26,6 +26,7 @@ pub mod waits;
 pub use effects::{EffectKey, EffectOrigin, EffectPurpose, effect_worst_case};
 mod chats;
 mod funding;
+mod goal_of;
 mod goals;
 mod historical;
 mod inbox;

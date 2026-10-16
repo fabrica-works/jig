@@ -87,15 +87,6 @@ fn phase_matches(phase: &tasks::Phase, selected: TaskPhase) -> bool {
         tasks::Phase::Ended(_) => false,
     }
 }
-fn goal(core: &Core, row: &tasks::TaskRecord) -> Option<u64> {
-    if row.tracked.is_some() {
-        return Some(row.number);
-    }
-    match core.tasks.task(row.root) {
-        Some(root) if root.tracked.is_some() => Some(root.number),
-        Some(_) | None => None,
-    }
-}
 fn matches(core: &Core, row: &tasks::TaskRecord, party: u64, filter: &TaskFilter) -> bool {
     if let Some(phase) = filter.phase
         && !phase_matches(&row.phase, phase)
@@ -108,7 +99,7 @@ fn matches(core: &Core, row: &tasks::TaskRecord, party: u64, filter: &TaskFilter
         return false;
     }
     if let Some(selected) = filter.goal
-        && goal(core, row) != Some(selected)
+        && core.goal_of(row) != Some(selected)
     {
         return false;
     }
@@ -150,7 +141,7 @@ pub(super) fn make(
         let row = core.tasks.task(*number).expect("ordered live task");
         rows.push(TaskLine {
             chip: super::small::chip_with_core(core, limits, row)?,
-            goal: goal(core, row),
+            goal: core.goal_of(row),
             requester: row.requester,
             asked_by_me: row.requester == tasks::Party::Person(party),
             changed: row.changed,

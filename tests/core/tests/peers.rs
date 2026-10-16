@@ -97,10 +97,13 @@ fn three_workers_and_the_engines_own_slot_use_the_same_host_scripts() {
         })
         .collect();
     let mut world = World::scripted(config, limits, Peers::new(workers, vec![party(7, Role::Owner, 10_000)]));
-    let requests = (1..=4)
-        .map(|key| Act::Request { key: [key; 16], ask: Ask::Chat { words: Box::from(&b"hello"[..]) } })
-        .collect();
-    acts(&mut world, 0, requests);
+    for key in 1..=4 {
+        acts(
+            &mut world,
+            0,
+            Box::new([Act::Request { key: [key; 16], ask: Ask::Chat { words: Box::from(&b"hello"[..]) } }]),
+        );
+    }
     let peers = world.peers.as_ref().expect("peers");
     assert!(peers.workers.iter().all(|worker| worker.seen.len() == 1), "all four configured hosts ran work");
     let tasks: Vec<_> = peers.workers.iter().map(|worker| worker.seen[0].task).collect();
