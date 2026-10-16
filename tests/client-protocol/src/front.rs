@@ -127,11 +127,14 @@ impl Side {
                         Event::First(client::first::Event::Read { read: original, result })
                     }
                     jig_client_domain::Readout::Family { .. } => panic!("unknown family read"),
+                    jig_client_domain::Readout::NotServed { .. } => {
+                        unreachable!("the link does not judge domain reads")
+                    }
                     jig_client_domain::Readout::Limit => unreachable!("the link does not limit domain reads"),
                 }
             }
             link::Request::Hello { family: None, versions } => {
-                Event::Jig(jig_domain_client::Event::Hello { served: link::serves(versions) })
+                Event::Jig(jig_domain_client::Event::Hello { served: versions.is_some_and(link::serves) })
             }
             transport @ (link::Request::Exchange { .. }
             | link::Request::OpenStream { .. }

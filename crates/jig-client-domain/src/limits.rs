@@ -8,6 +8,7 @@ pub struct Backoff {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
+    pub owners: &'static [crate::Spoken],
     pub requests: RequestLimits,
     pub ask_bytes: u64,
     pub handles: u32,
@@ -62,7 +63,12 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(1)?;
     let own = Map::<Handle, HandleState>::worst_case(limits.handles)?
         .checked_add(Map::<u64, Watch>::worst_case(limits.watches)?)?;
-    let own = own.checked_add(Map::<Handle, skein_lib::Token>::worst_case(limits.reads)?)?;
+    let owners = u32::try_from(limits.owners.len()).ok()?;
+    let own = own
+        .checked_add(List::<crate::domain::Owner>::worst_case(owners)?)?
+        .checked_add(List::<u16>::worst_case(owners)?)?
+        .checked_add(List::<skein_lib::Token>::worst_case(limits.requests.requests)?)?
+        .checked_add(Map::<Handle, skein_lib::Token>::worst_case(limits.reads)?)?;
     let own = own
         .checked_add(List::<Handle>::worst_case(limits.handles)?)?
         .checked_add(List::<u64>::worst_case(limits.watches)?)?;

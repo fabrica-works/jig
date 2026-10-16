@@ -539,21 +539,23 @@ impl Link {
                     if served.first() > served.last() {
                         return Err(crate::Undecodable::Malformed);
                     }
-                    let family = match served.owner() {
-                        w::Owner::Jig => None,
-                        w::Owner::Family(owner) => Some(owner.number()),
-                    };
-                    out.push(Request::Hello {
-                        family,
-                        versions: jig_client_domain::contract::VersionRange {
-                            first: served.first(),
-                            last: served.last(),
-                        },
-                    });
+                }
+                out.push(Request::Hello { family: None, versions: hello_versions(&hello, None) });
+                for owner in self.limits.client.owners {
+                    let family = Some(owner.family);
+                    out.push(Request::Hello { family, versions: hello_versions(&hello, family) });
                 }
                 let mut pending = skein_lib::List::with_capacity(self.limits.client.watches);
                 for (watch, opening) in &self.watches.0 {
-                    if opening.subject.is_some() {
+                    let family = match &opening.owner {
+                        w::Owner::Jig => None,
+                        w::Owner::Family(owner) => Some(owner.number()),
+                    };
+                    let served = match hello_versions(&hello, family) {
+                        Some(range) => range.contains(opening.version),
+                        None => false,
+                    };
+                    if opening.subject.is_some() && served {
                         pending.push(*watch).expect("bounded watches");
                     }
                 }
@@ -642,4 +644,17 @@ impl Link {
         out.push(Request::CloseStream);
         out.push(Request::Fact { fact: Fact::StreamDropped });
     }
+}
+
+fn hello_versions(hello: &w::Hello, family: Option<u16>) -> Option<jig_client_domain::contract::VersionRange> {
+    for served in hello.served() {
+        let owner = match served.owner() {
+            w::Owner::Jig => None,
+            w::Owner::Family(owner) => Some(owner.number()),
+        };
+        if owner == family {
+            return Some(jig_client_domain::contract::VersionRange { first: served.first(), last: served.last() });
+        }
+    }
+    None
 }

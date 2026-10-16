@@ -10,6 +10,7 @@ pub const ME: Handle = Handle { asker: Asker::JIG, number: 3 };
 pub const STOP: Key = Key { asker: Asker::JIG, number: 1 };
 pub fn domain_limits() -> DomainLimits {
     DomainLimits {
+        owners: &[],
         // tests/client/src/test.rs:70-77, the concrete world's table profile.
         requests: skein_lib::RequestLimits {
             requests: 4,
@@ -95,7 +96,7 @@ impl Client {
         let limits = limits();
         Self::with_limits(limits, kept, max_out(&limits))
     }
-    fn with_limits(limits: Limits, kept: List<Record>, outputs: u32) -> Self {
+    pub fn with_limits(limits: Limits, kept: List<Record>, outputs: u32) -> Self {
         let mut c = Self {
             machine: crate::Client::new(&limits, 7).unwrap(),
             out: Queue::with_capacity(outputs),
@@ -138,6 +139,13 @@ impl Client {
     pub fn step(&mut self, event: Event) {
         self.requests.clear();
         self.machine.step(Time::ZERO, Wall::EPOCH, event, &mut self.out);
+        while let Some(request) = self.out.pop() {
+            self.requests.push(request).unwrap();
+        }
+    }
+    pub fn fire(&mut self, now: Time) {
+        self.requests.clear();
+        self.machine.fire(now, Wall::EPOCH, &mut self.out);
         while let Some(request) = self.out.pop() {
             self.requests.push(request).unwrap();
         }
@@ -257,16 +265,6 @@ pub fn ended(requests: &[Request]) -> List<(Handle, Why)> {
     }
     ended
 }
-impl Client {
-    pub fn fire(&mut self, now: Time) {
-        self.requests.clear();
-        self.machine.fire(now, Wall::EPOCH, &mut self.out);
-        while let Some(request) = self.out.pop() {
-            self.requests.push(request).unwrap();
-        }
-    }
-}
-
 #[derive(Clone, Copy, Debug)]
 pub enum SigningTerminal {
     Request,

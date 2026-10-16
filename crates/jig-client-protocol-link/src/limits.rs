@@ -14,6 +14,16 @@ pub enum Unusable {
 }
 impl Limits {
     pub fn new(client: jig_client_domain::Limits, exchanges: u32) -> Result<Self, Unusable> {
+        if client.owners.len() >= usize::try_from(w::CEILINGS.hello_served).expect("u32 fits") {
+            return Err(Unusable::Limits);
+        }
+        for (i, owner) in client.owners.iter().enumerate() {
+            for earlier in client.owners.get(..i).expect("declared prefix") {
+                if earlier.family == owner.family {
+                    return Err(Unusable::Limits);
+                }
+            }
+        }
         let wire = wire(&client).ok_or(Unusable::Limits)?;
         let value = Self { client, exchanges, wire };
         worst_case(&value).ok_or(Unusable::Limits)?;

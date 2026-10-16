@@ -132,6 +132,7 @@ pub fn domain_limits() -> jig_client_domain::Limits {
     let profile = jig_client_world::test::limits();
     let jig = profile.jig;
     jig_client_domain::Limits {
+        owners: &[jig_client_domain::Spoken { family: 1, version: jig_client_test_protocol_wire::VERSION }],
         requests: profile.table,
         ask_bytes: 16384,
         handles: 8,

@@ -17,6 +17,7 @@ pub(crate) const OTHER_SUBJECT: u64 = 10;
 pub(crate) const INITIAL_TASK_WATCH: Token = Token::new(2);
 pub(crate) fn limits() -> Limits {
     Limits {
+        owners: &[Spoken { family: 19, version: 1 }, Spoken { family: 1, version: 1 }],
         // tests/client/src/test.rs:70-77, the concrete world's table profile.
         requests: skein_lib::RequestLimits {
             requests: 4,

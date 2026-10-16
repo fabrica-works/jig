@@ -2,6 +2,12 @@
 use crate::{Document, Down, Event, Handle, Latest, Limits, Request, State, Told, Watchable, Why, watches::Watch};
 use skein_lib::{Env, List, Map, Queue, RequestTable, Rng, Time, Token};
 #[derive(Debug)]
+pub(crate) struct Owner {
+    pub spoken: crate::Spoken,
+    pub versions: Option<crate::contract::VersionRange>,
+    pub served: bool,
+}
+#[derive(Debug)]
 pub(crate) struct HandleState {
     pub watch: Option<u64>,
     pub state: State,
@@ -20,12 +26,25 @@ pub struct Domain {
     pub(crate) link: crate::Link,
     pub(crate) table: RequestTable<crate::Key, crate::Held>,
     pub(crate) requests: Map<crate::Key, crate::requests::PendingRequest>,
+    pub(crate) owners: List<Owner>,
+    pub(crate) not_served: List<u16>,
+    pub(crate) jig_versions: Option<crate::contract::VersionRange>,
+    pub(crate) blocked: List<Token>,
 }
 impl Domain {
     #[must_use]
     pub fn new(limits: &Limits, seed: u64) -> Self {
         crate::worst_case(limits).expect("valid client limits");
+        let bound = u32::try_from(limits.owners.len()).expect("bounded owners");
+        let mut owners = List::with_capacity(bound);
+        for spoken in limits.owners {
+            owners.push(Owner { spoken: *spoken, versions: None, served: true }).expect("declared owner");
+        }
         Self {
+            owners,
+            not_served: List::with_capacity(bound),
+            jig_versions: None,
+            blocked: List::with_capacity(limits.requests.requests),
             handles: Map::with_capacity(limits.handles),
             watches: Map::with_capacity(limits.watches),
             reads: Map::with_capacity(limits.reads),
@@ -56,7 +75,76 @@ impl Domain {
         self.next = self.next.checked_add(1).expect("client names never wrap");
         Token::new(name)
     }
+    pub(crate) fn declared(&self, record: &crate::Family) -> bool {
+        for owner in &self.owners {
+            if owner.spoken.family == record.family && owner.spoken.version == record.version {
+                return true;
+            }
+        }
+        false
+    }
+    pub(crate) fn family(&self, record: &crate::Family) -> &Owner {
+        let mut declared = None;
+        for owner in &self.owners {
+            if owner.spoken.family == record.family {
+                assert!(owner.spoken.version == record.version, "family version must be declared");
+                declared = Some(owner);
+            }
+        }
+        assert!(declared.is_some(), "family owner must be declared");
+        declared.expect("declared owner")
+    }
+    #[must_use]
+    pub fn not_served(&self) -> &[u16] {
+        self.not_served.as_slice()
+    }
+    fn family_served(
+        &mut self,
+        family: u16,
+        versions: Option<crate::contract::VersionRange>,
+        out: &mut Queue<Request>,
+    ) {
+        let mut index = None;
+        for i in 0..self.owners.len() {
+            if self.owners.get(i).expect("owner index").spoken.family == family {
+                index = Some(i);
+            }
+        }
+        let Some(index) = index else { return };
+        let owner = self.owners.get_mut(index).expect("declared owner");
+        owner.versions = versions;
+        owner.served = match versions {
+            Some(v) => v.contains(owner.spoken.version),
+            None => false,
+        };
+        let served = owner.served;
+        self.not_served.clear();
+        for owner in &self.owners {
+            if !owner.served {
+                self.not_served.push(owner.spoken.family).expect("declared owners");
+            }
+        }
+        if !served {
+            for _ in 0..self.watches.len() {
+                let mut found = None;
+                for (id, w) in &self.watches {
+                    let same = match &w.subject {
+                        Watchable::Family(f) => f.family == family,
+                        Watchable::Jig(_) => false,
+                    };
+                    if !w.closing && same {
+                        found = Some(*id);
+                    }
+                }
+                let Some(id) = found else { break };
+                self.refuse_watch(id, Why::NotServed, out);
+            }
+        }
+    }
     pub(crate) fn watch(&mut self, env: &Env<Limits>, handle: Handle, subject: Watchable, out: &mut Queue<Request>) {
+        if let Watchable::Family(record) = &subject {
+            self.family(record);
+        }
         let previous = match self.document(handle) {
             Some(d) => d.latest.cloned(),
             None => None,
@@ -78,6 +166,15 @@ impl Domain {
             return;
         }
         self.unwatch(handle, out);
+        if let Watchable::Family(record) = &subject
+            && !self.family(record).served
+        {
+            self.handles
+                .insert(handle, HandleState { watch: None, state: State::Ended, previous })
+                .expect("handle admitted");
+            tell(out, Told::Ended { handle, why: Why::NotServed });
+            return;
+        }
         let id = match shared {
             Some(id) => id,
             None => {
@@ -164,7 +261,9 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             crate::Up::SignedIn => domain.signed_in(out),
             crate::Up::SignedOut => domain.signed_out(out),
             crate::Up::NotKept { key } => domain.not_kept(key, out),
-            crate::Up::Served { served } => {
+            crate::Up::FamilyServed { family, versions } => domain.family_served(family, versions, out),
+            crate::Up::Served { served, versions } => {
+                domain.jig_versions = versions;
                 if !served {
                     domain.set_link(crate::Link::OutOfDate, out);
                 }

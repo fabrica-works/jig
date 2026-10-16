@@ -2,12 +2,43 @@ use super::*;
 #[test]
 fn the_hello_s_jig_range_reaches_the_domain() {
     let harness = fixtures::Harness::streaming(fixtures::frame_subject());
-    assert!(harness.has(&Request::Hello { family: None, versions: c::VersionRange { first: 3, last: 3 } }));
+    assert!(harness.has(&Request::Hello { family: None, versions: Some(c::VersionRange { first: 8, last: 8 }) }));
 }
 #[test]
 fn the_hello_s_family_range_reaches_its_owner() {
     let harness = fixtures::Harness::streaming(fixtures::family_subject());
-    assert!(harness.has(&Request::Hello { family: Some(19), versions: c::VersionRange { first: 23, last: 23 } }));
+    assert!(harness.has(&Request::Hello { family: Some(19), versions: Some(c::VersionRange { first: 23, last: 23 }) }));
+}
+
+#[test]
+fn a_hello_reopens_no_watch_of_an_owner_it_does_not_serve() {
+    let mut harness = fixtures::Harness::new(&fixtures::limits());
+    harness.open(fixtures::WATCH, fixtures::family_subject());
+    harness.clear();
+    let bytes = fixtures::hello_event(fixtures::HEARTBEAT);
+    let w::StreamEvent::Hello(hello) = w::StreamEvent::decode(&w::CEILINGS, &mut Reader::new(&bytes)).unwrap() else {
+        panic!("fixture hello");
+    };
+    let mut hello = hello.into_parts();
+    hello.served.clear();
+    hello
+        .served
+        .push(w::Served::new(&w::CEILINGS, w::ServedParts { owner: w::Owner::Jig, first: 8, last: 8 }).unwrap())
+        .unwrap();
+    harness.stream_record(&fixtures::event_bytes(&w::StreamEvent::Hello(w::Hello::new(&w::CEILINGS, hello).unwrap())));
+    assert!(harness.has(&Request::Hello { family: Some(19), versions: None }));
+    for request in &harness.out {
+        if let Request::Exchange { .. } = request {
+            panic!("no opening exchange outside its owner range");
+        }
+    }
+    harness.link.step(Time::ZERO, Event::Close { watch: fixtures::WATCH }, &mut harness.out);
+    assert_eq!(harness.ended(fixtures::WATCH), Some(c::WatchEnd::Closed));
+    for request in &harness.out {
+        if let Request::Exchange { .. } = request {
+            panic!("no opening exchange outside its owner range");
+        }
+    }
 }
 #[test]
 fn a_delivery_before_its_opening_s_answer_admits_it() {

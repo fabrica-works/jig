@@ -8,6 +8,22 @@ use skein_lib::{Env, Queue, Token};
 impl Domain {
     pub(crate) fn read(&mut self, env: &Env<Limits>, handle: Handle, what: Readable, out: &mut Queue<Request>) {
         self.reads.remove(&handle);
+        let refused = match &what {
+            Readable::Family(record) => {
+                let owner = self.family(record);
+                (!owner.served).then_some(Readout::NotServed { family: Some(record.family), served: owner.versions })
+            }
+            Readable::Jig(_) => None,
+        };
+        let refused = if self.link == crate::Link::OutOfDate {
+            Some(Readout::NotServed { family: None, served: self.jig_versions })
+        } else {
+            refused
+        };
+        if let Some(page) = refused {
+            tell(out, Told::Page { handle, page });
+            return;
+        }
         if self.reads.len() == env.limits.reads {
             tell(out, Told::Page { handle, page: Readout::Limit });
             return;

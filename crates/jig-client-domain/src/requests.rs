@@ -15,7 +15,13 @@ pub(crate) struct PendingRequest {
 impl Domain {
     #[must_use]
     pub fn pending(&self, key: Key) -> Option<Pending> {
-        Some(self.requests.get(&key)?.pending)
+        let mut pending = self.requests.get(&key)?.pending;
+        for owner in &self.owners {
+            if Some(owner.spoken.family) == pending.owner && !owner.served {
+                pending.progress = Progress::NotServed;
+            }
+        }
+        Some(pending)
     }
     fn identity(&self) -> Option<(u64, skein_lib::Duration, bool)> {
         for (_, w) in &self.watches {
@@ -33,6 +39,9 @@ impl Domain {
         None
     }
     pub(crate) fn send(&mut self, env: &Env<Limits>, key: Key, request: Ask, out: &mut Queue<Request>) {
+        if let Ask::Family(record) = &request {
+            self.family(record);
+        }
         if let Some(held) = self.requests.get(&key) {
             assert!(held.request == request, "request key conflict");
             return;
@@ -60,7 +69,12 @@ impl Domain {
             let key = record.request.key;
             let request = record.request.request.clone();
             let pending = pending(record.scope, &request);
-            if self.requests.contains_key(&key)
+            let invalid = match &request {
+                Ask::Family(record) => !self.declared(record),
+                Ask::Jig(_) => false,
+            };
+            if invalid
+                || self.requests.contains_key(&key)
                 || self.table.restore(key, declared(&env.limits, &request), record).is_err()
             {
                 dropped = dropped.checked_add(1).expect("restored list bounded");
@@ -133,12 +147,33 @@ impl Domain {
                     Some(RequestOut::Erase(key)) => down(out, Down::Erase { key }),
                     Some(RequestOut::Send { attempt, key, request }) => {
                         self.requests.get_mut(&request.key).expect("sending request").attempt = Some(attempt);
-                        down(out, Down::Send { attempt, key, request: request.request.clone() });
+                        let mut refused = false;
+                        if let Ask::Family(record) = &request.request {
+                            for owner in &self.owners {
+                                if owner.spoken.family == record.family && !owner.served {
+                                    refused = true;
+                                }
+                            }
+                        }
+                        if refused {
+                            self.blocked.push(attempt).expect("one attempt per request");
+                            self.requests.get_mut(&request.key).expect("sending request").pending.progress =
+                                Progress::NotServed;
+                        } else {
+                            down(out, Down::Send { attempt, key, request: request.request.clone() });
+                        }
                     }
                     None => break,
                 }
             }
         }
+        for attempt in &self.blocked {
+            match self.table.answered(env.now, *attempt, RequestEnvelope::Again) {
+                RequestAnswered::Pending => {}
+                RequestAnswered::Final(_) | RequestAnswered::Stale => unreachable!("current refused attempt"),
+            }
+        }
+        self.blocked.clear();
         for _ in 0..env.limits.requests.requests {
             let Some((key, progress)) = self.table.progress() else {
                 break;
@@ -149,6 +184,7 @@ impl Domain {
                 RequestProgress::Parked => Progress::Parked,
                 RequestProgress::Unknown => Progress::Unknown,
                 RequestProgress::Retrying => match held.pending.progress {
+                    Progress::NotServed => Progress::NotServed,
                     Progress::Retrying { why } => Progress::Retrying { why },
                     Progress::InFlight | Progress::Parked | Progress::Unknown => {
                         Progress::Retrying { why: Retry::Lost }

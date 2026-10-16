@@ -4,6 +4,8 @@ use super::{
 };
 use jig_client_protocol_wire::v8 as w;
 use skein_lib::{Duration, Time};
+const FIRST_BACKOFF: Duration = Duration::from_millis(10);
+const LEAST_BACKOFF: Duration = Duration::from_millis(5);
 
 #[test]
 fn signed_out_ends_each_handle_once_and_parks_each_request() {
@@ -137,8 +139,8 @@ fn a_service_s_sign_in_answered_not_ready_is_sent_again_after_its_backoff() {
     c.step(Event::Reply { exchange: first, message: fixtures::sign_in_answer(&w::SignInAnswer::NotReady) });
     assert!(c.requests().is_empty());
     let until = c.machine.next_deadline().unwrap();
-    assert!(until >= Time::ZERO.saturating_add(Duration::from_millis(5)));
-    assert!(until <= Time::ZERO.saturating_add(Duration::from_millis(10)));
+    assert!(until >= Time::ZERO.saturating_add(LEAST_BACKOFF));
+    assert!(until <= Time::ZERO.saturating_add(FIRST_BACKOFF));
     c.fire(until);
     let [Request::Exchange { exchange, credential, message }] = c.requests() else {
         panic!("one service retry: {:?}", c.requests());

@@ -2,6 +2,11 @@
 use crate::contract;
 use alloc::boxed::Box;
 use skein_lib::{List, RequestEnvelope, RequestKey, RequestRecord, Token};
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Spoken {
+    pub family: u16,
+    pub version: u32,
+}
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Family {
     pub family: u16,
@@ -27,6 +32,10 @@ pub enum Watchable {
 pub enum Readout {
     /// Refused by the client's bound on reads in flight.
     Limit,
+    NotServed {
+        family: Option<u16>,
+        served: Option<contract::VersionRange>,
+    },
     Jig(contract::ReadResult),
     Family {
         family: u16,
@@ -68,6 +77,7 @@ pub struct Document<'a> {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Why {
+    NotServed,
     Unknown,
     NotAllowed,
     Busy,
@@ -89,7 +99,8 @@ pub enum Up {
     SignedIn,
     SignedOut,
     NotKept { key: RequestKey },
-    Served { served: bool },
+    Served { served: bool, versions: Option<contract::VersionRange> },
+    FamilyServed { family: u16, versions: Option<contract::VersionRange> },
     Answer { attempt: Token, envelope: RequestEnvelope, answer: Option<Answered>, why: Option<Retry> },
     Watched { watch: Token, event: contract::WatchEvent },
     FamilyDelivered { watch: Token, record: Family },
@@ -145,6 +156,7 @@ pub enum Outcome {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Progress {
+    NotServed,
     InFlight,
     Retrying { why: Retry },
     Parked,

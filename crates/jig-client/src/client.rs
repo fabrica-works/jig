@@ -189,7 +189,7 @@ impl Client {
         LinkView {
             state: self.domain.link(),
             party: self.domain.party(),
-            not_served: &[],
+            not_served: self.domain.not_served(),
             sign_out_lost: self.sign_out_lost,
             credential: self.link.credential(),
         }
@@ -259,7 +259,15 @@ impl Client {
                 match request {
                     domain::Request::Told { told } => out.push(Request::Told { told }),
                     domain::Request::Down { down } => {
-                        if self.domain.link() != Link::OutOfDate {
+                        let local = match &down {
+                            Down::Save { .. } | Down::Erase { .. } => true,
+                            Down::Send { .. }
+                            | Down::Read { .. }
+                            | Down::Open { .. }
+                            | Down::Continue { .. }
+                            | Down::Close { .. } => false,
+                        };
+                        if self.domain.link() != Link::OutOfDate || local {
                             match &down {
                                 Down::Save { record } => self.store.save(record.key),
                                 Down::Erase { key } => self.store.erase(*key),
@@ -320,7 +328,14 @@ impl Client {
             link::Request::Ended { watch, end } => self.up(env, Up::WatchEnded { watch, end }),
             link::Request::Read { read, result } => self.up(env, Up::ReadDone { read, result }),
             link::Request::Hello { family: None, versions } => {
-                self.up(env, Up::Served { served: link::serves(versions) });
+                let served = match versions {
+                    Some(range) => link::serves(range),
+                    None => false,
+                };
+                self.up(env, Up::Served { served, versions });
+            }
+            link::Request::Hello { family: Some(family), versions } => {
+                self.up(env, Up::FamilyServed { family, versions });
             }
             link::Request::Signing { signing } => self.signing(env, signing),
             link::Request::Kept { record: link::Saved::Table { record, .. } } => {
@@ -329,8 +344,7 @@ impl Client {
                 self.domain.restore_record(env, kept, &mut self.domain_out);
             }
             link::Request::Dropped { .. } => out.push(Request::Told { told: Told::Dropped { count: 1 } }),
-            link::Request::Hello { family: Some(_), .. }
-            | link::Request::Fact { .. }
+            link::Request::Fact { .. }
             | link::Request::ServiceCredential { .. }
             | link::Request::Kept { record: link::Saved::Jig(_) | link::Saved::Family { .. } } => {}
         }

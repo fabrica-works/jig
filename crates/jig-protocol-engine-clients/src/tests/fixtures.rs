@@ -739,6 +739,7 @@ impl Exchange {
 
 pub fn client_limits() -> jig_client_protocol_link::Limits {
     let client = jig_client_domain::Limits {
+        owners: &[],
         watches: 4,
         handles: 8,
         turn_bytes: 32,

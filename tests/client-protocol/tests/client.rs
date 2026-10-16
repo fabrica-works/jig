@@ -173,3 +173,52 @@ fn a_client_signed_out_with_a_stop_parked_sends_it_once_signed_in_again() {
     assert_eq!(story.answered(STOP).len(), 1);
     assert_eq!(story.made(fixtures::FIRST_OWNER), 1);
 }
+
+#[test]
+fn a_family_request_is_answered_as_its_owner_s_bytes() {
+    use jig_client_test_domain::{connector_values::ConnectorAnswer, first};
+    use jig_test_connector::{ApplicationObject, ApplicationOutcome};
+    let mut story = Story::live(fixtures::SEED);
+    let request = first::Ask::ChangeObject {
+        project: PROJECT_NUMBER,
+        object: 1,
+        revision: contract::Revision { value: 0 },
+        value: 42,
+    };
+    story.send(STOP, Ask::Family(jig_client_protocol_world::family::request(&request).expect("value-bearing request")));
+    assert!(story.run_until(|s| !s.answered(STOP).is_empty(), Duration::from_secs(1)));
+    let answers = story.answered(STOP);
+    let [Outcome::Answered(Answered::Family(answer))] = answers.as_slice() else {
+        panic!("one owner's byte answer: {answers:?}");
+    };
+    assert_eq!(
+        jig_client_protocol_world::family::answer(answer),
+        Some(first::Answer::Connector(ConnectorAnswer {
+            value: ApplicationOutcome::Changed { object: 1, now: ApplicationObject { revision: 1, value: 42 } },
+        }))
+    );
+    assert_eq!(story.made(fixtures::FIRST_OWNER), 1);
+}
+
+#[test]
+fn an_engine_outside_jig_s_version_leaves_the_client_out_of_date_sending_nothing() {
+    let mut story = Story::live(fixtures::SEED);
+    story.serve_jig(u32::MAX);
+    assert!(story.run_until(|s| s.client.link().state == Link::OutOfDate, Duration::from_secs(1)));
+    let exchanges = story.exchanges();
+    story.send(STOP, stop(TASK));
+    story.read(PROJECT, Readable::Jig(contract::Read::Project { project: PROJECT_NUMBER }));
+    story.watch(INBOX, Watchable::Jig(contract::Subject::Inbox { window: 2 }));
+    assert!(story.run_until(|_| true, Duration::from_secs(1)));
+    assert_eq!(story.exchanges(), exchanges);
+    assert_eq!(story.made(fixtures::FIRST_OWNER), 0);
+    assert_eq!(story.client.pending(STOP).expect("kept stop").progress, jig_client::Progress::Parked);
+    assert_eq!(story.client.next_deadline(), None);
+    assert_eq!(
+        story.pages(PROJECT),
+        vec![Readout::NotServed {
+            family: None,
+            served: Some(contract::VersionRange { first: u32::MAX, last: u32::MAX }),
+        }]
+    );
+}

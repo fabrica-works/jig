@@ -2,7 +2,7 @@ use super::{
     fixtures::{self, Client, PROJECT, STOP, TASK},
     *,
 };
-use skein_lib::{Duration, Time, Wall};
+use skein_lib::{Duration, Time};
 const SECOND: Key = Key { asker: Asker::JIG, number: 2 };
 
 #[test]
@@ -66,7 +66,7 @@ fn a_parked_request_whose_record_is_not_stored_is_answered_not_kept() {
     assert_eq!(erased.as_slice(), &[records.as_slice()[0].key.clone()]);
     assert_eq!(c.machine.pending(STOP), None);
     c.step(Event::Stored);
-    c.machine.fire(Time::from_nanos(100_000_000), Wall::EPOCH, &mut c.out);
+    c.fire(Time::from_nanos(100_000_000));
     c.stream(fixtures::hello(jig_client_protocol_wire::VERSION));
     let watch = c.opened_watch();
     c.stream(fixtures::frame(watch));
@@ -88,11 +88,7 @@ fn a_failed_write_answers_only_the_requests_it_carried() {
     assert_eq!(fixtures::keyed_count(c.requests()), 0);
     c.step(Event::Stored);
     assert_eq!(fixtures::keyed_count(c.requests()), 0);
-    c.requests.clear();
-    c.machine.fire(Time::ZERO.saturating_add(Duration::from_millis(10)), Wall::EPOCH, &mut c.out);
-    while let Some(request) = c.out.pop() {
-        c.requests.push(request).unwrap();
-    }
+    c.fire(Time::ZERO.saturating_add(Duration::from_millis(10)));
     assert_eq!(fixtures::keyed_count(c.requests()), 1);
     assert!(c.machine.pending(SECOND).is_some());
 }
@@ -112,7 +108,7 @@ fn a_record_carried_again_is_decided_by_its_later_write() {
     c.step(Event::StreamGone);
     c.step(Event::Send { key: STOP, request: fixtures::stop() });
     assert_eq!(fixtures::saved(c.requests()).len(), 1);
-    c.machine.fire(Time::from_nanos(100_000_000), Wall::EPOCH, &mut c.out);
+    c.fire(Time::from_nanos(100_000_000));
     c.stream(fixtures::hello(jig_client_protocol_wire::VERSION));
     let watch = c.opened_watch();
     c.stream(fixtures::frame(watch));
@@ -121,11 +117,7 @@ fn a_record_carried_again_is_decided_by_its_later_write() {
     assert_eq!(c.machine.pending(STOP).unwrap().progress, Progress::Retrying { why: Retry::Lost });
     assert_eq!(fixtures::answers(c.requests()).as_slice(), &[]);
     c.step(Event::Stored);
-    c.requests.clear();
-    c.machine.fire(Time::from_nanos(110_000_000), Wall::EPOCH, &mut c.out);
-    while let Some(request) = c.out.pop() {
-        c.requests.push(request).unwrap();
-    }
+    c.fire(Time::from_nanos(110_000_000));
     assert_eq!(fixtures::keyed_count(c.requests()), 1);
     assert!(c.machine.pending(STOP).is_some());
 }
@@ -162,11 +154,7 @@ fn a_request_lost_while_live_is_sent_again_and_the_link_stays_live() {
     c.step(Event::Lost { exchange: c.exchange() });
     assert_eq!(c.machine.pending(STOP).unwrap().progress, Progress::Retrying { why: Retry::Lost });
     assert_eq!(c.machine.link().state, Link::Live);
-    c.machine.fire(Time::ZERO.saturating_add(Duration::from_millis(10)), Wall::EPOCH, &mut c.out);
-    c.requests.clear();
-    while let Some(request) = c.out.pop() {
-        c.requests.push(request).unwrap();
-    }
+    c.fire(Time::ZERO.saturating_add(Duration::from_millis(10)));
     assert_eq!(fixtures::keyed_count(c.requests()), 1);
     assert_eq!(c.machine.link().state, Link::Live);
 }

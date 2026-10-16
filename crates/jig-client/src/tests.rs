@@ -1,6 +1,7 @@
 mod fixtures;
 mod sign_in;
 mod store;
+mod versions;
 use crate::*;
 use fixtures::{Client, ME, PARTY, PROJECT, STOP, TASK, task};
 #[test]

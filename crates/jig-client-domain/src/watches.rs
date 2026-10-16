@@ -24,6 +24,7 @@ impl Domain {
             | Up::SignedOut
             | Up::NotKept { .. }
             | Up::Served { .. }
+            | Up::FamilyServed { .. }
             | Up::Answer { .. }
             | Up::ReadDone { .. } => {
                 unreachable!("watch events only")
@@ -44,6 +45,7 @@ impl Domain {
             | Up::SignedOut
             | Up::NotKept { .. }
             | Up::Served { .. }
+            | Up::FamilyServed { .. }
             | Up::Answer { .. }
             | Up::ReadDone { .. } => {
                 unreachable!("watch events only")
@@ -65,6 +67,12 @@ impl Domain {
         }
     }
     fn deliver(&mut self, env: &Env<Limits>, id: u64, latest: Latest, out: &mut Queue<Request>) {
+        if let Latest::Family(record) = &latest
+            && u64::try_from(record.bytes.len()).expect("family bytes fit") > env.limits.document_bytes
+        {
+            self.refuse_watch(id, Why::Limit, out);
+            return;
+        }
         let w = self.watches.get_mut(&id).expect("delivery watch");
         if w.closing {
             return;
@@ -105,6 +113,29 @@ impl Domain {
             }
         }
         self.scratch.clear();
+    }
+    pub(crate) fn refuse_watch(&mut self, id: u64, why: Why, out: &mut Queue<Request>) {
+        if self.watches.get(&id).expect("refused watch").closing {
+            return;
+        }
+        self.select_handles(id);
+        for index in 0..self.scratch.len() {
+            let handle = *self.scratch.get(index).expect("selected handle");
+            let held = self.handles.get_mut(&handle).expect("selected handle exists");
+            held.state = State::Ended;
+            held.watch = None;
+            held.previous = self.watches.get(&id).expect("refused watch").latest.clone().or(held.previous.take());
+            tell(out, Told::Ended { handle, why });
+        }
+        self.scratch.clear();
+        let watch = self.watches.get_mut(&id).expect("refused watch");
+        watch.closing = true;
+        watch.until = None;
+        if let Some(watch) = watch.name {
+            crate::domain::down(out, crate::Down::Close { watch });
+        } else {
+            self.watches.remove(&id);
+        }
     }
     fn ended(&mut self, env: &Env<Limits>, id: u64, end: WatchEnd, out: &mut Queue<Request>) {
         let w = self.watches.get_mut(&id).expect("terminal watch");

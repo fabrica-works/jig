@@ -62,6 +62,7 @@ pub struct Front {
     referee: Referee,
     refuse_save: bool,
     seed: u64,
+    exchanges: u64,
 }
 impl Front {
     fn new(seed: u64) -> Self {
@@ -79,6 +80,7 @@ impl Front {
             referee: Referee::default(),
             refuse_save: false,
             seed,
+            exchanges: 0,
         }
     }
     fn event(&mut self, now: Time, event: Event) {
@@ -134,6 +136,7 @@ impl Front {
                 self.event(now, Event::Stored);
             }
             client::Request::Exchange { exchange, credential, message } => {
+                self.exchanges += 1;
                 if let client::Message::Request(bytes) = &message {
                     let keyed =
                         w::Keyed::decode(&w::CEILINGS, &mut Reader::new(bytes)).expect("client's keyed request");
@@ -188,6 +191,10 @@ impl Front {
     #[must_use]
     pub fn told_at(&self, key: Key) -> Time {
         self.told_at[&key]
+    }
+    #[must_use]
+    pub fn exchanges(&self) -> u64 {
+        self.exchanges
     }
 }
 /// Scripted applications against one durable real engine over HTTP bytes.
@@ -295,6 +302,19 @@ impl Story {
             &mut self.engine.out,
         )
         .expect("bounded replacement");
+    }
+    pub fn serve_jig(&mut self, version: u32) {
+        self.net.cut_all();
+        self.advance();
+        let mut settings = fixtures::settings(self.engine.limits.core.documents.rows);
+        settings.served = jig_client_world::test::list([
+            jig_protocol_engine_clients::Served { family: None, first: version, last: version },
+            jig_protocol_engine_clients::Served { family: Some(1), first: 1, last: 1 },
+        ]);
+        while self.engine.out.pop().is_some() {}
+        self.engine.component =
+            jig_protocol_engine_clients::Component::new(settings, &self.engine.env, &mut self.engine.out)
+                .expect("bounded version replacement");
     }
     pub fn add_second_client(&mut self) {
         let mut second = Front::new(self.front.seed.checked_add(1).expect("second seed"));

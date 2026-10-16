@@ -140,7 +140,7 @@ pub enum Request {
     },
     Hello {
         family: Option<u16>,
-        versions: contract::VersionRange,
+        versions: Option<contract::VersionRange>,
     },
     /// One terminal per read.
     Read {

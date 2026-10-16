@@ -5,6 +5,7 @@ pub const ATTEMPT: Token = Token::new(17);
 pub const KEY: RequestKey = [9; 16];
 pub const SERVICE_CREDENTIAL: [u8; 40] = [7; 40];
 const CLIENT: jig_client_domain::Limits = jig_client_domain::Limits {
+    owners: &[jig_client_domain::Spoken { family: 19, version: 23 }],
     watches: 4,
     handles: 8,
     turn_bytes: 32,
