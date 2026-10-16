@@ -1,7 +1,7 @@
 //! Explicitly scoped owner fixtures, with checked whole-document admission.
 use jig_client_scripted_engine::{Application, ApplicationValue, Bounds, Change, Decision, Truth};
 use jig_domain_client::contract::Revision;
-use jig_ops_domain_client::{infrastructure as infra, observability as obs};
+use jig_ops_client_domain::{infrastructure as infra, observability as obs};
 use skein_lib::Wall;
 use std::collections::BTreeMap;
 

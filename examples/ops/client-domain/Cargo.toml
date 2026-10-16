@@ -1,16 +1,15 @@
 [package]
-name = "jig-ops-view"
-description = "Ops reference client view and connector-owned fragments"
+name = "jig-ops-client-domain"
+description = "Ops reference client root and connector sides"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
+
 [dependencies]
-skein-ui.workspace = true
 skein-lib.workspace = true
 jig-domain-client.workspace = true
 jig-ops-domain-connectors.workspace = true
-jig-client-view.workspace = true
-jig-ops-domain-client.workspace = true
+
 [lints]
 workspace = true

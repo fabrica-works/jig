@@ -5,8 +5,8 @@ use jig_client_world::{
 };
 use jig_conformance::Cut;
 use jig_domain_client::address::{Address as JigAddress, TaskSection};
+use jig_ops_client_domain::{Address, observability as obs};
 use jig_ops_domain as root;
-use jig_ops_domain_client::{Address, observability as obs};
 use jig_ops_world::joint::engine::Milestone;
 use jig_ops_world::joint::fixture;
 use skein_fake_person::{Find, Step};
@@ -357,9 +357,9 @@ fn q_story(seed: u64, cut: Cut, noise: bool, reload: bool) -> StoryWorld {
             Step::Go { address: Address::Jig(JigAddress::Task { task: 1, section: TaskSection::Activity }) },
             see(b"staging/payments is ready"),
             Step::Go {
-                address: Address::Infrastructure(jig_ops_domain_client::infrastructure::Address::NativeEnvironment {
+                address: Address::Infrastructure(jig_ops_client_domain::infrastructure::Address::NativeEnvironment {
                     project: 1,
-                    environment: jig_ops_domain_client::infrastructure::native::Environment {
+                    environment: jig_ops_client_domain::infrastructure::native::Environment {
                         pool: b"staging".as_slice().into(),
                         name: b"payments".as_slice().into(),
                     },
@@ -558,10 +558,10 @@ fn assert_durable_end(
     assert_eq!(markers[0].0.person, 1);
     assert_eq!(markers[0].2, answers[0].0);
     let (_, request, digest) =
-        jig_ops_world::joint::infrastructure::ask(jig_ops_domain_client::infrastructure::Ask::NativeMoveEnd {
+        jig_ops_world::joint::infrastructure::ask(jig_ops_client_domain::infrastructure::Ask::NativeMoveEnd {
             object: skein_lib::Token::new(0),
             project: 1,
-            environment: jig_ops_domain_client::infrastructure::native::Environment {
+            environment: jig_ops_client_domain::infrastructure::native::Environment {
                 pool: environment.pool.clone(),
                 name: environment.name.clone(),
             },

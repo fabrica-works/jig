@@ -2,7 +2,7 @@
 //! Replace: observability's error-rate drawing.
 use crate::words::{Word, Words};
 use jig_client_view::Owner;
-use jig_ops_domain_client::observability::documents::Incident;
+use jig_ops_client_domain::observability::documents::Incident;
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, DrawingKind, Run};
 
@@ -43,8 +43,8 @@ fn open_rate(b: &mut Builder, words: &Words, percent: u8, observed: skein_lib::W
 pub fn native_rate(
     b: &mut Builder,
     words: &Words,
-    incident: &jig_ops_domain_client::observability::native::Incident,
-    fact: &jig_ops_domain_client::observability::native::Fact,
+    incident: &jig_ops_client_domain::observability::native::Incident,
+    fact: &jig_ops_client_domain::observability::native::Fact,
 ) {
     let observed = skein_lib::Wall::from_nanos(fact.observed.saturating_mul(1_000_000_000));
     open_rate(b, words, fact.error_rate_percent, observed);

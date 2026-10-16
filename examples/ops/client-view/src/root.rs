@@ -7,7 +7,7 @@ use crate::{
     words::{self, Word},
 };
 use jig_client_view::{JigBindings, Owner};
-use jig_ops_domain_client::Domain;
+use jig_ops_client_domain::Domain;
 use jig_ops_domain_connectors::Connector;
 use skein_ui::Act;
 use skein_ui::{Builder, NodeId, Patch, Role, Tree};
@@ -31,7 +31,7 @@ impl View {
     #[must_use]
     pub fn new(
         limits: &Limits,
-        domain: &jig_ops_domain_client::Limits,
+        domain: &jig_ops_client_domain::Limits,
         words: jig_client_view::words::Words,
         observability_words: words::Words,
         infrastructure_words: words::Words,
@@ -82,7 +82,7 @@ impl View {
 }
 #[expect(clippy::too_many_lines, reason = "the root exhaustively routes two connectors in both slot passes")]
 pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
-    let shown = jig_ops_domain_client::shown(root);
+    let shown = jig_ops_client_domain::shown(root);
     if !view.render.stale(shown) {
         return;
     }

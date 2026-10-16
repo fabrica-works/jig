@@ -13,7 +13,7 @@ use jig_domain_client::{
     address::{Address as JigAddress, TaskSection},
     contract::*,
 };
-use jig_ops_domain_client::{Address, infrastructure as infra, observability as obs};
+use jig_ops_client_domain::{Address, infrastructure as infra, observability as obs};
 use jig_ops_domain_connectors::{Connector, number};
 use skein_fake_person::{Face, Find, Found, TreeFace};
 use skein_lib::{Duration, Wall};

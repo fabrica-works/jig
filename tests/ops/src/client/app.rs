@@ -5,11 +5,11 @@ use jig_client_world::harness::Seen;
 use jig_client_world::{harness::*, observe};
 use jig_domain_client::contract::Outcome;
 use jig_domain_client::{boundary::Offset, contract::*};
-use jig_ops_domain_client::{
+use jig_ops_client_domain::{
     self as domain, Action, Address, Event, JigOut, Request, infrastructure as infra, observability as obs,
 };
+use jig_ops_client_view as view;
 use jig_ops_domain_connectors::{Connector, number};
-use jig_ops_view as view;
 use skein_ui::Act;
 use skein_ui::{NodeId, Patch, Role, Tree};
 

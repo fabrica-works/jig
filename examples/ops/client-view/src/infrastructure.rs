@@ -6,7 +6,7 @@ use crate::{
 };
 use jig_client_view::Owner;
 use jig_domain_client::contract::{Part, Proposer};
-use jig_ops_domain_client::{
+use jig_ops_client_domain::{
     Action,
     infrastructure::{
         self, Card, Value,

@@ -146,8 +146,8 @@ fn client_step(name: &str) -> bool {
             | "jig-client-test-domain"
             | "jig-client-test-view"
             | "jig-ops-domain-connectors"
-            | "jig-ops-domain-client"
-            | "jig-ops-view"
+            | "jig-ops-client-domain"
+            | "jig-ops-client-view"
     )
 }
 
@@ -341,19 +341,19 @@ fn ops_connector_identities_link_only_the_foundation() {
 #[test]
 fn ops_client_domain_is_step_code_with_only_client_and_connector_vocabulary() {
     let roots: Vec<_> =
-        manifests().into_iter().filter(|m| m.name.as_deref() == Some("jig-ops-domain-client")).collect();
+        manifests().into_iter().filter(|m| m.name.as_deref() == Some("jig-ops-client-domain")).collect();
     assert_eq!(roots.len(), 1);
     let mut dependencies = roots[0].dependencies.clone();
     dependencies.sort();
     assert_eq!(dependencies, ["jig-domain-client", "jig-ops-domain-connectors", "skein-lib"]);
-    let source = fs::read_to_string(kit_root().join("examples/ops/domain-client/src/lib.rs")).expect("domain source");
+    let source = fs::read_to_string(kit_root().join("examples/ops/client-domain/src/lib.rs")).expect("domain source");
     assert!(source.contains("cfg_attr(not(test), no_std)"));
     assert!(source.contains("forbid(unsafe_code)"));
 }
 
 #[test]
 fn ops_client_view_is_step_code_with_only_client_and_connector_vocabulary() {
-    let roots: Vec<_> = manifests().into_iter().filter(|m| m.name.as_deref() == Some("jig-ops-view")).collect();
+    let roots: Vec<_> = manifests().into_iter().filter(|m| m.name.as_deref() == Some("jig-ops-client-view")).collect();
     assert_eq!(roots.len(), 1);
     let mut dependencies = roots[0].dependencies.clone();
     dependencies.sort();
@@ -362,13 +362,13 @@ fn ops_client_view_is_step_code_with_only_client_and_connector_vocabulary() {
         [
             "jig-client-view",
             "jig-domain-client",
-            "jig-ops-domain-client",
+            "jig-ops-client-domain",
             "jig-ops-domain-connectors",
             "skein-lib",
             "skein-ui"
         ]
     );
-    let source = fs::read_to_string(kit_root().join("examples/ops/view/src/lib.rs")).expect("view source");
+    let source = fs::read_to_string(kit_root().join("examples/ops/client-view/src/lib.rs")).expect("view source");
     assert!(source.contains("cfg_attr(not(test), no_std)"));
     assert!(source.contains("forbid(unsafe_code)"));
 }
