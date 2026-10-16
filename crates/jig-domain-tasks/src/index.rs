@@ -132,6 +132,13 @@ pub enum Key {
         ended_at: Newest,
         task: u64,
     },
+    /// Listed ended tasks by project and label, newest ended first.
+    EndedByProject {
+        project: u32,
+        label: u32,
+        ended_at: Newest,
+        task: u64,
+    },
 }
 
 impl Key {
@@ -157,6 +164,7 @@ impl Key {
             | Self::ConversationOldest { .. }
             | Self::Goal { .. }
             | Self::EndedByParty { .. }
+            | Self::EndedByProject { .. }
             | Self::EndedDelegate { .. }
             | Self::Delegate { .. } => false,
         }
@@ -225,6 +233,27 @@ impl EndedByParty {
     pub const fn key(self) -> Key {
         Key::EndedByParty {
             party: self.party,
+            label: self.label,
+            ended_at: Newest::of(self.ended_at.as_nanos()),
+            task: self.task,
+        }
+    }
+}
+
+/// An ended task indexed by its project when listed (protocol/store.md, 7.4).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct EndedByProject {
+    pub project: u32,
+    pub label: u32,
+    pub ended_at: Wall,
+    pub task: u64,
+}
+impl EndedByProject {
+    /// Its key, newest ended first within the project and label.
+    #[must_use]
+    pub const fn key(self) -> Key {
+        Key::EndedByProject {
+            project: self.project,
             label: self.label,
             ended_at: Newest::of(self.ended_at.as_nanos()),
             task: self.task,

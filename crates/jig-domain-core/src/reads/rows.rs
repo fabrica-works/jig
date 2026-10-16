@@ -655,6 +655,7 @@ fn object(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Optio
                 | tasks::Stored::ConversationNewest(_)
                 | tasks::Stored::Goal(_)
                 | tasks::Stored::EndedByParty(_)
+                | tasks::Stored::EndedByProject(_)
                 | tasks::Stored::EndedDelegate(_)
                 | tasks::Stored::Delegate(_)
                 | tasks::Stored::ConversationOldest(_)
@@ -859,6 +860,7 @@ fn page_row(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Opt
                     | tasks::Stored::ConversationNewest(_)
                     | tasks::Stored::Goal(_)
                     | tasks::Stored::EndedByParty(_)
+                    | tasks::Stored::EndedByProject(_)
                     | tasks::Stored::EndedDelegate(_)
                     | tasks::Stored::Delegate(_)
                     | tasks::Stored::ConversationOldest(_)
@@ -985,6 +987,7 @@ fn inbox_selection_row(limits: &Limits, row: &Row) -> Result<Option<documents::I
             | tasks::Stored::ConversationNewest(_)
             | tasks::Stored::Goal(_)
             | tasks::Stored::EndedByParty(_)
+            | tasks::Stored::EndedByProject(_)
             | tasks::Stored::EndedDelegate(_)
             | tasks::Stored::Delegate(_)
             | tasks::Stored::ConversationOldest(_)
@@ -1036,6 +1039,7 @@ fn inbox_row(
             | tasks::Stored::ConversationNewest(_)
             | tasks::Stored::Goal(_)
             | tasks::Stored::EndedByParty(_)
+            | tasks::Stored::EndedByProject(_)
             | tasks::Stored::EndedDelegate(_)
             | tasks::Stored::Delegate(_)
             | tasks::Stored::ConversationOldest(_)
@@ -1282,6 +1286,7 @@ fn milestone_record(record: &Record) -> Option<&tasks::Milestone> {
             | tasks::Stored::ConversationNewest(_)
             | tasks::Stored::Goal(_)
             | tasks::Stored::EndedByParty(_)
+            | tasks::Stored::EndedByProject(_)
             | tasks::Stored::EndedDelegate(_)
             | tasks::Stored::Delegate(_)
             | tasks::Stored::ConversationOldest(_)
@@ -1312,6 +1317,7 @@ fn activity_record(record: &Record) -> Option<&tasks::ActivityLine> {
             | tasks::Stored::ConversationNewest(_)
             | tasks::Stored::Goal(_)
             | tasks::Stored::EndedByParty(_)
+            | tasks::Stored::EndedByProject(_)
             | tasks::Stored::EndedDelegate(_)
             | tasks::Stored::Delegate(_)
             | tasks::Stored::ConversationOldest(_)
@@ -1385,6 +1391,7 @@ fn ledger(record: &Record) -> Option<&tasks::FundingRecord> {
             | tasks::Stored::ConversationNewest(_)
             | tasks::Stored::Goal(_)
             | tasks::Stored::EndedByParty(_)
+            | tasks::Stored::EndedByProject(_)
             | tasks::Stored::EndedDelegate(_)
             | tasks::Stored::Delegate(_)
             | tasks::Stored::ConversationOldest(_)
@@ -1526,6 +1533,7 @@ fn key_kind(key: &Key) -> KeyKind {
             | tasks::Key::ConversationNewest { .. }
             | tasks::Key::Goal { .. }
             | tasks::Key::EndedByParty { .. }
+            | tasks::Key::EndedByProject { .. }
             | tasks::Key::EndedDelegate { .. }
             | tasks::Key::Delegate { .. }
             | tasks::Key::ConversationOldest { .. }

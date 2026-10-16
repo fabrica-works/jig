@@ -186,3 +186,25 @@ pub fn read_ended_by_party(row: wire::EndedByParty) -> domain::EndedByParty {
     let wire::EndedByPartyParts { party, label, ended_at, task } = row.into_parts();
     domain::EndedByParty { party, label, ended_at: Wall::from_nanos(ended_at), task }
 }
+
+/// The ended-by-project row (protocol/store.md, 7.4).
+pub fn ended_by_project(
+    row: &domain::EndedByProject,
+    limits: &wire::Limits,
+) -> Result<wire::EndedByProject, wire::Problem> {
+    wire::EndedByProject::new(
+        limits,
+        wire::EndedByProjectParts {
+            project: row.project,
+            label: row.label,
+            ended_at: row.ended_at.as_nanos(),
+            task: row.task,
+        },
+    )
+}
+/// Decode the ended-by-project row.
+#[must_use]
+pub fn read_ended_by_project(row: wire::EndedByProject) -> domain::EndedByProject {
+    let wire::EndedByProjectParts { project, label, ended_at, task } = row.into_parts();
+    domain::EndedByProject { project, label, ended_at: Wall::from_nanos(ended_at), task }
+}

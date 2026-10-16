@@ -50,6 +50,7 @@ fn ledger(world: &World, funder: Funder) -> tasks::FundingRecord {
         | Stored::ConversationNewest(_)
         | Stored::Goal(_)
         | Stored::EndedByParty(_)
+        | Stored::EndedByProject(_)
         | Stored::EndedDelegate(_)
         | Stored::Delegate(_)
         | Stored::ConversationOldest(_)

@@ -4,6 +4,8 @@ use crate::{codec::tasks, tasks_v3 as wire};
 use jig_domain_tasks as domain;
 use skein_lib::{Duration, Token, Wall};
 
+const PROJECT_INDEX_TASK: u64 = 17;
+
 fn activity(line: domain::Line) -> domain::Stored {
     domain::Stored::Activity(domain::ActivityLine { task: 17, position: 29, at: Wall::from_nanos(31), line })
 }
@@ -103,6 +105,12 @@ fn each_index_row_reads_back() {
             label: 3,
             ended_at: Wall::from_nanos(41),
             task: 17,
+        }),
+        domain::Stored::EndedByProject(domain::EndedByProject {
+            project: 31,
+            label: 3,
+            ended_at: Wall::from_nanos(41),
+            task: PROJECT_INDEX_TASK,
         }),
     ] {
         assert_eq!(saved_tasks(&row), Ok(row));

@@ -65,11 +65,10 @@ pub(super) fn write(writer: &mut KeyWriter, key: &Key) {
             writer.u64(task.raw());
         }
         Key::EndedByParty { party, label, ended_at, task } => {
-            writer.tag(19);
-            writer.u64(*party);
-            writer.u64(u64::from(*label));
-            writer.u64(ended_at.raw());
-            writer.u64(*task);
+            ended_index(writer, 19, *party, *label, *ended_at, *task);
+        }
+        Key::EndedByProject { project, label, ended_at, task } => {
+            ended_index(writer, 20, u64::from(*project), *label, *ended_at, *task);
         }
         Key::EndedDelegate { requester, task } => {
             writer.tag(17);
@@ -135,6 +134,12 @@ pub(super) fn read(reader: &mut KeyReader<'_>) -> Option<Key> {
             ended_at: Newest::from_raw(reader.u64()?),
             task: reader.u64()?,
         },
+        20 => Key::EndedByProject {
+            project: u32::try_from(reader.u64()?).ok()?,
+            label: u32::try_from(reader.u64()?).ok()?,
+            ended_at: Newest::from_raw(reader.u64()?),
+            task: reader.u64()?,
+        },
         17 => Key::EndedDelegate { requester: reader.u64()?, task: reader.u64()? },
         18 => Key::Delegate { requester: reader.u64()?, task: reader.u64()? },
         16 => Key::Goal { project: u32::try_from(reader.u64()?).ok()?, task: Newest::from_raw(reader.u64()?) },
@@ -192,4 +197,12 @@ fn update_object(writer: &mut KeyWriter, object: &UpdateObject) {
             writer.u64(activity.raw());
         }
     }
+}
+
+fn ended_index(writer: &mut KeyWriter, tag: u8, owner: u64, label: u32, at: Newest, task: u64) {
+    writer.tag(tag);
+    writer.u64(owner);
+    writer.u64(u64::from(label));
+    writer.u64(at.raw());
+    writer.u64(task);
 }

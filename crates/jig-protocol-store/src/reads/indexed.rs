@@ -31,6 +31,7 @@ fn owner_number(key: &core::Key) -> Result<(u64, bool), Failure> {
             | tasks::Key::Activity { .. }
             | tasks::Key::Result { .. }
             | tasks::Key::EndedByParty { .. }
+            | tasks::Key::EndedByProject { .. }
             | tasks::Key::Delegate { .. },
         )
         | core::Key::Core(_)
@@ -107,6 +108,7 @@ fn update(value: &core::Record) -> Option<tasks::Update> {
             | tasks::Stored::ConversationOldest(_)
             | tasks::Stored::Goal(_)
             | tasks::Stored::EndedByParty(_)
+            | tasks::Stored::EndedByProject(_)
             | tasks::Stored::EndedDelegate(_)
             | tasks::Stored::Delegate(_),
         )
@@ -137,6 +139,7 @@ fn delegate(value: &core::Record) -> Option<tasks::Edge> {
             | tasks::Stored::ConversationOldest(_)
             | tasks::Stored::Goal(_)
             | tasks::Stored::EndedByParty(_)
+            | tasks::Stored::EndedByProject(_)
             | tasks::Stored::EndedDelegate(_)
             | tasks::Stored::Update(_),
         )

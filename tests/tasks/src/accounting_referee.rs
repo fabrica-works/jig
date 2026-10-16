@@ -286,6 +286,7 @@ impl Accounting {
                             | Stored::ConversationNewest(_)
                             | Stored::Goal(_)
                             | Stored::EndedByParty(_)
+                            | Stored::EndedByProject(_)
                             | Stored::EndedDelegate(_)
                             | Stored::Delegate(_)
                             | Stored::ConversationOldest(_)
@@ -340,6 +341,7 @@ impl Accounting {
                             | Stored::ConversationNewest(_)
                             | Stored::Goal(_)
                             | Stored::EndedByParty(_)
+                            | Stored::EndedByProject(_)
                             | Stored::EndedDelegate(_)
                             | Stored::Delegate(_)
                             | Stored::ConversationOldest(_)
@@ -414,6 +416,7 @@ impl Accounting {
                 | Stored::ConversationNewest(_)
                 | Stored::Goal(_)
                 | Stored::EndedByParty(_)
+                | Stored::EndedByProject(_)
                 | Stored::EndedDelegate(_)
                 | Stored::Delegate(_)
                 | Stored::ConversationOldest(_)
@@ -443,6 +446,20 @@ impl Accounting {
 fn ended_party_indexes(rows: &BTreeMap<Key, Stored>, requests: &[Request]) -> Result<(), &'static str> {
     for request in requests {
         let Request::Save { record: Stored::Ended(task) } = request else { continue };
+        if task.flags.listed {
+            let row = jig_domain_tasks::EndedByProject {
+                project: task.project,
+                label: task.label,
+                ended_at: task.ended_at.ok_or("ending has no time")?,
+                task: task.number,
+            };
+            let expected = Stored::EndedByProject(row);
+            if rows.get(&row.key()) != Some(&expected)
+                || !requests.iter().any(|request| matches!(request, Request::Save { record } if record == &expected))
+            {
+                return Err("ended task missing its project index row");
+            }
+        }
         let jig_domain_tasks::Party::Person(party) = task.requester else { continue };
         let row = jig_domain_tasks::EndedByParty {
             party,

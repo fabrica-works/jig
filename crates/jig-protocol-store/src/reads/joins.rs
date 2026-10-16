@@ -26,6 +26,7 @@ pub(super) fn as_task(value: &core::Record) -> Option<&tasks::TaskRecord> {
             | tasks::Stored::ConversationOldest(_)
             | tasks::Stored::Goal(_)
             | tasks::Stored::EndedByParty(_)
+            | tasks::Stored::EndedByProject(_)
             | tasks::Stored::EndedDelegate(_)
             | tasks::Stored::Delegate(_),
         )

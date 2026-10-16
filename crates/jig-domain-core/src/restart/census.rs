@@ -41,6 +41,7 @@ impl Census {
                 | tasks::Key::ConversationNewest { .. }
                 | tasks::Key::Goal { .. }
                 | tasks::Key::EndedByParty { .. }
+                | tasks::Key::EndedByProject { .. }
                 | tasks::Key::EndedDelegate { .. }
                 | tasks::Key::Delegate { .. },
             )

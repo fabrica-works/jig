@@ -401,3 +401,25 @@ fn an_ended_task_without_its_party_index_row_is_refused() {
         Err("ended task missing its party index row")
     );
 }
+
+#[test]
+fn an_ended_listed_task_without_its_project_index_row_is_refused() {
+    use jig_domain_tasks::{Key, Request};
+    use jig_tasks_world::{LIMITS, World, accounting_referee::Accounting, task};
+    let mut world = World::new(823, LIMITS);
+    let mut listed = task(INDEX_TASK, &[]);
+    listed.flags.listed = true;
+    world.make(Party::Person(INDEX_REQUESTER), vec![listed]);
+    world.claim(INDEX_TASK, 1);
+    world.finish(INDEX_TASK);
+    world.settle(INDEX_TASK);
+    let ended = world.records[&Key::Ended(INDEX_TASK)].clone();
+    let index =
+        world.records.keys().find(|key| matches!(key, Key::EndedByProject { .. })).copied().expect("project row");
+    let row = world.records.remove(&index).expect("saved index");
+    let requests = [Request::Save { record: ended }, Request::Save { record: row }];
+    assert_eq!(
+        Accounting::default().committed(&world.records, &requests),
+        Err("ended task missing its project index row")
+    );
+}

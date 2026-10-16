@@ -99,7 +99,7 @@ pub fn funder(rng: &mut Rng) -> jig_domain_tasks::Funder {
 }
 pub fn tasks_key(rng: &mut Rng) -> jig_domain_tasks::Key {
     use jig_domain_tasks::{Key, Newest, UpdateObject};
-    match rng.below(20) {
+    match rng.below(21) {
         0 => Key::Live(number(rng)),
         1 => Key::Stub(number(rng)),
         2 => Key::Ledger(funder(rng)),
@@ -112,6 +112,12 @@ pub fn tasks_key(rng: &mut Rng) -> jig_domain_tasks::Key {
         17 => Key::EndedDelegate { requester: number(rng), task: number(rng) },
         19 => Key::EndedByParty {
             party: number(rng),
+            label: narrow(rng),
+            ended_at: Newest::of(number(rng)),
+            task: number(rng),
+        },
+        20 => Key::EndedByProject {
+            project: narrow(rng),
             label: narrow(rng),
             ended_at: Newest::of(number(rng)),
             task: number(rng),

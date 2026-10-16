@@ -298,7 +298,8 @@ record TaskOutcome {
 }
 record TaskRecord { history: TaskHistory run: TaskRun definition: TaskDefinition interests: TaskInterests outcome: TaskOutcome }
 record EndedByParty { party: u64 label: u32 ended_at: u64 task: u64 }
-enum Value { ledger: FundingRecord, closed_ledger: FundingRecord, writer: WriterSlot, pool: PoolSlots, history: boxed History, milestone: Milestone, person_proposal: PersonProposal, decided_proposal: PersonProposal, activity: ActivityLine, live: TaskRecord, ended: TaskRecord, stub: Stub, update: Update, result: ResultRow, conversation_newest: Conversation, conversation_oldest: Conversation, goal: GoalRow, ended_delegate: Edge, delegate: Edge, ended_by_party: EndedByParty }
+record EndedByProject { project: u32 label: u32 ended_at: u64 task: u64 }
+enum Value { ledger: FundingRecord, closed_ledger: FundingRecord, writer: WriterSlot, pool: PoolSlots, history: boxed History, milestone: Milestone, person_proposal: PersonProposal, decided_proposal: PersonProposal, activity: ActivityLine, live: TaskRecord, ended: TaskRecord, stub: Stub, update: Update, result: ResultRow, conversation_newest: Conversation, conversation_oldest: Conversation, goal: GoalRow, ended_delegate: Edge, delegate: Edge, ended_by_party: EndedByParty, ended_by_project: EndedByProject }
 versioned record Row { value: Value }
 record CapacityActionBatch { first: option u64 members: u32 }
 record CapacityActionProposal { number: u64 }

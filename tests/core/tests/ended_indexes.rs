@@ -59,3 +59,62 @@ fn an_ended_delegate_of_a_task_saves_no_party_row() {
         ended_rows(&world).iter().any(|key| matches!(key, tasks::Key::EndedByParty { task, .. } if *task == root_task))
     );
 }
+
+#[test]
+fn an_ended_goal_is_indexed_by_its_project_and_label() {
+    let mut world = world(824);
+    world.end(
+        tasks::End::Finished {
+            result: tasks::TaskResult::Report { words: b"done".as_slice().into() },
+            cancel_delegates: false,
+        },
+        0,
+    );
+    jig_core_world::stories::reads::request(&mut world, 100, jig_core_world::stories::offers::goal(100));
+    let task = world.assigned.as_ref().expect("goal").task;
+    world.end(
+        tasks::End::Finished {
+            result: tasks::TaskResult::Report { words: b"done".as_slice().into() },
+            cancel_delegates: false,
+        },
+        0,
+    );
+    let root::Record::Core(core::Record::Tasks(tasks::Stored::Ended(row))) =
+        &world.store.rows[&root::Key::Core(core::Key::Tasks(tasks::Key::Ended(task)))]
+    else {
+        panic!("ended goal")
+    };
+    let ended_at = tasks::Newest::of(row.ended_at.expect("ended").as_nanos());
+    let keys: Vec<_> = world
+        .store
+        .rows
+        .keys()
+        .filter_map(|key| match key {
+            root::Key::Core(core::Key::Tasks(key @ tasks::Key::EndedByProject { .. })) => Some(*key),
+            root::Key::Core(_) | root::Key::Connector { .. } => None,
+        })
+        .collect();
+    assert_eq!(keys, [tasks::Key::EndedByProject { project: 1, label: 0, ended_at, task }]);
+    assert!(ended_rows(&world).contains(&tasks::Key::EndedByParty { party: REQUESTER, label: 0, ended_at, task }));
+}
+
+#[test]
+fn an_ended_chat_saves_no_project_row() {
+    let mut world = world(825);
+    world.end(
+        tasks::End::Finished {
+            result: tasks::TaskResult::Report { words: b"done".as_slice().into() },
+            cancel_delegates: false,
+        },
+        0,
+    );
+    assert_eq!(
+        world
+            .store
+            .rows
+            .keys()
+            .filter(|key| matches!(key, root::Key::Core(core::Key::Tasks(tasks::Key::EndedByProject { .. }))))
+            .count(),
+        0
+    );
+}

@@ -78,3 +78,11 @@ fn one_label_sorts_before_the_next_for_one_party() {
     let next = crate::EndedByParty { label: 4, ended_at: Wall::from_nanos(2_000), ..row };
     assert!(row.key() < next.key());
 }
+
+#[test]
+fn a_newer_listed_task_sorts_first_within_project_and_label() {
+    let row = crate::EndedByProject { project: 1, label: 3, ended_at: Wall::from_nanos(1_000), task: INDEXED_TASK };
+    let later = crate::EndedByProject { ended_at: Wall::from_nanos(2_000), ..row };
+    assert!(later.key() < row.key());
+    assert!(!row.key().live());
+}

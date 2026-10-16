@@ -17,6 +17,7 @@ fn lines(world: &World, task: u64) -> Vec<ActivityLine> {
             | Stored::ConversationNewest(_)
             | Stored::Goal(_)
             | Stored::EndedByParty(_)
+            | Stored::EndedByProject(_)
             | Stored::EndedDelegate(_)
             | Stored::Delegate(_)
             | Stored::ConversationOldest(_)

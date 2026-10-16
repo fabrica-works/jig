@@ -348,6 +348,16 @@ fn end_task(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queue
             }),
         });
     }
+    if ended.flags.listed {
+        out.push(Request::Save {
+            record: Stored::EndedByProject(crate::EndedByProject {
+                project: ended.project,
+                label: ended.label,
+                ended_at: env.wall,
+                task: number,
+            }),
+        });
+    }
     out.push(Request::Save { record: Stored::Ended(Box::new(ended)) });
     let dependents = snapshot(domain, env.limits.tasks);
     for dependent in dependents.into_boxed() {

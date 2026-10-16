@@ -798,6 +798,13 @@ fn put_task_key(w: &mut Writer, value: &tasks::Key) -> Option<()> {
             w.u64(ended_at.raw())?;
             w.u64(*task)?;
         }
+        tasks::Key::EndedByProject { project, label, ended_at, task } => {
+            w.byte(20)?;
+            w.u32(*project)?;
+            w.u32(*label)?;
+            w.u64(ended_at.raw())?;
+            w.u64(*task)?;
+        }
         tasks::Key::EndedDelegate { requester, task } => index::conversation(w, 17, *requester, *task)?,
         tasks::Key::Delegate { requester, task } => index::conversation(w, 18, *requester, *task)?,
         tasks::Key::Goal { project, task } => {
@@ -869,6 +876,12 @@ fn take_task_key(r: &mut Reader<'_>) -> Option<tasks::Key> {
         14 => tasks::Key::ConversationNewest { party: r.u64()?, task: tasks::Newest::from_raw(r.u64()?) },
         19 => tasks::Key::EndedByParty {
             party: r.u64()?,
+            label: r.u32()?,
+            ended_at: tasks::Newest::from_raw(r.u64()?),
+            task: r.u64()?,
+        },
+        20 => tasks::Key::EndedByProject {
+            project: r.u32()?,
             label: r.u32()?,
             ended_at: tasks::Newest::from_raw(r.u64()?),
             task: r.u64()?,

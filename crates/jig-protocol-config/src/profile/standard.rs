@@ -139,15 +139,15 @@ pub(super) const CLIENTS: jig_protocol_engine_clients::Limits =
     jig_protocol_engine_clients::Limits { connections: 16, streams: 8, exchanges: 32, ..small::CLIENTS };
 
 const JOURNAL: skein_lib::JournalLimits =
-    skein_lib::JournalLimits { commits: 3, writes: 70_748, held: 212_244, now: 1024, release: 1024 };
+    skein_lib::JournalLimits { commits: 3, writes: 71_260, held: 213_780, now: 1024, release: 1024 };
 // Same 19.s3 composition as small; the standard domain supplies the larger value and operation bounds.
 const STORE_KV: skein_kv::Limits = skein_kv::Limits {
     value: 10_396_343,
-    ops: 141_498,
-    commit: 563_883_306,
-    queued_bytes: 1_691_649_918,
-    segment: 1_127_766_612,
-    snapshot_after: 563_883_306,
+    ops: 142_522,
+    commit: 566_021_418,
+    queued_bytes: 1_698_064_254,
+    segment: 1_132_042_836,
+    snapshot_after: 566_021_418,
     chunk: 10_398_442,
     page: skein_kv::Page { rows: 2, bytes: 10_398_422 },
     ..small::STORE_KV

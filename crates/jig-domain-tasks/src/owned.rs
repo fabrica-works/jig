@@ -58,6 +58,7 @@ pub fn stored_bytes(record: &Stored) -> Option<u64> {
         | Stored::ConversationNewest(_)
         | Stored::Goal(_)
         | Stored::EndedByParty(_)
+        | Stored::EndedByProject(_)
         | Stored::EndedDelegate(_)
         | Stored::Delegate(_)
         | Stored::ConversationOldest(_)
