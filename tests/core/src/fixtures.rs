@@ -131,3 +131,9 @@ pub fn member(world: &crate::effects::World, executor: tasks::Executor, words: &
         wake: tasks::WakePolicy::DEFAULT,
     }
 }
+
+/// Assert the last party answer carries this refusal.
+pub fn refusal(world: &crate::effects::World, why: jig_domain_people::Refusal) {
+    use jig_domain_people as people;
+    assert_eq!(world.people_answers.last(), Some(&people::Reply::Outcome(people::Outcome::Refused(why))));
+}

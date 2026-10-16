@@ -158,7 +158,7 @@ fn a_procedure_goal_proposal_restores_and_accepts_the_original_executor() {
         world.people_answers.last(),
         Some(&people::Reply::Outcome(people::Outcome::Refused(people::Refusal::Authority {
             lacking: people::Lack::Budget { needs: 300, left: 200 },
-            proposable: None
+            proposable: Some(people::Accepter::Role(0))
         })))
     );
     assert!(world.procedure_inputs.is_empty(), "current funding is rechecked before acceptance");

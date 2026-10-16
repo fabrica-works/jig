@@ -600,9 +600,14 @@ pub fn fixture(seed: u64, engine_slots: u32) -> (root::Config, root::Limits) {
 fn party_refusal(why: people::Refusal) -> parties::Refusal {
     match why {
         people::Refusal::Role { held } => parties::Refusal::Role { held: held.map(people::Role::number) },
-        people::Refusal::Authority { proposable, lacking } => {
-            parties::Refusal::Authority { proposable, lacking: party_lack(lacking) }
-        }
+        people::Refusal::Authority { proposable, lacking } => parties::Refusal::Authority {
+            proposable: match proposable {
+                Some(people::Accepter::Role(_)) => Some(true),
+                Some(people::Accepter::Nobody) => Some(false),
+                None => None,
+            },
+            lacking: party_lack(lacking),
+        },
         people::Refusal::Limit { which } => parties::Refusal::Limit { which: party_limit(which) },
         people::Refusal::Moved { now } => parties::Refusal::Moved { now: party_moved(now) },
         people::Refusal::Ended { how } => parties::Refusal::Ended { how: party_ending(how) },

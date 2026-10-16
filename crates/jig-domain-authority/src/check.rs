@@ -136,7 +136,7 @@ fn batch(
     source: Source,
     why: &mut Queue<Finding>,
 ) -> Checked {
-    let task_answer = if source == Source::Task { Answer::Propose } else { Answer::Refuse };
+    let task_answer = Answer::Propose;
     let mut answer = Answer::Allow;
     if numbers.spent.checked_add(numbers.spent_below).is_none() {
         find(&mut answer, why, Answer::Refuse, Finding::Arithmetic);
@@ -167,7 +167,10 @@ fn batch(
                 }
             }
             if !covered {
-                let strict = if source == Source::Task { task_answer } else { Answer::Refuse };
+                let strict = match source {
+                    Source::Task | Source::Role => task_answer,
+                    Source::Project | Source::Deployment => Answer::Refuse,
+                };
                 find(&mut answer, why, strict, Finding::Grant { source });
             }
         }
@@ -665,15 +668,19 @@ fn give(
         &domain.rules().implies,
     );
     if !lacks.is_empty() {
-        find(&mut answer, why, Answer::Refuse, Finding::Authority { source: Source::Role, lacks });
+        find(&mut answer, why, Answer::Propose, Finding::Authority { source: Source::Role, lacks });
     }
     ceilings(domain, policy, authority, &mut answer, why);
-    let numbers = match carve(ask.pool, &[authority.budget.spend]) {
-        Some(numbers) => Some(numbers),
-        None => {
-            find(&mut answer, why, Answer::Refuse, Finding::Arithmetic);
-            None
+    let numbers = if answer == Answer::Allow {
+        match carve(ask.pool, &[authority.budget.spend]) {
+            Some(numbers) => Some(numbers),
+            None => {
+                find(&mut answer, why, Answer::Refuse, Finding::Arithmetic);
+                None
+            }
         }
+    } else {
+        None
     };
     checked(answer, numbers)
 }

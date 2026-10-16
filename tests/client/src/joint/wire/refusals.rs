@@ -14,9 +14,14 @@ pub fn refusal(value: people::Refusal) -> client::Refusal {
             },
         },
         people::Refusal::Role { held } => client::Refusal::Role { held: held.map(super::owner::held_role) },
-        people::Refusal::Authority { lacking, proposable } => {
-            client::Refusal::Authority { lacking: lack(lacking), proposable }
-        }
+        people::Refusal::Authority { lacking, proposable } => client::Refusal::Authority {
+            lacking: lack(lacking),
+            proposable: match proposable {
+                Some(people::Accepter::Role(_)) => Some(true),
+                Some(people::Accepter::Nobody) => Some(false),
+                None => None,
+            },
+        },
         people::Refusal::Limit { which } => {
             client::Refusal::Limit { which: client::Limit::Admission { which: limit(which) } }
         }
@@ -190,11 +195,16 @@ mod tests {
             assert_eq!(actual, expected);
             assert!(client::EntranceRefusal::new(actual).is_ok());
         }
-        for proposable in [None, Some(false), Some(true)] {
+        for (proposable, boolean) in
+            [(None, None), (Some(people::Accepter::Nobody), Some(false)), (Some(people::Accepter::Role(0)), Some(true))]
+        {
             let source = people::Refusal::Authority { lacking: people::Lack::TaskKind { executor: None }, proposable };
             assert_eq!(
                 refusal(source),
-                client::Refusal::Authority { lacking: client::Lacking::TaskKind { executor: None }, proposable }
+                client::Refusal::Authority {
+                    lacking: client::Lacking::TaskKind { executor: None },
+                    proposable: boolean
+                }
             );
         }
         assert_eq!(

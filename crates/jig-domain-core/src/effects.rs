@@ -621,7 +621,7 @@ fn complete(core: &mut Core, env: &Env<Limits>, work: &mut Queue<Event>, out: &m
                                 description.effect.clone(),
                             )),
                         };
-                        Some(core.request_refusal(&ask, &mut findings))
+                        Some(core.request_refusal(&ask, checked, &mut findings))
                     }
                     tasks::Party::Person(_) | tasks::Party::Task(_) | tasks::Party::Deployment { .. } => None,
                 };

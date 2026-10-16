@@ -1184,7 +1184,7 @@ fn every_final_refusal_keeps_its_facts_under_the_key_when_roles_and_time_change(
         Refusal::Authority { proposable: None, lacking: Lack::Budget { needs: 30, left: 11 } },
         Refusal::Authority { proposable: None, lacking: Lack::Grant { kind: 5 } },
         Refusal::Authority { proposable: None, lacking: Lack::TaskKind { executor: None } },
-        Refusal::Authority { proposable: Some(false), lacking: Lack::Approver },
+        Refusal::Authority { proposable: Some(Accepter::Nobody), lacking: Lack::Approver },
         Refusal::Authority { proposable: None, lacking: Lack::Depth { most: 2 } },
         Refusal::Authority { proposable: None, lacking: Lack::Deadline },
         Refusal::Authority { proposable: None, lacking: Lack::Tasks { left: 3 } },

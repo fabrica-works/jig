@@ -132,3 +132,11 @@ pub(crate) fn domain_with_role_spend(spend: u64) -> Domain {
     assert_eq!(apply(&mut domain, Event::Policy { project: 1, policy }), PolicyFact::Added { project: 1 });
     domain
 }
+
+pub(crate) fn delegate(spend: u64) -> crate::Delegate {
+    let mut given = authority();
+    given.budget.spend = spend;
+    given.delegation.tasks = 0;
+    given.delegation.depth = 0;
+    crate::Delegate { executor: crate::Executor::Charter(1), authority: given, symbolic: Box::new([]) }
+}

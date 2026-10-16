@@ -1,7 +1,8 @@
 const NO_TOOLS: u64 = 0;
+const OWNER_ROLE: u32 = 0;
 use jig_core_world::{
     effects::World,
-    fixtures::{ask_as, live_row},
+    fixtures::{ask_as, live_row, refusal},
     stories::offers::{no_holder_fixture, world_with},
 };
 use jig_domain_people as people;
@@ -124,7 +125,7 @@ fn a_partys_batch_beyond_their_pool_is_refused_naming_the_budget() {
         world.people_answers.last(),
         Some(&people::Reply::Outcome(people::Outcome::Refused(people::Refusal::Authority {
             lacking: people::Lack::Budget { needs: 101, left: 100 },
-            proposable: None
+            proposable: Some(people::Accepter::Role(OWNER_ROLE))
         })))
     );
 }
@@ -152,9 +153,7 @@ const SIGN_IN_REQUEST: u64 = 8300;
 const INBOX_REQUEST: u64 = 8301;
 const PARAMETER: u32 = 13;
 const WRITE_KIND: u16 = 5;
-fn refusal(world: &World, why: people::Refusal) {
-    assert_eq!(world.people_answers.last(), Some(&people::Reply::Outcome(people::Outcome::Refused(why))));
-}
+
 fn finish(world: &mut World) {
     world.end(
         tasks::End::Finished { result: tasks::TaskResult::Report { words: Box::new([]) }, cancel_delegates: false },
@@ -315,7 +314,7 @@ fn a_member_whose_charter_the_role_lacks_is_refused_naming_it() {
         &world,
         people::Refusal::Authority {
             lacking: people::Lack::TaskKind { executor: Some(people::TaskExecutor::Agent { charter: CHARTER }) },
-            proposable: None,
+            proposable: Some(people::Accepter::Role(OWNER_ROLE)),
         },
     );
 }
@@ -390,5 +389,59 @@ fn a_partys_ended_input_is_loaded_and_kept_as_a_stub() {
             phase: tasks::Status::Done,
             result: skein_lib::Token::new(CHAT)
         }))))
+    );
+}
+
+#[test]
+fn a_partys_batch_beyond_their_role_is_refused_naming_who_may_accept() {
+    let mut world = batch_world(320);
+    create(&mut world, Box::new([member(b"beyond role", 150)]));
+    refusal(
+        &world,
+        people::Refusal::Authority {
+            lacking: people::Lack::Budget { needs: 150, left: 100 },
+            proposable: Some(people::Accepter::Role(OWNER_ROLE)),
+        },
+    );
+    assert!(
+        !world
+            .store
+            .rows
+            .contains_key(&jig_test_domain::Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Live(FIRST))))
+    );
+}
+#[test]
+fn a_partys_batch_beyond_the_project_ceiling_says_nobody_could_accept() {
+    let mut world =
+        jig_core_world::stories::offers::world_with_policy(321, Some(people::Role::Member), |_, _, policy| {
+            policy.ceiling.budget.spend = 120;
+            for role in &mut policy.roles {
+                role.authority.budget.spend = role.authority.budget.spend.min(120);
+            }
+        });
+    create(&mut world, Box::new([member(b"beyond project", 150)]));
+    refusal(
+        &world,
+        people::Refusal::Authority {
+            lacking: people::Lack::Budget { needs: 150, left: 100 },
+            proposable: Some(people::Accepter::Nobody),
+        },
+    );
+}
+#[test]
+fn a_partys_batch_no_role_may_accept_says_nobody() {
+    let (configuration, limits) = jig_core_world::stories::offers::no_acceptor_fixture(322);
+    let mut world = World::configured(322, false, configuration, limits);
+    world.send(jig_test_domain::Event::Core(jig_domain_core::Event::People(people::Event::Roles {
+        project: PROJECT,
+        holdings: Box::new([people::Holding { person: PARTY, role: people::Role::Member }]),
+    })));
+    create(&mut world, Box::new([member(b"nobody accepts", 150)]));
+    refusal(
+        &world,
+        people::Refusal::Authority {
+            lacking: people::Lack::Budget { needs: 150, left: 100 },
+            proposable: Some(people::Accepter::Nobody),
+        },
     );
 }

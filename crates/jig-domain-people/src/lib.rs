@@ -94,4 +94,4 @@ pub use policy_value::{
     Guard, Judge, PermissionRole, PolicyChange, PolicyRole, PolicyValue, Requirement, policy_bytes,
     policy_change_bytes, requirements_bytes,
 };
-pub use refusals::{Again, DisposalIssue, Ending, Lack, LimitKind, Malformed, Party, Refusal};
+pub use refusals::{Accepter, Again, DisposalIssue, Ending, Lack, LimitKind, Malformed, Party, Refusal};

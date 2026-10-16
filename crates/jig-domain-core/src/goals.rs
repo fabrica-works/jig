@@ -122,7 +122,7 @@ impl Core {
         if checked.answer == authority::Answer::Allow {
             Ok(source)
         } else {
-            Err(self.request_refusal(&ask, &mut findings))
+            Err(self.request_refusal(&ask, checked.answer, &mut findings))
         }
     }
 

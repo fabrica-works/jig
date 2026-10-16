@@ -3,6 +3,15 @@
 use crate::Role;
 use skein_lib::Wall;
 
+/// Who may accept a proposal of a refused request (client/domain/contract.md, 3.5).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Accepter {
+    /// No proposal of this request could be accepted.
+    Nobody,
+    /// The lowest-numbered policy role deciding this kind.
+    Role(u32),
+}
+
 /// A final reason a keyed request was refused.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Refusal {
@@ -15,9 +24,9 @@ pub enum Refusal {
     /// The request lacks the stated authority.
     Authority {
         lacking: Lack,
-        /// Whether this refusal determines that a proposal could be accepted.
+        /// Who could accept a proposal of this request.
         /// None preserves refusals that make no claim about a proposal.
-        proposable: Option<bool>,
+        proposable: Option<Accepter>,
     },
     /// The stated admission bound was reached.
     Limit { which: LimitKind },

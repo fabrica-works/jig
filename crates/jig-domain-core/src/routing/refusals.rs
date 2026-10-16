@@ -23,7 +23,7 @@ pub(super) fn person_message_refusal(core: &Core, task: Option<u64>, why: tasks:
 fn task_answer(core: &Core, task: Option<u64>, why: tasks::Refusal) -> people::Outcome {
     let refusal = match why {
         tasks::Refusal::Unproposable => {
-            people::Refusal::Authority { lacking: people::Lack::Approver, proposable: Some(false) }
+            people::Refusal::Authority { lacking: people::Lack::Approver, proposable: Some(people::Accepter::Nobody) }
         }
         tasks::Refusal::PersonRevision { revision } => {
             people::Refusal::Moved { now: people::Moved::Person { revision } }

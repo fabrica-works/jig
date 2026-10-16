@@ -12,10 +12,15 @@ impl Core {
     pub(crate) fn request_refusal(
         &self,
         ask: &authority::PersonAsk,
+        answer: authority::Answer,
         findings: &mut Queue<authority::Finding>,
     ) -> people::Refusal {
         let finding = findings.pop().expect("a refused authority check explains its reason");
         let held = Some(people::Role::from_number(ask.role));
+        let proposable = match answer {
+            authority::Answer::Propose | authority::Answer::Refuse => Some(self.request_accepter(ask, answer)),
+            authority::Answer::Allow | authority::Answer::Wait => None,
+        };
         match finding {
             authority::Finding::UnknownProject => people::Refusal::Unknown,
             authority::Finding::UnknownRole | authority::Finding::Unpermitted | authority::Finding::Undecidable => {
@@ -24,7 +29,7 @@ impl Core {
             authority::Finding::Oversized => people::Refusal::Limit { which: people::LimitKind::Authority },
             authority::Finding::Arithmetic => people::Refusal::Limit { which: people::LimitKind::Arithmetic },
             authority::Finding::ResourceUnavailable => {
-                people::Refusal::Authority { proposable: None, lacking: people::Lack::ResourceUnavailable }
+                people::Refusal::Authority { proposable, lacking: people::Lack::ResourceUnavailable }
             }
             authority::Finding::Authority { source, lacks } => {
                 let cap = self.source_cap(ask, source);
@@ -47,12 +52,12 @@ impl Core {
                 } else {
                     unreachable!("authority deficit has a component")
                 };
-                people::Refusal::Authority { proposable: None, lacking }
+                people::Refusal::Authority { proposable, lacking }
             }
             authority::Finding::Spend { source } | authority::Finding::Price { source } => {
                 let cap = self.source_cap(ask, source);
                 people::Refusal::Authority {
-                    proposable: None,
+                    proposable,
                     lacking: people::Lack::Budget {
                         needs: request_spend(&ask.request),
                         left: source_spend(ask, source, cap),
@@ -60,65 +65,91 @@ impl Core {
                 }
             }
             authority::Finding::Tasks { source } => people::Refusal::Authority {
-                proposable: None,
+                proposable,
                 lacking: people::Lack::Tasks {
                     left: source_tasks(ask, source, self.source_cap(ask, source).delegation.tasks),
                 },
             },
             authority::Finding::Executor { .. } => {
-                people::Refusal::Authority { proposable: None, lacking: people::Lack::TaskKind { executor: None } }
+                people::Refusal::Authority { proposable, lacking: people::Lack::TaskKind { executor: None } }
             }
             authority::Finding::Grant { source } => people::Refusal::Authority {
-                proposable: None,
+                proposable,
                 lacking: people::Lack::Grant {
                     kind: request_grant(&ask.request, self.source_cap(ask, source), &self.authority.rules().implies),
                 },
             },
             authority::Finding::RunBudget | authority::Finding::RunCap => people::Refusal::Authority {
-                proposable: None,
+                proposable,
                 lacking: people::Lack::Budget {
                     needs: request_spend(&ask.request),
                     left: available(ask.pool).min(self.authority.rules().maximum_run_spend),
                 },
             },
-            authority::Finding::Deadline => {
-                people::Refusal::Authority { proposable: None, lacking: people::Lack::Deadline }
-            }
-            authority::Finding::Account => {
-                people::Refusal::Authority { proposable: None, lacking: people::Lack::Account }
-            }
-            authority::Finding::Writer => {
-                people::Refusal::Authority { proposable: None, lacking: people::Lack::Writer }
-            }
-            authority::Finding::Tool => people::Refusal::Authority { proposable: None, lacking: people::Lack::Tool },
-            authority::Finding::Scope { .. } => {
-                people::Refusal::Authority { proposable: None, lacking: people::Lack::Scope }
-            }
+            authority::Finding::Deadline => people::Refusal::Authority { proposable, lacking: people::Lack::Deadline },
+            authority::Finding::Account => people::Refusal::Authority { proposable, lacking: people::Lack::Account },
+            authority::Finding::Writer => people::Refusal::Authority { proposable, lacking: people::Lack::Writer },
+            authority::Finding::Tool => people::Refusal::Authority { proposable, lacking: people::Lack::Tool },
+            authority::Finding::Scope { .. } => people::Refusal::Authority { proposable, lacking: people::Lack::Scope },
             authority::Finding::ResourceAccess => {
-                people::Refusal::Authority { proposable: None, lacking: people::Lack::ResourceAccess }
+                people::Refusal::Authority { proposable, lacking: people::Lack::ResourceAccess }
             }
             authority::Finding::Reference => {
-                people::Refusal::Authority { proposable: None, lacking: people::Lack::Reference }
+                people::Refusal::Authority { proposable, lacking: people::Lack::Reference }
             }
             authority::Finding::Required { judge } => people::Refusal::Authority {
-                proposable: None,
+                proposable,
                 lacking: people::Lack::Required { connector: judge.connector, kind: judge.requirement },
             },
             authority::Finding::Failed { judge } => people::Refusal::Authority {
-                proposable: None,
+                proposable,
                 lacking: people::Lack::Failed { connector: judge.connector, kind: judge.requirement },
             },
             authority::Finding::Unguarded { judge } => people::Refusal::Authority {
-                proposable: None,
+                proposable,
                 lacking: people::Lack::Unguarded { connector: judge.connector, kind: judge.requirement },
             },
             authority::Finding::PeriodSpend => people::Refusal::Authority {
-                proposable: None,
+                proposable,
                 lacking: people::Lack::Budget {
                     needs: ask.pool.budget,
                     left: self.authority.role(ask.project, ask.role).expect("checked role").period_spend,
                 },
             },
+        }
+    }
+
+    fn request_accepter(&self, ask: &authority::PersonAsk, answer: authority::Answer) -> people::Accepter {
+        if answer != authority::Answer::Propose {
+            return people::Accepter::Nobody;
+        }
+        let kind = match &ask.request {
+            authority::PersonRequest::Create(_) => authority::ProposalKind::Batch,
+            authority::PersonRequest::Amend(_) => authority::ProposalKind::Amend,
+            authority::PersonRequest::Allot(_) | authority::PersonRequest::Move(_) => authority::ProposalKind::Widen,
+            authority::PersonRequest::Accept(action) => match action {
+                authority::Action::Batch(_) => authority::ProposalKind::Batch,
+                authority::Action::Effect(_) => authority::ProposalKind::Effect,
+                authority::Action::Widen(_) => authority::ProposalKind::Widen,
+                authority::Action::Amend(_) => authority::ProposalKind::Amend,
+                authority::Action::Escalate { .. } => authority::ProposalKind::Escalation,
+            },
+            authority::PersonRequest::Cancel
+            | authority::PersonRequest::Release
+            | authority::PersonRequest::Watch
+            | authority::PersonRequest::Policy => return people::Accepter::Nobody,
+        };
+        match crate::acts::bounds::recipient(self, ask.project, kind) {
+            Some(crate::acts::Recipient::Roles { roles, .. }) => match roles.iter().copied().min() {
+                Some(role) => people::Accepter::Role(role),
+                None => people::Accepter::Nobody,
+            },
+            Some(
+                crate::acts::Recipient::Task(_)
+                | crate::acts::Recipient::Party(_)
+                | crate::acts::Recipient::Role { .. },
+            )
+            | None => people::Accepter::Nobody,
         }
     }
 

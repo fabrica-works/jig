@@ -21,7 +21,14 @@ pub(crate) fn refusal(value: p::Refusal, limits: &w::Limits) -> Result<w::Refusa
         }
         p::Refusal::Authority { lacking, proposable } => w::Refusal::Authority(w::RefusalAuthority::new(
             limits,
-            w::RefusalAuthorityParts { lacking: lack(lacking, limits)?, proposable },
+            w::RefusalAuthorityParts {
+                lacking: lack(lacking, limits)?,
+                proposable: match proposable {
+                    Some(p::Accepter::Role(_)) => Some(true),
+                    Some(p::Accepter::Nobody) => Some(false),
+                    None => None,
+                },
+            },
         )?),
         p::Refusal::Limit { which } => {
             let which =

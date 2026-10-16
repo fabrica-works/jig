@@ -189,7 +189,11 @@ impl Core {
         };
         let mut findings = Queue::with_capacity(authority::max_out(self.authority.limits()).expect("authority bound"));
         let checked = authority::check_request(&self.authority, &ask, &mut findings);
-        if checked.answer == authority::Answer::Allow { Ok(()) } else { Err(self.request_refusal(&ask, &mut findings)) }
+        if checked.answer == authority::Answer::Allow {
+            Ok(())
+        } else {
+            Err(self.request_refusal(&ask, checked.answer, &mut findings))
+        }
     }
 
     /// Check a task's proposed action against both project and deployment ceilings.

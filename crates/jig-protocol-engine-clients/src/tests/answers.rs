@@ -209,12 +209,17 @@ fn admission_refusals_keep_the_category_without_a_guessed_bound() {
 fn authority_refusals_keep_the_known_facts_and_optional_proposal_verdict() {
     let limits = f::wire();
     let cases = f::lacks();
-    for proposable in [None, Some(false), Some(true)] {
+    for (proposable, boolean) in
+        [(None, None), (Some(p::Accepter::Nobody), Some(false)), (Some(p::Accepter::Role(0)), Some(true))]
+    {
         for (source, expected) in &cases {
             let source = p::Refusal::Authority { lacking: *source, proposable };
             let expected = w::Refusal::Authority(
-                w::RefusalAuthority::new(&limits, w::RefusalAuthorityParts { lacking: expected.clone(), proposable })
-                    .expect("authority"),
+                w::RefusalAuthority::new(
+                    &limits,
+                    w::RefusalAuthorityParts { lacking: expected.clone(), proposable: boolean },
+                )
+                .expect("authority"),
             );
             assert_eq!(crate::translate::refusals::refusal(source, &limits).expect("authority fits"), expected);
         }

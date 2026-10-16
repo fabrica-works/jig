@@ -37,7 +37,7 @@ fn a_members_goal_beyond_their_pool_is_refused_when_nobody_may_accept_it() {
     };
     let refused = people::Reply::Outcome(people::Outcome::Refused(people::Refusal::Authority {
         lacking: people::Lack::Approver,
-        proposable: Some(false),
+        proposable: Some(people::Accepter::Nobody),
     }));
     ask(&mut world, 91, goal.clone());
     assert_eq!(world.people_answers.last(), Some(&refused));

@@ -4,6 +4,7 @@ use crate::{
     tests_fixtures::{domain_with_role_spend, domain_with_roles, numbers},
 };
 
+const SPENDS: [u64; 3] = [20, 60, 110];
 const PROJECT: u32 = 1;
 const MEMBER: u32 = 2;
 const HOLDER: u32 = 5;
@@ -110,5 +111,108 @@ fn as_allowed_over_generated_pools_roles_and_caps_is_the_least_bound() {
             pool.budget.saturating_sub(pool.spent).saturating_sub(pool.spent_below).saturating_sub(pool.reserved);
         let expected = remaining.min(spend).saturating_sub(named).min(cap.unwrap_or(u64::MAX));
         assert_eq!(as_allowed(&domain, &ask, named, cap), expected, "case {case}: {ask:?}, named {named}, cap {cap:?}");
+    }
+}
+
+fn batch_request(spend: u64) -> PersonAsk {
+    PersonAsk {
+        project: PROJECT,
+        role: MEMBER,
+        pool: numbers(100),
+        tasks_left: 8,
+        request: PersonRequest::Create(Box::new([crate::tests_fixtures::delegate(spend)])),
+    }
+}
+
+#[test]
+fn a_partys_batch_beyond_their_role_answers_propose() {
+    let domain = domain_with_role_spend(40);
+    let mut why = skein_lib::Queue::with_capacity(crate::max_out(domain.limits()).unwrap());
+    assert_eq!(crate::check_request(&domain, &batch_request(60), &mut why).answer, crate::Answer::Propose);
+}
+
+#[test]
+fn a_partys_batch_beyond_the_project_ceiling_answers_refuse() {
+    let domain = domain_with_role_spend(40);
+    let mut why = skein_lib::Queue::with_capacity(crate::max_out(domain.limits()).unwrap());
+    assert_eq!(crate::check_request(&domain, &batch_request(110), &mut why).answer, crate::Answer::Refuse);
+}
+
+#[test]
+fn a_partys_widening_beyond_their_role_answers_propose() {
+    let domain = domain_with_role_spend(40);
+    let mut ask = batch_request(60);
+    ask.request = PersonRequest::Amend(crate::tests_fixtures::delegate(60).authority);
+    let mut why = skein_lib::Queue::with_capacity(crate::max_out(domain.limits()).unwrap());
+    assert_eq!(crate::check_request(&domain, &ask, &mut why).answer, crate::Answer::Propose);
+}
+
+#[test]
+fn one_batch_answers_alike_under_a_task_and_under_a_party() {
+    let domain = domain_with_role_spend(40);
+    for spend in SPENDS {
+        let person = batch_request(spend);
+        let PersonRequest::Create(tasks) = &person.request else { unreachable!("batch fixture") };
+        let task = crate::BatchAsk {
+            project: PROJECT,
+            creator: domain.role(PROJECT, MEMBER).unwrap().authority.clone(),
+            numbers: person.pool,
+            tasks_left: person.tasks_left,
+            tasks: tasks.clone(),
+        };
+        let mut task_why = skein_lib::Queue::with_capacity(crate::max_out(domain.limits()).unwrap());
+        let mut person_why = skein_lib::Queue::with_capacity(crate::max_out(domain.limits()).unwrap());
+        assert_eq!(
+            crate::check_batch(&domain, &task, &mut task_why),
+            crate::check_request(&domain, &person, &mut person_why),
+            "spend {spend}"
+        );
+        assert_eq!(task_why.len(), person_why.len(), "spend {spend}");
+        for (task_finding, person_finding) in task_why.iter().zip(&person_why) {
+            assert_eq!(*task_finding, task_source(*person_finding), "spend {spend}");
+        }
+    }
+}
+
+#[test]
+fn a_partys_widening_beyond_their_pool_answers_propose() {
+    let domain = domain_with_role_spend(80);
+    let mut ask = batch_request(60);
+    ask.pool = numbers(40);
+    ask.request = PersonRequest::Amend(crate::tests_fixtures::delegate(60).authority);
+    let mut why = skein_lib::Queue::with_capacity(crate::max_out(domain.limits()).unwrap());
+    assert_eq!(crate::check_request(&domain, &ask, &mut why).answer, crate::Answer::Propose);
+}
+
+fn task_source(finding: crate::Finding) -> crate::Finding {
+    use crate::Finding;
+    let source = |source| if source == crate::Source::Role { crate::Source::Task } else { source };
+    match finding {
+        Finding::Authority { source: origin, lacks } => Finding::Authority { source: source(origin), lacks },
+        Finding::Executor { source: origin } => Finding::Executor { source: source(origin) },
+        Finding::Tasks { source: origin } => Finding::Tasks { source: source(origin) },
+        Finding::Spend { source: origin } => Finding::Spend { source: source(origin) },
+        Finding::Grant { source: origin } => Finding::Grant { source: source(origin) },
+        Finding::Price { source: origin } => Finding::Price { source: source(origin) },
+        Finding::Scope { source: origin } => Finding::Scope { source: source(origin) },
+        Finding::Oversized
+        | Finding::UnknownProject
+        | Finding::UnknownRole
+        | Finding::Arithmetic
+        | Finding::RunBudget
+        | Finding::RunCap
+        | Finding::Deadline
+        | Finding::Account
+        | Finding::Writer
+        | Finding::Tool
+        | Finding::ResourceAccess
+        | Finding::ResourceUnavailable
+        | Finding::Reference
+        | Finding::Required { .. }
+        | Finding::Failed { .. }
+        | Finding::Unguarded { .. }
+        | Finding::Unpermitted
+        | Finding::Undecidable
+        | Finding::PeriodSpend => finding,
     }
 }

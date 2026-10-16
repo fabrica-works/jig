@@ -766,7 +766,7 @@ fn person_cells_check_each_request_role_rights_funding_and_proposal_rights() {
     let mut why = findings(&domain);
     assert_eq!(
         check_request(&domain, &ask, &mut why).answer,
-        Answer::Refuse,
+        Answer::Propose,
         "funding must be available in this role's pool"
     );
     let mut ask = base.clone();

@@ -127,8 +127,12 @@ pub fn refusal_values() -> Box<[domain::Refusal]> {
         domain::Refusal::NotWellFormed { at: 1, why: domain::Malformed::AsAllowedTwice },
         domain::Refusal::NotWellFormed { at: 0, why: domain::Malformed::Conversation },
         domain::Refusal::Disposal { task: 2, issue: domain::DisposalIssue::Repeated },
+        domain::Refusal::Authority { lacking: domain::Lack::Approver, proposable: Some(domain::Accepter::Nobody) },
         domain::Refusal::Role { held: Some(domain::Role::Policy { role: 7 }) },
-        domain::Refusal::Authority { lacking: domain::Lack::Budget { needs: 17, left: 11 }, proposable: Some(true) },
+        domain::Refusal::Authority {
+            lacking: domain::Lack::Budget { needs: 17, left: 11 },
+            proposable: Some(domain::Accepter::Role(0)),
+        },
         domain::Refusal::Limit { which: domain::LimitKind::LiveTasks },
         domain::Refusal::Moved { now: domain::Moved::Hold { revision: 3, reason: domain::HoldReason::Budget } },
         domain::Refusal::Ended {
@@ -201,7 +205,7 @@ pub fn outcome_values() -> Box<[domain::Outcome]> {
         domain::Outcome::Started { task: 2 },
         domain::Outcome::Refused(domain::Refusal::Authority {
             lacking: domain::Lack::Budget { needs: 17, left: 11 },
-            proposable: Some(true),
+            proposable: Some(domain::Accepter::Role(0)),
         }),
     ])
 }

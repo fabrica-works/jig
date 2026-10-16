@@ -294,7 +294,7 @@ pub(crate) fn goal_start(
                 .budget
                 .saturating_sub(numbers.spent.saturating_add(numbers.spent_below).saturating_add(numbers.reserved));
     if hard || checked.answer != authority::Answer::Allow && !beyond {
-        return Err(core.request_refusal(&ask, &mut findings));
+        return Err(core.request_refusal(&ask, checked.answer, &mut findings));
     }
     if checked.answer != authority::Answer::Allow && recipient(core, project, authority::ProposalKind::Batch).is_none()
     {
@@ -366,20 +366,7 @@ pub(crate) fn amendment_admit(
         request: authority::PersonRequest::Amend(after),
     };
     let checked = authority::check_request_with_standing(&core.authority, &ask, standing, &mut findings);
-    let role_shortage = if findings.len() == 1 {
-        match findings.iter().next() {
-            Some(authority::Finding::Authority { source: authority::Source::Role, .. }) => true,
-            Some(_) | None => false,
-        }
-    } else {
-        false
-    };
-    let answer = if checked.answer == authority::Answer::Refuse && role_shortage {
-        authority::Answer::Propose
-    } else {
-        checked.answer
-    };
-    match answer {
+    match checked.answer {
         authority::Answer::Allow => Ok((stop_run, false)),
         authority::Answer::Propose => {
             if recipient(core, project, authority::ProposalKind::Amend).is_some() {
@@ -388,14 +375,16 @@ pub(crate) fn amendment_admit(
                 Err(unproposable())
             }
         }
-        authority::Answer::Wait | authority::Answer::Refuse => Err(core.request_refusal(&ask, &mut findings)),
+        authority::Answer::Wait | authority::Answer::Refuse => {
+            Err(core.request_refusal(&ask, checked.answer, &mut findings))
+        }
     }
 }
 
 /// The same static absence of accepting authority is reported before a draft
 /// is sent and when its admission would otherwise make a party proposal.
 fn unproposable() -> people::Refusal {
-    people::Refusal::Authority { lacking: people::Lack::Approver, proposable: Some(false) }
+    people::Refusal::Authority { lacking: people::Lack::Approver, proposable: Some(people::Accepter::Nobody) }
 }
 
 /// Only a newly admitted proposal needs an accepting policy role (tasks.md, 9).

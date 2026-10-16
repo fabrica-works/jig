@@ -92,7 +92,10 @@ fn a_goal_without_an_accepting_role_reports_the_same_refusal_in_its_bound_and_ad
     else {
         panic!("unproposable bound")
     };
-    assert_eq!(why, people::Refusal::Authority { lacking: people::Lack::Approver, proposable: Some(false) });
+    assert_eq!(
+        why,
+        people::Refusal::Authority { lacking: people::Lack::Approver, proposable: Some(people::Accepter::Nobody) }
+    );
     assert_eq!(
         core.goal_start(
             1,
@@ -483,7 +486,10 @@ fn task_controls_owner_changes_priorities_and_note_scopes_share_their_judges() {
             Ok(number)
         );
     }
-    let why = people::Refusal::Authority { lacking: people::Lack::Tasks { left: 3 }, proposable: None };
+    let why = people::Refusal::Authority {
+        lacking: people::Lack::Tasks { left: 3 },
+        proposable: Some(people::Accepter::Role(0)),
+    };
     assert_eq!(offers::admit(&core, &limits, 1, Act::TakeOver, &Subject::Task { task: 2 }), Admission::Refused(why));
     assert_eq!(
         core.move_admit(1, Some(people::Role::Owner), 1, 2, limits.tasks.tree_tasks, limits.tasks.depth),

@@ -19,9 +19,14 @@ pub(super) fn refusal(value: people::Refusal) -> application::Refusal {
                 None => None,
             },
         },
-        people::Refusal::Authority { proposable, lacking } => {
-            application::Refusal::Authority { proposable, lacking: lack(lacking) }
-        }
+        people::Refusal::Authority { proposable, lacking } => application::Refusal::Authority {
+            proposable: match proposable {
+                Some(people::Accepter::Role(_)) => Some(true),
+                Some(people::Accepter::Nobody) => Some(false),
+                None => None,
+            },
+            lacking: lack(lacking),
+        },
         people::Refusal::Limit { which } => application::Refusal::Limit { which: limit_kind(which) },
         people::Refusal::Moved { now } => application::Refusal::Moved { now: moved(now) },
         people::Refusal::Ended { how } => application::Refusal::Ended { how: ending(how) },

@@ -51,7 +51,7 @@ fn each_lack_reads_back() {
     for value in values::lack_values() {
         people_round_trip(values::answered(domain::Outcome::Refused(domain::Refusal::Authority {
             lacking: value,
-            proposable: Some(true),
+            proposable: Some(domain::Accepter::Role(0)),
         })));
     }
 }
@@ -95,7 +95,7 @@ fn an_answered_key_reads_back_with_its_ask_and_outcome() {
 fn a_refusal_lacking_a_budget_reads_back() {
     people_round_trip(values::answered(domain::Outcome::Refused(domain::Refusal::Authority {
         lacking: domain::Lack::Budget { needs: 17, left: 11 },
-        proposable: Some(true),
+        proposable: Some(domain::Accepter::Role(0)),
     })));
 }
 fn a_role_refusal_without_a_role_reads_back() {
@@ -110,7 +110,7 @@ fn an_authority_refusal_without_proposability_reads_back() {
 fn an_authority_refusal_prevents_a_proposal_reads_back() {
     people_round_trip(values::answered(domain::Outcome::Refused(domain::Refusal::Authority {
         lacking: domain::Lack::Funding,
-        proposable: Some(false),
+        proposable: Some(domain::Accepter::Nobody),
     })));
 }
 

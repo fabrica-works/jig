@@ -196,7 +196,11 @@ impl Core {
             request: authority::PersonRequest::Accept(authority::Action::Escalate { release: None }),
         };
         let checked = authority::check_request(&self.authority, &ask, &mut findings);
-        if checked.answer == authority::Answer::Allow { Ok(()) } else { Err(self.request_refusal(&ask, &mut findings)) }
+        if checked.answer == authority::Answer::Allow {
+            Ok(())
+        } else {
+            Err(self.request_refusal(&ask, checked.answer, &mut findings))
+        }
     }
 
     /// Select the project's configured fallback role for a held decision.

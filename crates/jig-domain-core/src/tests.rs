@@ -2798,7 +2798,7 @@ fn goal_deadlines_are_checked_against_the_role_and_policy() {
     assert_eq!(
         core.goal_start(1, 1, people::Role::Owner, people::GoalExecutor::Charter(1), 10, Some(later), 2)
             .expect_err("beyond policy"),
-        people::Refusal::Authority { proposable: None, lacking: people::Lack::Deadline }
+        people::Refusal::Authority { proposable: Some(people::Accepter::Nobody), lacking: people::Lack::Deadline }
     );
 }
 

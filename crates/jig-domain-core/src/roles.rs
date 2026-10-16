@@ -61,7 +61,7 @@ impl Core {
         };
         let checked = authority::check_request_with_standing(&self.authority, &ask, true, &mut findings);
         if checked.answer != authority::Answer::Allow {
-            return Err(self.request_refusal(&ask, &mut findings));
+            return Err(self.request_refusal(&ask, checked.answer, &mut findings));
         }
         if !self.tasks.takeover_state(task, person) {
             let people::Outcome::Refused(why) =
@@ -98,7 +98,7 @@ impl Core {
         };
         let checked = authority::check_request(&self.authority, &ask, &mut findings);
         if checked.answer != authority::Answer::Allow {
-            return Err(self.request_refusal(&ask, &mut findings));
+            return Err(self.request_refusal(&ask, checked.answer, &mut findings));
         }
         let Some(policy) = self.authority.policy(project) else { unreachable!("checked project policy") };
         if !self.authority.escalations_held(project, role.number()) {
@@ -184,7 +184,7 @@ impl Core {
         };
         let checked = authority::check_request_with_standing(&self.authority, &ask, standing, &mut findings);
         if checked.answer != authority::Answer::Allow {
-            return Err(self.request_refusal(&ask, &mut findings));
+            return Err(self.request_refusal(&ask, checked.answer, &mut findings));
         }
         if reason_len > usize::try_from(result_bytes).expect("u32 fits usize") {
             Err(people::Refusal::Limit { which: people::LimitKind::Words })
@@ -369,6 +369,10 @@ impl Core {
             request: authority::PersonRequest::Policy,
         };
         let checked = authority::check_request(&self.authority, &ask, &mut findings);
-        if checked.answer == authority::Answer::Allow { Ok(()) } else { Err(self.request_refusal(&ask, &mut findings)) }
+        if checked.answer == authority::Answer::Allow {
+            Ok(())
+        } else {
+            Err(self.request_refusal(&ask, checked.answer, &mut findings))
+        }
     }
 }

@@ -428,7 +428,17 @@ pub(super) fn encode_refusal(value: &domain::Refusal, limits: &wire::Limits) -> 
         )?),
         domain::Refusal::Authority { lacking, proposable } => wire::Refusal::Authority(wire::RefusalAuthority::new(
             limits,
-            wire::RefusalAuthorityParts { lacking: encode_lack(lacking, limits)?, proposable: *proposable },
+            wire::RefusalAuthorityParts {
+                lacking: encode_lack(lacking, limits)?,
+                proposable: match proposable {
+                    None => None,
+                    Some(domain::Accepter::Nobody) => Some(wire::Accepter::Nobody),
+                    Some(domain::Accepter::Role(role)) => Some(wire::Accepter::Role(wire::AccepterRole::new(
+                        limits,
+                        wire::AccepterRoleParts { role: *role },
+                    )?)),
+                },
+            },
         )?),
         domain::Refusal::Limit { which } => wire::Refusal::Limit(wire::RefusalLimit::new(
             limits,
@@ -484,7 +494,14 @@ pub(super) fn decode_refusal(value: wire::Refusal) -> domain::Refusal {
         }
         wire::Refusal::Authority(value) => {
             let wire::RefusalAuthorityParts { lacking, proposable } = value.into_parts();
-            domain::Refusal::Authority { lacking: decode_lack(lacking), proposable }
+            domain::Refusal::Authority {
+                lacking: decode_lack(lacking),
+                proposable: match proposable {
+                    None => None,
+                    Some(wire::Accepter::Nobody) => Some(domain::Accepter::Nobody),
+                    Some(wire::Accepter::Role(role)) => Some(domain::Accepter::Role(role.into_parts().role)),
+                },
+            }
         }
         wire::Refusal::Limit(value) => {
             let wire::RefusalLimitParts { which } = value.into_parts();
