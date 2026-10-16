@@ -7,6 +7,7 @@ use super::{
     encode_requirement_piece, encode_requirements, encode_segments, encode_spec_parameters, permission_sum, shared_sum,
     wire,
 };
+use alloc::boxed::Box;
 pub(super) fn encode_last(value: &domain::Last, limits: &wire::Limits) -> Result<wire::Last, wire::Problem> {
     Ok(match value {
         domain::Last::Exact(value) => {
@@ -274,11 +275,12 @@ pub(super) fn encode_policy_value(
     value: &domain::PolicyValue,
     limits: &wire::Limits,
 ) -> Result<wire::PolicyValue, wire::Problem> {
-    let domain::PolicyValue { period_spend, projections, roles, requirements, permissions } = value;
+    let domain::PolicyValue { period_spend, projections, roles, requirements, permissions, templates } = value;
     wire::PolicyValue::new(
         limits,
         wire::PolicyValueParts {
             period_spend: *period_spend,
+            templates: encode_templates(templates, limits, limits.policy_value_templates)?,
             projections: encode_grants(projections, limits)?,
             roles: encode_policy_value_roles(roles, limits)?,
             requirements: encode_requirements(requirements, limits)?,
@@ -295,8 +297,10 @@ pub(super) fn decode_policy_value(
     value: wire::PolicyValue,
     limits: &wire::Limits,
 ) -> Result<domain::PolicyValue, wire::Problem> {
-    let wire::PolicyValueParts { period_spend, projections, roles, requirements, permissions } = value.into_parts();
+    let wire::PolicyValueParts { period_spend, projections, roles, requirements, permissions, templates } =
+        value.into_parts();
     Ok(domain::PolicyValue {
+        templates: decode_templates(templates),
         period_spend,
         projections: decode_grants(projections, limits)?,
         roles: decode_policy_value_roles(roles, limits)?,
@@ -310,6 +314,14 @@ pub(super) fn encode_policy_change(
     limits: &wire::Limits,
 ) -> Result<wire::PolicyChange, wire::Problem> {
     Ok(match value {
+        domain::PolicyChange::Templates { overrides } => {
+            wire::PolicyChange::Templates(wire::PolicyChangeTemplates::new(
+                limits,
+                wire::PolicyChangeTemplatesParts {
+                    overrides: encode_templates(overrides, limits, limits.policy_change_templates_overrides)?,
+                },
+            )?)
+        }
         domain::PolicyChange::ProjectSpend { period_spend } => {
             wire::PolicyChange::ProjectSpend(wire::PolicyChangeProjectSpend::new(
                 limits,
@@ -366,6 +378,9 @@ pub(super) fn decode_policy_change(
     limits: &wire::Limits,
 ) -> Result<domain::PolicyChange, wire::Problem> {
     Ok(match value {
+        wire::PolicyChange::Templates(value) => {
+            domain::PolicyChange::Templates { overrides: decode_templates(value.into_parts().overrides) }
+        }
         wire::PolicyChange::ProjectSpend(value) => {
             let wire::PolicyChangeProjectSpendParts { period_spend } = value.into_parts();
             domain::PolicyChange::ProjectSpend { period_spend }
@@ -650,4 +665,88 @@ fn check_amendment(value: &domain::Amendment, limits: &wire::Limits) -> Result<(
         Some(bytes) if bytes <= u64::from(limits.parameter_bytes_value) => Ok(()),
         Some(_) | None => Err(super::problem()),
     }
+}
+
+fn encode_templates(
+    entries: &[domain::TemplateOverride],
+    limits: &wire::Limits,
+    bound: u32,
+) -> Result<skein_lib::List<wire::TemplateOverride>, wire::Problem> {
+    let mut values = skein_lib::List::with_capacity(bound);
+    for entry in entries {
+        let executor = match entry.executor {
+            Some(domain::TemplateExecutor::Charter(value)) => Some(wire::TemplateExecutor::Charter(
+                wire::TemplateExecutorCharter::new(limits, wire::TemplateExecutorCharterParts { value })?,
+            )),
+            Some(domain::TemplateExecutor::Chosen) => Some(wire::TemplateExecutor::Chosen),
+            None => None,
+        };
+        let budget = match entry.budget {
+            Some(domain::TemplateBudget::Amount(value)) => Some(wire::TemplateBudget::Amount(
+                wire::TemplateBudgetAmount::new(limits, wire::TemplateBudgetAmountParts { value })?,
+            )),
+            Some(domain::TemplateBudget::AsAllowed { cap }) => Some(wire::TemplateBudget::AsAllowed(
+                wire::TemplateBudgetAsAllowed::new(limits, wire::TemplateBudgetAsAllowedParts { cap })?,
+            )),
+            Some(domain::TemplateBudget::Given) => Some(wire::TemplateBudget::Given),
+            None => None,
+        };
+        let deadline = match entry.deadline {
+            Some(domain::TemplateDeadline::None) => Some(wire::TemplateDeadline::None),
+            Some(domain::TemplateDeadline::Span(value)) => Some(wire::TemplateDeadline::Span(
+                wire::TemplateDeadlineSpan::new(limits, wire::TemplateDeadlineSpanParts { value: value.as_nanos() })?,
+            )),
+            Some(domain::TemplateDeadline::Given) => Some(wire::TemplateDeadline::Given),
+            None => None,
+        };
+        if values
+            .push(wire::TemplateOverride::new(
+                limits,
+                wire::TemplateOverrideParts {
+                    template: entry.template,
+                    executor,
+                    budget,
+                    deadline,
+                    priority: entry.priority,
+                },
+            )?)
+            .is_err()
+        {
+            return Err(super::problem());
+        }
+    }
+    Ok(values)
+}
+fn decode_templates(entries: skein_lib::List<wire::TemplateOverride>) -> Box<[domain::TemplateOverride]> {
+    let mut values = skein_lib::List::with_capacity(entries.len());
+    for entry in entries.into_boxed() {
+        let wire::TemplateOverrideParts { template, executor, budget, deadline, priority } = entry.into_parts();
+        let executor = match executor {
+            Some(wire::TemplateExecutor::Charter(value)) => {
+                Some(domain::TemplateExecutor::Charter(value.into_parts().value))
+            }
+            Some(wire::TemplateExecutor::Chosen) => Some(domain::TemplateExecutor::Chosen),
+            None => None,
+        };
+        let budget = match budget {
+            Some(wire::TemplateBudget::Amount(value)) => Some(domain::TemplateBudget::Amount(value.into_parts().value)),
+            Some(wire::TemplateBudget::AsAllowed(value)) => {
+                Some(domain::TemplateBudget::AsAllowed { cap: value.into_parts().cap })
+            }
+            Some(wire::TemplateBudget::Given) => Some(domain::TemplateBudget::Given),
+            None => None,
+        };
+        let deadline = match deadline {
+            Some(wire::TemplateDeadline::None) => Some(domain::TemplateDeadline::None),
+            Some(wire::TemplateDeadline::Span(value)) => {
+                Some(domain::TemplateDeadline::Span(Duration::from_nanos(value.into_parts().value)))
+            }
+            Some(wire::TemplateDeadline::Given) => Some(domain::TemplateDeadline::Given),
+            None => None,
+        };
+        values
+            .push(domain::TemplateOverride { template, executor, budget, deadline, priority })
+            .expect("decoded overrides bounded");
+    }
+    values.into_boxed()
 }

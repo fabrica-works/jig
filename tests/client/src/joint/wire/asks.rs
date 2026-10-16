@@ -715,7 +715,9 @@ mod tests {
                 people::PolicyChange::Requirements { requirements } => assert!(requirements.is_empty()),
                 people::PolicyChange::Projections { grants } => assert!(grants.is_empty()),
                 people::PolicyChange::Permissions { mappings } => assert!(mappings.is_empty()),
-                people::PolicyChange::Role(_) | people::PolicyChange::ProjectSpend { .. } => {
+                people::PolicyChange::Role(_)
+                | people::PolicyChange::ProjectSpend { .. }
+                | people::PolicyChange::Templates { .. } => {
                     panic!("replacement kind retained")
                 }
             }

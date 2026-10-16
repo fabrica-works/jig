@@ -1,4 +1,5 @@
 use jig_core_world::effects::World;
+use jig_core_world::fixtures::ask_as;
 use jig_core_world::stories::offers::no_holder_fixture;
 use jig_domain_authority as authority;
 use jig_domain_core as core;
@@ -33,7 +34,6 @@ const OWNER: u64 = 1;
 const MEMBER: u64 = 2;
 const MEMBER_CHAT: u64 = 2;
 const SIGN_IN: u64 = 8100;
-const REQUEST_BASE: u64 = 8200;
 const ACTION: u64 = 8300;
 const COMPLETION: u32 = 1;
 
@@ -60,15 +60,6 @@ fn member_world() -> (World, u64, u64) {
     (world, owner, member)
 }
 
-fn ask_holder(world: &mut World, sign_in: u64, key: u8, ask: people::Ask) {
-    world.send(root::Event::Core(core::Event::People(people::Event::Ask {
-        reply_to: ReplyTo::new(Token::new(REQUEST_BASE + u64::from(key))),
-        sign_in,
-        key: [key; 16],
-        ask,
-    })));
-}
-
 fn member_decides(world: &mut World, owner: u64, key: u8, decides: authority::Proposals) {
     let role = people::PolicyRole {
         number: people::Role::Member.number(),
@@ -89,12 +80,7 @@ fn member_decides(world: &mut World, owner: u64, key: u8, decides: authority::Pr
         requests: authority::Requests::ALL.0,
         decides: decides.0,
     };
-    ask_holder(
-        world,
-        owner,
-        key,
-        people::Ask::ChangePolicy { project: PROJECT, change: people::PolicyChange::Role(role) },
-    );
+    ask_as(world, owner, key, people::Ask::ChangePolicy { project: PROJECT, change: people::PolicyChange::Role(role) });
     assert_eq!(
         world.people_answers.last(),
         Some(&people::Reply::Outcome(people::Outcome::PolicyChanged { project: PROJECT }))
@@ -102,12 +88,7 @@ fn member_decides(world: &mut World, owner: u64, key: u8, decides: authority::Pr
 }
 
 fn start_member_chat(world: &mut World, member: u64, key: u8) {
-    ask_holder(
-        world,
-        member,
-        key,
-        people::Ask::StartChat { project: PROJECT, words: b"member's root".as_slice().into() },
-    );
+    ask_as(world, member, key, people::Ask::StartChat { project: PROJECT, words: b"member's root".as_slice().into() });
 }
 
 #[test]
@@ -175,7 +156,7 @@ fn accepting_a_chats_batch_as_ones_own_is_refused_while_nobody_holds_it() {
     let proposal = propose_member_batch(&mut world);
     member_decides(&mut world, owner, 23, authority::Proposals(1));
     let tasks_before = live_task_count(&world);
-    ask_holder(
+    ask_as(
         &mut world,
         member,
         24,

@@ -479,7 +479,9 @@ impl Observer {
                     });
                 }
             }
-            people::PolicyChange::ProjectSpend { .. } | people::PolicyChange::Permissions { .. } => {}
+            people::PolicyChange::ProjectSpend { .. }
+            | people::PolicyChange::Permissions { .. }
+            | people::PolicyChange::Templates { .. } => {}
         }
     }
 

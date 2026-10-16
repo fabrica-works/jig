@@ -171,11 +171,13 @@ fn map_valid(policy: &authority::Policy, mappings: &[people::PermissionRole]) ->
 pub(crate) fn apply(
     policy: &mut authority::Policy,
     permissions: &mut Box<[people::PermissionRole]>,
+    templates: &mut Box<[people::TemplateOverride]>,
     change: people::PolicyChange,
     requirements_limit: u32,
     roles_limit: u32,
 ) -> Option<()> {
     match change {
+        people::PolicyChange::Templates { overrides } => *templates = overrides,
         people::PolicyChange::Projections { grants } => policy.projections = grants_to_authority(grants)?,
         people::PolicyChange::ProjectSpend { period_spend } => policy.period_spend = period_spend,
         people::PolicyChange::Role(edit) => {
@@ -232,6 +234,7 @@ pub(crate) fn apply(
 pub(crate) fn snapshot(
     policy: &authority::Policy,
     permissions: &[people::PermissionRole],
+    templates: &[people::TemplateOverride],
 ) -> Option<people::PolicyValue> {
     let mut roles = List::with_capacity(u32::try_from(policy.roles.len()).ok()?);
     for role in &policy.roles {
@@ -255,6 +258,7 @@ pub(crate) fn snapshot(
         roles: roles.into_boxed(),
         requirements: requirements.into_boxed(),
         permissions: Box::from(permissions),
+        templates: Box::from(templates),
     })
 }
 
@@ -262,6 +266,7 @@ pub(crate) fn snapshot(
 pub(crate) fn restore(
     policy: &mut authority::Policy,
     permissions: &mut Box<[people::PermissionRole]>,
+    templates: &mut Box<[people::TemplateOverride]>,
     value: people::PolicyValue,
     limit: u32,
 ) -> Option<()> {
@@ -289,6 +294,7 @@ pub(crate) fn restore(
     }
     policy.requirements = requirements.into_boxed();
     *permissions = value.permissions;
+    *templates = value.templates;
     if !map_valid(policy, permissions) {
         return None;
     }
@@ -315,9 +321,28 @@ impl Core {
             Some(mappings) => mappings.clone(),
             None => Box::new([]),
         };
+        if let people::PolicyChange::Templates { overrides } = &change {
+            if overrides.len() > usize::try_from(limits.templates).expect("template bound") {
+                return Err(people::Refusal::Limit { which: people::LimitKind::Policy });
+            }
+            for entry in overrides {
+                let mut known = false;
+                for template in &self.settings.templates {
+                    known |= template.number == entry.template;
+                }
+                if !known {
+                    return Err(people::Refusal::Unknown);
+                }
+            }
+        }
+        let mut templates = match self.template_overrides.get(&project) {
+            Some(entries) => entries.clone(),
+            None => Box::new([]),
+        };
         if apply(
             &mut policy,
             &mut permissions,
+            &mut templates,
             change,
             self.authority.limits().requirements,
             self.authority.limits().roles,
@@ -326,7 +351,7 @@ impl Core {
         {
             return Err(people::Refusal::Unknown);
         }
-        let Some(snapshot) = snapshot(&policy, &permissions) else {
+        let Some(snapshot) = snapshot(&policy, &permissions, &templates) else {
             return Err(people::Refusal::Limit { which: people::LimitKind::Policy });
         };
         if match people::policy_bytes(&snapshot) {
@@ -340,6 +365,7 @@ impl Core {
         match facts.pop().expect("policy update terminal") {
             authority::PolicyFact::Changed { .. } => {
                 assert!(self.permission_roles.insert(project, permissions).is_ok(), "admitted permission policy");
+                assert!(self.template_overrides.insert(project, templates).is_ok(), "admitted template policy");
                 Ok(snapshot)
             }
             authority::PolicyFact::Refused { .. } => {
@@ -362,13 +388,19 @@ impl Core {
             Some(mappings) => mappings.clone(),
             None => Box::new([]),
         };
-        if restore(&mut policy, &mut permissions, value, self.authority.limits().requirements).is_none() {
+        if value.templates.len() > usize::try_from(limits.templates).expect("template bound") {
+            return false;
+        }
+        let mut templates: Box<[people::TemplateOverride]> = Box::new([]);
+        if restore(&mut policy, &mut permissions, &mut templates, value, self.authority.limits().requirements).is_none()
+        {
             return false;
         }
         let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
         authority::step(&mut self.authority, authority::Event::Policy { project, policy }, &mut facts);
         facts.pop() == Some(authority::PolicyFact::Changed { project })
             && self.permission_roles.insert(project, permissions).is_ok()
+            && self.template_overrides.insert(project, templates).is_ok()
     }
 }
 

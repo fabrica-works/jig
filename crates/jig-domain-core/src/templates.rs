@@ -18,3 +18,24 @@ pub struct Template {
     pub label: u32,
     pub grace: Option<Duration>,
 }
+
+pub(crate) fn assert_configured(config: &crate::Config, limits: &crate::Limits) {
+    assert!(
+        config.settings.templates.len() <= usize::try_from(limits.templates).expect("template bound"),
+        "core prices configured templates"
+    );
+    for template in &config.settings.templates {
+        assert!(
+            template.name.len() <= usize::try_from(limits.documents.text_bytes).expect("template name bound"),
+            "core prices template names"
+        );
+        assert!(jig_domain_tasks::valid_contract(&limits.tasks, &template.contract), "core prices template contracts");
+    }
+    assert!(config.template_overrides.capacity() <= limits.authority.projects, "core prices project overrides");
+    for (_, overrides) in &config.template_overrides {
+        assert!(
+            overrides.len() <= usize::try_from(limits.templates).expect("template bound"),
+            "core prices policy overrides"
+        );
+    }
+}

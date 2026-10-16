@@ -21,6 +21,8 @@ pub enum PolicyChange {
     Projections { grants: Box<[crate::Grant]> },
     /// Replace the map from a connector's permission number to a project role.
     Permissions { mappings: Box<[PermissionRole]> },
+    /// Replace the project's template overrides.
+    Templates { overrides: Box<[crate::TemplateOverride]> },
 }
 
 /// Mutable project policy saved as one full committed value.
@@ -32,6 +34,7 @@ pub struct PolicyValue {
     pub roles: Box<[PolicyRole]>,
     pub requirements: Box<[Requirement]>,
     pub permissions: Box<[PermissionRole]>,
+    pub templates: Box<[crate::TemplateOverride]>,
 }
 
 /// One role's grant, funding and request decision authority.
@@ -88,6 +91,7 @@ pub fn policy_bytes(policy: &PolicyValue) -> Option<u64> {
     }
     total = total.checked_add(grants_bytes(&policy.projections)?)?;
     total = total.checked_add(requirements_bytes(&policy.requirements)?)?;
+    total = total.checked_add(templates_bytes(&policy.templates)?)?;
     total.checked_add(
         u64::try_from(policy.permissions.len()).ok()?.checked_mul(u64::try_from(size_of::<PermissionRole>()).ok()?)?,
     )
@@ -118,6 +122,7 @@ pub fn requirements_bytes(requirements: &[Requirement]) -> Option<u64> {
 pub fn policy_change_bytes(change: &PolicyChange) -> Option<u64> {
     match change {
         PolicyChange::ProjectSpend { .. } => Some(0),
+        PolicyChange::Templates { overrides } => templates_bytes(overrides),
         PolicyChange::Projections { grants } => grants_bytes(grants),
         PolicyChange::Role(role) => crate::authority_bytes(&role.authority),
         PolicyChange::Requirements { requirements } => requirements_bytes(requirements),
@@ -143,4 +148,8 @@ fn grants_bytes(grants: &[crate::Grant]) -> Option<u64> {
         })?;
     }
     Some(total)
+}
+
+fn templates_bytes(overrides: &[crate::TemplateOverride]) -> Option<u64> {
+    u64::try_from(overrides.len()).ok()?.checked_mul(u64::try_from(size_of::<crate::TemplateOverride>()).ok()?)
 }

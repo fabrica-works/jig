@@ -74,6 +74,7 @@ pub fn project_document() -> d::Project {
         number: 7,
         resources: List::with_capacity(0),
         policy: d::Policy {
+            templates: List::with_capacity(0),
             ceiling: authority(),
             period_spend: 7,
             escalation_role: None,

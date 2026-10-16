@@ -39,6 +39,8 @@ pub fn limits(domain: &core::Limits) -> Option<wire::Limits> {
         policy_value_roles: authority.roles,
         policy_value_requirements: authority.requirements,
         policy_value_permissions: 0,
+        policy_value_templates: domain.templates,
+        policy_change_templates_overrides: domain.templates,
         policy_change_requirements_requirements: 0,
         policy_change_projections_grants: 0,
         policy_change_permissions_mappings: 0,

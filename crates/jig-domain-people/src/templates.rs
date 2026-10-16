@@ -20,3 +20,13 @@ pub enum TemplateDeadline {
     Span(Duration),
     Given,
 }
+
+/// A project's override of the named template; absent fields keep its defaults.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct TemplateOverride {
+    pub template: u32,
+    pub executor: Option<TemplateExecutor>,
+    pub budget: Option<TemplateBudget>,
+    pub deadline: Option<TemplateDeadline>,
+    pub priority: Option<u32>,
+}

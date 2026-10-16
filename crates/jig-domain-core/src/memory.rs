@@ -136,6 +136,21 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(List::<tasks::ViewTask>::worst_case(limits.tasks.tasks.checked_mul(2)?)?)?
         .checked_add(Map::<(u32, u64), u64>::worst_case(limits.tasks.tasks)?)?
         .checked_add(Map::<(u64, u64), u64>::worst_case(limits.tasks.tasks)?)?
+        .checked_add(Map::<u32, Box<[people::TemplateOverride]>>::worst_case(limits.authority.projects)?)?
+        .checked_add(bytes(
+            limits.authority.projects.checked_add(1)?,
+            List::<people::TemplateOverride>::worst_case(limits.templates)?,
+        )?)?
+        .checked_add(bytes(
+            limits.views.watchers.checked_add(3)?,
+            List::<people::TemplateOverride>::worst_case(limits.templates)?,
+        )?)?
+        .checked_add(bytes(
+            limits.templates,
+            sizeof(size_of::<crate::Template>())?
+                .checked_add(u64::from(limits.documents.text_bytes))?
+                .checked_add(task_carrier(limits)?)?,
+        )?)?
         .checked_add(pending)?
         .checked_add(roles)?;
     for child in children {

@@ -46,7 +46,7 @@ fn project_permission_baselines_copy_restored_full_width_mappings_and_independen
         people::PermissionRole { connector: 0, permission: 0, role: 0 },
         people::PermissionRole { connector: 7, permission: 9, role: u32::MAX },
     ];
-    let committed = policy::snapshot(core.authority.policy(1).unwrap(), &mappings).unwrap();
+    let committed = policy::snapshot(core.authority.policy(1).unwrap(), &mappings, &[]).unwrap();
     assert!(core.restore_policy(&limits, 1, committed));
     limits.documents.lines = 3;
     let complete = project(&core, &limits);

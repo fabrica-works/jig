@@ -286,6 +286,7 @@ pub fn config(seed: u64) -> root::Config {
                 projects.push(1).expect("one project");
                 projects
             },
+            template_overrides: skein_lib::Map::with_capacity(limits().core.authority.projects),
             permission_roles: {
                 let mut projects: skein_lib::Map<u32, Box<[people::PermissionRole]>> = skein_lib::Map::with_capacity(1);
                 projects
@@ -302,6 +303,7 @@ pub fn config(seed: u64) -> root::Config {
             },
             connectors: Box::new([1, 2]),
             settings: core::Settings {
+                templates: crate::fixtures::templates(),
                 close_grace: Duration::from_secs(5),
                 deployment_provider: 3,
 

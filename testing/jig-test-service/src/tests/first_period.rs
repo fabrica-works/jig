@@ -14,7 +14,8 @@ fn started() -> Service {
     policy.period_spend = 73;
     policy.roles[0].period_spend = 73;
     let roles = first.roles.clone();
-    parsed.engine.projects = Box::new([first, jig_protocol_config::Project { number: 2, roles, policy }]);
+    parsed.engine.projects =
+        Box::new([first, jig_protocol_config::Project { number: 2, roles, policy, templates: Box::new([]) }]);
     let owner = parsed.engine.owners[0].clone();
     parsed.engine.owners = Box::new([owner.clone(), people::InitialOwner { project: 2, ..owner }]);
     let core = &mut parsed.engine.limits.core;

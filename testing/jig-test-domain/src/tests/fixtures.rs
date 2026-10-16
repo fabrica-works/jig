@@ -113,8 +113,10 @@ pub fn domain() -> Domain {
                 authority,
                 projects: List::with_capacity(0),
                 permission_roles: Map::with_capacity(0),
+                template_overrides: Map::with_capacity(limits.core.authority.projects),
                 connectors: Box::new([1, 2]),
                 settings: core::Settings {
+                    templates: Box::new([]),
                     close_grace: Duration::from_secs(5),
                     deployment_provider: 3,
                     chat: 1,

@@ -248,6 +248,7 @@ fn config(seed: u64) -> Config {
             projects.push(1).expect("one project");
             projects
         },
+        template_overrides: Map::with_capacity(limits().authority.projects),
         permission_roles: {
             let mut projects: Map<u32, Box<[people::PermissionRole]>> = Map::with_capacity(1);
             projects
@@ -264,6 +265,7 @@ fn config(seed: u64) -> Config {
         },
         connectors: Box::new([1, 2]),
         settings: Settings {
+            templates: Box::new([]),
             close_grace: Duration::from_secs(5),
             deployment_provider: 3,
 
@@ -3005,3 +3007,5 @@ mod task_query;
 mod brief_revisions;
 
 mod escalation_holder;
+
+mod templates;

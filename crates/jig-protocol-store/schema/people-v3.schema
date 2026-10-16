@@ -27,13 +27,22 @@ enum Guard { guarded, observed: GuardObserved }
 record Requirement { connector: u16 kind: u16 pattern: Pattern judge: Judge guard: Guard must_be_guarded: bool }
 record PermissionRole { connector: u16 permission: u16 role: u32 }
 record PolicyRole { number: u32 authority: Authority period_spend: u64 requests: u16 decides: u8 }
-record PolicyValue { period_spend: u64 projections: list 32 Grant roles: list 8 PolicyRole requirements: list 32 Requirement permissions: bytes 65536 }
+record TemplateExecutorCharter { value: u32 }
+enum TemplateExecutor { charter: TemplateExecutorCharter, chosen }
+record TemplateBudgetAmount { value: u64 }
+record TemplateBudgetAsAllowed { cap: option u64 }
+enum TemplateBudget { amount: TemplateBudgetAmount, as_allowed: TemplateBudgetAsAllowed, given }
+record TemplateDeadlineSpan { value: u64 }
+enum TemplateDeadline { none, span: TemplateDeadlineSpan, given }
+record TemplateOverride { template: u32 executor: option TemplateExecutor budget: option TemplateBudget deadline: option TemplateDeadline priority: option u32 }
+record PolicyValue { period_spend: u64 projections: list 32 Grant roles: list 8 PolicyRole requirements: list 32 Requirement permissions: bytes 65536 templates: list 16 TemplateOverride }
 record PolicyChangeProjectSpend { period_spend: u64 }
 record PolicyChangeRole { value: PolicyRole }
 record PolicyChangeRequirements { requirements: bytes 65536 }
 record PolicyChangeProjections { grants: bytes 65536 }
 record PolicyChangePermissions { mappings: bytes 65536 }
-enum PolicyChange { project_spend: PolicyChangeProjectSpend, role: PolicyChangeRole, requirements: PolicyChangeRequirements, projections: PolicyChangeProjections, permissions: PolicyChangePermissions }
+record PolicyChangeTemplates { overrides: list 16 TemplateOverride }
+enum PolicyChange { project_spend: PolicyChangeProjectSpend, role: PolicyChangeRole, requirements: PolicyChangeRequirements, projections: PolicyChangeProjections, permissions: PolicyChangePermissions, templates: PolicyChangeTemplates }
 record SeenResults { through: u64 }
 record SeenChat { task: u64 through: u64 }
 enum Seen { results: SeenResults, chat: SeenChat }

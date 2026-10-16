@@ -48,6 +48,7 @@ fn policy_source() -> documents::Policy {
     permissions.push(people::PermissionRole { connector: u16::MAX, permission: 0, role: u32::MAX }).expect("mapping");
     permissions.push(people::PermissionRole { connector: 0, permission: u16::MAX, role: 0 }).expect("mapping");
     documents::Policy {
+        templates: List::with_capacity(0),
         ceiling: state.authority,
         period_spend: u64::MAX,
         escalation_role: Some(0),

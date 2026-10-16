@@ -77,7 +77,7 @@ pub const ENGINE_SMALL: &[u8] = br#"{
 "implies": [], "requirements": []
 },
 "projects": [{"number": 1, "roles": [{"connector": 1, "permission": 1, "role": 1}],
-"policy": {"escalation_role": 1, "period_spend": 100, "projections": [], "requirements": [],
+"policy": {"templates": [], "escalation_role": 1, "period_spend": 100, "projections": [], "requirements": [],
 "ceiling": {"tools": 1023, "grants": [],
 "delegation": {"kinds": [{"kind": "charter", "number": 1}], "tasks": 8, "depth": 8},
 "budget": {"spend": 100, "deadline_unix_seconds": null}, "notes": 7, "note_resources": []},

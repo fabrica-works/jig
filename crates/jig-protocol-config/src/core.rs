@@ -13,6 +13,7 @@ pub fn core(engine: &Engine, deployment: [u8; 16], seed: u64) -> domain::Config 
     let mut authority = authority::Domain::new(engine.rules.clone(), limits.authority).expect("checked rules");
     let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
     let mut projects = List::with_capacity(limits.authority.projects);
+    let mut template_overrides = Map::with_capacity(limits.authority.projects);
     let mut permission_roles = Map::with_capacity(limits.authority.projects);
     for project in &engine.projects {
         authority::step(
@@ -26,6 +27,7 @@ pub fn core(engine: &Engine, deployment: [u8; 16], seed: u64) -> domain::Config 
                 unreachable!("checked project policies")
             }
         }
+        template_overrides.insert(project.number, project.templates.clone()).expect("checked projects");
         projects.push(project.number).expect("checked project count");
         let previous = permission_roles.insert(project.number, project.roles.clone()).expect("checked project count");
         assert!(previous.is_none(), "checked unique project");
@@ -53,6 +55,7 @@ pub fn core(engine: &Engine, deployment: [u8; 16], seed: u64) -> domain::Config 
         owners: engine.owners.clone(),
         authority,
         settings: domain::Settings {
+            templates: engine.templates.clone(),
             close_grace,
             deployment_provider: deployment_provider.expect("one checked deployment provider"),
             charters: engine.charters.clone(),
@@ -62,6 +65,7 @@ pub fn core(engine: &Engine, deployment: [u8; 16], seed: u64) -> domain::Config 
         },
         projects,
         permission_roles,
+        template_overrides,
         connectors: engine.connectors.clone(),
     }
 }

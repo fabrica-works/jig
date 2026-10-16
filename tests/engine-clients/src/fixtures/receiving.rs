@@ -29,8 +29,10 @@ fn configuration(limits: &core::Limits) -> core::Config {
         authority: authority::Domain::new(rules, limits.authority).expect("bounded authority"),
         projects: List::with_capacity(0),
         permission_roles: Map::with_capacity(0),
+        template_overrides: Map::with_capacity(limits.authority.projects),
         connectors: Box::new([]),
         settings: core::Settings {
+            templates: Box::new([]),
             close_grace: Duration::from_secs(5),
             deployment_provider: 2,
             chat: 1,

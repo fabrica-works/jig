@@ -327,3 +327,44 @@ fn fields(document: &Document, at: u32, path: &Path, problems: &mut Problems) ->
     }
     Some(fields.into_boxed())
 }
+
+pub(crate) fn overrides(
+    document: &Document,
+    at: u32,
+    path: &Path,
+    limit: u32,
+    problems: &mut Problems,
+) -> Option<Box<[jig_domain_people::TemplateOverride]>> {
+    let items = report_list(read::list(document, at, limit), path, problems)?;
+    let mut entries = List::with_capacity(items.len());
+    for (index, at) in items.iter().enumerate() {
+        let path = check::index(path, index);
+        let mut object = check::object(document, *at, &path, problems)?;
+        let template = check::count(&mut object, document, b"template", &path, problems);
+        let at = object.required(document, b"executor", &path, problems)?;
+        let executor =
+            if null(document, at) { None } else { Some(executor(document, at, &path.member(b"executor"), problems)?) };
+        let at = object.required(document, b"budget", &path, problems)?;
+        let budget =
+            if null(document, at) { None } else { Some(budget(document, at, &path.member(b"budget"), problems)?) };
+        let at = object.required(document, b"deadline", &path, problems)?;
+        let deadline =
+            if null(document, at) { None } else { Some(deadline(document, at, &path.member(b"deadline"), problems)?) };
+        let priority = check::optional(&mut object, document, b"priority", &path, problems).ok()?;
+        let priority = match priority {
+            Some(value) => match u32::try_from(value) {
+                Ok(value) => Some(value),
+                Err(_) => {
+                    problems.push(path.member(b"priority"), What::Bound);
+                    return None;
+                }
+            },
+            None => None,
+        };
+        object.finish(document, &path, problems);
+        entries
+            .push(jig_domain_people::TemplateOverride { template: template?, executor, budget, deadline, priority })
+            .expect("bounded overrides");
+    }
+    Some(entries.into_boxed())
+}

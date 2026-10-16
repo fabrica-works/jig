@@ -113,6 +113,8 @@ pub struct Config {
     pub projects: List<u32>,
     /// Policy-controlled connector permissions per project.
     pub permission_roles: Map<u32, Box<[people::PermissionRole]>>,
+    /// Template overrides retained with each project policy.
+    pub template_overrides: Map<u32, Box<[people::TemplateOverride]>>,
     /// Numbered connectors the application routes for task lifecycle handoffs.
     pub connectors: Box<[u16]>,
 }
@@ -120,6 +122,8 @@ pub struct Config {
 /// Immutable deployment and run settings used by core decisions.
 #[derive(Debug)]
 pub struct Settings {
+    /// Configured templates, served without affecting decisions.
+    pub templates: Box<[Template]>,
     /// Time a chat has to finish after its whole close decision.
     pub close_grace: skein_lib::Duration,
     /// Provider number for the application's services.
@@ -272,6 +276,8 @@ pub struct Core {
     pub projects: List<u32>,
     /// Mutable connector permission mappings approved by policy edits.
     pub permission_roles: Map<u32, Box<[people::PermissionRole]>>,
+    /// Template overrides retained with each project policy.
+    pub template_overrides: Map<u32, Box<[people::TemplateOverride]>>,
     pub(crate) seed_owners: Box<[people::InitialOwner]>,
     /// Immutable settings for core decisions.
     pub settings: Settings,
@@ -491,6 +497,7 @@ impl Core {
             "core prices its transcript retention"
         );
         charters::assert_configured(&config.settings, limits);
+        templates::assert_configured(&config, limits);
         assert!(config.projects.capacity() <= limits.authority.projects, "core prices configured projects");
         assert!(config.permission_roles.len() <= limits.authority.projects, "core prices project permissions");
         for (_, roles) in &config.permission_roles {
@@ -558,6 +565,7 @@ impl Core {
             relaying: Map::with_capacity(limits.tasks.tasks),
             projects: config.projects,
             permission_roles: config.permission_roles,
+            template_overrides: config.template_overrides,
             connectors: config.connectors,
             pending_calls: Map::with_capacity(limits.call_records),
             call_parts: Map::with_capacity(limits.call_records),

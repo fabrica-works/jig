@@ -10,6 +10,7 @@ use skein_lib::{List, Wall};
 pub struct Project {
     pub number: u32,
     pub roles: Box<[PermissionRole]>,
+    pub templates: Box<[jig_domain_people::TemplateOverride]>,
     pub policy: authority::Policy,
 }
 
@@ -56,11 +57,11 @@ pub(crate) fn projects(
         let Some(mut object) = check::object(document, *at, &path, problems) else { continue };
         let number = check::count(&mut object, document, b"number", &path, problems);
         let at = object.required(document, b"policy", &path, problems);
-        let policy = policy(document, at, &path.member(b"policy"), &limits.core.authority, problems);
+        let policy = policy(document, at, &path.member(b"policy"), limits, problems);
         let roles = permissions(&mut object, document, &path, limits, problems);
         object.finish(document, &path, problems);
         if let Some(number) = number
-            && let Some(policy) = policy
+            && let Some((policy, templates)) = policy
             && let Some(roles) = roles
         {
             for previous in &projects {
@@ -69,7 +70,7 @@ pub(crate) fn projects(
                     break;
                 }
             }
-            projects.push(Project { number, roles, policy }).expect("bounded project input");
+            projects.push(Project { number, roles, templates, policy }).expect("bounded project input");
         }
     }
     Some(projects.into_boxed())
@@ -114,10 +115,14 @@ fn policy(
     document: &Document,
     at: Option<u32>,
     path: &Path,
-    limits: &authority::Limits,
+    limits: &crate::Limits,
     problems: &mut Problems,
-) -> Option<authority::Policy> {
+) -> Option<(authority::Policy, Box<[jig_domain_people::TemplateOverride]>)> {
     let mut object = check::object(document, at?, path, problems)?;
+    let at = object.required(document, b"templates", path, problems);
+    let templates =
+        crate::templates::overrides(document, at?, &path.member(b"templates"), limits.core.templates, problems);
+    let limits = &limits.core.authority;
     let escalation = check::optional(&mut object, document, b"escalation_role", path, problems);
     let escalation_role = optional_count(escalation, &path.member(b"escalation_role"), problems);
     let at = object.required(document, b"ceiling", path, problems);
@@ -127,14 +132,17 @@ fn policy(
     let roles = roles(&mut object, document, path, limits, problems);
     let requirements = requirements(&mut object, document, path, limits, problems);
     object.finish(document, path, problems);
-    Some(authority::Policy {
-        escalation_role: escalation_role.ok()?,
-        ceiling: ceiling?,
-        projections: projections?,
-        period_spend: period_spend?,
-        roles: roles?,
-        requirements: requirements?,
-    })
+    Some((
+        authority::Policy {
+            escalation_role: escalation_role.ok()?,
+            ceiling: ceiling?,
+            projections: projections?,
+            period_spend: period_spend?,
+            roles: roles?,
+            requirements: requirements?,
+        },
+        templates?,
+    ))
 }
 fn roles(
     object: &mut read::Object,

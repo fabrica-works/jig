@@ -67,3 +67,48 @@ pub fn query_numbers(world: &crate::effects::World) -> Vec<u64> {
         })
         .collect()
 }
+
+#[must_use]
+pub fn templates() -> Box<[jig_domain_core::Template]> {
+    use jig_domain_people::{TemplateBudget, TemplateDeadline, TemplateExecutor};
+    use jig_domain_tasks::{Contract, Flags, Retention};
+    Box::new([
+        jig_domain_core::Template {
+            number: 1,
+            name: Box::from(&b"chat"[..]),
+            executor: TemplateExecutor::Charter(1),
+            contract: Contract::Report { words: 32 },
+            shallower: 1,
+            budget: TemplateBudget::AsAllowed { cap: None },
+            deadline: TemplateDeadline::None,
+            tracked: None,
+            flags: Flags { conversation: true, listed: false, retention: Retention::Kept },
+            label: 1,
+            grace: Some(skein_lib::Duration::from_millis(5000)),
+        },
+        jig_domain_core::Template {
+            number: 2,
+            name: Box::from(&b"goal"[..]),
+            executor: TemplateExecutor::Chosen,
+            contract: Contract::Report { words: 32 },
+            shallower: 1,
+            budget: TemplateBudget::Given,
+            deadline: TemplateDeadline::Given,
+            tracked: Some(1),
+            flags: Flags { conversation: false, listed: true, retention: Retention::Kept },
+            label: 2,
+            grace: None,
+        },
+    ])
+}
+
+const HOLDER_REQUEST_BASE: u64 = 8200;
+/// Submit an owner or member request with the fixture's request-token range.
+pub fn ask_as(world: &mut crate::effects::World, sign_in: u64, key: u8, ask: jig_domain_people::Ask) {
+    world.send(jig_test_domain::Event::Core(jig_domain_core::Event::People(jig_domain_people::Event::Ask {
+        reply_to: skein_lib::ReplyTo::new(skein_lib::Token::new(HOLDER_REQUEST_BASE + u64::from(key))),
+        sign_in,
+        key: [key; 16],
+        ask,
+    })));
+}

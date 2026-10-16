@@ -372,6 +372,29 @@ pub fn people_authority() -> people::Authority {
 
 pub fn people_policy() -> people::PolicyValue {
     people::PolicyValue {
+        templates: Box::new([
+            people::TemplateOverride {
+                template: 1,
+                executor: Some(people::TemplateExecutor::Charter(1)),
+                budget: Some(people::TemplateBudget::Amount(21)),
+                deadline: Some(people::TemplateDeadline::None),
+                priority: Some(5),
+            },
+            people::TemplateOverride {
+                template: 2,
+                executor: Some(people::TemplateExecutor::Chosen),
+                budget: Some(people::TemplateBudget::AsAllowed { cap: Some(34) }),
+                deadline: Some(people::TemplateDeadline::Span(skein_lib::Duration::from_secs(55))),
+                priority: None,
+            },
+            people::TemplateOverride {
+                template: 3,
+                executor: None,
+                budget: Some(people::TemplateBudget::Given),
+                deadline: Some(people::TemplateDeadline::Given),
+                priority: None,
+            },
+        ]),
         period_spend: 99,
         projections: Box::new([]),
         roles: Box::new([people::PolicyRole {

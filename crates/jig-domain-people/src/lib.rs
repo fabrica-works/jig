@@ -55,7 +55,7 @@
 #![forbid(unsafe_code)]
 extern crate alloc;
 mod templates;
-pub use templates::{TemplateBudget, TemplateDeadline, TemplateExecutor};
+pub use templates::{TemplateBudget, TemplateDeadline, TemplateExecutor, TemplateOverride};
 mod amendment;
 mod boundary;
 mod capacity;

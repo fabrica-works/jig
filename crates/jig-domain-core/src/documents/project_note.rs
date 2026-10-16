@@ -55,6 +55,7 @@ pub struct Policy {
     pub requirements: List<Requirement>,
     pub permissions: Option<List<people::PermissionRole>>,
     pub permissions_cut: bool,
+    pub templates: List<people::TemplateOverride>,
     pub cut: bool,
 }
 /// A retained party's membership; services carry the same role facts.
@@ -214,6 +215,7 @@ fn policy(
     limits: &Limits,
     value: &authority::Policy,
     mappings: Option<&[people::PermissionRole]>,
+    overrides: Option<&[people::TemplateOverride]>,
 ) -> Result<Policy, Missing> {
     let mut roles = List::with_capacity(limits.documents.lines);
     for value in value.roles.iter().take(bound(limits)) {
@@ -259,6 +261,12 @@ fn policy(
         }
         None => None,
     };
+    let mut templates = List::with_capacity(limits.templates);
+    if let Some(overrides) = overrides {
+        for entry in overrides {
+            templates.push(entry.clone()).expect("bounded overrides");
+        }
+    }
     Ok(Policy {
         ceiling: authority_line(limits, &value.ceiling)?,
         period_spend: value.period_spend,
@@ -268,6 +276,7 @@ fn policy(
         requirements,
         permissions,
         permissions_cut,
+        templates,
         cut: value.roles.len() > bound(limits)
             || value.requirements.len() > bound(limits)
             || value.projections.len() > bound(limits)
@@ -466,6 +475,10 @@ pub(super) fn project(core: &Core, limits: &Limits, party: u64, number: u32) -> 
             value,
             match core.permission_roles.get(&number) {
                 Some(mappings) => Some(mappings.as_ref()),
+                None => None,
+            },
+            match core.template_overrides.get(&number) {
+                Some(entries) => Some(entries.as_ref()),
                 None => None,
             },
         )?,

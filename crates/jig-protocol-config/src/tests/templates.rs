@@ -85,3 +85,46 @@ fn a_configuration_whose_template_one_names_no_charter_is_refused() {
         What::Refers,
     );
 }
+
+#[test]
+fn a_seeded_override_naming_no_template_refuses_the_start() {
+    let document = fixtures::with(
+        fixtures::ENGINE_SMALL,
+        br#""templates": []"#,
+        br#""templates": [{"template": 99, "executor": null, "budget": null, "deadline": null, "priority": 5}]"#,
+    );
+    let problems = fixtures::engine(&document).expect_err("unknown template");
+    assert_eq!(problems.problems.get(0).expect("one refusal").what, What::Refers);
+    assert_eq!(
+        problems.problems.get(0).expect("one refusal").path,
+        fixtures::path(&[b"projects"])
+            .child(Segment::Index(0))
+            .member(b"policy")
+            .member(b"templates")
+            .child(Segment::Index(0))
+            .member(b"template")
+    );
+}
+
+#[test]
+fn a_seeded_override_reaches_the_cores_config() {
+    const PROJECT: u32 = 1;
+    const GOAL: u32 = 2;
+    let document = fixtures::with(
+        fixtures::ENGINE_SMALL,
+        br#""templates": []"#,
+        br#""templates": [{"template": 2, "executor": null, "budget": null, "deadline": null, "priority": 5}]"#,
+    );
+    let engine = fixtures::engine(&document).expect("seeded override");
+    let config = crate::core(&engine, [0; 16], 7);
+    assert_eq!(
+        config.template_overrides.get(&PROJECT),
+        Some(&Box::from([jig_domain_people::TemplateOverride {
+            template: GOAL,
+            executor: None,
+            budget: None,
+            deadline: None,
+            priority: Some(5),
+        }]))
+    );
+}
