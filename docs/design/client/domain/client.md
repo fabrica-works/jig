@@ -339,9 +339,11 @@ handles, as every presentation does (sections 7 and 8).
   with each live delegate cancelled or moved to the party; amending a
   held task and releasing it; reordering goals). The client never chains
   two requests, so nothing is left to undo when the second is refused.
-- **A version not served** keeps the request: an owner whose version the
-  engine does not serve has its requests kept and unsent until the
-  client is updated, then sent under their keys (8.2).
+- **A version not served** keeps the request: while its owner's version
+  is not served (8.2), the request is kept and unsent, held for its
+  owner's version, and it is sent under its key once a hello serves that
+  version again. A client updated to another version of the owner drops
+  it at start (section 11).
 
 ## 7. Reads and windows
 
@@ -370,6 +372,10 @@ handles, as every presentation does (sections 7 and 8).
 - **A family's read** names its owner, its scope (a project, the
   deployment, or the party's own) and its record's bytes (contract.md,
   7.5); its page is its owner's, as bytes.
+- **A read of an owner not served** (8.2), a family's outside its
+  owner's range or any read while the link is out of date, is answered
+  at once and never sent: version not served, naming the owner and the
+  range the last hello named of it, or none where it named none.
 
 ## 8. Watches and the link
 
@@ -438,9 +444,9 @@ handles, as every presentation does (sections 7 and 8).
   - *out of date:* the engine serves no version of jig's that the client
     speaks. It sends nothing, and keeps every request.
 
-  Beside its state, the link names the party confirmed, each owner whose
-  version the engine does not serve, and a sign-out that did not reach
-  the engine (section 12).
+  Beside its state, the link names the party confirmed, each declared
+  owner whose version the last hello does not serve (below), and a
+  sign-out that did not reach the engine (section 12).
 - **Judged from the stream alone,** whatever the application watches. A
   request that got no answer while the link is live is sent again after
   a backoff, and does not by itself make the client offline.
@@ -449,14 +455,33 @@ handles, as every presentation does (sections 7 and 8).
 - **Versions, per owner.** The stream's hello states the ranges the
   engine serves, jig's and each application owner's
   (`../../protocol/client.md`, section 9). The client speaks the one
-  version of each owner its build holds. An answer *version not
-  served*, naming the owner and the ranges served, says the same of one
-  message. Outside a range of a family's owner, that owner's requests
-  stay kept and unsent, its reads are answered and its watches end as
-  version not served; outside jig's, the link is out of date. Updated,
-  the client sends what it kept, under its keys. `jig-client` and the
-  engine come from one pin of jig in an application; how jig is
-  released and pinned waits (`../../README.md`, section 14).
+  version of each owner its build holds: jig's, its wire's own; and each
+  family owner's, which the application declares as it makes the
+  client, with its limits (section 14): each owner whose families it
+  sends, by its number, with its wire's version (root.md, section 15).
+  Each family's request, read and subject names a declared owner, in
+  its declared version; any other is the application's mistake, and
+  loud, as a key conflict is (section 6).
+  - *Judged at each hello, whole.* A declared owner is not served when
+    the hello names no range of it, or one that leaves out its version.
+    The judgement holds until the next hello, so `client.link()` names
+    an owner not served from the hello on, before the application has
+    asked anything of it. The client keeps, for each declared owner, its
+    judgement and the range the hello named of it; of an owner it does
+    not declare, nothing.
+  - *An answer version not served,* naming the owner and the ranges
+    served, says the same of one message.
+  - *Outside a range of a family's owner,* that owner's requests stay
+    kept and unsent, held for its version (section 6); its reads are
+    answered at once, unsent (section 7); its watches end, none opened
+    again at that hello; each as version not served. Outside jig's, the
+    link is out of date, and its reads are answered so too.
+  - *Served again* by a later hello, the client sends what it kept,
+    under its keys. Updated, it sends what it kept in a version its new
+    build speaks, and drops what it kept in another (section 11).
+    `jig-client` and the engine come from one pin of jig in an
+    application; how jig is released and pinned waits
+    (`../../README.md`, section 14).
 - **A restart of the engine** is a moment offline, then answers by key.
   Provisional text streamed before it, never committed, is dropped when
   the next delivery comes (8.3).
@@ -593,7 +618,9 @@ for any presentation of a chat or of any agent task's activity.
 - **Versioned** with jig's store version, so a client updated since reads
   what an older one kept. A record of a version it does not read is
   dropped, and the application told (`../../protocol/client.md`, section
-  10).
+  10). A family's request is kept in its owner's version: one whose
+  owner the build does not declare, or whose version is not the one
+  declared (8.2), is such a record.
 - **Where it lives is the host's:** a browser tab's session storage, a
   file written whole and synced, a world's memory. A host whose store is
   copied (a browser tab duplicated) sends the same keys from both
@@ -697,7 +724,10 @@ Each is configured and part of the worst case:
   included (skein's `lib.md`, section 12); the records restored at
   start, no more than the table holds;
 - backoffs' first and most spans, the heartbeat's tolerance, the
-  retention's margin.
+  retention's margin;
+- the family owners the application declares, each once, with its
+  version (8.2): no more than a hello's ranges hold beside jig's
+  (`../../protocol/client.md`, section 9).
 
 `worst_case` sums the containers' own and the bytes each entity may hold
 (programming-model.md, 6.3). Each helper's limits are its own (section

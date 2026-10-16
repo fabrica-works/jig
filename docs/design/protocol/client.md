@@ -523,13 +523,19 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
   read: *version not served*, naming the owner and the ranges the engine
   serves. A keyed request, a read and a watch's opening are each
   answered so; nothing is done.
+- **The client's versions:** jig's is its wire's; each family owner's,
+  the application declares as it makes the client, and the client
+  judges each hello against them, whole (`../client/domain/client.md`,
+  8.2). A hello names at most its wire's bound of ranges, jig's among
+  them: an engine serves no more owners than that, and a client
+  declares no more family owners than that bound less jig's.
 - **A client outside a range,** from the hello or from such an answer,
   sends nothing more of that owner: its requests stay kept and unsent,
-  its reads are answered and its watches end as version not served.
-  Outside jig's range, the link is out of date, and the client sends
-  nothing at all (`../client/domain/client.md`, 8.2). The application
-  says how to update; updated, the client sends what it kept, under its
-  keys.
+  its reads are answered at once, unsent, and its watches end, as
+  version not served. Outside jig's range, the link is out of date, and
+  the client sends nothing at all (`../client/domain/client.md`, 8.2).
+  The application says how to update; updated, the client sends what it
+  kept in a version it speaks, under its keys (section 10).
 - **One jig pin:** an application's `jig-client` and its engine come from
   one jig pin, so a client the application's server serves is in range
   unless the engine was updated under a client still running; reloading
@@ -560,7 +566,10 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
   to `jig-client` as it starts, each to the request table; one of a
   version the client does not read is dropped, and the application told,
   so a request kept across an update that changed its record's version
-  is lost, not sent wrong. Pre-release, nothing is translated.
+  is lost, not sent wrong. A family's request whose owner and version
+  are not among those the application declares is one
+  (`../client/domain/client.md`, 11). Pre-release, nothing is
+  translated.
 - **Where** is the shell's: a browser tab's session storage, as text
   skein's small store part encodes (skein's `ui-web.md`, section 10); a
   file a native client writes whole and syncs; a service's file, synced
