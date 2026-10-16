@@ -165,6 +165,7 @@ impl Core {
                 | people::Outcome::NoteEdited { .. }
                 | people::Outcome::ServiceMade { .. }
                 | people::Outcome::Adopted { .. }
+                | people::Outcome::Created { .. }
                 | people::Outcome::GoalStarted { .. }
                 | people::Outcome::GoalProposed { .. }
                 | people::Outcome::Closing { .. }

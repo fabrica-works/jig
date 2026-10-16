@@ -615,6 +615,7 @@ fn party_refusal(why: people::Refusal) -> parties::Refusal {
             },
         },
         people::Refusal::Taken { by } => parties::Refusal::Taken { by },
+        people::Refusal::NotWellFormed { .. } => parties::Refusal::Limit { which: parties::LimitKind::Cycle },
         people::Refusal::NotWaiting => parties::Refusal::NotWaiting,
         people::Refusal::NoFurther => parties::Refusal::NoFurther,
         people::Refusal::Unknown => parties::Refusal::Unknown,

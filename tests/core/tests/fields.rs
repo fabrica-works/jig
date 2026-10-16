@@ -156,17 +156,7 @@ fn accepting_a_chats_batch_as_ones_own_is_refused_while_nobody_holds_it() {
     let proposal = propose_member_batch(&mut world);
     member_decides(&mut world, owner, 23, authority::Proposals(1));
     let tasks_before = live_task_count(&world);
-    ask_as(
-        &mut world,
-        member,
-        24,
-        people::Ask::DecideProposal {
-            project: PROJECT,
-            proposer: people::Proposer::Task(MEMBER_CHAT),
-            proposal,
-            decision: people::ProposalDecision::Accept,
-        },
-    );
+    world.decide_proposal(proposal, true, 24);
     assert_eq!(
         world.people_answers.last(),
         Some(&people::Reply::Outcome(people::Outcome::Refused(people::Refusal::NoEscalationHolder)))

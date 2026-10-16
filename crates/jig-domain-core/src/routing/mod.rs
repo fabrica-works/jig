@@ -5,6 +5,7 @@
 #![expect(clippy::mod_module_files, reason = "the route split keeps dispatch in routing/mod.rs")]
 
 pub(crate) mod application_routes;
+mod create;
 
 use crate::{CallKey, CallPart, Core, RoutedCall};
 use alloc::boxed::Box;
@@ -100,7 +101,8 @@ pub(crate) struct PersonEscalation {
 }
 
 #[derive(Debug)]
-enum CreationKind {
+pub(super) enum CreationKind {
+    Batch { person: u64 },
     Goal { person: u64, direct: bool },
     Chat { person: u64 },
 }
@@ -109,7 +111,8 @@ enum CreationKind {
 #[derive(Debug)]
 pub(crate) struct Creation {
     kind: CreationKind,
-    new: tasks::New,
+    members: Box<[tasks::New]>,
+    at: usize,
     remaining: u32,
     holdings: List<tasks::Holding>,
     answered: List<u16>,

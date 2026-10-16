@@ -160,6 +160,7 @@ pub(super) fn tag_people(
                     | people::Outcome::NoteEdited { .. }
                     | people::Outcome::ServiceMade { .. }
                     | people::Outcome::Adopted { .. }
+                    | people::Outcome::Created { .. }
                     | people::Outcome::GoalStarted { .. }
                     | people::Outcome::GoalProposed { .. }
                     | people::Outcome::Closing { .. }
@@ -252,6 +253,13 @@ pub(super) fn tag_people(
                     }
                     people::Ask::DecideEscalation { task, revision, decision, .. } => escalation_request(
                         core, env, work, request, person, project, role, &mut out, task, revision, decision,
+                    ),
+                    people::Ask::Create { batch, .. } => super::create::create_request(
+                        core,
+                        env,
+                        &mut out,
+                        work,
+                        super::create::Creation { request, person, project, role: role.expect("admitted role"), batch },
                     ),
                     people::Ask::SetGoal { spec, executor, budget, priority, deadline, .. } => begin_goal_creation(
                         core,

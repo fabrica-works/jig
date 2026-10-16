@@ -321,6 +321,7 @@ pub fn task_wake() -> jig_domain_tasks::WakePolicy {
 }
 
 pub const PEOPLE_LIMITS: people::Limits = people::Limits {
+    batch: 2,
     people: 2,
     inbox_entries: 2,
     inbox_tasks: 2,
@@ -444,11 +445,34 @@ pub fn people_amendment() -> people::Amendment {
     }
 }
 
+pub fn people_member() -> people::Member {
+    people::Member {
+        executor: people::TaskExecutor::Agent { charter: 3 },
+        words: b"a task".as_slice().into(),
+        parameters: Box::new([]),
+        contract: people::Contract::Report { words: 17 },
+        authority: people_authority(),
+        wake: people::WakePolicy {
+            words: people::WakeRule::Never,
+            notices: people::WakeRule::Never,
+            news: people::WakeRule::Never,
+            results: people::ResultsWake::Never,
+            questions: false,
+            answers: false,
+            timers: false,
+        },
+        dependencies: Box::new([]),
+        tracked: Some(3),
+        label: 41,
+        flags: people::Flags::PLAIN,
+    }
+}
 pub fn people_asks() -> Box<[people::Ask]> {
     use people::{Ask, Proposer};
     let mut disposals = skein_lib::List::with_capacity(1);
     disposals.push(people::Disposal { task: 2, keep: people::Keep::MakeMine }).expect("one disposal");
     Box::new([
+        Ask::Create { project: 1, batch: Box::new([people_member(), people_member()]) },
         Ask::Close { project: 1, chat: 2, disposals },
         Ask::MarkSeen { seen: people::Seen::Chat { task: 2, through: 3 } },
         Ask::Application { project: 1, connector: 2, digest: [3; 32] },

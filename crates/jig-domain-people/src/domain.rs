@@ -511,6 +511,7 @@ fn outcome_reply(outcome: Outcome) -> Reply {
         | Outcome::NoteEdited { .. }
         | Outcome::ServiceMade { .. }
         | Outcome::Adopted { .. }
+        | Outcome::Created { .. }
         | Outcome::GoalStarted { .. }
         | Outcome::GoalProposed { .. }
         | Outcome::Closing { .. }
@@ -586,6 +587,7 @@ fn apply_roles(
         | Ask::Stop { .. }
         | Ask::Cancel { .. }
         | Ask::Release { .. }
+        | Ask::Create { .. }
         | Ask::SetGoal { .. } => {
             return Err(Outcome::Refused(Refusal::Unknown));
         }
@@ -631,6 +633,7 @@ fn apply_roles(
         | Ask::Stop { .. }
         | Ask::Cancel { .. }
         | Ask::Release { .. }
+        | Ask::Create { .. }
         | Ask::SetGoal { .. } => {
             unreachable!("validated roster flight")
         }
@@ -719,6 +722,7 @@ fn make_service(domain: &mut Domain, env: &Env<Limits>, request: Token, person: 
         | Ask::Application { .. }
         | Ask::EditNote { .. }
         | Ask::Adopt { .. }
+        | Ask::Create { .. }
         | Ask::SetGoal { .. }
         | Ask::Stop { .. }
         | Ask::Cancel { .. }
@@ -931,6 +935,7 @@ fn project(ask: &Ask) -> u32 {
         | Ask::Stop { project, .. }
         | Ask::Cancel { project, .. }
         | Ask::Release { project, .. }
+        | Ask::Create { project, .. }
         | Ask::SetGoal { project, .. } => *project,
     }
 }
@@ -1077,6 +1082,7 @@ fn valid_ask(limits: &Limits, ask: &Ask) -> bool {
             None => false,
         },
         Ask::SetPool { person, .. } => *person != 0,
+        Ask::Create { batch, .. } => crate::batch::valid(limits, batch),
         Ask::SetGoal { spec, executor, .. } => {
             goal_executor(*executor)
                 && !spec.is_empty()
@@ -1135,7 +1141,7 @@ fn valid_ask(limits: &Limits, ask: &Ask) -> bool {
 }
 
 // Admission identifies the bounded payload before any keyed flight is made.
-fn invalid_ask(ask: &Ask) -> Refusal {
+fn invalid_ask(limits: &Limits, ask: &Ask) -> Refusal {
     let which = match ask {
         Ask::Close { chat, disposals, .. } => {
             let mut unknown = *chat == 0;
@@ -1178,6 +1184,15 @@ fn invalid_ask(ask: &Ask) -> Refusal {
         Ask::Adopt { .. } => LimitKind::Resource,
         Ask::SetRoles { .. } => LimitKind::Roles,
         Ask::ChangePolicy { .. } => LimitKind::Policy,
+        Ask::Create { batch, .. } => {
+            if batch.is_empty() {
+                LimitKind::Empty
+            } else if batch.len() > usize::try_from(limits.batch).expect("u32 fits usize") {
+                LimitKind::Batch
+            } else {
+                LimitKind::Words
+            }
+        }
         Ask::SetGoal { spec, executor, .. } => {
             if !goal_executor(*executor) {
                 return Refusal::Unknown;
@@ -1235,6 +1250,7 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
         Application(u16),
         Note(u64),
         Service,
+        Create,
         Goal,
         Stop(u64),
         Cancel(u64),
@@ -1273,6 +1289,7 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
         Ask::EditNote { name, .. } => Expected::Note(*name),
         Ask::MakeService { .. } => Expected::Service,
         Ask::Adopt { project, .. } => Expected::Adoption(*project),
+        Ask::Create { .. } => Expected::Create,
         Ask::SetGoal { .. } => Expected::Goal,
         Ask::Stop { task, .. } => Expected::Stop(*task),
         Ask::Cancel { task, .. } => Expected::Cancel(*task),
@@ -1313,6 +1330,7 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
         Outcome::NoteEdited { name } => expected == Expected::Note(name),
         Outcome::ServiceMade { person } => expected == Expected::Service && person != 0,
         Outcome::Adopted { project } => expected == Expected::Adoption(project),
+        Outcome::Created { first, last } => expected == Expected::Create && first != 0 && last >= first,
         Outcome::GoalStarted { task } => expected == Expected::Goal && task != 0,
         Outcome::GoalProposed { proposal } => expected == Expected::Goal && proposal != 0,
         Outcome::Stopped { task } => expected == Expected::Stop(task),
@@ -1378,7 +1396,7 @@ fn admit_ask(
     }
     let key = RequestKey { person: session.person, key: bytes };
     if !valid_ask(&env.limits, &ask) {
-        return refused(to, invalid_ask(&ask), out);
+        return refused(to, invalid_ask(&env.limits, &ask), out);
     }
     if let Some(answer) = domain.answers.get(&key)
         && (answer_expiry(answer.at, &env.limits) <= env.wall || answer.due <= env.now)
@@ -1498,6 +1516,7 @@ fn decided(domain: &mut Domain, env: &Env<Limits>, id: Id<Pending>, outcome: Out
         | Outcome::Stopped { .. }
         | Outcome::Cancelled { .. }
         | Outcome::Released { .. }
+        | Outcome::Created { .. }
         | Outcome::GoalStarted { .. }
         | Outcome::GoalProposed { .. }
         | Outcome::PersonTaken { .. }
@@ -1532,6 +1551,7 @@ fn decided(domain: &mut Domain, env: &Env<Limits>, id: Id<Pending>, outcome: Out
         | Outcome::Stopped { .. }
         | Outcome::Cancelled { .. }
         | Outcome::Released { .. }
+        | Outcome::Created { .. }
         | Outcome::GoalStarted { .. }
         | Outcome::GoalProposed { .. }
         | Outcome::PersonTaken { .. }
@@ -1699,6 +1719,7 @@ fn restored(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
                 | Ask::Stop { .. }
                 | Ask::Cancel { .. }
                 | Ask::Release { .. }
+                | Ask::Create { .. }
                 | Ask::SetGoal { .. } => {
                     unreachable!("restored role success has a matching roster ask");
                 }
@@ -1723,6 +1744,7 @@ fn restored(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
             | Outcome::Stopped { .. }
             | Outcome::Cancelled { .. }
             | Outcome::Released { .. }
+            | Outcome::Created { .. }
             | Outcome::GoalStarted { .. }
             | Outcome::GoalProposed { .. }
             | Outcome::EscalationDecided { .. }
@@ -1776,6 +1798,7 @@ pub fn application_part(domain: &mut Domain, env: &Env<Limits>, request: Token, 
         | Ask::ChangePolicy { .. }
         | Ask::SetPool { .. }
         | Ask::StartChat { .. }
+        | Ask::Create { .. }
         | Ask::SetGoal { .. }
         | Ask::Say { .. }
         | Ask::AnswerQuestion { .. }
@@ -1802,6 +1825,7 @@ pub fn application_part(domain: &mut Domain, env: &Env<Limits>, request: Token, 
         | Ask::ChangePolicy { .. }
         | Ask::SetPool { .. }
         | Ask::StartChat { .. }
+        | Ask::Create { .. }
         | Ask::SetGoal { .. }
         | Ask::Say { .. }
         | Ask::AnswerQuestion { .. }
@@ -1822,7 +1846,7 @@ pub fn application_part(domain: &mut Domain, env: &Env<Limits>, request: Token, 
         return Err(Outcome::Refused(Refusal::Unknown));
     }
     if !valid_ask(&env.limits, &ask) {
-        return Err(Outcome::Refused(invalid_ask(&ask)));
+        return Err(Outcome::Refused(invalid_ask(&env.limits, &ask)));
     }
     let person = flight.key.person;
     let role = role(domain, person, application_project);
@@ -1857,6 +1881,7 @@ fn admission(domain: &Domain, person: u64, _project: u32, role: Option<Role>, as
         | Ask::SetRoles { .. }
         | Ask::ChangePolicy { .. }
         | Ask::SetPool { .. }
+        | Ask::Create { .. }
         | Ask::SetGoal { .. }
         | Ask::Close { .. }
         | Ask::Say { .. }

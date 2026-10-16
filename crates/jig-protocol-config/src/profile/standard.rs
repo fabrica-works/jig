@@ -51,6 +51,7 @@ pub(super) const TASKS: tasks::Limits = tasks::Limits {
     ..small::TASKS
 };
 pub(super) const PEOPLE: people::Limits = people::Limits {
+    batch: 4,
     people: 16,
     inbox_tasks: 64,
     sign_ins: 32,

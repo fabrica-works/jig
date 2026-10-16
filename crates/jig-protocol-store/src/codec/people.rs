@@ -5,6 +5,7 @@ use jig_domain_core as core;
 use jig_domain_people as domain;
 use skein_lib::{Duration, List, Reader, Wall, Writer};
 mod asks;
+mod batch;
 mod outcomes;
 mod pieces;
 pub(crate) mod policy;
@@ -26,6 +27,13 @@ pub fn limits(domain: &core::Limits) -> Option<wire::Limits> {
     let people = &domain.people;
     let authority = &domain.authority;
     let mut limits = wire::Limits {
+        ask_create_batch: people.batch,
+        member_words: people.words,
+        member_parameters: 0,
+        member_dependencies: 0,
+        field_rule_name: people.amendment_bytes,
+        verdict_fields: 0,
+        contract_verdict_choices: 0,
         identity_key_subject: people.identity_bytes,
         identity_login: people.identity_bytes,
         identity_name: people.identity_bytes,
@@ -78,6 +86,20 @@ pub fn limits(domain: &core::Limits) -> Option<wire::Limits> {
     };
     derive_shared(domain, &mut limits)?;
     derive_amendment(domain, &mut limits)?;
+    limits.member_parameters = limits.spec_parameters;
+    limits.member_dependencies = people.amendment_bytes.checked_mul(3)?;
+    limits.verdict_fields = piece_bound(
+        people.amendment_bytes,
+        size_of::<domain::FieldRule>(),
+        wire::FieldRule::worst_case_bytes(&EMPTY)?,
+        true,
+    )?;
+    limits.contract_verdict_choices = piece_bound(
+        people.amendment_bytes,
+        size_of::<domain::Verdict>(),
+        wire::Verdict::worst_case_bytes(&EMPTY)?,
+        true,
+    )?;
     wire::check_limits(&limits).ok()?;
     Some(limits)
 }

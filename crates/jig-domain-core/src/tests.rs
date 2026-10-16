@@ -79,6 +79,7 @@ fn limits() -> Limits {
         room_refusals: 2,
     };
     let people = people::Limits {
+        batch: 2,
         people: 2,
         inbox_entries: 2,
         inbox_tasks: 16,

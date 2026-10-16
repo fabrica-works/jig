@@ -147,6 +147,7 @@ impl Core {
             | people::Ask::SetPool { .. }
             | people::Ask::DecideEscalation { .. }
             | people::Ask::StartChat { .. }
+            | people::Ask::Create { .. }
             | people::Ask::SetGoal { .. } => unreachable!("control route owns its ask"),
         };
         let Some(context) = self.tasks.delegation(task) else { return Err(people::Refusal::Unknown) };

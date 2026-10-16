@@ -19,8 +19,8 @@ pub(super) fn route_holdings(
     connector: u16,
     holdings: Option<Box<[tasks::Holding]>>,
 ) -> Requests {
-    created_holdings(core, env, work, request, connector, holdings);
-    let mut out = Queue::with_capacity(1);
+    let mut out = Queue::with_capacity(env.limits.connectors.checked_add(1).expect("connector output bound"));
+    created_holdings(core, env, &mut out, work, request, connector, holdings);
     out.push(Request::Decided);
     Requests::Out(out)
 }
@@ -190,7 +190,15 @@ pub(super) fn begin_goal_creation(
         pool_refused(work, request, people::Refusal::Limit { which: people::LimitKind::Words });
         return;
     }
-    begin_creation(core, env, out, work, request, CreationKind::Goal { person, direct: admitted.direct }, new);
+    begin_creation(
+        core,
+        env,
+        out,
+        work,
+        request,
+        CreationKind::Goal { person, direct: admitted.direct },
+        Box::new([new]),
+    );
 }
 
 #[expect(clippy::too_many_arguments, reason = "one authenticated chat carries its membership and opening words")]
@@ -242,7 +250,7 @@ pub(super) fn begin_chat_creation(
         recurring: None,
         tracked: None,
     };
-    begin_creation(core, env, out, work, request, CreationKind::Chat { person }, new);
+    begin_creation(core, env, out, work, request, CreationKind::Chat { person }, Box::new([new]));
 }
 
 pub(super) fn begin_creation(
@@ -252,7 +260,7 @@ pub(super) fn begin_creation(
     work: &mut Queue<Event>,
     request: Token,
     kind: CreationKind,
-    new: tasks::New,
+    members: Box<[tasks::New]>,
 ) {
     if core.creating.len() == core.creating.capacity() {
         super::refusals::pool_again(work, request, people::Again::Busy);
@@ -260,24 +268,13 @@ pub(super) fn begin_creation(
     }
     let remaining = u32::try_from(core.connectors.len()).expect("configured connector count fits u32");
     assert!(remaining > 0, "task creation has a numbered connector");
-    for &connector in core.connectors.as_ref() {
-        out.push(Request::Ask {
-            connector,
-            ask: Ask::TaskHoldings {
-                request,
-                project: new.project,
-                root: new.number,
-                number: new.number,
-                executor: new.executor,
-                spec: new.spec.clone(),
-            },
-        });
-    }
+    creation_holdings(core, out, request, members.first().expect("nonempty creation"));
     let inserted = core.creating.insert(
         request,
         Creation {
             kind,
-            new,
+            members,
+            at: 0,
             remaining,
             holdings: List::with_capacity(env.limits.tasks.holdings),
             answered: List::with_capacity(remaining),
@@ -293,6 +290,7 @@ pub(super) fn begin_creation(
 pub(super) fn created_holdings(
     core: &mut Core,
     env: &Env<Limits>,
+    out: &mut Queue<Request>,
     work: &mut Queue<Event>,
     request: Token,
     connector: u16,
@@ -319,14 +317,50 @@ pub(super) fn created_holdings(
     if creating.remaining != 0 {
         return;
     }
-    let creating = core.creating.remove(&request).expect("completed creation flight");
-    if creating.failed {
-        pool_refused(work, request, people::Refusal::Limit { which: people::LimitKind::Arithmetic });
+    let member = creating.members.get_mut(creating.at).expect("creation member");
+    member.holdings =
+        core::mem::replace(&mut creating.holdings, List::with_capacity(env.limits.tasks.holdings)).into_boxed();
+    creating.at = creating.at.checked_add(1).expect("bounded batch");
+    if let Some(member) = creating.members.get(creating.at) {
+        creating.remaining = u32::try_from(core.connectors.len()).expect("connector count");
+        creating.answered.clear();
+        let member = member.clone();
+        creation_holdings(core, out, request, &member);
         return;
     }
-    let mut new = creating.new;
-    new.holdings = creating.holdings.into_boxed();
+    let creating = core.creating.remove(&request).expect("completed creation flight");
+    if creating.failed {
+        pool_refused(work, request, people::Refusal::Limit { which: people::LimitKind::Holds });
+        return;
+    }
+    finish_creation(core, env, work, request, creating);
+}
+
+fn finish_creation(core: &mut Core, env: &Env<Limits>, work: &mut Queue<Event>, request: Token, creating: Creation) {
+    let person = match creating.kind {
+        CreationKind::Batch { person } => Some(person),
+        CreationKind::Goal { .. } | CreationKind::Chat { .. } => None,
+    };
+    if let Some(person) = person {
+        let first = creating.members.first().expect("nonempty batch").number;
+        let (period, pool) = core.goal_open_pool(creating.members.first().expect("nonempty batch").project, person);
+        if let Some(event) = period {
+            work.push(Event::Tasks(event));
+        }
+        if let Some(event) = pool {
+            work.push(Event::Tasks(event));
+        }
+        assert!(core.made.insert(request, (first, None)) == Ok(None), "one batch make flight");
+        work.push(Event::Tasks(tasks::Event::Make {
+            reply_to: ReplyTo::new(request),
+            creator: tasks::Party::Person(person),
+            batch: creating.members,
+        }));
+        return;
+    }
+    let new = creating.members.into_iter().next().expect("single creation");
     match creating.kind {
+        CreationKind::Batch { .. } => unreachable!("batch handled above"),
         CreationKind::Goal { person, direct: true } => {
             let (period, pool) = core.goal_open_pool(new.project, person);
             if let Some(event) = period {
@@ -335,7 +369,7 @@ pub(super) fn created_holdings(
             if let Some(event) = pool {
                 work.push(Event::Tasks(event));
             }
-            assert!(core.made.insert(request, (new.number, true)) == Ok(None), "one goal make flight");
+            assert!(core.made.insert(request, (new.number, Some(true))) == Ok(None), "one goal make flight");
             work.push(Event::Tasks(tasks::Event::Make {
                 reply_to: ReplyTo::new(request),
                 creator: tasks::Party::Person(person),
@@ -363,7 +397,7 @@ pub(super) fn created_holdings(
             }));
         }
         CreationKind::Chat { person } => {
-            assert!(core.made.insert(request, (new.number, false)) == Ok(None), "one chat make flight");
+            assert!(core.made.insert(request, (new.number, Some(false))) == Ok(None), "one chat make flight");
             work.push(Event::Tasks(tasks::Event::Make {
                 reply_to: ReplyTo::new(request),
                 creator: tasks::Party::Person(person),
@@ -567,5 +601,21 @@ pub(super) fn change_policy_request(
             }));
         }
         Err(why) => pool_refused(work, request, why),
+    }
+}
+
+fn creation_holdings(core: &Core, out: &mut Queue<Request>, request: Token, new: &tasks::New) {
+    for &connector in core.connectors.as_ref() {
+        out.push(Request::Ask {
+            connector,
+            ask: Ask::TaskHoldings {
+                request,
+                project: new.project,
+                root: new.number,
+                number: new.number,
+                executor: new.executor,
+                spec: new.spec.clone(),
+            },
+        });
     }
 }

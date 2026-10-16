@@ -242,7 +242,8 @@ fn request(ask: &people::Ask) -> Option<(Act, Subject)> {
         people::Ask::SetRoles { project, .. } => (Act::SetRoles, Subject::Project { project: *project }),
         people::Ask::MakeService { project, .. } => (Act::MakeService, Subject::Project { project: *project }),
         people::Ask::SetPool { project, .. } => (Act::SetPool, Subject::Project { project: *project }),
-        people::Ask::Application { .. }
+        people::Ask::Create { .. }
+        | people::Ask::Application { .. }
         | people::Ask::StartChat { .. }
         | people::Ask::MarkSeen { seen: people::Seen::Results { .. } } => return None,
     })

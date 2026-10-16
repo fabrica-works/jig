@@ -4,6 +4,24 @@ use crate::{Ask, EscalationDecision, NoteChange, PersonResult, ProposalDecision}
 pub(crate) fn valid(ask: &Ask) -> bool {
     match ask {
         Ask::StartChat { words, .. } | Ask::Say { words, .. } | Ask::AnswerQuestion { words, .. } => text(words),
+        Ask::Create { batch, .. } => {
+            for member in batch {
+                if !text(&member.words) {
+                    return false;
+                }
+                for parameter in &member.parameters {
+                    match parameter {
+                        crate::Parameter::Bytes { value, .. } => {
+                            if !text(value) {
+                                return false;
+                            }
+                        }
+                        crate::Parameter::Number { .. } | crate::Parameter::Resource { .. } => {}
+                    }
+                }
+            }
+            true
+        }
         Ask::SetGoal { spec, .. } => text(spec),
         Ask::MakeService { name, .. } => text(name),
         Ask::Move { reason, .. } | Ask::Cancel { reason, .. } => text(reason),

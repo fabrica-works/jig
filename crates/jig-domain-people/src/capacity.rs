@@ -9,6 +9,7 @@ use skein_lib::Wall;
 /// The refused operation's kind and existing object identity, without its payload.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum CapacityAction {
+    Create,
     Close,
     Application { connector: u16 },
     Note { name: u64 },
@@ -66,6 +67,7 @@ pub(crate) fn action(ask: &Ask) -> CapacityAction {
         Ask::ChangePolicy { .. } => CapacityAction::Policy,
         Ask::SetPool { person, .. } => CapacityAction::Pool { person: *person },
         Ask::StartChat { .. } => CapacityAction::Chat,
+        Ask::Create { .. } => CapacityAction::Create,
         Ask::SetGoal { .. } => CapacityAction::Goal,
         Ask::DecideEscalation { task, .. } => CapacityAction::Escalation { task: *task },
         Ask::DecideProposal { proposer, proposal, .. } => {
@@ -110,6 +112,7 @@ pub(crate) fn project(ask: &Ask) -> Option<u32> {
         | Ask::Stop { project, .. }
         | Ask::Cancel { project, .. }
         | Ask::Release { project, .. }
+        | Ask::Create { project, .. }
         | Ask::SetGoal { project, .. } => Some(*project),
         Ask::MarkSeen { .. } => None,
     }
@@ -124,6 +127,7 @@ pub(crate) fn permanent(outcome: Outcome) -> Option<CapacityCause> {
         | Outcome::NoteEdited { .. }
         | Outcome::ServiceMade { .. }
         | Outcome::Adopted { .. }
+        | Outcome::Created { .. }
         | Outcome::GoalStarted { .. }
         | Outcome::GoalProposed { .. }
         | Outcome::Closing { .. }
@@ -188,7 +192,8 @@ fn room(refusal: Refusal) -> Option<CapacityCause> {
             | LimitKind::Resource
             | LimitKind::Service => None,
         },
-        Refusal::Role { .. }
+        Refusal::NotWellFormed { .. }
+        | Refusal::Role { .. }
         | Refusal::Authority { .. }
         | Refusal::Moved { .. }
         | Refusal::Disposal { .. }

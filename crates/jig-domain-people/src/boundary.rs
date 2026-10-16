@@ -257,6 +257,8 @@ pub enum Keep {
 /// the root after role checks (domain/people.md, section 5.1).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Ask {
+    /// Make these roots together (domain/people.md, 5.1).
+    Create { project: u32, batch: Box<[crate::Member]> },
     /// Dispose of every live delegate and ask this chat to finish within its configured grace.
     Close { project: u32, chat: u64, disposals: List<Disposal> },
     /// Mark results or one chat's replies seen under this party's key.
@@ -420,6 +422,8 @@ pub enum EscalationChoice {
 /// final outcomes with the parent's task decision. (domain/people.md, section 5.1).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Outcome {
+    /// The batch was made in order.
+    Created { first: u64, last: u64 },
     /// The whole chat-close decision was kept.
     Closing { chat: u64, cancelled: u32, kept: u32 },
     /// The named read position was accepted; it never moves backwards.

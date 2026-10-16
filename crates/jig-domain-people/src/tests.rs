@@ -8,6 +8,7 @@ use crate::*;
 use skein_lib::{Duration, Env, List, Queue, ReplyTo, Time, Token, Wall};
 
 const LIMITS: Limits = Limits {
+    batch: 2,
     people: 4,
     inbox_entries: 2,
     inbox_tasks: 16,
@@ -1595,3 +1596,5 @@ fn a_proposal_makers_kind_is_kept_in_its_key_and_restored_answer() {
 mod marked_chats;
 
 mod utf8;
+
+mod create;

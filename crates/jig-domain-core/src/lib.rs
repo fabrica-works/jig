@@ -248,7 +248,7 @@ pub struct Core {
     /// Historical dependency results held for preparation.
     pub dependency_results: Map<u64, Box<[HistoricalResult]>>,
     /// Numbered task creation flights.
-    pub made: Map<Token, (u64, bool)>,
+    pub made: Map<Token, (u64, Option<bool>)>,
     /// Goal proposal decisions in flight.
     pub goal_routes: Map<Token, GoalRoute>,
     /// Delegations awaiting input checks.

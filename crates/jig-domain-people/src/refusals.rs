@@ -6,6 +6,8 @@ use skein_lib::Wall;
 /// A final reason a keyed request was refused.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Refusal {
+    /// The named batch member is not well formed.
+    NotWellFormed { at: u32, why: Malformed },
     /// A named direct delegate lacks its disposal or was named incorrectly.
     Disposal { task: u64, issue: DisposalIssue },
     /// The held role does not permit this request here.
@@ -37,6 +39,12 @@ pub enum Refusal {
     KeyConflict,
     /// The root's requester has nobody to hold its escalations (domain/people.md, 5.1).
     NoEscalationHolder,
+}
+
+/// Why a batch member is not well formed.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Malformed {
+    Cycle,
 }
 
 /// Authority missing from a party's request.

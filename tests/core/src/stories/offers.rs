@@ -19,6 +19,11 @@ pub fn world_configuration(seed: u64) -> root::Config {
 
 #[must_use]
 pub fn world(seed: u64, role: Option<people::Role>) -> World {
+    world_with(seed, role, |_| {})
+}
+
+#[must_use]
+pub fn world_with(seed: u64, role: Option<people::Role>, edit: impl FnOnce(&mut root::Limits)) -> World {
     let (mut configuration, mut limits) = fixture(seed, false);
     if let Some(held) = role {
         limits.core.authority.roles = 2;
@@ -40,6 +45,21 @@ pub fn world(seed: u64, role: Option<people::Role>) -> World {
         role.authority.delegation.tasks = 2;
         role.authority.delegation.depth = 2;
     });
+    edit(&mut limits);
+    let policy = configuration.core.authority.policy(1).expect("fixture policy").clone();
+    let mut domain = authority::Domain::new(configuration.core.authority.rules().clone(), limits.core.authority)
+        .expect("edited authority bounds");
+    let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
+    authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut facts);
+    assert_eq!(facts.pop(), Some(authority::PolicyFact::Added { project: 1 }));
+    configuration.core.authority = domain;
+    let room = core::room_max(&limits.core).expect("core room bound");
+    let connectors = jig_test_connector::MAX_OUT.checked_mul(2).expect("two connectors");
+    limits.journal.writes = limits.journal.writes.max(room.writes.checked_add(connectors).expect("writes"));
+    limits.journal.held = limits
+        .journal
+        .held
+        .max(room.held.checked_add(connectors).expect("held").checked_mul(limits.journal.commits).expect("flights"));
     let mut world = World::configured(seed, false, configuration, limits);
     let person = world
         .people_answers

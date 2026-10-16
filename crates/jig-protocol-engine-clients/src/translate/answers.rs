@@ -74,6 +74,7 @@ fn owner(value: &p::Outcome, limits: &w::Limits) -> Result<w::OwnerOutcome, w::P
             limits,
             w::OwnerOutcomeAdoptedParts { project: *project },
         )?),
+        p::Outcome::Created { .. } => return Err(problem()),
         p::Outcome::GoalStarted { task } => w::OwnerOutcome::GoalStarted(w::OwnerOutcomeGoalStarted::new(
             limits,
             w::OwnerOutcomeGoalStartedParts { task: *task },

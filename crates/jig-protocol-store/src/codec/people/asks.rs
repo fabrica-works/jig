@@ -347,6 +347,10 @@ pub(super) fn decode_escalation_decision(value: wire::EscalationDecision) -> dom
 #[expect(clippy::manual_map, reason = "step code translates optional fields through exhaustive matches")]
 pub fn encode_ask(value: &domain::Ask, limits: &wire::Limits) -> Result<wire::Ask, wire::Problem> {
     Ok(match value {
+        domain::Ask::Create { project, batch } => wire::Ask::Create(wire::AskCreate::new(
+            limits,
+            wire::AskCreateParts { project: *project, batch: super::batch::encode(batch, limits)? },
+        )?),
         domain::Ask::Close { project, chat, disposals } => wire::Ask::Close(wire::AskClose::new(
             limits,
             wire::AskCloseParts {
@@ -505,6 +509,10 @@ pub fn encode_ask(value: &domain::Ask, limits: &wire::Limits) -> Result<wire::As
 #[expect(clippy::manual_map, reason = "step code translates optional fields through exhaustive matches")]
 pub fn decode_ask(value: wire::Ask, limits: &wire::Limits) -> Result<domain::Ask, wire::Problem> {
     Ok(match value {
+        wire::Ask::Create(value) => {
+            let wire::AskCreateParts { project, batch } = value.into_parts();
+            domain::Ask::Create { project, batch: super::batch::decode(batch, limits)? }
+        }
         wire::Ask::Close(value) => {
             let wire::AskCloseParts { project, chat, disposals } = value.into_parts();
             domain::Ask::Close { project, chat, disposals: decode_ask_close_disposals(disposals) }

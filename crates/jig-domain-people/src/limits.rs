@@ -11,6 +11,8 @@ use skein_lib::{Deadlines, Duration, Id, List, Map, Queue, Slab, Wall};
 /// outputs; validate via `worst_case` before construction. (domain/people.md, sections 2–5).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Limits {
+    /// Maximum members of one requested or proposed batch.
+    pub batch: u32,
     /// Maximum retained parties and provider/subject index entries.
     pub people: u32,
     /// Maximum visible cached entries and unread count; results retain one extra overflow witness.
@@ -74,6 +76,9 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         return None;
     }
     let ask_bytes = List::<crate::Disposal>::worst_case(disposal_capacity(limits))?
+        .max(u64::from(limits.batch).checked_mul(
+            u64::try_from(size_of::<crate::Member>()).ok()?.checked_add(u64::from(limits.amendment_bytes))?,
+        )?)
         .max(u64::from(limits.words))
         .max(u64::from(limits.amendment_bytes))
         .max(u64::from(limits.holdings).checked_mul(u64::try_from(size_of::<Holding>()).ok()?)?)

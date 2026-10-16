@@ -112,7 +112,7 @@ fn wake_rule(value: people::WakeRule) -> tasks::WakeRule {
     }
 }
 
-fn wake(value: people::WakePolicy) -> tasks::WakePolicy {
+pub(crate) fn wake(value: people::WakePolicy) -> tasks::WakePolicy {
     tasks::WakePolicy {
         words: wake_rule(value.words),
         notices: wake_rule(value.notices),
@@ -128,7 +128,7 @@ fn wake(value: people::WakePolicy) -> tasks::WakePolicy {
     }
 }
 
-fn spec(value: people::Spec, limits: &tasks::Limits) -> Option<tasks::Spec> {
+pub(crate) fn spec(value: people::Spec, limits: &tasks::Limits) -> Option<tasks::Spec> {
     let mut parameters = List::with_capacity(limits.parameters);
     for parameter in value.parameters {
         let translated = match parameter {
@@ -143,7 +143,7 @@ fn spec(value: people::Spec, limits: &tasks::Limits) -> Option<tasks::Spec> {
     Some(tasks::Spec { words: value.words, parameters: parameters.into_boxed(), inputs: value.inputs })
 }
 
-fn granted(value: people::Authority, limits: &tasks::Limits) -> Option<tasks::Authority> {
+pub(crate) fn granted(value: people::Authority, limits: &tasks::Limits) -> Option<tasks::Authority> {
     let mut grants = List::with_capacity(limits.authority_grants);
     for grant in value.grants {
         let mut segments = List::with_capacity(limits.authority_segments);

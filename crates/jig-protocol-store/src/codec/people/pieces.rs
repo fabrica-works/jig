@@ -6,6 +6,12 @@ use super::{
 };
 
 pub(super) const EMPTY: wire::Limits = wire::Limits {
+    member_words: 0,
+    member_parameters: 0,
+    member_dependencies: 0,
+    field_rule_name: 0,
+    verdict_fields: 0,
+    contract_verdict_choices: 0,
     segment_bytes: 0,
     last_exact_value: 0,
     last_open_value: 0,
@@ -374,7 +380,7 @@ pub(super) fn decode_permissions(
     Ok(values.into_boxed())
 }
 
-fn split(reader: &mut Reader<'_>) -> Result<Option<Box<[u8]>>, wire::Problem> {
+pub(super) fn split(reader: &mut Reader<'_>) -> Result<Option<Box<[u8]>>, wire::Problem> {
     match skein_codec::piece::split(reader) {
         Ok(value) => Ok(value),
         Err(reason) => Err(wire::Problem { path: wire::Path::RowValue, reason }),

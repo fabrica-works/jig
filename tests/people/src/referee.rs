@@ -172,6 +172,7 @@ fn filled(why: Refusal) -> bool {
         | Refusal::NoFurther
         | Refusal::Unknown
         | Refusal::NotOffered
+        | Refusal::NotWellFormed { .. }
         | Refusal::NoEscalationHolder
         | Refusal::KeyConflict => true,
     }

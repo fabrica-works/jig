@@ -15,6 +15,7 @@ struct Winner {
 }
 
 pub const LIMITS: Limits = Limits {
+    batch: 2,
     people: 8,
     inbox_entries: 4,
     inbox_tasks: 16,
@@ -493,6 +494,7 @@ impl World {
                     let kind = match ask.as_ref() {
                         Ask::Application { .. } => RouteKind::Application,
                         Ask::StartChat { .. } => RouteKind::Chat,
+                        Ask::Create { .. } => unreachable!("Create is exercised by the core world"),
                         Ask::SetGoal { .. } => RouteKind::Goal,
                         Ask::MakeService { .. } => RouteKind::Service,
                         Ask::DecideProposal { .. } => RouteKind::Proposal,
@@ -589,6 +591,7 @@ impl World {
                                     &mut self.out,
                                 );
                             }
+                            Ask::Create { .. } => unreachable!("Create is exercised by the core world"),
                             Ask::StartChat { .. } | Ask::SetGoal { .. } => {
                                 let goal = kind == RouteKind::Goal;
                                 let outcome = if self.settings.authority_refuses {
@@ -758,6 +761,7 @@ impl World {
                                         | Ask::EditNote { .. }
                                         | Ask::MakeService { .. }
                                         | Ask::Adopt { .. }
+                                        | Ask::Create { .. }
                                         | Ask::SetGoal { .. }
                                         | Ask::Stop { .. }
                                         | Ask::Cancel { .. }

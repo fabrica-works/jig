@@ -388,6 +388,15 @@ pub(super) fn decode_limit_kind(value: wire::LimitKind) -> domain::LimitKind {
 }
 pub(super) fn encode_refusal(value: &domain::Refusal, limits: &wire::Limits) -> Result<wire::Refusal, wire::Problem> {
     Ok(match value {
+        domain::Refusal::NotWellFormed { at, why } => wire::Refusal::NotWellFormed(wire::RefusalNotWellFormed::new(
+            limits,
+            wire::RefusalNotWellFormedParts {
+                at: *at,
+                why: match why {
+                    domain::Malformed::Cycle => wire::Malformed::Cycle,
+                },
+            },
+        )?),
         domain::Refusal::Disposal { task, issue } => wire::Refusal::Disposal(wire::RefusalDisposal::new(
             limits,
             wire::RefusalDisposalParts { task: *task, issue: encode_disposal_issue(*issue, limits) },
@@ -430,6 +439,15 @@ pub(super) fn encode_refusal(value: &domain::Refusal, limits: &wire::Limits) -> 
 }
 pub(super) fn decode_refusal(value: wire::Refusal) -> domain::Refusal {
     match value {
+        wire::Refusal::NotWellFormed(value) => {
+            let wire::RefusalNotWellFormedParts { at, why } = value.into_parts();
+            domain::Refusal::NotWellFormed {
+                at,
+                why: match why {
+                    wire::Malformed::Cycle => domain::Malformed::Cycle,
+                },
+            }
+        }
         wire::Refusal::Disposal(value) => {
             let wire::RefusalDisposalParts { task, issue } = value.into_parts();
             domain::Refusal::Disposal { task, issue: decode_disposal_issue(issue) }

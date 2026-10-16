@@ -57,6 +57,8 @@ extern crate alloc;
 mod templates;
 pub use templates::{TemplateBudget, TemplateDeadline, TemplateExecutor, TemplateOverride};
 mod amendment;
+mod batch;
+pub use batch::{Contract, FieldRule, Flags, Member, Retention, TaskExecutor, Verdict, member_bytes};
 mod boundary;
 mod capacity;
 mod decisions;
@@ -87,4 +89,4 @@ pub use policy_value::{
     Guard, Judge, PermissionRole, PolicyChange, PolicyRole, PolicyValue, Requirement, policy_bytes,
     policy_change_bytes, requirements_bytes,
 };
-pub use refusals::{Again, DisposalIssue, Ending, Lack, LimitKind, Party, Refusal};
+pub use refusals::{Again, DisposalIssue, Ending, Lack, LimitKind, Malformed, Party, Refusal};

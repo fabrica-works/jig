@@ -176,6 +176,7 @@ const SMALL: &[(&[u8], u64)] = &[
     (b"people.sign_ins", 8),
     (b"people.projects", 2),
     (b"people.holdings", 8),
+    (b"people.batch", 2),
     (b"people.goals", 16),
     (b"people.initial_owners", 2),
     (b"people.requests", 32),

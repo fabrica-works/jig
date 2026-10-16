@@ -33,6 +33,7 @@ pub(crate) fn number(ask: &people::Ask) -> u64 {
         | people::Ask::Stop { .. }
         | people::Ask::Cancel { .. }
         | people::Ask::Release { .. }
+        | people::Ask::Create { .. }
         | people::Ask::SetGoal { .. } => unreachable!("person-task route owns its ask"),
     }
 }
@@ -142,6 +143,7 @@ impl Core {
             | people::Ask::Stop { .. }
             | people::Ask::Cancel { .. }
             | people::Ask::Release { .. }
+            | people::Ask::Create { .. }
             | people::Ask::SetGoal { .. } => unreachable!("person-task route owns its ask"),
         };
         let revision = if let people::Ask::AnswerPerson { revision, .. } = &ask { Some(*revision) } else { None };
@@ -198,6 +200,7 @@ impl Core {
             | people::Ask::Stop { .. }
             | people::Ask::Cancel { .. }
             | people::Ask::Release { .. }
+            | people::Ask::Create { .. }
             | people::Ask::SetGoal { .. } => unreachable!("person-task route owns its ask"),
         };
         assert!(self.person_tasks.insert(request, route) == Ok(None), "one routed person task per keyed flight");

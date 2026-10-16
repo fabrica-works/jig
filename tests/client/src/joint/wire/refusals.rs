@@ -23,6 +23,7 @@ pub fn refusal(value: people::Refusal) -> client::Refusal {
         people::Refusal::Moved { now } => moved(now),
         people::Refusal::Ended { how } => client::Refusal::Ended { how: ending(how) },
         people::Refusal::Taken { by } => client::Refusal::Taken { by },
+        people::Refusal::NotWellFormed { .. } => unreachable!("no v8 ask leads to NotWellFormed"),
         people::Refusal::NotWaiting => client::Refusal::NotWaiting,
         people::Refusal::NoFurther => client::Refusal::NoFurther,
         people::Refusal::Unknown => client::Refusal::Unknown,

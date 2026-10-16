@@ -8,6 +8,7 @@ use facts::{
 };
 pub(super) fn encode_outcome(value: &domain::Outcome, limits: &wire::Limits) -> Result<wire::Outcome, wire::Problem> {
     Ok(match value {
+        domain::Outcome::Created { first, last } => encode_created(*first, *last, limits)?,
         domain::Outcome::Closing { chat, cancelled, kept } => {
             wire::Outcome::Closing(encode_closing(*chat, *cancelled, *kept, limits)?)
         }
@@ -109,11 +110,9 @@ pub(super) fn encode_outcome(value: &domain::Outcome, limits: &wire::Limits) -> 
 }
 pub(super) fn decode_outcome(value: wire::Outcome) -> domain::Outcome {
     match value {
+        wire::Outcome::Created(value) => decode_created(value),
         wire::Outcome::Closing(value) => decode_closing(value),
-        wire::Outcome::MarkedSeen(value) => {
-            let wire::OutcomeMarkedSeenParts { seen } = value.into_parts();
-            domain::Outcome::MarkedSeen { seen: super::asks::decode_seen(seen) }
-        }
+        wire::Outcome::MarkedSeen(value) => decode_marked_seen(value),
         wire::Outcome::Applied(value) => {
             let wire::OutcomeAppliedParts { connector, token } = value.into_parts();
             domain::Outcome::Applied { connector, token: Token::new(token) }
@@ -315,4 +314,16 @@ fn encode_said(
 
 fn marked_seen(seen: &domain::Seen, limits: &wire::Limits) -> Result<wire::OutcomeMarkedSeen, wire::Problem> {
     wire::OutcomeMarkedSeen::new(limits, wire::OutcomeMarkedSeenParts { seen: super::asks::encode_seen(seen, limits)? })
+}
+
+fn encode_created(first: u64, last: u64, limits: &wire::Limits) -> Result<wire::Outcome, wire::Problem> {
+    Ok(wire::Outcome::Created(wire::OutcomeCreated::new(limits, wire::OutcomeCreatedParts { first, last })?))
+}
+fn decode_created(value: wire::OutcomeCreated) -> domain::Outcome {
+    let wire::OutcomeCreatedParts { first, last } = value.into_parts();
+    domain::Outcome::Created { first, last }
+}
+fn decode_marked_seen(value: wire::OutcomeMarkedSeen) -> domain::Outcome {
+    let wire::OutcomeMarkedSeenParts { seen } = value.into_parts();
+    domain::Outcome::MarkedSeen { seen: super::asks::decode_seen(seen) }
 }

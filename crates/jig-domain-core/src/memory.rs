@@ -257,6 +257,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     let creations = limits
         .people
         .pending
+        .checked_mul(limits.people.batch.max(1))?
         .checked_add(limits.call_records.checked_mul(task.batch)?)?
         .checked_add(task.tasks.checked_mul(task.batch)?)?;
     total = total.checked_add(bytes(creations, new_task)?)?;
@@ -316,7 +317,9 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(u64::from(task.message_bytes))?
         .checked_add(u64::from(limits.brief.brief_bytes))?
         .checked_add(u64::from(limits.resume_bytes))?
-        .checked_add(u64::from(limits.people.amendment_bytes))?
+        .checked_add(u64::from(limits.people.batch).checked_mul(
+            u64::from(limits.people.amendment_bytes).checked_add(sizeof(size_of::<people::Member>())?)?,
+        )?)?
         .checked_add(u64::from(limits.people.identity_bytes))?
         .checked_add(u64::from(limits.people.words))?
         .checked_add(u64::from(limits.notes.body_bytes))?

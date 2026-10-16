@@ -404,7 +404,7 @@ fn facts_change_nothing_and_a_seed_replays() {
     };
     assert_replays(3, 4, run);
     let mut none = World::new(Settings {
-        limits: jig_domain_people::Limits { facts: 0, ..jig_people_world::LIMITS },
+        limits: jig_domain_people::Limits { batch: 2, facts: 0, ..jig_people_world::LIMITS },
         ..Settings::calm(3)
     });
     none.run();

@@ -78,6 +78,7 @@ const TASK_RETRY: jig_domain_tasks::Retry = jig_domain_tasks::Retry {
 };
 
 pub const PEOPLE_LIMITS: people::Limits = people::Limits {
+    batch: 2,
     people: 2,
     inbox_entries: 2,
     inbox_tasks: 2,
