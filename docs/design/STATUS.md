@@ -74,6 +74,12 @@ smith, and builds what section 2's rows name it for.
   carries facts without content, so they give neither (wanted for the
   chat web interface); and an abort and a closed terminal for smith's
   LLM component. Waits for a smith design and plan.
+- **smith's parity changes, for jig's next repin of smith** (smith's
+  parity plan, its `later.md`; skein's development.md, 5.7): the tools
+  domain's new `Call` and `Outcome` variants, for jobs, in
+  `smith-domain-tools`, which jig's users of that crate follow. jig pins
+  smith `29fa97c9`, before them. Waits for the plan that moves jig's pin
+  of smith.
 - **`ops` standalone** (`examples.md`, 9.1; `protocol/service.md`,
   section 7): its systems' APIs, its connectors' protocols, its service
   and its binary, and its terminal client's loop over a real terminal,
