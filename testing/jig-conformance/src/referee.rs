@@ -993,8 +993,16 @@ impl Referee {
                 for receipt in &self.seen {
                     let must_keep = match receipt {
                         Receipt::Task(_) | Receipt::Turn(..) | Receipt::Terminal(..) | Receipt::Ended(_) => true,
-                        Receipt::Claim(task, attempt) | Receipt::Call(task, attempt, ..) => {
+                        Receipt::Claim(task, attempt) => {
                             self.last.tasks.get(task).is_some_and(|row| !row.closed() && row.attempt == *attempt)
+                        }
+                        Receipt::Call(task, attempt, completion, _) => {
+                            let carried = self.last.receipts.iter().any(|receipt| {
+                                matches!(receipt,
+                                Receipt::Turn(t, a, turn) if t == task && a == attempt && turn > completion)
+                            });
+                            !carried
+                                && self.last.tasks.get(task).is_some_and(|row| !row.closed() && row.attempt == *attempt)
                         }
                         Receipt::SignIn(_) | Receipt::Party(..) | Receipt::Outbox(..) | Receipt::Word(..) => false,
                     };

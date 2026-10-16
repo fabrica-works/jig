@@ -75,3 +75,8 @@ fn a_sign_in_past_its_lifetime_is_answered_signed_out() {
     world.drain().expect("expired sign-in answered");
     assert_eq!(world.peers.peers.parties[0].replies.last().map(|(_, reply)| reply), Some(&Reply::SignedOut));
 }
+
+#[test]
+fn racing_decisions_chosen_effect_admission_and_completion_cut_ends_the_story() {
+    chosen_cut(Scenario::RacingDecisions);
+}

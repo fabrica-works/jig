@@ -234,3 +234,18 @@ fn random_policy_changes_leave_a_committed_flight_whole_and_recheck_waiting_prop
         assert!(replay.is_ok(), "replay policy seed {seed}");
     }
 }
+
+#[test]
+fn each_commit_cut_of_an_agents_tool_story_answers_its_call_once() {
+    use jig_core_world::effects::Cut;
+    for story in jig_core_world::agents_tools::STORIES {
+        let commits = (story.run)(&mut World::new(190, false), None);
+        for at in 1..=commits {
+            for cut in [Cut::Submitted(at), Cut::Durable(at)] {
+                let mut world = World::new(190, false);
+                (story.run)(&mut world, Some(cut));
+                assert_eq!(world.reached_cut, Some(cut), "{} reaches its cut", story.name);
+            }
+        }
+    }
+}

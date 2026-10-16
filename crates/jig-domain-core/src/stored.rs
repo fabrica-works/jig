@@ -18,6 +18,10 @@ use skein_lib::Wall;
 /// answers for calls routed among its children (domain/engine.md, 7.3).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum CallPart {
+    /// A control committed; the spec revision a following amendment names.
+    Revised { task: u64, revision: u64 },
+    /// The named revision moved; the caller must decide against this value.
+    Moved { task: u64, now: jig_domain_people::Moved },
     /// An effect kept in the same decision; its settled connector answer may follow.
     Effect { connector: u16, entry: u64, deadline: Wall, outcome: Option<crate::connector::OutboxOutcome> },
     /// The application connector owns the answer.
@@ -81,6 +85,7 @@ impl CallPart {
         authority_limits: &jig_domain_authority::Limits,
     ) -> bool {
         match self {
+            CallPart::Revised { task, .. } | CallPart::Moved { task, .. } => *task != 0 && *task <= deployment.tasks,
             CallPart::Effect { entry, .. } => *entry != 0 && *entry <= deployment.connector_rows,
             CallPart::Connector { .. }
             | CallPart::Unavailable

@@ -437,7 +437,7 @@ pub(super) fn tag_tasks(
                     | RoutedCall::Introduce(_)
                     | RoutedCall::Subscribe { .. }
                     | RoutedCall::Unsubscribe(_)
-                    | RoutedCall::Control(_) => unreachable!("matching proposal decision"),
+                    | RoutedCall::Control { .. } => unreachable!("matching proposal decision"),
                 };
                 assert!(key.task == proposer || outcome != tasks::ProposalOutcome::Withdrawn, "withdrawal by proposer");
                 call_decision(
@@ -462,7 +462,7 @@ pub(super) fn tag_tasks(
                     | RoutedCall::Introduce(_)
                     | RoutedCall::Subscribe { .. }
                     | RoutedCall::Unsubscribe(_)
-                    | RoutedCall::Control(_) => unreachable!("task escalation route kind"),
+                    | RoutedCall::Control { .. } => unreachable!("task escalation route kind"),
                 };
                 assert!(task == named && revision == current, "exact task escalation terminal");
                 call_decision(
@@ -561,7 +561,15 @@ pub(super) fn tag_tasks(
                             Some((key, CallPart::Proposed { proposal }))
                         }
                         RoutedCall::Introduce(key) => Some((key, CallPart::Introduced)),
-                        RoutedCall::Control(key) => Some((key, CallPart::Controlled)),
+                        RoutedCall::Control { key, target, revised } => {
+                            let part = if revised {
+                                let revision = core.tasks.task(target).expect("controlled task exists").revisions.spec;
+                                CallPart::Revised { task: target, revision }
+                            } else {
+                                CallPart::Controlled
+                            };
+                            Some((key, part))
+                        }
                         RoutedCall::Accepting { key, proposer, proposal, message } => {
                             let _previous = core.routing_calls.remove(&token).expect("accepted proposal route");
                             core.routing_calls
@@ -607,7 +615,7 @@ pub(super) fn tag_tasks(
                         RoutedCall::Propose { .. }
                         | RoutedCall::Accepting { .. }
                         | RoutedCall::Introduce(_)
-                        | RoutedCall::Control(_)
+                        | RoutedCall::Control { .. }
                         | RoutedCall::Message(_)
                         | RoutedCall::Decide { .. }
                         | RoutedCall::Withdraw { .. }
@@ -1096,7 +1104,7 @@ pub(super) fn tag_tasks(
                         RoutedCall::Message(key) | RoutedCall::Introduce(key) => {
                             Some((key, CallPart::MessageRefused(problem.clone())))
                         }
-                        RoutedCall::Control(key) => Some((key, CallPart::ControlRefused(problem.clone()))),
+                        RoutedCall::Control { key, .. } => Some((key, CallPart::ControlRefused(problem.clone()))),
                         RoutedCall::Escalation { key, .. } => Some((key, CallPart::EscalationRefused(problem.clone()))),
                         RoutedCall::Propose { key, .. }
                         | RoutedCall::Decide { key, .. }

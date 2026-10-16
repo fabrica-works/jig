@@ -5,6 +5,7 @@ use super::{
     encode_escalation_outcome, encode_finding, encode_outbox_outcome, encode_proposal_outcome, note_problem, notes,
     problem, task_problem, tasks, too_large, wire,
 };
+mod moved;
 pub(super) fn encode_settled_answer(
     value: &domain::SettledAnswer,
     limits: &Limits,
@@ -104,6 +105,14 @@ pub(super) fn encode_call_part(value: &domain::CallPart, limits: &Limits) -> Res
             )?)
         }
         domain::CallPart::Controlled => wire::CallPart::Controlled,
+        domain::CallPart::Revised { task, revision } => wire::CallPart::Revised(wire::CallPartRevised::new(
+            &limits.core,
+            wire::CallPartRevisedParts { task: *task, revision: *revision },
+        )?),
+        domain::CallPart::Moved { task, now } => wire::CallPart::Moved(wire::CallPartMoved::new(
+            &limits.core,
+            wire::CallPartMovedParts { task: *task, now: moved::encode_moved(now, &limits.core)? },
+        )?),
         domain::CallPart::ControlRefused(value) => wire::CallPart::ControlRefused(wire::CallPartControlRefused::new(
             &limits.core,
             wire::CallPartControlRefusedParts { value: encode_task_problem(value, limits)? },
@@ -200,6 +209,8 @@ pub(super) fn decode_call_part(value: wire::CallPart, limits: &Limits) -> Result
             domain::CallPart::ProposalRefused(decode_task_problem(value, limits)?)
         }
         wire::CallPart::Controlled => domain::CallPart::Controlled,
+        wire::CallPart::Revised(value) => decode_revised(value),
+        wire::CallPart::Moved(value) => decode_moved(value),
         wire::CallPart::ControlRefused(value) => {
             let wire::CallPartControlRefusedParts { value } = value.into_parts();
             domain::CallPart::ControlRefused(decode_task_problem(value, limits)?)
@@ -571,4 +582,13 @@ fn decode_part_effect(value: wire::CallPartEffect, limits: &Limits) -> domain::C
             None => None,
         },
     }
+}
+
+fn decode_revised(value: wire::CallPartRevised) -> domain::CallPart {
+    let wire::CallPartRevisedParts { task, revision } = value.into_parts();
+    domain::CallPart::Revised { task, revision }
+}
+fn decode_moved(value: wire::CallPartMoved) -> domain::CallPart {
+    let wire::CallPartMovedParts { task, now } = value.into_parts();
+    domain::CallPart::Moved { task, now: moved::decode_moved(now) }
 }

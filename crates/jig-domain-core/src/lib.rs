@@ -458,6 +458,8 @@ impl Core {
                     | CallPart::NoteWritten { .. }
                     | CallPart::NoteRecalled { .. }
                     | CallPart::NoteRefused(_)
+                    | CallPart::Revised { .. }
+                    | CallPart::Moved { .. }
                     | CallPart::Unavailable,
                 )
                 | None => {}

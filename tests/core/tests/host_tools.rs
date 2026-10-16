@@ -89,3 +89,51 @@ fn a_delegate_call_makes_its_batch_and_answers_their_numbers() {
     );
     assert_eq!(world.procedure, Some(2));
 }
+
+#[test]
+fn an_amend_naming_an_old_spec_revision_is_answered_moved() {
+    let mut world = World::new(176, false);
+    world.hold_procedures = true;
+    world.delegate();
+    let task = world.procedure.expect("delegated child");
+    let amend = format!(
+        r#"{{"target":{task},"revision":0,"amendment":{{"spec":{{"words":"check again"}},"reason":"new evidence"}}}}"#
+    );
+    world.tool_call(b"amend", amend.as_bytes(), true);
+    world.turn(1, 0, None, b"delegate and amendment answered");
+    world.turn(2, 0, None, b"record the answers");
+    world.tool_call(b"amend", amend.as_bytes(), true);
+    assert_eq!(
+        answer(&world),
+        &core::SettledAnswer::Host { error: true, body: b"Moved: task 2 is at spec revision 1 now".as_slice().into() }
+    );
+}
+
+#[test]
+fn an_amend_naming_its_spec_revision_is_done_with_the_next() {
+    let mut world = World::new(177, false);
+    world.hold_procedures = true;
+    world.delegate();
+    let task = world.procedure.expect("delegated child");
+    let amend = format!(
+        r#"{{"target":{task},"revision":0,"amendment":{{"spec":{{"words":"check again"}},"reason":"new evidence"}}}}"#
+    );
+    world.tool_call(b"amend", amend.as_bytes(), true);
+    assert_eq!(
+        answer(&world),
+        &core::SettledAnswer::Host { error: false, body: b"Done: task 2 is at spec revision 1".as_slice().into() }
+    );
+}
+
+#[test]
+fn agents_tools_scenario_family() {
+    use jig_core_world::{agents_tools::STORIES, effects::Cut};
+    for story in STORIES {
+        let commits = (story.run)(&mut World::new(190, false), None);
+        for cut in [Cut::Submitted(commits), Cut::Durable(commits)] {
+            let mut world = World::new(190, false);
+            (story.run)(&mut world, Some(cut));
+            assert_eq!(world.reached_cut, Some(cut), "{} reaches its cut", story.name);
+        }
+    }
+}

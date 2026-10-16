@@ -39,7 +39,13 @@ fn arbitrary(seed: u64, check: fn(&[u8])) {
     }
 }
 fn mutated(family: &str, seed: u64, check: fn(&[u8])) {
-    let version = if matches!(family, "core" | "tasks" | "people") { "v2" } else { "v1" };
+    let version = if family == "core" {
+        "v3"
+    } else if matches!(family, "tasks" | "people") {
+        "v2"
+    } else {
+        "v1"
+    };
     let root =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../crates/jig-protocol-store/golden").join(family).join(version);
     mutate_goldens(&root, seed, check);
@@ -118,8 +124,8 @@ fn mutated_people_goldens_never_panic() {
 }
 
 fn core(bytes: &[u8]) {
-    use jig_protocol_store::core_v2;
-    if let Ok(row) = core_v2::Row::decode(&core_v2::CEILINGS, &mut Reader::new(bytes)) {
+    use jig_protocol_store::core_v3;
+    if let Ok(row) = core_v3::Row::decode(&core_v3::CEILINGS, &mut Reader::new(bytes)) {
         let mut writer = Writer::new(usize::try_from(row.measure()).expect("measured length"));
         row.encode(&mut writer).expect("measured room");
         assert_eq!(writer.finish().as_ref(), bytes);
@@ -135,9 +141,9 @@ fn mutated_core_goldens_never_panic() {
 }
 
 fn frames(bytes: &[u8]) {
-    use jig_protocol_store::{codec, core_v2, notes_v1, tasks_v2, transcripts::frame};
+    use jig_protocol_store::{codec, core_v3, notes_v1, tasks_v2, transcripts::frame};
     let limits = codec::Limits {
-        core: core_v2::CEILINGS,
+        core: core_v3::CEILINGS,
         tasks: tasks_v2::CEILINGS,
         people: people_v2::CEILINGS,
         notes: notes_v1::CEILINGS,
@@ -152,16 +158,16 @@ fn arbitrary_frames_never_panic_and_round_trip_when_they_decode() {
 }
 #[test]
 fn mutated_and_short_frames_never_panic() {
-    use jig_protocol_store::{codec, core_v2, notes_v1, tasks_v2, transcripts::frame};
+    use jig_protocol_store::{codec, core_v3, notes_v1, tasks_v2, transcripts::frame};
     let limits = codec::Limits {
-        core: core_v2::CEILINGS,
+        core: core_v3::CEILINGS,
         tasks: tasks_v2::CEILINGS,
         people: people_v2::CEILINGS,
         notes: notes_v1::CEILINGS,
     };
-    let turn = core_v2::TurnRecord::new(
+    let turn = core_v3::TurnRecord::new(
         &limits.core,
-        core_v2::TurnRecordParts {
+        core_v3::TurnRecordParts {
             opens_window: true,
             task: 11,
             attempt: 2,

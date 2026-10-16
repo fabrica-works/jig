@@ -111,6 +111,7 @@ impl ScenarioApplication for Testing {
     fn check(world: &World, scenario: Scenario) -> Result<(), Violation> {
         let applied = world.systems[0].observed().iter().filter(|effect| effect.applied).count();
         match scenario {
+            Scenario::RacingDecisions => crate::actions::check_racing_decisions(world),
             Scenario::LateCopy => check(
                 applied == 1 && world.systems[0].observed().len() == 2,
                 "late and retried copies did not make one effect",
@@ -203,6 +204,47 @@ impl Continuation {
     pub(crate) fn advance(&mut self, world: &mut World) -> Result<bool, Violation> {
         loop {
             match self.action {
+                Action::PartyAmend => {
+                    if self.phase == 0 {
+                        crate::actions::prepare_racing_decisions(world);
+                        self.phase = 1;
+                        return Ok(true);
+                    }
+                    let core::CallPart::Delegated(numbers) = named_part(world, 1).expect("delegated race target")
+                    else {
+                        panic!("race delegation refused");
+                    };
+                    let task = numbers[0];
+                    world.peers.children.push(task);
+                    ask(
+                        world,
+                        90,
+                        people::Ask::Amend {
+                            project: 1,
+                            task,
+                            revision: 0,
+                            release: None,
+                            amendment: people::Amendment {
+                                addressed: None,
+                                instructions: None,
+                                wake: None,
+                                dependencies: None,
+                                authority: None,
+                                reason: b"party evidence".as_slice().into(),
+                                spec: Some(people::Spec {
+                                    words: b"party choice".as_slice().into(),
+                                    parameters: Box::new([]),
+                                    inputs: Box::new([]),
+                                }),
+                            },
+                        },
+                    );
+                    return Ok(false);
+                }
+                Action::RunAmend => {
+                    crate::actions::run_racing_amendment(world);
+                    return Ok(false);
+                }
                 Action::Ready => match self.phase {
                     0 if world.peers.assignments.is_empty() => {
                         world.advance(6_000_000_000);
@@ -579,7 +621,9 @@ fn atomic(world: &mut World, action: Action) -> Result<(), Violation> {
         | Action::Propose
         | Action::StartStanding
         | Action::Period(_)
-        | Action::Resume => unreachable!("continued action"),
+        | Action::Resume
+        | Action::PartyAmend
+        | Action::RunAmend => unreachable!("continued action"),
     }
     Ok(())
 }

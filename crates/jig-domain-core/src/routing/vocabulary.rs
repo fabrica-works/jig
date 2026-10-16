@@ -587,6 +587,7 @@ pub enum NamedAction {
     },
     Amend {
         target: u64,
+        revision: u64,
         amendment: tasks::Amendment,
     },
     DecideEscalation {

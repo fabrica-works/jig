@@ -22,10 +22,12 @@ pub enum Scenario {
     StandingTask,
     /// Many sessions and sub-agent completions share one run's final allowance.
     RunBudget,
+    /// A party and a run amend one task against the same revision.
+    RacingDecisions,
 }
 
 /// Every shared story, in a stable order for focused cuts and sweeps.
-pub const ALL: [Scenario; 8] = [
+pub const ALL: [Scenario; 9] = [
     Scenario::LateCopy,
     Scenario::OtherHand,
     Scenario::UncertainRestarts,
@@ -34,6 +36,7 @@ pub const ALL: [Scenario; 8] = [
     Scenario::NarrowingPolicy,
     Scenario::StandingTask,
     Scenario::RunBudget,
+    Scenario::RacingDecisions,
 ];
 
 /// One scenario action, translated at the application's outside boundaries.
@@ -75,6 +78,10 @@ pub enum Action {
     Period(u64),
     /// Resume the run's independently priced sessions and sub-agents.
     Resume,
+    /// A party amends the spec revision both contenders read.
+    PartyAmend,
+    /// A run amends the same spec revision.
+    RunAmend,
 }
 
 /// An application adds kind/resource bindings and outside story checks to its
@@ -135,6 +142,7 @@ pub fn program(scenario: Scenario) -> Vec<Step> {
             &[Action::StartStanding, Action::Period(2), Action::Period(3), Action::Period(4), Action::Period(5)]
         }
         Scenario::RunBudget => &[Action::Resume],
+        Scenario::RacingDecisions => &[Action::PartyAmend, Action::RunAmend],
     };
     for &action in actions {
         steps.extend([Step::Action(action), Step::Drain]);
@@ -168,7 +176,7 @@ pub fn program(scenario: Scenario) -> Vec<Step> {
             }
             steps.push(Step::Drain);
         }
-        Scenario::ShrinkingPool | Scenario::StandingTask | Scenario::RunBudget => {}
+        Scenario::ShrinkingPool | Scenario::StandingTask | Scenario::RunBudget | Scenario::RacingDecisions => {}
     }
     steps
 }

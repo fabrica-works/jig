@@ -42,6 +42,7 @@ fn read(tool: &[u8], input: &[u8], limits: &Limits) -> Result<Decoded, Problem> 
         b"unsubscribe" => core::NamedAction::Unsubscribe { subscription: value.required(b"subscription")?.number()? },
         b"amend" => core::NamedAction::Amend {
             target: value.required(b"target")?.number()?,
+            revision: value.required(b"revision")?.number()?,
             amendment: nested::amendment(value.required(b"amendment")?)?,
         },
         b"decide" => {

@@ -244,7 +244,8 @@ impl Application for Testing {
                 | Scenario::OtherHand
                 | Scenario::UncertainRestarts
                 | Scenario::ChangedJudge
-                | Scenario::NarrowingPolicy,
+                | Scenario::NarrowingPolicy
+                | Scenario::RacingDecisions,
             ) => Box::new([
                 Script::Wait,
                 Script::Turn { body: b"whole turn".as_slice().into(), cost: 2, read: None },

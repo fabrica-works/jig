@@ -636,7 +636,7 @@ fn a_carried_change_reads_back_as_its_own_family() {
 
 fn core_limits_past_the_settled_answer_ceiling_are_refused() {
     let mut domain = core_limits();
-    domain.call_answer_bytes = crate::core_v2::CEILINGS.settled_answer_host_body + 1;
+    domain.call_answer_bytes = crate::core_v3::CEILINGS.settled_answer_host_body + 1;
     assert!(crate::codec::core::limits(&domain).is_none());
 }
 
@@ -704,3 +704,16 @@ fn notes_round_trip(row: domain::Record) {
 mod pieces;
 
 mod cases;
+
+#[test]
+fn a_moved_call_part_round_trips_through_the_core_family() {
+    use jig_domain_people::{HoldReason, Moved};
+    for now in [Moved::Spec { revision: 2 }, Moved::Hold { revision: 3, reason: HoldReason::Budget }] {
+        core_round_trip(fixtures::calls::call(jig_domain_core::CallPart::Moved { task: 1, now }));
+    }
+}
+
+#[test]
+fn a_revised_call_part_round_trips_through_the_core_family() {
+    core_round_trip(fixtures::calls::call(jig_domain_core::CallPart::Revised { task: 1, revision: 2 }));
+}

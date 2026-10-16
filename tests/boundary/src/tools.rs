@@ -10,7 +10,8 @@ fn core_tools_link_no_smith() {
 
 #[test]
 fn core_tools_link_no_application() {
-    const OWNERS: &[&str] = &["jig-domain-core", "jig-domain-tasks", "jig-domain-notes", "jig-domain-authority"];
+    const OWNERS: &[&str] =
+        &["jig-domain-core", "jig-domain-tasks", "jig-domain-notes", "jig-domain-authority", "jig-domain-people"];
     for line in MANIFEST.lines() {
         let Some((name, _)) = line.split_once('=') else { continue };
         let key = name.trim();

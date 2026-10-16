@@ -99,6 +99,7 @@ fn a_plan_of_reports_and_a_procedure_is_revised_midway_and_done() {
         key: core::CallKey { task: parent.0, attempt: parent.1, completion: 2, position: 0 },
         action: core::NamedAction::Amend {
             target: report,
+            revision: 0,
             amendment: tasks::Amendment {
                 addressed: None,
                 release: None,

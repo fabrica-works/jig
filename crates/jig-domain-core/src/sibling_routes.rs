@@ -448,7 +448,7 @@ impl Core {
                 | RoutedCall::Accepting { .. }
                 | RoutedCall::Subscribe { .. }
                 | RoutedCall::Unsubscribe(_)
-                | RoutedCall::Control(_),
+                | RoutedCall::Control { .. },
             ) => unreachable!("only message calls produce Sent"),
             None => {
                 let route = self.saying.remove(&request);

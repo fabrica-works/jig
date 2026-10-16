@@ -57,3 +57,88 @@ pub fn host_fault(world: &mut World, index: usize, fault: jig_fake_workers::Faul
 pub fn stop(world: &mut World) {
     world.send(jig_test_domain::Event::Stop);
 }
+
+pub(crate) fn prepare_racing_decisions(world: &mut World) {
+    use jig_domain_core as core;
+    use jig_domain_tasks as tasks;
+    let (task, attempt) = world.peers.assignments[0];
+    let mut authority = match &world.store.rows[&jig_test_domain::Key::Core(core::Key::Tasks(tasks::Key::Live(task)))] {
+        jig_test_domain::Record::Core(core::Record::Tasks(tasks::Stored::Live(row))) => row.authority.clone(),
+        row @ (jig_test_domain::Record::Core(_) | jig_test_domain::Record::Connector { .. }) => {
+            panic!("parent row {row:?}")
+        }
+    };
+    authority.budget.spend = 10;
+    authority.delegation = tasks::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 };
+    world.send(jig_test_domain::Event::Core(core::Event::DelegateValidated {
+        to: ReplyTo::new(Token::new(8001)),
+        key: core::CallKey { task, attempt, completion: 1, position: 0 },
+        batch: Box::new([core::Delegate {
+            executor: tasks::Executor::Agent { charter: 1 },
+            spec: tasks::Spec {
+                words: b"race target".as_slice().into(),
+                parameters: Box::new([]),
+                inputs: Box::new([]),
+            },
+            contract: tasks::Contract::Report { words: 128 },
+            authority,
+            symbolic_grants: Box::new([]),
+            dependencies: Box::new([]),
+            wake: tasks::WakePolicy::DEFAULT,
+        }]),
+        stubs: Box::new([]),
+    }));
+}
+pub(crate) fn run_racing_amendment(world: &mut World) {
+    use jig_domain_core as core;
+    use jig_domain_tasks as tasks;
+    let (task, attempt) = world.peers.assignments[0];
+    world.send(jig_test_domain::Event::Core(core::Event::NamedAction {
+        to: ReplyTo::new(Token::new(8002)),
+        key: core::CallKey { task, attempt, completion: 2, position: 0 },
+        action: core::NamedAction::Amend {
+            target: world.peers.children[0],
+            revision: 0,
+            amendment: tasks::Amendment {
+                addressed: None,
+                release: None,
+                instructions: None,
+                wake: None,
+                dependencies: None,
+                authority: None,
+                reason: b"run evidence".as_slice().into(),
+                spec: Some(tasks::Spec {
+                    words: b"run choice".as_slice().into(),
+                    parameters: Box::new([]),
+                    inputs: Box::new([]),
+                }),
+            },
+        },
+    }));
+}
+pub(crate) fn check_racing_decisions(world: &World) -> Result<(), jig_conformance::referee::Violation> {
+    use jig_domain_core as core;
+    use jig_domain_tasks as tasks;
+    let target = world.peers.children[0];
+    let row = &world.store.rows[&jig_test_domain::Key::Core(core::Key::Tasks(tasks::Key::Live(target)))];
+    let jig_test_domain::Record::Core(core::Record::Tasks(tasks::Stored::Live(row))) = row else {
+        panic!("live target")
+    };
+    let (task, attempt) = world.peers.assignments[0];
+    let key = core::CallKey { task, attempt, completion: 2, position: 0 };
+    let call = &world.store.rows[&jig_test_domain::Key::Core(core::Key::Core(core::CoreKey::Call(key)))];
+    let jig_test_domain::Record::Core(core::Record::Core(core::CoreRecord::Call(call))) = call else {
+        panic!("call row")
+    };
+    if call.part == (core::CallPart::Moved { task: target, now: jig_domain_people::Moved::Spec { revision: 1 } })
+        && row.revisions.spec == 1
+        && row.spec.words.as_ref() == b"party choice"
+    {
+        Ok(())
+    } else {
+        Err(jig_conformance::referee::Violation {
+            promise: jig_conformance::referee::Promise::Ownership,
+            why: format!("racing revision decisions: {:?}; spec {:?}", call.part, row.spec),
+        })
+    }
+}

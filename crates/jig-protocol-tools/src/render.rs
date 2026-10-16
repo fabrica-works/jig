@@ -89,6 +89,16 @@ pub fn render(part: &CallPart) -> Rendered {
             };
             text(&[b"Note refused: ", why], true)
         }
+        CallPart::Revised { task, revision } => text(
+            &[
+                b"Done: task ",
+                Decimal::of(*task).as_bytes(),
+                b" is at spec revision ",
+                Decimal::of(*revision).as_bytes(),
+            ],
+            false,
+        ),
+        CallPart::Moved { task, now } => moved(*task, now),
         CallPart::Unavailable => text(&[b"Unavailable"], true),
     }
 }
@@ -296,4 +306,79 @@ fn notes(entries: &[jig_domain_notes::Entry], more: bool) -> Box<[u8]> {
     }
     writer.put(tail).expect("page tail");
     writer.finish()
+}
+
+fn moved(task: u64, now: &jig_domain_people::Moved) -> Rendered {
+    use jig_domain_people::Moved;
+    match now {
+        Moved::Spec { revision } => text(
+            &[
+                b"Moved: task ",
+                Decimal::of(task).as_bytes(),
+                b" is at spec revision ",
+                Decimal::of(*revision).as_bytes(),
+                b" now",
+            ],
+            true,
+        ),
+        Moved::Person { revision } => text(
+            &[
+                b"Moved: task ",
+                Decimal::of(task).as_bytes(),
+                b" is at person revision ",
+                Decimal::of(*revision).as_bytes(),
+                b" now",
+            ],
+            true,
+        ),
+        Moved::Note { revision } => text(
+            &[
+                b"Moved: note ",
+                Decimal::of(task).as_bytes(),
+                b" is at revision ",
+                Decimal::of(u64::from(*revision)).as_bytes(),
+                b" now",
+            ],
+            true,
+        ),
+        Moved::Hold { revision, reason } => text(
+            &[
+                b"Moved: task ",
+                Decimal::of(task).as_bytes(),
+                b" is held at hold revision ",
+                Decimal::of(*revision).as_bytes(),
+                b" now, ",
+                hold_reason(reason),
+            ],
+            true,
+        ),
+    }
+}
+fn hold_reason(reason: &jig_domain_people::HoldReason) -> &'static [u8] {
+    use jig_domain_people::{FailureClass, HoldReason};
+    match reason {
+        HoldReason::Failures { class } => match class {
+            FailureClass::Transient => b"for transient failures",
+            FailureClass::Permanent => b"for permanent failures",
+            FailureClass::Run => b"for run failures",
+            FailureClass::Agent => b"for agent failures",
+            FailureClass::Lost => b"for lost runs",
+            FailureClass::Invalid => b"for invalid results",
+        },
+        HoldReason::Stalled => b"because it stalled",
+        HoldReason::Dependency { .. } => b"for its dependency",
+        HoldReason::Stopped => b"because it was stopped",
+        HoldReason::StoppedBy { .. } => b"because a party stopped it",
+        HoldReason::Drift => b"for drift",
+        HoldReason::Effects => b"for its effects",
+        HoldReason::EffectFailed => b"for a failed effect",
+        HoldReason::Uncertain { .. } => b"for an uncertain effect",
+        HoldReason::Budget => b"for its budget",
+        HoldReason::Deadline => b"for its deadline",
+        HoldReason::HoldsWaited => b"for waiting on holds",
+        HoldReason::ResourceUnavailable => b"for an unavailable resource",
+        HoldReason::ResourceAccess => b"for resource access",
+        HoldReason::PoolLost { .. } => b"for a lost pool",
+        HoldReason::Procedure => b"for its procedure",
+    }
 }

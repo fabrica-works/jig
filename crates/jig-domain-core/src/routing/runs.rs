@@ -368,6 +368,12 @@ pub(super) fn named_action(
     action: NamedAction,
 ) -> Requests {
     assert!(core.current_proof(key.task, key.attempt), "named action belongs to current claim");
+    if let Some(part) = core.call_parts.get(&key) {
+        let mut out = Queue::with_capacity(2);
+        out.push(Request::Held(Box::new(Held::CallAnswer { to, key, part: part.clone() })));
+        out.push(Request::Decided);
+        return Requests::Out(out);
+    }
     if let Some(part) = core.authorize_tool(key, named_tool_kind(&action)) {
         let mut out = Queue::with_capacity(3);
         call_decision(core, &mut out, to, key, part);
@@ -478,7 +484,10 @@ pub(super) fn named_action(
         }
         NamedAction::Control { target, control } => {
             assert!(core.pending_calls.insert(key, true).is_ok(), "call record room reserved");
-            assert!(core.routing_calls.insert(token, RoutedCall::Control(key)) == Ok(None), "one live routed call");
+            assert!(
+                core.routing_calls.insert(token, RoutedCall::Control { key, target, revised: false }) == Ok(None),
+                "one live routed call"
+            );
             work.push(Event::Tasks(tasks::Event::Control {
                 reply_to: ReplyTo::new(token),
                 by: tasks::Party::Task(key.task),
@@ -486,7 +495,7 @@ pub(super) fn named_action(
                 control,
             }));
         }
-        NamedAction::Amend { target, amendment } => {
+        NamedAction::Amend { target, revision, amendment } => {
             let stop_run =
                 match core.task_amend_admit(key.task, target, &amendment, env.limits.tasks.depth, &env.limits.tasks) {
                     Ok(stop_run) => stop_run,
@@ -512,6 +521,16 @@ pub(super) fn named_action(
                         return Requests::Out(out);
                     }
                 };
+            let moved = match core.spec_revision(target, revision) {
+                Ok(()) => None,
+                Err(jig_domain_people::Refusal::Moved { now }) => Some(now),
+                Err(_) => unreachable!("admitted amendment target exists"),
+            };
+            if let Some(now) = moved {
+                call_decision(core, &mut out, ReplyTo::new(token), key, CallPart::Moved { task: target, now });
+                out.push(Request::Decided);
+                return Requests::Out(out);
+            }
             let Some(message) = crate::fresh(&mut core.counters, crate::Family::Message) else {
                 call_decision(
                     core,
@@ -529,7 +548,10 @@ pub(super) fn named_action(
                 return Requests::Out(out);
             };
             assert!(core.pending_calls.insert(key, true).is_ok(), "call record room reserved");
-            assert!(core.routing_calls.insert(token, RoutedCall::Control(key)) == Ok(None), "one amendment route");
+            assert!(
+                core.routing_calls.insert(token, RoutedCall::Control { key, target, revised: true }) == Ok(None),
+                "one amendment route"
+            );
             work.push(Event::Tasks(tasks::Event::Amend {
                 reply_to: ReplyTo::new(token),
                 by: tasks::Party::Task(key.task),

@@ -383,3 +383,40 @@ fn nesting_past_its_bound_is_too_large() {
         }
     }
 }
+
+#[test]
+fn an_amend_call_names_the_spec_revision_it_saw() {
+    let Decoded::Action(core::NamedAction::Amend { target, revision, .. }) =
+        crate::decode(b"amend", fixtures::AMEND, &fixtures::LIMITS)
+    else {
+        panic!("decoded amendment")
+    };
+    assert_eq!((target, revision), (3, 1));
+}
+
+#[test]
+fn an_amend_call_without_a_revision_is_answered_missing() {
+    let Decoded::Problem(problem) =
+        crate::decode(b"amend", br#"{"target":3,"amendment":{"reason":"check again"}}"#, &fixtures::LIMITS)
+    else {
+        panic!("missing revision")
+    };
+    assert_eq!(problem, Problem { field: b"revision", why: Why::Missing });
+}
+
+#[test]
+fn a_revised_answer_names_the_spec_revision_made() {
+    let answer = crate::render(&core::CallPart::Revised { task: 7, revision: 2 });
+    assert_eq!(answer.text.as_ref(), b"Done: task 7 is at spec revision 2");
+    assert!(!answer.error);
+}
+
+#[test]
+fn a_moved_answer_names_the_hold_and_its_reason() {
+    let answer = crate::render(&core::CallPart::Moved {
+        task: 7,
+        now: jig_domain_people::Moved::Hold { revision: 3, reason: jig_domain_people::HoldReason::Budget },
+    });
+    assert_eq!(answer.text.as_ref(), b"Moved: task 7 is held at hold revision 3 now, for its budget");
+    assert!(answer.error);
+}

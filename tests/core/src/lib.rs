@@ -28,4 +28,5 @@ pub mod stories;
 
 pub mod fixtures;
 
+pub mod agents_tools;
 pub mod reference;

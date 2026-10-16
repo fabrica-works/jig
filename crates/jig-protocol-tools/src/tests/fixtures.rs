@@ -9,7 +9,7 @@ pub const DECIDE: &[u8] = br#"{"proposer":3,"proposal":2,"decision":"accept"}"#;
 pub const WITHDRAW: &[u8] = br#"{"proposal":2}"#;
 pub const SUBSCRIBE: &[u8] = br#"{"kind":"task","target":3}"#;
 pub const UNSUBSCRIBE: &[u8] = br#"{"subscription":1}"#;
-pub const AMEND: &[u8] = br#"{"target":3,"amendment":{"reason":"check again","instructions":"repeat"}}"#;
+pub const AMEND: &[u8] = br#"{"target":3,"revision":1,"amendment":{"reason":"check again","instructions":"repeat"}}"#;
 pub const DECIDE_ESCALATION: &[u8] = br#"{"task":3,"revision":1,"decision":"release"}"#;
 pub const PROPOSE: &[u8] = br#"{"action":"batch","reason":"help needed","batch":[{"executor":{"kind":"agent","charter":1},"spec":{"words":"check"},"contract":{"kind":"report","words":100},"authority":{"tools":0,"grants":[],"delegation":{"kinds":[],"tasks":0,"depth":0},"budget":{"spend":100},"notes":0}}]}"#;
 pub const NOTE: &[u8] = br#"{"scope":{"kind":"deployment"},"description":"status","body":"green"}"#;
@@ -25,7 +25,7 @@ pub const FIELDS: &[(&[u8], &[&[u8]])] = &[
     (b"withdraw", &[b"proposal"]),
     (b"subscribe", &[b"kind", b"target", b"at", b"period"]),
     (b"unsubscribe", &[b"subscription"]),
-    (b"amend", &[b"target", b"amendment"]),
+    (b"amend", &[b"target", b"revision", b"amendment"]),
     (b"decide_escalation", &[b"task", b"revision", b"decision", b"reason"]),
     (b"propose", &[b"action", b"reason", b"batch"]),
     (b"note", &[b"name", b"recalled", b"scope", b"description", b"body", b"references"]),

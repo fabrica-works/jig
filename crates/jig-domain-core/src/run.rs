@@ -356,7 +356,7 @@ pub enum RoutedCall {
     Introduce(CallKey),
     Subscribe { key: CallKey, subscription: u64 },
     Unsubscribe(CallKey),
-    Control(CallKey),
+    Control { key: CallKey, target: u64, revised: bool },
 }
 
 #[derive(Debug)]
