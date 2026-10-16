@@ -48,8 +48,14 @@ impl Core {
         let (_, pool) = self.goal_pool(project, person);
         given.delegation.tasks = given.delegation.tasks.min(tasks_left).saturating_sub(1);
         given.delegation.depth = given.delegation.depth.saturating_sub(1);
-        given.budget.spend =
-            given.budget.spend.min(jig_domain_authority::left(crate::translate::authority_numbers(pool)));
+        let ask = jig_domain_authority::PersonAsk {
+            project,
+            role: role.number(),
+            pool: crate::translate::authority_numbers(pool),
+            tasks_left,
+            request: jig_domain_authority::PersonRequest::Watch,
+        };
+        given.budget.spend = jig_domain_authority::as_allowed(&self.authority, &ask, 0, None);
         given
     }
 }

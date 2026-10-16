@@ -121,3 +121,14 @@ pub(crate) fn domain_with_roles(decides: Proposals, escalation_role: Option<u32>
     assert_eq!(apply(&mut domain, Event::Policy { project: 1, policy }), PolicyFact::Added { project: 1 });
     domain
 }
+
+pub(crate) fn domain_with_role_spend(spend: u64) -> Domain {
+    let mut member = role(authority());
+    member.number = 2;
+    member.authority.budget.spend = spend;
+    let mut policy = policy(authority());
+    policy.roles = Box::new([member]);
+    let mut domain = Domain::new(rules(authority()), LIMITS).unwrap();
+    assert_eq!(apply(&mut domain, Event::Policy { project: 1, policy }), PolicyFact::Added { project: 1 });
+    domain
+}

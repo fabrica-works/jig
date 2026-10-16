@@ -30,6 +30,7 @@
 
 extern crate alloc;
 
+mod allowed;
 mod boundary;
 mod check;
 mod domain;
@@ -50,6 +51,7 @@ mod tests_party;
 mod tests_policy;
 mod value;
 
+pub use allowed::as_allowed;
 pub use boundary::{
     Action, Answer, BatchAsk, Call, CallAsk, Checked, Delegate, Effect, EffectAccess, EffectAsk, EffectResource,
     Finding, Given, Holder, NoteScope, PersonAsk, PersonRequest, RunAsk, Source, Verdict, Write, Writer,
