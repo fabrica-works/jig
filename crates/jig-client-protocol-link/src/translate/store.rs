@@ -4,7 +4,7 @@ use crate::Limits;
 use alloc::boxed::Box;
 use jig_client_domain::contract as c;
 use jig_client_domain::{Ask, Family};
-use jig_client_protocol_wire::{self as wire, v7 as w};
+use jig_client_protocol_wire::{self as wire, v8 as w};
 use jig_domain_client::address::{Address, ProjectSection, TaskSection};
 use skein_lib::{List, Reader, RequestRecord, Wall, Writer, bytes};
 
@@ -282,8 +282,8 @@ fn restore_ask(value: w::Ask, limits: &Limits) -> Result<c::Ask, w::Problem> {
 }
 
 #[expect(clippy::manual_map, reason = "step code matches optional fields without closures")]
-pub fn table(value: &RequestRecord<Ask>, limits: &Limits) -> Result<w::TableEntry, w::Problem> {
-    let (owner, version, request) = match &value.request {
+pub fn table(value: &RequestRecord<jig_client_domain::Held>, limits: &Limits) -> Result<w::TableEntry, w::Problem> {
+    let (owner, version, request) = match &value.request.request {
         Ask::Jig(value) => {
             let record = super::asks::ask(value, &limits.wire)?;
             let mut writer = Writer::new(usize::try_from(record.measure()).expect("u32 fits usize"));
@@ -302,11 +302,23 @@ pub fn table(value: &RequestRecord<Ask>, limits: &Limits) -> Result<w::TableEntr
     };
     w::TableEntry::new(
         &limits.wire,
-        w::TableEntryParts { key: value.key, scope: value.scope, first_sent, owner, version, request },
+        w::TableEntryParts {
+            asker: value.request.key.asker.0,
+            number: value.request.key.number,
+            key: value.key,
+            scope: value.scope,
+            first_sent,
+            owner,
+            version,
+            request,
+        },
     )
 }
 #[expect(clippy::manual_map, reason = "step code matches optional fields without closures")]
-pub fn restore_table(value: w::TableEntry, limits: &Limits) -> Result<RequestRecord<Ask>, w::Problem> {
+pub fn restore_table(
+    value: w::TableEntry,
+    limits: &Limits,
+) -> Result<RequestRecord<jig_client_domain::Held>, w::Problem> {
     let request = match value.owner() {
         w::Owner::Jig => {
             if value.version() != wire::VERSION {
@@ -329,7 +341,15 @@ pub fn restore_table(value: w::TableEntry, limits: &Limits) -> Result<RequestRec
         Some(value) => Some(Wall::from_nanos(*value)),
         None => None,
     };
-    Ok(RequestRecord { key: *value.key(), scope: value.scope(), first_sent, request })
+    Ok(RequestRecord {
+        key: *value.key(),
+        scope: value.scope(),
+        first_sent,
+        request: jig_client_domain::Held {
+            key: jig_client_domain::Key { asker: jig_client_domain::Asker(value.asker()), number: value.number() },
+            request,
+        },
+    })
 }
 
 pub fn place(party: u64, at: Address, limits: &Limits) -> Result<w::Place, w::Problem> {

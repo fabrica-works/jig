@@ -1,6 +1,6 @@
 use super::fixtures;
 use crate::{Event, FromApplication, Request, ToApplication, translate::watches};
-use jig_client_protocol_wire::v7 as w;
+use jig_client_protocol_wire::v8 as w;
 use jig_domain_core as core;
 use skein_lib::{Reader, Token};
 fn stream_world() -> (fixtures::Exchange, [u8; 16]) {

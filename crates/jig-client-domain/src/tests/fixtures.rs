@@ -9,6 +9,16 @@ pub(crate) const OTHER_SUBJECT: u64 = 10;
 pub(crate) const INITIAL_TASK_WATCH: Token = Token::new(2);
 pub(crate) fn limits() -> Limits {
     Limits {
+        // tests/client/src/test.rs:70-77, the concrete world's table profile.
+        requests: skein_lib::RequestLimits {
+            requests: 4,
+            bytes: 65536,
+            out: 16,
+            first: Duration::from_millis(10),
+            most: Duration::from_millis(80),
+            margin: Duration::from_secs(1),
+        },
+        ask_bytes: 16384,
         handles: 8,
         watches: 8,            // tests/client/src/test.rs:23
         document_bytes: 65536, // tests/client/src/test.rs:38
@@ -48,18 +58,20 @@ impl Client {
     }
     pub(crate) fn started() -> Self {
         let mut client = Self::new(limits());
-        client.step(Event::Start);
+        client.step(Event::Start { kept: List::with_capacity(0) });
         client.downs();
         client
     }
     pub(crate) fn step(&mut self, event: Event) {
         step(&mut self.domain, &self.env, event, &mut self.out);
         self.drain();
+        reclaim(&mut self.domain);
     }
     pub(crate) fn at(&mut self, time: Time) {
         self.env.now = time;
         fire(&mut self.domain, &self.env, &mut self.out);
         self.drain();
+        reclaim(&mut self.domain);
     }
     fn drain(&mut self) {
         while let Some(request) = self.out.pop() {
@@ -176,5 +188,64 @@ fn document(number: u64) -> contract::Task {
         result: None,
         delegates: List::with_capacity(0),
         context: None,
+    }
+}
+
+pub(crate) const KEY: Key = Key { asker: Asker::JIG, number: 1 };
+pub(crate) const OTHER_KEY: Key = Key { asker: Asker(1), number: 2 };
+pub(crate) const PARTY: u64 = 1;
+pub(crate) const OTHER_PARTY: u64 = 2;
+pub(crate) const ENGINE_KEY: skein_lib::RequestKey = [1; 16];
+pub(crate) const OTHER_ENGINE_KEY: skein_lib::RequestKey = [2; 16];
+pub(crate) const ME_WATCH: Token = Token::new(1);
+pub(crate) fn stop() -> Ask {
+    Ask::Jig(Box::new(contract::Ask::Stop { project: 1, task: SUBJECT_TASK }))
+}
+pub(crate) fn me(party: u64, retention: Duration) -> Up {
+    Up::Watched {
+        watch: ME_WATCH,
+        event: contract::WatchEvent::Delivered(contract::Delivery::Frame(Box::new(contract::Frame {
+            party: contract::FrameParty {
+                number: party,
+                kind: contract::PartyKind::Person,
+                login: contract::DocumentText::complete(text()),
+                name: contract::DocumentText::complete(text()),
+            },
+            projects: List::with_capacity(0),
+            needs: contract::Needs { questions: 0, proposals: 0, escalations: 0, person_tasks: 0 },
+            needs_total: 0,
+            updates: contract::Count { value: 0, limited: false },
+            results_seen: 0,
+            charters: List::with_capacity(0),
+            cut: false,
+            retention,
+            deployment_role: None,
+        }))),
+    }
+}
+pub(crate) fn record(key: Key, engine: skein_lib::RequestKey, party: u64) -> skein_lib::RequestRecord<Held> {
+    skein_lib::RequestRecord {
+        key: engine,
+        scope: party,
+        first_sent: Some(Wall::EPOCH),
+        request: Held { key, request: stop() },
+    }
+}
+impl Client {
+    pub(crate) fn live() -> Self {
+        let mut c = Self::started();
+        c.step(Event::Up { up: me(PARTY, Duration::from_secs(1)) });
+        c
+    }
+    pub(crate) fn send(&mut self) -> Token {
+        self.step(Event::Send { key: KEY, request: stop() });
+        let mut attempt = None;
+        for down in self.downs() {
+            if let Down::Send { attempt: sent, .. } = down {
+                attempt = Some(sent);
+            }
+        }
+        self.told();
+        attempt.unwrap()
     }
 }

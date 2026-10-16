@@ -6,7 +6,10 @@ mod boundary;
 pub mod contract;
 mod domain;
 pub mod limits;
+mod requests;
 mod watches;
+/// The small-store version of keyed client request records.
+pub const TABLE_VERSION: u16 = 2;
 pub use boundary::*;
 pub use domain::{Domain, fire, next_deadline, reclaim, step};
 pub use limits::{Backoff, Limits, max_out, worst_case};

@@ -198,9 +198,12 @@ impl NativeClient {
                     key: record.key,
                     scope: record.scope,
                     first_sent: record.first_sent,
-                    request: match record.request {
-                        jig_client_domain::Ask::Jig(ask) => client::Ask::Jig(ask),
-                        jig_client_domain::Ask::Family(_) => panic!("chat script restores jig requests"),
+                    request: client::store::Held {
+                        key: record.request.key,
+                        request: match record.request.request {
+                            jig_client_domain::Ask::Jig(ask) => client::Ask::Jig(ask),
+                            jig_client_domain::Ask::Family(_) => panic!("chat script restores jig requests"),
+                        },
                     },
                 },
             },
@@ -219,11 +222,14 @@ impl NativeClient {
                     key: record.key,
                     scope: record.scope,
                     first_sent: record.first_sent,
-                    request: match record.request {
-                        client::Ask::Jig(ask) => jig_client_domain::Ask::Jig(ask),
-                        client::Ask::First(ask) => {
-                            jig_client_domain::Ask::Family(family::request(&ask).expect("family request"))
-                        }
+                    request: jig_client_domain::Held {
+                        key: record.request.key,
+                        request: match record.request.request {
+                            client::Ask::Jig(ask) => jig_client_domain::Ask::Jig(ask),
+                            client::Ask::First(ask) => {
+                                jig_client_domain::Ask::Family(family::request(&ask).expect("family request"))
+                            }
+                        },
                     },
                 },
             },

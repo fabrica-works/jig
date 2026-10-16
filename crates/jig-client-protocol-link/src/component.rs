@@ -2,7 +2,7 @@
 use crate::{Event, Fact, Limits, Message, Request, Streamed, Unusable, translate};
 use alloc::boxed::Box;
 use jig_client_domain::{Answered, Ask, Family, Readable, Readout, Watchable};
-use jig_client_protocol_wire::{self as wire, v7 as w};
+use jig_client_protocol_wire::{self as wire, v8 as w};
 use skein_lib::{Map, Queue, Reader, RequestEnvelope, RequestKey, Secret, Time, Token, Writer};
 #[derive(Debug)]
 pub(crate) struct Attempt {

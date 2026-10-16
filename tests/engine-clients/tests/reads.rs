@@ -1,4 +1,4 @@
-use jig_client_protocol_wire::v7 as w;
+use jig_client_protocol_wire::v8 as w;
 use jig_domain_core as core;
 use jig_engine_clients_world::fixtures::{self, Peer};
 use skein_lib::{
@@ -18,7 +18,7 @@ fn signed_in(peer: &mut Peer) -> Box<[u8]> {
 }
 fn read() -> Box<[u8]> {
     let limits = fixtures::limits().wire;
-    let value = w::Owned::new(&limits, w::OwnedParts { owner: w::Owner::Jig, version: 7, record: Box::new([0]) })
+    let value = w::Owned::new(&limits, w::OwnedParts { owner: w::Owner::Jig, version: 8, record: Box::new([0]) })
         .expect("frame read");
     let mut bytes = Writer::new(usize::try_from(value.measure()).expect("wire size"));
     value.encode(&mut bytes).expect("read envelope");

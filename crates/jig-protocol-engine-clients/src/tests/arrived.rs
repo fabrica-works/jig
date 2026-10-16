@@ -1,6 +1,6 @@
 use super::fixtures::{self as f, Exchange};
 use crate::{Request, connection::Connection, sign_in};
-use jig_client_protocol_wire::v7 as w;
+use jig_client_protocol_wire::v8 as w;
 use jig_domain_core as core;
 use jig_domain_people as people;
 use skein_http::server as http;
@@ -33,7 +33,7 @@ fn chunked(exchange: &mut Exchange) -> Connection {
 
 #[test]
 fn a_chunked_request_body_read_as_it_arrives_is_the_same_whatever_its_cuts() {
-    let body = f::keyed(w::Owner::Jig, 7, f::encode_ask(&f::start(&f::wire())));
+    let body = f::keyed(w::Owner::Jig, 8, f::encode_ask(&f::start(&f::wire())));
     for size in [body.len(), 1] {
         let mut env = f::env();
         env.limits.http.read = 256;

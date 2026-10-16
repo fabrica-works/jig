@@ -362,7 +362,7 @@ impl Front<Ops> for Scripted {
         self.recover(now, wall);
         let mut delivered: Vec<_> = std::mem::take(&mut self.hellos)
             .into_iter()
-            .map(|client| (client, Event::Jig(client::Event::Hello { served: self.engine.versions().contains(7) })))
+            .map(|client| (client, Event::Jig(client::Event::Hello { served: self.engine.versions().contains(8) })))
             .collect();
         delivered.append(&mut self.shell);
         for up in self.engine.poll(now) {

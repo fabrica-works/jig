@@ -261,6 +261,8 @@ fn a_table_entry_never_sent_round_trips_with_no_wall() {
     let entry = TableEntry::new(
         &limits,
         TableEntryParts {
+            asker: 65536,
+            number: 1,
             key: [7; 16],
             scope: u64::MAX,
             first_sent: None,

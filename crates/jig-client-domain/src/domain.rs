@@ -1,6 +1,6 @@
 //! Client-owned handles over shared engine watches (client/domain/client.md, 8.1).
 use crate::{Document, Down, Event, Handle, Latest, Limits, Request, State, Told, Watchable, Why, watches::Watch};
-use skein_lib::{Env, List, Map, Queue, Rng, Time, Token};
+use skein_lib::{Env, List, Map, Queue, RequestTable, Rng, Time, Token};
 #[derive(Debug)]
 pub(crate) struct HandleState {
     pub watch: Option<u64>,
@@ -16,6 +16,8 @@ pub struct Domain {
     pub(crate) scratch: List<Handle>,
     due: List<u64>,
     started: bool,
+    pub(crate) table: RequestTable<crate::Key, crate::Held>,
+    pub(crate) requests: Map<crate::Key, crate::requests::PendingRequest>,
 }
 impl Domain {
     #[must_use]
@@ -29,6 +31,8 @@ impl Domain {
             scratch: List::with_capacity(limits.handles),
             due: List::with_capacity(limits.watches),
             started: false,
+            table: RequestTable::new(&limits.requests, seed),
+            requests: Map::with_capacity(limits.requests.requests),
         }
     }
     #[must_use]
@@ -142,15 +146,25 @@ impl Domain {
 }
 pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     match event {
-        Event::Start => {
+        Event::Start { kept } => {
             assert!(!domain.started, "start once");
             domain.started = true;
+            domain.restore(env, kept, out);
             domain.open(Watchable::Jig(crate::contract::Subject::Frame), true, out);
         }
+        Event::Send { key, request } => domain.send(env, key, request, out),
         Event::Watch { handle, subject } => domain.watch(env, handle, subject, out),
         Event::Unwatch { handle } => domain.unwatch(handle, out),
-        Event::Up { up } => domain.up(env, up, out),
+        Event::Up { up } => match up {
+            crate::Up::Answer { attempt, envelope, answer, why } => {
+                domain.answer(env, attempt, envelope, answer, why, out);
+            }
+            crate::Up::Watched { .. } | crate::Up::FamilyDelivered { .. } | crate::Up::WatchEnded { .. } => {
+                domain.up(env, up, out);
+            }
+        },
     }
+    domain.flush(env, out);
 }
 pub fn fire(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     domain.due.clear();
@@ -170,10 +184,11 @@ pub fn fire(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
         down(out, Down::Open { watch: name, subject: w.subject.clone() });
     }
     domain.due.clear();
+    domain.flush(env, out);
 }
 #[must_use]
 pub fn next_deadline(domain: &Domain) -> Option<Time> {
-    let mut next = None;
+    let mut next = domain.table.next_deadline();
     for (_, w) in &domain.watches {
         if let Some(t) = w.until {
             next = Some(match next {
@@ -184,7 +199,9 @@ pub fn next_deadline(domain: &Domain) -> Option<Time> {
     }
     next
 }
-pub fn reclaim(_domain: &mut Domain) {}
+pub fn reclaim(domain: &mut Domain) {
+    domain.table.reclaim();
+}
 pub(crate) fn down(out: &mut Queue<Request>, down: Down) {
     out.push(Request::Down { down });
 }

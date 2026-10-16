@@ -1,7 +1,7 @@
 //! Client handles and exchanges (client/domain/client.md, 3 and 8).
 use crate::contract;
 use alloc::boxed::Box;
-use skein_lib::Token;
+use skein_lib::{List, RequestEnvelope, RequestKey, RequestRecord, Token};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Family {
     pub family: u16,
@@ -23,12 +23,12 @@ pub enum Watchable {
     Jig(contract::Subject),
     Family(Family),
 }
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Readout {
     Jig(contract::ReadResult),
     Family { family: u16, record: Option<Box<[u8]>> },
 }
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Answered {
     Jig(contract::Answer),
     Family(Family),
@@ -72,13 +72,15 @@ pub enum Why {
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Event {
-    Start,
+    Start { kept: List<RequestRecord<Held>> },
+    Send { key: Key, request: Ask },
     Watch { handle: Handle, subject: Watchable },
     Unwatch { handle: Handle },
     Up { up: Up },
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Up {
+    Answer { attempt: Token, envelope: RequestEnvelope, answer: Option<Answered>, why: Option<Retry> },
     Watched { watch: Token, event: contract::WatchEvent },
     FamilyDelivered { watch: Token, record: Family },
     WatchEnded { watch: Token, end: contract::WatchEnd },
@@ -90,11 +92,57 @@ pub enum Request {
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Down {
+    Save { record: RequestRecord<Held> },
+    Erase { key: RequestKey },
+    Send { attempt: Token, key: RequestKey, request: Ask },
     Open { watch: Token, subject: Watchable },
     Close { watch: Token },
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Told {
+    Pending { key: Key },
+    Answered { key: Key, outcome: Outcome },
+    Kept { key: Key, request: Ask },
+    Dropped { count: u32 },
     Changed { handle: Handle },
     Ended { handle: Handle, why: Why },
+}
+
+/// The application's stable request name, kept beside its wire key.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Key {
+    pub asker: Asker,
+    pub number: u64,
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Held {
+    pub key: Key,
+    pub request: Ask,
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Outcome {
+    Answered(Answered),
+    Unknown,
+    Limit,
+    Unconfirmed,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Progress {
+    InFlight,
+    Retrying { why: Retry },
+    Parked,
+    Unknown,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Retry {
+    Busy,
+    NotReady,
+    Lost,
+    Undecodable,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Pending {
+    pub progress: Progress,
+    pub party: u64,
+    pub owner: Option<u16>,
 }

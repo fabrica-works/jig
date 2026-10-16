@@ -24,7 +24,7 @@ pub struct StoreRead {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Saved {
     Jig(jig_domain_client::store::Record),
-    Table { version: u16, record: RequestRecord<Ask> },
+    Table { version: u16, record: RequestRecord<jig_client_domain::Held> },
     Family { family: u16, version: u16, key: Box<[u8]>, bytes: Box<[u8]> },
 }
 #[derive(Clone, Debug, PartialEq, Eq)]

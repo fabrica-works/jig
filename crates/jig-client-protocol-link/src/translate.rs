@@ -5,7 +5,7 @@ pub mod documents;
 mod facts;
 pub mod live;
 use alloc::boxed::Box;
-use jig_client_protocol_wire::v7 as w;
+use jig_client_protocol_wire::v8 as w;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Undecodable {
     Malformed,

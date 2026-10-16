@@ -3,12 +3,12 @@ use skein_lib::{List, RequestRecord, Wall};
 pub fn store_text() -> c::Text {
     c::Text::new(b"kept".as_slice().into(), 32).unwrap()
 }
-pub fn table_record(ask: c::Ask) -> RequestRecord<Ask> {
+pub fn table_record(ask: c::Ask) -> RequestRecord<jig_client_domain::Held> {
     RequestRecord {
         key: KEY,
         scope: u64::MAX,
         first_sent: Some(Wall::from_nanos(u64::MAX)),
-        request: Ask::Jig(Box::new(ask)),
+        request: jig_client_domain::Held { key: APPLICATION_KEY, request: Ask::Jig(Box::new(ask)) },
     }
 }
 fn specification() -> c::Specification {
@@ -111,7 +111,7 @@ fn list<T, const N: usize>(values: [T; N]) -> List<T> {
     }
     out
 }
-pub const TABLE_VERSION: u16 = 1;
+pub const TABLE_VERSION: u16 = 2;
 pub fn store_versions() -> List<StoreVersion> {
     list([
         StoreVersion { keeper: Keeper::Jig, version: jig_domain_client::store::STORE_VERSION },
@@ -280,3 +280,6 @@ pub fn saved_places() -> List<Saved> {
 pub fn one_store_read(value: StoreRead) -> List<StoreRead> {
     list([value])
 }
+
+pub const APPLICATION_KEY: jig_client_domain::Key =
+    jig_client_domain::Key { asker: jig_client_domain::Asker::JIG, number: u64::MAX };

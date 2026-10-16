@@ -153,7 +153,7 @@ impl Scripted {
         std::mem::take(&mut self.hellos)
             .into_iter()
             .map(|client| {
-                (client, Event::Jig(jig_domain_client::Event::Hello { served: self.engine.versions().contains(7) }))
+                (client, Event::Jig(jig_domain_client::Event::Hello { served: self.engine.versions().contains(8) }))
             })
             .collect()
     }

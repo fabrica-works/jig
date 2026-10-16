@@ -19,6 +19,7 @@ pub(crate) struct Watch {
 impl Domain {
     pub(crate) fn up(&mut self, env: &Env<Limits>, up: Up, out: &mut Queue<Request>) {
         let name = match &up {
+            Up::Answer { .. } => unreachable!("answers use the request table"),
             Up::Watched { watch, .. } | Up::FamilyDelivered { watch, .. } | Up::WatchEnded { watch, .. } => *watch,
         };
         let mut found = None;
@@ -31,6 +32,7 @@ impl Domain {
             return;
         };
         match up {
+            Up::Answer { .. } => unreachable!("answers use the request table"),
             Up::Watched { event, .. } => match event {
                 WatchEvent::Delivered(value) => self.deliver(id, Latest::Jig(value), out),
                 WatchEvent::Opened | WatchEvent::Alive => {}

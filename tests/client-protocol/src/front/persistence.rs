@@ -14,11 +14,14 @@ fn saved(record: client::store::Record) -> link::Saved {
                 key: record.key,
                 scope: record.scope,
                 first_sent: record.first_sent,
-                request: match record.request {
-                    client::Ask::Jig(value) => jig_client_domain::Ask::Jig(value),
-                    client::Ask::First(value) => {
-                        jig_client_domain::Ask::Family(family::request(&value).expect("family ask"))
-                    }
+                request: jig_client_domain::Held {
+                    key: record.request.key,
+                    request: match record.request.request {
+                        client::Ask::Jig(value) => jig_client_domain::Ask::Jig(value),
+                        client::Ask::First(value) => {
+                            jig_client_domain::Ask::Family(family::request(&value).expect("family ask"))
+                        }
+                    },
                 },
             },
         },
@@ -51,19 +54,22 @@ fn restored(saved: link::Saved) -> client::store::Record {
                 key: record.key,
                 scope: record.scope,
                 first_sent: record.first_sent,
-                request: match record.request {
-                    jig_client_domain::Ask::Jig(value) => client::Ask::Jig(value),
-                    jig_client_domain::Ask::Family(value) => {
-                        let decoded =
-                            jig_test_service::family::request(&value.bytes, &fixtures::owner_limits().connector)
-                                .expect("family ask");
-                        client::Ask::First(client::first::Ask::ChangeObject {
-                            project: decoded.project,
-                            object: decoded.value.object,
-                            revision: jig_client_domain::contract::Revision { value: decoded.value.revision },
-                            value: decoded.value.value,
-                        })
-                    }
+                request: client::store::Held {
+                    key: record.request.key,
+                    request: match record.request.request {
+                        jig_client_domain::Ask::Jig(value) => client::Ask::Jig(value),
+                        jig_client_domain::Ask::Family(value) => {
+                            let decoded =
+                                jig_test_service::family::request(&value.bytes, &fixtures::owner_limits().connector)
+                                    .expect("family ask");
+                            client::Ask::First(client::first::Ask::ChangeObject {
+                                project: decoded.project,
+                                object: decoded.value.object,
+                                revision: jig_client_domain::contract::Revision { value: decoded.value.revision },
+                                value: decoded.value.value,
+                            })
+                        }
+                    },
                 },
             },
         },

@@ -55,7 +55,7 @@ record AddressProject { project: u32 section: ProjectSection }
 enum Address { inbox: AddressInbox, conversations: AddressConversations, task: AddressTask, project: AddressProject, deployment }
 record Place { party: u64 address: Address }
 record Draft { party: u64 task: u64 words: text 65536 touched: u64 }
-record TableEntry { key: fixed 16 scope: u64 first_sent: option u64 owner: Owner version: u32 request: bytes 1048576 }
+record TableEntry { asker: u32 number: u64 key: fixed 16 scope: u64 first_sent: option u64 owner: Owner version: u32 request: bytes 1048576 }
 
 # A read value preserves the contract variant as well as its existing document (ruling 208).
 enum ReadValue { owner_project: OwnerProject, historical: boxed OwnerHistorical, frame: Frame, task: Task, proposal: Proposal, owner_proposal: OwnerProposal, escalation: Escalation, owner_escalation: OwnerEscalation, question: Question, person_task: PersonTask, owner_person_task: OwnerPersonTask, result: ResultDocument, ended: ObjectPage, owner_ended: OwnerEndedPage, history: HistoryPage, activity: ActivityPage, inbox: InboxPage, owner_inbox: OwnerInboxPage, conversations: ConversationPage, goals: GoalPage, spend: SpendPage, owner_spend: OwnerSpendPage, project: Project, notes: NotePage, deployment: Deployment, owner_deployment: OwnerDeployment }

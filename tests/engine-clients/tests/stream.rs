@@ -1,4 +1,4 @@
-use jig_client_protocol_wire::v7 as w;
+use jig_client_protocol_wire::v8 as w;
 use jig_domain_core as core;
 use jig_engine_clients_world::fixtures::{self, Peer};
 use skein_lib::{Duration, List, Reader, Writer};
@@ -140,7 +140,7 @@ fn hello(stream: [u8; 16]) -> w::StreamEvent {
     let lim = jig_client_test_records::limits();
     let mut served = List::with_capacity(1);
     served
-        .push(w::Served::new(&lim, w::ServedParts { owner: w::Owner::Jig, first: 7, last: 7 }).expect("literal range"))
+        .push(w::Served::new(&lim, w::ServedParts { owner: w::Owner::Jig, first: 8, last: 8 }).expect("literal range"))
         .expect("one range");
     w::StreamEvent::Hello(
         w::Hello::new(&lim, w::HelloParts { stream, served, heartbeat: Duration::from_secs(5) })
@@ -154,7 +154,7 @@ fn frame(watch: u64, needs: u32) -> w::StreamEvent {
     let value = w::DeliveryValue::Frame(w::Frame::new(&lim, frame).expect("literal frame"));
     let mut record = Writer::new(usize::try_from(value.measure()).expect("literal size"));
     value.encode(&mut record).expect("literal frame bytes");
-    let document = w::Owned::new(&lim, w::OwnedParts { owner: w::Owner::Jig, version: 7, record: record.finish() })
+    let document = w::Owned::new(&lim, w::OwnedParts { owner: w::Owner::Jig, version: 8, record: record.finish() })
         .expect("literal owner");
     w::StreamEvent::Delivery(w::Delivery::new(&lim, w::DeliveryParts { watch, document }).expect("literal delivery"))
 }

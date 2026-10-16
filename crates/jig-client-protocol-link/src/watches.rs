@@ -2,7 +2,7 @@
 use crate::{Limits, Request};
 use jig_client_domain::Family;
 use jig_client_domain::contract::{WatchEnd, WatchEvent};
-use jig_client_protocol_wire::v7 as w;
+use jig_client_protocol_wire::v8 as w;
 use skein_lib::{Map, Queue, Token};
 #[derive(Debug)]
 pub(crate) struct Opening {

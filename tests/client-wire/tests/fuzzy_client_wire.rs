@@ -1,5 +1,5 @@
 //! Arbitrary and mutated client bytes (skein's codec.md, section 6).
-use jig_client_protocol_wire::v7::*;
+use jig_client_protocol_wire::v8::*;
 use skein_lib::{Reader, Rng, Writer};
 use std::{fs, path::Path};
 
@@ -718,7 +718,7 @@ fn mutation_seed(path: &Path) -> bool {
 }
 
 fn mutated(rng: &mut Rng) {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../crates/jig-client-protocol-wire/golden/v7");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../crates/jig-client-protocol-wire/golden/v8");
     let mut paths: Vec<_> =
         fs::read_dir(root).expect("golden directory").map(|entry| entry.expect("golden entry").path()).collect();
     paths.sort();

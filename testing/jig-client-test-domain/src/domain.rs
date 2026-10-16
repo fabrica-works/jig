@@ -4,7 +4,7 @@ use crate::{
     Ask, Event, Fact, Limits, Request, first,
     owner::Owner,
     route,
-    store::{Key, Record},
+    store::{Held, Key, Record},
 };
 use skein_lib::{Env, Queue, RequestAnswered, RequestOut, RequestProgress, RequestTable, Rng, Time};
 #[derive(Debug)]
@@ -12,7 +12,7 @@ pub struct Domain {
     pub(crate) jig: jig_domain_client::Domain,
     pub(crate) first: first::Side,
     pub(crate) second: crate::second::Side,
-    pub(crate) table: RequestTable<Owner, Ask>,
+    pub(crate) table: RequestTable<Owner, Held>,
 }
 #[must_use]
 pub fn new(limits: &Limits, seed: u64) -> Domain {
@@ -73,7 +73,7 @@ pub fn take(root: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
                 }),
                 Some(RequestOut::Erase(key)) => out.push(Request::Erase { key: Key::Table(key) }),
                 Some(RequestOut::Send { attempt, key, request }) => {
-                    out.push(Request::Send { attempt, key, ask: request.clone() });
+                    out.push(Request::Send { attempt, key, ask: request.request.clone() });
                 }
                 None => break,
             }
@@ -136,7 +136,14 @@ pub(crate) fn answered(
 }
 pub(crate) fn ask(root: &mut Domain, env: &Env<Limits>, owner: Owner, scope: u64, ask: Ask, out: &mut Queue<Request>) {
     let size = ask_size(&env.limits, &ask);
-    if root.table.ask(owner, scope, size, ask).is_err() {
+    let key = match owner {
+        Owner::Jig(token) => jig_client_domain::Key { asker: jig_client_domain::Asker::JIG, number: token.raw() },
+        Owner::First(token) => {
+            jig_client_domain::Key { asker: jig_client_domain::Asker(u32::from(crate::FIRST)), number: token.raw() }
+        }
+        Owner::Kept { .. } => unreachable!("restored requests do not ask"),
+    };
+    if root.table.ask(owner, scope, size, Held { key, request: ask }).is_err() {
         out.push(Request::Fact { fact: Fact::TableFull });
         route::progress(root, env, owner, RequestProgress::Unknown, out);
     }

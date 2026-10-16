@@ -1,6 +1,6 @@
 use super::fixtures;
 use crate::translate;
-use jig_client_protocol_wire::v7 as w;
+use jig_client_protocol_wire::v8 as w;
 fn a_frame_with_two_projects_becomes_its_record() {
     let limits = fixtures::wire_limits();
     assert_eq!(

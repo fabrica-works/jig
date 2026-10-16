@@ -1,7 +1,7 @@
 //! Durability before exchanges, and owner-versioned restoration (protocol/client.md, 10).
 use crate::{Erased, Fact, Keeper, Limits, Link, Message, Request, Saved, StoreRead, StoreVersion, translate};
 use alloc::boxed::Box;
-use jig_client_protocol_wire::v7 as w;
+use jig_client_protocol_wire::v8 as w;
 use jig_domain_client::store::StoreKey;
 use skein_lib::{List, Queue, Reader, Token, Writer, bytes};
 #[derive(Debug)]

@@ -3,7 +3,7 @@ use crate::Limits;
 use crate::translate::text_problem;
 use alloc::boxed::Box;
 use jig_client_domain::contract as c;
-use jig_client_protocol_wire::v7 as w;
+use jig_client_protocol_wire::v8 as w;
 use skein_lib::{List, Reader, Wall, bytes};
 pub(crate) fn seen(value: &w::Seen, _limits: &Limits) -> c::Seen {
     match value {

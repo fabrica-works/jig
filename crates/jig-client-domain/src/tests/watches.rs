@@ -110,7 +110,7 @@ fn a_watch_past_the_handles_limit_ends_at_once() {
     let mut limits = fixtures::limits();
     limits.handles = 1;
     let mut c = Client::new(limits);
-    c.step(Event::Start);
+    c.step(Event::Start { kept: skein_lib::List::with_capacity(0) });
     c.downs();
     c.step(Event::Watch { handle: TASK, subject: task(SUBJECT_TASK) });
     c.downs();

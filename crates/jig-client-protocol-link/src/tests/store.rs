@@ -94,7 +94,10 @@ fn a_table_entry_restores_family_bytes_and_their_wire_version() {
             key: fixtures::KEY,
             scope: u64::MAX,
             first_sent: None,
-            request: Ask::Family(fixtures::family_read()),
+            request: jig_client_domain::Held {
+                key: fixtures::APPLICATION_KEY,
+                request: Ask::Family(fixtures::family_read()),
+            },
         },
     };
     assert!(restored(&expected).restored(&expected));

@@ -259,7 +259,7 @@ pub(super) const CLIENTS: jig_protocol_engine_clients::Limits = jig_protocol_eng
     exchanges: 8,
     exchanges_per_client: 2,
     http: skein_http::server::Limits { head: 4096, headers: 32, body: 65536, read: 16384, response: 1024, send: 16384 },
-    wire: jig_client_protocol_wire::v7::CEILINGS,
+    wire: jig_client_protocol_wire::v8::CEILINGS,
     link_span: Duration::from_secs(300),
     stall: Duration::from_secs(30),
 };

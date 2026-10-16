@@ -17,7 +17,7 @@ pub fn first_owner() -> Identity {
 #[must_use]
 pub fn settings() -> Settings {
     let mut served = List::with_capacity(1);
-    served.push(Served { family: None, first: 7, last: 7 }).expect("one range");
+    served.push(Served { family: None, first: 8, last: 8 }).expect("one range");
     Settings {
         deployment_provider: 2,
         listener: skein_io::Addr::Ip("127.0.0.1:8080".parse().expect("loopback")),
@@ -43,7 +43,7 @@ pub fn limits() -> Limits {
         exchanges: 4,
         exchanges_per_client: 2,
         http: skein_http::server::Limits { head: 4096, headers: 32, body: 1024, read: 256, response: 1024, send: 32 },
-        wire: jig_client_protocol_wire::v7::CEILINGS,
+        wire: jig_client_protocol_wire::v8::CEILINGS,
         link_span: Duration::from_secs(300),
         stall: Duration::from_secs(30),
     }
@@ -58,8 +58,8 @@ pub fn expires() -> skein_lib::Wall {
 }
 
 #[must_use]
-pub fn frame_subject() -> jig_client_protocol_wire::v7::Subject {
-    jig_client_protocol_wire::v7::Subject::Frame
+pub fn frame_subject() -> jig_client_protocol_wire::v8::Subject {
+    jig_client_protocol_wire::v8::Subject::Frame
 }
 #[must_use]
 pub fn frame_document(needs: u32) -> jig_domain_core::documents::Document {

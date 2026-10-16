@@ -1,5 +1,5 @@
 //! Checked composition of child, queue, and table capacities (root.md, 3).
-use crate::{Ask, Request, first, owner::Owner};
+use crate::{Request, first, owner::Owner, store::Held};
 use skein_lib::{Queue, RequestLimits, RequestTable};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
@@ -34,7 +34,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     total = total.checked_add(skein_lib::Map::<u64, u32>::worst_case(limits.table.requests)?)?;
     total = total.checked_add(first::worst_case(&limits.first)?)?;
     total = total.checked_add(crate::second::worst_case(limits.second_parts, limits.first.rows, limits.first.text)?)?;
-    total = total.checked_add(RequestTable::<Owner, Ask>::worst_case(&limits.table)?)?;
+    total = total.checked_add(RequestTable::<Owner, Held>::worst_case(&limits.table)?)?;
     total = total.checked_add(limits.table.bytes.checked_mul(3)?)?;
     // Synchronous frame hand-offs nest at most three child output queues.
     let jig_out = jig_domain_client::max_out(&limits.jig);
