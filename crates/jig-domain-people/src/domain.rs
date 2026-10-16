@@ -509,7 +509,9 @@ fn outcome_reply(outcome: Outcome) -> Reply {
     match outcome {
         Outcome::Again(why) => Reply::Again(why),
         Outcome::SignedOut => Reply::SignedOut,
-        Outcome::MarkedSeen { .. }
+        Outcome::Compound { .. }
+        | Outcome::CompoundRefused { .. }
+        | Outcome::MarkedSeen { .. }
         | Outcome::Applied { .. }
         | Outcome::NoteEdited { .. }
         | Outcome::ServiceMade { .. }
@@ -568,7 +570,8 @@ fn apply_roles(
     let flight = domain.pending.get(Id::from_token(request)).ok_or(Outcome::Refused(Refusal::Unknown))?;
     let project = match flight.part.as_ref().unwrap_or(&flight.ask) {
         Ask::SetRoles { project, .. } => *project,
-        Ask::MarkSeen { .. }
+        Ask::Compound { .. }
+        | Ask::MarkSeen { .. }
         | Ask::Close { .. }
         | Ask::Application { .. }
         | Ask::MakeService { .. }
@@ -614,7 +617,8 @@ fn apply_roles(
             }
             holdings.clone()
         }
-        Ask::MarkSeen { .. }
+        Ask::Compound { .. }
+        | Ask::MarkSeen { .. }
         | Ask::Close { .. }
         | Ask::Application { .. }
         | Ask::MakeService { .. }
@@ -720,7 +724,8 @@ fn make_service(domain: &mut Domain, env: &Env<Limits>, request: Token, person: 
     let flight = domain.pending.get(Id::from_token(request)).expect("service creation names a live keyed flight");
     let (project, name, service_role) = match flight.part.as_ref().unwrap_or(&flight.ask) {
         Ask::MakeService { project, name, role } => (*project, name.clone(), *role),
-        Ask::MarkSeen { .. }
+        Ask::Compound { .. }
+        | Ask::MarkSeen { .. }
         | Ask::Close { .. }
         | Ask::Application { .. }
         | Ask::EditNote { .. }
@@ -920,7 +925,8 @@ fn project(ask: &Ask) -> u32 {
             crate::ApplicationScope::Own | crate::ApplicationScope::Deployment => 0,
         },
         Ask::MarkSeen { .. } => 0,
-        Ask::Close { project, .. }
+        Ask::Compound { project, .. }
+        | Ask::Close { project, .. }
         | Ask::EditNote { project, .. }
         | Ask::MakeService { project, .. }
         | Ask::Adopt { project, .. }
@@ -1053,11 +1059,12 @@ fn goal_executor(value: crate::GoalExecutor) -> bool {
     }
 }
 
-fn valid_ask(limits: &Limits, ask: &Ask) -> bool {
+pub(crate) fn valid_ask(limits: &Limits, ask: &Ask) -> bool {
     if !crate::words::valid(ask) {
         return false;
     }
     match ask {
+        Ask::Compound { operations, .. } => crate::compound::refusal(limits, operations).is_none(),
         Ask::Close { chat, disposals, .. } => valid_close(limits, *chat, disposals),
         Ask::MarkSeen { seen } => match seen {
             Seen::Results { .. } => true,
@@ -1147,8 +1154,11 @@ fn valid_ask(limits: &Limits, ask: &Ask) -> bool {
 }
 
 // Admission identifies the bounded payload before any keyed flight is made.
-fn invalid_ask(limits: &Limits, ask: &Ask) -> Refusal {
+pub(crate) fn invalid_ask(limits: &Limits, ask: &Ask) -> Refusal {
     let which = match ask {
+        Ask::Compound { operations, .. } => {
+            return crate::compound::refusal(limits, operations).expect("invalid compound");
+        }
         Ask::Close { chat, disposals, .. } => {
             let mut unknown = *chat == 0;
             for disposal in disposals {
@@ -1251,6 +1261,7 @@ fn invalid_ask(limits: &Limits, ask: &Ask) -> Refusal {
 fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
     #[derive(PartialEq, Eq)]
     enum Expected {
+        Compound(u32, u32),
         Close(u64, u32, u32),
         MarkSeen(Seen),
         Application(u16),
@@ -1279,6 +1290,7 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
     }
 
     let expected = match ask {
+        Ask::Compound { project, operations } => Expected::Compound(*project, operations.len()),
         Ask::Close { chat, disposals, .. } => {
             let mut cancelled = 0_u32;
             let mut kept = 0_u32;
@@ -1330,6 +1342,14 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
     };
 
     match outcome {
+        Outcome::Compound { project, operations, .. } => expected == Expected::Compound(project, operations),
+        Outcome::CompoundRefused { at, .. } => {
+            if let Ask::Compound { operations, .. } = ask {
+                at < operations.len()
+            } else {
+                false
+            }
+        }
         Outcome::Closing { chat, cancelled, kept } => expected == Expected::Close(chat, cancelled, kept),
         Outcome::MarkedSeen { seen } => expected == Expected::MarkSeen(seen),
         Outcome::Applied { connector, token } => expected == Expected::Application(connector) && token.raw() != 0,
@@ -1524,7 +1544,9 @@ pub(super) fn answer_decided(
         // A refused admission is retryable with the same key, including
         // pressure reported by tasks or another child through the root.
         Outcome::Again(_) | Outcome::SignedOut => {}
-        Outcome::MarkedSeen { .. }
+        Outcome::Compound { .. }
+        | Outcome::CompoundRefused { .. }
+        | Outcome::MarkedSeen { .. }
         | Outcome::Applied { .. }
         | Outcome::NoteEdited { .. }
         | Outcome::ServiceMade { .. }
@@ -1691,7 +1713,8 @@ fn restored(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
                         }
                     }
                 }
-                Ask::MarkSeen { .. }
+                Ask::Compound { .. }
+                | Ask::MarkSeen { .. }
                 | Ask::Close { .. }
                 | Ask::Application { .. }
                 | Ask::EditNote { .. }
@@ -1718,7 +1741,9 @@ fn restored(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
                     unreachable!("restored role success has a matching roster ask");
                 }
             },
-            Outcome::MarkedSeen { .. }
+            Outcome::Compound { .. }
+            | Outcome::CompoundRefused { .. }
+            | Outcome::MarkedSeen { .. }
             | Outcome::Applied { .. }
             | Outcome::NoteEdited { .. }
             | Outcome::Adopted { .. }
@@ -1787,7 +1812,8 @@ pub fn application_part(domain: &mut Domain, env: &Env<Limits>, request: Token, 
             crate::ApplicationScope::Project(project) => *project,
             crate::ApplicationScope::Own | crate::ApplicationScope::Deployment => 0,
         },
-        Ask::Close { .. }
+        Ask::Compound { .. }
+        | Ask::Close { .. }
         | Ask::MarkSeen { .. }
         | Ask::MakeService { .. }
         | Ask::Adopt { .. }
@@ -1814,7 +1840,8 @@ pub fn application_part(domain: &mut Domain, env: &Env<Limits>, request: Token, 
     };
     match &ask {
         Ask::Application { .. } => return Err(Outcome::Refused(Refusal::NotOffered)),
-        Ask::Close { .. }
+        Ask::Compound { .. }
+        | Ask::Close { .. }
         | Ask::MarkSeen { .. }
         | Ask::MakeService { .. }
         | Ask::Adopt { .. }
@@ -1872,7 +1899,8 @@ fn admission(domain: &Domain, person: u64, _project: u32, role: Option<Role>, as
             };
             if service { Some(Refusal::Role { held: role }) } else { None }
         }
-        Ask::EditNote { .. }
+        Ask::Compound { .. }
+        | Ask::EditNote { .. }
         | Ask::MakeService { .. }
         | Ask::Adopt { .. }
         | Ask::SetRoles { .. }

@@ -97,7 +97,17 @@ pub(super) fn amend_preflight(
     task: u64,
     held: Option<people::Role>,
 ) -> Result<(), people::Refusal> {
-    let row = core.tasks.task(task).ok_or(people::Refusal::Unknown)?;
+    amend_preflight_in(core, limits, party, task, held, &tasks::CompoundAdmission::new(&core.tasks, 0))
+}
+pub(crate) fn amend_preflight_in(
+    core: &Core,
+    limits: &Limits,
+    party: u64,
+    task: u64,
+    held: Option<people::Role>,
+    admission: &tasks::CompoundAdmission<'_>,
+) -> Result<(), people::Refusal> {
+    let row = admission.task(task).ok_or(people::Refusal::Unknown)?;
     let empty = tasks::Amendment {
         tracked: None,
         addressed: None,
@@ -109,7 +119,15 @@ pub(super) fn amend_preflight(
         release: None,
         reason: Box::new([]),
     };
-    core.amend_admit(party, held, row.project, task, &empty, limits.tasks.depth, &limits.tasks)?;
+    amendment_admit_in(
+        core,
+        crate::compound::PartyTask { person: party, role: held, project: row.project, task },
+        &empty,
+        limits.tasks.depth,
+        &limits.tasks,
+        admission,
+        false,
+    )?;
     Ok(())
 }
 
@@ -315,14 +333,34 @@ pub(crate) fn amendment_admit(
     depth: u32,
     limits: &tasks::Limits,
 ) -> Result<(bool, bool), people::Refusal> {
+    amendment_admit_in(
+        core,
+        crate::compound::PartyTask { person, project, role, task },
+        amendment,
+        depth,
+        limits,
+        &tasks::CompoundAdmission::new(&core.tasks, 0),
+        false,
+    )
+}
+pub(crate) fn amendment_admit_in(
+    core: &Core,
+    party: crate::compound::PartyTask,
+    amendment: &tasks::Amendment,
+    depth: u32,
+    limits: &tasks::Limits,
+    admission: &tasks::CompoundAdmission<'_>,
+    direct: bool,
+) -> Result<(bool, bool), people::Refusal> {
+    let crate::compound::PartyTask { person, project, role, task } = party;
     standing::role(core, project, role, super::Act::Amend)?;
     if amendment.tracked.is_some() {
         standing::role(core, project, role, super::Act::Prioritise)?;
     }
-    let Some(context) = core.tasks.delegation(task) else { return Err(people::Refusal::Unknown) };
+    let Some(context) = admission.task(task) else { return Err(people::Refusal::Unknown) };
     let Some(role) = role else { return Err(people::Refusal::Role { held: None }) };
-    let standing = core.person_tree(person, task, depth);
-    if !core.reaches(person, role, project, task, depth) {
+    let standing = Core::person_tree_in(person, task, depth, admission);
+    if context.project != project || !core.reaches_project(role, project) && !standing {
         return Err(people::Refusal::Unknown);
     }
     let Some(role_policy) = core.authority.role(project, role.number()) else {
@@ -331,8 +369,8 @@ pub(crate) fn amendment_admit(
     if !role_policy.requests.allows(authority::RequestKind::Amend) && !standing {
         return Err(people::Refusal::Role { held: Some(role) });
     }
-    let row = core.tasks.task(task).expect("delegation found task");
-    if let Err(why) = tasks::address_admit(row, &amendment.addressed) {
+    let row = &context;
+    if let Err(why) = admission.address_admit(task, &amendment.addressed) {
         let people::Outcome::Refused(why) = crate::routing::refusals::person_task_refusal(core, Some(task), why) else {
             unreachable!("address refusal is permanent");
         };
@@ -348,7 +386,7 @@ pub(crate) fn amendment_admit(
     if !tasks::valid_authority(limits, after) {
         return Err(people::Refusal::Limit { which: people::LimitKind::Authority });
     }
-    let before = translate::authority_value(&context.authority);
+    let before = translate::authority_value(context.authority);
     let after = translate::authority_value(after);
     let implies = &core.authority.rules().implies;
     let stop_run = !authority::at_most(&before, &after, implies);
@@ -356,8 +394,8 @@ pub(crate) fn amendment_admit(
         return Ok((stop_run, false));
     }
     let pool = tasks::Funder::Pool { project, person, period: core.period(project) };
-    let numbers = match core.tasks.funding(pool) {
-        Some(row) => row.numbers,
+    let numbers = match admission.funding(pool) {
+        Some(numbers) => numbers,
         None => tasks::Numbers { budget: 0, spent: 0, spent_below: 0, reserved: 0 },
     };
     let mut findings = Queue::with_capacity(authority::max_out(core.authority.limits()).expect("authority bound"));
@@ -365,13 +403,16 @@ pub(crate) fn amendment_admit(
         project,
         role: role.number(),
         pool: translate::authority_numbers(numbers),
-        tasks_left: context.tasks_left,
+        tasks_left: context.tasks_left().ok_or(people::Refusal::Limit { which: people::LimitKind::Arithmetic })?,
         request: authority::PersonRequest::Amend(after),
     };
     let checked = authority::check_request_with_standing(&core.authority, &ask, standing, &mut findings);
     match checked.answer {
         authority::Answer::Allow => Ok((stop_run, false)),
         authority::Answer::Propose => {
+            if direct {
+                return Err(core.request_refusal(&ask, checked.answer, &mut findings));
+            }
             if recipient(core, project, authority::ProposalKind::Amend).is_some() {
                 Ok((stop_run, true))
             } else {

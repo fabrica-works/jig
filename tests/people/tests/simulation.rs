@@ -7,21 +7,10 @@ use jig_domain_people::{
     Again, Ask, Entry, EntryKind, Holding, IdentityKey, InitialOwner, Outcome, ProposalChoice, ProposalDecision,
     Proposer, Refusal, Reply, Role, Seed, Whom,
 };
+use jig_people_world::fixtures::member;
 use jig_people_world::{Settings, World};
 use skein_lib::Duration;
 use skein_world::domain::assert_replays;
-
-fn member(world: &mut World) -> u64 {
-    let call = world.signin(10, 1);
-    assert!(world.reply(call).is_none());
-    world.commit_all();
-    let Reply::SignedIn { person, .. } = world.reply(call).expect("test values are admitted and fit") else {
-        panic!("signed in")
-    };
-    world.roles(1, Box::new([Holding { person, role: Role::Member }]));
-    world.commit_all();
-    person
-}
 
 #[test]
 fn the_people_stories_and_both_restart_cuts() {

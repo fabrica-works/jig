@@ -84,6 +84,7 @@ pub fn lack_values() -> Box<[domain::Lack]> {
 }
 pub fn limit_kind_values() -> Box<[domain::LimitKind]> {
     Box::new([
+        domain::LimitKind::Operations,
         domain::LimitKind::Words,
         domain::LimitKind::Identity,
         domain::LimitKind::Roles,
@@ -163,6 +164,8 @@ pub fn escalation_choice_values() -> Box<[domain::EscalationChoice]> {
 }
 pub fn outcome_values() -> Box<[domain::Outcome]> {
     Box::new([
+        domain::Outcome::Compound { project: 1, operations: 6, first_message: 17 },
+        domain::Outcome::CompoundRefused { at: 2, why: domain::Refusal::Unknown },
         domain::Outcome::Created { first: 2, last: 3, given: None },
         domain::Outcome::Created { first: 2, last: 3, given: Some(domain::Given { task: 3, amount: 70 }) },
         domain::Outcome::Closing { chat: 2, cancelled: 3, kept: 4 },

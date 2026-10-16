@@ -4,37 +4,55 @@ use crate::{Active, Executor, Funder, Grace, Numbers, Party, Phase, Revisions, S
 use alloc::boxed::Box;
 use core::ops::Deref;
 
-pub(crate) struct View<'a> {
-    pub(crate) base: &'a TaskRecord,
-    pub(crate) phase: Phase,
-    pub(crate) revision: u64,
-    pub(crate) revisions: Revisions,
-    pub(crate) tracked: Option<u32>,
-    pub(crate) executor: Executor,
-    pub(crate) taken_by: Option<u64>,
-    pub(crate) requester: Party,
-    pub(crate) funder: Funder,
-    pub(crate) numbers: Numbers,
-    pub(crate) root: u64,
-    pub(crate) depth: u32,
-    pub(crate) last_message: u64,
-    pub(crate) inbox: &'a [crate::Word],
-    pub(crate) instructions: &'a Option<Box<[u8]>>,
-    pub(crate) spec: &'a crate::Spec,
-    pub(crate) wake: crate::WakePolicy,
-    pub(crate) dependencies: &'a [u64],
-    pub(crate) authority: &'a crate::Authority,
-    pub(crate) grace: Option<Grace>,
+#[derive(Debug)]
+pub struct CompoundTask<'a> {
+    /// Original record for fields unchanged by the admitted operations.
+    pub base: &'a TaskRecord,
+    pub phase: Phase,
+    pub revision: u64,
+    pub revisions: Revisions,
+    pub tracked: Option<u32>,
+    pub executor: Executor,
+    pub taken_by: Option<u64>,
+    pub requester: Party,
+    pub funder: Funder,
+    pub numbers: Numbers,
+    pub root: u64,
+    pub depth: u32,
+    pub last_message: u64,
+    pub inbox: &'a [crate::Word],
+    pub instructions: &'a Option<Box<[u8]>>,
+    pub spec: &'a crate::Spec,
+    pub wake: crate::WakePolicy,
+    pub dependencies: &'a [u64],
+    pub authority: &'a crate::Authority,
+    pub grace: Option<Grace>,
 }
 
-impl Deref for View<'_> {
+impl Deref for CompoundTask<'_> {
     type Target = TaskRecord;
     fn deref(&self) -> &TaskRecord {
         self.base
     }
 }
 
-impl View<'_> {
+impl CompoundTask<'_> {
+    /// Remaining lifetime delegation allowance under the projected authority.
+    #[must_use]
+    pub fn tasks_left(&self) -> Option<u32> {
+        self.authority.delegation.tasks.checked_sub(self.made.checked_sub(1)?)
+    }
+    /// Reservation a new requester must fund, excluding spend already charged.
+    #[must_use]
+    pub fn takeover_budget(&self) -> Option<u64> {
+        crate::funders::remaining(self.numbers)
+    }
+    /// Whether a different requester may take over the projected mutable task.
+    #[must_use]
+    pub fn takeover_state(&self, person: u64) -> bool {
+        person != 0 && self.requester != Party::Person(person) && crate::moving::mutable(&self.phase)
+    }
+
     pub(crate) fn settings(&self) -> Settings {
         Settings {
             tracked: self.tracked,
@@ -76,9 +94,9 @@ impl View<'_> {
 }
 
 impl Staged {
-    pub(crate) fn record<'a>(&'a self, domain: &'a crate::Domain, number: u64) -> Option<View<'a>> {
+    pub(crate) fn record<'a>(&'a self, domain: &'a crate::Domain, number: u64) -> Option<CompoundTask<'a>> {
         let base = crate::domain::record(domain, number)?;
-        let mut row = View {
+        let mut row = CompoundTask {
             base,
             phase: base.phase.clone(),
             revision: base.revision,
@@ -266,7 +284,10 @@ impl Staged {
         }
         if goals < limits.project_goals { Ok(()) } else { Err(crate::Refusal::Goals) }
     }
-    pub(crate) fn address(row: &View<'_>, addressed: Option<&crate::AddressChange>) -> Result<(), crate::Refusal> {
+    pub(crate) fn address(
+        row: &CompoundTask<'_>,
+        addressed: Option<&crate::AddressChange>,
+    ) -> Result<(), crate::Refusal> {
         if let Some(change) = addressed {
             if !match row.executor {
                 Executor::Person(_) => true,
@@ -296,7 +317,7 @@ impl Staged {
     }
 }
 
-fn project_amend<'a>(row: &mut View<'a>, plan: &'a crate::control::AmendPlan) {
+fn project_amend<'a>(row: &mut CompoundTask<'a>, plan: &'a crate::control::AmendPlan) {
     let amendment = &plan.amendment;
     if let Some(tracked) = amendment.tracked {
         row.tracked = match tracked {

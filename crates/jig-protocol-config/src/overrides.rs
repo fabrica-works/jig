@@ -158,6 +158,7 @@ fn set_tasks(limits: &mut jig_domain_tasks::Limits, name: &[u8], value: u64) -> 
 
 fn set_people(limits: &mut jig_domain_people::Limits, name: &[u8], value: u64) -> Result<(), What> {
     let jig_domain_people::Limits {
+        operations,
         batch,
         people,
         inbox_entries,
@@ -180,6 +181,7 @@ fn set_people(limits: &mut jig_domain_people::Limits, name: &[u8], value: u64) -
         facts,
     } = limits;
     match name {
+        b"operations" => *operations = count(value)?,
         b"batch" => *batch = count(value)?,
         b"people" => *people = count(value)?,
         b"inbox_entries" => *inbox_entries = count(value)?,

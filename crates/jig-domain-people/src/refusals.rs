@@ -106,6 +106,8 @@ pub enum Lack {
 /// The bound a final refusal identifies.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum LimitKind {
+    /// Empty or too many operations in one compound request.
+    Operations,
     /// The words or other byte payload exceed their bound.
     Words,
     /// The identity payload exceeds its bound.

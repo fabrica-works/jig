@@ -90,7 +90,9 @@ pub(super) fn limit_kind(value: people::LimitKind) -> application::LimitKind {
         people::LimitKind::Subscription => application::LimitKind::Subscription,
         people::LimitKind::Dependencies => application::LimitKind::Dependencies,
         people::LimitKind::Cycle => application::LimitKind::Cycle,
-        people::LimitKind::Spec | people::LimitKind::Grace => application::LimitKind::Spec,
+        people::LimitKind::Operations | people::LimitKind::Spec | people::LimitKind::Grace => {
+            application::LimitKind::Spec
+        }
         people::LimitKind::Contract => application::LimitKind::Contract,
         people::LimitKind::Authority => application::LimitKind::Authority,
         people::LimitKind::Inputs => application::LimitKind::Inputs,

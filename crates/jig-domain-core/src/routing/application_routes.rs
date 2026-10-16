@@ -159,7 +159,9 @@ impl Core {
                         && token.raw() <= self.counters.deployment().applications
                         && self.connectors.contains(connector)
                 }
-                people::Outcome::Again(..)
+                people::Outcome::Compound { .. }
+                | people::Outcome::CompoundRefused { .. }
+                | people::Outcome::Again(..)
                 | people::Outcome::SignedOut
                 | people::Outcome::MarkedSeen { .. }
                 | people::Outcome::NoteEdited { .. }

@@ -500,13 +500,27 @@ pub(super) fn tag_tasks(
                 );
                 continue;
             }
-            tasks::Request::CompoundRefused { .. } => {
-                unreachable!("the core sends no compound before its route is connected")
+            tasks::Request::CompoundRefused { reply_to, at, problem } => {
+                let request = reply_to.into_token();
+                let Some(PersonTaskRoute::Compound { .. }) = core.person_tasks.remove(&request) else {
+                    unreachable!("compound continuation");
+                };
+                let outcome = person_task_refusal(core, problem.task, problem.why);
+                let outcome = if let people::Outcome::Refused(why) = outcome {
+                    people::Outcome::CompoundRefused { at, why }
+                } else {
+                    outcome
+                };
+                append_people(core, env, people::Event::Decided { request, outcome }, &mut out);
+                continue;
             }
             tasks::Request::Done { reply_to } => {
                 let token = reply_to.into_token();
                 if let Some(route) = core.person_tasks.remove(&token) {
                     let outcome = match route {
+                        PersonTaskRoute::Compound { project, operations, first_message } => {
+                            people::Outcome::Compound { project, operations, first_message }
+                        }
                         PersonTaskRoute::Close { chat, cancelled, kept } => {
                             people::Outcome::Closing { chat, cancelled, kept }
                         }

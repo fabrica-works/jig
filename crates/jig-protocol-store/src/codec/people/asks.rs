@@ -347,6 +347,10 @@ pub(super) fn decode_escalation_decision(value: wire::EscalationDecision) -> dom
 #[expect(clippy::manual_map, reason = "step code translates optional fields through exhaustive matches")]
 pub fn encode_ask(value: &domain::Ask, limits: &wire::Limits) -> Result<wire::Ask, wire::Problem> {
     Ok(match value {
+        domain::Ask::Compound { project, operations } => wire::Ask::Compound(wire::AskCompound::new(
+            limits,
+            wire::AskCompoundParts { project: *project, operations: super::compound::encode(operations, limits)? },
+        )?),
         domain::Ask::Create { project, batch } => wire::Ask::Create(wire::AskCreate::new(
             limits,
             wire::AskCreateParts { project: *project, batch: super::batch::encode(batch, limits)? },
@@ -521,6 +525,10 @@ pub fn encode_ask(value: &domain::Ask, limits: &wire::Limits) -> Result<wire::As
 #[expect(clippy::manual_map, reason = "step code translates optional fields through exhaustive matches")]
 pub fn decode_ask(value: wire::Ask, limits: &wire::Limits) -> Result<domain::Ask, wire::Problem> {
     Ok(match value {
+        wire::Ask::Compound(value) => {
+            let wire::AskCompoundParts { project, operations } = value.into_parts();
+            domain::Ask::Compound { project, operations: super::compound::decode(operations, limits)? }
+        }
         wire::Ask::Create(value) => {
             let wire::AskCreateParts { project, batch } = value.into_parts();
             domain::Ask::Create { project, batch: super::batch::decode(batch, limits)? }

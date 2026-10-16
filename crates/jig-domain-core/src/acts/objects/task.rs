@@ -128,7 +128,16 @@ pub(super) fn admit(core: &Core, limits: &Limits, party: u64, act: Act, number: 
 }
 
 pub(crate) fn write(core: &Core, limits: &Limits, party: u64, number: u64) -> Result<(), people::Refusal> {
-    let row = core.tasks.task(number).ok_or(people::Refusal::Unknown)?;
+    write_in(core, limits, party, number, &tasks::CompoundAdmission::new(&core.tasks, 0))
+}
+pub(crate) fn write_in(
+    core: &Core,
+    limits: &Limits,
+    party: u64,
+    number: u64,
+    admission: &tasks::CompoundAdmission<'_>,
+) -> Result<(), people::Refusal> {
+    let row = admission.task(number).ok_or(people::Refusal::Unknown)?;
     let held = core.people.role(party, row.project);
     standing::role(core, row.project, held, Act::Write)?;
     let any = match held {
@@ -139,14 +148,14 @@ pub(crate) fn write(core: &Core, limits: &Limits, party: u64, number: u64) -> Re
         },
         Some(people::Role::Member | people::Role::Observer) | None => false,
     };
-    if !any && !core.person_tree(party, number, limits.tasks.depth) {
+    if !any && !Core::person_tree_in(party, number, limits.tasks.depth, admission) {
         return Err(people::Refusal::Unknown);
     }
     match row.executor {
         tasks::Executor::Agent { .. } => {}
         tasks::Executor::Procedure { .. } | tasks::Executor::Person(_) => return Err(people::Refusal::NotOffered),
     }
-    mutable(row)?;
+    super::mutable_phase(&row.phase)?;
     match row.phase {
         tasks::Phase::Active(_) | tasks::Phase::Held { was: tasks::Was::Active(_), .. } => Ok(()),
         tasks::Phase::Waiting

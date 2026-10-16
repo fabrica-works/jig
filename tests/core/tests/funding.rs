@@ -1,10 +1,11 @@
+use jig_core_world::fixtures::two_projects;
 use jig_core_world::{effects::World, world};
 use jig_domain_authority as authority;
 use jig_domain_core as core;
 use jig_domain_people as people;
 use jig_domain_tasks as tasks;
 use jig_test_domain as root;
-use skein_lib::{Queue, ReplyTo, Token};
+use skein_lib::{ReplyTo, Token};
 
 fn ask(world: &mut World, key: u8, ask: people::Ask) {
     world.send(root::Event::Core(core::Event::People(people::Event::Ask {
@@ -22,34 +23,6 @@ fn ledger(world: &World, funder: tasks::Funder) -> &tasks::FundingRecord {
         panic!("funding ledger")
     };
     row
-}
-
-fn two_projects(seed: u64) -> (root::Config, root::Limits) {
-    let mut config = world::config(seed);
-    let mut limits = world::limits();
-    limits.core.authority.projects = 2;
-    limits.core.tasks.funders = 8;
-    limits.core.people.projects = 2;
-    limits.core.people.initial_owners = 2;
-    jig_core_world::peers::journal(&mut limits);
-    let policy = config.core.authority.policy(1).expect("first policy").clone();
-    config.core.authority =
-        authority::Domain::new(config.core.authority.rules().clone(), limits.core.authority).expect("two projects");
-    let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
-    for project in [1, 2] {
-        let mut policy = policy.clone();
-        policy.period_spend = if project == 1 { 1000 } else { 700 };
-        authority::step(&mut config.core.authority, authority::Event::Policy { project, policy }, &mut facts);
-        assert_eq!(facts.pop(), Some(authority::PolicyFact::Added { project }));
-    }
-    config.core.projects = skein_lib::List::with_capacity(2);
-    config.core.projects.push(1).expect("first project");
-    config.core.projects.push(2).expect("second project");
-    config.core.owners = Box::new([
-        config.core.owners[0].clone(),
-        people::InitialOwner { project: 2, identity: config.core.owners[0].identity.clone() },
-    ]);
-    (config, limits)
 }
 
 #[test]

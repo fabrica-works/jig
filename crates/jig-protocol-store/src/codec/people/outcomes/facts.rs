@@ -359,6 +359,7 @@ pub(super) fn encode_limit_kind(value: domain::LimitKind, _limits: &wire::Limits
         domain::LimitKind::Policy => wire::LimitKind::Policy,
         domain::LimitKind::Resource => wire::LimitKind::Resource,
         domain::LimitKind::Service => wire::LimitKind::Service,
+        domain::LimitKind::Operations => wire::LimitKind::Operations,
         domain::LimitKind::Grace => wire::LimitKind::Grace,
         domain::LimitKind::Goals => wire::LimitKind::Goals,
     }
@@ -400,6 +401,7 @@ pub(super) fn decode_limit_kind(value: wire::LimitKind) -> domain::LimitKind {
         wire::LimitKind::Policy => domain::LimitKind::Policy,
         wire::LimitKind::Resource => domain::LimitKind::Resource,
         wire::LimitKind::Service => domain::LimitKind::Service,
+        wire::LimitKind::Operations => domain::LimitKind::Operations,
         wire::LimitKind::Grace => domain::LimitKind::Grace,
         wire::LimitKind::Goals => domain::LimitKind::Goals,
     }

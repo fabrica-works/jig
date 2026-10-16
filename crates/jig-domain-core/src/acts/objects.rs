@@ -7,7 +7,7 @@ use jig_domain_tasks as tasks;
 mod decisions;
 mod task;
 pub(crate) use decisions::{escalation, proposal};
-pub(crate) use task::{close, person, question, write};
+pub(crate) use task::{close, person, question, write, write_in};
 
 pub(super) fn admit(core: &Core, limits: &Limits, party: u64, act: Act, object: &documents::Subject) -> Admission {
     match object {
@@ -109,7 +109,10 @@ fn project_admission(core: &Core, limits: &Limits, party: u64, act: Act, project
 }
 
 pub(super) fn mutable(row: &tasks::TaskRecord) -> Result<(), people::Refusal> {
-    match &row.phase {
+    mutable_phase(&row.phase)
+}
+pub(crate) fn mutable_phase(phase: &tasks::Phase) -> Result<(), people::Refusal> {
+    match phase {
         tasks::Phase::Closing(closing) => Err(crate::routing::refusals::ended(&closing.ending)),
         tasks::Phase::Ended(ending) => Err(crate::routing::refusals::ended(ending)),
         tasks::Phase::Held { was: tasks::Was::Closing(closing), .. } => {

@@ -16,6 +16,7 @@ pub mod acts;
 mod amendments;
 mod authority_facts;
 mod brief_text;
+mod compound;
 pub use brief_text::{BriefPart, BriefTextLimits, note_index_text, read_brief_part};
 pub mod connector;
 mod delegation;

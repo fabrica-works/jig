@@ -321,6 +321,7 @@ pub fn task_wake() -> jig_domain_tasks::WakePolicy {
 }
 
 pub const PEOPLE_LIMITS: people::Limits = people::Limits {
+    operations: 2,
     batch: 2,
     people: 2,
     inbox_entries: 2,
@@ -473,6 +474,7 @@ pub fn people_member() -> people::Member {
 }
 pub fn people_asks() -> Box<[people::Ask]> {
     use people::{Ask, Proposer};
+    let [cancel_move, amend_release, message_stop] = people_compounds();
     let mut disposals = skein_lib::List::with_capacity(1);
     disposals.push(people::Disposal { task: 2, keep: people::Keep::MakeMine }).expect("one disposal");
     let mut procedure = people_member();
@@ -487,6 +489,9 @@ pub fn people_asks() -> Box<[people::Ask]> {
     Box::new([
         Ask::Create { project: 1, batch: Box::new([people_member(), procedure]) },
         Ask::Create { project: 1, batch: Box::new([person]) },
+        cancel_move,
+        amend_release,
+        message_stop,
         Ask::Close { project: 1, chat: 2, disposals },
         Ask::MarkSeen { seen: people::Seen::Chat { task: 2, through: 3 } },
         Ask::Application { scope: jig_domain_people::ApplicationScope::Project(1), connector: 2, digest: [3; 32] },
@@ -688,4 +693,38 @@ pub fn person_unchanged(reason: &[u8]) -> jig_domain_people::Amendment {
         authority: None,
         reason: reason.into(),
     }
+}
+
+fn people_compound(values: [people::Operation; 2]) -> people::Ask {
+    let mut operations = skein_lib::List::with_capacity(2);
+    for operation in values {
+        operations.push(operation).expect("two operation fixtures");
+    }
+    people::Ask::Compound { project: 1, operations }
+}
+
+fn people_compounds() -> [people::Ask; 3] {
+    [
+        people_compound([
+            people::Operation::Cancel {
+                task: 2,
+                reason: Box::new([3]),
+                grace: Some(skein_lib::Duration::from_secs(5)),
+            },
+            people::Operation::Move { task: 2, reason: Box::new([3]) },
+        ]),
+        people_compound([
+            people::Operation::Amend {
+                task: 2,
+                revision: 3,
+                amendment: Box::new(people_amendment()),
+                release: Some(4),
+            },
+            people::Operation::Release { task: 2, revision: 3, again: Some(false) },
+        ]),
+        people_compound([
+            people::Operation::Message { task: 2, words: Box::new([3]), release: true },
+            people::Operation::Stop { task: 2 },
+        ]),
+    ]
 }

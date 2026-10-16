@@ -83,6 +83,7 @@ fn limits() -> Limits {
         room_refusals: 2,
     };
     let people = people::Limits {
+        operations: 8,
         batch: 2,
         people: 2,
         inbox_entries: 2,

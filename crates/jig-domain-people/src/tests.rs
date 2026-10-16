@@ -8,6 +8,7 @@ use crate::*;
 use skein_lib::{Duration, Env, List, Queue, ReplyTo, Time, Token, Wall};
 
 const LIMITS: Limits = Limits {
+    operations: 2,
     batch: 2,
     people: 4,
     inbox_entries: 2,
@@ -1610,4 +1611,5 @@ mod create;
 mod application_scope;
 mod fixtures;
 
+mod compound;
 mod ended;

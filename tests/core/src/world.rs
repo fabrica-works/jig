@@ -67,6 +67,7 @@ pub fn limits() -> root::Limits {
         room_refusals: 2,
     };
     let people = people::Limits {
+        operations: 2,
         batch: 2,
         people: 2,
         inbox_entries: 2,

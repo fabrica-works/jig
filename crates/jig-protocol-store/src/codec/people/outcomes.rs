@@ -6,8 +6,25 @@ use facts::{
     decode_again, decode_escalation_choice, decode_proposal_choice, decode_refusal, encode_again,
     encode_escalation_choice, encode_proposal_choice, encode_refusal,
 };
+#[expect(clippy::too_many_lines, reason = "one exhaustive table translates permanent people outcomes")]
 pub(super) fn encode_outcome(value: &domain::Outcome, limits: &wire::Limits) -> Result<wire::Outcome, wire::Problem> {
     Ok(match value {
+        domain::Outcome::Compound { project, operations, first_message } => {
+            wire::Outcome::Compound(wire::OutcomeCompound::new(
+                limits,
+                wire::OutcomeCompoundParts {
+                    project: *project,
+                    operations: *operations,
+                    first_message: *first_message,
+                },
+            )?)
+        }
+        domain::Outcome::CompoundRefused { at, why } => {
+            wire::Outcome::CompoundRefused(wire::OutcomeCompoundRefused::new(
+                limits,
+                wire::OutcomeCompoundRefusedParts { at: *at, why: encode_refusal(why, limits)? },
+            )?)
+        }
         domain::Outcome::Created { first, last, given } => encode_created(*first, *last, *given, limits)?,
         domain::Outcome::Closing { chat, cancelled, kept } => {
             wire::Outcome::Closing(encode_closing(*chat, *cancelled, *kept, limits)?)
@@ -108,8 +125,17 @@ pub(super) fn encode_outcome(value: &domain::Outcome, limits: &wire::Limits) -> 
         )?),
     })
 }
+#[expect(clippy::too_many_lines, reason = "one exhaustive table translates permanent people outcomes")]
 pub(super) fn decode_outcome(value: wire::Outcome) -> domain::Outcome {
     match value {
+        wire::Outcome::Compound(value) => {
+            let wire::OutcomeCompoundParts { project, operations, first_message } = value.into_parts();
+            domain::Outcome::Compound { project, operations, first_message }
+        }
+        wire::Outcome::CompoundRefused(value) => {
+            let wire::OutcomeCompoundRefusedParts { at, why } = value.into_parts();
+            domain::Outcome::CompoundRefused { at, why: decode_refusal(why) }
+        }
         wire::Outcome::Created(value) => decode_created(value),
         wire::Outcome::Closing(value) => decode_closing(value),
         wire::Outcome::MarkedSeen(value) => decode_marked_seen(value),

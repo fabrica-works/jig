@@ -3,6 +3,7 @@ mod staged;
 use crate::{Amendment, Domain, Funder, Limits, Numbers, Party, Problem, Refusal, Request, Word};
 use alloc::boxed::Box;
 use skein_lib::{Duration, Env, List, Queue, ReplyTo};
+pub use staged::CompoundTask;
 
 /// One authenticated party operation in a single project's whole request.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -139,8 +140,6 @@ pub(crate) struct Compound {
 }
 
 pub(crate) fn compound(domain: &mut Domain, env: &Env<Limits>, request: Compound, out: &mut Queue<Request>) {
-    let mut staged = Staged::new(env.limits.tasks);
-    let mut request = request;
     if request.operations.len() > env.limits.tasks {
         return out.push(Request::CompoundRefused {
             reply_to: request.reply_to,
@@ -148,35 +147,24 @@ pub(crate) fn compound(domain: &mut Domain, env: &Env<Limits>, request: Compound
             problem: Problem::new(None, Refusal::Batch),
         });
     }
-    let operations = core::mem::replace(&mut request.operations, List::with_capacity(0));
-    for (at, operation) in operations.into_boxed().into_iter().enumerate() {
-        let at = u32::try_from(at).expect("bounded operations");
-        let number = operation.task();
-        let checked = if request.person == 0 {
-            Err(Box::new(Problem::new(Some(number), Refusal::Reference)))
-        } else if !domain.ready() {
-            Err(Box::new(Problem::new(Some(number), Refusal::NotReady)))
-        } else if has(&staged.closing, number) {
-            Err(Box::new(Problem::new(Some(number), Refusal::State)))
-        } else {
-            match staged.record(domain, number) {
-                None => Err(Box::new(Problem::new(Some(number), Refusal::Unknown))),
-                Some(row) if row.project != request.project => {
-                    Err(Box::new(Problem::new(Some(number), Refusal::Project)))
-                }
-                Some(_) => check(domain, &staged, env, &request, operation),
-            }
-        };
-        match checked {
-            Ok(plan) => {
-                staged.after(domain, &plan);
-                assert!(staged.plans.push(plan).is_ok(), "operation bound");
-            }
-            Err(problem) => {
-                return out.push(Request::CompoundRefused { reply_to: request.reply_to, at, problem: *problem });
-            }
+    let context = CompoundContext {
+        person: request.person,
+        project: request.project,
+        period: request.period,
+        pool_budget: request.pool_budget,
+        period_budget: request.period_budget,
+    };
+    let mut admission = CompoundAdmission::new(domain, env.limits.tasks);
+    for (at, operation) in request.operations.into_boxed().into_iter().enumerate() {
+        if let Err(problem) = admission.check(env, context, operation) {
+            return out.push(Request::CompoundRefused {
+                reply_to: request.reply_to,
+                at: u32::try_from(at).expect("bounded operations"),
+                problem: *problem,
+            });
         }
     }
+    let staged = admission.staged;
     let reroute = !staged.moved.is_empty();
     for plan in staged.plans.into_boxed() {
         apply(domain, env, request.person, plan, out);
@@ -187,11 +175,98 @@ pub(crate) fn compound(domain: &mut Domain, env: &Env<Limits>, request: Compound
     out.push(Request::Done { reply_to: request.reply_to });
 }
 
+/// Authenticated project and funding context shared by all compound operations.
+#[derive(Clone, Copy, Debug)]
+pub struct CompoundContext {
+    pub person: u64,
+    pub project: u32,
+    pub period: u64,
+    pub pool_budget: u64,
+    pub period_budget: u64,
+}
+
+/// A borrowed task-domain projection, changed only by admitted operation plans.
+pub struct CompoundAdmission<'a> {
+    domain: &'a Domain,
+    staged: Staged,
+    bound: u32,
+}
+impl core::fmt::Debug for CompoundAdmission<'_> {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        formatter
+            .debug_struct("CompoundAdmission")
+            .field("operations", &self.staged.plans.len())
+            .finish_non_exhaustive()
+    }
+}
+impl<'a> CompoundAdmission<'a> {
+    /// Reserve bounded scratch, without changing or copying the domain.
+    #[must_use]
+    pub fn new(domain: &'a Domain, bound: u32) -> Self {
+        Self { domain, staged: Staged::new(bound), bound }
+    }
+    /// Read a task as the preceding admitted operations leave it.
+    #[must_use]
+    pub fn task(&self, number: u64) -> Option<CompoundTask<'_>> {
+        if has(&self.staged.closing, number) {
+            return None;
+        }
+        self.staged.record(self.domain, number)
+    }
+    /// Read a funder's cumulative balances.
+    #[must_use]
+    pub fn funding(&self, funder: Funder) -> Option<Numbers> {
+        self.staged.numbers(self.domain, funder)
+    }
+    /// Check a person-address amendment against the projected executor and revision.
+    pub fn address_admit(&self, number: u64, change: &Option<crate::AddressChange>) -> Result<(), Refusal> {
+        let row = self.task(number).ok_or(Refusal::Unknown)?;
+        Staged::address(&row, change.as_ref())
+    }
+    /// Whether an earlier move has detached this task from its old tree.
+    #[must_use]
+    pub fn moved(&self, number: u64) -> bool {
+        self.staged.detached(number)
+    }
+    /// Check and retain one plan against the preceding plans; never apply it.
+    pub fn check(
+        &mut self,
+        env: &Env<Limits>,
+        context: CompoundContext,
+        operation: Operation,
+    ) -> Result<(), Box<Problem>> {
+        let number = operation.task();
+        if self.staged.plans.len() >= self.bound {
+            return Err(Box::new(Problem::new(None, Refusal::Batch)));
+        }
+        let problem = if context.person == 0 {
+            Some(Refusal::Reference)
+        } else if !self.domain.ready() {
+            Some(Refusal::NotReady)
+        } else if has(&self.staged.closing, number) {
+            Some(Refusal::State)
+        } else {
+            match self.staged.record(self.domain, number) {
+                None => Some(Refusal::Unknown),
+                Some(row) if row.project != context.project => Some(Refusal::Project),
+                Some(_) => None,
+            }
+        };
+        if let Some(why) = problem {
+            return Err(Box::new(Problem::new(Some(number), why)));
+        }
+        let plan = check(self.domain, &self.staged, env, context, operation)?;
+        self.staged.after(self.domain, &plan);
+        assert!(self.staged.plans.push(plan).is_ok(), "operation bound");
+        Ok(())
+    }
+}
+
 fn check(
     domain: &Domain,
     staged: &Staged,
     env: &Env<Limits>,
-    request: &Compound,
+    request: CompoundContext,
     operation: Operation,
 ) -> Result<Plan, Box<Problem>> {
     let by = Party::Person(request.person);

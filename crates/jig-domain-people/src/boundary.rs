@@ -232,6 +232,8 @@ pub enum Keep {
 /// the root after role checks (domain/people.md, section 5.1).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Ask {
+    /// Several task operations committed together under one key.
+    Compound { project: u32, operations: List<crate::Operation> },
     /// Make these roots together (domain/people.md, 5.1).
     Create { project: u32, batch: Box<[crate::Member]> },
     /// Dispose of every live delegate and ask this chat to finish within its configured grace.
@@ -398,6 +400,10 @@ pub enum EscalationChoice {
 /// final outcomes with the parent's task decision. (domain/people.md, section 5.1).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Outcome {
+    /// All operations were made; their issued messages start here, or at zero for none.
+    Compound { project: u32, operations: u32, first_message: u64 },
+    /// No operation was made; the first failure has this zero-based place.
+    CompoundRefused { at: u32, why: Refusal },
     /// The batch was made in order.
     Created { first: u64, last: u64, given: Option<crate::Given> },
     /// The whole chat-close decision was kept.

@@ -1,6 +1,10 @@
 //! Shared host bounds for the domain world.
+use jig_domain_authority as authority;
 use jig_domain_core as core;
+use jig_domain_people as people;
 use jig_domain_tasks as tasks;
+use jig_test_domain as root;
+use skein_lib::{Queue, ReplyTo, Token};
 pub const WORKSPACE_CREDENTIAL: u32 = 7;
 pub const CREDENTIAL_RESOURCE: u64 = 1;
 #[must_use]
@@ -175,4 +179,46 @@ pub fn unchanged(reason: &[u8]) -> tasks::Amendment {
         authority: None,
         reason: reason.into(),
     }
+}
+
+pub fn delegate(world: &mut crate::effects::World, run: (u64, u64), completion: u32, member: core::Delegate) -> u64 {
+    world.send(root::Event::Core(core::Event::DelegateValidated {
+        to: ReplyTo::new(Token::new(9000 + u64::from(completion))),
+        key: core::CallKey { task: run.0, attempt: run.1, completion, position: 0 },
+        batch: Box::new([member]),
+        stubs: Box::new([]),
+    }));
+    let core::CallPart::Delegated(numbers) = &world.answers.last().expect("delegate answer").2 else {
+        panic!("delegation was not admitted");
+    };
+    numbers[0]
+}
+
+#[must_use]
+pub fn two_projects(seed: u64) -> (root::Config, root::Limits) {
+    let mut config = crate::world::config(seed);
+    let mut limits = crate::world::limits();
+    limits.core.authority.projects = 2;
+    limits.core.tasks.funders = 8;
+    limits.core.people.projects = 2;
+    limits.core.people.initial_owners = 2;
+    crate::peers::journal(&mut limits);
+    let policy = config.core.authority.policy(1).expect("first policy").clone();
+    config.core.authority =
+        authority::Domain::new(config.core.authority.rules().clone(), limits.core.authority).expect("two projects");
+    let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
+    for project in [1, 2] {
+        let mut policy = policy.clone();
+        policy.period_spend = if project == 1 { 1000 } else { 700 };
+        authority::step(&mut config.core.authority, authority::Event::Policy { project, policy }, &mut facts);
+        assert_eq!(facts.pop(), Some(authority::PolicyFact::Added { project }));
+    }
+    config.core.projects = skein_lib::List::with_capacity(2);
+    config.core.projects.push(1).expect("first project");
+    config.core.projects.push(2).expect("second project");
+    config.core.owners = Box::new([
+        config.core.owners[0].clone(),
+        people::InitialOwner { project: 2, identity: config.core.owners[0].identity.clone() },
+    ]);
+    (config, limits)
 }

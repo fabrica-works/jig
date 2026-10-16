@@ -13,6 +13,8 @@ use skein_lib::{Deadlines, Duration, Id, List, Map, Queue, Slab, Wall};
 pub struct Limits {
     /// Maximum members of one requested or proposed batch.
     pub batch: u32,
+    /// Maximum task operations in one keyed compound request.
+    pub operations: u32,
     /// Maximum retained parties and provider/subject index entries.
     pub people: u32,
     /// Maximum visible cached entries and unread count; results retain one extra overflow witness.
@@ -75,14 +77,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     if limits.waiters == 0 || limits.sign_in_lifetime == Duration::ZERO || limits.request_retention == Duration::ZERO {
         return None;
     }
-    let ask_bytes = List::<crate::Disposal>::worst_case(disposal_capacity(limits))?
-        .max(u64::from(limits.batch).checked_mul(
-            u64::try_from(size_of::<crate::Member>()).ok()?.checked_add(u64::from(limits.amendment_bytes))?,
-        )?)
-        .max(u64::from(limits.words))
-        .max(u64::from(limits.amendment_bytes))
-        .max(u64::from(limits.holdings).checked_mul(u64::try_from(size_of::<Holding>()).ok()?)?)
-        .max(u64::from(limits.goals).checked_mul(u64::try_from(size_of::<(u64, u32)>()).ok()?)?);
+    let ask_bytes = ask_bytes(limits)?;
     let people = Map::<u64, Identity>::worst_case(limits.people)?
         .checked_add(Map::<IdentityKey, u64>::worst_case(limits.people)?)?
         .checked_add(u64::from(limits.people).checked_mul(u64::from(limits.identity_bytes).checked_mul(2)?)?)?;
@@ -100,6 +95,11 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(List::<crate::Whom>::worst_case(waiting_recipients)?)?
         .checked_add(List::<crate::Entry>::worst_case(limits.inbox_entries)?)?;
     people
+        .checked_add(
+            u64::from(limits.amendment_bytes)
+                .checked_add(u64::try_from(size_of::<crate::Amendment>()).ok()?)?
+                .max(u64::from(limits.words)),
+        )?
         .checked_add(roles)?
         .checked_add(waiting)?
         .checked_add(Map::<u64, Box<[crate::domain::Need]>>::worst_case(limits.inbox_tasks)?)?
@@ -166,4 +166,25 @@ pub fn disposal_capacity(limits: &Limits) -> u32 {
         .amendment_bytes
         .checked_div(u32::try_from(size_of::<crate::Disposal>()).expect("fixed disposal size fits"))
         .expect("nonzero disposal size")
+}
+
+fn ask_bytes(limits: &Limits) -> Option<u64> {
+    let compound = List::<crate::Operation>::worst_case(limits.operations)?.checked_add(
+        u64::from(limits.operations).checked_mul(
+            u64::from(limits.amendment_bytes)
+                .checked_add(u64::try_from(size_of::<crate::Amendment>()).ok()?)?
+                .max(u64::from(limits.words)),
+        )?,
+    )?;
+    Some(
+        List::<crate::Disposal>::worst_case(disposal_capacity(limits))?
+            .max(u64::from(limits.batch).checked_mul(
+                u64::try_from(size_of::<crate::Member>()).ok()?.checked_add(u64::from(limits.amendment_bytes))?,
+            )?)
+            .max(compound)
+            .max(u64::from(limits.words))
+            .max(u64::from(limits.amendment_bytes))
+            .max(u64::from(limits.holdings).checked_mul(u64::try_from(size_of::<Holding>()).ok()?)?)
+            .max(u64::from(limits.goals).checked_mul(u64::try_from(size_of::<(u64, u32)>()).ok()?)?),
+    )
 }

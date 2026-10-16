@@ -81,7 +81,9 @@ pub fn limit(value: people::LimitKind) -> client::AdmissionLimit {
         people::LimitKind::Subscription => client::AdmissionLimit::Subscription,
         people::LimitKind::Dependencies => client::AdmissionLimit::Dependencies,
         people::LimitKind::Cycle => client::AdmissionLimit::Cycle,
-        people::LimitKind::Spec | people::LimitKind::Grace => client::AdmissionLimit::Spec,
+        people::LimitKind::Operations | people::LimitKind::Spec | people::LimitKind::Grace => {
+            client::AdmissionLimit::Spec
+        }
         people::LimitKind::Contract => client::AdmissionLimit::Contract,
         people::LimitKind::Authority => client::AdmissionLimit::Authority,
         people::LimitKind::Inputs => client::AdmissionLimit::Inputs,

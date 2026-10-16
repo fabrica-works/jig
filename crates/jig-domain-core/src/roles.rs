@@ -20,7 +20,23 @@ impl Core {
         tasks_left: u32,
         depth: u32,
     ) -> Result<(), people::Refusal> {
-        let Some(context) = self.tasks.delegation(task) else { return Err(people::Refusal::Unknown) };
+        self.move_admit_in(
+            crate::compound::PartyTask { person, project, role, task },
+            tasks_left,
+            depth,
+            &tasks::CompoundAdmission::new(&self.tasks, 0),
+        )
+    }
+
+    pub(crate) fn move_admit_in(
+        &self,
+        party: crate::compound::PartyTask,
+        tasks_left: u32,
+        depth: u32,
+        admission: &tasks::CompoundAdmission<'_>,
+    ) -> Result<(), people::Refusal> {
+        let crate::compound::PartyTask { person, project, role, task } = party;
+        let Some(context) = admission.task(task) else { return Err(people::Refusal::Unknown) };
         if context.project != project {
             return Err(people::Refusal::Unknown);
         }
@@ -31,7 +47,7 @@ impl Core {
         let Some(role_policy) = self.authority.role(project, holding.number()) else {
             unreachable!("member belongs to configured policy")
         };
-        let standing = self.person_tree(person, task, depth);
+        let standing = Self::person_tree_in(person, task, depth, admission);
         if !role_policy.requests.allows(authority::RequestKind::Amend) && !standing {
             return Err(people::Refusal::Role { held: Some(holding) });
         }
@@ -45,11 +61,15 @@ impl Core {
                 lacking: people::Lack::Budget { needs: self.period_budget(project), left: policy.period_spend },
             });
         }
-        let Some(left) = self.tasks.takeover_budget(task) else {
+        let Some(left) = context.takeover_budget() else {
             return Err(people::Refusal::Limit { which: people::LimitKind::Arithmetic });
         };
-        let (_, pool_numbers) = self.goal_pool(project, person);
-        let mut giving = translate::authority_value(&context.authority);
+        let (source, fallback) = self.goal_pool(project, person);
+        let pool_numbers = match admission.funding(source) {
+            Some(numbers) => numbers,
+            None => fallback,
+        };
+        let mut giving = translate::authority_value(context.authority);
         giving.budget.spend = left;
         let mut findings = Queue::with_capacity(authority::max_out(self.authority.limits()).expect("authority output"));
         let ask = authority::PersonAsk {
@@ -63,7 +83,7 @@ impl Core {
         if checked.answer != authority::Answer::Allow {
             return Err(self.request_refusal(&ask, checked.answer, &mut findings));
         }
-        if !self.tasks.takeover_state(task, person) {
+        if !context.takeover_state(person) {
             let people::Outcome::Refused(why) =
                 crate::routing::refusals::person_task_refusal(self, Some(task), tasks::Refusal::State)
             else {
@@ -122,11 +142,24 @@ impl Core {
         role: Option<people::Role>,
         limits: &tasks::Limits,
     ) -> Result<u64, people::Refusal> {
+        self.control_admit_in(ask, person, project, role, limits, &tasks::CompoundAdmission::new(&self.tasks, 0))
+    }
+
+    pub(crate) fn control_admit_in(
+        &self,
+        ask: &people::Ask,
+        person: u64,
+        project: u32,
+        role: Option<people::Role>,
+        limits: &tasks::Limits,
+        admission: &tasks::CompoundAdmission<'_>,
+    ) -> Result<u64, people::Refusal> {
         let (task, kind, reason_len) = match ask {
             people::Ask::Stop { task, .. } => (*task, authority::RequestKind::Cancel, 0),
             people::Ask::Cancel { task, reason, .. } => (*task, authority::RequestKind::Cancel, reason.len()),
             people::Ask::Release { task, .. } => (*task, authority::RequestKind::Release, 0),
-            people::Ask::MarkSeen { .. }
+            people::Ask::Compound { .. }
+            | people::Ask::MarkSeen { .. }
             | people::Ask::Close { .. }
             | people::Ask::Application { .. }
             | people::Ask::TakePerson { .. }
@@ -154,7 +187,7 @@ impl Core {
         {
             return Err(people::Refusal::Limit { which: people::LimitKind::Grace });
         }
-        let Some(context) = self.tasks.delegation(task) else { return Err(people::Refusal::Unknown) };
+        let Some(context) = admission.task(task) else { return Err(people::Refusal::Unknown) };
         let Some(holding) = role else { return Err(people::Refusal::Role { held: None }) };
         let any_task = match holding {
             people::Role::Owner | people::Role::Maintainer => true,
@@ -164,13 +197,13 @@ impl Core {
                 None => false,
             },
         };
-        let standing = self.person_tree(person, task, limits.depth);
+        let standing = Self::person_tree_in(person, task, limits.depth, admission);
         if context.project != project || !any_task && !standing {
             return Err(people::Refusal::Unknown);
         }
         let pool = tasks::Funder::Pool { project, person, period: self.period(project) };
-        let numbers = match self.tasks.funding(pool) {
-            Some(record) => record.numbers,
+        let numbers = match admission.funding(pool) {
+            Some(numbers) => numbers,
             None => tasks::Numbers { budget: 0, spent: 0, spent_below: 0, reserved: 0 },
         };
         let action = if kind == authority::RequestKind::Cancel {
@@ -183,7 +216,7 @@ impl Core {
             project,
             role: holding.number(),
             pool: translate::authority_numbers(numbers),
-            tasks_left: context.tasks_left,
+            tasks_left: context.tasks_left().ok_or(people::Refusal::Limit { which: people::LimitKind::Arithmetic })?,
             request: action,
         };
         let checked = authority::check_request_with_standing(&self.authority, &ask, standing, &mut findings);
@@ -217,9 +250,12 @@ impl Core {
     /// Whether a person is the requesting ancestor of a live task.
     #[must_use]
     pub fn person_tree(&self, person: u64, task: u64, depth: u32) -> bool {
+        Self::person_tree_in(person, task, depth, &tasks::CompoundAdmission::new(&self.tasks, 0))
+    }
+    pub(crate) fn person_tree_in(person: u64, task: u64, depth: u32, admission: &tasks::CompoundAdmission<'_>) -> bool {
         let mut next = task;
         for _ in 0..=depth {
-            let Some(context) = self.tasks.delegation(next) else { return false };
+            let Some(context) = admission.task(next) else { return false };
             match context.requester {
                 tasks::Party::Person(requester) => return requester == person,
                 tasks::Party::Task(parent) => next = parent,

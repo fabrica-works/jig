@@ -22,7 +22,9 @@ pub fn outcome(value: &people::Outcome) -> Outcome {
         people::Outcome::NoteEdited { name } => client::OwnerOutcome::NoteEdited { name: *name },
         people::Outcome::ServiceMade { person } => client::OwnerOutcome::ServiceMade { person: *person },
         people::Outcome::Adopted { project } => client::OwnerOutcome::Adopted { project: *project },
-        people::Outcome::Created { .. } => unreachable!("no v8 ask leads to Created"),
+        people::Outcome::Compound { .. }
+        | people::Outcome::CompoundRefused { .. }
+        | people::Outcome::Created { .. } => unreachable!("no v8 ask leads to Created"),
         people::Outcome::GoalStarted { task } => client::OwnerOutcome::GoalStarted { task: *task },
         people::Outcome::GoalProposed { proposal } => client::OwnerOutcome::GoalProposed { proposal: *proposal },
         people::Outcome::Stopped { task } => client::OwnerOutcome::Stopped { task: *task },

@@ -670,6 +670,7 @@ fn party_lack(value: people::Lack) -> parties::Lack {
 
 fn party_limit(value: people::LimitKind) -> parties::LimitKind {
     match value {
+        people::LimitKind::Operations => parties::LimitKind::Operations,
         people::LimitKind::Words => parties::LimitKind::Words,
         people::LimitKind::Identity => parties::LimitKind::Identity,
         people::LimitKind::Roles => parties::LimitKind::Roles,

@@ -17,6 +17,7 @@ struct Winner {
 }
 
 pub const LIMITS: Limits = Limits {
+    operations: 2,
     batch: 2,
     people: 8,
     inbox_entries: 4,
@@ -498,6 +499,7 @@ impl World {
                     let key = self.context.expect("a routed call carries the client's key");
                     assert_eq!(person, key.person);
                     let kind = match ask.as_ref() {
+                        Ask::Compound { .. } => RouteKind::Control,
                         Ask::Application { .. } => RouteKind::Application,
                         Ask::StartChat { .. } => RouteKind::Chat,
                         Ask::Create { .. } => unreachable!("Create is exercised by the core world"),
@@ -554,6 +556,19 @@ impl World {
                         self.deferred.push((request, key));
                     } else {
                         match *ask {
+                            Ask::Compound { project, operations } => {
+                                let outcome = if self.settings.authority_refuses {
+                                    Outcome::CompoundRefused { at: 1, why: Refusal::Unknown }
+                                } else {
+                                    Outcome::Compound { project, operations: operations.len(), first_message: 0 }
+                                };
+                                people::step(
+                                    &mut self.domain,
+                                    &self.env,
+                                    Event::Decided { request, outcome },
+                                    &mut self.out,
+                                );
+                            }
                             Ask::MarkSeen { seen } => {
                                 let allowed = match seen {
                                     people::Seen::Results { .. } => true,
@@ -767,7 +782,8 @@ impl World {
                                         Ask::TakePerson { .. }
                                         | Ask::HandBackPerson { .. }
                                         | Ask::AnswerPerson { .. } => Outcome::Refused(Refusal::NotWaiting),
-                                        Ask::MarkSeen { .. }
+                                        Ask::Compound { .. }
+                                        | Ask::MarkSeen { .. }
                                         | Ask::Application { .. }
                                         | Ask::Close { .. }
                                         | Ask::EditNote { .. }

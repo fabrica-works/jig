@@ -380,6 +380,7 @@ pub enum PersonProposalRoute {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum PersonTaskRoute {
+    Compound { project: u32, operations: u32, first_message: u64 },
     Close { chat: u64, cancelled: u32, kept: u32 },
     PoolSet { project: u32, person: u64 },
     Take(u64),

@@ -68,6 +68,8 @@ mod boundary;
 mod results;
 pub use results::{Forgettable, ReplyRef, ResultRef, Update};
 mod capacity;
+mod compound;
+pub use compound::Operation;
 mod decisions;
 mod domain;
 pub use domain::EndedMark;

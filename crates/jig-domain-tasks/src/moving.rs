@@ -27,7 +27,7 @@ pub(crate) fn descendant(domain: &Domain, number: u64, ancestor: u64, bound: u32
     false
 }
 
-fn mutable(phase: &Phase) -> bool {
+pub(crate) fn mutable(phase: &Phase) -> bool {
     match phase {
         Phase::Waiting | Phase::Active(_) | Phase::Held { was: Was::Waiting | Was::Active(_), .. } => true,
         Phase::Closing(_) | Phase::Held { was: Was::Closing(_), .. } | Phase::Ended(_) => false,

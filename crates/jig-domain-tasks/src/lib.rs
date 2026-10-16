@@ -70,7 +70,7 @@ mod chat;
 mod closing;
 mod compound;
 mod control;
-pub use compound::Operation;
+pub use compound::{CompoundAdmission, CompoundContext, CompoundTask, Operation};
 mod domain;
 mod escalation;
 mod facts;

@@ -71,7 +71,8 @@ pub(crate) fn valid(ask: &Ask) -> bool {
             }
             true
         }
-        Ask::Close { .. }
+        Ask::Compound { .. }
+        | Ask::Close { .. }
         | Ask::MarkSeen { .. }
         | Ask::Application { .. }
         | Ask::Adopt { .. }

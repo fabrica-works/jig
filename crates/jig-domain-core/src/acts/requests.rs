@@ -16,7 +16,7 @@ pub(crate) fn request(
     ask: &people::Ask,
 ) -> Result<(), people::Refusal> {
     let (act, subject) = match ask {
-        people::Ask::Application { .. } => return Ok(()),
+        people::Ask::Application { .. } | people::Ask::Compound { .. } => return Ok(()),
         people::Ask::Create { .. } | people::Ask::StartChat { .. } | people::Ask::SetGoal { .. } => {
             return standing::role(core, project, role, Act::SetGoal);
         }
@@ -105,7 +105,8 @@ pub(crate) fn request(
                 | jig_domain_tasks::Escalation::Rejected { .. } => return Ok(()),
             }
         }
-        people::Ask::Application { .. }
+        people::Ask::Compound { .. }
+        | people::Ask::Application { .. }
         | people::Ask::StartChat { .. }
         | people::Ask::Say { .. }
         | people::Ask::AnswerQuestion { .. }

@@ -954,7 +954,9 @@ fn application_answer(outcome: people::Outcome) -> connector::ApplicationCoreAns
             connector::ApplicationCoreAnswer::Refused(crate::application_facts::refusal(why))
         }
         people::Outcome::Again(why) => connector::ApplicationCoreAnswer::Again(crate::application_facts::again(why)),
-        people::Outcome::Applied { .. }
+        people::Outcome::Compound { .. }
+        | people::Outcome::CompoundRefused { .. }
+        | people::Outcome::Applied { .. }
         | people::Outcome::SignedOut
         | people::Outcome::NoteEdited { .. }
         | people::Outcome::ServiceMade { .. }

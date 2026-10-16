@@ -13,7 +13,8 @@ pub(crate) fn number(ask: &people::Ask) -> u64 {
         people::Ask::TakePerson { task, .. }
         | people::Ask::HandBackPerson { task, .. }
         | people::Ask::AnswerPerson { task, .. } => *task,
-        people::Ask::MarkSeen { .. }
+        people::Ask::Compound { .. }
+        | people::Ask::MarkSeen { .. }
         | people::Ask::Close { .. }
         | people::Ask::Application { .. }
         | people::Ask::Move { .. }
@@ -123,7 +124,8 @@ impl Core {
             people::Ask::TakePerson { .. } => crate::acts::Act::Take,
             people::Ask::HandBackPerson { .. } => crate::acts::Act::HandBack,
             people::Ask::AnswerPerson { .. } => crate::acts::Act::Answer,
-            people::Ask::MarkSeen { .. }
+            people::Ask::Compound { .. }
+            | people::Ask::MarkSeen { .. }
             | people::Ask::Close { .. }
             | people::Ask::Application { .. }
             | people::Ask::Move { .. }
@@ -180,7 +182,8 @@ impl Core {
                     },
                 )
             }
-            people::Ask::MarkSeen { .. }
+            people::Ask::Compound { .. }
+            | people::Ask::MarkSeen { .. }
             | people::Ask::Close { .. }
             | people::Ask::Application { .. }
             | people::Ask::Move { .. }

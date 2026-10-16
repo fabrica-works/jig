@@ -9,6 +9,7 @@ use skein_lib::Wall;
 /// The refused operation's kind and existing object identity, without its payload.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum CapacityAction {
+    Compound,
     Create,
     Close,
     Application { connector: u16 },
@@ -58,6 +59,7 @@ pub struct CapacityRefusal {
 
 pub(crate) fn action(ask: &Ask) -> CapacityAction {
     match ask {
+        Ask::Compound { .. } => CapacityAction::Compound,
         Ask::Close { .. } => CapacityAction::Close,
         Ask::Application { connector, .. } => CapacityAction::Application { connector: *connector },
         Ask::EditNote { name, .. } => CapacityAction::Note { name: *name },
@@ -90,7 +92,8 @@ pub(crate) fn action(ask: &Ask) -> CapacityAction {
 
 pub(crate) fn project(ask: &Ask) -> Option<u32> {
     match ask {
-        Ask::Close { project, .. }
+        Ask::Compound { project, .. }
+        | Ask::Close { project, .. }
         | Ask::EditNote { project, .. }
         | Ask::MakeService { project, .. }
         | Ask::Adopt { project, .. }
@@ -124,8 +127,9 @@ pub(crate) fn project(ask: &Ask) -> Option<u32> {
 
 pub(crate) fn permanent(outcome: Outcome) -> Option<CapacityCause> {
     match outcome {
-        Outcome::Refused(refusal) => room(refusal),
-        Outcome::Applied { .. }
+        Outcome::Refused(refusal) | Outcome::CompoundRefused { why: refusal, .. } => room(refusal),
+        Outcome::Compound { .. }
+        | Outcome::Applied { .. }
         | Outcome::Again(_)
         | Outcome::SignedOut
         | Outcome::NoteEdited { .. }
@@ -169,7 +173,8 @@ fn room(refusal: Refusal) -> Option<CapacityCause> {
             | LimitKind::Holds
             | LimitKind::InboxFull
             | LimitKind::Notes => Some(CapacityCause::Limit { which }),
-            LimitKind::Words
+            LimitKind::Operations
+            | LimitKind::Words
             | LimitKind::Identity
             | LimitKind::Roles
             | LimitKind::Arithmetic

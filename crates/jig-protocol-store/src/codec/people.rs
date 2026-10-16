@@ -6,6 +6,7 @@ use jig_domain_people as domain;
 use skein_lib::{Duration, List, Reader, Wall, Writer};
 mod asks;
 mod batch;
+mod compound;
 mod outcomes;
 mod pieces;
 pub(crate) mod policy;
@@ -27,6 +28,10 @@ pub fn limits(domain: &core::Limits) -> Option<wire::Limits> {
     let people = &domain.people;
     let authority = &domain.authority;
     let mut limits = wire::Limits {
+        ask_compound_operations: people.operations,
+        operation_cancel_reason: people.words,
+        operation_move_reason: people.words,
+        operation_message_words: people.words,
         ask_create_batch: people.batch,
         member_words: people.words,
         member_parameters: 0,

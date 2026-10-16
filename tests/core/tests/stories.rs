@@ -1,5 +1,5 @@
 use jig_core_world::effects::{World, fixture};
-use jig_core_world::fixtures::{live_row, member};
+use jig_core_world::fixtures::{delegate, live_row, member};
 use jig_domain_authority as authority;
 use jig_domain_core as core;
 use jig_domain_notes as notes;
@@ -50,19 +50,6 @@ fn finish(world: &mut World, run: (u64, u64), words: &[u8]) {
             cancel_delegates: false,
         },
     });
-}
-
-fn delegate(world: &mut World, run: (u64, u64), completion: u32, member: core::Delegate) -> u64 {
-    world.send(root::Event::Core(core::Event::DelegateValidated {
-        to: ReplyTo::new(Token::new(9000 + u64::from(completion))),
-        key: core::CallKey { task: run.0, attempt: run.1, completion, position: 0 },
-        batch: Box::new([member]),
-        stubs: Box::new([]),
-    }));
-    let core::CallPart::Delegated(numbers) = &world.answers.last().expect("delegate answer").2 else {
-        panic!("delegation was not admitted");
-    };
-    numbers[0]
 }
 
 fn plan_world(seed: u64) -> World {

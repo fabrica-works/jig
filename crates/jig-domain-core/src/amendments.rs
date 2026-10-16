@@ -85,7 +85,15 @@ impl Core {
         revision: u64,
         amendment: &tasks::Amendment,
     ) -> Result<(), people::Refusal> {
-        let tracked = match self.tasks.task(task) {
+        Self::party_amend_revision_in(task, revision, amendment, &tasks::CompoundAdmission::new(&self.tasks, 0))
+    }
+    pub(crate) fn party_amend_revision_in(
+        task: u64,
+        revision: u64,
+        amendment: &tasks::Amendment,
+        admission: &tasks::CompoundAdmission<'_>,
+    ) -> Result<(), people::Refusal> {
+        let tracked = match admission.task(task) {
             Some(row) => row.tracked.is_some(),
             None => false,
         };
@@ -104,7 +112,7 @@ impl Core {
         {
             Ok(())
         } else {
-            self.spec_revision(task, revision)
+            Self::spec_revision_in(task, revision, admission)
         }
     }
 

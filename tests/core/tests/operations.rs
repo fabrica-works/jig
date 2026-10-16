@@ -88,3 +88,211 @@ fn a_grace_past_the_limit_is_refused_naming_it() {
     );
     assert_eq!(live_row(&world, task).grace, None);
 }
+
+fn compound(operations: impl IntoIterator<Item = people::Operation>) -> people::Ask {
+    let mut bounded = skein_lib::List::with_capacity(3);
+    for operation in operations {
+        bounded.push(operation).expect("three test operations");
+    }
+    people::Ask::Compound { project: PROJECT, operations: bounded }
+}
+
+fn compound_world(seed: u64) -> jig_core_world::effects::World {
+    let (config, mut limits) = jig_core_world::faults::plan_fixture(seed);
+    limits.core.people.operations = 3;
+    jig_core_world::effects::World::configured(seed, false, config, limits)
+}
+
+fn delegate_pair(world: &mut jig_core_world::effects::World) -> (u64, u64) {
+    use jig_core_world::fixtures::{delegate, member};
+    let parent = world.assignments[0];
+    let first = member(world, tasks::Executor::Agent { charter: 1 }, b"first");
+    let first = delegate(world, parent, 1, first);
+    let second = member(world, tasks::Executor::Agent { charter: 1 }, b"second");
+    let second = delegate(world, parent, 2, second);
+    (first, second)
+}
+
+fn closing(chat: u64, cancelled: u64, moved: u64) -> people::Ask {
+    compound([
+        people::Operation::Cancel { task: cancelled, reason: b"done".as_slice().into(), grace: None },
+        people::Operation::Move { task: moved, reason: b"continue".as_slice().into() },
+        people::Operation::Cancel {
+            task: chat,
+            reason: b"finish".as_slice().into(),
+            grace: Some(Duration::from_secs(5)),
+        },
+    ])
+}
+
+#[test]
+fn a_compound_closes_a_conversation_moving_one_delegate_and_cancelling_another() {
+    let mut world = compound_world(1107);
+    let chat = world.assignments[0].0;
+    let (cancelled, moved) = delegate_pair(&mut world);
+    request(&mut world, 11, closing(chat, cancelled, moved));
+    let first_message = 1;
+    assert_eq!(live_row(&world, chat).grace.as_ref().expect("finish asked").message, first_message);
+    assert_eq!(
+        world.people_answers.last(),
+        Some(&people::Reply::Outcome(people::Outcome::Compound { project: PROJECT, operations: 3, first_message }))
+    );
+    assert_eq!(live_row(&world, moved).requester, tasks::Party::Person(OWNER));
+    let tasks::Phase::Closing(ending) = &live_row(&world, cancelled).phase else { panic!("delegate cancelled") };
+    let tasks::Ending::Cancelled { by, reason, result, .. } = &ending.ending else { panic!("cancelled ending") };
+    assert_eq!(*by, tasks::Party::Person(OWNER));
+    assert_eq!(reason.as_ref(), b"done");
+    assert_eq!(*result, None);
+}
+
+#[test]
+fn a_compound_refused_at_its_second_operation_makes_nothing() {
+    let mut world = world(1108);
+    let chat = world.assigned.as_ref().expect("chat").task;
+    let revision = live_row(&world, chat).revision;
+    request(
+        &mut world,
+        12,
+        compound([
+            people::Operation::Message { task: chat, words: b"unmade".as_slice().into(), release: false },
+            people::Operation::Cancel {
+                task: chat,
+                reason: b"end".as_slice().into(),
+                grace: Some(Duration::from_secs(601)),
+            },
+        ]),
+    );
+    assert_eq!(
+        world.people_answers.last(),
+        Some(&people::Reply::Outcome(people::Outcome::CompoundRefused {
+            at: 1,
+            why: people::Refusal::Limit { which: people::LimitKind::Grace }
+        }))
+    );
+    assert_eq!(live_row(&world, chat).revision, revision);
+    assert_eq!(world.inbound, []);
+}
+
+#[test]
+fn a_compound_naming_another_projects_task_is_refused_at_its_place() {
+    let (config, limits) = jig_core_world::fixtures::two_projects(1109);
+    let mut world = jig_core_world::effects::World::configured(1109, false, config, limits);
+    let first = world.assigned.as_ref().expect("first chat").task;
+    request(&mut world, 13, people::Ask::StartChat { project: 2, words: b"other".as_slice().into() });
+    let people::Reply::Outcome(people::Outcome::Started { task: second }) =
+        *world.people_answers.last().expect("second chat")
+    else {
+        panic!("second project chat")
+    };
+    assert_eq!(live_row(&world, second).project, 2);
+    request(
+        &mut world,
+        14,
+        compound([people::Operation::Stop { task: first }, people::Operation::Stop { task: second }]),
+    );
+    assert_eq!(
+        world.people_answers.last(),
+        Some(&people::Reply::Outcome(people::Outcome::CompoundRefused { at: 1, why: people::Refusal::Unknown }))
+    );
+    assert_eq!(live_row(&world, first).revisions.hold, 0);
+}
+
+#[test]
+fn a_compound_reorders_two_goals_at_once() {
+    let mut world = compound_world(1110);
+    let chat = world.assignments[0].0;
+    let (first, second) = delegate_pair(&mut world);
+    let track = |task, priority| people::Operation::Amend {
+        task,
+        revision: 0,
+        amendment: Box::new(people::Amendment {
+            tracked: Some(people::Tracking::Tracked { priority }),
+            ..person_unchanged(b"order")
+        }),
+        release: None,
+    };
+    request(&mut world, 15, compound([track(first, 1), track(second, 2)]));
+    request(&mut world, 16, compound([track(first, 2), track(second, 1)]));
+    assert_eq!((live_row(&world, first).tracked, live_row(&world, second).tracked), (Some(2), Some(1)));
+    assert_eq!(live_row(&world, chat).tracked, None);
+}
+
+#[test]
+fn a_compound_sent_again_after_a_crash_is_made_once_and_answered_once() {
+    use jig_core_world::effects::Cut;
+    let mut world = compound_world(1111);
+    let chat = world.assignments[0].0;
+    let (cancelled, moved) = delegate_pair(&mut world);
+    let before = world.people_answers.len();
+    let number = world.store.applied + 1;
+    world.store.fault(jig_core_world::Fault::Hold { commits: 1 });
+    world.cut = Some(Cut::Submitted(number));
+    request(&mut world, 17, closing(chat, cancelled, moved));
+    assert_eq!(world.reached_cut, Some(Cut::Submitted(number)));
+    world.cut = Some(Cut::Durable(number));
+    world.drain();
+    assert_eq!(world.reached_cut, Some(Cut::Durable(number)));
+    assert_eq!(world.store.applied, number);
+    assert_eq!(world.people_answers.len(), before);
+    world.restart_with(jig_core_world::faults::plan_fixture(1111).0);
+    let revision = live_row(&world, chat).revision;
+    let first_message = 1;
+    assert_eq!(live_row(&world, chat).grace.as_ref().expect("grace retained").message, first_message);
+    request(&mut world, 17, closing(chat, cancelled, moved));
+    assert_eq!(world.people_answers.len(), before + 1);
+    assert_eq!(
+        world.people_answers.last(),
+        Some(&people::Reply::Outcome(people::Outcome::Compound { project: PROJECT, operations: 3, first_message }))
+    );
+    assert_eq!(live_row(&world, chat).revision, revision);
+    assert_eq!(live_row(&world, moved).requester, tasks::Party::Person(OWNER));
+}
+
+#[test]
+fn a_tasks_refusal_precedes_a_later_core_refusal_in_a_compound() {
+    let mut world = world(1112);
+    let chat = world.assigned.as_ref().expect("chat").task;
+    let revision = live_row(&world, chat).revision;
+    request(
+        &mut world,
+        18,
+        compound([
+            people::Operation::Amend {
+                task: chat,
+                revision: 0,
+                amendment: Box::new(people::Amendment {
+                    dependencies: Some(Box::new([chat])),
+                    ..person_unchanged(b"cycle")
+                }),
+                release: None,
+            },
+            people::Operation::Stop { task: u64::MAX },
+        ]),
+    );
+    assert_eq!(
+        world.people_answers.last(),
+        Some(&people::Reply::Outcome(people::Outcome::CompoundRefused {
+            at: 0,
+            why: people::Refusal::Limit { which: people::LimitKind::Dependencies }
+        }))
+    );
+    assert_eq!(live_row(&world, chat).revision, revision);
+}
+
+#[test]
+fn an_earlier_compound_amendment_sets_the_next_spec_revision() {
+    let mut world = world(1113);
+    let task = world.assigned.as_ref().expect("chat").task;
+    let edit = |revision, words: &[u8]| people::Operation::Amend {
+        task,
+        revision,
+        release: None,
+        amendment: Box::new(people::Amendment {
+            spec: Some(people::Spec { words: words.into(), parameters: Box::new([]), inputs: Box::new([]) }),
+            ..person_unchanged(b"edit")
+        }),
+    };
+    request(&mut world, 19, compound([edit(0, b"first"), edit(1, b"second")]));
+    assert_eq!(live_row(&world, task).revisions.spec, 2);
+    assert_eq!(live_row(&world, task).spec.words.as_ref(), b"second");
+}

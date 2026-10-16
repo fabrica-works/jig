@@ -195,7 +195,7 @@ fn hello(value: fleet::HelloRefusal) -> client::OwnerHelloRefusal {
 
 fn person_action(value: people::CapacityAction) -> client::OwnerPersonCapacityAction {
     match value {
-        people::CapacityAction::Create => unreachable!("no v8 ask leads to Create"),
+        people::CapacityAction::Compound | people::CapacityAction::Create => unreachable!("no v8 ask leads to Create"),
         people::CapacityAction::Close => client::OwnerPersonCapacityAction::Close,
         people::CapacityAction::Application { connector } => {
             client::OwnerPersonCapacityAction::Application { connector }

@@ -156,7 +156,9 @@ pub(super) fn tag_people(
                 | people::Reply::Again(..)
                 | people::Reply::Refused(..)
                 | people::Reply::Outcome(
-                    people::Outcome::Again(..)
+                    people::Outcome::Compound { .. }
+                    | people::Outcome::CompoundRefused { .. }
+                    | people::Outcome::Again(..)
                     | people::Outcome::SignedOut
                     | people::Outcome::MarkedSeen { .. }
                     | people::Outcome::NoteEdited { .. }
@@ -200,6 +202,15 @@ pub(super) fn tag_people(
                     continue;
                 }
                 match *ask {
+                    people::Ask::Compound { operations, .. } => {
+                        crate::compound::route(
+                            core,
+                            env,
+                            work,
+                            crate::compound::Route { request, person, project, role },
+                            operations,
+                        );
+                    }
                     people::Ask::Application { scope, connector, .. } => {
                         super::application_routes::admitted(
                             core, env, work, &mut out, request, connector, person, scope, role,
