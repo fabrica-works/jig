@@ -41,7 +41,14 @@ fn ask(
     reason: &[u8],
     out: &mut Queue<Request>,
 ) -> Result<(), Refusal> {
-    let plan = check_finish(domain, env, Finish { number, by, until, message }, words, reason)?;
+    let plan = check_finish(
+        domain,
+        &crate::compound::Staged::new(0),
+        env,
+        Finish { number, by, until, message },
+        words,
+        reason,
+    )?;
     apply_finish(domain, env, plan, out);
     Ok(())
 }
@@ -62,13 +69,14 @@ pub(crate) enum FinishPlan {
 
 pub(crate) fn check_finish(
     domain: &Domain,
+    staged: &crate::compound::Staged,
     env: &Env<Limits>,
     finish: Finish,
     words: &[u8],
     reason: &[u8],
 ) -> Result<FinishPlan, Refusal> {
     let Finish { number, by, until, message } = finish;
-    let old = record(domain, number).ok_or(Refusal::Unknown)?;
+    let old = staged.record(domain, number).ok_or(Refusal::Unknown)?;
     if message == 0
         || message <= old.last_message
         || words.len() > usize::try_from(env.limits.result_bytes).expect("reason bound")
@@ -79,7 +87,7 @@ pub(crate) fn check_finish(
         Phase::Waiting | Phase::Held { .. } => {
             let mut selected = skein_lib::List::with_capacity(env.limits.tasks);
             for (child, _) in &domain.names {
-                if crate::moving::descendant(domain, *child, number, env.limits.tasks) {
+                if staged.descendant(domain, *child, number, env.limits.tasks) {
                     selected.push(*child).expect("live subtree bound");
                 }
             }
@@ -105,8 +113,9 @@ pub(crate) fn check_finish(
         hits: 1,
         eligible: true,
     };
-    let prepared = crate::inbox::prepare(domain, &env.limits, number, word, crate::inbox::Admission::RoomKept)
-        .expect("grace has its reserved inbox slot");
+    let prepared =
+        crate::inbox::prepare_staged(domain, staged, &env.limits, number, word, crate::inbox::Admission::RoomKept)
+            .expect("grace has its reserved inbox slot");
     Ok(FinishPlan::Word { finish, reason: reason.into(), prepared })
 }
 

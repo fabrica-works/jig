@@ -486,6 +486,9 @@ pub(super) fn tag_tasks(
                 );
                 continue;
             }
+            tasks::Request::CompoundRefused { .. } => {
+                unreachable!("the core sends no compound before its route is connected")
+            }
             tasks::Request::Done { reply_to } => {
                 let token = reply_to.into_token();
                 if let Some(route) = core.person_tasks.remove(&token) {

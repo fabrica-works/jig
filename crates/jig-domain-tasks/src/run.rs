@@ -519,20 +519,21 @@ pub(crate) fn hold_from(
     source: Option<Box<crate::HoldSource>>,
     out: &mut Queue<Request>,
 ) {
-    if let Some(plan) = check_stop(domain, env, number, why, source) {
+    if let Some(plan) = check_stop(domain, &crate::compound::Staged::new(0), env, number, why, source) {
         apply_stop(domain, env, plan, out);
     }
 }
 
 pub(crate) struct StopPlan {
-    number: u64,
-    why: Hold,
-    attempt: Option<u64>,
-    next: Phase,
+    pub(crate) number: u64,
+    pub(crate) why: Hold,
+    pub(crate) attempt: Option<u64>,
+    pub(crate) next: Phase,
 }
 
 pub(crate) fn check_stop(
     domain: &Domain,
+    staged: &crate::compound::Staged,
     env: &Env<Limits>,
     number: u64,
     why: Hold,
@@ -547,7 +548,7 @@ pub(crate) fn check_stop(
     if !domain.ready() {
         return None;
     }
-    let task = record(domain, number)?;
+    let task = staged.record(domain, number)?;
     match task.phase {
         Phase::Held { why: current, source: ref previous, .. }
             if current == why && (source.is_none() || previous == &source) =>

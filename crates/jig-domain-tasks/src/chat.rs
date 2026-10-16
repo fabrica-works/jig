@@ -90,13 +90,16 @@ pub(crate) fn close(
             Keep::MakeMine => {
                 let plan = match crate::moving::check(
                     domain,
+                    &crate::compound::Staged::new(0),
                     env,
-                    disposal.task,
-                    person,
-                    period,
-                    pool_budget,
-                    period_budget,
-                    FINISH,
+                    crate::moving::Move {
+                        number: disposal.task,
+                        person,
+                        period,
+                        pool_budget,
+                        period_budget,
+                        reason: FINISH,
+                    },
                 ) {
                     Ok(plan) => plan,
                     Err(problem) => return crate::moving::refuse(domain, env, to, problem, out),

@@ -11,6 +11,7 @@ pub struct Accounting {
     before: BTreeMap<Key, Stored>,
     charged: Option<(u64, u64)>,
     procedure: Option<(u64, u64, Option<u64>)>,
+    moves: BTreeMap<u64, (u64, u64)>,
 }
 
 fn live(rows: &BTreeMap<Key, Stored>, task: u64) -> Option<&TaskRecord> {
@@ -81,6 +82,37 @@ fn merged_hint(before: &MessageKind, after: &MessageKind) -> bool {
 }
 
 impl Accounting {
+    pub fn moving(&mut self, task: u64, person: u64, period: u64) {
+        self.moves.insert(task, (person, period));
+    }
+
+    fn moved(&self, before: &TaskRecord, after: &TaskRecord) -> bool {
+        let Some((person, period)) = self.moves.get(&before.number) else { return false };
+        after.requester == jig_domain_tasks::Party::Person(*person)
+            && after.funder == Funder::Pool { project: before.project, person: *person, period: *period }
+            && before.funder != after.funder
+            && before
+                .numbers
+                .budget
+                .checked_sub(before.numbers.spent)
+                .and_then(|left| left.checked_sub(before.numbers.spent_below))
+                == Some(after.numbers.budget)
+            && after.numbers.spent == 0
+            && after.numbers.spent_below == 0
+    }
+
+    fn moved_spend(&self, rows: &BTreeMap<Key, Stored>, funder: Funder) -> u64 {
+        self.before
+            .values()
+            .filter_map(|row| {
+                let Stored::Live(before) = row else { return None };
+                let after = current(rows, before.number)?;
+                (before.funder == funder && self.moved(before, after))
+                    .then_some(before.numbers.spent + before.numbers.spent_below)
+            })
+            .sum()
+    }
+
     fn messages_and_holders(&self, rows: &BTreeMap<Key, Stored>, requests: &[Request]) -> Result<(), &'static str> {
         for old in self.before.values() {
             let Stored::Live(old) = old else { continue };
@@ -255,13 +287,17 @@ impl Accounting {
                 }
                 _ => false,
             };
-            if (old.funder != task.funder && !recurring_reset && !renewed && !standing_delegate)
-                || old.numbers.budget != task.numbers.budget
+            let moved = self.moved(old, task);
+            if !moved
+                && ((old.funder != task.funder && !recurring_reset && !renewed && !standing_delegate)
+                    || old.numbers.budget != task.numbers.budget)
             {
                 return Err("allocation identity or promise changed");
             }
-            let posted = self.newly_settled(rows, Funder::Task(old.number));
+            let posted =
+                self.newly_settled(rows, Funder::Task(old.number)) + self.moved_spend(rows, Funder::Task(old.number));
             if !renewed
+                && !moved
                 && (task.numbers.spent != old.numbers.spent + self.delta(old.number)
                     || task.numbers.spent_below != old.numbers.spent_below + posted)
             {
@@ -358,7 +394,7 @@ impl Accounting {
                             | Stored::PersonProposal(_) => None,
                         })
                         .sum();
-                    let posted = self.newly_settled(rows, ledger.funder);
+                    let posted = self.newly_settled(rows, ledger.funder) + self.moved_spend(rows, ledger.funder);
                     let before_posted = match funding(&self.before, ledger.funder) {
                         Some(old) => old.numbers.spent_below,
                         _ => 0,
@@ -431,6 +467,7 @@ impl Accounting {
             }
         }
         self.before = rows.clone();
+        self.moves.clear();
         self.charged = None;
         self.procedure = None;
         Ok(())

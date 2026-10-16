@@ -4,7 +4,7 @@
 //! owns exact transport replay and commits related rows/effects atomically.
 use crate::{Authority, Class, Funder, Numbers, Tries};
 use alloc::boxed::Box;
-use skein_lib::{Duration, ReplyTo, Wall};
+use skein_lib::{Duration, List, ReplyTo, Wall};
 
 /// A closed wake rule for task words and subscription hints (domain/tasks.md, section 8.3).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -1233,6 +1233,16 @@ pub enum Accepted {
 /// notifications have no reply destination and may be ignored if stale. (domain/tasks.md, sections 4–5).
 #[derive(PartialEq, Eq, Debug)]
 pub enum Event {
+    /// One project's party operations, admitted in order and made whole.
+    Compound {
+        reply_to: ReplyTo,
+        person: u64,
+        project: u32,
+        operations: List<crate::Operation>,
+        period: u64,
+        pool_budget: u64,
+        period_budget: u64,
+    },
     /// One root-authorized chat close, with all direct delegate disposals and a durable grace.
     CloseChat {
         reply_to: ReplyTo,
@@ -1240,7 +1250,7 @@ pub enum Event {
         person: u64,
         message: u64,
         until: Wall,
-        disposals: skein_lib::List<crate::chat::Disposal>,
+        disposals: List<crate::chat::Disposal>,
         period: u64,
         pool_budget: u64,
         period_budget: u64,
@@ -1578,6 +1588,8 @@ pub enum Event {
 /// saves/erases with effects and delays outward replies until durability. (domain/tasks.md, section 5).
 #[derive(PartialEq, Eq, Debug)]
 pub enum Request {
+    /// Nothing was made: the first failed operation and its owner diagnostic.
+    CompoundRefused { reply_to: ReplyTo, at: u32, problem: Problem },
     /// No part of this procedure step changed task state.
     ProcedureRefused { task: u64, step: u64, problem: Problem },
     /// The complete requested set became held in this commit.

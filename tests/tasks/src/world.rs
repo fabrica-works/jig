@@ -1,5 +1,6 @@
 //! Durable parent and scripted executors at the retained tasks boundary
 //! (domain/tasks.md, 11; domain/engine.md, 7).
+mod compound;
 use crate::referee::{Seen, Stimulus, Tasks};
 use crate::stories::{ChildResult, Restart, RetryEnd, Story, TurnState};
 use crate::trace::Trace;
@@ -369,6 +370,7 @@ impl World {
             | Request::EscalationStalled { .. }
             | Request::Made { .. }
             | Request::ProcedureRefused { .. }
+            | Request::CompoundRefused { .. }
             | Request::Refused { .. }
             | Request::Done { .. }
             | Request::Acknowledged { .. }
@@ -388,6 +390,14 @@ impl World {
     #[expect(clippy::too_many_lines, reason = "the world records every closed task input family")]
     fn remember_input(&mut self, event: &Event) {
         self.priced = match event {
+            Event::Move { task, person, period, .. } => {
+                self.accounting_referee.moving(*task, *person, *period);
+                None
+            }
+            Event::Compound { person, period, operations, .. } => {
+                self.remember_compound(*person, *period, operations);
+                None
+            }
             Event::Turn { task, cumulative, .. }
             | Event::Activation { task, cause: Cause::Priced { cumulative }, .. } => Some((*task, *cumulative)),
             Event::ResourceAccess { .. }
@@ -419,7 +429,6 @@ impl World {
             | Event::Amend { .. }
             | Event::Prioritise { .. }
             | Event::CloseChat { .. }
-            | Event::Move { .. }
             | Event::CarvePool { .. }
             | Event::ResizePool { .. }
             | Event::Make { .. }
@@ -486,6 +495,7 @@ impl World {
             | Event::Prioritise { .. }
             | Event::CloseChat { .. }
             | Event::Move { .. }
+            | Event::Compound { .. }
             | Event::Propose { .. }
             | Event::ProposePerson { .. }
             | Event::DecidePersonProposal { .. }
@@ -635,6 +645,7 @@ impl World {
                 | Request::Made { .. }
                 | Request::RecurringDue { .. }
                 | Request::ProcedureRefused { .. }
+                | Request::CompoundRefused { .. }
                 | Request::Refused { .. }
                 | Request::Done { .. }
                 | Request::Acknowledged { accepted: Accepted::Already, .. }
@@ -741,7 +752,9 @@ impl World {
                         self.reply(ReplyTo::new(token), Reply::Made(tasks.into_vec()));
                     }
                 }
-                Request::Refused { reply_to, problem } => self.reply(reply_to, Reply::Refused(problem)),
+                Request::Refused { reply_to, problem } | Request::CompoundRefused { reply_to, problem, .. } => {
+                    self.reply(reply_to, Reply::Refused(problem));
+                }
                 Request::ProcedureRefused { .. } => unreachable!("stage translates procedure terminal"),
                 Request::Acknowledged { reply_to, accepted, .. } => self.reply(reply_to, Reply::Acknowledged(accepted)),
                 Request::TurnAcknowledged { reply_to, accepted, .. } => self.reply(reply_to, Reply::Turn(accepted)),

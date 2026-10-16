@@ -259,6 +259,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
             .checked_add(u64::from(limits.hold_bytes))?,
     )?;
     Slab::<Task>::worst_case(limits.tasks)?
+        .checked_add(crate::compound::worst_case(limits, payload.checked_add(proposal_payload)?)?)?
         .checked_add(Deadlines::<u64>::worst_case(limits.tasks)?)?
         .checked_add(List::<crate::moving::Plan>::worst_case(limits.delegates)?)?
         .checked_add(u64::from(limits.delegates).checked_mul(List::<u64>::worst_case(limits.tasks)?)?)?

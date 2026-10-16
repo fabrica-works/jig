@@ -3,7 +3,7 @@ use super::*;
 use crate::{Disposal, Grace, Keep, Phase};
 use skein_lib::List;
 
-fn cohort() -> Harness {
+pub(super) fn cohort() -> Harness {
     let mut test = Harness::new();
     let mut root = task(1, &[]);
     root.numbers.budget = 1000;

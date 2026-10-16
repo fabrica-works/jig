@@ -206,15 +206,15 @@ pub(crate) struct Amend {
 }
 
 pub(crate) struct AmendPlan {
-    number: u64,
-    message: u64,
-    amendment: Amendment,
-    changed: bool,
-    person_changed: bool,
-    attempt: Option<u64>,
-    before: Settings,
-    prepared: crate::inbox::Prepared,
-    release: Option<ReleasePlan>,
+    pub(crate) number: u64,
+    pub(crate) message: u64,
+    pub(crate) amendment: Amendment,
+    pub(crate) changed: bool,
+    pub(crate) person_changed: bool,
+    pub(crate) attempt: Option<u64>,
+    pub(crate) before: Settings,
+    pub(crate) prepared: crate::inbox::Prepared,
+    pub(crate) release: Option<ReleasePlan>,
 }
 
 #[expect(
@@ -236,7 +236,8 @@ pub(crate) fn amend(
         Ok(to) => to,
         Err((to, why)) => return refused(to, Some(number), why, out),
     };
-    match check_amend(domain, env, by, Amend { number, message, stop_run, amendment }) {
+    match check_amend(domain, &crate::compound::Staged::new(0), env, by, Amend { number, message, stop_run, amendment })
+    {
         Ok(plan) => {
             apply_amend(domain, env, by, plan, out);
             out.push(Request::Done { reply_to: to });
@@ -248,6 +249,7 @@ pub(crate) fn amend(
 #[expect(clippy::too_many_lines, reason = "whole amendment preflight remains together")]
 pub(crate) fn check_amend(
     domain: &Domain,
+    staged: &crate::compound::Staged,
     env: &Env<Limits>,
     by: Party,
     amendment: Amend,
@@ -262,10 +264,10 @@ pub(crate) fn check_amend(
     if !allowed(domain, number, by, env.limits.tasks) {
         return Err(Refusal::Reference);
     }
-    let old = record(domain, number).ok_or(Refusal::Unknown)?;
+    let old = staged.record(domain, number).ok_or(Refusal::Unknown)?;
     if let Some(Tracking::Tracked { .. }) = amendment.tracked
         && old.tracked.is_none()
-        && let Err(why) = crate::goals::room(domain, old.project, 1, &env.limits)
+        && let Err(why) = staged.goals(domain, old.project, &env.limits)
     {
         return Err(why);
     }
@@ -297,7 +299,7 @@ pub(crate) fn check_amend(
     if amendment.reason.len() > usize::try_from(env.limits.message_bytes).expect("u32 fits usize") {
         return Err(Refusal::Read);
     }
-    address_admit(old, &amendment.addressed)?;
+    crate::compound::Staged::address(&old, amendment.addressed.as_ref())?;
     instruction_admit(&env.limits, old.executor, &amendment.instructions)?;
     if let Some(spec) = &amendment.spec
         && (!crate::batch::valid_spec(&env.limits, spec) || !spec.inputs.is_empty())
@@ -321,7 +323,7 @@ pub(crate) fn check_amend(
             return Err(Refusal::Dependencies);
         }
         for (at, dependency) in dependencies.iter().enumerate() {
-            if !crate::batch::contains(&old.dependencies, *dependency) {
+            if !crate::batch::contains(old.dependencies, *dependency) {
                 return Err(Refusal::Dependencies);
             }
             for earlier in dependencies.iter().take(at) {
@@ -335,18 +337,18 @@ pub(crate) fn check_amend(
         if !crate::batch::valid_authority(&env.limits, authority) {
             return Err(Refusal::AuthorityShape);
         }
-        if !crate::funders::can_resize(domain, number, authority.budget.spend) {
+        if !staged.can_resize(domain, number, authority.budget.spend) {
             return Err(Refusal::Funding);
         }
     } else if stop_run {
         return Err(Refusal::State);
     }
     let spec_changed = match &amendment.spec {
-        Some(spec) => *spec != old.spec,
+        Some(spec) => spec != old.spec,
         None => false,
     };
     let dependencies_changed = match &amendment.dependencies {
-        Some(dependencies) => *dependencies != old.dependencies,
+        Some(dependencies) => dependencies.as_ref() != old.dependencies,
         None => false,
     };
     let changed = spec_changed
@@ -360,7 +362,7 @@ pub(crate) fn check_amend(
             None => false,
         }
         || match &amendment.authority {
-            Some(authority) => *authority != old.authority,
+            Some(authority) => authority != old.authority,
             None => false,
         };
     let address_changed = match amendment.addressed {
@@ -388,10 +390,11 @@ pub(crate) fn check_amend(
         hits: 1,
         eligible: true,
     };
-    let before = settings(old);
-    let release = if releasing { Some(check_release(domain, env, number, by, None, None)?) } else { None };
-    let prepared = crate::inbox::prepare(domain, &env.limits, number, word, crate::inbox::Admission::Merged)
-        .expect("authenticated amendment has a merged inbox slot");
+    let before = old.settings();
+    let release = if releasing { Some(check_release(domain, staged, env, number, by, None, None)?) } else { None };
+    let prepared =
+        crate::inbox::prepare_staged(domain, staged, &env.limits, number, word, crate::inbox::Admission::Merged)
+            .expect("authenticated amendment has a merged inbox slot");
     Ok(AmendPlan { number, message, amendment, changed, person_changed, attempt, before, prepared, release })
 }
 
@@ -579,7 +582,13 @@ pub(crate) fn apply(
     }
     match control {
         Control::Cancel { reason, grace, message } => {
-            match check_cancel(domain, env, by, Cancel { number, reason, grace, message }) {
+            match check_cancel(
+                domain,
+                &crate::compound::Staged::new(0),
+                env,
+                by,
+                Cancel { number, reason, grace, message },
+            ) {
                 Ok(plan) => apply_cancel(domain, env, by, plan, out),
                 Err(problem) => return out.push(Request::Refused { reply_to: to, problem: *problem }),
             }
@@ -604,7 +613,7 @@ pub(crate) fn release(
     message: Option<u64>,
     out: &mut Queue<Request>,
 ) -> Result<(), Refusal> {
-    match check_release(domain, env, number, by, again, message) {
+    match check_release(domain, &crate::compound::Staged::new(0), env, number, by, again, message) {
         Ok(plan) => {
             apply_release(domain, env, by, plan, out);
             Ok(())
@@ -628,22 +637,23 @@ pub(crate) fn release(
 }
 
 pub(crate) struct ReleasePlan {
-    number: u64,
-    entry: Option<u64>,
-    again: Option<bool>,
-    notice: Option<crate::inbox::Prepared>,
-    next: Phase,
+    pub(crate) number: u64,
+    pub(crate) entry: Option<u64>,
+    pub(crate) again: Option<bool>,
+    pub(crate) notice: Option<crate::inbox::Prepared>,
+    pub(crate) next: Phase,
 }
 
 pub(crate) fn check_release(
     domain: &Domain,
+    staged: &crate::compound::Staged,
     env: &Env<Limits>,
     number: u64,
     by: Party,
     again: Option<bool>,
     message: Option<u64>,
 ) -> Result<ReleasePlan, Refusal> {
-    let task = record(domain, number).ok_or(Refusal::Unknown)?;
+    let task = staged.record(domain, number).ok_or(Refusal::Unknown)?;
     if task.revision == u64::MAX {
         return Err(Refusal::State);
     }
@@ -669,7 +679,7 @@ pub(crate) fn check_release(
             eligible: false,
         };
         let Some(prepared) =
-            crate::inbox::prepare(domain, &env.limits, number, word, crate::inbox::Admission::Refusable)
+            crate::inbox::prepare_staged(domain, staged, &env.limits, number, word, crate::inbox::Admission::Refusable)
         else {
             return Err(Refusal::Busy);
         };
@@ -752,14 +762,15 @@ pub(crate) struct Cancel {
 }
 
 pub(crate) struct CancelPlan {
-    number: u64,
-    reason: Box<[u8]>,
-    finish: Option<crate::grace::FinishPlan>,
-    selected: Box<[u64]>,
+    pub(crate) number: u64,
+    pub(crate) reason: Box<[u8]>,
+    pub(crate) finish: Option<crate::grace::FinishPlan>,
+    pub(crate) selected: Box<[u64]>,
 }
 
 pub(crate) fn check_cancel(
     domain: &Domain,
+    staged: &crate::compound::Staged,
     env: &Env<Limits>,
     by: Party,
     cancel: Cancel,
@@ -781,8 +792,8 @@ pub(crate) fn check_cancel(
     }
     let mut selected = skein_lib::List::with_capacity(env.limits.tasks);
     for (child, _) in &domain.names {
-        if below(domain, *child, number, env.limits.tasks) {
-            if record(domain, *child).expect("live child").revision == u64::MAX {
+        if staged.descendant(domain, *child, number, env.limits.tasks) {
+            if staged.record(domain, *child).expect("live child").revision == u64::MAX {
                 problem.task = Some(*child);
                 problem.why = Refusal::State;
                 return Err(problem);
@@ -797,7 +808,7 @@ pub(crate) fn check_cancel(
             until: skein_lib::Wall::from_nanos(env.wall.as_nanos().saturating_add(span.as_nanos())),
             message: message.expect("grace message checked"),
         };
-        match crate::grace::check_finish(domain, env, finish, &reason, &reason) {
+        match crate::grace::check_finish(domain, staged, env, finish, &reason, &reason) {
             Ok(plan) => Some(plan),
             Err(why) => {
                 problem.why = why;
@@ -834,6 +845,7 @@ pub(crate) fn preview_amend(
 ) -> Result<(), Refusal> {
     let checked = check_amend(
         domain,
+        &crate::compound::Staged::new(0),
         env,
         by,
         Amend { number: part.task, message: part.message, stop_run: part.stop_run, amendment: part.amendment.clone() },

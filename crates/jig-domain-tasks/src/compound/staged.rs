@@ -1,0 +1,338 @@
+//! Borrow unchanged fields and project only what admitted operations change.
+use super::{Plan, Staged};
+use crate::{Active, Executor, Funder, Grace, Numbers, Party, Phase, Revisions, Settings, TaskRecord, Tracking};
+use alloc::boxed::Box;
+use core::ops::Deref;
+
+pub(crate) struct View<'a> {
+    pub(crate) base: &'a TaskRecord,
+    pub(crate) phase: Phase,
+    pub(crate) revision: u64,
+    pub(crate) revisions: Revisions,
+    pub(crate) tracked: Option<u32>,
+    pub(crate) executor: Executor,
+    pub(crate) taken_by: Option<u64>,
+    pub(crate) requester: Party,
+    pub(crate) funder: Funder,
+    pub(crate) numbers: Numbers,
+    pub(crate) root: u64,
+    pub(crate) depth: u32,
+    pub(crate) last_message: u64,
+    pub(crate) inbox: &'a [crate::Word],
+    pub(crate) instructions: &'a Option<Box<[u8]>>,
+    pub(crate) spec: &'a crate::Spec,
+    pub(crate) wake: crate::WakePolicy,
+    pub(crate) dependencies: &'a [u64],
+    pub(crate) authority: &'a crate::Authority,
+    pub(crate) grace: Option<Grace>,
+}
+
+impl Deref for View<'_> {
+    type Target = TaskRecord;
+    fn deref(&self) -> &TaskRecord {
+        self.base
+    }
+}
+
+impl View<'_> {
+    pub(crate) fn settings(&self) -> Settings {
+        Settings {
+            tracked: self.tracked,
+            addressed: match self.executor {
+                Executor::Person(address) => Some(address),
+                Executor::Agent { .. } | Executor::Procedure { .. } => None,
+            },
+            taken_by: self.taken_by,
+            instructions: self.instructions.clone(),
+            spec: self.spec.clone(),
+            wake: self.wake,
+            dependencies: self.dependencies.into(),
+            authority: self.authority.clone(),
+        }
+    }
+    fn wake(&mut self, word: &crate::Word) {
+        let wakes = match self.executor {
+            Executor::Person(_) => false,
+            Executor::Procedure { .. } | Executor::Agent { .. } => match word.kind {
+                crate::MessageKind::Answer { .. } => self.wake.answers,
+                crate::MessageKind::Question => self.wake.questions,
+                crate::MessageKind::EffectNotMade { .. }
+                | crate::MessageKind::Words
+                | crate::MessageKind::Proposal { .. }
+                | crate::MessageKind::Escalation { .. }
+                | crate::MessageKind::Amendment { .. }
+                | crate::MessageKind::ProposalDecision { .. }
+                | crate::MessageKind::PersonStalled { .. }
+                | crate::MessageKind::Result(_)
+                | crate::MessageKind::Notice { .. }
+                | crate::MessageKind::Timer { .. }
+                | crate::MessageKind::News { .. } => true,
+            },
+        };
+        if wakes && self.phase == Phase::Active(Active::Idle) {
+            self.phase = Phase::Active(Active::Due);
+        }
+    }
+}
+
+impl Staged {
+    pub(crate) fn record<'a>(&'a self, domain: &'a crate::Domain, number: u64) -> Option<View<'a>> {
+        let base = crate::domain::record(domain, number)?;
+        let mut row = View {
+            base,
+            phase: base.phase.clone(),
+            revision: base.revision,
+            revisions: base.revisions,
+            tracked: base.tracked,
+            executor: base.executor,
+            taken_by: base.taken_by,
+            requester: base.requester,
+            funder: base.funder,
+            numbers: base.numbers,
+            root: base.root,
+            depth: base.depth,
+            last_message: base.last_message,
+            inbox: &base.inbox,
+            instructions: &base.instructions,
+            spec: &base.spec,
+            wake: base.wake,
+            dependencies: &base.dependencies,
+            authority: &base.authority,
+            grace: base.grace.clone(),
+        };
+        for plan in &self.plans {
+            match plan {
+                Plan::Move { plan, .. } => {
+                    if super::has(&plan.subtree, number) {
+                        row.root = plan.number;
+                        row.depth = row.depth.checked_sub(plan.previous_depth).expect("subtree depth checked");
+                        row.revision = row.revision.checked_add(1).expect("admission checked");
+                    }
+                    if plan.number == number {
+                        row.requester = Party::Person(plan.person);
+                        if plan.source != plan.destination {
+                            row.funder = plan.destination;
+                            row.numbers =
+                                Numbers { budget: plan.left, spent: 0, spent_below: 0, reserved: row.numbers.reserved };
+                        }
+                    }
+                }
+                Plan::Amend(plan) if plan.number == number => {
+                    project_amend(&mut row, plan);
+                }
+                Plan::Release(plan) if plan.number == number => {
+                    row.phase = plan.next.clone();
+                    row.revision = row.revision.checked_add(1).expect("admission checked");
+                    if let Some(notice) = &plan.notice {
+                        row.last_message = notice.word.number;
+                        row.inbox = &notice.inbox;
+                    }
+                }
+                Plan::Message(plan) if plan.number == number => {
+                    row.last_message = plan.prepared.word.number;
+                    row.inbox = &plan.prepared.inbox;
+                    if let Some(release) = &plan.release {
+                        row.phase = release.next.clone();
+                        row.revision = row.revision.checked_add(1).expect("admission checked");
+                    }
+                    row.wake(&plan.prepared.word);
+                }
+                Plan::Stop(Some(plan)) if plan.number == number => {
+                    row.phase = plan.next.clone();
+                    row.revisions.hold = row.revisions.hold.checked_add(1).expect("admission checked");
+                }
+                Plan::Cancel(plan) if plan.number == number => match &plan.finish {
+                    Some(crate::grace::FinishPlan::Word { finish, reason, prepared }) => {
+                        row.grace = Some(Grace {
+                            by: finish.by,
+                            until: finish.until,
+                            reason: reason.clone(),
+                            message: finish.message,
+                        });
+                        row.last_message = finish.message;
+                        row.inbox = &prepared.inbox;
+                        row.revision = row.revision.checked_add(1).expect("admission checked");
+                        row.wake(&prepared.word);
+                    }
+                    Some(crate::grace::FinishPlan::Sooner { finish, reason }) => {
+                        let grace = row.grace.as_mut().expect("earlier grace");
+                        grace.by = finish.by;
+                        grace.until = finish.until;
+                        grace.reason.clone_from(reason);
+                    }
+                    Some(crate::grace::FinishPlan::Cancel { .. } | crate::grace::FinishPlan::Unchanged) | None => {}
+                },
+                Plan::Amend(_) | Plan::Release(_) | Plan::Message(_) | Plan::Stop(_) | Plan::Cancel(_) => {}
+            }
+        }
+        if let Some(numbers) = self.funding_numbers(Funder::Task(number)) {
+            row.numbers = numbers;
+        }
+        Some(row)
+    }
+
+    pub(crate) fn funding_numbers(&self, funder: Funder) -> Option<Numbers> {
+        for (key, numbers) in self.funding.iter().rev() {
+            if *key == funder {
+                return Some(*numbers);
+            }
+        }
+        None
+    }
+    pub(crate) fn numbers(&self, domain: &crate::Domain, funder: Funder) -> Option<Numbers> {
+        if let Some(numbers) = self.funding_numbers(funder) {
+            return Some(numbers);
+        }
+        match funder {
+            Funder::Task(task) => Some(self.record(domain, task)?.numbers),
+            Funder::Pool { .. } | Funder::Period { .. } | Funder::Recurring { .. } => {
+                Some(domain.funding.get(&funder)?.numbers)
+            }
+        }
+    }
+    pub(crate) fn descendant(&self, domain: &crate::Domain, number: u64, ancestor: u64, bound: u32) -> bool {
+        let mut at = Some(number);
+        for _ in 0..bound {
+            let Some(number) = at else { return false };
+            if number == ancestor {
+                return true;
+            }
+            at = match self.record(domain, number) {
+                Some(row) => match row.requester {
+                    Party::Task(parent) => Some(parent),
+                    Party::Person(_) | Party::Deployment { .. } => None,
+                },
+                None => None,
+            };
+        }
+        false
+    }
+    pub(crate) fn detached(&self, number: u64) -> bool {
+        super::has(&self.moved, number)
+    }
+    pub(crate) fn reference(&self, domain: &crate::Domain, number: u64, target: u64) -> bool {
+        if let Some(row) = crate::domain::record(domain, number)
+            && row.references.contains(&target)
+        {
+            return true;
+        }
+        for plan in &self.plans {
+            if let Plan::Move { plan, .. } = plan
+                && let Some(parent) = plan.old_parent
+                && ((number == parent && target == plan.number) || (number == plan.number && target == parent))
+            {
+                return true;
+            }
+        }
+        false
+    }
+    pub(crate) fn references(&self, domain: &crate::Domain, number: u64) -> usize {
+        let mut count = crate::domain::record(domain, number).expect("live reference owner").references.len();
+        for plan in &self.plans {
+            if let Plan::Move { plan, .. } = plan
+                && let Some(parent) = plan.old_parent
+            {
+                let target = if number == parent {
+                    Some(plan.number)
+                } else if number == plan.number {
+                    Some(parent)
+                } else {
+                    None
+                };
+                if let Some(target) = target
+                    && !crate::domain::record(domain, number).expect("live owner").references.contains(&target)
+                {
+                    count = count.checked_add(1).expect("admission checked");
+                }
+            }
+        }
+        count
+    }
+}
+
+impl Staged {
+    pub(crate) fn goals(
+        &self,
+        domain: &crate::Domain,
+        project: u32,
+        limits: &crate::Limits,
+    ) -> Result<(), crate::Refusal> {
+        let mut goals = 0_u32;
+        for (number, _) in &domain.names {
+            let row = self.record(domain, *number).expect("live task");
+            if row.project == project && row.tracked.is_some() {
+                goals = goals.checked_add(1).expect("admission checked");
+            }
+        }
+        if goals < limits.project_goals { Ok(()) } else { Err(crate::Refusal::Goals) }
+    }
+    pub(crate) fn address(row: &View<'_>, addressed: Option<&crate::AddressChange>) -> Result<(), crate::Refusal> {
+        if let Some(change) = addressed {
+            if !match row.executor {
+                Executor::Person(_) => true,
+                Executor::Agent { .. } | Executor::Procedure { .. } => false,
+            } || !crate::control::valid_address(change.address)
+            {
+                return Err(crate::Refusal::Executor);
+            }
+            if change.revision != row.revisions.person {
+                return Err(crate::Refusal::PersonRevision { revision: row.revisions.person });
+            }
+        }
+        Ok(())
+    }
+    pub(crate) fn can_resize(&self, domain: &crate::Domain, number: u64, budget: u64) -> bool {
+        let Some(row) = self.record(domain, number) else { return false };
+        let mut numbers = row.numbers;
+        numbers.budget = budget;
+        if crate::funders::available(numbers).is_none() {
+            return false;
+        }
+        let Some(mut source) = self.numbers(domain, row.funder) else { return false };
+        let Some(reserved) = source.reserved.checked_sub(row.numbers.budget) else { return false };
+        let Some(reserved) = reserved.checked_add(budget) else { return false };
+        source.reserved = reserved;
+        crate::funders::available(source).is_some()
+    }
+}
+
+fn project_amend<'a>(row: &mut View<'a>, plan: &'a crate::control::AmendPlan) {
+    let amendment = &plan.amendment;
+    if let Some(tracked) = amendment.tracked {
+        row.tracked = match tracked {
+            Tracking::Tracked { priority } => Some(priority),
+            Tracking::Untracked => None,
+        };
+    }
+    if let Some(address) = amendment.addressed {
+        row.executor = Executor::Person(address.address);
+        row.taken_by = None;
+    }
+    if amendment.instructions.is_some() {
+        row.instructions = &amendment.instructions;
+    }
+    if let Some(value) = &amendment.spec {
+        row.spec = value;
+    }
+    if let Some(value) = amendment.wake {
+        row.wake = value;
+    }
+    if let Some(value) = &amendment.dependencies {
+        row.dependencies = value;
+    }
+    if let Some(value) = &amendment.authority {
+        row.authority = value;
+    }
+    row.revision = row.revision.checked_add(1).expect("admission checked");
+    row.revisions.spec = row.revisions.spec.checked_add(u64::from(plan.changed)).expect("admission checked");
+    row.revisions.person = row.revisions.person.checked_add(u64::from(plan.person_changed)).expect("admission checked");
+    row.last_message = plan.message;
+    row.inbox = &plan.prepared.inbox;
+    if plan.attempt.is_none() {
+        row.wake(&plan.prepared.word);
+    }
+    if let Some(release) = &plan.release {
+        row.phase = release.next.clone();
+        row.revision = row.revision.checked_add(1).expect("admission checked");
+    }
+}

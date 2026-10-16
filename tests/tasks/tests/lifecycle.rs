@@ -781,3 +781,6 @@ mod delegates;
 
 #[path = "lifecycle/grace.rs"]
 mod grace;
+
+#[path = "lifecycle/compound.rs"]
+mod compound;

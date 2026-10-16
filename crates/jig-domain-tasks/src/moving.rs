@@ -42,19 +42,20 @@ pub(crate) fn state(domain: &Domain, number: u64, person: u64) -> bool {
 
 #[derive(Debug)]
 pub(crate) struct Plan {
-    number: u64,
-    person: u64,
-    pool_budget: u64,
-    period_budget: u64,
-    previous_root: u64,
-    previous_depth: u32,
-    source: Funder,
-    spent: u64,
-    left: u64,
-    destination: Funder,
-    period_source: Funder,
-    subtree: List<u64>,
-    old_parent: Option<u64>,
+    pub(crate) number: u64,
+    pub(crate) person: u64,
+    pub(crate) pool_budget: u64,
+    pub(crate) period_budget: u64,
+    pub(crate) previous_root: u64,
+    pub(crate) previous_depth: u32,
+    pub(crate) source: Funder,
+    pub(crate) spent: u64,
+    pub(crate) left: u64,
+    pub(crate) budget: u64,
+    pub(crate) destination: Funder,
+    pub(crate) period_source: Funder,
+    pub(crate) subtree: List<u64>,
+    pub(crate) old_parent: Option<u64>,
 }
 
 #[expect(clippy::too_many_arguments, reason = "the existing move carries its person funding and reason")]
@@ -70,7 +71,12 @@ pub(crate) fn apply(
     reason: &[u8],
     out: &mut Queue<Request>,
 ) {
-    let plan = match check(domain, env, number, person, period, pool_budget, period_budget, reason) {
+    let plan = match check(
+        domain,
+        &crate::compound::Staged::new(0),
+        env,
+        Move { number, person, period, pool_budget, period_budget, reason },
+    ) {
         Ok(plan) => plan,
         Err(problem) => return refuse(domain, env, to, problem, out),
     };
@@ -92,23 +98,28 @@ pub(crate) fn refuse(
     }
 }
 
-#[expect(clippy::too_many_arguments, reason = "a pure move preflight checks its authentic funding context")]
+pub(crate) struct Move<'a> {
+    pub number: u64,
+    pub person: u64,
+    pub period: u64,
+    pub pool_budget: u64,
+    pub period_budget: u64,
+    pub reason: &'a [u8],
+}
+
 #[expect(clippy::too_many_lines, reason = "the full existing move preflight remains together")]
 pub(crate) fn check(
     domain: &Domain,
+    staged: &crate::compound::Staged,
     env: &Env<Limits>,
-    number: u64,
-    person: u64,
-    period: u64,
-    pool_budget: u64,
-    period_budget: u64,
-    reason: &[u8],
+    moving: Move<'_>,
 ) -> Result<Plan, crate::Problem> {
+    let Move { number, person, period, pool_budget, period_budget, reason } = moving;
     if let Err((_, why)) = entrance(domain, ReplyTo::new(skein_lib::Token::new(0)), number) {
         return Err(crate::Problem::new(Some(number), why));
     }
-    let old = record(domain, number).expect("entrance named live task");
-    if !state(domain, number, person) {
+    let old = staged.record(domain, number).expect("entrance named live task");
+    if person == 0 || old.requester == Party::Person(person) || !mutable(&old.phase) {
         return Err(crate::Problem::new(Some(number), Refusal::State));
     }
     if reason.len() > usize::try_from(env.limits.message_bytes).expect("bounded reason size") {
@@ -128,7 +139,7 @@ pub(crate) fn check(
     let destination = Funder::Pool { project, person, period };
     let period_source = Funder::Period { project, period };
     for (task, _) in &domain.names {
-        let row = record(domain, *task).expect("live name");
+        let row = staged.record(domain, *task).expect("live name");
         let exhausted_escalation = match row.escalation {
             crate::Escalation::Waiting { revision: u64::MAX, .. } => true,
             crate::Escalation::Waiting { .. }
@@ -151,9 +162,10 @@ pub(crate) fn check(
     }
     let mut subtree = List::with_capacity(env.limits.tasks);
     for (child, _) in &domain.names {
-        if descendant(domain, *child, number, env.limits.tasks) {
-            let row = record(domain, *child).expect("subtree name live");
-            if !mutable(&row.phase)
+        if staged.descendant(domain, *child, number, env.limits.tasks) {
+            let row = staged.record(domain, *child).expect("subtree name live");
+            if crate::compound::has(&staged.closing, *child)
+                || !mutable(&row.phase)
                 || row.revision == u64::MAX
                 || row.root != previous_root
                 || row.depth < previous_depth
@@ -165,16 +177,16 @@ pub(crate) fn check(
     }
     let old_parent = match from {
         Party::Task(parent) => {
-            let Some(parent_row) = record(domain, parent) else {
+            let Some(_parent_row) = staged.record(domain, parent) else {
                 return Err(crate::Problem::new(Some(number), Refusal::Reference));
             };
-            if !parent_row.references.contains(&number)
-                && parent_row.references.len() >= usize::try_from(env.limits.references).expect("reference bound")
+            if !staged.reference(domain, parent, number)
+                && staged.references(domain, parent) >= usize::try_from(env.limits.references).expect("reference bound")
             {
                 return Err(crate::Problem::new(Some(number), Refusal::Reference));
             }
-            if !old.references.contains(&parent)
-                && old.references.len() >= usize::try_from(env.limits.references).expect("reference bound")
+            if !staged.reference(domain, number, parent)
+                && staged.references(domain, number) >= usize::try_from(env.limits.references).expect("reference bound")
             {
                 return Err(crate::Problem::new(Some(number), Refusal::Reference));
             }
@@ -184,23 +196,24 @@ pub(crate) fn check(
     };
     if source != destination {
         let source_numbers = match source {
-            Funder::Task(parent) => match record(domain, parent) {
+            Funder::Task(parent) => match staged.record(domain, parent) {
                 Some(parent) => parent.numbers,
                 None => return Err(crate::Problem::new(Some(number), Refusal::Funding)),
             },
-            Funder::Pool { .. } | Funder::Period { .. } | Funder::Recurring { .. } => match domain.funding.get(&source)
-            {
-                Some(ledger) => ledger.numbers,
-                None => return Err(crate::Problem::new(Some(number), Refusal::Funding)),
-            },
+            Funder::Pool { .. } | Funder::Period { .. } | Funder::Recurring { .. } => {
+                match staged.numbers(domain, source) {
+                    Some(numbers) => numbers,
+                    None => return Err(crate::Problem::new(Some(number), Refusal::Funding)),
+                }
+            }
         };
         if source_numbers.reserved.checked_sub(old.numbers.budget).is_none()
             || source_numbers.spent_below.checked_add(spent).is_none()
         {
             return Err(crate::Problem::new(Some(number), Refusal::Funding));
         }
-        let mut after = match domain.funding.get(&destination) {
-            Some(pool) => pool.numbers,
+        let mut after = match staged.numbers(domain, destination) {
+            Some(numbers) => numbers,
             None => Numbers { budget: pool_budget, spent: 0, spent_below: 0, reserved: 0 },
         };
         after.reserved = match after.reserved.checked_add(left) {
@@ -215,8 +228,8 @@ pub(crate) fn check(
             return Err(crate::Problem::new(Some(number), Refusal::Funding));
         }
     }
-    let create_pool = domain.funding.get(&destination).is_none();
-    let create_period = domain.funding.get(&period_source).is_none();
+    let create_pool = staged.numbers(domain, destination).is_none();
+    let create_period = staged.numbers(domain, period_source).is_none();
     if create_pool && crate::funders::newer_period(domain, project, period) {
         return Err(crate::Problem::new(Some(number), Refusal::Funding));
     }
@@ -224,8 +237,8 @@ pub(crate) fn check(
         return Err(crate::Problem::new(Some(number), Refusal::Funding));
     }
     if create_pool {
-        let period_numbers = match domain.funding.get(&period_source) {
-            Some(ledger) => ledger.numbers,
+        let period_numbers = match staged.numbers(domain, period_source) {
+            Some(numbers) => numbers,
             None => {
                 for (funder, _) in &domain.funding {
                     match *funder {
@@ -275,6 +288,7 @@ pub(crate) fn check(
         source,
         spent,
         left,
+        budget: old.numbers.budget,
         destination,
         period_source,
         subtree,
@@ -294,6 +308,7 @@ pub(crate) fn make(domain: &mut Domain, env: &Env<Limits>, plan: Plan, reason: &
         source,
         spent,
         left,
+        budget: _,
         destination,
         period_source,
         subtree,

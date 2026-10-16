@@ -48,16 +48,27 @@ pub(crate) fn prepare(
     domain: &Domain,
     limits: &Limits,
     number: u64,
+    word: Word,
+    admission: Admission,
+) -> Option<Prepared> {
+    prepare_staged(domain, &crate::compound::Staged::new(0), limits, number, word, admission)
+}
+
+pub(crate) fn prepare_staged(
+    domain: &Domain,
+    staged: &crate::compound::Staged,
+    limits: &Limits,
+    number: u64,
     mut word: Word,
     admission: Admission,
 ) -> Option<Prepared> {
-    let task = record(domain, number)?;
+    let task = staged.record(domain, number)?;
     if word.number == 0 || word.number <= task.last_message {
         return None;
     }
     match admission {
         Admission::Refusable => {
-            if !room(domain, limits, number, 1, word.words.len()) {
+            if !room_staged(domain, staged, limits, number, 1, word.words.len()) {
                 return None;
             }
         }
@@ -70,8 +81,14 @@ pub(crate) fn prepare(
         Admission::Refusable | Admission::RoomKept => None,
     };
     let mut inbox = List::with_capacity(limits.inbox_messages.saturating_add(2));
-    for old in &task.inbox {
-        if key.is_some() && key == merge_key(&old.kind) && !finish_word(task, old.number) {
+    for old in task.inbox {
+        if key.is_some()
+            && key == merge_key(&old.kind)
+            && !match &task.grace {
+                Some(grace) => grace.message == old.number,
+                None => false,
+            }
+        {
             // The hint offered to a procedure belongs to that step. A later
             // hint stays unread and begins a fresh batch after its fence.
             match domain.procedure_offered(number) {
@@ -111,19 +128,35 @@ pub(crate) fn prepare(
 /// Account for messages already waiting and the result credit reserved for
 /// every live direct delegate (domain/tasks.md, section 8.2).
 pub(crate) fn room(domain: &Domain, limits: &Limits, task: u64, count: u32, bytes: usize) -> bool {
-    let Some(record) = record(domain, task) else {
+    room_staged(domain, &crate::compound::Staged::new(0), limits, task, count, bytes)
+}
+
+fn room_staged(
+    domain: &Domain,
+    staged: &crate::compound::Staged,
+    limits: &Limits,
+    task: u64,
+    count: u32,
+    bytes: usize,
+) -> bool {
+    let Some(record) = staged.record(domain, task) else {
         return false;
     };
     let mut stall_credits = 0_usize;
+    let mut delegates = 0_usize;
     for child in &record.delegates {
+        if staged.detached(*child) {
+            continue;
+        }
+        delegates = delegates.checked_add(1).expect("delegate bound");
         if crate::person::credit(crate::domain::record(domain, *child).expect("live delegate")) {
             stall_credits = stall_credits.checked_add(1).expect("bounded person delegates");
         }
     }
-    let Some(reserved) = record.delegates.len().checked_add(stall_credits) else { return false };
+    let Some(reserved) = delegates.checked_add(stall_credits) else { return false };
     let Some(reserved) = reserved.checked_add(record.questions.len()) else { return false };
     let Some(reserved) = reserved.checked_add(usize::from(record.proposal.is_some())) else { return false };
-    let Some((subscription_count, subscription_bytes)) = crate::subscriptions::credit(record, limits) else {
+    let Some((subscription_count, subscription_bytes)) = crate::subscriptions::credit(&record, limits) else {
         return false;
     };
     let Some(total_count) = record.inbox.len().checked_add(reserved) else {
@@ -131,8 +164,11 @@ pub(crate) fn room(domain: &Domain, limits: &Limits, task: u64, count: u32, byte
     };
     let mut finish_count = 0;
     let mut finish_bytes = 0;
-    for word in &record.inbox {
-        if finish_word(record, word.number) {
+    for word in record.inbox {
+        if match &record.grace {
+            Some(grace) => grace.message == word.number,
+            None => false,
+        } {
             finish_count = 1;
             finish_bytes = word.words.len();
         }
@@ -143,7 +179,7 @@ pub(crate) fn room(domain: &Domain, limits: &Limits, task: u64, count: u32, byte
         return false;
     };
     let mut total_bytes = bytes;
-    for message in &record.inbox {
+    for message in record.inbox {
         let Some(sum) = total_bytes.checked_add(match message.payload_bytes() {
             Some(bytes) => bytes,
             None => return false,
@@ -152,8 +188,7 @@ pub(crate) fn room(domain: &Domain, limits: &Limits, task: u64, count: u32, byte
         };
         total_bytes = sum;
     }
-    let Some(result_bytes) =
-        record.delegates.len().checked_mul(usize::try_from(limits.result_bytes).expect("u32 fits usize"))
+    let Some(result_bytes) = delegates.checked_mul(usize::try_from(limits.result_bytes).expect("u32 fits usize"))
     else {
         return false;
     };
@@ -187,8 +222,16 @@ pub(crate) fn message(
     authorized: bool,
     out: &mut Queue<Request>,
 ) {
-    match check_message(domain, env, Message { project, number, word, release, authorized }) {
-        Ok(plan) => apply_message(domain, env, to, plan, out),
+    match check_message(
+        domain,
+        &crate::compound::Staged::new(0),
+        env,
+        Message { project, number, word, release, authorized },
+    ) {
+        Ok(plan) => {
+            let (task, word, released) = apply_message(domain, env, plan, out);
+            out.push(Request::Sent { reply_to: to, task, word, released });
+        }
         Err(problem) => crate::capacity::refused(domain, env, to, *problem, out),
     }
 }
@@ -202,16 +245,17 @@ pub(crate) struct Message {
 }
 
 pub(crate) struct MessagePlan {
-    number: u64,
-    prepared: Prepared,
-    answer: Option<u64>,
-    released: bool,
-    release: Option<crate::control::ReleasePlan>,
+    pub(crate) number: u64,
+    pub(crate) prepared: Prepared,
+    pub(crate) answer: Option<u64>,
+    pub(crate) released: bool,
+    pub(crate) release: Option<crate::control::ReleasePlan>,
 }
 
 #[expect(clippy::too_many_lines, reason = "one inbox entrance preflights message and answer credits before mutation")]
 pub(crate) fn check_message(
     domain: &Domain,
+    staged: &crate::compound::Staged,
     env: &Env<Limits>,
     message: Message,
 ) -> Result<MessagePlan, Box<crate::Problem>> {
@@ -224,7 +268,7 @@ pub(crate) fn check_message(
             capacity: None,
         }));
     }
-    let Some(task) = record(domain, number) else {
+    let Some(task) = staged.record(domain, number) else {
         return Err(Box::new(crate::Problem {
             task: Some(number),
             why: Refusal::Unknown,
@@ -310,7 +354,7 @@ pub(crate) fn check_message(
                 Party::Person(person) => {
                     let mut found = false;
                     if task.requester == Party::Person(person) {
-                        for prior in &task.inbox {
+                        for prior in task.inbox {
                             if prior.number == question && prior.kind == MessageKind::Question {
                                 found = true;
                             }
@@ -375,7 +419,7 @@ pub(crate) fn check_message(
         action: crate::CapacityAction::Message { task: number, number: word.number },
         cause: crate::capacity::inbox(number, &env.limits),
     };
-    let Some(prepared) = prepare(domain, &env.limits, number, word, admission) else {
+    let Some(prepared) = prepare_staged(domain, staged, &env.limits, number, word, admission) else {
         return Err(Box::new(crate::Problem {
             task: Some(number),
             why: Refusal::Busy,
@@ -406,7 +450,7 @@ pub(crate) fn check_message(
     }
     let release = if released {
         Some(
-            crate::control::check_release(domain, env, number, prepared.word.from, None, None)
+            crate::control::check_release(domain, staged, env, number, prepared.word.from, None, None)
                 .expect("release preflight before words"),
         )
     } else {
@@ -418,10 +462,9 @@ pub(crate) fn check_message(
 pub(crate) fn apply_message(
     domain: &mut Domain,
     env: &Env<Limits>,
-    to: ReplyTo,
     plan: MessagePlan,
     out: &mut Queue<Request>,
-) {
+) -> (u64, Word, bool) {
     let MessagePlan { number, prepared, answer, released, release } = plan;
     let sender = prepared.word.from;
     let task = task_mut(domain, number).expect("admitted task still live");
@@ -460,7 +503,7 @@ pub(crate) fn apply_message(
         publish(domain, env, source, out);
     }
     crate::wake::after_message(domain, env, number, prepared.previous, prepared.word.clone(), out);
-    out.push(Request::Sent { reply_to: to, task: number, word: prepared.word, released });
+    (number, prepared.word, released)
 }
 
 /// Root's same-decision result handoff after a delegate settled. Its reserved
@@ -618,8 +661,12 @@ pub(crate) fn preview_message(
     number: u64,
     word: Word,
 ) -> Result<(), crate::Problem> {
-    let checked = match check_message(domain, env, Message { project, number, word, release: false, authorized: false })
-    {
+    let checked = match check_message(
+        domain,
+        &crate::compound::Staged::new(0),
+        env,
+        Message { project, number, word, release: false, authorized: false },
+    ) {
         Ok(plan) => plan,
         Err(problem) => return Err(*problem),
     };
