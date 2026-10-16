@@ -53,7 +53,7 @@ pub fn message_kind(value: &t::MessageKind, limits: &w::Limits) -> Result<w::Own
                     subscription: *subscription,
                     target: *target,
                     state: match state {
-                        t::NoticeState::Held => w::OwnerNoticeState::Held,
+                        t::NoticeState::Held { .. } => w::OwnerNoticeState::Held,
                         t::NoticeState::Done => w::OwnerNoticeState::Done,
                         t::NoticeState::Failed => w::OwnerNoticeState::Failed,
                         t::NoticeState::Cancelled => w::OwnerNoticeState::Cancelled,

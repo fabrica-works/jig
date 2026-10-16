@@ -46,3 +46,11 @@ pub const OWN_TASKS: jig_domain_core::documents::TaskQuery = jig_domain_core::do
     tracked: None,
     order: jig_domain_core::documents::QueryOrder::Number,
 };
+
+/// A delegate result and one standing state subscription each reserve a result payload.
+#[must_use]
+pub fn notices_world(seed: u64) -> crate::effects::World {
+    let (config, mut limits) = crate::effects::fixture(seed, false);
+    limits.core.tasks.inbox_bytes = 256;
+    crate::effects::World::configured(seed, false, config, limits)
+}

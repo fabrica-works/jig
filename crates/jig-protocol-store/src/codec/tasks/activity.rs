@@ -5,20 +5,21 @@ use jig_domain_tasks as domain;
 use skein_lib::Wall;
 
 /// Translate `NoticeState` to its durable tag.
-#[must_use]
-pub fn notice_state(source: domain::NoticeState) -> wire::NoticeState {
-    match source {
-        domain::NoticeState::Held => wire::NoticeState::Held,
+pub fn notice_state(source: domain::NoticeState, limits: &wire::Limits) -> Result<wire::NoticeState, wire::Problem> {
+    Ok(match source {
+        domain::NoticeState::Held { revision } => {
+            wire::NoticeState::Held(wire::NoticeHeld::new(limits, wire::NoticeHeldParts { revision })?)
+        }
         domain::NoticeState::Done => wire::NoticeState::Done,
         domain::NoticeState::Failed => wire::NoticeState::Failed,
         domain::NoticeState::Cancelled => wire::NoticeState::Cancelled,
-    }
+    })
 }
 /// Read `NoticeState` from its durable tag.
 #[must_use]
 pub fn read_notice_state(source: wire::NoticeState) -> domain::NoticeState {
     match source {
-        wire::NoticeState::Held => domain::NoticeState::Held,
+        wire::NoticeState::Held(held) => domain::NoticeState::Held { revision: held.revision() },
         wire::NoticeState::Done => domain::NoticeState::Done,
         wire::NoticeState::Failed => domain::NoticeState::Failed,
         wire::NoticeState::Cancelled => domain::NoticeState::Cancelled,
@@ -141,7 +142,11 @@ pub fn message_kind(source: &domain::MessageKind, limits: &wire::Limits) -> Resu
         domain::MessageKind::Notice { subscription, target, state } => {
             wire::MessageKind::Notice(wire::NoticeMessage::new(
                 limits,
-                wire::NoticeMessageParts { subscription: *subscription, target: *target, state: notice_state(*state) },
+                wire::NoticeMessageParts {
+                    subscription: *subscription,
+                    target: *target,
+                    state: notice_state(*state, limits)?,
+                },
             )?)
         }
         domain::MessageKind::Timer { subscription } => wire::MessageKind::Timer(wire::TimerMessage::new(

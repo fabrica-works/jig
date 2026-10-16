@@ -303,6 +303,20 @@ fn delegates_read(delegates: &[tasks::DelegateState], bytes: u32) -> BriefRead {
             .expect("bounded delegate text")
             .checked_add(delegate_phase(&delegate.phase).len())
             .expect("bounded delegate phase")
+            .checked_add(b", spec revision ".len())
+            .expect("delegate spec label")
+            .checked_add(Decimal::of(delegate.revisions.spec).as_bytes().len())
+            .expect("delegate spec revision")
+            .checked_add(match delegate.phase {
+                tasks::Phase::Held { .. } => b", hold revision "
+                    .len()
+                    .checked_add(Decimal::of(delegate.revisions.hold).as_bytes().len())
+                    .expect("delegate hold revision"),
+                tasks::Phase::Waiting | tasks::Phase::Active(_) | tasks::Phase::Closing(_) | tasks::Phase::Ended(_) => {
+                    0
+                }
+            })
+            .expect("delegate hold revision")
             .checked_add(1)
             .expect("delegate newline");
     }
@@ -312,6 +326,12 @@ fn delegates_read(delegates: &[tasks::DelegateState], bytes: u32) -> BriefRead {
         writer.put(Decimal::of(delegate.task).as_bytes()).expect("measured delegate ID");
         writer.put(b": ").expect("measured delegate text");
         writer.put(delegate_phase(&delegate.phase)).expect("measured delegate phase");
+        writer.put(b", spec revision ").expect("measured spec label");
+        writer.put(Decimal::of(delegate.revisions.spec).as_bytes()).expect("measured spec revision");
+        if let tasks::Phase::Held { .. } = delegate.phase {
+            writer.put(b", hold revision ").expect("measured hold label");
+            writer.put(Decimal::of(delegate.revisions.hold).as_bytes()).expect("measured hold revision");
+        }
         writer.put(b"\n").expect("measured delegate newline");
     }
     let text = writer.finish();

@@ -82,7 +82,10 @@ fn read(tool: &[u8], input: &[u8], limits: &Limits) -> Result<Decoded, Problem> 
             let kind = match value.required(b"kind")?.text()?.as_ref() {
                 b"task" => tasks::SubscriptionKind::Task {
                     target: value.required(b"target")?.number()?,
-                    held: false,
+                    held: match value.field(b"held")? {
+                        Some(value) => value.boolean()?,
+                        None => false,
+                    },
                     result: true,
                 },
                 b"timer" => tasks::SubscriptionKind::Timer {

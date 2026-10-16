@@ -12,7 +12,7 @@ use jig_domain_host as host;
 use jig_domain_tasks as tasks;
 use jig_ops_domain_connectors::Connector;
 use jig_protocol_charter as charter;
-use skein_lib::{Decimal, Env, List, Queue, ReplyTo, Token, Writer};
+use skein_lib::{Decimal, Env, List, Queue, ReplyTo, Token};
 
 pub(crate) fn brief(order: Box<[brief::GatherPlaced]>) -> Box<[charter::Section]> {
     let mut sections = List::with_capacity(u32::try_from(order.len()).expect("bounded sections"));
@@ -102,7 +102,7 @@ pub(crate) fn assignment(
             .push(host::StartMessage {
                 name: Token::new(word.number),
                 sender: sender(word.from),
-                words: inbox_words(&word),
+                words: jig_protocol_tools::words(&word),
             })
             .ok()?;
     }
@@ -206,44 +206,6 @@ const fn delivery(value: core::DeliveryOutcome) -> host::DeliveryOutcome {
         core::DeliveryOutcome::Failed => host::DeliveryOutcome::Failed,
     }
 }
-/// Preserve the task-owned message kind when translating its opaque words.
-pub(crate) fn inbox_words(word: &tasks::Word) -> Box<[u8]> {
-    let (label, number) = match word.kind {
-        tasks::MessageKind::Result(_) => (
-            b"Result from task ".as_slice(),
-            match word.from {
-                tasks::Party::Task(task) => task,
-                tasks::Party::Person(person) => person,
-                tasks::Party::Deployment { .. } => 0,
-            },
-        ),
-        tasks::MessageKind::ProposalDecision { proposal, accepted } => {
-            (if accepted { b"Proposal accepted ".as_slice() } else { b"Proposal rejected ".as_slice() }, proposal)
-        }
-        tasks::MessageKind::PersonStalled { task } => (b"Person task past its waiting deadline ".as_slice(), task),
-        tasks::MessageKind::EffectNotMade { entry } => (b"Effect not made ".as_slice(), entry),
-        tasks::MessageKind::Words
-        | tasks::MessageKind::Question
-        | tasks::MessageKind::Answer { .. }
-        | tasks::MessageKind::Notice { .. }
-        | tasks::MessageKind::News { .. }
-        | tasks::MessageKind::Timer { .. }
-        | tasks::MessageKind::Amendment { .. }
-        | tasks::MessageKind::Proposal { .. }
-        | tasks::MessageKind::Escalation { .. } => return word.words.clone(),
-    };
-    let number = Decimal::of(number);
-    let bytes = label.len().checked_add(number.as_bytes().len()).expect("bounded message label");
-    let bytes = bytes.checked_add(2).expect("bounded message separator");
-    let bytes = bytes.checked_add(word.words.len()).expect("bounded message envelope");
-    let mut writer = Writer::new(bytes);
-    writer.put(label).expect("measured label");
-    writer.put(number.as_bytes()).expect("measured source");
-    writer.put(b":\n").expect("measured separator");
-    writer.put(&word.words).expect("measured words");
-    writer.finish()
-}
-
 pub(crate) fn sender(value: tasks::Party) -> Box<[u8]> {
     match value {
         tasks::Party::Task(number) | tasks::Party::Person(number) => Box::from(Decimal::of(number).as_bytes()),

@@ -153,7 +153,7 @@ pub(crate) fn subscribe(
                     task: number,
                     subscription: subscription.number,
                     target,
-                    state: NoticeState::Held,
+                    state: NoticeState::Held { revision: watched.revisions.hold },
                     words: Box::new([]),
                 }),
                 Phase::Waiting | Phase::Active(_) | Phase::Closing(_) | Phase::Ended(_) => {}
@@ -312,7 +312,7 @@ pub(crate) fn notify_state(
             match subscription.kind {
                 SubscriptionKind::Task { target: watched, held, result } if watched == target => {
                     let interested = match state {
-                        NoticeState::Held => held,
+                        NoticeState::Held { .. } => held,
                         NoticeState::Done | NoticeState::Failed | NoticeState::Cancelled => result,
                     };
                     if interested {

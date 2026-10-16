@@ -25,10 +25,24 @@ pub const FIELDS: &[(&[u8], &[&[u8]])] = &[
     (b"introduce", &[b"left", b"right"]),
     (b"decide", &[b"kind", b"proposer", b"proposal", b"task", b"revision", b"decision", b"reason"]),
     (b"withdraw", &[b"proposal"]),
-    (b"subscribe", &[b"kind", b"target", b"at", b"period"]),
+    (b"subscribe", &[b"kind", b"target", b"held", b"at", b"period"]),
     (b"unsubscribe", &[b"subscription"]),
     (b"amend", &[b"target", b"revision", b"amendment"]),
     (b"propose", &[b"action", b"reason", b"batch"]),
     (b"note", &[b"name", b"recalled", b"scope", b"description", b"body", b"references"]),
     (b"recall", &[b"kind", b"name", b"page", b"scopes", b"query"]),
 ];
+
+pub(crate) const WORD_NUMBER: u64 = 1;
+pub(crate) const SUBSCRIPTION: u64 = 4;
+pub(crate) fn word(kind: jig_domain_tasks::MessageKind) -> jig_domain_tasks::Word {
+    jig_domain_tasks::Word {
+        number: WORD_NUMBER,
+        from: jig_domain_tasks::Party::Task(TARGET),
+        kind,
+        words: b"Hello".as_slice().into(),
+        at: skein_lib::Wall::EPOCH,
+        hits: 1,
+        eligible: true,
+    }
+}

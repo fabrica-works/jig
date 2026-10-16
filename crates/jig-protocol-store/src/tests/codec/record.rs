@@ -125,7 +125,7 @@ fn each_message_kind_reads_back() {
         domain::MessageKind::Amendment { revision: 3 },
         domain::MessageKind::Question,
         domain::MessageKind::Answer { question: 5 },
-        domain::MessageKind::Notice { subscription: 109, target: 19, state: domain::NoticeState::Held },
+        domain::MessageKind::Notice { subscription: 109, target: 19, state: domain::NoticeState::Held { revision: 1 } },
         domain::MessageKind::Timer { subscription: 109 },
         domain::MessageKind::News { subscription: 109, class: domain::NewsClass::Wakes },
         domain::MessageKind::Result(domain::ResultKind::Report),
@@ -155,7 +155,7 @@ fn each_result_message_kind_reads_back() {
 }
 fn each_notice_state_reads_back() {
     for state in [
-        domain::NoticeState::Held,
+        domain::NoticeState::Held { revision: 1 },
         domain::NoticeState::Done,
         domain::NoticeState::Failed,
         domain::NoticeState::Cancelled,

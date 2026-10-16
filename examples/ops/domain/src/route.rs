@@ -311,7 +311,7 @@ fn core_held(
                     attempt,
                     name: message.name,
                     sender: crate::assemble::sender(message_word.from),
-                    words: crate::assemble::inbox_words(&message_word),
+                    words: jig_protocol_tools::words(&message_word),
                 })),
             );
         }

@@ -1,3 +1,7 @@
+const REQUESTER: u64 = 1;
+const CHILD: u64 = 2;
+const SUBSCRIPTION: u64 = 10;
+const REPLY: u64 = 500;
 use jig_domain_tasks::{
     Class, End, Event, Funder, Hold, HoldKind, Holding, Kind, MessageKind, Name, NoticeState, Party, Phase, Refusal,
     Stored, Subscription, SubscriptionKind, Taken, Writer,
@@ -134,7 +138,7 @@ fn a_task_waiting_past_its_bound_for_a_hold_is_held_and_its_requester_told() {
             .record(1)
             .inbox
             .iter()
-            .any(|word| matches!(word.kind, MessageKind::Notice { target: 3, state: NoticeState::Held, .. }))
+            .any(|word| matches!(word.kind, MessageKind::Notice { target: 3, state: NoticeState::Held { .. }, .. }))
     );
 }
 
@@ -309,4 +313,25 @@ fn a_tree_root_can_retain_more_than_one_childs_per_task_hold_limit() {
     assert_eq!(world.record(1).holdings.len(), 2);
     world.restart();
     assert_eq!(world.record(1).holdings.len(), 2);
+}
+
+#[test]
+fn a_held_notice_carries_the_holds_revision() {
+    let mut world = World::new(317, LIMITS);
+    assert_eq!(world.make(Party::Person(REQUESTER), vec![task(REQUESTER, &[])]), Reply::Made(vec![REQUESTER]));
+    assert_eq!(world.make(Party::Task(REQUESTER), vec![task(CHILD, &[])]), Reply::Made(vec![CHILD]));
+    world.send(Event::Hold { task: CHILD, why: Hold::Budget });
+    world.send(Event::Subscribe {
+        reply_to: ReplyTo::new(Token::new(REPLY)),
+        task: REQUESTER,
+        subscription: Subscription {
+            number: SUBSCRIPTION,
+            kind: SubscriptionKind::Task { target: CHILD, held: true, result: false },
+        },
+    });
+    let notice = &world.record(REQUESTER).inbox.last().expect("held notice").kind;
+    assert_eq!(
+        notice,
+        &MessageKind::Notice { subscription: SUBSCRIPTION, target: CHILD, state: NoticeState::Held { revision: 1 } }
+    );
 }

@@ -84,7 +84,7 @@ pub fn kind(value: &tasks::MessageKind, limits: &Limits) -> Result<client::Owner
             subscription: *subscription,
             target: *target,
             state: match state {
-                tasks::NoticeState::Held => client::OwnerNoticeState::Held,
+                tasks::NoticeState::Held { .. } => client::OwnerNoticeState::Held,
                 tasks::NoticeState::Done => client::OwnerNoticeState::Done,
                 tasks::NoticeState::Failed => client::OwnerNoticeState::Failed,
                 tasks::NoticeState::Cancelled => client::OwnerNoticeState::Cancelled,

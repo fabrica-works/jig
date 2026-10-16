@@ -807,7 +807,11 @@ pub(crate) fn activate(domain: &mut Domain, number: u64, out: &mut Queue<Request
     for child in &task.delegates {
         let child_record = record(domain, *child).expect("live delegate named by requester");
         delegates
-            .push(crate::DelegateState { task: *child, phase: child_record.phase.clone() })
+            .push(crate::DelegateState {
+                task: *child,
+                phase: child_record.phase.clone(),
+                revisions: child_record.revisions,
+            })
             .expect("bounded delegate snapshot");
     }
     out.push(Request::Activate {
@@ -968,7 +972,8 @@ pub(crate) fn publish(domain: &mut Domain, env: &Env<Limits>, number: u64, out: 
         }
     }
     if became_held {
-        crate::subscriptions::notify_state(domain, number, crate::NoticeState::Held, &[], out);
+        let revision = record(domain, number).expect("held task").revisions.hold;
+        crate::subscriptions::notify_state(domain, number, crate::NoticeState::Held { revision }, &[], out);
     }
     if unavailable {
         crate::proposals::holder_unavailable(domain, number, out);

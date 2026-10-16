@@ -57,7 +57,7 @@ pub enum NewsClass {
 /// State of a watched task, distinct from a terminal result.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum NoticeState {
-    Held,
+    Held { revision: u64 },
     Done,
     Failed,
     Cancelled,
@@ -1782,6 +1782,7 @@ pub struct RunContext {
 pub struct DelegateState {
     pub task: u64,
     pub phase: Phase,
+    pub revisions: Revisions,
 }
 
 /// Authority and accounting view for a run's delegation call.

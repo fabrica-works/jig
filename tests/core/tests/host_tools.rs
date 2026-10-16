@@ -210,3 +210,12 @@ fn a_decide_naming_an_old_escalation_revision_is_answered_moved() {
         }
     );
 }
+
+#[test]
+fn a_held_delegates_notice_reaches_its_requester_with_its_hold_revision() {
+    let story = jig_core_world::agents_tools::STORIES
+        .iter()
+        .find(|story| story.name == "held notice")
+        .expect("held notice story");
+    (story.run)(&mut World::new(182, false), None);
+}

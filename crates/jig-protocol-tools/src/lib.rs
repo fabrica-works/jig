@@ -11,6 +11,8 @@ mod json;
 mod nested;
 mod notes;
 mod render;
+mod words;
+pub use words::words;
 #[cfg(test)]
 mod tests;
 pub use declarations::{Declaration, declarations};

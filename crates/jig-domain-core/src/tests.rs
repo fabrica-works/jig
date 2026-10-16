@@ -2996,3 +2996,5 @@ mod own_watches;
 
 mod goal_of;
 mod task_query;
+
+mod brief_revisions;
