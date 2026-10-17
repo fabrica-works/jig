@@ -8,6 +8,29 @@ const FIRST_BACKOFF: Duration = Duration::from_millis(10);
 const LEAST_BACKOFF: Duration = Duration::from_millis(5);
 
 #[test]
+fn a_watch_asked_before_signing_in_opens_once_signed_in() {
+    let mut c = Client::new();
+    c.step(Event::Watch { handle: ME, subject: Watchable::Jig(contract::Subject::Frame) });
+    assert!(c.requests().is_empty());
+    c.step(Event::Watch { handle: TASK, subject: task() });
+    assert!(c.requests().is_empty());
+    c.step(Event::SignIn { with: With::Held(fixtures::credential(&CREDENTIAL)) });
+    let [Request::Told { told }, Request::OpenStream { credential }] = c.requests() else {
+        panic!("starting with held credential: {:?}", c.requests());
+    };
+    assert_eq!(*told, Told::Link { link: Link::Starting });
+    assert_eq!(credential, &Some(fixtures::credential(&CREDENTIAL)));
+    c.stream(fixtures::hello(jig_client_protocol_wire::VERSION));
+    assert_eq!(c.requests().len(), 2);
+    for request in c.requests() {
+        let Request::Exchange { credential, message: Message::Watch(_), .. } = request else {
+            panic!("one exchange for each held watch: {request:?}");
+        };
+        assert_eq!(credential, &Some(fixtures::credential(&CREDENTIAL)));
+    }
+}
+
+#[test]
 fn signed_out_ends_each_handle_once_and_parks_each_request() {
     for terminal in fixtures::SIGNING_TERMINALS {
         let mut c = Client::narrow_signed_in();

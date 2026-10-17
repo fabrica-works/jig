@@ -57,11 +57,29 @@ impl Domain {
             self.signed_out(out);
         }
         self.set_link(Link::Starting, out);
-        for (_, watch) in &self.watches {
-            if watch.own {
-                return;
+        self.due.clear();
+        let mut own = None;
+        for (id, watch) in &self.watches {
+            if watch.subject == Watchable::Jig(contract::Subject::Frame) {
+                own = Some(*id);
+            }
+            if watch.name.is_none() {
+                self.due.push(*id).expect("one opening per watch");
             }
         }
-        self.open(Watchable::Jig(contract::Subject::Frame), true, out);
+        if let Some(id) = own {
+            self.watches.get_mut(&id).expect("held frame watch").own = true;
+        } else {
+            self.open(Watchable::Jig(contract::Subject::Frame), true, out);
+        }
+        for index in 0..self.due.len() {
+            let id = *self.due.get(index).expect("held watch index");
+            let name = self.token();
+            let w = self.watches.get_mut(&id).expect("held watch");
+            w.name = Some(name);
+            w.until = None;
+            crate::domain::down(out, w.opening(name));
+        }
+        self.due.clear();
     }
 }

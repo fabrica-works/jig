@@ -21,7 +21,7 @@ pub struct Domain {
     pub(crate) next: u64,
     pub(crate) rng: Rng,
     pub(crate) scratch: List<Handle>,
-    due: List<u64>,
+    pub(crate) due: List<u64>,
     started: bool,
     pub(crate) link: crate::Link,
     pub(crate) table: RequestTable<crate::Key, crate::Held>,
@@ -201,13 +201,18 @@ impl Domain {
     pub(crate) fn open(&mut self, subject: Watchable, own: bool, out: &mut Queue<Request>) -> u64 {
         let name = self.token();
         let id = name.raw();
-        down(out, Down::Open { watch: name, subject: subject.clone() });
+        let name = if self.link == crate::Link::SignedOut {
+            None
+        } else {
+            down(out, Down::Open { watch: name, subject: subject.clone() });
+            Some(name)
+        };
         self.watches
             .insert(
                 id,
                 Watch {
                     subject,
-                    name: Some(name),
+                    name,
                     latest: None,
                     state: State::Opening,
                     closing: false,
