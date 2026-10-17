@@ -22,17 +22,7 @@ fn records_1(bytes: &[u8]) {
     check!(StreamText, bytes);
     check!(Chips, bytes);
     check!(OwnerInbox, bytes);
-    check!(Keeper, bytes);
     check!(Kept, bytes);
-    check!(ProjectSection, bytes);
-    check!(TaskSection, bytes);
-    check!(AddressInbox, bytes);
-    check!(AddressConversations, bytes);
-    check!(AddressTask, bytes);
-    check!(AddressProject, bytes);
-    check!(Address, bytes);
-    check!(Place, bytes);
-    check!(Draft, bytes);
     check!(TableEntry, bytes);
     check!(Family, bytes);
     check!(Owner, bytes);

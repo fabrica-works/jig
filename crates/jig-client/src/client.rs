@@ -113,11 +113,7 @@ impl Client {
                     domain::Event::Start { kept: List::with_capacity(0) },
                     &mut self.domain_out,
                 );
-                let mut versions = List::with_capacity(1);
-                versions
-                    .push(link::StoreVersion { keeper: link::Keeper::Table, version: domain::TABLE_VERSION })
-                    .expect("one keeper");
-                self.link_step(now, link::Event::Start { kept, versions });
+                self.link_step(now, link::Event::Start { kept });
             }
             Event::Watch { handle, subject } => self.domain_step(&env, domain::Event::Watch { handle, subject }),
             Event::Unwatch { handle } => self.domain_step(&env, domain::Event::Unwatch { handle }),
@@ -392,24 +388,20 @@ impl Client {
                 self.up(env, Up::FamilyServed { family, versions });
             }
             link::Request::Signing { signing } => self.signing(env, signing),
-            link::Request::Kept { record: link::Saved::Table { record, .. } } => {
+            link::Request::Kept { record: link::Saved { record, .. } } => {
                 let mut kept = List::with_capacity(1);
                 kept.push(record).expect("one restored record");
                 self.domain.restore_record(env, kept, &mut self.domain_out);
             }
-            link::Request::Dropped { .. } => out.push(Request::Told { told: Told::Dropped { count: 1 } }),
-            link::Request::Fact { .. }
-            | link::Request::ServiceCredential { .. }
-            | link::Request::Kept { record: link::Saved::Jig(_) | link::Saved::Family { .. } } => {}
+            link::Request::Dropped => out.push(Request::Told { told: Told::Dropped { count: 1 } }),
+            link::Request::Fact { .. } | link::Request::ServiceCredential { .. } => {}
         }
     }
 }
 fn down_event(down: Down) -> link::Event {
     match down {
-        Down::Save { record } => {
-            link::Event::Save { record: link::Saved::Table { version: domain::TABLE_VERSION, record } }
-        }
-        Down::Erase { key } => link::Event::Erase { key: link::Erased::Table(key) },
+        Down::Save { record } => link::Event::Save { record: link::Saved { version: domain::TABLE_VERSION, record } },
+        Down::Erase { key } => link::Event::Erase { key },
         Down::Send { attempt, key, request } => link::Event::Send { attempt, key, ask: request },
         Down::Open { watch, subject } => link::Event::Open { watch, subject },
         Down::Continue { watch, subject } => link::Event::Continue { watch, subject },

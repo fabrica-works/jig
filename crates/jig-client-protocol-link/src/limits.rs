@@ -165,7 +165,6 @@ fn wire(client: &jig_client_domain::Limits) -> Option<w::Limits> {
     wire.owner_inbox_page_selection_some = u32::try_from(client.document_bytes).ok()?;
     wire.owner_inbox_page_rows = u32::try_from(client.document_bytes).ok()?;
     wire.subject_chips_tasks = client.rows;
-    wire.draft_words = client.text;
     w::check_limits(&wire).ok()?;
     Some(wire)
 }
@@ -178,7 +177,6 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         return None;
     }
     max_out(limits)?;
-    crate::store::records(limits)?.checked_add(2)?;
     if limits.client.watches == 0 || limits.client.heartbeat == Duration::ZERO {
         return None;
     }
@@ -193,5 +191,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
 #[must_use]
 pub fn max_out(limits: &Limits) -> Option<u32> {
     let per_event = limits.client.watches.checked_mul(3)?.checked_add(limits.exchanges)?.checked_add(20)?;
-    per_event.checked_add(limits.exchanges.checked_mul(2)?)?.checked_add(crate::store::records(limits)?.checked_mul(2)?)
+    per_event
+        .checked_add(limits.exchanges.checked_mul(2)?)?
+        .checked_add(limits.client.requests.requests.checked_mul(2)?)
 }

@@ -1,9 +1,8 @@
 //! Durability before exchanges, and owner-versioned restoration (protocol/client.md, 10).
-use crate::{Erased, Fact, Keeper, Limits, Link, Message, Record, Request, Saved, StoreVersion, translate};
+use crate::{Fact, Limits, Link, Message, Record, Request, Saved, translate};
 use alloc::boxed::Box;
 use jig_client_protocol_wire::v8 as w;
-use jig_domain_client::store::StoreKey;
-use skein_lib::{List, Queue, Reader, Token, Writer, bytes};
+use skein_lib::{List, Queue, Reader, RequestKey, Token, Writer, bytes};
 #[derive(Debug)]
 struct Held {
     exchange: Token,
@@ -30,96 +29,14 @@ pub(super) fn worst_case(limits: &Limits) -> Option<u64> {
     let body = w::Keyed::worst_case_bytes(&limits.wire)?;
     Queue::<Held>::worst_case(capacity)?.checked_add(body.checked_add(40)?.checked_mul(u64::from(capacity))?)
 }
-pub(super) fn records(limits: &Limits) -> Option<u32> {
-    limits.client.records.checked_add(limits.client.kept)?.checked_add(limits.client.parts)
-}
-fn keeper(value: &Saved) -> Keeper {
-    match value {
-        Saved::Jig(_) => Keeper::Jig,
-        Saved::Table { .. } => Keeper::Table,
-        Saved::Family { family, .. } => Keeper::Family(*family),
-    }
-}
-fn wire_keeper(value: Keeper) -> w::Keeper {
-    match value {
-        Keeper::Jig => w::Keeper::Jig,
-        Keeper::Table => w::Keeper::Table,
-        Keeper::Family(number) => w::Keeper::Family(
-            w::Family::new(&w::CEILINGS, w::FamilyParts { number }).expect("family identifier is unbounded"),
-        ),
-    }
-}
-fn read_keeper(value: &w::Keeper) -> Keeper {
-    match value {
-        w::Keeper::Jig => Keeper::Jig,
-        w::Keeper::Table => Keeper::Table,
-        w::Keeper::Family(value) => Keeper::Family(value.number()),
-    }
-}
-fn storage_keeper(key: &[u8], limits: &Limits) -> Result<(Keeper, usize), w::Problem> {
-    let length = match key.first() {
-        Some(0 | 1) => 1,
-        Some(2) => 3,
-        Some(_) => return Err(translate::piece_problem(skein_codec::Reason::Tag)),
-        None => return Err(translate::piece_problem(skein_codec::Reason::Short)),
-    };
-    let prefix = key.get(..length).ok_or(translate::piece_problem(skein_codec::Reason::Short))?;
-    let owner = w::Keeper::decode(&limits.wire, &mut Reader::new(prefix))?;
-    Ok((read_keeper(&owner), length))
-}
-fn keyed(owner: Keeper, value: &[u8]) -> Box<[u8]> {
-    let owner = wire_keeper(owner);
-    let length = usize::try_from(owner.measure())
-        .expect("keeper fits usize")
-        .checked_add(value.len())
-        .expect("admitted key fits usize");
-    let mut writer = Writer::new(length);
-    owner.encode(&mut writer).expect("measured keeper");
-    writer.put(value).expect("measured key");
-    writer.finish()
-}
-fn jig_key(value: StoreKey) -> Box<[u8]> {
-    match value {
-        StoreKey::Place => keyed(Keeper::Jig, &[]),
-        StoreKey::Draft { task } => keyed(Keeper::Jig, &task.to_be_bytes()),
-    }
-}
 pub(super) fn key(record: &Saved) -> Box<[u8]> {
-    match record {
-        Saved::Jig(value) => jig_key(value.key()),
-        Saved::Table { record, .. } => keyed(Keeper::Table, &record.key),
-        Saved::Family { family, key, .. } => keyed(Keeper::Family(*family), key),
-    }
-}
-fn erased(value: Erased) -> Box<[u8]> {
-    match value {
-        Erased::Jig(value) => jig_key(value),
-        Erased::Table(value) => keyed(Keeper::Table, &value),
-        Erased::Family { family, key } => keyed(Keeper::Family(family), &key),
-    }
+    bytes::copy_of(&record.record.key)
 }
 fn encoded(value: &Saved, limits: &Limits) -> Result<Box<[u8]>, w::Problem> {
-    let (store_version, record) = match value {
-        Saved::Jig(value) => {
-            let store_version = match value {
-                jig_domain_client::store::Record::Place { version, .. }
-                | jig_domain_client::store::Record::Draft { version, .. } => *version,
-            };
-            let record = translate::store::jig(value, limits)?;
-            let mut writer = Writer::new(usize::try_from(record.measure()).expect("record fits usize"));
-            record.encode(&mut writer).expect("measured jig record");
-            (store_version, writer.finish())
-        }
-        Saved::Table { version, record } => {
-            let record = translate::store::table(record, limits)?;
-            let mut writer = Writer::new(usize::try_from(record.measure()).expect("record fits usize"));
-            record.encode(&mut writer).expect("measured table record");
-            (*version, writer.finish())
-        }
-        Saved::Family { version, bytes, .. } => (*version, bytes::copy_of(bytes)),
-    };
-    let record =
-        w::Kept::new(&limits.wire, w::KeptParts { keeper: wire_keeper(keeper(value)), store_version, record })?;
+    let table = translate::store::table(&value.record, limits)?;
+    let mut writer = Writer::new(usize::try_from(table.measure()).expect("record fits usize"));
+    table.encode(&mut writer).expect("measured table record");
+    let record = w::Kept::new(&limits.wire, w::KeptParts { store_version: value.version, record: writer.finish() })?;
     if u64::from(record.measure()) > limits.client.document_bytes {
         return Err(translate::too_large());
     }
@@ -127,40 +44,13 @@ fn encoded(value: &Saved, limits: &Limits) -> Result<Box<[u8]>, w::Problem> {
     record.encode(&mut writer).expect("measured kept record");
     Ok(writer.finish())
 }
-fn reads(keeper: Keeper, version: u16, versions: &List<StoreVersion>) -> bool {
-    for value in versions {
-        if value.keeper == keeper {
-            return value.version == version;
-        }
-    }
-    false
-}
 fn restore(value: w::Kept, storage_key: &[u8], limits: &Limits) -> Result<Saved, w::Problem> {
-    let version = value.store_version();
     let mut reader = Reader::new(value.record());
-    let saved = match value.keeper() {
-        w::Keeper::Jig => Saved::Jig(translate::store::restore_jig(
-            w::JigRecord::decode(&limits.wire, &mut reader)?,
-            version,
-            limits,
-        )?),
-        w::Keeper::Table => Saved::Table {
-            version,
-            record: translate::store::restore_table(w::TableEntry::decode(&limits.wire, &mut reader)?, limits)?,
-        },
-        w::Keeper::Family(family) => {
-            let (owner, length) = storage_keeper(storage_key, limits)?;
-            if owner != Keeper::Family(family.number()) {
-                return Err(translate::piece_problem(skein_codec::Reason::Malformed));
-            }
-            let key = bytes::copy_of(storage_key.get(length..).expect("decoded storage keeper prefix"));
-            return Ok(Saved::Family { family: family.number(), version, key, bytes: bytes::copy_of(value.record()) });
-        }
-    };
-    if reader.remaining() != 0 || key(&saved).as_ref() != storage_key {
+    let record = translate::store::restore_table(w::TableEntry::decode(&limits.wire, &mut reader)?, limits)?;
+    if reader.remaining() != 0 || record.key.as_slice() != storage_key {
         return Err(translate::piece_problem(skein_codec::Reason::Malformed));
     }
-    Ok(saved)
+    Ok(Saved { version: value.store_version(), record })
 }
 impl Link {
     /// Keeps keyed exchanges behind writes the composing client has already given.
@@ -218,7 +108,7 @@ impl Link {
                 value @ (Request::Save { .. }
                 | Request::Erase { .. }
                 | Request::Kept { .. }
-                | Request::Dropped { .. }
+                | Request::Dropped
                 | Request::Answer { .. }
                 | Request::NotKept { .. }
                 | Request::OpenStream { .. }
@@ -236,18 +126,6 @@ impl Link {
     }
     pub(super) fn save(&mut self, record: Saved, out: &mut Queue<Request>) {
         self.gather(out);
-        let key_fits = match &record {
-            Saved::Family { key, .. } => {
-                u64::try_from(key.len()).expect("key fits u64") <= self.limits.client.document_bytes
-            }
-            Saved::Jig(_) | Saved::Table { .. } => true,
-        };
-        if !key_fits {
-            self.write_failed(out);
-            self.store.failed = true;
-            out.push(Request::Fact { fact: Fact::UndecodableStore });
-            return;
-        }
         let key = key(&record);
         match encoded(&record, &self.limits) {
             Ok(bytes) => out.push(Request::Save { record: Record { key, bytes } }),
@@ -258,21 +136,9 @@ impl Link {
             }
         }
     }
-    pub(super) fn erase(&mut self, key: Erased, out: &mut Queue<Request>) {
+    pub(super) fn erase(&mut self, key: RequestKey, out: &mut Queue<Request>) {
         self.gather(out);
-        let key_fits = match &key {
-            Erased::Family { key, .. } => {
-                u64::try_from(key.len()).expect("key fits u64") <= self.limits.client.document_bytes
-            }
-            Erased::Jig(_) | Erased::Table(_) => true,
-        };
-        if !key_fits {
-            self.write_failed(out);
-            self.store.failed = true;
-            out.push(Request::Fact { fact: Fact::UndecodableStore });
-            return;
-        }
-        out.push(Request::Erase { key: erased(key) });
+        out.push(Request::Erase { key: bytes::copy_of(&key) });
     }
     pub(super) fn written(&mut self, out: &mut Queue<Request>) {
         self.store.waiting = false;
@@ -298,48 +164,34 @@ impl Link {
             }
         }
     }
-    pub(super) fn start_store(&mut self, versions: List<StoreVersion>, kept: List<Record>, out: &mut Queue<Request>) {
-        let bound = records(&self.limits).expect("validated store input bound");
-        if kept.len() > bound || versions.len() > bound.checked_add(2).expect("validated keeper input bound") {
+    pub(super) fn start_store(&mut self, kept: List<Record>, out: &mut Queue<Request>) {
+        let bound = self.limits.client.requests.requests;
+        if kept.len() > bound {
             out.push(Request::Fact { fact: Fact::UndecodableStore });
             return;
         }
         for entry in kept.into_boxed() {
-            let Ok((owner, prefix)) = storage_keeper(&entry.key, &self.limits) else {
-                out.push(Request::Fact { fact: Fact::UndecodableStore });
-                continue;
-            };
-            if u64::try_from(entry.key.len().checked_sub(prefix).expect("decoded keeper prefix")).expect("key fits u64")
-                > self.limits.client.document_bytes
-            {
-                out.push(Request::Dropped { keeper: owner });
-                out.push(Request::Fact { fact: Fact::UndecodableStore });
-                continue;
-            }
             let mut reader = Reader::new(&entry.bytes);
-            let result = if u64::try_from(entry.bytes.len()).expect("bounded bytes fit u64")
-                > self.limits.client.document_bytes
+            let result = if entry.key.len() != 16
+                || u64::try_from(entry.bytes.len()).expect("bounded bytes fit u64") > self.limits.client.document_bytes
             {
                 Err(translate::too_large())
             } else {
                 w::Kept::decode(&self.limits.wire, &mut reader)
             };
             let Ok(value) = result else {
-                out.push(Request::Dropped { keeper: owner });
+                out.push(Request::Dropped);
                 out.push(Request::Fact { fact: Fact::UndecodableStore });
                 continue;
             };
-            if reader.remaining() != 0
-                || read_keeper(value.keeper()) != owner
-                || !reads(owner, value.store_version(), &versions)
-            {
-                out.push(Request::Dropped { keeper: owner });
+            if reader.remaining() != 0 || value.store_version() != jig_client_domain::TABLE_VERSION {
+                out.push(Request::Dropped);
                 continue;
             }
             match restore(value, &entry.key, &self.limits) {
                 Ok(record) => out.push(Request::Kept { record }),
                 Err(_) => {
-                    out.push(Request::Dropped { keeper: owner });
+                    out.push(Request::Dropped);
                     out.push(Request::Fact { fact: Fact::UndecodableStore });
                 }
             }

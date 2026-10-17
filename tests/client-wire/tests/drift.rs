@@ -8,12 +8,22 @@ fn client_wire_schema_matches_generated_code_and_goldens() {
     let mut source = fs::read_to_string(root.join("schema/client-v8.schema")).expect("client schema");
     source
         .push_str(&fs::read_to_string(root.join("schema/client-v8-part1.schema")).expect("client schema continuation"));
-    let output = generate(&parse(&source).expect("schema valid"));
-    let code = root.join("src/generated/v8.rs");
-    let goldens = root.join("golden/v8");
+    check(&root, &source, "v8");
+}
+#[test]
+fn view_records_schema_matches_generated_code_and_goldens() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../crates/jig-client-view");
+    let source = fs::read_to_string(root.join("schema/records-v1.schema")).expect("view records schema");
+    check(&root, &source, "records-v1");
+}
+fn check(root: &Path, source: &str, version: &str) {
+    let output = generate(&parse(source).expect("schema valid"));
+    let code = root.join(if version == "v8" { "src/generated/v8.rs" } else { "src/generated/records_v1.rs" });
+    let goldens = root.join("golden").join(version);
     let write = std::env::var_os("SKEIN_CODEGEN_WRITE").is_some_and(|value| value == "1");
     let again = "run SKEIN_CODEGEN_WRITE=1 heavy cargo nextest run -p jig-client-wire-world --test drift";
     if write {
+        fs::create_dir_all(code.parent().expect("generated code directory")).expect("create code directory");
         fs::write(&code, &output.rust).expect("write generated code");
         fs::create_dir_all(&goldens).expect("create golden directory");
     } else {

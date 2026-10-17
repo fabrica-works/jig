@@ -11,7 +11,7 @@ use skein_lib::{
 };
 use std::collections::BTreeMap;
 mod faults;
-mod persistence;
+pub(crate) mod persistence;
 pub(super) struct Side {
     pub(super) link: Link,
     connections: Connections,
@@ -143,7 +143,7 @@ impl Side {
             | link::Request::Save { .. }
             | link::Request::Erase { .. }
             | link::Request::Kept { .. }
-            | link::Request::Dropped { .. }
+            | link::Request::Dropped
             | link::Request::Hello { family: Some(_), .. }
             | link::Request::Fact { .. }
             | link::Request::ServiceCredential { .. }) => return Err(ignored),

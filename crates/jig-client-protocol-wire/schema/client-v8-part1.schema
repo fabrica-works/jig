@@ -43,18 +43,8 @@ record OwnerAccountStateUnloaded { at: OwnerAccountPlace why: OwnerAccountUnread
 enum OwnerAccountState { asking, granted, later: OwnerAccountStateLater, sign_in_again, misconfigured, unloaded: OwnerAccountStateUnloaded, cancelled, closing }
 record OwnerAccount { number: u32 generation: option u64 state: OwnerAccountState usable: bool expiring: bool attention: bool spent_until: option u64 runs: bytes 16777216 waiting: bytes 16777216 cut: bool }
 record OwnerDeployment { store: StoreFill hosts: bytes 16777216 attempts: bytes 16777216 accounts: bytes 16777216 tasks: OwnerCapacity workers: OwnerCapacity attempts_capacity: OwnerCapacity waiting_attempts: u32 proposals: OwnerCapacity projects: list 32 OwnerProjectCapacity grace_bound: duration hello_refusals: list 32 OwnerHelloRefusalLine hosts_forgotten: u64 hello_refusals_forgotten: u64 person_room_refusals: list 32 OwnerPersonCapacityRefusal person_room_refusals_forgotten: u64 person_answer_retention: duration task_room_refusals: list 32 OwnerTaskCapacityRefusal task_room_refusals_forgotten: u64 cut: bool connectors: list 32 u16 connectors_cut: bool }
-# Small store (protocol/client.md, 10); Draft.words: jig_domain_client::Limits::text; TableEntry.request has Keyed.request's ceiling; other opaque kept records use the unbounded-field ceiling (ruling 149).
-enum Keeper { jig, table, family: Family }
-versioned record Kept { keeper: Keeper store_version: u16 record: bytes 65536 }
-enum ProjectSection { overview, goals, tasks, notes, settings, resources, policy, roles, spend, recurring }
-enum TaskSection { overview, activity, plan, history, budget, panels }
-record AddressInbox { project: option u32 }
-record AddressConversations { project: option u32 }
-record AddressTask { task: u64 section: TaskSection }
-record AddressProject { project: u32 section: ProjectSection }
-enum Address { inbox: AddressInbox, conversations: AddressConversations, task: AddressTask, project: AddressProject, deployment }
-record Place { party: u64 address: Address }
-record Draft { party: u64 task: u64 words: text 65536 touched: u64 }
+# Small store (protocol/client.md, 10); TableEntry.request has Keyed.request's ceiling.
+versioned record Kept { store_version: u16 record: bytes 65536 }
 record TableEntry { asker: u32 number: u64 key: fixed 16 scope: u64 first_sent: option u64 owner: Owner version: u32 request: bytes 1048576 }
 
 # A read value preserves the contract variant as well as its existing document (ruling 208).
@@ -66,5 +56,3 @@ record OwnerInbox { party: u64 needs: bytes 16777216 updates: bytes 16777216 nex
 
 # A delivery preserves its contract variant and the whole document (ruling 211).
 enum DeliveryValue { owner_project: OwnerProject, frame: Frame, task: boxed Task, owner_proposal: OwnerProposal, tree: Tree, owner_tree: OwnerTree, chips: Chips, inbox: Inbox, owner_inbox: OwnerInbox, goals: Goals, tasks: Tasks, conversations: Conversations, run: RunText, run_state: RunState, deployment: Deployment, owner_deployment: OwnerDeployment }
-
-enum JigRecord { place: Place, draft: Draft }

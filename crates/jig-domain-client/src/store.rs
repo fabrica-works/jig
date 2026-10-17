@@ -24,7 +24,7 @@ use crate::{Domain, Request, facts::Fact};
 use jig_client_domain::contract::Limit;
 use skein_lib::{List, Queue};
 /// Version of this domain's small-store vocabulary.
-pub const STORE_VERSION: u16 = 2;
+pub const STORE_VERSION: u16 = 1;
 impl Record {
     /// Its key, owned solely by this domain.
     #[must_use]

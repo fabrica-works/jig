@@ -1,5 +1,5 @@
 //! The test application's native client over simulated or real io.
-use crate::{family, front::Side};
+use crate::front::Side;
 use jig_client_protocol_link as link;
 use jig_client_shell_native::{Settings, Shell};
 use jig_client_test_domain::{self as client, Request};
@@ -8,7 +8,7 @@ use jig_domain_client::address::{Address, TaskSection};
 use link::Signing;
 use skein_fake_person::{Doing, Find, Next, Person, Step, TreeFace};
 use skein_io::kernel::{Complete, Fd, Submit};
-use skein_lib::{Duration, Env, Queue, RequestRecord, Time, Wall};
+use skein_lib::{Duration, Env, Queue, Time, Wall};
 use skein_shell::Host;
 /// The fake person's finite script, shared by simulated and real worlds.
 pub struct Script {
@@ -187,70 +187,17 @@ impl NativeClient {
         Test::step(&mut self.root, &self.env, event, &mut self.out);
     }
     fn kept(&mut self, saved: link::Saved) {
-        let record = match saved {
-            link::Saved::Jig(record) => client::store::Record::Jig(record),
-            link::Saved::Family { bytes, .. } => {
-                client::store::Record::First(family::restored(&bytes).expect("family place"))
-            }
-            link::Saved::Table { version, record } => client::store::Record::Table {
-                version,
-                record: RequestRecord {
-                    key: record.key,
-                    scope: record.scope,
-                    first_sent: record.first_sent,
-                    request: client::store::Held {
-                        key: record.request.key,
-                        request: match record.request.request {
-                            jig_client_domain::Ask::Jig(ask) => client::Ask::Jig(ask),
-                            jig_client_domain::Ask::Family(_) => panic!("chat script restores jig requests"),
-                        },
-                    },
-                },
-            },
-        };
-        self.kept.push(record);
-    }
-    fn save(record: client::store::Record) -> link::Saved {
-        match record {
-            client::store::Record::Jig(record) => link::Saved::Jig(record),
-            client::store::Record::First(record) => {
-                link::Saved::Family { family: 1, version: 1, key: Box::new([]), bytes: family::saved(&record) }
-            }
-            client::store::Record::Table { version, record } => link::Saved::Table {
-                version,
-                record: RequestRecord {
-                    key: record.key,
-                    scope: record.scope,
-                    first_sent: record.first_sent,
-                    request: jig_client_domain::Held {
-                        key: record.request.key,
-                        request: match record.request.request {
-                            client::Ask::Jig(ask) => jig_client_domain::Ask::Jig(ask),
-                            client::Ask::First(ask) => {
-                                jig_client_domain::Ask::Family(family::request(&ask).expect("family request"))
-                            }
-                        },
-                    },
-                },
-            },
-        }
+        self.kept.push(crate::front::persistence::restored(saved));
     }
     fn outputs(&mut self) {
         while let Some(request) = self.out.pop() {
             match request {
                 Request::Save { record } => {
-                    self.side.event(self.env.now, link::Event::Save { record: Self::save(record) });
+                    self.shell.down(link::Request::Save { record: crate::front::persistence::encode_one(record) });
                 }
-                Request::Erase { key } => self.side.event(
-                    self.env.now,
-                    link::Event::Erase {
-                        key: match key {
-                            client::store::Key::Jig(key) => link::Erased::Jig(key),
-                            client::store::Key::Table(key) => link::Erased::Table(key),
-                            client::store::Key::First(_) => link::Erased::Family { family: 1, key: Box::new([]) },
-                        },
-                    },
-                ),
+                Request::Erase { key } => {
+                    self.shell.down(link::Request::Erase { key: crate::front::persistence::erased(key) });
+                }
                 Request::Show { address, .. } => {
                     if self.address != address {
                         self.address = address;
@@ -336,20 +283,15 @@ impl Host for NativeClient {
                 self.side.event(now, link::Event::SignIn { with: link::With::Held(credential) });
                 self.side.authenticated = true;
             }
-            self.side.event(
-                now,
-                link::Event::Start {
-                    kept: jig_client_world::test::list(kept),
-                    versions: jig_client_world::test::list([
-                        link::StoreVersion {
-                            keeper: link::Keeper::Jig,
-                            version: jig_domain_client::store::STORE_VERSION,
-                        },
-                        link::StoreVersion { keeper: link::Keeper::Table, version: client::store::VERSION },
-                        link::StoreVersion { keeper: link::Keeper::Family(1), version: 1 },
-                    ]),
-                },
-            );
+            let mut table = Vec::new();
+            for record in kept {
+                if record.key.len() == 16 {
+                    table.push(record);
+                } else if let Some(record) = crate::front::persistence::child_record(&record) {
+                    self.kept.push(record);
+                }
+            }
+            self.side.event(now, link::Event::Start { kept: jig_client_world::test::list(table) });
         }
         if let Some(ok) = self.shell.kept() {
             let signing = self.saving_signing.take().expect("pending credential");

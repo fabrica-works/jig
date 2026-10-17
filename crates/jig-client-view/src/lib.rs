@@ -23,6 +23,10 @@ pub mod owner_words;
 pub mod pages;
 pub mod proposed_task;
 pub mod proposed_task_words;
+pub mod records;
+#[rustfmt::skip]
+#[path = "generated/records_v1.rs"]
+pub mod records_wire;
 pub mod sections;
 pub mod specification;
 pub mod styles;

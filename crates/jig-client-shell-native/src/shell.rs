@@ -113,7 +113,7 @@ impl Shell {
                 self.connections.down(self.env.now, request, &mut self.below);
             }
             link::Request::Kept { .. }
-            | link::Request::Dropped { .. }
+            | link::Request::Dropped
             | link::Request::Answer { .. }
             | link::Request::NotKept { .. }
             | link::Request::Signing { .. }

@@ -225,34 +225,15 @@ fn small_store_family(limits: &Limits) -> Family {
 #[test]
 fn a_kept_record_of_another_family_version_is_refused() {
     let limits = fixtures::limits();
-    let family = small_store_family(&limits);
-    for keeper in [Keeper::Jig, Keeper::Table, Keeper::Family(family)] {
-        let kept = Kept::new(&limits, KeptParts { keeper, store_version: u16::MAX, record: Box::from([255, 0]) })
-            .expect("bounded kept record");
-        let mut bytes = fixtures::encoded(&kept, Kept::measure, Kept::encode);
-        bytes[0] = 2;
-        bytes[1] = 0;
-        assert_eq!(
-            Kept::decode(&limits, &mut Reader::new(&bytes)),
-            Err(Problem { path: Path::KeptVersion, reason: skein_codec::Reason::Version })
-        );
-    }
-}
-
-fn a_draft_at_its_ceiling_round_trips_unchanged() {
-    let limits = fixtures::limits();
-    let draft = Draft::new(
-        &limits,
-        DraftParts {
-            party: u64::MAX,
-            task: u64::MAX,
-            words: fixtures::ceiling_text(limits.draft_words),
-            touched: u64::MAX,
-        },
-    )
-    .expect("draft at its text ceiling");
-    let bytes = fixtures::encoded(&draft, Draft::measure, Draft::encode);
-    assert_eq!(Draft::decode(&limits, &mut Reader::new(&bytes)), Ok(draft));
+    let kept = Kept::new(&limits, KeptParts { store_version: u16::MAX, record: Box::from([255, 0]) })
+        .expect("bounded kept record");
+    let mut bytes = fixtures::encoded(&kept, Kept::measure, Kept::encode);
+    bytes[0] = 2;
+    bytes[1] = 0;
+    assert_eq!(
+        Kept::decode(&limits, &mut Reader::new(&bytes)),
+        Err(Problem { path: Path::KeptVersion, reason: skein_codec::Reason::Version })
+    );
 }
 
 fn a_table_entry_never_sent_round_trips_with_no_wall() {
@@ -352,7 +333,6 @@ fn wire_values_round_trip_unchanged() {
         ("a_hello_naming_two_owners_round_trips_unchanged", a_hello_naming_two_owners_round_trips_unchanged),
         ("a_stream_event_at_its_ceiling_round_trips_unchanged", a_stream_event_at_its_ceiling_round_trips_unchanged),
         ("each_watch_end_but_dropped_round_trips", each_watch_end_but_dropped_round_trips),
-        ("a_draft_at_its_ceiling_round_trips_unchanged", a_draft_at_its_ceiling_round_trips_unchanged),
         ("a_table_entry_never_sent_round_trips_with_no_wall", a_table_entry_never_sent_round_trips_with_no_wall),
         ("each_read_value_variant_round_trips_unchanged", each_read_value_variant_round_trips_unchanged),
         ("a_stream_text_event_round_trips_with_its_watch", a_stream_text_event_round_trips_with_its_watch),

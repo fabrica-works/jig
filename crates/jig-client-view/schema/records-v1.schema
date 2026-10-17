@@ -1,0 +1,12 @@
+family jig-client-view-records 1
+enum ProjectSection { overview, goals, tasks, notes, settings, resources, policy, roles, spend, recurring }
+enum TaskSection { overview, activity, plan, history, budget, panels }
+record AddressInbox { project: option u32 }
+record AddressConversations { project: option u32 }
+record AddressTask { task: u64 section: TaskSection }
+record AddressProject { project: u32 section: ProjectSection }
+enum Address { inbox: AddressInbox, conversations: AddressConversations, task: AddressTask, project: AddressProject, deployment }
+record Place { party: u64 address: Address }
+record Draft { party: u64 task: u64 words: text 65536 touched: u64 }
+enum JigRecord { place: Place, draft: Draft }
+versioned record Record { store_version: u16 record: bytes 65565 }

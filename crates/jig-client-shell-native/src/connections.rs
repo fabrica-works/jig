@@ -112,7 +112,7 @@ impl Connections {
             link::Request::Save { .. }
             | link::Request::Erase { .. }
             | link::Request::Kept { .. }
-            | link::Request::Dropped { .. }
+            | link::Request::Dropped
             | link::Request::Answer { .. }
             | link::Request::NotKept { .. }
             | link::Request::Signing { .. }

@@ -230,7 +230,6 @@ dependencies = [
  "jig-client-domain",
  "jig-client-protocol-wire",
  "jig-client-test-records",
- "jig-domain-client",
  "jig-protocol-transcript",
  "skein-codec",
  "skein-lib",
@@ -362,6 +361,7 @@ version = "0.0.0"
 dependencies = [
  "jig-client-domain",
  "jig-domain-client",
+ "skein-codec",
  "skein-lib",
  "skein-ui",
 ]

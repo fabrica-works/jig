@@ -33,10 +33,8 @@ impl Referee {
     }
     fn stored(&mut self, record: &client::Record) {
         let kept = w::Kept::decode(&w::CEILINGS, &mut Reader::new(&record.bytes)).expect("client's kept record");
-        if kept.keeper() == &w::Keeper::Table {
-            let entry = w::TableEntry::decode(&w::CEILINGS, &mut Reader::new(kept.record())).expect("table record");
-            self.stored.insert(*entry.key(), entry.scope());
-        }
+        let entry = w::TableEntry::decode(&w::CEILINGS, &mut Reader::new(kept.record())).expect("table record");
+        self.stored.insert(*entry.key(), entry.scope());
     }
     /// # Errors
     /// Refuses an exchange whose record is not stored or whose party is unconfirmed.

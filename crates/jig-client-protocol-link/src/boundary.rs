@@ -2,36 +2,16 @@
 use alloc::boxed::Box;
 use jig_client_domain::{Answered, Ask, Family, Readable, Readout, Retry, Watchable, contract};
 use skein_lib::{List, RequestEnvelope, RequestKey, RequestRecord, Secret, Token};
-/// The owner of a small-store record (protocol/client.md, 10).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum Keeper {
-    Jig,
-    Table,
-    Family(u16),
-}
-/// The store version its routing owner reads at start.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct StoreVersion {
-    pub keeper: Keeper,
-    pub version: u16,
-}
-/// A record the shell read with its keeper-tagged storage key.
+/// A record the shell read with its 16-byte request key.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Record {
     pub key: Box<[u8]>,
     pub bytes: Box<[u8]>,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Saved {
-    Jig(jig_domain_client::store::Record),
-    Table { version: u16, record: RequestRecord<jig_client_domain::Held> },
-    Family { family: u16, version: u16, key: Box<[u8]>, bytes: Box<[u8]> },
-}
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Erased {
-    Jig(jig_domain_client::store::StoreKey),
-    Table(RequestKey),
-    Family { family: u16, key: Box<[u8]> },
+pub struct Saved {
+    pub version: u16,
+    pub record: RequestRecord<jig_client_domain::Held>,
 }
 #[derive(Debug)]
 pub enum Event {
@@ -40,14 +20,13 @@ pub enum Event {
     },
     SignOut,
     Start {
-        versions: List<StoreVersion>,
         kept: List<Record>,
     },
     Save {
         record: Saved,
     },
     Erase {
-        key: Erased,
+        key: RequestKey,
     },
     /// Every write and removal of this step is durable.
     Stored,
@@ -96,9 +75,7 @@ pub enum Request {
     Kept {
         record: Saved,
     },
-    Dropped {
-        keeper: Keeper,
-    },
+    Dropped,
     /// One message; its transport owns the mapping and deadline.
     Exchange {
         exchange: Token,

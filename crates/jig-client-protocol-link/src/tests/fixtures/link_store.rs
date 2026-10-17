@@ -111,28 +111,9 @@ fn list<T, const N: usize>(values: [T; N]) -> List<T> {
     }
     out
 }
-pub const TABLE_VERSION: u16 = 2;
-pub fn store_versions() -> List<StoreVersion> {
-    list([
-        StoreVersion { keeper: Keeper::Jig, version: jig_domain_client::store::STORE_VERSION },
-        StoreVersion { keeper: Keeper::Table, version: TABLE_VERSION },
-        StoreVersion { keeper: Keeper::Family(19), version: 7 },
-    ])
-}
-pub fn saved_draft() -> Saved {
-    Saved::Jig(jig_domain_client::store::Record::Draft {
-        version: jig_domain_client::store::STORE_VERSION,
-        party: u64::MAX,
-        task: u64::MAX,
-        words: store_text(),
-        touched: u64::MAX,
-    })
-}
+pub const TABLE_VERSION: u16 = jig_client_domain::TABLE_VERSION;
 pub fn saved_table(ask: c::Ask) -> Saved {
-    Saved::Table { version: TABLE_VERSION, record: table_record(ask) }
-}
-pub fn saved_family() -> Saved {
-    Saved::Family { family: 19, version: 7, key: b"owner-key".as_slice().into(), bytes: Box::from([255, 0, 1]) }
+    Saved { version: TABLE_VERSION, record: table_record(ask) }
 }
 pub fn store_read(value: Saved) -> Record {
     let mut harness = Harness::new(&limits());
@@ -149,11 +130,8 @@ pub fn stored(harness: &Harness) -> Record {
 }
 pub fn other_store_version(mut value: Record) -> Record {
     let record = w::Kept::decode(&limits().wire, &mut Reader::new(&value.bytes)).unwrap();
-    let record = w::Kept::new(
-        &limits().wire,
-        w::KeptParts { keeper: record.keeper().clone(), store_version: u16::MAX, record: record.record().into() },
-    )
-    .unwrap();
+    let record =
+        w::Kept::new(&limits().wire, w::KeptParts { store_version: u16::MAX, record: record.record().into() }).unwrap();
     let mut writer = Writer::new(usize::try_from(record.measure()).unwrap());
     record.encode(&mut writer).unwrap();
     value.bytes = writer.finish();
@@ -163,8 +141,8 @@ impl Harness {
     pub fn save(&mut self, value: Saved) {
         self.link.step(Time::ZERO, Event::Save { record: value }, &mut self.out);
     }
-    pub fn start_store(&mut self, versions: List<StoreVersion>, kept: List<Record>) {
-        self.link.step(Time::ZERO, Event::Start { versions, kept }, &mut self.out);
+    pub fn start_store(&mut self, kept: List<Record>) {
+        self.link.step(Time::ZERO, Event::Start { kept }, &mut self.out);
     }
     pub fn send_kept(&mut self, attempt: Token) {
         self.link.step(
@@ -187,7 +165,7 @@ impl Harness {
                 Request::Kept { .. }
                 | Request::Save { .. }
                 | Request::Erase { .. }
-                | Request::Dropped { .. }
+                | Request::Dropped
                 | Request::Answer { .. }
                 | Request::NotKept { .. }
                 | Request::Read { .. }
@@ -212,7 +190,7 @@ impl Harness {
                 | Request::Exchange { .. }
                 | Request::Save { .. }
                 | Request::Erase { .. }
-                | Request::Dropped { .. }
+                | Request::Dropped
                 | Request::Answer { .. }
                 | Request::NotKept { .. }
                 | Request::Read { .. }
@@ -231,54 +209,6 @@ impl Harness {
     }
 }
 
-pub fn saved_places() -> List<Saved> {
-    use jig_domain_client::address::{Address, ProjectSection, TaskSection};
-    let mut addresses = List::with_capacity(21);
-    for address in [
-        Address::Inbox { project: None },
-        Address::Inbox { project: Some(u32::MAX) },
-        Address::Conversations { project: None },
-        Address::Conversations { project: Some(u32::MAX) },
-        Address::Deployment,
-    ] {
-        addresses.push(address).unwrap();
-    }
-    for section in [
-        TaskSection::Overview,
-        TaskSection::Activity,
-        TaskSection::Plan,
-        TaskSection::History,
-        TaskSection::Budget,
-        TaskSection::Panels,
-    ] {
-        addresses.push(Address::Task { task: u64::MAX, section }).unwrap();
-    }
-    for section in [
-        ProjectSection::Overview,
-        ProjectSection::Goals,
-        ProjectSection::Tasks,
-        ProjectSection::Notes,
-        ProjectSection::Settings,
-        ProjectSection::Resources,
-        ProjectSection::Policy,
-        ProjectSection::Roles,
-        ProjectSection::Spend,
-        ProjectSection::Recurring,
-    ] {
-        addresses.push(Address::Project { project: u32::MAX, section }).unwrap();
-    }
-    let mut saved = List::with_capacity(addresses.len());
-    for address in addresses.into_boxed() {
-        saved
-            .push(Saved::Jig(jig_domain_client::store::Record::Place {
-                version: jig_domain_client::store::STORE_VERSION,
-                party: u64::MAX,
-                address,
-            }))
-            .unwrap();
-    }
-    saved
-}
 pub fn one_store_read(value: Record) -> List<Record> {
     list([value])
 }

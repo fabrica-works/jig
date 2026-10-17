@@ -1,14 +1,10 @@
-//! The world's small store uses the link's actual owner-versioned records.
+//! Each owner's records are encoded by that owner's codec.
 use super::{ClientId, Link, Protocol, Queue, Side, Time, client, family, fixtures, link};
 use skein_lib::{List, RequestRecord};
 pub(super) type Bytes = Vec<(Box<[u8]>, Box<[u8]>)>;
 fn saved(record: client::store::Record) -> link::Saved {
     match record {
-        client::store::Record::Jig(record) => link::Saved::Jig(record),
-        client::store::Record::First(record) => {
-            link::Saved::Family { family: 1, version: 1, key: Box::new([]), bytes: family::saved(&record) }
-        }
-        client::store::Record::Table { version, record } => link::Saved::Table {
+        client::store::Record::Table { version, record } => link::Saved {
             version,
             record: RequestRecord {
                 key: record.key,
@@ -25,51 +21,94 @@ fn saved(record: client::store::Record) -> link::Saved {
                 },
             },
         },
+        client::store::Record::Jig(_) | client::store::Record::First(_) => unreachable!("table record"),
     }
 }
 pub(super) fn encode(records: &[client::store::Record]) -> Bytes {
-    let mut link = Link::new(&fixtures::link_limits()).expect("bounded store codec");
-    let mut out = Queue::with_capacity(256);
-    let mut bytes = Vec::new();
-    for record in records {
-        link.step(Time::ZERO, link::Event::Save { record: saved(record.clone()) }, &mut out);
-        while let Some(request) = out.pop() {
-            if let link::Request::Save { record: link::Record { key, bytes: record } } = request {
-                bytes.push((key, record));
-            } else {
-                panic!("save must write its record");
-            }
-        }
-        link.step(Time::ZERO, link::Event::Stored, &mut out);
-    }
-    bytes
+    records.iter().cloned().map(encode_one).map(|record| (record.key, record.bytes)).collect()
 }
-fn restored(saved: link::Saved) -> client::store::Record {
-    match saved {
-        link::Saved::Jig(record) => client::store::Record::Jig(record),
-        link::Saved::Family { bytes, .. } => client::store::Record::First(family::restored(&bytes).expect("family")),
-        link::Saved::Table { version, record } => client::store::Record::Table {
-            version,
-            record: RequestRecord {
-                key: record.key,
-                scope: record.scope,
-                first_sent: record.first_sent,
-                request: client::store::Held {
-                    key: record.request.key,
-                    request: match record.request.request {
-                        jig_client_domain::Ask::Jig(value) => client::Ask::Jig(value),
-                        jig_client_domain::Ask::Family(value) => {
-                            let decoded =
-                                jig_test_service::family::request(&value.bytes, &fixtures::owner_limits().connector)
-                                    .expect("family ask");
-                            client::Ask::First(client::first::Ask::ChangeObject {
-                                project: decoded.project,
-                                object: decoded.value.object,
-                                revision: jig_client_domain::contract::Revision { value: decoded.value.revision },
-                                value: decoded.value.value,
-                            })
-                        }
-                    },
+pub(crate) fn encode_one(record: client::store::Record) -> link::Record {
+    use jig_client_view::records as ui;
+    match record {
+        client::store::Record::Jig(record) => {
+            let record = match record {
+                jig_domain_client::store::Record::Place { version, party, address } => {
+                    ui::Record::Place { version, party, address }
+                }
+                jig_domain_client::store::Record::Draft { version, party, task, words, touched } => {
+                    ui::Record::Draft { version, party, task, words, touched }
+                }
+            };
+            let (key, bytes) = ui::encode(&record);
+            link::Record { key, bytes }
+        }
+        client::store::Record::First(record) => {
+            link::Record { key: Box::from(b"first.place".as_slice()), bytes: family::saved(&record) }
+        }
+        record @ client::store::Record::Table { .. } => {
+            let mut link = Link::new(&fixtures::link_limits()).expect("bounded store codec");
+            let mut out = Queue::with_capacity(256);
+            link.step(Time::ZERO, link::Event::Save { record: saved(record) }, &mut out);
+            let Some(link::Request::Save { record }) = out.pop() else { panic!("save writes its record") };
+            assert!(out.is_empty());
+            record
+        }
+    }
+}
+pub(crate) fn child_record(record: &link::Record) -> Option<client::store::Record> {
+    use jig_client_view::records as ui;
+    if record.key.as_ref() == b"first.place" {
+        return family::restored(&record.bytes).map(client::store::Record::First);
+    }
+    match ui::decode(&record.key, &record.bytes)? {
+        ui::Record::Place { version, party, address } => {
+            Some(client::store::Record::Jig(jig_domain_client::store::Record::Place { version, party, address }))
+        }
+        ui::Record::Draft { version, party, task, words, touched } => {
+            Some(client::store::Record::Jig(jig_domain_client::store::Record::Draft {
+                version,
+                party,
+                task,
+                words,
+                touched,
+            }))
+        }
+    }
+}
+pub(crate) fn erased(key: client::store::Key) -> Box<[u8]> {
+    use jig_client_view::records::RecordKey;
+    match key {
+        client::store::Key::Jig(key) => match key {
+            jig_domain_client::store::StoreKey::Place => RecordKey::Place.encode(),
+            jig_domain_client::store::StoreKey::Draft { task } => RecordKey::Draft { task }.encode(),
+        },
+        client::store::Key::First(_) => Box::from(b"first.place".as_slice()),
+        client::store::Key::Table(key) => Box::new(key),
+    }
+}
+pub(crate) fn restored(saved: link::Saved) -> client::store::Record {
+    let link::Saved { version, record } = saved;
+    client::store::Record::Table {
+        version,
+        record: RequestRecord {
+            key: record.key,
+            scope: record.scope,
+            first_sent: record.first_sent,
+            request: client::store::Held {
+                key: record.request.key,
+                request: match record.request.request {
+                    jig_client_domain::Ask::Jig(value) => client::Ask::Jig(value),
+                    jig_client_domain::Ask::Family(value) => {
+                        let decoded =
+                            jig_test_service::family::request(&value.bytes, &fixtures::owner_limits().connector)
+                                .expect("family ask");
+                        client::Ask::First(client::first::Ask::ChangeObject {
+                            project: decoded.project,
+                            object: decoded.value.object,
+                            revision: jig_client_domain::contract::Revision { value: decoded.value.revision },
+                            value: decoded.value.value,
+                        })
+                    }
                 },
             },
         },
@@ -77,18 +116,18 @@ fn restored(saved: link::Saved) -> client::store::Record {
 }
 pub(super) fn decode(bytes: &Bytes) -> Vec<client::store::Record> {
     let mut link = Link::new(&fixtures::link_limits()).expect("bounded store codec");
-    let versions = jig_client_world::test::list([
-        link::StoreVersion { keeper: link::Keeper::Jig, version: jig_domain_client::store::STORE_VERSION },
-        link::StoreVersion { keeper: link::Keeper::Table, version: client::store::VERSION },
-        link::StoreVersion { keeper: link::Keeper::Family(1), version: 1 },
-    ]);
     let mut kept = List::with_capacity(u32::try_from(bytes.len()).expect("bounded small store"));
-    for (key, record) in bytes {
-        kept.push(link::Record { key: key.clone(), bytes: record.clone() }).expect("exact store capacity");
+    let mut records = Vec::new();
+    for (key, bytes) in bytes {
+        let record = link::Record { key: key.clone(), bytes: bytes.clone() };
+        if key.len() == 16 {
+            kept.push(record).expect("exact store capacity");
+        } else if let Some(record) = child_record(&record) {
+            records.push(record);
+        }
     }
     let mut out = Queue::with_capacity(256);
-    link.step(Time::ZERO, link::Event::Start { versions, kept }, &mut out);
-    let mut records = Vec::new();
+    link.step(Time::ZERO, link::Event::Start { kept }, &mut out);
     while let Some(request) = out.pop() {
         if let link::Request::Kept { record } = request {
             records.push(restored(record));

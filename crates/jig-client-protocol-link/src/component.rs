@@ -63,7 +63,7 @@ impl Link {
         match event {
             Event::SignIn { with } => self.sign_in(now, with, out),
             Event::SignOut => self.sign_out(now, out),
-            Event::Start { versions, kept } => self.start_store(versions, kept, out),
+            Event::Start { kept } => self.start_store(kept, out),
             Event::Save { record } => self.save(record, out),
             Event::Erase { key } => self.erase(key, out),
             Event::Stored => self.written(out),

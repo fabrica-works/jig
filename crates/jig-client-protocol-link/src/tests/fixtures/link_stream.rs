@@ -102,7 +102,7 @@ impl Harness {
                 | Request::Save { .. }
                 | Request::Erase { .. }
                 | Request::Kept { .. }
-                | Request::Dropped { .. }
+                | Request::Dropped
                 | Request::Signing { .. }
                 | Request::ServiceCredential { .. }
                 | Request::Fact { .. } => {}
@@ -127,7 +127,7 @@ impl Harness {
                 | Request::Save { .. }
                 | Request::Erase { .. }
                 | Request::Kept { .. }
-                | Request::Dropped { .. }
+                | Request::Dropped
                 | Request::Signing { .. }
                 | Request::ServiceCredential { .. }
                 | Request::Fact { .. } => {}
@@ -152,7 +152,7 @@ impl Harness {
                 | Request::Save { .. }
                 | Request::Erase { .. }
                 | Request::Kept { .. }
-                | Request::Dropped { .. }
+                | Request::Dropped
                 | Request::Signing { .. }
                 | Request::ServiceCredential { .. }
                 | Request::Fact { .. } => {}
@@ -177,7 +177,7 @@ impl Harness {
             | Request::Save { .. }
             | Request::Erase { .. }
             | Request::Kept { .. }
-            | Request::Dropped { .. }
+            | Request::Dropped
             | Request::Signing { .. }
             | Request::ServiceCredential { .. }
             | Request::Fact { .. }) => panic!("no close: {other:?}"),
@@ -207,7 +207,7 @@ impl Harness {
                 | Request::Save { .. }
                 | Request::Erase { .. }
                 | Request::Kept { .. }
-                | Request::Dropped { .. }
+                | Request::Dropped
                 | Request::Signing { .. }
                 | Request::ServiceCredential { .. }
                 | Request::Fact { .. } => {}
@@ -249,7 +249,7 @@ impl Harness {
                 | Request::Save { .. }
                 | Request::Erase { .. }
                 | Request::Kept { .. }
-                | Request::Dropped { .. }
+                | Request::Dropped
                 | Request::Signing { .. }
                 | Request::ServiceCredential { .. }
                 | Request::Fact { .. } => {}

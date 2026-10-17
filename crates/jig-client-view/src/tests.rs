@@ -1,6 +1,8 @@
 mod binding;
+mod fixtures;
 mod owner;
 mod phrases;
+mod records;
 mod regions;
 
 mod cards;

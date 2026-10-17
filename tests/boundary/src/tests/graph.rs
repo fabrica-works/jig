@@ -111,7 +111,8 @@ fn client_view_links_only_its_domain_and_foundation() {
                 .dependencies
                 .iter()
                 .filter(|name| {
-                    !["skein-lib", "skein-ui", "jig-domain-client", "jig-client-domain"].contains(&name.as_str())
+                    !["skein-codec", "skein-lib", "skein-ui", "jig-domain-client", "jig-client-domain"]
+                        .contains(&name.as_str())
                 })
                 .map(|name| format!("{}: {name}", manifest.path.display()))
                 .collect::<Vec<_>>()
