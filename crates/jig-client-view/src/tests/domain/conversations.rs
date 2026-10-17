@@ -329,14 +329,14 @@ fn routed_scroll_and_end(
     use super::spine::drive;
     use crate::{Event, Request, action::Act};
     use jig_client::contract::{Delivery, ReadResult, ReadValue, Runtime, WatchEvent};
-    use skein_lib::{Time, Token};
+    use skein_lib::Time;
     let name = CallName { attempt: 1, turn: 1, call: 7 };
     drive(domain, Time::ZERO, Event::Act { action: Act::FoldCall { name, open: true } });
     assert_eq!(domain.conversation().fold(name), Fold::Open);
     let requests = drive(
         domain,
         Time::ZERO,
-        Event::Act { action: Act::More { window: Token::new(1), end: crate::action::End::Before } },
+        Event::Act { action: Act::More { window: skein_lib::Token::new(1), end: crate::action::End::Before } },
     );
     let read = activity_read(&requests);
     let mut continued = false;
@@ -509,34 +509,24 @@ fn routed_later_words(domain: &mut Fixture) {
     );
     assert_eq!(domain.fields.get(field).unwrap().text.bytes(), b"later");
     assert_eq!(domain.fields.get(field).unwrap().writes, writes);
-    let refused = program_words(domain);
+    assert!(card_words(domain).is_empty());
+    let id = domain.objects().find(ObjectKey::Task(8)).unwrap();
     assert_eq!(
-        refused.as_ref(),
-        &[Request::Answered {
-            asked: skein_lib::Token::new(77),
-            answer: Answer::Refused(Refusal::Limit { which: Limit::ConversationWords { limit: 2 } })
-        }]
+        domain.objects().get(id).unwrap().card,
+        crate::objects::Card::Refused { refusal: Refusal::Limit { which: Limit::ConversationWords { limit: 2 } } }
     );
     domain.conversation.words.read(5);
     assert_eq!(domain.conversation().words.rows.get(0).unwrap().state, crate::conversation::Words::Read { message: 4 });
     assert_eq!(domain.conversation().words.rows.get(1).unwrap().state, crate::conversation::Words::Read { message: 5 });
     routed_pending_restore(domain);
 }
-fn program_words(domain: &mut Fixture) -> Box<[Request]> {
-    super::spine::drive(
-        domain,
+fn card_words(domain: &mut Fixture) -> Box<[Request]> {
+    domain.drive(
         skein_lib::Time::ZERO,
-        crate::Event::Ask {
-            ask: crate::intents::ByValue {
-                asked: skein_lib::Token::new(77),
-                scope: 7,
-                ask: Box::new(jig_client::contract::Ask::Write {
-                    project: 1,
-                    task: 8,
-                    words: text(b"program"),
-                    release: false,
-                }),
-            },
+        crate::tests::fixtures::CardAsk {
+            object: ObjectKey::Task(8),
+            act: jig_client::contract::ActKind::Write,
+            ask: jig_client::contract::Ask::Write { project: 1, task: 8, words: text(b"program"), release: false },
         },
     )
 }
@@ -549,7 +539,7 @@ fn routed_pending_restore(domain: &mut Fixture) {
     };
     use skein_lib::Time;
     let mut sent = None;
-    for request in &program_words(domain) {
+    for request in &card_words(domain) {
         if let Request::Client { asked: jig_client::Event::Send { key: request, .. } } = request {
             sent = Some(*request);
         }
@@ -589,7 +579,7 @@ fn calls_share_a_chip_watch_and_deliveries_keep_the_same_task_card_live() {
         address::{Address, Place, TaskSection},
     };
     use jig_client::contract::*;
-    use skein_lib::{Time, Token};
+    use skein_lib::Time;
     let (mut domain, inbox) = super::objects::live();
     drive(
         &mut domain,
@@ -644,7 +634,7 @@ fn calls_share_a_chip_watch_and_deliveries_keep_the_same_task_card_live() {
     let watch = changed_chip_membership(&mut domain, watch);
     drive(&mut domain, Time::ZERO, Ended { watch, end: WatchEnd::Unknown });
     domain.reclaim();
-    let requests = drive(&mut domain, Time::ZERO, Event::Frame { asked: Token::new(99) });
+    let requests = drive(&mut domain, Time::ZERO, crate::tests::fixtures::Tick);
     for request in &requests {
         if let Request::Client { asked: jig_client::Event::Watch { .. } } = request {
             unreachable!("a final unavailable subject waits for different names");
@@ -653,9 +643,9 @@ fn calls_share_a_chip_watch_and_deliveries_keep_the_same_task_card_live() {
 }
 fn changed_chip_membership(domain: &mut Fixture, old: jig_client::Handle) -> jig_client::Handle {
     use super::spine::drive;
-    use crate::{Event, Request};
+    use crate::Request;
     use jig_client::contract::*;
-    use skein_lib::{Time, Token};
+    use skein_lib::Time;
     let mut rows = List::with_capacity(2);
     for position in [4_u32, 3] {
         let mut row = calls(u64::from(position), position);
@@ -691,7 +681,7 @@ fn changed_chip_membership(domain: &mut Fixture, old: jig_client::Handle) -> jig
     assert!(closed);
     drive(domain, Time::ZERO, Ended { watch: old, end: WatchEnd::Closed });
     domain.reclaim();
-    drive(domain, Time::ZERO, Event::Frame { asked: Token::new(98) });
+    drive(domain, Time::ZERO, crate::tests::fixtures::Tick);
     let watch = domain.conversation().chips_watch.unwrap();
     assert_ne!(watch, old);
     assert_eq!(domain.conversation().chips.as_slice(), &[55]);

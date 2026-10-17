@@ -217,8 +217,7 @@ impl Front<Test> for Joint {
             | Request::First(first::Out::Open { watch, .. }) => {
                 self.last_watch = Some((client, *watch));
             }
-            Request::Jig(_)
-            | Request::First(_)
+            Request::First(_)
             | Request::Save { .. }
             | Request::Erase { .. }
             | Request::Show { .. }

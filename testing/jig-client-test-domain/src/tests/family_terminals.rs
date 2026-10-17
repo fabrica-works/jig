@@ -9,7 +9,6 @@ use crate::{
     family::{self, Document, Item, ItemState, Kind, Scope, Subject},
     first::{self, FamilyTerminal as T},
 };
-use jig_client::Link;
 use jig_client::contract::{Part, ProposalKey, Proposer, Revision};
 use skein_lib::{Duration, Env, List, Queue, Time, Token, Wall};
 fn limits() -> first::Limits {
@@ -51,9 +50,7 @@ fn fire(side: &mut first::Side, now: u64) -> Vec<first::Request> {
     rows
 }
 fn start() -> (first::Side, Token, Token) {
-    let mut side = first::Side::new(&limits(), 1);
-    drive(&mut side, 0, first::Event::Confirmed { party: Some(7) });
-    drive(&mut side, 0, first::Event::Link { link: Link::Live });
+    let (mut side, _) = super::root::live_first(limits());
     let rows = drive(&mut side, 0, first::Event::Went { address: first::Address { project: 3, item: 5 } });
     let read = rows
         .iter()
@@ -259,7 +256,19 @@ fn family_terminal_envelopes_fit_full_rows_and_object_capacity_and_signed_out_pa
                 first::Request::Out(first::Out::Open { .. }) => true,
                 _ => false,
             }));
-            let resumed = drive(&mut side, 3, first::Event::Confirmed { party: Some(7) });
+            let (_, client) = super::root::live_first(limits());
+            let mut out = Queue::with_capacity(first::max_out(&limits()));
+            first::me::told(
+                &mut side,
+                &Env { now: Time::from_nanos(3), wall: Wall::EPOCH, limits: limits() },
+                &client,
+                &jig_client::Told::Changed { handle: first::me::handle() },
+                &mut out,
+            );
+            let mut resumed = Vec::new();
+            while let Some(row) = out.pop() {
+                resumed.push(row);
+            }
             assert_ne!(opened(&resumed), watch);
             assert_eq!(object(&side).card, first::Card::Open);
         }

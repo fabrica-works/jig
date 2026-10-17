@@ -48,7 +48,7 @@ pub fn open(
     b.style(crate::JigStyle::Card.token());
     match facts.card {
         Card::Deciding { .. } => b.state(skein_ui::State::Busy),
-        Card::Open | Card::Refused { .. } | Card::Unknown { .. } | Card::Leaving { .. } => {}
+        Card::Open | Card::NotSent { .. } | Card::Refused { .. } | Card::Unknown { .. } | Card::Leaving { .. } => {}
     }
     b.open(Role::Heading { level: 2 });
     b.text(skein_ui::Run::Plain, title);
@@ -76,6 +76,7 @@ pub fn open(
 pub fn state(b: &mut Builder, card: &Card, object: Id<Object>, words: &Words, bindings: &mut JigBindings) {
     let text_limit = bindings.text_limit();
     match card {
+        Card::NotSent { why } => words.status(b, why.phrase(), &[]),
         Card::Open => words.status(b, JigPhrase::Open, &[]),
         Card::Deciding { progress, .. } => words.progress(b, *progress),
         Card::Refused { refusal } => {

@@ -8,6 +8,13 @@ use skein_lib::{Duration, Id, Map, Slab, Time, Token};
 /// Facts the view phrases as a short-lived notice.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Kind {
+    /// Kept requests could not be read at start and were not sent.
+    Dropped { count: u32 },
+    /// A local refusal has no page or card left to show it on.
+    NotSent(crate::intents::NotSent),
+    /// A request restored without a UI intent ended without a known answer.
+    KeptUnknown,
+
     /// A sign-out exchange did not reach the engine.
     SignOutLost,
     /// The frame's link went away or came back.

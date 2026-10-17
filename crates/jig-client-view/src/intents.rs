@@ -19,17 +19,27 @@ pub enum Progress {
     Unknown,
 }
 
-/// A program ask, with a caller token to receive its outcome.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct ByValue {
-    pub asked: Token,
-    pub scope: u64,
-    pub ask: Box<Ask>,
-}
-
 use crate::boundary::Request;
-use jig_client::contract::{ActKind, Answer, Limit, ObjectKey};
+use jig_client::contract::{ActKind, Answer, ObjectKey};
 use skein_lib::{Id, Map, Queue, Slab};
+/// A local refusal, before the engine could judge the request.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum NotSent {
+    NotKept,
+    Unconfirmed,
+    Limit,
+}
+impl NotSent {
+    #[must_use]
+    pub const fn phrase(self) -> crate::phrases::jig::JigPhrase {
+        use crate::phrases::jig::JigPhrase;
+        match self {
+            Self::NotKept => JigPhrase::RequestNotKept,
+            Self::Unconfirmed => JigPhrase::RequestUnconfirmed,
+            Self::Limit => JigPhrase::RequestsInFlight,
+        }
+    }
+}
 /// The owner to which one terminal is applied.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Origin {
@@ -37,8 +47,6 @@ pub enum Origin {
     Card { object: ObjectKey, act: ActKind },
     /// A page's request, with the generation that originated it.
     Page { handle: Option<jig_client::Handle>, purpose: crate::page::IntentPurpose },
-    /// A caller's by-value ask; its token receives the one answer.
-    Program { asked: Token },
 }
 /// One intent, never the root table's key, saved record or retry state.
 #[derive(Debug)]
@@ -216,49 +224,22 @@ pub fn send_card(
             Some(id.token())
         }
         None => {
-            domain.objects.get_mut(object_id).expect("named card exists").card = crate::objects::Card::Refused {
-                refusal: jig_client::contract::Refusal::Limit { which: Limit::Requests },
-            };
+            domain.objects.get_mut(object_id).expect("named card exists").card =
+                crate::objects::Card::NotSent { why: NotSent::Limit };
             domain.changed();
             None
         }
-    }
-}
-pub(crate) fn by_value(domain: &mut crate::Ui, value: ByValue, out: &mut Queue<Request>, lent: &jig_client::Client) {
-    if domain.blocked {
-        out.push(Request::Answered {
-            asked: value.asked,
-            answer: Answer::Refused(jig_client::contract::Refusal::NotOffered),
-        });
-        return;
-    }
-    let origin = Origin::Program { asked: value.asked };
-    if domain.intents.joined(value.scope, origin).is_none()
-        && let Some(which) = crate::conversation::sending::admission(domain, value.scope, &value.ask)
-    {
-        out.push(Request::Answered {
-            asked: value.asked,
-            answer: Answer::Refused(jig_client::contract::Refusal::Limit { which }),
-        });
-        return;
-    }
-    match domain.intents.ask(value.scope, origin, value.ask, out) {
-        Some(id) => crate::conversation::sending::pending(domain, id, lent),
-        None => out.push(Request::Answered {
-            asked: value.asked,
-            answer: Answer::Refused(jig_client::contract::Refusal::Limit { which: Limit::Requests }),
-        }),
     }
 }
 pub(crate) fn progress(
     domain: &mut crate::Ui,
     request: Token,
     progress: Progress,
-    out: &mut Queue<Request>,
+    _out: &mut Queue<Request>,
     lent: &jig_client::Client,
 ) {
     if progress == Progress::Unknown {
-        unknown(domain, request, out, lent);
+        unknown(domain, request, lent);
         return;
     }
     let Some(origin) = domain.intents.progress(request, progress) else {
@@ -272,7 +253,6 @@ pub(crate) fn progress(
                 domain.changed();
             }
         }
-        Origin::Program { .. } => {}
         Origin::Page { .. } => domain.changed(),
     }
 }
@@ -289,7 +269,6 @@ pub(crate) fn answered(
     };
     crate::conversation::sending::answered(domain, request, &receipt.answer);
     match receipt.origin {
-        Origin::Program { asked } => out.push(Request::Answered { asked, answer: receipt.answer }),
         Origin::Page { handle, purpose } => {
             crate::page::conversations::answered(domain, env, (request, handle), purpose, receipt.answer, out, lent);
         }
@@ -317,14 +296,13 @@ pub(crate) fn answered(
         }
     }
 }
-fn unknown(domain: &mut crate::Ui, request: Token, out: &mut Queue<Request>, lent: &jig_client::Client) {
+fn unknown(domain: &mut crate::Ui, request: Token, lent: &jig_client::Client) {
     let Some(origin) = domain.intents.unknown(request) else {
         return;
     };
     domain.conversation.words.refused(request);
     match origin {
         Origin::Card { object, act } => crate::objects::answer::unknown(domain, object, act, lent),
-        Origin::Program { asked } => out.push(Request::Unknown { asked }),
         Origin::Page { purpose, .. } => {
             if domain.chats.starting == Some(request) {
                 domain.chats.starting = None;

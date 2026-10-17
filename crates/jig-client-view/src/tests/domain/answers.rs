@@ -7,7 +7,7 @@ use crate::tests::fixtures::{AnsweredByEngine, Fixture, ReadPage, Reported};
 use crate::{
     Event, Request,
     action::Act,
-    intents::{ByValue, Progress, send_card},
+    intents::{Progress, send_card},
     notices::kept::Kind,
     objects::{Body, Card, Left, Object, Source, answer::recovery},
 };
@@ -191,19 +191,6 @@ fn retention_expiry_retires_once_keeps_unknown_distinct_and_inspection_never_res
     );
     assert_eq!(domain.objects().get(id).unwrap().card, Card::Open);
     domain.intents.reclaim();
-    let rows = drive(
-        &mut domain,
-        Time::ZERO,
-        Event::Ask { ask: ByValue { scope: 7, asked: request, ask: Box::new(Ask::Stop { project: 1, task: 8 }) } },
-    );
-    let Request::Client { asked: jig_client::Event::Send { key: program, .. } } = rows[0] else {
-        panic!("program send")
-    };
-    assert_eq!(
-        drive(&mut domain, Time::ZERO, Reported { request: program, progress: Progress::Unknown }).as_ref(),
-        &[Request::Unknown { asked: request }]
-    );
-    assert!(drive(&mut domain, Time::ZERO, Reported { request: program, progress: Progress::Unknown }).is_empty());
 }
 #[test]
 fn full_requests_refuse_without_queueing_and_hidden_answers_and_unknowns_have_notices() {
@@ -215,7 +202,7 @@ fn full_requests_refuse_without_queueing_and_hidden_answers_and_unknowns_have_no
             .intents
             .ask(
                 7,
-                crate::intents::Origin::Program { asked: Token::new(u64::from(number)) },
+                crate::intents::Origin::Card { object: ObjectKey::Task(u64::from(number)), act: ActKind::Stop },
                 Box::new(Ask::Stop { project: 1, task: 8 }),
                 &mut out,
             )
@@ -233,10 +220,7 @@ fn full_requests_refuse_without_queueing_and_hidden_answers_and_unknowns_have_no
         )
         .is_none()
     );
-    assert_eq!(
-        domain.objects().get(id).unwrap().card,
-        Card::Refused { refusal: Refusal::Limit { which: Limit::Requests } }
-    );
+    assert_eq!(domain.objects().get(id).unwrap().card, Card::NotSent { why: crate::intents::NotSent::Limit });
     assert_eq!(drain(out).as_ref(), &[]);
     for unknown in [false, true] {
         let (mut domain, _) = live();

@@ -34,6 +34,24 @@ impl Fixture {
         Self::with_client_handles(limits, limits.watches.checked_add(limits.reads).unwrap().checked_add(1).unwrap())
     }
     pub fn with_client_handles(limits: &Limits, handles: u32) -> Self {
+        Self::build(limits, handles, None)
+    }
+    pub fn restored(
+        limits: &Limits,
+        records: List<crate::store::Record>,
+        kept: List<skein_lib::RequestRecord<jig_client::Held>>,
+    ) -> Self {
+        Self::build(
+            limits,
+            limits.watches.checked_add(limits.reads).unwrap().checked_add(1).unwrap(),
+            Some((records, kept)),
+        )
+    }
+    fn build(
+        limits: &Limits,
+        handles: u32,
+        restored: Option<(List<crate::store::Record>, List<skein_lib::RequestRecord<jig_client::Held>>)>,
+    ) -> Self {
         let domain = jig_client::DomainLimits {
             owners: &[],
             requests: skein_lib::RequestLimits {
@@ -80,9 +98,26 @@ impl Fixture {
             read_origins: List::with_capacity(OBSERVATIONS),
         };
         let mut out = Queue::with_capacity(OUTPUTS);
-        value.native(jig_client::Event::StartUnlinked { kept: List::with_capacity(0) }, &mut out);
+        let kept = if let Some((records, kept)) = restored {
+            value.ui.step(
+                Time::ZERO,
+                Wall::EPOCH,
+                &value.client,
+                Event::Start {
+                    records,
+                    place: crate::address::Place::Jig(crate::address::Address::Inbox { project: None }),
+                    seed: 8,
+                },
+                &mut out,
+            );
+            kept
+        } else {
+            List::with_capacity(0)
+        };
+        value.native(jig_client::Event::StartUnlinked { kept }, &mut out);
         value.native(jig_client::Event::Up { up: Up::SignedIn }, &mut out);
         value.native(jig_client::Event::Up { up: Up::Served { served: true, versions: None } }, &mut out);
+        value.output(out);
         value
     }
     pub fn view(&self) -> crate::Borrowed<'_> {
@@ -194,13 +229,7 @@ impl Fixture {
                 | Request::Save { .. }
                 | Request::Erase { .. }
                 | Request::ShowPart { .. }
-                | Request::PartsLeft
-                | Request::Link { .. }
-                | Request::Confirmed { .. }
-                | Request::Retention { .. }
-                | Request::FrameIs { .. }
-                | Request::Answered { .. }
-                | Request::Unknown { .. }) => observed.push(request).unwrap(),
+                | Request::PartsLeft) => observed.push(request).unwrap(),
             }
         }
         self.client.reclaim();
@@ -462,5 +491,69 @@ impl IntentKey for Token {
 impl IntentKey for Key {
     fn intent(self, ui: &Ui) -> Token {
         Token::new(self.number ^ ui.seed)
+    }
+}
+
+/// Supply an owner's intent without routing a sibling through the Ui.
+#[derive(Clone)]
+pub struct SendIntent {
+    pub scope: u64,
+    pub origin: crate::intents::Origin,
+    pub ask: Box<contract::Ask>,
+}
+impl Input for SendIntent {
+    fn enter(self, fixture: &mut Fixture, out: &mut Queue<Request>) {
+        fixture.ui.intents.ask(self.scope, self.origin, self.ask, out);
+    }
+}
+
+pub fn intent(scope: u64, number: u64, ask: contract::Ask) -> SendIntent {
+    SendIntent {
+        scope,
+        origin: crate::intents::Origin::Card {
+            object: contract::ObjectKey::Task(number),
+            act: contract::ActKind::Stop,
+        },
+        ask: Box::new(ask),
+    }
+}
+
+pub struct Tick;
+impl Input for Tick {
+    fn enter(self, fixture: &mut Fixture, out: &mut Queue<Request>) {
+        fixture.ui.fire(fixture.now, Wall::EPOCH, &fixture.client, out);
+    }
+}
+pub fn kept(number: u8, party: u64) -> skein_lib::RequestRecord<jig_client::Held> {
+    skein_lib::RequestRecord {
+        key: [number; 16],
+        scope: party,
+        first_sent: Some(Wall::EPOCH),
+        request: jig_client::Held {
+            key: Key { asker: jig_client::Asker::JIG, number: u64::from(number) },
+            request: jig_client::Ask::Jig(Box::new(contract::Ask::Stop { project: 1, task: 8 })),
+        },
+    }
+}
+
+pub struct CardAsk {
+    pub object: contract::ObjectKey,
+    pub act: contract::ActKind,
+    pub ask: contract::Ask,
+}
+impl Input for CardAsk {
+    fn enter(self, fixture: &mut Fixture, out: &mut Queue<Request>) {
+        crate::intents::send_card(&mut fixture.ui, self.object, self.act, Box::new(self.ask), out, &fixture.client);
+    }
+}
+
+pub struct FireClient {
+    pub wall: Wall,
+}
+impl Input for FireClient {
+    fn enter(self, fixture: &mut Fixture, out: &mut Queue<Request>) {
+        let mut native = Queue::with_capacity(OUTPUTS);
+        fixture.client.fire(fixture.now, self.wall, &mut native);
+        fixture.native_out(native, None, None, out);
     }
 }

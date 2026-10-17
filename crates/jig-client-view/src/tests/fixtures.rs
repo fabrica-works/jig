@@ -80,7 +80,10 @@ pub(crate) fn parts(output: &[crate::Request], capacity: u32) -> Box<[crate::Req
 }
 
 mod client;
-pub(crate) use client::{AnsweredByEngine, Ended, Fixture, Input, ReadPage, Reported, Served, Watched};
+pub(crate) use client::{
+    AnsweredByEngine, CardAsk, Ended, FireClient, Fixture, Input, ReadPage, Reported, SendIntent, Served, Tick,
+    Watched, intent, kept,
+};
 
 pub(crate) fn one<T>(value: T) -> skein_lib::List<T> {
     let mut list = skein_lib::List::with_capacity(1);

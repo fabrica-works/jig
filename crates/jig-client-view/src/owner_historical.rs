@@ -268,6 +268,7 @@ pub(crate) fn card(
         Card::Leaving { how: Left::Historical { facts }, .. } => Some(facts.as_ref()),
         Card::Open
         | Card::Deciding { .. }
+        | Card::NotSent { .. }
         | Card::Refused { .. }
         | Card::Unknown { .. }
         | Card::Leaving {

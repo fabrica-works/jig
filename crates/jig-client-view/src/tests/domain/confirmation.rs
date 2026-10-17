@@ -18,7 +18,7 @@ fn offered(act: ActKind, admission: Admission) -> List<Offered> {
     rows.push(Offered { act, admission }).unwrap();
     rows
 }
-fn install(domain: &mut Fixture, body: Body) -> Id<Object> {
+pub(super) fn install(domain: &mut Fixture, body: Body) -> Id<Object> {
     let key = body.key();
     let id = domain.objects.name(key, Source::Window { number: 4 }).unwrap();
     assert!(domain.objects.put(key, body));

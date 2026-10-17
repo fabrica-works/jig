@@ -55,7 +55,7 @@ pub fn acts(
 ) {
     let text_limit = bindings.text_limit();
     match card {
-        Card::Open | Card::Refused { .. } => {}
+        Card::Open | Card::NotSent { .. } | Card::Refused { .. } => {}
         Card::Deciding { .. } | Card::Unknown { .. } | Card::Leaving { .. } => return,
     }
     for offered in rows {

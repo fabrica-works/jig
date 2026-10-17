@@ -18,7 +18,7 @@ use crate::{
 };
 use crate::{JigBindings, JigMeaning, Owner, decode};
 use jig_client::contract::*;
-use skein_lib::{Duration, List, Queue, Time, Token, Wall};
+use skein_lib::{Duration, List, Time, Token, Wall};
 use skein_ui::Act;
 use skein_ui::phrases::{Hole, PhraseLimits, Phrasebook};
 use skein_ui::{Builder, Role, SlotRef, Tree};
@@ -158,6 +158,42 @@ pub(crate) fn contains(tree: &Tree, text: &[u8]) -> bool {
     flat(tree).windows(text.len()).any(|w| w == text)
 }
 
+pub(crate) fn tree(
+    fixture: &Fixture,
+    section: Option<crate::page::Section>,
+    card: Option<skein_lib::Id<crate::objects::Object>>,
+) -> Tree {
+    let bounds = crate::limits::of_words(&fixture.ui.limits, words()).unwrap();
+    let mut builder = Builder::new(&bounds);
+    let mut bindings = JigBindings::new(bounds.bindings, fixture.ui.limits.text);
+    builder.open(Role::Page);
+    if let Some(card) = card {
+        crate::cards::card(
+            &mut builder,
+            &fixture.view(),
+            card,
+            &crate::cards::Place::Elsewhere,
+            words(),
+            &mut bindings,
+        );
+    } else {
+        match section {
+            Some(section) => {
+                builder.open(Role::Main);
+                crate::sections::section(&mut builder, &fixture.view(), words(), &mut bindings, section);
+                builder.close();
+            }
+            None => {
+                crate::frame::banner(&mut builder, &fixture.view(), words(), &mut bindings);
+                crate::pages::main(&mut builder, &fixture.view(), words(), &mut bindings);
+                crate::notices::notices(&mut builder, &fixture.view(), words(), &mut bindings);
+            }
+        }
+    }
+    builder.close();
+    builder.finish()
+}
+
 fn frame_builds_statuses_counts_navigation_and_number_submission_in_every_link_state() {
     let (mut d, watch) = start();
     let words = words();
@@ -167,7 +203,7 @@ fn frame_builds_statuses_counts_navigation_and_number_submission_in_every_link_s
             drive(&mut d, Watched { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(document()))) });
         }
         if expected == b"Offline" {
-            d.set_link(jig_client::Link::Offline, &mut Queue::with_capacity(crate::max_out(&CLIENT)));
+            d.set_link(jig_client::Link::Offline);
         }
         bindings.begin();
         let mut b = Builder::new(&limits());

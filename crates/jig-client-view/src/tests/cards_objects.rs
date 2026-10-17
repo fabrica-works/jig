@@ -204,6 +204,7 @@ pub(super) fn render(d: &Fixture, id: Id<Object>, words: &crate::words::Words, b
         crate::objects::Card::Open
         | crate::objects::Card::Refused { .. }
         | crate::objects::Card::Unknown { .. }
+        | crate::objects::Card::NotSent { .. }
         | crate::objects::Card::Leaving { .. } => {}
     }
     tree

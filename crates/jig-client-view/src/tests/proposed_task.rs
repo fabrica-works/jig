@@ -239,7 +239,15 @@ fn selected_owner_language() -> skein_ui::phrases::Language {
     for phrase in &mut selected.phrases {
         if phrase.id.number >= 3000 {
             for form in &mut phrase.forms {
-                form.segments[0] = Segment::Text(b"Selected owner fact: ".as_slice().into());
+                for segment in &mut form.segments {
+                    match segment {
+                        Segment::Text(_) => {
+                            *segment = Segment::Text(b"Selected owner fact: ".as_slice().into());
+                            break;
+                        }
+                        Segment::Hole { .. } => {}
+                    }
+                }
             }
         }
     }

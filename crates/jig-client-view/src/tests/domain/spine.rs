@@ -9,7 +9,7 @@ use jig_client::Link;
 use jig_client::contract::{
     Count, Delivery, DocumentText, Frame, FrameParty, HeldRole, Inbox, Needs, PartyKind, WatchEvent,
 };
-use skein_lib::{Duration, Env, List, Queue, Time, Token, Wall};
+use skein_lib::{Duration, Env, List, Queue, Time, Wall};
 
 pub(crate) const LIMITS: Limits = Limits {
     watches: 4,
@@ -107,7 +107,7 @@ fn inbox() -> Inbox {
 #[test]
 fn start_opens_only_the_frame_and_takes_nothing_before_it() {
     let mut domain = Fixture::new(&LIMITS);
-    assert!(drive(&mut domain, Time::ZERO, Event::Frame { asked: Token::new(1) }).is_empty());
+    assert_eq!(domain.frame().party(), None);
     let opened = drive(
         &mut domain,
         Time::ZERO,
@@ -167,12 +167,9 @@ fn a_different_party_keeps_the_previous_partys_work_hidden_until_they_return() {
     let mut domain = Fixture::new(&LIMITS);
     let watch = start(&mut domain, kept);
     let refused = delivered(&mut domain, Time::ZERO, watch, frame(8));
-    assert_eq!(refused[0], Request::Link { link: Link::Live });
-    assert_eq!(refused[1], Request::Confirmed { party: None });
-    assert_eq!(refused.len(), 3);
+    assert_eq!(refused.as_ref(), &[]);
     assert_eq!(domain.page(), &Page::SomeoneElse);
-    let returned = delivered(&mut domain, Time::ZERO, watch, frame(7));
-    assert_eq!(returned[0], Request::Confirmed { party: Some(7) });
+    delivered(&mut domain, Time::ZERO, watch, frame(7));
     assert_eq!(domain.frame().party(), Some(7));
     assert_eq!(
         domain.page(),
@@ -187,11 +184,7 @@ fn an_unsupported_version_parks_work_and_never_sends_a_new_engine_request() {
     let refused = drive(&mut domain, Time::ZERO, Served { served: false });
     assert_eq!(
         refused.as_ref(),
-        &[
-            Request::Link { link: Link::OutOfDate },
-            Request::PartsLeft,
-            Request::Client { asked: jig_client::Event::Unwatch { handle: watch } }
-        ]
+        &[Request::PartsLeft, Request::Client { asked: jig_client::Event::Unwatch { handle: watch } }]
     );
     assert_eq!(domain.page(), &Page::OutOfDate);
     assert_eq!(domain.next_deadline(), None);
@@ -200,61 +193,39 @@ fn an_unsupported_version_parks_work_and_never_sends_a_new_engine_request() {
 }
 
 #[test]
-fn siblings_get_the_current_party_and_address_in_the_same_step() {
-    let mut domain = Fixture::new(&LIMITS);
-    let watch = start(&mut domain, List::with_capacity(0));
-    delivered(&mut domain, Time::ZERO, watch, frame(7));
-    assert_eq!(
-        drive(&mut domain, Time::ZERO, Event::Frame { asked: Token::new(42) }).as_ref(),
-        &[Request::FrameIs {
-            asked: Token::new(42),
-            frame: crate::frame::me::FrameShown {
-                party: Some(7),
-                address: Some(Address::Inbox { project: None }),
-                link: Link::Live
-            }
-        }]
-    );
-}
-
-#[test]
 fn foreign_kept_requests_hide_work_but_confirm_only_the_frame_party() {
-    let mut domain = Fixture::new(&LIMITS);
-    let watch = start(&mut domain, List::with_capacity(0));
-    drive(&mut domain, Time::ZERO, Event::Kept { scope: 7, requests: 2 });
-    let out = delivered(&mut domain, Time::ZERO, watch, frame(8));
-    assert!(out.contains(&Request::Confirmed { party: Some(8) }));
+    let mut domain = restored(&[(1, 7), (2, 7)], List::with_capacity(0));
+    let watch = domain.frame_watch.unwrap();
+    delivered(&mut domain, Time::ZERO, watch, frame(8));
+    assert_eq!(domain.frame().party(), Some(8));
     assert_eq!(domain.page(), &Page::SomeoneElse);
-    drive(&mut domain, Time::ZERO, Event::KeptGone { scope: 7 });
+    drive(&mut domain, Time::ZERO, jig_client::Up::NotKept { key: [1; 16] });
     assert_eq!(domain.page(), &Page::SomeoneElse);
 }
 
 #[test]
 fn the_last_foreign_kept_request_retiring_restores_the_work_page() {
-    let mut domain = Fixture::new(&LIMITS);
-    let watch = start(&mut domain, List::with_capacity(0));
-    drive(&mut domain, Time::ZERO, Event::Kept { scope: 7, requests: 2 });
-    drive(&mut domain, Time::ZERO, Event::Kept { scope: 9, requests: 1 });
+    let mut domain = restored(&[(1, 7), (2, 7), (3, 9)], List::with_capacity(0));
+    let watch = domain.frame_watch.unwrap();
+    // All three restored keys must retire before work returns.
     delivered(&mut domain, Time::ZERO, watch, frame(8));
-    drive(&mut domain, Time::ZERO, Event::KeptGone { scope: 7 });
-    drive(&mut domain, Time::ZERO, Event::KeptGone { scope: 7 });
+    drive(&mut domain, Time::ZERO, jig_client::Up::NotKept { key: [1; 16] });
+    drive(&mut domain, Time::ZERO, jig_client::Up::NotKept { key: [2; 16] });
     assert_eq!(domain.page(), &Page::SomeoneElse);
-    drive(&mut domain, Time::ZERO, Event::KeptGone { scope: 9 });
+    drive(&mut domain, Time::ZERO, jig_client::Up::NotKept { key: [3; 16] });
     assert!(work_page(&domain));
-    assert!(drive(&mut domain, Time::ZERO, Event::KeptGone { scope: 9 }).is_empty());
+    assert!(drive(&mut domain, Time::ZERO, jig_client::Up::NotKept { key: [3; 16] }).is_empty());
 }
 
 #[test]
 fn own_kept_requests_do_not_hide_work_or_override_kept_draft_guard() {
-    let mut domain = Fixture::new(&LIMITS);
-    let watch = start(&mut domain, List::with_capacity(0));
-    drive(&mut domain, Time::ZERO, Event::Kept { scope: 7, requests: 2 });
+    let mut domain = restored(&[(1, 7), (2, 7)], List::with_capacity(0));
+    let watch = domain.frame_watch.unwrap();
     delivered(&mut domain, Time::ZERO, watch, frame(7));
     assert!(work_page(&domain));
-    drive(&mut domain, Time::ZERO, Event::KeptGone { scope: 7 });
+    drive(&mut domain, Time::ZERO, jig_client::Up::NotKept { key: [1; 16] });
     assert!(work_page(&domain));
 
-    let mut guarded = Fixture::new(&LIMITS);
     let mut kept = List::with_capacity(1);
     kept.push(Record::Draft {
         version: crate::store::STORE_VERSION,
@@ -264,10 +235,10 @@ fn own_kept_requests_do_not_hide_work_or_override_kept_draft_guard() {
         touched: 1,
     })
     .unwrap();
-    let watch = start(&mut guarded, kept);
-    drive(&mut guarded, Time::ZERO, Event::Kept { scope: 7, requests: 1 });
+    let mut guarded = restored(&[(1, 7)], kept);
+    let watch = guarded.frame_watch.unwrap();
     delivered(&mut guarded, Time::ZERO, watch, frame(7));
-    drive(&mut guarded, Time::ZERO, Event::KeptGone { scope: 7 });
+    drive(&mut guarded, Time::ZERO, jig_client::Up::NotKept { key: [1; 16] });
     assert_eq!(guarded.page(), &Page::SomeoneElse);
 }
 
@@ -286,4 +257,12 @@ pub(super) fn party(number: u64) -> jig_client::contract::Party {
         kind: PartyKind::Person,
         name: jig_client::contract::Text::new(Box::from(*b"Pat"), 32).unwrap(),
     }
+}
+
+pub(super) fn restored(rows: &[(u8, u64)], records: List<Record>) -> Fixture {
+    let mut kept = List::with_capacity(u32::try_from(rows.len()).unwrap());
+    for (number, party) in rows {
+        kept.push(crate::tests::fixtures::kept(*number, *party)).unwrap();
+    }
+    Fixture::restored(&Limits { intents: LIMITS.kept, conversation_words: LIMITS.kept, ..LIMITS }, records, kept)
 }

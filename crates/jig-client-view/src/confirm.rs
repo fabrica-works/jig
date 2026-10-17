@@ -121,6 +121,7 @@ pub(crate) fn close(domain: &mut Ui) {
             Card::Deciding { request: None, .. } => object.card = open.previous,
             Card::Open
             | Card::Deciding { request: Some(_), .. }
+            | Card::NotSent { .. }
             | Card::Refused { .. }
             | Card::Unknown { .. }
             | Card::Leaving { .. } => {}
@@ -145,7 +146,7 @@ pub(crate) fn open(domain: &mut Ui, env: &Env<crate::Limits>, id: Id<Object>, ac
         return;
     };
     match object.card {
-        Card::Open | Card::Refused { .. } => {}
+        Card::Open | Card::NotSent { .. } | Card::Refused { .. } => {}
         Card::Deciding { .. } | Card::Unknown { .. } | Card::Leaving { .. } => return,
     }
     let proposed = match acts::offered(&object, act) {

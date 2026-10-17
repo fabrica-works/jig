@@ -4,14 +4,6 @@
 use crate::address::Address;
 use jig_client::Link;
 use jig_client::contract::Frame;
-/// A sibling hand off of who is signed in and where.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct FrameShown {
-    pub party: Option<u64>,
-    pub address: Option<Address>,
-    pub link: Link,
-}
-
 /// The current committed frame document.
 #[derive(Debug, PartialEq, Eq)]
 pub struct FrameState<'a> {

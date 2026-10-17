@@ -7,7 +7,7 @@ use jig_client_view::boundary::Offset;
 use jig_client_world::harness::Seen;
 use jig_client_world::{harness::*, observe};
 use jig_ops_client_domain::{
-    self as domain, Action, Address, Event, JigOut, Request, infrastructure as infra, observability as obs,
+    self as domain, Action, Address, Event, Request, infrastructure as infra, observability as obs,
 };
 use jig_ops_client_view as view;
 use jig_ops_domain_connectors::{Connector, number};
@@ -195,7 +195,6 @@ impl App for Ops {
                 panic!("family work routes through the client")
             }
             Request::Fact { .. }
-            | Request::Jig(JigOut::Answered { .. } | JigOut::Unknown { .. })
             | Request::Observability(obs::Out::Fact { .. })
             | Request::Infrastructure(infra::Out::Fact { .. }) => Duty::Fact,
         }
@@ -255,7 +254,6 @@ impl App for Ops {
             | Request::SignOut
             | Request::SignIn { .. }
             | Request::Fact { .. }
-            | Request::Jig(_)
             | Request::Infrastructure(_)
             | Request::Observability(_) => None,
         }

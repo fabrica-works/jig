@@ -4,13 +4,10 @@
 use crate::{
     action::Act,
     address::Place,
-    frame::me::FrameShown,
-    intents::ByValue,
     store::{Record, StoreKey},
 };
-use jig_client::Link;
-use jig_client::contract::{Answer, Part};
-use skein_lib::{Duration, List, Token};
+use jig_client::contract::Part;
+use skein_lib::List;
 /// The person offset from universal time, in minutes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Offset {
@@ -38,22 +35,14 @@ pub enum Event {
     Client { told: jig_client::Told },
     /// Its kept records, the initial place and the seed for fresh request keys.
     Start { records: List<Record>, place: Place, seed: u64 },
-    /// Restored table requests, counted once per scope after Start.
-    Kept { scope: u64, requests: u32 },
-    /// One restored request retired, with or without a known outcome.
-    KeptGone { scope: u64 },
     /// The shell reports a place it went.
     Went { place: Place },
     /// The application left for one of its own places.
     Left,
     /// A person acted on the view.
     Act { action: Act },
-    /// A program asks by value.
-    Ask { ask: ByValue },
     /// The application's page names the whole list of jig objects and sections.
     Named { objects: List<jig_client::contract::ObjectKey>, sections: List<crate::page::Section> },
-    /// A sibling requests the current frame within this step.
-    Frame { asked: Token },
 }
 
 /// One effect or hand off routed by the application root.
@@ -71,16 +60,4 @@ pub enum Request {
     ShowPart { part: Part, scope: jig_client::contract::PartScope },
     /// The old page no longer shows its parts.
     PartsLeft,
-    /// Tell siblings and the table the shared link.
-    Link { link: Link },
-    /// Tell the table whose parked requests may be sent.
-    Confirmed { party: Option<u64> },
-    /// Tell the table the engine answer retention.
-    Retention { retention: Duration },
-    /// Answer a sibling hand off in this step.
-    FrameIs { asked: Token, frame: FrameShown },
-    /// Tell a program its by value durable outcome.
-    Answered { asked: Token, answer: Answer },
-    /// Tell a program that retention ended without a known outcome.
-    Unknown { asked: Token },
 }

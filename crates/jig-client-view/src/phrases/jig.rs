@@ -6,6 +6,10 @@ use skein_ui::phrases::{HoleKind, HoleShape, PhraseId, PhraseShape};
 /// Each sentence jig says, independent of language word order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum JigPhrase {
+    RequestNotKept,
+    RequestUnconfirmed,
+    RequestsInFlight,
+    RequestsDropped,
     NoticesPart,
     NothingKnown,
     LinkPart,
@@ -1140,6 +1144,10 @@ impl JigPhrase {
             Self::FramePoolUnopened => 618,
             Self::PolicyPeriodSpend => 590,
             Self::PolicyEditRole => 591,
+            Self::RequestNotKept => 7404,
+            Self::RequestUnconfirmed => 7405,
+            Self::RequestsInFlight => 7406,
+            Self::RequestsDropped => 7407,
             Self::PolicyRequests => 592,
             Self::PolicyDecides => 593,
             Self::PolicyRequirements => 594,
@@ -1941,6 +1949,9 @@ impl JigPhrase {
             | Self::UpdateClient
             | Self::SomeoneElse
             | Self::LoadingNavigation
+            | Self::RequestNotKept
+            | Self::RequestUnconfirmed
+            | Self::RequestsInFlight
             | Self::Refused
             | Self::Leaving
             | Self::Live
@@ -2296,6 +2307,7 @@ impl JigPhrase {
             | Self::Priority
             | Self::Closing
             | Self::PartOwnerProposal
+            | Self::RequestsDropped
             | Self::ResultsThrough => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
             Self::PolicyEffect
             | Self::RunRetryFailed
@@ -2406,7 +2418,7 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 627] = [
+pub const ALL: [JigPhrase; 631] = [
     JigPhrase::NoticesPart,
     JigPhrase::NothingKnown,
     JigPhrase::LinkPart,
@@ -2447,6 +2459,10 @@ pub const ALL: [JigPhrase; 627] = [
     JigPhrase::FramePoolUnopened,
     JigPhrase::PolicyPeriodSpend,
     JigPhrase::PolicyEditRole,
+    JigPhrase::RequestNotKept,
+    JigPhrase::RequestUnconfirmed,
+    JigPhrase::RequestsInFlight,
+    JigPhrase::RequestsDropped,
     JigPhrase::PolicyRequests,
     JigPhrase::PolicyDecides,
     JigPhrase::PolicyRequirements,

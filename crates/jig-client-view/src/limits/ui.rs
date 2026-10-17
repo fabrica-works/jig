@@ -25,7 +25,7 @@ pub struct Limits {
     /// the root box), list capacities, texts and nested documents.
     pub document_bytes: u64,
     pub records: u32,
-    /// Distinct scopes of restored requests counted until their retirement.
+    /// Requests restored under jig's asker, until their terminal.
     pub kept: u32,
     /// Per-task composers kept across navigation and restart.
     pub drafts: u32,
@@ -83,7 +83,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     total = total.checked_add(crate::fields::worst_case(limits)?)?;
     total = total.checked_add(crate::drafts::worst_case(limits)?)?;
     total = total.checked_add(List::<u64>::worst_case(limits.records)?)?;
-    total = total.checked_add(Map::<u64, u32>::worst_case(limits.kept)?)?;
+    total = total.checked_add(Map::<jig_client::Key, u64>::worst_case(limits.kept)?)?;
     total = total.checked_add(crate::confirm::worst_case(limits)?)?;
     total = total.checked_add(List::<crate::objects::Context>::worst_case(limits.rows.checked_mul(2)?)?)?;
     total = total.checked_add(crate::objects::worst_case(limits)?)?;

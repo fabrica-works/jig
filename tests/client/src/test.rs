@@ -2,7 +2,7 @@
 #![allow(clippy::wildcard_imports, reason = "world adapters translate the complete owner vocabulary")]
 use crate::harness::*;
 use jig_client_domain::contract::*;
-use jig_client_test_domain::{self as domain, Address, Event, JigOut, Request, first};
+use jig_client_test_domain::{self as domain, Address, Event, Request, first};
 use jig_client_test_view as view;
 use jig_client_view::boundary::Offset;
 use skein_lib::{Duration, Env, List, Queue, RequestEnvelope, RequestLimits, Time};
@@ -265,9 +265,7 @@ impl App for Test {
             Request::Client { .. } => Duty::Wire(request),
             Request::Show { address, replace } => Duty::Show { address, replace },
             Request::SignIn { provider } => Duty::SignIn { provider },
-            Request::Jig(JigOut::Answered { .. } | JigOut::Unknown { .. })
-            | Request::First(_)
-            | Request::Fact { .. } => Duty::Fact,
+            Request::First(_) | Request::Fact { .. } => Duty::Fact,
         }
     }
     fn record_key(record: &Self::Record) -> Self::Key {
@@ -320,7 +318,6 @@ impl App for Test {
             | Request::SignOut
             | Request::SignIn { .. }
             | Request::Fact { .. }
-            | Request::Jig(_)
             | Request::First(_) => None,
         }
     }

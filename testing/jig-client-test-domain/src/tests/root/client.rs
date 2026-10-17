@@ -1,9 +1,10 @@
-use super::fixtures::{RECORD_ITEM, RECORD_PROJECT, ROUTED_TOKEN, UNOWNED_KEY_NUMBER};
-use super::{ask, confirm, drive, env, limits, out_iter, ready, start};
-use crate::{Address, Event, JigOut, Request, first, max_out, new, route};
+use super::fixtures::{RECORD_ITEM, RECORD_PROJECT, UNOWNED_KEY_NUMBER};
+use super::{confirm, drive, env, limits, out_iter, ready, start};
+use crate::{Address, Event, Request, first, max_out, new, route};
 use jig_client::Link;
 use jig_client::{Asker, Key, Told, contract};
 use skein_lib::{List, Queue};
+const ME: u64 = 7;
 
 #[test]
 fn the_link_reaches_each_child() {
@@ -53,23 +54,11 @@ fn routes_a_tell_to_the_child_its_asker_names() {
     let mut root = crate::unlinked(&limits(), 7);
     let watch = start(&mut root, List::with_capacity(0));
     confirm(&mut root, watch, 7);
-    let rows = ask(&mut root, ROUTED_TOKEN);
-    let key = rows
-        .iter()
-        .find_map(|row| match row {
-            Request::Save { record: crate::store::Record::Unlinked(record) } => Some(record.request.key),
-            _ => None,
-        })
-        .expect("the client keeps the original asker's key");
+    root.first = first::Side::new(&limits().first, 7);
     let mut out = Queue::with_capacity(max_out(&limits()));
-    let answer = contract::Answer::Done(contract::Outcome::Changed);
-    route::told(
-        &mut root,
-        &env(),
-        Told::Answered { key, outcome: jig_client::Outcome::Answered(jig_client::Answered::Jig(answer.clone())) },
-        &mut out,
-    );
-    assert_eq!(out_iter(out), vec![Request::Jig(JigOut::Answered { asked: ROUTED_TOKEN, answer })]);
+    route::told(&mut root, &env(), Told::Changed { handle: first::me::handle() }, &mut out);
+    assert_eq!(out_iter(out), vec![]);
+    assert_eq!(root.first().party(), Some(7));
 }
 
 #[test]
@@ -93,11 +82,34 @@ fn the_reference_ui_s_records_leave_before_the_step_s_exchanges() {
             Request::Show { .. }
             | Request::SignIn { .. }
             | Request::SignOut
-            | Request::Jig(_)
             | Request::First(_)
             | Request::Fact { .. } => {}
         }
     }
     assert!(stored);
     assert!(exchange);
+}
+
+#[test]
+fn a_family_side_reads_the_party_from_its_own_me_handle() {
+    let mut root = crate::unlinked(&limits(), ME);
+    let watch = start(&mut root, List::with_capacity(0));
+    confirm(&mut root, watch, ME);
+    let handle = first::me::handle();
+    assert_eq!(handle.asker, Asker(u32::from(crate::FIRST)));
+    assert_ne!(handle.asker, Asker::JIG);
+    assert!(root.client().document(handle).is_some());
+    root.first = first::Side::new(&limits().first, ME);
+    root.jig = jig_client_view::Ui::new(
+        &limits().jig,
+        jig_client_view::page::navigation::Navigation::new(limits().jig.navigation_entries),
+        jig_client_view::address::Address::Inbox { project: None },
+        jig_client_view::page::Arrangement::none(),
+    )
+    .unwrap();
+    let mut out = Queue::with_capacity(max_out(&limits()));
+    route::told(&mut root, &env(), Told::Changed { handle }, &mut out);
+    assert_eq!(root.first().party(), Some(ME));
+    assert_eq!(root.jig().link(), Link::Starting);
+    assert_eq!(out_iter(out), vec![]);
 }

@@ -5,7 +5,7 @@ use crate::{
 };
 use alloc::boxed::Box;
 use jig_client::contract::Ask as JigAsk;
-use skein_lib::{List, Token};
+use skein_lib::List;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Ask {
     Jig(Box<JigAsk>),
@@ -32,11 +32,6 @@ pub enum Event {
     First(first::Event),
     SignedOut,
 }
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum JigOut {
-    Answered { asked: Token, answer: jig_client::contract::Answer },
-    Unknown { asked: Token },
-}
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Fact {
     PartsFull,
@@ -48,7 +43,6 @@ pub enum Request {
     Save { record: Record },
     Erase { key: Key },
     Client { request: jig_client::Request },
-    Jig(JigOut),
     First(first::Out),
     Show { address: Address, replace: bool },
     SignIn { provider: u16 },

@@ -42,7 +42,7 @@ pub fn recovery(object: &Object) -> Recovery {
             | Refusal::NotOffered
             | Refusal::KeyConflict => {}
         },
-        Card::Open | Card::Deciding { .. } | Card::Leaving { .. } => {}
+        Card::Open | Card::NotSent { .. } | Card::Deciding { .. } | Card::Leaving { .. } => {}
     }
     recovery
 }

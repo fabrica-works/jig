@@ -15,7 +15,7 @@ use crate::{
     action::Act,
     address::{Address, Place},
     boundary::{Event, Refused, Request},
-    frame::me::{FrameShown, FrameState},
+    frame::me::FrameState,
     handles::Owner,
     limits::ui::Limits,
     page::{Arrangement, Page, Section},
@@ -23,7 +23,7 @@ use crate::{
 };
 use jig_client::Link;
 use jig_client::contract::{Delivery, Frame, Limit, Subject};
-use skein_lib::{Deadlines, Duration, Env, Id, List, Map, Queue, Time, Token, Wall};
+use skein_lib::{Deadlines, Duration, Env, Id, List, Map, Queue, Time, Wall};
 
 pub mod borrowed;
 pub(crate) mod client;
@@ -79,7 +79,7 @@ pub struct Ui {
     pub(crate) wall: Wall,
     pub(crate) shown: u64,
     pub(crate) kept: List<Record>,
-    pub(crate) kept_requests: Map<u64, u32>,
+    pub(crate) kept_requests: Map<jig_client::Key, u64>,
     pub(crate) handles: crate::handles::Handles,
     pub(crate) frame_watch: Option<jig_client::Handle>,
     pub(crate) timers: Deadlines<Timer>,
@@ -102,14 +102,9 @@ impl Ui {
                 step(self, &env, event, out, client);
                 client::told(self, &env, client, jig_client::Told::Link { link: client.link().state }, self.seed, out);
             }
-            event @ (Event::Went { .. }
-            | Event::Left
-            | Event::Act { .. }
-            | Event::Named { .. }
-            | Event::Frame { .. }
-            | Event::Ask { .. }
-            | Event::Kept { .. }
-            | Event::KeptGone { .. }) => step(self, &env, event, out, client),
+            event @ (Event::Went { .. } | Event::Left | Event::Act { .. } | Event::Named { .. }) => {
+                step(self, &env, event, out, client);
+            }
         }
         settle(self, &env, out, client);
     }
@@ -445,7 +440,7 @@ impl Ui {
     pub(crate) fn changed(&mut self) {
         self.shown = self.shown.saturating_add(1);
     }
-    pub(crate) fn set_link(&mut self, link: Link, out: &mut Queue<Request>) {
+    pub(crate) fn set_link(&mut self, link: Link) {
         if self.link != link {
             let previous = self.link;
             self.link = link;
@@ -454,7 +449,6 @@ impl Ui {
                 Link::Live | Link::Offline => crate::notices::kept::show(self, crate::notices::kept::Kind::Link(link)),
             }
             self.changed();
-            out.push(Request::Link { link });
         }
     }
     pub(crate) fn hold_watch(
@@ -529,15 +523,7 @@ pub fn step(domain: &mut Ui, env: &Env<Limits>, event: Event, out: &mut Queue<Re
                 domain.intents.seed = seed;
                 start(domain, env, place, records, out);
             }
-            Event::Client { .. }
-            | Event::Left
-            | Event::Went { .. }
-            | Event::Act { .. }
-            | Event::Ask { .. }
-            | Event::Named { .. }
-            | Event::Frame { .. }
-            | Event::Kept { .. }
-            | Event::KeptGone { .. } => {}
+            Event::Client { .. } | Event::Left | Event::Went { .. } | Event::Act { .. } | Event::Named { .. } => {}
         }
         return;
     }
@@ -545,33 +531,12 @@ pub fn step(domain: &mut Ui, env: &Env<Limits>, event: Event, out: &mut Queue<Re
     domain.wall = env.wall;
     match event {
         Event::Client { .. } => unreachable!("client tells enter through Ui::step"),
-        Event::Frame { asked } => frame_answer(domain, asked, out, lent),
         Event::Went { place } => {
             crate::confirm::close(domain);
             crate::page::routing::navigate(domain, env, place, true, out, lent);
         }
         Event::Act { action } => act_event(domain, env, action, out, lent),
         Event::Start { .. } => {}
-        Event::Kept { scope, requests } => {
-            if requests != 0 && domain.kept_requests.insert(scope, requests).is_err() {
-                crate::page::routing::refuse(domain, Limit::Requests);
-            }
-            refresh_kept_page(domain, env, out, lent);
-        }
-        Event::KeptGone { scope } => {
-            if let Some(requests) = domain.kept_requests.get(&scope).copied() {
-                if requests == 1 {
-                    domain.kept_requests.remove(&scope);
-                } else {
-                    domain
-                        .kept_requests
-                        .insert(scope, requests.checked_sub(1).expect("counted request remains"))
-                        .expect("existing scope retains its capacity");
-                }
-                refresh_kept_page(domain, env, out, lent);
-            }
-        }
-        Event::Ask { ask } => crate::intents::by_value(domain, ask, out, lent),
         Event::Named { objects, sections } => {
             crate::page::shown::show(domain, env, sections, out, lent);
             crate::application::show(domain, env, objects, out);
@@ -690,14 +655,19 @@ fn start(domain: &mut Ui, env: &Env<Limits>, place: Place, records: List<Record>
 }
 // Restored table scopes are facts; the client owns the warning and its end.
 pub(crate) fn foreign_kept_requests(domain: &Ui, party: u64) -> bool {
-    for (scope, requests) in &domain.kept_requests {
-        if *scope != party && *requests != 0 {
+    for (_, scope) in &domain.kept_requests {
+        if *scope != party {
             return true;
         }
     }
     false
 }
-fn refresh_kept_page(domain: &mut Ui, env: &Env<Limits>, out: &mut Queue<Request>, lent: &jig_client::Client) {
+pub(crate) fn refresh_kept_page(
+    domain: &mut Ui,
+    env: &Env<Limits>,
+    out: &mut Queue<Request>,
+    lent: &jig_client::Client,
+) {
     let Some(party) = domain.frame(lent).party() else {
         return;
     };
@@ -714,17 +684,6 @@ fn refresh_kept_page(domain: &mut Ui, env: &Env<Limits>, out: &mut Queue<Request
         domain.show_work(env, out, lent);
     }
 }
-fn frame_answer(domain: &Ui, asked: Token, out: &mut Queue<Request>, lent: &jig_client::Client) {
-    let party = domain.frame(lent).party();
-    let address = match domain.page {
-        Page::Work { address, .. } => Some(address),
-        Page::Starting | Page::Elsewhere | Page::SigningIn | Page::Missing | Page::OutOfDate | Page::SomeoneElse => {
-            None
-        }
-    };
-    out.push(Request::FrameIs { asked, frame: FrameShown { party, address, link: domain.link } });
-}
-
 pub(crate) fn changed_handle(
     domain: &mut Ui,
     env: &Env<Limits>,
@@ -793,7 +752,6 @@ pub(crate) fn frame_delivery(
         jig_client::contract::PartyKind::Service => true,
         jig_client::contract::PartyKind::Person => false,
     };
-    let first = domain.confirmed.is_none();
     let party = frame.party.number;
     let mut mismatch = false;
     for record in &domain.kept {
@@ -804,16 +762,8 @@ pub(crate) fn frame_delivery(
             mismatch = true;
         }
     }
-    let previous = domain.confirmed;
-    let previously_confirmed = domain.confirmed;
-    let retention = frame.retention;
     domain.confirmed = if mismatch { None } else { Some(party) };
     domain.changed();
-    if first || previous != Some(party) || mismatch || previously_confirmed != domain.confirmed {
-        let confirmed = if mismatch { None } else { Some(party) };
-        out.push(Request::Confirmed { party: confirmed });
-    }
-    out.push(Request::Retention { retention });
     if mismatch || foreign_kept_requests(domain, party) {
         domain.leave_handles(false, out);
         domain.page = Page::SomeoneElse;
@@ -919,6 +869,7 @@ pub fn fire(domain: &mut Ui, env: &Env<Limits>, out: &mut Queue<Request>, lent: 
                     }
                     crate::objects::Card::Open
                     | crate::objects::Card::Deciding { .. }
+                    | crate::objects::Card::NotSent { .. }
                     | crate::objects::Card::Refused { .. }
                     | crate::objects::Card::Unknown { .. } => {}
                 }

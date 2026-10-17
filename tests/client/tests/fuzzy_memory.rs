@@ -280,11 +280,24 @@ fn full_documents_tabs_and_all_page_kinds_fit_the_client_and_view_worst_cases() 
             }),
         );
     }
-    // The added owner count reaches every distinct restored-scope slot too.
+    // A second tab restores the client's full keyed request table.
     let counted = w.client(7, stories::inbox());
-    for scope in [7, 8, 9, 10] {
-        w.event(counted, jig_client_test_domain::Event::Jig(jig_client_view::Event::Kept { scope, requests: 1 }));
+    w.run(Until::Time(Time::from_nanos(30_000_000)));
+    for number in [100, 101, 102, 103] {
+        w.event(
+            counted,
+            jig_client_test_domain::Event::Client {
+                event: jig_client::Event::Send {
+                    key: jig_client::Key { asker: jig_client::Asker::JIG, number },
+                    request: jig_client::Ask::Jig(Box::new(jig_client_domain::contract::Ask::Stop {
+                        project: 1,
+                        task: 9,
+                    })),
+                },
+            },
+        );
     }
+    w.tab(counted);
     let result = w.run(Until::Steps(2));
     eprintln!("full client fixture: heap peak {} bytes, bound {} bytes", result.heap_peak, result.heap_bound);
     assert!(result.heap_peak > 0, "counted every iteration");

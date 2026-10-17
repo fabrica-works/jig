@@ -187,7 +187,7 @@ impl NativeClient {
                     self.received.extend(self.wire.sent(&request));
                     self.shell.down(request);
                 }
-                Request::Jig(_) | Request::First(_) | Request::Fact { .. } => {}
+                Request::First(_) | Request::Fact { .. } => {}
             }
         }
     }

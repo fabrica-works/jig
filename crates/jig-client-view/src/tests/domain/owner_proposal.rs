@@ -82,7 +82,11 @@ fn owner_proposal_original_maker_keys_all_three_decisions_and_reason_survive_dou
             assert_eq!(domain.objects().get(id).unwrap().answer, Some(answer.clone()));
             assert!(match domain.objects().get(id).unwrap().card {
                 Card::Leaving { .. } => true,
-                Card::Open | Card::Refused { .. } | Card::Unknown { .. } | Card::Deciding { .. } => false,
+                Card::NotSent { .. }
+                | Card::Open
+                | Card::Refused { .. }
+                | Card::Unknown { .. }
+                | Card::Deciding { .. } => false,
             });
             drive(&mut domain, Time::ZERO, AnsweredByEngine { request, answer: Answer::Refused(Refusal::KeyConflict) });
             assert_eq!(domain.objects().get(id).unwrap().answer, Some(answer.clone()));

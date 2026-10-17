@@ -1,7 +1,7 @@
 //! Exhaustive wrapping and synchronous hand-offs. The root never interprets
 //! child answers or application documents (client/domain/root.md, section 5).
 use crate::{
-    Action, Address, Domain, Event, Fact, JigOut, Limits, Place, Request, first,
+    Action, Address, Domain, Event, Fact, Limits, Place, Request, first,
     store::{Key, Record},
 };
 use skein_lib::{Env, List, Queue};
@@ -132,18 +132,6 @@ pub(crate) fn route_jig(
                 first(root, env, first::Event::PartsLeft, out);
                 root.second.left();
             }
-            jig_client_view::Request::Link { .. } | jig_client_view::Request::Retention { .. } => {}
-            jig_client_view::Request::Confirmed { party } => {
-                first(root, env, first::Event::Confirmed { party }, out);
-                root.second.confirmed(party);
-            }
-            jig_client_view::Request::FrameIs { asked, frame } => {
-                first(root, env, first::Event::FrameIs { asked, frame }, out);
-            }
-            jig_client_view::Request::Answered { asked, answer } => {
-                out.push(Request::Jig(JigOut::Answered { asked, answer }));
-            }
-            jig_client_view::Request::Unknown { asked } => out.push(Request::Jig(JigOut::Unknown { asked })),
         }
     }
 }
@@ -155,7 +143,7 @@ pub(crate) fn route_first(
 ) {
     for _ in 0..child.len() {
         match child.pop().expect("counted first output") {
-            first::Request::Frame { asked } => jig(root, env, jig_client_view::Event::Frame { asked }, out),
+            first::Request::Client { asked } => client(root, env, asked, out),
             first::Request::Show { address } => {
                 out.push(Request::Show { address: Address::First(address), replace: false });
             }
@@ -214,16 +202,13 @@ pub(crate) fn route_client(
 pub(crate) fn told(root: &mut Domain, env: &Env<Limits>, told: jig_client::Told, out: &mut Queue<Request>) {
     use jig_client::Told;
     let asker = match &told {
-        Told::Link { link } => {
-            let link = match link {
-                jig_client::Link::Live => jig_client::Link::Live,
-                jig_client::Link::Starting => jig_client::Link::Starting,
-                jig_client::Link::Offline | jig_client::Link::SignedOut | jig_client::Link::OutOfDate => {
-                    jig_client::Link::Offline
-                }
-            };
-            first(root, env, first::Event::Link { link }, out);
-            root.second.link_is(link);
+        Told::Link { .. } => {
+            first_me(root, env, &told, out);
+            let mut child = Queue::with_capacity(2);
+            root.second.told(&root.client, &told, &mut child);
+            while let Some(event) = child.pop() {
+                client(root, env, event, out);
+            }
             jig_client::Asker::JIG
         }
         Told::Dropped { .. } => jig_client::Asker::JIG,
@@ -239,9 +224,31 @@ pub(crate) fn told(root: &mut Domain, env: &Env<Limits>, told: jig_client::Told,
             route_jig(root, env, &mut child, out);
         }
         Some(jig_client_view::Owner::Application { number }) => match crate::Connector::of(number) {
-            Some(crate::Connector::First) => crate::family::client::told(root, env, told, out),
-            Some(crate::Connector::Second) | None => {}
+            Some(crate::Connector::First) if !first_me(root, env, &told, out) => {
+                crate::family::client::told(root, env, told, out);
+            }
+            Some(crate::Connector::Second) => {
+                let mut child = Queue::with_capacity(2);
+                root.second.told(&root.client, &told, &mut child);
+                while let Some(event) = child.pop() {
+                    client(root, env, event, out);
+                }
+            }
+            Some(crate::Connector::First) | None => {}
         },
         None => {}
     }
+}
+
+fn first_me(root: &mut Domain, env: &Env<Limits>, told: &jig_client::Told, out: &mut Queue<Request>) -> bool {
+    let mut child = Queue::with_capacity(first::max_out(&env.limits.first));
+    let consumed = first::me::told(
+        &mut root.first,
+        &Env { now: env.now, wall: env.wall, limits: env.limits.first },
+        &root.client,
+        told,
+        &mut child,
+    );
+    route_first(root, env, &mut child, out);
+    consumed
 }

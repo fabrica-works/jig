@@ -41,6 +41,5 @@ pub(crate) fn signed_out(domain: &mut Ui, out: &mut Queue<Request>, _lent: &jig_
     crate::page::routing::leave_page(domain, out);
     domain.confirmed = None;
     domain.page = if service { Page::Elsewhere } else { Page::SigningIn };
-    out.push(Request::Confirmed { party: None });
     domain.changed();
 }

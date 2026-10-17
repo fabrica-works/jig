@@ -1,6 +1,7 @@
 //! The UI reads the application-held client through its lent reference (view.md, 18.1).
-use crate::{Event, Limits, Request, Ui, intents};
-use jig_client::{Client, Outcome, Progress, Readout, Told, contract};
+use crate::{Limits, Request, Ui, intents};
+use jig_client::{Client, Progress, Readout, Told, contract};
+mod outcome;
 use skein_lib::{Env, Queue, Token};
 pub(crate) fn told(
     domain: &mut Ui,
@@ -24,31 +25,16 @@ pub(crate) fn told(
             };
             intents::progress(domain, Token::new(key.number ^ salt), progress, out, client);
         }
-        Told::Answered { key, outcome } => match outcome {
-            Outcome::Answered(jig_client::Answered::Jig(answer)) => {
-                intents::answered(domain, env, Token::new(key.number ^ salt), answer, out, client);
-            }
-            Outcome::Answered(jig_client::Answered::Family(_))
-            | Outcome::NotKept
-            | Outcome::Limit
-            | Outcome::Unconfirmed
-            | Outcome::Unknown => {
-                intents::progress(domain, Token::new(key.number ^ salt), intents::Progress::Unknown, out, client);
-            }
-        },
+        Told::Answered { key, outcome } => outcome::answered(domain, env, client, key, outcome, salt, out),
         Told::Kept { key, .. } => {
             let Some(pending) = client.pending(key) else { return };
-            let requests = domain
-                .kept_requests
-                .get(&pending.party)
-                .copied()
-                .unwrap_or(0)
-                .checked_add(1)
-                .expect("kept requests fit the client bound");
-            crate::step(domain, env, Event::Kept { scope: pending.party, requests }, out, client);
+            if domain.kept_requests.insert(key, pending.party).is_err() {
+                crate::page::routing::refuse(domain, contract::Limit::Requests);
+            }
+            super::refresh_kept_page(domain, env, out, client);
         }
         Told::Link { link: state } => {
-            domain.set_link(state, out);
+            domain.set_link(state);
             match state {
                 jig_client::Link::Starting => {
                     if domain.frame_watch.is_none() {
@@ -93,6 +79,8 @@ pub(crate) fn told(
         Told::Text { handle } => {
             crate::conversation::routing::text(domain, env, handle, out, client);
         }
-        Told::Dropped { .. } => (),
+        Told::Dropped { count } => {
+            crate::notices::kept::show(domain, crate::notices::kept::Kind::Dropped { count });
+        }
     }
 }

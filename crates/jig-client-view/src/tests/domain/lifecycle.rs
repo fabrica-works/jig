@@ -5,21 +5,21 @@ use crate::{
     action::Act,
     address::{Address, Place},
     fields::{Fields, Purpose},
-    intents::{ByValue, Progress, send_card},
+    intents::{Progress, send_card},
     objects::{Card, Source},
     page::Page,
     store::{self, Record, STORE_VERSION, StoreKey},
 };
 use jig_client::contract::*;
-use skein_lib::{Id, List, Queue, Time, Token};
+use skein_lib::{Id, List, Queue, Time};
 fn text(bytes: &[u8]) -> Text {
     Text::new(Box::from(bytes), 64).unwrap()
 }
-fn ask(asked: u64) -> ByValue {
-    ByValue { asked: Token::new(asked), scope: 7, ask: Box::new(Ask::Stop { project: 1, task: 8 }) }
+fn ask(asked: u64) -> crate::tests::fixtures::SendIntent {
+    crate::tests::fixtures::intent(7, asked, Ask::Stop { project: 1, task: 8 })
 }
 fn send(domain: &mut Fixture, asked: u64) -> jig_client::Key {
-    let out = drive(domain, Time::ZERO, Event::Ask { ask: ask(asked) });
+    let out = drive(domain, Time::ZERO, ask(asked));
     let Request::Client { asked: jig_client::Event::Send { key: request, .. } } = out[0] else {
         panic!("one send");
     };
@@ -56,13 +56,9 @@ fn intents_join_progress_and_one_terminal_and_refuse_past_the_limit() {
     );
     assert_eq!(drain(out).len(), 1);
     let program = send(&mut domain, 40);
-    assert!(drive(&mut domain, Time::ZERO, Event::Ask { ask: ask(40) }).is_empty());
-    let full = drive(&mut domain, Time::ZERO, Event::Ask { ask: ask(41) });
-    assert_eq!(full.len(), 1);
-    assert_eq!(
-        full[0],
-        Request::Answered { asked: Token::new(41), answer: Answer::Refused(Refusal::Limit { which: Limit::Requests }) }
-    );
+    assert!(drive(&mut domain, Time::ZERO, ask(40)).is_empty());
+    let full = drive(&mut domain, Time::ZERO, ask(41));
+    assert!(full.is_empty());
     assert!(drive(&mut domain, Time::ZERO, Reported { request, progress: Progress::Parked }).is_empty());
     assert_eq!(
         domain.objects().get(id).unwrap().card,
@@ -72,10 +68,8 @@ fn intents_join_progress_and_one_terminal_and_refuse_past_the_limit() {
     assert!(drive(&mut domain, Time::ZERO, AnsweredByEngine { request, answer: answer.clone() }).is_empty());
     assert_eq!(domain.intents().get(Id::from_token(request)).unwrap().answer, Some(answer.clone()));
     assert_eq!(domain.objects().get(id).unwrap().card, Card::Refused { refusal: Refusal::NotOffered });
-    assert_eq!(
-        drive(&mut domain, Time::ZERO, AnsweredByEngine { request: program, answer: answer.clone() }).as_ref(),
-        &[Request::Answered { asked: Token::new(40), answer: answer.clone() }]
-    );
+    assert!(drive(&mut domain, Time::ZERO, AnsweredByEngine { request: program, answer: answer.clone() }).is_empty());
+    assert_eq!(domain.intents().get(Id::from_token(domain.intent(program))).unwrap().answer, Some(answer.clone()));
     assert!(drive(&mut domain, Time::ZERO, AnsweredByEngine { request: program, answer }).is_empty());
     domain.reclaim();
     assert!(domain.intents().get(Id::from_token(request)).is_none());
@@ -129,7 +123,7 @@ fn signed_out_from_answer_read_or_watch_preserves_intents_and_returns_to_the_add
         let f = start(&mut domain, List::with_capacity(0));
         delivered(&mut domain, Time::ZERO, f, frame(7));
         let pending = send(&mut domain, 50);
-        let ended = match path {
+        match path {
             0 => drive(&mut domain, Time::ZERO, jig_client::Up::SignedOut),
             1 => {
                 let id = domain.request_read(Source::Window { number: 1 }, Read::Deployment).unwrap();
@@ -142,7 +136,6 @@ fn signed_out_from_answer_read_or_watch_preserves_intents_and_returns_to_the_add
             }
             _ => unreachable!(),
         };
-        assert!(ended.contains(&Request::Confirmed { party: None }));
         assert_eq!(domain.page(), &Page::SigningIn);
         assert_eq!(domain.frame().party(), None);
         assert!(domain.intents().get(Id::from_token(domain.intent(pending))).unwrap().answer.is_none());
@@ -150,8 +143,8 @@ fn signed_out_from_answer_read_or_watch_preserves_intents_and_returns_to_the_add
         drive(&mut domain, Time::ZERO, jig_client::Up::SignedIn);
         drive(&mut domain, Time::ZERO, crate::tests::fixtures::Served { served: true });
         let fresh = domain.frame_watch.expect("the client holds the frame handle through sign-in");
-        let confirmed = delivered(&mut domain, Time::ZERO, fresh, frame(7));
-        assert!(confirmed.contains(&Request::Confirmed { party: Some(7) }));
+        delivered(&mut domain, Time::ZERO, fresh, frame(7));
+        assert_eq!(domain.frame().party(), Some(7));
         let Page::Work { address, .. } = domain.page() else {
             panic!("returned work page");
         };
@@ -166,7 +159,7 @@ fn a_service_never_opens_a_work_or_signin_page() {
     let mut service = frame(7);
     service.party.kind = PartyKind::Service;
     let out = delivered(&mut domain, Time::ZERO, f, service);
-    assert_eq!(out.len(), 3);
+    assert_eq!(out.len(), 0);
     assert_eq!(domain.page(), &Page::Elsewhere);
     drive(&mut domain, Time::ZERO, jig_client::Up::SignedOut);
     assert_eq!(domain.page(), &Page::Elsewhere);

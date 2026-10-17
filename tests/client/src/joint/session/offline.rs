@@ -27,7 +27,6 @@ impl Session {
             request @ (Request::Save { .. }
             | Request::Erase { .. }
             | Request::Client { .. }
-            | Request::Jig(_)
             | Request::First(_)
             | Request::Show { .. }
             | Request::SignIn { .. }

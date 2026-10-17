@@ -5,13 +5,13 @@ use crate::{
     action::Act,
     address::{Address, Place},
     fields::Purpose,
-    intents::{ByValue, send_card},
+    intents::send_card,
     notices::kept::{self, Kind},
     objects::Source,
     store::{self, Record, STORE_VERSION},
 };
 use jig_client::contract::*;
-use skein_lib::{Duration, Env, List, Queue, Time, Token, Wall};
+use skein_lib::{Duration, Env, List, Queue, Time, Wall};
 fn limits() -> Limits {
     Limits { ..LIMITS }
 }
@@ -130,7 +130,7 @@ fn hidden_answers_have_notices_and_lingers_and_coalesced_saves_end_on_deadlines(
         Record::Draft { version: STORE_VERSION, party: 7, task: 8, words: text(b"first"), touched: 1 },
         &mut out
     ));
-    drive(&mut domain, &limits, Time::from_nanos(500_000_000), Event::Frame { asked: Token::new(90) });
+    drive(&mut domain, &limits, Time::from_nanos(500_000_000), crate::tests::fixtures::Tick);
     let newest = Record::Draft { version: STORE_VERSION, party: 7, task: 8, words: text(b"newest"), touched: 1 };
     assert!(store::coalesce(&mut domain, newest.clone(), &mut out));
     assert!(out.is_empty());
@@ -147,23 +147,7 @@ fn hidden_answers_have_notices_and_lingers_and_coalesced_saves_end_on_deadlines(
 
 #[test]
 fn checked_worst_case_and_full_containers_keep_steps_within_max_out() {
-    let limits = Limits {
-        watches: 2,
-        objects: 1,
-        sources: 1,
-        reads: 1,
-        intents: 1,
-        fields: 1,
-
-        notices: 1,
-        records: 1,
-        projects: 1,
-        roles: 1,
-        charters: 1,
-        parts: 1,
-        text: 4,
-        ..limits()
-    };
+    let limits = full_limits();
     check_worst_case(limits);
     let mut domain = Fixture::new(&limits);
     let mut kept = List::with_capacity(1);
@@ -205,11 +189,18 @@ fn checked_worst_case_and_full_containers_keep_steps_within_max_out() {
     let crate::page::Page::Work { excess: 1, refused: Some(Limit::Objects), .. } = domain.page() else {
         panic!("full kept the first and counted the rest");
     };
-    let ask = ByValue { asked: Token::new(50), scope: 7, ask: Box::new(Ask::Stop { project: 1, task: 8 }) };
-    assert_eq!(drive(&mut domain, &limits, Time::ZERO, Event::Ask { ask: ask.clone() }).len(), 1);
-    let mut other = ask;
-    other.asked = Token::new(51);
-    assert_eq!(drive(&mut domain, &limits, Time::ZERO, Event::Ask { ask: other }).len(), 1);
+    for (number, outputs) in [(50, 1), (51, 0)] {
+        assert_eq!(
+            drive(
+                &mut domain,
+                &limits,
+                Time::ZERO,
+                crate::tests::fixtures::intent(7, number, Ask::Stop { project: 1, task: 8 })
+            )
+            .len(),
+            outputs
+        );
+    }
     drive(
         &mut domain,
         &limits,
@@ -257,5 +248,25 @@ fn check_worst_case(limits: Limits) {
         Limits { save_delay: Duration::ZERO, ..limits },
     ] {
         assert!(crate::worst_case(&invalid).is_none());
+    }
+}
+
+fn full_limits() -> Limits {
+    Limits {
+        watches: 2,
+        objects: 1,
+        sources: 1,
+        reads: 1,
+        intents: 1,
+        fields: 1,
+
+        notices: 1,
+        records: 1,
+        projects: 1,
+        roles: 1,
+        charters: 1,
+        parts: 1,
+        text: 4,
+        ..limits()
     }
 }

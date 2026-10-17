@@ -108,6 +108,17 @@ pub fn language() -> Language {
             JigPhrase::PolicyEditRole => {
                 Box::new([Segment::Text(copy_of(b"Replace role ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
             }
+            JigPhrase::RequestNotKept => {
+                Box::new([Segment::Text(copy_of(b"Request not kept; it was not sent. Try again."))])
+            }
+            JigPhrase::RequestUnconfirmed => Box::new([Segment::Text(copy_of(
+                b"Party not confirmed; request was not made. Try again once connected.",
+            ))]),
+            JigPhrase::RequestsInFlight => Box::new([Segment::Text(copy_of(b"Too many requests in flight"))]),
+            JigPhrase::RequestsDropped => Box::new([
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+                Segment::Text(copy_of(b" requests kept from before were not sent")),
+            ]),
             JigPhrase::PolicyRequests => Box::new([
                 Segment::Text(copy_of(b"Request flags: ")),
                 Segment::Hole { index: 0, kind: HoleKind::Number },

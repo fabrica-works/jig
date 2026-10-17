@@ -6,7 +6,7 @@
     clippy::match_like_matches_macro,
     reason = "test fixtures collect observed root outputs and locate their variants"
 )]
-use crate::{Address, Domain, Event, JigOut, Request, first, unlinked};
+use crate::{Address, Domain, Event, Request, first, unlinked};
 use jig_client::Link;
 use jig_client::contract::{self, Answer, Delivery, Outcome, WatchEnd, WatchEvent};
 use skein_lib::{Duration, List, Queue, RequestEnvelope, Time, Token};
@@ -66,13 +66,7 @@ fn a_final_answer_reaches_the_child_that_asked_unread_and_once() {
             },
         },
     );
-    assert_eq!(
-        rows,
-        vec![
-            Request::Jig(JigOut::Answered { asked: Token::new(42), answer: answer.clone() }),
-            Request::Erase { key: crate::store::Key::Unlinked(saved) },
-        ]
-    );
+    assert_eq!(rows, vec![Request::Erase { key: crate::store::Key::Unlinked(saved) },]);
     assert!(
         drive(
             &mut root,
@@ -629,13 +623,12 @@ fn restored_requests(count: u32) -> List<crate::store::Record> {
     for n in 0..count {
         let rows = drive(
             &mut old,
-            Event::Jig(jig_client_view::Event::Ask {
-                ask: jig_client_view::intents::ByValue {
-                    asked: Token::new(u64::from(n)),
-                    scope: 7,
-                    ask: Box::new(contract::Ask::Stop { project: 1, task: 9 + u64::from(n) }),
+            Event::Client {
+                event: jig_client::Event::Send {
+                    key: jig_client::Key { asker: jig_client::Asker::JIG, number: u64::from(n) },
+                    request: jig_client::Ask::Jig(Box::new(contract::Ask::Stop { project: 1, task: 9 + u64::from(n) })),
                 },
-            }),
+            },
         );
         for row in rows {
             if let Request::Save { record: crate::store::Record::Unlinked(record) } = row {
@@ -701,7 +694,15 @@ fn restored_own_scope_sends_and_retires_each_final_request_once() {
         };
     }
     confirm(&mut root, watch, 8);
-    assert_eq!(root.jig().page(), &jig_client_view::page::Page::SomeoneElse);
+    assert_eq!(
+        root.jig().page(),
+        &jig_client_view::page::Page::Work {
+            address: jig_client_view::address::Address::Inbox { project: None },
+            behind: false,
+            excess: 0,
+            refused: None
+        }
+    );
 }
 
 fn work_page(page: &jig_client_view::page::Page) -> bool {
@@ -1087,4 +1088,11 @@ fn deployment_parts() -> List<contract::Part> {
         parts.push(part).unwrap();
     }
     parts
+}
+
+pub(super) fn live_first(first: first::Limits) -> (first::Side, jig_client::Client) {
+    let mut root = unlinked(&crate::Limits { first, ..limits() }, 1);
+    let watch = start(&mut root, List::with_capacity(0));
+    confirm(&mut root, watch, 7);
+    (root.first, root.client)
 }

@@ -6,10 +6,9 @@ use super::{
 use crate::{
     Event, Request,
     address::{Address, Place},
-    intents::ByValue,
 };
 use jig_client::{Asker, Key, Up, contract};
-use skein_lib::{List, Time, Token, Wall};
+use skein_lib::{List, Time, Wall};
 
 #[test]
 fn a_page_s_watch_is_the_client_s_under_jig_s_asker() {
@@ -63,12 +62,8 @@ fn sent(seed: u64) -> Key {
         &mut fixture,
         Event::Start { seed, place: Place::Jig(Address::Inbox { project: None }), records: List::with_capacity(0) },
     );
-    let out = cards::drive(
-        &mut fixture,
-        Event::Ask {
-            ask: ByValue { asked: Token::new(1), scope: 7, ask: Box::new(contract::Ask::Stop { project: 1, task: 9 }) },
-        },
-    );
+    let out =
+        cards::drive(&mut fixture, crate::tests::fixtures::intent(7, 1, contract::Ask::Stop { project: 1, task: 9 }));
     let Request::Client { asked: jig_client::Event::Send { key, .. } } = out[0] else { panic!("send") };
     key
 }

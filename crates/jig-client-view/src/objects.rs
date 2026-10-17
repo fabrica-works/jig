@@ -88,16 +88,30 @@ pub enum Left {
 /// leaving + terminal document -> leaving/ended; linger -> removed.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Card {
+    NotSent {
+        why: crate::intents::NotSent,
+    },
     /// Available for an offered act.
     Open,
     /// Asked, with the root table's progress.
-    Deciding { request: Option<Token>, progress: Progress },
+    Deciding {
+        request: Option<Token>,
+        progress: Progress,
+    },
     /// Refused, with facts kept on its card.
-    Refused { refusal: Refusal },
+    Refused {
+        refusal: Refusal,
+    },
     /// Retention ended without an answer; inspect the current object before acting again.
-    Unknown { act: jig_client::contract::ActKind, look: jig_client::contract::Read },
+    Unknown {
+        act: jig_client::contract::ActKind,
+        look: jig_client::contract::Read,
+    },
     /// Ended and still shown until its linger expires.
-    Leaving { how: Left, until: Time },
+    Leaving {
+        how: Left,
+        until: Time,
+    },
 }
 /// One object and the sources that still name it.
 #[derive(Debug)]
@@ -182,6 +196,7 @@ impl Objects {
                         Card::Leaving { how: Left::Looking, .. } => object.card = Card::Open,
                         Card::Open
                         | Card::Deciding { .. }
+                        | Card::NotSent { .. }
                         | Card::Refused { .. }
                         | Card::Unknown { .. }
                         | Card::Leaving {
@@ -344,6 +359,7 @@ impl Objects {
                 Card::Leaving { how: Left::Looking, .. } => object.card = Card::Open,
                 Card::Open
                 | Card::Deciding { .. }
+                | Card::NotSent { .. }
                 | Card::Refused { .. }
                 | Card::Unknown { .. }
                 | Card::Leaving {
@@ -385,7 +401,7 @@ impl Objects {
                                 break;
                             }
                         }
-                        Card::Open | Card::Refused { .. } => {
+                        Card::Open | Card::NotSent { .. } | Card::Refused { .. } => {
                             gone = Some(*key);
                             break;
                         }
@@ -433,7 +449,7 @@ fn retained(object: &Object) -> bool {
     match object.card {
         Card::Unknown { .. } => object.shown,
         Card::Deciding { .. } | Card::Leaving { .. } => true,
-        Card::Open | Card::Refused { .. } => false,
+        Card::Open | Card::NotSent { .. } | Card::Refused { .. } => false,
     }
 }
 
@@ -597,7 +613,7 @@ pub(crate) fn dropping(domain: &mut crate::Ui, watch: jig_client::Handle, value:
         let object = domain.objects.slab.get_mut(*id).expect("indexed object exists");
         if object.sources.len() == 1 && object.sources.contains(&source) && delivered_name(value, *key) == Some(false) {
             match object.card {
-                Card::Open | Card::Refused { .. } => {
+                Card::Open | Card::NotSent { .. } | Card::Refused { .. } => {
                     object.card = Card::Leaving { how: Left::Looking, until: domain.now.saturating_add(domain.linger) };
                 }
                 Card::Deciding { .. } | Card::Unknown { .. } | Card::Leaving { .. } => {}
@@ -614,7 +630,7 @@ pub(crate) fn ending_source(domain: &mut crate::Ui, watch: jig_client::Handle) {
         let object = domain.objects.slab.get_mut(*id).expect("indexed object exists");
         if object.shown && object.sources.len() == 1 && object.sources.contains(&source) {
             match object.card {
-                Card::Open | Card::Refused { .. } => {
+                Card::Open | Card::NotSent { .. } | Card::Refused { .. } => {
                     object.card = Card::Leaving { how: Left::Looking, until: domain.now.saturating_add(domain.linger) };
                 }
                 Card::Deciding { .. } | Card::Unknown { .. } | Card::Leaving { .. } => {}
@@ -649,7 +665,9 @@ pub(crate) fn read_dropped(domain: &mut crate::Ui, out: &mut skein_lib::Queue<cr
                 | Left::Historical { .. }
                 | Left::Unknown => false,
             },
-            Card::Open | Card::Deciding { .. } | Card::Refused { .. } | Card::Unknown { .. } => false,
+            Card::Open | Card::NotSent { .. } | Card::Deciding { .. } | Card::Refused { .. } | Card::Unknown { .. } => {
+                false
+            }
         };
         if looking {
             let what = document_read(object.key);
@@ -704,6 +722,7 @@ pub(crate) fn is_card_read(domain: &crate::Ui, token: Token, lent: &jig_client::
                 Card::Leaving { how: Left::Looking, .. } => true,
                 Card::Open
                 | Card::Deciding { .. }
+                | Card::NotSent { .. }
                 | Card::Refused { .. }
                 | Card::Unknown { .. }
                 | Card::Leaving {
@@ -763,7 +782,11 @@ pub(crate) fn read_card(
     let shown = object.shown;
     let leaving = match &object.card {
         Card::Leaving { how: Left::Looking, .. } => true,
-        Card::Open | Card::Refused { .. } | Card::Unknown { .. } | Card::Deciding { request: None, .. } => false,
+        Card::Open
+        | Card::NotSent { .. }
+        | Card::Refused { .. }
+        | Card::Unknown { .. }
+        | Card::Deciding { request: None, .. } => false,
         Card::Deciding { request: Some(_), .. }
         | Card::Leaving {
             how:
@@ -833,7 +856,8 @@ fn finish_read_card(domain: &mut crate::Ui, id: Id<Object>, leaving: bool, refre
                     object.card = Card::Open;
                 }
             }
-            Card::Open | Card::Deciding { .. } | Card::Refused { .. } | Card::Leaving { .. } => {}
+            Card::Open | Card::NotSent { .. } | Card::Deciding { .. } | Card::Refused { .. } | Card::Leaving { .. } => {
+            }
         }
         domain.changed();
         return;

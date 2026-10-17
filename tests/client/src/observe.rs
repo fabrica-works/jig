@@ -187,14 +187,10 @@ pub fn jig_received(event: &jig_client_view::Event) -> Vec<Receipt> {
     match event {
         jig_client_view::Event::Start { .. } => vec![Receipt::Started],
         jig_client_view::Event::Client { .. }
-        | jig_client_view::Event::Kept { .. }
-        | jig_client_view::Event::KeptGone { .. }
         | jig_client_view::Event::Went { .. }
         | jig_client_view::Event::Left
         | jig_client_view::Event::Act { .. }
-        | jig_client_view::Event::Ask { .. }
-        | jig_client_view::Event::Named { .. }
-        | jig_client_view::Event::Frame { .. } => vec![],
+        | jig_client_view::Event::Named { .. } => vec![],
     }
 }
 /// Observe native transport deliveries independently of the root and UI.

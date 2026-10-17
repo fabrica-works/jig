@@ -4,7 +4,6 @@ use jig_client::contract::{
 };
 use jig_client_view::boundary::Offset;
 use skein_lib::{Duration, Env, List, Queue, RequestLimits, Time, Token, Wall};
-pub(super) const ROUTED_TOKEN: Token = Token::new(42);
 pub(super) const UNOWNED_KEY_NUMBER: u64 = 42;
 pub(super) const RECORD_PROJECT: u32 = 3;
 pub(super) const RECORD_ITEM: u64 = 5;
@@ -209,13 +208,12 @@ pub(super) fn confirm(root: &mut Domain, watch: Token, party: u64) -> Vec<Reques
 pub(super) fn ask(root: &mut Domain, asked: Token) -> Vec<Request> {
     drive(
         root,
-        Event::Jig(jig_client_view::Event::Ask {
-            ask: jig_client_view::intents::ByValue {
-                asked,
-                scope: 7,
-                ask: Box::new(contract::Ask::Stop { project: 1, task: 9 }),
+        Event::Client {
+            event: jig_client::Event::Send {
+                key: jig_client::Key { asker: jig_client::Asker::JIG, number: asked.raw() },
+                request: jig_client::Ask::Jig(Box::new(contract::Ask::Stop { project: 1, task: 9 })),
             },
-        }),
+        },
     )
 }
 pub(super) fn resource_path(bytes: &[u8]) -> List<Box<[u8]>> {

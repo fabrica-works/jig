@@ -116,7 +116,6 @@ fn children_first(env: &Env<Limits>, out: &mut Queue<Request>) {
             Request::Client { .. } => client.push(request),
             request @ (Request::Save { .. }
             | Request::Erase { .. }
-            | Request::Jig(_)
             | Request::First(_)
             | Request::Show { .. }
             | Request::SignIn { .. }

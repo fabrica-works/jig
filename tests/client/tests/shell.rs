@@ -26,16 +26,15 @@ fn a_failed_store_stops_the_steps_keyed_sends_and_notifies_the_table() {
     w.fail_store();
     w.event(
         c,
-        jig_client_test_domain::Event::Jig(jig_client_view::Event::Ask {
-            ask: jig_client_view::intents::ByValue {
-                asked: skein_lib::Token::new(99),
-                scope: 7,
-                ask: Box::new(jig_client_domain::contract::Ask::StartChat {
+        jig_client_test_domain::Event::Client {
+            event: jig_client::Event::Send {
+                key: jig_client::Key { asker: jig_client::Asker::JIG, number: 99 },
+                request: jig_client::Ask::Jig(Box::new(jig_client_domain::contract::Ask::StartChat {
                     project: 1,
                     words: stories::text(b"Hello"),
-                }),
+                })),
             },
-        }),
+        },
     );
     assert!(w.front().engine.commits().iter().all(|c| c.key.is_none()), "failed write withheld the send");
     w.run(Until::Time(Time::from_nanos(100_000_000)));
