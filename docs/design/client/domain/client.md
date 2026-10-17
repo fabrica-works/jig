@@ -138,7 +138,7 @@ jig-client                        jig_client::Client: the domain and the link, c
 ## 4. Its vocabulary toward the application
 
 ```
-jig_client::Client: step(now, Event, &mut Queue<Request>), fire(now, &mut Queue<Request>), next_deadline()
+jig_client::Client: step(now, wall, Event, &mut Queue<Request>), fire(now, wall, &mut Queue<Request>), next_deadline()
 
 Event, in
   from the application:
@@ -154,12 +154,13 @@ Event, in
 Request, out
   to the transport:   Exchange { exchange, credential, message } | OpenStream { credential } | CloseStream | Save { records } | Erase { records }
   to the application: Link(state) | Changed { handle } | Ended { handle, why } | Page { handle, page }
-                      Pending { key } | Answered { key, outcome } | Kept { key, request } | Text { handle }
+                      Pending { key } | Answered { key, outcome } | Kept { key, request } | Dropped { count } | Text { handle }
 read by the application: client.document(handle), client.pending(key), client.link()
 ```
 
-- **`now`** is the monotonic instant and the wall time, as every step
-  machine takes them (programming-model.md, section 9).
+- **`now` and `wall`** are the monotonic instant and the wall time, as
+  every step machine takes them (programming-model.md, section 9:
+  `env.now` and `env.wall`).
 - **Handles and keys are the application's.** Each names its asker and a
   number of the asker's. The asker is the owner number of the child of
   the client root that asked (root.md, section 15; jig's reference UI's
@@ -189,7 +190,7 @@ read by the application: client.document(handle), client.pending(key), client.li
     stream ended;
   - *`Stored` and `NotStored`:* the last `Save` or `Erase` written, or
     not (section 11).
-- **Time:** `fire(now, ..)`, at the deadline `next_deadline()` gave
+- **Time:** `fire(now, wall, ..)`, at the deadline `next_deadline()` gave
   (section 13).
 
 ### 4.2 What it asks for
@@ -203,7 +204,9 @@ read by the application: client.document(handle), client.pending(key), client.li
   - *`Save { records }` and `Erase { records }`:* the small store's,
     written before the requests they keep are sent (section 11).
 - **Of the application,** told, never asked to act:
-  - *`Link(state)`:* the link's state, whenever it changes (8.2);
+  - *`Link(state)`:* the link's state, whenever it changes, and when a
+    sign-out does not reach the engine (8.2 and section 12): what a
+    presentation shows of the link, which it reads with `client.link()`;
   - *`Changed { handle }`:* a newer document for the handle, or the
     handle behind or live again (8.1);
     *`Text { handle }`:* more of a run's text (8.3); *`Ended { handle,
@@ -211,7 +214,9 @@ read by the application: client.document(handle), client.pending(key), client.li
   - *`Page { handle, page }`:* a read's one terminal (section 7);
   - *`Pending { key }`:* the request's progress changed; *`Answered {
     key, outcome }`:* its one answer; *`Kept { key, request }`:* a
-    request restored at start (sections 6 and 11).
+    request restored at start (sections 6 and 11); *`Dropped { count
+    }`:* how many kept records were dropped at start, unread, under no
+    asker (section 11).
 
 ### 4.3 What it never asks
 
@@ -622,7 +627,12 @@ for any presentation of a chat or of any agent task's activity.
   dropped, and the application told (`../../protocol/client.md`, section
   10). A family's request is kept in its owner's version: one whose
   owner the build does not declare, or whose version is not the one
-  declared (8.2), is such a record.
+  declared (8.2), is such a record. So is one past the records the
+  table holds (section 14). The client tells only how many, `Dropped {
+  count }`, once at start, under no asker: nothing of a record it
+  does not read is read, its key's asker included. The client root
+  gives the count to the presentation that says so (root.md, section
+  8): the reference UI's notice (view.md, 18.7).
 - **Where it lives is the host's:** a browser tab's session storage, a
   file written whole and synced, a world's memory. A host whose store is
   copied (a browser tab duplicated) sends the same keys from both
@@ -699,7 +709,7 @@ for any presentation of a chat or of any agent task's activity.
   opening the stream and its watches again, the stream's heartbeat
   tolerance, and the retention's cutoff, on the monotonic clock
   (programming-model.md, section 9). `next_deadline()` gives the
-  earliest, and `fire(now, ..)` runs what is due.
+  earliest, and `fire(now, wall, ..)` runs what is due.
 - **Wall times are for records and for showing.** The request table
   records the wall time of a request's first sending, so its cutoff holds
   across a restart; documents carry wall times, which a presentation

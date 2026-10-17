@@ -104,6 +104,7 @@ step(root, event):
         a link's state                              → every child
         changed, ended, a page, a text              → the child its handle's asker names
         pending, answered, kept                     → the child its key's asker names
+        kept records dropped, how many              → the child that says so                 (section 8)
     a child's own requests (a place shown, its records) → out, wrapped
 
 fire(root, now):
@@ -278,6 +279,12 @@ How jig's documents name an application's values.
   child's presentation's to decide (the reference UI's: pages.md,
   section 8); the root passes on what the client kept, and decides
   nothing.
+- **Kept work dropped.** The records the client could not restore are
+  told only by how many, `Dropped { count }`, under no asker (client.md,
+  section 11). The root gives the count to one child, which says so:
+  the reference UI, where the application has it (view.md, 18.7);
+  otherwise the presentation the application chooses, or none, in a
+  service (section 11).
 
 ## 9. The view, composed
 

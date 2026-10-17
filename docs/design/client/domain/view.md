@@ -822,7 +822,7 @@ and once, is theirs.
 ### 18.1 Its surface
 
 ```
-jig_client_view::Ui: step(now, &Client, Event, &mut Queue<Request>), fire(now, &Client, &mut Queue<Request>), next_deadline()
+jig_client_view::Ui: step(now, wall, &Client, Event, &mut Queue<Request>), fire(now, wall, &Client, &mut Queue<Request>), next_deadline()
 
 made with: its limits; the application's navigation and home; its arrangement
 
@@ -847,7 +847,16 @@ read by the application: ui.sections(), ui.shown()
 - **It asks the client through the root:** each request for the client
   is one of the client's events, which the root gives the client in the
   same step; the reference UI never holds the client, and reads it only
-  by the `&Client` the root lends it (`document`, `pending`, `link`).
+  by the `&Client` the root lends it (`document`, `text`, `pending`,
+  `link`).
+- **It asks for nothing else of the client's, and reports nothing.** It
+  never asks to sign in: signing in is the application's (18.6). It
+  never continues a run's watch: the client does, from the text it
+  holds (client.md, 8.3). A limit that refuses is said where it refuses,
+  on the page or in place (18.2, 18.4), never as a report beside it.
+- **`now` and `wall`,** as the client's (client.md, section 4): the
+  monotonic instant for its deadlines (18.7), and the wall time it shows
+  the engine's wall times against ("waiting 4 min").
 - **Its handles and keys** carry its asker, jig's owner, 65536 (section
   3; root.md, section 15), which the client hands back with everything
   it tells of them. It numbers its handles itself, and draws its keys'
@@ -901,7 +910,9 @@ read by the application: ui.sections(), ui.shown()
   12.5).
 - **Full is a refusal the page shows.** A page whose watches or reads
   would pass the reference UI's limits opens what fits, and says what it
-  left out; nothing grows.
+  left out; nothing grows. A handle the client ends, or a read it
+  answers, refused by the client's own limit (client.md, 7 and 8.1), is
+  one the page left out.
 
 ### 18.3 The working set
 
@@ -1009,7 +1020,10 @@ read by the application: ui.sections(), ui.shown()
   no intent across a restart, since its records are its drafts and its
   place (18.8). Refused, or unknown whether made, it shows as a notice
   (18.7); made, it shows in what it made. Kept for another party, it is
-  counted for the page someone else's work (pages.md, section 8).
+  counted for the page someone else's work (pages.md, section 8). Kept
+  work the client dropped at start, unread, is told by how many
+  (`Dropped`; client.md, section 11; root.md, section 8): a notice says
+  that many requests kept from before were not sent.
 - **Bounded.** The intents it keeps are a limit; an act past them is
   refused in place ("too many requests in flight"), never queued; so is
   one the client refuses for want of room.
@@ -1086,8 +1100,9 @@ read by the application: ui.sections(), ui.shown()
   client's (client.md, section 8).
 - **Notices** are short-lived, for what has no card: a request answered
   for an object not shown, a refusal with nothing to show it on, a
-  kept request of jig's refused or unknown, the link going and coming
-  back. A card's own outcome is on the card.
+  kept request of jig's refused or unknown, kept work dropped at start
+  (18.4), the link going and coming back. A card's own outcome is on
+  the card.
 
 ### 18.8 Its records
 
