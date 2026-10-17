@@ -2,14 +2,11 @@
 //! Objects stay in their shared cards; connector values stay in owner slots.
 use crate::phrases::jig::JigPhrase;
 use crate::{JigBindings, words::Words};
+use jig_client::thread::window::{Edge, Edges, End};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
-use crate::{
-    Borrowed,
-    action::{Act, End},
-    windows::{Edge, Edges},
-};
+use crate::{Borrowed, action::Act};
 use skein_lib::Token;
 mod not_the_work;
 pub(crate) mod work;

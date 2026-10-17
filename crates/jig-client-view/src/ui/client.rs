@@ -76,7 +76,7 @@ pub(crate) fn told(
             }
         }
         Told::Text { handle } => {
-            crate::conversation::routing::text(domain, env, handle, out, client);
+            crate::activity::routing::text(domain, env, handle, out, client);
         }
         Told::Dropped { count } => {
             crate::notices::kept::show(domain, crate::notices::kept::Kind::Dropped { count });

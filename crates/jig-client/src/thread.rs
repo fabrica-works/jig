@@ -13,23 +13,26 @@
 //! | latest read | page before known tail | latest read or idle | continuation or names |
 //! | edge read | page | idle | names |
 //! | any read | failed | idle | nothing |
-use crate::{
-    action::End,
-    objects::{Objects, Source},
-    windows::{Edge, Edges, TurnWindow},
-};
-use jig_client::contract::{
+use self::window::{Edge, Edges, End, TurnWindow};
+use crate::contract::{
     Activity, ActivityLine, ActivityPage, ArchivedTurn, Block, CallIdentity, Cursor, LiveCall, ObjectKey, Part,
     ProvisionalTurnName, Read, RunState, RunText, Text, TurnName, TurnRead,
 };
 use skein_lib::{List, Map, Wall, Writer};
-pub(crate) mod chips;
-pub(crate) mod routing;
-pub(crate) mod sending;
+mod model;
 mod shown;
+pub mod window;
 pub mod words;
-pub use routing::ACTIVITY_WINDOW;
+pub use model::Line;
 pub use words::{KeptWords, Sent, Words};
+
+/// Bounds on retained activity, provisional text and submitted words.
+#[derive(Clone, Copy, Debug)]
+pub struct Limits {
+    pub lines: u32,
+    pub bytes: u64,
+    pub text: u32,
+}
 
 /// The page's presentation of one call, independent of committed turn facts.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -57,7 +60,7 @@ pub enum Reading {
     Newer,
 }
 /// One turn's text is provisional until its committed turn is read.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct LiveTurn {
     pub name: ProvisionalTurnName,
     pub began: Option<Wall>,
@@ -68,7 +71,11 @@ pub struct LiveTurn {
 }
 /// Committed lines and page state for one task conversation.
 #[derive(Debug)]
-pub struct Conversation {
+pub struct Thread {
+    pub live: List<LiveTurn>,
+    pub limits: Limits,
+    pub attempt: Option<u64>,
+    pub left: u32,
     /// Loss reported by retained activity pages, independent of turn and text loss.
     pub page_cut: bool,
     pub task: u64,
@@ -91,17 +98,22 @@ pub struct Conversation {
     /// Pending snapshots and durable words retained until the agent read them.
     pub words: KeptWords,
     /// One live chips source for tasks named by calls in this window.
-    pub chips_watch: Option<jig_client::Handle>,
+    pub chips_watch: Option<crate::Handle>,
     /// Task membership shared by all displayed engine calls.
     pub chips: List<u64>,
     /// Membership is waiting for the old watch terminal or available watch room.
     pub chips_pending: bool,
 }
-impl Conversation {
+impl Thread {
     /// Allocates the activity window and equally bounded staging and fold state.
     #[must_use]
-    pub fn new(task: u64, rows: u32) -> Self {
+    pub fn new(task: u64, limits: &Limits) -> Self {
+        let rows = limits.lines;
         Self {
+            live: List::with_capacity(rows),
+            limits: *limits,
+            attempt: None,
+            left: 0,
             page_cut: false,
             task,
             lines: TurnWindow::new(rows),
@@ -208,6 +220,7 @@ impl Conversation {
                     self.lines.edges = Edges { before: Edge::End, after: Edge::End };
                 }
                 let dropped = self.lines.slide(rows, edges, End::Before);
+                self.left = self.left.saturating_add(dropped);
                 if dropped > 0 {
                     assert!(self.lines.rows.len() == self.lines.rows.capacity(), "a dropping slide fills its window");
                 }
@@ -233,11 +246,13 @@ impl Conversation {
                 }
                 order(&mut rows);
                 let dropped = self.lines.slide(rows, edges, end);
+                self.left = self.left.saturating_add(dropped);
                 if dropped > 0 {
                     assert!(self.lines.rows.len() == self.lines.rows.capacity(), "a dropping slide fills its window");
                 }
             }
         }
+        self.prune_live();
         self.moved(self.committed)
     }
     /// Allows a failed or refused read to be retried without inventing a page.
@@ -247,6 +262,7 @@ impl Conversation {
     }
     /// Ends the provisional presentation after its committed activity has been read.
     pub fn end_run(&mut self) {
+        self.live.clear();
         self.prune_folds(&[], None);
     }
     fn committed(&mut self, name: TurnName) {
@@ -288,17 +304,17 @@ impl Conversation {
                 Activity::Result { result } => {
                     if let Some(value) = &result.value {
                         match value {
-                            jig_client::contract::ResultValue::Connector { part, .. } => {
+                            crate::contract::ResultValue::Connector { part, .. } => {
                                 add_part(&mut parts, part);
                             }
-                            jig_client::contract::ResultValue::Report(_)
-                            | jig_client::contract::ResultValue::Verdict { .. }
-                            | jig_client::contract::ResultValue::OwnerVerdict { .. }
-                            | jig_client::contract::ResultValue::Change { .. }
-                            | jig_client::contract::ResultValue::Choice { .. }
-                            | jig_client::contract::ResultValue::Approved { .. }
-                            | jig_client::contract::ResultValue::Failure(_)
-                            | jig_client::contract::ResultValue::Words(_) => {}
+                            crate::contract::ResultValue::Report(_)
+                            | crate::contract::ResultValue::Verdict { .. }
+                            | crate::contract::ResultValue::OwnerVerdict { .. }
+                            | crate::contract::ResultValue::Change { .. }
+                            | crate::contract::ResultValue::Choice { .. }
+                            | crate::contract::ResultValue::Approved { .. }
+                            | crate::contract::ResultValue::Failure(_)
+                            | crate::contract::ResultValue::Words(_) => {}
                         }
                     }
                 }
@@ -425,7 +441,7 @@ impl Conversation {
             }
         }
     }
-    pub(crate) fn prune_folds(&mut self, live: &[LiveTurn], current_run: Option<&RunState>) {
+    pub fn prune_folds(&mut self, live: &[LiveTurn], current_run: Option<&RunState>) {
         let mut gone = List::with_capacity(self.opened.capacity());
         for (name, ()) in &self.opened {
             if !self.displayed_call(*name, live) {
@@ -489,11 +505,6 @@ impl Conversation {
         }
         names
     }
-    /// Replaces this window's working-set source without duplicating shared cards.
-    pub fn name_objects(&self, objects: &mut Objects, source: Source, capacity: u32) -> u32 {
-        let names = self.names(capacity, &[]);
-        objects.replace(source, names.as_slice())
-    }
 }
 fn add_name(names: &mut List<ObjectKey>, key: ObjectKey) {
     if !names.as_slice().contains(&key) {
@@ -551,23 +562,24 @@ fn has_call(rows: &List<ActivityLine>, name: CallName) -> bool {
 }
 /// Conversation fold/staging allocations beyond the shared activity window.
 #[must_use]
-pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
+pub fn worst_case(limits: &Limits) -> Option<u64> {
     words::worst_case(limits)?
         // The borrowed projection clones at most the client's one provisional turn.
-        .checked_add(List::<LiveTurn>::worst_case(1)?)?
-        .checked_add(limits.document_bytes)?
-        .checked_add(u64::from(limits.text))?
-        .checked_add(Map::<CallName, ()>::worst_case(limits.rows)?)?
-        .checked_add(List::<CallName>::worst_case(limits.rows)?)?
-        .checked_add(List::<CallIdentity>::worst_case(limits.rows)?.checked_mul(2)?)?
-        .checked_add(limits.document_bytes.checked_mul(2)?)?
-        .checked_add(u64::from(limits.rows).checked_mul(u64::from(limits.text))?.checked_mul(2)?)?
-        .checked_add(List::<u64>::worst_case(limits.rows)?.checked_mul(2)?)?
-        .checked_add(List::<ActivityLine>::worst_case(limits.rows)?.checked_mul(3)?)?
-        .checked_add(u64::from(limits.rows).checked_mul(limits.document_bytes)?.checked_mul(4)?)
+        .checked_add(List::<LiveTurn>::worst_case(limits.lines)?)?
+        .checked_add(limits.bytes.checked_mul(u64::from(limits.lines))?)?
+        .checked_add(u64::from(limits.text).checked_mul(u64::from(limits.lines))?)?
+        .checked_add(Map::<CallName, ()>::worst_case(limits.lines)?)?
+        .checked_add(List::<CallName>::worst_case(limits.lines)?)?
+        .checked_add(List::<CallIdentity>::worst_case(limits.lines)?.checked_mul(2)?)?
+        .checked_add(limits.bytes.checked_mul(2)?)?
+        .checked_add(u64::from(limits.lines).checked_mul(u64::from(limits.text))?.checked_mul(2)?)?
+        .checked_add(List::<u64>::worst_case(limits.lines)?.checked_mul(2)?)?
+        .checked_add(List::<ActivityLine>::worst_case(limits.lines)?.checked_mul(3)?)?
+        .checked_add(u64::from(limits.lines).checked_mul(limits.bytes)?.checked_mul(4)?)
 }
 
-pub(crate) fn live_turn(value: RunText, limit: u32) -> LiveTurn {
+#[must_use]
+pub fn live_turn(value: RunText, limit: u32) -> LiveTurn {
     let cut = value.cut || value.from > 0 || !value.text.fits(limit);
     LiveTurn {
         name: value.turn,
@@ -579,7 +591,8 @@ pub(crate) fn live_turn(value: RunText, limit: u32) -> LiveTurn {
     }
 }
 
-pub(crate) fn later(name: TurnName, other: TurnName) -> bool {
+#[must_use]
+pub fn later(name: TurnName, other: TurnName) -> bool {
     name.attempt > other.attempt || (name.attempt == other.attempt && name.number > other.number)
 }
 fn tail(old: &[u8], incoming: &[u8], limit: u32) -> Text {

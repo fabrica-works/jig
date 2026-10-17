@@ -1,4 +1,5 @@
 //! Page policies exercised through the client boundary.
+use jig_client::thread::window::End;
 mod conversation_merge;
 mod owner_effect_proposals;
 mod task_proposals;
@@ -449,7 +450,7 @@ fn conversations_show_live_before_ended_and_read_more_using_the_opaque_cursor() 
         Event::Act {
             action: crate::action::Act::More {
                 window: skein_lib::Token::new(crate::page::conversations::CONVERSATIONS_WINDOW),
-                end: crate::action::End::After,
+                end: End::After,
             },
         },
     );
@@ -642,11 +643,7 @@ fn tree_node(number: u64, phase: Phase, held: u32) -> TreeNode {
 }
 
 fn task_history_pages_and_scope_changes_discard_old_scope_reads() {
-    use crate::{
-        action::{Act, End},
-        address::TaskSection,
-        page::task::HISTORY_WINDOW,
-    };
+    use crate::{action::Act, address::TaskSection, page::task::HISTORY_WINDOW};
     let mut domain = Fixture::new(&LIMITS);
     let f = start(&mut domain, List::with_capacity(0));
     let initial = delivered(&mut domain, Time::ZERO, f, frame(7));
@@ -825,10 +822,7 @@ fn goal_line(number: u64, priority: u32, phase: Phase, changed: u64) -> GoalLine
     }
 }
 fn project_board_orders_live_waiting_and_ended_goals_and_names_task_cards() {
-    use crate::{
-        action::{Act, End},
-        page::project::GOALS_WINDOW,
-    };
+    use crate::{action::Act, page::project::GOALS_WINDOW};
     let (mut domain, opened) = project_open(ProjectSection::Goals);
     let project_read = project_read(&opened);
     drive(
@@ -1202,10 +1196,7 @@ fn project_notes_keep_revisions_and_settings_deployment_keep_facts_and_parts() {
 }
 
 fn project_task_filters_and_spend_pages() {
-    use crate::{
-        action::{Act, End},
-        page::project::SPEND_WINDOW,
-    };
+    use crate::{action::Act, page::project::SPEND_WINDOW};
     let (mut domain, opened) = project_open(ProjectSection::Tasks);
     let watch = open_token(&opened);
     let mut rows = List::with_capacity(2);
@@ -1469,7 +1460,7 @@ fn live_conversation_page() -> (Fixture, jig_client::Handle, jig_client::Handle)
 #[test]
 fn conversation_reply_windows_replace_sources_drop_rows_and_clear_committed_seen_facts() {
     use crate::{
-        action::{Act, End},
+        action::Act,
         objects::{Body, Source},
     };
     let (mut domain, watch, first_read) = live_conversation_page();
@@ -1712,7 +1703,7 @@ fn send(domain: &mut Fixture, event: impl crate::tests::fixtures::Input) -> Box<
 )]
 fn check_inbox_group_pages_keep_orders_cursors_and_live_precedence() {
     use crate::{
-        action::{Act, End},
+        action::Act,
         page::conversations::{INBOX_UPDATES_WINDOW, INBOX_WINDOW},
         page::inbox::Filter,
     };
@@ -2539,7 +2530,7 @@ fn owner_conversation_replacement_keeps_absent_facts_whole_text_and_independent_
     );
     assert_eq!(domain.conversation_rows().rows.get(0), Some(&current));
     assert!(domain.conversation_rows().cut);
-    assert_eq!(domain.conversation_rows().edges.after, crate::windows::Edge::More(cursor));
+    assert_eq!(domain.conversation_rows().edges.after, jig_client::thread::window::Edge::More(cursor));
     let mut zero = current.clone();
     zero.unread = Some(Count { value: 0, limited: false });
     zero.runtime = Some(Runtime::Idle);
@@ -2692,7 +2683,7 @@ fn an_application_page_shows_no_task_after_a_task_page() {
 fn no_two_windows_of_a_page_share_a_token() {
     use crate::page::{conversations::*, project::*, task::*};
     let mut numbers = [
-        crate::conversation::routing::ACTIVITY_WINDOW,
+        crate::activity::routing::ACTIVITY_WINDOW,
         INBOX_WINDOW,
         INBOX_UPDATES_WINDOW,
         CONVERSATIONS_WINDOW,
@@ -2711,7 +2702,7 @@ fn no_two_windows_of_a_page_share_a_token() {
 fn no_two_reads_of_a_page_share_a_number() {
     use crate::page::{conversations::*, project::*, task::*};
     let mut numbers = [
-        crate::conversation::routing::ACTIVITY_READ,
+        crate::activity::routing::ACTIVITY_READ,
         INBOX_NEEDS_READ,
         INBOX_UPDATES_READ,
         CONVERSATIONS_READ,

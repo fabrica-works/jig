@@ -2,11 +2,12 @@ use super::spine::{LIMITS, delivered, drive, frame, start};
 use crate::tests::fixtures::{Fixture, ReadPage};
 use crate::{
     Event, Request,
-    action::{Act, End},
+    action::Act,
     address::{Address, Place, TaskSection},
-    windows::{Edge, Edges, HistoryWindow},
+    windows::HistoryWindow,
 };
 use jig_client::contract::*;
+use jig_client::thread::window::{Edge, Edges, End};
 use skein_lib::{List, Time, Token, Wall};
 
 fn text(bytes: &[u8]) -> Text {

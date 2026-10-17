@@ -2,15 +2,14 @@
 //! Detailed page policies are jig 22's modules. See client/domain/client.md, 5–7.
 use crate::{
     Request, Ui,
-    action::End,
     address::{Address, Place},
     handles::Owner,
     objects::{Body, Source},
     page::{Page, Section},
-    windows::{Edge, Edges},
 };
 use alloc::boxed::Box;
 use jig_client::contract::{self, Delivery, Limit, ObjectKey, Part, PartyKind, Read, ReadResult, ReadValue, Subject};
+use jig_client::thread::window::{Edge, Edges, End};
 use skein_lib::{Env, List, Queue, Token};
 
 fn blank_edges() -> Edges {
@@ -132,8 +131,11 @@ pub(crate) fn leave_page(domain: &mut Ui, out: &mut Queue<Request>) {
     domain.conversation_rows.owner_after = None;
     let rows = domain.conversation.lines.rows.capacity();
     let words = domain.conversation.words.rows.capacity();
-    domain.conversation = crate::conversation::Conversation::new(0, rows);
-    domain.conversation.words = crate::conversation::KeptWords::new(words);
+    domain.conversation = jig_client::thread::Thread::new(
+        0,
+        &jig_client::thread::Limits { lines: rows, bytes: domain.limits.document_bytes, text: domain.text_limit },
+    );
+    domain.conversation.words = jig_client::thread::KeptWords::new(words);
     domain.history_rows.rows.clear();
     domain.history_rows.cut = false;
     domain.history_rows.edges = blank_edges();
@@ -326,13 +328,13 @@ pub(crate) fn delivery(
     let source = Source::Watch(watch);
     match value {
         Delivery::Me(_) | Delivery::OwnerProject(_) => {}
-        Delivery::Run(_) | Delivery::RunState(_) => crate::conversation::routing::text(domain, env, watch, out, lent),
+        Delivery::Run(_) | Delivery::RunState(_) => crate::activity::routing::text(domain, env, watch, out, lent),
         Delivery::OwnerProposal(proposal) => {
             let key = ObjectKey::Proposal(proposal.key);
             one(domain, env, source, key, Body::OwnerProposal(proposal), out, lent);
         }
         Delivery::Task(task) => {
-            crate::conversation::routing::document(domain, &task, out, lent);
+            crate::activity::routing::document(domain, &task, out, lent);
             crate::page::task::delivered(domain, source, task);
             crate::page::task::document(domain, env, out, lent);
         }
@@ -491,7 +493,7 @@ pub(crate) fn read_result(
                 super::shown::status(domain, None, None, true);
             }
             match receipt.source {
-                Source::Window { number: crate::conversation::routing::ACTIVITY_READ, .. } => {
+                Source::Window { number: crate::activity::routing::ACTIVITY_READ, .. } => {
                     domain.conversation.failed();
                 }
                 Source::Window { .. } | Source::Watch(_) | Source::Card(_) => {}
@@ -557,7 +559,7 @@ fn read_value(
             let key = ObjectKey::Result(result.task.task);
             read_body(domain, key, Body::Result(result));
         }
-        ReadValue::Activity(page) => crate::conversation::routing::page(domain, env, *page, out, lent),
+        ReadValue::Activity(page) => crate::activity::routing::page(domain, env, *page, out, lent),
         ReadValue::History(page) => {
             domain.history_rows.cut |= page.cut;
             let edges = page_edges(page.before, page.after);
@@ -624,7 +626,7 @@ fn task_read(
     out: &mut Queue<Request>,
     lent: &jig_client::Client,
 ) {
-    crate::conversation::routing::document(domain, &task, out, lent);
+    crate::activity::routing::document(domain, &task, out, lent);
     let key = ObjectKey::Task(task.chip.task);
     read_body(domain, key, Body::Task(task));
     crate::page::task::document(domain, env, out, lent);

@@ -3,6 +3,7 @@
 use crate::{address::Address, fields::Purpose};
 use alloc::boxed::Box;
 use jig_client::contract::{ActKind, InboxGroup, Text};
+use jig_client::thread::window::End;
 use skein_lib::Token;
 /// A person action already decoded from the semantic tree.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -46,7 +47,7 @@ pub enum Act {
     /// Open or fold an object.
     Fold { object: Token, open: bool },
     /// Open or fold the details of a committed turn call.
-    FoldCall { name: crate::conversation::CallName, open: bool },
+    FoldCall { name: jig_client::thread::CallName, open: bool },
     /// Open or fold a supplied opaque provisional call, by equality only.
     FoldCurrentCall { identity: jig_client::contract::CallIdentity, open: bool },
     /// Filter an inbox group.
@@ -76,4 +77,3 @@ pub enum Act {
     /// End this sign-in from the frame; never offered to a service.
     SignOut,
 }
-

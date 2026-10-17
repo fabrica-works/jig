@@ -476,7 +476,7 @@ pub(crate) fn document(domain: &mut Ui, env: &Env<crate::Limits>, out: &mut Queu
             if open_once(domain, subject, out) {
                 read(
                     domain,
-                    crate::conversation::routing::ACTIVITY_READ,
+                    crate::activity::routing::ACTIVITY_READ,
                     Read::Activity { task: number, before: None },
                     out,
                 );
@@ -608,15 +608,15 @@ pub const ENDED_WINDOW: u64 = 13;
 pub(crate) const ENDED_READ: u16 = 16;
 /// The person task read source.
 pub(crate) const PERSON_TASK_READ: u16 = 15;
-pub(crate) fn more(domain: &mut Ui, window: Token, end: crate::action::End, out: &mut Queue<Request>) {
+pub(crate) fn more(domain: &mut Ui, window: Token, end: jig_client::thread::window::End, out: &mut Queue<Request>) {
     if window == Token::new(HISTORY_WINDOW) {
         let edge = match end {
-            crate::action::End::Before => &domain.history_rows.edges.before,
-            crate::action::End::After => &domain.history_rows.edges.after,
+            jig_client::thread::window::End::Before => &domain.history_rows.edges.before,
+            jig_client::thread::window::End::After => &domain.history_rows.edges.after,
         };
         let cursor = match edge {
-            crate::windows::Edge::More(cursor) => Some(cursor.clone()),
-            crate::windows::Edge::End => None,
+            jig_client::thread::window::Edge::More(cursor) => Some(cursor.clone()),
+            jig_client::thread::window::Edge::End => None,
         };
         if let Some(cursor) = cursor {
             let Some(task) = domain.shown_task() else {
@@ -631,8 +631,8 @@ pub(crate) fn more(domain: &mut Ui, window: Token, end: crate::action::End, out:
         }
     } else if window == Token::new(ENDED_WINDOW) {
         let cursor = match end {
-            crate::action::End::Before => domain.task_page.ended_before.clone(),
-            crate::action::End::After => domain.task_page.ended_after.clone(),
+            jig_client::thread::window::End::Before => domain.task_page.ended_before.clone(),
+            jig_client::thread::window::End::After => domain.task_page.ended_after.clone(),
         };
         if let Some(task) = domain.task_page.ended_task
             && let Some(cursor) = cursor

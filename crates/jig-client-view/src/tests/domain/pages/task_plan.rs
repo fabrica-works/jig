@@ -61,10 +61,7 @@ pub(super) fn task_plan_keeps_folded_held_counts_and_filters_without_losing_rows
         &mut domain,
         Time::ZERO,
         Event::Act {
-            action: crate::action::Act::More {
-                window: skein_lib::Token::new(task::ENDED_WINDOW),
-                end: crate::action::End::After,
-            },
+            action: crate::action::Act::More { window: skein_lib::Token::new(task::ENDED_WINDOW), end: End::After },
         },
     );
     let Request::Client { asked: jig_client::Event::Read { read: jig_client::Readable::Jig(what), .. } } = &more[0]

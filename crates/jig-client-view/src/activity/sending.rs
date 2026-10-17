@@ -6,20 +6,24 @@ use jig_client::contract::{Answer, Ask, Limit, MeParty, Text};
 use skein_lib::{Id, Token};
 
 pub(crate) fn words(ask: &Ask, task: u64) -> Option<&Text> {
+    let (words, _) = message(ask, task)?;
+    Some(words)
+}
+fn message(ask: &Ask, task: u64) -> Option<(&Text, u32)> {
     match ask {
         Ask::Message { task: written, words, .. } => {
             if *written == task {
-                Some(words)
+                Some((words, 0))
             } else {
                 None
             }
         }
         Ask::Compound { operations, .. } => {
-            for operation in operations {
+            for (place, operation) in operations.as_slice().iter().enumerate() {
                 if let jig_client::contract::Operation::Message { task: written, words, .. } = operation
                     && *written == task
                 {
-                    return Some(words);
+                    return Some((words, u32::try_from(place).expect("bounded operation place fits")));
                 }
             }
             None
@@ -68,11 +72,11 @@ pub(crate) fn pending(domain: &mut Ui, id: Id<Intent>, lent: &jig_client::Client
     if domain.confirmed != Some(intent.scope) {
         return;
     }
-    let Some(text) = words(&intent.ask, domain.conversation.task) else {
+    let Some((text, place)) = message(&intent.ask, domain.conversation.task) else {
         return;
     };
     let by = author(domain, lent);
-    let kept = domain.conversation.words.begin_frame(id.token(), by, text.clone());
+    let kept = domain.conversation.words.begin_frame(key(domain, id.token()), by, text.clone(), place);
     assert!(kept, "new writes check room; restored pending intents fit their paired capacity");
     domain.changed();
 }
@@ -83,50 +87,28 @@ pub(crate) fn restore(domain: &mut Ui, lent: &jig_client::Client) {
     for (id, ()) in domain.intents.ids() {
         let intent = domain.intents.get(*id).expect("registered intent exists");
         if domain.confirmed == Some(intent.scope)
-            && !domain.conversation.words.pending(id.token())
-            && let Some(text) = words(&intent.ask, domain.conversation.task)
+            && !domain.conversation.words.pending(key(domain, id.token()))
+            && let Some((text, place)) = message(&intent.ask, domain.conversation.task)
         {
-            let kept = domain.conversation.words.begin_frame(id.token(), by.clone(), text.clone());
+            let kept = domain.conversation.words.begin_frame(key(domain, id.token()), by.clone(), text.clone(), place);
             assert!(kept, "pending intents restore before activity within their paired capacity");
         }
     }
 }
 /// A duplicate terminal never gets here; only a durable words result supplies a number.
 pub(crate) fn answered(domain: &mut Ui, request: Token, answer: &Answer) {
-    if !domain.conversation.words.pending(request) {
+    if !domain.conversation.words.pending(key(domain, request)) {
         return;
     }
-    let message = match answer {
-        Answer::Done(jig_client::contract::Outcome::Owner(jig_client::contract::OwnerOutcome::Compound {
-            first_message,
-            ..
-        })) => Some(*first_message),
-        Answer::Done(outcome) => match crate::outcome::route(outcome) {
-            crate::outcome::Route::Words { task, message } => {
-                if task == domain.conversation.task {
-                    Some(message)
-                } else {
-                    None
-                }
-            }
-            crate::outcome::Route::Chat { .. }
-            | crate::outcome::Route::Goal { .. }
-            | crate::outcome::Route::Proposed
-            | crate::outcome::Route::Other => None,
-        },
-        Answer::Refused { refusal: _, .. } => None,
-    };
-    match message {
-        Some(message) => {
-            let applied = domain.conversation.words.sent(request, message);
-            assert!(applied, "pending words exist");
-        }
-        None => domain.conversation.words.refused(request),
-    }
+    domain.conversation.answered(key(domain, request), answer);
     domain.changed();
 }
 
 fn author(domain: &Ui, lent: &jig_client::Client) -> Option<MeParty> {
     let frame = domain.frame(lent).document?;
     Some(frame.party.clone())
+}
+
+fn key(domain: &Ui, request: Token) -> jig_client::Key {
+    jig_client::Key { asker: jig_client::Asker::JIG, number: request.raw() ^ domain.seed }
 }

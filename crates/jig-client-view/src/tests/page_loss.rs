@@ -150,18 +150,18 @@ fn continuation(domain: &Fixture, kind: u8) -> Option<Cursor> {
     match kind {
         0 => domain.task_page().ended_after.clone(),
         1 => match &domain.history_rows().edges.after {
-            crate::windows::Edge::More(cursor) => Some(cursor.clone()),
-            crate::windows::Edge::End => None,
+            jig_client::thread::window::Edge::More(cursor) => Some(cursor.clone()),
+            jig_client::thread::window::Edge::End => None,
         },
         // Activity's reverse document end is the newer end of the held log.
         2 => match &domain.conversation().lines.edges.before {
-            crate::windows::Edge::More(cursor) => Some(cursor.clone()),
-            crate::windows::Edge::End => None,
+            jig_client::thread::window::Edge::More(cursor) => Some(cursor.clone()),
+            jig_client::thread::window::Edge::End => None,
         },
         3 => domain.inbox().needs_window.after.clone(),
         4 => match &domain.conversation_rows().edges.after {
-            crate::windows::Edge::More(cursor) => Some(cursor.clone()),
-            crate::windows::Edge::End => None,
+            jig_client::thread::window::Edge::More(cursor) => Some(cursor.clone()),
+            jig_client::thread::window::Edge::End => None,
         },
         5 => domain.project_page().ended_after.clone(),
         6 => domain.project_page().spend_after.clone(),
@@ -234,7 +234,7 @@ fn a_complete_conversation_page_preserves_independent_row_text_loss_and_opaque_c
     );
     assert!(!domain.conversation_rows().cut);
     assert_eq!(domain.conversation_rows().rows.get(0), Some(&row));
-    assert_eq!(domain.conversation_rows().edges.after, crate::windows::Edge::More(cursor()));
+    assert_eq!(domain.conversation_rows().edges.after, jig_client::thread::window::Edge::More(cursor()));
     let tree = build(&domain, 3, words()).0;
     assert!(!contains(&tree, b"This page is incomplete"));
     assert!(contains(&tree, b"Read later"));
@@ -250,7 +250,9 @@ fn sliding_a_read_window_keeps_supplied_page_loss_until_that_source_is_reset() {
         drive(&mut domain, ReadPage { read: token, result: ReadResult::Value(value(kind, true, Some(cursor()))) });
         let out = drive(
             &mut domain,
-            Event::Act { action: Act::More { window: Token::new(window), end: crate::action::End::After } },
+            Event::Act {
+                action: Act::More { window: Token::new(window), end: jig_client::thread::window::End::After },
+            },
         );
         let token = read(&out, kind);
         drive(&mut domain, ReadPage { read: token, result: ReadResult::Value(value(kind, false, None)) });

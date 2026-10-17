@@ -2,12 +2,12 @@ use super::spine::{LIMITS, delivered, drive, frame, open_token, start};
 use crate::tests::fixtures::{Fixture, ReadPage, Watched};
 use crate::{
     Event, Request,
-    action::End,
     address::{Address, Place, TaskSection},
     objects::{Card, Objects, Source},
     windows::*,
 };
 use jig_client::contract::*;
+use jig_client::thread::window::{Edge, Edges, End, TurnWindow};
 use skein_lib::{List, Time, Token, Wall};
 
 fn rows<T>(values: impl IntoIterator<Item = T>) -> List<T> {

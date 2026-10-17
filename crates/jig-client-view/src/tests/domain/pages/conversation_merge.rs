@@ -1,11 +1,8 @@
 //! Conversation read/watch agreement through the public boundary.
 use super::*;
 use crate::tests::fixtures::{Ended, Fixture, ReadPage, Served, Watched};
-use crate::{
-    action::{Act, End},
-    objects::Source,
-    windows::{ConversationWindow, Edge, Edges},
-};
+use crate::{action::Act, objects::Source, windows::ConversationWindow};
+use jig_client::thread::window::{Edge, Edges, End};
 use skein_lib::Token;
 
 fn rows(values: &[ConversationLine]) -> List<ConversationLine> {

@@ -161,7 +161,7 @@ fn inbox_edges(words: &crate::words::Words) {
         crate::decode(&mut bindings, named_binding(&tree, b"Read later"), skein_ui::Act::Press),
         Some(crate::action::Act::More {
             window: Token::new(crate::page::conversations::INBOX_WINDOW),
-            end: crate::action::End::After
+            end: jig_client::thread::window::End::After
         })
     );
     assert_eq!(
@@ -442,11 +442,11 @@ fn inbox_group_controls_decode_independent_windows() {
         &[
             crate::action::Act::More {
                 window: Token::new(crate::page::conversations::INBOX_WINDOW),
-                end: crate::action::End::After
+                end: jig_client::thread::window::End::After
             },
             crate::action::Act::More {
                 window: Token::new(crate::page::conversations::INBOX_UPDATES_WINDOW),
-                end: crate::action::End::After
+                end: jig_client::thread::window::End::After
             }
         ]
     );

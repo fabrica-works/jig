@@ -2,6 +2,7 @@
 mod facts;
 mod operations;
 mod shapes;
+mod thread;
 use crate::{engine::Engine, fixtures, net::Net};
 use jig_client::{self as client, Ask, Event, Handle, Key, Latest, Link, Outcome, Readable, Told, Watchable};
 use jig_client_protocol_wire::v8 as w;

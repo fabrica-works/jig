@@ -3,6 +3,7 @@ mod fixtures;
 mod shapes;
 mod sign_in;
 mod store;
+mod thread;
 mod unlinked;
 mod versions;
 use crate::*;

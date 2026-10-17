@@ -241,7 +241,7 @@ pub(crate) fn sent(
     answer: &Answer,
     out: &mut Queue<Request>,
 ) {
-    let Some(words) = crate::conversation::sending::words(ask, task) else {
+    let Some(words) = crate::activity::sending::words(ask, task) else {
         return;
     };
     let message_task = match answer {

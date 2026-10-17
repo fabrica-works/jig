@@ -86,7 +86,7 @@ pub struct Ui {
     pub(crate) objects: crate::objects::Objects,
     pub(crate) object_rows: crate::windows::ObjectWindow,
     pub(crate) conversation_rows: crate::windows::ConversationWindow,
-    pub(crate) conversation: crate::conversation::Conversation,
+    pub(crate) conversation: jig_client::thread::Thread,
     pub(crate) history_rows: crate::windows::HistoryWindow,
 }
 impl Ui {
@@ -128,8 +128,11 @@ impl Ui {
             return Err(Refused::Arrangement);
         }
         assert!(crate::limits::ui::worst_case(limits).is_some(), "client limits are valid");
-        let mut conversation = crate::conversation::Conversation::new(0, limits.rows);
-        conversation.words = crate::conversation::KeptWords::new(limits.conversation_words);
+        let mut conversation = jig_client::thread::Thread::new(
+            0,
+            &jig_client::thread::Limits { lines: limits.rows, bytes: limits.document_bytes, text: limits.text },
+        );
+        conversation.words = jig_client::thread::KeptWords::new(limits.conversation_words);
         Ok(Self {
             limits: *limits,
             seed: 0,
@@ -407,12 +410,12 @@ impl Ui {
     }
     /// The current task's activity, provisional turns and page-owned folds.
     #[must_use]
-    pub const fn conversation(&self) -> &crate::conversation::Conversation {
+    pub const fn conversation(&self) -> &jig_client::thread::Thread {
         &self.conversation
     }
     /// Activity including turns in the current window.
     #[must_use]
-    pub const fn turn_rows(&self) -> &crate::windows::TurnWindow {
+    pub const fn turn_rows(&self) -> &jig_client::thread::window::TurnWindow {
         &self.conversation.lines
     }
     /// Conversations in the current bounded window.
@@ -548,8 +551,8 @@ fn settle(domain: &mut Ui, env: &Env<Limits>, out: &mut Queue<Request>, lent: &j
     domain.section_context = u32::MAX;
     crate::drafts::sync(domain, out);
     crate::confirm::sync(domain, lent);
-    crate::conversation::sending::restore(domain, lent);
-    crate::conversation::chips::sync(domain, env, out, lent);
+    crate::activity::sending::restore(domain, lent);
+    crate::activity::chips::sync(domain, env, out, lent);
     crate::clock::sync(domain);
 }
 fn act_event(domain: &mut Ui, env: &Env<Limits>, act: Act, out: &mut Queue<Request>, lent: &jig_client::Client) {
@@ -585,12 +588,12 @@ fn act_event(domain: &mut Ui, env: &Env<Limits>, act: Act, out: &mut Queue<Reque
             crate::page::inbox::Filter { project, kind: Some(group), goal: None },
             out,
         ),
-        Act::FoldCall { name, open } => crate::conversation::routing::fold(domain, name, open, lent),
+        Act::FoldCall { name, open } => crate::activity::routing::fold(domain, name, open, lent),
         Act::FoldCurrentCall { identity, open } => {
-            crate::conversation::routing::fold_current(domain, identity, open, lent);
+            crate::activity::routing::fold_current(domain, identity, open, lent);
         }
         Act::More { window, end } => {
-            crate::conversation::routing::more(domain, window, end, out);
+            crate::activity::routing::more(domain, window, end, out);
             crate::page::conversations::more(domain, window, end, out, lent);
             crate::page::task::more(domain, window, end, out);
             crate::page::project::more(domain, window, end, out);

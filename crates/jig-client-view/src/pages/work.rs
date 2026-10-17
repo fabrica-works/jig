@@ -2,6 +2,7 @@
 use crate::JigBindings;
 use crate::phrases::jig::JigPhrase;
 use crate::words::Words;
+use jig_client::thread::window::{Edge, Edges};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run, State};
 
@@ -89,7 +90,6 @@ pub(crate) fn cursors(
     after: Option<&jig_client::contract::Cursor>,
     window: u64,
 ) {
-    use crate::windows::{Edge, Edges};
     super::edges(
         b,
         words,

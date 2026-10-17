@@ -402,7 +402,7 @@ fn every_binding_kind_decodes_and_old_tokens_are_retired() {
         Action::Dismiss,
         Action::Fold { object, open: true },
         Action::Filter { group: InboxGroup::Questions, project: None },
-        Action::More { window: object, end: crate::action::End::Before },
+        Action::More { window: object, end: jig_client::thread::window::End::Before },
     ];
     for action in actions {
         let token = bindings.insert(JigMeaning::Action(action.clone())).token;

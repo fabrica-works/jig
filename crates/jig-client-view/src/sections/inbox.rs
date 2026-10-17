@@ -2,13 +2,13 @@
 use crate::phrases::jig::JigPhrase;
 use crate::words::Words;
 use crate::{JigBindings, cards};
+use jig_client::thread::window::End;
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
 use crate::{
     Borrowed,
     action::Act,
-    action::End,
     page::inbox::{Filter, needs},
 };
 use jig_client::contract::{

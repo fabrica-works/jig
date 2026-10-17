@@ -1,13 +1,13 @@
 //! Literal cards drawn by the conversation (view.md, 4 and 9).
 //! Task-page proposals remain beside the log unless that exact shared key
 //! already has a card in a supplied turn, live call or decision.
-use crate::conversation::Conversation;
-use jig_client::contract::{Activity, ArchivedTurn, Block, LiveCall, ObjectKey, Turn, TurnRead};
+use crate::contract::{Activity, ArchivedTurn, Block, LiveCall, ObjectKey, Turn, TurnRead};
+use crate::thread::Thread;
 
-impl Conversation {
+impl Thread {
     /// Whether a shown conversation line or live call shows this object (view.md, 4.1).
     #[must_use]
-    pub fn shows(&self, key: ObjectKey, live: &[crate::conversation::LiveTurn]) -> bool {
+    pub fn shows(&self, key: ObjectKey, live: &[crate::thread::LiveTurn]) -> bool {
         for line in &self.lines.rows {
             match &line.event {
                 Activity::Turn { turn: TurnRead::Decoded(turn), .. }

@@ -588,7 +588,7 @@ fn delivered_name(value: &jig_client::contract::Delivery, key: ObjectKey) -> Opt
 pub(crate) fn dropping(domain: &mut crate::Ui, watch: jig_client::Handle, value: &jig_client::contract::Delivery) {
     match value {
         jig_client::contract::Delivery::Conversations(_) => {
-            if !domain.conversation_rows.edges.reaches(crate::action::End::Before) {
+            if !domain.conversation_rows.edges.reaches(jig_client::thread::window::End::Before) {
                 return;
             }
         }

@@ -754,3 +754,42 @@ fn close_shaped_chat(story: &mut Story, task: u64) -> Duration {
     );
     grace
 }
+
+const WORDS: Key = Key { asker: Asker::JIG, number: 91 };
+const THREAD_TASK: Handle = Handle { asker: Asker::JIG, number: 31 };
+const THREAD_ACTIVITY: Handle = Handle { asker: Asker::JIG, number: 32 };
+const READ_MESSAGE: u64 = 1;
+const COMMITTED_TURN_POSITION: u64 = 4;
+#[test]
+fn a_person_s_words_read_as_being_sent_then_sent_then_read() {
+    use jig_client::thread::{Thread, Words};
+    let mut story = Story::reading_chat(fixtures::SEED);
+    let task = story.running_task();
+    let mut thread = Thread::new(task, &jig_client::thread::Limits { lines: 4, bytes: 65536, text: 32 });
+    let words = contract::Text::new(Box::from(b"Please continue".as_slice()), 32).expect("bounded words");
+    assert!(thread.sending(WORDS, fixtures::FIRST_OWNER, words.clone(), 0));
+    story.send(WORDS, Ask::Jig(Box::new(contract::Ask::Message { project: PROJECT_NUMBER, task, words })));
+    assert_eq!(thread.words.rows.get(0).expect("submitted words").state, Words::BeingSent);
+    assert!(story.run_until(|s| !s.answered(WORDS).is_empty(), PROOF_WAIT));
+    let answers = story.answered(WORDS);
+    let [Outcome::Answered(Answered::Jig(answer))] = answers.as_slice() else {
+        panic!("durable words: {answers:?}");
+    };
+    thread.answered(WORDS, answer);
+    assert_eq!(thread.words.rows.get(0).expect("durable words").state, Words::Sent { message: READ_MESSAGE });
+    story.watch(THREAD_TASK, Watchable::Jig(contract::Subject::Task { task }));
+    assert!(story.run_until(|s| s.thread_activity(THREAD_TASK, task) >= COMMITTED_TURN_POSITION, PROOF_WAIT));
+    let Some(Latest::Jig(contract::Delivery::Task(document))) =
+        story.client.document(THREAD_TASK).expect("task watch").latest
+    else {
+        panic!("task document");
+    };
+    story.read(THREAD_ACTIVITY, Readable::Jig(thread.document(document).expect("new committed activity")));
+    assert!(story.run_until(|s| !s.pages(THREAD_ACTIVITY).is_empty(), PROOF_WAIT));
+    let pages = story.pages(THREAD_ACTIVITY);
+    let [Readout::Jig(contract::ReadResult::Value(contract::ReadValue::Activity(page)))] = pages.as_slice() else {
+        panic!("activity page: {pages:?}");
+    };
+    assert_eq!(thread.page((**page).clone()), None);
+    assert_eq!(thread.words.rows.get(0).expect("read words").state, Words::Read { message: READ_MESSAGE });
+}

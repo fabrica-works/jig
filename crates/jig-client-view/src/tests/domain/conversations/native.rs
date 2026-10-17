@@ -6,7 +6,7 @@ pub(super) fn native_run(rows: u32) -> (Fixture, jig_client::Handle) {
         skein_lib::Time::ZERO,
         crate::Event::Start { seed: 8, place: crate::address::Place::Elsewhere, records: List::with_capacity(0) },
     );
-    fixture.ui.conversation = Conversation::new(9, rows);
+    fixture.ui.conversation = Thread::new(9, &jig_client::thread::Limits { lines: rows, bytes: 65536, text: 4096 });
     let handle = fixture.request_watch(jig_client::contract::Subject::Run { task: 9, turn: None, offset: 0 }).unwrap();
     (fixture, handle)
 }

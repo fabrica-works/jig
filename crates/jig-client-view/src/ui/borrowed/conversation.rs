@@ -1,5 +1,6 @@
 use super::Borrowed;
-use crate::conversation::{Conversation, LiveTurn};
+use jig_client::thread::{LiveTurn, Thread};
+
 use jig_client::{
     Latest,
     contract::{Delivery, LiveCall, ObjectKey, Part, RunState},
@@ -7,13 +8,13 @@ use jig_client::{
 use skein_lib::List;
 #[derive(Debug)]
 pub struct Activity<'a> {
-    pub state: &'a Conversation,
+    pub state: &'a Thread,
     pub live: List<LiveTurn>,
     pub current_run: Option<&'a RunState>,
 }
 impl core::ops::Deref for Activity<'_> {
-    type Target = Conversation;
-    fn deref(&self) -> &Conversation {
+    type Target = Thread;
+    fn deref(&self) -> &Thread {
         self.state
     }
 }
@@ -34,7 +35,8 @@ impl Activity<'_> {
 impl<'a> Borrowed<'a> {
     #[must_use]
     pub fn conversation(&self) -> Activity<'a> {
-        let mut state = Activity { state: &self.ui.conversation, live: List::with_capacity(1), current_run: None };
+        let mut state =
+            Activity { state: &self.ui.conversation, live: self.ui.conversation.live.clone(), current_run: None };
         if self.ui.conversation.run_finished && self.ui.conversation.loaded >= self.ui.conversation.committed {
             return state;
         }
@@ -50,20 +52,12 @@ impl<'a> Borrowed<'a> {
             {
                 state.current_run = Some(run);
             }
-            if let Some(text) = self.client.text(*handle)
-                && match self.ui.conversation.committed_turn {
-                    Some(committed) => crate::conversation::later(text.turn.turn(), committed),
-                    None => true,
-                }
-            {
-                let mut live = crate::conversation::live_turn(text.clone(), self.ui.text_limit);
-                if state.current_run.is_some()
-                    && let Some(LiveCall::Raw(_)) = live.call
-                {
+        }
+        if state.current_run.is_some() {
+            for at in 0..state.live.len() {
+                let live = state.live.get_mut(at).expect("bounded projection turn exists");
+                if let Some(LiveCall::Raw(_)) = live.call {
                     live.call = None;
-                }
-                if state.live.push(live).is_err() {
-                    break;
                 }
             }
         }

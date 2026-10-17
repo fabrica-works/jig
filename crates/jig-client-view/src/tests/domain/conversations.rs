@@ -1,14 +1,12 @@
+const OTHER_PENDING: jig_client::Key = jig_client::Key { asker: jig_client::Asker::JIG, number: 999 };
 use crate::Request;
+use crate::objects::{Objects, Source};
 use crate::tests::fixtures::{AnsweredByEngine, Ended, Fixture, ReadPage, Reported, Watched};
-use crate::{
-    conversation::{CallName, Conversation, Fold},
-    objects::{Objects, Source},
-    windows::Edge,
-};
 use jig_client::contract::{
     Activity, ActivityLine, ActivityPage, Block, Call, Cursor, Message, ObjectKey, ProvisionalTurnName, Read,
     RunBeginning, RunText, Speaker, Text, Turn, TurnName, TurnRead, Usage,
 };
+use jig_client::thread::{CallName, Fold, Thread};
 use skein_lib::{List, Wall};
 fn text(bytes: &[u8]) -> Text {
     Text::new(bytes.into(), 100).unwrap()
@@ -47,57 +45,6 @@ fn page(positions: &[u64], older: Option<&[u8]>, newer: Option<&[u8]>) -> Activi
         },
     }
 }
-fn positions(c: &Conversation) -> Box<[u64]> {
-    let mut positions = List::with_capacity(c.lines.rows.capacity());
-    for row in &c.lines.rows {
-        positions.push(row.position).unwrap();
-    }
-    positions.into_boxed()
-}
-#[test]
-fn activity_reads_newest_then_older_and_keeps_reverse_cursor_when_sliding() {
-    let mut c = Conversation::new(9, 3);
-    assert_eq!(c.moved(6), Some(Read::Activity { task: 9, before: None }));
-    assert_eq!(c.moved(6), None);
-    assert_eq!(c.accept(page(&[6, 5, 4], Some(b"older"), None)), None);
-    assert_eq!(positions(&c).as_ref(), &[6, 5, 4]);
-    assert_eq!(c.older(), Some(Read::Activity { task: 9, before: Some(cursor(b"older")) }));
-    assert_eq!(c.accept(page(&[3, 2, 1], None, Some(b"newer"))), None);
-    assert_eq!(positions(&c).as_ref(), &[3, 2, 1]);
-    assert_eq!(c.lines.edges.before, Edge::More(cursor(b"newer")));
-    assert_eq!(c.older(), None);
-    assert_eq!(c.moved(7), None);
-    assert_eq!(c.newer(), Some(Read::Activity { task: 9, before: Some(cursor(b"newer")) }));
-    assert_eq!(c.accept(page(&[6, 5, 4], Some(b"older"), None)), Some(Read::Activity { task: 9, before: None }));
-    assert_eq!(c.accept(page(&[7, 6, 5], Some(b"older"), None)), None);
-    assert_eq!(positions(&c).as_ref(), &[7, 6, 5]);
-}
-#[test]
-fn activity_document_movement_reads_only_new_lines_and_bridges_small_pages() {
-    let mut c = Conversation::new(9, 4);
-    assert!(c.moved(2).is_some());
-    assert_eq!(c.accept(page(&[2, 1], None, None)), None);
-    assert_eq!(c.moved(2), None);
-    assert!(c.moved(5).is_some());
-    assert_eq!(
-        c.accept(page(&[5, 4], Some(b"tail"), None)),
-        Some(Read::Activity { task: 9, before: Some(cursor(b"tail")) })
-    );
-    assert_eq!(c.accept(page(&[3, 2], Some(b"past"), Some(b"reverse"))), None);
-    assert_eq!(positions(&c).as_ref(), &[5, 4, 3, 2]);
-    assert_eq!(c.loaded, 5);
-    assert_eq!(c.moved(5), None);
-    assert!(c.moved(6).is_some());
-    c.failed();
-    assert!(c.moved(6).is_some());
-    assert_eq!(
-        c.accept(page(&[11, 10], Some(b"remaining"), None)),
-        Some(Read::Activity { task: 9, before: Some(cursor(b"remaining")) })
-    );
-    assert_eq!(c.accept(page(&[9, 8, 7], Some(b"overflow"), Some(b"back"))), None);
-    assert_eq!(positions(&c).as_ref(), &[11, 10]);
-    assert_eq!(c.lines.edges.after, Edge::More(cursor(b"remaining")));
-}
 fn engine_call() -> Call {
     let mut objects = List::with_capacity(2);
     objects.push(ObjectKey::Task(44)).unwrap();
@@ -133,7 +80,7 @@ fn calls(position: u64, number: u32) -> ActivityLine {
 }
 #[test]
 fn calls_fold_on_the_page_and_engine_objects_share_one_live_card() {
-    let mut c = Conversation::new(9, 3);
+    let mut c = Thread::new(9, &jig_client::thread::Limits { lines: 3, bytes: 65536, text: 4096 });
     assert!(c.moved(2).is_some());
     let mut rows = List::with_capacity(2);
     rows.push(calls(2, 2)).unwrap();
@@ -148,9 +95,9 @@ fn calls_fold_on_the_page_and_engine_objects_share_one_live_card() {
     assert!(!c.set_fold(CallName { attempt: 8, ..call }, Fold::Open, &[]));
     let mut objects = Objects::new(3, 2);
     let source = Source::Window { number: 2 };
-    assert_eq!(c.name_objects(&mut objects, source, 3), 0);
+    assert_eq!(objects.replace(source, c.names(3, &[]).as_slice()), 0);
     let id = objects.find(ObjectKey::Task(44)).unwrap();
-    assert_eq!(c.name_objects(&mut objects, source, 3), 0);
+    assert_eq!(objects.replace(source, c.names(3, &[]).as_slice()), 0);
     assert_eq!(objects.len(), 1);
     assert_eq!(objects.find(ObjectKey::Task(44)), Some(id));
     assert!(objects.named(ObjectKey::Task(44), source));
@@ -166,8 +113,8 @@ fn provisional_turns_append_by_offset_and_commit_only_replaces_the_same_name() {
     assert_eq!(c.conversation().live.get(0).unwrap().text.bytes(), b"one++");
     feed_run(&mut c, run, jig_client::contract::Delivery::Run(Box::new(stream(1, 7, 8, b"x", false))));
     feed_run(&mut c, run, jig_client::contract::Delivery::Run(Box::new(stream(2, 0, 3, b"two", false))));
-    assert_eq!(c.conversation().live.len(), 1);
-    assert_eq!(c.conversation().live.get(0).unwrap().text.bytes(), b"two");
+    assert_eq!(c.conversation().live.len(), 2);
+    assert_eq!(c.conversation().live.get(1).unwrap().text.bytes(), b"two");
     assert_eq!(
         match c.client.text(run) {
             Some(text) => text.through,
@@ -213,7 +160,7 @@ fn provisional_text_keeps_its_cut_mark_and_recovery_replaces_uncommitted_text() 
     assert!(!c.conversation().live.get(0).unwrap().cut);
     feed_run(&mut c, run, jig_client::contract::Delivery::Run(Box::new(stream(2, 0, 1, b"x", false))));
     feed_run(&mut c, run, jig_client::contract::Delivery::Run(Box::new(stream(3, 0, 1, b"y", false))));
-    assert_eq!(c.conversation().live.len(), 1);
+    assert_eq!(c.conversation().live.len(), 2);
     c.ui.conversation.end_run();
     feed_run(&mut c, run, jig_client::contract::Delivery::Run(Box::new(stream(3, 0, 1, b"y", false))));
     assert_eq!(c.first_turn(), Some(ProvisionalTurnName { retry: 0, attempt: 1, number: 3 }));
@@ -336,7 +283,9 @@ fn routed_scroll_and_end(
     let requests = drive(
         domain,
         Time::ZERO,
-        Event::Act { action: Act::More { window: skein_lib::Token::new(1), end: crate::action::End::Before } },
+        Event::Act {
+            action: Act::More { window: skein_lib::Token::new(1), end: jig_client::thread::window::End::Before },
+        },
     );
     let read = activity_read(&requests);
     let mut continued = false;
@@ -365,69 +314,6 @@ fn routed_scroll_and_end(
 }
 
 #[test]
-fn words_keep_the_submitted_snapshot_and_restore_sent_messages_until_read() {
-    use crate::conversation::{KeptWords, Words};
-    use skein_lib::Token;
-    let mut words = KeptWords::new(2);
-    let a = Token::new(11);
-    let b = Token::new(12);
-    assert!(words.begin(a, None, text(b"first")));
-    assert!(words.begin(a, None, text(b"later edit")));
-    assert_eq!(words.rows.get(0).unwrap().words, text(b"first"));
-    assert_eq!(words.rows.get(0).unwrap().state, Words::BeingSent);
-    assert!(words.begin(b, None, text(b"second")));
-    assert!(!words.begin(Token::new(13), None, text(b"full")));
-    words.read(1);
-    assert!(words.sent(a, 1));
-    assert!(words.sent(b, 2));
-    assert_eq!(words.rows.get(0).unwrap().state, Words::Read { message: 1 });
-    assert_eq!(words.rows.get(1).unwrap().state, Words::Sent { message: 2 });
-    words.read(2);
-    assert_eq!(words.rows.get(1).unwrap().state, Words::Read { message: 2 });
-    assert!(words.admits());
-    assert_eq!(words.rows.len(), 0);
-    words.bind(Some(7));
-    assert!(words.begin(a, None, text(b"private pending")));
-    words.bind(Some(8));
-    assert!(words.rows.is_empty());
-    let mut joined = KeptWords::new(2);
-    assert!(joined.begin(a, None, text(b"original")));
-    assert!(joined.restore(super::spine::party(7), 3, text(b"activity copy")));
-    assert!(joined.sent(a, 3));
-    assert_eq!(joined.rows.len(), 1);
-    assert_eq!(joined.rows.get(0).unwrap().words, text(b"original"));
-    let mut reload = Conversation::new(8, 3);
-    assert!(reload.moved(2).is_some());
-    assert_eq!(reload.accept(words_page()), None);
-    assert_eq!(reload.words.rows.len(), 2);
-    assert_eq!(reload.words.rows.get(0).unwrap().request, None);
-    assert_eq!(reload.words.rows.get(0).unwrap().state, Words::Sent { message: 2 });
-    assert!(reload.moved(3).is_some());
-    let mut committed = calls(3, 1);
-    if let Activity::Turn { turn: TurnRead::Decoded(turn), .. } = &mut committed.event {
-        turn.read_through = Some(3);
-    }
-    let mut rows = List::with_capacity(1);
-    rows.push(committed).unwrap();
-    assert_eq!(reload.accept(ActivityPage { cut: false, rows, before: None, after: None }), None);
-    assert_eq!(reload.words.rows.get(0).unwrap().state, Words::Read { message: 2 });
-    assert_eq!(reload.words.rows.get(1).unwrap().state, Words::Read { message: 1 });
-    assert_eq!(reload.words.rows.get(1).unwrap().words, text(b"first"));
-}
-fn words_page() -> ActivityPage {
-    let mut rows = List::with_capacity(2);
-    for (message, words) in [(2, b"second".as_slice()), (1, b"first".as_slice())] {
-        rows.push(ActivityLine {
-            position: message,
-            at: Wall::EPOCH,
-            event: Activity::Words { by: super::spine::party(7), message, words: text(words) },
-        })
-        .unwrap();
-    }
-    ActivityPage { cut: false, rows, before: None, after: None }
-}
-
-#[test]
 fn routed_words_join_the_original_request_and_clear_the_composer_only_once() {
     use super::spine::{LIMITS, drain, drive};
     use crate::{
@@ -436,7 +322,7 @@ fn routed_words_join_the_original_request_and_clear_the_composer_only_once() {
         fields::Purpose,
     };
     use jig_client::contract::*;
-    use skein_lib::{Queue, Time, Token};
+    use skein_lib::{Queue, Time};
     let (mut domain, _) = super::objects::live();
     drive(
         &mut domain,
@@ -452,8 +338,12 @@ fn routed_words_join_the_original_request_and_clear_the_composer_only_once() {
     let submitted = submit_words(&mut domain, b"first");
     let field = Purpose::Composer { task: 8 };
     let writes = domain.fields.get(field).unwrap().writes;
-    assert_eq!(domain.conversation().words.rows.get(0).unwrap().state, crate::conversation::Words::BeingSent);
-    assert!(domain.conversation.words.begin(Token::new(999), None, text(b"other pending")));
+    assert_eq!(domain.conversation().words.rows.get(0).unwrap().state, jig_client::thread::Words::BeingSent);
+    assert!(domain.conversation.words.begin(
+        jig_client::Key { asker: jig_client::Asker::JIG, number: 999 },
+        None,
+        text(b"other pending")
+    ));
     let mut out = Queue::with_capacity(crate::max_out(&LIMITS));
     assert_eq!(
         crate::intents::send_card(
@@ -468,10 +358,10 @@ fn routed_words_join_the_original_request_and_clear_the_composer_only_once() {
     );
     assert!(drain(out).is_empty());
     assert_eq!(domain.conversation().words.rows.get(0).unwrap().words, text(b"first"));
-    domain.conversation.words.refused(Token::new(999));
+    domain.conversation.words.refused(OTHER_PENDING);
     let answer = Answer::Done(Outcome::Owner(OwnerOutcome::Said { task: 8, message: 4 }));
     drive(&mut domain, Time::ZERO, AnsweredByEngine { request: submitted, answer: answer.clone() });
-    assert_eq!(domain.conversation().words.rows.get(0).unwrap().state, crate::conversation::Words::Sent { message: 4 });
+    assert_eq!(domain.conversation().words.rows.get(0).unwrap().state, jig_client::thread::Words::Sent { message: 4 });
     assert_eq!(domain.fields.get(field).unwrap().text.bytes(), b"");
     assert_eq!(domain.fields.get(field).unwrap().writes, writes + 1);
     drive(&mut domain, Time::ZERO, AnsweredByEngine { request: submitted, answer });
@@ -516,8 +406,8 @@ fn routed_later_words(domain: &mut Fixture) {
         crate::objects::Card::Refused { refusal: Refusal::Limit { which: Limit::ConversationWords { limit: 2 } } }
     );
     domain.conversation.words.read(5);
-    assert_eq!(domain.conversation().words.rows.get(0).unwrap().state, crate::conversation::Words::Read { message: 4 });
-    assert_eq!(domain.conversation().words.rows.get(1).unwrap().state, crate::conversation::Words::Read { message: 5 });
+    assert_eq!(domain.conversation().words.rows.get(0).unwrap().state, jig_client::thread::Words::Read { message: 4 });
+    assert_eq!(domain.conversation().words.rows.get(1).unwrap().state, jig_client::thread::Words::Read { message: 5 });
     routed_pending_restore(domain);
 }
 fn card_words(domain: &mut Fixture) -> Box<[Request]> {
@@ -563,9 +453,12 @@ fn routed_pending_restore(domain: &mut Fixture) {
     );
     let projected = domain.conversation();
     let row = projected.words.rows.get(0).unwrap();
-    assert_eq!(row.request, Some(domain.intent(sent)));
+    assert_eq!(
+        row.request,
+        Some(jig_client::Key { asker: jig_client::Asker::JIG, number: domain.intent(sent).raw() ^ domain.seed })
+    );
     assert_eq!(row.words, text(b"program"));
-    assert_eq!(row.state, crate::conversation::Words::BeingSent);
+    assert_eq!(row.state, jig_client::thread::Words::BeingSent);
     drive(domain, Time::ZERO, Reported { request: sent, progress: Progress::Unknown });
     assert!(domain.conversation().words.rows.is_empty());
     assert_eq!(domain.fields.get(crate::fields::Purpose::Composer { task: 8 }).unwrap().text.bytes(), b"later");
@@ -728,7 +621,7 @@ fn owner_said_receipts_join_only_the_pending_task_and_preserve_later_composer_ed
                 if actual_task == 8 {
                     assert_eq!(
                         domain.conversation().words.rows.get(0).unwrap().state,
-                        crate::conversation::Words::Sent { message: u64::MAX }
+                        jig_client::thread::Words::Sent { message: u64::MAX }
                     );
                 } else {
                     assert!(domain.conversation().words.rows.is_empty());
@@ -813,8 +706,8 @@ fn raw_live_calls_keep_optional_wall_literals_cut_and_full_identity_without_made
     value.through = 4;
     value.text = text(b"next");
     feed_run(&mut c, run, jig_client::contract::Delivery::Run(Box::new(value)));
-    assert_eq!(c.conversation().live.len(), 1);
-    assert_eq!(c.conversation().live.get(0).unwrap().text.bytes(), b"next");
+    assert_eq!(c.conversation().live.len(), 2);
+    assert_eq!(c.conversation().live.get(1).unwrap().text.bytes(), b"next");
     assert!(c.ui.conversation.moved(1).is_some());
     let mut committed = calls(1, name.number);
     if let Activity::Turn { name: committed_name, .. } = &mut committed.event {
@@ -1106,45 +999,6 @@ fn explicit_cut_and_reopened_origin_replace_retry_text_while_valid_suffixes_dedu
         },
         4
     );
-}
-
-#[test]
-fn owner_archive_reference_keeps_committed_read_and_local_author_separate_from_raw_sender() {
-    use crate::conversation::words::{KeptWords, Words};
-    use jig_client::contract::{OwnerActivity, OwnerActivityLine, OwnerMessageKind, OwnerRequester};
-    use skein_lib::Token;
-    let mut kept = KeptWords::new(2);
-    let request = Token::new(77);
-    assert!(kept.begin(request, Some(super::spine::party(7)), text(b"local")));
-    assert!(kept.sent(request, 0));
-    let line = |position, source| ActivityLine {
-        position,
-        at: Wall::EPOCH,
-        event: Activity::Owner {
-            source: Box::new(OwnerActivityLine { task: 8, position, at: Wall::EPOCH, line: source }),
-            decoded: None,
-        },
-    };
-    let mut rows = List::with_capacity(2);
-    rows.push(line(2, OwnerActivity::Turn { reply: 9, attempt: 3, turn: 4, read: Some(0) })).unwrap();
-    rows.push(line(
-        1,
-        OwnerActivity::Words {
-            message: 0,
-            by: OwnerRequester::Task(7),
-            kind: OwnerMessageKind::Question,
-            words: text(b"task words"),
-        },
-    ))
-    .unwrap();
-    let page = ActivityPage { rows, before: None, after: None, cut: false };
-    kept.observe(&page);
-    assert_eq!(kept.rows.len(), 1);
-    assert_eq!(kept.rows.get(0).unwrap().state, Words::Read { message: 0 });
-    assert_eq!(kept.rows.get(0).unwrap().by.as_ref().unwrap().name.bytes(), b"Pat");
-    assert_eq!(page.rows.get(1).unwrap().event.word_message().unwrap().1.bytes(), b"task words");
-    assert!(page.rows.get(0).unwrap().event.decoded_turn().is_none());
-    assert_eq!(page.rows.get(0).unwrap().event.committed_turn(), Some(TurnName { attempt: 3, number: 4 }));
 }
 
 const UTF8_TEXTS: [&[u8]; 8] =

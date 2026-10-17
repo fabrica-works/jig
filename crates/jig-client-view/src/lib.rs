@@ -105,13 +105,13 @@ pub mod owner_historical;
 pub mod owner_historical_words;
 
 pub mod action;
+pub(crate) mod activity;
 pub mod acts;
 pub mod address;
 pub mod application;
 pub mod boundary;
 pub(crate) mod clock;
 pub mod confirm;
-pub mod conversation;
 pub mod drafts;
 pub mod fields;
 pub(crate) mod handles;

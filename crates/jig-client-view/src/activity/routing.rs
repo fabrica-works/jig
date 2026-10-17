@@ -2,8 +2,9 @@
 //! Reads use the page generation's activity source; stale terminals stay outside
 //! this module. The root only carries the resulting reads, names and parts.
 //! See client/domain/client.md, 10, and contract.md, 6 and 7.3.
-use crate::{Request, Ui, action::End, objects::Source};
+use crate::{Request, Ui, objects::Source};
 use jig_client::contract::{ActivityPage, Executor, Limit, Read, Runtime, Task};
+use jig_client::thread::window::End;
 use skein_lib::{Env, Queue, Token};
 /// The activity window binding, independent of a watch's slab token.
 pub const ACTIVITY_WINDOW: u64 = 1;
@@ -85,9 +86,9 @@ pub(crate) fn page(
     lent: &jig_client::Client,
 ) {
     if domain.conversation.reading.is_none() {
-        domain.conversation.reading = Some(super::Reading::Latest { known: domain.conversation.loaded });
+        domain.conversation.reading = Some(jig_client::thread::Reading::Latest { known: domain.conversation.loaded });
     }
-    let next = domain.conversation.accept(page);
+    let next = domain.conversation.page(page);
     working_set(domain, env, out, lent);
     ask(domain, next, out);
     finish(domain);
@@ -180,6 +181,29 @@ pub(crate) fn text(
     if !domain.handles.watches.contains_key(&handle) {
         return;
     }
+    let run = domain.borrow(lent).conversation().current_run.cloned();
+    let mut text = lent.text(handle).cloned();
+    if let Some(text) = &mut text {
+        let bounded = jig_client::thread::live_turn(text.clone(), domain.text_limit);
+        text.text = bounded.text;
+        text.cut = bounded.cut;
+    }
+    let run = match run {
+        Some(run) => Some(run),
+        None => match &text {
+            Some(text) => Some(jig_client::contract::RunState {
+                task: domain.conversation.task,
+                attempt: Some(text.attempt),
+                committed_turn: 0,
+                writing: None,
+                call: None,
+            }),
+            None => None,
+        },
+    };
+    if let Some(run) = run {
+        domain.conversation.run(&run, text.as_ref());
+    }
     let projected = domain.borrow(lent).conversation();
     let live = projected.live;
     let run = projected.current_run.cloned();
@@ -200,8 +224,8 @@ pub(crate) fn more(domain: &mut Ui, window: Token, end: End, out: &mut Queue<Req
 }
 
 /// A fold changes page presentation without changing committed call facts.
-pub(crate) fn fold(domain: &mut Ui, name: super::CallName, open: bool, lent: &jig_client::Client) {
-    let fold = if open { super::Fold::Open } else { super::Fold::Folded };
+pub(crate) fn fold(domain: &mut Ui, name: jig_client::thread::CallName, open: bool, lent: &jig_client::Client) {
+    let fold = if open { jig_client::thread::Fold::Open } else { jig_client::thread::Fold::Folded };
     let live = domain.borrow(lent).conversation().live;
     if domain.conversation.set_fold(name, fold, live.as_slice()) {
         domain.changed();
@@ -215,7 +239,7 @@ pub(crate) fn fold_current(
     open: bool,
     lent: &jig_client::Client,
 ) {
-    let fold = if open { super::Fold::Open } else { super::Fold::Folded };
+    let fold = if open { jig_client::thread::Fold::Open } else { jig_client::thread::Fold::Folded };
     let projected = domain.borrow(lent).conversation();
     let live = projected.live;
     let run = projected.current_run.cloned();

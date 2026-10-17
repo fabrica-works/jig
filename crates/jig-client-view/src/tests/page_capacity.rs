@@ -588,7 +588,7 @@ fn fill_activity(d: &mut Fixture, read: jig_client::Handle) {
                 d,
                 Event::Act {
                     action: Act::FoldCall {
-                        name: crate::conversation::CallName { attempt: 1, turn: number, call },
+                        name: jig_client::thread::CallName { attempt: 1, turn: number, call },
                         open: true,
                     },
                 },

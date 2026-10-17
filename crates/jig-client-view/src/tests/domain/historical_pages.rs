@@ -5,10 +5,11 @@ use super::{
 use crate::tests::fixtures::{Fixture, ReadPage, Watched};
 use crate::{
     Event, Request,
-    action::{Act, End},
+    action::Act,
     address::{Address, Place, ProjectSection, TaskSection},
 };
 use jig_client::contract::*;
+use jig_client::thread::window::End;
 use skein_lib::{List, Time, Token, Wall};
 fn cursor(bytes: &[u8]) -> Cursor {
     Cursor::new(Box::from(bytes), 1024).expect("bounded opaque cursor")

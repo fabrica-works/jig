@@ -8,6 +8,7 @@
 use crate::tests::fixtures::{Fixture, ReadPage, Served, Watched};
 use crate::words::Words;
 use crate::{JigBindings, owner_project as view};
+use jig_client::thread::window::End;
 use skein_ui::phrases::{PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat};
 use skein_ui::{Builder, Role, Tree};
 
@@ -1069,7 +1070,7 @@ fn historical_old_spend(before: &Cursor, after: &Cursor) -> SpendPage {
 fn native_historical_project() -> (Fixture, OwnerSpendPage) {
     use crate::{
         Event, Request,
-        action::{Act, End},
+        action::Act,
         address::{Address, ProjectSection},
     };
     let mut value = source();
@@ -1169,10 +1170,7 @@ fn historical_project_bound(w: &Words) -> skein_ui::Limits {
 }
 #[test]
 fn owner_project_genuine_spend_keeps_live_historical_and_earlier_period_facts_with_both_opaque_edges() {
-    use crate::{
-        Event, Request,
-        action::{Act, End},
-    };
+    use crate::{Event, Request, action::Act};
     let (mut domain, page) = native_historical_project();
     assert_eq!(domain.project_page().owner_spend.as_deref(), Some(&page));
     assert_eq!(domain.project_page().spend.get(0).unwrap().period, 997);

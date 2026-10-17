@@ -2,7 +2,8 @@
 //! Reading beyond a full window drops the opposite end and keeps the supplied
 //! reverse cursor; live rows enter only at an end the window still reaches.
 //! See client/domain/client.md, 7. Row owners supply cursors for re-reading drops.
-use crate::action::End;
+use jig_client::thread::window::{Edge, Edges, End, edges, plan};
+
 use jig_client::contract::{ActivityLine, ConversationLine, Cursor, HistoryRow, ObjectKey};
 use skein_lib::List;
 

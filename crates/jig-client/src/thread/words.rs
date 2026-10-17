@@ -11,8 +11,9 @@
 //! | being sent | refused or unknown | absent; the draft owner keeps the words |
 //! | sent | committed read-through | read |
 //! | absent | activity words | sent or read |
-use jig_client::contract::{Activity, ActivityPage, MeParty, Party, Text};
-use skein_lib::{List, Token};
+use crate::Key;
+use crate::contract::{Activity, ActivityPage, MeParty, Party, Text};
+use skein_lib::List;
 /// Where a person's words are relative to the engine's committed turns.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Words {
@@ -26,7 +27,8 @@ pub enum Words {
 /// Whole words, with a request only when this client sent them.
 #[derive(Debug)]
 pub struct Sent {
-    pub request: Option<Token>,
+    pub request: Option<Key>,
+    pub place: u32,
     pub by: Option<Party>,
     /// Name loss supplied by the local Me; historical Party has no such fact.
     pub by_name_cut: Option<bool>,
@@ -64,7 +66,7 @@ impl KeptWords {
     }
     /// Whether the same pending request is already shown.
     #[must_use]
-    pub fn pending(&self, request: Token) -> bool {
+    pub fn pending(&self, request: Key) -> bool {
         for sent in &self.rows {
             if sent.request == Some(request) {
                 return true;
@@ -78,7 +80,7 @@ impl KeptWords {
         self.rows.len() < self.rows.capacity()
     }
     /// Keeps the submitted snapshot once, including when a repeated press joins it.
-    pub fn begin(&mut self, request: Token, by: Option<Party>, words: Text) -> bool {
+    pub fn begin(&mut self, request: Key, by: Option<Party>, words: Text) -> bool {
         if self.pending(request) {
             return true;
         }
@@ -86,12 +88,12 @@ impl KeptWords {
             return false;
         }
         self.rows
-            .push(Sent { request: Some(request), by, by_name_cut: None, words, state: Words::BeingSent })
+            .push(Sent { request: Some(request), place: 0, by, by_name_cut: None, words, state: Words::BeingSent })
             .expect("word room checked");
         true
     }
     /// Keeps the supplied local author label and its independent document loss.
-    pub fn begin_frame(&mut self, request: Token, by: Option<MeParty>, words: Text) -> bool {
+    pub fn begin_frame(&mut self, request: Key, by: Option<MeParty>, words: Text, place: u32) -> bool {
         if self.pending(request) {
             return true;
         }
@@ -108,13 +110,14 @@ impl KeptWords {
             let row = self.rows.get_mut(at).expect("word row exists");
             if row.request == Some(request) {
                 row.by_name_cut = cut;
+                row.place = place;
                 break;
             }
         }
         true
     }
     /// Applies a durable message number once; an activity copy is joined by number.
-    pub fn sent(&mut self, request: Token, message: u64) -> bool {
+    pub fn sent(&mut self, request: Key, message: u64) -> bool {
         let mut present = None;
         for at in 0..self.rows.len() {
             if self.rows.get(at).expect("word row exists").request == Some(request) {
@@ -139,7 +142,7 @@ impl KeptWords {
         true
     }
     /// A refusal or unknown outcome restores the composer owner's display alone.
-    pub fn refused(&mut self, request: Token) {
+    pub fn refused(&mut self, request: Key) {
         let mut kept = List::with_capacity(self.rows.capacity());
         let rows = core::mem::replace(&mut self.rows, List::with_capacity(0));
         for row in rows.into_boxed() {
@@ -181,7 +184,7 @@ impl KeptWords {
         }
         let state = self.state(message);
         self.rows
-            .push(Sent { request: None, by: Some(by), by_name_cut: None, words, state })
+            .push(Sent { request: None, place: 0, by: Some(by), by_name_cut: None, words, state })
             .expect("word room checked");
         true
     }
@@ -231,8 +234,8 @@ fn number(state: Words) -> Option<u64> {
 }
 /// Local word snapshots may coexist with the committed activity copy while it slides.
 #[must_use]
-pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
-    List::<Sent>::worst_case(limits.conversation_words)?
+pub fn worst_case(limits: &super::Limits) -> Option<u64> {
+    List::<Sent>::worst_case(limits.lines)?
         .checked_mul(2)?
-        .checked_add(u64::from(limits.conversation_words).checked_mul(limits.document_bytes)?.checked_mul(2)?)
+        .checked_add(u64::from(limits.lines).checked_mul(limits.bytes)?.checked_mul(2)?)
 }

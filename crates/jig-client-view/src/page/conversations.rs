@@ -12,18 +12,17 @@
 //! | pending | made chat | ready | navigate to chat activity |
 use crate::{
     Request, Ui,
-    action::End,
     address::{Address, Place, TaskSection},
     fields::Purpose,
     intents::Origin,
     objects::{Body, Source},
     page::{IntentPurpose, inbox::Filter},
-    windows::{Edge, Edges},
 };
 use alloc::boxed::Box;
 use jig_client::contract::{
     self, Answer, Ask, ConversationLine, InboxGroup, InboxReadGroup, Limit, ObjectKey, Read, Refusal, SeenThrough, Text,
 };
+use jig_client::thread::window::{Edge, Edges, End};
 use skein_lib::{Env, List, Queue, Token};
 /// First-words submission and its refusal, held apart from the list window.
 #[derive(Debug)]

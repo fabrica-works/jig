@@ -71,7 +71,11 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     total = total.checked_add(List::<crate::page::Section>::worst_case(crate::page::MOST_SECTIONS)?)?;
     total = total.checked_add(List::<crate::page::SectionStatus>::worst_case(crate::page::MOST_SECTIONS)?)?;
     total = total.checked_add(crate::application::worst_case(limits)?)?;
-    total = total.checked_add(crate::conversation::worst_case(limits)?)?;
+    total = total.checked_add(jig_client::thread::worst_case(&jig_client::thread::Limits {
+        lines: limits.rows.max(limits.conversation_words),
+        bytes: limits.document_bytes,
+        text: limits.text,
+    })?)?;
     total = total.checked_add(List::<crate::page::navigation::Destination>::worst_case(limits.navigation_entries)?)?;
     total = total.checked_add(crate::page::conversations::worst_case(limits)?)?;
     total = total.checked_add(crate::page::inbox::worst_case(limits)?)?;

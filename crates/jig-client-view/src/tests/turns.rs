@@ -852,7 +852,7 @@ fn maximum_independent_current_call_fits_page_with_all_existing_provisional_rows
         escaped.push(UTF8_TEXTS[4][0]);
     }
     assert!(contains(&tree, &escaped));
-    assert_eq!(d.conversation().live.len(), 1);
+    assert_eq!(d.conversation().live.len(), 2);
 }
 
 #[test]
@@ -863,7 +863,7 @@ fn displayed_retry_replaces_empty_then_resumes_with_exact_actual_watch_position(
     drive(
         &mut d,
         Event::Act {
-            action: Act::FoldCall { name: crate::conversation::CallName { attempt: 2, turn: 1, call: 1 }, open: true },
+            action: Act::FoldCall { name: jig_client::thread::CallName { attempt: 2, turn: 1, call: 1 }, open: true },
         },
     );
     assert!(contains(&build(&d, 3, words).0, b"whole private input"), "existing rich call detail is still available");

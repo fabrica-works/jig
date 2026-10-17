@@ -1,3 +1,6 @@
+//! Shared bounded activity windows (client/domain/client.md, 7).
+use crate::contract::{ActivityLine, Cursor};
+use skein_lib::List;
 /// An end of the list or an opaque continuation for more rows.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Edge {
@@ -28,14 +31,15 @@ impl Edges {
 }
 /// The ranges retained by a slide, shared by all concrete row kinds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-struct Slide {
-    old_from: u32,
-    old_count: u32,
-    new_from: u32,
-    new_count: u32,
-    dropped: u32,
+pub struct Slide {
+    pub old_from: u32,
+    pub old_count: u32,
+    pub new_from: u32,
+    pub new_count: u32,
+    pub dropped: u32,
 }
-fn plan(old: u32, new: u32, capacity: u32, end: End) -> Slide {
+#[must_use]
+pub fn plan(old: u32, new: u32, capacity: u32, end: End) -> Slide {
     let dropped = old.saturating_add(new).saturating_sub(capacity);
     match end {
         End::After => {
@@ -52,7 +56,8 @@ fn plan(old: u32, new: u32, capacity: u32, end: End) -> Slide {
         }
     }
 }
-fn edges(current: Edges, incoming: Edges, dropped: u32, empty: bool, end: End) -> Edges {
+#[must_use]
+pub fn edges(current: Edges, incoming: Edges, dropped: u32, empty: bool, end: End) -> Edges {
     match end {
         End::After => {
             Edges { before: if dropped > 0 || empty { incoming.before } else { current.before }, after: incoming.after }

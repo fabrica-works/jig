@@ -1,3 +1,4 @@
+pub mod thread;
 use crate::*;
 use alloc::boxed::Box;
 use jig_client_protocol_wire::v8 as w;

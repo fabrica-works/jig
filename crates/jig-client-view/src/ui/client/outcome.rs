@@ -47,7 +47,7 @@ pub(super) fn answered(
 }
 fn not_sent(domain: &mut Ui, token: Token, why: NotSent) {
     let Some(origin) = domain.intents.unknown(token) else { return };
-    domain.conversation.words.refused(token);
+    domain.conversation.words.refused(Key { asker: jig_client::Asker::JIG, number: token.raw() ^ domain.seed });
     match origin {
         Origin::Card { object, .. } => match domain.objects.find(object) {
             Some(id) => {

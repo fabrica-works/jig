@@ -188,7 +188,7 @@ pub fn send_card(
     let object_id = domain.objects.find(object)?;
     let origin = Origin::Card { object, act };
     let joined = domain.intents.joined(scope, origin).is_some();
-    if !joined && let Some(which) = crate::conversation::sending::admission(domain, scope, &ask) {
+    if !joined && let Some(which) = crate::activity::sending::admission(domain, scope, &ask) {
         domain.objects.get_mut(object_id).expect("named card exists").card =
             crate::objects::Card::Refused { refusal: jig_client::contract::Refusal::Limit { which } };
 
@@ -197,7 +197,7 @@ pub fn send_card(
     }
     match domain.intents.ask(scope, origin, ask, out) {
         Some(id) => {
-            crate::conversation::sending::pending(domain, id, lent);
+            crate::activity::sending::pending(domain, id, lent);
             if act == ActKind::Message && !joined {
                 let task = match object {
                     ObjectKey::Task(task) => Some(task),
@@ -267,7 +267,7 @@ pub(crate) fn answered(
     let Some(receipt) = domain.intents.terminal(request, answer) else {
         return;
     };
-    crate::conversation::sending::answered(domain, request, &receipt.answer);
+    crate::activity::sending::answered(domain, request, &receipt.answer);
     match receipt.origin {
         Origin::Page { handle, purpose } => {
             crate::page::conversations::answered(domain, env, (request, handle), purpose, receipt.answer, out, lent);
@@ -300,7 +300,10 @@ fn unknown(domain: &mut crate::Ui, request: Token, lent: &jig_client::Client) {
     let Some(origin) = domain.intents.unknown(request) else {
         return;
     };
-    domain.conversation.words.refused(request);
+    domain
+        .conversation
+        .words
+        .refused(jig_client::Key { asker: jig_client::Asker::JIG, number: request.raw() ^ domain.seed });
     match origin {
         Origin::Card { object, act } => crate::objects::answer::unknown(domain, object, act, lent),
         Origin::Page { purpose, .. } => {

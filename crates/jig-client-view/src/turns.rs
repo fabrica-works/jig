@@ -3,12 +3,11 @@
 //! same task/attempt/turn key names live and committed text; no stream facts are
 //! committed by the view. Call objects use shared cards and parts leave slots.
 use crate::{JigBindings, Owner, phrases::jig::JigPhrase, words::Words};
+use jig_client::thread::window::{Edge, End};
+use jig_client::thread::{Thread, Words as WordState};
 use skein_ui::{Builder, Key, Role, Run};
 
-use crate::{
-    Borrowed,
-    conversation::{Conversation, Words as WordState},
-};
+use crate::Borrowed;
 use jig_client::contract::{LiveCall, Party, TurnName};
 mod activity;
 mod call;
@@ -94,7 +93,7 @@ pub fn conversation(b: &mut Builder, client: &Borrowed<'_>, words: &Words, bindi
     crate::pages::cut(b, words, state.page_cut);
     edges(b, &state, words, bindings);
 }
-fn pending(b: &mut Builder, state: &Conversation, words: &Words) {
+fn pending(b: &mut Builder, state: &Thread, words: &Words) {
     for sent in &state.words.rows {
         let message = match sent.state {
             WordState::BeingSent => None,
@@ -113,7 +112,7 @@ fn pending(b: &mut Builder, state: &Conversation, words: &Words) {
         }
         b.open(Role::Item);
         match sent.request {
-            Some(request) => b.key(Key { owner: Owner::Jig.opaque(), kind: 26, a: state.task, b: request.raw() }),
+            Some(request) => b.key(Key { owner: Owner::Jig.opaque(), kind: 26, a: state.task, b: request.number }),
             None => {
                 if let Some(message) = message {
                     b.key(word_key(state, message));
@@ -134,14 +133,14 @@ fn pending(b: &mut Builder, state: &Conversation, words: &Words) {
         b.close();
     }
 }
-fn word_key(state: &Conversation, message: u64) -> Key {
+fn word_key(state: &Thread, message: u64) -> Key {
     for sent in &state.words.rows {
         match sent.state {
             WordState::Sent { message: number } | WordState::Read { message: number } => {
                 if message == number
                     && let Some(request) = sent.request
                 {
-                    return Key { owner: Owner::Jig.opaque(), kind: 26, a: state.task, b: request.raw() };
+                    return Key { owner: Owner::Jig.opaque(), kind: 26, a: state.task, b: request.number };
                 }
             }
             WordState::BeingSent => {}
@@ -168,11 +167,8 @@ fn word_state(b: &mut Builder, state: WordState, words: &Words) {
     words.status(b, phrase, &[]);
 }
 
-fn edges(b: &mut Builder, state: &Conversation, words: &Words, bindings: &mut JigBindings) {
-    use crate::{
-        action::{Act, End},
-        windows::Edge,
-    };
+fn edges(b: &mut Builder, state: &Thread, words: &Words, bindings: &mut JigBindings) {
+    use crate::action::Act;
     for (edge, end, phrase) in [
         (&state.lines.edges.after, End::Before, JigPhrase::ReadEarlier),
         (&state.lines.edges.before, End::After, JigPhrase::ReadLater),
@@ -193,7 +189,7 @@ fn edges(b: &mut Builder, state: &Conversation, words: &Words, bindings: &mut Ji
                 Role::Button,
                 phrase,
                 &[],
-                Act::More { window: skein_lib::Token::new(crate::conversation::ACTIVITY_WINDOW), end },
+                Act::More { window: skein_lib::Token::new(crate::activity::routing::ACTIVITY_WINDOW), end },
             ),
         }
     }

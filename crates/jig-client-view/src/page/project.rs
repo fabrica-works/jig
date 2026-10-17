@@ -12,12 +12,12 @@
 //! | any | leave | empty context | parts leave through routing |
 use crate::{
     Request, Ui,
-    action::End,
     address::ProjectSection,
     objects::{Object, Source},
 };
 use alloc::boxed::Box;
 use jig_client::contract::{self, Cursor, GoalLine, NoteScope, Part, Project, Read, TaskLine, TaskQuery, Text};
+use jig_client::thread::window::End;
 use skein_lib::{Env, Id, List, Queue, Token};
 pub mod goals;
 pub mod notes;

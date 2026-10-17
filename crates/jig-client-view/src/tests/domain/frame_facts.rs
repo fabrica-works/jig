@@ -1,3 +1,4 @@
+const LOCAL_WORDS: jig_client::Key = jig_client::Key { asker: jig_client::Asker::JIG, number: 1 };
 use super::spine::{LIMITS, delivered, frame, start};
 use crate::tests::fixtures::Fixture;
 use crate::{
@@ -81,20 +82,16 @@ fn charter_offers_keep_their_own_project_and_reserved_capacity_is_bounded() {
 }
 #[test]
 fn pending_words_keep_the_local_name_loss_without_inventing_historical_loss_or_blocking_send() {
-    let mut words = crate::conversation::words::KeptWords::new(3);
+    let mut words = jig_client::thread::words::KeptWords::new(3);
     let mut author = frame(7).party;
     author.name = DocumentText { bytes: Text::new(Box::from(*b"partial"), 32).unwrap(), cut: true };
-    assert!(words.begin_frame(
-        skein_lib::Token::new(1),
-        Some(author.clone()),
-        Text::new(Box::from(*b"send"), 32).unwrap()
-    ));
+    assert!(words.begin_frame(LOCAL_WORDS, Some(author.clone()), Text::new(Box::from(*b"send"), 32).unwrap(), 0));
     let local = words.rows.get(0).unwrap();
     assert_eq!(local.by.as_ref().unwrap().number, 7);
     assert_eq!(local.by.as_ref().unwrap().name.bytes(), b"partial");
     assert_eq!(local.by_name_cut, Some(true));
     author.name.cut = false;
-    assert!(words.begin_frame(skein_lib::Token::new(1), Some(author), Text::new(Box::from(*b"later"), 32).unwrap()));
+    assert!(words.begin_frame(LOCAL_WORDS, Some(author), Text::new(Box::from(*b"later"), 32).unwrap(), 0));
     assert_eq!(words.rows.get(0).unwrap().by_name_cut, Some(true));
     assert_eq!(words.rows.get(0).unwrap().words.bytes(), b"send");
     assert!(words.restore(super::spine::party(8), 2, Text::new(Box::from(*b"history"), 32).unwrap()));
