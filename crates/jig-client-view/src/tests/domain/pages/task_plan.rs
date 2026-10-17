@@ -103,12 +103,12 @@ fn bounded_plan_filters() {
     assert_eq!(plan.held_below, 4);
     task::filter(&mut domain, PlanFilter::Held);
     let plan = &domain.task_page().plan;
-    assert!(plan.visible(&plan.nodes.as_slice()[0]));
-    assert!(!plan.visible(&plan.nodes.as_slice()[1]));
+    assert!(plan.visible(&plan.nodes[0]));
+    assert!(!plan.visible(&plan.nodes[1]));
     task::filter(&mut domain, PlanFilter::Live);
     let plan = &domain.task_page().plan;
-    assert!(!plan.visible(&plan.nodes.as_slice()[0]));
-    assert!(plan.visible(&plan.nodes.as_slice()[1]));
+    assert!(!plan.visible(&plan.nodes[0]));
+    assert!(plan.visible(&plan.nodes[1]));
     task::filter(&mut domain, PlanFilter::All);
     assert_eq!(domain.task_page().plan.nodes.len(), 2);
 }

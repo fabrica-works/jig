@@ -4,7 +4,6 @@ use jig_client::{
     Latest,
     contract::{Delivery, OwnerTree, Phase, PhaseCounts, TreeNode},
 };
-use skein_lib::List;
 #[derive(Debug)]
 pub struct Task<'a> {
     pub state: &'a TaskPage,
@@ -20,7 +19,7 @@ impl core::ops::Deref for Task<'_> {
 pub struct PlanView<'a> {
     pub state: &'a Plan,
     pub owner: Option<&'a OwnerTree>,
-    pub nodes: List<TreeNode>,
+    pub nodes: &'a [TreeNode],
     pub folded: PhaseCounts,
     pub held_below: u32,
 }
@@ -54,7 +53,7 @@ impl<'a> Borrowed<'a> {
         let mut plan = PlanView {
             state: &self.ui.task_page.plan,
             owner: None,
-            nodes: List::with_capacity(self.ui.limits.rows),
+            nodes: &[],
             folded: crate::page::task::counts(),
             held_below: 0,
         };
@@ -69,10 +68,12 @@ impl<'a> Borrowed<'a> {
                 Some(Latest::Jig(Delivery::Tree(tree))) => {
                     plan.folded = tree.folded;
                     plan.held_below = tree.held_below;
-                    for row in &tree.nodes {
-                        if plan.nodes.push(row.clone()).is_err() {
-                            add(&mut plan.folded, row.chip.phase);
-                        }
+                    let count = usize::try_from(self.ui.limits.rows)
+                        .expect("row bound fits usize")
+                        .min(tree.nodes.as_slice().len());
+                    plan.nodes = tree.nodes.as_slice().get(..count).expect("visible rows fit the delivered slice");
+                    for row in tree.nodes.as_slice().get(count..).expect("folded rows follow visible rows") {
+                        add(&mut plan.folded, row.chip.phase);
                     }
                 }
                 Some(Latest::Jig(_) | Latest::Family(_)) | None => {}

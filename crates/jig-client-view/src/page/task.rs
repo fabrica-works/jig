@@ -542,7 +542,7 @@ pub(crate) fn fold(domain: &mut Ui, object: Token, open: bool, lent: &jig_client
         }
         return;
     }
-    for node in &plan.nodes {
+    for node in plan.nodes {
         if node.chip.task == task {
             if domain.task_page.plan.folds.insert(task, open).is_ok() {
                 domain.changed();
@@ -583,7 +583,7 @@ pub(crate) fn open_ended(domain: &mut Ui, task: u64, out: &mut Queue<Request>, l
             found |= row.chip.task == task;
         }
     }
-    for node in &projected.plan.nodes {
+    for node in projected.plan.nodes {
         if node.chip.task == task {
             found = true;
         }

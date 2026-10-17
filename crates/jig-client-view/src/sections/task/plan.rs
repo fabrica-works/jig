@@ -39,14 +39,14 @@ pub(super) fn plan(b: &mut Builder, client: &Borrowed<'_>, words: &Words, bindin
     }
     b.open(Role::Tree);
     b.name(&words.say(JigPhrase::Plan, &[]));
-    let count = plan.nodes.len();
+    let count = u32::try_from(plan.nodes.len()).expect("bounded tree rows fit u32");
     let mut stack = Stack::with_capacity(count.checked_mul(2).expect("bounded tree visits"));
     let mut seen = Set::with_capacity(count);
     for index in 0..count {
         let index = count.checked_sub(1).expect("a row exists").checked_sub(index).expect("reverse row exists");
-        let node = plan.nodes.get(index).expect("node exists");
+        let node = plan.nodes.get(usize::try_from(index).expect("row index fits usize")).expect("node exists");
         let mut parent_present = false;
-        for parent in &plan.nodes {
+        for parent in plan.nodes {
             if node.parent == Some(parent.chip.task) && plan.visible(parent) {
                 parent_present = true;
             }
@@ -62,7 +62,8 @@ pub(super) fn plan(b: &mut Builder, client: &Borrowed<'_>, words: &Words, bindin
         match visit {
             Visit::Leave => b.close(),
             Visit::Enter(index) => {
-                let node = plan.nodes.get(index).expect("named row exists");
+                let node =
+                    plan.nodes.get(usize::try_from(index).expect("row index fits usize")).expect("named row exists");
                 if seen.contains(&node.chip.task) {
                     continue;
                 }
@@ -74,7 +75,10 @@ pub(super) fn plan(b: &mut Builder, client: &Borrowed<'_>, words: &Words, bindin
                     for child in 0..count {
                         let child =
                             count.checked_sub(1).expect("row exists").checked_sub(child).expect("reverse child exists");
-                        let next = plan.nodes.get(child).expect("child exists");
+                        let next = plan
+                            .nodes
+                            .get(usize::try_from(child).expect("row index fits usize"))
+                            .expect("child exists");
                         if next.parent == Some(node.chip.task) && plan.visible(next) && !seen.contains(&next.chip.task)
                         {
                             stack.push(Visit::Enter(child)).expect("bounded child visit fits");

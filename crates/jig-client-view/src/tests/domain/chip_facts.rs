@@ -116,7 +116,7 @@ fn folded_generic_endings_keep_unknown_outcome_separate_and_retain_whole_visible
     assert_eq!(plan.folded.failed, 1);
     assert_eq!(plan.folded.done, 0);
     assert_eq!(plan.folded.cancelled, 0);
-    let chip = &plan.nodes.get(0).unwrap().chip;
+    let chip = &plan.nodes.first().unwrap().chip;
     assert_eq!(chip.title.bytes(), b"partial");
     assert_eq!(chip.title.whole(), None);
     let ChipPhase::Owner { phase, details } = chip.details.as_ref() else {

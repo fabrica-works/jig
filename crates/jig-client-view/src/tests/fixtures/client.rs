@@ -2,6 +2,11 @@
 use crate::{Event, Limits, Request, Ui};
 use jig_client::{Client, Down, Handle, Key, Readout, Up, Watchable, contract};
 use skein_lib::{Duration, List, Queue, Time, Token, Wall};
+const OBSERVATIONS: u32 = 4096;
+const OUTPUTS: u32 = 512;
+const EXCHANGES: u32 = 256;
+const HEARTBEAT: Duration = Duration::from_secs(1000);
+const SEED: u64 = 9;
 #[derive(Debug)]
 pub struct Fixture {
     pub ui: Ui,
@@ -34,7 +39,7 @@ impl Fixture {
             requests: skein_lib::RequestLimits {
                 requests: limits.intents.max(1),
                 bytes: 1 << 20,
-                out: 256,
+                out: EXCHANGES,
                 first: Duration::from_nanos(10),
                 most: Duration::from_nanos(80),
                 margin: Duration::from_secs(1),
@@ -56,7 +61,7 @@ impl Fixture {
             records: limits.records,
             kept: limits.kept,
             parts: limits.parts,
-            heartbeat: Duration::from_secs(1000),
+            heartbeat: HEARTBEAT,
         };
         let mut value = Self {
             ui: Ui::new(
@@ -66,15 +71,15 @@ impl Fixture {
                 crate::page::Arrangement::none(),
             )
             .unwrap(),
-            client: Client::unlinked(&jig_client::Limits { domain, exchanges: 256 }, 9).unwrap(),
+            client: Client::unlinked(&jig_client::Limits { domain, exchanges: EXCHANGES }, SEED).unwrap(),
             now: Time::ZERO,
-            down: List::with_capacity(4096),
-            attempts: List::with_capacity(4096),
-            watches: List::with_capacity(4096),
-            transport_reads: List::with_capacity(4096),
-            read_origins: List::with_capacity(4096),
+            down: List::with_capacity(OBSERVATIONS),
+            attempts: List::with_capacity(OBSERVATIONS),
+            watches: List::with_capacity(OBSERVATIONS),
+            transport_reads: List::with_capacity(OBSERVATIONS),
+            read_origins: List::with_capacity(OBSERVATIONS),
         };
-        let mut out = Queue::with_capacity(512);
+        let mut out = Queue::with_capacity(OUTPUTS);
         value.native(jig_client::Event::StartUnlinked { kept: List::with_capacity(0) }, &mut out);
         value.native(jig_client::Event::Up { up: Up::SignedIn }, &mut out);
         value.native(jig_client::Event::Up { up: Up::Served { served: true, versions: None } }, &mut out);
@@ -124,9 +129,9 @@ impl Fixture {
     pub fn reopen(&mut self, watch: Handle) {
         self.drive(self.now, Ended { watch, end: contract::WatchEnd::Dropped });
         self.now = self.now.saturating_add(Duration::from_secs(1));
-        let mut native = Queue::with_capacity(512);
+        let mut native = Queue::with_capacity(OUTPUTS);
         self.client.fire(self.now, Wall::EPOCH, &mut native);
-        let mut ui = Queue::with_capacity(512);
+        let mut ui = Queue::with_capacity(OUTPUTS);
         self.native_out(native, None, None, &mut ui);
         self.output(ui);
     }
@@ -137,7 +142,7 @@ impl Fixture {
         Token::new(key.number ^ self.ui.seed)
     }
     pub fn request_watch(&mut self, subject: contract::Subject) -> Option<Handle> {
-        let mut out = Queue::with_capacity(512);
+        let mut out = Queue::with_capacity(OUTPUTS);
         let handle = self.ui.handles.watch(subject, crate::handles::Owner::Page, &mut out)?;
         self.output(out);
         Some(handle)
@@ -158,7 +163,7 @@ impl Fixture {
         handle
     }
     pub fn request_read(&mut self, source: crate::objects::Source, what: contract::Read) -> Option<Handle> {
-        let mut out = Queue::with_capacity(512);
+        let mut out = Queue::with_capacity(OUTPUTS);
         let handle = self.ui.handles.read(source, what, &mut out)?;
         self.output(out);
         Some(handle)
@@ -168,12 +173,12 @@ impl Fixture {
         self.ui.now = now;
         self.ui.wall = Wall::EPOCH;
         self.down.clear();
-        let mut out = Queue::with_capacity(512);
+        let mut out = Queue::with_capacity(OUTPUTS);
         input.enter(self, &mut out);
         self.output(out)
     }
     fn output(&mut self, mut out: Queue<Request>) -> Box<[Request]> {
-        let mut observed = List::with_capacity(4096);
+        let mut observed = List::with_capacity(OBSERVATIONS);
         while let Some(request) = out.pop() {
             match request {
                 Request::Client { asked } => {
@@ -238,7 +243,7 @@ impl Fixture {
             | jig_client::Event::NotStored
             | jig_client::Event::Up { .. } => None,
         };
-        let mut out = Queue::with_capacity(512);
+        let mut out = Queue::with_capacity(OUTPUTS);
         self.client.step(self.now, Wall::EPOCH, event, &mut out);
         self.native_out(out, reading, sending, ui_out);
     }
