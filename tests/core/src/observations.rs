@@ -3,6 +3,7 @@
 //! The conformance world can replace these translations and keep the referee
 //! (`domain/testing.md`, 4, 6).
 pub mod acceptance;
+pub mod intents;
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -197,6 +198,7 @@ fn call(key: core::CallKey) -> r::Receipt {
 #[derive(Clone, Debug)]
 pub struct Observer {
     pub referee: r::Referee,
+    intents: intents::Intents,
     policy_generation: u64,
     roles: BTreeMap<(u32, u32), r::Scope>,
     decisions_by_role: BTreeMap<(u32, u32), u8>,
@@ -318,6 +320,7 @@ impl Observer {
             applied_changes: BTreeSet::new(),
             forgetting: BTreeMap::new(),
             recorded: None,
+            intents: intents::Intents::default(),
         }
     }
 
@@ -346,6 +349,9 @@ impl Observer {
 
     /// Observe inbound peer traffic, before the root may decide it.
     pub fn inbound(&mut self, store: &Store, now: u64, event: &mut root::Event) {
+        for observed in self.intents.inbound_root(store, event) {
+            self.observe(now, observed);
+        }
         match event {
             root::Event::Core(core::Event::People(people::Event::Ask { reply_to, sign_in, key, ask })) => {
                 let person = store.rows.values().find_map(|row| match row {
@@ -579,6 +585,9 @@ impl Observer {
     pub fn durable(&mut self, now: u64, store: &Store) {
         if store.applied == self.applied {
             return;
+        }
+        for observed in self.intents.durable(store) {
+            self.observe(now, observed);
         }
         // Apply only an externally requested policy edit whose durable answer
         // says it succeeded. Saved policy carriers are never an authority oracle.
@@ -890,6 +899,11 @@ impl Observer {
 
     /// A released output and the neighbours' receipt of its words or result.
     pub fn delivered(&mut self, now: u64, delivery: &mut root::Delivery) {
+        if let root::Delivery::Core(core::Held::PeopleReply { to, reply }) = &mut *delivery {
+            for observed in self.intents.reply(skein_lib::Token::new(destination(to)), reply) {
+                self.observe(now, observed);
+            }
+        }
         let mut requires = Vec::new();
         match delivery {
             root::Delivery::Assigned { assignment, .. } => {

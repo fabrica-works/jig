@@ -120,6 +120,44 @@ pub fn policy(seed: u64, environment_chat: bool) -> r::Policy {
 
 pub type Store = jig_fake_store::Store<root::Key, root::Record>;
 
+pub fn inbound(
+    intents: &mut jig_core_world::observations::intents::Intents,
+    store: &Store,
+    event: &mut root::Event,
+) -> Vec<r::Observed> {
+    if let root::Event::Core(core::Event::People(people::Event::Ask { reply_to, sign_in, key, ask })) = event {
+        let person = store.rows.values().find_map(|row| match row {
+            root::Record::Core(core::Record::People(people::Stored::SignIn { number, person, .. }))
+                if number == sign_in =>
+            {
+                Some(*person)
+            }
+            root::Record::Core(_) | root::Record::Observability(_) | root::Record::Infrastructure(_) => None,
+        });
+        if let Some(person) = person {
+            return intents.party(reply_to, person, *key, ask);
+        }
+    }
+    if let root::Event::Core(event) = event {
+        return intents.inbound(event);
+    }
+    if let root::Event::Effect { key, proposal: Some(_), .. } = event {
+        return intents.propose(*key);
+    }
+    Vec::new()
+}
+
+pub fn intents(intents: &mut jig_core_world::observations::intents::Intents, store: &Store) -> Vec<r::Observed> {
+    store
+        .rows
+        .values()
+        .flat_map(|row| match row {
+            root::Record::Core(record) => intents.record(record),
+            root::Record::Observability(_) | root::Record::Infrastructure(_) => Vec::new(),
+        })
+        .collect()
+}
+
 #[expect(clippy::too_many_lines, reason = "one outside translation covers the durable row vocabulary")]
 pub fn snapshot(store: &Store) -> r::Snapshot {
     let mut snapshot = r::Snapshot::default();

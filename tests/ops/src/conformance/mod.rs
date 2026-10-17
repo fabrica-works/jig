@@ -101,6 +101,7 @@ pub struct Peers {
     applied: u64,
     observed: Vec<r::Observed>,
     application_observed: Vec<r::Observed>,
+    intents: jig_core_world::observations::intents::Intents,
     application_requests: bool,
     pub sign_in: Option<u64>,
     account_ready: bool,
@@ -175,6 +176,7 @@ impl Application for Ops {
             applied: 0,
             observed: Vec::new(),
             application_observed: Vec::new(),
+            intents: jig_core_world::observations::intents::Intents::default(),
             application_requests: false,
             sign_in: None,
             account_ready: false,
@@ -319,6 +321,7 @@ impl Application for Ops {
         outputs
     }
     fn inbound(peers: &mut Peers, store: &Store, _: Clock, event: &mut root::Event) {
+        peers.application_observed.extend(observations::inbound(&mut peers.intents, store, event));
         peers.agents.stepped(event);
         if let Some(observed) = application::requested(store, event) {
             peers.application_requests = true;
@@ -586,7 +589,9 @@ impl Application for Ops {
                     accounts::FromComponent::Closed,
                 ))))]
             }
-            root::Output::Core(core::Held::PeopleReply { reply, .. }) => {
+            root::Output::Core(core::Held::PeopleReply { mut to, reply }) => {
+                let token = std::mem::replace(&mut to, ReplyTo::new(Token::new(0))).into_token();
+                peers.application_observed.extend(peers.intents.reply(token, &reply));
                 peers.replies += 1;
                 match reply {
                     people::Reply::SignedIn { sign_in: number, .. } => {
@@ -762,6 +767,7 @@ impl Application for Ops {
     fn observed(peers: &mut Peers, _: &Systems, store: &Store, _: Clock) -> Vec<r::Observed> {
         let mut observed = std::mem::take(&mut peers.application_observed);
         if peers.applied != store.applied {
+            observed.extend(observations::intents(&mut peers.intents, store));
             let snapshot = observations::snapshot(store);
             for row in store.rows.values() {
                 if let root::Record::Core(core::Record::Core(core::CoreRecord::ProposalDecision(row))) = row

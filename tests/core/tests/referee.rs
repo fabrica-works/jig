@@ -1,8 +1,13 @@
 //! Misbehaving outside peers deliberately contradict each promised invariant.
+#[path = "referee/proposals.rs"]
+mod proposals;
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use jig_core_world::referee::*;
 use jig_test_system::{Copy, Name as SystemName, Observed as Effect, SystemKey, ValueObserved};
+
+const PROPOSER: u64 = 1;
 
 fn assigned(budget: u64) -> Observed {
     Observed::Assigned { task: 1, attempt: 1, conversation: 1, resumed: false, budget }
@@ -460,6 +465,7 @@ fn legitimate_repeated_sets_visible_proposals_and_delivered_words_remain_valid()
     fake.send(Observed::Reached(Receipt::Word(1, 9))).expect("words delivered");
     let mut rows = snapshot();
     rows.tasks.get_mut(&1).expect("task").proposal = Some((8, Source::Person(1)));
+    fake.send(Observed::ProposeAsked { proposer: Source::Task(PROPOSER) }).expect("run asked to propose");
     fake.commit(2, rows).expect("visible proposal may wait");
     fake.now = 100;
     fake.send(Observed::Restart).expect("satisfied deliveries survive restart");
@@ -591,6 +597,7 @@ fn accepted_batch() -> Snapshot {
 
 fn an_accepted_batch_uses_the_persons_authority_and_keeps_the_proposer_as_requester() {
     let mut fake = Fake::new(Recovery::Keyed);
+    fake.send(Observed::ProposeAsked { proposer: Source::Task(PROPOSER) }).expect("run asked to propose");
     fake.commit(1, proposed_batch()).expect("proposal waits for its covered person");
     let mut rows = accepted_batch();
     fake.commit(2, rows.clone()).expect("the person authorizes a wider delegate");
@@ -602,6 +609,7 @@ fn an_accepted_batch_uses_the_persons_authority_and_keeps_the_proposer_as_reques
 fn a_batch_member_without_its_covered_acceptance_is_rejected() {
     for fault in 0..3 {
         let mut fake = Fake::new(Recovery::Keyed);
+        fake.send(Observed::ProposeAsked { proposer: Source::Task(PROPOSER) }).expect("run asked to propose");
         fake.commit(1, proposed_batch()).expect("pending proposal");
         let mut rows = accepted_batch();
         match fault {
@@ -630,6 +638,7 @@ fn an_accepted_party_batch_stays_within_its_accepters_authority() {
         fake.referee.policy.people.insert((1, 2), accepter);
         let mut rows = Snapshot::default();
         rows.party_proposals.insert(9, 1);
+        fake.send(Observed::ProposeAsked { proposer: Source::Person(PROPOSER) }).expect("party asked to propose");
         fake.commit(1, rows.clone()).expect("party's pending batch");
         rows.party_proposals.clear();
         let mut member = task(2);
@@ -656,9 +665,11 @@ fn a_later_amendment_acceptance_replaces_the_tasks_authority_source() {
         let mut accepter = scope();
         accepter.budget = 60;
         fake.referee.policy.people.insert((1, 2), accepter);
+        fake.send(Observed::ProposeAsked { proposer: Source::Task(PROPOSER) }).expect("run asked to propose");
         fake.commit(1, proposed_batch()).expect("batch proposal");
         let mut rows = accepted_batch();
         fake.commit(2, rows.clone()).expect("batch accepted by party one");
+        fake.send(Observed::ProposeAsked { proposer: Source::Person(PROPOSER) }).expect("party asked to propose");
         rows.party_proposals.insert(10, 1);
         fake.commit(3, rows.clone()).expect("later amendment pending from its party");
         rows.party_proposals.clear();
@@ -674,7 +685,6 @@ fn a_later_amendment_acceptance_replaces_the_tasks_authority_source() {
         }
     }
 }
-
 #[test]
 fn a_watch_delivery_before_its_no_write_decisions_prior_commit_is_caught() {
     let mut fence = jig_core_world::watches::Fence::opened(7);
@@ -765,6 +775,7 @@ fn valid_referee_cases() {
 // Each named scenario preserves its own fixture and original assertions.
 #[test]
 fn referee_scenario_family() {
+    proposals::proposals_referee_cases();
     authority_referee_cases();
     spend_referee_cases();
     once_referee_cases();
