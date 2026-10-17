@@ -24,7 +24,7 @@ fn a_compound_answered_before_a_restart_is_answered_once_after_it() {
     world.commit_all();
     assert_eq!(
         world.reply(replay),
-        Some(Reply::Outcome(Outcome::Compound { project: 1, operations: 2, first_message: 0 }))
+        Some(Reply::Outcome(Outcome::Compound { project: 1, operations: 2, first_message: 1 }))
     );
     assert_eq!(world.stats().routes, routes);
     assert_eq!(world.stats().replies, replies + 1);

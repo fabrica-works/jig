@@ -13,6 +13,7 @@ const AMEND: u8 = 2;
 const MOVE_SIGN_IN: u64 = 6100;
 const MARK_BEFORE_MOVE: u8 = 21;
 const MOVE: u8 = 22;
+const FIRST_MOVE_TURN: u32 = 1;
 
 #[test]
 fn a_partys_cancel_with_a_grace_ends_the_chat_when_the_grace_ends() {
@@ -135,7 +136,7 @@ fn a_compound_closes_a_conversation_moving_one_delegate_and_cancelling_another()
     let (cancelled, moved) = delegate_pair(&mut world);
     request(&mut world, 11, closing(chat, cancelled, moved));
     let first_message = 1;
-    assert_eq!(live_row(&world, chat).grace.as_ref().expect("finish asked").message, first_message);
+    assert_eq!(live_row(&world, chat).grace.as_ref().expect("finish asked").message, first_message + 2);
     assert_eq!(
         world.people_answers.last(),
         Some(&people::Reply::Outcome(people::Outcome::Compound { project: PROJECT, operations: 3, first_message }))
@@ -240,7 +241,7 @@ fn a_compound_sent_again_after_a_crash_is_made_once_and_answered_once() {
     world.restart_with(jig_core_world::faults::plan_fixture(1111).0);
     let revision = live_row(&world, chat).revision;
     let first_message = 1;
-    assert_eq!(live_row(&world, chat).grace.as_ref().expect("grace retained").message, first_message);
+    assert_eq!(live_row(&world, chat).grace.as_ref().expect("grace retained").message, first_message + 2);
     request(&mut world, 17, closing(chat, cancelled, moved));
     assert_eq!(world.people_answers.len(), before + 1);
     assert_eq!(
@@ -326,33 +327,38 @@ fn another_requester(world: &mut jig_core_world::effects::World) -> u64 {
 
 #[test]
 fn a_moved_conversation_starts_its_new_requester_with_nothing_read() {
-    const COMPOUND: [bool; 2] = [false, true];
-    for compound_request in COMPOUND {
-        let mut world = world(1116);
-        let task = world.assigned.as_ref().expect("conversation").task;
-        world.turn(1, 0, None, b"unread after move");
-        let second = another_requester(&mut world);
-        request(&mut world, MARK_BEFORE_MOVE, people::Ask::MarkSeen { seen: people::Seen::Chat { task, through: 1 } });
-        assert!(
-            world
-                .store
-                .rows
-                .contains_key(&root::Key::Core(core::Key::People(people::Key::ReadChat { party: OWNER, task })))
-        );
-        world.sign_in = Some(second);
-        let ask = if compound_request {
-            compound([people::Operation::Move { task, reason: b"continue".as_slice().into() }])
-        } else {
-            people::Ask::Move { project: PROJECT, task, reason: b"continue".as_slice().into() }
-        };
-        request(&mut world, MOVE, ask);
-        assert_moved_read(&world, task, compound_request);
-    }
+    let mut world = world(1116);
+    let task = world.assigned.as_ref().expect("conversation").task;
+    let ask = people::Ask::Move { project: PROJECT, task, reason: b"continue".as_slice().into() };
+    assert_moved_read(&mut world, task, ask);
 }
 
-fn assert_moved_read(world: &jig_core_world::effects::World, task: u64, compound_request: bool) {
+#[test]
+fn a_compound_moved_conversation_starts_its_new_requester_with_nothing_read() {
+    let mut world = world(1116);
+    let task = world.assigned.as_ref().expect("conversation").task;
+    let ask = compound([people::Operation::Move { task, reason: b"continue".as_slice().into() }]);
+    assert_moved_read(&mut world, task, ask);
+}
+
+fn assert_moved_read(world: &mut jig_core_world::effects::World, task: u64, ask: people::Ask) {
+    world.turn(FIRST_MOVE_TURN, 0, None, b"unread after move");
+    let second = another_requester(world);
+    request(
+        world,
+        MARK_BEFORE_MOVE,
+        people::Ask::MarkSeen { seen: people::Seen::Chat { task, through: u64::from(FIRST_MOVE_TURN) } },
+    );
+    assert!(
+        world
+            .store
+            .rows
+            .contains_key(&root::Key::Core(core::Key::People(people::Key::ReadChat { party: OWNER, task })))
+    );
+    world.sign_in = Some(second);
+    request(world, MOVE, ask);
     let tasks::Party::Person(to) = live_row(world, task).requester else { panic!("new requester") };
-    assert_ne!(to, OWNER, "compound={compound_request}: {:?}", world.people_answers.last());
+    assert_ne!(to, OWNER, "{:?}", world.people_answers.last());
     assert_eq!(
         world.store.rows.get(&root::Key::Core(core::Key::People(people::Key::ReadChat { party: OWNER, task }))),
         None

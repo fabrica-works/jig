@@ -57,7 +57,7 @@ pub(crate) fn route(
             );
         }
         match issue(&mut core.counters, &mut operation) {
-            Ok(Some(message)) if first_message == 0 => first_message = message,
+            Ok(message) if first_message == 0 => first_message = message,
             Ok(_) => {}
             Err(why) => return refused(work, route.request, at, people::Outcome::Refused(why)),
         }
@@ -221,19 +221,20 @@ fn check(
     }
 }
 
-fn issue(counters: &mut Counters, operation: &mut tasks::Operation) -> Result<Option<u64>, people::Refusal> {
-    let slot = match operation {
+fn issue(counters: &mut Counters, operation: &mut tasks::Operation) -> Result<u64, people::Refusal> {
+    let number =
+        fresh(counters, Family::Message).ok_or(people::Refusal::Limit { which: people::LimitKind::Arithmetic })?;
+    match operation {
         tasks::Operation::Cancel { message: Some(message), .. }
         | tasks::Operation::Release { message: Some(message), .. }
-        | tasks::Operation::Amend { message, .. } => message,
-        tasks::Operation::Message { word, .. } => &mut word.number,
+        | tasks::Operation::Amend { message, .. } => *message = number,
+        tasks::Operation::Message { word, .. } => word.number = number,
         tasks::Operation::Cancel { message: None, .. }
         | tasks::Operation::Release { message: None, .. }
         | tasks::Operation::Move { .. }
-        | tasks::Operation::Stop { .. } => return Ok(None),
-    };
-    *slot = fresh(counters, Family::Message).ok_or(people::Refusal::Limit { which: people::LimitKind::Arithmetic })?;
-    Ok(Some(*slot))
+        | tasks::Operation::Stop { .. } => {}
+    }
+    Ok(number)
 }
 
 fn projection_room(core: &Core, prior: &List<tasks::Operation>, operation: &tasks::Operation, bound: u32) -> bool {

@@ -1,5 +1,7 @@
 use super::*;
 
+const RESTORED_KEY: RequestKey = RequestKey { person: 1, key: [1; 16] };
+
 fn compound(count: u32) -> Ask {
     let mut operations = List::with_capacity(count);
     for task in 1..=count {
@@ -30,7 +32,7 @@ fn a_compound_sent_twice_under_one_key_is_routed_once() {
     test.signin(1, 10, identity(0, 1));
     let request = route(&test.request(10, 1, compound(2)));
     assert!(test.request(10, 1, compound(2)).is_empty());
-    let outcome = Outcome::Compound { project: 1, operations: 2, first_message: 0 };
+    let outcome = Outcome::Compound { project: 1, operations: 2, first_message: 1 };
     let replies = test.send(Event::Decided { request, outcome });
     let mut answers = 0_u32;
     for row in replies {
@@ -41,6 +43,23 @@ fn a_compound_sent_twice_under_one_key_is_routed_once() {
     }
     assert_eq!(answers, 2);
     assert_eq!(reply(&test.request(10, 1, compound(2))), Reply::Outcome(outcome));
+}
+
+#[test]
+fn a_made_compound_with_a_zero_first_message_cannot_restore() {
+    let mut test = Test::new(LIMITS);
+    test.d = Domain::new(&LIMITS, Box::new([]), 2);
+    let outcome = Outcome::Compound { project: 1, operations: 2, first_message: 0 };
+    assert_eq!(
+        test.send(Event::Restore {
+            record: Stored::Answer { key: RESTORED_KEY, ask: Box::new(compound(2)), outcome, at: Wall::EPOCH }
+        }),
+        [Request::RestoreRefused {
+            key: Key::Answer(RESTORED_KEY),
+            refusal: Refusal::Limit { which: LimitKind::Restore }
+        }],
+    );
+    assert!(!test.d.ready());
 }
 
 const INVALID: &[(u64, &[u8], Refusal)] = &[

@@ -562,7 +562,7 @@ impl World {
                                 let outcome = if self.settings.authority_refuses {
                                     Outcome::CompoundRefused { at: 1, why: Refusal::Unknown }
                                 } else {
-                                    Outcome::Compound { project, operations: operations.len(), first_message: 0 }
+                                    Outcome::Compound { project, operations: operations.len(), first_message: 1 }
                                 };
                                 people::step(
                                     &mut self.domain,

@@ -1357,7 +1357,9 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
     };
 
     match outcome {
-        Outcome::Compound { project, operations, .. } => expected == Expected::Compound(project, operations),
+        Outcome::Compound { project, operations, first_message } => {
+            expected == Expected::Compound(project, operations) && first_message != 0
+        }
         Outcome::CompoundRefused { at, .. } => {
             if let Ask::Compound { operations, .. } = ask {
                 at < operations.len()
