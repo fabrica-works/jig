@@ -69,6 +69,43 @@ impl Joint {
         }
     }
 
+    /// Carry an unlinked client's contract operation to the real core.
+    /// # Errors
+    /// Returns work outside this transport's declared Jig owner intact.
+    pub fn down(
+        &mut self,
+        client: ClientId,
+        now: Time,
+        wall: Wall,
+        down: jig_client::Down,
+    ) -> Result<(), jig_client::Down> {
+        let request = super::transport::contract_request(down)?;
+        Front::<Test>::wire(self, client, now, wall, request);
+        Ok(())
+    }
+
+    /// Poll original core callbacks for an unlinked client with the supplied owners.
+    /// This front serves Jig; undeclared family ranges are never invented.
+    pub fn up(&mut self, now: Time, wall: Wall, owners: &[jig_client::Spoken]) -> Vec<(ClientId, jig_client::Up)> {
+        let mut up = Vec::new();
+        for (client, event) in Front::<Test>::poll(self, now, wall) {
+            if let Event::Jig(jig_domain_client::Event::Hello { served }) = &event {
+                up.push((
+                    client,
+                    jig_client::Up::Served { served: *served, versions: Some(self.session.driver.transport.served()) },
+                ));
+                for owner in owners {
+                    up.push((client, jig_client::Up::FamilyServed { family: owner.family, versions: None }));
+                }
+            } else {
+                let callback = super::transport::contract_event(&event).expect("original contract transport callback");
+                Front::<Test>::received(self, client, &event);
+                up.push((client, callback));
+            }
+        }
+        up
+    }
+
     /// Start without a protocol secret so the person initiates the real provider exchange.
     pub fn unsigned_on_bind(&mut self) {
         self.unsigned_on_bind = true;
@@ -235,12 +272,39 @@ impl Front<Test> for Joint {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+/// The shared real-core front fixture, with externally supplied owner limits.
+#[must_use]
+pub fn fixture(owner_limits: &jig_test_domain::Limits) -> Joint {
     use crate::joint::engine::Driver;
     use jig_client_domain::contract as client;
     use jig_core_world::peers::Peers;
+    use jig_domain_people as people;
+
+    let driver = Driver::new(
+        jig_core_world::world::config(8455),
+        *owner_limits,
+        Peers::new(Vec::new(), Vec::new()),
+        Time::ZERO,
+        super::fixture::clock(Time::ZERO),
+    );
+    let limits = crate::test::limits();
+    let codec = jig_protocol_transcript::Limits {
+        smith: smith_transcript::v3::CEILINGS,
+        bytes: 1_048_576,
+        turn: client::TurnLimits { messages: 64, blocks: 16, text: 65_536 },
+    };
+    let identity = Identity {
+        key: people::IdentityKey { provider: 0, subject: 7_u64.to_be_bytes().into() },
+        login: b"login".as_slice().into(),
+        name: b"Person".as_slice().into(),
+    };
+    Joint::new(Session::new(driver, limits, codec), BTreeMap::from([(1, identity)]), super::fixture::clock)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use jig_client_domain::contract as client;
     use jig_domain_people as people;
 
     fn clock(now: Time) -> Wall {
@@ -252,25 +316,7 @@ mod tests {
     }
 
     fn front_with_limits(owner_limits: &jig_test_domain::Limits) -> Joint {
-        let driver = Driver::new(
-            jig_core_world::world::config(8455),
-            *owner_limits,
-            Peers::new(Vec::new(), Vec::new()),
-            Time::ZERO,
-            clock(Time::ZERO),
-        );
-        let limits = crate::test::limits();
-        let codec = jig_protocol_transcript::Limits {
-            smith: smith_transcript::v3::CEILINGS,
-            bytes: 1_048_576,
-            turn: client::TurnLimits { messages: 64, blocks: 16, text: 65_536 },
-        };
-        let identity = Identity {
-            key: people::IdentityKey { provider: 0, subject: 7_u64.to_be_bytes().into() },
-            login: b"login".as_slice().into(),
-            name: b"Person".as_slice().into(),
-        };
-        Joint::new(Session::new(driver, limits, codec), BTreeMap::from([(1, identity)]), clock)
+        fixture(owner_limits)
     }
 
     fn answered_sign_out() -> (Joint, u64) {

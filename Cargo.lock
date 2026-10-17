@@ -389,6 +389,7 @@ dependencies = [
 name = "jig-client-world"
 version = "0.0.0"
 dependencies = [
+ "jig-client",
  "jig-client-domain",
  "jig-client-protocol-link",
  "jig-client-scripted-engine",

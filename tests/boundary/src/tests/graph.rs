@@ -303,6 +303,7 @@ fn client_world_joins_only_the_client_and_test_roles() {
             manifest.dependencies.iter().all(|d| [
                 "skein-lib",
                 "skein-world",
+                "jig-client",
                 "jig-client-domain",
                 "jig-client-protocol-link",
                 "jig-domain-client",

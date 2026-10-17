@@ -128,6 +128,12 @@ impl Transport {
         jig_domain_client::Event::Hello { served: jig_client_protocol_link::serves(self.versions) }
     }
 
+    /// The configured Jig range, independent of a delivered Frame.
+    #[must_use]
+    pub fn served(&self) -> VersionRange {
+        self.versions
+    }
+
     /// Replace only the protocol's configured served range, supplied outside Frame.
     pub fn versions(&mut self, versions: VersionRange) {
         self.versions = versions;
@@ -354,6 +360,74 @@ impl Transport {
             self.end_watch(*token);
         }
         watches
+    }
+}
+
+/// Carry Jig contract operations through the existing real-core routes.
+/// # Errors
+/// Returns storage work and unsupported family carriers intact to their owner.
+pub fn contract_request(down: jig_client::Down) -> Result<jig_client_test_domain::Request, jig_client::Down> {
+    use jig_client::{Ask, Down, Readable, Watchable};
+    use jig_client_test_domain::{Ask as RequestAsk, JigOut, Request};
+    Ok(match down {
+        Down::Send { attempt, key, request: Ask::Jig(ask) } => {
+            Request::Send { attempt, key, ask: RequestAsk::Jig(ask) }
+        }
+        Down::Open { watch, subject: Watchable::Jig(subject) } => Request::Jig(JigOut::Open { watch, subject }),
+        Down::Continue { watch, subject } => Request::Jig(JigOut::Continue { watch, subject }),
+        Down::Close { watch } => Request::Jig(JigOut::Close { watch }),
+        Down::Read { read, what: Readable::Jig(what) } => Request::Jig(JigOut::Read { read, what }),
+        other @ (Down::Save { .. }
+        | Down::Erase { .. }
+        | Down::Send { request: Ask::Family(_), .. }
+        | Down::Open { subject: Watchable::Family(_), .. }
+        | Down::Read { what: Readable::Family(_), .. }) => return Err(other),
+    })
+}
+
+/// Translate only original transport callbacks; shell handoffs stay with their caller.
+#[must_use]
+pub fn contract_event(event: &jig_client_test_domain::Event) -> Option<jig_client::Up> {
+    use jig_client::{Answered, Readout, Up};
+    use jig_client_test_domain::{Answered as Reply, Event};
+    use jig_domain_client::Event as Jig;
+    match event {
+        Event::Jig(Jig::Watch { watch, event }) => Some(Up::Watched { watch: *watch, event: event.clone() }),
+        Event::Jig(Jig::Ended { watch, end }) => Some(Up::WatchEnded { watch: *watch, end: *end }),
+        Event::Jig(Jig::Read { read, result }) => {
+            Some(Up::ReadDone { read: *read, result: Readout::Jig(result.clone()) })
+        }
+        Event::Answer { attempt, envelope, answer: Some(Reply::Jig(answer)) } => Some(Up::Answer {
+            attempt: *attempt,
+            envelope: *envelope,
+            answer: Some(Answered::Jig(answer.clone())),
+            why: None,
+        }),
+        Event::Answer { attempt, envelope, answer: None } => {
+            Some(Up::Answer { attempt: *attempt, envelope: *envelope, answer: None, why: None })
+        }
+        Event::SignedOut | Event::Jig(Jig::SignedOut) => Some(Up::SignedOut),
+        Event::Start { .. }
+        | Event::Went { .. }
+        | Event::Act { .. }
+        | Event::First(_)
+        | Event::Answer { answer: Some(Reply::First(_)), .. }
+        | Event::Jig(
+            Jig::Start { .. }
+            | Jig::Hello { .. }
+            | Jig::Kept { .. }
+            | Jig::KeptGone { .. }
+            | Jig::Went { .. }
+            | Jig::Act { .. }
+            | Jig::Ask { .. }
+            | Jig::Progress { .. }
+            | Jig::Answered { .. }
+            | Jig::ShowObjects { .. }
+            | Jig::ShowSections { .. }
+            | Jig::ObjectsLeft
+            | Jig::SignOutLost
+            | Jig::Frame { .. },
+        ) => None,
     }
 }
 

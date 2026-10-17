@@ -10,6 +10,7 @@ use skein_lib::{Duration, Env, List, Queue, Rng, Secret, Time, Token, Wall};
 #[derive(Debug)]
 pub enum Event {
     Start { kept: List<Record> },
+    StartUnlinked { kept: List<skein_lib::RequestRecord<crate::Held>> },
     SignIn { with: With },
     SignOut,
     Watch { handle: Handle, subject: Watchable },
@@ -22,6 +23,7 @@ pub enum Event {
     StreamGone,
     Stored,
     NotStored,
+    Up { up: Up },
 }
 #[derive(Debug)]
 pub enum Request {
@@ -31,6 +33,7 @@ pub enum Request {
     Save { records: List<Record> },
     Erase { records: List<Box<[u8]>> },
     Told { told: Told },
+    Down { down: Down },
 }
 #[derive(Debug)]
 pub struct LinkView<'a> {
@@ -43,7 +46,7 @@ pub struct LinkView<'a> {
 #[derive(Debug)]
 pub struct Client {
     domain: domain::Domain,
-    link: link::Link,
+    link: Option<link::Link>,
     limits: Limits,
     domain_out: Queue<domain::Request>,
     link_out: Queue<link::Request>,
@@ -68,8 +71,17 @@ impl Client {
         let Ok(link) = link::Link::new(&bounds) else {
             return Err(Unusable::Limits);
         };
+        Ok(Self::build(limits, seed, Some(link)))
+    }
+    /// # Errors
+    /// Refuses limits whose queues or receiving bounds cannot be represented.
+    pub fn unlinked(limits: &Limits, seed: u64) -> Result<Self, Unusable> {
+        crate::worst_case(limits).ok_or(Unusable::Limits)?;
+        Ok(Self::build(limits, seed, None))
+    }
+    fn build(limits: &Limits, seed: u64, link: Option<link::Link>) -> Self {
         let bound = crate::max_out(limits);
-        Ok(Self {
+        Self {
             domain: domain::Domain::new(&limits.domain, seed),
             link,
             limits: *limits,
@@ -84,10 +96,15 @@ impl Client {
             rng: Rng::new(seed),
             saves: List::with_capacity(bound),
             erases: List::with_capacity(bound),
-        })
+        }
     }
     pub fn step(&mut self, now: Time, wall: Wall, event: Event, out: &mut Queue<Request>) {
         let env = Env { now, wall, limits: self.limits.domain };
+        if self.link.is_none() {
+            self.step_unlinked(&env, event);
+            self.drain(&env, out);
+            return;
+        }
         match event {
             Event::Start { kept } => {
                 domain::step(
@@ -100,7 +117,7 @@ impl Client {
                 versions
                     .push(link::StoreVersion { keeper: link::Keeper::Table, version: domain::TABLE_VERSION })
                     .expect("one keeper");
-                self.link.step(now, link::Event::Start { kept, versions }, &mut self.link_out);
+                self.link_step(now, link::Event::Start { kept, versions });
             }
             Event::Watch { handle, subject } => self.domain_step(&env, domain::Event::Watch { handle, subject }),
             Event::Unwatch { handle } => self.domain_step(&env, domain::Event::Unwatch { handle }),
@@ -119,7 +136,7 @@ impl Client {
                     With::Held(_) | With::Transport => true,
                     With::Link(_) | With::Service(_) => false,
                 };
-                self.link.step(now, link::Event::SignIn { with }, &mut self.link_out);
+                self.link_step(now, link::Event::SignIn { with });
                 if held {
                     self.up(&env, Up::SignedIn);
                 }
@@ -127,16 +144,19 @@ impl Client {
             Event::SignOut => {
                 self.signing_out = true;
                 self.sign_out_lost = false;
-                self.link.step(now, link::Event::SignOut, &mut self.link_out);
+                self.link_step(now, link::Event::SignOut);
             }
             Event::Reply { exchange, message } => {
-                self.link.step(now, link::Event::Reply { exchange, message }, &mut self.link_out);
+                self.link_step(now, link::Event::Reply { exchange, message });
             }
-            Event::Lost { exchange } => self.link.step(now, link::Event::Lost { exchange }, &mut self.link_out),
-            Event::Streamed { message } => self.link.step(now, link::Event::Streamed { message }, &mut self.link_out),
-            Event::StreamGone => self.link.step(now, link::Event::StreamGone, &mut self.link_out),
+            Event::Lost { exchange } => self.link_step(now, link::Event::Lost { exchange }),
+            Event::Streamed { message } => self.link_step(now, link::Event::Streamed { message }),
+            Event::StreamGone => self.link_step(now, link::Event::StreamGone),
             Event::Stored => self.store_answer(&env, true),
             Event::NotStored => self.store_answer(&env, false),
+            Event::Up { .. } | Event::StartUnlinked { .. } => {
+                assert!(self.link.is_none(), "Up and StartUnlinked require an unlinked client");
+            }
         }
         self.drain(&env, out);
     }
@@ -147,14 +167,12 @@ impl Client {
         {
             self.signing_until = None;
             if let Some(credential) = &self.service {
-                self.link.step(
-                    now,
-                    link::Event::SignIn { with: With::Service(credential.clone()) },
-                    &mut self.link_out,
-                );
+                self.link_step(now, link::Event::SignIn { with: With::Service(credential.clone()) });
             }
         }
-        self.link.fire(now, &mut self.link_out);
+        if let Some(link) = &mut self.link {
+            link.fire(now, &mut self.link_out);
+        }
         self.drain(&env, out);
         if self.domain.link() != Link::OutOfDate {
             domain::fire(&mut self.domain, &env, &mut self.domain_out);
@@ -166,11 +184,17 @@ impl Client {
         if self.domain.link() == Link::OutOfDate {
             return None;
         }
-        domain::next_deadline(&self.domain).into_iter().chain(self.link.next_deadline()).chain(self.signing_until).min()
+        let deadline = match &self.link {
+            Some(link) => link.next_deadline(),
+            None => None,
+        };
+        domain::next_deadline(&self.domain).into_iter().chain(deadline).chain(self.signing_until).min()
     }
     pub fn reclaim(&mut self) {
         domain::reclaim(&mut self.domain);
-        self.link.reclaim();
+        if let Some(link) = &mut self.link {
+            link.reclaim();
+        }
     }
     #[must_use]
     pub fn document(&self, handle: Handle) -> Option<Document<'_>> {
@@ -191,8 +215,37 @@ impl Client {
             party: self.domain.party(),
             not_served: self.domain.not_served(),
             sign_out_lost: self.sign_out_lost,
-            credential: self.link.credential(),
+            credential: match &self.link {
+                Some(link) => link.credential(),
+                None => None,
+            },
         }
+    }
+    fn step_unlinked(&mut self, env: &Env<DomainLimits>, event: Event) {
+        match event {
+            Event::StartUnlinked { kept } => self.domain_step(env, domain::Event::Start { kept }),
+            Event::Watch { handle, subject } => self.domain_step(env, domain::Event::Watch { handle, subject }),
+            Event::Unwatch { handle } => self.domain_step(env, domain::Event::Unwatch { handle }),
+            Event::Read { handle, read } => self.domain_step(env, domain::Event::Read { handle, read }),
+            Event::Send { key, request } => self.domain_step(env, domain::Event::Send { key, request }),
+            Event::Up { up } => self.up(env, up),
+            Event::SignIn { with } => {
+                assert!(with == With::Transport, "unlinked sign-in belongs to the transport");
+                self.up(env, Up::SignedIn);
+            }
+            Event::SignOut => self.up(env, Up::SignedOut),
+            Event::Stored | Event::NotStored => {}
+            Event::Start { .. }
+            | Event::Reply { .. }
+            | Event::Lost { .. }
+            | Event::Streamed { .. }
+            | Event::StreamGone => {
+                assert!(self.link.is_some(), "wire events require a linked client");
+            }
+        }
+    }
+    fn link_step(&mut self, now: Time, event: link::Event) {
+        self.link.as_mut().expect("linked client").step(now, event, &mut self.link_out);
     }
     fn signing(&mut self, env: &Env<DomainLimits>, signing: link::Signing) {
         match signing {
@@ -237,12 +290,12 @@ impl Client {
             }
         }
         if !stored {
-            self.link.step(env.now, link::Event::NotStored, &mut self.link_out);
+            self.link_step(env.now, link::Event::NotStored);
         } else if !self.store.pending() {
-            self.link.step(env.now, link::Event::Stored, &mut self.link_out);
+            self.link_step(env.now, link::Event::Stored);
         }
         if self.store.pending() {
-            self.link.wait_for_store();
+            self.link.as_mut().expect("linked client").wait_for_store();
         }
     }
     fn domain_step(&mut self, env: &Env<DomainLimits>, event: domain::Event) {
@@ -258,6 +311,7 @@ impl Client {
             } else if let Some(request) = self.domain_out.pop() {
                 match request {
                     domain::Request::Told { told } => out.push(Request::Told { told }),
+                    domain::Request::Down { down } if self.link.is_none() => out.push(Request::Down { down }),
                     domain::Request::Down { down } => {
                         let local = match &down {
                             Down::Save { .. } | Down::Erase { .. } => true,
@@ -277,7 +331,7 @@ impl Client {
                                 | Down::Close { .. }
                                 | Down::Read { .. } => {}
                             }
-                            self.link.step(env.now, down_event(down), &mut self.link_out);
+                            self.link_step(env.now, down_event(down));
                         }
                     }
                 }
