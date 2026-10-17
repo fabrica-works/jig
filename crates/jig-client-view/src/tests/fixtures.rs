@@ -173,3 +173,24 @@ pub(crate) fn task_line(
         conversation: None,
     }
 }
+
+pub(crate) fn chat_templates() -> skein_lib::List<jig_client::contract::Template> {
+    use jig_client::contract as c;
+    let mut values = skein_lib::List::with_capacity(1);
+    values
+        .push(c::Template {
+            number: jig_client::shapes::CHAT,
+            name: c::DocumentText::complete(Text::new(b"Chat".as_slice().into(), 32).unwrap()),
+            executor: c::TemplateExecutor::Charter(1),
+            contract: c::TaskContractDocument::Report { words: 32 },
+            shallower: 1,
+            budget: c::TemplateBudget::AsAllowed { cap: None },
+            deadline: c::TemplateDeadline::None,
+            tracked: None,
+            flags: c::TaskFlags { conversation: true, listed: false, retention: c::Retention::Kept },
+            label: 1,
+            grace: None,
+        })
+        .unwrap();
+    values
+}

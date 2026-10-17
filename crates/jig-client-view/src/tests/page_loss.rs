@@ -4,7 +4,7 @@
     reason = "ordinary tests select public read requests and inspect semantic trees"
 )]
 use super::{
-    cards::{contains, drive, text, words},
+    cards::{contains, drive, words},
     pages::{build, deliver},
     work_pages::{entered, list, project_doc, task},
 };
@@ -30,7 +30,7 @@ fn read(out: &[Request], kind: u8) -> jig_client::Handle {
                 | (1, Read::History { .. })
                 | (2, Read::Activity { .. })
                 | (3, Read::Inbox { group: InboxReadGroup::Needs, .. })
-                | (4, Read::Conversations { .. })
+                | (4, Read::Tasks { .. })
                 | (5, Read::Goals { .. })
                 | (6, Read::Spend { .. })
                 | (7, Read::Notes { .. }) => Some(*read),
@@ -112,6 +112,17 @@ fn ready(kind: u8) -> (Fixture, jig_client::Handle) {
             ReadPage { read: project, result: ReadResult::Value(ReadValue::Project(Box::new(project_doc()))) },
         );
     }
+    if kind == 4 {
+        out.extend(drive(
+            &mut domain,
+            Event::Act {
+                action: Act::More {
+                    window: Token::new(crate::page::conversations::CONVERSATIONS_WINDOW),
+                    end: jig_client::thread::window::End::After,
+                },
+            },
+        ));
+    }
     let token = read(&out, kind);
     (domain, token)
 }
@@ -121,11 +132,10 @@ fn value(kind: u8, cut: bool, after: Option<Cursor>) -> ReadValue {
         1 => ReadValue::History(Box::new(HistoryPage { cut, rows: List::with_capacity(2), before: None, after })),
         2 => ReadValue::Activity(Box::new(ActivityPage { cut, rows: List::with_capacity(2), before: None, after })),
         3 => ReadValue::Inbox(Box::new(InboxPage { cut, rows: List::with_capacity(2), before: None, after })),
-        4 => ReadValue::Conversations(Box::new(ConversationPage {
-            cut,
-            rows: List::with_capacity(2),
-            before: None,
-            after,
+        4 => ReadValue::Tasks(Box::new(TaskPage {
+            live: List::with_capacity(0),
+            live_after: None,
+            ended: EndedGroup::Rows { rows: List::with_capacity(2), cut, after },
         })),
         5 => ReadValue::Goals(Box::new(GoalPage { cut, rows: List::with_capacity(2), before: None, after })),
         6 => ReadValue::Spend(Box::new(SpendPage { cut, rows: List::with_capacity(2), before: None, after })),
@@ -196,49 +206,6 @@ fn every_native_page_retains_source_loss_and_displays_it_independently_of_contin
             assert!(!contains(&build(&domain, 3, words).0, b"This page is incomplete"));
         }
     }
-}
-#[test]
-fn a_complete_conversation_page_preserves_independent_row_text_loss_and_opaque_continuation() {
-    let (mut domain, token) = ready(4);
-    let mut chip = super::work_pages::chip(8);
-    chip.title.cut = true;
-    let row = ConversationLine {
-        cached_replies: 0,
-        runtime: Some(Runtime::Idle),
-        delegates: 0,
-        budget: OwnerBudget {
-            numbers: OwnerNumbers { budget: 20, spent: 0, spent_below: 0, reserved: 0 },
-            left: 20,
-            funder: Funder::Pool { project: 4, person: 1, period: 3 },
-            deadline: None,
-        },
-        chip,
-        project: 4,
-        first_words: DocumentText::complete(text(b"whole first words")),
-        unread: Some(Count { value: 0, limited: false }),
-        seen: 7,
-        last_reply: 7,
-        changed: Some(skein_lib::Wall::EPOCH),
-    };
-    drive(
-        &mut domain,
-        ReadPage {
-            read: token,
-            result: ReadResult::Value(ReadValue::Conversations(Box::new(ConversationPage {
-                cut: false,
-                rows: list([row.clone()]),
-                before: None,
-                after: Some(cursor()),
-            }))),
-        },
-    );
-    assert!(!domain.conversation_rows().cut);
-    assert_eq!(domain.conversation_rows().rows.get(0), Some(&row));
-    assert_eq!(domain.conversation_rows().edges.after, jig_client::thread::window::Edge::More(cursor()));
-    let tree = build(&domain, 3, words()).0;
-    assert!(!contains(&tree, b"This page is incomplete"));
-    assert!(contains(&tree, b"Read later"));
-    assert!(contains(&tree, b"Title is incomplete"));
 }
 
 #[test]
@@ -312,35 +279,6 @@ fn row_selected_words() -> crate::words::Words {
         language: 1,
         offset_minutes: 0,
     }
-}
-
-#[test]
-fn owner_conversation_rows_render_whole_text_loss_independent_cache_and_only_supplied_enrichments_in_selected_language()
-{
-    let (mut domain, read) = ready(4);
-    let row = ConversationLine {
-        chip: super::work_pages::chip(8),
-        project: 4,
-        first_words: DocumentText { bytes: text(UTF8_TEXTS[1]), cut: true },
-        unread: None,
-        cached_replies: u32::MAX,
-        runtime: None,
-        changed: None,
-        delegates: u32::MAX,
-        seen: 1,
-        last_reply: u64::MAX,
-        budget: super::cards_objects::task_doc(&[]).budget,
-    };
-    let page = ConversationPage { rows: list([row.clone()]), cut: false, before: None, after: Some(cursor()) };
-    drive(&mut domain, ReadPage { read, result: ReadResult::Value(ReadValue::Conversations(Box::new(page))) });
-    let selected = row_selected_words();
-    let tree = build(&domain, 1, &selected).0;
-    assert!(contains(&tree, UTF8_TEXTS[1]));
-    assert!(contains(&tree, b"ALT Only part of this text was supplied"));
-    assert!(contains(&tree, b"4294967295ALT Cached replies "));
-    assert!(!contains(&tree, b"ALT Updates"));
-    assert!(tree.len() <= crate::conversations_nodes(&super::cards::CLIENT, 0).unwrap());
-    assert_eq!(domain.conversation_rows().rows.get(0), Some(&row));
 }
 
 #[test]

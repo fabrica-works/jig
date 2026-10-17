@@ -1,4 +1,4 @@
-//! Offered consequences survive the component's actual record encoding.
+//! Offered consequences survive the component's record encoding.
 use super::fixtures;
 use crate::translate;
 use jig_client_protocol_wire::v8 as w;

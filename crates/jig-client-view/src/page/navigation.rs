@@ -51,14 +51,7 @@ impl Navigation {
             Destination::Application { .. } => true,
             Destination::Jig(address) => match address {
                 Address::Inbox { .. } | Address::Task { .. } => true,
-                Address::Conversations { project } => {
-                    for offered in &frame.charters {
-                        if !offered.chats.is_empty() && (project.is_none() || project == Some(offered.project)) {
-                            return true;
-                        }
-                    }
-                    false
-                }
+                Address::Conversations { project } => crate::queries::chats(frame, project).is_some(),
                 Address::Project { project, .. } => {
                     for offered in &frame.projects {
                         if offered.project == project {

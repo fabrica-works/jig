@@ -1,4 +1,4 @@
-//! Fixture setup through the actual task-owner and worker doors.
+//! Fixture setup through the task-owner and worker doors.
 use super::{Engine, Protocol, fixtures};
 use jig_domain_core as core;
 use jig_domain_tasks as tasks;
@@ -24,7 +24,7 @@ impl Protocol {
         limits.core.fleet.slots = 2;
         Self::with_engine(Engine::with_peers(seed, &limits, config, peers))
     }
-    /// Admit one ordinary delegate of the first actual worker assignment.
+    /// Admit one ordinary delegate of the first worker assignment.
     pub fn make_live_delegate(&mut self) {
         let owner = &self.engine.driver.world;
         let assignment = owner.peers.as_ref().expect("worker peer").workers[0].seen[0].clone();
@@ -87,6 +87,78 @@ fn set_run_allowance(config: &mut root::Config) {
 mod tests {
     use super::{Protocol, fixtures};
     use skein_lib::Time;
+    #[test]
+    fn starting_a_chat_assigns_the_chat_templates_label() {
+        let templates = jig_core_world::fixtures::templates();
+        let label = templates
+            .iter()
+            .find(|template| template.number == jig_client::shapes::CHAT)
+            .expect("fixture template")
+            .label;
+        let mut protocol = Protocol::new(fixtures::SEED);
+        protocol.engine.driver.scripted_party(fixtures::starter(), Time::ZERO, fixtures::wall(Time::ZERO));
+        protocol.advance(Time::ZERO, fixtures::wall(Time::ZERO));
+        let labels: Vec<_> = protocol
+            .engine
+            .driver
+            .world
+            .store
+            .rows
+            .values()
+            .filter_map(|record| match record {
+                jig_test_domain::Record::Core(jig_domain_core::Record::Tasks(jig_domain_tasks::Stored::Live(row))) => {
+                    Some((row.label, row.flags.conversation))
+                }
+                jig_test_domain::Record::Core(_) | jig_test_domain::Record::Connector { .. } => None,
+            })
+            .collect();
+        assert_eq!(labels, vec![(label, true)]);
+    }
+    #[test]
+    fn setting_a_goal_assigns_the_goal_templates_label() {
+        use jig_fake_parties::{Act, Ask, Party, Role};
+        let templates = jig_core_world::fixtures::templates();
+        let label = templates
+            .iter()
+            .find(|template| template.number == jig_client::shapes::GOAL)
+            .expect("fixture template")
+            .label;
+        let mut protocol = Protocol::new(fixtures::SEED);
+        let party = Party::new(
+            1,
+            Role::Owner,
+            1_000_000,
+            Box::new([
+                Act::SignIn { provider: 0, subject: fixtures::OWNER_SUBJECT.as_slice().into() },
+                Act::Request {
+                    key: fixtures::START_KEY,
+                    ask: Ask::Goal {
+                        words: b"tracked goal".as_slice().into(),
+                        budget: 10,
+                        priority: 1,
+                        deadline: None,
+                    },
+                },
+            ]),
+        );
+        protocol.engine.driver.scripted_party(party, Time::ZERO, fixtures::wall(Time::ZERO));
+        protocol.advance(Time::ZERO, fixtures::wall(Time::ZERO));
+        let labels: Vec<_> = protocol
+            .engine
+            .driver
+            .world
+            .store
+            .rows
+            .values()
+            .filter_map(|record| match record {
+                jig_test_domain::Record::Core(jig_domain_core::Record::Tasks(jig_domain_tasks::Stored::Live(row))) => {
+                    Some((row.label, row.flags.listed))
+                }
+                jig_test_domain::Record::Core(_) | jig_test_domain::Record::Connector { .. } => None,
+            })
+            .collect();
+        assert_eq!(labels, vec![(label, true)]);
+    }
     #[test]
     fn the_two_slot_fixture_admits_a_running_delegate() {
         let mut protocol = Protocol::two_run_slots(fixtures::SEED);

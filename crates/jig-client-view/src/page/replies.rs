@@ -11,20 +11,23 @@ use skein_lib::{Env, List, Queue};
 
 /// A page watch owns the displayed window even when a read slides its rows.
 /// This avoids retaining dropped rows under an obsolete, second source.
-fn source(domain: &Ui, fallback: Source, conversations: bool) -> Source {
+fn source(domain: &Ui, fallback: Source, conversations: bool, lent: &jig_client::Client) -> Source {
     for (id, watch) in &domain.handles.watches {
         if watch.owner != (crate::page::shown::owner(domain)) {
             continue;
         }
         let matches = match watch.subject {
             Subject::Inbox { .. } => !conversations,
-            Subject::Conversations => conversations,
+            Subject::Tasks { query, .. } => match domain.frame(lent).document {
+                Some(me) => conversations && crate::queries::chats(me, query.project) == Some(query),
+                None => false,
+            },
             Subject::Me
             | Subject::Task { .. }
             | Subject::Tree { .. }
             | Subject::Chips { .. }
             | Subject::Goals { .. }
-            | Subject::Tasks { .. }
+            | Subject::Conversations
             | Subject::Run { .. }
             | Subject::Deployment => false,
         };
@@ -42,7 +45,7 @@ pub(crate) fn inbox(
     out: &mut Queue<Request>,
     lent: &jig_client::Client,
 ) {
-    let source = source(domain, incoming, false);
+    let source = source(domain, incoming, false, lent);
     let projected = domain.borrow(lent).inbox();
     let mut keys = List::with_capacity(projected.rows.capacity());
     let mut contexts = List::with_capacity(projected.rows.capacity());
@@ -65,7 +68,7 @@ pub(crate) fn conversations(
     out: &mut Queue<Request>,
     lent: &jig_client::Client,
 ) {
-    let source = source(domain, incoming, true);
+    let source = source(domain, incoming, true, lent);
     let projected = domain.borrow(lent).conversation_rows();
     let mut keys = List::with_capacity(env.limits.rows);
     let mut contexts = List::with_capacity(env.limits.rows);

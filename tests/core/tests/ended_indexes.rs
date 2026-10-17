@@ -20,6 +20,8 @@ fn ended_rows(world: &jig_core_world::effects::World) -> Vec<tasks::Key> {
 
 #[test]
 fn an_ended_chat_is_indexed_by_its_requesting_party_and_label() {
+    let templates = jig_core_world::fixtures::templates();
+    let label = templates.iter().find(|template| template.number == 1).expect("fixture template").label;
     let mut world = world(820);
     let task = world.assigned.as_ref().expect("chat").task;
     world.end(
@@ -35,7 +37,7 @@ fn an_ended_chat_is_indexed_by_its_requesting_party_and_label() {
         panic!("ended chat")
     };
     let ended_at = tasks::Newest::of(row.ended_at.expect("ended").as_nanos());
-    assert_eq!(ended_rows(&world), [tasks::Key::EndedByParty { party: REQUESTER, label: 0, ended_at, task }]);
+    assert_eq!(ended_rows(&world), [tasks::Key::EndedByParty { party: REQUESTER, label, ended_at, task }]);
 }
 
 #[test]
@@ -62,6 +64,8 @@ fn an_ended_delegate_of_a_task_saves_no_party_row() {
 
 #[test]
 fn an_ended_goal_is_indexed_by_its_project_and_label() {
+    let templates = jig_core_world::fixtures::templates();
+    let label = templates.iter().find(|template| template.number == 2).expect("fixture template").label;
     let mut world = world(824);
     world.end(
         tasks::End::Finished {
@@ -94,8 +98,8 @@ fn an_ended_goal_is_indexed_by_its_project_and_label() {
             root::Key::Core(_) | root::Key::Connector { .. } => None,
         })
         .collect();
-    assert_eq!(keys, [tasks::Key::EndedByProject { project: 1, label: 0, ended_at, task }]);
-    assert!(ended_rows(&world).contains(&tasks::Key::EndedByParty { party: REQUESTER, label: 0, ended_at, task }));
+    assert_eq!(keys, [tasks::Key::EndedByProject { project: 1, label, ended_at, task }]);
+    assert!(ended_rows(&world).contains(&tasks::Key::EndedByParty { party: REQUESTER, label, ended_at, task }));
 }
 
 #[test]

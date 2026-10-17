@@ -7,6 +7,7 @@ use jig_client_test_domain::Address as RootAddress;
 use jig_client_view::address::Address;
 use skein_lib::{Duration, Wall};
 pub mod client_construction;
+pub mod conversations;
 pub mod own_proposal;
 pub mod person_confirmation;
 pub mod text_pages;
@@ -26,7 +27,7 @@ pub fn frame(party: u64) -> Me {
             name: DocumentText::complete(text(b"Pat")),
         },
         projects: list([MeProject {
-            templates: skein_lib::List::with_capacity(0),
+            templates: conversations::templates(),
             creating: None,
             project: 1,
             name: Some(DocumentText::complete(text(b"First"))),
@@ -252,7 +253,7 @@ pub fn task() -> Task {
 #[must_use]
 pub fn chat_world(seed: u64) -> World<Test, Scripted> {
     let mut world = world(seed);
-    let task = task();
+    let task = conversations::chat(9, b"Chat nine", Wall::EPOCH);
     world
         .front()
         .engine

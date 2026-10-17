@@ -1,4 +1,4 @@
-//! Offered Task acts are checked against the actual admitted source packet and
+//! Offered Task acts are checked against the admitted source packet and
 //! the public card, not private domain state (client/domain/testing.md, 6).
 use super::*;
 use skein_fake_person::{Face, Found, TreeFace};
@@ -6,7 +6,7 @@ use skein_fake_person::{Face, Found, TreeFace};
 pub(super) fn task(world: &mut World<Test, Joint>, client: crate::ClientId, number: u64) {
     use jig_domain_core::acts::{Act, Admission};
     let (source, title) = {
-        let packet = world.front().session.task_offers(client, number).expect("actual Task packet");
+        let packet = world.front().session.task_offers(client, number).expect("Task packet");
         assert_eq!(packet.source.len(), packet.native.len());
         (packet.source.clone(), packet.native_task.chip.title.bytes().to_vec())
     };
@@ -68,7 +68,7 @@ pub(super) fn task(world: &mut World<Test, Joint>, client: crate::ClientId, numb
 pub(super) fn card(world: &mut World<Test, Joint>, client: crate::ClientId, key: client::ObjectKey, title: &[u8]) {
     use jig_domain_core::acts::{Act, Admission};
     let source = {
-        let packet = world.front().session.card_offers(client, key).expect("actual admitted card packet");
+        let packet = world.front().session.card_offers(client, key).expect("admitted card packet");
         assert_eq!(packet.source.len(), packet.native.len());
         packet.source.clone()
     };
@@ -118,14 +118,14 @@ pub(super) fn card(world: &mut World<Test, Joint>, client: crate::ClientId, key:
     );
     let start = tree.nodes().iter().position(|node| node.id == card).expect("card index");
     let end = start + usize::try_from(tree.nodes()[start].size).expect("card size");
-    let actual = tree.nodes()[start..end].iter().filter(|node| node.role == Role::Button).count();
+    let buttons = tree.nodes()[start..end].iter().filter(|node| node.role == Role::Button).count();
     let expected = source
         .iter()
         .filter(|offer| {
             matches!(&offer.admission, Admission::Allowed | Admission::Proposed { .. } | Admission::Bounded { .. })
         })
         .count();
-    assert_eq!(actual, expected + usize::from(composed), "no unoffered card buttons");
+    assert_eq!(buttons, expected + usize::from(composed), "no unoffered card buttons");
 }
 
 fn composed(source: &[jig_domain_core::acts::Offered]) -> bool {

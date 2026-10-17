@@ -255,3 +255,6 @@ fn cancelling_a_task_says_what_ends_before_it_is_sent() {
     assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed, "{outcome:?}");
     assert_eq!(world.front().requests_made(), before);
 }
+
+#[path = "client/conversations.rs"]
+mod conversations;

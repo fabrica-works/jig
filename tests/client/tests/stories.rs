@@ -473,3 +473,41 @@ fn an_own_proposal_view_hiding_its_effect_fails_jig_s_check() {
     world.person(client, stories::own_proposal::person());
     world.run(Until::Done);
 }
+
+const OLDER_CHAT: u64 = 41;
+const NEWER_CHAT: u64 = 42;
+const EARLIER: skein_lib::Wall = skein_lib::Wall::from_nanos(1);
+const LATER: skein_lib::Wall = skein_lib::Wall::from_nanos(2);
+const READER: u64 = 7;
+#[test]
+fn the_conversations_section_lists_live_chats_by_last_activity() {
+    let tasks = [
+        stories::conversations::chat(OLDER_CHAT, b"Earlier chat", EARLIER),
+        stories::conversations::chat(NEWER_CHAT, b"Later chat", LATER),
+    ];
+    let mut world = stories::conversations::list_world(511, &tasks);
+    let client = world.client(READER, stories::conversation());
+    world.person(client, vec![Step::See { find: Find::text(b"Later chat"), within: WITHIN }]);
+    assert_eq!(world.run(Until::Done).verdict, skein_world::domain::Verdict::Passed);
+    let keys: Vec<_> = world
+        .tree(client)
+        .nodes()
+        .iter()
+        .filter_map(|node| node.key.filter(|key| key.kind == 20).map(|key| key.a))
+        .collect();
+    assert_eq!(keys, vec![NEWER_CHAT, OLDER_CHAT]);
+}
+#[test]
+fn the_frame_shows_no_conversations_entry_without_a_chat_template() {
+    let mut world = stories::conversations::without_chats(512);
+    let client = world.client(READER, stories::inbox());
+    world.person(client, vec![Step::See { find: Find::text(b"Signed in as Pat"), within: WITHIN }]);
+    assert_eq!(world.run(Until::Done).verdict, skein_world::domain::Verdict::Passed);
+    assert!(
+        !world
+            .tree(client)
+            .nodes()
+            .iter()
+            .any(|node| node.role == Role::Link && node.name.as_deref() == Some(b"Conversations"))
+    );
+}

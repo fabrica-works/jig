@@ -24,6 +24,15 @@ pub(crate) fn section(
     }
     crate::pages::work::section(b, words, JigPhrase::Conversations, crate::regions::JigRegion::Conversations);
     super::status(b, client, words, crate::page::Section::Conversations { project });
+    let query = match client.frame().document {
+        Some(me) => crate::queries::chats(me, project),
+        None => None,
+    };
+    if query.is_none() {
+        words.refusal(b, &jig_client::contract::Refusal::NotOffered, text_limit);
+        b.close();
+        return true;
+    }
     b.open(Role::List);
     for row in &conversation_rows.rows {
         b.open(Role::Item);
@@ -37,53 +46,55 @@ pub(crate) fn section(
             &[Hole::Number(row.chip.task), crate::words::name(row.chip.title.bytes())],
             Act::OpenChat { task: row.chip.task },
         );
-        if let Some(runtime) = &row.runtime {
-            title_loss(b, &row.chip.title, runtime, words);
-        }
+        crate::document_text::loss(b, &row.chip.title, words);
         words.text(b, JigPhrase::ContextProject, &[Hole::Number(u64::from(row.project))]);
-        crate::document_text::plain(b, &row.first_words, words);
-        if let Some(value) = &row.runtime {
-            runtime(b, client, value, words, bindings);
-            match value {
-                Runtime::Held { .. } => {
-                    if let Some(id) = client.objects().find(jig_client::contract::ObjectKey::Task(row.chip.task))
-                        && !client.owes(id)
-                    {
-                        cards::card(b, client, id, &cards::Place::Conversation, words, bindings);
-                    }
-                }
-                Runtime::Ended => {
-                    cards::chip::chip(b, client, &row.chip, words, bindings);
-                }
-                Runtime::Active(_)
-                | Runtime::Waiting { .. }
-                | Runtime::Idle
-                | Runtime::Starting
-                | Runtime::Running { .. }
-                | Runtime::WaitingForWords { .. }
-                | Runtime::BackingOff { .. }
-                | Runtime::Procedure { .. }
-                | Runtime::Person { .. }
-                | Runtime::Closing(_) => {}
-            }
-        } else {
-            cards::chip::chip(b, client, &row.chip, words, bindings);
-        }
-        if let Some(unread) = row.unread {
-            words.text(
+        if let Some(me) = client.frame().document {
+            words.chat_status(
                 b,
-                if unread.limited { JigPhrase::MoreUpdates } else { JigPhrase::Updates },
-                &[Hole::Number(u64::from(unread.value))],
+                &jig_client::facts::chat_status(&row.chip, &row.waits_on, row.project, me),
+                client.wall(),
             );
         }
-        words.text(b, JigPhrase::CachedReplies, &[Hole::Number(u64::from(row.cached_replies))]);
-        words.text(b, JigPhrase::Delegates, &[Hole::Number(u64::from(row.delegates))]);
+        match row.waits_on {
+            jig_client::contract::WaitsOn::Party { .. } => {}
+            jig_client::contract::WaitsOn::Delegates
+            | jig_client::contract::WaitsOn::News
+            | jig_client::contract::WaitsOn::Nothing => {
+                words.text(b, JigPhrase::Word(Word::waiting(&row.waits_on)), &[]);
+            }
+        }
+        if let Some(read) = &row.conversation {
+            words.text(
+                b,
+                if read.unread.limited { JigPhrase::MoreUpdates } else { JigPhrase::Updates },
+                &[Hole::Number(u64::from(read.unread.value))],
+            );
+        }
+        crate::pages::work::owner_counts(b, row.phases, words);
         crate::owner_budget::render(b, &row.budget, words);
         b.close();
     }
     b.close();
     crate::pages::cut(b, words, conversation_rows.cut);
-    crate::pages::edges(b, words, bindings, &conversation_rows.edges, crate::page::conversations::CONVERSATIONS_WINDOW);
+    let earlier = match conversation_rows.edges.after {
+        jig_client::thread::window::Edge::More(_) => true,
+        jig_client::thread::window::Edge::End => client.chats().more,
+    };
+    words.text(b, JigPhrase::WindowEnd, &[]);
+    if earlier {
+        crate::frame::control(
+            b,
+            words,
+            bindings,
+            Role::Button,
+            JigPhrase::ReadEarlier,
+            &[],
+            Act::More {
+                window: skein_lib::Token::new(crate::page::conversations::CONVERSATIONS_WINDOW),
+                end: jig_client::thread::window::End::After,
+            },
+        );
+    }
     let state = client.chats();
     if let Some(token) = state.starting {
         b.open(Role::Status);
@@ -206,27 +217,5 @@ pub(crate) fn runtime(
             }
         }
         Runtime::Ended => words.text(b, JigPhrase::Word(Word::Phase(Phase::Ended)), &[]),
-    }
-}
-
-// Ended rows already render the complete chip, including its title-loss caption.
-fn title_loss(b: &mut Builder, title: &jig_client::contract::DocumentText, runtime: &Runtime, words: &Words) {
-    match runtime {
-        Runtime::Ended => {}
-        Runtime::Active(_)
-        | Runtime::Waiting { .. }
-        | Runtime::Idle
-        | Runtime::Starting
-        | Runtime::Running { .. }
-        | Runtime::WaitingForWords { .. }
-        | Runtime::BackingOff { .. }
-        | Runtime::Procedure { .. }
-        | Runtime::Person { .. }
-        | Runtime::Closing(_)
-        | Runtime::Held { .. } => {
-            if title.cut {
-                words.text(b, JigPhrase::ChipTitleCut, &[]);
-            }
-        }
     }
 }

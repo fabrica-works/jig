@@ -103,3 +103,42 @@ pub fn two_clients(seed: u64) -> (Story, ClientId) {
 pub fn transient_request(seed: u64, fault: &jig_client_world::FrontFault) {
     crate::client::transient_request(seed, fault);
 }
+
+const LIST_WAIT: Duration = Duration::from_secs(1);
+const FIRST_CHAT: u64 = 1;
+#[must_use]
+pub fn conversations() -> jig_client_test_domain::Address {
+    stories::conversation()
+}
+pub fn start_chat(world: &mut Story, client: ClientId, words: &[u8]) {
+    world.person(
+        client,
+        vec![
+            Step::Go { address: conversations() },
+            Step::See { find: Find::named(Role::TextArea, b"First words"), within: LIST_WAIT },
+            Step::Type { find: Find::named(Role::TextArea, b"First words"), words: words.into() },
+            Step::Press { find: Find::named(Role::Button, b"Start a conversation") },
+            Step::See { find: Find::text(words), within: LIST_WAIT },
+        ],
+    );
+    finish(world);
+}
+pub fn end_chat(world: &mut Story, client: ClientId, words: &[u8]) {
+    world.person(
+        client,
+        vec![
+            Step::Go {
+                address: jig_client_test_domain::Address::Jig(jig_client_view::address::Address::Task {
+                    task: FIRST_CHAT,
+                    section: jig_client_view::address::TaskSection::Activity,
+                }),
+            },
+            Step::See { find: Find::text(words), within: LIST_WAIT },
+            Step::Press { find: Find::exactly_named(Role::Button, b"Cancel") },
+            Step::Type { find: Find::named(Role::TextArea, b"Your reason"), words: b"Done chatting".as_slice().into() },
+            Step::Press { find: Find::exactly_named(Role::Button, b"Confirm") },
+            Step::See { find: Find::text(b"Ended"), within: LIST_WAIT },
+        ],
+    );
+    finish(world);
+}

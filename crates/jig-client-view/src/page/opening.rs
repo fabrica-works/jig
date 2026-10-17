@@ -15,6 +15,7 @@ pub(crate) fn section(
     section: Section,
     owner: Owner,
     out: &mut Queue<Request>,
+    lent: &jig_client::Client,
 ) {
     match section {
         Section::Inbox { group, project } => {
@@ -22,9 +23,13 @@ pub(crate) fn section(
             open_once(domain, Subject::Inbox { window: env.limits.rows }, owner, out);
             super::conversations::start_group(domain, group, out);
         }
-        Section::Conversations { .. } => {
-            open_once(domain, Subject::Conversations, owner, out);
-            read(domain, super::conversations::CONVERSATIONS_READ, Read::Conversations { after: None }, out);
+        Section::Conversations { project } => {
+            if let Some(me) = domain.frame(lent).document
+                && let Some(query) = crate::queries::chats(me, project)
+            {
+                domain.chats.more = true;
+                open_once(domain, Subject::Tasks { query, window: env.limits.rows }, owner, out);
+            }
         }
         Section::Task { task, section } => {
             domain.conversation.task = task;

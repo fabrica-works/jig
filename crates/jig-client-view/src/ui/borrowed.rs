@@ -84,10 +84,14 @@ impl<'a> Borrowed<'a> {
     #[must_use]
     pub fn conversation_rows(&self) -> crate::windows::ConversationWindow {
         let mut rows = self.ui.conversation_rows.clone();
-        for (handle, _) in &self.ui.handles.watches {
-            if self.ui.chats.show_live
+        for (handle, watch) in &self.ui.handles.watches {
+            if let jig_client::contract::Subject::Tasks { query, .. } = &watch.subject
+                && self.ui.shown_conversations() == Some(query.project)
+                && let Some(me) = self.frame().document
+                && crate::queries::chats(me, query.project) == Some(*query)
+                && self.ui.chats.show_live
                 && let Some(document) = self.client.document(*handle)
-                && let Some(Latest::Jig(Delivery::Conversations(value))) = document.latest
+                && let Some(Latest::Jig(Delivery::Tasks(value))) = document.latest
             {
                 crate::page::conversations::project_live(&mut rows, *value.clone());
             }
@@ -162,11 +166,8 @@ impl ObjectsBorrowed<'_> {
         };
         if let ObjectKey::Task(number) = object.key {
             for line in &self.ui.borrow(self.client).conversation_rows().rows {
-                if line.chip.task == number {
-                    if object.body.is_none() {
-                        object.body = Some(Body::Chip(line.chip.clone()));
-                    }
-                    object.reply = crate::objects::result::Reply::from_line(line.clone());
+                if line.chip.task == number && object.body.is_none() {
+                    object.body = Some(Body::Chip(line.chip.clone()));
                 }
             }
             for row in &self.ui.borrow(self.client).inbox().rows {

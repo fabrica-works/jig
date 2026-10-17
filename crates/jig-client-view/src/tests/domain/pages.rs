@@ -1,6 +1,5 @@
 //! Page policies exercised through the client boundary.
 use jig_client::thread::window::End;
-mod conversation_merge;
 mod owner_effect_proposals;
 mod task_proposals;
 use super::spine::{LIMITS, delivered, drive, frame, open_token, start};
@@ -20,9 +19,9 @@ use skein_lib::{List, Time};
 fn text(value: &[u8]) -> Text {
     Text::new(Box::from(value), LIMITS.text).unwrap()
 }
-pub(super) fn project(number: u32, _chats: bool) -> MeProject {
+pub(super) fn project(number: u32, chats: bool) -> MeProject {
     MeProject {
-        templates: List::with_capacity(0),
+        templates: if chats { crate::tests::fixtures::chat_templates() } else { List::with_capacity(0) },
         creating: None,
         project: number,
         name: Some(DocumentText::complete(text(b"shop"))),
@@ -409,71 +408,7 @@ fn opening_updates_marks_the_newest_result_displayed_as_seen() {
     }
     assert!(drive(&mut domain, Time::ZERO, Event::Act { action: crate::action::Act::OpenUpdates }).is_empty());
 }
-fn conversations_show_live_before_ended_and_read_more_using_the_opaque_cursor() {
-    let (mut domain, _) = live_inbox();
-    let entered =
-        drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::Conversations { project: None }) });
-    let mut read = None;
-    for request in &entered {
-        if let Request::Client {
-            asked:
-                jig_client::Event::Read { handle: token, read: jig_client::Readable::Jig(Read::Conversations { .. }) },
-        } = request
-        {
-            read = Some(*token);
-        }
-    }
-    let mut rows = List::with_capacity(2);
-    rows.push(list_entry(7, Phase::Done, 30)).unwrap();
-    rows.push(list_entry(8, Phase::Idle, 10)).unwrap();
-    let cursor = Cursor::new(Box::from(b"next".as_slice()), 1024).expect("bounded opaque cursor");
-    drive(
-        &mut domain,
-        Time::ZERO,
-        ReadPage {
-            read: read.unwrap(),
-            result: ReadResult::Value(ReadValue::Conversations(Box::new(ConversationPage {
-                cut: false,
-                rows,
-                before: None,
-                after: Some(cursor.clone()),
-            }))),
-        },
-    );
-    assert_eq!(domain.conversation_rows().rows.get(0).unwrap().chip.task, 8);
-    assert_eq!(domain.conversation_rows().rows.get(0).unwrap().delegates, 2);
-    assert_eq!(domain.conversation_rows().rows.get(0).unwrap().budget.numbers.spent, 5);
-    domain.reclaim();
-    let out = drive(
-        &mut domain,
-        Time::ZERO,
-        Event::Act {
-            action: crate::action::Act::More {
-                window: skein_lib::Token::new(crate::page::conversations::CONVERSATIONS_WINDOW),
-                end: End::After,
-            },
-        },
-    );
-    let mut found = false;
-    for request in &out {
-        if let Request::Client { asked: jig_client::Event::Read { read: jig_client::Readable::Jig(what), .. } } =
-            request
-        {
-            assert_eq!(*what, Read::Conversations { after: Some(cursor.clone()) });
-            found = true;
-        }
-    }
-    assert!(found);
-    let out = drive(&mut domain, Time::ZERO, Event::Act { action: crate::action::Act::OpenChat { task: 8 } });
-    let mut mark = false;
-    for request in &out {
-        if let Request::Client { asked: jig_client::Event::Send { request: jig_client::Ask::Jig(ask), .. } } = request {
-            assert_eq!(**ask, Ask::Seen { through: SeenThrough::Conversation { task: 8, through: 3 } });
-            mark = true;
-        }
-    }
-    assert!(mark);
-}
+
 fn starting_a_chat_joins_refuses_and_opens_only_after_its_durable_answer() {
     let mut about = Fixture::new(&LIMITS);
     let f = start(&mut about, List::with_capacity(0));
@@ -1301,7 +1236,6 @@ fn frame_navigation_and_non_work_pages_follow_owner_facts() {
 fn inbox_and_conversation_pages_preserve_context_order_and_request_lifetimes() {
     inbox_orders_both_groups_filters_context_and_removes_role_entries_for_every_holder();
     opening_updates_marks_the_newest_result_displayed_as_seen();
-    conversations_show_live_before_ended_and_read_more_using_the_opaque_cursor();
     starting_a_chat_joins_refuses_and_opens_only_after_its_durable_answer();
 }
 #[test]
@@ -1448,105 +1382,6 @@ fn inbox_reply_receipts_keep_whole_chat_facts_shared_task_documents_and_seen_req
     inbox_delivery(&mut domain, page, rows);
     assert!(domain.objects().get(domain.objects().find(ObjectKey::Task(8)).unwrap()).unwrap().reply.is_none());
     assert!(domain.objects().find(ObjectKey::Task(9)).is_none(), "mismatched facts cannot name another chat");
-}
-fn live_conversation_page() -> (Fixture, jig_client::Handle, jig_client::Handle) {
-    let (mut domain, _) = live_inbox();
-    let entered =
-        drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::Conversations { project: None }) });
-    let watch = open_token(&entered);
-    let first_read = read_named(&entered, &Read::Conversations { after: None });
-    (domain, watch, first_read)
-}
-#[test]
-fn conversation_reply_windows_replace_sources_drop_rows_and_clear_committed_seen_facts() {
-    use crate::{
-        action::Act,
-        objects::{Body, Source},
-    };
-    let (mut domain, watch, first_read) = live_conversation_page();
-    let mut rows = List::with_capacity(2);
-    rows.push(list_entry(8, Phase::Idle, 10)).unwrap();
-    rows.push(list_entry(9, Phase::Idle, 9)).unwrap();
-    drive(
-        &mut domain,
-        Time::ZERO,
-        Watched { watch, event: WatchEvent::Delivered(conversation_delivery(rows.clone(), true)) },
-    );
-    let eight = domain.objects().find(ObjectKey::Task(8)).unwrap();
-    let nine = domain.objects().find(ObjectKey::Task(9)).unwrap();
-    assert_eq!(domain.objects().get(eight).unwrap().reply.as_ref().unwrap().first_unread, 3);
-    assert!(domain.objects().get(eight).unwrap().sources.contains(&Source::Watch(watch)));
-    let mut task = super::confirmation::task();
-    task.chip.task = 9;
-    task.spec = specification(text(b"retained full document"));
-    assert!(domain.objects.put(ObjectKey::Task(9), Body::Task(Box::new(task.clone()))));
-    rows.get_mut(1).unwrap().seen = 3;
-    rows.get_mut(1).unwrap().unread.as_mut().unwrap().value = 0;
-    drive(
-        &mut domain,
-        Time::ZERO,
-        Watched { watch, event: WatchEvent::Delivered(conversation_delivery(rows.clone(), true)) },
-    );
-    assert!(domain.objects().get(nine).unwrap().reply.is_none(), "committed seen facts remove stale unread metadata");
-    let cursor = Cursor::new(Box::from(b"older".as_slice()), 1024).expect("bounded opaque cursor");
-    drive(
-        &mut domain,
-        Time::ZERO,
-        ReadPage {
-            read: first_read,
-            result: ReadResult::Value(ReadValue::Conversations(Box::new(ConversationPage {
-                cut: false,
-                rows,
-                before: None,
-                after: Some(cursor.clone()),
-            }))),
-        },
-    );
-    assert_eq!(domain.objects().get(eight).unwrap().sources.len(), 1);
-    domain.reclaim();
-    let out = drive(
-        &mut domain,
-        Time::ZERO,
-        Event::Act {
-            action: Act::More {
-                window: skein_lib::Token::new(crate::page::conversations::CONVERSATIONS_WINDOW),
-                end: End::After,
-            },
-        },
-    );
-    let mut rows = List::with_capacity(1);
-    rows.push(list_entry(10, Phase::Done, 8)).unwrap();
-    drive(
-        &mut domain,
-        Time::ZERO,
-        ReadPage {
-            read: read_named(&out, &Read::Conversations { after: Some(cursor) }),
-            result: ReadResult::Value(ReadValue::Conversations(Box::new(ConversationPage {
-                cut: false,
-                rows,
-                before: Some(Cursor::new(Box::from(b"back".as_slice()), 1024).expect("bounded opaque cursor")),
-                after: None,
-            }))),
-        },
-    );
-    assert!(domain.objects().find(ObjectKey::Task(8)).is_none(), "a dropped row has no obsolete watch name");
-    assert_eq!(domain.objects().get(nine).unwrap().sources.len(), 1);
-    let Some(Body::Task(kept)) = &domain.objects().get(nine).unwrap().body else {
-        panic!("task retained");
-    };
-    assert_eq!(**kept, task);
-    let ten = domain.objects().find(ObjectKey::Task(10)).unwrap();
-    assert_eq!(domain.objects().get(ten).unwrap().reply.as_ref().unwrap().first_words.bytes(), b"help checkout");
-    let out = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Elsewhere });
-    assert!(domain.objects().find(ObjectKey::Task(9)).is_none());
-    assert!(domain.objects().find(ObjectKey::Task(10)).is_none());
-    let mut closed = false;
-    for request in &out {
-        if let Request::Client { asked: jig_client::Event::Unwatch { handle: old } } = request {
-            closed |= *old == watch;
-        }
-    }
-    assert!(closed);
 }
 
 #[test]
@@ -1827,34 +1662,6 @@ fn check_inbox_group_pages_keep_orders_cursors_and_live_precedence() {
         &mut domain,
         Watched { watch, event: WatchEvent::Delivered(Delivery::Inbox(Box::new(inbox(List::with_capacity(0))))) },
     );
-}
-#[test]
-fn conversations_address_project_preselects_form_without_filtering_rows() {
-    let (mut domain, _) = live_inbox();
-    let entered =
-        drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::Conversations { project: Some(1) }) });
-    let query = Read::Conversations { after: None };
-    let mut rows = List::with_capacity(2);
-    rows.push(list_entry(7, Phase::Idle, 1)).unwrap();
-    let mut other = list_entry(8, Phase::Idle, 2);
-    other.project = 2;
-    rows.push(other).unwrap();
-    drive(
-        &mut domain,
-        Time::ZERO,
-        ReadPage {
-            read: read_named(&entered, &query),
-            result: ReadResult::Value(ReadValue::Conversations(Box::new(ConversationPage {
-                cut: false,
-                rows,
-                before: None,
-                after: None,
-            }))),
-        },
-    );
-    assert_eq!(domain.conversation_rows().rows.len(), 2);
-    assert_eq!(domain.conversation_rows().rows.get(0).unwrap().project, 2);
-    assert_eq!(domain.address, Address::Conversations { project: Some(1) });
 }
 
 #[test]
@@ -2489,81 +2296,6 @@ fn task_budget_watch_replacements_keep_all_owner_numbers_funders_and_optional_de
 }
 
 #[test]
-fn owner_conversation_replacement_keeps_absent_facts_whole_text_and_independent_reply_positions() {
-    let (mut domain, watch, read) = live_conversation_page();
-    let mut old = list_entry(8, Phase::Idle, 99);
-    old.cached_replies = 17;
-    let mut rows = List::with_capacity(1);
-    rows.push(old.clone()).unwrap();
-    drive(&mut domain, Time::ZERO, Watched { watch, event: WatchEvent::Delivered(conversation_delivery(rows, false)) });
-    let mut current = old.clone();
-    current.runtime = None;
-    current.changed = None;
-    current.unread = None;
-    current.first_words = DocumentText { bytes: text(UTF8_TEXTS[0]), cut: true };
-    current.cached_replies = u32::MAX;
-    current.seen = 0;
-    current.last_reply = u64::MAX;
-    let mut rows = List::with_capacity(1);
-    rows.push(current.clone()).unwrap();
-    drive(&mut domain, Time::ZERO, Watched { watch, event: WatchEvent::Delivered(conversation_delivery(rows, true)) });
-    let projected = domain.objects().get(domain.objects().find(ObjectKey::Task(8)).unwrap()).unwrap();
-    let reply = projected.reply.as_ref().unwrap();
-    assert_eq!(reply.first_words, current.first_words);
-    assert_eq!(reply.chat, 8);
-    assert_eq!(reply.first_unread, 1);
-    let mut rows = List::with_capacity(1);
-    rows.push(old).unwrap();
-    let cursor = Cursor::new(Box::from(UTF8_TEXTS[1]), 1024).expect("bounded opaque cursor");
-    drive(
-        &mut domain,
-        Time::ZERO,
-        ReadPage {
-            read,
-            result: ReadResult::Value(ReadValue::Conversations(Box::new(ConversationPage {
-                rows,
-                cut: true,
-                before: None,
-                after: Some(cursor.clone()),
-            }))),
-        },
-    );
-    assert_eq!(domain.conversation_rows().rows.get(0), Some(&current));
-    assert!(domain.conversation_rows().cut);
-    assert_eq!(domain.conversation_rows().edges.after, jig_client::thread::window::Edge::More(cursor));
-    let mut zero = current.clone();
-    zero.unread = Some(Count { value: 0, limited: false });
-    zero.runtime = Some(Runtime::Idle);
-    zero.changed = Some(skein_lib::Wall::EPOCH);
-    zero.first_words = DocumentText::complete(text(b""));
-    let mut rows = List::with_capacity(1);
-    rows.push(zero.clone()).unwrap();
-    drive(&mut domain, Time::ZERO, Watched { watch, event: WatchEvent::Delivered(conversation_delivery(rows, false)) });
-    assert_eq!(domain.conversation_rows().rows.get(0), Some(&zero));
-}
-
-#[test]
-fn owner_conversation_order_keeps_missing_clock_rows_in_source_order_and_supplied_clocks_newest_first() {
-    for absent in [true, false] {
-        let (mut domain, watch, _) = live_conversation_page();
-        let mut first = list_entry(8, Phase::Idle, 1);
-        let second = list_entry(9, Phase::Idle, 99);
-        if absent {
-            first.changed = None;
-        }
-        let mut rows = List::with_capacity(2);
-        rows.push(first).unwrap();
-        rows.push(second).unwrap();
-        drive(
-            &mut domain,
-            Time::ZERO,
-            Watched { watch, event: WatchEvent::Delivered(conversation_delivery(rows, false)) },
-        );
-        assert_eq!(domain.conversation_rows().rows.get(0).unwrap().chip.task, if absent { 8 } else { 9 });
-    }
-}
-
-#[test]
 fn owner_goal_read_and_watch_keep_all_ten_counters_absent_clock_and_exact_budget_by_key() {
     let (mut domain, opened) = project_open(ProjectSection::Goals);
     let watch = open_token(&opened);
@@ -2616,16 +2348,6 @@ fn owner_goal_read_and_watch_keep_all_ten_counters_absent_clock_and_exact_budget
     assert_eq!(domain.project_page().listed_goals.get(0), Some(&row));
     assert_eq!(domain.project_page().listed_goals.len(), 2);
 }
-
-fn conversation_delivery(rows: List<ConversationLine>, more: bool) -> Delivery {
-    Delivery::Conversations(Box::new(Conversations {
-        rows,
-        more,
-        after: Cursor::new(Box::from(b"fixture-watch-after".as_slice()), 1024).expect("bounded opaque cursor"),
-    }))
-}
-
-const UTF8_TEXTS: [&[u8]; 2] = [b"~\0whole", b"~\0opaque-row"];
 
 #[test]
 fn the_inbox_shows_both_groups_of_its_filter() {
@@ -2706,8 +2428,6 @@ fn no_two_reads_of_a_page_share_a_number() {
         INBOX_NEEDS_READ,
         INBOX_UPDATES_READ,
         CONVERSATIONS_READ,
-        CONVERSATIONS_BEFORE_READ,
-        REPLAY_READ,
         HISTORY_READ,
         ENDED_READ,
         PERSON_TASK_READ,

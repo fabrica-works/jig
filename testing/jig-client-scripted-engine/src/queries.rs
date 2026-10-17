@@ -7,7 +7,7 @@ pub(crate) fn selects(query: &TaskQuery, task: &Task) -> bool {
         Phase::Waiting => PhaseClass::Waiting,
         Phase::Held => PhaseClass::Held,
         Phase::Closing => PhaseClass::Closing,
-        Phase::Ended | Phase::Done | Phase::Failed | Phase::Cancelled => return false,
+        Phase::Ended | Phase::Done | Phase::Failed | Phase::Cancelled => PhaseClass::Ended,
         Phase::Idle
         | Phase::Due
         | Phase::Preparing
@@ -26,7 +26,7 @@ pub(crate) fn selects(query: &TaskQuery, task: &Task) -> bool {
         && query.root.is_none_or(|v| v == task.lineage.as_slice().first().copied().unwrap_or(task.chip.task))
         && query.parent.is_none_or(|v| Some(v) == task.lineage.as_slice().last().copied())
         && query.label.is_none_or(|v| v == task.label)
-        && query.phase.is_none_or(|v| v == phase)
+        && query.phase.map_or(phase != PhaseClass::Ended, |v| v == phase)
         && query.executor.is_none_or(|v| v == executor)
         && query.tracked.is_none_or(|v| v == task.priority.is_some())
 }
@@ -68,7 +68,7 @@ pub(crate) fn line<'a>(
         flags: task.flags,
         changed: task.changed,
         last_activity: task.last_activity,
-        ended_at: None,
+        ended_at: (!jig_client_view::page::conversations::live(task.chip.phase)).then_some(task.changed),
         budget: task.budget.clone(),
         waits_on: task.waits_on,
         held_below: phases.held - u32::from(task.chip.phase == Phase::Held),
@@ -79,7 +79,8 @@ pub(crate) fn line<'a>(
 pub(crate) fn order(rows: &mut [TaskLine], order: QueryOrder) {
     rows.sort_by(|a, b| {
         let ordering = match order {
-            QueryOrder::Number | QueryOrder::Ended => Ordering::Equal,
+            QueryOrder::Number => Ordering::Equal,
+            QueryOrder::Ended => b.ended_at.cmp(&a.ended_at),
             QueryOrder::Changed => b.changed.cmp(&a.changed),
             QueryOrder::Activity => b.last_activity.cmp(&a.last_activity),
             QueryOrder::Priority => (a.tracked.is_none(), a.tracked).cmp(&(b.tracked.is_none(), b.tracked)),
@@ -121,7 +122,9 @@ impl<A: crate::Application> crate::Engine<A> {
         let crate::Rows::Conversations(rows) = self.rows_for(requester, &c::Read::Conversations { after: None }) else {
             unreachable!("conversation rows")
         };
-        let row = rows.iter().find(|row| row.chip.task == task.chip.task).ok_or(c::WatchEnd::Unknown)?;
+        let Some(row) = rows.iter().find(|row| row.chip.task == task.chip.task) else {
+            return Ok(Some(c::ConversationRead { seen: 0, unread: c::Count { value: 0, limited: false } }));
+        };
         let unread = row.unread.ok_or(c::WatchEnd::Unknown)?;
         Ok(Some(c::ConversationRead { seen: row.seen, unread }))
     }

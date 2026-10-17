@@ -167,10 +167,7 @@ pub(crate) fn plain(mut read: Read) -> (Read, Option<Cursor>) {
         | Read::Goals { after, .. }
         | Read::Spend { after, .. }
         | Read::Notes { after, .. } => after.take(),
-        Read::Tasks { live, ended, .. } => {
-            ended.take();
-            live.take()
-        }
+        Read::Tasks { live, ended, .. } => ended.take().or_else(|| live.take()),
         Read::Activity { before, .. } => before.take(),
         Read::Me
         | Read::Task { .. }
@@ -214,9 +211,6 @@ impl<A: crate::Application> Engine<A> {
         Ok(())
     }
     pub(crate) fn read_value(&mut self, party: u64, read: Read) -> core::result::Result<ReadValue, ReadNone> {
-        if let Read::Tasks { ended: Some(_), .. } = &read {
-            return Err(ReadNone::Unknown);
-        }
         let (query, position) = plain(read);
         if !self.read_visible(party, &query) {
             return Err(ReadNone::Unknown);
@@ -284,7 +278,21 @@ impl<A: crate::Application> Engine<A> {
             let (start, end) = if backward { (index - count, index) } else { (index, index + count) };
             let before = (start != 0).then(|| cursor(self.next_position, &self.bounds));
             let after = (end != rows.len()).then(|| cursor(self.next_position + 1, &self.bounds));
-            let page = rows.page(start, end, before.clone(), after.clone());
+            let page = if let (Rows::Tasks(rows), Read::Tasks { query, .. }) = (&rows, &query)
+                && query.phase == Some(jig_client_domain::contract::PhaseClass::Ended)
+            {
+                ReadValue::Tasks(Box::new(jig_client_domain::contract::TaskPage {
+                    live: list(&[]),
+                    live_after: None,
+                    ended: jig_client_domain::contract::EndedGroup::Rows {
+                        rows: list(&rows[start..end]),
+                        after: after.clone(),
+                        cut: false,
+                    },
+                }))
+            } else {
+                rows.page(start, end, before.clone(), after.clone())
+            };
             if payload::fits(&page, &self.bounds) {
                 if before.is_some() {
                     self.positions.insert(self.next_position, Position { party, read: query.clone(), index: start });

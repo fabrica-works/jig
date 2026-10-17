@@ -237,7 +237,7 @@ pub(crate) fn show(
         let section = *domain.sections.get(index).expect("section index exists");
         if !previous.as_slice().contains(&section) {
             context_section(domain, section);
-            super::routing::open_section(domain, env, section, owner, out);
+            super::routing::open_section(domain, env, section, owner, out, lent);
             domain.section_context = u32::MAX;
         }
     }
@@ -293,9 +293,12 @@ pub(crate) fn uses(section: Section, subject: &jig_client::contract::Subject) ->
             section == Section::Project { project: *project, section: ProjectSection::Overview }
                 || section == Section::Project { project: *project, section: ProjectSection::Goals }
         }
-        Subject::Tasks { query, .. } => match query.project {
-            Some(project) => section == Section::Project { project, section: ProjectSection::Tasks },
-            None => false,
+        Subject::Tasks { query, .. } => match section {
+            Section::Conversations { project } => {
+                query.project == project && query.requester.is_some() && query.label.is_some()
+            }
+            Section::Project { project, section: ProjectSection::Tasks } => query.project == Some(project),
+            Section::Inbox { .. } | Section::Task { .. } | Section::Project { .. } | Section::Deployment => false,
         },
         Subject::Deployment => section == Section::Deployment,
     }
@@ -410,12 +413,10 @@ pub(crate) fn context_read(domain: &mut Ui, what: &jig_client::contract::Read) {
             return;
         }
         Read::Deployment => Some(Section::Deployment),
-        Read::Tasks { .. }
-        | Read::Me
-        | Read::Proposal { .. }
-        | Read::Escalation { .. }
-        | Read::Question { .. }
-        | Read::Result { .. } => None,
+        Read::Tasks { query, .. } => Some(Section::Conversations { project: query.project }),
+        Read::Me | Read::Proposal { .. } | Read::Escalation { .. } | Read::Question { .. } | Read::Result { .. } => {
+            None
+        }
     };
     domain.section_context = 0;
     if let Some(section) = section {

@@ -55,6 +55,7 @@ pub struct Protocol {
     stores: BTreeMap<ClientId, persistence::Bytes>,
     deliveries: BTreeMap<ClientId, u64>,
     answers: BTreeMap<ClientId, u64>,
+    task_queries_read: u32,
 }
 impl Protocol {
     #[must_use]
@@ -81,9 +82,14 @@ impl Protocol {
             stores: BTreeMap::new(),
             deliveries: BTreeMap::new(),
             answers: BTreeMap::new(),
+            task_queries_read: 0,
         };
         value.advance(Time::ZERO, fixtures::wall(Time::ZERO));
         value
+    }
+    #[must_use]
+    pub fn task_queries_read(&self) -> u32 {
+        self.task_queries_read
     }
     #[must_use]
     pub fn chats_made(&self) -> usize {
@@ -224,6 +230,21 @@ impl Front<Test> for Protocol {
         })
     }
     fn wire(&mut self, client: ClientId, now: Time, _wall: Wall, request: Request) {
+        if let Request::Client {
+            request: jig_client::Request::Exchange { message: jig_client::Message::Read(bytes), .. },
+        } = &request
+        {
+            use jig_client_protocol_wire::v8 as w;
+            let owned = w::Owned::decode(&w::CEILINGS, &mut skein_lib::Reader::new(bytes)).expect("read envelope");
+            if *owned.owner() == w::Owner::Jig
+                && matches!(
+                    w::Read::decode(&w::CEILINGS, &mut skein_lib::Reader::new(owned.record())),
+                    Ok(w::Read::Tasks(_))
+                )
+            {
+                self.task_queries_read += 1;
+            }
+        }
         self.last_client = Some(client);
         self.clients.get_mut(&client).expect("bound client").wire(now, request);
     }

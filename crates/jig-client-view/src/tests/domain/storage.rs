@@ -35,25 +35,8 @@ fn chip(task: u64) -> Chip {
         details: Box::new(super::objects::phase_details(Phase::Idle)),
     }
 }
-fn conversation(task: u64) -> ConversationLine {
-    ConversationLine {
-        cached_replies: 0,
-        runtime: Some(Runtime::Idle),
-        delegates: 0,
-        budget: OwnerBudget {
-            numbers: OwnerNumbers { budget: 0, spent: 0, spent_below: 0, reserved: 0 },
-            left: 0,
-            funder: Funder::Pool { project: 1, person: 7, period: 3 },
-            deadline: None,
-        },
-        chip: chip(task),
-        project: 1,
-        first_words: DocumentText::complete(text(b"words")),
-        unread: Some(Count { value: 0, limited: false }),
-        seen: 0,
-        last_reply: 0,
-        changed: Some(Wall::EPOCH),
-    }
+fn conversation(task: u64) -> TaskLine {
+    crate::tests::fixtures::task_line(chip(task), 1, OwnerRequester::Person(7), Wall::EPOCH)
 }
 fn activity(position: u64) -> ActivityLine {
     ActivityLine {

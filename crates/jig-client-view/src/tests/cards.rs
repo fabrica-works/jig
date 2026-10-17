@@ -84,7 +84,7 @@ pub(super) fn document() -> Me {
     let mut projects = List::with_capacity(2);
     projects
         .push(MeProject {
-            templates: List::with_capacity(0),
+            templates: crate::tests::fixtures::chat_templates(),
             creating: None,
             project: 4,
             name: Some(DocumentText::complete(text(b"One"))),

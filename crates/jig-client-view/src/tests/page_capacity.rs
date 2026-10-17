@@ -323,34 +323,36 @@ fn conversations(words: &Words) {
                     asked:
                         jig_client::Event::Watch {
                             handle: watch,
-                            subject: jig_client::Watchable::Jig(Subject::Conversations),
+                            subject: jig_client::Watchable::Jig(Subject::Tasks { .. }),
                         },
                 } => Some(*watch),
                 _ => None,
             })
             .unwrap();
-    let line = |number| ConversationLine {
-        cached_replies: u32::MAX,
-        runtime: Some(Runtime::Waiting { dependencies: list([8, 9]), hold: Some(part()) }),
-        delegates: u32::MAX,
-        budget: full_owner_budget(),
-        chip: full_chip(number),
-        project: 4,
-        first_words: DocumentText { bytes: full(), cut: true },
-        unread: Some(Count { value: u32::MAX, limited: true }),
-        seen: 0,
-        last_reply: u64::MAX,
-        changed: Some(Wall::EPOCH),
+    let line = |number| {
+        let mut chip = full_chip(number);
+        chip.details = Box::new(ChipPhase::Owner {
+            phase: OwnerChipPhase::Active(RunStage::Idle),
+            details: Box::new(super::owner_chip::details()),
+        });
+        let mut line = crate::tests::fixtures::task_line(chip, 4, OwnerRequester::Person(1), Wall::EPOCH);
+        line.phases = OwnerPhaseCounts {
+            waiting: u32::MAX,
+            idle: u32::MAX,
+            starting: u32::MAX,
+            running: u32::MAX,
+            backing_off: u32::MAX,
+            closing: u32::MAX,
+            held: u32::MAX,
+            done: u32::MAX,
+            failed: u32::MAX,
+            cancelled: u32::MAX,
+        };
+        line.conversation = Some(ConversationRead { seen: 0, unread: Count { value: u32::MAX, limited: true } });
+        line.budget = full_owner_budget();
+        line
     };
-    deliver(
-        &mut d,
-        watch,
-        Delivery::Conversations(Box::new(Conversations {
-            rows: list([line(8), line(9)]),
-            more: true,
-            after: full_cursor(),
-        })),
-    );
+    deliver(&mut d, watch, Delivery::Tasks(Box::new(Tasks { rows: list([line(8), line(9)]), more: true })));
     render(&d, words);
 }
 fn inbox(words: &Words) {

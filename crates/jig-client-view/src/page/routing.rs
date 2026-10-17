@@ -128,7 +128,6 @@ pub(crate) fn leave_page(domain: &mut Ui, out: &mut Queue<Request>) {
     domain.conversation_rows.rows.clear();
     domain.conversation_rows.cut = false;
     domain.conversation_rows.edges = blank_edges();
-    domain.conversation_rows.owner_after = None;
     let rows = domain.conversation.lines.rows.capacity();
     let words = domain.conversation.words.rows.capacity();
     domain.conversation = jig_client::thread::Thread::new(
@@ -193,7 +192,7 @@ pub(crate) fn enter(domain: &mut Ui, env: &Env<crate::Limits>, out: &mut Queue<R
     let owner = Owner::Page;
     for index in 0..domain.sections().len() {
         let section = *domain.sections().get(index).expect("section index is in the page");
-        open_section(domain, env, section, owner, out);
+        open_section(domain, env, section, owner, out, lent);
     }
 }
 /// Opens the sources one section needs (client/domain/client.md, 5.1).
@@ -203,8 +202,9 @@ pub(crate) fn open_section(
     section: Section,
     owner: Owner,
     out: &mut Queue<Request>,
+    lent: &jig_client::Client,
 ) {
-    super::opening::section(domain, env, section, owner, out);
+    super::opening::section(domain, env, section, owner, out, lent);
 }
 pub(crate) fn document_read(key: ObjectKey) -> Read {
     match key {
@@ -327,7 +327,7 @@ pub(crate) fn delivery(
 ) {
     let source = Source::Watch(watch);
     match value {
-        Delivery::Me(_) | Delivery::OwnerProject(_) => {}
+        Delivery::Me(_) | Delivery::OwnerProject(_) | Delivery::Conversations(_) => {}
         Delivery::Run(_) | Delivery::RunState(_) => crate::activity::routing::text(domain, env, watch, out, lent),
         Delivery::OwnerProposal(proposal) => {
             let key = ObjectKey::Proposal(proposal.key);
@@ -378,9 +378,18 @@ pub(crate) fn delivery(
             domain.changed();
         }
         Delivery::Goals(goals) => crate::page::project::live(domain, env, source, *goals, out, lent),
-        Delivery::Tasks(tasks) => crate::page::project::task_rows(domain, env, source, *tasks, out, lent),
-        Delivery::Conversations(conversations) => {
-            super::conversations::delivered(domain, env, source, *conversations, out, lent);
+        Delivery::Tasks(tasks) => {
+            if let Source::Watch(handle) = source
+                && let Some(watch) = domain.handles.watches.get(&handle)
+                && let Subject::Tasks { query, .. } = &watch.subject
+                && domain.shown_conversations() == Some(query.project)
+                && let Some(me) = domain.frame(lent).document
+                && crate::queries::chats(me, query.project) == Some(*query)
+            {
+                super::conversations::delivered(domain, env, source, *tasks, out, lent);
+            } else {
+                crate::page::project::task_rows(domain, env, source, *tasks, out, lent);
+            }
         }
         Delivery::Deployment(_) | Delivery::OwnerDeployment(_) => {
             crate::page::deployment::watched(domain, env, out, lent);
@@ -523,7 +532,7 @@ fn read_value(
     lent: &jig_client::Client,
 ) {
     match value {
-        ReadValue::Tasks(_)
+        ReadValue::Conversations(_)
         | ReadValue::Me(_)
         | ReadValue::OwnerInbox(_)
         | ReadValue::OwnerEnded(_)
@@ -569,7 +578,7 @@ fn read_value(
             }
             domain.changed();
         }
-        ReadValue::Conversations(page) => {
+        ReadValue::Tasks(page) => {
             crate::page::conversations::read_page(domain, source, *page, lent);
             crate::page::replies::conversations(domain, env, source, out, lent);
             domain.changed();

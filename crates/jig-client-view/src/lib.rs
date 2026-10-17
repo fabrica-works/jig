@@ -39,6 +39,7 @@ mod frame_facts;
 pub mod limits;
 mod owner;
 pub mod phrases;
+pub mod queries;
 pub mod regions;
 mod runtime;
 mod sizes;

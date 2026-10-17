@@ -314,77 +314,6 @@ fn conversations_form(words: &crate::words::Words) {
             .all(|n| n.name.as_ref().is_some_and(|name| !name.is_empty()))
     );
 }
-fn conversation_states(words: &crate::words::Words) {
-    for (runtime, expected) in conversation_cases() {
-        let (mut d, f) = start();
-        deliver(&mut d, f, Delivery::Me(Box::new(document())));
-        let out = drive(&mut d, Event::Went { place: Place::Jig(Address::Conversations { project: None }) });
-        let token = out
-            .iter()
-            .find_map(|r| match r {
-                Request::Client {
-                    asked:
-                        jig_client::Event::Read {
-                            handle: read,
-                            read: jig_client::Readable::Jig(Read::Conversations { .. }),
-                        },
-                } => Some(*read),
-                _ => None,
-            })
-            .unwrap();
-        let mut rows = List::with_capacity(2);
-        for task in [1, 2] {
-            rows.push(ConversationLine {
-                cached_replies: 0,
-                runtime: Some(runtime.clone()),
-                delegates: 2,
-                budget: OwnerBudget {
-                    numbers: OwnerNumbers { budget: 20, spent: 5, spent_below: 1, reserved: 2 },
-                    left: 12,
-                    funder: Funder::Pool { project: 4, person: 1, period: 3 },
-                    deadline: None,
-                },
-                chip: Chip {
-                    task,
-                    title: DocumentText::complete(text(b"Help")),
-                    executor: Executor::Agent { charter: 2 },
-                    phase: if task == 1 { Phase::Done } else { Phase::Idle },
-                    details: Box::new(ChipPhase::Starting),
-                },
-                project: 4,
-                first_words: DocumentText::complete(text(b"Help with work")),
-                unread: Some(Count { value: 2, limited: task == 2 }),
-                seen: 1,
-                last_reply: 3,
-                changed: Some(skein_lib::Wall::EPOCH),
-            })
-            .unwrap();
-        }
-        drive(
-            &mut d,
-            ReadPage {
-                read: token,
-                result: ReadResult::Value(ReadValue::Conversations(Box::new(ConversationPage {
-                    cut: false,
-                    rows,
-                    before: Some(Cursor::new(Box::from(b"before".as_slice()), 1024).expect("bounded opaque cursor")),
-                    after: Some(Cursor::new(Box::from(b"after".as_slice()), 1024).expect("bounded opaque cursor")),
-                }))),
-            },
-        );
-        let (tree, mut bindings) = build(&d, 1, words);
-        for label in [expected, b"Live delegates: 2", b"More than 2 updates", b"Read earlier", b"Read later"] {
-            assert!(contains(&tree, label), "{label:?}");
-        }
-        let keyed: Vec<_> = tree.nodes().iter().filter_map(|n| n.key.filter(|key| key.kind == 20)).collect();
-        assert_eq!(keyed[0].a, 2);
-        assert_eq!(keyed[1].a, 1);
-        assert_eq!(
-            crate::decode(&mut bindings, named_binding(&tree, b"Task 2: Help"), skein_ui::Act::Press),
-            Some(crate::action::Act::OpenChat { task: 2 })
-        );
-    }
-}
 
 #[test]
 fn pages_show_non_work_states_inbox_edges_and_the_offered_conversation_form() {
@@ -393,7 +322,6 @@ fn pages_show_non_work_states_inbox_edges_and_the_offered_conversation_form() {
     inbox_edges(words);
     inbox_committed_read_position(words);
     conversations_form(words);
-    conversation_states(words);
 }
 
 #[test]
@@ -654,43 +582,4 @@ fn a_missing_section_says_so_in_its_own_region() {
     assert_eq!(tree.nodes()[0].region, Some(crate::regions::JigRegion::TaskPlan.region()));
     assert_eq!(tree.nodes()[0].size, tree.len());
     assert!(contains(&tree, b"Page missing"));
-}
-
-fn conversation_cases() -> [(Runtime, &'static [u8]); 9] {
-    [
-        (Runtime::Idle, b"Waiting for news".as_slice()),
-        (Runtime::Starting, b"Starting".as_slice()),
-        (Runtime::Running { attempt: 1, since: skein_lib::Wall::EPOCH, tool: None }, b"Writing".as_slice()),
-        (
-            Runtime::Running { attempt: 1, since: skein_lib::Wall::EPOCH, tool: Some(text(b"inspect")) },
-            b"Using tool inspect".as_slice(),
-        ),
-        (Runtime::WaitingForWords { attempt: 1, since: skein_lib::Wall::EPOCH }, b"Waiting for your words".as_slice()),
-        (
-            Runtime::BackingOff {
-                at: skein_lib::Wall::EPOCH,
-                attempt: 1,
-                tries: 2,
-                class: FailureClass::Temporary,
-                reason: text(b"later"),
-            },
-            b"Retrying at".as_slice(),
-        ),
-        (
-            Runtime::Closing(Closing {
-                delegates: 1,
-                stage: None,
-                ending: None,
-                connectors: Some({
-                    let mut rows = List::with_capacity(2);
-                    rows.push(1).unwrap();
-                    rows.push(2).unwrap();
-                    rows
-                }),
-            }),
-            b"Closing: 1 delegates".as_slice(),
-        ),
-        (Runtime::Held { was: None }, b"Held".as_slice()),
-        (Runtime::Ended, b"Ended".as_slice()),
-    ]
 }

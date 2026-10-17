@@ -16,6 +16,13 @@ impl Script {
     #[must_use]
     pub fn answered_chat(words: &[u8], answer: &[u8]) -> Self {
         let mut steps = Self::start_chat(words).steps.into_vec();
+        steps.push(Step::See {
+            find: Find::named(skein_ui::Role::Heading { level: 1 }, b"Task 1"),
+            within: Duration::from_secs(5),
+        });
+        steps.push(Step::Go {
+            address: client::Address::Jig(Address::Task { task: 1, section: TaskSection::Activity }),
+        });
         steps.push(Step::See { find: Find::text(answer), within: Duration::from_secs(5) });
         Self { steps: steps.into_boxed_slice() }
     }

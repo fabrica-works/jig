@@ -67,7 +67,7 @@ fn charter_offers_keep_their_own_project_and_reserved_capacity_is_bounded() {
     chats.push(Charter { number: u32::MAX, name: Some(text(b"")) }).unwrap();
     source.charters.push(OfferedCharters { project: 17, chats, goals: List::with_capacity(1), cut: true }).unwrap();
     let nav = Navigation::new(0);
-    assert!(nav.offered(Destination::Jig(Address::Conversations { project: Some(17) }), Some(&source)));
+    assert!(!nav.offered(Destination::Jig(Address::Conversations { project: Some(17) }), Some(&source)));
     assert!(!nav.offered(Destination::Jig(Address::Conversations { project: Some(u32::MAX) }), Some(&source)));
     assert!(crate::frame::me::fits(&source, &LIMITS));
     source.projects = List::with_capacity(LIMITS.projects + 1);

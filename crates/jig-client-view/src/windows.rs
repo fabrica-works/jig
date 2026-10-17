@@ -4,7 +4,7 @@
 //! See client/domain/client.md, 7. Row owners supply cursors for re-reading drops.
 use jig_client::thread::window::{Edge, Edges, End, edges, plan};
 
-use jig_client::contract::{ActivityLine, ConversationLine, Cursor, HistoryRow, ObjectKey};
+use jig_client::contract::{ActivityLine, HistoryRow, ObjectKey, TaskLine};
 use skein_lib::List;
 
 /// Object names on a page.
@@ -68,24 +68,17 @@ fn move_objectwindow(rows: List<ObjectKey>, start: u32, count: u32, out: &mut Li
 pub struct ConversationWindow {
     /// A retained read reported page loss; independent from its row edges.
     pub cut: bool,
-    pub rows: List<ConversationLine>,
+    pub rows: List<TaskLine>,
     pub edges: Edges,
-    /// Original opaque owner continuation supplied by an admitted live snapshot.
-    pub owner_after: Option<Cursor>,
 }
 impl ConversationWindow {
     /// Allocates a fixed row capacity and starts at both list ends.
     #[must_use]
     pub fn new(capacity: u32) -> Self {
-        Self {
-            cut: false,
-            rows: List::with_capacity(capacity),
-            edges: Edges { before: Edge::End, after: Edge::End },
-            owner_after: None,
-        }
+        Self { cut: false, rows: List::with_capacity(capacity), edges: Edges { before: Edge::End, after: Edge::End } }
     }
     /// Merges by task key before sliding; a retained row wins over a read overlap.
-    pub fn slide(&mut self, incoming: List<ConversationLine>, incoming_edges: Edges, end: End) -> u32 {
+    pub fn slide(&mut self, incoming: List<TaskLine>, incoming_edges: Edges, end: End) -> u32 {
         let key_capacity = self.rows.len().checked_add(incoming.len()).expect("admitted row counts fit");
         let mut keys = List::with_capacity(key_capacity);
         let old_count = conversation_count(&self.rows);
@@ -98,23 +91,9 @@ impl ConversationWindow {
         }
         self.merge(incoming, incoming_edges, end, keys, old_count)
     }
-    /// The supplied watch continuation starts a source prefix before retained past.
-    pub(crate) fn replay(&mut self, incoming: List<ConversationLine>, incoming_edges: Edges) -> u32 {
-        let key_capacity = self.rows.len().checked_add(incoming.len()).expect("admitted row counts fit");
-        let mut keys = List::with_capacity(key_capacity);
-        for row in &self.rows {
-            if crate::page::conversations::live(row.chip.phase) {
-                conversation_key(&mut keys, row.chip.task);
-            }
-        }
-        conversation_keys(&incoming, &mut keys);
-        conversation_keys(&self.rows, &mut keys);
-        let old_count = conversation_count(&self.rows);
-        self.merge(incoming, incoming_edges, End::After, keys, old_count)
-    }
     fn merge(
         &mut self,
-        incoming: List<ConversationLine>,
+        incoming: List<TaskLine>,
         incoming_edges: Edges,
         end: End,
         keys: List<u64>,
@@ -146,7 +125,7 @@ impl ConversationWindow {
         slide.dropped
     }
     /// Adds live rows only if this window reaches their end.
-    pub fn live(&mut self, incoming: List<ConversationLine>, incoming_edges: Edges, end: End) -> bool {
+    pub fn live(&mut self, incoming: List<TaskLine>, incoming_edges: Edges, end: End) -> bool {
         if !self.edges.reaches(end) {
             return false;
         }
@@ -157,14 +136,14 @@ impl ConversationWindow {
         true
     }
 }
-fn conversation_keys(rows: &List<ConversationLine>, keys: &mut List<u64>) {
+fn conversation_keys(rows: &List<TaskLine>, keys: &mut List<u64>) {
     for row in rows {
         if !keys.as_slice().contains(&row.chip.task) {
             keys.push(row.chip.task).expect("one key per admitted row fits");
         }
     }
 }
-fn conversation_count(rows: &List<ConversationLine>) -> u32 {
+fn conversation_count(rows: &List<TaskLine>) -> u32 {
     let mut count = 0_u32;
     for index in 0..rows.len() {
         let key = rows.get(index).expect("row exists").chip.task;
@@ -181,7 +160,7 @@ fn conversation_count(rows: &List<ConversationLine>) -> u32 {
     }
     count
 }
-fn conversation_named(rows: &List<ConversationLine>, key: u64) -> bool {
+fn conversation_named(rows: &List<TaskLine>, key: u64) -> bool {
     for row in rows {
         if row.chip.task == key {
             return true;
@@ -198,7 +177,7 @@ fn conversation_key(keys: &mut List<u64>, key: u64) {
 /// page's keys keep their order; current rows still supply the whole facts.
 /// Retained gaps remain beside their old preceding source anchor, without an
 /// inferred clock or numeric ordering. The bounded After slide selects its tail.
-fn conversation_after_keys(old: &List<ConversationLine>, incoming: &List<ConversationLine>, keys: &mut List<u64>) {
+fn conversation_after_keys(old: &List<TaskLine>, incoming: &List<TaskLine>, keys: &mut List<u64>) {
     for row in old {
         if conversation_named(incoming, row.chip.task) {
             break;
@@ -221,7 +200,7 @@ fn conversation_after_keys(old: &List<ConversationLine>, incoming: &List<Convers
     }
     conversation_keys(old, keys);
 }
-fn order_conversationwindow(rows: &mut List<ConversationLine>, keys: &List<u64>, start: u32) {
+fn order_conversationwindow(rows: &mut List<TaskLine>, keys: &List<u64>, start: u32) {
     for first in 0..rows.len() {
         let key = keys.get(start.checked_add(first).expect("selected key range fits")).expect("key exists");
         for second in first..rows.len() {
@@ -236,13 +215,7 @@ fn order_conversationwindow(rows: &mut List<ConversationLine>, keys: &List<u64>,
         }
     }
 }
-fn move_conversationwindow(
-    rows: List<ConversationLine>,
-    keys: &List<u64>,
-    start: u32,
-    count: u32,
-    out: &mut List<ConversationLine>,
-) {
+fn move_conversationwindow(rows: List<TaskLine>, keys: &List<u64>, start: u32, count: u32, out: &mut List<TaskLine>) {
     let until = start.saturating_add(count);
     for row in rows.into_boxed() {
         let mut selected = false;
@@ -327,7 +300,7 @@ fn move_historywindow(rows: List<HistoryRow>, start: u32, count: u32, out: &mut 
 #[must_use]
 pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
     let mut total = List::<ObjectKey>::worst_case(limits.rows)?;
-    total = total.checked_add(List::<ConversationLine>::worst_case(limits.rows)?)?;
+    total = total.checked_add(List::<TaskLine>::worst_case(limits.rows)?)?;
     total = total.checked_add(List::<ActivityLine>::worst_case(limits.rows)?)?;
     total = total.checked_add(List::<HistoryRow>::worst_case(limits.rows)?)?;
     total

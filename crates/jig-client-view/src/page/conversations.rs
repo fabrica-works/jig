@@ -20,7 +20,7 @@ use crate::{
 };
 use alloc::boxed::Box;
 use jig_client::contract::{
-    self, Answer, Ask, ConversationLine, InboxGroup, InboxReadGroup, Limit, ObjectKey, Read, Refusal, SeenThrough, Text,
+    self, Answer, Ask, InboxGroup, InboxReadGroup, Limit, ObjectKey, Read, Refusal, SeenThrough, Text,
 };
 use jig_client::thread::window::{Edge, Edges, End};
 use skein_lib::{Env, List, Queue, Token};
@@ -277,11 +277,6 @@ pub(crate) fn open_chat(
             through = Some(line.last_reply);
         }
     }
-    for row in &domain.borrow(lent).conversation_rows().rows {
-        if row.chip.task == task && row.last_reply > row.seen {
-            through = Some(through.unwrap_or(0).max(row.last_reply));
-        }
-    }
     if let Some(through) = through {
         let sent = seen(domain, SeenThrough::Conversation { task, through }, out);
         if !sent {
@@ -372,24 +367,6 @@ pub(crate) const INBOX_UPDATES_READ: u16 = 12;
 pub const CONVERSATIONS_WINDOW: u64 = 11;
 /// The conversations read source.
 pub(crate) const CONVERSATIONS_READ: u16 = 11;
-/// The read source for the conversations window's reverse edge.
-pub(crate) const CONVERSATIONS_BEFORE_READ: u16 = 14;
-/// Captures an original read of the supplied watch continuation, even if a
-/// newer snapshot arrives before its terminal. Public action bindings stay 11.
-pub(crate) const REPLAY_READ: u16 = 17;
-pub(crate) const fn is_replay(source: Source) -> bool {
-    match source {
-        Source::Window { number: REPLAY_READ, .. } => true,
-        Source::Window { .. } | Source::Watch(_) | Source::Card(_) => false,
-    }
-}
-/// Recovers the requested sliding end from this domain's read source.
-pub(crate) const fn read_end(source: Source) -> End {
-    match source {
-        Source::Window { number: CONVERSATIONS_BEFORE_READ, .. } => End::Before,
-        Source::Window { .. } | Source::Watch(_) | Source::Card(_) => End::After,
-    }
-}
 pub(crate) fn more(domain: &mut Ui, window: Token, end: End, out: &mut Queue<Request>, lent: &jig_client::Client) {
     if window == Token::new(INBOX_WINDOW) || window == Token::new(INBOX_UPDATES_WINDOW) {
         let group = if window == Token::new(INBOX_WINDOW) { InboxReadGroup::Needs } else { InboxReadGroup::Updates };
@@ -418,39 +395,21 @@ pub(crate) fn more(domain: &mut Ui, window: Token, end: End, out: &mut Queue<Req
             End::Before => &displayed.edges.before,
             End::After => &displayed.edges.after,
         };
-        match edge {
-            Edge::More(cursor) => {
-                if domain.shown_conversations().is_none() {
-                    return;
-                }
-                let number = match end {
-                    End::Before => CONVERSATIONS_BEFORE_READ,
-                    End::After => match &displayed.owner_after {
-                        Some(owner) if owner == cursor => REPLAY_READ,
-                        Some(_) | None => CONVERSATIONS_READ,
-                    },
-                };
-                ask_read(domain, number, Read::Conversations { after: Some(cursor.clone()) }, out);
-            }
-            Edge::End => {}
-        }
-    }
-}
-/// Sorts a bounded list with live chats first and most recent activity first.
-pub(crate) fn order(rows: &mut List<ConversationLine>) {
-    // Adjacent swaps preserve source order when independent clocks are absent.
-    for _pass in 0..rows.len() {
-        for second in 1..rows.len() {
-            let first = second.checked_sub(1).expect("row has predecessor");
-            let a = rows.get(first).expect("row exists");
-            let b = rows.get(second).expect("row exists");
-            let a_live = live(a.chip.phase);
-            let b_live = live(b.chip.phase);
-            if (b_live && !a_live) || (a_live == b_live && later(b.changed, a.changed)) {
-                let b = b.clone();
-                let a = core::mem::replace(rows.get_mut(first).expect("row exists"), b);
-                *rows.get_mut(second).expect("row exists") = a;
-            }
+        let earlier = match edge {
+            Edge::More(_) => true,
+            Edge::End => domain.chats.more,
+        };
+        if earlier {
+            let Some(project) = domain.shown_conversations() else { return };
+            let Some(me) = domain.frame(lent).document else { return };
+            let Some(mut query) = crate::queries::chats(me, project) else { return };
+            query.phase = Some(contract::PhaseClass::Ended);
+            query.order = contract::QueryOrder::Ended;
+            let ended = match edge {
+                Edge::More(cursor) => Some(cursor.clone()),
+                Edge::End => None,
+            };
+            ask_read(domain, CONVERSATIONS_READ, Read::Tasks { query, live: None, ended }, out);
         }
     }
 }
@@ -484,44 +443,26 @@ pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
         .checked_add(limits.document_bytes)
 }
 
-// No owner clock means no inferred ordering against a supplied clock.
-fn later(b: Option<skein_lib::Wall>, a: Option<skein_lib::Wall>) -> bool {
-    match b {
-        Some(b) => match a {
-            Some(a) => b > a,
-            None => false,
-        },
-        None => false,
-    }
-}
-
-/// Receives the whole live snapshot only at its reached end, preserving read
-/// rows and recording the exact supplied continuation independently of more.
+/// Receives the live snapshot at its reached end, preserving retained ended rows.
 pub(crate) fn delivered(
     domain: &mut Ui,
     env: &Env<crate::Limits>,
     source: Source,
-    conversations: contract::Conversations,
+    conversations: contract::Tasks,
     out: &mut Queue<Request>,
     lent: &jig_client::Client,
 ) {
-    domain.chats.more = conversations.more;
     domain.chats.show_live = domain.conversation_rows.edges.reaches(End::Before);
     let mut projected = domain.conversation_rows.clone();
     if project_live(&mut projected, conversations) > 0 {
         super::routing::refuse(domain, Limit::Objects);
     }
     domain.conversation_rows.edges = projected.edges;
-    domain.conversation_rows.owner_after = projected.owner_after;
     crate::page::replies::conversations(domain, env, source, out, lent);
     domain.changed();
 }
-pub(crate) fn project_live(
-    window: &mut crate::windows::ConversationWindow,
-    conversations: contract::Conversations,
-) -> u32 {
+pub(crate) fn project_live(window: &mut crate::windows::ConversationWindow, conversations: contract::Tasks) -> u32 {
     if window.edges.reaches(End::Before) {
-        window.owner_after = Some(conversations.after.clone());
         // A current live snapshot replaces live rows, while retained past rows
         // still belong to the read window. An overlapping watch row wins whole.
         let capacity = window.rows.capacity();
@@ -539,9 +480,9 @@ pub(crate) fn project_live(
             }
         }
         let after = window.edges.after.clone();
-        let mut rows = conversations.rows;
-        order(&mut rows);
-        let edges = Edges { before: Edge::End, after: Edge::More(conversations.after) };
+        let rows = conversations.rows;
+
+        let edges = Edges { before: Edge::End, after: Edge::End };
         let dropped = window.slide(rows, edges, End::Before);
         if dropped == 0 {
             window.edges.after = after;
@@ -554,38 +495,11 @@ pub(crate) fn project_live(
 }
 
 /// Merge the visible layout, retaining only facts supplied by reads in the page.
-pub(crate) fn read_page(domain: &mut Ui, source: Source, page: contract::ConversationPage, lent: &jig_client::Client) {
-    let old = domain.conversation_rows.clone();
-    let incoming = page.rows.clone();
+pub(crate) fn read_page(domain: &mut Ui, _source: Source, page: contract::TaskPage, lent: &jig_client::Client) {
+    let contract::EndedGroup::Rows { rows, after, cut } = page.ended else { return };
+    domain.chats.more = false;
     let mut displayed = domain.borrow(lent).conversation_rows();
-    displayed.cut |= page.cut;
-    let edges = super::routing::page_edges(page.before, page.after);
-    let mut rows = page.rows;
-    order(&mut rows);
-    if is_replay(source) {
-        displayed.replay(rows, edges);
-    } else {
-        displayed.slide(rows, edges, read_end(source));
-    }
-    let mut retained = List::with_capacity(displayed.rows.capacity());
-    for row in &displayed.rows {
-        let mut read = None;
-        for values in [&old.rows, &incoming] {
-            for value in values {
-                if value.chip.task == row.chip.task {
-                    read = Some(value);
-                    break;
-                }
-            }
-            if read.is_some() {
-                break;
-            }
-        }
-        if let Some(read) = read {
-            retained.push(read.clone()).expect("read rows fit the visible layout");
-        }
-    }
-    displayed.rows = retained;
-    order(&mut displayed.rows);
+    displayed.cut |= cut;
+    displayed.slide(rows, super::routing::page_edges(None, after), End::After);
     domain.conversation_rows = displayed;
 }

@@ -167,7 +167,7 @@ pub(super) fn begin_goal_creation(
         return;
     };
     let new = tasks::New {
-        label: 0,
+        label: 2, // Transitional default goal label; 16.5 removes this handler.
         flags: tasks::Flags { conversation: false, listed: true, retention: tasks::Retention::Kept },
         number,
         project,
@@ -226,7 +226,7 @@ pub(super) fn begin_chat_creation(
     };
     let given = core.chat_authority(project, person, role, env.limits.tasks.tree_tasks);
     let new = tasks::New {
-        label: 0,
+        label: 1, // Transitional default chat label; 16.5 removes this handler.
         flags: tasks::Flags { conversation: true, listed: false, retention: tasks::Retention::Kept },
         number,
         project,
