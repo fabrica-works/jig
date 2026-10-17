@@ -372,7 +372,8 @@ will do:
 - **Write:** words to an agent's task, a `Message`, which wakes it. Not
   offered to a procedure, which decides on facts, nor to a party's task,
   which is answered. Words to a task the person stopped release it too,
-  in one compound request.
+  in one compound request: the `Message`, and a `Release` naming the
+  hold's revision the card showed.
 - **Amend:** an `Amend` naming the spec's revision: its spec; its wake
   policy; its dependencies, removing some while it waits; its authority,
   narrowed freely and widened within the party's own (beyond it,

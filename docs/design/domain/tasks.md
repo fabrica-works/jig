@@ -522,10 +522,14 @@ tasks holding it: a quota cut, a machine gone.
 - **A decision names what it saw.** An amendment names its task's spec's
   revision, and a release its hold's (5.5), whoever makes it: a party,
   as their client showed it (`../client/domain/contract.md`, 5.2); a
-  run, as it last read it (engine.md, 7.3). One whose revision has moved
-  is refused as moved, saying what it is. A priority moves no revision,
-  and an amendment of the priority alone names none: the first commit
-  decides (people.md, 5.1). A cancel, a move and a stop name none.
+  run, as it last read it (engine.md, 7.3); alone, or in a compound
+  beside words or an amendment. One whose revision has moved is refused
+  as moved, saying what it is. No message releases a task: words to a
+  task its party stopped come with a release, which names the hold's
+  revision as any release does (people.md, 5.1). A priority moves no
+  revision, and an amendment of the priority alone names none: the
+  first commit decides (people.md, 5.1). A cancel, a move and a stop
+  name none.
 - **Instructions are replaced whole.** An agent task runs with its
   charter's instructions until an amendment gives it its own. An
   amendment's instructions replace the task's whole instructions, and

@@ -258,8 +258,8 @@ this environment) is the application's (`../../domain/people.md`, 5.1):
   or not at all: closing a conversation whose delegates are live, each
   delegate cancelled or moved to the party and the conversation then
   cancelled with a grace; reordering several tracked tasks at once;
-  amending a held task and releasing it; words that release a task the
-  party stopped.
+  amending a held task and releasing it; words to a task the party
+  stopped, and its release.
 - **One keyed request, `Compound { project, operations }`:** a list of
   operations, admitted in order and committed in one decision, all or
   none. It has one key and one answer: done, with each operation's
@@ -282,7 +282,9 @@ this environment) is the application's (`../../domain/people.md`, 5.1):
   operations before it leave, as it would be alone after them; one pool
   is counted across all of them (a move's reservation and the rest);
   each names its revision where it would alone, and a priority-only
-  `Amend` names none, the first commit deciding.
+  `Amend` names none, the first commit deciding. A `Release` names its
+  hold's revision beside words or an amendment as it does alone: a
+  `Message` names a task and words, and releases nothing.
 - **Each operation's outcome: made, with a message number.** Its
   operations take consecutive message numbers, one each, in the
   request's order, and the answer names the first: the operation at

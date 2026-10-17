@@ -264,7 +264,8 @@ activity, the conversation, comes first.
   parked one resumes. They do not interrupt the turn being written; to
   stop it at once, the person stops it. Words to a chat the person
   stopped release it too: one compound request, the words and the
-  release (contract.md, 3.4). Sent words are not edited or withdrawn.
+  release, which names the hold's revision the page showed (contract.md,
+  3.4 and 5.2). Sent words are not edited or withdrawn.
 - **Stop, close and cancel** are three requests, kept apart in name and in
   what each says before it is sent (objects.md, section 11). Closing is
   `shapes::close_chat`'s compound request.

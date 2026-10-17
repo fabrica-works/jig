@@ -261,9 +261,13 @@ The operations as the client sends them are
   the first commit decides.
 - **A hold's revision moves with the hold:** when the task is held anew,
   or its reason changes; never when its escalation passes up. A release,
-  and a decision about the escalation, name it. Where the escalation
-  waits is checked apart: deciding the escalation needs it to wait for
-  the party, and is refused as not waiting for them otherwise; releasing,
+  and a decision about the escalation, name it, whatever held the task,
+  the releasing party's own stop among them. Words release nothing: a
+  `Message` adds words to the inbox, and words to a task the party
+  stopped come with a `Release` in one compound request (below), naming
+  the hold's revision as it would alone. Where the escalation waits is
+  checked apart: deciding the escalation needs it to wait for the
+  party, and is refused as not waiting for them otherwise; releasing,
   amending or cancelling the held task needs the task in their tree, or
   maintainer, wherever its escalation waits. So a release named with the
   revision from before a pass up is made, not refused as moved.
@@ -273,8 +277,8 @@ The operations as the client sends them are
   decision made of several: closing a conversation whose delegates are
   live, each cancelled or moved to the party, and the conversation then
   cancelled with a grace (section 7); ordering several goals at once;
-  amending a held task and releasing it; words that release a task the
-  party stopped.
+  amending a held task and releasing it; words to a task the party
+  stopped, and its release.
   - *What it may hold:* `Cancel`, with or without a grace; `Move`;
     `Amend`, priority included; `Release`; `Message`; `Stop`. The other
     operations keep requests of their own.
@@ -291,8 +295,10 @@ The operations as the client sends them are
     `Message`'s words are numbered so, and an operation that adds nothing
     to its task's inbox leaves its number unused. Nothing more of an
     operation is answered (`../client/domain/contract.md`, 3.4).
-  - *Revisions:* each operation names its revision where it would alone;
-    a change of priority alone names none, and the first commit decides.
+  - *Revisions:* each operation names its revision where it would alone,
+    so a `Release` names its hold's beside words or an amendment as it
+    does alone; a change of priority alone names none, and the first
+    commit decides.
   - *Bounded* by operations per request, a limit of this child's.
     Configuration refuses a profile where it is smaller than the larger
     of delegates per task plus one and goals per project
