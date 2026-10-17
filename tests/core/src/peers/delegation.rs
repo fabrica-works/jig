@@ -1,0 +1,18 @@
+//! The peers' plain delegated task fixture.
+use super::{authority, core, tasks};
+
+pub(super) fn delegate(words: Box<[u8]>, executor: tasks::Executor, budget: u64) -> core::Delegate {
+    core::Delegate {
+        label: 0,
+        flags: jig_domain_tasks::Flags::PLAIN,
+        tracked: None,
+        budget: jig_domain_people::Budget::Named,
+        executor,
+        spec: tasks::Spec { words, parameters: Box::new([]), inputs: Box::new([]) },
+        contract: tasks::Contract::Report { words: 128 },
+        authority: authority(budget, true),
+        symbolic_grants: Box::new([]),
+        dependencies: Box::new([]),
+        wake: tasks::WakePolicy::DEFAULT,
+    }
+}

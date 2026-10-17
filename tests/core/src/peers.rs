@@ -2,6 +2,8 @@
 //! workers and parties retain their own observations; this world reads only
 //! released root outputs and durable store rows (`domain/testing.md`, 4, 7).
 use crate::Store;
+mod delegation;
+use delegation::delegate;
 use jig_domain_core as core;
 use jig_domain_fleet as fleet;
 use jig_domain_people as people;
@@ -507,22 +509,6 @@ fn authority(budget: u64, agent: bool) -> tasks::Authority {
         budget: tasks::Budget { spend: budget, deadline: None },
         notes: tasks::Scopes(0),
         note_resources: Box::new([]),
-    }
-}
-
-fn delegate(words: Box<[u8]>, executor: tasks::Executor, budget: u64) -> core::Delegate {
-    core::Delegate {
-        label: 0,
-        flags: jig_domain_tasks::Flags::PLAIN,
-        tracked: None,
-        budget: jig_domain_people::Budget::Named,
-        executor,
-        spec: tasks::Spec { words, parameters: Box::new([]), inputs: Box::new([]) },
-        contract: tasks::Contract::Report { words: 128 },
-        authority: authority(budget, true),
-        symbolic_grants: Box::new([]),
-        dependencies: Box::new([]),
-        wake: tasks::WakePolicy::DEFAULT,
     }
 }
 
