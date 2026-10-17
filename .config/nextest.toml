@@ -6,7 +6,8 @@
 
 [profile.default]
 default-filter = "not binary(/^fuzzy_/) & not binary(/^(process|live)$/)"
-global-timeout = "15s"
+# Doubled for temper's client-api run (ruling 275); 15s again after the test-cost pass that follows it.
+global-timeout = "30s"
 slow-timeout = { period = "500ms" }
 
 # The worlds' tests first, the longest, then the many short unit tests behind
