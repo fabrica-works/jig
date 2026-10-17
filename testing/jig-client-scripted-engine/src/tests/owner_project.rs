@@ -8,6 +8,7 @@ fn source() -> OwnerProject {
         acts: List::with_capacity(2),
         resources: List::with_capacity(2),
         policy: OwnerProjectPolicy {
+            templates: skein_lib::List::with_capacity(0),
             ceiling: OwnerAuthorityDocument::complete(OwnerAuthority {
                 tools: u64::MAX,
                 grants: List::with_capacity(0),
@@ -256,7 +257,8 @@ fn owner_project_last_of_twenty_five_offers_keeps_recursive_rows_and_source_orde
     roles.push(u32::MAX).unwrap();
     value.acts.get_mut(last).unwrap().act = ActKind::SetGoal;
     value.acts.get_mut(last).unwrap().admission = Admission::Bounded {
-        within: jig_client_domain::contract::Bounds::Goal {
+        within: jig_client_domain::contract::Bounds::Create(jig_client_domain::contract::CreateBounds {
+            authority: Box::new(crate::tests::owner_authority()),
             pool_left: u64::MAX,
             charters,
             procedures: List::with_capacity(2),
@@ -264,13 +266,14 @@ fn owner_project_last_of_twenty_five_offers_keeps_recursive_rows_and_source_orde
             budget: 0,
             maximum_budget: u64::MAX,
             maximum_deadline: None,
-        },
+        }),
         beyond: Beyond::Proposed { to: Recipient::Roles { project: u32::MAX, roles } },
     };
     let original = value.clone();
     let bytes = reserved_project_bytes(MAX_OFFERED_ACTS)
         + List::<u32>::worst_case(2).unwrap() * 2
-        + List::<GoalProcedure>::worst_case(2).unwrap();
+        + List::<CreateProcedure>::worst_case(2).unwrap()
+        + u64::try_from(core::mem::size_of::<OwnerAuthorityDocument>()).unwrap();
     let mut bounds = Bounds { rows: 2, segments: 2, document_bytes: bytes, ..Bounds::default() };
     assert_eq!(owner_project::bytes(&value, &bounds), Some(bytes));
     assert!(owner_project::fits(&value, &bounds));

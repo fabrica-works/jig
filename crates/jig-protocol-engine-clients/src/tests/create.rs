@@ -11,7 +11,11 @@ fn a_create_reaches_the_people_child_with_each_task_s_fields() {
 fn an_as_allowed_answer_names_what_was_given() {
     let l = f::wire();
     let w::Final::Done(value) = f::translated(
-        &p::Reply::Outcome(p::Outcome::Created { first: 7, last: 8, given: Some(p::Given { task: 8, amount: 42 }) }),
+        &p::Reply::Outcome(p::Outcome::Created {
+            first: f::FIRST_TASK,
+            last: f::LAST_TASK,
+            given: Some(p::Given { task: f::LAST_TASK, amount: 42 }),
+        }),
         &l,
     ) else {
         panic!("done")

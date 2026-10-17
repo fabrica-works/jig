@@ -26,7 +26,7 @@ impl Domain {
     fn identity(&self) -> Option<(u64, skein_lib::Duration, bool)> {
         for (_, w) in &self.watches {
             if w.own {
-                let Some(crate::Latest::Jig(contract::Delivery::Frame(frame))) = &w.latest else {
+                let Some(crate::Latest::Jig(contract::Delivery::Me(frame))) = &w.latest else {
                     continue;
                 };
                 return Some((

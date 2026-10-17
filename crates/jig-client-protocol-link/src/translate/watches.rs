@@ -9,7 +9,7 @@ use skein_lib::{List, Reader, Writer};
 
 pub fn subject(value: &c::Subject, limits: &w::Limits) -> Result<w::Subject, w::Problem> {
     Ok(match value {
-        c::Subject::Frame => w::Subject::Frame,
+        c::Subject::Me => w::Subject::Me,
         c::Subject::Task { task } => {
             w::Subject::Task(w::SubjectTask::new(limits, w::SubjectTaskParts { task: *task })?)
         }
@@ -153,7 +153,7 @@ pub fn delivery(bytes: &[u8], limits: &Limits) -> Result<c::Delivery, Undecodabl
         w::DeliveryValue::OwnerProject(value) => {
             c::Delivery::OwnerProject(Box::new(documents::owner_project(value, limits)?))
         }
-        w::DeliveryValue::Frame(value) => c::Delivery::Frame(Box::new(documents::frame(value, limits)?)),
+        w::DeliveryValue::Me(value) => c::Delivery::Me(Box::new(documents::frame(value, limits)?)),
         w::DeliveryValue::Task(value) => c::Delivery::Task(Box::new(documents::task(*value, limits)?)),
         w::DeliveryValue::OwnerProposal(value) => {
             c::Delivery::OwnerProposal(Box::new(objects::owner_proposal(value, limits)?))

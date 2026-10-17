@@ -244,7 +244,7 @@ impl<A: Application> Engine<A> {
     pub fn bounds(&self) -> Bounds {
         self.bounds
     }
-    /// Configured range for the stream hello, independent of Frame and commits.
+    /// Configured range for the stream hello, independent of Me and commits.
     #[must_use]
     pub fn versions(&self) -> jig_client_domain::contract::VersionRange {
         self.versions

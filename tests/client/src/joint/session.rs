@@ -183,7 +183,7 @@ impl Session {
     }
 
     /// A version fault supplies the replacement range served by the protocol
-    /// fixture, independently of core business configuration and Frame.
+    /// fixture, independently of core business configuration and Me.
     pub fn versions(&mut self, versions: client::VersionRange) {
         self.driver.transport.versions(versions);
         for client in self.driver.transport.clients() {
@@ -911,7 +911,7 @@ mod tests {
     fn frame(watch: Token) -> Request {
         Request::Client {
             request: jig_client::Request::Down {
-                down: jig_client::Down::Open { watch, subject: jig_client::Watchable::Jig(client::Subject::Frame) },
+                down: jig_client::Down::Open { watch, subject: jig_client::Watchable::Jig(client::Subject::Me) },
             },
         }
     }
@@ -975,7 +975,7 @@ mod tests {
         let callbacks = session.poll(now, wall).expect("replacement body");
         assert!(
             matches!(callbacks.as_slice(), [(owner, Event::Client { event: jig_client::Event::Up { up: jig_client::Up::Watched {
-            watch, event: client::WatchEvent::Delivered(client::Delivery::Frame(_)),
+            watch, event: client::WatchEvent::Delivered(client::Delivery::Me(_)),
         } } })] if *owner == client && *watch == native)
         );
     }
@@ -990,7 +990,7 @@ mod tests {
         for watch in [Token::new(0), Token::new(u64::MAX)] {
             session.send(client, now, wall, frame(watch)).expect("actual owner watch");
         }
-        let first = session.poll(now, wall).expect("actual Frame packets");
+        let first = session.poll(now, wall).expect("actual Me packets");
         assert_eq!(
             first
                 .iter()
@@ -999,7 +999,7 @@ mod tests {
                     Event::Client {
                         event: jig_client::Event::Up {
                             up: jig_client::Up::Watched {
-                                event: client::WatchEvent::Delivered(client::Delivery::Frame(_)),
+                                event: client::WatchEvent::Delivered(client::Delivery::Me(_)),
                                 ..
                             }
                         }
@@ -1147,7 +1147,7 @@ mod tests {
     }
 
     #[test]
-    fn real_protocol_loop_parks_whole_requests_until_authentication_and_keeps_hello_independent_of_frame_durability() {
+    fn requests_wait_for_authentication_independently_of_me_durability() {
         let (mut session, now, wall) = session();
         session.driver.world.cut =
             Some(jig_core_world::effects::Cut::Submitted(session.driver.world.store.applied + 1));
@@ -1180,14 +1180,11 @@ mod tests {
             event:
                 jig_client::Event::Up {
                     up:
-                        jig_client::Up::Watched {
-                            watch,
-                            event: client::WatchEvent::Delivered(client::Delivery::Frame(value)),
-                        },
+                        jig_client::Up::Watched { watch, event: client::WatchEvent::Delivered(client::Delivery::Me(value)) },
                 },
         } = event
         else {
-            panic!("actual whole Frame")
+            panic!("actual whole Me")
         };
         assert_eq!(*watch, native);
         assert_eq!(value.party.number, 1);
@@ -1219,7 +1216,7 @@ mod tests {
         let callbacks = session.poll(now, wall).expect("old route cannot deliver late");
         assert_eq!(callbacks.len(), 1, "actual callbacks: {callbacks:?}");
         assert!(
-            matches!(&callbacks[0], (ClientId(1), Event::Client { event: jig_client::Event::Up { up: jig_client::Up::Watched { watch, event: client::WatchEvent::Delivered(client::Delivery::Frame(_)) } } }) if *watch == native),
+            matches!(&callbacks[0], (ClientId(1), Event::Client { event: jig_client::Event::Up { up: jig_client::Up::Watched { watch, event: client::WatchEvent::Delivered(client::Delivery::Me(_)) } } }) if *watch == native),
             "actual callbacks: {callbacks:?}"
         );
         assert!(session.driver.transport.watch(first).is_none());
@@ -1261,7 +1258,7 @@ mod tests {
         assert!(session.driver.transport.taken(ClientId(0), native).is_none());
     }
     #[test]
-    fn a_reloaded_protocol_epoch_drops_actual_old_frame_packets_and_reopens_only_its_original_tabs_routes() {
+    fn a_reloaded_epoch_discards_old_me_and_preserves_routes() {
         let (mut session, now, wall) = session();
         for client in [ClientId(0), ClientId(1)] {
             session.bind(client, 1, identity(), now, wall);
@@ -1271,7 +1268,7 @@ mod tests {
         assert_eq!(callbacks.len(), 2);
         let native = Token::new(9);
         for client in [ClientId(0), ClientId(1)] {
-            session.send(client, now, wall, frame(native)).expect("actual Frame watch");
+            session.send(client, now, wall, frame(native)).expect("actual Me watch");
         }
         let old = session.driver.transport.watch_token(ClientId(0), native).expect("old tab route");
         let sibling = session.driver.transport.watch_token(ClientId(1), native).expect("sibling route");
@@ -1282,14 +1279,14 @@ mod tests {
         assert!(session.driver.transport.watch(old).is_none());
         assert!(session.driver.transport.watch(sibling).is_some());
         for packet in packets {
-            let Packet::Held { delivery, .. } = packet else { panic!("real held Frame") };
+            let Packet::Held { delivery, .. } = packet else { panic!("real held Me") };
             session.held(*delivery, now, wall).expect("old route discarded without acknowledging");
         }
         session.send(ClientId(0), now, wall, frame(native)).expect("root supplies its new watch");
         let reopened = session.driver.transport.watch_token(ClientId(0), native).expect("fresh route");
         assert_ne!(old, reopened);
         let callbacks =
-            take_signed_in(ClientId(0), session.poll(now, wall).expect("actual fresh Frame plus untouched sibling"));
+            take_signed_in(ClientId(0), session.poll(now, wall).expect("actual fresh Me plus untouched sibling"));
         assert_eq!(callbacks.len(), 3);
         assert!(matches!(
             &callbacks[0],
@@ -1303,7 +1300,7 @@ mod tests {
                     Event::Client {
                         event: jig_client::Event::Up {
                             up: jig_client::Up::Watched {
-                                event: client::WatchEvent::Delivered(client::Delivery::Frame(_)),
+                                event: client::WatchEvent::Delivered(client::Delivery::Me(_)),
                                 ..
                             }
                         }
@@ -1321,23 +1318,23 @@ mod tests {
         assert!(session.driver.transport.taken(ClientId(0), native).is_none());
     }
     #[test]
-    fn delayed_actual_frame_callbacks_keep_the_normal_flight_pending_until_the_supplied_deadline() {
+    fn delayed_me_callbacks_preserve_the_flight_until_its_deadline() {
         let (mut session, now, wall) = session();
         session.bind(ClientId(0), 1, identity(), now, wall);
         session.poll(now, wall).expect("actual authentication");
         let native = Token::new(9);
-        session.send(ClientId(0), now, wall, frame(native)).expect("original Frame watch");
+        session.send(ClientId(0), now, wall, frame(native)).expect("original Me watch");
         let until = Time::from_nanos(1000);
         session.delay(until);
         assert!(session.poll(now, wall).expect("owner packets delayed at protocol boundary").is_empty());
         assert_eq!(session.delayed.len(), 1);
         assert!(session.driver.transport.watch_token(ClientId(0), native).is_some());
         assert!(session.poll(Time::from_nanos(999), wall).expect("before supplied deadline").is_empty());
-        let callbacks = session.poll(until, wall).expect("same whole actual Frame released");
+        let callbacks = session.poll(until, wall).expect("same whole actual Me released");
         assert_eq!(callbacks.len(), 1);
         assert!(
             matches!(&callbacks[0], (ClientId(0), Event::Client { event: jig_client::Event::Up { up: jig_client::Up::Watched {
-            watch, event: client::WatchEvent::Delivered(client::Delivery::Frame(value)),
+            watch, event: client::WatchEvent::Delivered(client::Delivery::Me(value)),
         } } }) if *watch == native && value.party.number == 1)
         );
         session.received(ClientId(0), until, wall, &callbacks[0].1);
@@ -1346,7 +1343,7 @@ mod tests {
     }
 
     #[test]
-    fn a_protocol_dropped_watch_closes_only_its_original_owner_route_without_taking_a_siblings_frame() {
+    fn dropping_a_watch_preserves_sibling_me_deliveries() {
         let (mut session, now, wall) = session();
         for client in [ClientId(0), ClientId(1)] {
             session.bind(client, 1, identity(), now, wall);
@@ -1354,19 +1351,19 @@ mod tests {
         session.poll(now, wall).expect("actual independent sessions");
         let native = Token::new(9);
         for client in [ClientId(0), ClientId(1)] {
-            session.send(client, now, wall, frame(native)).expect("real Frame watches");
+            session.send(client, now, wall, frame(native)).expect("real Me watches");
         }
         let dropped = session.driver.transport.watch_token(ClientId(0), native).expect("original route");
         let sibling =
             session.driver.transport.watch_token(ClientId(1), native).expect("independent equal native token");
         session.drop_watch(ClientId(0), native, now, wall).expect("actual external protocol drop");
-        let callbacks = session.poll(now, wall).expect("late original Frame is discarded");
+        let callbacks = session.poll(now, wall).expect("late original Me is discarded");
         assert_eq!(callbacks.len(), 2);
         assert!(
             matches!(&callbacks[0], (ClientId(0), Event::Client { event: jig_client::Event::Up { up: jig_client::Up::WatchEnded { watch, end: client::WatchEnd::Dropped } } }) if *watch == native)
         );
         assert!(
-            matches!(&callbacks[1], (ClientId(1), Event::Client { event: jig_client::Event::Up { up: jig_client::Up::Watched { watch, event: client::WatchEvent::Delivered(client::Delivery::Frame(_)) } } }) if *watch == native)
+            matches!(&callbacks[1], (ClientId(1), Event::Client { event: jig_client::Event::Up { up: jig_client::Up::Watched { watch, event: client::WatchEvent::Delivered(client::Delivery::Me(_)) } } }) if *watch == native)
         );
         assert!(session.driver.transport.watch(dropped).is_none());
         assert!(session.driver.transport.watch(sibling).is_some());
@@ -1382,7 +1379,7 @@ mod tests {
         session.poll(now, wall).expect("genuine authentication");
         let _ = session.observed();
         let native = Token::new(u64::MAX);
-        session.send(ClientId(0), now, wall, frame(native)).expect("original Frame watch");
+        session.send(ClientId(0), now, wall, frame(native)).expect("original Me watch");
         let watcher = session.driver.transport.watch_token(ClientId(0), native).expect("original route");
         let durable = session.driver.world.store.applied;
         let rows = session.driver.world.store.rows.clone();
@@ -1576,7 +1573,7 @@ mod tests {
             request: jig_client::Request::Down {
                 down: jig_client::Down::Open {
                     watch: native,
-                    subject: jig_client::Watchable::Jig(client::Subject::Frame),
+                    subject: jig_client::Watchable::Jig(client::Subject::Me),
                 },
             },
         };

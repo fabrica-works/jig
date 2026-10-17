@@ -136,7 +136,7 @@ pub fn store_asks() -> List<c::Ask> {
         c::Ask::SetPool { project: 7, party: u64::MAX, budget: u64::MAX },
     ])
 }
-fn list<T, const N: usize>(values: [T; N]) -> List<T> {
+pub fn list<T, const N: usize>(values: [T; N]) -> List<T> {
     let mut out = List::with_capacity(u32::try_from(N).unwrap());
     for value in values {
         out.push(value).ok().expect("fixture list fits");

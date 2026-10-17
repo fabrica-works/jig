@@ -38,6 +38,7 @@ pub fn owner_project() -> c::OwnerProject {
         number: 7,
         resources: List::with_capacity(0),
         policy: c::OwnerProjectPolicy {
+            templates: List::with_capacity(0),
             ceiling: c::OwnerAuthorityDocument {
                 authority: c::OwnerAuthority {
                     tools: 7,

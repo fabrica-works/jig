@@ -126,7 +126,7 @@ fn own_script() -> Script {
             answer: Answer::Done(Outcome::Changed),
             changes: vec![
                 Change::Seen { party: 1, results: through, replies: vec![] },
-                Change::Frame(latest),
+                Change::Me(latest),
                 Change::Source(Source {
                     party: 1,
                     read: read.clone(),
@@ -277,11 +277,11 @@ fn scenario_hook_limits_visibility_conflicts_and_expired_retention() {
     setup.bounds.watches = 1;
     let mut engine = Engine::with_application(setup, 17, own()).expect("shared limits");
     engine.open_application(Time::ZERO, 11, Token::new(1), 7, 1, 0).expect("own watch");
-    engine.open(Time::ZERO, 11, Token::new(2), Subject::Frame).expect("jig over limit");
+    engine.open(Time::ZERO, 11, Token::new(2), Subject::Me).expect("jig over limit");
     assert!(engine.poll(Time::ZERO).contains(&Up::Ended { token: Token::new(2), why: WatchEnd::Busy }));
     engine.close(Time::ZERO, Token::new(1));
     assert_eq!(engine.poll(Time::ZERO), vec![Up::Ended { token: Token::new(1), why: WatchEnd::Closed }]);
-    engine.open(Time::ZERO, 11, Token::new(3), Subject::Frame).expect("jig watch");
+    engine.open(Time::ZERO, 11, Token::new(3), Subject::Me).expect("jig watch");
     engine.open_application(Time::ZERO, 11, Token::new(4), 7, 1, 0).expect("own over limit");
     assert!(engine.poll(Time::ZERO).contains(&Up::Ended { token: Token::new(4), why: WatchEnd::Busy }));
     engine.read_application(Time::ZERO, 11, Token::new(5), 7, 2, &0).expect("hidden project");
@@ -359,7 +359,7 @@ fn scenario_deployment_parts_dynamic_rules_and_scheduling() {
     let mut removed = frame(1);
     removed.deployment_role = None;
     removed.projects = list(vec![]);
-    engine.act(Time::ZERO, Wall::EPOCH, Change::Frame(removed)).expect("role removed");
+    engine.act(Time::ZERO, Wall::EPOCH, Change::Me(removed)).expect("role removed");
     assert_eq!(engine.poll(at(10_000_000)), vec![Up::Ended { token: Token::new(2), why: WatchEnd::NotAllowed }]);
     let mut engine = Engine::new(live_script(), 19).expect("dynamic rules");
     let ask = Ask::StartChat { project: 1, words: text(b"world generated words") };
@@ -412,7 +412,7 @@ fn scenario_deployment_parts_dynamic_rules_and_scheduling() {
     );
     let mut engine = Engine::new(live_script(), 21).expect("slow heartbeat");
     engine.fault(Time::ZERO, Fault::Slow { span: Duration::from_secs(5) });
-    engine.open(Time::ZERO, 11, Token::new(1), Subject::Frame).expect("slow frame");
+    engine.open(Time::ZERO, 11, Token::new(1), Subject::Me).expect("slow frame");
     for seconds in 1..5 {
         assert!(engine.poll(at(seconds * 1_000_000_000)).is_empty());
     }

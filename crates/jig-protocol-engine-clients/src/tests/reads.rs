@@ -63,7 +63,7 @@ fn a_read_signed_out_is_answered_signed_out() {
         let mut exchange = f::read_exchange();
         let owner = if label == "absent digest" {
             let owner =
-                exchange.post_to(b"/jig/v1/read", f::owned_read(w::Owner::Jig, 8, f::encoded_read(&w::Read::Frame)));
+                exchange.post_to(b"/jig/v1/read", f::owned_read(w::Owner::Jig, 8, f::encoded_read(&w::Read::Me)));
             let Some(Request::Secrets(SecretsRequest::Get { owner: who })) = exchange.out.pop() else {
                 panic!("digest get")
             };
@@ -74,7 +74,7 @@ fn a_read_signed_out_is_answered_signed_out() {
             );
             owner
         } else {
-            let (owner, reply, _) = exchange.read(&w::Read::Frame);
+            let (owner, reply, _) = exchange.read(&w::Read::Me);
             if label == "core answer" {
                 exchange.release_read(reply, reads::Answer::None(reads::Why::SignedOut));
             } else {

@@ -623,7 +623,7 @@ fn deployment_person_room_causes_remain_independent_of_action_project_and_opaque
 }
 
 #[test]
-fn deployment_frame_role_is_independent_of_another_project_owner_or_clipped_project_rows() {
+fn me_deployment_role_is_independent_of_project_rows() {
     for (source_role, expected) in [
         (None, None),
         (Some(people::Role::Owner), Some(client::HeldRole::Owner)),
@@ -658,9 +658,9 @@ fn deployment_frame_role_is_independent_of_another_project_owner_or_clipped_proj
             charters: List::with_capacity(0),
             cut: true,
         };
-        assert_eq!(owner::frame(&source, &limits()).expect("supplied Frame").deployment_role, expected);
+        assert_eq!(owner::frame(&source, &limits()).expect("supplied Me").deployment_role, expected);
         source.projects = List::with_capacity(1);
-        let value = owner::frame(&source, &limits()).expect("clipped supplied Frame");
+        let value = owner::frame(&source, &limits()).expect("clipped supplied Me");
         assert_eq!(value.deployment_role, expected);
         assert!(value.cut && value.projects.is_empty());
     }

@@ -1,5 +1,9 @@
 //! Supplied Frame facts keep absent names, unopened pools and actual current ledgers distinct.
 use super::*;
+const CREATING_PROJECT: u32 = 1;
+const CREATING_PARTY: u64 = 1;
+const CREATING_CHARTER: u32 = 1;
+const CREATING_PROCEDURE: u32 = 1;
 
 fn frame(core: &Core, limits: &Limits) -> Frame {
     let Document::Frame(value) = make(core, limits, 1, &Subject::Frame { party: 1 }, &window()).expect("frame") else {
@@ -163,14 +167,28 @@ fn the_frame_offers_both_charters_for_goals() {
     assert_eq!(frame.charters.get(0).expect("project charters").goals.as_slice(), [1, 2]);
 }
 
-pub(super) fn owner_creating(capacity: u32) -> crate::acts::Bounds {
+pub(super) fn owner_creating(capacity: u32, tasks_left: u32, depth: u32) -> crate::acts::Bounds {
     let mut charters = List::with_capacity(capacity);
     charters.push(1).unwrap();
     let mut procedures = List::with_capacity(capacity);
     for connector in [1, 2] {
         procedures.push(crate::acts::GoalProcedure { connector, code: 1 }).unwrap();
     }
+    let mut executors = List::with_capacity(2);
+    executors.push(tasks::AuthorityExecutor::Charter(CREATING_CHARTER)).unwrap();
+    executors.push(tasks::AuthorityExecutor::Procedure(CREATING_PROCEDURE)).unwrap();
     crate::acts::Bounds::Goal {
+        authority: Box::new(AuthorityLine {
+            tools: tasks::Tools(1023),
+            grants: List::with_capacity(0),
+            executors,
+            tasks: tasks_left,
+            depth,
+            ceiling: tasks::Budget { spend: 500, deadline: None },
+            notes: tasks::Scopes(0),
+            note_resources: List::with_capacity(0),
+            cut: false,
+        }),
         pool_left: 500,
         charters,
         procedures,
@@ -202,7 +220,11 @@ fn me_carries_a_members_creating_bounds_per_project() {
     assert_eq!(out.pop(), Some(authority::PolicyFact::Changed { project: 1 }));
     hold(&mut core, &limits, people::Role::Member);
     let value = frame(&core, &limits);
-    assert_eq!(value.projects.get(0).unwrap().creating, Some(owner_creating(limits.documents.lines)));
+    let Some(creating) = &value.projects.get(0).unwrap().creating else { panic!("member creating bound") };
+    assert_eq!(creating.within, owner_creating(limits.documents.lines, 15, 4));
+    let crate::acts::Bounds::Goal { authority, .. } = &creating.within else { panic!("creating authority") };
+    let given = core.chat_authority(CREATING_PROJECT, CREATING_PARTY, people::Role::Member, limits.tasks.tree_tasks);
+    assert_eq!(**authority, act_authority(&limits, &task_authority(&given)).unwrap());
 }
 
 #[test]

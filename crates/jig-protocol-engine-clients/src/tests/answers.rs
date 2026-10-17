@@ -235,7 +235,7 @@ fn a_sparse_ending_past_its_piece_bound_is_refused() {
     );
 }
 
-const UNSERVED_VERSION: u32 = 9;
+const UNSERVED_VERSION: u32 = jig_client_protocol_wire::VERSION + 1;
 const REFUSED_WATCH: u64 = 71;
 #[test]
 fn a_keyed_request_outside_its_owners_range_is_answered_not_served() {

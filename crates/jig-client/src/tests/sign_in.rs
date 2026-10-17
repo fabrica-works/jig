@@ -10,7 +10,7 @@ const LEAST_BACKOFF: Duration = Duration::from_millis(5);
 #[test]
 fn a_watch_asked_before_signing_in_opens_once_signed_in() {
     let mut c = Client::new();
-    c.step(Event::Watch { handle: ME, subject: Watchable::Jig(contract::Subject::Frame) });
+    c.step(Event::Watch { handle: ME, subject: Watchable::Jig(contract::Subject::Me) });
     assert!(c.requests().is_empty());
     c.step(Event::Watch { handle: TASK, subject: task() });
     assert!(c.requests().is_empty());

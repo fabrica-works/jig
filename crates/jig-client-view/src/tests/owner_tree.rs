@@ -75,7 +75,7 @@ fn domain(value: &OwnerTree) -> Fixture {
 }
 fn domain_and_watch(value: &OwnerTree) -> (Fixture, jig_client::Handle) {
     let (mut d, frame) = start();
-    drive(&mut d, Watched { watch: frame, event: WatchEvent::Delivered(Delivery::Frame(Box::new(document()))) });
+    drive(&mut d, Watched { watch: frame, event: WatchEvent::Delivered(Delivery::Me(Box::new(document()))) });
     let asks = drive(&mut d, Event::Went { place: Place::Jig(Address::Task { task: 8, section: TaskSection::Plan }) });
     let task =
         asks.iter()

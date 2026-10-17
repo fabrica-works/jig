@@ -1,5 +1,10 @@
 use super::*;
 use jig_domain_people as p;
+pub const PROJECT: u32 = 3;
+pub const CHARTER: u32 = 7;
+pub const ROLE: u32 = 2;
+pub const FIRST_TASK: u64 = 7;
+pub const LAST_TASK: u64 = 8;
 pub fn create_ask() -> (w::Ask, p::Ask) {
     let (wire, people) = authority_ask();
     let w::Ask::ChangePolicy(wire) = wire else { panic!("policy fixture") };
@@ -15,18 +20,17 @@ pub fn create_ask() -> (w::Ask, p::Ask) {
         tasks.push(task).unwrap();
         batch.push(member).unwrap();
     }
-    let mut size = 0_usize;
+    let mut encoded = List::with_capacity(tasks.len());
     for task in &tasks {
-        size = size.checked_add(usize::try_from(task.measure()).unwrap()).unwrap().checked_add(4).unwrap();
+        let mut out = Writer::new(usize::try_from(task.measure()).unwrap());
+        task.encode(&mut out).unwrap();
+        encoded.push(out.finish()).unwrap();
     }
-    let mut bytes = Writer::new(size);
-    for task in tasks.into_boxed() {
-        bytes.put(&task.measure().to_be_bytes()).unwrap();
-        task.encode(&mut bytes).unwrap();
-    }
+    let bytes = pieces(encoded.as_slice());
+
     (
-        w::Ask::Create(w::Create::new(&super::wire(), w::CreateParts { project: 3, tasks: bytes.finish() }).unwrap()),
-        p::Ask::Create { project: 3, batch: batch.into_boxed() },
+        w::Ask::Create(w::Create::new(&super::wire(), w::CreateParts { project: PROJECT, tasks: bytes }).unwrap()),
+        p::Ask::Create { project: PROJECT, batch: batch.into_boxed() },
     )
 }
 fn member(role: bool, authority: w::OwnerAuthority, expected: p::Authority) -> (w::NewTask, p::Member) {
@@ -69,14 +73,16 @@ fn member(role: bool, authority: w::OwnerAuthority, expected: p::Authority) -> (
                 &l,
                 w::OwnerExecutorPersonParts {
                     value: w::PersonAddress::Role(
-                        w::PersonAddressRole::new(&l, w::PersonAddressRoleParts { value: 2 }).unwrap(),
+                        w::PersonAddressRole::new(&l, w::PersonAddressRoleParts { value: ROLE }).unwrap(),
                     ),
                 },
             )
             .unwrap(),
         )
     } else {
-        w::OwnerExecutor::Agent(w::OwnerExecutorAgent::new(&l, w::OwnerExecutorAgentParts { charter: 7 }).unwrap())
+        w::OwnerExecutor::Agent(
+            w::OwnerExecutorAgent::new(&l, w::OwnerExecutorAgentParts { charter: CHARTER }).unwrap(),
+        )
     };
     let task = w::NewTask::new(
         &l,
@@ -108,9 +114,9 @@ fn member(role: bool, authority: w::OwnerAuthority, expected: p::Authority) -> (
 fn expected_member(role: bool, expected: p::Authority) -> p::Member {
     p::Member {
         executor: if role {
-            p::TaskExecutor::Person(p::PersonAddress::Role(2))
+            p::TaskExecutor::Person(p::PersonAddress::Role(ROLE))
         } else {
-            p::TaskExecutor::Agent { charter: 7 }
+            p::TaskExecutor::Agent { charter: CHARTER }
         },
         words: b"new words".as_slice().into(),
         parameters: Box::new([p::Parameter::Number { name: 9, value: 12 }]),
@@ -140,13 +146,6 @@ fn expected_member(role: bool, expected: p::Authority) -> p::Member {
         label: 15,
         flags: p::Flags { conversation: false, listed: true, retention: p::Retention::ForgottenOnceRead },
     }
-}
-fn list<T, const N: usize>(values: [T; N]) -> List<T> {
-    let mut list = List::with_capacity(u32::try_from(N).unwrap());
-    for value in values {
-        assert!(list.push(value).is_ok());
-    }
-    list
 }
 
 pub fn create_refusals() -> [(&'static str, p::Refusal, w::Refusal); 5] {
@@ -214,10 +213,10 @@ pub fn created_outcome() -> w::Outcome {
                     w::OwnerOutcomeCreated::new(
                         &l,
                         w::OwnerOutcomeCreatedParts {
-                            first: 7,
-                            last: 8,
+                            first: FIRST_TASK,
+                            last: LAST_TASK,
                             given: Some(
-                                w::CreatedGiven::new(&l, w::CreatedGivenParts { task: 8, amount: 42 }).unwrap(),
+                                w::CreatedGiven::new(&l, w::CreatedGivenParts { task: LAST_TASK, amount: 42 }).unwrap(),
                             ),
                         },
                     )

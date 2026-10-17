@@ -86,10 +86,7 @@ fn domain(value: OwnerDeployment) -> Fixture {
     authoritative.deployment_role = Some(HeldRole::Policy { role: 4 });
     authoritative.projects.clear();
     authoritative.cut = true;
-    drive(
-        &mut client,
-        Watched { watch: frame, event: WatchEvent::Delivered(Delivery::Frame(Box::new(authoritative))) },
-    );
+    drive(&mut client, Watched { watch: frame, event: WatchEvent::Delivered(Delivery::Me(Box::new(authoritative))) });
     let out = drive(&mut client, Event::Went { place: Place::Jig(Address::Deployment) });
     let watch = out
         .iter()

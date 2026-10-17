@@ -206,10 +206,10 @@ pub fn malformed_activity_pieces() -> [Box<[u8]>; 3] {
 pub fn document_limits() -> Limits {
     let mut limits = CEILINGS;
     limits.document_text_bytes = 4;
-    limits.frame_projects = 2;
+    limits.me_projects = 512;
     limits.offered_charters_chats = 2;
     limits.offered_charters_goals = 2;
-    limits.frame_charters = 146;
+    limits.me_charters = 146;
     check_limits(&limits).expect("document fixtures below ceilings");
     limits
 }
@@ -273,10 +273,12 @@ pub fn held_role_policy(limits: &Limits) -> HeldRolePolicy {
     HeldRolePolicy::new(limits, HeldRolePolicyParts { role: u32::MAX }).expect("bounded held_role_policy")
 }
 
-pub fn project_role(limits: &Limits) -> ProjectRole {
-    ProjectRole::new(
+pub fn project_role(limits: &Limits) -> MeProject {
+    MeProject::new(
         limits,
-        ProjectRoleParts {
+        MeProjectParts {
+            templates: Box::from([]),
+            creating: None,
             project: u32::MAX,
             name: Some(document_text(limits)),
             role: HeldRole::Policy(held_role_policy(limits)),
@@ -287,10 +289,10 @@ pub fn project_role(limits: &Limits) -> ProjectRole {
     .expect("bounded project_role")
 }
 
-pub fn frame_party(limits: &Limits) -> FrameParty {
-    FrameParty::new(
+pub fn frame_party(limits: &Limits) -> MeParty {
+    MeParty::new(
         limits,
-        FramePartyParts {
+        MePartyParts {
             number: u64::MAX,
             kind: PartyKind::Service,
             login: document_text(limits),
@@ -601,15 +603,15 @@ pub fn hold_reason_budget_fields(limits: &Limits) -> HoldReasonBudgetFields {
         .expect("bounded hold_reason_budget_fields")
 }
 
-pub fn frame_at_ceilings(limits: &Limits) -> Frame {
-    let charters = repeated(offered_charters(limits), limits.frame_projects);
+pub fn frame_at_ceilings(limits: &Limits) -> Me {
+    let charters = repeated(offered_charters(limits), 2);
     let charters = piece_items(&charters, OfferedCharters::measure, OfferedCharters::encode);
-    assert_eq!(charters.len(), usize::try_from(limits.frame_charters).expect("small piece"));
-    Frame::new(
+    assert_eq!(charters.len(), usize::try_from(limits.me_charters).expect("small piece"));
+    Me::new(
         limits,
-        FrameParts {
+        MeParts {
             party: frame_party(limits),
-            projects: repeated(project_role(limits), limits.frame_projects),
+            projects: piece_items(&repeated(project_role(limits), 2), MeProject::measure, MeProject::encode),
             needs: needs(limits),
             needs_total: u32::MAX,
             updates: count(limits),

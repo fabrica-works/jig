@@ -49,6 +49,7 @@ pub(super) fn source(number: u32) -> OwnerProject {
         acts: list(2, [Offered { act: ActKind::ChangePolicy, admission: Admission::Allowed }]),
         resources: List::with_capacity(2),
         policy: OwnerProjectPolicy {
+            templates: List::with_capacity(0),
             ceiling: authority.clone(),
             period_spend: u64::MAX,
             escalation_role: Some(u32::MAX),

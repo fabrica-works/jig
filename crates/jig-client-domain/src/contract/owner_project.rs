@@ -42,6 +42,7 @@ pub enum OwnerProjectResourceRole {
 /// Missing mappings remain absent; reserved lists and loss remain independent.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct OwnerProjectPolicy {
+    pub templates: List<super::TemplateOverride>,
     pub ceiling: OwnerAuthorityDocument,
     pub period_spend: u64,
     pub escalation_role: Option<u32>,

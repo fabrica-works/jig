@@ -230,8 +230,8 @@ pub(crate) fn stop() -> Ask {
 pub(crate) fn me(party: u64, retention: Duration) -> Up {
     Up::Watched {
         watch: ME_WATCH,
-        event: contract::WatchEvent::Delivered(contract::Delivery::Frame(Box::new(contract::Frame {
-            party: contract::FrameParty {
+        event: contract::WatchEvent::Delivered(contract::Delivery::Me(Box::new(contract::Me {
+            party: contract::MeParty {
                 number: party,
                 kind: contract::PartyKind::Person,
                 login: contract::DocumentText::complete(text()),

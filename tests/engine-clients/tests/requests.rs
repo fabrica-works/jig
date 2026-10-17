@@ -178,7 +178,7 @@ fn amendment_setup(seed: u64) -> (Peer, jig_core_world::effects::World, Box<[u8]
 }
 
 #[test]
-fn a_v8_amend_beyond_the_role_is_proposed_and_answered_amend_proposed() {
+fn a_v8_propose_beyond_the_role_is_answered_proposed() {
     let (mut peer, mut world, bearer) = amendment_setup(349);
     let revision = jig_core_world::fixtures::live_row(&world, 2).revisions.spec;
     let socket = peer.post(b"/jig/v1/request", propose_request(revision, 150), Some(&bearer));
@@ -190,12 +190,12 @@ fn a_v8_amend_beyond_the_role_is_proposed_and_answered_amend_proposed() {
     );
     let w::Final::Done(done) = final_answer(&peer, socket) else { panic!("done") };
     let w::Outcome::Owner(owner) = done.outcome() else { panic!("owner outcome") };
-    let w::OwnerOutcome::Proposed(row) = owner.value() else { panic!("amend proposed") };
+    let w::OwnerOutcome::Proposed(row) = owner.value() else { panic!("proposed") };
     assert_eq!(row.proposal(), 1);
     assert_eq!(jig_core_world::fixtures::live_row(&world, 2).numbers.budget, 20);
 }
 #[test]
-fn a_v8_amend_sent_again_replays_the_same_proposal() {
+fn a_v8_propose_sent_again_replays_the_same_proposal() {
     let (mut peer, mut world, bearer) = amendment_setup(350);
     let revision = jig_core_world::fixtures::live_row(&world, 2).revisions.spec;
     let body = propose_request(revision, 150);

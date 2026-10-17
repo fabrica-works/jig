@@ -321,7 +321,7 @@ impl Front<Test> for Scripted {
                     Read::Question { task, message } => Some(ObjectKey::Question { task: *task, message: *message }),
                     Read::PersonTask { task } => Some(ObjectKey::PersonTask(*task)),
                     Read::Result { task } => Some(ObjectKey::Result(*task)),
-                    Read::Frame
+                    Read::Me
                     | Read::Ended { .. }
                     | Read::History { .. }
                     | Read::Activity { .. }
@@ -347,7 +347,7 @@ impl Front<Test> for Scripted {
                 Subject::Run { turn, offset, .. } => {
                     self.engine.continue_run(watch, turn, offset).expect("run watch exists");
                 }
-                Subject::Frame
+                Subject::Me
                 | Subject::Task { .. }
                 | Subject::Tree { .. }
                 | Subject::Chips { .. }
@@ -563,7 +563,7 @@ fn observe_change(change: &engine::Change, commit: u64, seen: &mut Vec<Observed>
                 | ReadValue::Historical(_)
                 | ReadValue::OwnerProposal(_)
                 | ReadValue::OwnerEscalation(_)
-                | ReadValue::Frame(_)
+                | ReadValue::Me(_)
                 | ReadValue::Ended(_)
                 | ReadValue::History(_)
                 | ReadValue::Activity(_)
@@ -587,7 +587,7 @@ fn observe_change(change: &engine::Change, commit: u64, seen: &mut Vec<Observed>
                 ReadValue::Task(t) if t.result.is_some() => seen.push(Observed::Ended { task: t.chip.task, commit }),
                 ReadValue::Result(r) => seen.push(Observed::Ended { task: r.task.task, commit }),
                 ReadValue::Task(_)
-                | ReadValue::Frame(_)
+                | ReadValue::Me(_)
                 | ReadValue::Proposal(_)
                 | ReadValue::Historical(_)
                 | ReadValue::OwnerProposal(_)
@@ -614,7 +614,7 @@ fn observe_change(change: &engine::Change, commit: u64, seen: &mut Vec<Observed>
             }
         }
         engine::Change::Request(_)
-        | engine::Change::Frame(_)
+        | engine::Change::Me(_)
         | engine::Change::SignIn { .. }
         | engine::Change::SignedOut { .. }
         | engine::Change::Project(_)

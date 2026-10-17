@@ -180,7 +180,7 @@ impl<A: crate::Application> Engine<A> {
             Subject::Goals { project } | Subject::Tasks { project, .. } => {
                 return (!self.truth.visible(party, *project)).then_some(hidden);
             }
-            Subject::Frame => return (!self.truth.frames.contains_key(&party)).then_some(hidden),
+            Subject::Me => return (!self.truth.frames.contains_key(&party)).then_some(hidden),
             Subject::Inbox { .. } | Subject::Conversations => return None,
             Subject::Deployment => return (!self.read_visible(party, &Read::Deployment)).then_some(hidden),
         };
@@ -200,7 +200,7 @@ impl<A: crate::Application> Engine<A> {
     #[expect(clippy::too_many_lines, reason = "each contract subject has a distinct whole document")]
     fn delivery(&mut self, party: u64, subject: &Subject) -> Result<Option<Delivery>, WatchEnd> {
         let mut value = match subject {
-            Subject::Frame => Delivery::Frame(Box::new(self.truth.frames[&party].clone())),
+            Subject::Me => Delivery::Me(Box::new(self.truth.frames[&party].clone())),
             Subject::Task { task } => {
                 let Some(ReadValue::Task(doc)) = self.truth.objects.get(&ObjectKey::Task(*task)) else {
                     return Err(WatchEnd::Unknown);
@@ -372,7 +372,7 @@ impl<A: crate::Application> Engine<A> {
                     fold(&mut doc.folded, last.chip.phase);
                     doc.nodes = list(&nodes[..nodes.len() - 1]);
                 }
-                Delivery::Frame(_)
+                Delivery::Me(_)
                 | Delivery::OwnerTree(_)
                 | Delivery::Task(_)
                 | Delivery::OwnerProject(_)

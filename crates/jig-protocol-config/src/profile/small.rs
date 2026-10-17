@@ -155,6 +155,7 @@ pub(super) const NOTES: notes::Limits = notes::Limits {
     recalled: 4,
 };
 pub(super) const DOCUMENTS: core::documents::DocumentLimits = core::documents::DocumentLimits {
+    roles: AUTHORITY.roles,
     segments: super::name_segments(&TASKS, &AUTHORITY),
     rows: 4,
     text_bytes: 4_096,

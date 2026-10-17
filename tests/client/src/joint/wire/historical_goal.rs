@@ -83,7 +83,10 @@ fn spec(value: &tasks::Spec, limits: &Limits) -> Result<client::Specification, o
         inputs: list(&value.inputs, limits, |value| Ok(*value))?,
     })
 }
-fn contract(value: &tasks::Contract, limits: &Limits) -> Result<client::TaskContractDocument, owner::Invalid> {
+pub(super) fn contract(
+    value: &tasks::Contract,
+    limits: &Limits,
+) -> Result<client::TaskContractDocument, owner::Invalid> {
     Ok(match value {
         tasks::Contract::Approval { state, part } => client::TaskContractDocument::Approval {
             state: owner::bytes(state, limits)?,

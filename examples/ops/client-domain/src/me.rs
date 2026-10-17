@@ -25,7 +25,7 @@ pub(crate) fn told(connector: Connector, watching: &mut bool, client: &Client, t
             let asked = match link {
                 Link::Starting | Link::Live | Link::Offline if !*watching => {
                     *watching = true;
-                    Some(jig_client::Event::Watch { handle, subject: Watchable::Jig(Subject::Frame) })
+                    Some(jig_client::Event::Watch { handle, subject: Watchable::Jig(Subject::Me) })
                 }
                 Link::SignedOut | Link::OutOfDate if *watching => {
                     *watching = false;
@@ -39,7 +39,7 @@ pub(crate) fn told(connector: Connector, watching: &mut bool, client: &Client, t
             let Some(document) = client.document(handle) else {
                 return Some(Update { change: Change::Unchanged, asked: None });
             };
-            let Some(Latest::Jig(Delivery::Frame(frame))) = document.latest else {
+            let Some(Latest::Jig(Delivery::Me(frame))) = document.latest else {
                 return Some(Update { change: Change::Unchanged, asked: None });
             };
             Some(Update { change: Change::Party(Some(frame.party.number)), asked: None })

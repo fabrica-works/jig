@@ -79,10 +79,8 @@ fn whole(rows: impl IntoIterator<Item = OwnerInboxEntry>, limited: bool) -> Owne
 }
 fn domain(value: OwnerInbox) -> Fixture {
     let (mut client, frame) = start();
-    let out = drive(
-        &mut client,
-        Watched { watch: frame, event: WatchEvent::Delivered(Delivery::Frame(Box::new(document()))) },
-    );
+    let out =
+        drive(&mut client, Watched { watch: frame, event: WatchEvent::Delivered(Delivery::Me(Box::new(document()))) });
     let watch =
         out.iter()
             .find_map(|r| match r {

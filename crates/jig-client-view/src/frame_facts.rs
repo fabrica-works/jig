@@ -7,15 +7,15 @@ use skein_ui::Builder;
 use skein_ui::phrases::Hole;
 
 use alloc::boxed::Box;
-use jig_client::contract::{Charter, Frame, FrameParty, PartyKind, ProjectRole};
+use jig_client::contract::{Charter, Me, MeParty, MeProject, PartyKind};
 
-pub(crate) fn project_label(words: &Words, project: &ProjectRole) -> Box<[u8]> {
+pub(crate) fn project_label(words: &Words, project: &MeProject) -> Box<[u8]> {
     match &project.name {
         Some(value) => words.say(JigPhrase::Project, &[name(value.bytes())]),
         None => words.say(JigPhrase::FrameProjectNumber, &[Hole::Number(u64::from(project.project))]),
     }
 }
-pub(crate) fn project_loss(b: &mut Builder, words: &Words, project: &ProjectRole) {
+pub(crate) fn project_loss(b: &mut Builder, words: &Words, project: &MeProject) {
     if let Some(value) = &project.name {
         document_text::loss(b, value, words);
     }
@@ -25,7 +25,7 @@ pub(crate) fn charter_name(b: &mut Builder, words: &Words, charter: &Charter) {
         document_text::plain(b, value, words);
     }
 }
-pub(crate) fn identity(b: &mut Builder, words: &Words, party: &FrameParty) {
+pub(crate) fn identity(b: &mut Builder, words: &Words, party: &MeParty) {
     words.status(b, JigPhrase::SignedIn, &[name(party.name.bytes())]);
     document_text::loss(b, &party.name, words);
     let kind = match party.kind {
@@ -36,14 +36,14 @@ pub(crate) fn identity(b: &mut Builder, words: &Words, party: &FrameParty) {
     words.text(b, JigPhrase::FrameLogin, &[name(party.login.bytes())]);
     document_text::loss(b, &party.login, words);
 }
-pub(crate) fn membership(b: &mut Builder, words: &Words, project: &ProjectRole) {
+pub(crate) fn membership(b: &mut Builder, words: &Words, project: &MeProject) {
     words.held_role(b, Some(project.role));
     match &project.pool {
         Some(ledger) => crate::owner_budget::ledger(b, ledger, words),
         None => words.text(b, JigPhrase::FramePoolUnopened, &[]),
     }
 }
-pub(crate) fn counts(b: &mut Builder, words: &Words, frame: &Frame) {
+pub(crate) fn counts(b: &mut Builder, words: &Words, frame: &Me) {
     words.text(
         b,
         JigPhrase::FrameNeedsKinds,
@@ -60,7 +60,7 @@ pub(crate) fn counts(b: &mut Builder, words: &Words, frame: &Frame) {
     }
     for offers in &frame.charters {
         if offers.cut {
-            words.text(b, JigPhrase::FrameChartersCut, &[Hole::Number(u64::from(offers.project))]);
+            words.text(b, JigPhrase::MeChartersCut, &[Hole::Number(u64::from(offers.project))]);
         }
     }
 }

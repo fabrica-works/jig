@@ -1,13 +1,13 @@
 //! The story's starting documents and atomic changes; contract.md, 5.
 //! Documents carry offers, revisions, terminal facts and parts in the client's vocabulary.
 use crate::{Bounds, Invalid, Source, payload};
-use jig_client_domain::contract::{Answer, Ask, Deployment, Frame, Note, ObjectKey, Project, ReadValue, Tree};
+use jig_client_domain::contract::{Answer, Ask, Deployment, Me, Note, ObjectKey, Project, ReadValue, Tree};
 use std::collections::BTreeMap;
 
 /// Client documents indexed by their identities, with parties and sign-ins.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Truth {
-    pub frames: BTreeMap<u64, Frame>,
+    pub frames: BTreeMap<u64, Me>,
     pub sign_ins: BTreeMap<u64, u64>,
     pub objects: BTreeMap<ObjectKey, ReadValue>,
     /// Project context for object documents whose client carrier names only a task.
@@ -31,7 +31,7 @@ pub enum Change {
     /// A jig request on an application requester's behalf; only application decisions may use this.
     Request(Box<Ask>),
     /// Replace a party's authoritative frame, including roles and retention.
-    Frame(Frame),
+    Me(Me),
     /// Confirm a numbered sign-in for a party.
     SignIn { sign_in: u64, party: u64 },
     /// End a numbered sign-in.
@@ -66,7 +66,7 @@ impl Change {
             }
             Self::Seen { replies, .. } => replies.len() <= bounds.rows as usize,
             Self::Tree(value) => payload::fits(value, bounds),
-            Self::Frame(value) => payload::fits(value, bounds),
+            Self::Me(value) => payload::fits(value, bounds),
             Self::Object { project, key, value } => {
                 if identity(value) != Some(*key) || document_project(value).is_some_and(|number| number != *project) {
                     return Err(Invalid::Identity);
@@ -89,7 +89,7 @@ impl Truth {
             if *party != frame.party.number {
                 return Err(Invalid::Identity);
             }
-            Change::Frame(frame.clone()).validate(bounds)?;
+            Change::Me(frame.clone()).validate(bounds)?;
         }
         for party in self.sign_ins.values() {
             if !self.frames.contains_key(party) {
@@ -160,7 +160,7 @@ impl Truth {
             Change::Tree(tree) => {
                 self.trees.insert(tree.task, tree.clone());
             }
-            Change::Frame(frame) => {
+            Change::Me(frame) => {
                 self.frames.insert(frame.party.number, frame.clone());
             }
             Change::SignIn { sign_in, party } => {
@@ -276,7 +276,7 @@ pub(crate) fn identity(value: &ReadValue) -> Option<ObjectKey> {
         ReadValue::PersonTask(v) => Some(ObjectKey::PersonTask(v.task.task)),
         ReadValue::OwnerPersonTask(v) => Some(ObjectKey::PersonTask(v.task.task)),
         ReadValue::Result(v) => Some(ObjectKey::Result(v.task.task)),
-        ReadValue::Frame(_)
+        ReadValue::Me(_)
         | ReadValue::Ended(_)
         | ReadValue::History(_)
         | ReadValue::Activity(_)
@@ -303,7 +303,7 @@ fn document_project(value: &ReadValue) -> Option<u32> {
         ReadValue::OwnerProposal(v) => Some(v.project),
         ReadValue::OwnerPersonTask(v) => v.project(),
         ReadValue::Historical(_)
-        | ReadValue::Frame(_)
+        | ReadValue::Me(_)
         | ReadValue::Escalation(_)
         | ReadValue::Question(_)
         | ReadValue::PersonTask(_)

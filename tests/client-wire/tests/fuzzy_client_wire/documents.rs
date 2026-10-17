@@ -3,12 +3,12 @@ use super::*;
 
 fn records_1(bytes: &[u8]) {
     check!(PoolLedger, bytes);
-    check!(FrameParty, bytes);
+    check!(MeParty, bytes);
     check!(Needs, bytes);
-    check!(ProjectRole, bytes);
+    check!(MeProject, bytes);
     check!(Charter, bytes);
     check!(OfferedCharters, bytes);
-    check!(Frame, bytes);
+    check!(Me, bytes);
     check!(PhaseCounts, bytes);
     check!(Impact, bytes);
     check!(WriterSlot, bytes);

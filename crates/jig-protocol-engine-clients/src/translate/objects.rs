@@ -4,7 +4,7 @@ use super::{deployment, owner, task, w};
 use alloc::boxed::Box;
 use jig_domain_core::{documents as d, reads};
 mod current;
-mod goal;
+pub(super) mod goal;
 pub(super) mod historical;
 mod projects;
 pub(super) mod proposals;
@@ -99,7 +99,7 @@ pub fn historical(value: &reads::Historical, limits: &w::Limits) -> Result<w::Ow
 pub fn document(answer: &reads::Answer, limits: &w::Limits) -> Result<w::ReadValue, w::Problem> {
     Ok(match answer {
         reads::Answer::Document(value) => match value.as_ref() {
-            d::Document::Frame(value) => w::ReadValue::Frame(owner::frame(value, limits)?),
+            d::Document::Frame(value) => w::ReadValue::Me(owner::frame(value, limits)?),
             d::Document::Task(value) => w::ReadValue::Task(task::document(value, limits)?),
             d::Document::Proposal(value) => w::ReadValue::OwnerProposal(proposal(value, limits)?),
             d::Document::Escalation(value) => w::ReadValue::OwnerEscalation(escalation(value, limits)?),

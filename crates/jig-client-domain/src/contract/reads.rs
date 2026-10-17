@@ -1,7 +1,7 @@
 //! One-terminal reads, bounded pages and opaque cursors; client/domain/contract.md, 6.
 //! A cursor is never decoded by the client. Live watches may overlap retained read pages.
 use super::{
-    ActivityLine, Bytes, ConversationLine, Deployment, Escalation, Frame, GoalLine, HistoryRow, InboxEntry, InboxGroup,
+    ActivityLine, Bytes, ConversationLine, Deployment, Escalation, GoalLine, HistoryRow, InboxEntry, InboxGroup, Me,
     Note, NoteScope, PersonTask, Project, Proposal, ProposalKey, Question, Result, Task, Text,
 };
 use alloc::boxed::Box;
@@ -44,7 +44,7 @@ impl InboxReadGroup {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Read {
     /// The frame.
-    Frame,
+    Me,
     /// One task.
     Task { task: u64 },
     /// One proposal.
@@ -163,7 +163,7 @@ pub enum ReadValue {
     /// Whole historical facts for one existing object query.
     Historical(Box<super::OwnerHistorical>),
     /// The frame.
-    Frame(Box<Frame>),
+    Me(Box<Me>),
     /// A task.
     Task(Box<Task>),
     /// A proposal.

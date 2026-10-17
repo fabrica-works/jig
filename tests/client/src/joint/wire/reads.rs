@@ -16,7 +16,7 @@ pub enum Invalid {
 /// Refuses a cursor for another query or an inbox kind outside its supplied parent group.
 pub fn read(value: &client::Read, cursor_bytes: u32) -> Result<reads::Read, Invalid> {
     Ok(match value {
-        client::Read::Frame => reads::Read::Frame,
+        client::Read::Me => reads::Read::Frame,
         client::Read::Task { task } => reads::Read::Task { task: *task },
         client::Read::Proposal { proposal } => {
             reads::Read::Proposal { proposer: proposer(proposal.proposer), proposal: proposal.number }

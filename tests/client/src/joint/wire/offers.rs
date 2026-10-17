@@ -53,19 +53,27 @@ pub fn recipient(value: &acts::Recipient, limits: &Limits) -> Result<client::Rec
 /// Refuses overflowing or pending owner facts and any whole offer allocation above bounds.
 pub fn bounds(value: &acts::Bounds, limits: &Limits) -> Result<client::Bounds, owner::Invalid> {
     Ok(match value {
-        acts::Bounds::Goal { pool_left, charters, procedures, latest, budget, maximum_budget, maximum_deadline } => {
-            client::Bounds::Goal {
-                pool_left: *pool_left,
-                charters: owner::list(charters, limits, |number| Ok(*number))?,
-                procedures: owner::list(procedures, limits, |value| {
-                    Ok(client::GoalProcedure { connector: value.connector, code: value.code })
-                })?,
-                latest: *latest,
-                budget: *budget,
-                maximum_budget: *maximum_budget,
-                maximum_deadline: *maximum_deadline,
-            }
-        }
+        acts::Bounds::Goal {
+            authority,
+            pool_left,
+            charters,
+            procedures,
+            latest,
+            budget,
+            maximum_budget,
+            maximum_deadline,
+        } => client::Bounds::Create(client::CreateBounds {
+            authority: Box::new(owner::authority(authority, limits)?),
+            pool_left: *pool_left,
+            charters: owner::list(charters, limits, |number| Ok(*number))?,
+            procedures: owner::list(procedures, limits, |value| {
+                Ok(client::CreateProcedure { connector: value.connector, code: value.code })
+            })?,
+            latest: *latest,
+            budget: *budget,
+            maximum_budget: *maximum_budget,
+            maximum_deadline: *maximum_deadline,
+        }),
         acts::Bounds::Amend { budget_left, grants, implications, authority, ceiling } => client::Bounds::Amend {
             budget_left: *budget_left,
             grants: owner::list(grants, limits, |grant| {
@@ -134,6 +142,7 @@ mod tests {
         roles.push(u32::MAX).expect("supplied full role");
         let source = acts::Admission::Bounded {
             within: acts::Bounds::Goal {
+                authority: Box::new(super::super::me::empty_authority()),
                 pool_left: 3,
                 charters,
                 procedures,
@@ -148,7 +157,16 @@ mod tests {
         let copied = admission(&source, &limits).expect("whole bounded offer");
         let client::Admission::Bounded {
             within:
-                client::Bounds::Goal { pool_left, charters, procedures, latest, budget, maximum_budget, maximum_deadline },
+                client::Bounds::Create(client::CreateBounds {
+                    authority: _,
+                    pool_left,
+                    charters,
+                    procedures,
+                    latest,
+                    budget,
+                    maximum_budget,
+                    maximum_deadline,
+                }),
             beyond: client::Beyond::Proposed { to: client::Recipient::Roles { project, roles } },
         } = copied
         else {
@@ -159,7 +177,7 @@ mod tests {
         assert_eq!(charters.capacity(), 4);
         assert_eq!(charters.as_slice(), &[u32::MAX]);
         assert_eq!(procedures.capacity(), 4);
-        assert_eq!(procedures.as_slice(), &[client::GoalProcedure { connector: u16::MAX, code: u32::MAX }]);
+        assert_eq!(procedures.as_slice(), &[client::CreateProcedure { connector: u16::MAX, code: u32::MAX }]);
         assert_eq!(project, u32::MAX);
         assert_eq!(roles.capacity(), 4);
         assert_eq!(roles.as_slice(), &[0, u32::MAX]);

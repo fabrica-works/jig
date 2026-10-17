@@ -16,15 +16,17 @@ pub fn text(bytes: &[u8]) -> Text {
 }
 /// Creates a signed-in party with a chat and goal charter.
 #[must_use]
-pub fn frame(party: u64) -> Frame {
-    Frame {
-        party: FrameParty {
+pub fn frame(party: u64) -> Me {
+    Me {
+        party: MeParty {
             number: party,
             kind: PartyKind::Person,
             login: DocumentText::complete(text(b"fixture-login")),
             name: DocumentText::complete(text(b"Pat")),
         },
-        projects: list([ProjectRole {
+        projects: list([MeProject {
+            templates: skein_lib::List::with_capacity(0),
+            creating: None,
             project: 1,
             name: Some(DocumentText::complete(text(b"First"))),
             role: HeldRole::Policy { role: 1 },
@@ -691,7 +693,8 @@ pub fn goal_world(seed: u64) -> World<Test, Scripted> {
     doc.acts = list([Offered {
         act: ActKind::SetGoal,
         admission: Admission::Bounded {
-            within: jig_client_domain::contract::Bounds::Goal {
+            within: jig_client_domain::contract::Bounds::Create(jig_client_domain::contract::CreateBounds {
+                authority: Box::new(owner_authority()),
                 pool_left: 1,
                 procedures: list([]),
                 charters: list([1]),
@@ -699,7 +702,7 @@ pub fn goal_world(seed: u64) -> World<Test, Scripted> {
                 budget: 1,
                 maximum_budget: 100,
                 maximum_deadline: None,
-            },
+            }),
             beyond: Beyond::Proposed { to: Recipient::Role { project: 1, role: 1 } },
         },
     }]);
@@ -742,21 +745,22 @@ pub fn procedure_goal_world(seed: u64) -> World<Test, Scripted> {
     world
         .front()
         .engine
-        .act(skein_lib::Time::ZERO, Wall::EPOCH, jig_client_scripted_engine::Change::Frame(procedure_frame))
+        .act(skein_lib::Time::ZERO, Wall::EPOCH, jig_client_scripted_engine::Change::Me(procedure_frame))
         .expect("procedure-only frame fits");
     let mut doc = project();
     doc.acts = list([Offered {
         act: ActKind::SetGoal,
         admission: Admission::Bounded {
-            within: jig_client_domain::contract::Bounds::Goal {
+            within: jig_client_domain::contract::Bounds::Create(jig_client_domain::contract::CreateBounds {
+                authority: Box::new(owner_authority()),
                 pool_left: 1,
-                procedures: list([GoalProcedure { connector: 2, code: 7 }]),
+                procedures: list([CreateProcedure { connector: 2, code: 7 }]),
                 charters: list([]),
                 latest: None,
                 budget: 1,
                 maximum_budget: 100,
                 maximum_deadline: None,
-            },
+            }),
             beyond: Beyond::Proposed { to: Recipient::Role { project: 1, role: 1 } },
         },
     }]);

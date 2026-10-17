@@ -18,7 +18,11 @@ pub fn apply(limits: &mut Limits, name: &[u8], value: u64) -> Result<(), What> {
         b"tasks" => set_tasks(&mut core.tasks, field, value),
         b"people" => set_people(&mut core.people, field, value),
         b"fleet" => set_fleet(&mut core.fleet, field, value),
-        b"authority" => set_authority(&mut core.authority, field, value),
+        b"authority" => {
+            set_authority(&mut core.authority, field, value)?;
+            core.documents.roles = core.authority.roles;
+            Ok(())
+        }
         b"brief" => set_brief(&mut core.brief, field, value),
         b"accounts" => set_accounts(&mut core.accounts, field, value),
         b"views" => set_views(&mut core.views, field, value),
@@ -389,7 +393,8 @@ fn set_hub(limits: &mut jig_domain_host::Limits, name: &[u8], value: u64) -> Res
 }
 
 fn set_documents(limits: &mut jig_domain_core::documents::DocumentLimits, name: &[u8], value: u64) -> Result<(), What> {
-    let jig_domain_core::documents::DocumentLimits { rows, text_bytes, chips, lines, versions, segments: _ } = limits;
+    let jig_domain_core::documents::DocumentLimits { roles: _, rows, text_bytes, chips, lines, versions, segments: _ } =
+        limits;
     let jig_domain_core::documents::Versions { minimum, maximum } = versions;
     match name {
         b"rows" => *rows = count(value)?,

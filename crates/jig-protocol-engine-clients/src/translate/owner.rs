@@ -138,11 +138,10 @@ pub fn wake(value: t::WakePolicy, limits: &w::Limits) -> Result<w::OwnerWakePoli
         },
     )
 }
-fn project(value: &d::FrameProjectRole, limits: &w::Limits) -> Result<w::ProjectRole, w::Problem> {
-    // Creating bounds and templates are carried on the wire in jig 22.
-    w::ProjectRole::new(
+fn project(value: &d::FrameProjectRole, limits: &w::Limits) -> Result<w::MeProject, w::Problem> {
+    w::MeProject::new(
         limits,
-        w::ProjectRoleParts {
+        w::MeProjectParts {
             project: value.project,
             name: match &value.name {
                 Some(item) => Some(text(item, limits)?),
@@ -151,6 +150,11 @@ fn project(value: &d::FrameProjectRole, limits: &w::Limits) -> Result<w::Project
             role: held_role(value.role, limits)?,
             pool: match &value.pool {
                 Some(item) => Some(ledger(item, limits)?),
+                None => None,
+            },
+            templates: super::me::templates(&value.templates, limits)?,
+            creating: match &value.creating {
+                Some(value) => Some(super::me::creating(value, limits)?),
                 None => None,
             },
             chat_budget: value.chat_budget,
@@ -166,7 +170,7 @@ fn charters(value: &d::OfferedCharter, limits: &w::Limits) -> Result<w::OfferedC
     }
     w::OfferedCharters::new(limits, w::OfferedChartersParts { project: value.project, chats, goals, cut: value.cut })
 }
-pub fn frame(value: &d::Frame, limits: &w::Limits) -> Result<w::Frame, w::Problem> {
+pub fn frame(value: &d::Frame, limits: &w::Limits) -> Result<w::Me, w::Problem> {
     let mut projects = List::with_capacity(value.projects.len());
     for item in &value.projects {
         projects.push(project(item, limits)?).expect("supplied projects");
@@ -175,21 +179,18 @@ pub fn frame(value: &d::Frame, limits: &w::Limits) -> Result<w::Frame, w::Proble
     for item in &value.charters {
         charters_rows.push(charters(item, limits)?).expect("supplied charter rows");
     }
-    let charters = offered_charters_pieces(
-        &charters_rows,
-        limits.frame_charters.min(w::CEILINGS.frame_charters),
-        w::Path::FrameCharters,
-    )?;
+    let charters =
+        offered_charters_pieces(&charters_rows, limits.me_charters.min(w::CEILINGS.me_charters), w::Path::MeCharters)?;
     let updates = match value.updates {
         d::Count::Known(value) => w::Count::new(limits, w::CountParts { value, limited: false })?,
         d::Count::AtLeast(value) => w::Count::new(limits, w::CountParts { value, limited: true })?,
     };
-    w::Frame::new(
+    w::Me::new(
         limits,
-        w::FrameParts {
-            party: w::FrameParty::new(
+        w::MeParts {
+            party: w::MeParty::new(
                 limits,
-                w::FramePartyParts {
+                w::MePartyParts {
                     number: value.party,
                     kind: match value.kind {
                         jig_domain_people::Kind::Person => w::PartyKind::Person,
@@ -199,7 +200,7 @@ pub fn frame(value: &d::Frame, limits: &w::Limits) -> Result<w::Frame, w::Proble
                     name: text(&value.name, limits)?,
                 },
             )?,
-            projects,
+            projects: me_projects_pieces(&projects, limits.me_projects, w::Path::MeProjects)?,
             needs: w::Needs::new(
                 limits,
                 w::NeedsParts {
@@ -518,6 +519,19 @@ pub fn contract(value: &d::ContractLine, limits: &w::Limits) -> Result<w::TaskCo
 }
 
 pub fn choices_pieces(rows: &List<w::VerdictChoice>, bound: u32, path: w::Path) -> Result<Box<[u8]>, w::Problem> {
+    let mut encoded = List::with_capacity(rows.len());
+    for row in rows {
+        let mut out = skein_lib::Writer::new(usize::try_from(row.measure()).expect("u32 record measure fits usize"));
+        match row.encode(&mut out) {
+            Ok(()) => (),
+            Err(_) => return Err(problem(skein_codec::Reason::Bound)),
+        }
+        encoded.push(out.finish()).expect("supplied piece count");
+    }
+    pieces(&encoded, bound, path)
+}
+
+pub fn me_projects_pieces(rows: &List<w::MeProject>, bound: u32, path: w::Path) -> Result<Box<[u8]>, w::Problem> {
     let mut encoded = List::with_capacity(rows.len());
     for row in rows {
         let mut out = skein_lib::Writer::new(usize::try_from(row.measure()).expect("u32 record measure fits usize"));

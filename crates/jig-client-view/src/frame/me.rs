@@ -3,11 +3,11 @@
 //! See client/domain/client.md, 3 and 8.
 use crate::address::Address;
 use jig_client::Link;
-use jig_client::contract::Frame;
+use jig_client::contract::Me;
 /// The current committed frame document.
 #[derive(Debug, PartialEq, Eq)]
 pub struct FrameState<'a> {
-    pub document: Option<&'a Frame>,
+    pub document: Option<&'a Me>,
 }
 
 impl FrameState<'_> {
@@ -24,7 +24,7 @@ impl FrameState<'_> {
 /// Checks each allocation this spine itself keeps from the frame. Other whole
 /// documents arrive within the decoding owner's `document_bytes` budget.
 #[must_use]
-pub fn fits(frame: &Frame, limits: &crate::Limits) -> bool {
+pub fn fits(frame: &Me, limits: &crate::Limits) -> bool {
     if !frame.party.name.bytes.fits(limits.text)
         || !frame.party.login.bytes.fits(limits.text)
         || frame.projects.capacity() > limits.projects

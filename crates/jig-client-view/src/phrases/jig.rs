@@ -58,7 +58,7 @@ pub enum JigPhrase {
     FrameResultsSeen,
     FrameNeedsKinds,
     FrameProjectsCut,
-    FrameChartersCut,
+    MeChartersCut,
     FramePoolUnopened,
     PolicyPeriodSpend,
     PolicyEditRole,
@@ -147,7 +147,7 @@ pub enum JigPhrase {
     /// Signed out.
     SignedOut,
     /// Work.
-    Frame,
+    Me,
     /// Navigation.
     Navigation,
     /// Project: (0).
@@ -681,7 +681,7 @@ pub enum JigPhrase {
     /// Charter (0).
     Charter,
     /// Connector (0), procedure code (1), supplied by the goal bounds.
-    GoalProcedure,
+    CreateProcedure,
     /// Priority (0).
     Priority,
     /// Notice.
@@ -1147,7 +1147,7 @@ impl JigPhrase {
             Self::FrameResultsSeen => 614,
             Self::FrameNeedsKinds => 615,
             Self::FrameProjectsCut => 616,
-            Self::FrameChartersCut => 617,
+            Self::MeChartersCut => 617,
             Self::FramePoolUnopened => 618,
             Self::PolicyPeriodSpend => 590,
             Self::PolicyEditRole => 591,
@@ -1227,7 +1227,7 @@ impl JigPhrase {
             Self::SignOut => 563,
             Self::SignOutLost => 564,
             Self::SignedOut => 13,
-            Self::Frame => 14,
+            Self::Me => 14,
             Self::Navigation => 15,
             Self::Project => 16,
             Self::AllProjects => 17,
@@ -1498,7 +1498,7 @@ impl JigPhrase {
             Self::ChangeResultKind => 3701,
             Self::NoteReferencesCut => 3300,
             Self::Charter => 270,
-            Self::GoalProcedure => 510,
+            Self::CreateProcedure => 510,
             Self::Priority => 271,
             Self::Notice => 272,
             Self::UnknownAction => 273,
@@ -1987,7 +1987,7 @@ impl JigPhrase {
             | Self::GoToTaskPart
             | Self::NoticesPart
             | Self::SignedOut
-            | Self::Frame
+            | Self::Me
             | Self::Navigation
             | Self::AllProjects
             | Self::TaskNumber
@@ -2205,7 +2205,7 @@ impl JigPhrase {
             Self::TurnUnreadVersion
             | Self::FrameProjectNumber
             | Self::FrameResultsSeen
-            | Self::FrameChartersCut
+            | Self::MeChartersCut
             | Self::PolicyEditRole
             | Self::PolicyRequests
             | Self::PolicyDecides
@@ -2336,7 +2336,7 @@ impl JigPhrase {
             Self::PolicyEffect
             | Self::RunRetryFailed
             | Self::SpecificationNumber
-            | Self::GoalProcedure
+            | Self::CreateProcedure
             | Self::RequiredJudgeMissing
             | Self::FailedJudge
             | Self::UnguardedJudge
@@ -2478,7 +2478,7 @@ pub const ALL: [JigPhrase; 639] = [
     JigPhrase::FrameResultsSeen,
     JigPhrase::FrameNeedsKinds,
     JigPhrase::FrameProjectsCut,
-    JigPhrase::FrameChartersCut,
+    JigPhrase::MeChartersCut,
     JigPhrase::FramePoolUnopened,
     JigPhrase::PolicyPeriodSpend,
     JigPhrase::PolicyEditRole,
@@ -2556,7 +2556,7 @@ pub const ALL: [JigPhrase; 639] = [
     JigPhrase::SignOut,
     JigPhrase::SignOutLost,
     JigPhrase::SignedOut,
-    JigPhrase::Frame,
+    JigPhrase::Me,
     JigPhrase::Navigation,
     JigPhrase::Project,
     JigPhrase::AllProjects,
@@ -2827,7 +2827,7 @@ pub const ALL: [JigPhrase; 639] = [
     JigPhrase::ChangeResultKind,
     JigPhrase::NoteReferencesCut,
     JigPhrase::Charter,
-    JigPhrase::GoalProcedure,
+    JigPhrase::CreateProcedure,
     JigPhrase::Priority,
     JigPhrase::Notice,
     JigPhrase::UnknownAction,

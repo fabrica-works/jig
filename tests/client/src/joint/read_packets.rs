@@ -55,7 +55,7 @@ pub fn read_with_codec(
                 }
                 client::Read::Ended { task, .. } => wire::ledger_pages::ended(*task, value, limits),
                 client::Read::Spend { project, .. } => wire::ledger_pages::spend(*project, value, limits),
-                client::Read::Frame
+                client::Read::Me
                 | client::Read::Task { .. }
                 | client::Read::Proposal { .. }
                 | client::Read::Escalation { .. }
@@ -70,7 +70,7 @@ pub fn read_with_codec(
         }
         reads::Answer::Document(value) => match value.as_ref() {
             documents::Document::Frame(value) => {
-                if *what != client::Read::Frame || value.party != transport.party(client) {
+                if *what != client::Read::Me || value.party != transport.party(client) {
                     return Err(Invalid::OwnerRoute);
                 }
                 client::ReadResult::Value(wire::documents::frame_read(value, limits).map_err(Invalid::Document)?)

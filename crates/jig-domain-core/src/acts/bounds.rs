@@ -66,8 +66,13 @@ pub(crate) fn goal(core: &Core, limits: &Limits, party: u64, project: u32, held:
         Some(to) => Beyond::Proposed { to },
         None => Beyond::Refused(unproposable()),
     };
+    let given = crate::task_authority(&core.chat_authority(project, party, held, limits.tasks.tree_tasks));
+    let Ok(authority) = crate::documents::act_authority(limits, &given) else {
+        return Admission::Refused(people::Refusal::Limit { which: people::LimitKind::Authority });
+    };
     Admission::Bounded {
         within: Bounds::Goal {
+            authority: Box::new(authority),
             pool_left,
             charters,
             procedures,

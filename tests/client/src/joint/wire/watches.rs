@@ -30,7 +30,7 @@ pub fn watch(watcher: Token, sign_in: u64, value: &client::Subject, default_rows
 
 fn subject(value: &client::Subject, default_rows: u32) -> Result<(documents::Watched, documents::Window), Invalid> {
     let (subject, rows) = match value {
-        client::Subject::Frame => (documents::Watched::Frame, default_rows),
+        client::Subject::Me => (documents::Watched::Frame, default_rows),
         client::Subject::Task { task } => (documents::Watched::Task { task: *task }, default_rows),
         client::Subject::Tree { task, window } => (documents::Watched::Tree { task: *task }, *window),
         client::Subject::Chips { tasks } => (documents::Watched::Chips { tasks: tasks.clone() }, default_rows),
@@ -162,7 +162,7 @@ mod tests {
         chips.push(u64::MAX).expect("the complete supplied fixture is admitted");
         chips.push(1).expect("the complete supplied fixture is admitted");
         let values = [
-            ("Frame", client::Subject::Frame, documents::Watched::Frame, 5),
+            ("Me", client::Subject::Me, documents::Watched::Frame, 5),
             ("Task", client::Subject::Task { task: u64::MAX }, documents::Watched::Task { task: u64::MAX }, 5),
             (
                 "Tree",

@@ -45,7 +45,7 @@ pub(super) fn named_binding(tree: &Tree, name: &[u8]) -> Token {
 pub(super) fn special_pages(words: &crate::words::Words) {
     let (mut d, f) = start();
     assert!(contains(&build(&d, 2, words).0, b"Connecting"));
-    deliver(&mut d, f, Delivery::Frame(Box::new(document())));
+    deliver(&mut d, f, Delivery::Me(Box::new(document())));
     drive(&mut d, Event::Went { place: Place::Missing });
     assert!(contains(&build(&d, 2, words).0, b"Page missing"));
     drive(&mut d, jig_client::Up::SignedOut);
@@ -54,7 +54,7 @@ pub(super) fn special_pages(words: &crate::words::Words) {
     assert!(tree.nodes().iter().any(|node| node.slot == Some(crate::signin::SLOT)));
     let (mut d, f) = start();
     drive(&mut d, Served { served: false });
-    assert!(deliver(&mut d, f, Delivery::Frame(Box::new(document()))).is_empty());
+    assert!(deliver(&mut d, f, Delivery::Me(Box::new(document()))).is_empty());
     assert!(contains(&build(&d, 2, words).0, b"update or reload"));
     let mut d = Fixture::new(&CLIENT);
     let mut kept = List::with_capacity(1);
@@ -72,12 +72,12 @@ pub(super) fn special_pages(words: &crate::words::Words) {
         .iter()
         .find_map(|r| match r {
             Request::Client {
-                asked: jig_client::Event::Watch { handle: watch, subject: jig_client::Watchable::Jig(Subject::Frame) },
+                asked: jig_client::Event::Watch { handle: watch, subject: jig_client::Watchable::Jig(Subject::Me) },
             } => Some(*watch),
             _ => None,
         })
         .unwrap();
-    deliver(&mut d, f, Delivery::Frame(Box::new(document())));
+    deliver(&mut d, f, Delivery::Me(Box::new(document())));
     assert_eq!(d.page(), &Page::SomeoneElse);
     let tree = build(&d, 2, words).0;
     assert!(contains(&tree, b"Someone else's work"));
@@ -85,7 +85,7 @@ pub(super) fn special_pages(words: &crate::words::Words) {
 }
 fn inbox_edges(words: &crate::words::Words) {
     let (mut d, f) = start();
-    let out = deliver(&mut d, f, Delivery::Frame(Box::new(document())));
+    let out = deliver(&mut d, f, Delivery::Me(Box::new(document())));
     let page =
         out.iter()
             .find_map(|r| match r {
@@ -173,7 +173,7 @@ fn inbox_edges(words: &crate::words::Words) {
 }
 fn inbox_committed_read_position(words: &crate::words::Words) {
     let (mut d, f) = start();
-    let out = deliver(&mut d, f, Delivery::Frame(Box::new(document())));
+    let out = deliver(&mut d, f, Delivery::Me(Box::new(document())));
     let page =
         out.iter()
             .find_map(|r| match r {
@@ -274,7 +274,7 @@ fn conversations_domain() -> Fixture {
         .push(Charter { number: 2, name: Some(DocumentText::complete(text(b"guide"))) })
         .unwrap();
     frame.projects.get_mut(0).unwrap().chat_budget = 20;
-    deliver(&mut d, f, Delivery::Frame(Box::new(frame)));
+    deliver(&mut d, f, Delivery::Me(Box::new(frame)));
     drive(&mut d, Event::Went { place: Place::Jig(Address::Conversations { project: Some(4) }) });
     d
 }
@@ -317,7 +317,7 @@ fn conversations_form(words: &crate::words::Words) {
 fn conversation_states(words: &crate::words::Words) {
     for (runtime, expected) in conversation_cases() {
         let (mut d, f) = start();
-        deliver(&mut d, f, Delivery::Frame(Box::new(document())));
+        deliver(&mut d, f, Delivery::Me(Box::new(document())));
         let out = drive(&mut d, Event::Went { place: Place::Jig(Address::Conversations { project: None }) });
         let token = out
             .iter()
@@ -400,7 +400,7 @@ fn pages_show_non_work_states_inbox_edges_and_the_offered_conversation_form() {
 fn inbox_group_controls_decode_independent_windows() {
     let words = words();
     let (mut d, frame) = start();
-    let out = deliver(&mut d, frame, Delivery::Frame(Box::new(document())));
+    let out = deliver(&mut d, frame, Delivery::Me(Box::new(document())));
     for request in &out {
         if let Request::Client {
             asked: jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(Read::Inbox { group, .. }) },
@@ -501,7 +501,7 @@ fn each_of_jigs_pages_keeps_the_outline() {
     ];
     let (mut d, watch) = start();
     assert_eq!(skein_ui::outline::check(&whole_page(&d)), None, "starting");
-    deliver(&mut d, watch, Delivery::Frame(Box::new(document())));
+    deliver(&mut d, watch, Delivery::Me(Box::new(document())));
     for (label, place) in rows {
         let out = drive(&mut d, Event::Went { place });
         for request in out {
@@ -521,7 +521,7 @@ fn each_of_jigs_pages_keeps_the_outline() {
 
 fn domain_with_an_owed_card() -> Fixture {
     let (mut d, watch) = start();
-    deliver(&mut d, watch, Delivery::Frame(Box::new(document())));
+    deliver(&mut d, watch, Delivery::Me(Box::new(document())));
     let mut objects = List::with_capacity(1);
     objects.push(ObjectKey::Task(8)).unwrap();
     let out = drive(&mut d, Event::Named { objects, sections: List::with_capacity(0) });
@@ -633,7 +633,7 @@ fn the_deployment_section_holds_its_four_named_regions() {
 #[test]
 fn a_missing_section_says_so_in_its_own_region() {
     let (mut domain, frame) = start();
-    deliver(&mut domain, frame, Delivery::Frame(Box::new(document())));
+    deliver(&mut domain, frame, Delivery::Me(Box::new(document())));
     drive(&mut domain, Event::Went { place: Place::Elsewhere });
     let section = crate::page::Section::Task { task: 8, section: crate::address::TaskSection::Plan };
     let mut sections = List::with_capacity(1);

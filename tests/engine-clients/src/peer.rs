@@ -453,7 +453,7 @@ impl Peer {
     }
     pub fn release_current_frame(&mut self, watcher: Token) {
         let party = self.sign_ins[&self.watch_sign_ins[&watcher]];
-        let core::documents::Document::Frame(mut frame) = fixtures::frame_document(7) else {
+        let core::documents::Document::Frame(mut frame) = fixtures::me_document(7) else {
             panic!("frame fixture");
         };
         frame.party = party;

@@ -238,6 +238,7 @@ pub fn owner_project_record() -> w::OwnerProject {
             policy: w::OwnerProjectPolicy::new(
                 &lim,
                 w::OwnerProjectPolicyParts {
+                    templates: List::with_capacity(0),
                     ceiling: w::OwnerAuthorityDocument::new(
                         &lim,
                         w::OwnerAuthorityDocumentParts {

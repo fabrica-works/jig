@@ -165,6 +165,7 @@ pub(crate) fn owner_project_policy_fields(
         None => None,
     };
     Ok(c::OwnerProjectPolicy {
+        templates: super::me::overrides(value.templates(), limits)?,
         ceiling: owner_authority_document_fields(value.ceiling(), limits)?,
         period_spend: value.period_spend(),
         escalation_role: opt0,

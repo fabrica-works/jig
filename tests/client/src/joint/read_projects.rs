@@ -64,7 +64,7 @@ fn a_project_document_never_consumes_another_original_query_or_another_project_r
     let source = wire::projects::tests::source();
     let limits = wire::projects::tests::limits();
     let wrong = transport
-        .reply_to(Reply::Read { client: ClientId(0), read: Token::new(1), what: client::Read::Frame })
+        .reply_to(Reply::Read { client: ClientId(0), read: Token::new(1), what: client::Read::Me })
         .into_token();
     let other = transport
         .reply_to(Reply::Read { client: ClientId(1), read: Token::new(2), what: client::Read::Project { project: 0 } })

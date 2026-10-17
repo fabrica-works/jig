@@ -27,7 +27,7 @@ pub fn limits() -> w::Limits {
         call_identity_id: 32,
         cursor_value: 64,
         owner_inbox_selection_goals: 2,
-        frame_projects: 2,
+        me_projects: 512,
         document_specification_parameters: 2,
         document_specification_inputs: 2,
         owner_part_key_path_value: 2,
@@ -80,14 +80,14 @@ pub fn chip_pieces(count: u32) -> Box<[u8]> {
     pieces.finish()
 }
 #[must_use]
-pub fn frame_record() -> w::Frame {
+pub fn frame_record() -> w::Me {
     let lim = limits();
-    w::Frame::new(
+    w::Me::new(
         &lim,
-        w::FrameParts {
-            party: w::FrameParty::new(
+        w::MeParts {
+            party: w::MeParty::new(
                 &lim,
-                w::FramePartyParts {
+                w::MePartyParts {
                     number: 7,
                     kind: w::PartyKind::Person,
                     login: w::DocumentText::new(&lim, w::DocumentTextParts { bytes: Box::from([]), cut: false })
@@ -97,7 +97,7 @@ pub fn frame_record() -> w::Frame {
                 },
             )
             .expect("literal fixture fits"),
-            projects: List::with_capacity(0),
+            projects: Box::from([]),
             needs: w::Needs::new(&lim, w::NeedsParts { questions: 7, proposals: 7, escalations: 7, person_tasks: 7 })
                 .expect("literal fixture fits"),
             needs_total: 7,

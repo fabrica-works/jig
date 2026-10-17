@@ -35,9 +35,9 @@ fn frame_tree(domain: &Fixture, words: &crate::words::Words) -> Tree {
     super::cards_access::check(&tree);
     tree
 }
-fn ready(source: Frame) -> Fixture {
+fn ready(source: Me) -> Fixture {
     let (mut domain, watch) = start();
-    drive(&mut domain, Watched { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(source))) });
+    drive(&mut domain, Watched { watch, event: WatchEvent::Delivered(Delivery::Me(Box::new(source))) });
     domain
 }
 #[test]
@@ -176,7 +176,7 @@ fn choose_sign_out(domain: &mut Fixture) -> Box<[crate::Request]> {
     drive(domain, Event::Act { action: crate::action::Act::SignOut }).into_boxed_slice()
 }
 
-fn sign_out_frame(kind: PartyKind) -> Frame {
+fn sign_out_frame(kind: PartyKind) -> Me {
     let mut source = document();
     source.party.kind = kind;
     source.projects = List::with_capacity(0);
@@ -185,7 +185,7 @@ fn sign_out_frame(kind: PartyKind) -> Frame {
     source
 }
 const SIGN_OUT_PHRASES: [JigPhrase; 21] = [
-    JigPhrase::Frame,
+    JigPhrase::Me,
     JigPhrase::NothingKnown,
     JigPhrase::LinkPart,
     JigPhrase::NeedsPart,

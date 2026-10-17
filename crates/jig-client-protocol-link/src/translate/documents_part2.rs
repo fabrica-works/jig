@@ -74,8 +74,8 @@ pub(crate) fn act_kind_fields(value: &w::ActKind, _limits: &Limits) -> c::ActKin
     }
 }
 
-pub(crate) fn goal_procedure_fields(value: &w::GoalProcedure, _limits: &Limits) -> c::GoalProcedure {
-    c::GoalProcedure { connector: value.connector(), code: value.code() }
+pub(crate) fn goal_procedure_fields(value: &w::CreateProcedure, _limits: &Limits) -> c::CreateProcedure {
+    c::CreateProcedure { connector: value.connector(), code: value.code() }
 }
 
 pub(crate) fn owner_kind_implication_fields(
@@ -88,7 +88,7 @@ pub(crate) fn owner_kind_implication_fields(
 #[expect(clippy::manual_map, reason = "step code matches optional fields without closures")]
 pub(crate) fn bounds_fields(value: &w::Bounds, limits: &Limits) -> Result<c::Bounds, w::Problem> {
     Ok(match value {
-        w::Bounds::Goal(row) => {
+        w::Bounds::Create(row) => {
             if row.charters().len() > limits.client.rows {
                 return Err(too_large());
             }
@@ -111,7 +111,8 @@ pub(crate) fn bounds_fields(value: &w::Bounds, limits: &Limits) -> Result<c::Bou
                 Some(item) => Some(Wall::from_nanos(*item)),
                 None => None,
             };
-            c::Bounds::Goal {
+            c::Bounds::Create(c::CreateBounds {
+                authority: Box::new(owner_authority_document_fields(row.authority(), limits)?),
                 pool_left: row.pool_left(),
                 charters: list0,
                 procedures: list1,
@@ -119,7 +120,7 @@ pub(crate) fn bounds_fields(value: &w::Bounds, limits: &Limits) -> Result<c::Bou
                 budget: row.budget(),
                 maximum_budget: row.maximum_budget(),
                 maximum_deadline: opt3,
-            }
+            })
         }
         w::Bounds::Amend(row) => {
             if row.implications().len() > limits.client.rows {

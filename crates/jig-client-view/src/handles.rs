@@ -9,7 +9,7 @@ use skein_lib::{Map, Queue};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Owner {
-    Frame,
+    Me,
     Page,
     Application,
     Sections,
@@ -45,7 +45,7 @@ impl Handles {
             return None;
         }
         let handle = self.fresh()?;
-        if owner != Owner::Frame {
+        if owner != Owner::Me {
             self.anchor.get_or_insert(handle);
         }
         out.push(Request::Client { asked: Event::Watch { handle, subject: Watchable::Jig(subject.clone()) } });

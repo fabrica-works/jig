@@ -65,12 +65,14 @@ pub fn held_role(value: jig_domain_people::Role) -> client::HeldRole {
 
 /// # Errors
 /// Refuses inconsistent executor or specification resource facts, any whole text/list allocation above bounds.
-pub fn frame(value: &documents::Frame, limits: &Limits) -> Result<client::Frame, Invalid> {
+pub fn frame(value: &documents::Frame, limits: &Limits) -> Result<client::Me, Invalid> {
     if value.projects.capacity() > limits.projects || value.charters.capacity() > limits.projects {
         return Err(Invalid::TooLarge);
     }
     let projects = list(&value.projects, limits, |row| {
-        Ok(client::ProjectRole {
+        Ok(client::MeProject {
+            templates: super::me::templates(&row.templates, limits)?,
+            creating: row.creating.as_ref().map(|v| super::me::creating(v, limits)).transpose()?,
             project: row.project,
             name: row.name.as_ref().map(|value| text(value, limits)).transpose()?,
             role: held_role(row.role),
@@ -91,8 +93,8 @@ pub fn frame(value: &documents::Frame, limits: &Limits) -> Result<client::Frame,
             cut: row.cut,
         })
     })?;
-    Ok(client::Frame {
-        party: client::FrameParty {
+    Ok(client::Me {
+        party: client::MeParty {
             number: value.party,
             kind: match value.kind {
                 jig_domain_people::Kind::Person => client::PartyKind::Person,
@@ -792,7 +794,7 @@ pub(super) mod tests {
     }
 
     #[test]
-    fn frame_wire_keeps_independent_identity_loss_owner_counts_memberships_and_project_offers() {
+    fn me_preserves_identity_counts_memberships_and_project_offers() {
         let roles = [
             (jig_domain_people::Role::Owner, client::HeldRole::Owner),
             (jig_domain_people::Role::Maintainer, client::HeldRole::Maintainer),

@@ -24,15 +24,17 @@ fn party(number: u64) -> Party {
 fn budget() -> Budget {
     Budget { total: 100, own: 0, ended: 0, reserved: 0, left: 100, funder: Actor::Deployment }
 }
-fn frame(number: u64) -> Frame {
-    Frame {
-        party: FrameParty {
+fn frame(number: u64) -> Me {
+    Me {
+        party: MeParty {
             number,
             kind: PartyKind::Person,
             login: DocumentText::complete(text(b"fixture-login")),
             name: DocumentText::complete(text(b"party")),
         },
-        projects: list(vec![ProjectRole {
+        projects: list(vec![MeProject {
+            templates: skein_lib::List::with_capacity(0),
+            creating: None,
             project: 1,
             name: Some(DocumentText::complete(text(b"project"))),
             role: HeldRole::Policy { role: 1 },
@@ -63,7 +65,7 @@ fn frame(number: u64) -> Frame {
         deployment_role: Some(HeldRole::Policy { role: 1 }),
     }
 }
-fn owner_authority() -> OwnerAuthorityDocument {
+pub(crate) fn owner_authority() -> OwnerAuthorityDocument {
     OwnerAuthorityDocument {
         authority: OwnerAuthority {
             tools: 0,
@@ -465,7 +467,7 @@ fn scenario_pages_and_read_barriers() {
         engine.poll(at(10_000_000)),
         vec![Up::Read { token: Token::new(1), terminal: ReadResult::Value(ReadValue::Task(Box::new(changed))) }]
     );
-    assert_eq!(engine.read(at(10_000_000), 11, Token::new(1), Read::Frame), Err(Invalid::Identity));
+    assert_eq!(engine.read(at(10_000_000), 11, Token::new(1), Read::Me), Err(Invalid::Identity));
     let mut cursor = None;
     for position in 0..3 {
         engine
@@ -504,11 +506,11 @@ fn scenario_pages_and_read_barriers() {
         engine.poll(at(10_000_000)),
         vec![Up::Read { token: Token::new(21), terminal: ReadResult::None(ReadNone::Gone) }]
     );
-    engine.read(at(10_000_000), 999, Token::new(22), Read::Frame).expect("signed out");
+    engine.read(at(10_000_000), 999, Token::new(22), Read::Me).expect("signed out");
     assert!(matches!(engine.poll(at(10_000_000))[0], Up::Read { terminal: ReadResult::None(ReadNone::SignedOut), .. }));
     let mut frame = frame(2);
     frame.projects = list(vec![]);
-    engine.act(at(10_000_000), Wall::EPOCH, Change::Frame(frame)).expect("roles removed");
+    engine.act(at(10_000_000), Wall::EPOCH, Change::Me(frame)).expect("roles removed");
     engine.read(at(10_000_000), 22, Token::new(23), Read::Task { task: 8 }).expect("hidden read");
     assert_eq!(
         engine.poll(at(20_000_000)),
@@ -518,7 +520,7 @@ fn scenario_pages_and_read_barriers() {
 fn scenario_watch_subjects_coalescing_and_lifecycle() {
     let mut engine = Engine::new(live_script(), 5).expect("live truth");
     let subjects = vec![
-        Subject::Frame,
+        Subject::Me,
         Subject::Task { task: 8 },
         Subject::Tree { task: 8, window: 1 },
         Subject::Chips { tasks: list(vec![8]) },
@@ -592,8 +594,8 @@ fn scenario_watch_subjects_coalescing_and_lifecycle() {
     let mut setup = live_script();
     setup.bounds.watches = 1;
     let mut engine = Engine::new(setup, 1).expect("limited engine");
-    engine.open(Time::ZERO, 11, Token::new(1), Subject::Frame).expect("first");
-    engine.open(Time::ZERO, 11, Token::new(2), Subject::Frame).expect("over limit");
+    engine.open(Time::ZERO, 11, Token::new(1), Subject::Me).expect("first");
+    engine.open(Time::ZERO, 11, Token::new(2), Subject::Me).expect("over limit");
     assert!(engine.poll(Time::ZERO).contains(&Up::Ended { token: Token::new(2), why: WatchEnd::Busy }));
     engine.act(Time::ZERO, Wall::EPOCH, Change::SignedOut { sign_in: 11 }).expect("signed out");
     assert_eq!(engine.poll(at(10_000_000)), vec![Up::Ended { token: Token::new(1), why: WatchEnd::SignedOut }]);
@@ -796,7 +798,7 @@ fn scenario_all_read_shapes_and_reverse_activity() {
         cursor = page.before.clone();
     }
     let reads = vec![
-        Read::Frame,
+        Read::Me,
         Read::Task { task: 8 },
         Read::Proposal { proposal: ProposalKey { proposer: Proposer::Task(8), number: 1 } },
         Read::Escalation { task: 8 },
@@ -998,7 +1000,8 @@ fn oversized_bounded_offer_payloads() {
         let mut setup = live_script();
         let mut row = task();
         let within = if variant == 0 {
-            DraftBounds::Goal {
+            DraftBounds::Create(jig_client_domain::contract::CreateBounds {
+                authority: Box::new(owner_authority()),
                 pool_left: 1,
                 procedures: List::with_capacity(0),
                 charters: List::with_capacity(33),
@@ -1006,7 +1009,7 @@ fn oversized_bounded_offer_payloads() {
                 budget: 1,
                 maximum_budget: 2,
                 maximum_deadline: None,
-            }
+            })
         } else {
             let mut direct = owner_authority();
             let mut ceiling = owner_authority();
@@ -1125,7 +1128,8 @@ fn collective_policy_recipients_accept_any_listed_role_and_price_the_whole_list(
         let recipient = Recipient::Roles { project: 1, roles: List::with_capacity(33) };
         row.acts.get_mut(0).unwrap().admission = if bounded {
             Admission::Bounded {
-                within: jig_client_domain::contract::Bounds::Goal {
+                within: jig_client_domain::contract::Bounds::Create(jig_client_domain::contract::CreateBounds {
+                    authority: Box::new(owner_authority()),
                     pool_left: 10,
                     procedures: List::with_capacity(0),
                     charters: list(vec![1]),
@@ -1133,7 +1137,7 @@ fn collective_policy_recipients_accept_any_listed_role_and_price_the_whole_list(
                     budget: 0,
                     maximum_budget: 100,
                     maximum_deadline: None,
-                },
+                }),
                 beyond: Beyond::Proposed { to: recipient },
             }
         } else {
@@ -1575,23 +1579,25 @@ fn goals_read_from_start_includes_live_and_ended_while_watch_is_live() {
 fn procedure_goal_bounds_price_allocated_pairs_and_judge_the_exact_executor() {
     let exact = GoalExecutor::Procedure { connector: u16::MAX, code: u32::MAX };
     let offer = Admission::Bounded {
-        within: jig_client_domain::contract::Bounds::Goal {
+        within: jig_client_domain::contract::Bounds::Create(jig_client_domain::contract::CreateBounds {
+            authority: Box::new(owner_authority()),
             pool_left: 100,
             charters: list(vec![]),
             procedures: list(vec![
-                GoalProcedure { connector: u16::MAX, code: u32::MAX },
-                GoalProcedure { connector: 7, code: u32::MAX },
+                CreateProcedure { connector: u16::MAX, code: u32::MAX },
+                CreateProcedure { connector: 7, code: u32::MAX },
             ]),
             latest: None,
             budget: 3,
             maximum_budget: 10,
             maximum_deadline: None,
-        },
+        }),
         beyond: Beyond::Proposed { to: Recipient::Party(2) },
     };
     let bytes = u64::try_from(core::mem::size_of::<Admission>()).unwrap()
+        + u64::try_from(core::mem::size_of::<OwnerAuthorityDocument>()).unwrap()
         + List::<u32>::worst_case(0).unwrap()
-        + List::<GoalProcedure>::worst_case(2).unwrap();
+        + List::<CreateProcedure>::worst_case(2).unwrap();
     let mut bounds = Bounds { rows: 2, document_bytes: bytes, ..Bounds::default() };
     assert!(crate::payload::fits(&offer, &bounds));
     bounds.document_bytes = bytes.checked_sub(1).unwrap();
@@ -1600,7 +1606,11 @@ fn procedure_goal_bounds_price_allocated_pairs_and_judge_the_exact_executor() {
     bounds.rows = 1;
     assert!(!crate::payload::fits(&offer, &bounds));
     let mut room = offer.clone();
-    let Admission::Bounded { within: jig_client_domain::contract::Bounds::Goal { procedures, .. }, .. } = &mut room
+    let Admission::Bounded {
+        within:
+            jig_client_domain::contract::Bounds::Create(jig_client_domain::contract::CreateBounds { procedures, .. }),
+        ..
+    } = &mut room
     else {
         panic!("goal bounds");
     };

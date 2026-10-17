@@ -143,10 +143,10 @@ pub fn jig_read_value_answer(value: &w::ReadValue) -> Box<[u8]> {
     jig_read_record_answer(encoded_read_value(value), jig_client_protocol_wire::VERSION)
 }
 pub fn frame_read_value() -> w::ReadValue {
-    w::ReadValue::Frame(frame_record())
+    w::ReadValue::Me(frame_record())
 }
 pub fn expected_frame_read() -> Readout {
-    Readout::Jig(c::ReadResult::Value(c::ReadValue::Frame(Box::new(frame()))))
+    Readout::Jig(c::ReadResult::Value(c::ReadValue::Me(Box::new(frame()))))
 }
 pub fn read_value_cases() -> Box<[(w::ReadValue, c::ReadValue)]> {
     let mut cases = skein_lib::List::with_capacity(26);
@@ -167,7 +167,7 @@ fn read_value_cases_first(cases: &mut skein_lib::List<(w::ReadValue, c::ReadValu
             c::ReadValue::Historical(Box::new(read_value_owner_historical())),
         ))
         .unwrap();
-    cases.push((w::ReadValue::Frame(frame_record()), c::ReadValue::Frame(Box::new(frame())))).unwrap();
+    cases.push((w::ReadValue::Me(frame_record()), c::ReadValue::Me(Box::new(frame())))).unwrap();
     cases.push((w::ReadValue::Task(task_record()), c::ReadValue::Task(Box::new(task())))).unwrap();
     cases
         .push((w::ReadValue::Proposal(read_wire_proposal()), c::ReadValue::Proposal(Box::new(read_value_proposal()))))

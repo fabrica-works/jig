@@ -128,13 +128,13 @@ impl Transport {
         jig_client::Up::Served { served: jig_client_protocol_link::serves(self.versions), versions: None }
     }
 
-    /// The configured Jig range, independent of a delivered Frame.
+    /// The configured Jig range, independent of a delivered Me.
     #[must_use]
     pub fn served(&self) -> VersionRange {
         self.versions
     }
 
-    /// Replace only the protocol's configured served range, supplied outside Frame.
+    /// Replace only the protocol's configured served range, supplied outside Me.
     pub fn versions(&mut self, versions: VersionRange) {
         self.versions = versions;
     }
@@ -481,7 +481,7 @@ mod tests {
             front.continued(ClientId(0), native, Subject::Run { task: 42, turn: None, offset: 0 }),
             Err(InvalidContinuation)
         ));
-        assert!(matches!(front.continued(ClientId(0), native, Subject::Frame), Err(InvalidContinuation)));
+        assert!(matches!(front.continued(ClientId(0), native, Subject::Me), Err(InvalidContinuation)));
         assert_eq!(front.watch(owner).expect("unchanged original").subject, Watched::Jig(original.clone()));
         assert_eq!(front.detach(ClientId(0)), vec![owner]);
         assert!(front.taken(ClientId(0), native).is_none());
@@ -502,8 +502,8 @@ mod tests {
         assert_eq!(front.sign_in(ClientId(0)), Some(41));
         assert_eq!(front.sign_in(ClientId(1)), Some(u64::MAX));
         let native = Token::new(9);
-        let a = front.open(ClientId(0), native, Watched::Jig(Subject::Frame));
-        let b = front.open(ClientId(1), native, Watched::Jig(Subject::Frame));
+        let a = front.open(ClientId(0), native, Watched::Jig(Subject::Me));
+        let b = front.open(ClientId(1), native, Watched::Jig(Subject::Me));
         assert_ne!(a, b);
         assert_eq!(front.watch(a).expect("first owner watch").native, native);
         assert_eq!(front.watch(b).expect("second owner watch").client, ClientId(1));
@@ -520,15 +520,14 @@ mod tests {
         let mut front = Transport::new(VersionRange { first: 8, last: 8 });
         front.bind(ClientId(0), 7, identity(b"same"));
         front.bind(ClientId(1), 7, identity(b"same"));
-        let a = front.open(ClientId(0), Token::new(3), Watched::Jig(Subject::Frame));
-        let b = front.open(ClientId(1), Token::new(3), Watched::Jig(Subject::Frame));
-        let old =
-            front.reply_to(Reply::Read { client: ClientId(0), read: Token::new(3), what: Read::Frame }).into_token();
+        let a = front.open(ClientId(0), Token::new(3), Watched::Jig(Subject::Me));
+        let b = front.open(ClientId(1), Token::new(3), Watched::Jig(Subject::Me));
+        let old = front.reply_to(Reply::Read { client: ClientId(0), read: Token::new(3), what: Read::Me }).into_token();
         assert_eq!(front.detach(ClientId(0)), vec![a]);
         assert_eq!(front.take_reply(old), None);
         assert_eq!(front.watch(a), None);
         assert!(front.watch(b).is_some());
-        let next = front.open(ClientId(0), Token::new(3), Watched::Jig(Subject::Frame));
+        let next = front.open(ClientId(0), Token::new(3), Watched::Jig(Subject::Me));
         assert_ne!(next, a);
         assert_ne!(next, b);
         assert_eq!(front.watch_token(ClientId(0), Token::new(3)), Some(next));

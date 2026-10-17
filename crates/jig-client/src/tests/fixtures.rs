@@ -74,7 +74,7 @@ pub fn event(value: &w::StreamEvent) -> Box<[u8]> {
 pub fn frame(watch: u64) -> Box<[u8]> {
     let mut parts = jig_client_test_records::frame_record().into_parts();
     parts.retention = Duration::from_secs(60);
-    let value = w::DeliveryValue::Frame(w::Frame::new(&w::CEILINGS, parts).unwrap());
+    let value = w::DeliveryValue::Me(w::Me::new(&w::CEILINGS, parts).unwrap());
     let mut bytes = Writer::new(usize::try_from(value.measure()).unwrap());
     value.encode(&mut bytes).unwrap();
     let document = w::Owned::new(

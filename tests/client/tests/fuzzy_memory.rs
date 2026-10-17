@@ -172,7 +172,7 @@ fn full_world() -> jig_client_world::World<jig_client_world::Test, jig_client_wo
     frame.charters = jig_client_world::test::list([offer, other_offer]);
     w.front()
         .engine
-        .act(Time::ZERO, Wall::EPOCH, jig_client_scripted_engine::Change::Frame(frame))
+        .act(Time::ZERO, Wall::EPOCH, jig_client_scripted_engine::Change::Me(frame))
         .expect("full frame fits");
     let mut family = jig_client_world::scripted::Family::default();
     for n in 1..=8 {

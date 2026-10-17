@@ -21,7 +21,7 @@ fn a_changed_handle_is_the_page_s_delivery() {
     let (mut fixture, watch) = cards::start();
     cards::drive(
         &mut fixture,
-        Watched { watch, event: contract::WatchEvent::Delivered(contract::Delivery::Frame(Box::new(frame()))) },
+        Watched { watch, event: contract::WatchEvent::Delivered(contract::Delivery::Me(Box::new(frame()))) },
     );
     assert_eq!(fixture.frame().party(), Some(7));
 }
@@ -80,7 +80,7 @@ fn a_lost_sign_out_reaches_the_ui() {
     let (mut fixture, watch) = cards::start();
     cards::drive(
         &mut fixture,
-        Watched { watch, event: contract::WatchEvent::Delivered(contract::Delivery::Frame(Box::new(frame()))) },
+        Watched { watch, event: contract::WatchEvent::Delivered(contract::Delivery::Me(Box::new(frame()))) },
     );
     fixture.drive(Time::ZERO, jig_client::Event::SignOut);
     fixture.drive(Time::ZERO, jig_client::Event::SignOutLost);
@@ -92,7 +92,7 @@ fn a_lost_sign_out_reaches_the_ui() {
     assert_eq!(fixture.frame().party(), Some(7));
 }
 
-fn frame() -> contract::Frame {
+fn frame() -> contract::Me {
     let mut frame = cards::document();
     frame.party.number = 7;
     frame

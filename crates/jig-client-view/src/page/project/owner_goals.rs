@@ -1,5 +1,5 @@
 //! Goal admission from genuine whole Project offers; pages.md, 6.2.
-//! The engine's bounded offer and Frame facts remain independent source values.
+//! The engine's bounded offer and Me facts remain independent source values.
 use crate::{Ui, page::project::goals::GoalForm};
 use jig_client::contract::{ActKind, Admission, Bounds, Funder, GoalExecutor};
 /// Preserve the original goal confirmation protocol without a fabricated Project.
@@ -22,7 +22,7 @@ pub(crate) fn prediction(
     let offer = offer?;
     let bounded_pool = match offer {
         Admission::Bounded { within, .. } => match within {
-            Bounds::Goal { pool_left, .. } => Some(*pool_left),
+            Bounds::Create(jig_client::contract::CreateBounds { pool_left, .. }) => Some(*pool_left),
             Bounds::Amend { .. } => None,
         },
         Admission::Allowed | Admission::Proposed { .. } | Admission::Refused(_) => None,

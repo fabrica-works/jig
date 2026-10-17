@@ -47,7 +47,7 @@ pub(super) fn entered_arranged(address: Address, arrangement: crate::page::Arran
     frame.charters.get_mut(0).unwrap().goals =
         list([Charter { number: 2, name: Some(DocumentText::complete(text(b"Guide"))) }]);
     frame.projects.get_mut(0).unwrap().pool.as_mut().unwrap().left = 20;
-    let initial = deliver(&mut d, f, Delivery::Frame(Box::new(frame)));
+    let initial = deliver(&mut d, f, Delivery::Me(Box::new(frame)));
     for request in &initial {
         if let Request::Client {
             asked: jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(Read::Inbox { .. }) },
@@ -610,13 +610,13 @@ fn recurring_times_use_supplied_boundaries_without_inferred_cadence(words: &Word
 }
 
 #[test]
-fn procedure_goal_choices_render_whole_numeric_pairs_without_frame_charters() {
+fn procedure_goal_choices_preserve_pairs_without_me_charters() {
     use crate::page::project::goals::GoalForm;
     let words = words();
     let (mut d, f) = start();
     let mut frame = document();
     frame.charters.get_mut(0).unwrap().goals = List::with_capacity(0);
-    deliver(&mut d, f, Delivery::Frame(Box::new(frame)));
+    deliver(&mut d, f, Delivery::Me(Box::new(frame)));
     let out = drive(
         &mut d,
         Event::Went { place: Place::Jig(Address::Project { project: 4, section: ProjectSection::Goals }) },
@@ -634,18 +634,19 @@ fn procedure_goal_choices_render_whole_numeric_pairs_without_frame_charters() {
     doc.acts = list([Offered {
         act: ActKind::SetGoal,
         admission: Admission::Bounded {
-            within: Bounds::Goal {
+            within: Bounds::Create(CreateBounds {
+                authority: Box::new(crate::tests::cards_objects::owner_authority()),
                 pool_left: 30,
                 charters: list([99]),
                 procedures: list([
-                    GoalProcedure { connector: 7, code: u32::MAX },
-                    GoalProcedure { connector: u16::MAX, code: u32::MAX },
+                    CreateProcedure { connector: 7, code: u32::MAX },
+                    CreateProcedure { connector: u16::MAX, code: u32::MAX },
                 ]),
                 latest: None,
                 budget: 3,
                 maximum_budget: 50,
                 maximum_deadline: None,
-            },
+            }),
             beyond: Beyond::Proposed { to: Recipient::Party(9) },
         },
     }]);

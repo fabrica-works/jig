@@ -14,7 +14,7 @@ pub(super) fn offer_fits(value: &Admission, limits: &crate::Limits) -> Option<()
     let recipient = match value {
         Admission::Bounded { within, beyond } => {
             match within {
-                Bounds::Goal { charters, procedures, .. } => {
+                Bounds::Create(jig_client::contract::CreateBounds { charters, procedures, .. }) => {
                     if charters.capacity() > limits.rows || procedures.capacity() > limits.rows {
                         return None;
                     }
@@ -77,7 +77,10 @@ pub(super) fn form(
         }
     }
     match offer {
-        Some(Admission::Bounded { within: Bounds::Goal { pool_left, .. }, .. }) => pool = Some(*pool_left),
+        Some(Admission::Bounded {
+            within: Bounds::Create(jig_client::contract::CreateBounds { pool_left, .. }),
+            ..
+        }) => pool = Some(*pool_left),
         Some(Admission::Refused(why)) => words.refusal(b, why, text_limit),
         None
         | Some(
@@ -88,7 +91,9 @@ pub(super) fn form(
         Some(admission) => match admission {
             Admission::Allowed
             | Admission::Proposed { .. }
-            | Admission::Bounded { within: Bounds::Goal { .. }, .. } => Some(admission),
+            | Admission::Bounded { within: Bounds::Create(jig_client::contract::CreateBounds { .. }), .. } => {
+                Some(admission)
+            }
             Admission::Refused(_) | Admission::Bounded { within: Bounds::Amend { .. }, .. } => None,
         },
         None => None,
@@ -133,7 +138,10 @@ fn choices(
     bindings: &mut JigBindings,
 ) {
     match admission {
-        Admission::Bounded { within: Bounds::Goal { charters, procedures, .. }, .. } => {
+        Admission::Bounded {
+            within: Bounds::Create(jig_client::contract::CreateBounds { charters, procedures, .. }),
+            ..
+        } => {
             for charter in charters {
                 super::goals::choice(b, client, words, bindings, doc.number, GoalExecutor::Charter(*charter), left);
             }

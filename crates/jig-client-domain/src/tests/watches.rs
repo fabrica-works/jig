@@ -121,10 +121,10 @@ fn a_watch_past_the_handles_limit_ends_at_once() {
 #[test]
 fn an_application_handle_on_me_shares_the_client_s_own() {
     let mut c = Client::started();
-    let name = c.name(Watchable::Jig(contract::Subject::Frame));
-    c.step(Event::Watch { handle: ME, subject: Watchable::Jig(contract::Subject::Frame) });
+    let name = c.name(Watchable::Jig(contract::Subject::Me));
+    c.step(Event::Watch { handle: ME, subject: Watchable::Jig(contract::Subject::Me) });
     assert!(c.downs().is_empty());
     c.step(Event::Unwatch { handle: ME });
     assert!(c.downs().is_empty());
-    assert_eq!(c.name(Watchable::Jig(contract::Subject::Frame)), name);
+    assert_eq!(c.name(Watchable::Jig(contract::Subject::Me)), name);
 }

@@ -213,7 +213,7 @@ fn check_drafts_survive_pages_and_restart_evict_oldest_untouched_and_coalesce_on
         &mut domain,
         limits,
         Time::ZERO,
-        Watched { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(frame(7)))) },
+        Watched { watch, event: WatchEvent::Delivered(Delivery::Me(Box::new(frame(7)))) },
     );
     edit(&mut domain, 8, b"first");
     edit(&mut domain, 9, b"older");
@@ -265,7 +265,7 @@ fn check_drafts_survive_pages_and_restart_evict_oldest_untouched_and_coalesce_on
         &mut restarted,
         limits,
         Time::ZERO,
-        Watched { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(frame(7)))) },
+        Watched { watch, event: WatchEvent::Delivered(Delivery::Me(Box::new(frame(7)))) },
     );
     let field = restarted.fields().get(Purpose::Composer { task: 8 }).unwrap();
     assert_eq!(field.text, text(b"newest"));

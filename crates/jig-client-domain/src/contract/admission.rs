@@ -29,7 +29,8 @@ fn deadline(draft: Option<Wall>, latest: Option<Wall>) -> bool {
 pub fn goal(offer: &Admission, executor: GoalExecutor, budget: u64, at: Option<Wall>) -> Admission {
     match offer {
         Admission::Bounded { within, beyond: outside } => match within {
-            Bounds::Goal {
+            Bounds::Create(super::CreateBounds {
+                authority: _,
                 pool_left: _,
                 charters,
                 procedures,
@@ -37,7 +38,7 @@ pub fn goal(offer: &Admission, executor: GoalExecutor, budget: u64, at: Option<W
                 budget: allowed,
                 maximum_budget,
                 maximum_deadline,
-            } => {
+            }) => {
                 let mut listed = false;
                 match executor {
                     GoalExecutor::Charter(charter) => {
@@ -97,7 +98,7 @@ pub fn amendment(offer: &Admission, change: &Amendment, before: &OwnerAuthorityD
                     beyond(outside)
                 }
             }
-            Bounds::Goal { .. } => Admission::Refused(Refusal::NotOffered),
+            Bounds::Create(super::CreateBounds { .. }) => Admission::Refused(Refusal::NotOffered),
         },
         Admission::Allowed | Admission::Proposed { .. } | Admission::Refused(_) => offer.clone(),
     }

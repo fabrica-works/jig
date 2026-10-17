@@ -58,6 +58,7 @@ fn bounded(limits: &DocumentLimits, order_rows: u32) -> Admission {
 }
 fn limits() -> DocumentLimits {
     DocumentLimits {
+        roles: 4,
         segments: 4,
         rows: 2,
         text_bytes: 2,

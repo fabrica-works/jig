@@ -29,7 +29,8 @@ impl Payload for OwnerProjectPolicy {
             .checked_add(self.projections.heap(bounds)?)?
             .checked_add(self.roles.heap(bounds)?)?
             .checked_add(self.requirements.heap(bounds)?)?
-            .checked_add(self.permissions.heap(bounds)?)
+            .checked_add(self.permissions.heap(bounds)?)?
+            .checked_add(self.templates.heap(bounds)?)
     }
 }
 impl Payload for OwnerProjectMember {

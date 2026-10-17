@@ -19,7 +19,7 @@ pub(crate) fn watch(watcher: Token, sign_in: u64, value: w::Subject, rows: u32) 
         return Some(core::Event::WatchRun { watcher, sign_in, task: value.task, turn, offset: value.offset });
     }
     let (subject, rows) = match value {
-        w::Subject::Frame => (d::Watched::Frame, rows),
+        w::Subject::Me => (d::Watched::Frame, rows),
         w::Subject::Inbox(value) => (d::Watched::Inbox, value.window()),
         w::Subject::Conversations => (d::Watched::Conversations, rows),
         w::Subject::Task(value) => (d::Watched::Task { task: value.task() }, rows),
@@ -126,7 +126,7 @@ pub(crate) fn delivery(
     limits: &w::Limits,
 ) -> Result<w::DeliveryValue, w::Problem> {
     Ok(match value {
-        d::Document::Frame(value) => w::DeliveryValue::Frame(owner::frame(value, limits)?),
+        d::Document::Frame(value) => w::DeliveryValue::Me(owner::frame(value, limits)?),
         d::Document::Task(value) => w::DeliveryValue::Task(Box::new(task::document(value, limits)?)),
         d::Document::Tree(value) => {
             let next = match &value.next {

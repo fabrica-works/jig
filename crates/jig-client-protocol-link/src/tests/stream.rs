@@ -237,13 +237,13 @@ fn each_jig_delivery_reaches_the_domain_with_its_variant() {
 fn a_jig_delivery_before_the_opening_answer_admits_it() {
     let mut harness = fixtures::Harness::streaming(fixtures::frame_subject());
     let (exchange, name) = harness.opening();
-    harness.stream_record(&fixtures::jig_delivery(&w::DeliveryValue::Frame(fixtures::frame_record()), name));
+    harness.stream_record(&fixtures::jig_delivery(&w::DeliveryValue::Me(fixtures::frame_record()), name));
     harness.answer(exchange, &fixtures::open_answer(&w::OpenAnswer::Admitted));
-    assert_eq!(harness.delivered(), Some(&c::Delivery::Frame(Box::new(fixtures::frame()))));
+    assert_eq!(harness.delivered(), Some(&c::Delivery::Me(Box::new(fixtures::frame()))));
 }
 #[test]
 fn a_delivery_over_the_original_document_bound_is_refused() {
-    let value = w::DeliveryValue::Frame(fixtures::frame_record());
+    let value = w::DeliveryValue::Me(fixtures::frame_record());
     let bytes = fixtures::encoded_delivery(&value);
     let limits = Limits::new(fixtures::limits().client, 4).unwrap();
     let mut client = limits.client;

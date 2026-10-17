@@ -95,8 +95,11 @@ fn deadline(value: c::TemplateDeadline, limits: &w::Limits) -> Result<w::Templat
         c::TemplateDeadline::Given => w::TemplateDeadline::Given,
     })
 }
-#[expect(clippy::manual_map, reason = "step code matches optional fields without closures")]
 pub(super) fn restore_templates(values: &List<w::TemplateOverride>) -> c::PolicyEdit {
+    c::PolicyEdit::Templates { overrides: restore_template_overrides(values) }
+}
+#[expect(clippy::manual_map, reason = "step code matches optional fields without closures")]
+pub(super) fn restore_template_overrides(values: &List<w::TemplateOverride>) -> List<c::TemplateOverride> {
     let mut overrides = List::with_capacity(values.len());
     for v in values {
         overrides
@@ -118,22 +121,22 @@ pub(super) fn restore_templates(values: &List<w::TemplateOverride>) -> c::Policy
             })
             .expect("same capacity");
     }
-    c::PolicyEdit::Templates { overrides }
+    overrides
 }
-fn restore_executor(value: &w::TemplateExecutor) -> c::TemplateExecutor {
+pub(super) fn restore_executor(value: &w::TemplateExecutor) -> c::TemplateExecutor {
     match value {
         w::TemplateExecutor::Charter(v) => c::TemplateExecutor::Charter(v.value()),
         w::TemplateExecutor::Chosen => c::TemplateExecutor::Chosen,
     }
 }
-fn restore_budget(value: &w::TemplateBudget) -> c::TemplateBudget {
+pub(super) fn restore_budget(value: &w::TemplateBudget) -> c::TemplateBudget {
     match value {
         w::TemplateBudget::Amount(v) => c::TemplateBudget::Amount(v.value()),
         w::TemplateBudget::AsAllowed(v) => c::TemplateBudget::AsAllowed { cap: *v.cap() },
         w::TemplateBudget::Given => c::TemplateBudget::Given,
     }
 }
-fn restore_deadline(value: &w::TemplateDeadline) -> c::TemplateDeadline {
+pub(super) fn restore_deadline(value: &w::TemplateDeadline) -> c::TemplateDeadline {
     match value {
         w::TemplateDeadline::None => c::TemplateDeadline::None,
         w::TemplateDeadline::Span(v) => c::TemplateDeadline::Span(v.value()),

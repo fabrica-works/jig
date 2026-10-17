@@ -166,7 +166,7 @@ fn prediction(domain: &Ui, form: GoalForm, scope: u64, lent: &jig_client::Client
     // Bounded offers own these facts; frame facts remain for fixed admissions.
     match &admission {
         Admission::Bounded { within, .. } => match within {
-            Bounds::Goal { pool_left, .. } => pool = Some(*pool_left),
+            Bounds::Create(jig_client::contract::CreateBounds { pool_left, .. }) => pool = Some(*pool_left),
             Bounds::Amend { .. } => {}
         },
         Admission::Refused(why) => return Some((Admission::Refused(why.clone()), pool.unwrap_or(0))),

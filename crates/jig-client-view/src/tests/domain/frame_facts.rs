@@ -9,11 +9,19 @@ use skein_lib::{List, Time};
 fn text(bytes: &[u8]) -> DocumentText {
     DocumentText::complete(Text::new(bytes.into(), 32).unwrap())
 }
-fn member(role: HeldRole) -> ProjectRole {
-    ProjectRole { project: u32::MAX, name: None, role, pool: None, chat_budget: u64::MAX }
+fn member(role: HeldRole) -> MeProject {
+    MeProject {
+        templates: List::with_capacity(0),
+        creating: None,
+        project: u32::MAX,
+        name: None,
+        role,
+        pool: None,
+        chat_budget: u64::MAX,
+    }
 }
 #[test]
-fn frame_delivery_keeps_exact_roles_absent_pools_and_independent_owner_counts() {
+fn me_preserves_roles_pools_and_independent_owner_counts() {
     let roles = [
         HeldRole::Owner,
         HeldRole::Maintainer,

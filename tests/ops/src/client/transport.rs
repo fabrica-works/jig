@@ -505,7 +505,7 @@ struct SubjectRun {
 fn run_position(subject: &jig_client_domain::contract::Subject) -> SubjectRun {
     match subject {
         jig_client_domain::contract::Subject::Run { turn, offset, .. } => SubjectRun { turn: *turn, offset: *offset },
-        jig_client_domain::contract::Subject::Frame
+        jig_client_domain::contract::Subject::Me
         | jig_client_domain::contract::Subject::Task { .. }
         | jig_client_domain::contract::Subject::Tree { .. }
         | jig_client_domain::contract::Subject::Chips { .. }
@@ -540,7 +540,7 @@ fn change_facts(change: &engine::Change, commit: u64, out: &mut Vec<Observed>) {
                 ReadValue::Escalation(row) => row.ending.is_some(),
                 ReadValue::Question(row) => row.ending.is_some(),
                 ReadValue::PersonTask(row) => row.ending.is_some(),
-                ReadValue::Frame(_)
+                ReadValue::Me(_)
                 | ReadValue::Ended(_)
                 | ReadValue::OwnerEnded(_)
                 | ReadValue::History(_)
@@ -570,7 +570,7 @@ fn change_facts(change: &engine::Change, commit: u64, out: &mut Vec<Observed>) {
                 }
                 ReadValue::Result(result) => out.push(Observed::Ended { task: result.task.task, commit }),
                 ReadValue::Task(_)
-                | ReadValue::Frame(_)
+                | ReadValue::Me(_)
                 | ReadValue::Proposal(_)
                 | ReadValue::Escalation(_)
                 | ReadValue::Question(_)
@@ -597,7 +597,7 @@ fn change_facts(change: &engine::Change, commit: u64, out: &mut Vec<Observed>) {
             }
         }
         engine::Change::Request(_)
-        | engine::Change::Frame(_)
+        | engine::Change::Me(_)
         | engine::Change::SignIn { .. }
         | engine::Change::SignedOut { .. }
         | engine::Change::Project(_)
@@ -619,7 +619,7 @@ impl Scripted {
             Read::Question { task, message } => Some(ObjectKey::Question { task: *task, message: *message }),
             Read::PersonTask { task } => Some(ObjectKey::PersonTask(*task)),
             Read::Result { task } => Some(ObjectKey::Result(*task)),
-            Read::Frame
+            Read::Me
             | Read::Ended { .. }
             | Read::History { .. }
             | Read::Activity { .. }

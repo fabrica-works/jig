@@ -65,7 +65,7 @@ fn delivery_cases_first(cases: &mut List<(w::DeliveryValue, c::Delivery)>) {
             c::Delivery::OwnerProject(Box::new(owner_project())),
         ))
         .unwrap();
-    cases.push((w::DeliveryValue::Frame(frame_record()), c::Delivery::Frame(Box::new(frame())))).unwrap();
+    cases.push((w::DeliveryValue::Me(frame_record()), c::Delivery::Me(Box::new(frame())))).unwrap();
     cases.push((w::DeliveryValue::Task(Box::new(task_record())), c::Delivery::Task(Box::new(task())))).unwrap();
     cases
         .push((

@@ -23,12 +23,12 @@ pub fn chip_record() -> w::Chip {
 pub fn chip_pieces(count: u32) -> Box<[u8]> {
     jig_client_test_records::chip_pieces(count)
 }
-pub fn frame_record() -> w::Frame {
+pub fn frame_record() -> w::Me {
     jig_client_test_records::frame_record()
 }
-pub fn frame() -> c::Frame {
-    c::Frame {
-        party: c::FrameParty {
+pub fn frame() -> c::Me {
+    c::Me {
+        party: c::MeParty {
             number: 7,
             kind: c::PartyKind::Person,
             login: c::DocumentText { bytes: text(b""), cut: false },

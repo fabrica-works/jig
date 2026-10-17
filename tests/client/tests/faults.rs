@@ -143,7 +143,7 @@ fn another_party_keeps_the_original_partys_work_parked_and_hidden() {
     let now = w.now();
     w.front()
         .engine
-        .act(now, Wall::EPOCH, jig_client_scripted_engine::Change::Frame(stories::frame(8)))
+        .act(now, Wall::EPOCH, jig_client_scripted_engine::Change::Me(stories::frame(8)))
         .expect("second party");
     w.run(Until::Time(now.saturating_add(Duration::from_millis(10))));
     begin(&mut w, c);

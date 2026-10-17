@@ -142,6 +142,7 @@ fn source() -> OwnerProject {
             .map(|role| OwnerProjectResource { part: part(), role }),
         ),
         policy: OwnerProjectPolicy {
+            templates: List::with_capacity(0),
             ceiling: authority(true),
             period_spend: u64::MAX,
             escalation_role: None,
@@ -507,14 +508,14 @@ fn check_owner_project_real_page_decodes_whole_role_edits_preserves_prior_channe
         .iter()
         .find_map(|r| match r {
             Request::Client {
-                asked: jig_client::Event::Watch { handle: watch, subject: jig_client::Watchable::Jig(Subject::Frame) },
+                asked: jig_client::Event::Watch { handle: watch, subject: jig_client::Watchable::Jig(Subject::Me) },
             } => Some(*watch),
             _ => None,
         })
         .unwrap();
     let ready = native_drive(
         &mut d,
-        Watched { watch: f, event: WatchEvent::Delivered(Delivery::Frame(Box::new(super::cards::document()))) },
+        Watched { watch: f, event: WatchEvent::Delivered(Delivery::Me(Box::new(super::cards::document()))) },
     );
     let read =
         ready
@@ -698,14 +699,14 @@ fn native_owner_at(value: OwnerProject, section: crate::address::ProjectSection)
         .iter()
         .find_map(|request| match request {
             Request::Client {
-                asked: jig_client::Event::Watch { handle: watch, subject: jig_client::Watchable::Jig(Subject::Frame) },
+                asked: jig_client::Event::Watch { handle: watch, subject: jig_client::Watchable::Jig(Subject::Me) },
             } => Some(*watch),
             _ => None,
         })
         .unwrap();
     let out = native_drive(
         &mut domain,
-        Watched { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(super::cards::document()))) },
+        Watched { watch, event: WatchEvent::Delivered(Delivery::Me(Box::new(super::cards::document()))) },
     );
     let read = out
         .iter()
@@ -878,15 +879,16 @@ fn owner_project_public_goal_form_decodes_whole_bounded_procedure_and_keeps_prop
         [Offered {
             act: ActKind::SetGoal,
             admission: Admission::Bounded {
-                within: Bounds::Goal {
+                within: Bounds::Create(CreateBounds {
+                    authority: Box::new(crate::tests::cards_objects::owner_authority()),
                     pool_left: 17,
                     charters: list(4, [u32::MAX, 0, u32::MAX]),
-                    procedures: list(4, [GoalProcedure { connector: u16::MAX, code: u32::MAX }]),
+                    procedures: list(4, [CreateProcedure { connector: u16::MAX, code: u32::MAX }]),
                     latest: None,
                     budget: 17,
                     maximum_budget: 23,
                     maximum_deadline: None,
-                },
+                }),
                 beyond: Beyond::Proposed { to: recipient.clone() },
             },
         }],
@@ -1015,7 +1017,8 @@ fn owner_project_public_offer_ceiling_preserves_twenty_five_in_order_and_rejects
         .push(Offered {
             act: ActKind::SetGoal,
             admission: Admission::Bounded {
-                within: Bounds::Goal {
+                within: Bounds::Create(CreateBounds {
+                    authority: Box::new(crate::tests::cards_objects::owner_authority()),
                     pool_left: 0,
                     charters: List::with_capacity(5),
                     procedures: List::with_capacity(4),
@@ -1023,7 +1026,7 @@ fn owner_project_public_offer_ceiling_preserves_twenty_five_in_order_and_rejects
                     budget: 0,
                     maximum_budget: 0,
                     maximum_deadline: None,
-                },
+                }),
                 beyond: Beyond::Proposed { to: Recipient::Roles { project: u32::MAX, roles: List::with_capacity(4) } },
             },
         })
@@ -1079,14 +1082,14 @@ fn native_historical_project() -> (Fixture, OwnerSpendPage) {
         .iter()
         .find_map(|request| match request {
             Request::Client {
-                asked: jig_client::Event::Watch { handle: watch, subject: jig_client::Watchable::Jig(Subject::Frame) },
+                asked: jig_client::Event::Watch { handle: watch, subject: jig_client::Watchable::Jig(Subject::Me) },
             } => Some(*watch),
             _ => None,
         })
         .unwrap();
     let ready = native_drive(
         &mut domain,
-        Watched { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(super::cards::document()))) },
+        Watched { watch, event: WatchEvent::Delivered(Delivery::Me(Box::new(super::cards::document()))) },
     );
     let read =
         ready

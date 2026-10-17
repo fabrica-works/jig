@@ -154,15 +154,16 @@ fn nested() -> List<Offered> {
         Offered {
             act: ActKind::SetGoal,
             admission: Admission::Bounded {
-                within: jig_client_domain::contract::Bounds::Goal {
+                within: jig_client_domain::contract::Bounds::Create(jig_client_domain::contract::CreateBounds {
+                    authority: Box::new(owner_authority()),
                     pool_left: u64::MAX,
                     charters: list(vec![u32::MAX, 0]),
-                    procedures: list(vec![GoalProcedure { connector: u16::MAX, code: u32::MAX }; 2]),
+                    procedures: list(vec![CreateProcedure { connector: u16::MAX, code: u32::MAX }; 2]),
                     latest: Some(Wall::from_nanos(u64::MAX)),
                     budget: u64::MAX,
                     maximum_budget: u64::MAX,
                     maximum_deadline: None,
-                },
+                }),
                 beyond: Beyond::Proposed { to: Recipient::Roles { project: u32::MAX, roles: list(vec![u32::MAX, 0]) } },
             },
         },
@@ -201,14 +202,16 @@ fn recursive_goal_and_amend_offers_keep_full_width_holders_rows_and_opaque_bytes
     let mut value = seven();
     value.acts = nested();
     let before = value.clone();
-    // Independent allocation arithmetic, including both authority boxes and all raw pattern bytes.
+    // Independent allocation arithmetic, including three authority boxes and all raw pattern bytes.
     let pattern = List::<Box<[u8]>>::worst_case(2).unwrap() + 9;
     let grants = List::<OwnerGrant>::worst_case(2).unwrap() + 2 * pattern;
     let authority = grants
         + List::<OwnerAuthorityExecutor>::worst_case(2).unwrap()
         + List::<OwnerResourceScope>::worst_case(2).unwrap()
         + 2 * pattern;
-    let goal = List::<u32>::worst_case(2).unwrap() * 2 + List::<GoalProcedure>::worst_case(2).unwrap();
+    let goal = List::<u32>::worst_case(2).unwrap() * 2
+        + List::<CreateProcedure>::worst_case(2).unwrap()
+        + u64::try_from(size_of::<OwnerAuthorityDocument>()).unwrap();
     let amend = grants
         + List::<OwnerKindImplication>::worst_case(2).unwrap()
         + 2 * (u64::try_from(size_of::<OwnerAuthorityDocument>()).unwrap() + authority);
@@ -227,8 +230,14 @@ fn nested_offer_lists_and_unused_paged_rows_keep_their_original_independent_boun
         value.acts = nested();
         match dimension {
             0 => {
-                let Admission::Bounded { within: jig_client_domain::contract::Bounds::Goal { charters, .. }, .. } =
-                    &mut value.acts.get_mut(0).unwrap().admission
+                let Admission::Bounded {
+                    within:
+                        jig_client_domain::contract::Bounds::Create(jig_client_domain::contract::CreateBounds {
+                            charters,
+                            ..
+                        }),
+                    ..
+                } = &mut value.acts.get_mut(0).unwrap().admission
                 else {
                     panic!("goal")
                 };

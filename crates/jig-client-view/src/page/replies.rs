@@ -19,7 +19,7 @@ fn source(domain: &Ui, fallback: Source, conversations: bool) -> Source {
         let matches = match watch.subject {
             Subject::Inbox { .. } => !conversations,
             Subject::Conversations => conversations,
-            Subject::Frame
+            Subject::Me
             | Subject::Task { .. }
             | Subject::Tree { .. }
             | Subject::Chips { .. }

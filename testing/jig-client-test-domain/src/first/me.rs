@@ -19,10 +19,7 @@ pub fn told(side: &mut Side, env: &Env<Limits>, client: &Client, told: &Told, ou
                     if !side.me {
                         side.me = true;
                         out.push(Request::Client {
-                            asked: jig_client::Event::Watch {
-                                handle: handle(),
-                                subject: Watchable::Jig(Subject::Frame),
-                            },
+                            asked: jig_client::Event::Watch { handle: handle(), subject: Watchable::Jig(Subject::Me) },
                         });
                     }
                 }
@@ -39,7 +36,7 @@ pub fn told(side: &mut Side, env: &Env<Limits>, client: &Client, told: &Told, ou
         }
         Told::Changed { handle: value } if *value == handle() => {
             let Some(document) = client.document(*value) else { return true };
-            let Some(Latest::Jig(Delivery::Frame(frame))) = document.latest else { return true };
+            let Some(Latest::Jig(Delivery::Me(frame))) = document.latest else { return true };
             party(side, env, Some(frame.party.number), out);
         }
         Told::Ended { handle: value, .. } if *value == handle() => {

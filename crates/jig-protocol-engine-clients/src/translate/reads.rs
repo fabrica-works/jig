@@ -7,7 +7,7 @@ use jig_domain_people as people;
 use skein_lib::{Reader, Writer};
 pub(crate) fn read(value: w::Read) -> Option<reads::Read> {
     Some(match value {
-        w::Read::Frame => reads::Read::Frame,
+        w::Read::Me => reads::Read::Frame,
         w::Read::Task(value) => reads::Read::Task { task: value.task() },
         w::Read::Proposal(value) => reads::Read::Proposal {
             proposer: match value.proposal().proposer() {

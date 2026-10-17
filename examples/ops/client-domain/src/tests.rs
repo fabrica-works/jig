@@ -11,7 +11,7 @@ use crate as support_domain;
 #[path = "tests_support.rs"]
 mod support;
 use crate::{Address, Answered, Ask, Event, Limits, infrastructure};
-use jig_client::contract::{self, Delivery, DocumentText, Frame, FrameParty, HeldRole, Needs, PartyKind, WatchEvent};
+use jig_client::contract::{self, Delivery, DocumentText, HeldRole, Me, MeParty, Needs, PartyKind, WatchEvent};
 use jig_client_view::boundary::Offset;
 use skein_lib::{Duration, Env, List, Queue, RequestEnvelope, Time, Token, Wall};
 use support::{Domain, JigOut, Request, new, step, take};
@@ -104,7 +104,7 @@ fn start(root: &mut Domain, kept: List<crate::store::Record>) -> Token {
     ));
     rows.iter()
         .find_map(|row| match row {
-            Request::Jig(JigOut::Open { watch, subject: contract::Subject::Frame }) => Some(*watch),
+            Request::Jig(JigOut::Open { watch, subject: contract::Subject::Me }) => Some(*watch),
             _ => None,
         })
         .unwrap()
@@ -115,8 +115,8 @@ fn confirm(root: &mut Domain, watch: Token, party: u64) {
         Event::Client { event: jig_client::Event::Up { up: jig_client::Up::Served { served: true, versions: None } } },
     );
     // Explicit synthetic identity and empty offers, supplied independently of the party's display name.
-    let frame = Frame {
-        party: FrameParty {
+    let frame = Me {
+        party: MeParty {
             number: party,
             kind: PartyKind::Person,
             login: DocumentText::complete(contract::Text::new(Box::from(*b"fixture-login"), 32).unwrap()),
@@ -136,7 +136,7 @@ fn confirm(root: &mut Domain, watch: Token, party: u64) {
         root,
         Event::Client {
             event: jig_client::Event::Up {
-                up: jig_client::Up::Watched { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(frame))) },
+                up: jig_client::Up::Watched { watch, event: WatchEvent::Delivered(Delivery::Me(Box::new(frame))) },
             },
         },
     );

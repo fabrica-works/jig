@@ -6,7 +6,7 @@ fn a_create_s_tasks_cross_as_pieces_within_the_request_s_bytes() {
     let ask = fixtures::create_ask();
     let record = translate::asks::ask(&ask, &limits.wire).unwrap();
     let w::Ask::Create(value) = &record else { panic!("create") };
-    assert_eq!(value.project(), 7);
+    assert_eq!(value.project(), fixtures::PROJECT);
     let mut reader = Reader::new(value.tasks());
     let first = skein_codec::piece::split(&mut reader).unwrap().unwrap();
     let second = skein_codec::piece::split(&mut reader).unwrap().unwrap();
@@ -34,7 +34,11 @@ fn a_new_task_keeps_each_contract_and_executor_through_the_store() {
                 }]),
             },
         ),
-        ("change", c::OwnerExecutor::Agent { charter: 7 }, c::NewContract::Change { connector: 5, kind: 6, words: 18 }),
+        (
+            "change",
+            c::OwnerExecutor::Agent { charter: fixtures::CHARTER },
+            c::NewContract::Change { connector: 5, kind: 6, words: 18 },
+        ),
     ] {
         let mut task = fixtures::new_task(executor, contract);
         task.budget = c::NewBudget::Named;

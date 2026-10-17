@@ -96,8 +96,14 @@ pub(super) const ACCOUNTS: accounts::Limits =
 pub(super) const VIEWS: views::Limits = views::Limits { runs: 32, watchers: 16, facts: 256, ..small::VIEWS };
 pub(super) const NOTES: notes::Limits =
     notes::Limits { scopes: 16, entries_per_scope: 64, body_bytes: 8_192, lines: 8, recalled: 8, ..small::NOTES };
-pub(super) const DOCUMENTS: core::documents::DocumentLimits =
-    core::documents::DocumentLimits { rows: 8, text_bytes: 8_192, chips: 8, lines: 8, ..small::DOCUMENTS };
+pub(super) const DOCUMENTS: core::documents::DocumentLimits = core::documents::DocumentLimits {
+    roles: AUTHORITY.roles,
+    rows: 8,
+    text_bytes: 8_192,
+    chips: 8,
+    lines: 8,
+    ..small::DOCUMENTS
+};
 pub(super) const CORE: core::Limits = core::Limits {
     templates: 16,
     fill_mark: 1_073_741_824,

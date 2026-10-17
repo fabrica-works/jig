@@ -94,7 +94,7 @@ fn ready() -> Domain {
     let watch = rows
         .iter()
         .find_map(|r| match r {
-            Request::Jig(JigOut::Open { watch, subject: Subject::Frame }) => Some(*watch),
+            Request::Jig(JigOut::Open { watch, subject: Subject::Me }) => Some(*watch),
             _ => None,
         })
         .unwrap();
@@ -103,8 +103,8 @@ fn ready() -> Domain {
         Event::Client { event: jig_client::Event::Up { up: jig_client::Up::Served { served: true, versions: None } } },
     );
     // Explicit synthetic identity and empty offers, supplied independently of the party's display name.
-    let frame = Frame {
-        party: FrameParty {
+    let frame = Me {
+        party: MeParty {
             number: 7,
             kind: PartyKind::Person,
             login: DocumentText::complete(Text::new(Box::from(*b"fixture-login"), 32).unwrap()),
@@ -124,7 +124,7 @@ fn ready() -> Domain {
         &mut root,
         Event::Client {
             event: jig_client::Event::Up {
-                up: jig_client::Up::Watched { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(frame))) },
+                up: jig_client::Up::Watched { watch, event: WatchEvent::Delivered(Delivery::Me(Box::new(frame))) },
             },
         },
     );

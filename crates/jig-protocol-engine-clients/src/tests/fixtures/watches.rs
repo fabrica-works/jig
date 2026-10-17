@@ -59,7 +59,7 @@ pub fn subject_cases() -> [(&'static str, w::Subject, core::documents::Watched, 
     use core::documents as d;
     let limits = wire();
     [
-        ("Frame", w::Subject::Frame, d::Watched::Frame, 32),
+        ("Frame", w::Subject::Me, d::Watched::Frame, 32),
         (
             "Inbox",
             w::Subject::Inbox(w::SubjectInbox::new(&limits, w::SubjectInboxParts { window: 3 }).expect("inbox")),

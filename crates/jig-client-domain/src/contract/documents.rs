@@ -3,36 +3,12 @@
 //! List capacities and Text byte bounds are validated by the protocol before entry;
 //! the working set keeps only what its own configured limits admit.
 use super::{
-    Actor, Amendment, Authority, Count, Cursor, Decision, DocumentText, Ending, Executor, HeldRole, Holding, Lacking,
-    NoteScope, ObjectKey, Part, Party, PartyKind, Phase, Policy, PoolLedger, ProposalKey, Proposer, Refusal, Revision,
-    Text, TurnName, TurnRead, WakePolicy,
+    Actor, Amendment, Authority, Count, Cursor, Decision, DocumentText, Ending, Executor, Holding, Lacking, NoteScope,
+    ObjectKey, Part, Party, Phase, Policy, ProposalKey, Proposer, Refusal, Revision, Text, TurnName, TurnRead,
+    WakePolicy,
 };
 use alloc::boxed::Box;
 use skein_lib::{Duration, List, Wall};
-/// Who is signed in and what the engine offers.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Frame {
-    pub party: FrameParty,
-    pub projects: List<ProjectRole>,
-    pub needs: Needs,
-    pub needs_total: u32,
-    pub updates: Count,
-    pub results_seen: u64,
-    pub charters: List<OfferedCharters>,
-    pub cut: bool,
-    pub retention: Duration,
-    pub deployment_role: Option<HeldRole>,
-}
-
-/// The authenticated identity, with independently supplied local text loss.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct FrameParty {
-    pub number: u64,
-    pub kind: PartyKind,
-    pub login: DocumentText,
-    pub name: DocumentText,
-}
-
 /// Exact counts of work needing this party.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Needs {
@@ -40,17 +16,6 @@ pub struct Needs {
     pub proposals: u32,
     pub escalations: u32,
     pub person_tasks: u32,
-}
-
-/// Actual membership and the optional retained pool, independent of charter offers.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct ProjectRole {
-    pub project: u32,
-    pub name: Option<DocumentText>,
-    pub role: HeldRole,
-    pub pool: Option<PoolLedger>,
-    /// The owner-configured chat budget for this supplied membership.
-    pub chat_budget: u64,
 }
 
 /// Offers associated with their supplied project, with independent goal-list loss.
@@ -293,29 +258,11 @@ pub enum Admission {
     Refused(Refusal),
 }
 
-/// One actual procedure alternative supplied for the fixed goal form.
-/// See domain/people.md, 5.1, and client/domain/contract.md, 3.2.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct GoalProcedure {
-    pub connector: u16,
-    pub code: u32,
-}
-
 /// Numbers and lists supplied by the engine, never policy inferred by the client.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Bounds {
-    /// Goal choices within the party's offered authority.
-    Goal {
-        pool_left: u64,
-        charters: List<u32>,
-        procedures: List<GoalProcedure>,
-        latest: Option<Wall>,
-        /// Largest directly made budget; pool balance alone is not role authority.
-        budget: u64,
-        /// Hard limits of the supported form, supplied by the engine.
-        maximum_budget: u64,
-        maximum_deadline: Option<Wall>,
-    },
+    /// Creating choices within the party's offered authority.
+    Create(super::CreateBounds),
     /// Additional budget and complete held grants for an amendment.
     Amend {
         budget_left: u64,

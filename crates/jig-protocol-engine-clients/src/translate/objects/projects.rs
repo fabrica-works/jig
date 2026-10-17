@@ -175,6 +175,7 @@ pub fn policy(value: &d::Policy, limits: &w::Limits) -> Result<w::OwnerProjectPo
     w::OwnerProjectPolicy::new(
         limits,
         w::OwnerProjectPolicyParts {
+            templates: super::super::me::overrides(&value.templates, limits)?,
             ceiling: owner::authority(&value.ceiling, limits)?,
             period_spend: value.period_spend,
             escalation_role: value.escalation_role,

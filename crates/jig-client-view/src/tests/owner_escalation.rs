@@ -290,7 +290,7 @@ fn presence_domain(l: crate::Limits, documents: &[(ObjectKey, Option<ReadValue>)
         .into_iter()
         .find_map(|request| match request {
             Request::Client {
-                asked: jig_client::Event::Watch { handle: watch, subject: jig_client::Watchable::Jig(Subject::Frame) },
+                asked: jig_client::Event::Watch { handle: watch, subject: jig_client::Watchable::Jig(Subject::Me) },
             } => Some(watch),
             _ => None,
         })
@@ -298,7 +298,7 @@ fn presence_domain(l: crate::Limits, documents: &[(ObjectKey, Option<ReadValue>)
     presence_step(
         &mut domain,
         l,
-        Watched { watch: frame, event: WatchEvent::Delivered(Delivery::Frame(Box::new(document()))) },
+        Watched { watch: frame, event: WatchEvent::Delivered(Delivery::Me(Box::new(document()))) },
     );
     let requests = presence_step(
         &mut domain,

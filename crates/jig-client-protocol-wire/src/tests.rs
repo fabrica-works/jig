@@ -115,8 +115,8 @@ fn a_page_of_many_small_rows_and_one_of_a_few_large_rows_fit_one_bound() {
 fn a_frame_at_its_ceilings_round_trips_unchanged() {
     let limits = fixtures::document_limits();
     let frame = fixtures::frame_at_ceilings(&limits);
-    let bytes = fixtures::encoded(&frame, Frame::measure, Frame::encode);
-    assert_eq!(Frame::decode(&limits, &mut Reader::new(&bytes)), Ok(frame));
+    let bytes = fixtures::encoded(&frame, Me::measure, Me::encode);
+    assert_eq!(Me::decode(&limits, &mut Reader::new(&bytes)), Ok(frame));
 }
 
 #[test]

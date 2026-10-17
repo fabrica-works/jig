@@ -83,7 +83,10 @@ fn form(b: &mut Builder, client: &Borrowed<'_>, doc: &Project, words: &Words, bi
     for offer in &doc.acts {
         if offer.act == ActKind::SetGoal {
             match &offer.admission {
-                Admission::Bounded { within: Bounds::Goal { pool_left: left, .. }, .. } => {
+                Admission::Bounded {
+                    within: Bounds::Create(jig_client::contract::CreateBounds { pool_left: left, .. }),
+                    ..
+                } => {
                     pool_left = Some(*left);
                     bounds = Some(&offer.admission);
                 }
@@ -122,7 +125,7 @@ fn form(b: &mut Builder, client: &Borrowed<'_>, doc: &Project, words: &Words, bi
     }
     b.close();
 }
-/// Bounds supply the whole choice list; Frame supplies only actual charter names.
+/// Bounds supply the whole choice list; Me supplies only actual charter names.
 fn choices(
     b: &mut Builder,
     client: &Borrowed<'_>,
@@ -133,7 +136,10 @@ fn choices(
     offer: Option<&Admission>,
 ) {
     match offer {
-        Some(Admission::Bounded { within: Bounds::Goal { charters, procedures, .. }, .. }) => {
+        Some(Admission::Bounded {
+            within: Bounds::Create(jig_client::contract::CreateBounds { charters, procedures, .. }),
+            ..
+        }) => {
             for charter in charters {
                 choice(b, client, words, bindings, doc.number, GoalExecutor::Charter(*charter), pool_left);
             }
@@ -204,7 +210,7 @@ pub(super) fn choice(
             words,
             bindings,
             Role::Button,
-            JigPhrase::GoalProcedure,
+            JigPhrase::CreateProcedure,
             &[Hole::Number(u64::from(connector)), Hole::Number(u64::from(code))],
             Act::GoalForm { form },
         ),

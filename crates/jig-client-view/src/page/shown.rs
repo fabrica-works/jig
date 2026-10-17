@@ -262,7 +262,7 @@ pub(crate) fn needed(domain: &Ui, subject: &jig_client::contract::Subject) -> bo
 pub(crate) fn uses(section: Section, subject: &jig_client::contract::Subject) -> bool {
     use jig_client::contract::Subject;
     match subject {
-        Subject::Frame => false,
+        Subject::Me => false,
         Subject::Task { task } => match section {
             Section::Task { task: named, .. } => named == *task,
             Section::Inbox { .. } | Section::Conversations { .. } | Section::Project { .. } | Section::Deployment => {
@@ -409,7 +409,7 @@ pub(crate) fn context_read(domain: &mut Ui, what: &jig_client::contract::Read) {
             return;
         }
         Read::Deployment => Some(Section::Deployment),
-        Read::Frame | Read::Proposal { .. } | Read::Escalation { .. } | Read::Question { .. } | Read::Result { .. } => {
+        Read::Me | Read::Proposal { .. } | Read::Escalation { .. } | Read::Question { .. } | Read::Result { .. } => {
             None
         }
     };

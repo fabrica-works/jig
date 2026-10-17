@@ -486,7 +486,7 @@ fn delivered_name(value: &jig_client::contract::Delivery, key: ObjectKey) -> Opt
     use jig_client::contract::Delivery;
     match value {
         Delivery::OwnerProject(_)
-        | Delivery::Frame(_)
+        | Delivery::Me(_)
         | Delivery::Run(_)
         | Delivery::RunState(_)
         | Delivery::Deployment(_)
@@ -592,7 +592,7 @@ pub(crate) fn dropping(domain: &mut crate::Ui, watch: jig_client::Handle, value:
                 return;
             }
         }
-        jig_client::contract::Delivery::Frame(_)
+        jig_client::contract::Delivery::Me(_)
         | jig_client::contract::Delivery::Run(_)
         | jig_client::contract::Delivery::RunState(_)
         | jig_client::contract::Delivery::Deployment(_)
@@ -692,7 +692,7 @@ fn read_key(what: &jig_client::contract::Read) -> Option<ObjectKey> {
         Read::Question { task, message } => Some(ObjectKey::Question { task: *task, message: *message }),
         Read::PersonTask { task } => Some(ObjectKey::PersonTask(*task)),
         Read::Result { task } => Some(ObjectKey::Result(*task)),
-        Read::Frame
+        Read::Me
         | Read::Ended { .. }
         | Read::History { .. }
         | Read::Activity { .. }
@@ -892,7 +892,7 @@ pub(crate) fn historical_read(
     match result {
         ReadResult::Value(value) => match value {
             ReadValue::Historical(value) => Some(value),
-            ReadValue::Frame(_)
+            ReadValue::Me(_)
             | ReadValue::Task(_)
             | ReadValue::Proposal(_)
             | ReadValue::OwnerProposal(_)
@@ -940,7 +940,7 @@ fn read_body(key: ObjectKey, value: jig_client::contract::ReadValue) -> Option<B
         ReadValue::PersonTask(task) => Some(Body::PersonTask(task)),
         ReadValue::OwnerPersonTask(task) => Some(Body::OwnerPersonTask(task)),
         ReadValue::Result(result) => Some(Body::Result(result)),
-        ReadValue::Frame(_)
+        ReadValue::Me(_)
         | ReadValue::Inbox(_)
         | ReadValue::OwnerInbox(_)
         | ReadValue::Activity(_)
@@ -1118,7 +1118,7 @@ pub(crate) fn contexts(value: &jig_client::contract::Delivery, capacity: u32) ->
                 }
             }
         }
-        jig_client::contract::Delivery::Frame(_)
+        jig_client::contract::Delivery::Me(_)
         | jig_client::contract::Delivery::Task(_)
         | jig_client::contract::Delivery::OwnerProject(_)
         | jig_client::contract::Delivery::OwnerProposal(_)

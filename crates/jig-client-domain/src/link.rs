@@ -10,7 +10,7 @@ impl Domain {
     pub fn party(&self) -> Option<u64> {
         for (_, watch) in &self.watches {
             if watch.own
-                && let Some(crate::Latest::Jig(contract::Delivery::Frame(frame))) = &watch.latest
+                && let Some(crate::Latest::Jig(contract::Delivery::Me(frame))) = &watch.latest
             {
                 return Some(frame.party.number);
             }
@@ -60,7 +60,7 @@ impl Domain {
         self.due.clear();
         let mut own = None;
         for (id, watch) in &self.watches {
-            if watch.subject == Watchable::Jig(contract::Subject::Frame) {
+            if watch.subject == Watchable::Jig(contract::Subject::Me) {
                 own = Some(*id);
             }
             if watch.name.is_none() {
@@ -70,7 +70,7 @@ impl Domain {
         if let Some(id) = own {
             self.watches.get_mut(&id).expect("held frame watch").own = true;
         } else {
-            self.open(Watchable::Jig(contract::Subject::Frame), true, out);
+            self.open(Watchable::Jig(contract::Subject::Me), true, out);
         }
         for index in 0..self.due.len() {
             let id = *self.due.get(index).expect("held watch index");

@@ -325,7 +325,7 @@ pub(crate) fn delivery(
 ) {
     let source = Source::Watch(watch);
     match value {
-        Delivery::Frame(_) | Delivery::OwnerProject(_) => {}
+        Delivery::Me(_) | Delivery::OwnerProject(_) => {}
         Delivery::Run(_) | Delivery::RunState(_) => crate::conversation::routing::text(domain, env, watch, out, lent),
         Delivery::OwnerProposal(proposal) => {
             let key = ObjectKey::Proposal(proposal.key);
@@ -456,7 +456,7 @@ pub(crate) fn read_result(
             }
             false
         }
-        Read::Frame
+        Read::Me
         | Read::Task { .. }
         | Read::Proposal { .. }
         | Read::Escalation { .. }
@@ -520,7 +520,7 @@ fn read_value(
     lent: &jig_client::Client,
 ) {
     match value {
-        ReadValue::Frame(_) | ReadValue::OwnerInbox(_) | ReadValue::OwnerEnded(_) | ReadValue::OwnerSpend(_) => {}
+        ReadValue::Me(_) | ReadValue::OwnerInbox(_) | ReadValue::OwnerEnded(_) | ReadValue::OwnerSpend(_) => {}
         ReadValue::OwnerProject(value) => crate::page::project::owner_document(domain, value),
         ReadValue::Notes(page) => crate::page::project::notes::page(domain, source, *page),
         ReadValue::Spend(page) => crate::page::project::spend(domain, *page),
@@ -630,7 +630,7 @@ fn owner_project_read_valid(domain: &Ui, token: Token, result: &ReadResult) -> b
     let value = match result {
         ReadResult::Value(value) => match value {
             ReadValue::OwnerProject(value) => value,
-            ReadValue::Frame(_)
+            ReadValue::Me(_)
             | ReadValue::Historical(_)
             | ReadValue::Task(_)
             | ReadValue::Proposal(_)
@@ -663,7 +663,7 @@ fn owner_project_read_valid(domain: &Ui, token: Token, result: &ReadResult) -> b
     };
     match &read.what {
         Read::Project { project } => *project == value.number,
-        Read::Frame
+        Read::Me
         | Read::Task { .. }
         | Read::Proposal { .. }
         | Read::Escalation { .. }
@@ -687,7 +687,7 @@ fn owner_inbox_read_valid(domain: &Ui, env: &Env<crate::Limits>, token: Token, r
     let page = match result {
         ReadResult::Value(value) => match value {
             ReadValue::OwnerInbox(page) => page,
-            ReadValue::Frame(_)
+            ReadValue::Me(_)
             | ReadValue::Task(_)
             | ReadValue::Proposal(_)
             | ReadValue::Historical(_)
@@ -720,7 +720,7 @@ fn owner_inbox_read_valid(domain: &Ui, env: &Env<crate::Limits>, token: Token, r
     };
     let group = match &read.what {
         Read::Inbox { group, .. } => *group,
-        Read::Frame
+        Read::Me
         | Read::Task { .. }
         | Read::Proposal { .. }
         | Read::Escalation { .. }
@@ -778,7 +778,7 @@ fn received_value(
                     crate::page::project::owner_document(domain, value);
                 }
             }
-            Read::Frame
+            Read::Me
             | Read::Task { .. }
             | Read::Proposal { .. }
             | Read::Escalation { .. }
@@ -803,7 +803,7 @@ fn received_value(
         ReadValue::OwnerInbox(page) => {
             let group = match &query {
                 Read::Inbox { group, .. } => *group,
-                Read::Frame
+                Read::Me
                 | Read::Task { .. }
                 | Read::Proposal { .. }
                 | Read::Escalation { .. }
@@ -825,7 +825,7 @@ fn received_value(
             crate::page::conversations::mark_results(domain, out, lent);
             domain.changed();
         }
-        ReadValue::Frame(_)
+        ReadValue::Me(_)
         | ReadValue::Task(_)
         | ReadValue::Proposal(_)
         | ReadValue::Historical(_)
@@ -867,7 +867,7 @@ fn owner_tree_delivery(
                 return;
             }
         }
-        Subject::Frame
+        Subject::Me
         | Subject::Task { .. }
         | Subject::Chips { .. }
         | Subject::Inbox { .. }
@@ -926,7 +926,7 @@ fn historical_read_valid(domain: &Ui, env: &Env<crate::Limits>, token: Token, re
         ReadValue::OwnerEnded(page) => {
             let task = match &read.what {
                 Read::Ended { task, .. } => *task,
-                Read::Frame
+                Read::Me
                 | Read::Task { .. }
                 | Read::Proposal { .. }
                 | Read::Escalation { .. }
@@ -955,7 +955,7 @@ fn historical_read_valid(domain: &Ui, env: &Env<crate::Limits>, token: Token, re
         ReadValue::OwnerSpend(page) => {
             let project = match &read.what {
                 Read::Spend { project, .. } => *project,
-                Read::Frame
+                Read::Me
                 | Read::Task { .. }
                 | Read::Proposal { .. }
                 | Read::Escalation { .. }
@@ -985,7 +985,7 @@ fn historical_read_valid(domain: &Ui, env: &Env<crate::Limits>, token: Token, re
             }
             historical_funders_fit(page, project)
         }
-        ReadValue::Frame(_)
+        ReadValue::Me(_)
         | ReadValue::Task(_)
         | ReadValue::Proposal(_)
         | ReadValue::Historical(_)
@@ -1030,7 +1030,7 @@ fn owner_escalation_read_valid(domain: &Ui, token: Token, result: &ReadResult, l
     let document = match result {
         ReadResult::Value(ReadValue::OwnerEscalation(document)) => document,
         ReadResult::Value(
-            ReadValue::Frame(_)
+            ReadValue::Me(_)
             | ReadValue::Task(_)
             | ReadValue::Proposal(_)
             | ReadValue::Historical(_)
@@ -1063,7 +1063,7 @@ fn owner_escalation_read_valid(domain: &Ui, token: Token, result: &ReadResult, l
     };
     let task = match read.what {
         Read::Escalation { task } => task,
-        Read::Frame
+        Read::Me
         | Read::Task { .. }
         | Read::Proposal { .. }
         | Read::Question { .. }

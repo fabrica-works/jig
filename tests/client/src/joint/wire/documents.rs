@@ -29,7 +29,7 @@ fn bounds(limits: &Limits) -> admission::Bounds {
 /// # Errors
 /// Refuses any owner fact or complete boxed document above the receiving bounds.
 pub fn frame_read(value: &documents::Frame, limits: &Limits) -> Result<client::ReadValue, Invalid> {
-    let value = client::ReadValue::Frame(Box::new(owner::frame(value, limits).map_err(Invalid::Owner)?));
+    let value = client::ReadValue::Me(Box::new(owner::frame(value, limits).map_err(Invalid::Owner)?));
     admission::admit_read_value(&value, &bounds(limits)).map_err(|_| Invalid::Payload)?;
     Ok(value)
 }
@@ -37,7 +37,7 @@ pub fn frame_read(value: &documents::Frame, limits: &Limits) -> Result<client::R
 /// # Errors
 /// Refuses any owner fact or complete boxed document above the receiving bounds.
 pub fn frame_delivery(value: &documents::Frame, limits: &Limits) -> Result<client::Delivery, Invalid> {
-    let value = client::Delivery::Frame(Box::new(owner::frame(value, limits).map_err(Invalid::Owner)?));
+    let value = client::Delivery::Me(Box::new(owner::frame(value, limits).map_err(Invalid::Owner)?));
     admission::admit_delivery(&value, &bounds(limits)).map_err(|_| Invalid::Payload)?;
     Ok(value)
 }
@@ -778,15 +778,15 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn whole_frame_read_and_watch_admit_allocated_envelopes_without_erasing_owner_loss() {
+    fn me_read_and_watch_preserve_allocations_and_owner_loss() {
         let source = frame();
         let before = source.clone();
         // This fixture deliberately reserves three unfilled offer rows.
         let limits = Limits { projects: 3, rows: 3, ..crate::test::limits().jig };
         let read = frame_read(&source, &limits).expect("whole frame read fits");
-        let client::ReadValue::Frame(read) = read else { panic!("actual Frame read envelope") };
+        let client::ReadValue::Me(read) = read else { panic!("actual Me read envelope") };
         let delivery = frame_delivery(&source, &limits).expect("whole frame watch fits");
-        let client::Delivery::Frame(delivery) = delivery else { panic!("actual Frame watch envelope") };
+        let client::Delivery::Me(delivery) = delivery else { panic!("actual Me watch envelope") };
         assert_eq!(read, delivery);
         assert_eq!(read.party.login.bytes.bytes(), UTF8_TEXTS[0]);
         assert!(read.party.login.cut);

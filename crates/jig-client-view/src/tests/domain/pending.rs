@@ -175,7 +175,7 @@ fn an_act_answered_unconfirmed_is_offered_again_once_live() {
     assert_eq!(fixture.client.pending(refused), None);
     assert_eq!(fixture.objects().get(id).unwrap().card, Card::NotSent { why: intents::NotSent::Unconfirmed });
     assert_eq!(fixture.objects().get(id).unwrap().answer, None);
-    fixture.drive(Time::ZERO, jig_client::Event::Watch { handle, subject: jig_client::Watchable::Jig(Subject::Frame) });
+    fixture.drive(Time::ZERO, jig_client::Event::Watch { handle, subject: jig_client::Watchable::Jig(Subject::Me) });
     spine::delivered(&mut fixture, Time::ZERO, handle, spine::frame(ME));
     fixture.reclaim();
     let fresh = key(&press(&mut fixture, id));

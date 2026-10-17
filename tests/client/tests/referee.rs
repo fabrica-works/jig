@@ -416,7 +416,7 @@ fn ending_the_task_discharges_word_retention() {
 }
 
 #[test]
-fn a_business_frame_cannot_unpark_an_out_of_date_stream_before_the_client_restarts() {
+fn me_cannot_unpark_a_client_running_outdated_code() {
     let mut referee = skein_world::domain::Referee::new(referee::Rules::new(
         Duration::from_millis(10),
         Duration::from_millis(10),
@@ -492,7 +492,7 @@ const WATCH_ENDS: &[jig_client_domain::contract::WatchEnd] = &[
     jig_client_domain::contract::WatchEnd::SignedOut,
 ];
 #[test]
-fn a_frame_after_its_watchs_end_is_no_evidence() {
+fn me_after_its_watch_ends_is_no_evidence() {
     use jig_client::Up;
     use jig_client_domain::contract::{Delivery, WatchEvent};
     use jig_client_world::observe::up_received;
@@ -509,7 +509,7 @@ fn a_frame_after_its_watchs_end_is_no_evidence() {
             Up::WatchEnded { watch: WATCH, end: *end },
             Up::Watched {
                 watch: WATCH,
-                event: WatchEvent::Delivered(Delivery::Frame(Box::new(jig_client_world::stories::frame(7)))),
+                event: WatchEvent::Delivered(Delivery::Me(Box::new(jig_client_world::stories::frame(7)))),
             },
         ] {
             for receipt in up_received(&event) {

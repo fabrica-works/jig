@@ -87,7 +87,7 @@ fn populated() -> Fixture {
         },
     );
     let Request::Client {
-        asked: jig_client::Event::Watch { handle: watch, subject: jig_client::Watchable::Jig(Subject::Frame) },
+        asked: jig_client::Event::Watch { handle: watch, subject: jig_client::Watchable::Jig(Subject::Me) },
     } = out.as_slice()[0]
     else {
         panic!("explicit frame watch")
@@ -95,7 +95,7 @@ fn populated() -> Fixture {
     drive(&mut domain, Served { served: true });
     let mut frame = cards::document();
     frame.party.login = DocumentText::complete(cards::text(b"login"));
-    let opened = drive(&mut domain, Watched { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(frame))) });
+    let opened = drive(&mut domain, Watched { watch, event: WatchEvent::Delivered(Delivery::Me(Box::new(frame))) });
     let _original_read = history_read(opened.as_slice());
     let task_watch = opened
         .as_slice()

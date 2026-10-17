@@ -43,7 +43,7 @@ fn start(domain: &mut Fixture, limits: &Limits, kept: List<Record>) -> (jig_clie
         domain,
         limits,
         Time::ZERO,
-        Watched { watch: f, event: WatchEvent::Delivered(Delivery::Frame(Box::new(source))) },
+        Watched { watch: f, event: WatchEvent::Delivered(Delivery::Me(Box::new(source))) },
     );
     let page = open_token(&initial);
     for request in &initial {
@@ -228,7 +228,7 @@ fn checked_worst_case_and_full_containers_keep_steps_within_max_out() {
             &mut domain,
             &limits,
             Time::ZERO,
-            Watched { watch: f, event: WatchEvent::Delivered(Delivery::Frame(Box::new(oversized))) }
+            Watched { watch: f, event: WatchEvent::Delivered(Delivery::Me(Box::new(oversized))) }
         )
         .len(),
         0

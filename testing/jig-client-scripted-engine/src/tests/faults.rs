@@ -88,8 +88,8 @@ fn scenario_busy_not_ready_loss_sign_out_versions_and_watch_faults() {
     let (setup, ask) = making_script();
     let mut engine = Engine::new(setup, 13).expect("sign-out");
     send(&mut engine, 0, 11, 1, 1, ask.clone());
-    engine.read(Time::ZERO, 11, Token::new(2), Read::Frame).expect("read");
-    engine.open(Time::ZERO, 11, Token::new(3), Subject::Frame).expect("watch");
+    engine.read(Time::ZERO, 11, Token::new(2), Read::Me).expect("read");
+    engine.open(Time::ZERO, 11, Token::new(3), Subject::Me).expect("watch");
     engine.fault(at(1), Fault::SignOut { sign_in: 11 });
     let up = engine.poll(at(1));
     assert!(up.contains(&Up::Answer { attempt: Token::new(1), envelope: Envelope::SignedOut, answer: None }));
@@ -100,22 +100,22 @@ fn scenario_busy_not_ready_loss_sign_out_versions_and_watch_faults() {
     assert!(matches!(final_answer(&engine.poll(at(10_000_001))[0]), Answer::Done(Outcome::Made { .. })));
     assert_eq!(engine.commits().len(), 1);
     let mut engine = Engine::new(live_script(), 14).expect("versions");
-    engine.open(Time::ZERO, 11, Token::new(1), Subject::Frame).expect("frame");
+    engine.open(Time::ZERO, 11, Token::new(1), Subject::Me).expect("frame");
     drop(engine.poll(Time::ZERO));
     engine.taken(Token::new(1));
     engine.fault(Time::ZERO, Fault::Versions(VersionRange { first: 2, last: 2 }));
     assert_eq!(engine.versions(), VersionRange { first: 2, last: 2 });
     assert!(engine.commits().is_empty(), "a hello range is protocol configuration, not a business commit");
     assert!(engine.poll(at(9_999_999)).is_empty());
-    assert!(engine.poll(at(10_000_000)).is_empty(), "changing hello never rewrites Frame");
+    assert!(engine.poll(at(10_000_000)).is_empty(), "changing hello never rewrites Me");
     let versions = VersionRange { first: u32::MAX, last: u32::MAX };
     engine.fault(at(10_000_000), Fault::Versions(versions));
     assert_eq!(engine.versions(), versions);
     assert!(engine.commits().is_empty(), "full-width ranges remain protocol facts");
-    assert!(engine.poll(at(10_000_000)).is_empty(), "a full-width range leaves Frame unchanged");
+    assert!(engine.poll(at(10_000_000)).is_empty(), "a full-width range leaves Me unchanged");
     engine.fault(at(10_000_000), Fault::DropWatch { watch: Token::new(1) });
     assert_eq!(engine.poll(at(10_000_000)), vec![Up::Ended { token: Token::new(1), why: WatchEnd::Dropped }]);
-    engine.open(at(10_000_000), 11, Token::new(2), Subject::Frame).expect("new frame");
+    engine.open(at(10_000_000), 11, Token::new(2), Subject::Me).expect("new frame");
     drop(engine.poll(at(10_000_000)));
     engine.stop(at(10_000_000));
     assert_eq!(engine.poll(at(10_000_000)), vec![Up::Ended { token: Token::new(2), why: WatchEnd::Stopping }]);
@@ -123,25 +123,24 @@ fn scenario_busy_not_ready_loss_sign_out_versions_and_watch_faults() {
 fn scenario_slow_current_documents_preserve_in_flight_and_barriers() {
     let mut engine = Engine::new(live_script(), 15).expect("slow");
     engine.fault(Time::ZERO, Fault::Slow { span: Duration::from_millis(50) });
-    engine.open(Time::ZERO, 11, Token::new(1), Subject::Frame).expect("frame");
+    engine.open(Time::ZERO, 11, Token::new(1), Subject::Me).expect("frame");
     let mut latest = frame(1);
     latest.needs.questions = 7;
-    engine.act(at(10_000_000), Wall::EPOCH, Change::Frame(latest.clone())).expect("latest frame");
+    engine.act(at(10_000_000), Wall::EPOCH, Change::Me(latest.clone())).expect("latest frame");
     assert!(engine.poll(at(49_999_999)).is_empty());
     let up = engine.poll(at(60_000_000));
-    assert!(up.contains(&Up::Watch {
-        token: Token::new(1),
-        event: WatchEvent::Delivered(Delivery::Frame(Box::new(latest)))
-    }));
+    assert!(
+        up.contains(&Up::Watch { token: Token::new(1), event: WatchEvent::Delivered(Delivery::Me(Box::new(latest))) })
+    );
     engine.fault(at(60_000_000), Fault::Slow { span: Duration::from_millis(1) });
     let mut latest = frame(1);
     latest.needs.questions = 8;
-    engine.act(at(60_000_000), Wall::EPOCH, Change::Frame(latest.clone())).expect("changed while in flight");
+    engine.act(at(60_000_000), Wall::EPOCH, Change::Me(latest.clone())).expect("changed while in flight");
     assert!(engine.poll(at(70_000_000)).is_empty(), "slow does not acknowledge a delivery the client still holds");
     engine.taken(Token::new(1));
     assert_eq!(
         engine.poll(at(70_000_000)),
-        vec![Up::Watch { token: Token::new(1), event: WatchEvent::Delivered(Delivery::Frame(Box::new(latest))) }]
+        vec![Up::Watch { token: Token::new(1), event: WatchEvent::Delivered(Delivery::Me(Box::new(latest))) }]
     );
 }
 pub(super) fn run() {

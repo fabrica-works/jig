@@ -88,6 +88,7 @@ pub struct Versions {
 /// Bounds of one constructed document and its configured served versions.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct DocumentLimits {
+    pub roles: u32,
     pub segments: u32,
     pub rows: u32,
     pub text_bytes: u32,
@@ -256,7 +257,7 @@ pub struct FrameProjectRole {
     pub pool: Option<Ledger>,
     pub chat_budget: u64,
     /// Direct creating bounds for this party and project (contract.md, 5.3).
-    pub creating: Option<crate::acts::Bounds>,
+    pub creating: Option<crate::acts::Creating>,
     /// Configured templates with this project's policy overrides applied.
     pub templates: List<crate::Template>,
 }
@@ -427,7 +428,11 @@ pub fn document_worst_case(limits: &DocumentLimits) -> Option<u64> {
     let chip = chip_phase::heap_worst_case(limits)?;
     let chips = List::<Chip>::worst_case(limits.chips)?.checked_add(u64::from(limits.chips).checked_mul(chip)?)?;
     let charter = List::<u32>::worst_case(limits.lines)?;
-    let creating = charter.checked_add(List::<crate::acts::GoalProcedure>::worst_case(limits.lines)?)?;
+    let creating = charter
+        .checked_add(List::<crate::acts::GoalProcedure>::worst_case(limits.lines)?)?
+        .checked_add(List::<u32>::worst_case(limits.roles)?)?
+        .checked_add(u64::try_from(size_of::<AuthorityLine>()).ok()?)?
+        .checked_add(task_tree::authority_worst_case(limits)?)?;
     let frame = List::<FrameProjectRole>::worst_case(limits.lines)?
         .checked_add(u64::from(limits.lines).checked_mul(creating)?)?
         .checked_add(u64::from(limits.lines).checked_mul(u64::from(limits.text_bytes))?)?

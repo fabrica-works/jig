@@ -229,7 +229,10 @@ pub(super) fn heap_worst_case(limits: &DocumentLimits) -> Option<u64> {
     let recipient = List::<u32>::worst_case(limits.lines)?;
     // Only Amend and AmendRelease carry the full amendment facts on a task;
     // all other object kinds carry at most one bounded act.
-    let goal = List::<u32>::worst_case(1)?.checked_add(List::<acts::GoalProcedure>::worst_case(limits.lines)?)?;
+    let goal = List::<u32>::worst_case(1)?
+        .checked_add(List::<acts::GoalProcedure>::worst_case(limits.lines)?)?
+        .checked_add(u64::try_from(size_of::<super::AuthorityLine>()).ok()?)?
+        .checked_add(authority)?;
     List::<Offered>::worst_case(MAX_ACTS)?.checked_add(amended.max(goal).checked_add(recipient)?.checked_mul(2)?)
 }
 
@@ -283,10 +286,13 @@ pub(super) fn heap_bytes(value: &List<Offered>) -> Option<u64> {
             Admission::Proposed { to } => recipient_heap(to)?,
             Admission::Bounded { within, beyond } => {
                 let inner = match within {
-                    Bounds::Goal { charters, procedures, .. } => {
-                        List::<u32>::worst_case(charters.len().checked_add(charters.room())?)?.checked_add(
-                            List::<acts::GoalProcedure>::worst_case(procedures.len().checked_add(procedures.room())?)?,
-                        )?
+                    Bounds::Goal { charters, procedures, authority, .. } => {
+                        List::<u32>::worst_case(charters.len().checked_add(charters.room())?)?
+                            .checked_add(List::<acts::GoalProcedure>::worst_case(
+                                procedures.len().checked_add(procedures.room())?,
+                            )?)?
+                            .checked_add(u64::try_from(size_of::<super::AuthorityLine>()).ok()?)?
+                            .checked_add(authority_heap(authority)?)?
                     }
                     Bounds::Amend { grants, implications, authority, ceiling, .. } => grants_heap(grants)?
                         .checked_add(List::<jig_domain_authority::Implication>::worst_case(

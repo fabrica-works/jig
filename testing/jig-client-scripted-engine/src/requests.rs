@@ -137,7 +137,7 @@ impl<A: crate::Application> Engine<A> {
                     (ReadValue::PersonTask(value), Moved::PersonTask) => Some(value.revision),
                     (ReadValue::OwnerPersonTask(value), Moved::PersonTask) => Some(value.revision),
                     (
-                        ReadValue::Frame(_)
+                        ReadValue::Me(_)
                         | ReadValue::Task(_)
                         | ReadValue::Proposal(_)
                         | ReadValue::Historical(_)
@@ -176,7 +176,7 @@ impl<A: crate::Application> Engine<A> {
                                     ReadValue::Escalation(escalation) => {
                                         Some(CurrentHold::Document(Box::new(escalation.hold.reason.clone())))
                                     }
-                                    ReadValue::Frame(_)
+                                    ReadValue::Me(_)
                                     | ReadValue::Proposal(_)
                                     | ReadValue::Historical(_)
                                     | ReadValue::OwnerProposal(_)
@@ -233,7 +233,7 @@ impl<A: crate::Application> Engine<A> {
                 ReadValue::Historical(_)
                 | ReadValue::OwnerProposal(_)
                 | ReadValue::OwnerEscalation(_)
-                | ReadValue::Frame(_)
+                | ReadValue::Me(_)
                 | ReadValue::Task(_)
                 | ReadValue::Question(_)
                 | ReadValue::PersonTask(_)
@@ -443,7 +443,7 @@ impl<A: crate::Application> Engine<A> {
             let by = self.truth.frames.get(&party).expect("signed-in party has a frame").party.clone();
             let mut value = self.truth.objects.get(&key).expect("target checked").clone();
             // Terminal Party labels have no loss carrier; retain the exact actor
-            // number and only a complete supplied optional name. Frame keeps its cut.
+            // number and only a complete supplied optional name. Me keeps its cut.
             let label = by.name.whole().map(|name| jig_client_domain::contract::Party {
                 number: by.number,
                 kind: by.kind,
@@ -465,7 +465,7 @@ impl<A: crate::Application> Engine<A> {
                 ReadValue::Historical(_)
                 | ReadValue::OwnerProposal(_)
                 | ReadValue::OwnerEscalation(_)
-                | ReadValue::Frame(_)
+                | ReadValue::Me(_)
                 | ReadValue::Question(_)
                 | ReadValue::PersonTask(_)
                 | ReadValue::OwnerPersonTask(_)
@@ -549,7 +549,7 @@ fn offers(value: &ReadValue) -> Option<&List<Offered>> {
         ReadValue::OwnerPersonTask(v) => Some(&v.acts),
         ReadValue::Result(v) => Some(&v.acts),
         ReadValue::Historical(_)
-        | ReadValue::Frame(_)
+        | ReadValue::Me(_)
         | ReadValue::Ended(_)
         | ReadValue::History(_)
         | ReadValue::Activity(_)
@@ -588,7 +588,7 @@ fn ending(value: &ReadValue) -> Option<Ending> {
         | ReadValue::Historical(_)
         | ReadValue::OwnerProposal(_)
         | ReadValue::OwnerEscalation(_)
-        | ReadValue::Frame(_)
+        | ReadValue::Me(_)
         | ReadValue::Ended(_)
         | ReadValue::History(_)
         | ReadValue::Activity(_)

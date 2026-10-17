@@ -534,10 +534,10 @@ fn records_12(bytes: &[u8]) {
     check!(OwnerTaskLink, bytes);
     check!(ResultDetails, bytes);
     check!(ActKind, bytes);
-    check!(GoalProcedure, bytes);
+    check!(CreateProcedure, bytes);
     check!(OwnerKindImplication, bytes);
     check!(OwnerAuthorityDocument, bytes);
-    check!(BoundsGoal, bytes);
+    check!(BoundsCreate, bytes);
     check!(BoundsAmend, bytes);
     check!(Bounds, bytes);
     check!(BeyondProposed, bytes);

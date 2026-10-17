@@ -77,16 +77,15 @@ pub fn person_unchanged(reason: &[u8]) -> jig_domain_people::Amendment {
 }
 
 pub fn compound(project: u32, values: &[w::Operation]) -> w::Ask {
-    let mut size = 0_usize;
+    let mut encoded = List::with_capacity(u32::try_from(values.len()).unwrap());
     for value in values {
-        size = size.checked_add(usize::try_from(value.measure()).unwrap()).unwrap().checked_add(4).unwrap();
+        let mut out = Writer::new(usize::try_from(value.measure()).unwrap());
+        value.encode(&mut out).unwrap();
+        encoded.push(out.finish()).unwrap();
     }
-    let mut bytes = Writer::new(size);
-    for value in values {
-        bytes.put(&value.measure().to_be_bytes()).unwrap();
-        value.encode(&mut bytes).unwrap();
-    }
-    w::Ask::Compound(w::Compound::new(&wire(), w::CompoundParts { project, operations: bytes.finish() }).unwrap())
+    w::Ask::Compound(
+        w::Compound::new(&wire(), w::CompoundParts { project, operations: pieces(encoded.as_slice()) }).unwrap(),
+    )
 }
 
 pub fn encode_ask(ask: &w::Ask) -> Box<[u8]> {
@@ -102,5 +101,17 @@ pub fn keyed(owner: w::Owner, version: u32, request: Box<[u8]>) -> Box<[u8]> {
     let value = w::Keyed::new(&wire(), w::KeyedParts { key: [5; 16], owner, version, request }).expect("keyed");
     let mut out = Writer::new(usize::try_from(value.measure()).expect("short keyed record"));
     value.encode(&mut out).expect("bounded keyed");
+    out.finish()
+}
+
+pub fn pieces(values: &[Box<[u8]>]) -> Box<[u8]> {
+    let mut size = 0_usize;
+    for value in values {
+        size = size.checked_add(value.len()).unwrap().checked_add(4).unwrap();
+    }
+    let mut out = Writer::new(size);
+    for value in values {
+        skein_codec::piece::write(&mut out, value).unwrap();
+    }
     out.finish()
 }

@@ -99,20 +99,30 @@ pub fn recipient(value: &acts::Recipient, limits: &w::Limits) -> Result<w::Recip
         )?),
     })
 }
-fn bounds(value: &acts::Bounds, limits: &w::Limits) -> Result<w::Bounds, w::Problem> {
+pub(super) fn bounds(value: &acts::Bounds, limits: &w::Limits) -> Result<w::Bounds, w::Problem> {
     Ok(match value {
-        acts::Bounds::Goal { pool_left, charters, procedures, latest, budget, maximum_budget, maximum_deadline } => {
+        acts::Bounds::Goal {
+            authority,
+            pool_left,
+            charters,
+            procedures,
+            latest,
+            budget,
+            maximum_budget,
+            maximum_deadline,
+        } => {
             let mut rows = List::with_capacity(procedures.capacity());
             for item in procedures {
-                rows.push(w::GoalProcedure::new(
+                rows.push(w::CreateProcedure::new(
                     limits,
-                    w::GoalProcedureParts { connector: item.connector, code: item.code },
+                    w::CreateProcedureParts { connector: item.connector, code: item.code },
                 )?)
                 .expect("supplied goal procedures");
             }
-            w::Bounds::Goal(w::BoundsGoal::new(
+            w::Bounds::Create(w::BoundsCreate::new(
                 limits,
-                w::BoundsGoalParts {
+                w::BoundsCreateParts {
+                    authority: owner::authority(authority, limits)?,
                     pool_left: *pool_left,
                     charters: charters.clone(),
                     procedures: rows,

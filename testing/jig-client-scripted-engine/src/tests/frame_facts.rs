@@ -6,7 +6,7 @@ use crate::{
 use jig_client_domain::contract::*;
 use skein_lib::{List, Wall};
 #[test]
-fn frame_prices_all_reserved_memberships_offers_and_optional_document_text() {
+fn me_prices_memberships_offers_and_optional_document_text() {
     let mut row = frame(1);
     row.party.login = DocumentText { bytes: text(&[b'l'; 32]), cut: true };
     row.party.name = DocumentText::complete(text(&[b'n'; 32]));
@@ -17,12 +17,12 @@ fn frame_prices_all_reserved_memberships_offers_and_optional_document_text() {
     row.charters.get_mut(0).unwrap().goals = List::with_capacity(2);
     row.charters.get_mut(0).unwrap().cut = true;
     let mut bounds = Bounds { rows: 2, text: 32, document_bytes: u64::MAX, ..Bounds::default() };
-    let expected = u64::try_from(core::mem::size_of::<Frame>()).unwrap()
-        + List::<ProjectRole>::worst_case(1).unwrap()
+    let expected = u64::try_from(core::mem::size_of::<Me>()).unwrap()
+        + List::<MeProject>::worst_case(1).unwrap()
         + List::<OfferedCharters>::worst_case(1).unwrap()
         + List::<Charter>::worst_case(2).unwrap() * 2
         + 128;
-    assert_eq!(row.heap(&bounds).unwrap() + u64::try_from(core::mem::size_of::<Frame>()).unwrap(), expected);
+    assert_eq!(row.heap(&bounds).unwrap() + u64::try_from(core::mem::size_of::<Me>()).unwrap(), expected);
     bounds.document_bytes = expected;
     assert!(fits(&row, &bounds));
     bounds.document_bytes -= 1;

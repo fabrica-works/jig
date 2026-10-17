@@ -536,7 +536,7 @@ fn presence_domain(l: &crate::Limits) -> Fixture {
         .iter()
         .find_map(|request| {
             if let Request::Client {
-                asked: jig_client::Event::Watch { handle: watch, subject: jig_client::Watchable::Jig(Subject::Frame) },
+                asked: jig_client::Event::Watch { handle: watch, subject: jig_client::Watchable::Jig(Subject::Me) },
             } = request
             {
                 Some(*watch)
@@ -549,7 +549,7 @@ fn presence_domain(l: &crate::Limits) -> Fixture {
     step(
         &mut domain,
         l,
-        Watched { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(super::cards::document()))) },
+        Watched { watch, event: WatchEvent::Delivered(Delivery::Me(Box::new(super::cards::document()))) },
     );
     domain
 }

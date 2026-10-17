@@ -4,7 +4,7 @@ pub const WATCH: Token = Token::new(41);
 pub const HEARTBEAT: Duration = Duration::from_nanos(100);
 pub const STREAM: [u8; 16] = [7; 16];
 pub fn frame_subject() -> Watchable {
-    Watchable::Jig(c::Subject::Frame)
+    Watchable::Jig(c::Subject::Me)
 }
 pub fn family_subject() -> Watchable {
     Watchable::Family {

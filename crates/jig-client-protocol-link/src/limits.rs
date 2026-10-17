@@ -129,8 +129,8 @@ fn wire(client: &jig_client_domain::Limits) -> Option<w::Limits> {
     wire.task_contract_document_verdict_choices = u32::try_from(client.document_bytes).ok()?;
     wire.result_details_delegates = u32::try_from(client.document_bytes).ok()?;
     wire.result_details_followups_some = u32::try_from(client.document_bytes).ok()?;
-    wire.bounds_goal_charters = client.rows;
-    wire.bounds_goal_procedures = client.rows;
+    wire.bounds_create_charters = client.rows;
+    wire.bounds_create_procedures = client.rows;
     wire.bounds_amend_grants = u32::try_from(client.document_bytes).ok()?;
     wire.bounds_amend_implications = client.rows;
     wire.result_document_acts = u32::try_from(client.document_bytes).ok()?;

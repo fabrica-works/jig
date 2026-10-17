@@ -30,7 +30,7 @@ fn key(query: &client::Read) -> Result<client::ObjectKey, Invalid> {
         client::Read::Question { task, message } => client::ObjectKey::Question { task: *task, message: *message },
         client::Read::PersonTask { task } => client::ObjectKey::PersonTask(*task),
         client::Read::Result { task } => client::ObjectKey::Result(*task),
-        client::Read::Frame
+        client::Read::Me
         | client::Read::Activity { .. }
         | client::Read::Notes { .. }
         | client::Read::Conversations { .. }

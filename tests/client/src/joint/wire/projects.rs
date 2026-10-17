@@ -58,6 +58,7 @@ pub fn document(source: &documents::Project, limits: &Limits) -> Result<client::
 
 fn policy(source: &documents::Policy, limits: &Limits) -> Result<client::OwnerProjectPolicy, owner::Invalid> {
     Ok(client::OwnerProjectPolicy {
+        templates: super::me::overrides(&source.templates, limits)?,
         ceiling: owner::authority(&source.ceiling, limits)?,
         period_spend: source.period_spend,
         escalation_role: source.escalation_role,

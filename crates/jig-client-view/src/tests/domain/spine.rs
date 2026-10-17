@@ -6,9 +6,7 @@ use crate::{
     store::Record,
 };
 use jig_client::Link;
-use jig_client::contract::{
-    Count, Delivery, DocumentText, Frame, FrameParty, HeldRole, Inbox, Needs, PartyKind, WatchEvent,
-};
+use jig_client::contract::{Count, Delivery, DocumentText, HeldRole, Inbox, Me, MeParty, Needs, PartyKind, WatchEvent};
 use skein_lib::{Duration, Env, List, Queue, Time, Wall};
 
 pub(crate) const LIMITS: Limits = Limits {
@@ -63,9 +61,9 @@ pub(super) fn open_token(requests: &[Request]) -> jig_client::Handle {
 fn needs() -> Needs {
     Needs { questions: 0, proposals: 0, escalations: 0, person_tasks: 0 }
 }
-pub(crate) fn frame(party: u64) -> Frame {
-    Frame {
-        party: FrameParty {
+pub(crate) fn frame(party: u64) -> Me {
+    Me {
+        party: MeParty {
             number: party,
             kind: PartyKind::Person,
             login: DocumentText::complete(jig_client::contract::Text::new(Box::from(*b"fixture-login"), 32).unwrap()),
@@ -90,8 +88,8 @@ pub(crate) fn start(domain: &mut Fixture, kept: List<Record>) -> jig_client::Han
         Event::Start { seed: 8, place: Place::Jig(Address::Inbox { project: None }), records: kept },
     ))
 }
-pub(super) fn delivered(domain: &mut Fixture, now: Time, watch: jig_client::Handle, frame: Frame) -> Box<[Request]> {
-    drive(domain, now, Watched { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(frame))) })
+pub(super) fn delivered(domain: &mut Fixture, now: Time, watch: jig_client::Handle, frame: Me) -> Box<[Request]> {
+    drive(domain, now, Watched { watch, event: WatchEvent::Delivered(Delivery::Me(Box::new(frame))) })
 }
 fn inbox() -> Inbox {
     Inbox {
@@ -105,7 +103,7 @@ fn inbox() -> Inbox {
 }
 
 #[test]
-fn start_opens_only_the_frame_and_takes_nothing_before_it() {
+fn start_opens_me_before_any_other_watch() {
     let mut domain = Fixture::new(&LIMITS);
     assert_eq!(domain.frame().party(), None);
     let opened = drive(
@@ -119,7 +117,7 @@ fn start_opens_only_the_frame_and_takes_nothing_before_it() {
     else {
         unreachable!("start opens a watch");
     };
-    assert_eq!(*subject, jig_client::contract::Subject::Frame);
+    assert_eq!(*subject, jig_client::contract::Subject::Me);
     assert_eq!(domain.page(), &Page::Starting);
     assert_eq!(domain.link(), Link::Starting);
 }
@@ -193,7 +191,7 @@ fn an_unsupported_version_parks_work_and_never_sends_a_new_engine_request() {
 }
 
 #[test]
-fn foreign_kept_requests_hide_work_but_confirm_only_the_frame_party() {
+fn foreign_requests_hide_work_until_me_confirms_the_party() {
     let mut domain = restored(
         &[(1, 7), (2, 7)],
         List::with_capacity(0),

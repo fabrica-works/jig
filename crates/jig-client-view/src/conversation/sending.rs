@@ -2,7 +2,7 @@
 //! The draft owner clears that edit on its durable receipt; this module only keeps
 //! the submitted words and their read position. See client/domain/client.md, 10.
 use crate::{Ui, intents::Intent};
-use jig_client::contract::{Answer, Ask, FrameParty, Limit, Text};
+use jig_client::contract::{Answer, Ask, Limit, MeParty, Text};
 use skein_lib::{Id, Token};
 
 pub(crate) fn words(ask: &Ask, task: u64) -> Option<&Text> {
@@ -126,7 +126,7 @@ pub(crate) fn answered(domain: &mut Ui, request: Token, answer: &Answer) {
     domain.changed();
 }
 
-fn author(domain: &Ui, lent: &jig_client::Client) -> Option<FrameParty> {
+fn author(domain: &Ui, lent: &jig_client::Client) -> Option<MeParty> {
     let frame = domain.frame(lent).document?;
     Some(frame.party.clone())
 }

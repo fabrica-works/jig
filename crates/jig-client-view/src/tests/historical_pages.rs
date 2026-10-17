@@ -380,7 +380,7 @@ fn historical_public_plan_keeps_owner_tree_early_return_and_companion_ended_read
         address::{Address, Place, TaskSection},
     };
     let (mut client, frame) = start();
-    drive(&mut client, Watched { watch: frame, event: WatchEvent::Delivered(Delivery::Frame(Box::new(document()))) });
+    drive(&mut client, Watched { watch: frame, event: WatchEvent::Delivered(Delivery::Me(Box::new(document()))) });
     let out =
         drive(&mut client, Event::Went { place: Place::Jig(Address::Task { task: 8, section: TaskSection::Plan }) });
     let task =

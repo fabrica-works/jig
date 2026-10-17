@@ -11,7 +11,7 @@
 //! | being sent | refused or unknown | absent; the draft owner keeps the words |
 //! | sent | committed read-through | read |
 //! | absent | activity words | sent or read |
-use jig_client::contract::{Activity, ActivityPage, FrameParty, Party, Text};
+use jig_client::contract::{Activity, ActivityPage, MeParty, Party, Text};
 use skein_lib::{List, Token};
 /// Where a person's words are relative to the engine's committed turns.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -28,7 +28,7 @@ pub enum Words {
 pub struct Sent {
     pub request: Option<Token>,
     pub by: Option<Party>,
-    /// Name loss supplied by the local Frame; historical Party has no such fact.
+    /// Name loss supplied by the local Me; historical Party has no such fact.
     pub by_name_cut: Option<bool>,
     pub words: Text,
     pub state: Words,
@@ -91,7 +91,7 @@ impl KeptWords {
         true
     }
     /// Keeps the supplied local author label and its independent document loss.
-    pub fn begin_frame(&mut self, request: Token, by: Option<FrameParty>, words: Text) -> bool {
+    pub fn begin_frame(&mut self, request: Token, by: Option<MeParty>, words: Text) -> bool {
         if self.pending(request) {
             return true;
         }

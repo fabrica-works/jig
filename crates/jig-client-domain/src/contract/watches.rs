@@ -1,14 +1,14 @@
 //! Level-triggered subjects and one-terminal watches; client/domain/contract.md, 7.
 //! Deliveries replace the previous document. Run text alone is offset based and
 //! provisional, and never resets text belonging to an earlier turn.
-use super::{Chip, Conversations, CurrentCall, Deployment, Frame, Goals, Inbox, LiveCall, Task, Text, Tree, TurnName};
+use super::{Chip, Conversations, CurrentCall, Deployment, Goals, Inbox, LiveCall, Me, Task, Text, Tree, TurnName};
 use alloc::boxed::Box;
 use skein_lib::{List, Wall};
 /// A live subject followed by one unkeyed watch.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Subject {
     /// The frame, always open.
-    Frame,
+    Me,
     /// A task.
     Task { task: u64 },
     /// A bounded live subtree.
@@ -35,7 +35,7 @@ pub enum Delivery {
     /// Whole authentic project owner document.
     OwnerProject(Box<super::OwnerProject>),
     /// The frame.
-    Frame(Box<Frame>),
+    Me(Box<Me>),
     /// A task.
     Task(Box<Task>),
     /// Whole supplied pending owner proposal.

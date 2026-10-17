@@ -93,11 +93,19 @@ pub struct GoalProcedure {
     pub code: u32,
 }
 
+/// Creating bounds and the judgement beyond the first (contract.md, 5.3).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Creating {
+    pub within: Bounds,
+    pub beyond: Beyond,
+}
+
 /// A draft's numerical and listed bounds, supplied by the engine.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Bounds {
     /// A goal's direct funding, executor and deadline choices.
     Goal {
+        authority: Box<documents::AuthorityLine>,
         pool_left: u64,
         charters: List<u32>,
         procedures: List<GoalProcedure>,

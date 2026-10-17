@@ -108,7 +108,7 @@ pub(super) fn entered(address: Address) -> (Fixture, Vec<Request>) {
     frame.projects = list([project, second]);
     frame.party.name = DocumentText::complete(full());
     frame.party.login = DocumentText::complete(full());
-    deliver(&mut d, watch, Delivery::Frame(Box::new(frame)));
+    deliver(&mut d, watch, Delivery::Me(Box::new(frame)));
     let out = drive(&mut d, Event::Went { place: Place::Jig(address) });
     (d, out)
 }
@@ -248,18 +248,19 @@ fn goal_offers(doc: &mut Project) {
     doc.acts = list([Offered {
         act: ActKind::SetGoal,
         admission: Admission::Bounded {
-            within: Bounds::Goal {
+            within: Bounds::Create(CreateBounds {
+                authority: Box::new(crate::tests::cards_objects::owner_authority()),
                 pool_left: u64::MAX,
                 charters: list([1, 2]),
                 procedures: list([
-                    GoalProcedure { connector: u16::MAX, code: u32::MAX },
-                    GoalProcedure { connector: u16::MAX, code: u32::MAX.checked_sub(1).unwrap() },
+                    CreateProcedure { connector: u16::MAX, code: u32::MAX },
+                    CreateProcedure { connector: u16::MAX, code: u32::MAX.checked_sub(1).unwrap() },
                 ]),
                 latest: None,
                 budget: 0,
                 maximum_budget: u64::MAX,
                 maximum_deadline: None,
-            },
+            }),
             beyond: Beyond::Proposed { to: Recipient::Roles { project: 4, roles: list([1, 2]) } },
         },
     }]);
@@ -827,7 +828,7 @@ fn no_arrangement_keeps_each_page_bound() {
 
 fn most_owed_cards() -> Fixture {
     let (mut d, watch) = start();
-    deliver(&mut d, watch, Delivery::Frame(Box::new(document())));
+    deliver(&mut d, watch, Delivery::Me(Box::new(document())));
     let objects = list((1..=CLIENT.objects).map(|n| ObjectKey::Task(u64::from(n))));
     let out = drive(&mut d, Event::Named { objects, sections: List::with_capacity(0) });
     for request in out {

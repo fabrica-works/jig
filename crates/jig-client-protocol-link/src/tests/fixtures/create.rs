@@ -1,15 +1,18 @@
 use super::*;
 use skein_lib::List;
+pub const PROJECT: u32 = 7;
+pub const CHARTER: u32 = 7;
+pub const ROLE: u32 = 2;
 pub fn create_ask() -> c::Ask {
     let mut tasks = List::with_capacity(2);
-    tasks.push(new_task(c::OwnerExecutor::Agent { charter: 7 }, c::NewContract::Report { words: 17 })).unwrap();
+    tasks.push(new_task(c::OwnerExecutor::Agent { charter: CHARTER }, c::NewContract::Report { words: 17 })).unwrap();
     tasks
         .push(new_task(
-            c::OwnerExecutor::Person(c::PersonAddress::Role(2)),
+            c::OwnerExecutor::Person(c::PersonAddress::Role(ROLE)),
             c::NewContract::Change { connector: 5, kind: 6, words: 18 },
         ))
         .unwrap();
-    c::Ask::Create { project: 7, tasks }
+    c::Ask::Create { project: PROJECT, tasks }
 }
 pub fn new_task(executor: c::OwnerExecutor, contract: c::NewContract) -> c::NewTask {
     c::NewTask {
@@ -36,12 +39,4 @@ pub fn new_task(executor: c::OwnerExecutor, contract: c::NewContract) -> c::NewT
         label: 14,
         flags: c::TaskFlags { conversation: false, listed: true, retention: c::Retention::ForgottenOnceRead },
     }
-}
-
-pub fn list<T, const N: usize>(values: [T; N]) -> List<T> {
-    let mut result = List::with_capacity(u32::try_from(N).unwrap());
-    for value in values {
-        assert!(result.push(value).is_ok());
-    }
-    result
 }

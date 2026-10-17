@@ -58,13 +58,13 @@ pub(crate) fn classify(problem: w::Problem) -> Undecodable {
     }
 }
 
-pub fn frame(record: w::Frame, limits: &Limits) -> Result<c::Frame, Undecodable> {
+pub fn frame(record: w::Me, limits: &Limits) -> Result<c::Me, Undecodable> {
     if crate::limits::worst_case(limits).is_none() || u64::from(record.measure()) > limits.client.document_bytes {
         return Err(Undecodable::TooLarge);
     }
     let checked = receiving(limits)?;
     let limits = &checked;
-    let record = match w::Frame::new(&limits.wire, record.into_parts()) {
+    let record = match w::Me::new(&limits.wire, record.into_parts()) {
         Ok(value) => value,
         Err(problem) => return Err(classify(problem)),
     };
@@ -273,8 +273,7 @@ fn receiving_part0(checked: &mut Limits, limits: &Limits) {
     checked.wire.ending_withdrawn_fields_reason = limits.client.text;
     checked.wire.escalation_trail = u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
     checked.wire.escalation_acts = u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
-    checked.wire.frame_projects = limits.client.projects;
-    checked.wire.frame_charters = u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
+    checked.wire.me_charters = u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
     checked.wire.goals_rows = u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
     checked.wire.held_runtime_rows = u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
     checked.wire.hold_spend = limits.client.rows;
@@ -375,3 +374,6 @@ fn receiving_part2(checked: &mut Limits, limits: &Limits) {
     checked.wire.wake_policy_subscriptions =
         u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
 }
+
+#[path = "me.rs"]
+mod me;

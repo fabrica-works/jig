@@ -1,7 +1,7 @@
 use super::fixtures;
 use crate::translate;
 use jig_client_protocol_wire::v8 as w;
-fn a_frame_with_two_projects_becomes_its_record() {
+fn me_preserves_two_projects_in_its_wire_record() {
     let limits = fixtures::wire_limits();
     assert_eq!(
         translate::owner::frame(&fixtures::frame_two_projects(), &limits),
@@ -10,7 +10,7 @@ fn a_frame_with_two_projects_becomes_its_record() {
 }
 const SPARE_FRAME_ROOM: [(u32, u32); 2] = [(32, 2), (1, 32)];
 #[test]
-fn a_frame_with_spare_list_room_becomes_its_record() {
+fn me_encoding_preserves_rows_despite_spare_list_capacity() {
     let limits = fixtures::wire_limits();
     for (goal_room, project_room) in SPARE_FRAME_ROOM {
         let mut frame = fixtures::frame_two_projects();
@@ -53,12 +53,12 @@ fn a_chip_in_each_phase_becomes_its_record() {
     }
 }
 #[test]
-fn a_frame_past_the_wire_s_bound_is_refused_naming_it() {
+fn me_overflow_reports_the_wire_bound_it_exceeds() {
     let frame = fixtures::frame_two_projects();
     let limits = fixtures::wire_limits();
     let rows = [
-        (w::Limits { frame_projects: 1, ..limits }, w::Path::FrameProjects),
-        (w::Limits { frame_charters: 0, ..limits }, w::Path::FrameCharters),
+        (w::Limits { me_projects: 1, ..limits }, w::Path::MeProjects),
+        (w::Limits { me_charters: 0, ..limits }, w::Path::MeCharters),
         (w::Limits { document_text_bytes: 1, ..limits }, w::Path::DocumentTextBytes),
     ];
     for (limits, path) in rows {
@@ -160,7 +160,7 @@ fn live_nested_pieces_past_the_wire_bounds_are_refused_naming_them() {
 #[test]
 fn documents_become_their_literal_records() {
     table([
-        ("a_frame_with_two_projects_becomes_its_record", a_frame_with_two_projects_becomes_its_record),
+        ("me_preserves_two_projects_in_its_wire_record", me_preserves_two_projects_in_its_wire_record),
         ("a_task_with_a_hold_becomes_its_record", a_task_with_a_hold_becomes_its_record),
         ("a_chip_in_each_phase_becomes_its_record", a_chip_in_each_phase_becomes_its_record),
         ("a_run_writing_with_a_call_becomes_its_run_state", a_run_writing_with_a_call_becomes_its_run_state),
@@ -192,4 +192,103 @@ fn table<const N: usize>(cases: [Case; N]) {
         }
     }
     assert!(passed, "{failures:?}");
+}
+
+const TEMPLATE: u32 = 2;
+const TEMPLATE_CHARTER: u32 = 1;
+const TEMPLATE_HOLDER_ROLE: u32 = 0;
+#[test]
+fn a_me_document_carries_each_project_s_templates_and_bounds() {
+    use jig_domain_core::acts;
+    use jig_domain_people as p;
+    use jig_domain_tasks as t;
+    let mut frame = fixtures::frame_two_projects();
+    for index in 0..frame.projects.len() {
+        let project = frame.projects.get_mut(index).unwrap();
+        project.templates = fixtures::list([jig_domain_core::Template {
+            number: TEMPLATE,
+            name: b"task".as_slice().into(),
+            executor: p::TemplateExecutor::Charter(TEMPLATE_CHARTER),
+            contract: t::Contract::Report { words: 32 },
+            shallower: 1,
+            budget: p::TemplateBudget::Amount(42),
+            deadline: p::TemplateDeadline::Given,
+            tracked: Some(1),
+            flags: t::Flags::PLAIN,
+            label: TEMPLATE,
+            grace: None,
+        }]);
+        project.creating = Some(acts::Creating {
+            within: acts::Bounds::Goal {
+                authority: Box::new(fixtures::authority()),
+                pool_left: 50,
+                charters: fixtures::list([TEMPLATE_CHARTER]),
+                procedures: skein_lib::List::with_capacity(0),
+                latest: None,
+                budget: 50,
+                maximum_budget: 100,
+                maximum_deadline: None,
+            },
+            beyond: acts::Beyond::Proposed {
+                to: acts::Recipient::Role { project: project.project, role: TEMPLATE_HOLDER_ROLE },
+            },
+        });
+    }
+    let record = translate::owner::frame(&frame, &w::CEILINGS).unwrap();
+    let mut reader = skein_lib::Reader::new(record.projects());
+    for source in &frame.projects {
+        let bytes = skein_codec::piece::split(&mut reader).unwrap().unwrap();
+        let project = w::MeProject::decode(&w::CEILINGS, &mut skein_lib::Reader::new(&bytes)).unwrap();
+        assert_eq!(project.project(), source.project);
+        let mut templates = skein_lib::Reader::new(project.templates());
+        let bytes = skein_codec::piece::split(&mut templates).unwrap().unwrap();
+        let template = w::Template::decode(&w::CEILINGS, &mut skein_lib::Reader::new(&bytes)).unwrap();
+        assert_eq!(template.number(), TEMPLATE);
+        assert_eq!(
+            template.budget(),
+            &w::TemplateBudget::Amount(
+                w::TemplateAmount::new(&w::CEILINGS, w::TemplateAmountParts { value: 42 }).unwrap()
+            )
+        );
+        assert_eq!(project.creating().as_ref().unwrap().within().budget(), 50);
+        assert_eq!(
+            project.creating().as_ref().unwrap().beyond(),
+            &w::Beyond::Proposed(
+                w::BeyondProposed::new(
+                    &w::CEILINGS,
+                    w::BeyondProposedParts {
+                        to: w::Recipient::Role(
+                            w::RecipientRole::new(
+                                &w::CEILINGS,
+                                w::RecipientRoleParts { project: source.project, role: TEMPLATE_HOLDER_ROLE }
+                            )
+                            .unwrap()
+                        )
+                    }
+                )
+                .unwrap()
+            )
+        );
+    }
+    assert_eq!(skein_codec::piece::split(&mut reader), Ok(None));
+}
+#[test]
+fn a_project_document_carries_its_policy_s_template_overrides() {
+    let mut project = fixtures::project_document();
+    project.policy.templates = fixtures::list([jig_domain_people::TemplateOverride {
+        template: TEMPLATE,
+        executor: None,
+        budget: Some(jig_domain_people::TemplateBudget::Amount(42)),
+        deadline: None,
+        priority: None,
+    }]);
+    let record = translate::objects::project(&project, &w::CEILINGS).unwrap();
+    let entry = record.policy().templates().get(0).unwrap();
+    assert_eq!(entry.template(), TEMPLATE);
+    assert_eq!(
+        entry.budget(),
+        &Some(w::TemplateBudget::Amount(
+            w::TemplateAmount::new(&w::CEILINGS, w::TemplateAmountParts { value: 42 }).unwrap()
+        ))
+    );
 }

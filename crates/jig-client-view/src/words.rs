@@ -90,7 +90,7 @@ impl Words {
             GoalExecutor::Charter(number) => self.text(b, JigPhrase::Charter, &[Hole::Number(u64::from(number))]),
             GoalExecutor::Procedure { connector, code } => self.text(
                 b,
-                JigPhrase::GoalProcedure,
+                JigPhrase::CreateProcedure,
                 &[Hole::Number(u64::from(connector)), Hole::Number(u64::from(code))],
             ),
         }

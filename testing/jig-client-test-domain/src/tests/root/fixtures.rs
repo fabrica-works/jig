@@ -1,6 +1,6 @@
 use crate::{Address, Domain, Event, Limits, Request, first, step, take};
 use jig_client::contract::{
-    self, Answer, Delivery, DocumentText, Frame, FrameParty, HeldRole, Needs, PartyKind, WatchEnd, WatchEvent,
+    self, Answer, Delivery, DocumentText, HeldRole, Me, MeParty, Needs, PartyKind, WatchEnd, WatchEvent,
 };
 use jig_client_view::boundary::Offset;
 use skein_lib::{Duration, Env, List, Queue, RequestLimits, Time, Token, Wall};
@@ -155,7 +155,7 @@ pub(super) fn start(root: &mut Domain, kept: List<crate::store::Record>) -> Toke
     ));
     rows.iter()
         .find_map(|row| match row {
-            Request::Client { request: jig_client::Request::Down { down: jig_client::Down::Open { watch, subject: jig_client::Watchable::Jig(contract::Subject::Frame) } } } => Some(*watch),
+            Request::Client { request: jig_client::Request::Down { down: jig_client::Down::Open { watch, subject: jig_client::Watchable::Jig(contract::Subject::Me) } } } => Some(*watch),
             _ => None,
         })
         .unwrap()
@@ -178,8 +178,8 @@ pub(super) fn confirm(root: &mut Domain, watch: Token, party: u64) -> Vec<Reques
             },
         );
     }
-    let frame = Frame {
-        party: FrameParty {
+    let frame = Me {
+        party: MeParty {
             number: party,
             kind: PartyKind::Person,
             login: DocumentText::complete(contract::Text::new(Box::from(*b"fixture-login"), 32).unwrap()),
@@ -200,7 +200,7 @@ pub(super) fn confirm(root: &mut Domain, watch: Token, party: u64) -> Vec<Reques
         root,
         Event::Client {
             event: jig_client::Event::Up {
-                up: jig_client::Up::Watched { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(frame))) },
+                up: jig_client::Up::Watched { watch, event: WatchEvent::Delivered(Delivery::Me(Box::new(frame))) },
             },
         },
     )

@@ -58,11 +58,11 @@ pub fn expires() -> skein_lib::Wall {
 }
 
 #[must_use]
-pub fn frame_subject() -> jig_client_protocol_wire::v8::Subject {
-    jig_client_protocol_wire::v8::Subject::Frame
+pub fn me_subject() -> jig_client_protocol_wire::v8::Subject {
+    jig_client_protocol_wire::v8::Subject::Me
 }
 #[must_use]
-pub fn frame_document(needs: u32) -> jig_domain_core::documents::Document {
+pub fn me_document(needs: u32) -> jig_domain_core::documents::Document {
     use jig_domain_core::documents as d;
     d::Document::Frame(d::Frame {
         party: 7,

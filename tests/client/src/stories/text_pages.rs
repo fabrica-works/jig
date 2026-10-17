@@ -38,7 +38,7 @@ fn cards(world: &mut World<Test, Scripted>) -> ConversationLine {
     frame.needs = Needs { questions: 1, proposals: 1, escalations: 1, person_tasks: 1 };
     frame.needs_total = 4;
     frame.updates.value = 2;
-    world.front().engine.act(Time::ZERO, Wall::EPOCH, Change::Frame(frame)).expect("golden frame fits");
+    world.front().engine.act(Time::ZERO, Wall::EPOCH, Change::Me(frame)).expect("golden frame fits");
     let task = task();
     let question = Question {
         task: task.chip.clone(),

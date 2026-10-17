@@ -91,7 +91,16 @@ pub(super) fn predict(value: &Admission, ask: &people::Ask, before: Option<&Task
     };
     match (within, ask) {
         (
-            Bounds::Goal { pool_left, charters, procedures, latest, budget, maximum_budget, maximum_deadline },
+            Bounds::Goal {
+                authority: _,
+                pool_left,
+                charters,
+                procedures,
+                latest,
+                budget,
+                maximum_budget,
+                maximum_deadline,
+            },
             people::Ask::SetGoal { executor, budget: amount, deadline: until, .. },
         ) => {
             let supported = match executor {

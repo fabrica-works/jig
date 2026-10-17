@@ -3,23 +3,44 @@ use alloc::boxed::Box;
 extern crate alloc;
 
 #[must_use]
-pub fn frame_two_projects_record() -> w::Frame {
+pub fn frame_two_projects_record() -> w::Me {
     let lim = limits();
     let mut parts = frame_record().into_parts();
     let mut identity = parts.party.into_parts();
     identity.login = w::DocumentText::new(&lim, w::DocumentTextParts { bytes: Box::from("é".as_bytes()), cut: true })
         .expect("literal UTF-8 login");
-    parts.party = w::FrameParty::new(&lim, identity).expect("literal frame party");
-    parts.projects = List::with_capacity(2);
+    parts.party = w::MeParty::new(&lim, identity).expect("literal frame party");
+    let mut projects = List::with_capacity(2);
     for (project, role, chat_budget) in [(3, w::HeldRole::Owner, 11), (5, w::HeldRole::Observer, 13)] {
-        parts
-            .projects
+        projects
             .push(
-                w::ProjectRole::new(&lim, w::ProjectRoleParts { project, name: None, role, pool: None, chat_budget })
-                    .expect("literal fixture fits"),
+                w::MeProject::new(
+                    &lim,
+                    w::MeProjectParts {
+                        templates: Box::from([]),
+                        creating: None,
+                        project,
+                        name: None,
+                        role,
+                        pool: None,
+                        chat_budget,
+                    },
+                )
+                .expect("literal fixture fits"),
             )
             .expect("literal fixture fits");
     }
+    let mut size = 0_u32;
+    for project in &projects {
+        size = size.checked_add(project.measure()).expect("fixture sizes").checked_add(4).expect("piece header");
+    }
+    let mut out = skein_lib::Writer::new(usize::try_from(size).expect("fixture size"));
+    for project in &projects {
+        let mut encoded = skein_lib::Writer::new(usize::try_from(project.measure()).expect("fixture size"));
+        project.encode(&mut encoded).expect("fixture encode");
+        skein_codec::piece::write(&mut out, &encoded.finish()).expect("fixture piece");
+    }
+    parts.projects = out.finish();
     let mut chats = List::with_capacity(1);
     chats
         .push(w::Charter::new(&lim, w::CharterParts { number: 17, name: None }).expect("literal chat charter"))
@@ -37,7 +58,7 @@ pub fn frame_two_projects_record() -> w::Frame {
     );
     skein_codec::piece::write(&mut framed, &encoded.finish()).expect("literal piece");
     parts.charters = framed.finish();
-    w::Frame::new(&lim, parts).expect("literal fixture fits")
+    w::Me::new(&lim, parts).expect("literal fixture fits")
 }
 #[must_use]
 pub fn owner_phase_records() -> [w::OwnerChipPhase; 6] {

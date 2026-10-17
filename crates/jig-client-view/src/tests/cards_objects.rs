@@ -38,7 +38,7 @@ fn chip() -> Chip {
         }),
     }
 }
-fn owner_authority() -> OwnerAuthorityDocument {
+pub(super) fn owner_authority() -> OwnerAuthorityDocument {
     OwnerAuthorityDocument {
         authority: OwnerAuthority {
             tools: 0,
@@ -132,8 +132,7 @@ fn result() -> Result {
 }
 fn loaded_with_watch(key: ObjectKey, value: ReadValue) -> (Fixture, Id<Object>, jig_client::Handle) {
     let (mut d, frame) = start();
-    let out =
-        drive(&mut d, Watched { watch: frame, event: WatchEvent::Delivered(Delivery::Frame(Box::new(document()))) });
+    let out = drive(&mut d, Watched { watch: frame, event: WatchEvent::Delivered(Delivery::Me(Box::new(document()))) });
     let inbox =
         out.iter()
             .find_map(|r| match r {
@@ -643,8 +642,7 @@ fn all_chip_phases(words: &crate::words::Words) {
 
 fn live_reply_and_dependency_chips(words: &crate::words::Words) {
     let (mut d, frame) = start();
-    let out =
-        drive(&mut d, Watched { watch: frame, event: WatchEvent::Delivered(Delivery::Frame(Box::new(document()))) });
+    let out = drive(&mut d, Watched { watch: frame, event: WatchEvent::Delivered(Delivery::Me(Box::new(document()))) });
     let inbox =
         out.iter()
             .find_map(|r| match r {
@@ -1041,7 +1039,7 @@ fn goal_dialog_scenario(words: &crate::words::Words, bindings: &mut JigBindings)
     let mut doc = document();
     doc.charters.get_mut(0).unwrap().goals =
         list([Charter { number: 1, name: Some(DocumentText::complete(text(b"lead"))) }]);
-    drive(&mut d, Watched { watch: frame, event: WatchEvent::Delivered(Delivery::Frame(Box::new(doc))) });
+    drive(&mut d, Watched { watch: frame, event: WatchEvent::Delivered(Delivery::Me(Box::new(doc))) });
     let out = drive(
         &mut d,
         Event::Went { place: Place::Jig(Address::Project { project: 4, section: ProjectSection::Goals }) },
@@ -1146,7 +1144,7 @@ fn note_loaded(note: Note) -> (Fixture, Id<Object>) {
     use crate::address::{Address, Place, ProjectSection};
     let number = note.number;
     let (mut d, frame) = start();
-    drive(&mut d, Watched { watch: frame, event: WatchEvent::Delivered(Delivery::Frame(Box::new(document()))) });
+    drive(&mut d, Watched { watch: frame, event: WatchEvent::Delivered(Delivery::Me(Box::new(document()))) });
     let out = drive(
         &mut d,
         Event::Went { place: Place::Jig(Address::Project { project: 4, section: ProjectSection::Notes }) },

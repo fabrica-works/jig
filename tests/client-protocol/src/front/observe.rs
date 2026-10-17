@@ -156,7 +156,7 @@ pub fn receipts(fact: &Received) -> Vec<Receipt> {
                 },
             },
         },
-        Received::Delivery(c::Delivery::Frame(value)) => {
+        Received::Delivery(c::Delivery::Me(value)) => {
             return vec![Receipt::Party { party: value.party.number, watch: None }];
         }
         Received::Delivery(value) => Event::Client {

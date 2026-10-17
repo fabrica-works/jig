@@ -117,7 +117,7 @@ fn task(t: &Task) -> Receipt {
 fn read(v: &ReadValue) -> Vec<Receipt> {
     match v {
         ReadValue::Task(t) => vec![task(t)],
-        ReadValue::Frame(f) => frame(f, None),
+        ReadValue::Me(f) => frame(f, None),
         ReadValue::Escalation(e) => vec![Receipt::Card {
             key: key(ObjectKey::Escalation(e.task.task)),
             revisions: vec![(1, e.steering.revision.value), (2, e.hold.revision.value)],
@@ -169,7 +169,7 @@ fn read(v: &ReadValue) -> Vec<Receipt> {
         | ReadValue::OwnerDeployment(_) => vec![],
     }
 }
-fn frame(frame: &Frame, watch: Option<Token>) -> Vec<Receipt> {
+fn frame(frame: &Me, watch: Option<Token>) -> Vec<Receipt> {
     vec![Receipt::Party { party: frame.party.number, watch }]
 }
 fn family(doc: &family::Document) -> Receipt {
@@ -234,7 +234,7 @@ pub fn up_received(up: &jig_client::Up) -> Vec<Receipt> {
         Up::Served { served: false, .. } => vec![Receipt::OutOfDate],
         Up::ReadDone { result: Readout::Jig(ReadResult::Value(value)), .. } => read(value),
         Up::Watched { event: WatchEvent::Delivered(Delivery::Task(value)), .. } => vec![task(value)],
-        Up::Watched { watch, event: WatchEvent::Delivered(Delivery::Frame(value)) } => frame(value, Some(*watch)),
+        Up::Watched { watch, event: WatchEvent::Delivered(Delivery::Me(value)) } => frame(value, Some(*watch)),
         Up::WatchEnded { watch, end } => {
             let mut receipts = vec![Receipt::WatchEnded { watch: *watch }];
             if *end == WatchEnd::SignedOut {

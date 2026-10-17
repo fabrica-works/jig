@@ -382,7 +382,7 @@ fn full_frame_notices(words: &crate::words::Words, sized: &Limits) {
     let mut second = f.projects.get(0).unwrap().clone();
     second.project = 5;
     f.projects.push(second).unwrap();
-    let out = drive(&mut d, Watched { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(f))) });
+    let out = drive(&mut d, Watched { watch, event: WatchEvent::Delivered(Delivery::Me(Box::new(f))) });
     let mut bindings = JigBindings::new(sized.bindings, CLIENT.text);
     let mut b = Builder::new(sized);
     b.open(Role::Page);

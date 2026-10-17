@@ -80,10 +80,12 @@ pub(super) fn text(bytes: &[u8]) -> Text {
 pub(super) fn drive(d: &mut Fixture, event: impl crate::tests::fixtures::Input) -> Vec<Request> {
     d.drive(Time::ZERO, event).into_vec()
 }
-pub(super) fn document() -> Frame {
+pub(super) fn document() -> Me {
     let mut projects = List::with_capacity(2);
     projects
-        .push(ProjectRole {
+        .push(MeProject {
+            templates: List::with_capacity(0),
+            creating: None,
             project: 4,
             name: Some(DocumentText::complete(text(b"One"))),
             role: HeldRole::Policy { role: 1 },
@@ -99,8 +101,8 @@ pub(super) fn document() -> Frame {
             chat_budget: 0,
         })
         .unwrap();
-    Frame {
-        party: FrameParty {
+    Me {
+        party: MeParty {
             number: 1,
             kind: PartyKind::Person,
             login: DocumentText::complete(text(b"fixture-login")),
@@ -200,7 +202,7 @@ fn frame_builds_statuses_counts_navigation_and_number_submission_in_every_link_s
     let mut bindings = JigBindings::new(64, CLIENT.text);
     for expected in [b"Connecting".as_slice(), b"Live", b"Offline"] {
         if expected == b"Live" {
-            drive(&mut d, Watched { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(document()))) });
+            drive(&mut d, Watched { watch, event: WatchEvent::Delivered(Delivery::Me(Box::new(document()))) });
         }
         if expected == b"Offline" {
             d.set_link(jig_client::Link::Offline);
@@ -299,7 +301,7 @@ fn shared_card_frame_says_each_progress_refusal_and_departure_with_context_only_
 
 fn card_context(d: &mut Fixture, frame_watch: jig_client::Handle, words: &Words, bindings: &mut JigBindings) {
     let out =
-        drive(d, Watched { watch: frame_watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(document()))) });
+        drive(d, Watched { watch: frame_watch, event: WatchEvent::Delivered(Delivery::Me(Box::new(document()))) });
     let inbox_watch =
         out.iter()
             .find_map(|r| match r {

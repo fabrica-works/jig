@@ -52,7 +52,7 @@ fn ready() -> Domain {
             Request::Client {
                 request:
                     jig_client::Request::Down {
-                        down: jig_client::Down::Open { watch, subject: jig_client::Watchable::Jig(Subject::Frame) },
+                        down: jig_client::Down::Open { watch, subject: jig_client::Watchable::Jig(Subject::Me) },
                     },
             } => Some(*watch),
             _ => None,
@@ -78,8 +78,8 @@ fn ready() -> Domain {
             event: jig_client::Event::Up {
                 up: jig_client::Up::Watched {
                     watch,
-                    event: WatchEvent::Delivered(Delivery::Frame(Box::new(Frame {
-                        party: FrameParty {
+                    event: WatchEvent::Delivered(Delivery::Me(Box::new(Me {
+                        party: MeParty {
                             number: 7,
                             kind: PartyKind::Person,
                             login: DocumentText::complete(text(b"fixture-login")),

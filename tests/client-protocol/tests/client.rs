@@ -21,8 +21,8 @@ fn a_client_signed_in_by_the_printed_link_sees_me_live() {
 #[test]
 fn a_client_reads_the_project_me_names_by_its_handle() {
     let mut story = Story::live(fixtures::SEED);
-    story.watch(ME, Watchable::Jig(contract::Subject::Frame));
-    let Some(Latest::Jig(contract::Delivery::Frame(me))) = story.client.document(ME).expect("watched handle").latest
+    story.watch(ME, Watchable::Jig(contract::Subject::Me));
+    let Some(Latest::Jig(contract::Delivery::Me(me))) = story.client.document(ME).expect("watched handle").latest
     else {
         panic!("me");
     };
@@ -38,7 +38,7 @@ fn a_client_reads_the_project_me_names_by_its_handle() {
 #[test]
 fn a_dropped_stream_makes_each_handle_behind_then_live_with_me() {
     let mut story = Story::live(fixtures::SEED);
-    story.watch(ME, Watchable::Jig(contract::Subject::Frame));
+    story.watch(ME, Watchable::Jig(contract::Subject::Me));
     story.watch(INBOX, Watchable::Jig(contract::Subject::Inbox { window: 2 }));
     assert!(
         story.run_until(
@@ -481,4 +481,60 @@ fn a_create_beyond_authority_is_refused_saying_a_proposal_could_be_accepted() {
     );
     assert_eq!(story.party_proposal(1), None);
     assert_eq!((story.task_budget(1), story.task_budget(2)), (None, None));
+}
+
+const OVERRIDE_TEMPLATE: Key = Key { asker: Asker::JIG, number: 501 };
+const GOAL_TEMPLATE: u32 = 2;
+const CHAT_TEMPLATE: u32 = 1;
+const ME_WAIT: Duration = Duration::from_secs(1);
+#[test]
+fn me_serves_a_template_merged_with_its_project_s_override() {
+    let mut story = Story::live(fixtures::SEED);
+    story.watch(ME, Watchable::Jig(contract::Subject::Me));
+    let override_goal = contract::TemplateOverride {
+        template: GOAL_TEMPLATE,
+        executor: None,
+        budget: Some(contract::TemplateBudget::Amount(42)),
+        deadline: None,
+        priority: None,
+    };
+    let mut overrides = skein_lib::List::with_capacity(1);
+    overrides.push(override_goal.clone()).expect("one override");
+    story.send(
+        OVERRIDE_TEMPLATE,
+        Ask::Jig(Box::new(contract::Ask::ChangePolicy {
+            project: PROJECT_NUMBER,
+            edit: contract::PolicyEdit::Templates { overrides },
+        })),
+    );
+    assert!(story.run_until(|s| !s.answered(OVERRIDE_TEMPLATE).is_empty(), ME_WAIT));
+    assert_eq!(
+        story.answered(OVERRIDE_TEMPLATE),
+        vec![Outcome::Answered(Answered::Jig(contract::Answer::Done(contract::Outcome::Owner(
+            contract::OwnerOutcome::PolicyChanged { project: PROJECT_NUMBER }
+        ))))]
+    );
+    assert!(
+        story
+            .run_until(|s| me_template_budget(s, GOAL_TEMPLATE) == Some(contract::TemplateBudget::Amount(42)), ME_WAIT)
+    );
+    assert_eq!(me_template_budget(&story, CHAT_TEMPLATE), Some(contract::TemplateBudget::AsAllowed { cap: None }));
+    story.read(PROJECT, Readable::Jig(contract::Read::Project { project: PROJECT_NUMBER }));
+    assert!(story.run_until(|s| !s.pages(PROJECT).is_empty(), ME_WAIT));
+    let pages = story.pages(PROJECT);
+    let [Readout::Jig(contract::ReadResult::Value(contract::ReadValue::OwnerProject(project)))] = pages.as_slice()
+    else {
+        panic!("project page")
+    };
+    assert_eq!(project.policy.templates.as_slice(), &[override_goal]);
+}
+fn me_template_budget(story: &Story, template: u32) -> Option<contract::TemplateBudget> {
+    let Some(Latest::Jig(contract::Delivery::Me(me))) = story.client.document(ME)?.latest else { return None };
+    me.projects
+        .iter()
+        .find(|row| row.project == PROJECT_NUMBER)?
+        .templates
+        .iter()
+        .find(|row| row.number == template)
+        .map(|row| row.budget)
 }

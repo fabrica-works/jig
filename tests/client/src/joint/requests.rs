@@ -233,7 +233,7 @@ mod tests {
             request: jig_client::Request::Down {
                 down: jig_client::Down::Open {
                     watch: Token::new(71),
-                    subject: jig_client::Watchable::Jig(jig_client_domain::contract::Subject::Frame),
+                    subject: jig_client::Watchable::Jig(jig_client_domain::contract::Subject::Me),
                 },
             },
         };
@@ -249,7 +249,7 @@ mod tests {
                 request: jig_client::Request::Down {
                     down: jig_client::Down::Open {
                         watch: Token::new(71),
-                        subject: jig_client::Watchable::Jig(jig_client_domain::contract::Subject::Frame)
+                        subject: jig_client::Watchable::Jig(jig_client_domain::contract::Subject::Me)
                     }
                 }
             }

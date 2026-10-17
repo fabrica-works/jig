@@ -1,7 +1,7 @@
 //! Field-for-field document values (client/domain/contract.md, 5–7).
 use super::{Limits, List, Reader, Wall, c, piece_problem, too_large, w};
-pub(crate) fn frame_party_fields(value: &w::FrameParty, limits: &Limits) -> Result<c::FrameParty, w::Problem> {
-    Ok(c::FrameParty {
+pub(crate) fn frame_party_fields(value: &w::MeParty, limits: &Limits) -> Result<c::MeParty, w::Problem> {
+    Ok(c::MeParty {
         number: value.number(),
         kind: crate::translate::answers::party_kind(value.kind(), limits),
         login: crate::translate::facts::document_text(value.login(), limits)?,
@@ -35,7 +35,7 @@ pub(crate) fn pool_ledger_fields(value: &w::PoolLedger, limits: &Limits) -> c::P
 }
 
 #[expect(clippy::manual_map, reason = "step code matches optional fields without closures")]
-pub(crate) fn project_role_fields(value: &w::ProjectRole, limits: &Limits) -> Result<c::ProjectRole, w::Problem> {
+pub(crate) fn project_role_fields(value: &w::MeProject, limits: &Limits) -> Result<c::MeProject, w::Problem> {
     let opt0 = match value.name() {
         Some(item) => Some(crate::translate::facts::document_text(item, limits)?),
         None => None,
@@ -44,11 +44,22 @@ pub(crate) fn project_role_fields(value: &w::ProjectRole, limits: &Limits) -> Re
         Some(item) => Some(pool_ledger_fields(item, limits)),
         None => None,
     };
-    Ok(c::ProjectRole {
+    Ok(c::MeProject {
         project: value.project(),
         name: opt0,
         role: crate::translate::answers::held_role(value.role(), limits),
         pool: opt1,
+        templates: super::me::templates(value.templates(), limits)?,
+        creating: match value.creating() {
+            Some(value) => Some(c::Creating {
+                within: match super::bounds_fields(&w::Bounds::Create(value.within().clone()), limits)? {
+                    c::Bounds::Create(value) => value,
+                    c::Bounds::Amend { .. } => unreachable!("wire creating bounds"),
+                },
+                beyond: super::beyond_fields(value.beyond(), limits)?,
+            }),
+            None => None,
+        },
         chat_budget: value.chat_budget(),
     })
 }
@@ -129,19 +140,13 @@ pub(crate) fn offered_charters_piece(
 }
 
 #[expect(clippy::manual_map, reason = "step code matches optional fields without closures")]
-pub(crate) fn frame_fields(value: &w::Frame, limits: &Limits) -> Result<c::Frame, w::Problem> {
-    if value.projects().len() > limits.client.projects {
-        return Err(too_large());
-    }
-    let mut list0 = List::with_capacity(value.projects().len());
-    for item in value.projects() {
-        list0.push(project_role_fields(item, limits)?).expect("reserved supplied list");
-    }
+pub(crate) fn frame_fields(value: &w::Me, limits: &Limits) -> Result<c::Me, w::Problem> {
+    let list0 = super::me::projects(value.projects(), limits)?;
     let opt1 = match value.deployment_role() {
         Some(item) => Some(crate::translate::answers::held_role(item, limits)),
         None => None,
     };
-    Ok(c::Frame {
+    Ok(c::Me {
         party: frame_party_fields(value.party(), limits)?,
         projects: list0,
         needs: needs_fields(value.needs(), limits),

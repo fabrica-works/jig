@@ -216,7 +216,7 @@ fn a_read_value_counts_its_discriminator_against_the_document_byte_bound() {
     let value = fixtures::encoded_read_value(&fixtures::frame_read_value());
     let bytes = u64::try_from(value.len()).unwrap();
     let limits = fixtures::read_byte_limits(bytes);
-    assert_eq!(translate::reads::value(&value, &limits), Ok(c::ReadValue::Frame(Box::new(fixtures::frame()))));
+    assert_eq!(translate::reads::value(&value, &limits), Ok(c::ReadValue::Me(Box::new(fixtures::frame()))));
     let short = fixtures::read_byte_limits(bytes.checked_sub(1).unwrap());
     assert_eq!(translate::reads::value(&value, &short), Err(Undecodable::TooLarge));
 }
@@ -243,4 +243,12 @@ fn a_read_activity_keeps_each_undecodable_turn_in_its_page() {
         let expected = c::ReadValue::Activity(Box::new(expected));
         assert_eq!(h.read_answered(), Some(&Readout::Jig(c::ReadResult::Value(expected))));
     }
+}
+
+#[test]
+fn me_s_projects_past_the_document_bytes_are_refused_as_too_large() {
+    let value = jig_client_test_records::frame_two_projects_record();
+    let mut limits = fixtures::limits();
+    limits.client.document_bytes = u64::from(value.measure()).checked_sub(1).unwrap();
+    assert_eq!(translate::documents::frame(value, &limits), Err(Undecodable::TooLarge));
 }

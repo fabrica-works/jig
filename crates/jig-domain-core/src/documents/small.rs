@@ -116,7 +116,9 @@ pub(super) fn frame(core: &Core, limits: &Limits, party: u64) -> Result<Frame, M
                 name: None,
                 pool,
                 creating: match crate::acts::bounds::goal(core, limits, party, role.project, Some(role.role)) {
-                    crate::acts::Admission::Bounded { within, .. } => Some(within),
+                    crate::acts::Admission::Bounded { within, beyond } => {
+                        Some(crate::acts::Creating { within, beyond })
+                    }
                     crate::acts::Admission::Refused(_) => None,
                     crate::acts::Admission::Allowed | crate::acts::Admission::Proposed { .. } => {
                         unreachable!("creating is bounded or refused")

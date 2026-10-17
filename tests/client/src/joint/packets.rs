@@ -68,7 +68,7 @@ pub fn document(
     let (client, watch, subject) = watched(transport, watcher)?;
     let delivery = match source {
         jig_domain_core::documents::Document::Frame(value) => {
-            if subject != client::Subject::Frame || value.party != transport.party(client) {
+            if subject != client::Subject::Me || value.party != transport.party(client) {
                 return Err(Invalid::OwnerRoute);
             }
             wire::documents::frame_delivery(value, limits)

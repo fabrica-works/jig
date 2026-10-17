@@ -29,7 +29,7 @@ pub struct Domain {
     later: Vec<Request>,
     watches: alloc::collections::BTreeMap<Token, u16>,
     me: Option<Token>,
-    frame: Option<Box<jig_client::contract::Frame>>,
+    frame: Option<Box<jig_client::contract::Me>>,
 }
 impl core::ops::Deref for Domain {
     type Target = d::Domain;
@@ -57,7 +57,7 @@ pub fn step(root: &mut Domain, env: &Env<d::Limits>, event: d::Event, out: &mut 
             jig_client::Event::Up {
                 up:
                     Up::Watched {
-                        event: jig_client::contract::WatchEvent::Delivered(jig_client::contract::Delivery::Frame(frame)),
+                        event: jig_client::contract::WatchEvent::Delivered(jig_client::contract::Delivery::Me(frame)),
                         ..
                     },
             },
@@ -86,8 +86,7 @@ fn collect(root: &mut Domain, raw: &mut Queue<d::Request>, out: &mut Queue<Reque
         if let d::Request::Client {
             request:
                 jig_client::Request::Down {
-                    down:
-                        Down::Open { watch, subject: jig_client::Watchable::Jig(jig_client::contract::Subject::Frame) },
+                    down: Down::Open { watch, subject: jig_client::Watchable::Jig(jig_client::contract::Subject::Me) },
                 },
         } = &row
         {
@@ -320,7 +319,7 @@ pub fn reconnect(root: &mut Domain, env: &Env<d::Limits>, out: &mut Queue<Reques
         &env,
         up(Up::Watched {
             watch,
-            event: jig_client::contract::WatchEvent::Delivered(jig_client::contract::Delivery::Frame(frame)),
+            event: jig_client::contract::WatchEvent::Delivered(jig_client::contract::Delivery::Me(frame)),
         }),
         out,
     );

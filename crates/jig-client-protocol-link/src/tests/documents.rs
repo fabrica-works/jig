@@ -1,7 +1,7 @@
 use super::*;
 use crate::translate::{Undecodable, documents, live};
 #[test]
-fn a_frame_record_becomes_the_contract_s_frame() {
+fn a_me_record_becomes_the_contract_s_me() {
     assert_eq!(documents::frame(fixtures::frame_record(), &fixtures::limits()), Ok(fixtures::frame()));
 }
 #[test]

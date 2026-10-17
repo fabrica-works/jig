@@ -230,7 +230,7 @@ fn historical_unadmitted_recurrence_is_refused_before_copying_any_raw_goal_field
 #[test]
 fn historical_original_query_and_all_nested_companion_identities_are_checked_before_route_admission() {
     for (query, source) in sources() {
-        assert_eq!(read(&client::Read::Frame, &source, &limits()), Err(Invalid::Query));
+        assert_eq!(read(&client::Read::Me, &source, &limits()), Err(Invalid::Query));
         assert_eq!(read(&client::Read::Task { task: 0 }, &source, &limits()), Err(Invalid::Identity));
         let mut wrong = source.clone();
         match &mut wrong.value {

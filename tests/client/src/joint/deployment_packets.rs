@@ -11,7 +11,7 @@ fn deployment_read_keeps_original_query_client_and_token_until_whole_owner_admis
     let limits = wire::deployment::tests::limits();
     let answer = reads::Answer::Document(Box::new(documents::Document::Deployment(Box::new(source.clone()))));
     let wrong =
-        transport.reply_to(Reply::Read { client: ClientId(0), read: native, what: client::Read::Frame }).into_token();
+        transport.reply_to(Reply::Read { client: ClientId(0), read: native, what: client::Read::Me }).into_token();
     let to = transport
         .reply_to(Reply::Read { client: ClientId(0), read: native, what: client::Read::Deployment })
         .into_token();
@@ -55,7 +55,7 @@ fn deployment_watch_keeps_original_subject_and_ack_until_whole_delivery_admissio
     let source = wire::deployment::tests::source();
     let limits = wire::deployment::tests::limits();
     let document = documents::Document::Deployment(Box::new(source.clone()));
-    let wrong = transport.open(ClientId(0), Token::new(1), Watched::Jig(client::Subject::Frame));
+    let wrong = transport.open(ClientId(0), Token::new(1), Watched::Jig(client::Subject::Me));
     let watcher = transport.open(ClientId(0), native, Watched::Jig(client::Subject::Deployment));
     assert_eq!(
         super::super::packets::document(&mut transport, wrong, &document, &limits).err(),

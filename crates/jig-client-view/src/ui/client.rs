@@ -38,8 +38,7 @@ pub(crate) fn told(
             match state {
                 jig_client::Link::Starting => {
                     if domain.frame_watch.is_none() {
-                        domain.frame_watch =
-                            domain.hold_watch(contract::Subject::Frame, crate::handles::Owner::Frame, out);
+                        domain.frame_watch = domain.hold_watch(contract::Subject::Me, crate::handles::Owner::Me, out);
                     }
                 }
                 jig_client::Link::Offline | jig_client::Link::Live => {}

@@ -329,7 +329,7 @@ fn three() -> (Fixture, jig_client::Handle, jig_client::Handle) {
     step_three(&mut domain, Served { served: true });
     let entered = step_three(
         &mut domain,
-        Watched { watch: frame_watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(frame(7)))) },
+        Watched { watch: frame_watch, event: WatchEvent::Delivered(Delivery::Me(Box::new(frame(7)))) },
     );
     let watch = open_token(&entered);
     let read = read_named(&entered, &Read::Conversations { after: None });

@@ -159,7 +159,7 @@ pub(crate) fn plain(mut read: Read) -> (Read, Option<Cursor>) {
         | Read::Spend { after, .. }
         | Read::Notes { after, .. } => after.take(),
         Read::Activity { before, .. } => before.take(),
-        Read::Frame
+        Read::Me
         | Read::Task { .. }
         | Read::Proposal { .. }
         | Read::Escalation { .. }
@@ -206,9 +206,8 @@ impl<A: crate::Application> Engine<A> {
             return Err(ReadNone::Unknown);
         }
         let object = match &query {
-            Read::Frame => {
-                return self
-                    .checked_read(self.truth.frames.get(&party).cloned().map(|v| ReadValue::Frame(Box::new(v))));
+            Read::Me => {
+                return self.checked_read(self.truth.frames.get(&party).cloned().map(|v| ReadValue::Me(Box::new(v))));
             }
             Read::Task { task } => Some(ObjectKey::Task(*task)),
             Read::Proposal { proposal } => Some(ObjectKey::Proposal(*proposal)),
@@ -313,7 +312,7 @@ impl<A: crate::Application> Engine<A> {
                 if !self.truth.visible(party,row.project) { return false; }
                 match query {
                     Read::Inbox { group, project, kind, goal, .. } => *group == InboxReadGroup::of(row.group) && project.is_none_or(|p| p == row.project) && kind.is_none_or(|k| k == row.group) && goal.is_none_or(|g| row.goal == Some(g)),
-                    Read::Frame | Read::Task { .. } | Read::Proposal { .. } | Read::Escalation { .. } | Read::Question { .. }
+                    Read::Me | Read::Task { .. } | Read::Proposal { .. } | Read::Escalation { .. } | Read::Question { .. }
                     | Read::PersonTask { .. } | Read::Result { .. } | Read::Ended { .. } | Read::History { .. } | Read::Activity { .. }
                     | Read::Conversations { .. } | Read::Goals { .. } | Read::Spend { .. } | Read::Project { .. } | Read::Notes { .. } | Read::Deployment => false,
                 }
@@ -365,7 +364,7 @@ impl<A: crate::Application> Engine<A> {
                     NoteScope::Goal { project, .. } => self.truth.visible(party, *project),
                 };
             }
-            Read::Frame | Read::Conversations { .. } => return self.truth.frames.contains_key(&party),
+            Read::Me | Read::Conversations { .. } => return self.truth.frames.contains_key(&party),
             Read::Deployment => return self.truth.frames.get(&party).is_some_and(|f| f.deployment_role.is_some()),
         };
         key.and_then(|key| self.truth.project(key)).is_some_and(|project| self.truth.visible(party, project))
@@ -381,7 +380,7 @@ fn empty(read: &Read) -> Rows {
         Read::Goals { .. } => Rows::Goals(vec![]),
         Read::Spend { .. } => Rows::Spend(vec![]),
         Read::Notes { .. } => Rows::Notes(vec![]),
-        Read::Frame
+        Read::Me
         | Read::Task { .. }
         | Read::Proposal { .. }
         | Read::Escalation { .. }

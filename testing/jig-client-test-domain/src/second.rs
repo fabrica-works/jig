@@ -112,7 +112,7 @@ impl Side {
                             self.me = true;
                             out.push(jig_client::Event::Watch {
                                 handle,
-                                subject: jig_client::Watchable::Jig(jig_client::contract::Subject::Frame),
+                                subject: jig_client::Watchable::Jig(jig_client::contract::Subject::Me),
                             });
                         }
                     }
@@ -128,7 +128,7 @@ impl Side {
             }
             jig_client::Told::Changed { handle: value } if *value == handle => {
                 if let Some(document) = client.document(handle)
-                    && let Some(jig_client::Latest::Jig(jig_client::contract::Delivery::Frame(frame))) = document.latest
+                    && let Some(jig_client::Latest::Jig(jig_client::contract::Delivery::Me(frame))) = document.latest
                 {
                     self.party = Some(frame.party.number);
                     self.changed();

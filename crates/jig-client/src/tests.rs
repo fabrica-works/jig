@@ -29,7 +29,7 @@ fn a_reply_reaches_the_domain_as_its_decoded_answer() {
 #[test]
 fn an_application_watch_on_me_shares_the_client_s_own() {
     let mut c = Client::signed_in();
-    c.step(Event::Watch { handle: ME, subject: Watchable::Jig(contract::Subject::Frame) });
+    c.step(Event::Watch { handle: ME, subject: Watchable::Jig(contract::Subject::Me) });
     let [Request::Told { told: Told::Changed { handle } }] = c.requests() else {
         panic!("one change: {:?}", c.requests());
     };

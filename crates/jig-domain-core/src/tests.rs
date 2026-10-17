@@ -125,6 +125,7 @@ fn limits() -> Limits {
         templates: 8,
         fill_mark: 1000,
         documents: DocumentLimits {
+            roles: authority_limits().roles,
             segments: 4,
             rows: 32,
             text_bytes: 256,
@@ -420,7 +421,19 @@ fn documents_frame_carries_roles_retention_and_configured_charters() {
             name: None,
             pool: None,
             chat_budget: core.authority.role(1, 0).unwrap().authority.budget.spend,
-            creating: Some(frame_facts::owner_creating(limits.documents.lines)),
+            creating: Some(crate::acts::Creating {
+                within: frame_facts::owner_creating(limits.documents.lines, 1, 1),
+                beyond: crate::acts::Beyond::Proposed {
+                    to: crate::acts::Recipient::Roles {
+                        project: 1,
+                        roles: {
+                            let mut roles = List::with_capacity(limits.authority.roles);
+                            roles.push(0).unwrap();
+                            roles
+                        }
+                    }
+                },
+            }),
             templates: List::with_capacity(0),
         }]
     );

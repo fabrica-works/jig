@@ -133,7 +133,7 @@ pub fn navigation(b: &mut Builder, client: &Borrowed<'_>, nav: SlotRef, words: &
 /// Jig's banner, with its five parts in their stable order.
 pub fn banner(b: &mut Builder, client: &Borrowed<'_>, words: &Words, bindings: &mut JigBindings) {
     b.open(Role::Banner);
-    b.name(&words.say(JigPhrase::Frame, &[]));
+    b.name(&words.say(JigPhrase::Me, &[]));
     link(b, client, words, bindings);
     needs(b, client, words, bindings);
     party(b, client, words, bindings);
@@ -170,7 +170,7 @@ pub fn control(
 
 fn membership(
     b: &mut Builder,
-    project: &jig_client::contract::ProjectRole,
+    project: &jig_client::contract::MeProject,
     selected_project: Option<u32>,
     words: &Words,
     bindings: &mut JigBindings,

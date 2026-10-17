@@ -10,7 +10,7 @@ fn signed() -> Peer {
 fn watched() -> (Peer, [u8; 16], Token) {
     let mut peer = signed();
     let stream = peer.open_stream();
-    let watcher = peer.open_watch(stream, &fixtures::frame_subject());
+    let watcher = peer.open_watch(stream, &fixtures::me_subject());
     (peer, stream, watcher)
 }
 fn provider() -> Peer {
@@ -164,7 +164,7 @@ fn after_stop_a_new_exchange_is_answered_not_ready() {
 fn after_stop_a_read_is_served() {
     let mut peer = signed();
     let lim = fixtures::limits().wire;
-    let value = w::Read::Frame;
+    let value = w::Read::Me;
     let mut bytes = Writer::new(usize::try_from(value.measure()).expect("read size"));
     value.encode(&mut bytes).expect("read bytes");
     let record = w::Owned::new(&lim, w::OwnedParts { owner: w::Owner::Jig, version: 8, record: bytes.finish() })
@@ -211,7 +211,7 @@ fn close_ends_each_stream_then_says_closed() {
     let (mut peer, first, watcher) = watched();
     let second = second_stream(&mut peer);
     peer.stop_reading(first);
-    peer.release_delivery(watcher, fixtures::frame_document(7));
+    peer.release_delivery(watcher, fixtures::me_document(7));
     peer.event(Event::Close);
     assert_eq!(peer.closed(), 0, "the last stream has unread bytes");
     assert!(!peer.stream_closed(first));
@@ -228,7 +228,7 @@ fn close_ends_each_stream_then_says_closed() {
 fn abort_drops_a_stream_without_waiting_for_its_last_bytes() {
     let (mut peer, stream, watcher) = watched();
     peer.stop_reading(stream);
-    peer.release_delivery(watcher, fixtures::frame_document(7));
+    peer.release_delivery(watcher, fixtures::me_document(7));
     let bytes = peer.stream_bytes(stream).len();
     peer.event(Event::Close);
     assert_eq!(peer.closed(), 0);

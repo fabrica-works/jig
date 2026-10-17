@@ -225,7 +225,7 @@ pub(crate) fn tasks(domain: &mut Ui, env: &Env<crate::Limits>, filter: TaskFilte
                     old.push(*id).expect("watch IDs fit");
                 }
             }
-            contract::Subject::Frame
+            contract::Subject::Me
             | contract::Subject::Task { .. }
             | contract::Subject::Tree { .. }
             | contract::Subject::Chips { .. }

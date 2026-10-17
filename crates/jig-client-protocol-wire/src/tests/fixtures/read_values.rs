@@ -15,9 +15,9 @@ macro_rules! value {
 
 pub fn read_values(limits: &Limits) -> List<(&'static str, ReadValue)> {
     let mut values = List::with_capacity(26);
-    value!(values, limits, OwnerProject, OwnerProject, 106);
+    value!(values, limits, OwnerProject, OwnerProject, 110);
     value!(values, limits, Historical, OwnerHistorical, 240, Box::new);
-    value!(values, limits, Frame, Frame, 70);
+    value!(values, limits, Me, Me, 70);
     value!(values, limits, Task, Task, 213);
     value!(values, limits, Proposal, Proposal, 148);
     value!(values, limits, OwnerProposal, OwnerProposal, 57);

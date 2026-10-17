@@ -25,8 +25,8 @@ fn live() -> Client {
     c.step(Event::Up {
         up: Up::Watched {
             watch: ME_WATCH,
-            event: contract::WatchEvent::Delivered(contract::Delivery::Frame(Box::new(contract::Frame {
-                party: contract::FrameParty {
+            event: contract::WatchEvent::Delivered(contract::Delivery::Me(Box::new(contract::Me {
+                party: contract::MeParty {
                     number: PARTY,
                     kind: contract::PartyKind::Person,
                     login: contract::DocumentText::complete(contract::Text::new(Box::new([]), 0).unwrap()),
@@ -56,7 +56,7 @@ fn an_unlinked_client_gives_its_watch_as_the_domain_s_opening() {
     else {
         panic!("one opening: {:?}", c.requests());
     };
-    assert_eq!((*watch, subject), (ME_WATCH, &Watchable::Jig(contract::Subject::Frame)));
+    assert_eq!((*watch, subject), (ME_WATCH, &Watchable::Jig(contract::Subject::Me)));
 }
 #[test]
 fn an_unlinked_client_takes_an_answer_as_the_domain_s() {

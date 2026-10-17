@@ -35,7 +35,7 @@ fn a_page_reads_its_documents_from_the_client_by_handle() {
         jig_client::Event::Up {
             up: Up::Watched {
                 watch: fixture.watch_token(handle).unwrap(),
-                event: WatchEvent::Delivered(Delivery::Frame(Box::new(changed.clone()))),
+                event: WatchEvent::Delivered(Delivery::Me(Box::new(changed.clone()))),
             },
         },
         &mut out,

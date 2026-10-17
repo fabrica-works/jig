@@ -22,7 +22,7 @@ use crate::{
     store::Record,
 };
 use jig_client::Link;
-use jig_client::contract::{Delivery, Frame, Limit, Subject};
+use jig_client::contract::{Delivery, Limit, Me, Subject};
 use skein_lib::{Deadlines, Duration, Env, Id, List, Map, Queue, Time, Wall};
 
 pub mod borrowed;
@@ -358,7 +358,7 @@ impl Ui {
         let document = match self.frame_watch {
             Some(handle) => match client.document(handle) {
                 Some(document) => match document.latest {
-                    Some(jig_client::Latest::Jig(Delivery::Frame(frame)))
+                    Some(jig_client::Latest::Jig(Delivery::Me(frame)))
                         if crate::frame::me::fits(frame, &self.limits) =>
                     {
                         Some(frame.as_ref())
@@ -486,7 +486,7 @@ impl Ui {
         for _ in 0..self.handles.watches.len() {
             let mut found = None;
             for (handle, held) in &self.handles.watches {
-                if all || held.owner != Owner::Frame {
+                if all || held.owner != Owner::Me {
                     found = Some(*handle);
                     break;
                 }
@@ -650,7 +650,7 @@ fn start(domain: &mut Ui, env: &Env<Limits>, place: Place, records: List<Record>
         Place::Missing => domain.page = Page::Missing,
     }
     crate::store::restore(domain, env.limits.text, records, out);
-    domain.frame_watch = domain.hold_watch(Subject::Frame, Owner::Frame, out);
+    domain.frame_watch = domain.hold_watch(Subject::Me, Owner::Me, out);
     domain.changed();
 }
 // Restored table scopes are facts; the client owns the warning and its end.
@@ -707,8 +707,8 @@ pub(crate) fn changed_handle(
             return;
         };
         match owner {
-            Owner::Frame => {
-                if let Delivery::Frame(frame) = delivery {
+            Owner::Me => {
+                if let Delivery::Me(frame) = delivery {
                     frame_delivery(domain, env, *frame.clone(), out, client);
                 }
             }
@@ -740,7 +740,7 @@ pub(crate) fn changed_handle(
 pub(crate) fn frame_delivery(
     domain: &mut Ui,
     env: &Env<Limits>,
-    frame: Frame,
+    frame: Me,
     out: &mut Queue<Request>,
     lent: &jig_client::Client,
 ) {
@@ -820,7 +820,7 @@ pub(crate) fn ended_handle(
             crate::page::routing::refuse(domain, Limit::Objects);
         }
     }
-    if final_task && held.owner != Owner::Frame {
+    if final_task && held.owner != Owner::Me {
         crate::objects::ending_source(domain, handle);
     }
     if why == jig_client::Why::NotAllowed && held.owner == Owner::Sections {
