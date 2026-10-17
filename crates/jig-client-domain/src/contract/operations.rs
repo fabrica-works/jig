@@ -62,7 +62,7 @@ pub struct NewTask {
     pub contract: NewContract,
     pub authority: super::OwnerAuthority,
     pub budget: NewBudget,
-    pub wake: super::OwnerWakePolicy,
+    pub wake: Option<super::OwnerWakePolicy>,
     pub dependencies: skein_lib::List<TaskRef>,
     pub named: skein_lib::List<super::OwnerGrant>,
     pub tracked: Option<u32>,

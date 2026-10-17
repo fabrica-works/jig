@@ -25,7 +25,7 @@ pub fn new_task(executor: c::OwnerExecutor, contract: c::NewContract) -> c::NewT
         contract,
         authority: read_value_owner_authority(),
         budget: c::NewBudget::AsAllowed { cap: Some(99) },
-        wake: read_value_owner_wake_policy(),
+        wake: Some(read_value_owner_wake_policy()),
         dependencies: list([c::TaskRef::Member(1), c::TaskRef::Task(u64::MAX)]),
         named: list([c::OwnerGrant {
             connector: 5,

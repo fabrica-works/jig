@@ -227,7 +227,10 @@ fn new_task(v: &c::NewTask, limits: &w::Limits) -> Result<w::NewTask, w::Problem
                     w::NewBudget::AsAllowed(w::BudgetAsAllowed::new(limits, w::BudgetAsAllowedParts { cap })?)
                 }
             },
-            wake: asks::wire_owner_wake_policy(&v.wake, limits)?,
+            wake: match &v.wake {
+                Some(wake) => Some(asks::wire_owner_wake_policy(wake, limits)?),
+                None => None,
+            },
             dependencies,
             named: asks::wire_owner_grant_piece(&named, limits)?,
             tracked: v.tracked,
@@ -325,7 +328,7 @@ fn restore_task(v: &w::NewTask, limits: &crate::Limits) -> Result<c::NewTask, w:
             w::NewBudget::Named => c::NewBudget::Named,
             w::NewBudget::AsAllowed(v) => c::NewBudget::AsAllowed { cap: *v.cap() },
         },
-        wake: super::facts::owner_wake_policy(v.wake(), limits),
+        wake: restore_wake(v.wake().as_ref(), limits),
         dependencies,
         named: super::documents::owner_grant_piece(v.named(), limits, limits.client.rows)?,
         tracked: *v.tracked(),
@@ -386,4 +389,9 @@ pub(super) fn restore_propose(value: &w::Propose, limits: &crate::Limits) -> Res
     };
     let reason = super::store::text(value.reason(), limits)?;
     Ok(c::Ask::Propose { project: value.project(), action, reason })
+}
+
+fn restore_wake(value: Option<&w::OwnerWakePolicy>, limits: &crate::Limits) -> Option<c::OwnerWakePolicy> {
+    let Some(wake) = value else { return None };
+    Some(super::facts::owner_wake_policy(wake, limits))
 }

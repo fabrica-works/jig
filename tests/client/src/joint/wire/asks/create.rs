@@ -40,7 +40,18 @@ fn member(v: &c::NewTask) -> p::Member {
                     .collect(),
             },
         },
-        wake: request_arguments::wake(v.wake),
+        wake: match v.wake {
+            Some(wake) => request_arguments::wake(wake),
+            None => p::WakePolicy {
+                words: p::WakeRule::Immediate,
+                notices: p::WakeRule::Immediate,
+                news: p::WakeRule::Immediate,
+                results: p::ResultsWake::LastOrFailure,
+                questions: true,
+                answers: true,
+                timers: true,
+            },
+        },
         dependencies: v
             .dependencies
             .iter()

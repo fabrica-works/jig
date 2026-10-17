@@ -39,19 +39,6 @@ fn member(role: bool, authority: w::OwnerAuthority, expected: p::Authority) -> (
         w::TaskRef::Member(w::TaskRefMember::new(&l, w::TaskRefMemberParts { value: 1 }).unwrap()),
         w::TaskRef::Task(w::TaskRefTask::new(&l, w::TaskRefTaskParts { value: u64::MAX }).unwrap()),
     ]);
-    let wake = w::OwnerWakePolicy::new(
-        &l,
-        w::OwnerWakePolicyParts {
-            words: w::WakeRule::Immediate,
-            notices: w::WakeRule::Never,
-            news: w::WakeRule::Never,
-            results: w::ResultsWake::LastOrFailure,
-            questions: true,
-            answers: false,
-            timers: true,
-        },
-    )
-    .unwrap();
     let spec = w::Specification::new(
         &l,
         w::SpecificationParts {
@@ -96,7 +83,7 @@ fn member(role: bool, authority: w::OwnerAuthority, expected: p::Authority) -> (
             budget: w::NewBudget::AsAllowed(
                 w::BudgetAsAllowed::new(&l, w::BudgetAsAllowedParts { cap: Some(42) }).unwrap(),
             ),
-            wake,
+            wake: None,
             dependencies,
             named: authority.grants().into(),
             tracked: Some(14),
@@ -133,11 +120,11 @@ fn expected_member(role: bool, expected: p::Authority) -> p::Member {
         budget: p::Budget::AsAllowed { cap: Some(42) },
         wake: p::WakePolicy {
             words: p::WakeRule::Immediate,
-            notices: p::WakeRule::Never,
-            news: p::WakeRule::Never,
+            notices: p::WakeRule::Immediate,
+            news: p::WakeRule::Immediate,
             results: p::ResultsWake::LastOrFailure,
             questions: true,
-            answers: false,
+            answers: true,
             timers: true,
         },
         dependencies: Box::new([p::Dependency::Batch(1), p::Dependency::Existing(u64::MAX)]),

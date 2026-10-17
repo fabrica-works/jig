@@ -28,7 +28,7 @@ pub fn create_tasks() -> List<c::NewTask> {
                     note_resources: List::with_capacity(0),
                 },
                 budget: if allowed { c::NewBudget::AsAllowed { cap: Some(20) } } else { c::NewBudget::Named },
-                wake: c::OwnerWakePolicy {
+                wake: Some(c::OwnerWakePolicy {
                     words: c::WakeRule::Immediate,
                     notices: c::WakeRule::Never,
                     news: c::WakeRule::Never,
@@ -36,7 +36,7 @@ pub fn create_tasks() -> List<c::NewTask> {
                     questions: false,
                     answers: false,
                     timers: false,
-                },
+                }),
                 dependencies,
                 named: List::with_capacity(0),
                 tracked: None,
