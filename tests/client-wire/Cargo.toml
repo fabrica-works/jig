@@ -7,6 +7,9 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dev-dependencies]
+jig-client-domain.workspace = true
+jig-client-test-domain.workspace = true
+jig-core-world = { path = "../core" }
 jig-client-test-protocol-wire.workspace = true
 jig-client-protocol-wire.workspace = true
 skein-codegen.workspace = true

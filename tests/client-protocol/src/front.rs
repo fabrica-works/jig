@@ -176,36 +176,17 @@ impl Side {
                 link::Event::Close { watch }
             }
             Request::Send { attempt, key, ask: client::Ask::First(ask) } => {
-                let Ok(ask) = family::request(&ask) else {
-                    self.callbacks.push(Event::Answer {
-                        attempt,
-                        envelope: skein_lib::RequestEnvelope::Lost,
-                        answer: None,
-                    });
-                    return;
-                };
+                let ask = family::request(&ask);
                 link::Event::Send { attempt, key, ask: jig_client_domain::Ask::Family(ask) }
             }
             Request::First(client::first::Out::Read { read, subject }) => {
-                let Ok(what) = family::read(subject) else {
-                    self.callbacks.push(Event::First(client::first::Event::Read {
-                        read,
-                        result: client::first::ReadResult::Unsupported,
-                    }));
-                    return;
-                };
+                let what = family::read(subject);
                 let read = self.route(true, read);
                 self.subjects.insert(read, subject);
                 link::Event::Read { read, what: jig_client_domain::Readable::Family(what) }
             }
             Request::First(client::first::Out::Open { watch, subject }) => {
-                let Ok(record) = family::subject(subject) else {
-                    self.callbacks.push(Event::First(client::first::Event::Ended {
-                        watch,
-                        end: client::first::WatchEnd::Unsupported,
-                    }));
-                    return;
-                };
+                let record = family::subject(subject);
                 let routed = self.route(true, watch);
                 self.watched.insert((true, watch), routed);
                 self.subjects.insert(routed, subject);

@@ -378,8 +378,11 @@ dependencies = [
 name = "jig-client-wire-world"
 version = "0.0.0"
 dependencies = [
+ "jig-client-domain",
  "jig-client-protocol-wire",
+ "jig-client-test-domain",
  "jig-client-test-protocol-wire",
+ "jig-core-world",
  "skein-codegen",
  "skein-lib",
 ]

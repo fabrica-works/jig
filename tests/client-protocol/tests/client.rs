@@ -185,7 +185,7 @@ fn a_family_request_is_answered_as_its_owner_s_bytes() {
         revision: contract::Revision { value: 0 },
         value: 42,
     };
-    story.send(STOP, Ask::Family(jig_client_protocol_world::family::request(&request).expect("value-bearing request")));
+    story.send(STOP, Ask::Family(jig_client_protocol_world::family::request(&request)));
     assert!(story.run_until(|s| !s.answered(STOP).is_empty(), Duration::from_secs(1)));
     let answers = story.answered(STOP);
     let [Outcome::Answered(Answered::Family(answer))] = answers.as_slice() else {

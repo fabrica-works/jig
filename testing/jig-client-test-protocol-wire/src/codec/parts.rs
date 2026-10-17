@@ -185,7 +185,7 @@ pub(super) fn encode_application_release(value: &d::ApplicationRelease) -> w::Ap
     .expect("admitted fields fit schema")
 }
 #[expect(clippy::manual_map, reason = "step code translates optional fields without closures")]
-pub(super) fn decode_application_release(value: w::ApplicationRelease, _limits: &d::Limits) -> d::ApplicationRelease {
+pub(super) fn decode_application_release(value: w::ApplicationRelease) -> d::ApplicationRelease {
     let w::ApplicationReleaseParts { task, revision, again } = value.into_parts();
     d::ApplicationRelease {
         task,
@@ -204,7 +204,7 @@ pub(super) fn encode_application_request(value: &d::ApplicationRequest) -> w::Ap
         w::ApplicationRequestParts {
             object: *object,
             revision: *revision,
-            value: *value,
+            value: Some(*value),
             release: match release {
                 Some(value) => Some(encode_application_release(value)),
                 None => None,
@@ -214,17 +214,18 @@ pub(super) fn encode_application_request(value: &d::ApplicationRequest) -> w::Ap
     .expect("admitted fields fit schema")
 }
 #[expect(clippy::manual_map, reason = "step code translates optional fields without closures")]
-pub(super) fn decode_application_request(value: w::ApplicationRequest, limits: &d::Limits) -> d::ApplicationRequest {
+pub(super) fn decode_application_request(value: w::ApplicationRequest) -> Result<d::ApplicationRequest, Undecodable> {
     let w::ApplicationRequestParts { object, revision, value, release } = value.into_parts();
-    d::ApplicationRequest {
+    let value = value.ok_or(Undecodable)?;
+    Ok(d::ApplicationRequest {
         object,
         revision,
         value,
         release: match release {
-            Some(value) => Some(decode_application_release(value, limits)),
+            Some(value) => Some(decode_application_release(value)),
             None => None,
         },
-    }
+    })
 }
 #[expect(clippy::manual_map, reason = "step code translates optional fields without closures")]
 pub(super) fn encode_fact(value: &d::Fact) -> w::Fact {
@@ -378,77 +379,66 @@ pub(super) fn decode_application_outcome(value: w::ApplicationOutcome, limits: &
         }
     }
 }
-pub(super) fn encode_client_subject(value: &d::ClientSubject) -> w::ClientSubject {
-    match value {
-        d::ClientSubject::Object { project, object } => w::ClientSubject::Object(
-            w::ClientSubjectObject::new(
-                &w::CEILINGS,
-                w::ClientSubjectObjectParts { project: *project, object: *object },
-            )
-            .expect("admitted fields fit schema"),
+pub(super) fn encode_client_subject(value: &d::ClientSubject) -> w::FamilySubject {
+    let (project, kind) = match *value {
+        d::ClientSubject::Object { project, object } => (Some(project), w::FamilyKind::Item(number(object))),
+        d::ClientSubject::Panel { project, task } => (Some(project), w::FamilyKind::Panel(number(task))),
+        d::ClientSubject::Result { project, task } => (Some(project), w::FamilyKind::Result(number(task))),
+        d::ClientSubject::Effect { project, proposal } => (Some(project), w::FamilyKind::OwnerEffect(number(proposal))),
+        d::ClientSubject::Outbox { project, entry } => (Some(project), w::FamilyKind::Outbox(number(entry))),
+        d::ClientSubject::Hold { project, task } => (Some(project), w::FamilyKind::Hold(number(task))),
+        d::ClientSubject::Project { project } => (
+            Some(project),
+            w::FamilyKind::Project(
+                w::FamilyProject::new(&w::CEILINGS, w::FamilyProjectParts { value: project }).expect("fixed project"),
+            ),
         ),
-        d::ClientSubject::Panel { project, task } => w::ClientSubject::Panel(
-            w::ClientSubjectPanel::new(&w::CEILINGS, w::ClientSubjectPanelParts { project: *project, task: *task })
-                .expect("admitted fields fit schema"),
+        d::ClientSubject::Deployment => (None, w::FamilyKind::Deployment),
+    };
+    let scope = match project {
+        Some(value) => w::FamilyScope::Project(
+            w::FamilyProject::new(&w::CEILINGS, w::FamilyProjectParts { value }).expect("fixed project"),
         ),
-        d::ClientSubject::Result { project, task } => w::ClientSubject::Result(
-            w::ClientSubjectResult::new(&w::CEILINGS, w::ClientSubjectResultParts { project: *project, task: *task })
-                .expect("admitted fields fit schema"),
-        ),
-        d::ClientSubject::Effect { project, proposal } => w::ClientSubject::Effect(
-            w::ClientSubjectEffect::new(
-                &w::CEILINGS,
-                w::ClientSubjectEffectParts { project: *project, proposal: *proposal },
-            )
-            .expect("admitted fields fit schema"),
-        ),
-        d::ClientSubject::Outbox { project, entry } => w::ClientSubject::Outbox(
-            w::ClientSubjectOutbox::new(&w::CEILINGS, w::ClientSubjectOutboxParts { project: *project, entry: *entry })
-                .expect("admitted fields fit schema"),
-        ),
-        d::ClientSubject::Hold { project, task } => w::ClientSubject::Hold(
-            w::ClientSubjectHold::new(&w::CEILINGS, w::ClientSubjectHoldParts { project: *project, task: *task })
-                .expect("admitted fields fit schema"),
-        ),
-        d::ClientSubject::Project { project } => w::ClientSubject::Project(
-            w::ClientSubjectProject::new(&w::CEILINGS, w::ClientSubjectProjectParts { project: *project })
-                .expect("admitted fields fit schema"),
-        ),
-        d::ClientSubject::Deployment => w::ClientSubject::Deployment,
-    }
+        None => w::FamilyScope::Deployment,
+    };
+    w::FamilySubject::new(&w::CEILINGS, w::FamilySubjectParts { scope, kind }).expect("fixed subject")
 }
-pub(super) fn decode_client_subject(value: w::ClientSubject, _limits: &d::Limits) -> d::ClientSubject {
-    match value {
-        w::ClientSubject::Object(value) => {
-            let w::ClientSubjectObjectParts { project, object } = value.into_parts();
-            d::ClientSubject::Object { project, object }
+fn number(value: u64) -> w::FamilyNumber {
+    w::FamilyNumber::new(&w::CEILINGS, w::FamilyNumberParts { value }).expect("fixed number")
+}
+pub(super) fn decode_client_subject(value: w::FamilySubject) -> Result<d::ClientSubject, Undecodable> {
+    let w::FamilySubjectParts { scope, kind } = value.into_parts();
+    let project = match scope {
+        w::FamilyScope::Project(value) => value.value(),
+        w::FamilyScope::Deployment => {
+            return match kind {
+                w::FamilyKind::Deployment => Ok(d::ClientSubject::Deployment),
+                w::FamilyKind::Item(_)
+                | w::FamilyKind::Panel(_)
+                | w::FamilyKind::Result(_)
+                | w::FamilyKind::Effect(_)
+                | w::FamilyKind::OwnerEffect(_)
+                | w::FamilyKind::Outbox(_)
+                | w::FamilyKind::Hold(_)
+                | w::FamilyKind::Project(_) => Err(Undecodable),
+            };
         }
-        w::ClientSubject::Panel(value) => {
-            let w::ClientSubjectPanelParts { project, task } = value.into_parts();
-            d::ClientSubject::Panel { project, task }
-        }
-        w::ClientSubject::Result(value) => {
-            let w::ClientSubjectResultParts { project, task } = value.into_parts();
-            d::ClientSubject::Result { project, task }
-        }
-        w::ClientSubject::Effect(value) => {
-            let w::ClientSubjectEffectParts { project, proposal } = value.into_parts();
-            d::ClientSubject::Effect { project, proposal }
-        }
-        w::ClientSubject::Outbox(value) => {
-            let w::ClientSubjectOutboxParts { project, entry } = value.into_parts();
-            d::ClientSubject::Outbox { project, entry }
-        }
-        w::ClientSubject::Hold(value) => {
-            let w::ClientSubjectHoldParts { project, task } = value.into_parts();
-            d::ClientSubject::Hold { project, task }
-        }
-        w::ClientSubject::Project(value) => {
-            let w::ClientSubjectProjectParts { project } = value.into_parts();
+    };
+    Ok(match kind {
+        w::FamilyKind::Item(value) => d::ClientSubject::Object { project, object: value.value() },
+        w::FamilyKind::Panel(value) => d::ClientSubject::Panel { project, task: value.value() },
+        w::FamilyKind::Result(value) => d::ClientSubject::Result { project, task: value.value() },
+        w::FamilyKind::OwnerEffect(value) => d::ClientSubject::Effect { project, proposal: value.value() },
+        w::FamilyKind::Outbox(value) => d::ClientSubject::Outbox { project, entry: value.value() },
+        w::FamilyKind::Hold(value) => d::ClientSubject::Hold { project, task: value.value() },
+        w::FamilyKind::Project(value) => {
+            if value.value() != project {
+                return Err(Undecodable);
+            }
             d::ClientSubject::Project { project }
         }
-        w::ClientSubject::Deployment => d::ClientSubject::Deployment,
-    }
+        w::FamilyKind::Effect(_) | w::FamilyKind::Deployment => return Err(Undecodable),
+    })
 }
 pub(super) fn encode_form(value: d::Form) -> w::Form {
     match &value {

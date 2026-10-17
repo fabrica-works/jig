@@ -5,6 +5,7 @@ use jig_test_connector as d;
 use skein_lib::{Reader, Writer};
 mod documents;
 mod facts;
+pub mod family;
 mod parts;
 use parts::{decode_application_request, encode_application_request};
 
@@ -52,7 +53,7 @@ pub fn request(bytes: &[u8], bound: &d::Limits) -> Result<DecodedRequest, Undeco
         return Err(Undecodable);
     }
     let w::RequestParts { project, value } = record.into_parts();
-    Ok(DecodedRequest { project, value: decode_application_request(value, bound) })
+    Ok(DecodedRequest { project, value: decode_application_request(value)? })
 }
 #[must_use]
 pub fn outcome(value: &d::ApplicationOutcome) -> Box<[u8]> {
@@ -86,7 +87,7 @@ pub fn subject_value(bytes: &[u8], bound: &d::Limits) -> Result<d::ClientSubject
     if reader.remaining() != 0 {
         return Err(Undecodable);
     }
-    Ok(parts::decode_client_subject(record.into_parts().value, bound))
+    parts::decode_client_subject(record.into_parts().value)
 }
 #[must_use]
 pub fn read(value: &d::ClientSubject) -> Box<[u8]> {
@@ -103,7 +104,7 @@ pub fn read_value(bytes: &[u8], bound: &d::Limits) -> Result<d::ClientSubject, U
     if reader.remaining() != 0 {
         return Err(Undecodable);
     }
-    Ok(parts::decode_client_subject(record.into_parts().value, bound))
+    parts::decode_client_subject(record.into_parts().value)
 }
 #[must_use]
 pub fn document(value: &d::ClientDocument) -> Box<[u8]> {

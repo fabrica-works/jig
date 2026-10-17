@@ -26,3 +26,92 @@ fn test_client_wire_schema_matches_generated_code_and_goldens() {
         }
     }
 }
+
+mod fixtures;
+use jig_client_test_domain::family;
+
+#[test]
+fn a_scripted_item_round_trips_with_every_field_and_state() {
+    for state in [family::ItemState::Ready, family::ItemState::Held, family::ItemState::Ended] {
+        fixtures::assert_document(family::Document::Item(fixtures::item(state)));
+    }
+}
+#[test]
+fn a_scripted_part_round_trips_without_parameters() {
+    fixtures::assert_document(family::Document::Part(fixtures::part(None)));
+}
+#[test]
+fn a_scripted_part_round_trips_with_parameters() {
+    let parameters =
+        family::Parameters { item: fixtures::ITEM, revision: fixtures::REVISION, value: 0, amendable: false };
+    fixtures::assert_document(family::Document::Part(fixtures::part(Some(parameters))));
+}
+
+#[test]
+fn a_connector_document_round_trips_with_its_supplied_subject() {
+    use jig_client_test_domain::connector_values::{ApplicationObject, ClientDocument, ConnectorDocument};
+    let value = ConnectorDocument {
+        subject: family::Subject {
+            scope: family::Scope::Project(fixtures::PROJECT),
+            kind: family::Kind::Item(fixtures::ITEM),
+        },
+        value: Box::new(ClientDocument::Object {
+            object: fixtures::ITEM,
+            now: ApplicationObject { revision: fixtures::REVISION.value, value: 42 },
+        }),
+    };
+    fixtures::assert_document(family::Document::Connector(value));
+}
+
+#[test]
+fn a_scripted_touched_answer_round_trips() {
+    fixtures::assert_answer(family::Answer::Touched { item: fixtures::ITEM, revision: fixtures::REVISION });
+}
+#[test]
+fn a_scripted_moved_answer_round_trips() {
+    fixtures::assert_answer(family::Answer::Moved { item: fixtures::ITEM, revision: fixtures::REVISION });
+}
+#[test]
+fn a_scripted_gone_answer_round_trips() {
+    fixtures::assert_answer(family::Answer::Gone);
+}
+#[test]
+fn a_connector_answer_round_trips() {
+    use jig_client_test_domain::connector_values::{ApplicationObject, ApplicationOutcome, ConnectorAnswer};
+    fixtures::assert_answer(family::Answer::Connector(ConnectorAnswer {
+        value: ApplicationOutcome::Moved {
+            object: fixtures::ITEM,
+            now: ApplicationObject { revision: fixtures::REVISION.value, value: 42 },
+        },
+    }));
+}
+#[test]
+fn an_entrance_refusal_has_no_application_wire_record() {
+    use jig_client_domain::contract::{EntranceRefusal, Refusal};
+    let refusal = EntranceRefusal::new(Refusal::Unknown).expect("fixed entrance refusal");
+    assert_eq!(
+        family::wire::encode_answer(&family::Answer::Refused(refusal)),
+        Err(family::wire::Invalid::EntranceRefusal)
+    );
+}
+
+#[test]
+fn a_scripted_touch_round_trips_without_parameters() {
+    fixtures::assert_touch(None);
+}
+#[test]
+fn a_scripted_touch_round_trips_with_parameters() {
+    fixtures::assert_touch(Some(0));
+}
+#[test]
+fn every_project_subject_round_trips_through_reads_and_opens() {
+    for kind in fixtures::SUBJECT_KINDS {
+        fixtures::assert_subject(family::Subject { scope: family::Scope::Project(fixtures::PROJECT), kind });
+    }
+}
+#[test]
+fn every_deployment_subject_round_trips_through_reads_and_opens() {
+    for kind in fixtures::SUBJECT_KINDS {
+        fixtures::assert_subject(family::Subject { scope: family::Scope::Deployment, kind });
+    }
+}

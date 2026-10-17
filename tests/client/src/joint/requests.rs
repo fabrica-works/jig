@@ -83,7 +83,7 @@ pub fn send(
             first::Out::Read { read, subject } => {
                 let sign_in = sign_in.ok_or(Invalid::Session)?;
                 let (scope, owner) =
-                    jig_client_test_domain::family::wire::subject(*subject).map_err(Invalid::Family)?;
+                    jig_client_test_domain::family::wire::connector_subject(*subject).map_err(Invalid::Family)?;
                 let reply =
                     driver.transport.reply_to(Reply::ApplicationRead { client, read: *read, subject: *subject });
                 root::Event::ReadApplication {
@@ -98,7 +98,7 @@ pub fn send(
             first::Out::Open { watch, subject } => {
                 let sign_in = sign_in.ok_or(Invalid::Session)?;
                 let (scope, owner) =
-                    jig_client_test_domain::family::wire::subject(*subject).map_err(Invalid::Family)?;
+                    jig_client_test_domain::family::wire::connector_subject(*subject).map_err(Invalid::Family)?;
                 let scope = application_scope(scope);
                 let watcher = driver.transport.open(client, *watch, Watched::Application { subject: *subject, scope });
                 root::Event::WatchApplication {
@@ -147,7 +147,8 @@ fn keyed(
             root::Event::Core(core::Event::People(people::Event::Ask { reply_to, sign_in, key, ask }))
         }
         Ask::First(value) => {
-            let (project, value) = jig_client_test_domain::family::wire::request(value).map_err(Invalid::Family)?;
+            let (project, value) =
+                jig_client_test_domain::family::wire::connector_request(value).map_err(Invalid::Family)?;
             let number = 1;
             let digest = application_digest(number, project, &value);
             let reply_to = driver.transport.reply_to(Reply::Keyed {

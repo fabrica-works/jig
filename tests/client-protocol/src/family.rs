@@ -10,23 +10,23 @@ use skein_lib::{Reader, Writer};
 pub fn owned(bytes: Box<[u8]>) -> Family {
     Family { family: 1, version: jig_client_test_protocol_wire::VERSION, bytes }
 }
-/// # Errors
-/// Refuses a mutation without its explicit value.
-pub fn request(value: &first::Ask) -> Result<Family, application::Invalid> {
-    let (project, value) = application::request(value)?;
-    Ok(owned(codec::request_record(project, &value)))
+/// Carry optional parameters without manufacturing a connector value.
+#[must_use]
+pub fn request(value: &first::Ask) -> Family {
+    let (project, value) = application::request(value);
+    owned(codec::family::request_record(project, value))
 }
-/// # Errors
-/// Refuses an unsupported scope or a jig proposal reference.
-pub fn subject(value: d::Subject) -> Result<Family, application::Invalid> {
-    let (_, subject) = application::subject(value)?;
-    Ok(owned(codec::subject(&subject)))
+/// Carry the complete family subject.
+#[must_use]
+pub fn subject(value: d::Subject) -> Family {
+    let (_, subject) = application::subject(value);
+    owned(codec::family::subject(subject))
 }
-/// # Errors
-/// Refuses an unsupported scope or a jig proposal reference.
-pub fn read(value: d::Subject) -> Result<Family, application::Invalid> {
-    let (_, subject) = application::subject(value)?;
-    Ok(owned(codec::read(&subject)))
+/// Carry the complete family subject.
+#[must_use]
+pub fn read(value: d::Subject) -> Family {
+    let (_, subject) = application::subject(value);
+    owned(codec::family::read(subject))
 }
 #[must_use]
 pub fn answer(value: &Family) -> Option<first::Answer> {

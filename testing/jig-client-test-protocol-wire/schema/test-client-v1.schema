@@ -53,7 +53,7 @@ enum Refusal { disposal: RefusalDisposal, role: RefusalRole, authority: RefusalA
 record ApplicationOutcomeCoreRefused { why: Refusal }
 enum ApplicationOutcome { changed: ApplicationOutcomeChanged, moved: ApplicationOutcomeMoved, role: ApplicationOutcomeRole, unknown, exhausted, core_refused: ApplicationOutcomeCoreRefused }
 record ApplicationRelease { task: u64 revision: u64 again: option bool }
-record ApplicationRequest { object: u64 revision: u64 value: u64 release: option ApplicationRelease }
+record ApplicationRequest { object: u64 revision: u64 value: option u64 release: option ApplicationRelease }
 record ClientSubjectObject { project: u32 object: u64 }
 record ClientSubjectPanel { project: u32 task: u64 }
 record ClientSubjectResult { project: u32 task: u64 }
@@ -83,10 +83,28 @@ record ClientDocumentDeployment { outbox: list 128 OutboxEntry subject_limit: u3
 enum ClientDocument { object: ClientDocumentObject, panel: ClientDocumentPanel, result: ClientDocumentResult, effect: ClientDocumentEffect, outbox: ClientDocumentOutbox, hold: ClientDocumentHold, project: ClientDocumentProject, deployment: ClientDocumentDeployment }
 versioned record Request { project: u32 value: ApplicationRequest }
 versioned record Outcome { value: ApplicationOutcome }
-versioned record Subject { value: ClientSubject }
-versioned record Read { value: ClientSubject }
 versioned record Document { value: ClientDocument }
 record ReadValue { value: ClientDocument }
 enum ReadResult { value: boxed ReadValue, unknown, not_allowed }
 versioned record ReadAnswer { value: ReadResult }
 versioned record Place { store_version: u16 party: u64 project: u32 item: u64 }
+record FamilyNumber { value: u64 }
+record FamilyProject { value: u32 }
+enum FamilyProposer { task: FamilyNumber, party: FamilyNumber }
+record FamilyProposalKey { proposer: FamilyProposer number: u64 }
+enum FamilyScope { project: FamilyProject, deployment }
+enum FamilyKind { item: FamilyNumber, panel: FamilyNumber, result: FamilyNumber, effect: FamilyProposalKey, owner_effect: FamilyNumber, outbox: FamilyNumber, hold: FamilyNumber, project: FamilyProject, deployment }
+record FamilySubject { scope: FamilyScope kind: FamilyKind }
+versioned record Subject { value: FamilySubject }
+versioned record Read { value: FamilySubject }
+enum ItemState { ready, held, ended }
+record Item { project: u32 key: u64 revision: u64 state: ItemState value: u64 task: u64 second: option u64 proposals: list 128 FamilyProposalKey touchable: bool }
+record Parameters { item: u64 revision: u64 value: u64 amendable: bool }
+record PartDocument { subject: FamilySubject revision: u64 value: u64 parameters: option Parameters }
+record FamilyRevision { item: u64 revision: u64 }
+record FamilyConnectorDocument { subject: FamilySubject value: ClientDocument }
+enum FamilyDocument { item: Item, part: PartDocument, connector: FamilyConnectorDocument }
+versioned record FamilyDocumentRecord { value: FamilyDocument }
+record FamilyConnectorAnswer { value: ApplicationOutcome }
+enum FamilyAnswer { touched: FamilyRevision, moved: FamilyRevision, gone, connector: FamilyConnectorAnswer }
+versioned record FamilyAnswerRecord { value: FamilyAnswer }

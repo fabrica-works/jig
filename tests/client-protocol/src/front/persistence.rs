@@ -14,9 +14,7 @@ fn saved(record: client::store::Record) -> link::Saved {
                     key: record.request.key,
                     request: match record.request.request {
                         client::Ask::Jig(value) => jig_client_domain::Ask::Jig(value),
-                        client::Ask::First(value) => {
-                            jig_client_domain::Ask::Family(family::request(&value).expect("family ask"))
-                        }
+                        client::Ask::First(value) => jig_client_domain::Ask::Family(family::request(&value)),
                     },
                 },
             },

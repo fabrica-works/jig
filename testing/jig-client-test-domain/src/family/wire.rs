@@ -8,64 +8,60 @@ use jig_test_connector::{ApplicationOutcome, ApplicationRequest, ClientDocument,
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Invalid {
-    Scope,
-    CoreEffectReference,
-    MissingValue,
+    EntranceRefusal,
     Identity,
     TooLarge,
 }
 
-/// # Errors
-/// Refuses missing supplied mutation values, unsupported individual deployment scope, mismatched subjects or a whole owner value above bounds.
-pub fn subject(value: family::Subject) -> Result<(ClientScope, ClientSubject), Invalid> {
-    let project = match value.scope {
-        family::Scope::Project(project) => project,
-        family::Scope::Deployment => {
-            return match value.kind {
-                family::Kind::Deployment => Ok((ClientScope::Deployment, ClientSubject::Deployment)),
-                family::Kind::Item(_)
-                | family::Kind::Panel(_)
-                | family::Kind::Result(_)
-                | family::Kind::Effect(_)
-                | family::Kind::OwnerEffect(_)
-                | family::Kind::Outbox(_)
-                | family::Kind::Hold(_)
-                | family::Kind::Project(_) => Err(Invalid::Scope),
-            };
+/// Preserve the supplied scope and every scripted subject kind.
+#[must_use]
+pub fn subject(value: family::Subject) -> (ClientScope, jig_client_test_protocol_wire::v1::FamilySubject) {
+    let scope = match value.scope {
+        family::Scope::Project(project) => ClientScope::Project(project),
+        family::Scope::Deployment => ClientScope::Deployment,
+    };
+    (scope, scripted::subject(value))
+}
+/// Recover the whole family subject, including jig proposal makers.
+#[must_use]
+pub fn subject_value(value: jig_client_test_protocol_wire::v1::FamilySubject) -> family::Subject {
+    scripted::subject_value(value)
+}
+/// Carry absent parameters explicitly, separately from an explicit zero.
+#[must_use]
+pub fn request(value: &family::Ask) -> (u32, jig_client_test_protocol_wire::v1::ApplicationRequest) {
+    use jig_client_test_protocol_wire::v1 as w;
+    let (project, object, revision, value) = match value {
+        family::Ask::Touch { project, item, revision, parameters } => (*project, *item, revision.value, *parameters),
+        family::Ask::ChangeObject { project, object, revision, value } => {
+            (*project, *object, revision.value, Some(*value))
         }
     };
-    let now = match value.kind {
-        family::Kind::Item(object) => ClientSubject::Object { project, object },
-        family::Kind::Panel(task) => ClientSubject::Panel { project, task },
-        family::Kind::Result(task) => ClientSubject::Result { project, task },
-        family::Kind::Effect(_) => return Err(Invalid::CoreEffectReference),
-        family::Kind::OwnerEffect(proposal) => ClientSubject::Effect { project, proposal },
-        family::Kind::Outbox(entry) => ClientSubject::Outbox { project, entry },
-        family::Kind::Hold(task) => ClientSubject::Hold { project, task },
-        family::Kind::Project(named) => {
-            if named != project {
-                return Err(Invalid::Scope);
-            }
-            ClientSubject::Project { project }
-        }
-        family::Kind::Deployment => return Err(Invalid::Scope),
-    };
-    Ok((ClientScope::Project(project), now))
+    let value =
+        w::ApplicationRequest::new(&w::CEILINGS, w::ApplicationRequestParts { object, revision, value, release: None })
+            .expect("fixed family request");
+    (project, value)
 }
 
+/// Admit a whole family subject to the connector's smaller vocabulary.
 /// # Errors
-/// Refuses missing supplied mutation values, unsupported individual deployment scope, mismatched subjects or a whole owner value above bounds.
-pub fn request(value: &family::Ask) -> Result<(u32, ApplicationRequest), Invalid> {
-    match value {
-        family::Ask::Touch { project, item, revision, parameters } => {
-            let value = parameters.ok_or(Invalid::MissingValue)?;
-            Ok((*project, ApplicationRequest { object: *item, revision: revision.value, value, release: None }))
-        }
-        family::Ask::ChangeObject { project, object, revision, value } => Ok((
-            *project,
-            ApplicationRequest { object: *object, revision: revision.value, value: *value, release: None },
-        )),
-    }
+/// Refuses a subject without a representation in that connector.
+pub fn connector_subject(value: family::Subject) -> Result<(ClientScope, ClientSubject), Invalid> {
+    let (scope, value) = subject(value);
+    let Ok(value) = jig_client_test_protocol_wire::codec::family::connector_subject_value(value) else {
+        return Err(Invalid::Identity);
+    };
+    Ok((scope, value))
+}
+/// Admit a whole family request to the connector's fixed-value vocabulary.
+/// # Errors
+/// Refuses absent values rather than constructing a connector parameter.
+pub fn connector_request(value: &family::Ask) -> Result<(u32, ApplicationRequest), Invalid> {
+    let (project, value) = request(value);
+    let Ok(value) = jig_client_test_protocol_wire::codec::family::connector_request(value) else {
+        return Err(Invalid::Identity);
+    };
+    Ok((project, value))
 }
 
 #[must_use]
@@ -80,7 +76,7 @@ pub fn document(
     value: ClientDocument,
     limits: &ConnectorLimits,
 ) -> Result<ConnectorDocument, Invalid> {
-    let (_, named) = subject(original)?;
+    let (_, named) = connector_subject(original)?;
     let same = match named {
         ClientSubject::Object { object, .. } => match &value {
             ClientDocument::Object { object: actual, .. } => *actual == object,
@@ -176,70 +172,18 @@ pub fn document(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use jig_client_domain::contract::{ProposalKey, Proposer, Revision};
+    use jig_client_domain::contract::Revision;
     use skein_lib::List;
 
     #[test]
-    fn application_subject_translation_preserves_supplied_scope_and_refuses_an_inferred_project_or_maker() {
-        let cases = [
-            (family::Kind::Item(u64::MAX), ClientSubject::Object { project: u32::MAX, object: u64::MAX }),
-            (family::Kind::Panel(u64::MAX), ClientSubject::Panel { project: u32::MAX, task: u64::MAX }),
-            (family::Kind::Result(u64::MAX), ClientSubject::Result { project: u32::MAX, task: u64::MAX }),
-            (family::Kind::OwnerEffect(u64::MAX), ClientSubject::Effect { project: u32::MAX, proposal: u64::MAX }),
-            (family::Kind::Outbox(u64::MAX), ClientSubject::Outbox { project: u32::MAX, entry: u64::MAX }),
-            (family::Kind::Hold(u64::MAX), ClientSubject::Hold { project: u32::MAX, task: u64::MAX }),
-            (family::Kind::Project(u32::MAX), ClientSubject::Project { project: u32::MAX }),
-        ];
-        for (kind, expected) in cases {
-            assert_eq!(
-                subject(family::Subject { scope: family::Scope::Project(u32::MAX), kind }),
-                Ok((ClientScope::Project(u32::MAX), expected))
-            );
-            assert_eq!(subject(family::Subject { scope: family::Scope::Deployment, kind }), Err(Invalid::Scope));
-        }
-        assert_eq!(
-            subject(family::Subject { scope: family::Scope::Deployment, kind: family::Kind::Deployment }),
-            Ok((ClientScope::Deployment, ClientSubject::Deployment))
-        );
-        assert_eq!(
-            subject(family::Subject { scope: family::Scope::Project(4), kind: family::Kind::Project(5) }),
-            Err(Invalid::Scope)
-        );
-        for proposer in [Proposer::Task(u64::MAX), Proposer::Party(u64::MAX)] {
-            assert_eq!(
-                subject(family::Subject {
-                    scope: family::Scope::Project(4),
-                    kind: family::Kind::Effect(ProposalKey { proposer, number: 7 })
-                }),
-                Err(Invalid::CoreEffectReference)
-            );
-        }
-    }
-
-    #[test]
     fn application_requests_keep_an_explicit_zero_and_owner_documents_reject_mismatched_or_partial_values() {
-        assert_eq!(
-            request(&family::Ask::Touch {
-                project: u32::MAX,
-                item: u64::MAX,
-                revision: Revision { value: u64::MAX },
-                parameters: Some(0)
-            }),
-            Ok((u32::MAX, ApplicationRequest { object: u64::MAX, revision: u64::MAX, value: 0, release: None }))
-        );
-        assert_eq!(
-            request(&family::Ask::Touch { project: 4, item: 7, revision: Revision { value: 1 }, parameters: None }),
-            Err(Invalid::MissingValue)
-        );
-        assert_eq!(
-            request(&family::Ask::ChangeObject {
-                project: u32::MAX,
-                object: u64::MAX,
-                revision: Revision { value: u64::MAX },
-                value: 0
-            }),
-            Ok((u32::MAX, ApplicationRequest { object: u64::MAX, revision: u64::MAX, value: 0, release: None }))
-        );
+        let (_, encoded) = request(&family::Ask::ChangeObject {
+            project: u32::MAX,
+            object: u64::MAX,
+            revision: Revision { value: u64::MAX },
+            value: 0,
+        });
+        assert_eq!(*encoded.value(), Some(0));
         let original = family::Subject { scope: family::Scope::Project(4), kind: family::Kind::Panel(77) };
         let limits = ConnectorLimits { rows: 3, paths: 3, segments: 3, segment_bytes: 64, bytes: 100_000 };
         let panel = |task, capacity| ClientDocument::Panel {
@@ -261,4 +205,262 @@ mod tests {
             assert_eq!(answer(value).value, value);
         }
     }
+}
+
+mod scripted {
+    //! Exact scripted-family fields, separate from the connector's vocabulary.
+    use crate::family as d;
+    use jig_client_domain::contract::{ProposalKey, Proposer, Revision};
+    use jig_client_test_protocol_wire::v1 as w;
+    use skein_lib::List;
+
+    pub(super) fn key(value: ProposalKey) -> w::FamilyProposalKey {
+        let proposer = match value.proposer {
+            Proposer::Task(value) => w::FamilyProposer::Task(number(value)),
+            Proposer::Party(value) => w::FamilyProposer::Party(number(value)),
+        };
+        w::FamilyProposalKey::new(&w::CEILINGS, w::FamilyProposalKeyParts { proposer, number: value.number })
+            .expect("fixed proposal key")
+    }
+    pub(super) fn key_value(value: w::FamilyProposalKey) -> ProposalKey {
+        let value = value.into_parts();
+        let proposer = match value.proposer {
+            w::FamilyProposer::Task(value) => Proposer::Task(value.value()),
+            w::FamilyProposer::Party(value) => Proposer::Party(value.value()),
+        };
+        ProposalKey { proposer, number: value.number }
+    }
+    fn number(value: u64) -> w::FamilyNumber {
+        w::FamilyNumber::new(&w::CEILINGS, w::FamilyNumberParts { value }).expect("fixed number")
+    }
+    fn project(value: u32) -> w::FamilyProject {
+        w::FamilyProject::new(&w::CEILINGS, w::FamilyProjectParts { value }).expect("fixed project")
+    }
+    pub(super) fn subject(value: d::Subject) -> w::FamilySubject {
+        let scope = match value.scope {
+            d::Scope::Project(value) => w::FamilyScope::Project(project(value)),
+            d::Scope::Deployment => w::FamilyScope::Deployment,
+        };
+        let kind = match value.kind {
+            d::Kind::Item(value) => w::FamilyKind::Item(number(value)),
+            d::Kind::Panel(value) => w::FamilyKind::Panel(number(value)),
+            d::Kind::Result(value) => w::FamilyKind::Result(number(value)),
+            d::Kind::Effect(value) => w::FamilyKind::Effect(key(value)),
+            d::Kind::OwnerEffect(value) => w::FamilyKind::OwnerEffect(number(value)),
+            d::Kind::Outbox(value) => w::FamilyKind::Outbox(number(value)),
+            d::Kind::Hold(value) => w::FamilyKind::Hold(number(value)),
+            d::Kind::Project(value) => w::FamilyKind::Project(project(value)),
+            d::Kind::Deployment => w::FamilyKind::Deployment,
+        };
+        w::FamilySubject::new(&w::CEILINGS, w::FamilySubjectParts { scope, kind }).expect("fixed subject")
+    }
+    pub(super) fn subject_value(value: w::FamilySubject) -> d::Subject {
+        let value = value.into_parts();
+        let scope = match value.scope {
+            w::FamilyScope::Project(value) => d::Scope::Project(value.value()),
+            w::FamilyScope::Deployment => d::Scope::Deployment,
+        };
+        let kind = match value.kind {
+            w::FamilyKind::Item(value) => d::Kind::Item(value.value()),
+            w::FamilyKind::Panel(value) => d::Kind::Panel(value.value()),
+            w::FamilyKind::Result(value) => d::Kind::Result(value.value()),
+            w::FamilyKind::Effect(value) => d::Kind::Effect(key_value(value)),
+            w::FamilyKind::OwnerEffect(value) => d::Kind::OwnerEffect(value.value()),
+            w::FamilyKind::Outbox(value) => d::Kind::Outbox(value.value()),
+            w::FamilyKind::Hold(value) => d::Kind::Hold(value.value()),
+            w::FamilyKind::Project(value) => d::Kind::Project(value.value()),
+            w::FamilyKind::Deployment => d::Kind::Deployment,
+        };
+        d::Subject { scope, kind }
+    }
+    pub(super) fn item(value: &d::Item) -> w::Item {
+        let state = match value.state {
+            d::ItemState::Ready => w::ItemState::Ready,
+            d::ItemState::Held => w::ItemState::Held,
+            d::ItemState::Ended => w::ItemState::Ended,
+        };
+        let mut proposals = List::with_capacity(value.proposals.len());
+        for proposal in &value.proposals {
+            proposals.push(key(*proposal)).expect("reserved proposal keys");
+        }
+        w::Item::new(
+            &w::CEILINGS,
+            w::ItemParts {
+                project: value.project,
+                key: value.key,
+                revision: value.revision.value,
+                state,
+                value: value.value,
+                task: value.task,
+                second: value.second,
+                proposals,
+                touchable: value.touchable,
+            },
+        )
+        .expect("admitted item")
+    }
+    pub(super) fn item_value(value: w::Item) -> d::Item {
+        let value = value.into_parts();
+        let state = match value.state {
+            w::ItemState::Ready => d::ItemState::Ready,
+            w::ItemState::Held => d::ItemState::Held,
+            w::ItemState::Ended => d::ItemState::Ended,
+        };
+        let mut proposals = List::with_capacity(value.proposals.len());
+        for proposal in &value.proposals {
+            proposals.push(key_value(proposal.clone())).expect("reserved proposal keys");
+        }
+        d::Item {
+            project: value.project,
+            key: value.key,
+            revision: Revision { value: value.revision },
+            state,
+            value: value.value,
+            task: value.task,
+            second: value.second,
+            proposals,
+            touchable: value.touchable,
+        }
+    }
+    #[expect(clippy::manual_map, reason = "step code matches optional fields without closures")]
+    pub(super) fn part(value: &d::PartDocument) -> w::PartDocument {
+        let parameters = match value.parameters {
+            Some(value) => Some(
+                w::Parameters::new(
+                    &w::CEILINGS,
+                    w::ParametersParts {
+                        item: value.item,
+                        revision: value.revision.value,
+                        value: value.value,
+                        amendable: value.amendable,
+                    },
+                )
+                .expect("fixed parameters"),
+            ),
+            None => None,
+        };
+        w::PartDocument::new(
+            &w::CEILINGS,
+            w::PartDocumentParts {
+                subject: subject(value.subject),
+                revision: value.revision.value,
+                value: value.value,
+                parameters,
+            },
+        )
+        .expect("fixed part")
+    }
+    pub(super) fn part_value(value: w::PartDocument) -> d::PartDocument {
+        let value = value.into_parts();
+        let parameters = match value.parameters {
+            Some(value) => {
+                let value = value.into_parts();
+                Some(d::Parameters {
+                    item: value.item,
+                    revision: Revision { value: value.revision },
+                    value: value.value,
+                    amendable: value.amendable,
+                })
+            }
+            None => None,
+        };
+        d::PartDocument {
+            subject: subject_value(value.subject),
+            revision: Revision { value: value.revision },
+            value: value.value,
+            parameters,
+        }
+    }
+}
+
+/// Encode every scripted field and the complete connector document, with its supplied subject.
+#[must_use]
+pub fn encode_document(value: &family::Document) -> Box<[u8]> {
+    use jig_client_test_protocol_wire::{codec, v1 as w};
+    let value = match value {
+        family::Document::Item(value) => w::FamilyDocument::Item(scripted::item(value)),
+        family::Document::Part(value) => w::FamilyDocument::Part(scripted::part(value)),
+        family::Document::Connector(value) => w::FamilyDocument::Connector(
+            w::FamilyConnectorDocument::new(
+                &w::CEILINGS,
+                w::FamilyConnectorDocumentParts {
+                    subject: scripted::subject(value.subject),
+                    value: codec::family::connector_document(&value.value),
+                },
+            )
+            .expect("admitted connector document"),
+        ),
+    };
+    codec::family::document(value)
+}
+/// # Errors
+/// Refuses malformed records or values outside the family's configured bounds.
+pub fn decode_document(
+    bytes: &[u8],
+    bounds: &jig_test_connector::Limits,
+    limits: &ConnectorLimits,
+) -> Result<family::Document, Invalid> {
+    use jig_client_test_protocol_wire::{codec, v1 as w};
+    let Ok(value) = codec::family::document_value(bytes, bounds, limits.rows) else { return Err(Invalid::TooLarge) };
+    let value = match value {
+        w::FamilyDocument::Item(value) => family::Document::Item(scripted::item_value(value)),
+        w::FamilyDocument::Part(value) => family::Document::Part(scripted::part_value(value)),
+        w::FamilyDocument::Connector(value) => {
+            let value = value.into_parts();
+            let subject = scripted::subject_value(value.subject);
+            let Ok(value) = codec::family::connector_document_value(value.value, bounds) else {
+                return Err(Invalid::TooLarge);
+            };
+            return match document(subject, value, limits) {
+                Ok(value) => Ok(family::Document::Connector(value)),
+                Err(why) => Err(why),
+            };
+        }
+    };
+    if !value.fits(limits.rows) {
+        return Err(Invalid::TooLarge);
+    }
+    Ok(value)
+}
+
+/// # Errors
+/// Entrance refusals belong to jig's wire and have no application record.
+pub fn encode_answer(value: &family::Answer) -> Result<Box<[u8]>, Invalid> {
+    use jig_client_test_protocol_wire::{codec, v1 as w};
+    let value = match value {
+        family::Answer::Touched { item, revision } => w::FamilyAnswer::Touched(
+            w::FamilyRevision::new(&w::CEILINGS, w::FamilyRevisionParts { item: *item, revision: revision.value })
+                .expect("fixed family revision"),
+        ),
+        family::Answer::Moved { item, revision } => w::FamilyAnswer::Moved(
+            w::FamilyRevision::new(&w::CEILINGS, w::FamilyRevisionParts { item: *item, revision: revision.value })
+                .expect("fixed family revision"),
+        ),
+        family::Answer::Gone => w::FamilyAnswer::Gone,
+        family::Answer::Refused(_) => return Err(Invalid::EntranceRefusal),
+        family::Answer::Connector(value) => w::FamilyAnswer::Connector(codec::family::connector_answer(&value.value)),
+    };
+    Ok(codec::family::answer(value))
+}
+/// # Errors
+/// Refuses malformed records or values outside the family's configured bounds.
+pub fn decode_answer(bytes: &[u8], bounds: &jig_test_connector::Limits) -> Result<family::Answer, Invalid> {
+    use jig_client_domain::contract::Revision;
+    use jig_client_test_protocol_wire::{codec, v1 as w};
+    let Ok(value) = codec::family::answer_value(bytes, bounds) else { return Err(Invalid::TooLarge) };
+    let value = match value {
+        w::FamilyAnswer::Touched(value) => {
+            let value = value.into_parts();
+            family::Answer::Touched { item: value.item, revision: Revision { value: value.revision } }
+        }
+        w::FamilyAnswer::Moved(value) => {
+            let value = value.into_parts();
+            family::Answer::Moved { item: value.item, revision: Revision { value: value.revision } }
+        }
+        w::FamilyAnswer::Gone => family::Answer::Gone,
+        w::FamilyAnswer::Connector(value) => {
+            family::Answer::Connector(answer(codec::family::connector_answer_value(value, bounds)))
+        }
+    };
+    Ok(value)
 }
