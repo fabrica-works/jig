@@ -401,6 +401,13 @@ handles, as every presentation does (sections 7 and 8).
 - **Handles share the engine's watches.** Several handles naming one
   subject and one window share one watch on the engine and one document.
   It opens with the first handle and closes with the last.
+- **A watch waits for a sign-in.** A `Watch` while no sign-in is live
+  (the link signed out, 8.2) is admitted, its handle opening, and
+  nothing leaves for the transport: a stream opened with no credential
+  ends at once (`../../protocol/client.md`, 4.2), and the client sends
+  none unless the transport carries one (section 12). Once signed in,
+  the client opens each such watch under a fresh name; one on `me` is
+  the client's own (8.2), not a second.
 - **Each opening is named afresh.** The client names each watch it opens
   on the engine with a name of its own, never reused, so a delivery for
   a watch it closed is dropped, even when the application has given its
@@ -661,7 +668,10 @@ for any presentation of a chat or of any agent task's activity.
     sees, as a browser carries a cookie its server set.
 
   The `credential` on `Exchange` and `OpenStream` is the one held, or
-  none. Signed in, the client opens the stream and watches `me` (8.2).
+  none. Signed in, the client opens the stream,
+  watches `me` (8.2), and opens the watches asked before (8.1); under
+  `Transport` it is signed in from its `SignIn`. So a host may sign in
+  after `Start { kept }`, its children watching from their start.
 - **The credential is never in the small store.** It is the link's, and
   `client.link()` gives it: a host that keeps a sign-in across its own
   restart keeps the credential where its platform keeps secrets, and
