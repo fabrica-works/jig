@@ -54,16 +54,47 @@ pub(super) fn goal_decide(
             if let Some(event) = pool {
                 work.push(Event::Tasks(event));
             }
-            let tasks::PersonAction::Batch(mut batch) = proposal.action;
-            for member in &mut batch {
-                member.funder = source;
-            }
+            let event = match proposal.action {
+                tasks::PersonAction::Batch(mut batch) => {
+                    for member in &mut batch {
+                        member.funder = source;
+                    }
+                    tasks::Event::Make {
+                        reply_to: ReplyTo::new(request),
+                        creator: tasks::Party::Person(proposer),
+                        batch,
+                    }
+                }
+                tasks::PersonAction::Amend { task, amendment } => {
+                    let Some(current) = core.tasks.task(task) else {
+                        pool_refused(work, request, people::Refusal::Unknown);
+                        return;
+                    };
+                    let before = crate::translate::authority_value(&current.authority);
+                    let after =
+                        crate::translate::authority_value(amendment.authority.as_ref().unwrap_or(&current.authority));
+                    let stop_run = !authority::at_most(&before, &after, &core.authority.rules().implies);
+                    let Some(message) = crate::fresh(&mut core.counters, crate::Family::Message) else {
+                        pool_refused(work, request, people::Refusal::Limit { which: people::LimitKind::Arithmetic });
+                        return;
+                    };
+                    tasks::Event::Amend {
+                        reply_to: ReplyTo::new(request),
+                        by: tasks::Party::Person(proposer),
+                        funder: Some(source),
+                        task,
+                        message,
+                        stop_run,
+                        amendment: *amendment,
+                    }
+                }
+            };
             assert!(
-                core.goal_routes.insert(request, GoalRoute::Accepting { proposer, proposal: number, by: person },)
+                core.goal_routes.insert(request, GoalRoute::Accepting { proposer, proposal: number, by: person })
                     == Ok(None),
-                "one goal acceptance"
+                "one party acceptance"
             );
-            tasks::Event::Make { reply_to: ReplyTo::new(request), creator: tasks::Party::Person(proposer), batch }
+            event
         }
         people::ProposalDecision::Reject { reason } => {
             let Some(message) = crate::fresh(&mut core.counters, crate::Family::Message) else {
@@ -182,6 +213,22 @@ pub(super) fn person_proposal_accept(
     person: u64,
     proposal: tasks::Proposal,
 ) {
+    let source = tasks::Funder::Pool { project: proposal.project, person, period: core.period(proposal.project) };
+    match &proposal.action {
+        tasks::ProposalAction::Amend { .. } | tasks::ProposalAction::Widen { .. } => {
+            let (period, pool) = core.goal_open_pool(proposal.project, person);
+            if let Some(event) = period {
+                work.push(Event::Tasks(event));
+            }
+            if let Some(event) = pool {
+                work.push(Event::Tasks(event));
+            }
+        }
+        tasks::ProposalAction::Batch(_)
+        | tasks::ProposalAction::Effect { .. }
+        | tasks::ProposalAction::ProcedureEffect { .. }
+        | tasks::ProposalAction::Release { .. } => {}
+    }
     let result_followups = core.tasks.result_proposal(proposal.proposer, proposal.number);
     match proposal.action {
         tasks::ProposalAction::Effect { connector, .. } | tasks::ProposalAction::ProcedureEffect { connector, .. } => {
@@ -256,6 +303,7 @@ pub(super) fn person_proposal_accept(
             let before = crate::translate::authority_value(&current.authority);
             let stop_run = !authority::at_most(&before, &after, &core.authority.rules().implies);
             tasks::Event::Amend {
+                funder: Some(source),
                 reply_to: ReplyTo::new(request),
                 by: tasks::Party::Person(person),
                 task,
@@ -270,6 +318,7 @@ pub(super) fn person_proposal_accept(
                 return;
             };
             tasks::Event::Amend {
+                funder: Some(source),
                 reply_to: ReplyTo::new(request),
                 by: tasks::Party::Person(person),
                 task,

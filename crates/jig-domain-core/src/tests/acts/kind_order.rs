@@ -104,13 +104,16 @@ fn budget_only_amendments_preserve_narrower_implied_grants_and_follow_direct_har
     let draft = change(&core, 150);
     assert_eq!(
         core.amend_admit(1, Some(people::Role::Owner), 1, 1, &draft, limits.tasks.depth, &limits.tasks),
-        Ok((false, false))
+        Ok(false)
     );
     let mut mixed = change(&core, 550);
     mixed.authority.as_mut().unwrap().grants[0].pattern.last = tasks::Last::Exact(b"zeta".as_slice().into());
     assert_eq!(
         core.amend_admit(1, Some(people::Role::Owner), 1, 1, &mixed, limits.tasks.depth, &limits.tasks),
-        Ok((true, true))
+        Err(people::Refusal::Authority {
+            lacking: people::Lack::Budget { needs: 550, left: 500 },
+            proposable: Some(people::Accepter::Role(0))
+        })
     );
     let Admission::Bounded { beyond: Beyond::Proposed { to }, .. } =
         offers::admit(&core, &limits, 1, Act::Amend, &Subject::Task { task: 1 })
@@ -124,14 +127,22 @@ fn budget_only_amendments_preserve_narrower_implied_grants_and_follow_direct_har
     else {
         panic!("recipient absence")
     };
+
+    assert_eq!(
+        why,
+        people::Refusal::Authority { lacking: people::Lack::Approver, proposable: Some(people::Accepter::Nobody) }
+    );
     assert_eq!(
         core.amend_admit(1, Some(people::Role::Owner), 1, 1, &mixed, limits.tasks.depth, &limits.tasks),
-        Err(why)
+        Err(people::Refusal::Authority {
+            lacking: people::Lack::Budget { needs: 550, left: 500 },
+            proposable: Some(people::Accepter::Nobody)
+        })
     );
     mixed.authority = change(&core, 90).authority;
     assert_eq!(
         core.amend_admit(1, Some(people::Role::Owner), 1, 1, &mixed, limits.tasks.depth, &limits.tasks),
-        Ok((true, false))
+        Ok(true)
     );
     assert_eq!(core.tasks.task(1).unwrap().revisions, revisions, "pure admission moves no named revision");
 }

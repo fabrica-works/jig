@@ -184,7 +184,6 @@ impl Core {
                 | people::Outcome::QuestionAnswered { .. }
                 | people::Outcome::Prioritised { .. }
                 | people::Outcome::Amended { .. }
-                | people::Outcome::AmendProposed { .. }
                 | people::Outcome::RolesSet { .. }
                 | people::Outcome::PolicyChanged { .. }
                 | people::Outcome::PoolSet { .. }

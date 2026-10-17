@@ -351,17 +351,26 @@ pub fn encode_ask(value: &domain::Ask, limits: &wire::Limits) -> Result<wire::As
             limits,
             wire::AskCompoundParts { project: *project, operations: super::compound::encode(operations, limits)? },
         )?),
-        domain::Ask::Propose { project, action: domain::Action::Batch(batch), reason } => {
+        domain::Ask::Propose { project, action, reason } => {
+            let action = match action {
+                domain::Action::Batch(batch) => wire::Action::Batch(wire::ActionBatch::new(
+                    limits,
+                    wire::ActionBatchParts { members: super::batch::encode(batch, limits)? },
+                )?),
+                domain::Action::Amend { task, revision, amendment } => {
+                    wire::Action::Amend(Box::new(wire::ActionAmend::new(
+                        limits,
+                        wire::ActionAmendParts {
+                            task: *task,
+                            revision: *revision,
+                            amendment: encode_amendment(amendment, limits)?,
+                        },
+                    )?))
+                }
+            };
             wire::Ask::Propose(wire::AskPropose::new(
                 limits,
-                wire::AskProposeParts {
-                    project: *project,
-                    action: wire::Action::Batch(wire::ActionBatch::new(
-                        limits,
-                        wire::ActionBatchParts { members: super::batch::encode(batch, limits)? },
-                    )?),
-                    reason: reason.clone(),
-                },
+                wire::AskProposeParts { project: *project, action, reason: reason.clone() },
             )?)
         }
         domain::Ask::Withdraw { project, proposal } => wire::Ask::Withdraw(wire::AskWithdraw::new(
@@ -547,12 +556,17 @@ pub fn decode_ask(value: wire::Ask, limits: &wire::Limits) -> Result<domain::Ask
             domain::Ask::Compound { project, operations: super::compound::decode(operations, limits)? }
         }
         wire::Ask::Propose(value) => {
-            let wire::AskProposeParts { project, action: wire::Action::Batch(batch), reason } = value.into_parts();
-            domain::Ask::Propose {
-                project,
-                action: domain::Action::Batch(super::batch::decode(batch.into_parts().members, limits)?),
-                reason,
-            }
+            let wire::AskProposeParts { project, action, reason } = value.into_parts();
+            let action = match action {
+                wire::Action::Batch(batch) => {
+                    domain::Action::Batch(super::batch::decode(batch.into_parts().members, limits)?)
+                }
+                wire::Action::Amend(value) => {
+                    let wire::ActionAmendParts { task, revision, amendment } = (*value).into_parts();
+                    domain::Action::Amend { task, revision, amendment: Box::new(decode_amendment(amendment, limits)?) }
+                }
+            };
+            domain::Ask::Propose { project, action, reason }
         }
         wire::Ask::Withdraw(value) => {
             let wire::AskWithdrawParts { project, proposal } = value.into_parts();

@@ -217,7 +217,7 @@ fn historical_raw_person_goal_keeps_all_four_counters_authority_parameters_and_l
 fn historical_unadmitted_recurrence_is_refused_before_copying_any_raw_goal_field() {
     let (query, mut source) = sources().remove(2);
     let reads::Past::PersonProposal { proposal, .. } = &mut source.value else { panic!("person source") };
-    let tasks::PersonAction::Batch(batch) = &mut proposal.action;
+    let tasks::PersonAction::Batch(batch) = &mut proposal.action else { panic!("batch fixture") };
     batch.first_mut().expect("proposal member").recurring = Some(Box::new(tasks::RecurringTemplate {
         key: 0,
         batch: Box::new([]),
@@ -237,7 +237,7 @@ fn historical_original_query_and_all_nested_companion_identities_are_checked_bef
             reads::Past::Task { result, .. } | reads::Past::PersonTask { result, .. } => result.task.number = 0,
             reads::Past::Proposal(proposal) => proposal.proposer = 1,
             reads::Past::PersonProposal { proposal, .. } => {
-                let tasks::PersonAction::Batch(batch) = &mut proposal.action;
+                let tasks::PersonAction::Batch(batch) = &mut proposal.action else { panic!("batch fixture") };
                 batch.first_mut().expect("proposal member").project = 0;
             }
             reads::Past::Escalation { decision, .. } => decision.task = 0,

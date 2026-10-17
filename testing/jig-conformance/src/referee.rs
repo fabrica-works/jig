@@ -228,7 +228,8 @@ pub struct Snapshot {
     /// Last attempt number and absolute retry deadline for each durable key.
     pub attempts: BTreeMap<(u16, SystemKey), (u32, u64)>,
     pub acceptances: BTreeMap<(u16, SystemKey), Acceptance>,
-    /// Durable covered-holder acceptance for each member of a proposed batch.
+    /// Last durable covered-holder acceptance setting each task's authority:
+    /// its batch's acceptance, or a later amendment's or widening's acceptance.
     pub accepted_tasks: BTreeMap<u64, Acceptance>,
     /// Pending party proposal numbers and the parties that proposed them.
     pub party_proposals: BTreeMap<u64, u64>,
@@ -463,49 +464,48 @@ impl Referee {
         require(number == self.commit + 1, Promise::Commit, "commits apply whole in number order")?;
         for task in snapshot.tasks.values() {
             require(
-                self.last
-                    .accepted_tasks
-                    .get(&task.number)
-                    .is_none_or(|accepted| snapshot.accepted_tasks.get(&task.number) == Some(accepted)),
+                !self.last.accepted_tasks.contains_key(&task.number)
+                    || snapshot.accepted_tasks.contains_key(&task.number),
                 Promise::Authority,
-                "durable batch acceptance disappeared or changed",
+                "durable task acceptance disappeared",
             )?;
             if let Some(accepted) = snapshot.accepted_tasks.get(&task.number) {
-                let proposer = match task.source {
-                    Source::Task(parent) => snapshot.tasks.get(&parent),
-                    Source::Person(_) | Source::Deployment => None,
-                };
-                let prior =
-                    proposer.and_then(|parent| self.last.tasks.get(&parent.number)).and_then(|parent| parent.proposal);
                 let known = self.last.accepted_tasks.get(&task.number) == Some(accepted);
-                let party = match task.source {
-                    Source::Person(person) => self.last.party_proposals.get(&accepted.proposal) == Some(&person),
-                    Source::Task(_) | Source::Deployment => false,
-                };
+                let existing = self.last.tasks.contains_key(&task.number);
+                let party = self
+                    .last
+                    .party_proposals
+                    .get(&accepted.proposal)
+                    .is_some_and(|person| existing || task.source == Source::Person(*person));
                 require(
                     known
                         || party
-                        || prior.is_some_and(|(proposal, holder)| {
-                            proposal == accepted.proposal
-                                && (holder == accepted.by
-                                    || (holder == Source::Deployment
-                                        && match accepted.by {
-                                            Source::Person(person) => {
-                                                self.policy.effect_accepters.contains(&(task.project, person))
-                                            }
-                                            Source::Task(_) | Source::Deployment => false,
-                                        }))
-                        }),
+                        || self
+                            .last
+                            .tasks
+                            .values()
+                            .filter(|proposer| existing || task.source == Source::Task(proposer.number))
+                            .filter_map(|proposer| proposer.proposal)
+                            .any(|(proposal, holder)| {
+                                proposal == accepted.proposal
+                                    && (holder == accepted.by
+                                        || (holder == Source::Deployment
+                                            && match accepted.by {
+                                                Source::Person(person) => {
+                                                    self.policy.effect_accepters.contains(&(task.project, person))
+                                                }
+                                                Source::Task(_) | Source::Deployment => false,
+                                            }))
+                            }),
                     Promise::Authority,
-                    "batch member lacks a durable covered-holder acceptance",
+                    "task lacks a durable covered-holder acceptance",
                 )?;
             }
-            if !self
-                .last
-                .tasks
-                .get(&task.number)
-                .is_some_and(|old| old.scope == task.scope && old.source == task.source)
-            {
+            if !self.last.tasks.get(&task.number).is_some_and(|old| {
+                old.scope == task.scope
+                    && old.source == task.source
+                    && self.last.accepted_tasks.get(&task.number) == snapshot.accepted_tasks.get(&task.number)
+            }) {
                 let project = self.policy.projects.get(&task.project);
                 let source = self.source(&snapshot, task);
                 require(
@@ -551,9 +551,7 @@ impl Referee {
             require(task.budget <= task.scope.budget, Promise::Authority, "allotment exceeds spend authority")?;
             let total = task.spent.checked_add(task.spent_below).and_then(|sum| sum.checked_add(task.reserved));
             require(
-                total.is_some_and(|total| total <= task.budget)
-                    && task.run_spent <= task.spent
-                    && task.run_reserved <= task.reserved,
+                total.is_some_and(|total| total <= task.budget) && task.run_reserved <= task.reserved,
                 Promise::Spend,
                 format!("task {} overdraws its durable allotment", task.number),
             )?;

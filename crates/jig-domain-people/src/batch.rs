@@ -5,6 +5,12 @@ use alloc::boxed::Box;
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Action {
     Batch(Box<[Member]>),
+    /// Amend a task at the displayed specification revision.
+    Amend {
+        task: u64,
+        revision: u64,
+        amendment: Box<crate::Amendment>,
+    },
 }
 
 pub(crate) fn invalid(limits: &crate::Limits, batch: &[Member]) -> crate::LimitKind {

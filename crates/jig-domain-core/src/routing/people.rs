@@ -182,7 +182,6 @@ pub(super) fn tag_people(
                     | people::Outcome::QuestionAnswered { .. }
                     | people::Outcome::Prioritised { .. }
                     | people::Outcome::Amended { .. }
-                    | people::Outcome::AmendProposed { .. }
                     | people::Outcome::RolesSet { .. }
                     | people::Outcome::PolicyChanged { .. }
                     | people::Outcome::PoolSet { .. }
@@ -268,22 +267,37 @@ pub(super) fn tag_people(
                         work,
                         super::create::Creation { request, person, project, role: role.expect("admitted role"), batch },
                     ),
-                    people::Ask::Propose { action, reason, .. } => super::propose::propose_request(
-                        core,
-                        env,
-                        &mut out,
-                        work,
-                        super::create::Creation {
-                            request,
-                            person,
-                            project,
-                            role: role.expect("admitted role"),
-                            batch: match action {
-                                people::Action::Batch(batch) => batch,
+                    people::Ask::Propose { action, reason, .. } => match action {
+                        people::Action::Batch(batch) => super::propose::propose_request(
+                            core,
+                            env,
+                            &mut out,
+                            work,
+                            super::create::Creation {
+                                request,
+                                person,
+                                project,
+                                role: role.expect("admitted role"),
+                                batch,
                             },
-                        },
-                        reason,
-                    ),
+                            reason,
+                        ),
+                        people::Action::Amend { task, revision, amendment } => super::propose::amend_request(
+                            core,
+                            env,
+                            work,
+                            super::propose::Edit {
+                                request,
+                                person,
+                                project,
+                                role,
+                                task,
+                                revision,
+                                amendment: *amendment,
+                                reason,
+                            },
+                        ),
+                    },
                     people::Ask::Withdraw { proposal, .. } => super::propose::withdraw_request(
                         core,
                         work,

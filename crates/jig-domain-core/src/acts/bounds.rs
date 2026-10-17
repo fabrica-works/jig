@@ -116,7 +116,6 @@ pub(crate) fn amend_preflight_in(
         limits.tasks.depth,
         &limits.tasks,
         admission,
-        false,
     )?;
     Ok(())
 }
@@ -294,7 +293,7 @@ pub(crate) fn amendment_admit(
     amendment: &tasks::Amendment,
     depth: u32,
     limits: &tasks::Limits,
-) -> Result<(bool, bool), people::Refusal> {
+) -> Result<bool, people::Refusal> {
     amendment_admit_in(
         core,
         crate::compound::PartyTask { person, project, role, task },
@@ -302,7 +301,6 @@ pub(crate) fn amendment_admit(
         depth,
         limits,
         &tasks::CompoundAdmission::new(&core.tasks, 0),
-        false,
     )
 }
 pub(crate) fn amendment_admit_in(
@@ -312,8 +310,7 @@ pub(crate) fn amendment_admit_in(
     depth: u32,
     limits: &tasks::Limits,
     admission: &tasks::CompoundAdmission<'_>,
-    direct: bool,
-) -> Result<(bool, bool), people::Refusal> {
+) -> Result<bool, people::Refusal> {
     let crate::compound::PartyTask { person, project, role, task } = party;
     standing::role(core, project, role, super::Act::Amend)?;
     if amendment.tracked.is_some() {
@@ -344,7 +341,7 @@ pub(crate) fn amendment_admit_in(
         };
         return Err(why);
     }
-    let Some(after) = &amendment.authority else { return Ok((false, false)) };
+    let Some(after) = &amendment.authority else { return Ok(false) };
     if !tasks::valid_authority(limits, after) {
         return Err(people::Refusal::Limit { which: people::LimitKind::Authority });
     }
@@ -353,7 +350,7 @@ pub(crate) fn amendment_admit_in(
     let implies = &core.authority.rules().implies;
     let stop_run = !authority::at_most(&before, &after, implies);
     if authority::at_most(&after, &before, implies) {
-        return Ok((stop_run, false));
+        return Ok(stop_run);
     }
     let pool = tasks::Funder::Pool { project, person, period: core.period(project) };
     let numbers = match admission.funding(pool) {
@@ -370,17 +367,8 @@ pub(crate) fn amendment_admit_in(
     };
     let checked = authority::check_request_with_standing(&core.authority, &ask, standing, &mut findings);
     match checked.answer {
-        authority::Answer::Allow => Ok((stop_run, false)),
-        authority::Answer::Propose => {
-            if direct {
-                return Err(core.request_refusal(&ask, checked.answer, &mut findings));
-            }
-            if recipient(core, project, authority::ProposalKind::Amend).is_some() {
-                Ok((stop_run, true))
-            } else {
-                Err(unproposable())
-            }
-        }
+        authority::Answer::Allow => Ok(stop_run),
+        authority::Answer::Propose => Err(core.request_refusal(&ask, checked.answer, &mut findings)),
         authority::Answer::Wait | authority::Answer::Refuse => {
             Err(core.request_refusal(&ask, checked.answer, &mut findings))
         }

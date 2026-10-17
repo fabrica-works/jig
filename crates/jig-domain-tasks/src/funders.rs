@@ -3,6 +3,7 @@
 //! Root authorizes new allocations; tasks reserves, charges and closes their
 //! financial links once, emitting rows for one root decision. No move
 //! and retires superseded sources after their last reservations settle.
+pub(crate) mod refunding;
 use crate::domain::{Domain, publish, record, refused, task_mut};
 use crate::{Funder, Limits, Numbers, Refusal, Request, Stored};
 use skein_lib::{Env, Queue, ReplyTo};

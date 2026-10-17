@@ -157,7 +157,6 @@ pub(crate) fn permanent(outcome: Outcome) -> Option<CapacityCause> {
         | Outcome::QuestionAnswered { .. }
         | Outcome::Prioritised { .. }
         | Outcome::Amended { .. }
-        | Outcome::AmendProposed { .. }
         | Outcome::RolesSet { .. }
         | Outcome::PolicyChanged { .. }
         | Outcome::PoolSet { .. }

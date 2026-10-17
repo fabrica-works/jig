@@ -283,7 +283,7 @@ fn check(
             staged,
             env,
             by,
-            crate::control::Amend { number: task, message, stop_run, amendment: *amendment },
+            crate::control::Amend { number: task, message, stop_run, funder: None, amendment: *amendment },
         ) {
             Ok(plan) => Ok(Plan::Amend(Box::new(plan))),
             Err(why) => Err(Box::new(Problem::new(Some(task), why))),

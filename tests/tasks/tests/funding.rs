@@ -349,3 +349,79 @@ fn delegate_expense_follows_task_funding_chain_once() {
     w.restart();
     assert_eq!(w.records, before);
 }
+
+fn accepted_amendment(world: &mut World, funder: Funder, budget: u64) -> Reply {
+    let mut authority = world.record(1).authority.clone();
+    authority.budget.spend = budget;
+    let message = world.record(1).last_message + 1;
+    send(world, |reply_to| Event::Amend {
+        reply_to,
+        by: Party::Person(9),
+        task: 1,
+        message,
+        stop_run: false,
+        funder: Some(funder),
+        amendment: tasks::Amendment {
+            tracked: None,
+            addressed: None,
+            instructions: None,
+            release: None,
+            spec: None,
+            wake: None,
+            dependencies: None,
+            authority: Some(authority),
+            reason: b"more work".as_slice().into(),
+        },
+    })
+}
+
+const AMENDMENT_FUNDERS: [Funder; 4] =
+    [Funder::Task(1), Funder::Task(2), Funder::Task(99), Funder::Pool { project: 2, person: 8, period: 1 }];
+
+#[test]
+fn an_amendments_funder_must_be_in_its_project_and_above_its_requester() {
+    for source in AMENDMENT_FUNDERS {
+        let mut world = World::new(347, LIMITS);
+        assert_eq!(world.make(Party::Person(9), vec![task(1, &[]), task(2, &[])]), Reply::Made(vec![1, 2]));
+        send(&mut world, |reply_to| Event::OpenPeriod { reply_to, project: 2, period: 1, budget: 200 });
+        send(&mut world, |reply_to| Event::CarvePool { reply_to, project: 2, person: 8, period: 1, budget: 100 });
+        assert_eq!(ledger(&world, AMENDMENT_FUNDERS[3]).numbers.budget, 100);
+        let before = world.records.clone();
+        assert_eq!(
+            accepted_amendment(&mut world, source, 100),
+            Reply::Refused(tasks::Problem::new(Some(1), Refusal::Funding)),
+            "{source:?}"
+        );
+        assert_eq!(world.records, before, "{source:?}");
+    }
+}
+#[test]
+fn an_amendment_accepted_by_another_funder_funds_its_task_anew() {
+    let mut world = World::new(346, LIMITS);
+    world.open_period(1, 100);
+    world.carve_pool(1, 30);
+    send(&mut world, |reply_to| Event::CarvePool { reply_to, project: 1, person: 8, period: 1, budget: 30 });
+    let first = Funder::Pool { project: 1, person: 9, period: 1 };
+    let second = Funder::Pool { project: 1, person: 8, period: 1 };
+    let mut member = task(1, &[]);
+    member.funder = first;
+    member.numbers.budget = 10;
+    member.authority.budget.spend = 10;
+    assert_eq!(world.make(Party::Person(9), vec![member]), Reply::Made(vec![1]));
+    world.claim(1, 1);
+    assert_eq!(turn(&mut world, 1, 1, 1, None, 3), Reply::Turn(Accepted::New));
+    accepted_amendment(&mut world, second, 15);
+    assert_eq!(ledger(&world, first).numbers, Numbers { budget: 30, spent: 0, spent_below: 3, reserved: 0 });
+    assert_eq!(ledger(&world, second).numbers, Numbers { budget: 30, spent: 0, spent_below: 0, reserved: 12 });
+    assert_eq!(
+        (world.record(1).funder, world.record(1).numbers.budget, world.record(1).authority.budget.spend),
+        (second, 12, 12)
+    );
+    assert_eq!((world.record(1).requester, world.record(1).root, world.record(1).depth), (Party::Person(9), 1, 0));
+    accepted_amendment(&mut world, second, 14);
+    assert_eq!((world.record(1).funder, world.record(1).numbers.budget), (second, 14));
+    assert_eq!(ledger(&world, second).numbers.reserved, 14);
+    assert_eq!(turn(&mut world, 1, 1, 2, None, 4), Reply::Turn(Accepted::New));
+    assert_eq!((world.record(1).numbers.spent, world.record(1).run_spent), (1, 4));
+    world.restart();
+}

@@ -138,7 +138,7 @@ pub struct Proposal {
     pub state: ProposalState,
 }
 
-/// A party's explicit batch request, kept separately from task-origin proposals.
+/// A party's explicit action request, kept separately from task-origin proposals.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct PersonProposal {
     pub number: u64,
@@ -150,26 +150,32 @@ pub struct PersonProposal {
 }
 
 impl PersonProposal {
-    /// The proposed roots, in their durable batch order.
+    /// Proposed roots in their durable order; empty for an amendment.
     #[must_use]
     pub fn batch(&self) -> &[New] {
-        let PersonAction::Batch(batch) = &self.action;
-        batch
+        match &self.action {
+            PersonAction::Batch(batch) => batch,
+            PersonAction::Amend { .. } => &[],
+        }
     }
-    /// First root for the inbox's task link, or zero for an invalid empty batch.
+    /// The amended task or first root for the inbox link; zero for an invalid empty batch.
     #[must_use]
     pub fn first(&self) -> u64 {
-        match self.batch().first() {
-            Some(member) => member.number,
-            None => 0,
+        match &self.action {
+            PersonAction::Batch(batch) => match batch.first() {
+                Some(member) => member.number,
+                None => 0,
+            },
+            PersonAction::Amend { task, .. } => *task,
         }
     }
 }
 
-/// A party's requested roots, funded by the accepter.
+/// A party's requested action, funded by the accepter.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum PersonAction {
     Batch(Box<[New]>),
+    Amend { task: u64, amendment: Box<Amendment> },
 }
 
 /// Durable decision on a person-origin proposal; terminal rows remain in the store.
@@ -181,7 +187,7 @@ pub enum PersonProposalState {
     Withdrawn { at: Wall },
 }
 
-/// A restored or newly proposed batch has the bounded shape of future roots.
+/// A restored or newly proposed action has its bounded durable shape.
 pub(crate) fn valid_person_proposal(proposal: &PersonProposal, limits: &Limits) -> bool {
     if proposal.number == 0
         || proposal.proposer == 0
@@ -228,6 +234,9 @@ pub(crate) fn propose_person(
         }
     {
         return refused(to, None, Refusal::Read, out);
+    }
+    if let Err(why) = crate::person_proposals::check(domain, env, &proposal) {
+        return refused(to, None, why, out);
     }
     if domain.person_proposals.len() >= env.limits.tasks || domain.person_proposals.contains_key(&proposal.number) {
         if domain.person_proposals.len() >= env.limits.tasks && !domain.person_proposals.contains_key(&proposal.number)

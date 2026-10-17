@@ -647,6 +647,34 @@ fn an_accepted_party_batch_stays_within_its_accepters_authority() {
     }
 }
 
+const LATER_ACCEPTANCE_BUDGETS: [(u64, bool); 2] = [(60, true), (61, false)];
+
+#[test]
+fn a_later_amendment_acceptance_replaces_the_tasks_authority_source() {
+    for (budget, accepted) in LATER_ACCEPTANCE_BUDGETS {
+        let mut fake = Fake::new(Recovery::Keyed);
+        let mut accepter = scope();
+        accepter.budget = 60;
+        fake.referee.policy.people.insert((1, 2), accepter);
+        fake.commit(1, proposed_batch()).expect("batch proposal");
+        let mut rows = accepted_batch();
+        fake.commit(2, rows.clone()).expect("batch accepted by party one");
+        rows.party_proposals.insert(10, 1);
+        fake.commit(3, rows.clone()).expect("later amendment pending from its party");
+        rows.party_proposals.clear();
+        rows.accepted_tasks.insert(2, Acceptance { proposal: 10, by: Source::Person(2) });
+        let task = rows.tasks.get_mut(&2).expect("amended task");
+        task.scope.budget = budget;
+        task.budget = budget;
+        let result = fake.commit(4, rows);
+        if accepted {
+            result.expect("the later accepter covers the amended task");
+        } else {
+            assert_eq!(result.expect_err("past the later accepter's ceiling").promise, Promise::Authority);
+        }
+    }
+}
+
 #[test]
 fn a_watch_delivery_before_its_no_write_decisions_prior_commit_is_caught() {
     let mut fence = jig_core_world::watches::Fence::opened(7);

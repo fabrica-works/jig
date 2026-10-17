@@ -481,6 +481,14 @@ fn people_propose() -> people::Ask {
     }
 }
 
+fn people_amend_proposal() -> people::Ask {
+    people::Ask::Propose {
+        project: 1,
+        action: people::Action::Amend { task: 2, revision: 3, amendment: Box::new(people_amendment()) },
+        reason: b"please amend".as_slice().into(),
+    }
+}
+
 pub fn people_asks() -> Box<[people::Ask]> {
     use people::{Ask, Proposer};
     let [cancel_move, amend_release, message_stop] = people_compounds();
@@ -502,6 +510,7 @@ pub fn people_asks() -> Box<[people::Ask]> {
         amend_release,
         message_stop,
         people_propose(),
+        people_amend_proposal(),
         Ask::Withdraw { project: 1, proposal: 43 },
         Ask::Close { project: 1, chat: 2, disposals },
         Ask::MarkSeen { seen: people::Seen::Chat { task: 2, through: 3 } },

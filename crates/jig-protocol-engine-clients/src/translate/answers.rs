@@ -121,12 +121,6 @@ fn owner(value: &p::Outcome, limits: &w::Limits) -> Result<w::OwnerOutcome, w::P
             limits,
             w::OwnerOutcomeAmendedParts { task: *task, released: *released },
         )?),
-        p::Outcome::AmendProposed { task, proposal, released } => {
-            w::OwnerOutcome::AmendProposed(w::OwnerOutcomeAmendProposed::new(
-                limits,
-                w::OwnerOutcomeAmendProposedParts { task: *task, proposal: *proposal, released: *released },
-            )?)
-        }
         p::Outcome::RolesSet { project } => w::OwnerOutcome::RolesSet(w::OwnerOutcomeRolesSet::new(
             limits,
             w::OwnerOutcomeRolesSetParts { project: *project },
@@ -215,4 +209,28 @@ fn escalation_choice(value: p::EscalationChoice) -> w::OwnerEscalationChoice {
         p::EscalationChoice::Rejected => w::OwnerEscalationChoice::Rejected,
         p::EscalationChoice::Passed => w::OwnerEscalationChoice::Passed,
     }
+}
+
+/// Translate the explicit follow-up of the temporary v8 amendment confirmation.
+pub(crate) fn amend_answer(
+    reply: &p::Reply,
+    kept: Option<&p::Ask>,
+    limits: &w::Limits,
+) -> Result<w::Answer, w::Problem> {
+    if let (
+        Some(p::Ask::Propose { action: p::Action::Amend { task, .. }, .. }),
+        p::Reply::Outcome(p::Outcome::Proposed { proposal, .. }),
+    ) = (kept, reply)
+    {
+        let value = w::OwnerOutcome::AmendProposed(w::OwnerOutcomeAmendProposed::new(
+            limits,
+            w::OwnerOutcomeAmendProposedParts { task: *task, proposal: *proposal, released: false },
+        )?);
+        let outcome = w::Outcome::Owner(w::OutcomeOwner::new(limits, w::OutcomeOwnerParts { value })?);
+        let final_answer = w::Final::Done(w::Done::new(limits, w::DoneParts { outcome })?);
+        let mut out = Writer::new(usize::try_from(final_answer.measure()).expect("wire size fits"));
+        final_answer.encode(&mut out).expect("measured final answer");
+        return owned(w::Owner::Jig, jig_client_protocol_wire::VERSION, out.finish(), limits);
+    }
+    answer(reply, limits)
 }

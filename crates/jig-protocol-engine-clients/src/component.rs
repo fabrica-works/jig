@@ -512,26 +512,7 @@ impl Component {
                     self.respond(env, exchange, routes::refused(&env.limits.wire));
                 }
             },
-            Waiting::Ask { sign_in, .. } => match reply {
-                people::Reply::Outcome(people::Outcome::ServiceMade { person }) => {
-                    self.pending
-                        .exchanges
-                        .insert(exchange, Waiting::Made { sign_in, party: person })
-                        .expect("same slot");
-                    out.push(Request::Secrets(SecretsRequest::Get { owner: SecretOwner::Service(person) }));
-                }
-                people::Reply::Outcome(people::Outcome::Applied { .. }) => {
-                    self.pending.exchanges.insert(exchange, waiting).expect("same slot");
-                }
-                people::Reply::SignedIn { .. }
-                | people::Reply::SignedOut
-                | people::Reply::Outcome(_)
-                | people::Reply::Again(_)
-                | people::Reply::Refused(_) => {
-                    let answer = crate::translate::answers::answer(&reply, &env.limits.wire);
-                    self.answer(env, exchange, answer, out);
-                }
-            },
+            Waiting::Ask { .. } => self.ask_reply(env, exchange, reply, out, waiting),
             Waiting::Provider { .. }
             | Waiting::Watch { .. }
             | Waiting::Read { .. }
@@ -541,6 +522,45 @@ impl Component {
             | Waiting::Made { .. }
             | Waiting::Checked { .. } => {
                 self.pending.exchanges.insert(exchange, waiting).expect("same slot");
+            }
+        }
+    }
+    fn ask_reply(
+        &mut self,
+        env: &Env<Limits>,
+        exchange: Token,
+        reply: people::Reply,
+        out: &mut Queue<Request>,
+        mut waiting: Waiting,
+    ) {
+        let Waiting::Ask { sign_in, ref mut amendment, .. } = waiting else { unreachable!("ask reply route") };
+        if let Some(event) = sign_in::propose_amend(amendment, &reply, sign_in, exchange) {
+            self.pending.exchanges.insert(exchange, waiting).expect("same slot");
+            out.push(Request::Core(Box::new(core::Event::People(event))));
+            return;
+        }
+        match reply {
+            people::Reply::Outcome(people::Outcome::ServiceMade { person }) => {
+                self.pending.exchanges.insert(exchange, Waiting::Made { sign_in, party: person }).expect("same slot");
+                out.push(Request::Secrets(SecretsRequest::Get { owner: SecretOwner::Service(person) }));
+            }
+            people::Reply::Outcome(people::Outcome::Applied { .. }) => {
+                self.pending.exchanges.insert(exchange, waiting).expect("same slot");
+            }
+            people::Reply::SignedIn { .. }
+            | people::Reply::SignedOut
+            | people::Reply::Outcome(_)
+            | people::Reply::Again(_)
+            | people::Reply::Refused(_) => {
+                let answer = crate::translate::answers::amend_answer(
+                    &reply,
+                    match amendment.as_ref() {
+                        Some((_, ask)) => Some(ask.as_ref()),
+                        None => None,
+                    },
+                    &env.limits.wire,
+                );
+                self.answer(env, exchange, answer, out);
             }
         }
     }
@@ -676,6 +696,7 @@ impl Component {
             self.connections.get_mut(&owner).expect("exchange owner").respond(400, Box::new([]), &env.limits);
             return;
         }
+        let mut amendment = None;
         let request = match keyed.owner {
             w::Owner::Jig => {
                 let ask = match w::Ask::decode(&env.limits.wire, &mut skein_lib::Reader::new(&keyed.request)) {
@@ -686,6 +707,9 @@ impl Component {
                     self.connections.get_mut(&owner).expect("exchange owner").respond(400, Box::new([]), &env.limits);
                     return;
                 };
+                if let people::Ask::Amend { .. } = &ask {
+                    amendment = Some((keyed.key, Box::new(ask.clone())));
+                }
                 Request::Core(Box::new(core::Event::People(people::Event::Ask {
                     reply_to: ReplyTo::new(exchange),
                     sign_in,
@@ -708,7 +732,7 @@ impl Component {
         };
         self.pending
             .exchanges
-            .insert(exchange, Waiting::Ask { sign_in, family, version: keyed.version })
+            .insert(exchange, Waiting::Ask { sign_in, family, version: keyed.version, amendment })
             .expect("get released slot");
         out.push(request);
     }

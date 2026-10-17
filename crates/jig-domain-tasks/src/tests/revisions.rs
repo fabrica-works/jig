@@ -154,6 +154,7 @@ impl Harness {
     fn amend(&mut self, number: u64, amendment: Amendment) {
         let message = self.domain.task(number).unwrap().last_message.checked_add(1).expect("test message room");
         let out = self.send(Event::Amend {
+            funder: None,
             reply_to: to(),
             by: Party::Person(9),
             task: number,
@@ -700,6 +701,7 @@ fn words_release_a_stop_before_its_cancelled_run_answers() {
     authority.budget.spend = 90;
     change.authority = Some(authority);
     test.send(Event::Amend {
+        funder: None,
         reply_to: to(),
         by: Party::Person(9),
         task: 1,
@@ -747,6 +749,7 @@ fn an_amendment_releases_only_the_named_hold_and_preflights_both_changes() {
     bad.dependencies = Some(Box::new([99]));
     let before = h.domain.task(1).unwrap().clone();
     h.send(Event::Amend {
+        funder: None,
         reply_to: to(),
         by: Party::Person(9),
         task: 1,
@@ -760,6 +763,7 @@ fn an_amendment_releases_only_the_named_hold_and_preflights_both_changes() {
     let mut change = amendment();
     change.release = Some(held);
     h.send(Event::Amend {
+        funder: None,
         reply_to: to(),
         by: Party::Person(9),
         task: 1,

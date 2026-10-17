@@ -179,14 +179,13 @@ fn check(
             crate::acts::mutable_phase(&row.phase)?;
             let mut amendment = crate::amendments::translate(*amendment, &env.limits.tasks)
                 .ok_or(people::Refusal::Limit { which: people::LimitKind::Words })?;
-            let (stop_run, _) = crate::acts::bounds::amendment_admit_in(
+            let stop_run = crate::acts::bounds::amendment_admit_in(
                 core,
                 route.task(task),
                 &amendment,
                 env.limits.tasks.depth,
                 &env.limits.tasks,
                 admission,
-                true,
             )?;
             crate::acts::mutable_phase(&row.phase)?;
             Core::party_amend_revision_in(task, revision, &amendment, admission)?;

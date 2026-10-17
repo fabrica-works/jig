@@ -191,7 +191,10 @@ fn an_amendment_uses_live_pool_and_remaining_task_facts_and_preserves_narrowing(
     };
     assert_eq!(
         core.amend_admit(1, Some(people::Role::Owner), 1, 1, &change, limits.tasks.depth, &limits.tasks),
-        Ok((false, true))
+        Err(people::Refusal::Authority {
+            lacking: people::Lack::Budget { needs: 550, left: 500 },
+            proposable: Some(people::Accepter::Role(0))
+        })
     );
     policy(&mut core, false, 1000);
     let Admission::Bounded { beyond: Beyond::Refused(why), .. } =
@@ -199,14 +202,22 @@ fn an_amendment_uses_live_pool_and_remaining_task_facts_and_preserves_narrowing(
     else {
         panic!("unproposable amendment")
     };
+
+    assert_eq!(
+        why,
+        people::Refusal::Authority { lacking: people::Lack::Approver, proposable: Some(people::Accepter::Nobody) }
+    );
     assert_eq!(
         core.amend_admit(1, Some(people::Role::Owner), 1, 1, &change, limits.tasks.depth, &limits.tasks),
-        Err(why)
+        Err(people::Refusal::Authority {
+            lacking: people::Lack::Budget { needs: 550, left: 500 },
+            proposable: Some(people::Accepter::Nobody)
+        })
     );
     change.authority.as_mut().unwrap().budget.spend = 90;
     assert_eq!(
         core.amend_admit(1, Some(people::Role::Owner), 1, 1, &change, limits.tasks.depth, &limits.tasks),
-        Ok((true, false))
+        Ok(true)
     );
 }
 

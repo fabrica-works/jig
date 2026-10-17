@@ -447,8 +447,6 @@ pub enum Outcome {
     Prioritised { project: u32 },
     /// The named task accepted this person's amendment.
     Amended { task: u64, released: bool },
-    /// A widening amendment waits for an authorized proposal holder.
-    AmendProposed { task: u64, proposal: u64, released: bool },
     /// Root accepted one roster and all affected `Waiting` recipients atomically; saved keyed
     /// replay does not apply the roster again.
     RolesSet {

@@ -10,6 +10,7 @@ use crate::{Core, Limits};
 use alloc::boxed::Box;
 use jig_domain_tasks as tasks;
 use skein_lib::{List, Wall};
+mod party;
 
 /// A specification without application values; loss is explicit on every text and list.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -392,17 +393,7 @@ fn action(
                 purpose: *purpose,
             }
         }
-        tasks::ProposalAction::Amend { task, amendment: change } => {
-            let row = super::small::visible(core, party, *task)?;
-            ProposalAction::Amend {
-                task: super::task_tree::link(core, limits, party, *task)?,
-                addressed: change.addressed,
-                before: Box::new(amendment(core, limits, row, None)?),
-                after: Box::new(amendment(core, limits, row, Some(change))?),
-                reason: super::small::text(&change.reason, limits.documents.text_bytes),
-                release: change.release,
-            }
-        }
+        tasks::ProposalAction::Amend { task, amendment } => party::amendment(core, limits, party, *task, amendment)?,
         tasks::ProposalAction::Widen { task, authority } => ProposalAction::Widen {
             task: super::task_tree::link(core, limits, party, *task)?,
             before: super::task_tree::authority(limits, &super::small::visible(core, party, *task)?.authority)?,
@@ -501,21 +492,13 @@ pub(super) fn proposal(
                     return Err(Missing::Ended);
                 }
             };
-            let mut batch = List::with_capacity(limits.documents.lines);
-            for member in value.batch() {
-                if batch.push(proposed(limits, member)?).is_err() {
-                    return Err(Missing::TooLarge);
-                }
-            }
+            let (action, kind) = party::action(core, limits, party, &value.action)?;
             (
                 value.project,
                 super::small::text(&value.reason, limits.documents.text_bytes),
-                ProposalAction::Batch(batch),
+                action,
                 true,
-                ProposalWaiting {
-                    holder: tasks::ProposalHolder::Policy { project: value.project, kind: tasks::ProposalKind::Batch },
-                    since,
-                },
+                ProposalWaiting { holder: tasks::ProposalHolder::Policy { project: value.project, kind }, since },
             )
         }
     };
@@ -551,9 +534,12 @@ pub(super) fn proposal(
                     unreachable!("matched authority action")
                 }
             };
-            offers
-                .push(funding(core, row.funder, ceiling.saturating_sub(row.numbers.budget)))
-                .expect("one widening source");
+            let needed = if source == row.funder {
+                ceiling.saturating_sub(row.numbers.budget)
+            } else {
+                ceiling.saturating_sub(row.numbers.spent).saturating_sub(row.numbers.spent_below)
+            };
+            offers.push(funding(core, source, needed)).expect("one widening source");
         }
     }
     Ok(Proposal {

@@ -6,7 +6,7 @@ use super::refusals::{person_message_refusal, person_move_refusal, person_task_r
 use super::runs::call_decision;
 use super::view_routes::touch_task;
 use crate::{
-    Ask, CallPart, Core, CoreKey, CoreRecord, EscalationDecisionRecord, Event, Held, Key, Limits, Now,
+    Ask, CallPart, Core, CoreKey, CoreRecord, EscalationDecisionRecord, Event, GoalRoute, Held, Key, Limits, Now,
     PersonProposalRoute, PersonTaskRoute, Record, Request, Requests, RoutedCall, SentRoute, Write,
 };
 use alloc::boxed::Box;
@@ -544,9 +544,6 @@ pub(super) fn tag_tasks(
                         PersonTaskRoute::Release(task) => people::Outcome::Released { task },
                         PersonTaskRoute::Prioritised(project) => people::Outcome::Prioritised { project },
                         PersonTaskRoute::Amended { task, released } => people::Outcome::Amended { task, released },
-                        PersonTaskRoute::AmendProposed { task, proposal } => {
-                            people::Outcome::AmendProposed { task, proposal, released: false }
-                        }
                     };
                     append_people(core, env, people::Event::Decided { request: token, outcome }, &mut out);
                     continue;
@@ -570,6 +567,29 @@ pub(super) fn tag_tasks(
                     );
                     for _ in 0..follow.len() {
                         pending.push(follow.pop().expect("procedure proposal outcome"));
+                    }
+                    continue;
+                }
+                if let Some(GoalRoute::Accepting { proposer, proposal, by }) = core.goal_routes.get(&token).cloned() {
+                    core.goal_routes
+                        .insert(token, GoalRoute::Deciding { proposer, proposal, by })
+                        .expect("party acceptance route");
+                    let mut follow = Queue::with_capacity(room);
+                    tasks::step(
+                        &mut core.tasks,
+                        &Env { now: env.now, wall: env.wall, limits: env.limits.tasks },
+                        tasks::Event::DecidePersonProposal {
+                            reply_to: ReplyTo::new(token),
+                            proposer,
+                            proposal,
+                            by: tasks::Party::Person(by),
+                            message: None,
+                            decision: tasks::ProposalDecision::Accept,
+                        },
+                        &mut follow,
+                    );
+                    for _ in 0..follow.len() {
+                        pending.push(follow.pop().expect("party amendment decision"));
                     }
                     continue;
                 }

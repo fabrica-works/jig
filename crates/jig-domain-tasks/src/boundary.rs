@@ -1342,7 +1342,16 @@ pub enum Event {
     /// Root-checked live ancestor controls a delegate and its subtree.
     Control { reply_to: ReplyTo, by: Party, task: u64, control: crate::Control },
     /// Root-checked amendment of a live delegate, with a fresh commit-order message number.
-    Amend { reply_to: ReplyTo, by: Party, task: u64, message: u64, stop_run: bool, amendment: crate::Amendment },
+    Amend {
+        reply_to: ReplyTo,
+        by: Party,
+        task: u64,
+        message: u64,
+        stop_run: bool,
+        amendment: crate::Amendment,
+        /// The accepter's source; a direct amendment keeps its present funding.
+        funder: Option<Funder>,
+    },
     /// Root-checked project maintainer changes several tracked goal priorities atomically.
     Prioritise { reply_to: ReplyTo, project: u32, by: Party, goals: Box<[(u64, u32)]> },
     /// Root-authorized person adoption of one live task, with its reservation moved to that person's pool.

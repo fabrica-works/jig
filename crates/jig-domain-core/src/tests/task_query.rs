@@ -184,6 +184,7 @@ fn generated_event(core: &Core, draw: u64, iteration: u64) -> Event {
             ask: people::Ask::StartChat { project: 1, words: Box::from(&b"new task"[..]) },
         }),
         1 => Event::Tasks(tasks::Event::Amend {
+            funder: None,
             reply_to,
             by: tasks::Party::Person(REQUESTER),
             task,

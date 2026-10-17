@@ -128,7 +128,7 @@ impl Core {
         amendment: &tasks::Amendment,
         depth: u32,
         limits: &tasks::Limits,
-    ) -> Result<(bool, bool), people::Refusal> {
+    ) -> Result<bool, people::Refusal> {
         crate::acts::bounds::amendment_admit(self, person, role, project, task, amendment, depth, limits)
     }
 }

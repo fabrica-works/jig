@@ -348,7 +348,10 @@ pub(crate) fn decision_record(row: &tasks::Stored, at: skein_lib::Wall) -> Optio
                 project: row.project,
                 proposer: people::Proposer::Party(row.proposer),
                 proposal: row.number,
-                kind: tasks::ProposalKind::Batch,
+                kind: match row.action {
+                    tasks::PersonAction::Batch(_) => tasks::ProposalKind::Batch,
+                    tasks::PersonAction::Amend { .. } => tasks::ProposalKind::Amend,
+                },
                 by,
                 at: match row.state {
                     tasks::PersonProposalState::Withdrawn { at } => at,

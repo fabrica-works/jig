@@ -199,6 +199,7 @@ fn save_history(domain: &mut Domain, mut row: History, out: &mut Queue<Request>)
 
 /// An authenticated amendment and its root-issued message.
 pub(crate) struct Amend {
+    pub funder: Option<crate::Funder>,
     pub number: u64,
     pub message: u64,
     pub stop_run: bool,
@@ -206,6 +207,7 @@ pub(crate) struct Amend {
 }
 
 pub(crate) struct AmendPlan {
+    pub(crate) funding: Option<(crate::Funder, u64)>,
     pub(crate) number: u64,
     pub(crate) message: u64,
     pub(crate) amendment: Amendment,
@@ -217,27 +219,20 @@ pub(crate) struct AmendPlan {
     pub(crate) release: Option<ReleasePlan>,
 }
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "one root-fenced amendment carries task, caller, message and stop decision"
-)]
 pub(crate) fn amend(
     domain: &mut Domain,
     env: &Env<Limits>,
     to: ReplyTo,
     by: Party,
-    number: u64,
-    message: u64,
-    stop_run: bool,
-    amendment: Amendment,
+    change: Amend,
     out: &mut Queue<Request>,
 ) {
+    let number = change.number;
     let to = match entrance(domain, to, number) {
         Ok(to) => to,
         Err((to, why)) => return refused(to, Some(number), why, out),
     };
-    match check_amend(domain, &crate::compound::Staged::new(0), env, by, Amend { number, message, stop_run, amendment })
-    {
+    match check_amend(domain, &crate::compound::Staged::new(0), env, by, change) {
         Ok(plan) => {
             apply_amend(domain, env, by, plan, out);
             out.push(Request::Done { reply_to: to });
@@ -254,7 +249,7 @@ pub(crate) fn check_amend(
     by: Party,
     amendment: Amend,
 ) -> Result<AmendPlan, Refusal> {
-    let Amend { number, message, stop_run, amendment } = amendment;
+    let Amend { number, message, stop_run, funder, amendment } = amendment;
     if !domain.ready() {
         return Err(Refusal::NotReady);
     }
@@ -337,12 +332,23 @@ pub(crate) fn check_amend(
         if !crate::batch::valid_authority(&env.limits, authority) {
             return Err(Refusal::AuthorityShape);
         }
-        if !staged.can_resize(domain, number, authority.budget.spend) {
+        if funder.unwrap_or(old.funder) == old.funder && !staged.can_resize(domain, number, authority.budget.spend) {
             return Err(Refusal::Funding);
         }
     } else if stop_run {
         return Err(Refusal::State);
     }
+    let funding = match funder {
+        Some(destination) if destination != old.funder => {
+            let budget = match &amendment.authority {
+                Some(authority) => authority.budget.spend,
+                None => old.numbers.budget,
+            };
+            crate::funders::refunding::check(domain, staged, number, destination, budget, None)?;
+            Some((destination, budget))
+        }
+        Some(_) | None => None,
+    };
     let spec_changed = match &amendment.spec {
         Some(spec) => spec != old.spec,
         None => false,
@@ -395,7 +401,7 @@ pub(crate) fn check_amend(
     let prepared =
         crate::inbox::prepare_staged(domain, staged, &env.limits, number, word, crate::inbox::Admission::Merged)
             .expect("authenticated amendment has a merged inbox slot");
-    Ok(AmendPlan { number, message, amendment, changed, person_changed, attempt, before, prepared, release })
+    Ok(AmendPlan { funding, number, message, amendment, changed, person_changed, attempt, before, prepared, release })
 }
 
 pub(crate) fn apply_amend(
@@ -405,7 +411,24 @@ pub(crate) fn apply_amend(
     plan: AmendPlan,
     out: &mut Queue<Request>,
 ) {
-    let AmendPlan { number, message, amendment, changed, person_changed, attempt, before, prepared, release } = plan;
+    let AmendPlan {
+        funding,
+        number,
+        message,
+        mut amendment,
+        changed,
+        person_changed,
+        attempt,
+        before,
+        prepared,
+        release,
+    } = plan;
+    if let Some((destination, budget)) = funding {
+        crate::funders::refunding::apply(domain, env, number, destination, budget, out);
+        if let Some(authority) = &mut amendment.authority {
+            authority.budget.spend = record(domain, number).expect("amendment live").numbers.budget;
+        }
+    }
     if let Some(authority) = &amendment.authority
         && authority.budget.spend != record(domain, number).expect("amendment task live").numbers.budget
     {
@@ -848,7 +871,13 @@ pub(crate) fn preview_amend(
         &crate::compound::Staged::new(0),
         env,
         by,
-        Amend { number: part.task, message: part.message, stop_run: part.stop_run, amendment: part.amendment.clone() },
+        Amend {
+            number: part.task,
+            message: part.message,
+            stop_run: part.stop_run,
+            funder: None,
+            amendment: part.amendment.clone(),
+        },
     )?;
     let old = record(domain, part.task).expect("amendment checked");
     if let Some(authority) = &part.amendment.authority {

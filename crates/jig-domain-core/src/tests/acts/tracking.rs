@@ -15,6 +15,7 @@ fn track(core: &mut Core, limits: &Limits) {
         core,
         limits,
         tasks::Event::Amend {
+            funder: None,
             reply_to: ReplyTo::new(Token::new(TRACK_REQUEST)),
             by: tasks::Party::Person(PRIORITY_PARTY),
             task: PRIORITY_TASK,

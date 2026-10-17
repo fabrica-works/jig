@@ -13,8 +13,15 @@ fn a_held_phase_reads_back_with_its_source() {
 }
 
 fn a_pending_person_proposal_reads_back() {
-    let row = jig_domain_tasks::Stored::PersonProposal(Box::new(fixtures::task_person_proposal()));
-    assert_eq!(saved_tasks(&row), Ok(row));
+    for action in [
+        fixtures::task_person_proposal().action,
+        jig_domain_tasks::PersonAction::Amend { task: 23, amendment: Box::new(fixtures::task_amendment()) },
+    ] {
+        let mut proposal = fixtures::task_person_proposal();
+        proposal.action = action;
+        let row = jig_domain_tasks::Stored::PersonProposal(Box::new(proposal));
+        assert_eq!(saved_tasks(&row), Ok(row));
+    }
 }
 fn a_recurring_template_reads_back_one_level_deep() {
     use crate::{codec::tasks::phase, tasks_v3::Creation};

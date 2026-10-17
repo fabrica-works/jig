@@ -151,3 +151,69 @@ fn a_batch_proposal_naming_a_task_since_ended_is_withdrawn() {
     };
     assert_eq!(row.state, jig_domain_tasks::PersonProposalState::Withdrawn { at: world.env.wall });
 }
+
+fn propose_amendment(world: &mut World) {
+    let reply_to = world.to();
+    let mut authority = task(1, &[]).authority;
+    authority.budget.spend = 150;
+    world.send(Event::ProposePerson {
+        reply_to,
+        proposal: jig_domain_tasks::PersonProposal {
+            number: 100,
+            proposer: 9,
+            project: 1,
+            action: jig_domain_tasks::PersonAction::Amend {
+                task: 1,
+                amendment: Box::new(jig_domain_tasks::Amendment {
+                    tracked: None,
+                    addressed: None,
+                    instructions: None,
+                    release: None,
+                    spec: None,
+                    wake: None,
+                    dependencies: None,
+                    authority: Some(authority),
+                    reason: b"more work".as_slice().into(),
+                }),
+            },
+            reason: b"please widen".as_slice().into(),
+            state: jig_domain_tasks::PersonProposalState::Pending { since: world.env.wall },
+        },
+    });
+}
+#[test]
+fn a_partys_amendment_proposal_names_the_party_as_proposer() {
+    let mut world = World::new(344, LIMITS);
+    assert_eq!(world.make(Party::Person(9), vec![task(1, &[])]), Reply::Made(vec![1]));
+    propose_amendment(&mut world);
+    let jig_domain_tasks::Stored::PersonProposal(row) = &world.records[&jig_domain_tasks::Key::PersonProposal(100)]
+    else {
+        panic!("pending proposal")
+    };
+    assert_eq!(row.proposer, 9);
+    assert_eq!(row.first(), 1);
+    assert_eq!(world.record(1).proposal, None);
+    world.restart();
+    assert_eq!(world.record(1).proposal, None);
+}
+#[test]
+fn an_amendment_proposal_whose_task_ends_is_withdrawn() {
+    let mut world = World::new(345, LIMITS);
+    assert_eq!(world.make(Party::Person(9), vec![task(1, &[])]), Reply::Made(vec![1]));
+    propose_amendment(&mut world);
+    let reply_to = world.to();
+    world.send(Event::Control {
+        reply_to,
+        by: Party::Person(9),
+        task: 1,
+        control: jig_domain_tasks::Control::Cancel { reason: Box::new([]), message: None, grace: None },
+    });
+    world.settle(1);
+    let jig_domain_tasks::Stored::DecidedProposal(row) = &world.records[&jig_domain_tasks::Key::DecidedProposal(100)]
+    else {
+        panic!("withdrawn proposal")
+    };
+    assert_eq!(row.state, jig_domain_tasks::PersonProposalState::Withdrawn { at: world.env.wall });
+    assert!(!world.records.contains_key(&jig_domain_tasks::Key::PersonProposal(100)));
+    world.restart();
+}

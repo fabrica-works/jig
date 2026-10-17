@@ -19,6 +19,10 @@ jig-client-test-records = { path = "../../testing/jig-client-test-records" }
 skein-http.workspace = true
 skein-lib.workspace = true
 skein-io.workspace = true
+[dev-dependencies]
+jig-core-world = { path = "../core" }
+jig-domain-tasks.workspace = true
+jig-test-domain = { path = "../../testing/jig-test-domain" }
 [lints.rust]
 unsafe_code = "forbid"
 elided_lifetimes_in_paths = "deny"

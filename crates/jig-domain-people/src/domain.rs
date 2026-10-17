@@ -536,7 +536,6 @@ fn outcome_reply(outcome: Outcome) -> Reply {
         | Outcome::QuestionAnswered { .. }
         | Outcome::Prioritised { .. }
         | Outcome::Amended { .. }
-        | Outcome::AmendProposed { .. }
         | Outcome::RolesSet { .. }
         | Outcome::PolicyChanged { .. }
         | Outcome::PoolSet { .. }
@@ -1111,6 +1110,11 @@ pub(crate) fn valid_ask(limits: &Limits, ask: &Ask) -> bool {
         Ask::Propose { action: crate::Action::Batch(batch), reason, .. } => {
             crate::batch::valid(limits, batch) && reason.len() <= usize::try_from(limits.words).expect("u32 fits usize")
         }
+        Ask::Propose { action: crate::Action::Amend { task, amendment, .. }, reason, .. } => {
+            *task != 0
+                && reason.len() <= usize::try_from(limits.words).expect("u32 fits usize")
+                && crate::amendment::valid(limits, amendment)
+        }
         Ask::Withdraw { proposal, .. } => *proposal != 0,
         Ask::SetGoal { spec, executor, .. } => {
             goal_executor(*executor)
@@ -1138,14 +1142,7 @@ pub(crate) fn valid_ask(limits: &Limits, ask: &Ask) -> bool {
             }
             true
         }
-        Ask::Amend { task, amendment, .. } => {
-            *task != 0
-                && amendment.reason.len() <= usize::try_from(limits.words).expect("u32 fits usize")
-                && match crate::amendment_bytes(amendment) {
-                    Some(bytes) => bytes <= u64::from(limits.amendment_bytes),
-                    None => false,
-                }
-        }
+        Ask::Amend { task, amendment, .. } => *task != 0 && crate::amendment::valid(limits, amendment),
         Ask::DecideEscalation { task, revision, decision, .. } => {
             *task != 0
                 && *revision != 0
@@ -1226,7 +1223,7 @@ pub(crate) fn invalid_ask(limits: &Limits, ask: &Ask) -> Refusal {
             }
             if spec.is_empty() { LimitKind::Empty } else { LimitKind::Words }
         }
-        Ask::StartChat { .. } => LimitKind::Words,
+        Ask::StartChat { .. } | Ask::Propose { action: crate::Action::Amend { .. }, .. } => LimitKind::Words,
         Ask::Say { task, words, .. } => {
             if *task == 0 {
                 return Refusal::Unknown;
@@ -1395,11 +1392,6 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
         Outcome::Prioritised { project } => expected == Expected::Prioritise(project),
         Outcome::Amended { task, released } => {
             expected == Expected::Amend(task, true) || !released && expected == Expected::Amend(task, false)
-        }
-        Outcome::AmendProposed { task, proposal, released } => {
-            (expected == Expected::Amend(task, true) || expected == Expected::Amend(task, false))
-                && proposal != 0
-                && !released
         }
         Outcome::RolesSet { project } => expected == Expected::Roles(project, true),
         Outcome::PolicyChanged { project } => expected == Expected::Policy(project),
@@ -1577,7 +1569,6 @@ pub(super) fn answer_decided(
         | Outcome::QuestionAnswered { .. }
         | Outcome::Prioritised { .. }
         | Outcome::Amended { .. }
-        | Outcome::AmendProposed { .. }
         | Outcome::Moved { .. }
         | Outcome::Closing { .. }
         | Outcome::Stopped { .. }
@@ -1775,7 +1766,6 @@ fn restored(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
             | Outcome::QuestionAnswered { .. }
             | Outcome::Prioritised { .. }
             | Outcome::Amended { .. }
-            | Outcome::AmendProposed { .. }
             | Outcome::Moved { .. }
             | Outcome::PersonTaken { .. }
             | Outcome::PersonHandedBack { .. }

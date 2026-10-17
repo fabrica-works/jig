@@ -59,7 +59,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Map::<Token, Waiting>::worst_case(limits.exchanges.checked_add(limits.connections)?)?)?
         .checked_add(
             u64::from(limits.exchanges.checked_add(limits.connections)?)
-                .checked_mul(u64::from(body).checked_mul(64)?.checked_add(80)?)?,
+                .checked_mul(u64::from(body).checked_mul(128)?.checked_add(80)?)?,
         )?
         .checked_add(Queue::<Request>::worst_case(MAX_OUT_DOWN)?)?
         .checked_add(skein_lib::List::<crate::Served>::worst_case(limits.families)?)?

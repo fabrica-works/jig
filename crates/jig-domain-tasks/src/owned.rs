@@ -27,10 +27,15 @@ pub fn stored_bytes(record: &Stored) -> Option<u64> {
         },
         Stored::Milestone(row) => phase_bytes(&row.phase),
         Stored::PersonProposal(row) | Stored::DecidedProposal(row) => {
-            let crate::PersonAction::Batch(batch) = &row.action;
+            let action = match &row.action {
+                crate::PersonAction::Batch(batch) => batch_bytes(batch)?,
+                crate::PersonAction::Amend { amendment, .. } => {
+                    amendment_bytes(amendment)?.checked_add(bytes(size_of::<crate::Amendment>())?)?
+                }
+            };
             let mut total = bytes(size_of::<crate::PersonProposal>())?
                 .checked_add(bytes(row.reason.len())?)?
-                .checked_add(batch_bytes(batch)?)?;
+                .checked_add(action)?;
             match &row.state {
                 PersonProposalState::Rejected { reason, .. } => {
                     total = total.checked_add(bytes(reason.len())?)?;
@@ -333,19 +338,7 @@ fn proposal_bytes(proposal: &Proposal) -> Option<u64> {
             }
         }
         ProposalAction::Amend { amendment, .. } => {
-            total = total.checked_add(bytes(amendment.reason.len())?)?;
-            if let Some(instructions) = &amendment.instructions {
-                total = total.checked_add(bytes(instructions.len())?)?;
-            }
-            if let Some(spec) = &amendment.spec {
-                total = total.checked_add(spec_bytes(spec)?)?;
-            }
-            if let Some(authority) = &amendment.authority {
-                total = total.checked_add(authority_bytes(authority)?)?;
-            }
-            if let Some(dependencies) = &amendment.dependencies {
-                total = total.checked_add(bytes(size_of_val(&**dependencies))?)?;
-            }
+            total = total.checked_add(amendment_bytes(amendment)?)?;
         }
         ProposalAction::Effect { authority, .. }
         | ProposalAction::ProcedureEffect { authority, .. }
@@ -434,4 +427,21 @@ fn settings_bytes(value: &crate::Settings) -> Option<u64> {
         })?
         .checked_add(authority_bytes(&value.authority)?)?
         .checked_add(bytes(size_of_val(&*value.dependencies))?)
+}
+
+fn amendment_bytes(amendment: &crate::Amendment) -> Option<u64> {
+    let mut total = bytes(amendment.reason.len())?;
+    if let Some(instructions) = &amendment.instructions {
+        total = total.checked_add(bytes(instructions.len())?)?;
+    }
+    if let Some(spec) = &amendment.spec {
+        total = total.checked_add(spec_bytes(spec)?)?;
+    }
+    if let Some(authority) = &amendment.authority {
+        total = total.checked_add(authority_bytes(authority)?)?;
+    }
+    if let Some(dependencies) = &amendment.dependencies {
+        total = total.checked_add(bytes(size_of_val(&**dependencies))?)?;
+    }
+    Some(total)
 }

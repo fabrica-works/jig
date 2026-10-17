@@ -124,7 +124,8 @@ record AskEditNote { project: u32 name: u64 scope: NoteScope change: NoteChange 
 record AskMakeService { project: u32 name: bytes 8192 role: Role }
 record AskAdopt { project: u32 adoption: Adoption }
 record ActionBatch { members: list 8 Member }
-enum Action { batch: ActionBatch }
+record ActionAmend { task: u64 revision: u64 amendment: Amendment }
+enum Action { batch: ActionBatch, amend: boxed ActionAmend }
 record AskPropose { project: u32 action: Action reason: bytes 8192 }
 record AskWithdraw { project: u32 proposal: u64 }
 record AskSetGoal { project: u32 spec: bytes 8192 executor: GoalExecutor budget: u64 priority: u32 deadline: option u64 }
@@ -223,7 +224,6 @@ record OutcomeSaid { task: u64 message: u64 released: bool }
 record OutcomeQuestionAnswered { task: u64 question: u64 message: u64 }
 record OutcomePrioritised { project: u32 }
 record OutcomeAmended { task: u64 released: bool }
-record OutcomeAmendProposed { task: u64 proposal: u64 released: bool }
 record OutcomeRolesSet { project: u32 }
 record OutcomePolicyChanged { project: u32 }
 record OutcomePoolSet { project: u32 person: u64 }
@@ -232,7 +232,7 @@ record OutcomeStarted { task: u64 }
 record OutcomeRefused { value: Refusal }
 record Given { task: u64 amount: u64 }
 record OutcomeCreated { first: u64 last: u64 given: option Given }
-enum Outcome { compound: OutcomeCompound, compound_refused: OutcomeCompoundRefused, created: OutcomeCreated, closing: OutcomeClosing, marked_seen: OutcomeMarkedSeen, applied: OutcomeApplied, again: OutcomeAgain, signed_out, note_edited: OutcomeNoteEdited, service_made: OutcomeServiceMade, adopted: OutcomeAdopted, goal_started: OutcomeGoalStarted, proposed: OutcomeProposed, stopped: OutcomeStopped, cancelled: OutcomeCancelled, released: OutcomeReleased, person_taken: OutcomePersonTaken, person_handed_back: OutcomePersonHandedBack, person_answered: OutcomePersonAnswered, moved: OutcomeMoved, proposal_decided: OutcomeProposalDecided, said: OutcomeSaid, question_answered: OutcomeQuestionAnswered, prioritised: OutcomePrioritised, amended: OutcomeAmended, amend_proposed: OutcomeAmendProposed, roles_set: OutcomeRolesSet, policy_changed: OutcomePolicyChanged, pool_set: OutcomePoolSet, escalation_decided: OutcomeEscalationDecided, started: OutcomeStarted, refused: OutcomeRefused, withdrawn: OutcomeWithdrawn }
+enum Outcome { compound: OutcomeCompound, compound_refused: OutcomeCompoundRefused, created: OutcomeCreated, closing: OutcomeClosing, marked_seen: OutcomeMarkedSeen, applied: OutcomeApplied, again: OutcomeAgain, signed_out, note_edited: OutcomeNoteEdited, service_made: OutcomeServiceMade, adopted: OutcomeAdopted, goal_started: OutcomeGoalStarted, proposed: OutcomeProposed, stopped: OutcomeStopped, cancelled: OutcomeCancelled, released: OutcomeReleased, person_taken: OutcomePersonTaken, person_handed_back: OutcomePersonHandedBack, person_answered: OutcomePersonAnswered, moved: OutcomeMoved, proposal_decided: OutcomeProposalDecided, said: OutcomeSaid, question_answered: OutcomeQuestionAnswered, prioritised: OutcomePrioritised, amended: OutcomeAmended, roles_set: OutcomeRolesSet, policy_changed: OutcomePolicyChanged, pool_set: OutcomePoolSet, escalation_decided: OutcomeEscalationDecided, started: OutcomeStarted, refused: OutcomeRefused, withdrawn: OutcomeWithdrawn }
 record StoredAnswer { key: RequestKey ask: Ask outcome: Outcome at: u64 }
 enum Value { person: StoredPerson, read_results: StoredReadResults, read_chat: StoredReadChat, sign_in: StoredSignIn, roles: StoredRoles, policy: StoredPolicy, answer: StoredAnswer, ended_read: EndedRead }
 versioned record Row { value: Value }

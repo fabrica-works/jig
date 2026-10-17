@@ -124,8 +124,14 @@ pub type Store = jig_fake_store::Store<root::Key, root::Record>;
 pub fn snapshot(store: &Store) -> r::Snapshot {
     let mut snapshot = r::Snapshot::default();
     let mut decisions = Vec::new();
+    let mut authority_acceptances = Vec::new();
     for record in store.rows.values() {
         match record {
+            root::Record::Core(core::Record::Tasks(tasks::Stored::History(row))) => {
+                if let Some(accepted) = jig_core_world::observations::acceptance::task(row) {
+                    authority_acceptances.push(accepted);
+                }
+            }
             root::Record::Core(core::Record::Tasks(tasks::Stored::PersonProposal(row)))
                 if matches!(row.state, tasks::PersonProposalState::Pending { .. }) =>
             {
@@ -228,6 +234,17 @@ pub fn snapshot(store: &Store) -> r::Snapshot {
         }
     }
     for accepted in decisions {
+        let key = root::Key::Core(core::Key::Tasks(tasks::Key::DecidedProposal(accepted.proposal)));
+        if let Some(root::Record::Core(core::Record::Tasks(tasks::Stored::DecidedProposal(proposal)))) =
+            store.rows.get(&key)
+            && let tasks::PersonAction::Amend { task, .. } = proposal.action
+        {
+            authority_acceptances.push((
+                accepted.at,
+                task,
+                r::Acceptance { proposal: accepted.proposal, by: r::Source::Person(accepted.by) },
+            ));
+        }
         if let Some((first, last)) = accepted.created {
             for task in first..=last {
                 snapshot
@@ -246,6 +263,10 @@ pub fn snapshot(store: &Store) -> r::Snapshot {
                 );
             }
         }
+    }
+    authority_acceptances.sort_by_key(|(at, ..)| *at);
+    for (_, task, accepted) in authority_acceptances {
+        snapshot.accepted_tasks.insert(task, accepted);
     }
     snapshot
 }

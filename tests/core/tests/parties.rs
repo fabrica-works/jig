@@ -1,7 +1,7 @@
 const OWNER_ROLE: u32 = 0;
 use jig_core_world::{
     effects::World,
-    fixtures::{ask_as, live_row, people_member, refusal},
+    fixtures::{ask_as, inbox_objects as inbox, live_row, people_member, proposal_object, refusal},
     stories::offers::{no_holder_fixture, world_with},
 };
 use jig_domain_people as people;
@@ -15,6 +15,7 @@ const PROPOSE_REQUEST: u8 = 32;
 const DECIDE_REQUEST: u8 = 33;
 const WITHDRAW_REQUEST: u8 = 34;
 const GOAL_REQUEST: u8 = 32;
+const AMEND_REQUEST: u8 = 35;
 const REJECTED_AT: skein_lib::Wall = skein_lib::Wall::from_nanos(92_000_000);
 const WITHDRAWN_AT: skein_lib::Wall = skein_lib::Wall::from_nanos(91_000_000);
 fn batch_world(seed: u64) -> World {
@@ -127,7 +128,6 @@ const OTHER_PARTY: u64 = 2;
 const CHAT: u64 = 1;
 const SECOND_MEMBER: u32 = 1;
 const FIRST_MEMBER: u32 = 0;
-const SIGN_IN_REQUEST: u64 = 8300;
 const INBOX_REQUEST: u64 = 8301;
 const PARAMETER: u32 = 13;
 const WRITE_KIND: u16 = 5;
@@ -158,21 +158,7 @@ fn person_world(seed: u64) -> World {
     })
 }
 fn other_party(world: &mut World, role: people::Role) {
-    world.send(jig_test_domain::Event::Core(jig_domain_core::Event::SignIn {
-        reply_to: skein_lib::ReplyTo::new(skein_lib::Token::new(SIGN_IN_REQUEST)),
-        identity: people::Identity {
-            key: people::IdentityKey { provider: 0, subject: b"second-party".as_slice().into() },
-            login: b"second".as_slice().into(),
-            name: b"Second".as_slice().into(),
-        },
-    }));
-    world.send(jig_test_domain::Event::Core(jig_domain_core::Event::People(people::Event::Roles {
-        project: PROJECT,
-        holdings: Box::new([
-            people::Holding { person: PARTY, role: people::Role::Member },
-            people::Holding { person: OTHER_PARTY, role },
-        ]),
-    })));
+    jig_core_world::fixtures::second_party(world, b"second-party", role);
 }
 fn person_inbox(world: &mut World) -> Vec<u64> {
     use jig_domain_core::{documents, reads};
@@ -423,8 +409,7 @@ fn a_partys_batch_no_role_may_accept_says_nobody() {
 }
 
 fn owner(world: &mut World) -> u64 {
-    other_party(world, people::Role::Owner);
-    world.sign_in.expect("owner signed in")
+    jig_core_world::fixtures::second_party(world, b"second-party", people::Role::Owner)
 }
 fn propose(world: &mut World, sign_in: u64, key: u8, batch: Box<[people::Member]>) -> u64 {
     ask_as(
@@ -455,40 +440,7 @@ fn decide(world: &mut World, sign_in: u64, key: u8, proposal: u64, decision: peo
 fn withdraw(world: &mut World, sign_in: u64, proposal: u64) {
     ask_as(world, sign_in, WITHDRAW_REQUEST, people::Ask::Withdraw { project: PROJECT, proposal });
 }
-fn inbox(
-    world: &mut World,
-    sign_in: u64,
-    group: jig_domain_core::reads::Group,
-) -> Vec<jig_domain_core::documents::InboxObject> {
-    use jig_domain_core::reads;
-    world.sign_in = Some(sign_in);
-    let mut from = None;
-    let mut objects = Vec::new();
-    for page_number in 0..32 {
-        jig_core_world::reads::ask(
-            world,
-            INBOX_REQUEST + page_number,
-            reads::Read::Inbox {
-                group,
-                filter: reads::Filter { project: Some(PROJECT), goal: None },
-                from: from.take(),
-            },
-        );
-        let reads::Answer::Page(page) = jig_core_world::reads::latest(world) else { panic!("inbox page") };
-        for row in &page.rows {
-            let reads::PageRow::Inbox(entry) = row else { panic!("inbox entry") };
-            objects.push(entry.object);
-        }
-        from.clone_from(&page.next);
-        if from.is_none() {
-            return objects;
-        }
-    }
-    panic!("bounded inbox pages")
-}
-fn proposal_object(proposal: u64) -> jig_domain_core::documents::InboxObject {
-    jig_domain_core::documents::InboxObject::Proposal { proposer: people::Proposer::Party(PARTY), number: proposal }
-}
+
 #[test]
 fn a_partys_batch_beyond_their_role_is_proposed_and_accepted() {
     let mut world = batch_world(330);
@@ -720,4 +672,145 @@ fn a_goal_beyond_the_pool_is_refused_naming_who_may_accept() {
             proposable: Some(people::Accepter::Role(OWNER_ROLE)),
         },
     );
+}
+
+fn widening() -> people::Amendment {
+    let mut amendment = jig_core_world::fixtures::person_unchanged(b"more work");
+    amendment.authority = Some(people_member(b"work", 150).authority);
+    amendment
+}
+fn propose_amendment(world: &mut World, sign_in: u64) -> u64 {
+    let revision = live_row(world, FIRST).revisions.spec;
+    ask_as(
+        world,
+        sign_in,
+        PROPOSE_REQUEST,
+        people::Ask::Propose {
+            project: PROJECT,
+            action: people::Action::Amend { task: FIRST, revision, amendment: Box::new(widening()) },
+            reason: b"please widen".as_slice().into(),
+        },
+    );
+    let Some(people::Reply::Outcome(people::Outcome::Proposed { proposal, to: OWNER_ROLE })) =
+        world.people_answers.last()
+    else {
+        panic!("amendment proposed: {:?}", world.people_answers.last())
+    };
+    *proposal
+}
+#[test]
+fn a_widening_amendment_beyond_the_role_is_refused_naming_who_may_accept() {
+    let mut world = batch_world(347);
+    create(&mut world, Box::new([people_member(b"work", 20)]));
+    let sign_in = world.sign_in.expect("member signed in");
+    let revision = live_row(&world, FIRST).revisions.spec;
+    ask_as(
+        &mut world,
+        sign_in,
+        AMEND_REQUEST,
+        people::Ask::Amend { project: PROJECT, task: FIRST, revision, amendment: widening(), release: None },
+    );
+    refusal(
+        &world,
+        people::Refusal::Authority {
+            lacking: people::Lack::Budget { needs: 150, left: 100 },
+            proposable: Some(people::Accepter::Role(OWNER_ROLE)),
+        },
+    );
+    assert_eq!(live_row(&world, FIRST).numbers.budget, 20);
+    assert_eq!(live_row(&world, FIRST).proposal, None);
+}
+#[test]
+fn a_rejected_amendment_proposal_reaches_the_party_not_the_task() {
+    let mut world = batch_world(348);
+    create(&mut world, Box::new([people_member(b"work", 20)]));
+    let member_sign_in = world.sign_in.expect("member signed in");
+    let owner_sign_in = owner(&mut world);
+    let proposal = propose_amendment(&mut world, member_sign_in);
+    world.set_clock(skein_lib::Time::ZERO, REJECTED_AT);
+    decide(
+        &mut world,
+        owner_sign_in,
+        DECIDE_REQUEST,
+        proposal,
+        people::ProposalDecision::Reject { reason: b"not now".as_slice().into() },
+    );
+    assert!(
+        inbox(&mut world, member_sign_in, jig_domain_core::reads::Group::Updates).contains(&proposal_object(proposal))
+    );
+    assert_eq!(live_row(&world, FIRST).proposal, None);
+    let jig_test_domain::Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::DecidedProposal(row))) = &world
+        .store
+        .rows[&jig_test_domain::Key::Core(jig_domain_core::Key::Tasks(tasks::Key::DecidedProposal(proposal)))]
+    else {
+        panic!("decided proposal")
+    };
+    assert_eq!(row.proposer, PARTY);
+    assert_eq!(
+        row.state,
+        tasks::PersonProposalState::Rejected {
+            by: tasks::Party::Person(2),
+            reason: b"not now".as_slice().into(),
+            message: 2,
+            at: REJECTED_AT
+        }
+    );
+}
+
+fn pool_reserved(world: &World, person: u64) -> u64 {
+    let source = tasks::Funder::Pool { project: PROJECT, person, period: 1 };
+    let key = jig_test_domain::Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Ledger(source)));
+    let jig_test_domain::Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Ledger(row))) =
+        &world.store.rows[&key]
+    else {
+        panic!("pool ledger")
+    };
+    row.numbers.reserved
+}
+#[test]
+fn a_partys_widening_amendment_is_proposed_by_the_party_and_accepted() {
+    use jig_domain_core::{documents, reads};
+    let mut world = batch_world(352);
+    create(&mut world, Box::new([people_member(b"work", 20)]));
+    let member_sign_in = world.sign_in.expect("member signed in");
+    let revision = live_row(&world, FIRST).revisions.spec;
+    ask_as(
+        &mut world,
+        member_sign_in,
+        AMEND_REQUEST,
+        people::Ask::Amend { project: PROJECT, task: FIRST, revision, amendment: widening(), release: None },
+    );
+    refusal(
+        &world,
+        people::Refusal::Authority {
+            lacking: people::Lack::Budget { needs: 150, left: 100 },
+            proposable: Some(people::Accepter::Role(OWNER_ROLE)),
+        },
+    );
+    let owner_sign_in = owner(&mut world);
+    let proposal = propose_amendment(&mut world, member_sign_in);
+    world.sign_in = Some(owner_sign_in);
+    jig_core_world::reads::ask(
+        &mut world,
+        9100,
+        reads::Read::Proposal { proposer: documents::Proposer::Party(PARTY), proposal },
+    );
+    let reads::Answer::Document(value) = jig_core_world::reads::latest(&world) else { panic!("proposal document") };
+    let documents::Document::Proposal(row) = value.as_ref() else { panic!("party proposal") };
+    assert_eq!(row.proposer, documents::Proposer::Party(PARTY));
+    assert!(matches!(row.action, documents::ProposalAction::Amend { .. }));
+    assert_eq!(pool_reserved(&world, PARTY), 320);
+    decide(&mut world, owner_sign_in, DECIDE_REQUEST, proposal, people::ProposalDecision::Accept);
+    let task = live_row(&world, FIRST);
+    assert_eq!(
+        (task.requester, task.funder, task.authority.budget.spend, task.numbers.budget),
+        (
+            tasks::Party::Person(PARTY),
+            tasks::Funder::Pool { project: PROJECT, person: OTHER_PARTY, period: 1 },
+            150,
+            150
+        )
+    );
+    assert_eq!((pool_reserved(&world, PARTY), pool_reserved(&world, OTHER_PARTY)), (300, 150));
+    assert!(inbox(&mut world, member_sign_in, reads::Group::Updates).contains(&proposal_object(proposal)));
 }

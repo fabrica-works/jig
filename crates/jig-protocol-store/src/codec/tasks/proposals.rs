@@ -460,24 +460,26 @@ pub fn person_proposal(
     source: &domain::PersonProposal,
     limits: &wire::Limits,
 ) -> Result<wire::PersonProposal, wire::Problem> {
-    let domain::PersonProposal {
-        number,
-        proposer,
-        project,
-        action: domain::PersonAction::Batch(members),
-        reason,
-        state,
-    } = source;
+    let domain::PersonProposal { number, proposer, project, action, reason, state } = source;
+    let action = match action {
+        domain::PersonAction::Batch(members) => wire::PersonAction::Batch(wire::ProposedBatch::new(
+            limits,
+            wire::ProposedBatchParts { members: batch(members, limits)? },
+        )?),
+        domain::PersonAction::Amend { task, amendment } => {
+            wire::PersonAction::Amend(Box::new(wire::ProposedAmendment::new(
+                limits,
+                wire::ProposedAmendmentParts { task: *task, amendment: self::amendment(amendment, limits)? },
+            )?))
+        }
+    };
     wire::PersonProposal::new(
         limits,
         wire::PersonProposalParts {
             number: *number,
             proposer: *proposer,
             project: *project,
-            action: wire::PersonAction::Batch(wire::ProposedBatch::new(
-                limits,
-                wire::ProposedBatchParts { members: batch(members, limits)? },
-            )?),
+            action,
             reason: reason.clone(),
             state: person_state(state, limits)?,
         },
@@ -488,22 +490,17 @@ pub fn read_person_proposal(
     source: wire::PersonProposal,
     limits: &wire::Limits,
 ) -> Result<domain::PersonProposal, wire::Problem> {
-    let wire::PersonProposalParts {
-        number,
-        proposer,
-        project,
-        action: wire::PersonAction::Batch(batch),
-        reason,
-        state,
-    } = source.into_parts();
-    Ok(domain::PersonProposal {
-        number,
-        proposer,
-        project,
-        action: domain::PersonAction::Batch(read_batch(batch.into_parts().members, limits)?),
-        reason,
-        state: read_person_state(state, limits)?,
-    })
+    let wire::PersonProposalParts { number, proposer, project, action, reason, state } = source.into_parts();
+    let action = match action {
+        wire::PersonAction::Batch(batch) => {
+            domain::PersonAction::Batch(read_batch(batch.into_parts().members, limits)?)
+        }
+        wire::PersonAction::Amend(value) => {
+            let wire::ProposedAmendmentParts { task, amendment } = (*value).into_parts();
+            domain::PersonAction::Amend { task, amendment: Box::new(read_amendment(amendment, limits)?) }
+        }
+    };
+    Ok(domain::PersonProposal { number, proposer, project, action, reason, state: read_person_state(state, limits)? })
 }
 
 /// Translate `Milestone` to its store record.

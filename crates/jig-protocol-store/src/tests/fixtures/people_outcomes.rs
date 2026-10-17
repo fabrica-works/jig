@@ -197,7 +197,6 @@ pub fn outcome_values() -> Box<[domain::Outcome]> {
         domain::Outcome::QuestionAnswered { task: 2, question: 3, message: 4 },
         domain::Outcome::Prioritised { project: 2 },
         domain::Outcome::Amended { task: 2, released: true },
-        domain::Outcome::AmendProposed { task: 2, proposal: 3, released: true },
         domain::Outcome::RolesSet { project: 2 },
         domain::Outcome::PolicyChanged { project: 2 },
         domain::Outcome::PoolSet { project: 2, person: 3 },

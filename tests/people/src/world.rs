@@ -106,7 +106,7 @@ struct Commit {
     sayings: Vec<(u64, u64, Box<[u8]>, bool)>,
     resolved: Vec<(u64, bool)>,
     amendments: Vec<(u64, u64, bool)>,
-    pending_amendments: Vec<((u64, u64), Option<u64>)>,
+    pending_amendments: Vec<((u64, u64), u64)>,
 }
 
 #[derive(Debug)]
@@ -150,7 +150,7 @@ pub struct World {
     pub sayings: BTreeMap<u64, (u64, Box<[u8]>, bool)>,
     pub executor_outcomes: Vec<(u64, bool)>,
     specs: BTreeMap<u64, u64>,
-    pending_amendments: BTreeMap<(u64, u64), Option<u64>>,
+    pending_amendments: BTreeMap<(u64, u64), u64>,
     person_tasks: BTreeMap<u64, PersonTask>,
     commits: VecDeque<Commit>,
     held: VecDeque<Held>,
@@ -502,12 +502,16 @@ impl World {
                         Ask::Compound { .. } => RouteKind::Control,
                         Ask::Application { .. } => RouteKind::Application,
                         Ask::StartChat { .. } => RouteKind::Chat,
-                        Ask::Create { .. } | Ask::Propose { .. } | Ask::Withdraw { .. } => {
+                        Ask::Create { .. }
+                        | Ask::Propose { action: people::Action::Batch(_), .. }
+                        | Ask::Withdraw { .. } => {
                             unreachable!("party batches are exercised by the core world")
                         }
                         Ask::SetGoal { .. } => RouteKind::Goal,
                         Ask::MakeService { .. } => RouteKind::Service,
-                        Ask::DecideProposal { .. } => RouteKind::Proposal,
+                        Ask::DecideProposal { .. } | Ask::Propose { action: people::Action::Amend { .. }, .. } => {
+                            RouteKind::Proposal
+                        }
                         Ask::TakePerson { .. } | Ask::HandBackPerson { .. } | Ask::AnswerPerson { .. } => {
                             RouteKind::TakePerson
                         }
@@ -620,7 +624,19 @@ impl World {
                                     &mut self.out,
                                 );
                             }
-                            Ask::Create { .. } | Ask::Propose { .. } | Ask::Withdraw { .. } => {
+                            Ask::Propose { action: people::Action::Amend { task, .. }, .. } => {
+                                let proposal = self.name();
+                                pending_amendments.push(((person, proposal), task));
+                                people::step(
+                                    &mut self.domain,
+                                    &self.env,
+                                    Event::Decided { request, outcome: Outcome::Proposed { proposal, to: 0 } },
+                                    &mut self.out,
+                                );
+                            }
+                            Ask::Create { .. }
+                            | Ask::Propose { action: people::Action::Batch(_), .. }
+                            | Ask::Withdraw { .. } => {
                                 unreachable!("party batches are exercised by the core world")
                             }
                             Ask::StartChat { .. } | Ask::SetGoal { .. } => {
@@ -655,19 +671,11 @@ impl World {
                                     };
                                     let winner = Winner { by: person, choice, at: self.env.wall };
                                     proposals.push((name, winner));
-                                    if choice == ProposalChoice::Accepted {
-                                        match proposer {
-                                            people::Proposer::Task(task) => {
-                                                if let Some(release) = self.pending_amendments.get(&(task, proposal)) {
-                                                    let released = self
-                                                        .holds
-                                                        .get(&task)
-                                                        .is_some_and(|(revision, _)| Some(*revision) == *release);
-                                                    amendments.push((task, self.specs[&task] + 1, released));
-                                                }
-                                            }
-                                            people::Proposer::Party(_) => {}
-                                        }
+                                    if choice == ProposalChoice::Accepted
+                                        && let people::Proposer::Party(party) = proposer
+                                        && let Some(task) = self.pending_amendments.get(&(party, proposal))
+                                    {
+                                        amendments.push((*task, self.specs[task] + 1, false));
                                     }
                                     winner
                                 };
@@ -712,6 +720,11 @@ impl World {
                                     }
                                     None => Outcome::Refused(Refusal::Unknown),
                                 };
+                                if let Outcome::Released { task } = outcome
+                                    && let Some(revision) = self.specs.get(&task)
+                                {
+                                    amendments.push((task, *revision, true));
+                                }
                                 people::step(
                                     &mut self.domain,
                                     &self.env,
@@ -742,9 +755,10 @@ impl World {
                                                 lacking: Lack::Again { required: true },
                                             })
                                         } else if amendment.authority.is_some() && self.settings.authority_refuses {
-                                            let proposal = self.name();
-                                            pending_amendments.push(((task, proposal), release));
-                                            Outcome::AmendProposed { task, proposal, released: false }
+                                            Outcome::Refused(Refusal::Authority {
+                                                proposable: Some(people::Accepter::Role(0)),
+                                                lacking: Lack::Shape,
+                                            })
                                         } else {
                                             let released = release.is_some() && self.holds.contains_key(&task);
                                             amendments.push((task, now + 1, released));

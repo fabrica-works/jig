@@ -602,7 +602,7 @@ fn an_amendment_and_a_release_are_one_decision() {
 #[test]
 fn a_widening_amendment_with_release_is_proposed_and_released_on_acceptance() {
     let mut world = World::new(Settings { authority_refuses: true, ..Settings::calm(98) });
-    member(&mut world);
+    let person = member(&mut world);
     world.amended_task(7, 1);
     world.held_task(7, 2, jig_domain_people::HoldReason::Stopped);
     let mut amendment = edit();
@@ -615,16 +615,28 @@ fn a_widening_amendment_with_release_is_proposed_and_released_on_acceptance() {
         notes: 0,
         note_resources: Box::new([]),
     });
-    let call = world.request(10, [1; 16], Ask::Amend { project: 1, task: 7, revision: 1, amendment, release: Some(2) });
+    let call = world.request(
+        10,
+        [1; 16],
+        Ask::Propose {
+            project: 1,
+            action: jig_domain_people::Action::Amend { task: 7, revision: 1, amendment: Box::new(amendment) },
+            reason: b"please widen".as_slice().into(),
+        },
+    );
     world.commit_all();
-    let Some(Reply::Outcome(Outcome::AmendProposed { task: 7, proposal, released: false })) = world.reply(call) else {
+    let Some(Reply::Outcome(Outcome::Proposed { proposal, to: 0 })) = world.reply(call) else {
         panic!("widening proposed")
     };
     assert_eq!(world.spec_revision(7), Some(1));
     assert!(world.held(7));
     world.restart();
-    let decision =
-        Ask::DecideProposal { project: 1, proposer: Proposer::Task(7), proposal, decision: ProposalDecision::Accept };
+    let decision = Ask::DecideProposal {
+        project: 1,
+        proposer: Proposer::Party(person),
+        proposal,
+        decision: ProposalDecision::Accept,
+    };
     let call = world.request(10, [2; 16], decision.clone());
     assert!(world.reply(call).is_none());
     assert_eq!(world.spec_revision(7), Some(1));
@@ -635,6 +647,8 @@ fn a_widening_amendment_with_release_is_proposed_and_released_on_acceptance() {
         Some(Reply::Outcome(Outcome::ProposalDecided { choice: ProposalChoice::Accepted, .. }))
     ));
     assert_eq!(world.spec_revision(7), Some(2));
+    world.request(10, [3; 16], Ask::Release { project: 1, task: 7, revision: 2, again: None });
+    world.commit_all();
     assert!(!world.held(7));
     world.restart();
     let replay = world.request(10, [2; 16], decision);

@@ -150,7 +150,7 @@ pub fn check(expected: &Admission, actual: &people::Reply) -> Result<(), &'stati
     let matches = match expected {
         Admission::Refused(why) => *answer == people::Outcome::Refused(*why),
         Admission::Proposed { .. } => {
-            matches!(answer, people::Outcome::Proposed { .. } | people::Outcome::AmendProposed { .. })
+            matches!(answer, people::Outcome::Proposed { .. })
         }
         Admission::Allowed => !matches!(
             answer,
@@ -158,7 +158,6 @@ pub fn check(expected: &Admission, actual: &people::Reply) -> Result<(), &'stati
                 | people::Outcome::Again(_)
                 | people::Outcome::SignedOut
                 | people::Outcome::Proposed { .. }
-                | people::Outcome::AmendProposed { .. }
         ),
         Admission::Bounded { .. } => false,
     };

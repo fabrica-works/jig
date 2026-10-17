@@ -198,36 +198,7 @@ fn valid_proposal(task: &TaskRecord, limits: &Limits) -> bool {
             *step != 0 && crate::batch::valid_authority(limits, authority)
         }
         crate::ProposalAction::Amend { task: target, amendment } => {
-            *target != 0
-                && match amendment.addressed {
-                    Some(change) => crate::control::valid_address(change.address),
-                    None => true,
-                }
-                && match &amendment.instructions {
-                    Some(instructions) => {
-                        instructions.len() <= usize::try_from(limits.message_bytes).expect("u32 fits usize")
-                    }
-                    None => true,
-                }
-                && amendment.reason.len() <= usize::try_from(limits.message_bytes).expect("u32 fits usize")
-                && match &amendment.spec {
-                    Some(spec) => crate::batch::valid_spec(limits, spec) && spec.inputs.is_empty(),
-                    None => true,
-                }
-                && match &amendment.authority {
-                    Some(authority) => crate::batch::valid_authority(limits, authority),
-                    None => false,
-                }
-                && match &amendment.dependencies {
-                    Some(dependencies) => {
-                        dependencies.len() <= usize::try_from(limits.dependencies).expect("u32 fits usize")
-                    }
-                    None => true,
-                }
-                && match &amendment.wake {
-                    Some(wake) => crate::wake::valid(wake),
-                    None => true,
-                }
+            *target != 0 && amendment.authority.is_some() && valid_amendment(limits, amendment)
         }
         crate::ProposalAction::Widen { task: target, authority } => {
             *target != 0 && crate::batch::valid_authority(limits, authority)
@@ -337,7 +308,6 @@ fn valid_followups(task: &TaskRecord) -> bool {
 #[expect(clippy::too_many_lines, reason = "one complete restored task shape is checked before retention")]
 fn valid_record(domain: &Domain, limits: &Limits, task: &TaskRecord) -> bool {
     if task.last_activity < task.created_at
-        || task.run_spent > task.numbers.spent
         || task.run_reserved > task.numbers.reserved
         || (task.run_reserved != 0 && crate::run::run_attempt(&task.phase).is_none())
         || task.ended_at.is_some()
@@ -1086,4 +1056,31 @@ fn valid_grace(task: &TaskRecord, limits: &Limits) -> bool {
         Party::Task(task) => task != 0,
         Party::Deployment { .. } => false,
     }
+}
+
+/// Bounded durable amendment payload shared by both proposal origins.
+pub(crate) fn valid_amendment(limits: &Limits, amendment: &crate::Amendment) -> bool {
+    (match amendment.addressed {
+        Some(change) => crate::control::valid_address(change.address),
+        None => true,
+    }) && match &amendment.instructions {
+        Some(instructions) => instructions.len() <= usize::try_from(limits.message_bytes).expect("u32 fits usize"),
+        None => true,
+    } && amendment.reason.len() <= usize::try_from(limits.message_bytes).expect("u32 fits usize")
+        && match &amendment.spec {
+            Some(spec) => crate::batch::valid_spec(limits, spec) && spec.inputs.is_empty(),
+            None => true,
+        }
+        && match &amendment.authority {
+            Some(authority) => crate::batch::valid_authority(limits, authority),
+            None => true,
+        }
+        && match &amendment.dependencies {
+            Some(dependencies) => dependencies.len() <= usize::try_from(limits.dependencies).expect("u32 fits usize"),
+            None => true,
+        }
+        && match &amendment.wake {
+            Some(wake) => crate::wake::valid(wake),
+            None => true,
+        }
 }

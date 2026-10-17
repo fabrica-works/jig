@@ -63,6 +63,7 @@ fn tracking_past_goals_per_project_is_refused_and_changes_nothing() {
     let mut change = amendment();
     change.tracked = Some(Tracking::Tracked { priority: 3 });
     let out = test.send(Event::Amend {
+        funder: None,
         reply_to: to(),
         by: Party::Person(REQUESTER),
         task: THIRD,

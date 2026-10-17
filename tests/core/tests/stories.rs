@@ -1217,8 +1217,16 @@ fn a_widening_amendment_with_release_is_proposed_and_released_on_acceptance(worl
     };
     change.authority = Some(widened_authority.clone());
 
-    ask(world, 81, people::Ask::Amend { project: 1, task, revision, amendment: change, release: Some(hold) });
-    let Some(people::Reply::Outcome(people::Outcome::AmendProposed { proposal, released: false, .. })) =
+    ask(
+        world,
+        81,
+        people::Ask::Propose {
+            project: 1,
+            action: people::Action::Amend { task, revision, amendment: Box::new(change) },
+            reason: b"widen task".as_slice().into(),
+        },
+    );
+    let Some(people::Reply::Outcome(people::Outcome::Proposed { proposal, to: 0 })) =
         world.people_answers.last().copied()
     else {
         panic!("widening proposed: {:?}", world.people_answers)
@@ -1227,8 +1235,15 @@ fn a_widening_amendment_with_release_is_proposed_and_released_on_acceptance(worl
     assert!(matches!(live_row(world, task).phase, tasks::Phase::Held { .. }));
     let (restored_configuration, _) = amendment_world_fixture(seed);
     world.restart_with(restored_configuration);
+    let proposal_key = root::Key::Core(core::Key::Tasks(tasks::Key::PersonProposal(proposal)));
+    let Some(root::Record::Core(core::Record::Tasks(tasks::Stored::PersonProposal(row)))) =
+        world.store.rows.get(&proposal_key)
+    else {
+        panic!("retained party amendment")
+    };
+    assert_eq!(row.proposer, 1);
     assert!(
-        matches!(&live_row(world, task).proposal.as_ref().expect("retained amendment proposal").action, tasks::ProposalAction::Amend { amendment, .. } if amendment.release == Some(hold))
+        matches!(&row.action, tasks::PersonAction::Amend { task: target, amendment } if *target == task && amendment.release.is_none())
     );
 
     widened_authority.spend = 1000;
@@ -1257,7 +1272,7 @@ fn a_widening_amendment_with_release_is_proposed_and_released_on_acceptance(worl
         82,
         people::Ask::DecideProposal {
             project: 1,
-            proposer: people::Proposer::Task(task),
+            proposer: people::Proposer::Party(1),
             proposal,
             decision: people::ProposalDecision::Accept,
         },
@@ -1275,6 +1290,7 @@ fn a_widening_amendment_with_release_is_proposed_and_released_on_acceptance(worl
         "acceptance: {:?}",
         world.people_answers
     );
+    ask(world, 84, people::Ask::Release { project: 1, task, revision: hold, again: None });
     assert_eq!(live_row(world, task).spec.words.as_ref(), b"widened task");
     assert_eq!(live_row(world, task).numbers.budget, 600);
     assert!(!matches!(live_row(world, task).phase, tasks::Phase::Held { .. }));

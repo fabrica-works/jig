@@ -935,6 +935,7 @@ fn person_address_proposals_keep_the_named_revision_and_actual_beforefacts() {
         &mut core,
         &limits,
         tasks::Event::Amend {
+            funder: None,
             reply_to: ReplyTo::new(Token::new(5)),
             by: tasks::Party::Person(1),
             task: 2,

@@ -2,6 +2,8 @@
 //! durable store rows and peer traffic enter here; no domain state is read.
 //! The conformance world can replace these translations and keep the referee
 //! (`domain/testing.md`, 4, 6).
+pub mod acceptance;
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{Store, referee as r};
@@ -595,6 +597,7 @@ impl Observer {
         let mut snapshot = r::Snapshot::default();
         let mut decisions = Vec::new();
         let mut task_acceptances = Vec::new();
+        let mut authority_acceptances = Vec::new();
         let mut words = Vec::new();
         let mut reached = Vec::new();
         for row in store.rows.values() {
@@ -645,6 +648,9 @@ impl Observer {
                     assert_eq!(kept, value, "immutable activity row changed");
                 }
                 root::Record::Core(core::Record::Tasks(tasks::Stored::History(value))) => {
+                    if let Some(accepted) = acceptance::task(value) {
+                        authority_acceptances.push(accepted);
+                    }
                     if value.change == tasks::Change::ProposalAccepted
                         && let Some(proposal) = &value.proposal
                         && let tasks::ProposalAction::Effect { connector, attempt, completion, position, .. } =
@@ -779,6 +785,17 @@ impl Observer {
             }
         }
         for accepted in decisions {
+            let key = root::Key::Core(core::Key::Tasks(tasks::Key::DecidedProposal(accepted.proposal)));
+            if let Some(root::Record::Core(core::Record::Tasks(tasks::Stored::DecidedProposal(proposal)))) =
+                store.rows.get(&key)
+                && let tasks::PersonAction::Amend { task, .. } = proposal.action
+            {
+                authority_acceptances.push((
+                    accepted.at,
+                    task,
+                    r::Acceptance { proposal: accepted.proposal, by: r::Source::Person(accepted.by) },
+                ));
+            }
             if let Some((first, last)) = accepted.created {
                 for task in first..=last {
                     if snapshot.tasks.get(&task).is_some_and(|row| {
@@ -830,6 +847,10 @@ impl Observer {
                     }
                 }
             }
+        }
+        authority_acceptances.sort_by_key(|(at, ..)| *at);
+        for (_, task, accepted) in authority_acceptances {
+            snapshot.accepted_tasks.insert(task, accepted);
         }
         for (connector, task, attempt, completion, position, holder, proposal) in task_acceptances {
             for decision in &mut snapshot.decisions {

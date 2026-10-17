@@ -218,3 +218,11 @@ pub fn authority_bytes(authority: &Authority) -> Option<u64> {
     }
     Some(total)
 }
+
+pub(crate) fn valid(limits: &crate::Limits, amendment: &Amendment) -> bool {
+    amendment.reason.len() <= usize::try_from(limits.words).expect("u32 fits usize")
+        && match amendment_bytes(amendment) {
+            Some(bytes) => bytes <= u64::from(limits.amendment_bytes),
+            None => false,
+        }
+}

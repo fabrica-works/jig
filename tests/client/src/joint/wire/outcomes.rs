@@ -47,9 +47,7 @@ pub fn outcome(value: &people::Outcome) -> Outcome {
         people::Outcome::Amended { task, released } => {
             client::OwnerOutcome::Amended { task: *task, released: *released }
         }
-        people::Outcome::AmendProposed { task, proposal, released } => {
-            client::OwnerOutcome::AmendProposed { task: *task, proposal: *proposal, released: *released }
-        }
+
         people::Outcome::RolesSet { project } => client::OwnerOutcome::RolesSet { project: *project },
         people::Outcome::PolicyChanged { project } => client::OwnerOutcome::PolicyChanged { project: *project },
         people::Outcome::PoolSet { project, person } => {
@@ -176,10 +174,6 @@ mod tests {
             assert_eq!(
                 outcome(&people::Outcome::Amended { task: 11, released }),
                 Outcome::Owner(client::OwnerOutcome::Amended { task: 11, released })
-            );
-            assert_eq!(
-                outcome(&people::Outcome::AmendProposed { task: 11, proposal: u64::MAX, released }),
-                Outcome::Owner(client::OwnerOutcome::AmendProposed { task: 11, proposal: u64::MAX, released })
             );
         }
         assert_eq!(

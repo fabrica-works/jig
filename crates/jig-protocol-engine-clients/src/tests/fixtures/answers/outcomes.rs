@@ -131,18 +131,6 @@ fn case_15() -> (p::Reply, w::Final) {
 }
 fn case_16() -> (p::Reply, w::Final) {
     (
-        p::Reply::Outcome(p::Outcome::AmendProposed { task: 8, proposal: 8, released: true }),
-        owner(w::OwnerOutcome::AmendProposed(
-            w::OwnerOutcomeAmendProposed::new(
-                &wire(),
-                w::OwnerOutcomeAmendProposedParts { task: 8, proposal: 8, released: true },
-            )
-            .expect("AmendProposed"),
-        )),
-    )
-}
-fn case_17() -> (p::Reply, w::Final) {
-    (
         p::Reply::Outcome(p::Outcome::RolesSet { project: 3 }),
         owner(w::OwnerOutcome::RolesSet(
             w::OwnerOutcomeRolesSet::new(&wire(), w::OwnerOutcomeRolesSetParts { project: 3 }).expect("RolesSet"),
@@ -175,7 +163,7 @@ fn case_20() -> (p::Reply, w::Final) {
         )),
     )
 }
-pub fn owner_outcomes() -> [(p::Reply, w::Final); 20] {
+pub fn owner_outcomes() -> [(p::Reply, w::Final); 19] {
     [
         case_0(),
         case_1(),
@@ -193,7 +181,6 @@ pub fn owner_outcomes() -> [(p::Reply, w::Final); 20] {
         case_14(),
         case_15(),
         case_16(),
-        case_17(),
         case_18(),
         case_19(),
         case_20(),

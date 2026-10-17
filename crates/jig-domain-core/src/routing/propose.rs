@@ -76,8 +76,10 @@ fn check(
     Ok((members, to))
 }
 pub(super) fn allowed(core: &Core, project: u32, batch: Box<[authority::Delegate]>) -> Result<(), people::Refusal> {
-    let needs = authority::needs(&authority::Action::Batch(batch))
-        .ok_or(people::Refusal::Limit { which: people::LimitKind::Arithmetic })?;
+    allowed_action(core, project, &authority::Action::Batch(batch))
+}
+fn allowed_action(core: &Core, project: u32, action: &authority::Action) -> Result<(), people::Refusal> {
+    let needs = authority::needs(action).ok_or(people::Refusal::Limit { which: people::LimitKind::Arithmetic })?;
     let policy = core.authority.policy(project).ok_or(people::Refusal::Unknown)?;
     let rules = core.authority.rules();
     let cap = policy.period_spend.min(rules.period_spend);
@@ -157,4 +159,65 @@ pub(super) fn withdraw_request(core: &mut Core, work: &mut Queue<Event>, out: &m
             proposal,
         })));
     }
+}
+
+pub(super) struct Edit {
+    pub request: Token,
+    pub person: u64,
+    pub project: u32,
+    pub role: Option<people::Role>,
+    pub task: u64,
+    pub revision: u64,
+    pub amendment: people::Amendment,
+    pub reason: Box<[u8]>,
+}
+pub(super) fn amend_request(core: &mut Core, env: &Env<Limits>, work: &mut Queue<Event>, value: Edit) {
+    let request = value.request;
+    if let Err(why) = offer_amendment(core, env, work, value) {
+        pool_refused(work, request, why);
+    }
+}
+fn offer_amendment(
+    core: &mut Core,
+    env: &Env<Limits>,
+    work: &mut Queue<Event>,
+    value: Edit,
+) -> Result<(), people::Refusal> {
+    let Edit { request, person, project, role, task, revision, amendment, reason } = value;
+    let amendment = crate::amendments::translate(amendment, &env.limits.tasks)
+        .ok_or(people::Refusal::Limit { which: people::LimitKind::Words })?;
+    match core.amend_admit(person, role, project, task, &amendment, env.limits.tasks.depth, &env.limits.tasks) {
+        Ok(_) | Err(people::Refusal::Authority { proposable: Some(people::Accepter::Role(_)), .. }) => {}
+        Err(why) => return Err(why),
+    }
+    core.party_amend_revision(task, revision, &amendment)?;
+    let row = core.tasks.task(task).ok_or(people::Refusal::Unknown)?;
+    let action = authority::Action::Amend(crate::translate::authority_value(
+        amendment.authority.as_ref().unwrap_or(&row.authority),
+    ));
+    allowed_action(core, project, &action)?;
+    let Some(crate::acts::Recipient::Roles { roles, .. }) =
+        crate::acts::bounds::recipient(core, project, authority::ProposalKind::Amend)
+    else {
+        return Err(nobody(people::Lack::Approver));
+    };
+    let to = *roles.iter().min().expect("nonempty recipient roles");
+    let number = crate::fresh(&mut core.counters, crate::Family::Message)
+        .ok_or(people::Refusal::Limit { which: people::LimitKind::Arithmetic })?;
+    assert!(
+        core.goal_routes.insert(request, GoalRoute::Offering { proposal: number, to, stubs: Box::new([]) }).is_ok(),
+        "one amendment proposal"
+    );
+    work.push(Event::Tasks(tasks::Event::ProposePerson {
+        reply_to: ReplyTo::new(request),
+        proposal: tasks::PersonProposal {
+            number,
+            proposer: person,
+            project,
+            action: tasks::PersonAction::Amend { task, amendment: Box::new(amendment) },
+            reason,
+            state: tasks::PersonProposalState::Pending { since: env.wall },
+        },
+    }));
+    Ok(())
 }

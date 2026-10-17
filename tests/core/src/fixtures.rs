@@ -282,3 +282,82 @@ pub fn people_member(words: &[u8], spend: u64) -> jig_domain_people::Member {
         flags: people::Flags::PLAIN,
     }
 }
+
+const FIXTURE_INBOX_REQUEST: u64 = 8301;
+const FIXTURE_SIGN_IN_REQUEST: u64 = 8300;
+const FIXTURE_PROJECT: u32 = 1;
+
+/// Read every page of one party inbox group.
+pub fn inbox_objects(
+    world: &mut crate::effects::World,
+    sign_in: u64,
+    group: jig_domain_core::reads::Group,
+) -> Vec<jig_domain_core::documents::InboxObject> {
+    use jig_domain_core::reads;
+    world.sign_in = Some(sign_in);
+    let mut from = None;
+    let mut objects = Vec::new();
+    for page_number in 0..32 {
+        crate::reads::ask(
+            world,
+            FIXTURE_INBOX_REQUEST + page_number,
+            reads::Read::Inbox {
+                group,
+                filter: reads::Filter { project: Some(FIXTURE_PROJECT), goal: None },
+                from: from.take(),
+            },
+        );
+        let reads::Answer::Page(page) = crate::reads::latest(world) else { panic!("inbox page") };
+        for row in &page.rows {
+            let reads::PageRow::Inbox(entry) = row else { panic!("inbox entry") };
+            objects.push(entry.object);
+        }
+        from.clone_from(&page.next);
+        if from.is_none() {
+            return objects;
+        }
+    }
+    panic!("bounded inbox pages")
+}
+/// The shared requesting party's exact proposal inbox identity.
+#[must_use]
+pub fn proposal_object(proposal: u64) -> jig_domain_core::documents::InboxObject {
+    jig_domain_core::documents::InboxObject::Proposal {
+        proposer: jig_domain_people::Proposer::Party(QUERY_REQUESTER),
+        number: proposal,
+    }
+}
+
+/// Sign in a second identity and give it a role, preserving the other holdings.
+pub fn second_party(world: &mut crate::effects::World, subject: &[u8], role: jig_domain_people::Role) -> u64 {
+    use jig_domain_people as people;
+    let mut holdings = match world
+        .store
+        .rows
+        .get(&jig_test_domain::Key::Core(jig_domain_core::Key::People(people::Key::Roles(FIXTURE_PROJECT))))
+    {
+        Some(jig_test_domain::Record::Core(jig_domain_core::Record::People(people::Stored::Roles {
+            holdings,
+            ..
+        }))) => holdings.to_vec(),
+        value => panic!("project roles: {value:?}"),
+    };
+    world.send(jig_test_domain::Event::Core(jig_domain_core::Event::SignIn {
+        reply_to: skein_lib::ReplyTo::new(skein_lib::Token::new(FIXTURE_SIGN_IN_REQUEST)),
+        identity: people::Identity {
+            key: people::IdentityKey { provider: 0, subject: subject.into() },
+            login: b"second".as_slice().into(),
+            name: b"Second".as_slice().into(),
+        },
+    }));
+    let Some(people::Reply::SignedIn { sign_in, person, .. }) = world.people_answers.last().copied() else {
+        panic!("second party signed in")
+    };
+    holdings.retain(|holding| holding.person != person);
+    holdings.push(people::Holding { person, role });
+    world.send(jig_test_domain::Event::Core(jig_domain_core::Event::People(people::Event::Roles {
+        project: FIXTURE_PROJECT,
+        holdings: holdings.into_boxed_slice(),
+    })));
+    sign_in
+}

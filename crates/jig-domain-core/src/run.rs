@@ -390,7 +390,6 @@ pub enum PersonTaskRoute {
     Release(u64),
     Prioritised(u32),
     Amended { task: u64, released: bool },
-    AmendProposed { task: u64, proposal: u64 },
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]

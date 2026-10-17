@@ -194,39 +194,17 @@ pub(crate) fn check(
         }
         Party::Person(_) | Party::Deployment { .. } => None,
     };
-    if source != destination {
-        let source_numbers = match source {
-            Funder::Task(parent) => match staged.record(domain, parent) {
-                Some(parent) => parent.numbers,
-                None => return Err(crate::Problem::new(Some(number), Refusal::Funding)),
-            },
-            Funder::Pool { .. } | Funder::Period { .. } | Funder::Recurring { .. } => {
-                match staged.numbers(domain, source) {
-                    Some(numbers) => numbers,
-                    None => return Err(crate::Problem::new(Some(number), Refusal::Funding)),
-                }
-            }
-        };
-        if source_numbers.reserved.checked_sub(old.numbers.budget).is_none()
-            || source_numbers.spent_below.checked_add(spent).is_none()
-        {
-            return Err(crate::Problem::new(Some(number), Refusal::Funding));
-        }
-        let mut after = match staged.numbers(domain, destination) {
-            Some(numbers) => numbers,
-            None => Numbers { budget: pool_budget, spent: 0, spent_below: 0, reserved: 0 },
-        };
-        after.reserved = match after.reserved.checked_add(left) {
-            Some(reserved) => reserved,
-            None => return Err(crate::Problem::new(Some(number), Refusal::Funding)),
-        };
-        if crate::funders::available(after).is_none() {
-            return Err(crate::Problem::new(Some(number), Refusal::Funding));
-        }
-        let normalized = Numbers { budget: left, spent: 0, spent_below: 0, reserved: old.numbers.reserved };
-        if crate::funders::available(normalized).is_none() {
-            return Err(crate::Problem::new(Some(number), Refusal::Funding));
-        }
+    if source != destination
+        && let Err(why) = crate::funders::refunding::check(
+            domain,
+            staged,
+            number,
+            destination,
+            old.numbers.budget,
+            Some(Numbers { budget: pool_budget, spent: 0, spent_below: 0, reserved: 0 }),
+        )
+    {
+        return Err(crate::Problem::new(Some(number), why));
     }
     let create_pool = staged.numbers(domain, destination).is_none();
     let create_period = staged.numbers(domain, period_source).is_none();
@@ -296,7 +274,6 @@ pub(crate) fn check(
     })
 }
 
-#[expect(clippy::too_many_lines, reason = "one admitted move rewrites its funding and requester cohort")]
 pub(crate) fn make(domain: &mut Domain, env: &Env<Limits>, plan: Plan, reason: &[u8], out: &mut Queue<Request>) {
     let Plan {
         number,
@@ -306,8 +283,8 @@ pub(crate) fn make(domain: &mut Domain, env: &Env<Limits>, plan: Plan, reason: &
         previous_root,
         previous_depth,
         source,
-        spent,
-        left,
+        spent: _,
+        left: _,
         budget: _,
         destination,
         period_source,
@@ -345,27 +322,8 @@ pub(crate) fn make(domain: &mut Domain, env: &Env<Limits>, plan: Plan, reason: &
         crate::funders::save_funding(domain, destination, out);
     }
     if source != destination {
-        match source {
-            Funder::Task(parent) => {
-                let budget = record(domain, number).expect("target live").numbers.budget;
-                let row = task_mut(domain, parent).expect("checked task source");
-                row.record.numbers.reserved =
-                    row.record.numbers.reserved.checked_sub(budget).expect("source preflight");
-                row.record.numbers.spent_below =
-                    row.record.numbers.spent_below.checked_add(spent).expect("source preflight");
-                publish(domain, env, parent, out);
-            }
-            Funder::Pool { .. } | Funder::Period { .. } | Funder::Recurring { .. } => {
-                let budget = record(domain, number).expect("target live").numbers.budget;
-                let ledger = domain.funding.get_mut(&source).expect("checked finite source");
-                ledger.numbers.reserved = ledger.numbers.reserved.checked_sub(budget).expect("source preflight");
-                ledger.numbers.spent_below = ledger.numbers.spent_below.checked_add(spent).expect("source preflight");
-                crate::funders::save_funding(domain, source, out);
-            }
-        }
-        let ledger = domain.funding.get_mut(&destination).expect("checked new pool");
-        ledger.numbers.reserved = ledger.numbers.reserved.checked_add(left).expect("destination preflight");
-        crate::funders::save_funding(domain, destination, out);
+        let budget = record(domain, number).expect("target live").numbers.budget;
+        crate::funders::refunding::apply(domain, env, number, destination, budget, out);
     }
     if let Some(parent) = old_parent {
         out.push(Request::Erase { key: crate::Key::Delegate { requester: parent, task: number } });
@@ -399,13 +357,6 @@ pub(crate) fn make(domain: &mut Domain, env: &Env<Limits>, plan: Plan, reason: &
             }
             references.push(parent).expect("bilateral reference room preflighted");
             task.record.references = references.into_boxed();
-        }
-        if source != destination {
-            task.record.funder = destination;
-            task.record.numbers.budget = left;
-            task.record.numbers.spent = 0;
-            task.record.numbers.spent_below = 0;
-            task.record.authority.budget.spend = left;
         }
     }
     for child in subtree.into_boxed() {

@@ -132,6 +132,7 @@ pub(super) fn named_proposal_accept(
             let before = crate::translate::authority_value(&current.authority);
             let stop_run = !authority::at_most(&before, &after, &core.authority.rules().implies);
             tasks::Event::Amend {
+                funder: Some(tasks::Funder::Task(key.task)),
                 reply_to: ReplyTo::new(token),
                 by: tasks::Party::Task(key.task),
                 task,
@@ -145,6 +146,7 @@ pub(super) fn named_proposal_accept(
                 return proposal_refused(core, ReplyTo::new(token), key, tasks::Refusal::Busy);
             };
             tasks::Event::Amend {
+                funder: Some(tasks::Funder::Task(key.task)),
                 reply_to: ReplyTo::new(token),
                 by: tasks::Party::Task(key.task),
                 task,
@@ -622,6 +624,7 @@ pub(super) fn named_action(
                 "one amendment route"
             );
             work.push(Event::Tasks(tasks::Event::Amend {
+                funder: None,
                 reply_to: ReplyTo::new(token),
                 by: tasks::Party::Task(key.task),
                 task: target,

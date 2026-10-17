@@ -90,10 +90,13 @@ fn apply(domain: &mut Domain, env: &Env<Limits>, fence: Fence, decision: Procedu
             env,
             ReplyTo::new(skein_lib::Token::new(u64::MAX - 1)),
             Party::Task(number),
-            part.task,
-            part.message,
-            part.stop_run,
-            part.amendment,
+            crate::control::Amend {
+                number: part.task,
+                message: part.message,
+                stop_run: part.stop_run,
+                funder: None,
+                amendment: part.amendment,
+            },
             out,
         );
     }

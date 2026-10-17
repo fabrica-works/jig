@@ -83,7 +83,11 @@ impl Core {
         let Some(policy) = self.authority.role(project, named.number()) else {
             return Err(people::Refusal::Unknown);
         };
-        if !policy.decides.allows(authority::ProposalKind::Batch) {
+        let kind = match &proposal.action {
+            tasks::PersonAction::Batch(_) => authority::ProposalKind::Batch,
+            tasks::PersonAction::Amend { .. } => authority::ProposalKind::Amend,
+        };
+        if !policy.decides.allows(kind) {
             return Err(people::Refusal::Unknown);
         }
         Ok(())
@@ -99,18 +103,30 @@ impl Core {
         tasks_left: u32,
     ) -> Result<tasks::Funder, people::Refusal> {
         let (source, numbers) = self.goal_pool(project, person);
-        let tasks::PersonAction::Batch(batch) = &proposal.action;
-        let mut members = skein_lib::List::with_capacity(u32::try_from(batch.len()).expect("bounded party batch"));
-        for member in batch {
-            members
-                .push(authority::Delegate {
-                    executor: self.delegation_executor(project, member.executor).ok_or(people::Refusal::Unknown)?,
-                    authority: translate::authority_value(&member.authority),
-                    symbolic: Box::new([]),
-                })
-                .expect("bounded party batch");
-        }
-        let action = authority::Action::Batch(members.into_boxed());
+        let action = match &proposal.action {
+            tasks::PersonAction::Batch(batch) => {
+                let mut members =
+                    skein_lib::List::with_capacity(u32::try_from(batch.len()).expect("bounded party batch"));
+                for member in batch {
+                    members
+                        .push(authority::Delegate {
+                            executor: self
+                                .delegation_executor(project, member.executor)
+                                .ok_or(people::Refusal::Unknown)?,
+                            authority: translate::authority_value(&member.authority),
+                            symbolic: Box::new([]),
+                        })
+                        .expect("bounded party batch");
+                }
+                authority::Action::Batch(members.into_boxed())
+            }
+            tasks::PersonAction::Amend { task, amendment } => {
+                let row = self.tasks.task(*task).ok_or(people::Refusal::Unknown)?;
+                authority::Action::Amend(translate::authority_value(
+                    amendment.authority.as_ref().unwrap_or(&row.authority),
+                ))
+            }
+        };
         let mut findings = Queue::with_capacity(authority::max_out(self.authority.limits()).expect("authority room"));
         let ask = authority::PersonAsk {
             project,

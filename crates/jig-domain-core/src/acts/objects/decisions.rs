@@ -28,7 +28,9 @@ pub(crate) fn proposal(
             }
             match act {
                 Act::Accept => {
-                    if core.projections.len() >= limits.tasks.tasks {
+                    if let tasks::PersonAction::Batch(_) = &row.action
+                        && core.projections.len() >= limits.tasks.tasks
+                    {
                         return Err(people::Refusal::Limit { which: people::LimitKind::LiveTasks });
                     }
                     core.goal_accept_allowed(

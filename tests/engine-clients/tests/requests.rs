@@ -7,10 +7,13 @@ use skein_lib::{
     base64::{self, Alphabet},
 };
 fn signed_in(peer: &mut Peer) -> Box<[u8]> {
+    bearer(peer, fixtures::FIRST_SIGN_IN, fixtures::FIRST_PERSON)
+}
+fn bearer(peer: &mut Peer, sign_in: u64, person: u64) -> Box<[u8]> {
     let link = peer.printed_link();
     let exchange = peer.post_link(&link);
-    peer.answer_signed_in(fixtures::FIRST_SIGN_IN, fixtures::FIRST_PERSON);
-    peer.answer_kept(fixtures::FIRST_SIGN_IN);
+    peer.answer_signed_in(sign_in, person);
+    peer.answer_kept(sign_in);
     let token = peer.sign_in_answer(exchange);
     let mut out = Writer::new(61);
     out.put(b"Bearer ").expect("prefix");
@@ -78,4 +81,152 @@ fn a_native_request_waits_for_the_released_reply_and_takes_its_task() {
         w::Final::decode(&limits, &mut skein_lib::Reader::new(answer.record())),
         Ok(w::Final::Done(w::Done::new(&limits, w::DoneParts { outcome }).expect("done")))
     );
+}
+
+fn amend_request(revision: u64, spend: u64) -> Box<[u8]> {
+    let limits = fixtures::limits().wire;
+    let authority = w::OwnerAuthority::new(
+        &limits,
+        w::OwnerAuthorityParts {
+            tools: 0,
+            grants: Box::new([]),
+            spend,
+            deadline: None,
+            notes: 0,
+            note_resources: Box::new([]),
+            delegation: w::OwnerDelegation::new(
+                &limits,
+                w::OwnerDelegationParts { kinds: skein_lib::List::with_capacity(0), tasks: 0, depth: 0 },
+            )
+            .expect("delegation"),
+        },
+    )
+    .expect("authority");
+    let ask = w::Ask::Amend(Box::new(
+        w::Amend::new(
+            &limits,
+            w::AmendParts {
+                project: 1,
+                task: 2,
+                revision: w::Revision::new(&limits, w::RevisionParts { value: revision }).expect("revision"),
+                change: w::Amendment::new(
+                    &limits,
+                    w::AmendmentParts {
+                        addressed: None,
+                        spec: None,
+                        wake: None,
+                        dependencies: None,
+                        authority: Some(authority),
+                        instructions: None,
+                    },
+                )
+                .expect("change"),
+                release: None,
+                reason: b"more work".as_slice().into(),
+            },
+        )
+        .expect("amend"),
+    ));
+    let mut out = Writer::new(usize::try_from(ask.measure()).expect("ask size"));
+    ask.encode(&mut out).expect("ask bytes");
+    let keyed = w::Keyed::new(
+        &limits,
+        w::KeyedParts { key: [61; 16], owner: w::Owner::Jig, version: 8, request: out.finish() },
+    )
+    .expect("keyed");
+    let mut out = Writer::new(usize::try_from(keyed.measure()).expect("keyed size"));
+    keyed.encode(&mut out).expect("keyed bytes");
+    out.finish()
+}
+fn route_real_core(peer: &mut Peer, world: &mut jig_core_world::effects::World) -> Vec<[u8; 16]> {
+    let mut keys = Vec::new();
+    while let Some(event) = peer.take_core() {
+        let core::Event::People(people::Event::Ask { reply_to, sign_in, key, ask }) = event else {
+            panic!("authenticated ask")
+        };
+        let token = reply_to.into_token();
+        keys.push(key);
+        world.send(jig_test_domain::Event::Core(core::Event::People(people::Event::Ask {
+            reply_to: skein_lib::ReplyTo::new(token),
+            sign_in,
+            key,
+            ask,
+        })));
+        peer.answer_request(skein_lib::ReplyTo::new(token), *world.people_answers.last().expect("real core reply"));
+    }
+    keys
+}
+fn final_answer(peer: &Peer, socket: skein_lib::Token) -> w::Final {
+    let limits = fixtures::limits().wire;
+    let w::Answer::FinalAnswer(answer) =
+        w::Answer::decode(&limits, &mut skein_lib::Reader::new(peer.answered(socket).expect("http answer")))
+            .expect("answer")
+    else {
+        panic!("final")
+    };
+    w::Final::decode(&limits, &mut skein_lib::Reader::new(answer.record())).expect("owner answer")
+}
+fn amendment_setup(seed: u64) -> (Peer, jig_core_world::effects::World, Box<[u8]>) {
+    let mut world = jig_core_world::stories::offers::world(seed, Some(people::Role::Member));
+    let sign_in = world.sign_in.expect("member");
+    jig_core_world::fixtures::ask_as(
+        &mut world,
+        sign_in,
+        30,
+        people::Ask::Create { project: 1, batch: Box::new([jig_core_world::fixtures::people_member(b"work", 20)]) },
+    );
+    let mut peer = Peer::started(&fixtures::settings());
+    let bearer = bearer(&mut peer, world.sign_in.expect("member"), 1);
+    (peer, world, bearer)
+}
+const FOLLOWUP_KEY: [u8; 16] = [61, 61, 61, 61, 61, 61, 61, 61, 61, 61, 61, 61, 61, 61, 61, 189];
+#[test]
+fn a_v8_amend_beyond_the_role_is_proposed_and_answered_amend_proposed() {
+    let (mut peer, mut world, bearer) = amendment_setup(349);
+    let revision = jig_core_world::fixtures::live_row(&world, 2).revisions.spec;
+    let socket = peer.post(b"/jig/v1/request", amend_request(revision, 150), Some(&bearer));
+    assert_eq!(
+        route_real_core(&mut peer, &mut world),
+        [[61; 16], FOLLOWUP_KEY],
+        "real core reply: {:?}",
+        world.people_answers.last()
+    );
+    let w::Final::Done(done) = final_answer(&peer, socket) else { panic!("done") };
+    let w::Outcome::Owner(owner) = done.outcome() else { panic!("owner outcome") };
+    let w::OwnerOutcome::AmendProposed(row) = owner.value() else { panic!("amend proposed") };
+    assert_eq!((row.task(), row.proposal(), row.released()), (2, 1, false));
+    assert_eq!(jig_core_world::fixtures::live_row(&world, 2).numbers.budget, 20);
+}
+#[test]
+fn a_v8_amend_sent_again_replays_the_same_proposal() {
+    let (mut peer, mut world, bearer) = amendment_setup(350);
+    let revision = jig_core_world::fixtures::live_row(&world, 2).revisions.spec;
+    let body = amend_request(revision, 150);
+    let first = peer.post(b"/jig/v1/request", body.clone(), Some(&bearer));
+    assert_eq!(
+        route_real_core(&mut peer, &mut world),
+        [[61; 16], FOLLOWUP_KEY],
+        "real core reply: {:?}",
+        world.people_answers.last()
+    );
+    let original = final_answer(&peer, first);
+    let second = peer.post(b"/jig/v1/request", body, Some(&bearer));
+    assert_eq!(
+        route_real_core(&mut peer, &mut world),
+        [[61; 16], FOLLOWUP_KEY],
+        "real core reply: {:?}",
+        world.people_answers.last()
+    );
+    assert_eq!(final_answer(&peer, second), original);
+}
+#[test]
+fn a_v8_amend_beyond_the_ceiling_stays_refused() {
+    let (mut peer, mut world, bearer) = amendment_setup(351);
+    let revision = jig_core_world::fixtures::live_row(&world, 2).revisions.spec;
+    let socket = peer.post(b"/jig/v1/request", amend_request(revision, 2000), Some(&bearer));
+    assert_eq!(route_real_core(&mut peer, &mut world), [[61; 16]]);
+    let w::Final::Refused(refused) = final_answer(&peer, socket) else { panic!("refused") };
+    let w::Refusal::Authority(row) = refused.refusal() else { panic!("authority refusal: {:?}", refused.refusal()) };
+    assert_eq!(row.proposable(), &Some(false));
+    assert_eq!(jig_core_world::fixtures::live_row(&world, 2).proposal, None);
 }

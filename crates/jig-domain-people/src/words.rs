@@ -29,32 +29,10 @@ pub(crate) fn valid(ask: &Ask) -> bool {
             NoteChange::Correct { description, body, .. } => text(description) && text(body),
             NoteChange::Delete { .. } => true,
         },
-        Ask::Amend { amendment, .. } => {
-            if !text(&amendment.reason) {
-                return false;
-            }
-            if let Some(instructions) = &amendment.instructions
-                && !text(instructions)
-            {
-                return false;
-            }
-            if let Some(spec) = &amendment.spec {
-                if !text(&spec.words) {
-                    return false;
-                }
-                for parameter in &spec.parameters {
-                    match parameter {
-                        crate::Parameter::Bytes { value, .. } => {
-                            if !text(value) {
-                                return false;
-                            }
-                        }
-                        crate::Parameter::Number { .. } | crate::Parameter::Resource { .. } => {}
-                    }
-                }
-            }
-            true
+        Ask::Propose { action: crate::Action::Amend { amendment, .. }, reason, .. } => {
+            text(reason) && amendment_words(amendment)
         }
+        Ask::Amend { amendment, .. } => amendment_words(amendment),
         Ask::Compound { .. }
         | Ask::Close { .. }
         | Ask::MarkSeen { .. }
@@ -83,6 +61,33 @@ fn batch_words(batch: &[crate::Member]) -> bool {
             return false;
         }
         for parameter in &member.parameters {
+            match parameter {
+                crate::Parameter::Bytes { value, .. } => {
+                    if !text(value) {
+                        return false;
+                    }
+                }
+                crate::Parameter::Number { .. } | crate::Parameter::Resource { .. } => {}
+            }
+        }
+    }
+    true
+}
+
+fn amendment_words(amendment: &crate::Amendment) -> bool {
+    if !text(&amendment.reason) {
+        return false;
+    }
+    if let Some(instructions) = &amendment.instructions
+        && !text(instructions)
+    {
+        return false;
+    }
+    if let Some(spec) = &amendment.spec {
+        if !text(&spec.words) {
+            return false;
+        }
+        for parameter in &spec.parameters {
             match parameter {
                 crate::Parameter::Bytes { value, .. } => {
                     if !text(value) {

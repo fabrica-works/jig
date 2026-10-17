@@ -12,6 +12,7 @@ pub struct Accounting {
     charged: Option<(u64, u64)>,
     procedure: Option<(u64, u64, Option<u64>)>,
     moves: BTreeMap<u64, (u64, u64)>,
+    amendments: BTreeMap<u64, (Funder, u64)>,
 }
 
 fn live(rows: &BTreeMap<Key, Stored>, task: u64) -> Option<&TaskRecord> {
@@ -86,6 +87,30 @@ impl Accounting {
         self.moves.insert(task, (person, period));
     }
 
+    pub fn amending(&mut self, task: u64, funder: Funder, budget: u64) {
+        self.amendments.insert(task, (funder, budget));
+    }
+
+    fn refunded(&self, before: &TaskRecord, after: &TaskRecord) -> bool {
+        let Some((funder, budget)) = self.amendments.get(&before.number) else { return false };
+        *funder != before.funder
+            && *funder == after.funder
+            && before.requester == after.requester
+            && before.root == after.root
+            && before.depth == after.depth
+            && before.delegates == after.delegates
+            && before.numbers.reserved == after.numbers.reserved
+            && budget.checked_sub(before.numbers.spent).and_then(|left| left.checked_sub(before.numbers.spent_below))
+                == Some(after.numbers.budget)
+            && after.numbers.spent == 0
+            && after.numbers.spent_below == 0
+    }
+
+    fn resized(&self, before: &TaskRecord, after: &TaskRecord) -> bool {
+        self.amendments.get(&before.number) == Some(&(before.funder, after.numbers.budget))
+            && before.funder == after.funder
+    }
+
     fn moved(&self, before: &TaskRecord, after: &TaskRecord) -> bool {
         let Some((person, period)) = self.moves.get(&before.number) else { return false };
         after.requester == jig_domain_tasks::Party::Person(*person)
@@ -107,7 +132,7 @@ impl Accounting {
             .filter_map(|row| {
                 let Stored::Live(before) = row else { return None };
                 let after = current(rows, before.number)?;
-                (before.funder == funder && self.moved(before, after))
+                (before.funder == funder && (self.moved(before, after) || self.refunded(before, after)))
                     .then_some(before.numbers.spent + before.numbers.spent_below)
             })
             .sum()
@@ -287,10 +312,10 @@ impl Accounting {
                 }
                 _ => false,
             };
-            let moved = self.moved(old, task);
+            let moved = self.moved(old, task) || self.refunded(old, task);
             if !moved
                 && ((old.funder != task.funder && !recurring_reset && !renewed && !standing_delegate)
-                    || old.numbers.budget != task.numbers.budget)
+                    || old.numbers.budget != task.numbers.budget && !self.resized(old, task))
             {
                 return Err("allocation identity or promise changed");
             }
@@ -466,6 +491,7 @@ impl Accounting {
                 | Stored::PersonProposal(_) => {}
             }
         }
+        self.amendments.clear();
         self.before = rows.clone();
         self.moves.clear();
         self.charged = None;

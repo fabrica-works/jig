@@ -26,7 +26,7 @@ pub(super) fn amend_route(
         pool_refused(work, request, people::Refusal::Limit { which: people::LimitKind::Words });
         return;
     };
-    let (stop_run, propose) =
+    let stop_run =
         match core.amend_admit(person, role, project, task, &amendment, env.limits.tasks.depth, &env.limits.tasks) {
             Ok(admitted) => admitted,
             Err(why) => {
@@ -60,32 +60,6 @@ pub(super) fn amend_route(
         }
     }
     amendment.release = release;
-    if propose {
-        let Some(proposal) = crate::fresh(&mut core.counters, crate::Family::Message) else {
-            pool_refused(work, request, people::Refusal::Limit { which: people::LimitKind::Arithmetic });
-            return;
-        };
-        assert!(
-            core.person_tasks.insert(request, PersonTaskRoute::AmendProposed { task, proposal }) == Ok(None),
-            "one amendment proposal"
-        );
-        work.push(Event::Tasks(tasks::Event::Propose {
-            reply_to: ReplyTo::new(request),
-            proposal: tasks::Proposal {
-                number: proposal,
-                proposer: task,
-                project,
-                reason: amendment.reason.clone(),
-                as_holder: false,
-                action: tasks::ProposalAction::Amend { task, amendment },
-                state: tasks::ProposalState::Pending {
-                    holder: tasks::ProposalHolder::Policy { project, kind: tasks::ProposalKind::Amend },
-                    since: env.wall,
-                },
-            },
-        }));
-        return;
-    }
     let Some(message) = crate::fresh(&mut core.counters, crate::Family::Message) else {
         pool_refused(work, request, people::Refusal::Limit { which: people::LimitKind::Arithmetic });
         return;
@@ -99,6 +73,7 @@ pub(super) fn amend_route(
         "one person amendment"
     );
     work.push(Event::Tasks(tasks::Event::Amend {
+        funder: None,
         reply_to: ReplyTo::new(request),
         by: tasks::Party::Person(person),
         task,

@@ -125,7 +125,11 @@ impl Core {
             tasks::PersonProposalState::Pending { since } => {
                 if let Some(project) = self.authority.policy(row.project) {
                     for policy in &project.roles {
-                        if !policy.decides.allows(authority::ProposalKind::Batch) {
+                        let kind = match row.action {
+                            tasks::PersonAction::Batch(_) => authority::ProposalKind::Batch,
+                            tasks::PersonAction::Amend { .. } => authority::ProposalKind::Amend,
+                        };
+                        if !policy.decides.allows(kind) {
                             continue;
                         }
                         entries
@@ -223,7 +227,9 @@ impl Core {
         }
         if let Some(GoalRoute::Accepting { proposer, proposal, by }) = self.goal_routes.get(&request).cloned() {
             let row = self.tasks.person_proposal(proposer, proposal).expect("accepted party proposal");
-            let tasks::PersonAction::Batch(batch) = &row.action;
+            let tasks::PersonAction::Batch(batch) = &row.action else {
+                unreachable!("only a party batch makes tasks");
+            };
             assert!(batch.len() == tasks.len(), "accepted batch length");
             for (member, number) in batch.iter().zip(tasks.iter()) {
                 assert!(member.number == *number, "accepted batch made");

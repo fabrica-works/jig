@@ -96,9 +96,7 @@ pub(super) fn encode_outcome(value: &domain::Outcome, limits: &wire::Limits) -> 
             limits,
             wire::OutcomeAmendedParts { task: *task, released: *released },
         )?),
-        domain::Outcome::AmendProposed { task, proposal, released } => {
-            wire::Outcome::AmendProposed(encode_amend_proposed(*task, *proposal, *released, limits)?)
-        }
+
         domain::Outcome::RolesSet { project } => wire::Outcome::RolesSet(wire::OutcomeRolesSet::new(
             limits,
             wire::OutcomeRolesSetParts { project: *project },
@@ -209,7 +207,6 @@ pub(super) fn decode_outcome(value: wire::Outcome) -> domain::Outcome {
             let wire::OutcomeAmendedParts { task, released } = value.into_parts();
             domain::Outcome::Amended { task, released }
         }
-        wire::Outcome::AmendProposed(value) => decode_amend_proposed(value),
         wire::Outcome::RolesSet(value) => {
             let wire::OutcomeRolesSetParts { project } = value.into_parts();
             domain::Outcome::RolesSet { project }
@@ -315,19 +312,6 @@ fn decode_question_answered(value: wire::OutcomeQuestionAnswered) -> domain::Out
     let wire::OutcomeQuestionAnsweredParts { task, question, message } = value.into_parts();
     domain::Outcome::QuestionAnswered { task, question, message }
 }
-fn encode_amend_proposed(
-    task: u64,
-    proposal: u64,
-    released: bool,
-    limits: &wire::Limits,
-) -> Result<wire::OutcomeAmendProposed, wire::Problem> {
-    wire::OutcomeAmendProposed::new(limits, wire::OutcomeAmendProposedParts { task, proposal, released })
-}
-fn decode_amend_proposed(value: wire::OutcomeAmendProposed) -> domain::Outcome {
-    let wire::OutcomeAmendProposedParts { task, proposal, released } = value.into_parts();
-    domain::Outcome::AmendProposed { task, proposal, released }
-}
-
 fn encode_said(
     task: u64,
     message: u64,
