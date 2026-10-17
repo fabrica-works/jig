@@ -1,6 +1,5 @@
 use super::*;
 
-const PROPOSER: u64 = 1;
 const PROPOSAL: u64 = 40;
 const NEXT_PROPOSAL: u64 = 41;
 
