@@ -193,7 +193,7 @@ pub fn outcome_values() -> Box<[domain::Outcome]> {
             at: Wall::from_nanos(19),
             choice: domain::ProposalChoice::Rejected,
         },
-        domain::Outcome::Said { task: 2, message: 3, released: true },
+        domain::Outcome::Said { task: 2, message: 3 },
         domain::Outcome::QuestionAnswered { task: 2, question: 3, message: 4 },
         domain::Outcome::Prioritised { project: 2 },
         domain::Outcome::Amended { task: 2, released: true },

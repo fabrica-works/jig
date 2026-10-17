@@ -16,7 +16,7 @@ fn a_chats_flags_and_last_activity_survive_a_cold_restart() {
         reply_to: ReplyTo::new(Token::new(8001)),
         sign_in: world.sign_in.expect("signed in"),
         key: [1; 16],
-        ask: people::Ask::Say { project: 1, task: 1, words: b"heard at nine".as_slice().into(), release: false },
+        ask: people::Ask::Say { project: 1, task: 1, words: b"heard at nine".as_slice().into() },
     })));
     world.restart(171, false);
     let root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row))) =

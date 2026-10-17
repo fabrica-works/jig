@@ -21,7 +21,7 @@ fn compound(project: u32, stop_project: u32) -> w::Ask {
 #[test]
 fn a_compound_reaches_the_people_child_in_order() {
     let mut expected = List::with_capacity(2);
-    expected.push(p::Operation::Message { task: TASK, words: b"words".as_slice().into(), release: false }).unwrap();
+    expected.push(p::Operation::Message { task: TASK, words: b"words".as_slice().into() }).unwrap();
     expected.push(p::Operation::Stop { task: TASK }).unwrap();
     assert_eq!(
         asks::ask(compound(PROJECT, PROJECT), &f::wire()),

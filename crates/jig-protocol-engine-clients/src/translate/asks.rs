@@ -15,7 +15,7 @@ pub(crate) fn ask(record: w::Ask, limits: &w::Limits) -> Result<p::Ask, Untransl
         }
         w::Ask::Message(value) => {
             let v = value.into_parts();
-            p::Ask::Say { project: v.project, task: v.task, words: v.words, release: false }
+            p::Ask::Say { project: v.project, task: v.task, words: v.words }
         }
         w::Ask::Answer(value) => {
             let v = value.into_parts();

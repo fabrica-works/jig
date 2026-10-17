@@ -158,7 +158,6 @@ fn a_graces_ask_to_finish_is_admitted_into_a_full_inbox() {
                 hits: 1,
                 eligible: true,
             },
-            release: false,
         });
     }
     assert_eq!(world.record(TASK).inbox.len(), usize::try_from(LIMITS.inbox_messages).expect("small inbox bound"));

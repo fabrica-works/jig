@@ -73,7 +73,7 @@ fn a_compounds_invalid_operation_keeps_its_standalone_refusal() {
     test.signin(1, 10, identity(0, 1));
     for &(task, words, refusal) in INVALID {
         let mut operations = List::with_capacity(1);
-        operations.push(Operation::Message { task, words: words.into(), release: false }).expect("one operation");
+        operations.push(Operation::Message { task, words: words.into() }).expect("one operation");
         let rows = test.request(10, 1, Ask::Compound { project: 1, operations });
         assert_eq!(reply(&rows), Reply::Refused(refusal), "task {task}, words {words:?}");
     }

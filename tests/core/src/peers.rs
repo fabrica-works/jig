@@ -400,9 +400,7 @@ fn party_reply(reply: people::Reply) -> parties::Reply {
         people::Reply::Outcome(people::Outcome::Started { task } | people::Outcome::GoalStarted { task }) => {
             parties::Reply::Started { task }
         }
-        people::Reply::Outcome(people::Outcome::Said { task, message, released }) => {
-            parties::Reply::Said { task, message, released }
-        }
+        people::Reply::Outcome(people::Outcome::Said { task, message }) => parties::Reply::Said { task, message },
         people::Reply::Outcome(people::Outcome::Proposed { proposal, .. }) => parties::Reply::Proposed { proposal },
         people::Reply::Outcome(people::Outcome::Closing { chat, cancelled, kept }) => {
             parties::Reply::Closed { chat, cancelled, kept }
@@ -775,14 +773,12 @@ fn say(project: u32, task: u64, words: Box<[u8]>, release: Option<u64>) -> peopl
     match release {
         Some(revision) => {
             let mut operations = skein_lib::List::with_capacity(2);
-            operations
-                .push(people::Operation::Message { task, words, release: false })
-                .expect("two word and release operations");
+            operations.push(people::Operation::Message { task, words }).expect("two word and release operations");
             operations
                 .push(people::Operation::Release { task, revision, again: None })
                 .expect("two word and release operations");
             people::Ask::Compound { project, operations }
         }
-        None => people::Ask::Say { project, task, words, release: false },
+        None => people::Ask::Say { project, task, words },
     }
 }

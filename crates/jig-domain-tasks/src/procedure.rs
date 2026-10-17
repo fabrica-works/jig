@@ -110,7 +110,6 @@ fn apply(domain: &mut Domain, env: &Env<Limits>, fence: Fence, decision: Procedu
             part.task,
             part.word,
             false,
-            false,
             out,
         );
     }

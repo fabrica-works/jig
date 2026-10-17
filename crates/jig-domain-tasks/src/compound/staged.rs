@@ -149,10 +149,6 @@ impl Staged {
                 Plan::Message(plan) if plan.number == number => {
                     row.last_message = plan.prepared.word.number;
                     row.inbox = &plan.prepared.inbox;
-                    if let Some(release) = &plan.release {
-                        row.phase = release.next.clone();
-                        row.revision = row.revision.checked_add(1).expect("admission checked");
-                    }
                     row.wake(&plan.prepared.word);
                 }
                 Plan::Stop(Some(plan)) if plan.number == number => {

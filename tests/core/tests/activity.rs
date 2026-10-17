@@ -43,12 +43,7 @@ fn a_chat_s_activity_holds_the_person_s_words_its_turns_and_its_delegate_s_resul
         reply_to: ReplyTo::new(Token::new(5001)),
         sign_in: world.sign_in.expect("signed-in person"),
         key: [51; 16],
-        ask: people::Ask::Say {
-            project: 1,
-            task: parent.0,
-            words: b"the person's complete words".as_slice().into(),
-            release: false,
-        },
+        ask: people::Ask::Say { project: 1, task: parent.0, words: b"the person's complete words".as_slice().into() },
     })));
     let message = world
         .people_answers

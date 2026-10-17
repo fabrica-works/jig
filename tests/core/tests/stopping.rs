@@ -124,11 +124,7 @@ fn drained_is_released_once_after_the_last_commit_is_durable() {
     let task = world.task();
     let commits = world.store.applied;
     world.store.fault(jig_core_world::Fault::Hold { commits: 1 });
-    request(
-        &mut world,
-        57,
-        people::Ask::Say { project: 1, task, words: b"before the stop".as_slice().into(), release: false },
-    );
+    request(&mut world, 57, people::Ask::Say { project: 1, task, words: b"before the stop".as_slice().into() });
     world.stop();
     assert!(!world.stop_deliveries.iter().any(|held| matches!(held, core::Held::Drained)));
     let number = world.store.release_held().expect("the pending commit");

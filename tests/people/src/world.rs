@@ -103,7 +103,7 @@ struct Commit {
     proposals: Vec<((people::Proposer, u64), Winner)>,
     person_claims: Vec<(u64, Option<u64>)>,
     person_answers: Vec<(u64, u64, Wall)>,
-    sayings: Vec<(u64, u64, Box<[u8]>, bool)>,
+    sayings: Vec<(u64, u64, Box<[u8]>)>,
     resolved: Vec<(u64, bool)>,
     amendments: Vec<(u64, u64, bool)>,
     pending_amendments: Vec<((u64, u64), u64)>,
@@ -147,7 +147,7 @@ pub struct World {
     ended_chats: BTreeMap<u64, (u64, u64)>,
     proposals: BTreeMap<(people::Proposer, u64), Winner>,
     holds: BTreeMap<u64, (u64, people::HoldReason)>,
-    pub sayings: BTreeMap<u64, (u64, Box<[u8]>, bool)>,
+    pub sayings: BTreeMap<u64, (u64, Box<[u8]>)>,
     pub executor_outcomes: Vec<(u64, bool)>,
     specs: BTreeMap<u64, u64>,
     pending_amendments: BTreeMap<(u64, u64), u64>,
@@ -687,15 +687,13 @@ impl World {
                                     &mut self.out,
                                 );
                             }
-                            Ask::Say { task, words, release, .. } => {
-                                let released = release
-                                    && matches!(self.holds.get(&task), Some((_, people::HoldReason::StoppedBy { party })) if *party == person);
+                            Ask::Say { task, words, .. } => {
                                 let message = self.name();
-                                sayings.push((task, message, words, released));
+                                sayings.push((task, message, words));
                                 people::step(
                                     &mut self.domain,
                                     &self.env,
-                                    Event::Decided { request, outcome: Outcome::Said { task, message, released } },
+                                    Event::Decided { request, outcome: Outcome::Said { task, message } },
                                     &mut self.out,
                                 );
                             }
@@ -919,11 +917,8 @@ impl World {
                     self.holds.remove(&task);
                 }
             }
-            for (task, message, words, released) in commit.sayings {
-                assert!(self.sayings.insert(message, (task, words, released)).is_none());
-                if released {
-                    self.holds.remove(&task);
-                }
+            for (task, message, words) in commit.sayings {
+                assert!(self.sayings.insert(message, (task, words)).is_none());
             }
             for (task, holder) in commit.person_claims {
                 let saved = self.person_tasks.get_mut(&task).expect("known person task");

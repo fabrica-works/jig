@@ -192,9 +192,8 @@ mod tests {
                 project: 1,
                 task: 7,
                 words: b"whole".to_vec().into_boxed_slice(),
-                release: false,
             }),
-            outcome: jig_domain_people::Outcome::Said { task: 7, message: 4, released: false },
+            outcome: jig_domain_people::Outcome::Said { task: 7, message: 4 },
             at: Wall::from_nanos(0),
         }))
     }

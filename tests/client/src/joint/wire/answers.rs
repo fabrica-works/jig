@@ -113,11 +113,7 @@ mod tests {
         assert_eq!(applied, Reply::Applied { connector: u16::MAX, token: Token::new(u64::MAX) });
         assert_eq!(keyed(applied.clone()), Err(applied));
         assert_eq!(
-            keyed(reply(people::Reply::Outcome(people::Outcome::Said {
-                task: u64::MAX,
-                message: u64::MAX,
-                released: true
-            }))),
+            keyed(reply(people::Reply::Outcome(people::Outcome::Said { task: u64::MAX, message: u64::MAX }))),
             Ok((
                 RequestEnvelope::Final,
                 Some(client::Answer::Done(client::Outcome::Owner(client::OwnerOutcome::Said {

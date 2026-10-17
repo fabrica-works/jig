@@ -113,7 +113,6 @@ fn word(h: &mut Harness, task: u64, from: Party, number: u64, kind: MessageKind)
         reply_to: to(),
         project: 1,
         task,
-        release: false,
         word: crate::Word { number, from, kind, words: Box::new([1]), at: Wall::EPOCH, hits: 1, eligible: true },
     })
 }

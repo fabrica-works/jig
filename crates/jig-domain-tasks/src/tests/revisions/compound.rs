@@ -10,8 +10,10 @@ const PROJECT: u32 = 1;
 const OTHER_PROJECT: u32 = 2;
 const FIRST_MESSAGE: u64 = 1;
 const SECOND_MESSAGE: u64 = 2;
+const OTHER_PARTY: u64 = 10;
+const HOLDS: [Hold; 3] = [Hold::StoppedBy { party: REQUESTER }, Hold::StoppedBy { party: OTHER_PARTY }, Hold::Budget];
 
-fn compound(test: &mut Harness, operations: Vec<Operation>, pool_budget: u64) -> Vec<Request> {
+pub(super) fn compound(test: &mut Harness, operations: Vec<Operation>, pool_budget: u64) -> Vec<Request> {
     let mut bounded = List::with_capacity(u32::try_from(operations.len()).unwrap());
     for operation in operations {
         bounded.push(operation).unwrap();
@@ -124,6 +126,7 @@ fn an_amendment_then_a_release_of_one_held_task_are_made_together() {
 #[test]
 fn words_then_a_stop_release_in_one_request_wake_the_task() {
     let mut test = chat::cohort();
+    test.send(Event::Hold { task: FIRST, why: Hold::StoppedBy { party: REQUESTER } });
     let word = crate::Word {
         number: FIRST_MESSAGE,
         from: Party::Person(REQUESTER),
@@ -135,7 +138,7 @@ fn words_then_a_stop_release_in_one_request_wake_the_task() {
     };
     compound(
         &mut test,
-        vec![Operation::Stop { task: FIRST }, Operation::Message { task: FIRST, word, release: true }],
+        vec![Operation::Message { task: FIRST, word }, Operation::Release { task: FIRST, again: None, message: None }],
         1_000,
     );
     let row = test.domain.task(FIRST).unwrap();
@@ -157,4 +160,39 @@ fn an_operation_on_another_projects_task_is_refused_at_its_place() {
     let out = compound(&mut test, vec![Operation::Stop { task: ROOT }, Operation::Stop { task: SECOND }], 1_000);
     refused(out, 1, SECOND, Refusal::Project);
     assert_eq!(test.stored, before);
+}
+
+#[test]
+fn words_alone_keep_the_hold_and_its_revision() {
+    for why in HOLDS {
+        let mut test = chat::cohort();
+        test.send(Event::Hold { task: FIRST, why });
+        let before = test.domain.task(FIRST).unwrap().clone();
+        let out = test.send(Event::AuthorizedMessage {
+            reply_to: to(),
+            project: PROJECT,
+            task: FIRST,
+            word: crate::Word {
+                number: FIRST_MESSAGE,
+                from: Party::Person(REQUESTER),
+                kind: MessageKind::Words,
+                words: b"continue".as_slice().into(),
+                at: test.env.wall,
+                hits: 1,
+                eligible: true,
+            },
+        });
+        let row = test.domain.task(FIRST).unwrap();
+        assert_eq!(row.phase, before.phase, "{why:?}");
+        assert_eq!(row.revisions.hold, before.revisions.hold, "{why:?}");
+        assert_eq!(row.revision, before.revision, "{why:?}");
+        assert_eq!(row.inbox[0].words.as_ref(), b"continue", "{why:?}");
+        assert!(
+            out.iter().any(|request| match request {
+                Request::Sent { .. } => true,
+                _ => false,
+            }),
+            "{why:?}"
+        );
+    }
 }

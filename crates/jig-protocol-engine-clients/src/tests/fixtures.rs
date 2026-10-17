@@ -268,7 +268,7 @@ fn write_case(limits: &w::Limits) -> (w::Ask, people::Ask) {
             w::Message::new(limits, w::MessageParts { project: 3, task: 8, words: Box::from(b"say".as_slice()) })
                 .expect("Write"),
         ),
-        p::Ask::Say { project: 3, task: 8, words: Box::from(b"say".as_slice()), release: false },
+        p::Ask::Say { project: 3, task: 8, words: Box::from(b"say".as_slice()) },
     )
 }
 fn answer_question_case(limits: &w::Limits) -> (w::Ask, people::Ask) {

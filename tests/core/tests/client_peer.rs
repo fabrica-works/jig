@@ -95,7 +95,7 @@ fn a_client_watch_coalesces_until_its_delivery_is_taken() {
         reply_to: ReplyTo::new(Token::new(45_104)),
         sign_in,
         key: [46; 16],
-        ask: people::Ask::Say { project: 1, task, words: Box::from(&b"new words"[..]), release: false },
+        ask: people::Ask::Say { project: 1, task, words: Box::from(&b"new words"[..]) },
     })));
     assert!(!world.client_peer.as_ref().expect("client peer").delivered.iter().any(|(_, receipt)| matches!(receipt,
         root::Delivery::Core(core::Held::Delivery { watcher: delivered, .. }) if *delivered == watcher)));

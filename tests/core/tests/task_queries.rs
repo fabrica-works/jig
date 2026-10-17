@@ -232,7 +232,7 @@ fn a_task_query_reads_a_partys_live_tasks_in_last_activity_order() {
     request(
         &mut world,
         QUERY_MORE_REQUEST,
-        people::Ask::Say { project: 1, task: older, words: b"new activity".as_slice().into(), release: false },
+        people::Ask::Say { project: 1, task: older, words: b"new activity".as_slice().into() },
     );
     let query = documents::TaskQuery { order: documents::QueryOrder::Activity, ..jig_core_world::fixtures::OWN_TASKS };
     ask(&mut world, QUERY_READ, reads::Read::Tasks { query, from: None });
@@ -273,7 +273,7 @@ fn a_task_query_read_waits_for_the_commit_in_flight_and_survives_the_crash() {
     request(
         &mut world,
         QUERY_REQUEST,
-        people::Ask::Say { project: 1, task, words: b"durable activity".as_slice().into(), release: false },
+        people::Ask::Say { project: 1, task, words: b"durable activity".as_slice().into() },
     );
     assert_eq!(world.reached_cut, Some(jig_core_world::effects::Cut::Submitted(number)));
     assert!(world.store.applied < number);

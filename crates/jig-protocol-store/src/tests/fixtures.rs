@@ -561,7 +561,7 @@ pub fn people_asks() -> Box<[people::Ask]> {
             proposal: 3,
             decision: people::ProposalDecision::Reject { reason: Box::new([4]) },
         },
-        Ask::Say { project: 1, task: 2, words: Box::new([3]), release: true },
+        Ask::Say { project: 1, task: 2, words: Box::new([3]) },
         Ask::AnswerQuestion { project: 1, task: 2, question: 3, words: Box::new([4]) },
         Ask::Prioritise { project: 1, goals: Box::new([(2, 3)]) },
         Ask::Amend { project: 1, task: 2, revision: 3, amendment: people_amendment(), release: Some(4) },
@@ -744,7 +744,7 @@ fn people_compounds() -> [people::Ask; 3] {
             people::Operation::Release { task: 2, revision: 3, again: Some(false) },
         ]),
         people_compound([
-            people::Operation::Message { task: 2, words: Box::new([3]), release: true },
+            people::Operation::Message { task: 2, words: Box::new([3]) },
             people::Operation::Stop { task: 2 },
         ]),
     ]

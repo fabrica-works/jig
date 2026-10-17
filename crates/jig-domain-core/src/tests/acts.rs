@@ -347,7 +347,6 @@ fn a_maintainer_word_uses_the_trusted_entrance_and_keeps_its_actor() {
                 project: 1,
                 task: 2,
                 question: None,
-                release: false,
                 words: b"maintainer word".as_slice().into(),
                 at: Wall::EPOCH,
             },

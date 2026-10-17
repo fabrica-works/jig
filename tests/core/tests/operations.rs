@@ -158,7 +158,7 @@ fn a_compound_refused_at_its_second_operation_makes_nothing() {
         &mut world,
         12,
         compound([
-            people::Operation::Message { task: chat, words: b"unmade".as_slice().into(), release: false },
+            people::Operation::Message { task: chat, words: b"unmade".as_slice().into() },
             people::Operation::Cancel {
                 task: chat,
                 reason: b"end".as_slice().into(),

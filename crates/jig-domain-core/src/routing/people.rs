@@ -407,8 +407,8 @@ pub(super) fn tag_people(
                         role.expect("chat membership admitted"),
                         words,
                     ),
-                    people::Ask::Say { task, words, release, .. } => {
-                        say_request(core, env, work, request, person, project, task, words, release);
+                    people::Ask::Say { task, words, .. } => {
+                        say_request(core, env, work, request, person, project, task, words);
                     }
                     people::Ask::AnswerQuestion { task, question, words, .. } => {
                         answer_question_request(core, env, work, request, person, project, task, question, words);

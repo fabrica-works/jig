@@ -562,7 +562,7 @@ impl World {
             reply_to: ReplyTo::new(Token::new(3000 + u64::from(key))),
             sign_in: self.sign_in.expect("signed in"),
             key: [key; 16],
-            ask: people::Ask::Say { project: 1, task, words: Box::from(words.as_bytes()), release: false },
+            ask: people::Ask::Say { project: 1, task, words: Box::from(words.as_bytes()) },
         })));
         self.people_answers
             .iter()

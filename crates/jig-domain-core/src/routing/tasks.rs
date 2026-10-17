@@ -150,10 +150,9 @@ pub(super) fn tag_tasks(
                 }
                 continue;
             }
-            tasks::Request::Sent { reply_to, task, word, released, .. } => {
+            tasks::Request::Sent { reply_to, task, word, .. } => {
                 let request = reply_to.into_token();
-                match core.sent(request, task, &word, released, env.limits.tasks.inbox_messages, env.limits.tasks.tasks)
-                {
+                match core.sent(request, task, &word, env.limits.tasks.inbox_messages, env.limits.tasks.tasks) {
                     SentRoute::Call { key, message } => {
                         call_decision(core, &mut out, ReplyTo::new(request), key, CallPart::Sent { message });
                     }

@@ -1375,9 +1375,9 @@ pub enum Event {
     /// Give two live tasks referenced by the introducer reciprocal references.
     Introduce { reply_to: ReplyTo, by: u64, left: u64, right: u64 },
     /// Admit authenticated person words to a live chat and wake or relay after their commit.
-    Message { reply_to: ReplyTo, project: u32, task: u64, word: Word, release: bool },
+    Message { reply_to: ReplyTo, project: u32, task: u64, word: Word },
     /// A person's words whose project standing was admitted by the core; retains that actor.
-    AuthorizedMessage { reply_to: ReplyTo, project: u32, task: u64, word: Word, release: bool },
+    AuthorizedMessage { reply_to: ReplyTo, project: u32, task: u64, word: Word },
     /// Root delivers a just-ended delegate's result to its task requester in
     /// the same decision that archived the delegate.
     DelegateResult { task: u64, word: Word },
@@ -1648,7 +1648,7 @@ pub enum Request {
     /// An ending task releases a connector topic interest in the same decision.
     EndTopic { task: u64, subscription: u64, connector: u16 },
     /// Accepted person words; root answers the keyed request after the inbox write commits.
-    Sent { reply_to: ReplyTo, task: u64, word: Word, released: bool },
+    Sent { reply_to: ReplyTo, task: u64, word: Word },
     /// Resolve an unrecoverable outbox entry with the release in one decision.
     ResolveUncertain { task: u64, entry: u64, again: bool },
     /// Root relays this whole committed message through the fleet to the current run.

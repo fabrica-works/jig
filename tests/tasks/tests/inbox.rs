@@ -20,7 +20,6 @@ fn say(world: &mut World, number: u64) {
             hits: 1,
             eligible: false,
         },
-        release: false,
     });
 }
 
@@ -118,7 +117,6 @@ fn task_words(world: &mut World, source: u64, target: u64, number: u64, kind: Me
             hits: 1,
             eligible: false,
         },
-        release: false,
     });
     world.replies[&key].clone()
 }
@@ -165,7 +163,6 @@ fn a_person_answers_one_numbered_question_in_their_active_task() {
             hits: 1,
             eligible: false,
         },
-        release: false,
     });
     assert_eq!(world.replies[&key], Reply::Done);
     assert_eq!(world.record(1).inbox.len(), 2);
@@ -184,7 +181,6 @@ fn a_person_answers_one_numbered_question_in_their_active_task() {
             hits: 1,
             eligible: false,
         },
-        release: false,
     });
     assert!(matches!(&world.replies[&key], Reply::Refused(problem) if problem.why == Refusal::Reference));
     world.restart();

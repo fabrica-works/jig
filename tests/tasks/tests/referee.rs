@@ -369,7 +369,7 @@ fn message_and_escalation_referee_rejects_lost_delivery_and_missing_holder() {
     };
     let mut judge = Accounting::default();
     judge.reset(&before);
-    let sent = Request::Sent { reply_to: ReplyTo::new(Token::new(1)), task: 1, word: message, released: false };
+    let sent = Request::Sent { reply_to: ReplyTo::new(Token::new(1)), task: 1, word: message };
     assert_eq!(judge.committed(&before, &[sent]), Err("accepted message missing from durable inbox"));
 
     let mut bad = before.clone();

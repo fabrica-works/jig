@@ -269,7 +269,7 @@ pub enum Ask {
     /// Authenticated keyed decision for a proposal waiting at this person or a policy role.
     DecideProposal { project: u32, proposer: Proposer, proposal: u64, decision: ProposalDecision },
     /// Authenticated requester's whole words to an existing chat.
-    Say { project: u32, task: u64, words: Box<[u8]>, release: bool },
+    Say { project: u32, task: u64, words: Box<[u8]> },
     /// Answer a numbered question waiting in a task requested by this person.
     AnswerQuestion { project: u32, task: u64, question: u64, words: Box<[u8]> },
     /// Set the priorities of a bounded set of current project goals together.
@@ -440,7 +440,7 @@ pub enum Outcome {
     /// Keyed answer to one current or historical proposal decision.
     ProposalDecided { proposer: Proposer, proposal: u64, by: u64, at: Wall, choice: ProposalChoice },
     /// Words were durably admitted under the root-issued message number.
-    Said { task: u64, message: u64, released: bool },
+    Said { task: u64, message: u64 },
     /// A named question was answered with a durable message.
     QuestionAnswered { task: u64, question: u64, message: u64 },
     /// All named goal priorities were durably changed together.

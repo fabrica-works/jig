@@ -1331,9 +1331,9 @@ fn restored_application_tokens_must_name_their_connector_and_a_positive_outcome(
 fn a_said_answer_keeps_the_release_fact_and_request_choice() {
     let mut test = Test::new(LIMITS);
     test.member();
-    let ask = Ask::Say { project: 1, task: 7, words: Box::new([1]), release: true };
+    let ask = Ask::Say { project: 1, task: 7, words: Box::new([1]) };
     let request = route(&test.request(10, 1, ask.clone()));
-    let outcome = Outcome::Said { task: 7, message: 8, released: true };
+    let outcome = Outcome::Said { task: 7, message: 8 };
     let out = test.send(Event::Decided { request, outcome });
     assert_eq!(reply(&out), Reply::Outcome(outcome));
     assert_eq!(reply(&test.request(10, 1, ask)), Reply::Outcome(outcome));

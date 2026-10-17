@@ -487,9 +487,9 @@ pub fn encode_ask(value: &domain::Ask, limits: &wire::Limits) -> Result<wire::As
                 },
             )?)
         }
-        domain::Ask::Say { project, task, words, release } => wire::Ask::Say(wire::AskSay::new(
+        domain::Ask::Say { project, task, words } => wire::Ask::Say(wire::AskSay::new(
             limits,
-            wire::AskSayParts { project: *project, task: *task, words: words.clone(), release: *release },
+            wire::AskSayParts { project: *project, task: *task, words: words.clone() },
         )?),
         domain::Ask::AnswerQuestion { project, task, question, words } => {
             wire::Ask::AnswerQuestion(wire::AskAnswerQuestion::new(
@@ -665,8 +665,8 @@ pub fn decode_ask(value: wire::Ask, limits: &wire::Limits) -> Result<domain::Ask
             }
         }
         wire::Ask::Say(value) => {
-            let wire::AskSayParts { project, task, words, release } = value.into_parts();
-            domain::Ask::Say { project, task, words, release }
+            let wire::AskSayParts { project, task, words } = value.into_parts();
+            domain::Ask::Say { project, task, words }
         }
         wire::Ask::AnswerQuestion(value) => {
             let wire::AskAnswerQuestionParts { project, task, question, words } = value.into_parts();

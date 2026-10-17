@@ -270,11 +270,10 @@ pub(super) fn say_request(
     project: u32,
     task: u64,
     words: Box<[u8]>,
-    release: bool,
 ) {
     match core.person_message(
         &env.limits,
-        crate::PersonMessage { request, person, project, task, question: None, release, words, at: env.wall },
+        crate::PersonMessage { request, person, project, task, question: None, words, at: env.wall },
     ) {
         Ok(event) => work.push(Event::Tasks(event)),
         Err(why) => {
@@ -297,16 +296,7 @@ pub(super) fn answer_question_request(
 ) {
     match core.person_message(
         &env.limits,
-        crate::PersonMessage {
-            request,
-            person,
-            project,
-            task,
-            question: Some(question),
-            release: false,
-            words,
-            at: env.wall,
-        },
+        crate::PersonMessage { request, person, project, task, question: Some(question), words, at: env.wall },
     ) {
         Ok(event) => work.push(Event::Tasks(event)),
         Err(why) => {

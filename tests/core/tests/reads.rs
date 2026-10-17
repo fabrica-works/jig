@@ -16,11 +16,7 @@ fn a_read_waits_for_the_commit_in_flight_before_it() {
     let number = world.store.applied + 1;
     world.store.fault(jig_core_world::Fault::Hold { commits: 1 });
     world.cut = Some(Cut::Submitted(number));
-    request(
-        &mut world,
-        1,
-        people::Ask::Say { project: 1, task, words: b"not yet acknowledged".as_slice().into(), release: false },
-    );
+    request(&mut world, 1, people::Ask::Say { project: 1, task, words: b"not yet acknowledged".as_slice().into() });
     assert_eq!(world.reached_cut, Some(Cut::Submitted(number)));
     assert!(world.store.applied < number);
     ask(&mut world, 1, reads::Read::Task { task });

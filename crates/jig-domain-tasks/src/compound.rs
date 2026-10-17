@@ -12,7 +12,7 @@ pub enum Operation {
     Move { task: u64, reason: Box<[u8]> },
     Amend { task: u64, message: u64, stop_run: bool, amendment: Box<Amendment> },
     Release { task: u64, again: Option<bool>, message: Option<u64> },
-    Message { task: u64, word: Word, release: bool },
+    Message { task: u64, word: Word },
     Stop { task: u64 },
 }
 impl Operation {
@@ -294,7 +294,7 @@ fn check(
                 Err(why) => Err(Box::new(Problem::new(Some(task), why))),
             }
         }
-        Operation::Message { task, word, release } => {
+        Operation::Message { task, word } => {
             if word.from != by {
                 return Err(Box::new(Problem::new(Some(task), Refusal::Reference)));
             }
@@ -302,7 +302,7 @@ fn check(
                 domain,
                 staged,
                 env,
-                crate::inbox::Message { project: request.project, number: task, word, release, authorized: true },
+                crate::inbox::Message { project: request.project, number: task, word, authorized: true },
             )?)))
         }
         Operation::Stop { task } => {

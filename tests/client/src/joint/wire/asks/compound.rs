@@ -18,8 +18,8 @@ pub(super) fn ask(project: u32, values: &List<client::Operation>) -> Result<peop
             client::Operation::Move { project, task, reason } => client::Ask::Move { project, task, reason },
         };
         let operation = match super::ask(&ask)? {
-            people::Ask::Say { project: owner, task, words, release } if owner == project => {
-                people::Operation::Message { task, words, release }
+            people::Ask::Say { project: owner, task, words } if owner == project => {
+                people::Operation::Message { task, words }
             }
             people::Ask::Amend { project: owner, task, revision, amendment, release } if owner == project => {
                 people::Operation::Amend { task, revision, amendment: Box::new(amendment), release }

@@ -110,7 +110,7 @@ record OperationCancel { task: u64 reason: bytes 8192 grace: option u64 }
 record OperationMove { task: u64 reason: bytes 8192 }
 record OperationAmend { task: u64 revision: u64 amendment: Amendment release: option u64 }
 record OperationRelease { task: u64 revision: u64 again: option bool }
-record OperationMessage { task: u64 words: bytes 8192 release: bool }
+record OperationMessage { task: u64 words: bytes 8192 }
 record OperationStop { task: u64 }
 enum Operation { cancel: OperationCancel, move_task: OperationMove, amend: boxed OperationAmend, release: OperationRelease, message: OperationMessage, stop: OperationStop }
 record AskCompound { project: u32 operations: list 1024 Operation }
@@ -137,7 +137,7 @@ record AskHandBackPerson { project: u32 task: u64 }
 record AskAnswerPerson { project: u32 task: u64 revision: u64 result: PersonResult }
 record AskMove { project: u32 task: u64 reason: bytes 8192 }
 record AskDecideProposal { project: u32 proposer: Proposer proposal: u64 decision: ProposalDecision }
-record AskSay { project: u32 task: u64 words: bytes 8192 release: bool }
+record AskSay { project: u32 task: u64 words: bytes 8192 }
 record AskAnswerQuestion { project: u32 task: u64 question: u64 words: bytes 8192 }
 record AskPrioritise { project: u32 goals: list 1024 Priority }
 record AskAmend { project: u32 task: u64 revision: u64 amendment: Amendment release: option u64 }
@@ -220,7 +220,7 @@ record OutcomePersonHandedBack { task: u64 }
 record OutcomePersonAnswered { task: u64 }
 record OutcomeMoved { task: u64 }
 record OutcomeProposalDecided { proposer: Proposer proposal: u64 by: u64 at: u64 choice: ProposalChoice }
-record OutcomeSaid { task: u64 message: u64 released: bool }
+record OutcomeSaid { task: u64 message: u64 }
 record OutcomeQuestionAnswered { task: u64 question: u64 message: u64 }
 record OutcomePrioritised { project: u32 }
 record OutcomeAmended { task: u64 released: bool }

@@ -79,7 +79,7 @@ pub enum Ask {
     Say {
         task: Task,
         words: Box<[u8]>,
-        /// The hold revision to release alongside these words.
+        /// A Release of this hold revision, sent with the words in one Compound.
         release: Option<u64>,
     },
     /// Cancel a task, allowing it a grace to finish.
@@ -180,11 +180,10 @@ pub enum Reply {
     },
     /// The numbered request finished.
     Done,
-    /// Words admitted under their numbered message, possibly with the stop lifted.
+    /// Words admitted under their numbered message.
     Said {
         task: u64,
         message: u64,
-        released: bool,
     },
     /// A final refusal retains its facts.
     Refused(Refusal),

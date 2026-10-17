@@ -29,7 +29,7 @@ pub fn ask(value: &client::Ask) -> Result<people::Ask, Invalid> {
             people::Ask::StartChat { project: *project, words: Box::from(words.bytes()) }
         }
         client::Ask::Message { project, task, words } => {
-            people::Ask::Say { project: *project, task: *task, words: Box::from(words.bytes()), release: false }
+            people::Ask::Say { project: *project, task: *task, words: Box::from(words.bytes()) }
         }
         client::Ask::Answer { project, on: client::AnswerOn::Question { task, message, words } } => {
             people::Ask::AnswerQuestion {

@@ -167,7 +167,7 @@ mod tests {
     fn owner_outcomes_keep_independent_messages_counts_seen_positions_and_released_flags_without_inventing_makers() {
         for released in [false, true] {
             assert_eq!(
-                outcome(&people::Outcome::Said { task: u64::MAX, message: 17, released }),
+                outcome(&people::Outcome::Said { task: u64::MAX, message: 17 }),
                 Outcome::Owner(client::OwnerOutcome::Said { task: u64::MAX, message: 17 })
             );
             assert_eq!(

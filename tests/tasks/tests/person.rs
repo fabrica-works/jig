@@ -226,7 +226,6 @@ fn person_stall_news_and_the_result_keep_room_before_ordinary_words() {
             hits: 1,
             eligible: true,
         },
-        release: false,
     });
     assert!(matches!(got, Reply::Refused(tasks::Problem { why: tasks::Refusal::Busy, .. })));
     world.elapse(skein_lib::Duration::from_secs(1));

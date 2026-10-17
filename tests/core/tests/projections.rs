@@ -57,7 +57,7 @@ fn projections_use_project_grants_require_verdicts_and_observe_a_policy_narrowin
             reply_to: ReplyTo::new(Token::new(9100 + u64::from(number))),
             sign_in: world.sign_in.expect("signed in party"),
             key: [number; 16],
-            ask: people::Ask::Say { project: 1, task: goal, words: Box::from(&b"waiting words"[..]), release: false },
+            ask: people::Ask::Say { project: 1, task: goal, words: Box::from(&b"waiting words"[..]) },
         })));
     }
     world.send(root::Event::ProjectionEffect { goal, number: 1, effect: World::effect() });
@@ -414,7 +414,7 @@ fn an_untracked_goal_is_fed_its_state_once_as_its_last_feed() {
     jig_core_world::stories::reads::request(
         &mut world,
         93,
-        people::Ask::Say { project: 1, task: goal, words: b"still live".as_slice().into(), release: false },
+        people::Ask::Say { project: 1, task: goal, words: b"still live".as_slice().into() },
     );
     assert_eq!(world.projections.len(), 2, "later decisions and restart send no further feed");
 }

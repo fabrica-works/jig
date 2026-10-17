@@ -152,7 +152,6 @@ fn a_delegates_question_marks_a_query_listing_its_parent() {
         tasks::Event::Message {
             reply_to: ReplyTo::new(Token::new(REPLY)),
             project: 1,
-            release: false,
             task: CHILD,
             word: tasks::Word {
                 number: QUESTION,

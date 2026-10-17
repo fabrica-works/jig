@@ -82,9 +82,7 @@ pub(super) fn encode_outcome(value: &domain::Outcome, limits: &wire::Limits) -> 
         domain::Outcome::ProposalDecided { proposer, proposal, by, at, choice } => {
             wire::Outcome::ProposalDecided(encode_proposal_decided(proposer, *proposal, *by, *at, *choice, limits)?)
         }
-        domain::Outcome::Said { task, message, released } => {
-            wire::Outcome::Said(encode_said(*task, *message, *released, limits)?)
-        }
+        domain::Outcome::Said { task, message } => wire::Outcome::Said(encode_said(*task, *message, limits)?),
         domain::Outcome::QuestionAnswered { task, question, message } => {
             wire::Outcome::QuestionAnswered(encode_question_answered(*task, *question, *message, limits)?)
         }
@@ -195,8 +193,8 @@ pub(super) fn decode_outcome(value: wire::Outcome) -> domain::Outcome {
         }
         wire::Outcome::ProposalDecided(value) => decode_proposal_decided(value),
         wire::Outcome::Said(value) => {
-            let wire::OutcomeSaidParts { task, message, released } = value.into_parts();
-            domain::Outcome::Said { task, message, released }
+            let wire::OutcomeSaidParts { task, message } = value.into_parts();
+            domain::Outcome::Said { task, message }
         }
         wire::Outcome::QuestionAnswered(value) => decode_question_answered(value),
         wire::Outcome::Prioritised(value) => {
@@ -312,13 +310,8 @@ fn decode_question_answered(value: wire::OutcomeQuestionAnswered) -> domain::Out
     let wire::OutcomeQuestionAnsweredParts { task, question, message } = value.into_parts();
     domain::Outcome::QuestionAnswered { task, question, message }
 }
-fn encode_said(
-    task: u64,
-    message: u64,
-    released: bool,
-    limits: &wire::Limits,
-) -> Result<wire::OutcomeSaid, wire::Problem> {
-    wire::OutcomeSaid::new(limits, wire::OutcomeSaidParts { task, message, released })
+fn encode_said(task: u64, message: u64, limits: &wire::Limits) -> Result<wire::OutcomeSaid, wire::Problem> {
+    wire::OutcomeSaid::new(limits, wire::OutcomeSaidParts { task, message })
 }
 
 fn marked_seen(seen: &domain::Seen, limits: &wire::Limits) -> Result<wire::OutcomeMarkedSeen, wire::Problem> {

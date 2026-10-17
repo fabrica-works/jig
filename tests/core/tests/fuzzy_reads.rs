@@ -25,7 +25,7 @@ fn seeded_reads_wait_for_prior_commits_and_keep_receipts_across_restart_cuts() {
                 reply_to: ReplyTo::new(Token::new(30_001)),
                 sign_in: world.sign_in.expect("signed in"),
                 key: [1; 16],
-                ask: people::Ask::Say { project: 1, task, words: b"before the cut".as_slice().into(), release: false },
+                ask: people::Ask::Say { project: 1, task, words: b"before the cut".as_slice().into() },
             })));
             ask(&mut world, 1, reads::Read::Task { task });
             assert!(world.reads.as_ref().expect("party").receipts.is_empty());

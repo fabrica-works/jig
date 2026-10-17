@@ -16,6 +16,10 @@ use crate::{
 use alloc::{boxed::Box, collections::BTreeMap};
 use skein_lib::{Duration, Env, Queue, ReplyTo, Time, Token, Wall};
 
+const STOPPED_TASK: u64 = 1;
+const REQUESTER: u64 = 9;
+const CONTINUE_MESSAGE: u64 = 1;
+
 const RETRY: Retry = Retry { retries: 2, base: Duration::from_millis(10), max: Duration::from_secs(1) };
 
 pub(super) const LIMITS: Limits = Limits {
@@ -448,7 +452,6 @@ fn write(test: &mut Harness, number: u64, message: u64) {
             hits: 1,
             eligible: true,
         },
-        release: false,
     });
 }
 
@@ -577,47 +580,6 @@ fn activity_keeps_each_news_admission_before_the_unread_hints_merge() {
 }
 
 #[test]
-fn words_and_a_stop_release_preflight_together() {
-    let mut test = Harness::new();
-    test.make(vec![task(1, &[])]);
-    test.send(Event::Hold { task: 1, why: Hold::StoppedBy { party: 9 } });
-    let word = crate::Word {
-        number: 1,
-        from: Party::Person(9),
-        kind: MessageKind::Words,
-        words: Box::new([1]),
-        at: Wall::EPOCH,
-        hits: 1,
-        eligible: false,
-    };
-    let out = test.send(Event::Message { reply_to: to(), project: 1, task: 1, word: word.clone(), release: true });
-    assert!(out.iter().any(|request| match request {
-        Request::Sent { released: true, .. } => true,
-        _ => false,
-    }));
-    assert!(!match test.domain.task(1).unwrap().phase {
-        crate::Phase::Held { .. } => true,
-        _ => false,
-    });
-    test.send(Event::Hold { task: 1, why: Hold::Budget });
-    let out = test.send(Event::Message {
-        reply_to: to(),
-        project: 1,
-        task: 1,
-        word: crate::Word { number: 2, ..word },
-        release: true,
-    });
-    assert!(out.iter().any(|request| match request {
-        Request::Sent { released: false, .. } => true,
-        _ => false,
-    }));
-    assert!(match test.domain.task(1).unwrap().phase {
-        crate::Phase::Held { why: Hold::Budget, .. } => true,
-        _ => false,
-    });
-}
-
-#[test]
 fn an_uncertain_release_needs_exactly_one_repeat_choice() {
     let mut test = Harness::new();
     test.make(vec![task(1, &[])]);
@@ -654,23 +616,25 @@ fn words_release_a_stop_before_its_cancelled_run_answers() {
     test.send(Event::Claim { reply_to: to(), task: 1, attempt: 1, resumed: false, budget: 10, writes: Box::new([]) });
     test.send(Event::Started { task: 1, attempt: 1 });
     test.send(Event::Hold { task: 1, why: Hold::StoppedBy { party: 9 } });
-    let out = test.send(Event::Message {
-        reply_to: to(),
-        project: 1,
-        task: 1,
-        word: crate::Word {
-            number: 1,
-            from: Party::Person(9),
-            kind: MessageKind::Words,
-            words: Box::new([1]),
-            at: Wall::EPOCH,
-            hits: 1,
-            eligible: false,
-        },
-        release: true,
-    });
+    let word = crate::Word {
+        number: CONTINUE_MESSAGE,
+        from: Party::Person(REQUESTER),
+        kind: MessageKind::Words,
+        words: Box::new([1]),
+        at: Wall::EPOCH,
+        hits: 1,
+        eligible: false,
+    };
+    let out = compound::compound(
+        &mut test,
+        vec![
+            crate::Operation::Message { task: STOPPED_TASK, word },
+            crate::Operation::Release { task: STOPPED_TASK, again: None, message: None },
+        ],
+        10_000,
+    );
     assert!(out.iter().any(|request| match request {
-        Request::Sent { released: true, .. } => true,
+        Request::Done { .. } => true,
         _ => false,
     }));
     assert!(match test.domain.task(1).unwrap().phase {
@@ -864,7 +828,6 @@ fn pending_task_proposal_room_keeps_original_action_and_excludes_wrong_project()
         reply_to: to(),
         project: 1,
         task: 1,
-        release: false,
         word: crate::Word {
             number: 9,
             from: Party::Person(9),

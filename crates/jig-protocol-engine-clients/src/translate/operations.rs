@@ -126,7 +126,7 @@ fn operation_to_people(value: w::Operation, project: u32, limits: &w::Limits) ->
     Ok(match value {
         w::Operation::Message(v) => {
             let v = v.into_parts();
-            p::Operation::Message { task: v.task, words: v.words, release: false }
+            p::Operation::Message { task: v.task, words: v.words }
         }
         w::Operation::Amend(v) => {
             let v = v.into_parts();

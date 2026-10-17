@@ -32,12 +32,10 @@ pub(super) fn encode(
                     wire::OperationReleaseParts { task: *task, revision: *revision, again: *again },
                 )?)
             }
-            domain::Operation::Message { task, words, release } => {
-                wire::Operation::Message(wire::OperationMessage::new(
-                    limits,
-                    wire::OperationMessageParts { task: *task, words: words.clone(), release: *release },
-                )?)
-            }
+            domain::Operation::Message { task, words } => wire::Operation::Message(wire::OperationMessage::new(
+                limits,
+                wire::OperationMessageParts { task: *task, words: words.clone() },
+            )?),
             domain::Operation::Stop { task } => {
                 wire::Operation::Stop(wire::OperationStop::new(limits, wire::OperationStopParts { task: *task })?)
             }
@@ -75,8 +73,8 @@ pub(super) fn decode(
                 domain::Operation::Release { task, revision, again }
             }
             wire::Operation::Message(value) => {
-                let wire::OperationMessageParts { task, words, release } = value.into_parts();
-                domain::Operation::Message { task, words, release }
+                let wire::OperationMessageParts { task, words } = value.into_parts();
+                domain::Operation::Message { task, words }
             }
             wire::Operation::Stop(value) => {
                 let wire::OperationStopParts { task } = value.into_parts();

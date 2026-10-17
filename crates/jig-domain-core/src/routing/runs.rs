@@ -462,7 +462,6 @@ pub(super) fn named_action(
                     hits: 1,
                     eligible: false,
                 },
-                release: false,
             }));
         }
         NamedAction::Introduce { left, right } => {

@@ -201,7 +201,7 @@ fn check(
             amendment.release = release;
             Ok(tasks::Operation::Amend { task, message: 0, stop_run, amendment: Box::new(amendment) })
         }
-        people::Operation::Message { words, release, .. } => {
+        people::Operation::Message { words, .. } => {
             crate::acts::write_in(core, &env.limits, route.person, task, admission)?;
             Ok(tasks::Operation::Message {
                 task,
@@ -214,7 +214,6 @@ fn check(
                     hits: 1,
                     eligible: false,
                 },
-                release,
             })
         }
     }

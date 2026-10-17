@@ -10,7 +10,7 @@ pub enum Operation {
     Move { task: u64, reason: Box<[u8]> },
     Amend { task: u64, revision: u64, amendment: Box<Amendment>, release: Option<u64> },
     Release { task: u64, revision: u64, again: Option<bool> },
-    Message { task: u64, words: Box<[u8]>, release: bool },
+    Message { task: u64, words: Box<[u8]> },
     Stop { task: u64 },
 }
 impl Operation {
@@ -24,7 +24,7 @@ impl Operation {
                 Ask::Amend { project, task, revision, amendment: *amendment, release }
             }
             Self::Release { task, revision, again } => Ask::Release { project, task, revision, again },
-            Self::Message { task, words, release } => Ask::Say { project, task, words, release },
+            Self::Message { task, words } => Ask::Say { project, task, words },
             Self::Stop { task } => Ask::Stop { project, task },
         }
     }

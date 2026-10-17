@@ -210,7 +210,7 @@ fn room_staged(
         && total_bytes <= usize::try_from(limits.inbox_bytes).expect("u32 fits usize")
 }
 
-#[expect(clippy::too_many_arguments, reason = "one message entrance carries its atomic release choice")]
+#[expect(clippy::too_many_arguments, reason = "one message entrance carries its addressed word and authorization")]
 pub(crate) fn message(
     domain: &mut Domain,
     env: &Env<Limits>,
@@ -218,19 +218,13 @@ pub(crate) fn message(
     project: u32,
     number: u64,
     word: Word,
-    release: bool,
     authorized: bool,
     out: &mut Queue<Request>,
 ) {
-    match check_message(
-        domain,
-        &crate::compound::Staged::new(0),
-        env,
-        Message { project, number, word, release, authorized },
-    ) {
+    match check_message(domain, &crate::compound::Staged::new(0), env, Message { project, number, word, authorized }) {
         Ok(plan) => {
-            let (task, word, released) = apply_message(domain, env, plan, out);
-            out.push(Request::Sent { reply_to: to, task, word, released });
+            let (task, word) = apply_message(domain, env, plan, out);
+            out.push(Request::Sent { reply_to: to, task, word });
         }
         Err(problem) => crate::capacity::refused(domain, env, to, *problem, out),
     }
@@ -240,7 +234,6 @@ pub(crate) struct Message {
     pub project: u32,
     pub number: u64,
     pub word: Word,
-    pub release: bool,
     pub authorized: bool,
 }
 
@@ -248,8 +241,6 @@ pub(crate) struct MessagePlan {
     pub(crate) number: u64,
     pub(crate) prepared: Prepared,
     pub(crate) answer: Option<u64>,
-    pub(crate) released: bool,
-    pub(crate) release: Option<crate::control::ReleasePlan>,
 }
 
 #[expect(clippy::too_many_lines, reason = "one inbox entrance preflights message and answer credits before mutation")]
@@ -259,7 +250,7 @@ pub(crate) fn check_message(
     env: &Env<Limits>,
     message: Message,
 ) -> Result<MessagePlan, Box<crate::Problem>> {
-    let Message { project, number, word, release, authorized } = message;
+    let Message { project, number, word, authorized } = message;
     if !domain.ready() {
         return Err(Box::new(crate::Problem {
             task: Some(number),
@@ -393,22 +384,6 @@ pub(crate) fn check_message(
             unreachable!("root hints have reserved entrances")
         }
     };
-    let released = release
-        && match word.from {
-            Party::Person(person) => match task.phase {
-                Phase::Held { why: crate::Hold::StoppedBy { party }, .. } => party == person,
-                Phase::Held { .. } | Phase::Waiting | Phase::Active(_) | Phase::Closing(_) | Phase::Ended(_) => false,
-            },
-            Party::Task(_) | Party::Deployment { .. } => false,
-        };
-    if released && task.revision == u64::MAX {
-        return Err(Box::new(crate::Problem {
-            task: Some(number),
-            why: Refusal::State,
-            blocked_by: None,
-            capacity: None,
-        }));
-    }
     let admission = match answer {
         Some(_) => Admission::RoomKept,
         None => Admission::Refusable,
@@ -448,15 +423,7 @@ pub(crate) fn check_message(
             }));
         }
     }
-    let release = if released {
-        Some(
-            crate::control::check_release(domain, staged, env, number, prepared.word.from, None, None)
-                .expect("release preflight before words"),
-        )
-    } else {
-        None
-    };
-    Ok(MessagePlan { number, prepared, answer, released, release })
+    Ok(MessagePlan { number, prepared, answer })
 }
 
 pub(crate) fn apply_message(
@@ -464,8 +431,8 @@ pub(crate) fn apply_message(
     env: &Env<Limits>,
     plan: MessagePlan,
     out: &mut Queue<Request>,
-) -> (u64, Word, bool) {
-    let MessagePlan { number, prepared, answer, released, release } = plan;
+) -> (u64, Word) {
+    let MessagePlan { number, prepared, answer } = plan;
     let sender = prepared.word.from;
     let task = task_mut(domain, number).expect("admitted task still live");
     task.record.last_activity = env.wall;
@@ -483,11 +450,7 @@ pub(crate) fn apply_message(
         let heard = crate::AnswerLine { task: number, position: task.record.activity };
         crate::positions::sent_answer(domain, env, sender, question, heard, out);
     }
-    if let Some(release) = release {
-        crate::control::apply_release(domain, env, sender, release, out);
-    } else {
-        publish(domain, env, number, out);
-    }
+    publish(domain, env, number, out);
     if prepared.word.kind == MessageKind::Question {
         let source = match prepared.word.from {
             Party::Task(source) => source,
@@ -503,7 +466,7 @@ pub(crate) fn apply_message(
         publish(domain, env, source, out);
     }
     crate::wake::after_message(domain, env, number, prepared.previous, prepared.word.clone(), out);
-    (number, prepared.word, released)
+    (number, prepared.word)
 }
 
 /// Root's same-decision result handoff after a delegate settled. Its reserved
@@ -665,7 +628,7 @@ pub(crate) fn preview_message(
         domain,
         &crate::compound::Staged::new(0),
         env,
-        Message { project, number, word, release: false, authorized: false },
+        Message { project, number, word, authorized: false },
     ) {
         Ok(plan) => plan,
         Err(problem) => return Err(*problem),

@@ -281,16 +281,30 @@ pub(crate) fn party_event(up: parties::Up) -> core::Event {
             sign_in,
             project,
             key,
-            ask: parties::Ask::Say { task: parties::Task::Number(task), words, release: None },
+            ask: parties::Ask::Say { task: parties::Task::Number(task), words, release },
         } => core::Event::People(people::Event::Ask {
             reply_to: ReplyTo::new(Token::new(to)),
             sign_in,
             key,
-            ask: people::Ask::Say { project, task, words, release: false },
+            ask: party_words(project, task, words, release),
         }),
         parties::Up::Request { ask, .. } => panic!("channel script requested {ask:?}"),
     }
 }
+fn party_words(project: u32, task: u64, words: Box<[u8]>, release: Option<u64>) -> people::Ask {
+    match release {
+        Some(revision) => {
+            let mut operations = skein_lib::List::with_capacity(2);
+            operations.push(people::Operation::Message { task, words }).expect("two word and release operations");
+            operations
+                .push(people::Operation::Release { task, revision, again: None })
+                .expect("two word and release operations");
+            people::Ask::Compound { project, operations }
+        }
+        None => people::Ask::Say { project, task, words },
+    }
+}
+
 pub(crate) fn answer_parties(engine: &mut jig_test_service::Engine, party: &mut parties::Party, views: &mut Views) {
     while let Some(output) = engine.parties_out().pop() {
         match output {
@@ -298,8 +312,8 @@ pub(crate) fn answer_parties(engine: &mut jig_test_service::Engine, party: &mut 
                 let reply = match reply {
                     people::Reply::SignedIn { person, sign_in, .. } => parties::Reply::SignedIn { person, sign_in },
                     people::Reply::Outcome(people::Outcome::Started { task }) => parties::Reply::Started { task },
-                    people::Reply::Outcome(people::Outcome::Said { task, message, released }) => {
-                        parties::Reply::Said { task, message, released }
+                    people::Reply::Outcome(people::Outcome::Said { task, message }) => {
+                        parties::Reply::Said { task, message }
                     }
                     people::Reply::Again(reason) => parties::Reply::Again(match reason {
                         people::Again::Busy => parties::Again::Busy,
