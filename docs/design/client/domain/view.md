@@ -814,10 +814,13 @@ What of the reference UI is not a tree: where the person is, what the
 page holds, the requests it sent, what the person is in the middle of,
 and its notices. It is step code under the subset, as the client is
 (programming-model.md, section 3), with its own limits, worst case and
-stories (18.9, 18.10). It keeps no document of its own: it reads each
-from the client, by its handles, when the client reports it changed. It
-decides nothing the engine or the client decides: what is made, when,
-and once, is theirs.
+stories (18.9, 18.10). It keeps no copy of a watch's document: it reads
+each from the client, by its handles, when the client reports it
+changed. A read's page, which the client hands over once, in the read's
+terminal, and keeps no copy of (client.md, 7), the reference UI keeps
+until the page that read it is left or the handle's next page replaces
+it (18.3). It decides nothing the engine or the client decides: what is
+made, when, and once, is theirs.
 
 ### 18.1 Its surface
 
@@ -888,11 +891,12 @@ read by the application: ui.sections(), ui.shown()
   bounds a draft is compared with, and the party whose work is kept
   come from it (contract.md, 5.1).
 - **Going to a page** closes the old page's watches (`Unwatch`), forgets
-  its reads, tells the application its parts have left (`PartsLeft`),
-  drops from the working set every object no request in flight is about
-  (18.3), then opens the new page's watches and reads (pages.md, 12.5),
-  and asks for its place to be shown (`Show`). Requests in flight, `me`,
-  drafts and notices carry over.
+  its reads and the pages they were handed (18.3), tells the application
+  its parts have left (`PartsLeft`), drops from the working set every
+  object no request in flight is about (18.3), then opens the new
+  page's watches and reads (pages.md, 12.5), and asks for its place to
+  be shown (`Show`). Requests in flight, `me`, drafts and notices carry
+  over.
 - **Handles, not generations.** Each watch and read a page opens has a
   handle of the reference UI's; what the client tells of a handle the
   page does not hold is dropped. The client drops what comes for a watch
@@ -924,8 +928,21 @@ read by the application: ui.sections(), ui.shown()
 - **Read from the client's documents.** Its facts are the documents the
   client holds for the page's handles (`client.document(handle)`), read
   each time the client reports one changed. The working set keeps only
-  what no document holds: which handles name each object, its card's
-  state, and, for a leaving object, how it ended.
+  what no document of the client's holds: which handles name each
+  object, its card's state, for a leaving object, how it ended, and the
+  pages its reads were handed.
+- **A read's page is kept by the page that read it.** A read has one
+  terminal, `Page { handle, page }`, and the client keeps nothing of it
+  once it is told (client.md, 7: "A read is one attempt ...: the
+  application reads again if it wants"). The page keeps what the read is
+  handed, under the read's handle: a project's settings, a page of a
+  task's history or activity, an object's document read to say how it
+  ended. A read's handle keeps one page; a window's keeps the rows its
+  pages put in the window (client.md, 7: "Keeping rows across pages, as
+  a list slides while a person scrolls, is the presentation's"). What it
+  keeps goes when the page is left (18.2), or when a read on the same
+  handle is answered with a page, which replaces it; a read answered
+  with none leaves it, and the page shows why, as 18.2 says.
 - **Sources, not reference counts.** Each object records which of the
   page's handles name it. Each change stands for the whole of what its
   handle names: an object no handle names leaves, unless a request about
@@ -1132,10 +1149,12 @@ read by the application: ui.sections(), ui.shown()
 Each is configured and part of its worst case:
 
 - objects in a page's working set; rows per window; turns a
-  conversation's window holds; nodes of a plan held;
+  conversation's window holds; nodes of a plan held; the pages its reads
+  were handed that it keeps (18.3), one per read handle, each priced at
+  the client's bytes of a page handed over (client.md, 14);
 - its handles (watches open, `me`'s included, and reads in flight) and
   intents kept;
-- these, and the objects and windows above, counted for the most
+- these, and the objects, windows and pages above, counted for the most
   sections a page may show together: at a place of jig's, its own with
   the arrangement's beside them; on an application's page, every
   section of one task, one project and one inbox filter, with the
