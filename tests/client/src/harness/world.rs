@@ -630,7 +630,9 @@ impl<A: App, F: Front<A>> World<A, F> {
                 c.model.apply(patch);
             }
             c.model.check(A::tree(&c.view));
-            if let Some(node) = old_nodes.into_iter().find(|node| A::tree(&c.view).find(*node).is_none()) {
+            let mut current: Vec<_> = A::tree(&c.view).nodes().iter().map(|node| node.id).collect();
+            current.sort_unstable();
+            if let Some(node) = old_nodes.into_iter().find(|node| current.binary_search(node).is_err()) {
                 self.last_removed = Some((id, node));
             }
             let mut seen = A::seen(A::tree(&c.view));

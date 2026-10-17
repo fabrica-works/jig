@@ -28,15 +28,13 @@ pub fn owner_limits() -> jig_test_domain::Limits {
 pub fn journal(mut limits: jig_test_domain::Limits) -> jig_test_domain::Limits {
     let room = jig_domain_core::room_max(&limits.core).expect("whole core room");
     let connectors = jig_test_connector::MAX_OUT.checked_mul(2).expect("two connector routes");
-    limits.journal.writes =
-        limits.journal.writes.max(2000).max(room.writes.checked_add(connectors).expect("whole writes"));
-    limits.journal.held = limits.journal.held.max(2000).max(
-        room.held
-            .checked_add(connectors)
-            .expect("whole held")
-            .checked_mul(limits.journal.commits)
-            .expect("bounded flights"),
-    );
+    limits.journal.writes = room.writes.checked_add(connectors).expect("whole writes");
+    limits.journal.held = room
+        .held
+        .checked_add(connectors)
+        .expect("whole held")
+        .checked_mul(limits.journal.commits)
+        .expect("bounded flights");
     limits
 }
 #[must_use]

@@ -17,6 +17,11 @@ struct Checked {
     response: bool,
     events: usize,
 }
+#[derive(Default)]
+struct Room {
+    shell: bool,
+    engine: bool,
+}
 struct Socket {
     client: ClientId,
     conn: Conn,
@@ -34,6 +39,7 @@ struct Socket {
     closed: bool,
     fail: bool,
     upload_limit: Option<usize>,
+    room: Room,
 }
 pub struct Net {
     sockets: BTreeMap<Token, Socket>,
@@ -64,6 +70,22 @@ impl Net {
             cuts: 0,
             offline: None,
         }
+    }
+    /// Whether another seeded wire attempt can transfer bytes, room or EOF.
+    /// Idle read demands consume no RNG draws, so skipping those attempts
+    /// retains the exact fragment and room schedule of subsequent traffic.
+    #[must_use]
+    pub fn pending(&self) -> bool {
+        self.offline.is_none()
+            && self.sockets.values().any(|socket| {
+                !socket.broken
+                    && (socket.shell.received.len() != socket.request.len()
+                        || socket.engine.received.len() != socket.response.len()
+                        || socket.room.shell
+                        || (!socket.closed && socket.room.engine)
+                        || (socket.shell.eof && !socket.shell.ended)
+                        || (!socket.closed && socket.engine.eof && !socket.engine.ended))
+            })
     }
     pub fn clock(&mut self, now: Time) {
         self.now = now;
@@ -145,12 +167,14 @@ impl Net {
                     closed: false,
                     fail: false,
                     upload_limit: None,
+                    room: Room::default(),
                 },
             );
             Some(Event::Accepted { owner: self.listener, socket, peer: crate::fixtures::address() })
         };
         let socket = self.sockets.get_mut(&self.names[&(client, conn)]).expect("named socket");
         if !socket.broken {
+            socket.room.shell = room(&down, socket.room.shell);
             socket.shell.take(down);
         }
         event
@@ -168,6 +192,7 @@ impl Net {
             Request::Stream { stream, down } => {
                 let socket = self.sockets.get_mut(&stream).expect("bound socket");
                 if !socket.broken {
+                    socket.room.engine = room(&down, socket.room.engine);
                     socket.engine.take(down);
                 }
                 None
@@ -244,6 +269,7 @@ impl Net {
             // complete line. That is progress even without a callback.
             changed |= socket.shell.trace.len() != shell_progress;
             if let Some(up) = shell_up {
+                socket.room.shell = false;
                 if let Up::Bytes(bytes) = &up {
                     socket.response.extend_from_slice(bytes);
                     record_changed = true;
@@ -264,6 +290,7 @@ impl Net {
                     socket.request.extend_from_slice(bytes);
                     record_changed = true;
                 }
+                socket.room.engine = false;
                 events.push(Event::Stream { owner, up });
                 changed = true;
             }
@@ -321,5 +348,12 @@ fn check(socket: &mut Socket, rules: &mut Rules) {
             panic!("response {path:?} lengths {}/{} tag {:?}: {error:?}", encoded.len(), actual.len(), actual.first())
         });
         socket.checked.response = true;
+    }
+}
+
+fn room(down: &Down, pending: bool) -> bool {
+    match down {
+        Down::Demand { room, .. } => *room > 0,
+        Down::Send(_) | Down::Finish => pending,
     }
 }

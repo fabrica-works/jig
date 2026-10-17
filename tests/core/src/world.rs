@@ -13,8 +13,13 @@ use skein_lib::{Duration, Env, JournalLimits, Queue, ReplyTo, Time, Token, Wall}
 use std::collections::VecDeque;
 
 #[must_use]
-#[expect(clippy::too_many_lines, reason = "the walking fixture states every child bound")]
 pub fn limits() -> root::Limits {
+    static LIMITS: std::sync::OnceLock<root::Limits> = std::sync::OnceLock::new();
+    *LIMITS.get_or_init(profile)
+}
+
+#[expect(clippy::too_many_lines, reason = "the walking fixture states every child bound")]
+fn profile() -> root::Limits {
     let retry = tasks::Retry { retries: 1, base: Duration::from_millis(10), max: Duration::from_secs(1) };
     let tasks = tasks::Limits {
         tasks: 2,

@@ -35,7 +35,7 @@ const ENGINE: &[u8] = br#"{
 "fleet.attempts":1,"fleet.calls":1,"fleet.turns":8,
 "brief.briefs":1,"brief.sections":1,
 "notes.entries_per_scope":1,"views.runs":1,"views.watchers":2,"views.watchers_per_party":2,
-"core.load_slots":1
+"core.load_slots":1,"core.load_bytes":8192,"core.resume_bytes":4096,"core.run_bytes":4096,"views.text_bytes":1024
 ,"core.templates":2,"documents.rows":1,"documents.lines":1,"documents.chips":1,"documents.text_bytes":128
 }},
 "llm": {

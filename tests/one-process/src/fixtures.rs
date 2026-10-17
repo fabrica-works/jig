@@ -30,9 +30,12 @@ fn engine_document() -> String {
         .replace(r#""application":{"credential""#, r#""application":{"workers":[{"root":"agent-root"}],"credential""#)
         .replace(r#""people.sign_ins":1"#, r#""people.sign_ins":2"#)
         .replace(r#""people.projects":1"#, r#""people.projects":1,"authority.projects":1"#)
-        .replace(r#""core.load_slots":1"#, r#""core.load_slots":1,"core.load_bytes":8192,"core.resume_bytes":4096,"core.run_bytes":4096,"views.text_bytes":1024"#)
 }
 pub(crate) fn store_limits() -> jig_test_service::limits::Limits {
+    static LIMITS: std::sync::OnceLock<jig_test_service::limits::Limits> = std::sync::OnceLock::new();
+    *LIMITS.get_or_init(profile)
+}
+fn profile() -> jig_test_service::limits::Limits {
     let bytes = engine_document();
     let size = u32::try_from(bytes.len()).expect("fixture document size");
     let bounds = jig_protocol_config::DocumentLimits { bytes: size, tokens: size, depth: 32 };

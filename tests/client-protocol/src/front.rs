@@ -191,7 +191,7 @@ impl Protocol {
                 self.up(client, conn, now, up);
             }
             quiet = if active { 0 } else { quiet + 1 };
-            if quiet == 32 {
+            if quiet == 32 || (!active && self.engine.out.is_empty() && !self.net.pending()) {
                 return;
             }
         }

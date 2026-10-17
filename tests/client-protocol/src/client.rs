@@ -524,7 +524,7 @@ impl Story {
             }
             self.seen.extend(self.engine.observed());
             quiet = if active { 0 } else { quiet + 1 };
-            if quiet == 32 {
+            if quiet == 32 || (!active && self.engine.out.is_empty() && !self.net.pending()) {
                 return;
             }
         }

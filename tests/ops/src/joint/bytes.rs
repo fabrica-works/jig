@@ -373,7 +373,7 @@ impl Bytes {
                 side.connections.up(now, conn, up, &mut side.up, &mut side.down);
             }
             quiet = if active { 0 } else { quiet + 1 };
-            if quiet == 32 {
+            if quiet == 32 || (!active && self.out.is_empty() && !joint.work && !self.net.pending()) {
                 return callbacks;
             }
         }

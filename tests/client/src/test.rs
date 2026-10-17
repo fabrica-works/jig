@@ -14,6 +14,8 @@ use std::{
 };
 /// The test application’s client root and view adapter.
 pub struct Test;
+// Keep the story's before/after-linger transition within one heartbeat.
+const LINGER: Duration = Duration::from_millis(25);
 /// Returns the small focused-world capacities.
 #[must_use]
 pub fn limits() -> jig_client_test_domain::Limits {
@@ -22,7 +24,7 @@ pub fn limits() -> jig_client_test_domain::Limits {
             watches: 8,
             notices: 2,
             notice_life: Duration::from_secs(5),
-            linger: Duration::from_secs(5),
+            linger: LINGER,
             save_delay: Duration::from_millis(10),
             intents: 2,
             fields: 4,
@@ -142,7 +144,7 @@ fn fixture_with(limits: &domain::Limits, arranged: bool) -> &'static Fixture {
         return fixture;
     }
     let books = phrasebooks(limits);
-    let bounds = view::Limits::for_world(limits, &books.0, &books.1, if arranged { 2048 } else { 1024 }, 256)
+    let bounds = view::Limits::for_world(limits, &books.0, &books.1, if arranged { 1024 } else { 512 }, 256)
         .expect("view bounds fit");
     let worst_case = domain::worst_case(limits).expect("root worst case")
         // The shell model is bounded by another renderer envelope.
