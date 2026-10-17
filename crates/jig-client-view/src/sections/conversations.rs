@@ -2,6 +2,8 @@
 use crate::phrases::jig::JigPhrase;
 use crate::words::Words;
 use crate::{JigBindings, Owner, cards};
+use jig_client::contract::Phase;
+use jig_client::words::{StatusWord, Word};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Key, Role, Run, State};
 
@@ -156,7 +158,7 @@ pub(crate) fn runtime(
     match runtime {
         Runtime::Active(value) => crate::runtime::active(b, value, words),
         Runtime::Waiting { dependencies, hold } => {
-            words.text(b, JigPhrase::Waiting, &[]);
+            words.text(b, JigPhrase::Word(Word::Phase(Phase::Waiting)), &[]);
             for task in dependencies {
                 words.text(b, JigPhrase::ContextTask, &[Hole::Number(*task)]);
             }
@@ -165,10 +167,10 @@ pub(crate) fn runtime(
             }
         }
         Runtime::Idle => {
-            words.text(b, JigPhrase::Idle, &[]);
-            words.text(b, JigPhrase::ParkedResume, &[]);
+            words.text(b, JigPhrase::Word(Word::Phase(Phase::Idle)), &[]);
+            words.text(b, JigPhrase::Word(Word::Status(StatusWord::Parked)), &[]);
         }
-        Runtime::Starting => words.text(b, JigPhrase::TaskStarting, &[]),
+        Runtime::Starting => words.text(b, JigPhrase::Word(Word::Status(StatusWord::Starting)), &[]),
         Runtime::Running { tool, since, .. } => {
             words.text(
                 b,
@@ -178,11 +180,13 @@ pub(crate) fn runtime(
                 ))],
             );
             match tool {
-                Some(tool) => words.text(b, JigPhrase::Tool, &[crate::words::name(tool.bytes())]),
-                None => words.text(b, JigPhrase::Writing, &[]),
+                Some(tool) => {
+                    words.text(b, JigPhrase::Word(Word::Status(StatusWord::Tool)), &[crate::words::name(tool.bytes())]);
+                }
+                None => words.text(b, JigPhrase::Word(Word::Status(StatusWord::Writing)), &[]),
             }
         }
-        Runtime::WaitingForWords { .. } => words.text(b, JigPhrase::WaitingWords, &[]),
+        Runtime::WaitingForWords { .. } => words.text(b, JigPhrase::Word(Word::Status(StatusWord::WaitingForYou)), &[]),
         Runtime::BackingOff { at, attempt, tries, class, reason } => {
             words.text(
                 b,
@@ -196,12 +200,12 @@ pub(crate) fn runtime(
         Runtime::Person { addressed, .. } => cards::common::recipient(b, addressed, words),
         Runtime::Closing(closing) => cards::common::closing(b, closing, words, bindings),
         Runtime::Held { was } => {
-            words.text(b, JigPhrase::Held, &[]);
+            words.text(b, JigPhrase::Word(Word::Phase(Phase::Held)), &[]);
             if let Some(was) = was {
                 crate::runtime::prior(b, was, words, bindings);
             }
         }
-        Runtime::Ended => words.text(b, JigPhrase::Ended, &[]),
+        Runtime::Ended => words.text(b, JigPhrase::Word(Word::Phase(Phase::Ended)), &[]),
     }
 }
 

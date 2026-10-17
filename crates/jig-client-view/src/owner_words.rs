@@ -6,8 +6,9 @@ use skein_ui::phrases::{Language, PhraseShape, Phrasebook};
 
 #[must_use]
 pub fn phrase_count() -> u32 {
-    u32::try_from(crate::phrases::jig::ALL.len())
-        .expect("normal phrase count fits")
+    jig_client::words::PHRASES
+        .checked_add(u32::try_from(crate::phrases::jig::ALL.len()).expect("view count fits"))
+        .expect("composed count fits")
         .checked_add(u32::try_from(crate::owner_authority_words::ALL.len()).expect("authority phrase count fits"))
         .expect("composed phrase count fits")
         .checked_add(u32::try_from(crate::owner_wake_words::ALL.len()).expect("wake phrase count fits"))
@@ -53,8 +54,11 @@ pub fn phrase_count() -> u32 {
 }
 
 #[must_use]
-pub fn shapes(normal: Box<[PhraseShape]>) -> Box<[PhraseShape]> {
+pub fn shapes(normal: Box<[PhraseShape]>, text: u32) -> Box<[PhraseShape]> {
     let mut result = List::with_capacity(phrase_count());
+    for shape in jig_client::words::phrase_shapes(text) {
+        result.push(shape).expect("public word shapes fit");
+    }
     for shape in normal {
         result.push(shape).expect("normal shapes fit");
     }
@@ -124,6 +128,9 @@ pub fn shapes(normal: Box<[PhraseShape]>) -> Box<[PhraseShape]> {
 #[must_use]
 pub fn language(normal: Language) -> Language {
     let mut phrases = List::with_capacity(phrase_count());
+    for phrase in jig_client::words::english().phrases {
+        phrases.push(phrase).expect("public words fit");
+    }
     for phrase in normal.phrases {
         phrases.push(phrase).expect("normal words fit");
     }
@@ -194,6 +201,9 @@ pub fn language(normal: Language) -> Language {
 #[must_use]
 pub fn phrase_bytes(book: &Phrasebook) -> Option<u32> {
     let mut largest = 0;
+    for word in jig_client::words::ALL {
+        largest = largest.max(book.capacity(word.id())?);
+    }
     for phrase in crate::owner_authority_words::ALL {
         largest = largest.max(book.capacity(phrase.id())?);
     }

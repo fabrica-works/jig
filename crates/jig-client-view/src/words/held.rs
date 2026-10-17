@@ -2,6 +2,7 @@
 use super::{Words, name};
 use crate::phrases::jig::JigPhrase;
 use jig_client::contract::{HoldCategory, HoldFailure, HoldReason, Part};
+use jig_client::words::{HoldWord, Word};
 use skein_ui::Builder;
 use skein_ui::phrases::Hole;
 impl Words {
@@ -9,7 +10,7 @@ impl Words {
     pub(crate) fn hold_category(&self, b: &mut Builder, reason: HoldCategory) {
         match reason {
             HoldCategory::Failures { class } => {
-                self.text(b, JigPhrase::TriesExhausted, &[]);
+                self.text(b, JigPhrase::Word(Word::Hold(HoldWord::Failures)), &[]);
                 let phrase = match class {
                     HoldFailure::Transient => JigPhrase::Temporary,
                     HoldFailure::Permanent => JigPhrase::Permanent,
@@ -20,24 +21,31 @@ impl Words {
                 };
                 self.text(b, phrase, &[]);
             }
-            HoldCategory::Stalled => self.text(b, JigPhrase::HoldStalled, &[]),
-            HoldCategory::Dependency { task } => self.text(b, JigPhrase::HoldDependency, &[Hole::Number(task)]),
-            HoldCategory::Stopped => self.text(b, JigPhrase::HoldStopped, &[]),
+            HoldCategory::Stalled => self.text(b, JigPhrase::Word(Word::Hold(HoldWord::Stalled)), &[]),
+            HoldCategory::Dependency { task } => {
+                self.text(b, JigPhrase::Word(Word::Hold(HoldWord::Dependency)), &[Hole::Number(task)]);
+            }
+            HoldCategory::Stopped => self.text(b, JigPhrase::Word(Word::Hold(HoldWord::Stopped)), &[]),
             HoldCategory::StoppedBy { party } => {
-                self.text(b, JigPhrase::HoldStopped, &[]);
+                self.text(b, JigPhrase::Word(Word::hold(&reason)), &[]);
                 self.actor(b, jig_client::contract::Actor::Party(party));
             }
-            HoldCategory::Drift => self.text(b, JigPhrase::HoldDrift, &[]),
-            HoldCategory::Effects => self.text(b, JigPhrase::HoldEffects, &[]),
-            HoldCategory::EffectFailed => self.text(b, JigPhrase::HoldEffectFailed, &[]),
-            HoldCategory::Uncertain { entry } => self.text(b, JigPhrase::HoldUncertainEntry, &[Hole::Number(entry)]),
-            HoldCategory::Budget => self.text(b, JigPhrase::HoldBudget, &[]),
-            HoldCategory::Deadline => self.text(b, JigPhrase::HoldDeadline, &[]),
-            HoldCategory::HoldsWaited => self.text(b, JigPhrase::HoldWaited, &[]),
-            HoldCategory::ResourceUnavailable => self.text(b, JigPhrase::ResourceUnavailable, &[]),
-            HoldCategory::ResourceAccess => self.text(b, JigPhrase::ResourceAccessMissing, &[]),
-            HoldCategory::PoolLost { pool } => self.text(b, JigPhrase::HoldPoolLost, &[Hole::Number(pool)]),
-            HoldCategory::Procedure => self.text(b, JigPhrase::HoldProcedure, &[]),
+            HoldCategory::Drift => self.text(b, JigPhrase::Word(Word::Hold(HoldWord::Drift)), &[]),
+            HoldCategory::Effects => self.text(b, JigPhrase::Word(Word::Hold(HoldWord::Effects)), &[]),
+            HoldCategory::EffectFailed => self.text(b, JigPhrase::Word(Word::Hold(HoldWord::EffectFailed)), &[]),
+            HoldCategory::Uncertain { entry } => {
+                self.text(b, JigPhrase::Word(Word::Hold(HoldWord::Uncertain)), &[Hole::Number(entry)]);
+            }
+            HoldCategory::Budget => self.text(b, JigPhrase::Word(Word::Hold(HoldWord::Budget)), &[]),
+            HoldCategory::Deadline => self.text(b, JigPhrase::Word(Word::Hold(HoldWord::Deadline)), &[]),
+            HoldCategory::HoldsWaited => self.text(b, JigPhrase::Word(Word::Hold(HoldWord::HoldsWaited)), &[]),
+            HoldCategory::ResourceUnavailable | HoldCategory::ResourceAccess => {
+                self.text(b, JigPhrase::Word(Word::hold(&reason)), &[]);
+            }
+            HoldCategory::PoolLost { pool } => {
+                self.text(b, JigPhrase::Word(Word::Hold(HoldWord::PoolLost)), &[Hole::Number(pool)]);
+            }
+            HoldCategory::Procedure => self.text(b, JigPhrase::Word(Word::Hold(HoldWord::Procedure)), &[]),
         }
     }
 
@@ -45,7 +53,7 @@ impl Words {
     pub(super) fn hold_fact(&self, b: &mut Builder, reason: &HoldReason, text_limit: u32) {
         match reason {
             HoldReason::Tries { failures } => {
-                self.text(b, JigPhrase::TriesExhausted, &[]);
+                self.text(b, JigPhrase::Word(Word::Hold(HoldWord::Failures)), &[]);
                 for failure in failures {
                     self.text(b, JigPhrase::Attempt, &[Hole::Number(failure.attempt)]);
                     crate::cards::chip::failure(b, failure.class, self);

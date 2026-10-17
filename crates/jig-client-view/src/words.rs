@@ -8,8 +8,8 @@ mod status;
 use crate::intents::Progress;
 use crate::phrases::jig::JigPhrase;
 use alloc::boxed::Box;
-use jig_client::Link;
 use jig_client::contract::{Actor, Decision, Ending, Executor, GoalExecutor, Made, Outcome, ProposalKey, Proposer};
+use jig_client::{Link, contract::Phase, words::Word};
 use skein_lib::{Duration, Wall, bytes::copy_of};
 use skein_ui::phrases::{Hole, Phrasebook};
 use skein_ui::{Builder, Role, Run};
@@ -26,6 +26,11 @@ impl Words {
     #[must_use]
     pub fn say(&self, phrase: JigPhrase, holes: &[Hole]) -> Box<[u8]> {
         self.book.say(self.language, phrase.id(), holes).expect("checked phrase and bounded facts").text
+    }
+    /// Say jig's public enum phrase in the selected language.
+    #[must_use]
+    pub fn say_word(&self, word: Word, holes: &[Hole]) -> Box<[u8]> {
+        self.book.say(self.language, word.id(), holes).expect("checked word and bounded facts").text
     }
     pub(crate) fn node_text(&self, text: u32) -> u32 {
         let phrase = match crate::phrases::jig_capacity(&self.book) {
@@ -69,7 +74,7 @@ impl Words {
         let phrase = match progress {
             Progress::Confirming => JigPhrase::Confirming,
             Progress::InFlight => JigPhrase::InFlight,
-            Progress::Retrying => JigPhrase::Retrying,
+            Progress::Retrying => JigPhrase::Word(Word::Phase(Phase::BackingOff)),
             Progress::Parked => JigPhrase::Parked,
             Progress::Unknown => JigPhrase::Unknown,
         };
@@ -162,7 +167,9 @@ impl Words {
     /// Say a durable ending and every fact that ending carries.
     pub fn ending(&self, b: &mut Builder, how: &Ending) {
         match how {
-            Ending::Done => self.text(b, JigPhrase::Done, &[]),
+            Ending::Done => {
+                self.text(b, JigPhrase::Word(Word::Phase(Phase::Done)), &[]);
+            }
             Ending::Failed { reason } => match reason {
                 Some(reason) => self.text(b, JigPhrase::Failed, &[name(reason.bytes())]),
                 None => self.text(b, JigPhrase::FailedBare, &[]),

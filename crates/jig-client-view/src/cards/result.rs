@@ -101,7 +101,7 @@ pub fn value_nodes(
             crate::document_text::markdown(b, reason, words);
         }
         ResultValue::Failure(reason) => {
-            words.text(b, JigPhrase::FailedPhase, &[]);
+            words.text(b, JigPhrase::Word(jig_client::words::Word::Phase(jig_client::contract::Phase::Failed)), &[]);
             crate::document_text::markdown(b, reason, words);
         }
         ResultValue::Approved { state, words: explanation } => {

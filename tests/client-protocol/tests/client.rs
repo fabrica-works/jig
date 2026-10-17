@@ -1,3 +1,5 @@
+#[path = "client/words.rs"]
+mod words;
 use jig_client::{
     Answered, Ask, Asker, Handle, Key, Latest, Link, Outcome, Readable, Readout, State, Watchable, contract,
 };

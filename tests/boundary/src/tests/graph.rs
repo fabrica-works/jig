@@ -707,5 +707,5 @@ fn client_crate_links_only_its_domain_link_and_foundation() {
     assert_eq!(clients.len(), 1, "one client");
     let mut dependencies = clients[0].dependencies.clone();
     dependencies.sort();
-    assert_eq!(dependencies, ["jig-client-domain", "jig-client-protocol-link", "skein-lib"]);
+    assert_eq!(dependencies, ["jig-client-domain", "jig-client-protocol-link", "skein-lib", "skein-ui"]);
 }

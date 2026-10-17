@@ -6,6 +6,7 @@ use skein_ui::phrases::{HoleKind, HoleShape, PhraseId, PhraseShape};
 /// Each sentence jig says, independent of language word order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum JigPhrase {
+    Word(jig_client::words::Word),
     RequestNotKept,
     RequestUnconfirmed,
     RequestsInFlight,
@@ -83,30 +84,6 @@ pub enum JigPhrase {
     PartProposalParty,
     /// A proposal number owned by the part's connector.
     PartOwnerProposal,
-    /// The executor stopped progressing.
-    HoldStalled,
-    /// Dependency task .
-    HoldDependency,
-    /// Task stopped.
-    HoldStopped,
-    /// Required resource drifted.
-    HoldDrift,
-    /// Effects need a decision.
-    HoldEffects,
-    /// An effect failed permanently.
-    HoldEffectFailed,
-    /// Uncertain outbox entry .
-    HoldUncertainEntry,
-    /// Insufficient activation budget.
-    HoldBudget,
-    /// Deadline passed.
-    HoldDeadline,
-    /// Resource holds waited too long.
-    HoldWaited,
-    /// Allocation lost from pool .
-    HoldPoolLost,
-    /// Procedure needs a decision.
-    HoldProcedure,
     /// Executor reported failure.
     FailureRun,
     /// Agent failed.
@@ -172,8 +149,7 @@ pub enum JigPhrase {
     Confirming,
     /// Being decided: waiting for the engine.
     InFlight,
-    /// Being decided: retrying.
-    Retrying,
+
     /// Being decided: waiting for the engine connection or your sign-in.
     Parked,
     /// Outcome unknown: inspect the current object before acting again.
@@ -188,8 +164,7 @@ pub enum JigPhrase {
     Changed,
     /// Proposed by task (0), proposal (1).
     Proposed,
-    /// Completed.
-    Done,
+
     /// Failed: (0).
     Failed,
     /// Cancelled: (0).
@@ -286,12 +261,6 @@ pub enum JigPhrase {
     MovedWaiting,
     /// Current revision (0).
     Revision,
-    /// No visible object with that name.
-    NoObject,
-    /// This act is not offered.
-    NotOffered,
-    /// The request key names another act.
-    KeyConflict,
     /// (0).
     Amount,
     /// Waiting (0) min.
@@ -318,10 +287,6 @@ pub enum JigPhrase {
     ContextTask,
     /// Task (0): (1).
     ChipNumber,
-    /// Waiting.
-    Waiting,
-    /// Waiting for news.
-    Idle,
     /// Wakes on any news.
     WakeAny,
     /// Wakes at the next scheduled time.
@@ -332,18 +297,10 @@ pub enum JigPhrase {
     WakeTopic,
     /// Wakes on inbox messages.
     WakeInbox,
-    /// Running.
-    Running,
-    /// Writing.
-    Writing,
-    /// Using tool (0).
-    Tool,
     /// Attempt (0).
     Attempt,
     /// Retrying at (0): try (1) of (2).
     RetryAt,
-    /// Waiting for your words.
-    WaitingWords,
     /// Host lost.
     HostLost,
     /// Temporary failure.
@@ -364,10 +321,6 @@ pub enum JigPhrase {
     NobodyMayAccept,
     /// Missing proposal approval authority.
     ApprovalAuthorityMissing,
-    /// Held.
-    Held,
-    /// Ended.
-    Ended,
     /// Waiting for party (0).
     WaitingParty,
     /// Waiting for task (0).
@@ -494,8 +447,6 @@ pub enum JigPhrase {
     ActSetPool,
     /// Chat about it.
     ChatAbout,
-    /// Starting.
-    TaskStarting,
     /// Subscribed topic (0).
     Topic,
     /// For (0) min.
@@ -506,8 +457,6 @@ pub enum JigPhrase {
     LoadingPhase,
     /// Deadline (0).
     Deadline,
-    /// Held: out of tries.
-    TriesExhausted,
     /// Held: stalled on (0).
     StalledOn,
     /// Held: dependency (0) ended unsuccessfully.
@@ -692,26 +641,13 @@ pub enum JigPhrase {
     ResultsThrough,
     /// Chat (0), replies through (1).
     RepliesThrough,
-    /// Failed.
-    FailedPhase,
-    /// Cancelled.
-    CancelledPhase,
+
     /// Address to party number.
     AddressParty,
     /// Address to task number.
     AddressTask,
     /// Address to role number in this project.
     AddressRole,
-    /// Due to run.
-    DuePhase,
-    /// Preparing a host.
-    PreparingPhase,
-    /// Claimed by a host.
-    ClaimedPhase,
-    /// Executor active.
-    ActivePhase,
-    /// Closing.
-    ClosingPhase,
     /// Needs you.
     NeedsYou,
     /// Updates.
@@ -896,10 +832,7 @@ pub enum JigPhrase {
     Grace,
     /// Tasks waiting for this account.
     WaitingAccount,
-    /// Parked; your words resume it.
-    ParkedResume,
-    /// Retrying.
-    RetryingPhase,
+
     /// Resource scope: (0).
     ResourceScope,
     /// Result expected.
@@ -1007,7 +940,6 @@ pub enum JigPhrase {
     HeldPriorWaiting,
 
     EngineLimitGoals,
-    NoEscalationHolder,
     MalformedTwoAsAllowed,
     MalformedConversation,
     MalformedCycle,
@@ -1055,7 +987,6 @@ pub enum JigPhrase {
     DecidedBare,
     DeletedEnding,
     ByProjectDeployment,
-    RoleNotAllowed,
     NoHeldRole,
     HeldOwner,
     HeldMaintainer,
@@ -1065,9 +996,6 @@ pub enum JigPhrase {
     DisposalMissing,
     DisposalUnknown,
     DisposalRepeated,
-    RefusalTakenBy,
-    NotWaitingForYou,
-    NoFurtherHolder,
     GrantKindMissing,
     FundingMissing,
     DepthMaximum,
@@ -1109,6 +1037,7 @@ impl JigPhrase {
     #[expect(clippy::too_many_lines, reason = "closed phrase-number data is kept in one exhaustive table")]
     pub const fn id(self) -> PhraseId {
         let number = match self {
+            Self::Word(word) => return word.id(),
             Self::OwnerHoldRelease => 673,
             Self::NoticesPart => 680,
             Self::NothingKnown => 674,
@@ -1240,7 +1169,6 @@ impl JigPhrase {
             Self::Open => 24,
             Self::Confirming => 25,
             Self::InFlight => 26,
-            Self::Retrying => 27,
             Self::Parked => 28,
             Self::Unknown => 29,
             Self::LookAgain => 30,
@@ -1248,7 +1176,6 @@ impl JigPhrase {
             Self::GoneUnknown => 32,
             Self::Changed => 33,
             Self::Proposed => 34,
-            Self::Done => 35,
             Self::Failed => 36,
             Self::Cancelled => 37,
             Self::Withdrawn => 38,
@@ -1297,9 +1224,6 @@ impl JigPhrase {
             Self::MovedNote => 82,
             Self::MovedWaiting => 83,
             Self::Revision => 84,
-            Self::NoObject => 85,
-            Self::NotOffered => 86,
-            Self::KeyConflict => 87,
             Self::Amount => 88,
             Self::WaitingSpan => 89,
             Self::Span => 90,
@@ -1313,19 +1237,13 @@ impl JigPhrase {
             Self::ContextProject => 98,
             Self::ContextTask => 99,
             Self::ChipNumber => 100,
-            Self::Waiting => 101,
-            Self::Idle => 102,
             Self::WakeAny => 103,
             Self::WakeAt => 104,
             Self::WakeResult => 105,
             Self::WakeTopic => 106,
             Self::WakeInbox => 107,
-            Self::Running => 108,
-            Self::Writing => 109,
-            Self::Tool => 110,
             Self::Attempt => 111,
             Self::RetryAt => 112,
-            Self::WaitingWords => 113,
             Self::HostLost => 114,
             Self::Temporary => 115,
             Self::Permanent => 116,
@@ -1336,8 +1254,6 @@ impl JigPhrase {
             Self::ClosingEffects => 404,
             Self::NobodyMayAccept => 405,
             Self::ApprovalAuthorityMissing => 406,
-            Self::Held => 120,
-            Self::Ended => 121,
             Self::WaitingParty => 122,
             Self::WaitingTask => 123,
             Self::WaitingRole => 124,
@@ -1401,13 +1317,11 @@ impl JigPhrase {
             Self::ActMakeService => 181,
             Self::ActSetPool => 182,
             Self::ChatAbout => 183,
-            Self::TaskStarting => 184,
             Self::Topic => 185,
             Self::ElapsedSpan => 186,
             Self::ReasonField => 187,
             Self::LoadingPhase => 188,
             Self::Deadline => 189,
-            Self::TriesExhausted => 190,
             Self::StalledOn => 191,
             Self::DependencyEnded => 192,
             Self::DriftHold => 193,
@@ -1504,16 +1418,9 @@ impl JigPhrase {
             Self::UnknownAction => 273,
             Self::ResultsThrough => 274,
             Self::RepliesThrough => 275,
-            Self::FailedPhase => 276,
-            Self::CancelledPhase => 277,
             Self::AddressParty => 278,
             Self::AddressTask => 279,
             Self::AddressRole => 280,
-            Self::DuePhase => 281,
-            Self::PreparingPhase => 282,
-            Self::ClaimedPhase => 283,
-            Self::ActivePhase => 284,
-            Self::ClosingPhase => 285,
             Self::NeedsYou => 286,
             Self::InboxUpdates => 287,
             Self::AllKinds => 288,
@@ -1603,8 +1510,6 @@ impl JigPhrase {
             Self::CapacityLimit => 366,
             Self::Grace => 367,
             Self::WaitingAccount => 368,
-            Self::ParkedResume => 369,
-            Self::RetryingPhase => 370,
             Self::ResourceScope => 371,
             Self::ResultExpected => 372,
             Self::ReportExpected => 373,
@@ -1647,7 +1552,6 @@ impl JigPhrase {
             Self::TakenByNumber => 509,
 
             Self::EngineLimitGoals => 7413,
-            Self::NoEscalationHolder => 7414,
             Self::MalformedTwoAsAllowed => 7415,
             Self::MalformedConversation => 7416,
             Self::MalformedCycle => 7417,
@@ -1695,7 +1599,6 @@ impl JigPhrase {
             Self::DecidedBare => 450,
             Self::DeletedEnding => 451,
             Self::ByProjectDeployment => 452,
-            Self::RoleNotAllowed => 453,
             Self::NoHeldRole => 454,
             Self::HeldOwner => 455,
             Self::HeldMaintainer => 456,
@@ -1705,9 +1608,6 @@ impl JigPhrase {
             Self::DisposalMissing => 460,
             Self::DisposalUnknown => 461,
             Self::DisposalRepeated => 462,
-            Self::RefusalTakenBy => 463,
-            Self::NotWaitingForYou => 464,
-            Self::NoFurtherHolder => 465,
             Self::GrantKindMissing => 466,
             Self::FundingMissing => 467,
             Self::DepthMaximum => 468,
@@ -1732,18 +1632,6 @@ impl JigPhrase {
             Self::PartTask => 487,
             Self::PartProject => 488,
             Self::PartProposal => 489,
-            Self::HoldStalled => 493,
-            Self::HoldDependency => 494,
-            Self::HoldStopped => 495,
-            Self::HoldDrift => 496,
-            Self::HoldEffects => 497,
-            Self::HoldEffectFailed => 498,
-            Self::HoldUncertainEntry => 499,
-            Self::HoldBudget => 500,
-            Self::HoldDeadline => 501,
-            Self::HoldWaited => 502,
-            Self::HoldPoolLost => 503,
-            Self::HoldProcedure => 504,
             Self::FailureRun => 505,
             Self::FailureAgent => 506,
             Self::FailureInvalid => 507,
@@ -1761,6 +1649,7 @@ impl JigPhrase {
     #[expect(clippy::too_many_lines, reason = "every phrase declares its holes in one exhaustive table")]
     pub fn shape(self, text: u32) -> PhraseShape {
         let holes: Box<[HoleShape]> = match self {
+            Self::Word(word) => return word.shape(text),
             Self::FrameNeedsKinds => Box::new([
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
@@ -1810,15 +1699,6 @@ impl JigPhrase {
             | Self::HeldPriorLifecycle
             | Self::HeldPriorWaiting
             | Self::SpecificationCut
-            | Self::HoldStalled
-            | Self::HoldStopped
-            | Self::HoldDrift
-            | Self::HoldEffects
-            | Self::HoldEffectFailed
-            | Self::HoldBudget
-            | Self::HoldDeadline
-            | Self::HoldWaited
-            | Self::HoldProcedure
             | Self::FailureRun
             | Self::FailureAgent
             | Self::FailureInvalid
@@ -1826,7 +1706,6 @@ impl JigPhrase {
             | Self::ResultPart
             | Self::HoldPart
             | Self::EngineLimitGoals
-            | Self::NoEscalationHolder
             | Self::EngineLimitOperations
             | Self::EngineLimitGrace
             | Self::EngineLimitWords
@@ -1868,14 +1747,11 @@ impl JigPhrase {
             | Self::CancelledBare
             | Self::DecidedBare
             | Self::DeletedEnding
-            | Self::RoleNotAllowed
             | Self::NoHeldRole
             | Self::HeldOwner
             | Self::HeldMaintainer
             | Self::HeldMember
             | Self::HeldObserver
-            | Self::NotWaitingForYou
-            | Self::NoFurtherHolder
             | Self::FundingMissing
             | Self::DeadlineAuthorityMissing
             | Self::ToolMissing
@@ -1931,8 +1807,6 @@ impl JigPhrase {
             | Self::AccountUnavailable
             | Self::Capacity
             | Self::WaitingAccount
-            | Self::ParkedResume
-            | Self::RetryingPhase
             | Self::ResultExpected
             | Self::ReportExpected
             | Self::WordsExpected
@@ -2000,14 +1874,12 @@ impl JigPhrase {
             | Self::Open
             | Self::Confirming
             | Self::InFlight
-            | Self::Retrying
             | Self::Parked
             | Self::Unknown
             | Self::LookAgain
             | Self::Looking
             | Self::GoneUnknown
             | Self::Changed
-            | Self::Done
             | Self::ByDeployment
             | Self::Accepted
             | Self::PassedUp
@@ -2030,9 +1902,6 @@ impl JigPhrase {
             | Self::MovedPerson
             | Self::MovedNote
             | Self::MovedWaiting
-            | Self::NoObject
-            | Self::NotOffered
-            | Self::KeyConflict
             | Self::Object
             | Self::Proposal
             | Self::Escalation
@@ -2040,26 +1909,19 @@ impl JigPhrase {
             | Self::PersonTask
             | Self::Result
             | Self::Note
-            | Self::Waiting
-            | Self::Idle
             | Self::WakeAny
             | Self::WakeAt
             | Self::WakeResult
             | Self::WakeTopic
             | Self::WakeInbox
-            | Self::Running
-            | Self::Writing
-            | Self::WaitingWords
             | Self::HostLost
             | Self::Temporary
             | Self::Permanent
             | Self::Stall
-            | Self::Held
             | Self::ResourceSegments
             | Self::ChipTitleCut
             | Self::ChipDependenciesCut
             | Self::ChipWaitingHolds
-            | Self::Ended
             | Self::Pool
             | Self::ProposalWhy
             | Self::OwnTasks
@@ -2105,10 +1967,8 @@ impl JigPhrase {
             | Self::ActMakeService
             | Self::ActSetPool
             | Self::ChatAbout
-            | Self::TaskStarting
             | Self::ReasonField
             | Self::LoadingPhase
-            | Self::TriesExhausted
             | Self::DriftHold
             | Self::EffectFailedHold
             | Self::EffectUncertainHold
@@ -2173,16 +2033,9 @@ impl JigPhrase {
             | Self::NoteReferencesCut
             | Self::Notice
             | Self::UnknownAction
-            | Self::FailedPhase
-            | Self::CancelledPhase
             | Self::AddressParty
             | Self::AddressTask
-            | Self::AddressRole
-            | Self::DuePhase
-            | Self::PreparingPhase
-            | Self::ClaimedPhase
-            | Self::ActivePhase
-            | Self::ClosingPhase => Box::new([]),
+            | Self::AddressRole => Box::new([]),
             Self::FrameLogin
             | Self::PartResource
             | Self::ResourceScope
@@ -2199,7 +2052,6 @@ impl JigPhrase {
             | Self::Rejected
             | Self::LeftHeld
             | Self::DecidedFirst
-            | Self::Tool
             | Self::Reason
             | Self::ApprovalState
             | Self::TakenBy
@@ -2218,15 +2070,11 @@ impl JigPhrase {
             | Self::ClosingRun
             | Self::SpecificationBytes
             | Self::SpecificationInput
-            | Self::HoldDependency
-            | Self::HoldUncertainEntry
-            | Self::HoldPoolLost
             | Self::ByProjectDeployment
             | Self::HeldPolicy
             | Self::DisposalMissing
             | Self::DisposalUnknown
             | Self::DisposalRepeated
-            | Self::RefusalTakenBy
             | Self::GrantKindMissing
             | Self::DepthMaximum
             | Self::TasksLeft
@@ -2441,7 +2289,7 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 639] = [
+pub const ALL: [JigPhrase; 598] = [
     JigPhrase::NoticesPart,
     JigPhrase::NothingKnown,
     JigPhrase::LinkPart,
@@ -2569,7 +2417,6 @@ pub const ALL: [JigPhrase; 639] = [
     JigPhrase::Open,
     JigPhrase::Confirming,
     JigPhrase::InFlight,
-    JigPhrase::Retrying,
     JigPhrase::Parked,
     JigPhrase::Unknown,
     JigPhrase::LookAgain,
@@ -2577,7 +2424,6 @@ pub const ALL: [JigPhrase; 639] = [
     JigPhrase::GoneUnknown,
     JigPhrase::Changed,
     JigPhrase::Proposed,
-    JigPhrase::Done,
     JigPhrase::Failed,
     JigPhrase::Cancelled,
     JigPhrase::Withdrawn,
@@ -2626,9 +2472,6 @@ pub const ALL: [JigPhrase; 639] = [
     JigPhrase::MovedNote,
     JigPhrase::MovedWaiting,
     JigPhrase::Revision,
-    JigPhrase::NoObject,
-    JigPhrase::NotOffered,
-    JigPhrase::KeyConflict,
     JigPhrase::Amount,
     JigPhrase::WaitingSpan,
     JigPhrase::Span,
@@ -2642,19 +2485,13 @@ pub const ALL: [JigPhrase; 639] = [
     JigPhrase::ContextProject,
     JigPhrase::ContextTask,
     JigPhrase::ChipNumber,
-    JigPhrase::Waiting,
-    JigPhrase::Idle,
     JigPhrase::WakeAny,
     JigPhrase::WakeAt,
     JigPhrase::WakeResult,
     JigPhrase::WakeTopic,
     JigPhrase::WakeInbox,
-    JigPhrase::Running,
-    JigPhrase::Writing,
-    JigPhrase::Tool,
     JigPhrase::Attempt,
     JigPhrase::RetryAt,
-    JigPhrase::WaitingWords,
     JigPhrase::HostLost,
     JigPhrase::Temporary,
     JigPhrase::Permanent,
@@ -2665,8 +2502,6 @@ pub const ALL: [JigPhrase; 639] = [
     JigPhrase::ClosingEffects,
     JigPhrase::NobodyMayAccept,
     JigPhrase::ApprovalAuthorityMissing,
-    JigPhrase::Held,
-    JigPhrase::Ended,
     JigPhrase::WaitingParty,
     JigPhrase::WaitingTask,
     JigPhrase::WaitingRole,
@@ -2730,13 +2565,11 @@ pub const ALL: [JigPhrase; 639] = [
     JigPhrase::ActMakeService,
     JigPhrase::ActSetPool,
     JigPhrase::ChatAbout,
-    JigPhrase::TaskStarting,
     JigPhrase::Topic,
     JigPhrase::ElapsedSpan,
     JigPhrase::ReasonField,
     JigPhrase::LoadingPhase,
     JigPhrase::Deadline,
-    JigPhrase::TriesExhausted,
     JigPhrase::StalledOn,
     JigPhrase::DependencyEnded,
     JigPhrase::DriftHold,
@@ -2833,16 +2666,9 @@ pub const ALL: [JigPhrase; 639] = [
     JigPhrase::UnknownAction,
     JigPhrase::ResultsThrough,
     JigPhrase::RepliesThrough,
-    JigPhrase::FailedPhase,
-    JigPhrase::CancelledPhase,
     JigPhrase::AddressParty,
     JigPhrase::AddressTask,
     JigPhrase::AddressRole,
-    JigPhrase::DuePhase,
-    JigPhrase::PreparingPhase,
-    JigPhrase::ClaimedPhase,
-    JigPhrase::ActivePhase,
-    JigPhrase::ClosingPhase,
     JigPhrase::NeedsYou,
     JigPhrase::InboxUpdates,
     JigPhrase::AllKinds,
@@ -2932,8 +2758,6 @@ pub const ALL: [JigPhrase; 639] = [
     JigPhrase::CapacityLimit,
     JigPhrase::Grace,
     JigPhrase::WaitingAccount,
-    JigPhrase::ParkedResume,
-    JigPhrase::RetryingPhase,
     JigPhrase::ResourceScope,
     JigPhrase::ResultExpected,
     JigPhrase::ReportExpected,
@@ -2975,7 +2799,6 @@ pub const ALL: [JigPhrase; 639] = [
     JigPhrase::OutboxEntry,
     JigPhrase::TakenByNumber,
     JigPhrase::EngineLimitGoals,
-    JigPhrase::NoEscalationHolder,
     JigPhrase::MalformedTwoAsAllowed,
     JigPhrase::MalformedConversation,
     JigPhrase::MalformedCycle,
@@ -3023,7 +2846,6 @@ pub const ALL: [JigPhrase; 639] = [
     JigPhrase::DecidedBare,
     JigPhrase::DeletedEnding,
     JigPhrase::ByProjectDeployment,
-    JigPhrase::RoleNotAllowed,
     JigPhrase::NoHeldRole,
     JigPhrase::HeldOwner,
     JigPhrase::HeldMaintainer,
@@ -3033,9 +2855,6 @@ pub const ALL: [JigPhrase; 639] = [
     JigPhrase::DisposalMissing,
     JigPhrase::DisposalUnknown,
     JigPhrase::DisposalRepeated,
-    JigPhrase::RefusalTakenBy,
-    JigPhrase::NotWaitingForYou,
-    JigPhrase::NoFurtherHolder,
     JigPhrase::GrantKindMissing,
     JigPhrase::FundingMissing,
     JigPhrase::DepthMaximum,
@@ -3060,18 +2879,6 @@ pub const ALL: [JigPhrase; 639] = [
     JigPhrase::PartTask,
     JigPhrase::PartProject,
     JigPhrase::PartProposal,
-    JigPhrase::HoldStalled,
-    JigPhrase::HoldDependency,
-    JigPhrase::HoldStopped,
-    JigPhrase::HoldDrift,
-    JigPhrase::HoldEffects,
-    JigPhrase::HoldEffectFailed,
-    JigPhrase::HoldUncertainEntry,
-    JigPhrase::HoldBudget,
-    JigPhrase::HoldDeadline,
-    JigPhrase::HoldWaited,
-    JigPhrase::HoldPoolLost,
-    JigPhrase::HoldProcedure,
     JigPhrase::FailureRun,
     JigPhrase::FailureAgent,
     JigPhrase::FailureInvalid,
@@ -3089,5 +2896,5 @@ pub fn shapes(text: u32) -> Box<[PhraseShape]> {
     for phrase in ALL {
         rows.push(phrase.shape(text)).expect("all jig shapes fit");
     }
-    crate::owner_words::shapes(rows.into_boxed())
+    crate::owner_words::shapes(rows.into_boxed(), text)
 }

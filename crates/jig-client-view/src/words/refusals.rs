@@ -2,6 +2,7 @@
 use super::Words;
 use crate::phrases::jig::JigPhrase;
 use jig_client::contract::{AdmissionLimit, CurrentHold, DisposalIssue, HeldRole, Limit, Malformed, Moved, Refusal};
+use jig_client::words::{RefusalWord, Word};
 use skein_ui::Builder;
 use skein_ui::phrases::Hole;
 impl Words {
@@ -20,7 +21,7 @@ impl Words {
                 &[Hole::Number(u64::from(*at))],
             ),
             Refusal::Role { held } => {
-                self.text(b, JigPhrase::RoleNotAllowed, &[]);
+                self.text(b, JigPhrase::Word(Word::Refusal(RefusalWord::Role)), &[]);
                 self.held_role(b, *held);
             }
             Refusal::Disposal { task, issue } => {
@@ -31,9 +32,11 @@ impl Words {
                 };
                 self.text(b, phrase, &[Hole::Number(*task)]);
             }
-            Refusal::Taken { by } => self.text(b, JigPhrase::RefusalTakenBy, &[Hole::Number(*by)]),
-            Refusal::NotWaiting => self.text(b, JigPhrase::NotWaitingForYou, &[]),
-            Refusal::NoFurther => self.text(b, JigPhrase::NoFurtherHolder, &[]),
+            Refusal::Taken { by } => {
+                self.text(b, JigPhrase::Word(Word::Refusal(RefusalWord::Taken)), &[Hole::Number(*by)]);
+            }
+            Refusal::NotWaiting => self.text(b, JigPhrase::Word(Word::Refusal(RefusalWord::NotWaiting)), &[]),
+            Refusal::NoFurther => self.text(b, JigPhrase::Word(Word::Refusal(RefusalWord::NoFurther)), &[]),
             Refusal::Authority { lacking, proposable } => {
                 self.lacking(b, lacking, text_limit);
                 if let Some(false) = proposable {
@@ -64,10 +67,12 @@ impl Words {
                 }
             }
             Refusal::Ended { how } => self.ending(b, how),
-            Refusal::Unknown => self.text(b, JigPhrase::NoObject, &[]),
-            Refusal::NoEscalationHolder => self.text(b, JigPhrase::NoEscalationHolder, &[]),
-            Refusal::NotOffered => self.text(b, JigPhrase::NotOffered, &[]),
-            Refusal::KeyConflict => self.text(b, JigPhrase::KeyConflict, &[]),
+            Refusal::Unknown => self.text(b, JigPhrase::Word(Word::Refusal(RefusalWord::Unknown)), &[]),
+            Refusal::NoEscalationHolder => {
+                self.text(b, JigPhrase::Word(Word::Refusal(RefusalWord::NoEscalationHolder)), &[]);
+            }
+            Refusal::NotOffered => self.text(b, JigPhrase::Word(Word::Refusal(RefusalWord::NotOffered)), &[]),
+            Refusal::KeyConflict => self.text(b, JigPhrase::Word(Word::Refusal(RefusalWord::KeyConflict)), &[]),
         }
     }
     pub(crate) fn held_role(&self, b: &mut Builder, held: Option<HeldRole>) {

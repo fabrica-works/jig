@@ -4,6 +4,8 @@
 use crate::JigBindings;
 use crate::phrases::jig::JigPhrase;
 use crate::words::{Words, name};
+use jig_client::contract::Phase;
+use jig_client::words::{StatusWord, Word};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role};
 
@@ -122,19 +124,19 @@ pub fn details(
         }
         ChipPhase::Active(value) => crate::runtime::active(b, value, words),
         ChipPhase::Waiting { dependencies, hold } => {
-            words.text(b, JigPhrase::Waiting, &[]);
+            words.text(b, JigPhrase::Word(Word::Phase(Phase::Waiting)), &[]);
             dependencies_list(b, client, dependencies, words, bindings, pending, seen);
             if let Some(hold) = hold {
                 super::common::part(b, hold, words, bindings);
             }
         }
         ChipPhase::Idle { wake: policy } => {
-            words.text(b, JigPhrase::Idle, &[]);
+            words.text(b, JigPhrase::Word(Word::Phase(Phase::Idle)), &[]);
             wake(b, policy, words, bindings);
         }
-        ChipPhase::Starting => words.text(b, JigPhrase::TaskStarting, &[]),
+        ChipPhase::Starting => words.text(b, JigPhrase::Word(Word::Status(StatusWord::Starting)), &[]),
         ChipPhase::Running { attempt, since, tool } => {
-            words.text(b, JigPhrase::Running, &[]);
+            words.text(b, JigPhrase::Word(Word::Phase(Phase::Running)), &[]);
             words.text(b, JigPhrase::Attempt, &[Hole::Number(*attempt)]);
             words.text(
                 b,
@@ -144,12 +146,12 @@ pub fn details(
                 ))],
             );
             match tool {
-                Some(tool) => words.text(b, JigPhrase::Tool, &[name(tool.bytes())]),
-                None => words.text(b, JigPhrase::Writing, &[]),
+                Some(tool) => words.text(b, JigPhrase::Word(Word::Status(StatusWord::Tool)), &[name(tool.bytes())]),
+                None => words.text(b, JigPhrase::Word(Word::Status(StatusWord::Writing)), &[]),
             }
         }
         ChipPhase::WaitingForWords { attempt, since } => {
-            words.text(b, JigPhrase::WaitingWords, &[]);
+            words.text(b, JigPhrase::Word(Word::Status(StatusWord::WaitingForYou)), &[]);
             words.text(b, JigPhrase::Attempt, &[Hole::Number(*attempt)]);
             words.text(
                 b,

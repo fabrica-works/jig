@@ -3,6 +3,8 @@
 use crate::phrases::jig::JigPhrase;
 use crate::words::Words;
 use crate::{JigBindings, cards};
+use jig_client::contract::Phase;
+use jig_client::words::Word;
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role};
 
@@ -95,11 +97,11 @@ pub(super) fn tasks(b: &mut Builder, client: &Borrowed<'_>, _doc: &Project, word
 }
 const fn phrase(phase: PhaseClass) -> JigPhrase {
     match phase {
-        PhaseClass::Working => JigPhrase::ActivePhase,
-        PhaseClass::Waiting => JigPhrase::Waiting,
-        PhaseClass::Held => JigPhrase::Held,
-        PhaseClass::Closing => JigPhrase::ClosingPhase,
-        PhaseClass::Ended => JigPhrase::Ended,
+        PhaseClass::Working => JigPhrase::Word(Word::Phase(Phase::Active)),
+        PhaseClass::Waiting => JigPhrase::Word(Word::Phase(Phase::Waiting)),
+        PhaseClass::Held => JigPhrase::Word(Word::Phase(Phase::Held)),
+        PhaseClass::Closing => JigPhrase::Word(Word::Phase(Phase::Closing)),
+        PhaseClass::Ended => JigPhrase::Word(Word::Phase(Phase::Ended)),
     }
 }
 

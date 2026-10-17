@@ -1,0 +1,92 @@
+use crate::{
+    contract::{HoldCategory as H, HoldFailure, Phase},
+    words::{self, Word},
+};
+use skein_ui::phrases::{Form, Hole, Language, PhraseLimits, Phrasebook, PluralClass, Segment};
+const TEXT: u32 = 32;
+const TASK: u64 = 7;
+const HOLDS: &[(H, &[u8])] = &[
+    (H::Failures { class: HoldFailure::Lost }, b"Held: out of tries"),
+    (H::Stalled, b"The executor stopped progressing"),
+    (H::Dependency { task: TASK }, b"Dependency task 7"),
+    (H::Stopped, b"Task stopped"),
+    (H::StoppedBy { party: TASK }, b"Task stopped"),
+    (H::Drift, b"Required resource drifted"),
+    (H::Effects, b"Effects need a decision"),
+    (H::EffectFailed, b"An effect failed permanently"),
+    (H::Uncertain { entry: TASK }, b"Uncertain outbox entry 7"),
+    (H::Budget, b"Insufficient activation budget"),
+    (H::Deadline, b"Deadline passed"),
+    (H::HoldsWaited, b"Resource holds waited too long"),
+    (H::ResourceUnavailable, b"A required connector resource is unavailable"),
+    (H::ResourceAccess, b"Current resource access forbids this action"),
+    (H::PoolLost { pool: TASK }, b"Allocation lost from pool 7"),
+    (H::Procedure, b"Procedure needs a decision"),
+];
+fn book(languages: Box<[Language]>) -> Phrasebook {
+    let limits =
+        PhraseLimits { languages: 2, phrases: 59, holes: 1, segments: 128, text_bytes: 8192, hole_bytes: TEXT };
+    Phrasebook::load(words::phrase_shapes(TEXT), languages, &limits).expect("bounded public words")
+}
+#[test]
+fn each_hold_category_says_its_own_phrase() {
+    let book = book(Box::new([words::english()]));
+    for (hold, expected) in HOLDS {
+        let holes: &[Hole] = match hold {
+            H::Dependency { .. } | H::Uncertain { .. } | H::PoolLost { .. } => &[Hole::Number(TASK)],
+            H::Failures { .. }
+            | H::Stalled
+            | H::Stopped
+            | H::StoppedBy { .. }
+            | H::Drift
+            | H::Effects
+            | H::EffectFailed
+            | H::Budget
+            | H::Deadline
+            | H::HoldsWaited
+            | H::ResourceUnavailable
+            | H::ResourceAccess
+            | H::Procedure => &[],
+        };
+        assert_eq!(book.say(0, Word::hold(hold).id(), holes).unwrap().text.as_ref(), *expected, "{hold:?}");
+    }
+}
+#[test]
+fn an_application_s_language_overrides_one_word_and_keeps_the_others() {
+    let mut language = words::english();
+    for phrase in &mut language.phrases {
+        if phrase.id == Word::Phase(Phase::Held).id() {
+            phrase.forms = Box::new([Form {
+                class: PluralClass::Other,
+                segments: Box::new([Segment::Text(Box::from(b"On hold".as_slice()))]),
+            }]);
+        }
+    }
+    let book = book(Box::new([words::english(), language]));
+    assert_eq!(book.say(1, Word::Phase(Phase::Held).id(), &[]).unwrap().text.as_ref(), b"On hold");
+    assert_eq!(book.say(1, Word::Phase(Phase::Running).id(), &[]).unwrap().text.as_ref(), b"Running");
+}
+
+const PHASES: &[(Phase, &[u8])] = &[
+    (Phase::Waiting, b"Waiting"),
+    (Phase::Idle, b"Waiting for news"),
+    (Phase::Due, b"Due to run"),
+    (Phase::Preparing, b"Preparing a host"),
+    (Phase::Claimed, b"Claimed by a host"),
+    (Phase::Running, b"Running"),
+    (Phase::BackingOff, b"Retrying"),
+    (Phase::Active, b"Executor active"),
+    (Phase::Closing, b"Closing"),
+    (Phase::Held, b"Held"),
+    (Phase::Ended, b"Ended"),
+    (Phase::Done, b"Completed"),
+    (Phase::Failed, b"Failed"),
+    (Phase::Cancelled, b"Cancelled"),
+];
+#[test]
+fn each_phase_says_its_existing_english() {
+    let book = book(Box::new([words::english()]));
+    for (phase, expected) in PHASES {
+        assert_eq!(book.say(0, Word::Phase(*phase).id(), &[]).unwrap().text.as_ref(), *expected, "{phase:?}");
+    }
+}

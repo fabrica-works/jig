@@ -1,6 +1,7 @@
 //! The conversation header says the public helper's facts with existing phrases.
 use super::{Words, name};
 use crate::phrases::jig::JigPhrase as P;
+use jig_client::words::{StatusWord, Word};
 use jig_client::{
     contract::{RetryNotice, WaitedFor, Whom},
     facts::ChatStatus,
@@ -10,18 +11,18 @@ use skein_ui::{Builder, phrases::Hole};
 impl Words {
     pub(crate) fn chat_status(&self, b: &mut Builder, status: &ChatStatus, wall: Wall) {
         match status {
-            ChatStatus::Starting => self.text(b, P::TaskStarting, &[]),
-            ChatStatus::Writing => self.text(b, P::Writing, &[]),
+            ChatStatus::Starting => self.text(b, P::Word(Word::Status(StatusWord::Starting)), &[]),
+            ChatStatus::Writing => self.text(b, P::Word(Word::Status(StatusWord::Writing)), &[]),
             ChatStatus::Tool { tool, since } => {
-                self.text(b, P::Tool, &[name(tool)]);
+                self.text(b, P::Word(Word::Status(StatusWord::Tool)), &[name(tool)]);
                 self.status_span(b, *since, wall);
             }
             ChatStatus::Working { since } => {
-                self.text(b, P::WorkActive, &[]);
+                self.text(b, P::Word(Word::status(status)), &[]);
                 self.status_span(b, *since, wall);
             }
             ChatStatus::WaitingForYou { kind, entries } => {
-                self.text(b, P::WaitingWords, &[]);
+                self.text(b, P::Word(Word::Status(StatusWord::WaitingForYou)), &[]);
                 let phrase = match kind {
                     WaitedFor::Question => P::Question,
                     WaitedFor::Proposal => P::Proposal,
@@ -37,7 +38,7 @@ impl Words {
                     self.text(b, P::WaitingRole, &[Hole::Number(u64::from(*project)), Hole::Number(u64::from(*role))]);
                 }
             },
-            ChatStatus::Parked => self.text(b, P::ParkedResume, &[]),
+            ChatStatus::Parked => self.text(b, P::Word(Word::Status(StatusWord::Parked)), &[]),
             ChatStatus::Retrying { until, notice } => {
                 self.text(b, P::RunBackingOff, &[Hole::Wall(self.adjusted_wall(*until))]);
                 match notice {
@@ -63,9 +64,9 @@ impl Words {
                 }
             }
             ChatStatus::Held(reason) => self.hold_category(b, *reason),
-            ChatStatus::Closing => self.text(b, P::Closing, &[]),
+            ChatStatus::Closing => self.text(b, P::Word(Word::status(status)), &[]),
             ChatStatus::Ended { at } => {
-                self.text(b, P::Ended, &[]);
+                self.text(b, P::Word(Word::status(status)), &[]);
                 self.wall(b, *at);
             }
         }

@@ -2,6 +2,7 @@
 use crate::JigBindings;
 use crate::phrases::jig::JigPhrase;
 use crate::words::Words;
+use jig_client::words::Word;
 use skein_ui::Builder;
 use skein_ui::phrases::Hole;
 
@@ -69,23 +70,7 @@ pub fn held(b: &mut Builder, client: &Borrowed<'_>, hold: &Hold, words: &Words, 
 }
 /// Compact prior phase is a fact, distinct from the live chip's detailed phase.
 pub fn phase(b: &mut Builder, phase: Phase, words: &Words) {
-    let label = match phase {
-        Phase::Waiting => JigPhrase::Waiting,
-        Phase::Idle => JigPhrase::Idle,
-        Phase::Due => JigPhrase::DuePhase,
-        Phase::Preparing => JigPhrase::PreparingPhase,
-        Phase::Claimed => JigPhrase::ClaimedPhase,
-        Phase::Running => JigPhrase::Running,
-        Phase::Active => JigPhrase::ActivePhase,
-        Phase::BackingOff => JigPhrase::Retrying,
-        Phase::Closing => JigPhrase::ClosingPhase,
-        Phase::Held => JigPhrase::Held,
-        Phase::Ended => JigPhrase::Ended,
-        Phase::Done => JigPhrase::Done,
-        Phase::Failed => JigPhrase::FailedPhase,
-        Phase::Cancelled => JigPhrase::CancelledPhase,
-    };
-    words.text(b, label, &[]);
+    words.text(b, JigPhrase::Word(Word::Phase(phase)), &[]);
 }
 /// Run and delegate attribution remains exactly the committed snapshot.
 pub fn spend(b: &mut Builder, rows: &List<SpendLine>, words: &Words) {

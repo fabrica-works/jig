@@ -9,6 +9,7 @@ publish.workspace = true
 jig-client-domain.workspace = true
 jig-client-protocol-link.workspace = true
 skein-lib.workspace = true
+skein-ui.workspace = true
 [lints]
 workspace = true
 [dev-dependencies]

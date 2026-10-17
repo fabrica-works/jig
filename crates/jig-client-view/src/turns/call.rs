@@ -2,6 +2,7 @@
 use crate::phrases::jig::JigPhrase;
 use crate::words::Words;
 use crate::{JigBindings, cards};
+use jig_client::words::{StatusWord, Word};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run, State};
 
@@ -21,7 +22,7 @@ pub(super) fn call(
     b.open(Role::Region);
     b.name(call.tool.bytes());
     words.text(b, JigPhrase::CallNumber, &[Hole::Number(call.number)]);
-    words.text(b, JigPhrase::Tool, &[crate::words::name(call.tool.bytes())]);
+    words.text(b, JigPhrase::Word(Word::Status(StatusWord::Tool)), &[crate::words::name(call.tool.bytes())]);
     words.text(
         b,
         if call.failed {

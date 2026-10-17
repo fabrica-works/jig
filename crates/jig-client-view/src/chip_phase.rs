@@ -2,6 +2,8 @@
 //! See client/domain/objects.md, 3, and domain/tasks.md, 5.
 use crate::phrases::jig::JigPhrase;
 use crate::words::Words;
+use jig_client::contract::Phase;
+use jig_client::words::Word;
 use skein_ui::Builder;
 use skein_ui::phrases::Hole;
 
@@ -10,7 +12,7 @@ use jig_client::contract::{ClosingStage, OwnerChipPhase, RunStage};
 pub(crate) fn brief(b: &mut Builder, phase: &OwnerChipPhase, words: &Words) {
     match phase {
         OwnerChipPhase::Waiting { more, holds, .. } => {
-            words.text(b, JigPhrase::Waiting, &[]);
+            words.text(b, JigPhrase::Word(Word::Phase(Phase::Waiting)), &[]);
             if *more {
                 words.text(b, JigPhrase::ChipDependenciesCut, &[]);
             }
@@ -38,7 +40,7 @@ pub(crate) fn brief(b: &mut Builder, phase: &OwnerChipPhase, words: &Words) {
             }
         }
         OwnerChipPhase::Closing(stage) => {
-            words.text(b, JigPhrase::ClosingPhase, &[]);
+            words.text(b, JigPhrase::Word(Word::Phase(Phase::Closing)), &[]);
             match stage {
                 ClosingStage::Run { attempt } => words.text(b, JigPhrase::ClosingRun, &[Hole::Number(*attempt)]),
                 ClosingStage::Delegates => words.text(b, JigPhrase::ClosingDelegates, &[]),
@@ -48,10 +50,10 @@ pub(crate) fn brief(b: &mut Builder, phase: &OwnerChipPhase, words: &Words) {
             }
         }
         OwnerChipPhase::Held { reason, revision } => {
-            words.text(b, JigPhrase::Held, &[]);
+            words.text(b, JigPhrase::Word(Word::Phase(Phase::Held)), &[]);
             crate::owner_chip::reason(b, *reason, words);
             words.text(b, JigPhrase::Revision, &[Hole::Number(*revision)]);
         }
-        OwnerChipPhase::Ended => words.text(b, JigPhrase::Ended, &[]),
+        OwnerChipPhase::Ended => words.text(b, JigPhrase::Word(Word::Phase(Phase::Ended)), &[]),
     }
 }

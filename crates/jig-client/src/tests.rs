@@ -6,6 +6,7 @@ mod store;
 mod thread;
 mod unlinked;
 mod versions;
+mod words;
 use crate::*;
 use fixtures::{Client, ME, PARTY, PROJECT, STOP, TASK, task};
 #[test]

@@ -2,6 +2,7 @@
 use crate::JigBindings;
 use crate::phrases::jig::JigPhrase;
 use crate::words::{Words, name};
+use jig_client::words::{HoldWord, Word};
 use skein_ui::Builder;
 use skein_ui::phrases::Hole;
 
@@ -11,7 +12,7 @@ use jig_client::contract::HoldReason;
 pub fn reason(b: &mut Builder, reason: &HoldReason, words: &Words, bindings: &mut JigBindings) {
     match reason {
         HoldReason::Tries { failures } => {
-            words.text(b, JigPhrase::TriesExhausted, &[]);
+            words.text(b, JigPhrase::Word(Word::Hold(HoldWord::Failures)), &[]);
             for failure in failures {
                 words.text(b, JigPhrase::Attempt, &[Hole::Number(failure.attempt)]);
                 super::chip::failure(b, failure.class, words);
