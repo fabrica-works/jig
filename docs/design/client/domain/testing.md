@@ -1,6 +1,6 @@
 # Testing the client
 
-Provisional, 2026-10-09, revised 2026-10-15. How jig's client is tested
+Provisional, 2026-10-09, revised 2026-10-17. How jig's client is tested
 through its surface, and how a presentation on it is tested: the
 client's world with a scripted engine, the joint world with the engine's
 domain, their referee and their faults; jig's check, which an
@@ -297,7 +297,14 @@ application's on skein's UI kit:
   application that shows neither is not held to it, and the person is
   not told (pages.md, section 2).
 - **A sign-out told:** a sign-out the engine did not receive is never
-  shown done (view.md, 18.6).
+  shown done (view.md, 18.6). After a person asks to sign out, the
+  sign-in page is a fault while the engine still holds the sign-in they
+  asked to end. Once the engine has ended it, by that sign-out or by an
+  end of its own (an expiry, a revocation, another client's sign-out of
+  it), before the ask or after it, the page shows that end, whatever
+  became of the ask. The world observes each end of a sign-in where the
+  engine makes it, as it observes its commits, never from a client's
+  link.
 - **The page's outline:** every tree a person saw keeps skein-ui's
   outline (view.md, 3.1; skein's `ui.md`, section 14): the page node the
   root, its children landmarks or dialogs, one main, at most one banner

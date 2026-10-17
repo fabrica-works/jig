@@ -1,6 +1,6 @@
 # The view
 
-Provisional, 2026-10-09, revised 2026-10-16. `jig-client-view`: the
+Provisional, 2026-10-09, revised 2026-10-17. `jig-client-view`: the
 reference UI, jig's optional presentation, for `ops` and jig's test
 application. It is built on the public client alone, `jig-client` and
 its helpers (client.md, sections 4 and 19), and on skein's UI kit,
@@ -1102,7 +1102,10 @@ read by the application: ui.sections(), ui.shown()
 - **A sign-out that does not reach the engine** leaves the person signed
   in, as the link says (client.md, 8.2 and section 12): the frame says the
   sign-out did not reach the engine and offers it again; nothing is
-  shown done before it is (testing.md, 6.3).
+  shown done before it is (testing.md, 6.3). A sign-in the engine ends
+  itself, before the sign-out or after it, ends what was asked: the link
+  says signed out, and the reference UI shows the sign-in page, as
+  above; it never keeps the work page once the link says signed out.
 - **A service** has no reference UI, and never sees a sign-in page.
 
 ### 18.7 Time and notices

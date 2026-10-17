@@ -1,6 +1,6 @@
 # The client
 
-Provisional, 2026-10-09, revised 2026-10-16. `jig-client`: the client an
+Provisional, 2026-10-09, revised 2026-10-17. `jig-client`: the client an
 application holds, as a component, to reach jig's engine. It holds the
 link, the watches the application names by handle and the latest
 document of each, the application's keyed requests in skein-lib's
@@ -692,6 +692,8 @@ for any presentation of a chat or of any agent task's activity.
   handles, and the link says the sign-out did not reach the engine.
   `SignOut` again sends it again, which is safe: a sign-out whose
   sign-in has already ended is answered signed out, the end asked for.
+  Signed out meanwhile, whatever ended the sign-in, the client is signed
+  out, as above, and the link no longer names the sign-out.
 - **A sign-out's answer is its sign-in's.** The client knows which of
   its sign-ins each exchange belongs to. Once a newer sign-in is
   live, an earlier one's sign-out answer is dropped, and the newer
